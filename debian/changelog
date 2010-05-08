@@ -1,3 +1,15 @@
+webkit (1.2.0-2) UNRELEASED; urgency=low
+
+  [Michael Gilbert]
+  * Convert to source format version 3.0 (quilt) to make it easier to support
+    security backports in the future.
+    - Create patches for existing debian modifications (sparc-support.patch
+      and pool-fixup.patch)
+  * Use ${misc:Depends}.
+  * Bump standards to 3.8.4 (no changes required).
+
+ -- Michael Gilbert <michael.s.gilbert@gmail.com>  Fri, 07 May 2010 22:59:10 -0400
+
 webkit (1.2.0-1) unstable; urgency=low
 
   * New upstream release - this is the first release in the 1.2 stable
