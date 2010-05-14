@@ -1,4 +1,4 @@
-webkit (1.2.1-1) UNRELEASED; urgency=low
+webkit (1.2.1-1) unstable; urgency=low
 
   [Michael Gilbert]
   * Convert to source format version 3.0 (quilt) to make it easier to support
