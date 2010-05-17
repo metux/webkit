@@ -1,8 +1,11 @@
-webkit (1.2.1-2) unstable; urgency=low
+webkit (1.2.1-2) unstable; urgency=high
 
   * debian/patches/01-fix-bashism-in-build.diff:
   - remove bashism from the code that handles Web Inspector files,
     that end up not being installed. (Closes: #581893)
+  * Marking this release as urgency=high, given the 1.2.0 series was
+    already well tested, and testing has a quite buggy version for some
+    time now.
 
  -- Gustavo Noronha Silva <kov@debian.org>  Mon, 17 May 2010 11:33:48 -0300
 
