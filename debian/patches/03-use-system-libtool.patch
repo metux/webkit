@@ -1,29 +1,5 @@
-Description: Upstream changes introduced in version 1.2.1-3
- This patch has been created by dpkg-source during the package build.
- Here's the last changelog entry, hopefully it gives details on why
- those changes were made:
- .
- webkit (1.2.1-3) UNRELEASED; urgency=high
- .
-   * Use system libtool.
-   * Turn direct source changes into a patch.
- .
- The person named in the Author field signed this changelog entry.
-Author: Michael Gilbert <michael.s.gilbert@gmail.com>
-
----
-The information above should follow the Patch Tagging Guidelines, please
-checkout http://dep.debian.net/deps/dep3/ to learn about the format. Here
-are templates for supplementary fields that you might want to add:
-
-Origin: <vendor|upstream|other>, <url of original patch>
-Bug: <url in upstream bugtracker>
-Bug-Debian: http://bugs.debian.org/<bugnumber>
-Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
-Forwarded: <no|not-needed|url proving that it has been forwarded>
-Reviewed-By: <name and email of someone who approved the patch>
-Last-Update: <YYYY-MM-DD>
-
+description: use system libtool 
+author: Michael Gilbert <michael.s.gilbert@gmail.com>
 --- webkit-1.2.1.orig/GNUmakefile.in
 +++ webkit-1.2.1/GNUmakefile.in
 @@ -132,9 +132,14 @@ DIST_COMMON = README $(am__configure_dep
