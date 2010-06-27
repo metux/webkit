@@ -53,17 +53,6 @@ author: Michael Gilbert <michael.s.gilbert@gmail.com>
  am__depfiles_maybe = depfiles
  am__mv = mv -f
  COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-@@ -9214,9 +9218,7 @@ libWebCoreJS_depfiles := $(patsubst \
- webinspectordir = ${datadir}/webkit-1.0/webinspector
- dist_webinspector_DATA = \
- 	$(WebCore)/English.lproj/localizedStrings.js \
--	$(shell ls $(WebCore)/inspector/front-end/*.js) \
--	$(shell ls $(WebCore)/inspector/front-end/*.html) \
--	$(shell ls $(WebCore)/inspector/front-end/*.css)
-+	$(shell ls $(WebCore)/inspector/front-end/*.{js,html,css})
- 
- webinspectorimagesdir = ${datadir}/webkit-1.0/webinspector/Images
- dist_webinspectorimages_DATA = \
 --- webkit-1.2.1.orig/configure.ac
 +++ webkit-1.2.1/configure.ac
 @@ -13,9 +13,9 @@ m4_define([webkit_user_agent_minor_versi
@@ -79,20 +68,6 @@ author: Michael Gilbert <michael.s.gilbert@gmail.com>
  
  AC_CONFIG_HEADERS([autotoolsconfig.h])
  AC_CANONICAL_HOST
---- /dev/null
-+++ webkit-1.2.1/WebKit/gtk/webkit-1.0.pc
-@@ -0,0 +1,11 @@
-+prefix=/usr
-+exec_prefix=${prefix}
-+libdir=${exec_prefix}/lib
-+includedir=${prefix}/include
-+
-+Name: WebKit
-+Description: Web content engine for GTK+
-+Version: 1.2.1
-+Requires: glib-2.0 gtk+-2.0 libsoup-2.4
-+Libs: -L${libdir} -lwebkit-1.0
-+Cflags: -I${includedir}/webkit-1.0
 --- webkit-1.2.1.orig/WebKit/gtk/docs/GNUmakefile.in
 +++ webkit-1.2.1/WebKit/gtk/docs/GNUmakefile.in
 @@ -42,15 +42,14 @@ host_triplet = @host@
