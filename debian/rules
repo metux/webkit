@@ -27,11 +27,7 @@ clean:
 	dh_testroot
 
 	rm -f build-stamp install-stamp
-	-test -d build/WebKit/gtk/docs && \
-		cd build/WebKit/gtk/docs && \
-		make maintainer-clean
 	rm -rf build
-	rm -f WebKit/gtk/docs/version.xml
 
 	dh_clean
 
@@ -63,8 +59,6 @@ build-stamp:
 	# Awesome hack to get the docs built! For some reason, the
 	# first call to make docs fails mid-work, but the second
 	# succeeds.
-	ln -fs ../../../build/WebKit/gtk/docs/version.xml \
-		WebKit/gtk/docs/
 	cd build/WebKit/gtk/docs && make docs
 
 	touch $@
