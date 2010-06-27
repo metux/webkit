@@ -33,10 +33,6 @@ clean:
 	rm -rf build
 	rm -f WebKit/gtk/docs/version.xml
 
-	for file in config.guess config.sub; do \
-		sed -i '2!b;/^exec "/ d' autotools/$$file ; \
-	done
-
 	dh_clean
 
 build: build-stamp
@@ -44,17 +40,19 @@ build: build-stamp
 build-stamp:
 	dh_testdir
 
-	for file in config.guess config.sub; do \
-		sed -i '2!b;/^#/ i\exec "/usr/share/misc/'$$file'" "$$@"' autotools/$$file ; \
+	[ ! -d build ] && mkdir build || true
+	for file in * ; do \
+		[ "$$file" != "build" ] && [ "$$file" != "debian" ] \
+		&& cp -r $$file build || true ; \
 	done
 
-	[ ! -d build ] && mkdir build || true
+	cd build && autoconf
 	cd build && \
 	CFLAGS="$(CFLAGS)" \
 	CXXFLAGS="$(CFLAGS)" \
 	CC="gcc -Wl,--as-needed" \
 	CXX="g++ -Wl,--as-needed" \
-	../configure --prefix=/usr \
+	./configure --prefix=/usr \
 		--host=$(DEB_HOST_GNU_TYPE) \
 		--build=$(DEB_BUILD_GNU_TYPE) \
 		--enable-gtk-doc \
@@ -67,8 +65,7 @@ build-stamp:
 	# succeeds.
 	ln -fs ../../../build/WebKit/gtk/docs/version.xml \
 		WebKit/gtk/docs/
-	cd build/WebKit/gtk/docs && \
-		make docs || make docs
+	cd build/WebKit/gtk/docs && make docs
 
 	touch $@
 
@@ -88,7 +85,7 @@ install-stamp: build-stamp
 	chrpath -d "$(CURDIR)"/debian/tmp/usr/lib/webkit-1.0-2/libexec/GtkLauncher
 
 	install -d -m 755 debian/tmp/usr/share/doc/libwebkit-dev/html
-	install -m 644 WebKit/gtk/docs/html/* \
+	install -m 644 build/WebKit/gtk/docs/html/* \
 		debian/tmp/usr/share/doc/libwebkit-dev/html/
 
 	touch $@

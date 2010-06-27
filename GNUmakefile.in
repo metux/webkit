@@ -132,9 +132,14 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 	$(srcdir)/autotoolsconfig.h.in \
 	$(top_srcdir)/WebKit/gtk/webkit.pc.in \
 	$(top_srcdir)/WebKit/gtk/webkit/webkitversion.h.in \
-	$(top_srcdir)/configure ChangeLog INSTALL autotools/compile \
-	autotools/config.guess autotools/config.sub autotools/depcomp \
-	autotools/install-sh autotools/ltmain.sh autotools/missing
+	$(top_srcdir)/configure ChangeLog INSTALL \
+	/usr/share/libtool/config/compile \
+	/usr/share/libtool/config/config.guess \
+	/usr/share/libtool/config/config.sub \
+	/usr/share/libtool/config/depcomp \
+	/usr/share/libtool/config/install-sh \
+	/usr/share/libtool/config/ltmain.sh \
+	/usr/share/libtool/config/missing
 @TARGET_WIN32_TRUE@am__append_14 = \
 @TARGET_WIN32_TRUE@	JavaScriptCore/wtf/ThreadSpecificWin.cpp \
 @TARGET_WIN32_TRUE@	JavaScriptCore/jit/ExecutableAllocatorWin.cpp \
@@ -1440,15 +1445,14 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 
 @TARGET_X11_TRUE@am__append_138 = TestNetscapePlugin/libtestnetscapeplugin.la
 subdir = .
-ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/autotools/acinclude.m4 \
-	$(top_srcdir)/autotools/dolt.m4 \
-	$(top_srcdir)/autotools/gtk-doc.m4 \
-	$(top_srcdir)/autotools/libtool.m4 \
-	$(top_srcdir)/autotools/ltoptions.m4 \
-	$(top_srcdir)/autotools/ltsugar.m4 \
-	$(top_srcdir)/autotools/ltversion.m4 \
-	$(top_srcdir)/autotools/lt~obsolete.m4 \
+ACLOCAL_M4 = /usr/share/libtool/libltdl/aclocal.m4 
+am__aclocal_m4_deps = $(top_srcdir)/autotools/dolt.m4 \
+	/usr/share/aclocal/gtk-doc.m4 \
+	/usr/share/aclocal/libtool.m4 \
+	/usr/share/aclocal/ltoptions.m4 \
+	/usr/share/aclocal/ltsugar.m4 \
+	/usr/share/aclocal/ltversion.m4 \
+	/usr/share/aclocal/lt~obsolete.m4 \
 	$(top_srcdir)/autotools/webkit.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -5888,7 +5892,7 @@ Programs_unittests_testwindow_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(Programs_unittests_testwindow_CFLAGS) $(CFLAGS) \
 	$(Programs_unittests_testwindow_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@
-depcomp = $(SHELL) $(top_srcdir)/autotools/depcomp
+depcomp = $(SHELL) /usr/share/libtool/config/depcomp 
 am__depfiles_maybe = depfiles
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \

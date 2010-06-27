@@ -1,2 +1,3 @@
 01-fix-bashism-in-build.diff
 02-pool-fixup-and-sparc-support.patch
+03-use-system-libtool.patch
