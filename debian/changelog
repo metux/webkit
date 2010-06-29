@@ -16,6 +16,7 @@ webkit (1.2.1-3) UNRELEASED; urgency=low
     may be duplicated as cve-2010-1767 in mitre's cve database).
   * Fix cve-2010-1664: possible code execution due to improper html5 media
     handling.
+  * Fix cve-2010-1758: possible code execution in xml dom processor.
 
  -- Michael Gilbert <michael.s.gilbert@gmail.com>  Thu, 27 May 2010 20:36:41 -0400
 
