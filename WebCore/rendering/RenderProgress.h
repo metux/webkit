@@ -50,6 +50,8 @@ inline RenderProgress* toRenderProgress(RenderObject* object)
 // This will catch anyone doing an unnecessary cast.
 void toRenderProgress(const RenderProgress*);
 
+    virtual bool requiresForcedStyleRecalcPropagation() const { return true; }
+
 } // namespace WebCore
 
 #endif
