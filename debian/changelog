@@ -20,6 +20,7 @@ webkit (1.2.1-3) UNRELEASED; urgency=low
   * Fix cve-2010-1759: another possible code execution issue in the xml dom
     processor.
   * Fix cve-2010-1760: user credential information disclosure.
+  * Fix cve-2010-1761: possible code execution in frameview logic.
 
  -- Michael Gilbert <michael.s.gilbert@gmail.com>  Thu, 27 May 2010 20:36:41 -0400
 
