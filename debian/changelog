@@ -8,10 +8,12 @@ webkit (1.2.1-3) UNRELEASED; urgency=low
   * Fix cve-2010-1407: iframe information disclosure.
   * Fix cve-2010-1416: svg cross-site information disclosure.
   * Fix cve-2010-1417: possible code execution in the css implementation (this
-    currently duplicated as cve-2010-1665 in the cve tracker).
+    is currently duplicated as cve-2010-1665 in mitre's cve database).
   * Fix cve-2010-1418: remote web script and/or html injection.
   * Fix cve-2010-1421: remote modification of clipboard contents.
   * Fix cve-2010-1422: keyboard focus hijack.
+  * Fix cve-2010-1501: add check to prevent cross-site request forgery (this
+    may be duplicated as cve-2010-1767 in mitre's cve database).
 
  -- Michael Gilbert <michael.s.gilbert@gmail.com>  Thu, 27 May 2010 20:36:41 -0400
 
