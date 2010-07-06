@@ -24,10 +24,7 @@ Build-Depends: debhelper (>= 5.0),
                libgail-dev,
                libgirepository1.0-dev (>= 0.6.2),
                gir-repository-dev (>= 0.6.2),
-               gobject-introspection (>= 0.6.2),
-               gtk-doc-tools,
-               libltdl-dev,
-               autoconf
+               gobject-introspection (>= 0.6.2)
 Standards-Version: 3.8.4
 Homepage: http://webkit.org/
 Vcs-Browser: http://git.debian.org/?p=pkg-webkit/webkit.git

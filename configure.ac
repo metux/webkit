@@ -13,9 +13,9 @@ m4_define([webkit_user_agent_minor_version], [2])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
-AC_CONFIG_MACRO_DIR([/usr/share/libtool/config])
-AC_CONFIG_AUX_DIR([/usr/share/libtool/config])
-AC_SUBST(ACLOCAL_AMFLAGS, "-I /usr/share/libtool/config")
+AC_CONFIG_MACRO_DIR([autotools])
+AC_CONFIG_AUX_DIR([autotools])
+AC_SUBST(ACLOCAL_AMFLAGS, "-I autotools")
 
 AC_CONFIG_HEADERS([autotoolsconfig.h])
 AC_CANONICAL_HOST

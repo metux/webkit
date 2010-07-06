@@ -42,14 +42,15 @@ host_triplet = @host@
 DIST_COMMON = $(srcdir)/GNUmakefile.am $(srcdir)/GNUmakefile.in \
 	$(srcdir)/version.xml.in $(top_srcdir)/gtk-doc.make
 subdir = WebKit/gtk/docs
-ACLOCAL_M4 = /usr/share/libtool/libltdl/aclocal.m4 
-am__aclocal_m4_deps = $(top_srcdir)/autotools/dolt.m4 \
-	/usr/share/aclocal/gtk-doc.m4 \
-	/usr/share/aclocal/libtool.m4 \
-	/usr/share/aclocal/ltoptions.m4 \
-	/usr/share/aclocal/ltsugar.m4 \
-	/usr/share/aclocal/ltversion.m4 \
-	/usr/share/aclocal/lt~obsolete.m4 \
+ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+am__aclocal_m4_deps = $(top_srcdir)/autotools/acinclude.m4 \
+	$(top_srcdir)/autotools/dolt.m4 \
+	$(top_srcdir)/autotools/gtk-doc.m4 \
+	$(top_srcdir)/autotools/libtool.m4 \
+	$(top_srcdir)/autotools/ltoptions.m4 \
+	$(top_srcdir)/autotools/ltsugar.m4 \
+	$(top_srcdir)/autotools/ltversion.m4 \
+	$(top_srcdir)/autotools/lt~obsolete.m4 \
 	$(top_srcdir)/autotools/webkit.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)

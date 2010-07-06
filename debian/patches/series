@@ -1,5 +1,5 @@
+01-fix-bashism-in-build.patch
 02-pool-fixup-and-sparc-support.patch
-03-use-system-libtool.patch
 
 # security patches
 cve-2010-1386.patch
