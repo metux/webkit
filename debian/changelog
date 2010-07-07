@@ -10,24 +10,30 @@ webkit (1.2.1-3) UNRELEASED; urgency=low
     is currently duplicated as cve-2010-1665 in mitre's cve database).
   * Fix cve-2010-1418: remote web script and/or html injection.
   * Fix cve-2010-1421: remote modification of clipboard contents.
-  * Fix cve-2010-1422: keyboard focus hijack.
+  * Fix cve-2010-1422: keyboard focus hijack (this is duplicated as
+    cve-2010-2295 in mitre's cve database).
   * Fix cve-2010-1501: add check to prevent cross-site request forgery (this
     may be duplicated as cve-2010-1767 in mitre's cve database).
   * Fix cve-2010-1664: possible code execution due to improper html5 media
     handling.
   * Fix cve-2010-1758: possible code execution in xml dom processor.
   * Fix cve-2010-1759: another possible code execution issue in the xml dom
-    processor.
+    processor (this is duplicated as cve-2010-2300 in mitre's database).
   * Fix cve-2010-1760: user credential information disclosure.
   * Fix cve-2010-1761: possible code execution in frameview logic.
   * Fix cve-2010-1762: webscript and/or html injection using the textarea
-    element.
+    element (this is duplicated as cve-2010-2301 in mitre's database).
   * Fix cve-2010-1770: possible code execution due to improper handling of the
     ibm1147 character set.
-  * Fix cve-2010-1771: possible code execution due to improper font handling.
-  * Fix cve-2010-1772: geolocation disconnectframe timer issue.
-  * Fix cve-2010-1773: integer overflow in alphabet conversion.
-  * Fix cve-2010-1774: integer overflow in table layout handling.
+  * Fix cve-2010-1771: possible code execution due to improper font handling
+    (this is duplicated as cve-2010-2302 in mitre's database).
+  * Fix cve-2010-1772: geolocation disconnectframe timer issue (this is
+    duplicated as cve-2010-2303 in mitre's database).
+  * Fix cve-2010-1773: integer overflow in alphabet conversion (this is
+    duplicated as cve-2010-2304 and cve-2010-2441 in mitre's database)
+    closes: #586547.
+  * Fix cve-2010-1774: integer overflow in table layout handling (this is
+    duplicated as cve-2010-2297 in mitre's database).
 
  -- Michael Gilbert <michael.s.gilbert@gmail.com>  Thu, 27 May 2010 20:36:41 -0400
 
