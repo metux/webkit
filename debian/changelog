@@ -1,5 +1,6 @@
-webkit (1.2.1-3) UNRELEASED; urgency=low
+webkit (1.2.2-1) UNRELEASED; urgency=low
 
+  [ Michael Gilbert ]
   * Turn direct source changes into a patch.
   * Fix cve-2010-1386: geolocation information disclosure.
   * Fix cve-2010-1392: possible code execution in html button logic.
@@ -35,7 +36,11 @@ webkit (1.2.1-3) UNRELEASED; urgency=low
   * Fix cve-2010-1774: integer overflow in table layout handling (this is
     duplicated as cve-2010-2297 in mitre's database).
 
- -- Michael Gilbert <michael.s.gilbert@gmail.com>  Thu, 27 May 2010 20:36:41 -0400
+  [ Gustavo Noronha Silva ]
+  * New upstream release
+  - adds a new symbol, fixed symbols file to include it
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 12 Jul 2010 15:23:17 -0300
 
 webkit (1.2.1-2) unstable; urgency=high
 
