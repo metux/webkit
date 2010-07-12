@@ -39,6 +39,8 @@ webkit (1.2.2-1) UNRELEASED; urgency=low
   [ Gustavo Noronha Silva ]
   * New upstream release
   - adds a new symbol, fixed symbols file to include it
+  * debian/patches/01-fix-bashism-in-build.patch:
+  - removed, no longer needed
 
  -- Gustavo Noronha Silva <kov@debian.org>  Mon, 12 Jul 2010 15:23:17 -0300
 
