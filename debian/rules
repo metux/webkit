@@ -22,6 +22,11 @@ ifeq ($(DEB_BUILD_ARCH),s390)
         CFLAGS += -gstabs
 endif
 
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	MAKEARGUMENTS += -j$(NUMJOBS)
+endif
+
 clean:
 	dh_testdir
 	dh_testroot
@@ -51,7 +56,7 @@ build-stamp:
 		--enable-gtk-doc \
 		--enable-introspection
 
-	$(MAKE) -C build
+	$(MAKE) $(MAKEARGUMENTS) -C build
 
 	# Awesome hack to get the docs built! For some reason, the
 	# first call to make docs fails mid-work, but the second
