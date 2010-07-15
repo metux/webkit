@@ -1,3 +1,11 @@
+webkit (1.2.3-1) unstable; urgency=low
+
+  * New upstream stable release
+  - fixes building with ICU 4.4.1 (Closes: #589046)
+  - all CVE patches included, so drop them
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 15 Jul 2010 18:33:04 -0300
+
 webkit (1.2.2-1) unstable; urgency=low
 
   [ Michael Gilbert ]
