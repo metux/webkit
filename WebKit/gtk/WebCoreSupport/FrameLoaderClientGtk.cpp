@@ -47,6 +47,7 @@
 #include "MIMETypeRegistry.h"
 #include "MouseEvent.h"
 #include "NotImplemented.h"
+#include "Page.h"
 #include "PlatformString.h"
 #include "PluginDatabase.h"
 #include "RenderPart.h"
@@ -91,9 +92,133 @@ FrameLoaderClient::~FrameLoaderClient()
         g_object_unref(m_policyDecision);
 }
 
-String FrameLoaderClient::userAgent(const KURL&)
+typedef HashSet<String> GoogleDomainsSet;
+
+static void initializeDomainsList(GoogleDomainsSet& googleDomains)
+{
+    // Google search domains, plus *.google.com.
+    googleDomains.add("google.biz");
+    googleDomains.add("google.com");
+    googleDomains.add("google.net");
+    googleDomains.add("google.org");
+    googleDomains.add("google.ae");
+    googleDomains.add("google.ag");
+    googleDomains.add("google.am");
+    googleDomains.add("google.at");
+    googleDomains.add("google.az");
+    googleDomains.add("google.be");
+    googleDomains.add("google.bi");
+    googleDomains.add("google.ca");
+    googleDomains.add("google.cc");
+    googleDomains.add("google.cd");
+    googleDomains.add("google.cg");
+    googleDomains.add("google.ch");
+    googleDomains.add("google.cl");
+    googleDomains.add("google.com.br");
+    googleDomains.add("google.co.uk");
+    googleDomains.add("google.co.jp");
+    googleDomains.add("google.de");
+    googleDomains.add("google.dj");
+    googleDomains.add("google.dk");
+    googleDomains.add("google.es");
+    googleDomains.add("google.fi");
+    googleDomains.add("google.fm");
+    googleDomains.add("google.fr");
+    googleDomains.add("google.gg");
+    googleDomains.add("google.gl");
+    googleDomains.add("google.gm");
+    googleDomains.add("google.gs");
+    googleDomains.add("google.hn");
+    googleDomains.add("google.hu");
+    googleDomains.add("google.ie");
+    googleDomains.add("google.it");
+    googleDomains.add("google.je");
+    googleDomains.add("google.kz");
+    googleDomains.add("google.li");
+    googleDomains.add("google.lt");
+    googleDomains.add("google.lu");
+    googleDomains.add("google.lv");
+    googleDomains.add("google.ma");
+    googleDomains.add("google.ms");
+    googleDomains.add("google.mu");
+    googleDomains.add("google.mw");
+    googleDomains.add("google.nl");
+    googleDomains.add("google.no");
+    googleDomains.add("google.nu");
+    googleDomains.add("google.pl");
+    googleDomains.add("google.pn");
+    googleDomains.add("google.pt");
+    googleDomains.add("google.ru");
+    googleDomains.add("google.rw");
+    googleDomains.add("google.sh");
+    googleDomains.add("google.sk");
+    googleDomains.add("google.sm");
+    googleDomains.add("google.st");
+    googleDomains.add("google.td");
+    googleDomains.add("google.tk");
+    googleDomains.add("google.tp");
+    googleDomains.add("google.tv");
+    googleDomains.add("google.us");
+    googleDomains.add("google.uz");
+    googleDomains.add("google.ws");
+
+    // Youtube-related domains.
+    googleDomains.add("youtube.com");
+    googleDomains.add("ytimg.com");
+
+    // GMail.
+    googleDomains.add("gmail.com");
+
+    // Google static files domain.
+    googleDomains.add("gstatic.com");
+}
+
+static bool isGoogleDomain(String host)
+{
+    DEFINE_STATIC_LOCAL(HashSet<String>, googleDomains, ());
+    DEFINE_STATIC_LOCAL(Vector<String>, googleNamespaces, ());
+
+    if (googleDomains.isEmpty()) {
+        googleNamespaces.append(".google.");
+        googleNamespaces.append(".gmail.");
+        googleNamespaces.append(".youtube.");
+        googleNamespaces.append(".gstatic.");
+        googleNamespaces.append(".ytimg.");
+
+        initializeDomainsList(googleDomains);
+    }
+
+    // First we try a full-match, for cases such as 'youtube.com' as opposed to
+    // 'www.youtube.com'.
+    if (googleDomains.contains(host))
+        return true;
+
+    // Then we check the possibility of the URL being a subdomain of well-known google domains.
+    for (unsigned int i = 0; i < googleNamespaces.size(); i++) {
+        int position = host.find(googleNamespaces.at(i));
+        if (position > 0) {
+            if (googleDomains.contains(host.substring(position + 1)))
+                return true;
+            return false;
+        }
+    }
+
+    return false;
+}
+
+String FrameLoaderClient::userAgent(const KURL& url)
 {
     WebKitWebSettings* settings = webkit_web_view_get_settings(getViewFromFrame(m_frame));
+
+    gboolean useQuirks;
+    g_object_get(settings, "enable-site-specific-quirks", &useQuirks, NULL);
+
+    g_message("useQuirks: %d / %d / %s", useQuirks, isGoogleDomain(url.host()), url.host().utf8().data());
+
+    // For Google domains, identify as Chrome, so they don't give us a broken experience.
+    if (useQuirks && isGoogleDomain(url.host()))
+        return chromeUserAgent();
+
     return String::fromUTF8(webkit_web_settings_get_user_agent(settings));
 }
 

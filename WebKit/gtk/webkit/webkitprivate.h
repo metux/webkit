@@ -54,10 +54,11 @@
 #include "Geolocation.h"
 #include "HistoryItem.h"
 #include "Settings.h"
-#include "Page.h"
 #include "Frame.h"
 #include "InspectorClientGtk.h"
 #include "FrameLoaderClient.h"
+#include "Page.h"
+#include "PlatformString.h"
 #include "ResourceHandle.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
@@ -180,6 +181,9 @@ extern "C" {
 
     PassRefPtr<WebCore::Frame>
     webkit_web_frame_init_with_web_view(WebKitWebView*, WebCore::HTMLFrameOwnerElement*);
+
+    WebCore::String
+    chromeUserAgent();
 
     void
     webkit_web_frame_core_frame_gone(WebKitWebFrame*);

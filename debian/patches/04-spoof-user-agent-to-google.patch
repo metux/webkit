@@ -1,0 +1,264 @@
+From bb336fd07a8bf11ee22ec7361d77c8a765033001 Mon Sep 17 00:00:00 2001
+From: Gustavo Noronha Silva <kov@debian.org>
+Date: Tue, 10 Aug 2010 19:59:21 -0300
+Subject: [PATCH] Spoof User-Agent when talking to Google sites
+
+Some Google sites do User-Agent sniffing and cripple the experience
+for browsers that are not in their white lists. This includes not
+delivering the nice fade-in effect for Google's main page, and HTML5
+videos on Youtube. This change makes WebKitGTK+ fake being Chrome
+through the User-Agent field whenever the "site specific quirks"
+setting is enabled.
+---
+ WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp |  127 +++++++++++++++++++-
+ WebKit/gtk/webkit/webkitprivate.h                  |    6 +-
+ WebKit/gtk/webkit/webkitwebsettings.cpp            |   35 +++++-
+ 3 files changed, 159 insertions(+), 9 deletions(-)
+
+diff --git a/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp b/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp
+index 7187244..4e58cd3 100644
+--- a/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp
++++ b/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp
+@@ -47,6 +47,7 @@
+ #include "MIMETypeRegistry.h"
+ #include "MouseEvent.h"
+ #include "NotImplemented.h"
++#include "Page.h"
+ #include "PlatformString.h"
+ #include "PluginDatabase.h"
+ #include "RenderPart.h"
+@@ -91,9 +92,133 @@ FrameLoaderClient::~FrameLoaderClient()
+         g_object_unref(m_policyDecision);
+ }
+ 
+-String FrameLoaderClient::userAgent(const KURL&)
++typedef HashSet<String> GoogleDomainsSet;
++
++static void initializeDomainsList(GoogleDomainsSet& googleDomains)
++{
++    // Google search domains, plus *.google.com.
++    googleDomains.add("google.biz");
++    googleDomains.add("google.com");
++    googleDomains.add("google.net");
++    googleDomains.add("google.org");
++    googleDomains.add("google.ae");
++    googleDomains.add("google.ag");
++    googleDomains.add("google.am");
++    googleDomains.add("google.at");
++    googleDomains.add("google.az");
++    googleDomains.add("google.be");
++    googleDomains.add("google.bi");
++    googleDomains.add("google.ca");
++    googleDomains.add("google.cc");
++    googleDomains.add("google.cd");
++    googleDomains.add("google.cg");
++    googleDomains.add("google.ch");
++    googleDomains.add("google.cl");
++    googleDomains.add("google.com.br");
++    googleDomains.add("google.co.uk");
++    googleDomains.add("google.co.jp");
++    googleDomains.add("google.de");
++    googleDomains.add("google.dj");
++    googleDomains.add("google.dk");
++    googleDomains.add("google.es");
++    googleDomains.add("google.fi");
++    googleDomains.add("google.fm");
++    googleDomains.add("google.fr");
++    googleDomains.add("google.gg");
++    googleDomains.add("google.gl");
++    googleDomains.add("google.gm");
++    googleDomains.add("google.gs");
++    googleDomains.add("google.hn");
++    googleDomains.add("google.hu");
++    googleDomains.add("google.ie");
++    googleDomains.add("google.it");
++    googleDomains.add("google.je");
++    googleDomains.add("google.kz");
++    googleDomains.add("google.li");
++    googleDomains.add("google.lt");
++    googleDomains.add("google.lu");
++    googleDomains.add("google.lv");
++    googleDomains.add("google.ma");
++    googleDomains.add("google.ms");
++    googleDomains.add("google.mu");
++    googleDomains.add("google.mw");
++    googleDomains.add("google.nl");
++    googleDomains.add("google.no");
++    googleDomains.add("google.nu");
++    googleDomains.add("google.pl");
++    googleDomains.add("google.pn");
++    googleDomains.add("google.pt");
++    googleDomains.add("google.ru");
++    googleDomains.add("google.rw");
++    googleDomains.add("google.sh");
++    googleDomains.add("google.sk");
++    googleDomains.add("google.sm");
++    googleDomains.add("google.st");
++    googleDomains.add("google.td");
++    googleDomains.add("google.tk");
++    googleDomains.add("google.tp");
++    googleDomains.add("google.tv");
++    googleDomains.add("google.us");
++    googleDomains.add("google.uz");
++    googleDomains.add("google.ws");
++
++    // Youtube-related domains.
++    googleDomains.add("youtube.com");
++    googleDomains.add("ytimg.com");
++
++    // GMail.
++    googleDomains.add("gmail.com");
++
++    // Google static files domain.
++    googleDomains.add("gstatic.com");
++}
++
++static bool isGoogleDomain(String host)
++{
++    DEFINE_STATIC_LOCAL(HashSet<String>, googleDomains, ());
++    DEFINE_STATIC_LOCAL(Vector<String>, googleNamespaces, ());
++
++    if (googleDomains.isEmpty()) {
++        googleNamespaces.append(".google.");
++        googleNamespaces.append(".gmail.");
++        googleNamespaces.append(".youtube.");
++        googleNamespaces.append(".gstatic.");
++        googleNamespaces.append(".ytimg.");
++
++        initializeDomainsList(googleDomains);
++    }
++
++    // First we try a full-match, for cases such as 'youtube.com' as opposed to
++    // 'www.youtube.com'.
++    if (googleDomains.contains(host))
++        return true;
++
++    // Then we check the possibility of the URL being a subdomain of well-known google domains.
++    for (unsigned int i = 0; i < googleNamespaces.size(); i++) {
++        int position = host.find(googleNamespaces.at(i));
++        if (position > 0) {
++            if (googleDomains.contains(host.substring(position + 1)))
++                return true;
++            return false;
++        }
++    }
++
++    return false;
++}
++
++String FrameLoaderClient::userAgent(const KURL& url)
+ {
+     WebKitWebSettings* settings = webkit_web_view_get_settings(getViewFromFrame(m_frame));
++
++    gboolean useQuirks;
++    g_object_get(settings, "enable-site-specific-quirks", &useQuirks, NULL);
++
++    g_message("useQuirks: %d / %d / %s", useQuirks, isGoogleDomain(url.host()), url.host().utf8().data());
++
++    // For Google domains, identify as Chrome, so they don't give us a broken experience.
++    if (useQuirks && isGoogleDomain(url.host()))
++        return chromeUserAgent();
++
+     return String::fromUTF8(webkit_web_settings_get_user_agent(settings));
+ }
+ 
+diff --git a/WebKit/gtk/webkit/webkitprivate.h b/WebKit/gtk/webkit/webkitprivate.h
+index d51d681..c6b8273 100644
+--- a/WebKit/gtk/webkit/webkitprivate.h
++++ b/WebKit/gtk/webkit/webkitprivate.h
+@@ -54,10 +54,11 @@
+ #include "Geolocation.h"
+ #include "HistoryItem.h"
+ #include "Settings.h"
+-#include "Page.h"
+ #include "Frame.h"
+ #include "InspectorClientGtk.h"
+ #include "FrameLoaderClient.h"
++#include "Page.h"
++#include "PlatformString.h"
+ #include "ResourceHandle.h"
+ #include "ResourceRequest.h"
+ #include "ResourceResponse.h"
+@@ -181,6 +182,9 @@ extern "C" {
+     PassRefPtr<WebCore::Frame>
+     webkit_web_frame_init_with_web_view(WebKitWebView*, WebCore::HTMLFrameOwnerElement*);
+ 
++    WebCore::String
++    chromeUserAgent();
++
+     void
+     webkit_web_frame_core_frame_gone(WebKitWebFrame*);
+ 
+diff --git a/WebKit/gtk/webkit/webkitwebsettings.cpp b/WebKit/gtk/webkit/webkitwebsettings.cpp
+index 19c4168..fe63fdb 100644
+--- a/WebKit/gtk/webkit/webkitwebsettings.cpp
++++ b/WebKit/gtk/webkit/webkitwebsettings.cpp
+@@ -163,10 +163,9 @@ enum {
+ // Create a default user agent string
+ // This is a liberal interpretation of http://www.mozilla.org/build/revised-user-agent-strings.html
+ // See also http://developer.apple.com/internet/safari/faq.html#anchor2
+-static String webkit_get_user_agent()
++static String webkit_get_platform()
+ {
+-    gchar* platform;
+-    gchar* osVersion;
++    char* platform;
+ 
+ #if PLATFORM(X11)
+     platform = g_strdup("X11");
+@@ -180,6 +179,16 @@ static String webkit_get_user_agent()
+     platform = g_strdup("Unknown");
+ #endif
+ 
++    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String::fromUTF8(platform)));
++    g_free(platform);
++
++    return uaPlatform;
++}
++
++static String webkit_get_os_version()
++{
++    char* osVersion;
++
+    // FIXME: platform/version detection can be shared.
+ #if OS(DARWIN)
+ 
+@@ -204,19 +213,31 @@ static String webkit_get_user_agent()
+     osVersion = g_strdup("Unknown");
+ #endif
+ 
++    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String::fromUTF8(osVersion)));
++
++    return uaOSVersion;
++}
++
++static String webkit_get_user_agent()
++{
+     // We mention Safari since many broken sites check for it (OmniWeb does this too)
+     // We re-use the WebKit version, though it doesn't seem to matter much in practice
+ 
+     DEFINE_STATIC_LOCAL(const String, uaVersion, (String::format("%d.%d+", WEBKIT_USER_AGENT_MAJOR_VERSION, WEBKIT_USER_AGENT_MINOR_VERSION)));
+     DEFINE_STATIC_LOCAL(const String, staticUA, (String::format("Mozilla/5.0 (%s; U; %s; %s) AppleWebKit/%s (KHTML, like Gecko) Safari/%s",
+-                                                                platform, osVersion, defaultLanguage().utf8().data(), uaVersion.utf8().data(), uaVersion.utf8().data())));
+-
+-    g_free(osVersion);
+-    g_free(platform);
++                                                                webkit_get_platform().utf8().data(), webkit_get_os_version().utf8().data(), defaultLanguage().utf8().data(), uaVersion.utf8().data(), uaVersion.utf8().data())));
+ 
+     return staticUA;
+ }
+ 
++String chromeUserAgent()
++{
++    DEFINE_STATIC_LOCAL(const String, uaChrome, (String::format("Mozilla/5.0 (%s; U; %s; en-US) AppleWebKit/534.0 (KHTML, like Gecko) Chrome/6.0.411.0 Safari/534.0",
++                                                                webkit_get_platform().utf8().data(), webkit_get_os_version().utf8().data())));
++
++    return uaChrome;
++}
++
+ static void webkit_web_settings_finalize(GObject* object);
+ 
+ static void webkit_web_settings_set_property(GObject* object, guint prop_id, const GValue* value, GParamSpec* pspec);
+-- 
+1.7.1
+

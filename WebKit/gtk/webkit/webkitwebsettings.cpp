@@ -163,10 +163,9 @@ enum {
 // Create a default user agent string
 // This is a liberal interpretation of http://www.mozilla.org/build/revised-user-agent-strings.html
 // See also http://developer.apple.com/internet/safari/faq.html#anchor2
-static String webkit_get_user_agent()
+static String webkit_get_platform()
 {
-    gchar* platform;
-    gchar* osVersion;
+    char* platform;
 
 #if PLATFORM(X11)
     platform = g_strdup("X11");
@@ -179,6 +178,16 @@ static String webkit_get_user_agent()
 #else
     platform = g_strdup("Unknown");
 #endif
+
+    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String::fromUTF8(platform)));
+    g_free(platform);
+
+    return uaPlatform;
+}
+
+static String webkit_get_os_version()
+{
+    char* osVersion;
 
    // FIXME: platform/version detection can be shared.
 #if OS(DARWIN)
@@ -204,17 +213,29 @@ static String webkit_get_user_agent()
     osVersion = g_strdup("Unknown");
 #endif
 
+    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String::fromUTF8(osVersion)));
+
+    return uaOSVersion;
+}
+
+static String webkit_get_user_agent()
+{
     // We mention Safari since many broken sites check for it (OmniWeb does this too)
     // We re-use the WebKit version, though it doesn't seem to matter much in practice
 
     DEFINE_STATIC_LOCAL(const String, uaVersion, (String::format("%d.%d+", WEBKIT_USER_AGENT_MAJOR_VERSION, WEBKIT_USER_AGENT_MINOR_VERSION)));
     DEFINE_STATIC_LOCAL(const String, staticUA, (String::format("Mozilla/5.0 (%s; U; %s; %s) AppleWebKit/%s (KHTML, like Gecko) Safari/%s",
-                                                                platform, osVersion, defaultLanguage().utf8().data(), uaVersion.utf8().data(), uaVersion.utf8().data())));
-
-    g_free(osVersion);
-    g_free(platform);
+                                                                webkit_get_platform().utf8().data(), webkit_get_os_version().utf8().data(), defaultLanguage().utf8().data(), uaVersion.utf8().data(), uaVersion.utf8().data())));
 
     return staticUA;
+}
+
+String chromeUserAgent()
+{
+    DEFINE_STATIC_LOCAL(const String, uaChrome, (String::format("Mozilla/5.0 (%s; U; %s; en-US) AppleWebKit/534.0 (KHTML, like Gecko) Chrome/6.0.411.0 Safari/534.0",
+                                                                webkit_get_platform().utf8().data(), webkit_get_os_version().utf8().data())));
+
+    return uaChrome;
 }
 
 static void webkit_web_settings_finalize(GObject* object);
