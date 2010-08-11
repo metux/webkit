@@ -213,8 +213,6 @@ String FrameLoaderClient::userAgent(const KURL& url)
     gboolean useQuirks;
     g_object_get(settings, "enable-site-specific-quirks", &useQuirks, NULL);
 
-    g_message("useQuirks: %d / %d / %s", useQuirks, isGoogleDomain(url.host()), url.host().utf8().data());
-
     // For Google domains, identify as Chrome, so they don't give us a broken experience.
     if (useQuirks && isGoogleDomain(url.host()))
         return chromeUserAgent();
