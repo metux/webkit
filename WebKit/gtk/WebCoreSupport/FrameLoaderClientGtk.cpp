@@ -96,111 +96,96 @@ typedef HashSet<String> GoogleDomainsSet;
 
 static void initializeDomainsList(GoogleDomainsSet& googleDomains)
 {
-    // Google search domains, plus *.google.com.
-    googleDomains.add("google.biz");
-    googleDomains.add("google.com");
-    googleDomains.add("google.net");
-    googleDomains.add("google.org");
-    googleDomains.add("google.ae");
-    googleDomains.add("google.ag");
-    googleDomains.add("google.am");
-    googleDomains.add("google.at");
-    googleDomains.add("google.az");
-    googleDomains.add("google.be");
-    googleDomains.add("google.bi");
-    googleDomains.add("google.ca");
-    googleDomains.add("google.cc");
-    googleDomains.add("google.cd");
-    googleDomains.add("google.cg");
-    googleDomains.add("google.ch");
-    googleDomains.add("google.cl");
-    googleDomains.add("google.com.br");
-    googleDomains.add("google.co.uk");
-    googleDomains.add("google.co.jp");
-    googleDomains.add("google.de");
-    googleDomains.add("google.dj");
-    googleDomains.add("google.dk");
-    googleDomains.add("google.es");
-    googleDomains.add("google.fi");
-    googleDomains.add("google.fm");
-    googleDomains.add("google.fr");
-    googleDomains.add("google.gg");
-    googleDomains.add("google.gl");
-    googleDomains.add("google.gm");
-    googleDomains.add("google.gs");
-    googleDomains.add("google.hn");
-    googleDomains.add("google.hu");
-    googleDomains.add("google.ie");
-    googleDomains.add("google.it");
-    googleDomains.add("google.je");
-    googleDomains.add("google.kz");
-    googleDomains.add("google.li");
-    googleDomains.add("google.lt");
-    googleDomains.add("google.lu");
-    googleDomains.add("google.lv");
-    googleDomains.add("google.ma");
-    googleDomains.add("google.ms");
-    googleDomains.add("google.mu");
-    googleDomains.add("google.mw");
-    googleDomains.add("google.nl");
-    googleDomains.add("google.no");
-    googleDomains.add("google.nu");
-    googleDomains.add("google.pl");
-    googleDomains.add("google.pn");
-    googleDomains.add("google.pt");
-    googleDomains.add("google.ru");
-    googleDomains.add("google.rw");
-    googleDomains.add("google.sh");
-    googleDomains.add("google.sk");
-    googleDomains.add("google.sm");
-    googleDomains.add("google.st");
-    googleDomains.add("google.td");
-    googleDomains.add("google.tk");
-    googleDomains.add("google.tp");
-    googleDomains.add("google.tv");
-    googleDomains.add("google.us");
-    googleDomains.add("google.uz");
-    googleDomains.add("google.ws");
-
-    // Youtube-related domains.
-    googleDomains.add("youtube.com");
-    googleDomains.add("ytimg.com");
-
-    // GMail.
-    googleDomains.add("gmail.com");
-
-    // Google static files domain.
-    googleDomains.add("gstatic.com");
+    // Google search domains.
+    googleDomains.add("biz");
+    googleDomains.add("com");
+    googleDomains.add("net");
+    googleDomains.add("org");
+    googleDomains.add("ae");
+    googleDomains.add("ag");
+    googleDomains.add("am");
+    googleDomains.add("at");
+    googleDomains.add("az");
+    googleDomains.add("be");
+    googleDomains.add("bi");
+    googleDomains.add("ca");
+    googleDomains.add("cc");
+    googleDomains.add("cd");
+    googleDomains.add("cg");
+    googleDomains.add("ch");
+    googleDomains.add("cl");
+    googleDomains.add("com.br");
+    googleDomains.add("co.uk");
+    googleDomains.add("co.jp");
+    googleDomains.add("de");
+    googleDomains.add("dj");
+    googleDomains.add("dk");
+    googleDomains.add("es");
+    googleDomains.add("fi");
+    googleDomains.add("fm");
+    googleDomains.add("fr");
+    googleDomains.add("gg");
+    googleDomains.add("gl");
+    googleDomains.add("gm");
+    googleDomains.add("gs");
+    googleDomains.add("hn");
+    googleDomains.add("hu");
+    googleDomains.add("ie");
+    googleDomains.add("it");
+    googleDomains.add("je");
+    googleDomains.add("kz");
+    googleDomains.add("li");
+    googleDomains.add("lt");
+    googleDomains.add("lu");
+    googleDomains.add("lv");
+    googleDomains.add("ma");
+    googleDomains.add("ms");
+    googleDomains.add("mu");
+    googleDomains.add("mw");
+    googleDomains.add("nl");
+    googleDomains.add("no");
+    googleDomains.add("nu");
+    googleDomains.add("pl");
+    googleDomains.add("pn");
+    googleDomains.add("pt");
+    googleDomains.add("ru");
+    googleDomains.add("rw");
+    googleDomains.add("sh");
+    googleDomains.add("sk");
+    googleDomains.add("sm");
+    googleDomains.add("st");
+    googleDomains.add("td");
+    googleDomains.add("tk");
+    googleDomains.add("tp");
+    googleDomains.add("tv");
+    googleDomains.add("us");
+    googleDomains.add("uz");
+    googleDomains.add("ws");
 }
 
 static bool isGoogleDomain(String host)
 {
     DEFINE_STATIC_LOCAL(HashSet<String>, googleDomains, ());
-    DEFINE_STATIC_LOCAL(Vector<String>, googleNamespaces, ());
+    DEFINE_STATIC_LOCAL(Vector<String>, otherGoogleDomains, ());
 
     if (googleDomains.isEmpty()) {
-        googleNamespaces.append(".google.");
-        googleNamespaces.append(".gmail.");
-        googleNamespaces.append(".youtube.");
-        googleNamespaces.append(".gstatic.");
-        googleNamespaces.append(".ytimg.");
+        otherGoogleDomains.append("gmail.com");
+        otherGoogleDomains.append("youtube.com");
+        otherGoogleDomains.append("gstatic.com");
+        otherGoogleDomains.append("ytimg.com");
 
         initializeDomainsList(googleDomains);
     }
 
-    // First we try a full-match, for cases such as 'youtube.com' as opposed to
-    // 'www.youtube.com'.
-    if (googleDomains.contains(host))
+    // First check if this is one of the various google.com international domains.
+    int position = host.find(".google.");
+    if (position > 0 && googleDomains.contains(host.substring(position + sizeof(".google."))))
         return true;
 
-    // Then we check the possibility of the URL being a subdomain of well-known google domains.
-    for (unsigned int i = 0; i < googleNamespaces.size(); i++) {
-        int position = host.find(googleNamespaces.at(i));
-        if (position > 0) {
-            if (googleDomains.contains(host.substring(position + 1)))
-                return true;
-            return false;
-        }
+    // Then we check the possibility of it being one of the other, .com-only google domains.
+    for (unsigned int i = 0; i < otherGoogleDomains.size(); i++) {
+        if (host.endsWith(otherGoogleDomains.at(i)))
+            return true;
     }
 
     return false;
@@ -213,9 +198,10 @@ String FrameLoaderClient::userAgent(const KURL& url)
     gboolean useQuirks;
     g_object_get(settings, "enable-site-specific-quirks", &useQuirks, NULL);
 
-    // For Google domains, identify as Chrome, so they don't give us a broken experience.
+    // For Google domains, drop the browser's custom User Agent string, and use the standard
+    // WebKit/Safari one, so they don't give us a broken experience.
     if (useQuirks && isGoogleDomain(url.host()))
-        return chromeUserAgent();
+        return webkitUserAgent();
 
     return String::fromUTF8(webkit_web_settings_get_user_agent(settings));
 }

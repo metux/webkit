@@ -1,3 +1,18 @@
+webkit (1.2.4-1) unstable; urgency=high
+
+  * New stable release
+  - fixes the following CVEs (thus urgency=high):
+
+      CVE-2010-1781 CVE-2010-1782 CVE-2010-1784 CVE-2010-1785
+      CVE-2010-1786 CVE-2010-1787 CVE-2010-1788 CVE-2010-1790
+      CVE-2010-1792 CVE-2010-1793 CVE-2010-2648
+
+  * debian/patches/04-spoof-user-agent-to-google.patch:
+  - updated from the latest patch proposed for inclusion upstream
+  - does not have the annoying g_message() (Closes: #592670)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Fri, 03 Sep 2010 17:52:14 -0300
+
 webkit (1.2.3-2) unstable; urgency=low
 
   * debian/patches/04-spoof-user-agent-to-google.patch:
