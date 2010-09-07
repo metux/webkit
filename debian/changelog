@@ -4,6 +4,7 @@ webkit (1.2.4-2) unstable; urgency=high
   * fix cve-2010-2651: vulnerability in css style rendering.
   * fix cve-2010-2900: vulnerability with large canvas elements when using the
     SKIA library.
+  * fix cve-2010-2901: vulnerability in the rendering implementation.
 
  -- Michael Gilbert <michael.s.gilbert@gmail.com>  Mon, 06 Sep 2010 21:36:40 -0400
 
