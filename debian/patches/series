@@ -1,2 +1,3 @@
 02-pool-fixup-and-sparc-support.patch
 04-spoof-user-agent-to-google.patch
+cve-2010-2646.patch
