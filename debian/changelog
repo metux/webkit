@@ -1,5 +1,15 @@
-webkit (1.2.4-2) unstable; urgency=high
+webkit (1.2.5-1) unstable; urgency=high
 
+  [ Gustavo Noronha Silva ]
+
+  * New upstream release
+  - fixes the following CVES:
+
+      CVE-2010-1780 CVE-2010-3113 CVE-2010-1814 CVE-2010-1812
+      CVE-2010-1815 CVE-2010-3115 CVE-2010-1807 CVE-2010-3114
+      CVE-2010-3116 CVE-2010-3257 CVE-2010-3259
+
+  [ Michael Gilbert ]
   * fix cve-2010-2646: security origin bypass using IFRAME elements.
   * fix cve-2010-2651: vulnerability in css style rendering.
   * fix cve-2010-2900: vulnerability with large canvas elements when using the
@@ -7,7 +17,7 @@ webkit (1.2.4-2) unstable; urgency=high
   * fix cve-2010-2901: vulnerability in the rendering implementation.
   * fix cve-2010-3120: vulnerability in geolocation feature.
 
- -- Michael Gilbert <michael.s.gilbert@gmail.com>  Mon, 06 Sep 2010 21:36:40 -0400
+ -- Gustavo Noronha Silva <kov@debian.org>  Sat, 16 Oct 2010 17:50:56 -0300
 
 webkit (1.2.4-1) unstable; urgency=high
 
