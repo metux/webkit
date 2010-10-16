@@ -6,7 +6,6 @@ webkit (1.2.4-2) unstable; urgency=high
     SKIA library.
   * fix cve-2010-2901: vulnerability in the rendering implementation.
   * fix cve-2010-3115: address bar spoofing (only partially fixed in 1.2.4-1).
-  * fix cve-2010-3116: vulnerability in MIME type handling.
   * fix cve-2010-3120: vulnerability in geolocation feature.
 
  -- Michael Gilbert <michael.s.gilbert@gmail.com>  Mon, 06 Sep 2010 21:36:40 -0400
