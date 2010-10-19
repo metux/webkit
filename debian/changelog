@@ -1,3 +1,11 @@
+webkit (1.2.5-2) UNRELEASED; urgency=high
+
+  * Unapply 02-pool-fixup-and-sparc-support.patch and
+    04-spoof-user-agent-to-google.patch in git.  This prevents the
+    creation of an unwanted debian-changes patch.
+
+ -- Michael Gilbert <michael.s.gilbert@gmail.com>  Mon, 18 Oct 2010 22:00:36 -0400
+
 webkit (1.2.5-1) unstable; urgency=high
 
   [ Gustavo Noronha Silva ]

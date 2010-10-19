@@ -163,65 +163,56 @@ enum {
 // Create a default user agent string
 // This is a liberal interpretation of http://www.mozilla.org/build/revised-user-agent-strings.html
 // See also http://developer.apple.com/internet/safari/faq.html#anchor2
-static String webkitPlatform()
+static String webkit_get_user_agent()
 {
+    gchar* platform;
+    gchar* osVersion;
+
 #if PLATFORM(X11)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("X11")));
+    platform = g_strdup("X11");
 #elif OS(WINDOWS)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("Windows")));
+    platform = g_strdup("Windows");
 #elif PLATFORM(MAC)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("Macintosh")));
+    platform = g_strdup("Macintosh");
 #elif defined(GDK_WINDOWING_DIRECTFB)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("DirectFB")));
+    platform = g_strdup("DirectFB");
 #else
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("Unknown")));
+    platform = g_strdup("Unknown");
 #endif
 
-    return uaPlatform;
-}
-
-static String webkitOSVersion()
-{
    // FIXME: platform/version detection can be shared.
 #if OS(DARWIN)
 
 #if CPU(X86)
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String("Intel Mac OS X")));
+    osVersion = g_strdup("Intel Mac OS X");
 #else
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String("PPC Mac OS X")));
+    osVersion = g_strdup("PPC Mac OS X");
 #endif
 
 #elif OS(UNIX)
-    DEFINE_STATIC_LOCAL(String, uaOSVersion, (String()));
-
-    if (!uaOSVersion.isEmpty())
-        return uaOSVersion;
-
     struct utsname name;
-    GOwnPtr<gchar> osVersion;
     if (uname(&name) != -1)
-        osVersion.set(g_strdup_printf("%s %s", name.sysname, name.machine));
+        osVersion = g_strdup_printf("%s %s", name.sysname, name.machine);
     else
-        osVersion.set(g_strdup("Unknown"));
+        osVersion = g_strdup("Unknown");
 
-    uaOSVersion = String::fromUTF8(osVersion.get());
 #elif OS(WINDOWS)
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String("Windows")));
+    // FIXME: Compute the Windows version
+    osVersion = g_strdup("Windows");
+
 #else
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String("Unknown")));
+    osVersion = g_strdup("Unknown");
 #endif
 
-    return uaOSVersion;
-}
-
-String webkitUserAgent()
-{
     // We mention Safari since many broken sites check for it (OmniWeb does this too)
     // We re-use the WebKit version, though it doesn't seem to matter much in practice
 
     DEFINE_STATIC_LOCAL(const String, uaVersion, (String::format("%d.%d+", WEBKIT_USER_AGENT_MAJOR_VERSION, WEBKIT_USER_AGENT_MINOR_VERSION)));
-    DEFINE_STATIC_LOCAL(const String, staticUA, (String::format("Mozilla/5.0 (%s; U; %s; %s) AppleWebKit/%s (KHTML, like Gecko) Version/5.0 Safari/%s",
-                                                                webkitPlatform().utf8().data(), webkitOSVersion().utf8().data(), defaultLanguage().utf8().data(), uaVersion.utf8().data(), uaVersion.utf8().data())));
+    DEFINE_STATIC_LOCAL(const String, staticUA, (String::format("Mozilla/5.0 (%s; U; %s; %s) AppleWebKit/%s (KHTML, like Gecko) Safari/%s",
+                                                                platform, osVersion, defaultLanguage().utf8().data(), uaVersion.utf8().data(), uaVersion.utf8().data())));
+
+    g_free(osVersion);
+    g_free(platform);
 
     return staticUA;
 }
@@ -616,7 +607,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                     g_param_spec_string("user-agent",
                                                         _("User Agent"),
                                                         _("The User-Agent string used by WebKitGtk"),
-                                                        webkitUserAgent().utf8().data(),
+                                                        webkit_get_user_agent().utf8().data(),
                                                         flags));
 
     /**
@@ -1043,7 +1034,7 @@ static void webkit_web_settings_set_property(GObject* object, guint prop_id, con
     case PROP_USER_AGENT:
         g_free(priv->user_agent);
         if (!g_value_get_string(value) || !strlen(g_value_get_string(value)))
-            priv->user_agent = g_strdup(webkitUserAgent().utf8().data());
+            priv->user_agent = g_strdup(webkit_get_user_agent().utf8().data());
         else
             priv->user_agent = g_strdup(g_value_get_string(value));
         break;

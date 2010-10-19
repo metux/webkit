@@ -55,7 +55,6 @@
 #include "HistoryItem.h"
 #include "Settings.h"
 #include "Page.h"
-#include "PlatformString.h"
 #include "Frame.h"
 #include "InspectorClientGtk.h"
 #include "FrameLoaderClient.h"
@@ -213,9 +212,6 @@ extern "C" {
     };
     WebKitWebResource*
     webkit_web_resource_new_with_core_resource(PassRefPtr<WebCore::ArchiveResource>);
-
-    WebCore::String
-    webkitUserAgent();
 
     void
     webkit_web_resource_init_with_core_resource(WebKitWebResource*, PassRefPtr<WebCore::ArchiveResource>);
