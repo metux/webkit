@@ -1,4 +1,4 @@
-webkit (1.2.5-2) UNRELEASED; urgency=high
+webkit (1.2.5-2) unstable; urgency=high
 
   * Unapply 02-pool-fixup-and-sparc-support.patch and
     04-spoof-user-agent-to-google.patch in git.  This prevents the
