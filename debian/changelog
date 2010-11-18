@@ -1,3 +1,12 @@
+webkit (1.2.5-3) UNRELEASED; urgency=high
+
+  * fix cve-2010-1824: use-after-free issue in svg handling.
+  * fix cve-2010-3254: integer overflow in websockets.
+  * fix cve-2010-4040: buffer overflow in gif handling.
+  * fix cve-2010-4042: element attribute mishandling.
+
+ -- Michael Gilbert <michael.s.gilbert@gmail.com>  Wed, 17 Nov 2010 23:07:08 -0500
+
 webkit (1.2.5-2) unstable; urgency=high
 
   * Unapply 02-pool-fixup-and-sparc-support.patch and
