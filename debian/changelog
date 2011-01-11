@@ -1,11 +1,18 @@
-webkit (1.2.5-3) UNRELEASED; urgency=high
+webkit (1.2.6-1) unstable; urgency=high
 
+  [ Michael Gilbert ]
   * fix cve-2010-1824: use-after-free issue in svg handling.
   * fix cve-2010-3254: integer overflow in websockets.
   * fix cve-2010-4040: buffer overflow in gif handling.
   * fix cve-2010-4042: element attribute mishandling.
 
- -- Michael Gilbert <michael.s.gilbert@gmail.com>  Wed, 17 Nov 2010 23:07:08 -0500
+  [ Gustavo Noronha Silva ]
+  * New upstream release fixing the following CVEs:
+
+      CVE-2010-4198 CVE-2010-4197 CVE-2010-4204 CVE-2010-4206
+      CVE-2010-1791 CVE-2010-3812 CVE-2010-3813
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 11 Jan 2011 09:44:19 -0200
 
 webkit (1.2.5-2) unstable; urgency=high
 
