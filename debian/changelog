@@ -1,3 +1,9 @@
+webkit (1.2.6-2) unstable; urgency=low
+
+  * Acknowledge 1.2.5-2.1 NMU, thanks gregor! (Closes: #598956).
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 12 Jan 2011 09:33:46 -0200
+
 webkit (1.2.6-1) unstable; urgency=high
 
   [ Michael Gilbert ]
@@ -13,6 +19,15 @@ webkit (1.2.6-1) unstable; urgency=high
       CVE-2010-1791 CVE-2010-3812 CVE-2010-3813
 
  -- Gustavo Noronha Silva <kov@debian.org>  Tue, 11 Jan 2011 09:44:19 -0200
+
+webkit (1.2.5-2.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Add patch 05-fix-jit-on-kfreebsd-i386.patch by Petr Salinger and 
+    Michael Dorrington: Fixes Javascript JIT crashing on kfreebsd-i386
+    (closes: #598956).
+
+ -- gregor herrmann <gregoa@debian.org>  Wed, 10 Nov 2010 23:28:55 +0100
 
 webkit (1.2.5-2) unstable; urgency=high
 

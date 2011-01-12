@@ -1,5 +1,6 @@
 02-pool-fixup-and-sparc-support.patch
 04-spoof-user-agent-to-google.patch
+05-fix-jit-on-kfreebsd-i386.patch
 cve-2010-2646.patch
 cve-2010-2651.patch
 cve-2010-2900.patch

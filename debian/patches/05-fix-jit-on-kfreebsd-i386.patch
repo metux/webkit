@@ -1,0 +1,51 @@
+Author: Petr Salinger
+Tester: Michael Dorrington
+Description: Fixes Javascript JIT crashing on kfreebsd-i386.
+ Fixes Javascript JIT issue that causes webkit to crash on kfreebsd-i386,
+ see <http://bugs.debian.org/598956>.
+
+ For reasoning of patch see:
+ "Common practices and problems found when porting to GNU/k*BSD"
+ <http://glibc-bsd.alioth.debian.org/porting/PORTING>
+
+ On kfreebsd-amd64, this issue does not occur.
+
+
+--- webkit-1.2.4/JavaScriptCore/jit/JITOpcodes.cpp	2010-09-03 20:18:02.000000000 +0100
++++ webkit-1.2.4-fix_jit_kfreebsd_i386/JavaScriptCore/jit/JITOpcodes.cpp	2010-10-07 06:09:55.000000000 +0100
+@@ -165,7 +165,7 @@
+      * stack pointer by the right amount after the call.
+      */
+ 
+-#if COMPILER(MSVC) || OS(LINUX)
++#if COMPILER(MSVC) || OS(LINUX) || defined(__GLIBC__)
+ #if COMPILER(MSVC)
+ #pragma pack(push)
+ #pragma pack(4)
+@@ -228,7 +228,7 @@
+     storePtr(regT2, Address(stackPointerRegister, OBJECT_OFFSETOF(NativeCallFrameStructure, thisValue) + OBJECT_OFFSETOF(JSValue, u.asBits.payload)));
+     storePtr(regT3, Address(stackPointerRegister, OBJECT_OFFSETOF(NativeCallFrameStructure, thisValue) + OBJECT_OFFSETOF(JSValue, u.asBits.tag)));
+ 
+-#if COMPILER(MSVC) || OS(LINUX)
++#if COMPILER(MSVC) || OS(LINUX) || defined(__GLIBC__)
+     // ArgList is passed by reference so is stackPointerRegister + 4 * sizeof(Register)
+     addPtr(Imm32(OBJECT_OFFSETOF(NativeCallFrameStructure, result)), stackPointerRegister, X86Registers::ecx);
+ 
+@@ -1689,7 +1689,7 @@
+      * not the rest of the callframe so we need a nice way to ensure we increment the
+      * stack pointer by the right amount after the call.
+      */
+-#if COMPILER(MSVC) || OS(LINUX)
++#if COMPILER(MSVC) || OS(LINUX) || defined(__GLIBC__)
+     struct NativeCallFrameStructure {
+       //  CallFrame* callFrame; // passed in EDX
+         JSObject* callee;
+@@ -1742,7 +1742,7 @@
+     loadPtr(Address(regT1, -(int)sizeof(Register)), regT1);
+     storePtr(regT1, Address(stackPointerRegister, OBJECT_OFFSETOF(NativeCallFrameStructure, thisValue)));
+ 
+-#if COMPILER(MSVC) || OS(LINUX)
++#if COMPILER(MSVC) || OS(LINUX) || defined(__GLIBC__)
+     // ArgList is passed by reference so is stackPointerRegister + 4 * sizeof(Register)
+     addPtr(Imm32(OBJECT_OFFSETOF(NativeCallFrameStructure, result)), stackPointerRegister, X86Registers::ecx);
+ 
