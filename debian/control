@@ -2,7 +2,7 @@ Source: webkit
 Priority: optional
 Section: web
 Maintainer: Debian WebKit Maintainers <pkg-webkit-maintainers@lists.alioth.debian.org>
-Uploaders: Mike Hommey <glandium@debian.org>, Gustavo Noronha Silva <kov@debian.org>
+Uploaders: Mike Hommey <glandium@debian.org>, Gustavo Noronha Silva <kov@debian.org>, Michael Gilbert <michael.s.gilbert@gmail.com>
 Build-Depends: debhelper (>= 5.0),
                chrpath,
                libgtk2.0-dev (>= 2.10),
@@ -26,6 +26,7 @@ Build-Depends: debhelper (>= 5.0),
                gir-repository-dev (>= 0.6.2),
                gobject-introspection (>= 0.6.2)
 Standards-Version: 3.8.4
+DM-Upload-Allowed: yes
 Homepage: http://webkit.org/
 Vcs-Browser: http://git.debian.org/?p=pkg-webkit/webkit.git
 Vcs-Git: git://git.debian.org/git/pkg-webkit/webkit.git

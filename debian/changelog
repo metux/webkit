@@ -1,3 +1,11 @@
+webkit (1.2.7-1) unstable; urgency=high
+
+  * Import new upstream security release.
+  * Set DM-Upload-Allowed and add myself as an uploader.
+  * Drop patches for cve-2010-2901 and cve-2010-4040 (included upstream now).
+
+ -- Michael Gilbert <michael.s.gilbert@gmail.com>  Sat, 19 Feb 2011 17:24:56 -0500
+
 webkit (1.2.6-2) unstable; urgency=low
 
   * Acknowledge 1.2.5-2.1 NMU, thanks gregor! (Closes: #598956).
