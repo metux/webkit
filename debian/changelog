@@ -1,6 +1,15 @@
+webkit (1.2.7-0+squeeze2) stable; urgency=low
+
+  [ Gustavo Noronha Silva ]
+  * debian/patches/06-fix-null-dns-lookups.patch:
+  - Avoid doing lots of needless NULL DNS lookups, thanks to Michael
+    Gratton <mike@vee.net> for the patch and Simon Paillard
+    <spaillard@debian.org> for the investigation (Closes: #578019)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Sat, 09 Apr 2011 10:02:05 -0300
+
 webkit (1.2.7-0+squeeze1) stable-security; urgency=high
 
-  [ Michael Gilbert ]
   * Import new upstream security release:
     - Fixes cve-2010-1783, cve-2010-2901, cve-2010-4199, cve-2010-4040,
             cve-2010-4492, cve-2010-4493, cve-2010-4577, cve-2010-4578,
@@ -9,12 +18,7 @@ webkit (1.2.7-0+squeeze1) stable-security; urgency=high
       (included upstream now).
   * Set DM-Upload-Allowed and add myself as an uploader.
 
-  [ Gustavo Noronha Silva ]
-  * debian/patches/06-fix-null-dns-lookups.patch:
-  - Avoid doing lots of needless NULL DNS lookups
-    (This is part of fixing #578019)
-
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 30 Mar 2011 09:23:37 -0300
+ -- Michael Gilbert <michael.s.gilbert@gmail.com>  Sat, 19 Feb 2011 17:24:56 -0500
 
 webkit (1.2.6-2) unstable; urgency=low
 
