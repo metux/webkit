@@ -71,9 +71,12 @@ build-stamp:
 		sed -i '2!b;/^#/ i\exec "/usr/share/misc/'$$file'" "$$@"' Source/autotools/$$file ; \
 	done
 
+	# FIXME: upstream is broken when running pot-update, is why we
+	# create the po directory manually here
 	for version in $(GTK_VERSIONS); do \
 		if [ ! -d build-$${version} ]; then \
 			mkdir build-$${version}; \
+			mkdir -p build-$${version}/Source/WebKit/gtk/po/; \
 		fi; \
 		cd build-$${version}; \
 		env CFLAGS="$(CFLAGS)" \
