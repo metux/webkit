@@ -3,6 +3,9 @@ webkitgtk+ (1.6.0-1) experimental; urgency=low
   * New upstream release
   * debian/patches/01_fix-introspection.patch:
   - Removed; applied upstream
+  * debian/patches/02_notebook_scroll.patch:
+  - Patch by Josselin Mouette <joss@debian.org> to ignore alt+wheel
+    (Closes: #640980)
 
  -- Gustavo Noronha Silva <kov@debian.org>  Mon, 26 Sep 2011 23:24:37 -0300
 
