@@ -49,7 +49,6 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  _NPN_SetException@Base 1.3.10
  _NPN_SetProperty@Base 1.3.10
  _NPN_UTF8FromIdentifier@Base 1.3.10
- (optional|c++)"DumpRenderTreeSupportGtk::rectangleForSelection(_WebKitWebFrame*, _cairo_rectangle_int*)@Base" 1.5.2
  (optional|c++)"DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::addUserStyleSheet(_WebKitWebFrame*, char const*, bool)@Base" 1.3.13
@@ -91,6 +90,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"DumpRenderTreeSupportGtk::pauseAnimation(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::pauseSVGAnimation(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::pauseTransition(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::rectangleForSelection(_WebKitWebFrame*, _cairo_rectangle_int*)@Base" 1.5.2
  (optional|c++)"DumpRenderTreeSupportGtk::resetOriginAccessWhiteLists()@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::resumeAnimations(_WebKitWebFrame*)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::s_drtRun@Base" 1.3.13
@@ -120,9 +120,16 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"WebCore::Document::page() const@Base" 1.5.2
  (optional|c++)"WebCore::Document::settings() const@Base" 1.5.2
  (optional|c++)"WebCore::Document::updateLayoutIgnorePendingStylesheets()@Base" 1.5.2
+ (optional|c++)"WebCore::Document::view() const@Base" 1.6.1
+ (optional|c++)"WebCore::DocumentMarkerController::markersFor(WebCore::Node*)@Base" 1.6.1
  (optional|c++)"WebCore::Element::ensureShadowRoot()@Base" 1.5.2
  (optional|c++)"WebCore::Element::removeShadowRoot()@Base" 1.5.2
  (optional|c++)"WebCore::Element::shadowRoot() const@Base" 1.5.2
+ (optional|c++)"WebCore::HTMLInputElement::setSuggestedValue(WTF::String const&)@Base" 1.6.1
+ (optional|c++)"WebCore::HTMLInputElement::suggestedValue() const@Base" 1.6.1
+ (optional|c++)"WebCore::HTMLNames::inputTag@Base" 1.6.1
+ (optional|c++)"WebCore::HTMLNames::textareaTag@Base" 1.6.1
+ (optional|c++)"WebCore::HTMLTextFormControlElement::lastChangeWasUserEdit() const@Base" 1.6.1
  (optional|c++)"WebCore::InspectorController::setResourcesDataSizeLimitsFromInternals(int, int)@Base" 1.5.2
  (optional|c++)"WebCore::JSDOMWrapper::virtualFunctionToPreventWeakVtable()@Base" 1.5.1
  (optional|c++)"WebCore::JSDocument::put(JSC::ExecState*, JSC::Identifier const&, JSC::JSValue, JSC::PutPropertySlot&)@Base" 1.5.2
@@ -136,7 +143,11 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"WebCore::MemoryCache::setDisabled(bool)@Base" 1.5.2
  (optional|c++)"WebCore::NodeRenderingContext::NodeRenderingContext(WebCore::Node*)@Base" 1.5.2
  (optional|c++)"WebCore::NodeRenderingContext::~NodeRenderingContext()@Base" 1.5.2
+ (optional|c++)"WebCore::Range::create(WTF::PassRefPtr<WebCore::Document>, WTF::PassRefPtr<WebCore::Node>, int, WTF::PassRefPtr<WebCore::Node>, int)@Base" 1.6.1
+ (optional|c++)"WebCore::Range::~Range()@Base" 1.6.1
  (optional|c++)"WebCore::RenderObject::absoluteBoundingBoxRect(bool)@Base" 1.5.2
+ (optional|c++)"WebCore::ScrollView::setScrollbarsSuppressed(bool, bool)@Base" 1.6.1
+ (optional|c++)"WebCore::ScrollableArea::setScrollOffsetFromInternals(WebCore::IntPoint const&)@Base" 1.6.1
  (optional|c++)"WebCore::ShadowContentElement::create(WebCore::Document*)@Base" 1.5.2
  (optional|c++)"WebCore::TreeScope::getElementById(WTF::AtomicString const&) const@Base" 1.5.2
  (optional|c++)"WebCore::cacheDOMStructure(WebCore::JSDOMGlobalObject*, JSC::Structure*, JSC::ClassInfo const*)@Base" 1.5.1
@@ -149,6 +160,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"WebCore::toDocument(JSC::JSValue)@Base" 1.5.2
  (optional|c++)"WebCore::toElement(JSC::JSValue)@Base" 1.5.2
  (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::ClientRect*)@Base" 1.5.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Range*)@Base" 1.6.1
  (optional|c++)"WebCore::toNode(JSC::JSValue)@Base" 1.5.2
  objectAndOffsetUnignored@Base 1.3.10
  webKitWebSrcSetFrame@Base 1.3.10
@@ -180,6 +192,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_bar_info_get_visible@Base 1.3.10
  webkit_dom_blob_get_size@Base 1.3.10
  webkit_dom_blob_get_type@Base 1.3.10
+ webkit_dom_blob_slice@Base 1.6.1
  webkit_dom_blob_webkit_slice@Base 1.5.1
  webkit_dom_cdata_section_get_type@Base 1.3.10
  webkit_dom_character_data_append_data@Base 1.3.10
@@ -406,19 +419,48 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_dom_window_find@Base 1.3.10
  webkit_dom_dom_window_focus@Base 1.3.10
  webkit_dom_dom_window_get_application_cache@Base 1.3.10
+ webkit_dom_dom_window_get_client_information@Base 1.6.1
  webkit_dom_dom_window_get_closed@Base 1.3.10
  webkit_dom_dom_window_get_computed_style@Base 1.3.10
+ webkit_dom_dom_window_get_console@Base 1.6.1
  webkit_dom_dom_window_get_default_status@Base 1.3.10
+ webkit_dom_dom_window_get_device_pixel_ratio@Base 1.6.1
  webkit_dom_dom_window_get_document@Base 1.3.10
  webkit_dom_dom_window_get_frame_element@Base 1.3.10
+ webkit_dom_dom_window_get_frames@Base 1.6.1
+ webkit_dom_dom_window_get_history@Base 1.6.1
+ webkit_dom_dom_window_get_inner_height@Base 1.6.1
+ webkit_dom_dom_window_get_inner_width@Base 1.6.1
+ webkit_dom_dom_window_get_length@Base 1.6.1
  webkit_dom_dom_window_get_local_storage@Base 1.3.10
+ webkit_dom_dom_window_get_locationbar@Base 1.6.1
+ webkit_dom_dom_window_get_menubar@Base 1.6.1
  webkit_dom_dom_window_get_name@Base 1.3.10
+ webkit_dom_dom_window_get_navigator@Base 1.6.1
+ webkit_dom_dom_window_get_offscreen_buffering@Base 1.6.1
+ webkit_dom_dom_window_get_opener@Base 1.6.1
+ webkit_dom_dom_window_get_outer_height@Base 1.6.1
+ webkit_dom_dom_window_get_outer_width@Base 1.6.1
  webkit_dom_dom_window_get_page_x_offset@Base 1.3.10
  webkit_dom_dom_window_get_page_y_offset@Base 1.3.10
+ webkit_dom_dom_window_get_parent@Base 1.6.1
+ webkit_dom_dom_window_get_personalbar@Base 1.6.1
+ webkit_dom_dom_window_get_screen@Base 1.6.1
+ webkit_dom_dom_window_get_screen_left@Base 1.6.1
+ webkit_dom_dom_window_get_screen_top@Base 1.6.1
+ webkit_dom_dom_window_get_screen_x@Base 1.6.1
+ webkit_dom_dom_window_get_screen_y@Base 1.6.1
+ webkit_dom_dom_window_get_scroll_x@Base 1.6.1
+ webkit_dom_dom_window_get_scroll_y@Base 1.6.1
+ webkit_dom_dom_window_get_scrollbars@Base 1.6.1
  webkit_dom_dom_window_get_selection@Base 1.3.10
+ webkit_dom_dom_window_get_self@Base 1.6.1
  webkit_dom_dom_window_get_session_storage@Base 1.3.10
  webkit_dom_dom_window_get_status@Base 1.3.10
+ webkit_dom_dom_window_get_statusbar@Base 1.6.1
  webkit_dom_dom_window_get_style_media@Base 1.3.10
+ webkit_dom_dom_window_get_toolbar@Base 1.6.1
+ webkit_dom_dom_window_get_top@Base 1.6.1
  webkit_dom_dom_window_get_type@Base 1.3.10
  webkit_dom_dom_window_get_window@Base 1.3.10
  webkit_dom_dom_window_match_media@Base 1.3.10
@@ -439,7 +481,6 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_dom_window_webkit_convert_point_from_node_to_page@Base 1.3.10
  webkit_dom_dom_window_webkit_convert_point_from_page_to_node@Base 1.3.10
  webkit_dom_element_blur@Base 1.3.10
- webkit_dom_element_contains@Base 1.3.10
  webkit_dom_element_focus@Base 1.3.10
  webkit_dom_element_get_attribute@Base 1.3.10
  webkit_dom_element_get_attribute_node@Base 1.3.10
@@ -626,9 +667,6 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_base_font_element_set_color@Base 1.3.10
  webkit_dom_html_base_font_element_set_face@Base 1.3.10
  webkit_dom_html_base_font_element_set_size@Base 1.3.10
- webkit_dom_html_blockquote_element_get_cite@Base 1.3.10
- webkit_dom_html_blockquote_element_get_type@Base 1.3.10
- webkit_dom_html_blockquote_element_set_cite@Base 1.3.10
  webkit_dom_html_body_element_get_a_link@Base 1.3.10
  webkit_dom_html_body_element_get_background@Base 1.3.10
  webkit_dom_html_body_element_get_bg_color@Base 1.3.10
@@ -779,6 +817,8 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_font_element_set_face@Base 1.3.10
  webkit_dom_html_font_element_set_size@Base 1.3.10
  webkit_dom_html_form_element_check_validity@Base 1.3.10
+ webkit_dom_html_form_element_dispatch_form_change@Base 1.6.1
+ webkit_dom_html_form_element_dispatch_form_input@Base 1.6.1
  webkit_dom_html_form_element_get_accept_charset@Base 1.3.10
  webkit_dom_html_form_element_get_action@Base 1.3.10
  webkit_dom_html_form_element_get_autocomplete@Base 1.5.2
@@ -1073,10 +1113,12 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_media_element_get_controls@Base 1.3.10
  webkit_dom_html_media_element_get_current_src@Base 1.3.10
  webkit_dom_html_media_element_get_current_time@Base 1.3.10
+ webkit_dom_html_media_element_get_default_muted@Base 1.6.1
  webkit_dom_html_media_element_get_default_playback_rate@Base 1.3.10
  webkit_dom_html_media_element_get_duration@Base 1.3.10
  webkit_dom_html_media_element_get_ended@Base 1.3.10
  webkit_dom_html_media_element_get_error@Base 1.3.10
+ webkit_dom_html_media_element_get_initial_time@Base 1.6.1
  webkit_dom_html_media_element_get_loop@Base 1.3.10
  webkit_dom_html_media_element_get_muted@Base 1.3.10
  webkit_dom_html_media_element_get_network_state@Base 1.3.10
@@ -1102,6 +1144,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_media_element_set_autoplay@Base 1.3.10
  webkit_dom_html_media_element_set_controls@Base 1.3.10
  webkit_dom_html_media_element_set_current_time@Base 1.3.10
+ webkit_dom_html_media_element_set_default_muted@Base 1.6.1
  webkit_dom_html_media_element_set_default_playback_rate@Base 1.3.10
  webkit_dom_html_media_element_set_loop@Base 1.3.10
  webkit_dom_html_media_element_set_muted@Base 1.3.10
@@ -1523,6 +1566,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_node_append_child@Base 1.3.10
  webkit_dom_node_clone_node@Base 1.3.10
  webkit_dom_node_compare_document_position@Base 1.3.10
+ webkit_dom_node_contains@Base 1.6.1
  webkit_dom_node_dispatch_event@Base 1.3.10
  webkit_dom_node_filter_accept_node@Base 1.3.10
  webkit_dom_node_filter_get_type@Base 1.3.10
