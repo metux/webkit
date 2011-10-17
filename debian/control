@@ -1,4 +1,4 @@
-Source: webkitgtk+
+Source: webkit
 Priority: optional
 Section: web
 Maintainer: Debian WebKit Maintainers <pkg-webkit-maintainers@lists.alioth.debian.org>

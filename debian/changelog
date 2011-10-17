@@ -1,3 +1,9 @@
+webkit (1.6.1-2) unstable; urgency=low
+
+  * Rename source package back to webkit
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 17 Oct 2011 20:55:24 -0200
+
 webkitgtk+ (1.6.1-1) experimental; urgency=low
 
   * New upstream release
