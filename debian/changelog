@@ -1,8 +1,11 @@
 webkit (1.6.1-2) unstable; urgency=low
 
   * Rename source package back to webkit
+  * debian/control:
+  - Build-Depend on gawk, since our GNUmakefile.in has lines that are too
+    long for mawk, which results in a broken GNUmakefile
 
- -- Gustavo Noronha Silva <kov@debian.org>  Mon, 17 Oct 2011 20:55:24 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 17 Oct 2011 22:07:25 -0200
 
 webkitgtk+ (1.6.1-1) experimental; urgency=low
 
