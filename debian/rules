@@ -8,7 +8,7 @@ DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 
 GTK_VERSIONS = 2.0 3.0
 
-CFLAGS = -g -Wall
+CFLAGS = -g -Wall -Wl,--as-needed
 
 ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
         CFLAGS += -O0
@@ -81,8 +81,8 @@ build-stamp:
 		cd build-$${version}; \
 		env CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CFLAGS)" \
-		CC="gcc -Wl,--as-needed" \
-		CXX="g++ -Wl,--as-needed" \
+		CC="gcc" \
+		CXX="g++" \
 		../configure --prefix=/usr \
 			--host=$(DEB_HOST_GNU_TYPE) \
 			--build=$(DEB_BUILD_GNU_TYPE) \
