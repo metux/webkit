@@ -21,11 +21,11 @@ git-svn-id: http://svn.webkit.org/repository/webkit/trunk@97568 268f45cc-cd09-04
  Source/JavaScriptCore/wtf/dtoa/utils.h |    2 +-
  2 files changed, 12 insertions(+), 1 deletions(-)
 
-diff --git a/Source/JavaScriptCore/wtf/dtoa/utils.h b/Source/JavaScriptCore/wtf/dtoa/utils.h
-index f8eb25b..a23c44c 100644
---- a/Source/JavaScriptCore/wtf/dtoa/utils.h
-+++ b/Source/JavaScriptCore/wtf/dtoa/utils.h
-@@ -49,8 +49,7 @@
+Index: webkit-1.6.1/Source/JavaScriptCore/wtf/dtoa/utils.h
+===================================================================
+--- webkit-1.6.1.orig/Source/JavaScriptCore/wtf/dtoa/utils.h	2011-10-21 11:44:37.000000000 -0200
++++ webkit-1.6.1/Source/JavaScriptCore/wtf/dtoa/utils.h	2011-10-21 11:46:41.928885576 -0200
+@@ -49,7 +49,7 @@
  defined(__ARMEL__) || \
  defined(_MIPS_ARCH_MIPS32R2)
  #define DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS 1
@@ -34,6 +34,3 @@ index f8eb25b..a23c44c 100644
  #define DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS 1
  #elif defined(_M_IX86) || defined(__i386__)
  #if defined(_WIN32)
--- 
-1.7.7
-
