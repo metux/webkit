@@ -79,7 +79,8 @@ build-stamp:
 			mkdir -p build-$${version}/Source/WebKit/gtk/po/; \
 		fi; \
 		cd build-$${version}; \
-		env CFLAGS="$(CFLAGS)" \
+		env AR_FLAGS="cruT" \
+		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CFLAGS)" \
 		CC="gcc" \
 		CXX="g++" \
