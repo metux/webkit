@@ -24,7 +24,7 @@ ifeq ($(DEB_BUILD_ARCH),alpha)
         CFLAGS += -Wl,--no-relax
 endif
 
-ifneq (,$(findstring $(DEB_BUILD_ARCH),mips mipsel s390))
+ifneq (,$(findstring $(DEB_BUILD_ARCH),mips mipsel s390 s390x))
         CFLAGS += -gstabs
 endif
 

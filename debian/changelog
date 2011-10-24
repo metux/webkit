@@ -1,3 +1,11 @@
+webkit (1.6.1-5) UNRELEASED; urgency=low
+
+  * debian/rules:
+  - also build with stabs debug symbols format when under s390x
+    patch by Aurelien Jarno <aurel32@debian.org> (Closes: #637228)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 24 Oct 2011 17:50:49 -0200
+
 webkit (1.6.1-4) unstable; urgency=low
 
   * debian/patches/03_freebsd-fix.patch:
