@@ -3,8 +3,12 @@ webkit (1.6.1-5) UNRELEASED; urgency=low
   * debian/rules:
   - also build with stabs debug symbols format when under s390x
     patch by Aurelien Jarno <aurel32@debian.org> (Closes: #637228)
+  * debian/control:
+  - add Breaks for midori and claws-mail-fancy-plugin versions that
+    were using the private webkit_web_view_get_selected_text symbol
+    (Closes: #646095)
 
- -- Gustavo Noronha Silva <kov@debian.org>  Mon, 24 Oct 2011 17:50:49 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 01 Nov 2011 23:20:19 -0200
 
 webkit (1.6.1-4) unstable; urgency=low
 
