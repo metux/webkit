@@ -1,4 +1,4 @@
-webkit (1.6.1-5) UNRELEASED; urgency=low
+webkit (1.6.1-5) unstable; urgency=low
 
   * debian/rules:
   - also build with stabs debug symbols format when under s390x
