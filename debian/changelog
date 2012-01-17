@@ -1,8 +1,13 @@
 webkit (1.7.4-1) experimental; urgency=low
 
   * New development release
+  * debian/patches/01_double-conversion.patch:
+  - refreshed; partially applied upstream
+  * debian/patches/03_freebsd-fix.patch,
+    debian/patches/04_pkgconfig-fix.patch:
+  - removed; applied upstream
 
- -- Gustavo Noronha Silva <kov@debian.org>  Tue, 17 Jan 2012 20:06:21 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 17 Jan 2012 20:31:34 -0200
 
 webkit (1.6.3-1) unstable; urgency=low
 
