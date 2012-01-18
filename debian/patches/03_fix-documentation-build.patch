@@ -1,0 +1,32 @@
+diff --git a/Tools/gtk/common.py b/Tools/gtk/common.py
+index 7941e13..59f1aec 100644
+--- a/Tools/gtk/common.py
++++ b/Tools/gtk/common.py
+@@ -64,6 +64,10 @@ def get_build_path():
+     if is_valid_build_directory(build_dir):
+         return build_dir
+ 
++    build_dir = os.getcwd()
++    if is_valid_build_directory(build_dir):
++        return build_dir
++
+     print 'Could not determine build directory.'
+     sys.exit(1)
+ 
+diff --git a/Tools/gtk/generate-gtkdoc b/Tools/gtk/generate-gtkdoc
+index db5f83a..6b48f46 100755
+--- a/Tools/gtk/generate-gtkdoc
++++ b/Tools/gtk/generate-gtkdoc
+@@ -83,7 +83,11 @@ def get_webkit1_options():
+                    ' -I' + common.top_level_path('Source', 'JavaScriptCore', 'ForwardingHeaders'),
+         'ignored_files': glob.glob(src_path('webkit', '*private.*'))
+     })
+-    return (common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-3.0.pc'), options)
++
++    if os.path.exists(common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-3.0.pc')):
++        return (common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-3.0.pc'), options)
++
++    return (common.build_path('Source', 'WebKit', 'gtk', 'webkit-1.0.pc'), options)
+ 
+ configure_logging()
+ 

@@ -6,6 +6,8 @@ webkit (1.7.4-1) experimental; urgency=low
   * debian/patches/03_freebsd-fix.patch,
     debian/patches/04_pkgconfig-fix.patch:
   - removed; applied upstream
+  * debian/patches/03_fix-documentation-build.patch:
+  - added; fix building docs for the GTK+ 2 library
   * debian/control:
   - update build-dependency for libsoup2.4-dev to 2.37.4
   - add libgl1-mesa-dev as a B-D, since we now build with
