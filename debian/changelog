@@ -14,8 +14,10 @@ webkit (1.7.4-1) experimental; urgency=low
     WebGL enabled by default
   * debian/rules:
   - adapted doc installation to the new system
+  * debian/*.install:
+  - include directory got renamed webkit->webkitgtk
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 18 Jan 2012 23:51:38 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 18 Jan 2012 23:52:34 -0200
 
 webkit (1.6.3-1) unstable; urgency=low
 
