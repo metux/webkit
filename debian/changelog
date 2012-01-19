@@ -12,8 +12,10 @@ webkit (1.7.4-1) experimental; urgency=low
   - update build-dependency for libsoup2.4-dev to 2.37.4
   - add libgl1-mesa-dev as a B-D, since we now build with
     WebGL enabled by default
+  * debian/rules:
+  - adapted doc installation to the new system
 
- -- Gustavo Noronha Silva <kov@debian.org>  Tue, 17 Jan 2012 20:31:34 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 18 Jan 2012 23:51:38 -0200
 
 webkit (1.6.3-1) unstable; urgency=low
 

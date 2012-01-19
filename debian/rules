@@ -35,20 +35,6 @@ clean:
 	dh_testroot
 
 	rm -f build-stamp install-stamp
-	-test -d build/Source/WebKit/gtk/docs && \
-		cd build/Source/WebKit/gtk/docs && \
-		make maintainer-clean
-
-	-rm -rf Source/WebKit/gtk/docs/xml* Source/WebKit/gtk/docs/html* Source/WebKit/gtk/docs/sgml.stamp Source/WebKit/gtk/docs/tmpl*
-	-for file in Source/WebKit/gtk/docs/webkitgtk.prerequisites Source/WebKit/gtk/docs/tmpl.stamp \
-		Source/WebKit/gtk/docs/webkitgtk-overrides.txt Source/WebKit/gtk/docs/webkitgtk.args \
-		Source/WebKit/gtk/docs/webkitgtk.interfaces Source/WebKit/gtk/docs/webkitgtk.signals \
-		Source/WebKit/gtk/docs/webkitgtk.hierarchy Source/WebKit/gtk/docs/tmpl/webkitgtk-unused.sgml \
-		Source/WebKit/gtk/docs/webkitgtk-decl-list.txt Source/WebKit/gtk/docs/webkitgtk-decl.txt \
-		Source/WebKit/gtk/docs/webkitgtk-undeclared.txt Source/WebKit/gtk/docs/webkitgtk-undocumented.txt \
-		Source/WebKit/gtk/docs/webkitgtk-unused.txt; do \
-		rm -f ${file}; \
-	done
 	rm -rf build-*
 	rm -rf debian/tmp-*
 	rm -f Source/WebKit/gtk/docs/version.xml
@@ -99,17 +85,6 @@ build-stamp:
 		$(MAKE) $(MAKEARGUMENTS) -C build-$${version}; \
 	done
 
-	# Awesome hack to get the docs built! For some reason, the
-	# first call to make docs fails mid-work, but the second
-	# succeeds.
-	for version in $(GTK_VERSIONS); do \
-		ln -fs ../../../build-$${version}/Source/WebKit/gtk/docs/version.xml \
-			Source/WebKit/gtk/docs/; \
-		cd build-$${version}/Source/WebKit/gtk/docs; \
-		make docs || make docs; \
-		cd ../../../../../; \
-	done
-
 	touch $@
 
 install: install-stamp
@@ -127,7 +102,7 @@ ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	chrpath -d debian/tmp-2.0/usr/lib/webkitgtk-1.0-0/libexec/GtkLauncher
 
 	install -d -m 755 debian/tmp-2.0/usr/share/doc/libwebkitgtk-dev/html
-	install -m 644 build-2.0/Source/WebKit/gtk/docs/html/* \
+	install -m 644 build-2.0/Documentation/webkitgtk/html/* \
 		debian/tmp-2.0/usr/share/doc/libwebkitgtk-dev/html/
 endif
 
@@ -138,8 +113,8 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	chrpath -d debian/tmp-3.0/usr/lib/webkitgtk-3.0-0/libexec/GtkLauncher
 
 	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html
-	install -m 644 build-3.0/Source/WebKit/gtk/docs/html/* \
-	 	debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html/
+	install -m 644 build-3.0/Documentation/webkitgtk/html/* \
+		debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html/
 endif
 
 	touch $@
