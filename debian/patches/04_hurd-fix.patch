@@ -1,0 +1,34 @@
+--- a/Source/JavaScriptCore/wtf/Platform.h
++++ b/Source/JavaScriptCore/wtf/Platform.h
+@@ -352,6 +352,11 @@
+ #define WTF_OS_HAIKU 1
+ #endif
+ 
++/* OS(HURD) - GNU/Hurd */
++#ifdef __GNU__
++#define WTF_OS_HURD 1
++#endif
++
+ /* OS(LINUX) - Linux */
+ #ifdef __linux__
+ #define WTF_OS_LINUX 1
+@@ -398,6 +403,7 @@
+     || OS(DARWIN)           \
+     || OS(FREEBSD)          \
+     || OS(HAIKU)            \
++    || OS(HURD)             \
+     || OS(LINUX)            \
+     || OS(NETBSD)           \
+     || OS(OPENBSD)          \
+--- a/Source/JavaScriptCore/wtf/ThreadIdentifierDataPthreads.cpp
++++ b/Source/JavaScriptCore/wtf/ThreadIdentifierDataPthreads.cpp
+@@ -41,6 +41,9 @@
+ #define PTHREAD_KEYS_MAX 1024
+ #else
+ #include <limits.h>
++#if OS(HURD)
++#define PTHREAD_KEYS_MAX INT_MAX
++#endif
+ #endif
+ 
+ namespace WTF {

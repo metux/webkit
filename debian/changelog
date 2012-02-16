@@ -8,8 +8,11 @@ webkit (1.6.3-1) unstable; urgency=low
   * debian/patches/01_double-conversion.patch:
   - add CPU(ALPHA) to the list of cpus that pass the test
     (Closes: #648761)
+  * debian/patches/04_hurd-fix.patch:
+  - patch by Pino Toscano <pino@debian.org> to fix FTBFS on Hurd
+    (Closes: #649192)
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:14:25 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:21:46 -0200
 
 webkit (1.6.1-5) unstable; urgency=low
 
