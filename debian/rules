@@ -8,17 +8,13 @@ DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 
 GTK_VERSIONS = 2.0 3.0
 
-LDFLAGS =
-CFLAGS = -g -Wall -Wl,--as-needed
+CFLAGS = `dpkg-buildflags --get CFLAGS`
+CFLAGS += -Wall -Wl,--as-needed
+LDFLAGS = `dpkg-buildflags --get LDFLAGS`
+CPPFLAGS = `dpkg-buildflags --get CPPFLAGS`
 
-ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
-        CFLAGS += -O0
-else
 ifeq (armhf,$(filter $(DEB_BUILD_ARCH),armhf))
 	CFLAGS += -O1
-else
-        CFLAGS += -O2
-endif
 endif
 
 ifeq ($(DEB_BUILD_ARCH),alpha)
@@ -84,6 +80,8 @@ build-stamp:
 		LDFLAGS="$(LDFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CFLAGS)" \
+		CPPFLAGS="$(CPPFLAGS)" \
+		LDFLAGS="$(LDFLAGS)" \
 		CC="gcc" \
 		CXX="g++" \
 		../configure --prefix=/usr \
