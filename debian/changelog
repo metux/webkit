@@ -14,8 +14,11 @@ webkit (1.6.3-1) unstable; urgency=low
   * debian/rules:
   - accepted patch by Moritz Muehlenhoff <jmm@debian.org> to use
     dpkg-buildflags for cflags/cppflags/ldflags (Closes: #659391)
+  * debian/control:
+  - add Conflicts and Replaces combo on libjavascriptcoregtk-1.0-dev also
+    for libwebkit-dev << 1.5.0 (Closes: #657408)
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:26:38 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:29:11 -0200
 
 webkit (1.6.1-5) unstable; urgency=low
 

@@ -23,8 +23,8 @@ Package: libjavascriptcoregtk-1.0-dev
 Section: libdevel
 Priority: extra
 Architecture: any
-Conflicts: libwebkitgtk-dev (<< 1.5.0)
-Replaces: libwebkitgtk-dev (<< 1.5.0)
+Conflicts: libwebkitgtk-dev (<< 1.5.0), libwebkit-dev (<< 1.5.0)
+Replaces: libwebkitgtk-dev (<< 1.5.0), libwebkit-dev (<< 1.5.0)
 Depends: libjavascriptcoregtk-1.0-0 (= ${binary:Version}),
          gir1.2-javascriptcoregtk-1.0 (= ${binary:Version}),
          ${misc:Depends}
