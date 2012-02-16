@@ -51,6 +51,13 @@ webkit (1.6.3-1) unstable; urgency=low
 
  -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:29:11 -0200
 
+webkit (1.6.3-1) unstable; urgency=low
+
+  * debian/patches/04_pkgconfig-fix.patch:
+  - removed; applied in this upstream version
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 22:58:25 -0200
+
 webkit (1.6.1-5) unstable; urgency=low
 
   * debian/rules:
