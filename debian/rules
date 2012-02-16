@@ -8,6 +8,7 @@ DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 
 GTK_VERSIONS = 2.0 3.0
 
+LDFLAGS =
 CFLAGS = -g -Wall -Wl,--as-needed
 
 ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
@@ -21,7 +22,7 @@ endif
 endif
 
 ifeq ($(DEB_BUILD_ARCH),alpha)
-        CFLAGS += -Wl,--no-relax
+        LDFLAGS += -Wl,--no-relax
 endif
 
 ifneq (,$(findstring $(DEB_BUILD_ARCH),mips mipsel s390 s390x))
@@ -80,6 +81,7 @@ build-stamp:
 		fi; \
 		cd build-$${version}; \
 		env AR_FLAGS="cruT" \
+		LDFLAGS="$(LDFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CFLAGS)" \
 		CC="gcc" \
