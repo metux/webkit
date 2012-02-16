@@ -1,32 +1,99 @@
+diff --git a/Tools/GNUmakefile.am b/Tools/GNUmakefile.am
+index a676abc..234b968 100644
+--- a/Tools/GNUmakefile.am
++++ b/Tools/GNUmakefile.am
+@@ -325,7 +325,7 @@ if ENABLE_WEBKIT2
+ 	  fi; \
+ 	fi
+ endif
+-	$(srcdir)/Tools/gtk/generate-gtkdoc --rebase
++	$(srcdir)/Tools/gtk/generate-gtkdoc --rebase --virtual-root=$${DESTDIR}
+ 
+ uninstall-local:
+ 	@DOC_MODULE_VERSION=`cat ./Documentation/webkitgtk/version.xml`; \
 diff --git a/Tools/gtk/common.py b/Tools/gtk/common.py
-index 7941e13..59f1aec 100644
+index 88ca7fc..2a5ea37 100644
 --- a/Tools/gtk/common.py
 +++ b/Tools/gtk/common.py
-@@ -64,6 +64,10 @@ def get_build_path():
-     if is_valid_build_directory(build_dir):
-         return build_dir
+@@ -42,6 +42,15 @@ def get_build_path():
+     def is_valid_build_directory(path):
+         return os.path.exists(os.path.join(path, 'GNUmakefile'))
  
++    # Debian and Ubuntu build both flavours of the library (with gtk2
++    # and with gtk3); they use directories build-2.0 and build-3.0 for
++    # that, which is not handled by the above cases; we check that the
++    # directory where we are called from is a valid build directory,
++    # which should handle pretty much all other non-standard cases.
 +    build_dir = os.getcwd()
 +    if is_valid_build_directory(build_dir):
 +        return build_dir
 +
-     print 'Could not determine build directory.'
-     sys.exit(1)
- 
+     build_types = ['Release', 'Debug']
+     if '--debug' in sys.argv:
+         build_types.reverse()
 diff --git a/Tools/gtk/generate-gtkdoc b/Tools/gtk/generate-gtkdoc
-index db5f83a..6b48f46 100755
+index 639a7b7..04f0bda 100755
 --- a/Tools/gtk/generate-gtkdoc
 +++ b/Tools/gtk/generate-gtkdoc
-@@ -83,7 +83,11 @@ def get_webkit1_options():
-                    ' -I' + common.top_level_path('Source', 'JavaScriptCore', 'ForwardingHeaders'),
-         'ignored_files': glob.glob(src_path('webkit', '*private.*'))
-     })
--    return (common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-3.0.pc'), options)
-+
-+    if os.path.exists(common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-3.0.pc')):
-+        return (common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-3.0.pc'), options)
-+
-+    return (common.build_path('Source', 'WebKit', 'gtk', 'webkit-1.0.pc'), options)
+@@ -50,10 +50,19 @@ def get_gtkdoc_module_paths(xref_dep_packages):
  
- configure_logging()
+ 
+ def get_common_options():
++    # TODO: We should consider using an arguments parsing library if
++    # we need more of these complex ones.
++    virtual_root = ''
++    for argument in sys.argv:
++        if argument.startswith('--virtual-root='):
++            virtual_root = argument.split('=')[1]
++            break
++
+     return {
+         'decorator': 'WEBKIT_API',
+         'deprecation_guard': 'WEBKIT_DISABLE_DEPRECATED',
+         'library_path' : common.build_path('.libs'),
++        'virtual_root' : virtual_root,
+     }
+ 
+ def get_common_xref_deps():
+@@ -146,7 +155,7 @@ saw_webkit1_warnings = saw_webkit2_warnings = False
+ 
+ pkg_config_path = common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-3.0.pc')
+ if not os.path.exists(pkg_config_path):
+-    pkg_config_path = common.build_path('Source', 'WebKit', 'gtk', 'webkitgtk-1.0.pc')
++    pkg_config_path = common.build_path('Source', 'WebKit', 'gtk', 'webkit-1.0.pc')
+ if os.path.exists(pkg_config_path):
+     options = get_webkit1_options(common.gtk_version_of_pkg_config_file(pkg_config_path))
+     if '--rebase' not in sys.argv:
+diff --git a/Tools/gtk/gtkdoc.py b/Tools/gtk/gtkdoc.py
+index ffaa832..a2586ac 100644
+--- a/Tools/gtk/gtkdoc.py
++++ b/Tools/gtk/gtkdoc.py
+@@ -74,6 +74,11 @@ class GTKDoc(object):
+     interactive        -- Whether or not errors or warnings should prompt the user
+                           to continue or not. When this value is false, generation
+                           will continue despite warnings. (default False)
++
++    virtual_root       -- A temporary installation directory which is used as the root
++                          where the actual installation prefix lives; this is mostly
++                          useful for packagers, and should be set to what is given to
++                          make install as DESTDIR.
+     """
+ 
+     def __init__(self, args):
+@@ -356,13 +361,15 @@ class GTKDoc(object):
+         self._run_command(args, cwd=self.output_dir, ignore_warnings=True)
+ 
+     def rebase_installed_docs(self):
+-        html_dir = os.path.join(self.prefix, 'share', 'gtk-doc', 'html', self.module_name)
++        html_dir = os.path.join(self.virtual_root + self.prefix, 'share', 'gtk-doc', 'html', self.module_name)
+         if not os.path.isdir(html_dir):
+             return
+         args = ['gtkdoc-rebase',
+                 '--relative',
+                 '--html-dir=%s' % html_dir]
+         args.extend(['--other-dir=%s' % extra_dir for extra_dir in self.cross_reference_deps])
++        if self.virtual_root:
++            args.extend(['--dest-dir=%s' % self.virtual_root])
+         self._run_command(args, cwd=self.output_dir)
+ 
  

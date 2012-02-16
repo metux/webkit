@@ -1,6 +1,8 @@
 webkit (1.7.5-1) experimental; urgency=low
 
   * New development release
+  * debian/patches/03_fix-documentation-build.patch:
+  - refreshed, with changes from upstream
 
  -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:56:15 -0200
 
