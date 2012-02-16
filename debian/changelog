@@ -58,6 +58,9 @@ webkit (1.6.3-1) unstable; urgency=low
   * debian/rules:
   - move -Wl,--no-relax to LD_FLAGS, when building on alpha, and add
     LDFLAGS as a parameter (part of #648761)
+  * debian/patches/01_double-conversion.patch:
+  - add CPU(ALPHA) to the list of cpus that pass the test
+    (Closes: #648761)
 
  -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:14:25 -0200
 
