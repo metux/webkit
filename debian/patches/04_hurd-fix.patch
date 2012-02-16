@@ -1,7 +1,9 @@
+diff --git a/Source/JavaScriptCore/wtf/Platform.h b/Source/JavaScriptCore/wtf/Platform.h
+index 1b7b697..648c38d 100644
 --- a/Source/JavaScriptCore/wtf/Platform.h
 +++ b/Source/JavaScriptCore/wtf/Platform.h
-@@ -352,6 +352,11 @@
- #define WTF_OS_HAIKU 1
+@@ -351,6 +351,11 @@
+ #define WTF_OS_FREEBSD 1
  #endif
  
 +/* OS(HURD) - GNU/Hurd */
@@ -12,14 +14,16 @@
  /* OS(LINUX) - Linux */
  #ifdef __linux__
  #define WTF_OS_LINUX 1
-@@ -398,6 +403,7 @@
+@@ -394,6 +399,7 @@
+     || OS(ANDROID)          \
      || OS(DARWIN)           \
      || OS(FREEBSD)          \
-     || OS(HAIKU)            \
 +    || OS(HURD)             \
      || OS(LINUX)            \
      || OS(NETBSD)           \
      || OS(OPENBSD)          \
+diff --git a/Source/JavaScriptCore/wtf/ThreadIdentifierDataPthreads.cpp b/Source/JavaScriptCore/wtf/ThreadIdentifierDataPthreads.cpp
+index b3b690f..affa7c4 100644
 --- a/Source/JavaScriptCore/wtf/ThreadIdentifierDataPthreads.cpp
 +++ b/Source/JavaScriptCore/wtf/ThreadIdentifierDataPthreads.cpp
 @@ -41,6 +41,9 @@
