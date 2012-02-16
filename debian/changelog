@@ -64,8 +64,11 @@ webkit (1.6.3-1) unstable; urgency=low
   * debian/patches/04_hurd-fix.patch:
   - patch by Pino Toscano <pino@debian.org> to fix FTBFS on Hurd
     (Closes: #649192)
+  * debian/rules:
+  - accepted patch by Moritz Muehlenhoff <jmm@debian.org> to use
+    dpkg-buildflags for cflags/cppflags/ldflags (Closes: #659391)
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:21:46 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 15 Feb 2012 23:26:38 -0200
 
 webkit (1.6.1-5) unstable; urgency=low
 
