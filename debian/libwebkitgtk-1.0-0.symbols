@@ -163,9 +163,13 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"WebCore::Element::removeShadowRoot()@Base" 1.5.2
  (optional|c++)"WebCore::Element::shadowRoot() const@Base" 1.5.2
  (optional|c++)"WebCore::Frame::settings() const@Base" 1.7.4
+ (optional|c++)"WebCore::FrameDestructionObserver::FrameDestructionObserver(WebCore::Frame*)@Base" 1.7.5-1
+ (optional|c++)"WebCore::FrameDestructionObserver::frameDestroyed()@Base" 1.7.5-1
+ (optional|c++)"WebCore::FrameDestructionObserver::observeFrame(WebCore::Frame*)@Base" 1.7.5-1
+ (optional|c++)"WebCore::FrameDestructionObserver::~FrameDestructionObserver()@Base" 1.7.5-1
  (optional|c++)"WebCore::FrameView::paintControlTints()@Base" 1.7.4
  (optional|c++)"WebCore::FrameView::scrollElementToRect(WebCore::Element*, WebCore::IntRect const&)@Base" 1.7.4
- (optional|c++)"WebCore::FrameView::setShouldLayoutFixedElementsRelativeToFrame(bool)@Base" 1.7.4
+ (optional|c++)"WebCore::HTMLContentElement::create(WebCore::Document*)@Base" 1.7.5-1
  (optional|c++)"WebCore::HTMLInputElement::setSuggestedValue(WTF::String const&)@Base" 1.6.1
  (optional|c++)"WebCore::HTMLInputElement::suggestedValue() const@Base" 1.6.1
  (optional|c++)"WebCore::HTMLNames::inputTag@Base" 1.6.1
@@ -186,8 +190,9 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"WebCore::RenderObject::absoluteBoundingBoxRect(bool) const@Base" 1.7.4
  (optional|c++)"WebCore::ScrollView::setScrollbarsSuppressed(bool, bool)@Base" 1.6.1
  (optional|c++)"WebCore::ScrollableArea::setScrollOffsetFromInternals(WebCore::IntPoint const&)@Base" 1.6.1
+ (optional|c++)"WebCore::Settings::setFixedElementsLayoutRelativeToFrame(bool)@Base" 1.7.5-1
  (optional|c++)"WebCore::Settings::setMockScrollbarsEnabled(bool)@Base" 1.7.4
- (optional|c++)"WebCore::ShadowContentElement::create(WebCore::Document*)@Base" 1.5.2
+ (optional|c++)"WebCore::ShadowRoot::create(WebCore::Element*, int&)@Base" 1.7.5-1
  (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Element*, WebCore::Range const*, unsigned long&, unsigned long&)@Base" 1.7.4
  (optional|c++)"WebCore::TextIterator::rangeFromLocationAndLength(WebCore::Element*, int, int, bool)@Base" 1.7.4
  (optional|c++)"WebCore::TreeScope::getElementById(WTF::AtomicString const&) const@Base" 1.5.2
@@ -196,6 +201,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"WebCore::externalRepresentation(WebCore::Element*, unsigned int)@Base" 1.5.2
  (optional|c++)"WebCore::getCachedDOMStructure(WebCore::JSDOMGlobalObject*, JSC::ClassInfo const*)@Base" 1.5.1
  (optional|c++)"WebCore::jsStringSlowCase(JSC::ExecState*, WTF::HashMap<WTF::StringImpl*, JSC::Weak<JSC::JSString>, WTF::StringHash, WTF::HashTraits<WTF::StringImpl*>, WTF::HashTraits<JSC::Weak<JSC::JSString> > >&, WTF::StringImpl*)@Base" 1.5.2
+ (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0ul> const&)@Base" 1.7.5-1
  (optional|c++)"WebCore::setDOMException(JSC::ExecState*, int)@Base" 1.5.2
  (optional|c++)"WebCore::toDocument(JSC::JSValue)@Base" 1.5.2
  (optional|c++)"WebCore::toElement(JSC::JSValue)@Base" 1.5.2
@@ -203,23 +209,24 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Range*)@Base" 1.6.1
  (optional|c++)"WebCore::toNode(JSC::JSValue)@Base" 1.5.2
  (optional|c++)"WebCore::toRange(JSC::JSValue)@Base" 1.7.4
+ (optional|c++)"WebCore::userPreferredLanguages()@Base" 1.7.5-1
  atof_dot@Base 1.7.4
  objectFocusedAndCaretOffsetUnignored@Base 1.7.4
  updateExtensionBehavior@Base 1.7.4
  webKitWebSrcSetFrame@Base 1.3.10
  webViewEnterFullscreen@Base 1.3.10
  webViewExitFullscreen@Base 1.3.10
+ webkitAccessibleDetach@Base 1.7.5-1
+ webkitAccessibleGetAccessibilityObject@Base 1.7.5-1
+ webkitAccessibleGetFocusedElement@Base 1.7.5-1
  webkitAccessibleHyperlinkGetAccessibilityObject@Base 1.3.10
  webkitAccessibleHyperlinkGetType@Base 1.3.10
  webkitAccessibleHyperlinkNew@Base 1.3.10
+ webkitAccessibleNew@Base 1.7.5-1
  webkitInit@Base 1.3.10
  webkitViewportAttributesRecompute@Base 1.3.10
  webkitWebSettingsUserAgentForURI@Base 1.5.2
- webkit_accessible_detach@Base 1.3.10
- webkit_accessible_get_accessibility_object@Base 1.3.10
- webkit_accessible_get_focused_element@Base 1.3.10
  webkit_accessible_get_type@Base 1.3.10
- webkit_accessible_new@Base 1.3.10
  webkit_application_cache_get_database_directory_path@Base 1.3.13
  webkit_application_cache_get_maximum_size@Base 1.3.13
  webkit_application_cache_set_maximum_size@Base 1.3.10
@@ -378,6 +385,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_document_type_get_type@Base 1.3.10
  webkit_dom_document_webkit_cancel_full_screen@Base 1.3.10
  webkit_dom_document_webkit_get_flow_by_name@Base 1.7.4
+ webkit_dom_dom_application_cache_abort@Base 1.7.5-1
  webkit_dom_dom_application_cache_dispatch_event@Base 1.3.10
  webkit_dom_dom_application_cache_get_status@Base 1.3.10
  webkit_dom_dom_application_cache_get_type@Base 1.3.10
@@ -780,6 +788,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_document_get_type@Base 1.3.10
  webkit_dom_html_document_get_vlink_color@Base 1.3.10
  webkit_dom_html_document_has_focus@Base 1.3.10
+ webkit_dom_html_document_open@Base 1.7.5-1
  webkit_dom_html_document_release_events@Base 1.3.10
  webkit_dom_html_document_set_alink_color@Base 1.3.10
  webkit_dom_html_document_set_bg_color@Base 1.3.10
@@ -1068,10 +1077,6 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_input_element_set_webkitdirectory@Base 1.5.2
  webkit_dom_html_input_element_step_down@Base 1.3.10
  webkit_dom_html_input_element_step_up@Base 1.3.10
- webkit_dom_html_is_index_element_get_form@Base 1.3.10
- webkit_dom_html_is_index_element_get_prompt@Base 1.3.10
- webkit_dom_html_is_index_element_get_type@Base 1.3.10
- webkit_dom_html_is_index_element_set_prompt@Base 1.3.10
  webkit_dom_html_keygen_element_check_validity@Base 1.3.11
  webkit_dom_html_keygen_element_get_autofocus@Base 1.3.11
  webkit_dom_html_keygen_element_get_challenge@Base 1.3.11
@@ -1870,8 +1875,13 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_marshal_OBJECT__OBJECT@Base 1.3.10
  webkit_marshal_OBJECT__STRING_STRING_POINTER@Base 1.3.10
  webkit_marshal_OBJECT__VOID@Base 1.3.10
+ webkit_marshal_VOID__OBJECT_INT@Base 1.7.5-1
  webkit_marshal_VOID__OBJECT_OBJECT@Base 1.3.10
+ webkit_marshal_VOID__OBJECT_OBJECT_INT@Base 1.7.5-1
+ webkit_marshal_VOID__OBJECT_OBJECT_OBJECT@Base 1.7.5-1
  webkit_marshal_VOID__OBJECT_OBJECT_OBJECT_OBJECT@Base 1.3.10
+ webkit_marshal_VOID__OBJECT_OBJECT_POINTER@Base 1.7.5-1
+ webkit_marshal_VOID__OBJECT_POINTER@Base 1.7.5-1
  webkit_marshal_VOID__OBJECT_POINTER_POINTER@Base 1.3.10
  webkit_marshal_VOID__OBJECT_STRING@Base 1.3.10
  webkit_marshal_VOID__STRING_STRING@Base 1.3.10
