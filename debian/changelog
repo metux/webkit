@@ -8,6 +8,8 @@ webkit (1.7.90+svn20120304-1) experimental; urgency=low
   * debian/*.symbols:
   - updated
   * Merged changes done in 1.6.3-2
+  * debian/control:
+  - Put all gir1.2-* packages into the introspection section.
 
  -- Gustavo Noronha Silva <kov@debian.org>  Sun, 04 Mar 2012 16:28:56 -0300
 
