@@ -5,8 +5,10 @@ webkit (1.7.90+svn20120304-1) experimental; urgency=low
     debian/patches/03_fix-documentation-build.patch,
     debian/patches/04_hurd-fix.patch:
   - removed; applied upstream
+  * debian/*.symbols:
+  - updated
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sun, 04 Mar 2012 02:22:27 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 04 Mar 2012 16:28:56 -0300
 
 webkit (1.7.5-1) experimental; urgency=low
 

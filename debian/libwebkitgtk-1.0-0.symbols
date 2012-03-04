@@ -78,151 +78,155 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  _NPN_SetException@Base 1.3.10
  _NPN_SetProperty@Base 1.3.10
  _NPN_UTF8FromIdentifier@Base 1.3.10
- (optional|c++)"DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::accessibilityHelpText(_AtkObject*)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::addUserStyleSheet(_WebKitWebFrame*, char const*, bool)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::clearMainFrameName(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::clearOpener(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::compositionRange(_WebKitWebView*, int*, int*)@Base" 1.5.1
- (optional|c++)"DumpRenderTreeSupportGtk::confirmComposition(_WebKitWebView*, char const*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::counterValueForElementById(_WebKitWebFrame*, char const*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::decrementAccessibilityValue(_AtkObject*)@Base" 1.5.1
- (optional|c++)"DumpRenderTreeSupportGtk::defaultMinimumTimerInterval()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::doCommand(_WebKitWebView*, char const*)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::dumpConfigurationForViewport(_WebKitWebView*, int, int, int, int, int)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::dumpRenderTree(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::executeCoreCommandByName(_WebKitWebView*, char const*, char const*)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::findString(_WebKitWebView*, char const*, unsigned int)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::firstRectForCharacterRange(_WebKitWebView*, int, int, _cairo_rectangle_int*)@Base" 1.5.2
- (optional|c++)"DumpRenderTreeSupportGtk::gcCollectJavascriptObjects()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::gcCollectJavascriptObjectsOnAlternateThread(bool)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::gcCountJavascriptObjects()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::getFocusedAccessibleElement(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::getFrameChildren(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::getInnerText(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::getPendingUnloadEventCount(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::getRootAccessibleElement(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::hasComposition(_WebKitWebView*)@Base" 1.5.1
- (optional|c++)"DumpRenderTreeSupportGtk::incrementAccessibilityValue(_AtkObject*)@Base" 1.5.1
- (optional|c++)"DumpRenderTreeSupportGtk::isCommandEnabled(_WebKitWebView*, char const*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::isPageBoxVisible(_WebKitWebFrame*, int)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::jsValueToDOMRange(OpaqueJSContext const*, OpaqueJSValue const*)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::clearOpener(_WebKitWebFrame*)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::layoutFrame(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::linksIncludedInFocusChain()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::markerTextForListItem(_WebKitWebFrame*, OpaqueJSContext const*, OpaqueJSValue const*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::nodesFromRect(OpaqueJSContext const*, OpaqueJSValue const*, int, int, unsigned int, unsigned int, unsigned int, unsigned int, bool)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::numberOfActiveAnimations(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::numberOfPagesForFrame(_WebKitWebFrame*, float, float)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests(_WebKitWebView*)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::pageNumberForElementById(_WebKitWebFrame*, char const*, float, float)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::pageProperty(_WebKitWebFrame*, char const*, int)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::pageSizeAndMarginsInPixels(_WebKitWebFrame*, int, int, int, int, int, int, int)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::pauseAnimation(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::pauseSVGAnimation(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::pauseTransition(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::rectangleForSelection(_WebKitWebFrame*, _cairo_rectangle_int*)@Base" 1.5.2
- (optional|c++)"DumpRenderTreeSupportGtk::resetGeolocationClientMock(_WebKitWebView*)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::resetOriginAccessWhiteLists()@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::resumeAnimations(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::s_drtRun@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::s_linksIncludedInTabChain@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::s_selectTrailingWhitespaceEnabled@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::scalePageBy(_WebKitWebView*, float, float, float)@Base" 1.5.1
- (optional|c++)"DumpRenderTreeSupportGtk::selectTrailingWhitespaceEnabled()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::shouldClose(_WebKitWebFrame*)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::getInnerText(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::pageProperty(_WebKitWebFrame*, char const*, int)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::nodesFromRect(OpaqueJSContext const*, OpaqueJSValue const*, int, int, unsigned int, unsigned int, unsigned int, unsigned int, bool)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::selectedRange(_WebKitWebView*, int*, int*)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::setAutofilled(OpaqueJSContext const*, OpaqueJSValue const*, bool)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::dumpRenderTree(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::hasComposition(_WebKitWebView*)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::pauseAnimation(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::setComposition(_WebKitWebView*, char const*, int, int)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::setDumpRenderTreeModeEnabled(bool)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(_WebKitWebView*, bool)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(bool)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::pauseTransition(_WebKitWebFrame*, char const*, double, char const*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::setValueForUser(OpaqueJSContext const*, OpaqueJSValue const*, OpaqueJSString*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::compositionRange(_WebKitWebView*, int*, int*)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::getFrameChildren(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::isCommandEnabled(_WebKitWebView*, char const*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::isPageBoxVisible(_WebKitWebFrame*, int)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::resumeAnimations(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::addUserStyleSheet(_WebKitWebFrame*, char const*, bool)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::jsValueToDOMRange(OpaqueJSContext const*, OpaqueJSValue const*)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::suspendAnimations(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::workerThreadCount()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::clearMainFrameName(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::confirmComposition(_WebKitWebView*, char const*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::accessibilityHelpText(_AtkObject*)@Base" 1.7.4
+ (optional|c++)"DumpRenderTreeSupportGtk::markerTextForListItem(_WebKitWebFrame*, OpaqueJSContext const*, OpaqueJSValue const*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::numberOfPagesForFrame(_WebKitWebFrame*, float, float)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::rectangleForSelection(_WebKitWebFrame*, _cairo_rectangle_int*)@Base" 1.5.2
  (optional|c++)"DumpRenderTreeSupportGtk::setMinimumTimerInterval(_WebKitWebView*, double)@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::setMockGeolocationError(_WebKitWebView*, int, char const*)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::setMockGeolocationPermission(_WebKitWebView*, bool)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::setMockGeolocationPosition(_WebKitWebView*, double, double, double)@Base" 1.7.4
- (optional|c++)"DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(bool)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(_WebKitWebView*, bool)@Base" 1.5.1
- (optional|c++)"DumpRenderTreeSupportGtk::setValueForUser(OpaqueJSContext const*, OpaqueJSValue const*, OpaqueJSString*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::shouldClose(_WebKitWebFrame*)@Base" 1.5.1
- (optional|c++)"DumpRenderTreeSupportGtk::suspendAnimations(_WebKitWebFrame*)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::webkitWebFrameSelectionHasSpellingMarker(_WebKitWebFrame*, int, int)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::executeCoreCommandByName(_WebKitWebView*, char const*, char const*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::gcCountJavascriptObjects()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::getRootAccessibleElement(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::numberOfActiveAnimations(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::pageNumberForElementById(_WebKitWebFrame*, char const*, float, float)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::linksIncludedInFocusChain()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::s_linksIncludedInTabChain@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::whiteListAccessFromOrigin(char const*, char const*, char const*, bool)@Base" 1.3.13
- (optional|c++)"DumpRenderTreeSupportGtk::workerThreadCount()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::counterValueForElementById(_WebKitWebFrame*, char const*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::firstRectForCharacterRange(_WebKitWebView*, int, int, _cairo_rectangle_int*)@Base" 1.5.2
+ (optional|c++)"DumpRenderTreeSupportGtk::gcCollectJavascriptObjects()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::getPendingUnloadEventCount(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::pageSizeAndMarginsInPixels(_WebKitWebFrame*, int, int, int, int, int, int, int)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::resetGeolocationClientMock(_WebKitWebView*)@Base" 1.7.4
+ (optional|c++)"DumpRenderTreeSupportGtk::setMockGeolocationPosition(_WebKitWebView*, double, double, double)@Base" 1.7.4
+ (optional|c++)"DumpRenderTreeSupportGtk::decrementAccessibilityValue(_AtkObject*)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::defaultMinimumTimerInterval()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::getFocusedAccessibleElement(_WebKitWebFrame*)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::incrementAccessibilityValue(_AtkObject*)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::resetOriginAccessWhiteLists()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(_WebKitWebView*, bool)@Base" 1.5.1
+ (optional|c++)"DumpRenderTreeSupportGtk::dumpConfigurationForViewport(_WebKitWebView*, int, int, int, int, int)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::setDumpRenderTreeModeEnabled(bool)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(bool)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::setMockGeolocationPermission(_WebKitWebView*, bool)@Base" 1.7.4
+ (optional|c++)"DumpRenderTreeSupportGtk::selectTrailingWhitespaceEnabled()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::s_selectTrailingWhitespaceEnabled@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(_WebKitWebView*, bool)@Base" 1.7.4
+ (optional|c++)"DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(bool)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(_WebKitWebFrame*, OpaqueJSString*)@Base" 1.7.90
+ (optional|c++)"DumpRenderTreeSupportGtk::webkitWebFrameSelectionHasSpellingMarker(_WebKitWebFrame*, int, int)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::gcCollectJavascriptObjectsOnAlternateThread(bool)@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests(_WebKitWebView*)@Base" 1.7.4
+ (optional|c++)"DumpRenderTreeSupportGtk::s_drtRun@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::doCommand(_WebKitWebView*, char const*)@Base" 1.7.4
+ (optional|c++)"DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()@Base" 1.3.13
+ (optional|c++)"DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::~DumpRenderTreeSupportGtk()@Base" 1.3.13
  (optional|c++)"DumpRenderTreeSupportGtk::~DumpRenderTreeSupportGtk()@Base" 1.3.13
- (optional|c++)"WebCore::CachedResourceLoader::isPreloaded(WTF::String const&) const@Base" 1.5.2
- (optional|c++)"WebCore::ClientRect::ClientRect()@Base" 1.5.2
+ (optional|c++)"void WTF::freeOwnedGPtr<_GdkEvent>(_GdkEvent*)@Base" 1.7.90
  (optional|c++)"WebCore::ClientRect::ClientRect(WebCore::IntRect const&)@Base" 1.5.2
- (optional|c++)"WebCore::Document::page() const@Base" 1.5.2
- (optional|c++)"WebCore::Document::settings() const@Base" 1.5.2
- (optional|c++)"WebCore::Document::updateLayoutIgnorePendingStylesheets()@Base" 1.5.2
- (optional|c++)"WebCore::Document::view() const@Base" 1.6.1
- (optional|c++)"WebCore::DocumentMarkerController::markersFor(WebCore::Node*, WebCore::DocumentMarker::MarkerTypes)@Base" 1.7.4
- (optional|c++)"WebCore::Element::ensureShadowRoot()@Base" 1.5.2
- (optional|c++)"WebCore::Element::removeShadowRoot()@Base" 1.5.2
- (optional|c++)"WebCore::Element::shadowRoot() const@Base" 1.5.2
- (optional|c++)"WebCore::Frame::settings() const@Base" 1.7.4
- (optional|c++)"WebCore::FrameDestructionObserver::FrameDestructionObserver(WebCore::Frame*)@Base" 1.7.5-1
- (optional|c++)"WebCore::FrameDestructionObserver::frameDestroyed()@Base" 1.7.5-1
- (optional|c++)"WebCore::FrameDestructionObserver::observeFrame(WebCore::Frame*)@Base" 1.7.5-1
- (optional|c++)"WebCore::FrameDestructionObserver::~FrameDestructionObserver()@Base" 1.7.5-1
- (optional|c++)"WebCore::FrameView::paintControlTints()@Base" 1.7.4
- (optional|c++)"WebCore::FrameView::scrollElementToRect(WebCore::Element*, WebCore::IntRect const&)@Base" 1.7.4
- (optional|c++)"WebCore::HTMLContentElement::create(WebCore::Document*)@Base" 1.7.5-1
- (optional|c++)"WebCore::HTMLInputElement::setSuggestedValue(WTF::String const&)@Base" 1.6.1
- (optional|c++)"WebCore::HTMLInputElement::suggestedValue() const@Base" 1.6.1
- (optional|c++)"WebCore::HTMLNames::inputTag@Base" 1.6.1
- (optional|c++)"WebCore::HTMLNames::textareaTag@Base" 1.6.1
- (optional|c++)"WebCore::HTMLTextFormControlElement::lastChangeWasUserEdit() const@Base" 1.6.1
- (optional|c++)"WebCore::InspectorController::setResourcesDataSizeLimitsFromInternals(int, int)@Base" 1.5.2
- (optional|c++)"WebCore::JSDOMGlobalObject::scriptExecutionContext() const@Base" 1.7.4
+ (optional|c++)"WebCore::ClientRect::ClientRect()@Base" 1.5.2
  (optional|c++)"WebCore::JSDocument::s_info@Base" 1.5.2
- (optional|c++)"WebCore::JSElement::s_info@Base" 1.5.2
- (optional|c++)"WebCore::JSNode::pushEventHandlerScope(JSC::ExecState*, JSC::ScopeChainNode*) const@Base" 1.5.2
- (optional|c++)"WebCore::JSNode::s_info@Base" 1.5.2
+ (optional|c++)"WebCore::ScrollView::setScrollbarsSuppressed(bool, bool)@Base" 1.6.1
+ (optional|c++)"WebCore::ShadowRoot::create(WebCore::Element*, int&)@Base" 1.7.5
+ (optional|c++)"WebCore::toDocument(JSC::JSValue)@Base" 1.5.2
+ (optional|c++)"WebCore::TextIterator::rangeFromLocationAndLength(WebCore::Element*, int, int, bool)@Base" 1.7.4
+ (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Element*, WebCore::Range const*, unsigned long&, unsigned long&)@Base" 1.7.4
+ (optional|c++)"WebCore::createWrapper(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Node*)@Base" 1.5.2
+ (optional|c++)"WebCore::ScrollableArea::setScrollOffsetFromInternals(WebCore::IntPoint const&)@Base" 1.6.1
+ (optional|c++)"WebCore::setDOMException(JSC::ExecState*, int)@Base" 1.5.2
+ (optional|c++)"WebCore::HTMLInputElement::setSuggestedValue(WTF::String const&)@Base" 1.6.1
+ (optional|c++)"WebCore::jsStringSlowCase(JSC::ExecState*, WTF::HashMap<WTF::StringImpl*, JSC::Weak<JSC::JSString>, WTF::StringHash, WTF::HashTraits<WTF::StringImpl*>, WTF::HashTraits<JSC::Weak<JSC::JSString> > >&, WTF::StringImpl*)@Base" 1.5.2
+ (optional|c++)"WebCore::cacheDOMStructure(WebCore::JSDOMGlobalObject*, JSC::Structure*, JSC::ClassInfo const*)@Base" 1.5.1
+ (optional|c++)"WebCore::HTMLContentElement::create(WebCore::Document*)@Base" 1.7.5
+ (optional|c++)"WebCore::InspectorController::setResourcesDataSizeLimitsFromInternals(int, int)@Base" 1.5.2
  (optional|c++)"WebCore::NodeRenderingContext::NodeRenderingContext(WebCore::Node*)@Base" 1.5.2
  (optional|c++)"WebCore::NodeRenderingContext::~NodeRenderingContext()@Base" 1.5.2
- (optional|c++)"WebCore::Page::setPageScaleFactor(float, WebCore::IntPoint const&)@Base" 1.7.4
- (optional|c++)"WebCore::Page::setPagination(WebCore::Page::Pagination const&)@Base" 1.7.4
- (optional|c++)"WebCore::Range::create(WTF::PassRefPtr<WebCore::Document>, WTF::PassRefPtr<WebCore::Node>, int, WTF::PassRefPtr<WebCore::Node>, int)@Base" 1.6.1
- (optional|c++)"WebCore::Range::~Range()@Base" 1.6.1
- (optional|c++)"WebCore::RenderObject::absoluteBoundingBoxRect(bool) const@Base" 1.7.4
- (optional|c++)"WebCore::ScrollView::setScrollbarsSuppressed(bool, bool)@Base" 1.6.1
- (optional|c++)"WebCore::ScrollableArea::setScrollOffsetFromInternals(WebCore::IntPoint const&)@Base" 1.6.1
- (optional|c++)"WebCore::Settings::setFixedElementsLayoutRelativeToFrame(bool)@Base" 1.7.5-1
- (optional|c++)"WebCore::Settings::setMockScrollbarsEnabled(bool)@Base" 1.7.4
- (optional|c++)"WebCore::ShadowRoot::create(WebCore::Element*, int&)@Base" 1.7.5-1
- (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Element*, WebCore::Range const*, unsigned long&, unsigned long&)@Base" 1.7.4
- (optional|c++)"WebCore::TextIterator::rangeFromLocationAndLength(WebCore::Element*, int, int, bool)@Base" 1.7.4
- (optional|c++)"WebCore::TreeScope::getElementById(WTF::AtomicString const&) const@Base" 1.5.2
- (optional|c++)"WebCore::cacheDOMStructure(WebCore::JSDOMGlobalObject*, JSC::Structure*, JSC::ClassInfo const*)@Base" 1.5.1
- (optional|c++)"WebCore::createWrapper(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Node*)@Base" 1.5.2
- (optional|c++)"WebCore::externalRepresentation(WebCore::Element*, unsigned int)@Base" 1.5.2
  (optional|c++)"WebCore::getCachedDOMStructure(WebCore::JSDOMGlobalObject*, JSC::ClassInfo const*)@Base" 1.5.1
- (optional|c++)"WebCore::jsStringSlowCase(JSC::ExecState*, WTF::HashMap<WTF::StringImpl*, JSC::Weak<JSC::JSString>, WTF::StringHash, WTF::HashTraits<WTF::StringImpl*>, WTF::HashTraits<JSC::Weak<JSC::JSString> > >&, WTF::StringImpl*)@Base" 1.5.2
- (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0ul> const&)@Base" 1.7.5-1
- (optional|c++)"WebCore::setDOMException(JSC::ExecState*, int)@Base" 1.5.2
- (optional|c++)"WebCore::toDocument(JSC::JSValue)@Base" 1.5.2
- (optional|c++)"WebCore::toElement(JSC::JSValue)@Base" 1.5.2
+ (optional|c++)"WebCore::RuntimeEnabledFeatures::isMultipleShadowSubtreesEnabled@Base" 1.7.90
+ (optional|c++)"WebCore::externalRepresentation(WebCore::Element*, unsigned int)@Base" 1.5.2
+ (optional|c++)"WebCore::userPreferredLanguages()@Base" 1.7.5
+ (optional|c++)"WebCore::DocumentMarkerController::markersFor(WebCore::Node*, WebCore::DocumentMarker::MarkerTypes)@Base" 1.7.4
+ (optional|c++)"WebCore::FrameDestructionObserver::observeFrame(WebCore::Frame*)@Base" 1.7.5
+ (optional|c++)"WebCore::FrameDestructionObserver::frameDestroyed()@Base" 1.7.5
+ (optional|c++)"WebCore::FrameDestructionObserver::FrameDestructionObserver(WebCore::Frame*)@Base" 1.7.5
+ (optional|c++)"WebCore::FrameDestructionObserver::~FrameDestructionObserver()@Base" 1.7.5
+ (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0ul> const&)@Base" 1.7.5
+ (optional|c++)"WebCore::Page::setPagination(WebCore::Page::Pagination const&)@Base" 1.7.4
+ (optional|c++)"WebCore::Page::setPageScaleFactor(float, WebCore::IntPoint const&)@Base" 1.7.4
  (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::ClientRect*)@Base" 1.5.2
  (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Range*)@Base" 1.6.1
+ (optional|c++)"WebCore::Range::create(WTF::PassRefPtr<WebCore::Document>, WTF::PassRefPtr<WebCore::Node>, int, WTF::PassRefPtr<WebCore::Node>, int)@Base" 1.6.1
+ (optional|c++)"WebCore::Range::~Range()@Base" 1.6.1
+ (optional|c++)"WebCore::JSNode::s_info@Base" 1.5.2
  (optional|c++)"WebCore::toNode(JSC::JSValue)@Base" 1.5.2
+ (optional|c++)"WebCore::Element::removeShadowRoot()@Base" 1.5.2
  (optional|c++)"WebCore::toRange(JSC::JSValue)@Base" 1.7.4
- (optional|c++)"WebCore::userPreferredLanguages()@Base" 1.7.5-1
+ (optional|c++)"WebCore::Document::updateLayoutIgnorePendingStylesheets()@Base" 1.5.2
+ (optional|c++)"WebCore::Settings::setMockScrollbarsEnabled(bool)@Base" 1.7.4
+ (optional|c++)"WebCore::Settings::setFixedElementsLayoutRelativeToFrame(bool)@Base" 1.7.5
+ (optional|c++)"WebCore::FrameView::paintControlTints()@Base" 1.7.4
+ (optional|c++)"WebCore::FrameView::scrollElementToRect(WebCore::Element*, WebCore::IntRect const&)@Base" 1.7.4
+ (optional|c++)"WebCore::HTMLNames::textareaTag@Base" 1.6.1
+ (optional|c++)"WebCore::HTMLNames::inputTag@Base" 1.6.1
+ (optional|c++)"WebCore::JSElement::s_info@Base" 1.5.2
+ (optional|c++)"WebCore::toElement(JSC::JSValue)@Base" 1.5.2
+ (optional|c++)"WebCore::RenderObject::absoluteBoundingBoxRect(bool) const@Base" 1.7.4
+ (optional|c++)"WebCore::DocumentMarker::description() const@Base" 1.7.90
+ (optional|c++)"WebCore::HTMLInputElement::suggestedValue() const@Base" 1.6.1
+ (optional|c++)"WebCore::JSDOMGlobalObject::scriptExecutionContext() const@Base" 1.7.4
+ (optional|c++)"WebCore::CachedResourceLoader::isPreloaded(WTF::String const&) const@Base" 1.5.2
+ (optional|c++)"WebCore::HTMLTextFormControlElement::lastChangeWasUserEdit() const@Base" 1.6.1
+ (optional|c++)"WebCore::Node::numberOfScopedHTMLStyleChildren() const@Base" 1.7.90
+ (optional|c++)"WebCore::Frame::settings() const@Base" 1.7.4
+ (optional|c++)"WebCore::JSNode::pushEventHandlerScope(JSC::ExecState*, JSC::ScopeChainNode*) const@Base" 1.5.2
+ (optional|c++)"WebCore::Element::hasShadowRoot() const@Base" 1.7.90
+ (optional|c++)"WebCore::Element::shadowRootList() const@Base" 1.7.90
+ (optional|c++)"WebCore::Document::page() const@Base" 1.5.2
+ (optional|c++)"WebCore::Document::view() const@Base" 1.6.1
+ (optional|c++)"WebCore::Document::settings() const@Base" 1.5.2
+ (optional|c++)"WebCore::TreeScope::getElementById(WTF::AtomicString const&) const@Base" 1.5.2
  atof_dot@Base 1.7.4
  objectFocusedAndCaretOffsetUnignored@Base 1.7.4
  updateExtensionBehavior@Base 1.7.4
  webKitWebSrcSetFrame@Base 1.3.10
  webViewEnterFullscreen@Base 1.3.10
  webViewExitFullscreen@Base 1.3.10
- webkitAccessibleDetach@Base 1.7.5-1
- webkitAccessibleGetAccessibilityObject@Base 1.7.5-1
- webkitAccessibleGetFocusedElement@Base 1.7.5-1
+ webkitAccessibleDetach@Base 1.7.5
+ webkitAccessibleGetAccessibilityObject@Base 1.7.5
+ webkitAccessibleGetFocusedElement@Base 1.7.5
  webkitAccessibleHyperlinkGetAccessibilityObject@Base 1.3.10
  webkitAccessibleHyperlinkGetType@Base 1.3.10
  webkitAccessibleHyperlinkNew@Base 1.3.10
- webkitAccessibleNew@Base 1.7.5-1
+ webkitAccessibleNew@Base 1.7.5
  webkitInit@Base 1.3.10
  webkitViewportAttributesRecompute@Base 1.3.10
  webkitWebSettingsUserAgentForURI@Base 1.5.2
@@ -385,7 +389,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_document_type_get_type@Base 1.3.10
  webkit_dom_document_webkit_cancel_full_screen@Base 1.3.10
  webkit_dom_document_webkit_get_flow_by_name@Base 1.7.4
- webkit_dom_dom_application_cache_abort@Base 1.7.5-1
+ webkit_dom_dom_application_cache_abort@Base 1.7.5
  webkit_dom_dom_application_cache_dispatch_event@Base 1.3.10
  webkit_dom_dom_application_cache_get_status@Base 1.3.10
  webkit_dom_dom_application_cache_get_type@Base 1.3.10
@@ -529,6 +533,8 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_dom_window_set_name@Base 1.3.10
  webkit_dom_dom_window_set_status@Base 1.3.10
  webkit_dom_dom_window_stop@Base 1.3.10
+ webkit_dom_dom_window_webkit_cancel_animation_frame@Base 1.7.90
+ webkit_dom_dom_window_webkit_cancel_request_animation_frame@Base 1.7.90
  webkit_dom_dom_window_webkit_convert_point_from_node_to_page@Base 1.3.10
  webkit_dom_dom_window_webkit_convert_point_from_page_to_node@Base 1.3.10
  webkit_dom_element_blur@Base 1.3.10
@@ -561,6 +567,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_element_get_style@Base 1.3.10
  webkit_dom_element_get_tag_name@Base 1.3.10
  webkit_dom_element_get_type@Base 1.3.10
+ webkit_dom_element_get_webkit_region_overflow@Base 1.7.90
  webkit_dom_element_has_attribute@Base 1.3.10
  webkit_dom_element_has_attribute_ns@Base 1.3.10
  webkit_dom_element_query_selector@Base 1.3.10
@@ -727,7 +734,6 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_body_element_set_text@Base 1.3.10
  webkit_dom_html_body_element_set_v_link@Base 1.3.10
  webkit_dom_html_button_element_check_validity@Base 1.3.10
- webkit_dom_html_button_element_click@Base 1.3.10
  webkit_dom_html_button_element_get_autofocus@Base 1.3.10
  webkit_dom_html_button_element_get_disabled@Base 1.3.10
  webkit_dom_html_button_element_get_form@Base 1.3.10
@@ -788,7 +794,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_document_get_type@Base 1.3.10
  webkit_dom_html_document_get_vlink_color@Base 1.3.10
  webkit_dom_html_document_has_focus@Base 1.3.10
- webkit_dom_html_document_open@Base 1.7.5-1
+ webkit_dom_html_document_open@Base 1.7.5
  webkit_dom_html_document_release_events@Base 1.3.10
  webkit_dom_html_document_set_alink_color@Base 1.3.10
  webkit_dom_html_document_set_bg_color@Base 1.3.10
@@ -797,6 +803,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_document_set_fg_color@Base 1.3.10
  webkit_dom_html_document_set_link_color@Base 1.3.10
  webkit_dom_html_document_set_vlink_color@Base 1.3.10
+ webkit_dom_html_element_click@Base 1.7.90
  webkit_dom_html_element_get_access_key@Base 1.7.4
  webkit_dom_html_element_get_children@Base 1.3.10
  webkit_dom_html_element_get_class_list@Base 1.3.10
@@ -820,6 +827,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_element_get_spellcheck@Base 1.3.10
  webkit_dom_html_element_get_tab_index@Base 1.3.10
  webkit_dom_html_element_get_title@Base 1.3.10
+ webkit_dom_html_element_get_translate@Base 1.7.90
  webkit_dom_html_element_get_type@Base 1.3.10
  webkit_dom_html_element_get_webkitdropzone@Base 1.5.1
  webkit_dom_html_element_insert_adjacent_element@Base 1.3.10
@@ -842,6 +850,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_element_set_spellcheck@Base 1.3.10
  webkit_dom_html_element_set_tab_index@Base 1.3.10
  webkit_dom_html_element_set_title@Base 1.3.10
+ webkit_dom_html_element_set_translate@Base 1.7.90
  webkit_dom_html_element_set_webkitdropzone@Base 1.5.1
  webkit_dom_html_embed_element_get_align@Base 1.3.10
  webkit_dom_html_embed_element_get_height@Base 1.3.10
@@ -991,7 +1000,6 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_image_element_set_vspace@Base 1.3.10
  webkit_dom_html_image_element_set_width@Base 1.3.10
  webkit_dom_html_input_element_check_validity@Base 1.3.10
- webkit_dom_html_input_element_click@Base 1.3.10
  webkit_dom_html_input_element_get_accept@Base 1.3.10
  webkit_dom_html_input_element_get_align@Base 1.3.10
  webkit_dom_html_input_element_get_alt@Base 1.3.10
@@ -1794,6 +1802,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_webkit_animation_pause@Base 1.3.13
  webkit_dom_webkit_animation_play@Base 1.3.13
  webkit_dom_webkit_animation_set_elapsed_time@Base 1.3.13
+ webkit_dom_webkit_named_flow_get_overflow@Base 1.7.90
  webkit_dom_webkit_named_flow_get_type@Base 1.7.4
  webkit_dom_webkit_point_get_type@Base 1.3.10
  webkit_dom_webkit_point_get_x@Base 1.3.10
@@ -1875,13 +1884,13 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_marshal_OBJECT__OBJECT@Base 1.3.10
  webkit_marshal_OBJECT__STRING_STRING_POINTER@Base 1.3.10
  webkit_marshal_OBJECT__VOID@Base 1.3.10
- webkit_marshal_VOID__OBJECT_INT@Base 1.7.5-1
+ webkit_marshal_VOID__OBJECT_INT@Base 1.7.5
  webkit_marshal_VOID__OBJECT_OBJECT@Base 1.3.10
- webkit_marshal_VOID__OBJECT_OBJECT_INT@Base 1.7.5-1
- webkit_marshal_VOID__OBJECT_OBJECT_OBJECT@Base 1.7.5-1
+ webkit_marshal_VOID__OBJECT_OBJECT_INT@Base 1.7.5
+ webkit_marshal_VOID__OBJECT_OBJECT_OBJECT@Base 1.7.5
  webkit_marshal_VOID__OBJECT_OBJECT_OBJECT_OBJECT@Base 1.3.10
- webkit_marshal_VOID__OBJECT_OBJECT_POINTER@Base 1.7.5-1
- webkit_marshal_VOID__OBJECT_POINTER@Base 1.7.5-1
+ webkit_marshal_VOID__OBJECT_OBJECT_POINTER@Base 1.7.5
+ webkit_marshal_VOID__OBJECT_POINTER@Base 1.7.5
  webkit_marshal_VOID__OBJECT_POINTER_POINTER@Base 1.3.10
  webkit_marshal_VOID__OBJECT_STRING@Base 1.3.10
  webkit_marshal_VOID__STRING_STRING@Base 1.3.10
