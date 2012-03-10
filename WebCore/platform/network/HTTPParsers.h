@@ -38,6 +38,7 @@ namespace WebCore {
     String filenameFromHTTPContentDisposition(const String&); 
     String extractMIMETypeFromMediaType(const String&);
     String extractCharsetFromMediaType(const String&); 
+    void findCharsetInMediaType(const String& mediaType, unsigned int& charsetPos, unsigned int& charsetLen, unsigned int start = 0);
 }
 
 #endif

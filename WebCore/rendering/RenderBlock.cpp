@@ -1546,7 +1546,7 @@ void RenderBlock::paint(PaintInfo& paintInfo, int tx, int ty)
 
 void RenderBlock::paintColumnRules(PaintInfo& paintInfo, int tx, int ty)
 {
-    const Color& ruleColor = style()->columnRuleColor();
+    const Color& ruleColor = style()->visitedDependentColor(CSSPropertyWebkitColumnRuleColor);
     bool ruleTransparent = style()->columnRuleIsTransparent();
     EBorderStyle ruleStyle = style()->columnRuleStyle();
     int ruleWidth = style()->columnRuleWidth();
@@ -1581,7 +1581,7 @@ void RenderBlock::paintColumnRules(PaintInfo& paintInfo, int tx, int ty)
             int ruleTop = ty + borderTop() + paddingTop();
             int ruleBottom = ruleTop + contentHeight();
             drawLineForBoxSide(paintInfo.context, ruleStart, ruleTop, ruleEnd, ruleBottom,
-                               style()->direction() == LTR ? BSLeft : BSRight, ruleColor, style()->color(), ruleStyle, 0, 0);
+                               style()->direction() == LTR ? BSLeft : BSRight, ruleColor, ruleStyle, 0, 0);
         }
         
         ruleX = currXOffset;
@@ -1760,7 +1760,7 @@ void RenderBlock::paintObject(PaintInfo& paintInfo, int tx, int ty)
 
     // 5. paint outline.
     if ((paintPhase == PaintPhaseOutline || paintPhase == PaintPhaseSelfOutline) && hasOutline() && style()->visibility() == VISIBLE)
-        paintOutline(paintInfo.context, tx, ty, width(), height(), style());
+        paintOutline(paintInfo.context, tx, ty, width(), height());
 
     // 6. paint continuation outlines.
     if ((paintPhase == PaintPhaseOutline || paintPhase == PaintPhaseChildOutlines)) {
@@ -4726,9 +4726,7 @@ void RenderBlock::updateFirstLetter()
             // construct text fragment for the first letter
             RenderTextFragment* letter = 
                 new (renderArena()) RenderTextFragment(remainingText->node() ? remainingText->node() : remainingText->document(), oldText.get(), 0, length);
-            RefPtr<RenderStyle> newStyle = RenderStyle::create();
-            newStyle->inheritFrom(pseudoStyle);
-            letter->setStyle(newStyle.release());
+            letter->setStyle(pseudoStyle);
             firstLetter->addChild(letter);
 
             textObj->destroy();

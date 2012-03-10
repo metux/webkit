@@ -1,10 +1,10 @@
 /*
- * Copyright (c) 2010, Google Inc. All rights reserved.
- * 
+ * Copyright (C) 2010 Google Inc. All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -14,7 +14,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -28,35 +28,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ScriptWrappable_h
-#define ScriptWrappable_h
+#ifndef TreeDepthLimit_h
+#define TreeDepthLimit_h
 
-#include "JSDOMWrapper.h"
-#include <runtime/WeakGCPtr.h>
+#ifndef MAX_DOM_TREE_DEPTH
+#define MAX_DOM_TREE_DEPTH 5000
+#endif
+const unsigned maxDOMTreeDepth = MAX_DOM_TREE_DEPTH;
 
-namespace WebCore {
+#endif // TreeDepthLimit.h
 
-class ScriptWrappable {
-public:
-    DOMObject* wrapper() const
-    {
-        return m_wrapper.get();
-    }
-    
-    void setWrapper(DOMObject* wrapper)
-    {
-        m_wrapper = wrapper;
-    }
-    
-    void clearWrapper(DOMObject* wrapper) 
-    { 
-        m_wrapper.clear(wrapper); 
-    }
-    
-private:
-    JSC::WeakGCPtr<DOMObject> m_wrapper;
-};
-
-} // namespace WebCore
-
-#endif // ScriptWrappable_h

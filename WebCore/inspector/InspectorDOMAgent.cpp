@@ -34,10 +34,10 @@
 #if ENABLE(INSPECTOR)
 
 #include "AtomicString.h"
+#include "CSSComputedStyleDeclaration.h"
 #include "CSSMutableStyleDeclaration.h"
 #include "CSSRule.h"
 #include "CSSRuleList.h"
-#include "CSSStyleDeclaration.h"
 #include "CSSStyleRule.h"
 #include "CSSStyleSheet.h"
 #include "ContainerNode.h"
@@ -698,12 +698,12 @@ void InspectorDOMAgent::getStyles(long callId, long nodeId, bool authorOnly)
     }
 
     Element* element = static_cast<Element*>(node);
-    RefPtr<CSSStyleDeclaration> computedStyle = defaultView->getComputedStyle(element, "");
+    RefPtr<CSSComputedStyleDeclaration> computedStyleInfo = computedStyle(node, true); // Support the viewing of :visited information in computed style.
 
     ScriptObject result = m_frontend->newScriptObject();
     if (element->style())
         result.set("inlineStyle", buildObjectForStyle(element->style(), true));
-    result.set("computedStyle", buildObjectForStyle(computedStyle.get(), false));
+    result.set("computedStyle", buildObjectForStyle(computedStyleInfo.get(), false));
     result.set("matchedCSSRules", getMatchedCSSRules(element, authorOnly));
     result.set("styleAttributes", getAttributeStyles(element));
     m_frontend->didGetStyles(callId, result);

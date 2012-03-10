@@ -33,12 +33,12 @@ enum EUpdateLayout { DoNotUpdateLayout = false, UpdateLayout = true };
 
 class CSSComputedStyleDeclaration : public CSSStyleDeclaration {
 public:
-    friend PassRefPtr<CSSComputedStyleDeclaration> computedStyle(PassRefPtr<Node>);
+    friend PassRefPtr<CSSComputedStyleDeclaration> computedStyle(PassRefPtr<Node>, bool allowVisitedStyle = false);
     virtual ~CSSComputedStyleDeclaration();
 
     virtual String cssText() const;
 
-    virtual unsigned length() const;
+    virtual unsigned virtualLength() const;
     virtual String item(unsigned index) const;
 
     virtual PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const;
@@ -60,7 +60,7 @@ protected:
     virtual bool cssPropertyMatches(const CSSProperty*) const;
 
 private:
-    CSSComputedStyleDeclaration(PassRefPtr<Node>);
+    CSSComputedStyleDeclaration(PassRefPtr<Node>, bool allowVisitedStyle);
 
     virtual void setCssText(const String&, ExceptionCode&);
 
@@ -70,11 +70,12 @@ private:
     PassRefPtr<CSSValue> valueForShadow(const ShadowData*, int) const;
 
     RefPtr<Node> m_node;
+    bool m_allowVisitedStyle;
 };
 
-inline PassRefPtr<CSSComputedStyleDeclaration> computedStyle(PassRefPtr<Node> node)
+inline PassRefPtr<CSSComputedStyleDeclaration> computedStyle(PassRefPtr<Node> node, bool allowVisitedStyle)
 {
-    return adoptRef(new CSSComputedStyleDeclaration(node));
+    return adoptRef(new CSSComputedStyleDeclaration(node, allowVisitedStyle));
 }
 
 } // namespace WebCore

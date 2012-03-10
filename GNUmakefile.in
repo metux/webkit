@@ -751,6 +751,12 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/MathMLTextElement.h \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLBlock.cpp \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLBlock.h \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLMath.cpp \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLMath.h \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLOperator.cpp \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLOperator.h \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLRow.cpp \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLRow.h \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLSubSup.cpp \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLSubSup.h \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLUnderOver.cpp \
@@ -2540,9 +2546,9 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 	WebCore/dom/Text.h WebCore/dom/TextEvent.cpp \
 	WebCore/dom/TextEvent.h WebCore/dom/Tokenizer.h \
 	WebCore/dom/Traversal.cpp WebCore/dom/Traversal.h \
-	WebCore/dom/TreeWalker.cpp WebCore/dom/TreeWalker.h \
-	WebCore/dom/UIEvent.cpp WebCore/dom/UIEvent.h \
-	WebCore/dom/UIEventWithKeyState.cpp \
+	WebCore/dom/TreeDepthLimit.h WebCore/dom/TreeWalker.cpp \
+	WebCore/dom/TreeWalker.h WebCore/dom/UIEvent.cpp \
+	WebCore/dom/UIEvent.h WebCore/dom/UIEventWithKeyState.cpp \
 	WebCore/dom/UIEventWithKeyState.h \
 	WebCore/dom/WebKitAnimationEvent.cpp \
 	WebCore/dom/WebKitAnimationEvent.h \
@@ -3065,12 +3071,12 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 	WebCore/platform/FloatConversion.h \
 	WebCore/platform/GeolocationService.cpp \
 	WebCore/platform/GeolocationService.h \
-	WebCore/platform/HostWindow.h WebCore/platform/KeyboardCodes.h \
-	WebCore/platform/KURL.cpp WebCore/platform/KURL.h \
-	WebCore/platform/KURLHash.h WebCore/platform/Language.h \
-	WebCore/platform/Length.cpp WebCore/platform/Length.h \
-	WebCore/platform/LengthBox.h WebCore/platform/LengthSize.h \
-	WebCore/platform/LinkHash.cpp WebCore/platform/LinkHash.h \
+	WebCore/platform/HostWindow.h WebCore/platform/KURL.cpp \
+	WebCore/platform/KURL.h WebCore/platform/KURLHash.h \
+	WebCore/platform/Language.h WebCore/platform/Length.cpp \
+	WebCore/platform/Length.h WebCore/platform/LengthBox.h \
+	WebCore/platform/LengthSize.h WebCore/platform/LinkHash.cpp \
+	WebCore/platform/LinkHash.h \
 	WebCore/platform/LocalizedStrings.h \
 	WebCore/platform/Logging.cpp WebCore/platform/Logging.h \
 	WebCore/platform/MIMETypeRegistry.cpp \
@@ -3110,6 +3116,7 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 	WebCore/platform/ThreadTimers.h WebCore/platform/Timer.cpp \
 	WebCore/platform/Timer.h WebCore/platform/TreeShared.h \
 	WebCore/platform/Widget.cpp WebCore/platform/Widget.h \
+	WebCore/platform/WindowsKeyboardCodes.h \
 	WebCore/platform/animation/Animation.cpp \
 	WebCore/platform/animation/Animation.h \
 	WebCore/platform/animation/AnimationList.cpp \
@@ -3785,6 +3792,12 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 	WebCore/mathml/MathMLTextElement.h \
 	WebCore/mathml/RenderMathMLBlock.cpp \
 	WebCore/mathml/RenderMathMLBlock.h \
+	WebCore/mathml/RenderMathMLMath.cpp \
+	WebCore/mathml/RenderMathMLMath.h \
+	WebCore/mathml/RenderMathMLOperator.cpp \
+	WebCore/mathml/RenderMathMLOperator.h \
+	WebCore/mathml/RenderMathMLRow.cpp \
+	WebCore/mathml/RenderMathMLRow.h \
 	WebCore/mathml/RenderMathMLSubSup.cpp \
 	WebCore/mathml/RenderMathMLSubSup.h \
 	WebCore/mathml/RenderMathMLUnderOver.cpp \
@@ -4225,6 +4238,7 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 	WebCore/platform/gtk/MIMETypeRegistryGtk.cpp \
 	WebCore/platform/gtk/MouseEventGtk.cpp \
 	WebCore/platform/gtk/PasteboardGtk.cpp \
+	WebCore/platform/gtk/PasteboardHelper.cpp \
 	WebCore/platform/gtk/PasteboardHelper.h \
 	WebCore/platform/gtk/PlatformScreenGtk.cpp \
 	WebCore/platform/gtk/PopupMenuGtk.cpp \
@@ -4509,6 +4523,9 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-MathMLMathElement.lo \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-MathMLTextElement.lo \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-RenderMathMLBlock.lo \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo \
+@ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-RenderMathMLSubSup.lo \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/libwebkit_1_0_la-RenderMathMLUnderOver.lo
 @ENABLE_NOTIFICATIONS_TRUE@am__objects_22 = WebCore/notifications/libwebkit_1_0_la-Notification.lo \
@@ -5543,6 +5560,7 @@ am__objects_35 =  \
 	WebCore/platform/gtk/libwebkit_1_0_la-MIMETypeRegistryGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-MouseEventGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-PasteboardGtk.lo \
+	WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-PlatformScreenGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-PopupMenuGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-RenderThemeGtk.lo \
@@ -7599,9 +7617,9 @@ webcore_sources := WebCore/WebCorePrefix.h \
 	WebCore/dom/Text.h WebCore/dom/TextEvent.cpp \
 	WebCore/dom/TextEvent.h WebCore/dom/Tokenizer.h \
 	WebCore/dom/Traversal.cpp WebCore/dom/Traversal.h \
-	WebCore/dom/TreeWalker.cpp WebCore/dom/TreeWalker.h \
-	WebCore/dom/UIEvent.cpp WebCore/dom/UIEvent.h \
-	WebCore/dom/UIEventWithKeyState.cpp \
+	WebCore/dom/TreeDepthLimit.h WebCore/dom/TreeWalker.cpp \
+	WebCore/dom/TreeWalker.h WebCore/dom/UIEvent.cpp \
+	WebCore/dom/UIEvent.h WebCore/dom/UIEventWithKeyState.cpp \
 	WebCore/dom/UIEventWithKeyState.h \
 	WebCore/dom/WebKitAnimationEvent.cpp \
 	WebCore/dom/WebKitAnimationEvent.h \
@@ -8124,12 +8142,12 @@ webcore_sources := WebCore/WebCorePrefix.h \
 	WebCore/platform/FloatConversion.h \
 	WebCore/platform/GeolocationService.cpp \
 	WebCore/platform/GeolocationService.h \
-	WebCore/platform/HostWindow.h WebCore/platform/KeyboardCodes.h \
-	WebCore/platform/KURL.cpp WebCore/platform/KURL.h \
-	WebCore/platform/KURLHash.h WebCore/platform/Language.h \
-	WebCore/platform/Length.cpp WebCore/platform/Length.h \
-	WebCore/platform/LengthBox.h WebCore/platform/LengthSize.h \
-	WebCore/platform/LinkHash.cpp WebCore/platform/LinkHash.h \
+	WebCore/platform/HostWindow.h WebCore/platform/KURL.cpp \
+	WebCore/platform/KURL.h WebCore/platform/KURLHash.h \
+	WebCore/platform/Language.h WebCore/platform/Length.cpp \
+	WebCore/platform/Length.h WebCore/platform/LengthBox.h \
+	WebCore/platform/LengthSize.h WebCore/platform/LinkHash.cpp \
+	WebCore/platform/LinkHash.h \
 	WebCore/platform/LocalizedStrings.h \
 	WebCore/platform/Logging.cpp WebCore/platform/Logging.h \
 	WebCore/platform/MIMETypeRegistry.cpp \
@@ -8169,6 +8187,7 @@ webcore_sources := WebCore/WebCorePrefix.h \
 	WebCore/platform/ThreadTimers.h WebCore/platform/Timer.cpp \
 	WebCore/platform/Timer.h WebCore/platform/TreeShared.h \
 	WebCore/platform/Widget.cpp WebCore/platform/Widget.h \
+	WebCore/platform/WindowsKeyboardCodes.h \
 	WebCore/platform/animation/Animation.cpp \
 	WebCore/platform/animation/Animation.h \
 	WebCore/platform/animation/AnimationList.cpp \
@@ -8704,6 +8723,7 @@ webcoregtk_sources := WebCore/bindings/js/ScriptControllerGtk.cpp \
 	WebCore/platform/gtk/MIMETypeRegistryGtk.cpp \
 	WebCore/platform/gtk/MouseEventGtk.cpp \
 	WebCore/platform/gtk/PasteboardGtk.cpp \
+	WebCore/platform/gtk/PasteboardHelper.cpp \
 	WebCore/platform/gtk/PasteboardHelper.h \
 	WebCore/platform/gtk/PlatformScreenGtk.cpp \
 	WebCore/platform/gtk/PopupMenuGtk.cpp \
@@ -13116,6 +13136,15 @@ WebCore/mathml/libwebkit_1_0_la-MathMLTextElement.lo:  \
 WebCore/mathml/libwebkit_1_0_la-RenderMathMLBlock.lo:  \
 	WebCore/mathml/$(am__dirstamp) \
 	WebCore/mathml/$(DEPDIR)/$(am__dirstamp)
+WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo:  \
+	WebCore/mathml/$(am__dirstamp) \
+	WebCore/mathml/$(DEPDIR)/$(am__dirstamp)
+WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo:  \
+	WebCore/mathml/$(am__dirstamp) \
+	WebCore/mathml/$(DEPDIR)/$(am__dirstamp)
+WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo:  \
+	WebCore/mathml/$(am__dirstamp) \
+	WebCore/mathml/$(DEPDIR)/$(am__dirstamp)
 WebCore/mathml/libwebkit_1_0_la-RenderMathMLSubSup.lo:  \
 	WebCore/mathml/$(am__dirstamp) \
 	WebCore/mathml/$(DEPDIR)/$(am__dirstamp)
@@ -13949,6 +13978,9 @@ WebCore/platform/gtk/libwebkit_1_0_la-MouseEventGtk.lo:  \
 	WebCore/platform/gtk/$(am__dirstamp) \
 	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
 WebCore/platform/gtk/libwebkit_1_0_la-PasteboardGtk.lo:  \
+	WebCore/platform/gtk/$(am__dirstamp) \
+	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
+WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo:  \
 	WebCore/platform/gtk/$(am__dirstamp) \
 	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
 WebCore/platform/gtk/libwebkit_1_0_la-PlatformScreenGtk.lo:  \
@@ -16098,6 +16130,12 @@ mostlyclean-compile:
 	-rm -f WebCore/mathml/libwebkit_1_0_la-MathMLTextElement.lo
 	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLBlock.$(OBJEXT)
 	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLBlock.lo
+	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.$(OBJEXT)
+	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo
+	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.$(OBJEXT)
+	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo
+	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.$(OBJEXT)
+	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo
 	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLSubSup.$(OBJEXT)
 	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLSubSup.lo
 	-rm -f WebCore/mathml/libwebkit_1_0_la-RenderMathMLUnderOver.$(OBJEXT)
@@ -16400,6 +16438,8 @@ mostlyclean-compile:
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-MouseEventGtk.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-PasteboardGtk.$(OBJEXT)
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-PasteboardGtk.lo
+	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.$(OBJEXT)
+	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-PlatformScreenGtk.$(OBJEXT)
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-PlatformScreenGtk.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-PopupMenuGtk.$(OBJEXT)
@@ -18266,6 +18306,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-MathMLMathElement.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-MathMLTextElement.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLBlock.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLMath.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLOperator.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLRow.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLSubSup.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLUnderOver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/notifications/$(DEPDIR)/libwebkit_1_0_la-Notification.Plo@am__quote@
@@ -18439,6 +18482,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-MIMETypeRegistryGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-MouseEventGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PasteboardGtk.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PasteboardHelper.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PlatformScreenGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PopupMenuGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-RenderThemeGtk.Plo@am__quote@
@@ -28087,6 +28131,30 @@ WebCore/mathml/libwebkit_1_0_la-RenderMathMLBlock.lo: WebCore/mathml/RenderMathM
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLBlock.lo `test -f 'WebCore/mathml/RenderMathMLBlock.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLBlock.cpp
 
+WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo: WebCore/mathml/RenderMathMLMath.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo -MD -MP -MF WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLMath.Tpo -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo `test -f 'WebCore/mathml/RenderMathMLMath.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLMath.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLMath.Tpo WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLMath.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='WebCore/mathml/RenderMathMLMath.cpp' object='WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLMath.lo `test -f 'WebCore/mathml/RenderMathMLMath.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLMath.cpp
+
+WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo: WebCore/mathml/RenderMathMLOperator.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo -MD -MP -MF WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLOperator.Tpo -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo `test -f 'WebCore/mathml/RenderMathMLOperator.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLOperator.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLOperator.Tpo WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLOperator.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='WebCore/mathml/RenderMathMLOperator.cpp' object='WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLOperator.lo `test -f 'WebCore/mathml/RenderMathMLOperator.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLOperator.cpp
+
+WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo: WebCore/mathml/RenderMathMLRow.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo -MD -MP -MF WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLRow.Tpo -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo `test -f 'WebCore/mathml/RenderMathMLRow.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLRow.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLRow.Tpo WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLRow.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='WebCore/mathml/RenderMathMLRow.cpp' object='WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLRow.lo `test -f 'WebCore/mathml/RenderMathMLRow.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLRow.cpp
+
 WebCore/mathml/libwebkit_1_0_la-RenderMathMLSubSup.lo: WebCore/mathml/RenderMathMLSubSup.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/mathml/libwebkit_1_0_la-RenderMathMLSubSup.lo -MD -MP -MF WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLSubSup.Tpo -c -o WebCore/mathml/libwebkit_1_0_la-RenderMathMLSubSup.lo `test -f 'WebCore/mathml/RenderMathMLSubSup.cpp' || echo '$(srcdir)/'`WebCore/mathml/RenderMathMLSubSup.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLSubSup.Tpo WebCore/mathml/$(DEPDIR)/libwebkit_1_0_la-RenderMathMLSubSup.Plo
@@ -30127,6 +30195,14 @@ WebCore/platform/gtk/libwebkit_1_0_la-PasteboardGtk.lo: WebCore/platform/gtk/Pas
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/platform/gtk/libwebkit_1_0_la-PasteboardGtk.lo `test -f 'WebCore/platform/gtk/PasteboardGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/PasteboardGtk.cpp
 
+WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo: WebCore/platform/gtk/PasteboardHelper.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo -MD -MP -MF WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PasteboardHelper.Tpo -c -o WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo `test -f 'WebCore/platform/gtk/PasteboardHelper.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/PasteboardHelper.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PasteboardHelper.Tpo WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PasteboardHelper.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='WebCore/platform/gtk/PasteboardHelper.cpp' object='WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/platform/gtk/libwebkit_1_0_la-PasteboardHelper.lo `test -f 'WebCore/platform/gtk/PasteboardHelper.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/PasteboardHelper.cpp
+
 WebCore/platform/gtk/libwebkit_1_0_la-PlatformScreenGtk.lo: WebCore/platform/gtk/PlatformScreenGtk.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/platform/gtk/libwebkit_1_0_la-PlatformScreenGtk.lo -MD -MP -MF WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PlatformScreenGtk.Tpo -c -o WebCore/platform/gtk/libwebkit_1_0_la-PlatformScreenGtk.lo `test -f 'WebCore/platform/gtk/PlatformScreenGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/PlatformScreenGtk.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PlatformScreenGtk.Tpo WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-PlatformScreenGtk.Plo
@@ -32079,8 +32155,8 @@ JavaScriptCore/pcre/chartables.c: $(srcdir)/JavaScriptCore/pcre/dftables
 
 @ENABLE_MATHML_TRUE@DerivedSources/MathMLNames.h: DerivedSources/MathMLNames.cpp
 
-@ENABLE_MATHML_TRUE@DerivedSources/MathMLElementFactory.cpp DerivedSources/MathMLNames.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/mathml/mathtags.in
-@ENABLE_MATHML_TRUE@	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/mathml/mathtags.in --factory --wrapperFactory --outputDir "$(GENSOURCES)"
+@ENABLE_MATHML_TRUE@DerivedSources/MathMLElementFactory.cpp DerivedSources/MathMLNames.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/mathml/mathtags.in $(WebCore)/mathml/mathattrs.in
+@ENABLE_MATHML_TRUE@	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/mathml/mathtags.in --attrs $(WebCore)/mathml/mathattrs.in --factory --wrapperFactory --outputDir "$(GENSOURCES)"
 @ENABLE_MATHML_FALSE@DerivedSources/MathMLElementFactory.cpp:
 @ENABLE_MATHML_FALSE@	echo > $@
 

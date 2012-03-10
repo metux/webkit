@@ -22,7 +22,7 @@
 #include "webkitnetworkrequest.h"
 
 #include "CString.h"
-#include "GOwnPtr.h"
+#include "GRefPtr.h"
 #include "ResourceRequest.h"
 #include "webkitprivate.h"
 
@@ -165,7 +165,7 @@ static void webkit_network_request_init(WebKitNetworkRequest* request)
 // for internal use only
 WebKitNetworkRequest* webkit_network_request_new_with_core_request(const WebCore::ResourceRequest& resourceRequest)
 {
-    GOwnPtr<SoupMessage> soupMessage(resourceRequest.toSoupMessage());
+    GRefPtr<SoupMessage> soupMessage(adoptGRef(resourceRequest.toSoupMessage()));
     if (soupMessage)
         return WEBKIT_NETWORK_REQUEST(g_object_new(WEBKIT_TYPE_NETWORK_REQUEST, "message", soupMessage.get(), NULL));
 
