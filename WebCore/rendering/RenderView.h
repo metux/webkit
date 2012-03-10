@@ -43,6 +43,7 @@ public:
     virtual const char* renderName() const { return "RenderView"; }
 
     virtual bool isRenderView() const { return true; }
+    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const; 
 
     virtual void layout();
     virtual void calcWidth();

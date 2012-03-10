@@ -1,4 +1,48 @@
 ================
+WebKitGTK+ 1.2.7
+================
+
+What's new in WebKitGTK+ 1.2.7?
+
+  - Fixes a regression caused by earlier fix for CVE-2010-1791. This
+    caused webkitgtk to crash on certain sites with javascript.
+  - Fixes the following CVEs:
+
+    CVE-2010-4492 CVE-2010-4493 CVE-2011-0482 CVE-2010-4199 CVE-2010-4578
+
+  - Fixes the following bugs which did not have a CVE assigned yet:
+
+    * (Crash in ReplaceSelectionCommand::doApply when modified during mutation event)
+      + Bugzilla: https://bugs.webkit.org/show_bug.cgi?id=50840
+      + Trac: http://trac.webkit.org/changeset/73801
+
+    * (Stale m_firstBody pointer in WebCore::RenderTable::firstLineBoxBaseline)
+      + Bugzilla: https://bugs.webkit.org/show_bug.cgi?id=53265
+      + Trac: http://trac.webkit.org/changeset/76915
+
+    * ZDI-CAN-968: font glyph layout (wushi)
+      + Bugzilla: https://bugs.webkit.org/show_bug.cgi?id=50932
+      + Trac: http://trac.webkit.org/changeset/74954
+              http://trac.webkit.org/changeset/74364
+
+    * crash in Range during mutation event (credit: Emil Eklund)
+      + Bugzilla: https://bugs.webkit.org/show_bug.cgi?id=50710
+      + Trac: http://trac.webkit.org/changeset/73801
+
+    * stale pointer in the CSS object model (credit: Sergey Glazunov)
+      + Bugzilla: https://bugs.webkit.org/show_bug.cgi?id=51993
+      + Trac: http://trac.webkit.org/changeset/75168
+
+
+    * Stale pointer due to incorrect before child addition to table
+      + Bugzilla: https://bugs.webkit.org/show_bug.cgi?id=53276
+      + Trac: http://trac.webkit.org/changeset/77141
+
+    * (Bad cast in RenderView docheight,docwidth calc due to adding non box childs)
+      + Bugzilla: https://bugs.webkit.org/show_bug.cgi?id=48328
+      + Trac: http://trac.webkit.org/changeset/70681
+
+================
 WebKitGTK+ 1.2.6
 ================
 
@@ -13,6 +57,9 @@ What's new in WebKitGTK+ 1.2.6?
 
       CVE-2010-4198 CVE-2010-4197 CVE-2010-4204 CVE-2010-4206
       CVE-2010-1791 CVE-2010-3812 CVE-2010-3813
+
+  Update: CVE-2010-4577  was also addressed in this release, but failed
+  to be listed at release time.
 
 ================
 WebKitGTK+ 1.2.5

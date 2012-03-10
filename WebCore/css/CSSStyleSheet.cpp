@@ -135,6 +135,7 @@ void CSSStyleSheet::deleteRule(unsigned index, ExceptionCode& ec)
     }
 
     ec = 0;
+    item(index)->setParent(0); 
     remove(index);
     styleSheetChanged();
 }
