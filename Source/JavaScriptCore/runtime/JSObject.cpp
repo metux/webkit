@@ -24,7 +24,7 @@
 #include "config.h"
 #include "JSObject.h"
 
-#include "BumpSpaceInlineMethods.h"
+#include "CopiedSpaceInlineMethods.h"
 #include "DatePrototype.h"
 #include "ErrorConstructor.h"
 #include "GetterSetter.h"
@@ -48,22 +48,13 @@ ASSERT_CLASS_FITS_IN_CELL(JSNonFinalObject);
 ASSERT_CLASS_FITS_IN_CELL(JSFinalObject);
 
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSObject);
+ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSFinalObject);
 
 const char* StrictModeReadonlyPropertyWriteError = "Attempted to assign to readonly property.";
 
 const ClassInfo JSObject::s_info = { "Object", 0, 0, 0, CREATE_METHOD_TABLE(JSObject) };
 
 const ClassInfo JSFinalObject::s_info = { "Object", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSFinalObject) };
-
-void JSFinalObject::destroy(JSCell* cell)
-{
-    jsCast<JSFinalObject*>(cell)->JSFinalObject::~JSFinalObject();
-}
-
-void JSNonFinalObject::destroy(JSCell* cell)
-{
-    jsCast<JSNonFinalObject*>(cell)->JSNonFinalObject::~JSNonFinalObject();
-}
 
 static inline void getClassPropertyNames(ExecState* exec, const ClassInfo* classInfo, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
@@ -82,11 +73,6 @@ static inline void getClassPropertyNames(ExecState* exec, const ClassInfo* class
                 propertyNames.add(entry->key());
         }
     }
-}
-
-void JSObject::destroy(JSCell* cell)
-{
-    jsCast<JSObject*>(cell)->JSObject::~JSObject();
 }
 
 void JSObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
@@ -186,7 +172,8 @@ void JSObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyName
             if (gs.isGetterSetter()) {
                 JSObject* setterFunc = asGetterSetter(gs)->setter();        
                 if (!setterFunc) {
-                    throwSetterError(exec);
+                    if (slot.isStrictMode())
+                        throwSetterError(exec);
                     return;
                 }
                 
@@ -479,6 +466,8 @@ void JSObject::freeze(JSGlobalData& globalData)
 
 void JSObject::preventExtensions(JSGlobalData& globalData)
 {
+    if (isJSArray(this))
+        asArray(this)->enterDictionaryMode(globalData);
     if (isExtensible())
         setStructure(globalData, Structure::preventExtensionsTransition(globalData, structure()));
 }
@@ -711,21 +700,15 @@ bool JSObject::defineOwnProperty(JSObject* object, ExecState* exec, const Identi
                 return false;
             }
             if (!current.writable()) {
-                if (descriptor.value() || !sameValue(exec, current.value(), descriptor.value())) {
+                if (descriptor.value() && !sameValue(exec, current.value(), descriptor.value())) {
                     if (throwException)
                         throwError(exec, createTypeError(exec, "Attempting to change value of a readonly property."));
                     return false;
                 }
             }
-        } else if (current.attributesEqual(descriptor)) {
-            if (!descriptor.value())
-                return true;
-            PutPropertySlot slot;
-            object->methodTable()->put(object, exec, propertyName, descriptor.value(), slot);
-            if (exec->hadException())
-                return false;
-            return true;
         }
+        if (current.attributesEqual(descriptor) && !descriptor.value())
+            return true;
         object->methodTable()->deleteProperty(object, exec, propertyName);
         return putDescriptor(exec, object, propertyName, descriptor, current.attributesWithOverride(descriptor), current);
     }
@@ -748,15 +731,14 @@ bool JSObject::defineOwnProperty(JSObject* object, ExecState* exec, const Identi
     if (!accessor)
         return false;
     GetterSetter* getterSetter = asGetterSetter(accessor);
-    if (current.attributesEqual(descriptor)) {
-        if (descriptor.setterPresent())
-            getterSetter->setSetter(exec->globalData(), descriptor.setterObject());
-        if (descriptor.getterPresent())
-            getterSetter->setGetter(exec->globalData(), descriptor.getterObject());
+    if (descriptor.setterPresent())
+        getterSetter->setSetter(exec->globalData(), descriptor.setterObject());
+    if (descriptor.getterPresent())
+        getterSetter->setGetter(exec->globalData(), descriptor.getterObject());
+    if (current.attributesEqual(descriptor))
         return true;
-    }
     object->methodTable()->deleteProperty(object, exec, propertyName);
-    unsigned attrs = current.attributesWithOverride(descriptor);
+    unsigned attrs = descriptor.attributesOverridingCurrent(current);
     object->putDirectAccessor(exec->globalData(), propertyName, getterSetter, attrs | Accessor);
     return true;
 }

@@ -36,6 +36,7 @@ namespace WebCore {
 
 class ClientRect;
 class Document;
+class DocumentMarker;
 class Element;
 class InternalSettings;
 class Node;
@@ -56,7 +57,7 @@ public:
 
     bool isPreloaded(Document*, const String& url);
 
-    size_t numberOfScopedHTMLStyleChildren(const Element*, ExceptionCode&) const;
+    size_t numberOfScopedHTMLStyleChildren(const Node*, ExceptionCode&) const;
 
 #if ENABLE(SHADOW_DOM)
     typedef ShadowRoot ShadowRootIfShadowDOMEnabledOrNode;
@@ -65,7 +66,10 @@ public:
 #endif
     ShadowRootIfShadowDOMEnabledOrNode* ensureShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* shadowRoot(Element* host, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* youngestShadowRoot(Element* host, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* oldestShadowRoot(Element* host, ExceptionCode&);
     void removeShadowRoot(Element* host, ExceptionCode&);
+    void setMultipleShadowSubtreesEnabled(bool);
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
     PassRefPtr<Element> createContentElement(Document*, ExceptionCode&);
@@ -79,7 +83,8 @@ public:
     PassRefPtr<ClientRect> boundingBox(Element*, ExceptionCode&);
 
     unsigned markerCountForNode(Node*, const String&, ExceptionCode&);
-    PassRefPtr<Range> markerRangeForNode(Node*, const String&, unsigned, ExceptionCode&);
+    PassRefPtr<Range> markerRangeForNode(Node*, const String& markerType, unsigned index, ExceptionCode&);
+    String markerDescriptionForNode(Node*, const String& markerType, unsigned index, ExceptionCode&);
 
     void setScrollViewPosition(Document*, long x, long y, ExceptionCode&);
 
@@ -105,12 +110,15 @@ public:
     void setShouldDisplayTrackKind(Document*, const String& kind, bool, ExceptionCode&);
     bool shouldDisplayTrackKind(Document*, const String& kind, ExceptionCode&);
 
+    unsigned wheelEventHandlerCount(Document*, ExceptionCode&);
+
     static const char* internalsId;
 
     InternalSettings* settings() const { return m_settings.get(); }
 
 private:
     explicit Internals(Document*);
+    DocumentMarker* markerAt(Node*, const String& markerType, unsigned index, ExceptionCode&);
 
     RefPtr<InternalSettings> m_settings;
 };

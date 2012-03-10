@@ -60,6 +60,12 @@ public:
     virtual LayoutUnit offsetWidth() const = 0;
     virtual LayoutUnit offsetHeight() const = 0;
 
+    // FIXME: The implementation for these functions will change once we move to subpixel layout. See bug 60318.
+    int pixelSnappedOffsetLeft() const { return offsetLeft(); }
+    int pixelSnappedOffsetTop() const { return offsetTop(); }
+    int pixelSnappedOffsetWidth() const;
+    int pixelSnappedOffsetHeight() const;
+
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
     virtual void updateBoxModelInfoFromStyle();
@@ -121,6 +127,8 @@ public:
     void paintBoxShadow(const PaintInfo&, const LayoutRect&, const RenderStyle*, ShadowStyle, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true);
     void paintFillLayerExtended(const PaintInfo&, const Color&, const FillLayer*, const LayoutRect&, BackgroundBleedAvoidance, InlineFlowBox* = 0, const LayoutSize& = LayoutSize(), CompositeOperator = CompositeSourceOver, RenderObject* backgroundObject = 0);
     
+    virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox* = 0) const;
+
     // Overridden by subclasses to determine line height and baseline position.
     virtual LayoutUnit lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const = 0;
     virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const = 0;

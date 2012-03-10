@@ -72,8 +72,8 @@ public:
 
     // Functions for child manipulation and inspection.
     const HashSet<RefPtr<Widget> >* children() const { return &m_children; }
-    void addChild(PassRefPtr<Widget>);
-    void removeChild(Widget*);
+    virtual void addChild(PassRefPtr<Widget>);
+    virtual void removeChild(Widget*);
     
     // If the scroll view does not use a native widget, then it will have cross-platform Scrollbars. These functions
     // can be used to obtain those scrollbars.
@@ -234,14 +234,6 @@ public:
 
     // For platforms that need to hit test scrollbars from within the engine's event handlers (like Win32).
     Scrollbar* scrollbarAtPoint(const IntPoint& windowPoint);
-
-    // This function exists for scrollviews that need to handle wheel events manually.
-    // On Mac the underlying NSScrollView just does the scrolling, but on other platforms
-    // (like Windows), we need this function in order to do the scroll ourselves.
-    bool wheelEvent(const PlatformWheelEvent&);
-#if ENABLE(GESTURE_EVENTS)
-    void gestureEvent(const PlatformGestureEvent&);
-#endif
 
     IntPoint convertChildToSelf(const Widget* child, const IntPoint& point) const
     {

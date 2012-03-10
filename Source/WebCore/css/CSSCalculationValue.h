@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -58,11 +58,13 @@ enum CalculationCategory {
 class CSSCalcExpressionNode : public RefCounted<CSSCalcExpressionNode> {
 public:
     
-    virtual ~CSSCalcExpressionNode() = 0;    
+    virtual ~CSSCalcExpressionNode() = 0;  
+    virtual bool isZero() const = 0;
+    virtual double doubleValue() const = 0;  
+    virtual double computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const = 0;
     
     CalculationCategory category() const { return m_category; }    
     bool isInteger() const { return m_isInteger; }
-    bool isZero() const { return false; }
     
 protected:
     CSSCalcExpressionNode(CalculationCategory category, bool isInteger)
@@ -80,7 +82,9 @@ public:
     static PassRefPtr<CSSCalcValue> create(CSSParserString name, CSSParserValueList*);
 
     CalculationCategory category() const { return m_expression->category(); }
-    bool isInt() const { return m_expression->isInteger(); }
+    bool isInt() const { return m_expression->isInteger(); }    
+    double doubleValue() const;
+    double computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const;
         
     String customCssText() const;
     

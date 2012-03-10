@@ -874,7 +874,7 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
     // Give the embedder a chance to intercept this postMessage because this
     // DOMWindow might be a proxy for another in browsers that support
     // postMessage calls across WebKit instances.
-    if (isCurrentlyDisplayedInFrame() && m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), PassRefPtr<MessageEvent>(event).leakRef()))
+    if (isCurrentlyDisplayedInFrame() && m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), event.get()))
         return;
 
     if (timer->targetOrigin()) {
@@ -1321,7 +1321,7 @@ PassRefPtr<CSSStyleDeclaration> DOMWindow::getComputedStyle(Element* elt, const 
     if (!elt)
         return 0;
 
-    return computedStyle(elt, false, pseudoElt);
+    return CSSComputedStyleDeclaration::create(elt, false, pseudoElt);
 }
 
 PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const String& pseudoElement, bool authorOnly) const
@@ -1550,18 +1550,24 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
     if (!EventTarget::addEventListener(eventType, listener, useCapture))
         return false;
 
-    if (Document* document = this->document())
+    if (Document* document = this->document()) {
         document->addListenerTypeIfNeeded(eventType);
+        if (eventType == eventNames().mousewheelEvent)
+            document->didAddWheelEventHandler();
+    }
 
     if (eventType == eventNames().unloadEvent)
         addUnloadEventListener(this);
     else if (eventType == eventNames().beforeunloadEvent && allowsBeforeUnloadListeners(this))
         addBeforeUnloadEventListener(this);
 #if ENABLE(DEVICE_ORIENTATION)
-    else if (eventType == eventNames().devicemotionEvent && frame() && frame()->page() && frame()->page()->deviceMotionController())
-        frame()->page()->deviceMotionController()->addListener(this);
-    else if (eventType == eventNames().deviceorientationEvent && frame() && frame()->page() && frame()->page()->deviceOrientationController())
-        frame()->page()->deviceOrientationController()->addListener(this);
+    else if (eventType == eventNames().devicemotionEvent) {
+        if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+            controller->addListener(this);
+    } else if (eventType == eventNames().deviceorientationEvent) {
+        if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+            controller->addListener(this);
+    }
 #endif
 
     return true;
@@ -1572,15 +1578,23 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
     if (!EventTarget::removeEventListener(eventType, listener, useCapture))
         return false;
 
+    if (Document* document = this->document()) {
+        if (eventType == eventNames().mousewheelEvent)
+            document->didRemoveWheelEventHandler();
+    }
+
     if (eventType == eventNames().unloadEvent)
         removeUnloadEventListener(this);
     else if (eventType == eventNames().beforeunloadEvent && allowsBeforeUnloadListeners(this))
         removeBeforeUnloadEventListener(this);
 #if ENABLE(DEVICE_ORIENTATION)
-    else if (eventType == eventNames().devicemotionEvent && frame() && frame()->page() && frame()->page()->deviceMotionController())
-        frame()->page()->deviceMotionController()->removeListener(this);
-    else if (eventType == eventNames().deviceorientationEvent && frame() && frame()->page() && frame()->page()->deviceOrientationController())
-        frame()->page()->deviceOrientationController()->removeListener(this);
+    else if (eventType == eventNames().devicemotionEvent) {
+        if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+            controller->removeListener(this);
+    } else if (eventType == eventNames().deviceorientationEvent) {
+        if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+            controller->removeListener(this);
+    }
 #endif
 
     return true;
@@ -1633,10 +1647,10 @@ void DOMWindow::removeAllEventListeners()
     EventTarget::removeAllEventListeners();
 
 #if ENABLE(DEVICE_ORIENTATION)
-    if (frame() && frame()->page() && frame()->page()->deviceMotionController())
-        frame()->page()->deviceMotionController()->removeAllListeners(this);
-    if (frame() && frame()->page() && frame()->page()->deviceOrientationController())
-        frame()->page()->deviceOrientationController()->removeAllListeners(this);
+    if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+        controller->removeAllListeners(this);
+    if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+        controller->removeAllListeners(this);
 #endif
 
     removeAllUnloadEventListeners(this);
@@ -1888,15 +1902,6 @@ void DOMWindow::showModalDialog(const String& urlString, const String& dialogFea
 
     dialogFrame->page()->chrome()->runModal();
 }
-
-#if ENABLE(BLOB)
-DOMURL* DOMWindow::webkitURL() const
-{
-    if (!m_domURL && isCurrentlyDisplayedInFrame())
-        m_domURL = DOMURL::create(this->scriptExecutionContext());
-    return m_domURL.get();
-}
-#endif
 
 #if ENABLE(QUOTA)
 StorageInfo* DOMWindow::webkitStorageInfo() const

@@ -86,8 +86,6 @@ public:
     virtual PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
 
     virtual bool avoidScrollbarCreation() const;
-    virtual void didAddHorizontalScrollbar(Scrollbar*);
-    virtual void willRemoveHorizontalScrollbar(Scrollbar*);
 
     virtual void setContentsSize(const IntSize&);
 
@@ -171,8 +169,7 @@ public:
     void scrollPositionChangedViaPlatformWidget();
     virtual void repaintFixedElementsAfterScrolling();
     virtual bool shouldRubberBandInDirection(ScrollDirection) const;
-
-    virtual void zoomAnimatorTransformChanged(float, float, float, ZoomAnimationState);
+    virtual bool requestScrollPositionUpdate(const IntPoint&) OVERRIDE;
 
     String mediaType() const;
     void setMediaType(const String&);
@@ -186,9 +183,11 @@ public:
 
     void addSlowRepaintObject();
     void removeSlowRepaintObject();
+    bool hasSlowRepaintObjects() const { return m_slowRepaintObjectCount; }
 
     void addFixedObject();
     void removeFixedObject();
+    bool hasFixedObjects() const { return m_fixedObjectCount > 0; }
 
     // Functions for querying the current scrolled position, negating the effects of overhang
     // and adjusting for page scale.
@@ -308,6 +307,20 @@ public:
     void resetTrackedRepaints() { m_trackedRepaintRects.clear(); }
     const Vector<IntRect>& trackedRepaintRects() const { return m_trackedRepaintRects; }
 
+    typedef HashSet<ScrollableArea*> ScrollableAreaSet;
+    void addScrollableArea(ScrollableArea*);
+    void removeScrollableArea(ScrollableArea*);
+    bool containsScrollableArea(ScrollableArea*) const;
+    const ScrollableAreaSet* scrollableAreas() const { return m_scrollableAreas.get(); }
+
+    virtual void addChild(PassRefPtr<Widget>) OVERRIDE;
+    virtual void removeChild(Widget*) OVERRIDE;
+
+    // This function exists for ports that need to handle wheel events manually.
+    // On Mac WebKit1 the underlying NSScrollView just does the scrolling, but on most other platforms
+    // we need this function in order to do the scroll ourselves.
+    bool wheelEvent(const PlatformWheelEvent&);
+
 protected:
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);
     virtual void scrollContentsSlowPath(const IntRect& updateRect);
@@ -328,8 +341,6 @@ private:
     bool useSlowRepaintsIfNotOverlapped() const;
     void updateCanBlitOnScrollRecursively();
     bool contentsInCompositedLayer() const;
-
-    bool hasFixedObjects() const { return m_fixedObjectCount > 0; }
 
     void applyOverflowToViewport(RenderObject*, ScrollbarMode& hMode, ScrollbarMode& vMode);
 
@@ -362,6 +373,7 @@ private:
     virtual void setVisibleScrollerThumbRect(const IntRect&);
     virtual bool isOnActivePage() const;
     virtual ScrollableArea* enclosingScrollableArea() const;
+    virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual GraphicsLayer* layerForHorizontalScrollbar() const OVERRIDE;
@@ -373,7 +385,6 @@ private:
 #endif
 
     virtual void notifyPageThatContentAreaWillPaint() const;
-    virtual void disconnectFromPage() { m_page = 0; }
 
     virtual bool scrollAnimatorEnabled() const;
 
@@ -476,8 +487,6 @@ private:
     // Renderer to hold our custom scroll corner.
     RenderScrollbarPart* m_scrollCorner;
 
-    Page* m_page;
-
     // If true, automatically resize the frame view around its content.
     bool m_shouldAutoSize;
     bool m_inAutoSize;
@@ -485,6 +494,8 @@ private:
     IntSize m_minAutoSize;
     // The upper bound on the size when autosizing.
     IntSize m_maxAutoSize;
+
+    OwnPtr<ScrollableAreaSet> m_scrollableAreas;
 
     static double s_deferredRepaintDelay;
     static double s_initialDeferredRepaintDelayDuringLoading;

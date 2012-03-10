@@ -478,6 +478,16 @@ LayoutUnit RenderBox::clientHeight() const
     return height() - borderTop() - borderBottom() - horizontalScrollbarHeight();
 }
 
+int RenderBox::pixelSnappedClientWidth() const
+{
+    return clientWidth();
+}
+
+int RenderBox::pixelSnappedClientHeight() const
+{
+    return clientHeight();
+}
+
 int RenderBox::scrollWidth() const
 {
     if (hasOverflowClip())
@@ -495,7 +505,7 @@ int RenderBox::scrollHeight() const
         return layer()->scrollHeight();
     // For objects with visible overflow, this matches IE.
     // FIXME: Need to work right with writing modes.
-    return max(clientHeight(), maxYLayoutOverflow() - borderTop());
+    return max(pixelSnappedClientHeight(), maxYLayoutOverflow() - borderTop());
 }
 
 int RenderBox::scrollLeft() const
@@ -907,11 +917,12 @@ void RenderBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint& pai
     // balloon layout is an example of this).
     borderFitAdjust(paintRect);
 
+    BackgroundBleedAvoidance bleedAvoidance = determineBackgroundBleedAvoidance(paintInfo.context);
+
     // FIXME: Should eventually give the theme control over whether the box shadow should paint, since controls could have
     // custom shadows of their own.
-    paintBoxShadow(paintInfo, paintRect, style(), Normal);
-
-    BackgroundBleedAvoidance bleedAvoidance = determineBackgroundBleedAvoidance(paintInfo.context);
+    if (!boxShadowShouldBeAppliedToBackground(bleedAvoidance))
+        paintBoxShadow(paintInfo, paintRect, style(), Normal);
 
     GraphicsContextStateSaver stateSaver(*paintInfo.context, false);
     if (bleedAvoidance == BackgroundBleedUseTransparencyLayer) {
@@ -931,12 +942,12 @@ void RenderBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint& pai
         paintBackground(paintInfo, paintRect, bleedAvoidance);
 
         if (style()->hasAppearance())
-            theme()->paintDecorations(this, paintInfo, paintRect);
+            theme()->paintDecorations(this, paintInfo, pixelSnappedIntRect(paintRect));
     }
     paintBoxShadow(paintInfo, paintRect, style(), Inset);
 
     // The theme will tell us whether or not we should also paint the CSS border.
-    if ((!style()->hasAppearance() || (!themePainted && theme()->paintBorderOnly(this, paintInfo, paintRect))) && style()->hasBorder())
+    if ((!style()->hasAppearance() || (!themePainted && theme()->paintBorderOnly(this, paintInfo, pixelSnappedIntRect(paintRect)))) && style()->hasBorder())
         paintBorder(paintInfo, paintRect, style(), bleedAvoidance);
 
     if (bleedAvoidance == BackgroundBleedUseTransparencyLayer)
@@ -1176,7 +1187,7 @@ bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumu
         paintObject(paintInfo, accumulatedOffset);
         paintInfo.phase = PaintPhaseChildBlockBackgrounds;
     }
-    IntRect clipRect(isControlClip ? controlClipRect(accumulatedOffset) : overflowClipRect(accumulatedOffset, paintInfo.renderRegion));
+    IntRect clipRect = pixelSnappedIntRect(isControlClip ? controlClipRect(accumulatedOffset) : overflowClipRect(accumulatedOffset, paintInfo.renderRegion));
     paintInfo.context->save();
     if (style()->hasBorderRadius())
         paintInfo.context->addRoundedRectClip(style()->getRoundedInnerBorderFor(LayoutRect(accumulatedOffset, size())));
@@ -3434,9 +3445,9 @@ VisiblePosition RenderBox::positionForPoint(const LayoutPoint& point)
         
         RenderBox* renderer = toRenderBox(renderObject);
 
-        LayoutUnit top = renderer->borderTop() + renderer->paddingTop() + (isTableRow() ? 0 : renderer->y());
+        LayoutUnit top = renderer->borderTop() + renderer->paddingTop() + (isTableRow() ? zeroLayoutUnit : renderer->y());
         LayoutUnit bottom = top + renderer->contentHeight();
-        LayoutUnit left = renderer->borderLeft() + renderer->paddingLeft() + (isTableRow() ? 0 : renderer->x());
+        LayoutUnit left = renderer->borderLeft() + renderer->paddingLeft() + (isTableRow() ? zeroLayoutUnit : renderer->x());
         LayoutUnit right = left + renderer->contentWidth();
         
         if (point.x() <= right && point.x() >= left && point.y() <= top && point.y() >= bottom) {

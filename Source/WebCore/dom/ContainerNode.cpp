@@ -69,7 +69,7 @@ static inline void collectNodes(Node* node, NodeVector& nodes)
 
 static void collectTargetNodes(Node* node, NodeVector& nodes)
 {
-    if (node->nodeType() != Node::DOCUMENT_FRAGMENT_NODE) {
+    if (node->nodeType() != Node::DOCUMENT_FRAGMENT_NODE || node->isShadowRoot()) {
         nodes.append(node);
         return;
     }
@@ -114,6 +114,8 @@ bool ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
     // Check that this node is not "floating".
     // If it is, it can be deleted as a side effect of sending mutation events.
     ASSERT(refCount() || parentOrHostNode());
+
+    RefPtr<Node> protect(this);
 
     ec = 0;
 
@@ -260,6 +262,8 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
     // If it is, it can be deleted as a side effect of sending mutation events.
     ASSERT(refCount() || parentOrHostNode());
 
+    RefPtr<Node> protect(this);
+
     ec = 0;
 
     if (oldChild == newChild) // nothing to do
@@ -294,7 +298,7 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
     // that no callers call with ref count == 0 and parent = 0 (as of this
     // writing, there are definitely callers who call that way).
 
-    bool isFragment = newChild->nodeType() == DOCUMENT_FRAGMENT_NODE;
+    bool isFragment = newChild->nodeType() == DOCUMENT_FRAGMENT_NODE && !newChild->isShadowRoot();
 
     // Add the new child(ren)
     RefPtr<Node> child = isFragment ? newChild->firstChild() : newChild;
@@ -426,6 +430,8 @@ bool ContainerNode::removeChild(Node* oldChild, ExceptionCode& ec)
     // If it is, it can be deleted as a side effect of sending mutation events.
     ASSERT(refCount() || parentOrHostNode());
 
+    RefPtr<Node> protect(this);
+
     ec = 0;
 
     // NO_MODIFICATION_ALLOWED_ERR: Raised if this node is readonly.
@@ -472,14 +478,14 @@ bool ContainerNode::removeChild(Node* oldChild, ExceptionCode& ec)
     Node* next = child->nextSibling();
     removeBetween(prev, next, child.get());
 
-    // Dispatch post-removal mutation events
-    childrenChanged(false, prev, next, -1);
-    dispatchSubtreeModifiedEvent();
-
     if (child->inDocument())
         child->removedFromDocument();
     else
         child->removedFromTree(true);
+
+    // Dispatch post-removal mutation events
+    childrenChanged(false, prev, next, -1);
+    dispatchSubtreeModifiedEvent();
 
     return child;
 }
@@ -604,7 +610,7 @@ void ContainerNode::removeChildren()
 
 bool ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionCode& ec, bool shouldLazyAttach)
 {
-    RefPtr<ContainerNode> protector(this);
+    RefPtr<ContainerNode> protect(this);
 
     // Check that this node is not "floating".
     // If it is, it can be deleted as a side effect of sending mutation events.

@@ -26,7 +26,6 @@
 #ifndef GraphicsContext3D_h
 #define GraphicsContext3D_h
 
-#include "IntSize.h"
 #include "GraphicsLayer.h"
 #include "GraphicsTypes3D.h"
 #include "PlatformString.h"
@@ -56,6 +55,10 @@ OBJC_CLASS WebGLLayer;
 QT_BEGIN_NAMESPACE
 class QPainter;
 class QRect;
+class QGLWidget;
+class QGLContext;
+class QOpenGLContext;
+class QSurface;
 QT_END_NAMESPACE
 #elif PLATFORM(GTK) || PLATFORM(EFL)
 typedef unsigned int GLuint;
@@ -63,6 +66,14 @@ typedef unsigned int GLuint;
 
 #if PLATFORM(MAC)
 typedef CGLContextObj PlatformGraphicsContext3D;
+#elif PLATFORM(QT)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+typedef QOpenGLContext* PlatformGraphicsContext3D;
+typedef QSurface* PlatformGraphicsSurface3D;
+#else
+typedef QGLContext* PlatformGraphicsContext3D;
+typedef QGLWidget* PlatformGraphicsSurface3D;
+#endif
 #else
 typedef void* PlatformGraphicsContext3D;
 #endif
@@ -93,6 +104,8 @@ class HostWindow;
 class Image;
 class ImageBuffer;
 class ImageData;
+class IntRect;
+class IntSize;
 #if USE(CAIRO)
 class PlatformContextCairo;
 #endif
@@ -788,6 +801,9 @@ public:
 #elif PLATFORM(GTK) || PLATFORM(EFL)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, PlatformContextCairo* context);
+#elif PLATFORM(QT)
+    void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
+                       int canvasWidth, int canvasHeight, QPainter* context);
 #endif
 
     void markContextChanged();
@@ -908,6 +924,9 @@ public:
     void readRenderingResults(unsigned char* pixels, int pixelsSize);
 #endif
 
+    bool reshapeFBOs(const IntSize&);
+    void resolveMultisamplingIfNecessary(const IntRect&);
+
     int m_currentWidth, m_currentHeight;
     bool isResourceSafe();
 
@@ -942,6 +961,10 @@ public:
     GC3Duint m_depthBuffer;
     GC3Duint m_stencilBuffer;
 #else
+#if USE(OPENGL_ES_2)
+    GC3Duint m_depthBuffer;
+    GC3Duint m_stencilBuffer;
+#endif
     GC3Duint m_depthStencilBuffer;
 #endif
     bool m_layerComposited;

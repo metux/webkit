@@ -73,8 +73,7 @@ bool isLegacyAppleStyleSpan(const Node *node)
 enum ShouldStyleAttributeBeEmpty { AllowNonEmptyStyleAttribute, StyleAttributeShouldBeEmpty };
 static bool hasNoAttributeOrOnlyStyleAttribute(const StyledElement* element, ShouldStyleAttributeBeEmpty shouldStyleAttributeBeEmpty)
 {
-    NamedNodeMap* map = element->updatedAttributes();
-    if (!map || map->isEmpty())
+    if (!element->hasAttributes())
         return true;
 
     unsigned matchedAttributes = 0;
@@ -84,8 +83,8 @@ static bool hasNoAttributeOrOnlyStyleAttribute(const StyledElement* element, Sho
         || !element->inlineStyleDecl() || element->inlineStyleDecl()->isEmpty()))
         matchedAttributes++;
 
-    ASSERT(matchedAttributes <= map->length());
-    return matchedAttributes == map->length();
+    ASSERT(matchedAttributes <= element->attributeCount());
+    return matchedAttributes == element->attributeCount();
 }
 
 bool isStyleSpanOrSpanWithOnlyStyleAttribute(const Element* element)
@@ -108,10 +107,9 @@ static bool isEmptyFontTag(const Node *node)
         return false;
 
     const Element *elem = static_cast<const Element *>(node);
-    NamedNodeMap* map = elem->updatedAttributes();
-    if (!map)
+    if (!elem->hasAttributes())
         return true;
-    return map->isEmpty() || (map->length() == 1 && elem->getAttribute(classAttr) == styleSpanClassString());
+    return elem->attributeCount() == 1 && elem->getAttribute(classAttr) == styleSpanClassString();
 }
 
 static PassRefPtr<Element> createFontElement(Document* document)
@@ -389,7 +387,7 @@ void ApplyStyleCommand::applyRelativeFontStyleChange(EditingStyle* style)
         float desiredFontSize = max(MinimumFontSize, startingFontSizes.get(node) + style->fontSizeDelta());
         RefPtr<CSSValue> value = inlineStyleDecl->getPropertyCSSValue(CSSPropertyFontSize);
         if (value) {
-            inlineStyleDecl->removeProperty(CSSPropertyFontSize);
+            element->removeInlineStyleProperty(CSSPropertyFontSize);
             currentFontSize = computedFontSize(node);
         }
         if (currentFontSize != desiredFontSize) {
@@ -446,7 +444,7 @@ HTMLElement* ApplyStyleCommand::splitAncestorsWithUnicodeBidi(Node* node, bool b
     Node* nextHighestAncestorWithUnicodeBidi = 0;
     int highestAncestorUnicodeBidi = 0;
     for (Node* n = node->parentNode(); n != block; n = n->parentNode()) {
-        int unicodeBidi = getIdentifierValue(computedStyle(n).get(), CSSPropertyUnicodeBidi);
+        int unicodeBidi = getIdentifierValue(CSSComputedStyleDeclaration::create(n).get(), CSSPropertyUnicodeBidi);
         if (unicodeBidi && unicodeBidi != CSSValueNormal) {
             highestAncestorUnicodeBidi = unicodeBidi;
             nextHighestAncestorWithUnicodeBidi = highestAncestorWithUnicodeBidi;
@@ -498,7 +496,7 @@ void ApplyStyleCommand::removeEmbeddingUpToEnclosingBlock(Node* node, Node* unsp
             continue;
 
         StyledElement* element = static_cast<StyledElement*>(n);
-        int unicodeBidi = getIdentifierValue(computedStyle(element).get(), CSSPropertyUnicodeBidi);
+        int unicodeBidi = getIdentifierValue(CSSComputedStyleDeclaration::create(element).get(), CSSPropertyUnicodeBidi);
         if (!unicodeBidi || unicodeBidi == CSSValueNormal)
             continue;
 
@@ -524,7 +522,7 @@ void ApplyStyleCommand::removeEmbeddingUpToEnclosingBlock(Node* node, Node* unsp
 static Node* highestEmbeddingAncestor(Node* startNode, Node* enclosingNode)
 {
     for (Node* n = startNode; n && n != enclosingNode; n = n->parentNode()) {
-        if (n->isHTMLElement() && getIdentifierValue(computedStyle(n).get(), CSSPropertyUnicodeBidi) == CSSValueEmbed)
+        if (n->isHTMLElement() && getIdentifierValue(CSSComputedStyleDeclaration::create(n).get(), CSSPropertyUnicodeBidi) == CSSValueEmbed)
             return n;
     }
 
@@ -1125,14 +1123,14 @@ void ApplyStyleCommand::splitTextAtEnd(const Position& start, const Position& en
     ASSERT(end.containerNode()->isTextNode());
 
     bool shouldUpdateStart = start.anchorType() == Position::PositionIsOffsetInAnchor && start.containerNode() == end.containerNode();
-    Text* text = static_cast<Text *>(end.deprecatedNode());
+    Text* text = toText(end.deprecatedNode());
     splitTextNode(text, end.offsetInContainerNode());
 
     Node* prevNode = text->previousSibling();
     if (!prevNode || !prevNode->isTextNode())
         return;
 
-    Position newStart = shouldUpdateStart ? Position(static_cast<Text*>(prevNode), start.offsetInContainerNode()) : start;
+    Position newStart = shouldUpdateStart ? Position(toText(prevNode), start.offsetInContainerNode()) : start;
     updateStartEnd(newStart, lastPositionInNode(prevNode));
 }
 
@@ -1164,7 +1162,7 @@ void ApplyStyleCommand::splitTextElementAtEnd(const Position& start, const Posit
     if (!firstTextNode || !firstTextNode->isTextNode())
         return;
 
-    Position newStart = shouldUpdateStart ? Position(static_cast<Text*>(firstTextNode), start.offsetInContainerNode()) : start;
+    Position newStart = shouldUpdateStart ? Position(toText(firstTextNode), start.offsetInContainerNode()) : start;
     updateStartEnd(newStart, positionAfterNode(firstTextNode));
 }
 
@@ -1412,7 +1410,7 @@ float ApplyStyleCommand::computedFontSize(Node* node)
     if (!node)
         return 0;
 
-    RefPtr<CSSComputedStyleDeclaration> style = computedStyle(node);
+    RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(node);
     if (!style)
         return 0;
 
@@ -1435,8 +1433,8 @@ void ApplyStyleCommand::joinChildTextNodes(Node* node, const Position& start, co
     while (child) {
         Node* next = child->nextSibling();
         if (child->isTextNode() && next && next->isTextNode()) {
-            Text* childText = static_cast<Text *>(child);
-            Text* nextText = static_cast<Text *>(next);
+            Text* childText = toText(child);
+            Text* nextText = toText(next);
             if (start.anchorType() == Position::PositionIsOffsetInAnchor && next == start.containerNode())
                 newStart = Position(childText, childText->length() + start.offsetInContainerNode());
             if (end.anchorType() == Position::PositionIsOffsetInAnchor && next == end.containerNode())

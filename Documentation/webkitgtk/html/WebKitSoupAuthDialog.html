@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase">
 <link rel="next" href="WebKitSecurityOrigin.html" title="WebKitSecurityOrigin">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -37,7 +37,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitSoupAuthDialog.top_of_page"></a>WebKitSoupAuthDialog</span></h2>
-<p>WebKitSoupAuthDialog — A <a href="../libsoup-2.4/SoupSessionFeature.html"><span class="type">SoupSessionFeature</span></a> to provide a simple
+<p>WebKitSoupAuthDialog — A <span class="type">SoupSessionFeature</span> to provide a simple
 authentication dialog for HTTP basic auth support.</p>
 </td>
 <td valign="top" align="right"></td>
@@ -50,7 +50,7 @@ authentication dialog for HTTP basic auth support.</p>
 <div class="refsect1">
 <a name="WebKitSoupAuthDialog.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+  GObject
    +----WebKitSoupAuthDialog
 </pre>
 </div>
@@ -58,19 +58,19 @@ authentication dialog for HTTP basic auth support.</p>
 <a name="WebKitSoupAuthDialog.implemented-interfaces"></a><h2>Implemented Interfaces</h2>
 <p>
 WebKitSoupAuthDialog implements
- <a href="../libsoup-2.4/SoupSessionFeature.html">SoupSessionFeature</a>.</p>
+ SoupSessionFeature.</p>
 </div>
 <div class="refsect1">
 <a name="WebKitSoupAuthDialog.signals"></a><h2>Signals</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitSoupAuthDialog.html#WebKitSoupAuthDialog-current-toplevel" title='The "current-toplevel" signal'>current-toplevel</a>"                               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitSoupAuthDialog.html#WebKitSoupAuthDialog-current-toplevel" title='The "current-toplevel" signal'>current-toplevel</a>"                               : <code class="literal">Run Last</code>
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitSoupAuthDialog.description"></a><h2>Description</h2>
 <p>
-<a class="link" href="WebKitSoupAuthDialog.html" title="WebKitSoupAuthDialog"><span class="type">WebKitSoupAuthDialog</span></a> is a <a href="../libsoup-2.4/SoupSessionFeature.html"><span class="type">SoupSessionFeature</span></a> that you can attach to your
-<a href="../libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a> to provide a simple authentication dialog while
+<a class="link" href="WebKitSoupAuthDialog.html" title="WebKitSoupAuthDialog"><span class="type">WebKitSoupAuthDialog</span></a> is a <span class="type">SoupSessionFeature</span> that you can attach to your
+<span class="type">SoupSession</span> to provide a simple authentication dialog while
 handling HTTP basic auth.
 </p>
 </div>
@@ -87,9 +87,9 @@ handling HTTP basic auth.
 <a name="WebKitSoupAuthDialog.signal-details"></a><h2>Signal Details</h2>
 <div class="refsect2">
 <a name="WebKitSoupAuthDialog-current-toplevel"></a><h3>The <code class="literal">"current-toplevel"</code> signal</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a>*          user_function                      (<a class="link" href="WebKitSoupAuthDialog.html" title="WebKitSoupAuthDialog"><span class="type">WebKitSoupAuthDialog</span></a> *authDialog,
-                                                        <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>          *message,
-                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              user_data)       : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<pre class="programlisting"><span class="returnvalue">GtkWidget</span>*          user_function                      (<a class="link" href="WebKitSoupAuthDialog.html" title="WebKitSoupAuthDialog"><span class="type">WebKitSoupAuthDialog</span></a> *authDialog,
+                                                        <span class="type">SoupMessage</span>          *message,
+                                                        <span class="type">gpointer</span>              user_data)       : <code class="literal">Run Last</code></pre>
 <p>
 This signal is emitted by the <em class="parameter"><code>authDialog</code></em> when it needs to know
 the current toplevel widget in order to correctly set the
@@ -104,7 +104,7 @@ transiency for the authentication dialog.
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>message</code></em> :</span></p></td>
-<td>the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> being used in the authentication process</td>
+<td>the <span class="type">SoupMessage</span> being used in the authentication process</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
@@ -112,7 +112,7 @@ transiency for the authentication dialog.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the current toplevel <a href="../gtk3/GtkWidget.html"><span class="type">GtkWidget</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if there's none. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the current toplevel <span class="type">GtkWidget</span> or <code class="literal">NULL</code> if there's none. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -123,6 +123,6 @@ transiency for the authentication dialog.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>

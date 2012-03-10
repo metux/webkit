@@ -28,7 +28,14 @@
 
 #include "CodeProfile.h"
 #include "MetaAllocator.h"
-#include "signal.h"
+
+#if HAVE(SIGNAL_H)
+#include <signal.h>
+#endif
+
+#if OS(LINUX)
+#include <sys/time.h>
+#endif
 
 namespace JSC {
 
@@ -41,7 +48,7 @@ WTF::MetaAllocatorTracker* CodeProfiling::s_tracker = 0;
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 #endif
 
-#if PLATFORM(MAC) && CPU(X86_64)
+#if (PLATFORM(MAC) && CPU(X86_64)) || (OS(LINUX) && CPU(X86))
 // Helper function to start & stop the timer.
 // Presently we're using the wall-clock timer, since this seems to give the best results.
 static void setProfileTimer(unsigned usec)
@@ -66,6 +73,13 @@ static void profilingTimer(int, siginfo_t*, void* uap)
     CodeProfiling::sample(reinterpret_cast<void*>(context->__ss.__rip),
                           reinterpret_cast<void**>(context->__ss.__rbp));
 }
+#elif OS(LINUX) && CPU(X86)
+static void profilingTimer(int, siginfo_t*, void* uap)
+{
+    mcontext_t context = static_cast<ucontext_t*>(uap)->uc_mcontext;
+    CodeProfiling::sample(reinterpret_cast<void*>(context.gregs[REG_EIP]),
+                          reinterpret_cast<void**>(context.gregs[REG_EBP]));
+}
 #endif
 
 // Callback triggered when the timer is fired.
@@ -78,6 +92,7 @@ void CodeProfiling::sample(void* pc, void** framePointer)
 
 void CodeProfiling::notifyAllocator(WTF::MetaAllocator* allocator)
 {
+#if !OS(WINCE)
     // Check for JSC_CODE_PROFILING.
     const char* codeProfilingMode = getenv("JSC_CODE_PROFILING");
     if (!codeProfilingMode)
@@ -104,6 +119,7 @@ void CodeProfiling::notifyAllocator(WTF::MetaAllocator* allocator)
     ASSERT(!s_tracker);
     s_tracker = new WTF::MetaAllocatorTracker();
     allocator->trackAllocations(s_tracker);
+#endif
 }
 
 void* CodeProfiling::getOwnerUIDForPC(void* address)
@@ -127,10 +143,10 @@ void CodeProfiling::begin(const SourceCode& source)
     if (alreadyProfiling)
         return;
 
-#if PLATFORM(MAC) && CPU(X86_64)
+#if (PLATFORM(MAC) && CPU(X86_64)) || (OS(LINUX) && CPU(X86))
     // Regsiter a signal handler & itimer.
     struct sigaction action;
-    action.sa_sigaction = reinterpret_cast<void (*)(int, struct __siginfo *, void *)>(profilingTimer);
+    action.sa_sigaction = reinterpret_cast<void (*)(int, siginfo_t *, void *)>(profilingTimer);
     sigfillset(&action.sa_mask);
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGALRM, &action, 0);
@@ -151,7 +167,7 @@ void CodeProfiling::end()
     if (s_profileStack)
         return;
 
-#if PLATFORM(MAC) && CPU(X86_64)
+#if (PLATFORM(MAC) && CPU(X86_64)) || (OS(LINUX) && CPU(X86))
     // Stop profiling
     setProfileTimer(0);
 #endif

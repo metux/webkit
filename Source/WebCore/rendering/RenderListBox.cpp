@@ -92,17 +92,17 @@ RenderListBox::RenderListBox(Element* element)
     ASSERT(element);
     ASSERT(element->isHTMLElement());
     ASSERT(element->hasTagName(HTMLNames::selectTag));
-    if (Page* page = frame()->page()) {
-        m_page = page;
-        m_page->addScrollableArea(this);
-    }
+
+    if (FrameView* frameView = frame()->view())
+        frameView->addScrollableArea(this);
 }
 
 RenderListBox::~RenderListBox()
 {
     setHasVerticalScrollbar(false);
-    if (m_page)
-        m_page->removeScrollableArea(this);
+
+    if (FrameView* frameView = frame()->view())
+        frameView->removeScrollableArea(this);
 }
 
 void RenderListBox::updateFromElement()
@@ -255,7 +255,7 @@ void RenderListBox::computeLogicalHeight()
         m_vBar->setSteps(1, max(1, numVisibleItems() - 1), itemHeight);
         m_vBar->setProportion(numVisibleItems(), numItems());
         if (!enabled) {
-            scrollToYOffsetWithoutAnimation(0);
+            scrollToOffsetWithoutAnimation(VerticalScrollbar, 0);
             m_indexOffset = 0;
         }
     }
@@ -473,7 +473,7 @@ int RenderListBox::listIndexAtOffset(const LayoutSize& offset)
     if (offset.height() < borderTop() + paddingTop() || offset.height() > height() - paddingBottom() - borderBottom())
         return -1;
 
-    LayoutUnit scrollbarWidth = m_vBar ? m_vBar->width() : LayoutUnit(0);
+    int scrollbarWidth = m_vBar ? m_vBar->width() : 0;
     if (offset.width() < borderLeft() + paddingLeft() || offset.width() > width() - borderRight() - paddingRight() - scrollbarWidth)
         return -1;
 
@@ -579,7 +579,7 @@ bool RenderListBox::scrollToRevealElementAtListIndex(int index)
     else
         newOffset = index - numVisibleItems() + 1;
 
-    ScrollableArea::scrollToYOffsetWithoutAnimation(newOffset);
+    scrollToOffsetWithoutAnimation(VerticalScrollbar, newOffset);
 
     return true;
 }
@@ -638,7 +638,7 @@ LayoutUnit RenderListBox::itemHeight() const
 
 int RenderListBox::verticalScrollbarWidth() const
 {
-    return m_vBar && !m_vBar->isOverlayScrollbar() ? m_vBar->width() : LayoutUnit(0);
+    return m_vBar && !m_vBar->isOverlayScrollbar() ? m_vBar->width() : 0;
 }
 
 // FIXME: We ignore padding in the vertical direction as far as these values are concerned, since that's
@@ -651,7 +651,7 @@ LayoutUnit RenderListBox::scrollWidth() const
 
 int RenderListBox::scrollHeight() const
 {
-    return max(clientHeight(), listHeight());
+    return max(pixelSnappedClientHeight(), listHeight());
 }
 
 int RenderListBox::scrollLeft() const
@@ -675,7 +675,7 @@ void RenderListBox::setScrollTop(int newTop)
     if (index < 0 || index >= numItems() || index == m_indexOffset)
         return;
     
-    ScrollableArea::scrollToYOffsetWithoutAnimation(index);
+    scrollToOffsetWithoutAnimation(VerticalScrollbar, index);
 }
 
 bool RenderListBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
@@ -819,6 +819,11 @@ ScrollableArea* RenderListBox::enclosingScrollableArea() const
 {
     // FIXME: Return a RenderLayer that's scrollable.
     return 0;
+}
+
+IntRect RenderListBox::scrollableAreaBoundingBox() const
+{
+    return absoluteBoundingBoxRect();
 }
 
 PassRefPtr<Scrollbar> RenderListBox::createScrollbar()

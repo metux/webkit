@@ -77,7 +77,9 @@ namespace JSC {
     public:
         typedef JSCell Base;
 
+#if ENABLE(JIT)
         static void destroy(JSCell*);
+#endif
 
         bool isHostFunction() const
         {
@@ -197,7 +199,7 @@ namespace JSC {
         }
 #endif
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         static NativeExecutable* create(JSGlobalData& globalData, NativeFunction function, NativeFunction constructor)
         {
             ASSERT(!globalData.canUseJIT());
@@ -208,7 +210,9 @@ namespace JSC {
         }
 #endif
 
+#if ENABLE(JIT)
         static void destroy(JSCell*);
+#endif
 
         NativeFunction function() { return m_function; }
         NativeFunction constructor() { return m_constructor; }
@@ -233,7 +237,7 @@ namespace JSC {
         }
 #endif
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         void finishCreation(JSGlobalData& globalData)
         {
             ASSERT(!globalData.canUseJIT());
@@ -276,7 +280,9 @@ namespace JSC {
         {
         }
 
+#if ENABLE(JIT)
         static void destroy(JSCell*);
+#endif
 
         const SourceCode& source() { return m_source; }
         intptr_t sourceID() const { return m_source.provider()->asID(); }

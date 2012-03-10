@@ -122,7 +122,6 @@ public:
         DOCUMENT_FRAGMENT_NODE = 11,
         NOTATION_NODE = 12,
         XPATH_NAMESPACE_NODE = 13,
-        SHADOW_ROOT_NODE = 14
     };
     enum DocumentPosition {
         DOCUMENT_POSITION_EQUIVALENT = 0x00,
@@ -224,6 +223,9 @@ public:
     bool isDocumentNode() const;
     bool isShadowRoot() const { return getFlag(IsShadowRootOrSVGShadowRootFlag) && !isSVGElement(); }
     virtual bool isContentElement() const { return false; }
+#if ENABLE(SHADOW_DOM)
+    virtual bool isShadowElement() const { return false; }
+#endif
 
     Node* shadowAncestorNode() const;
     // Returns 0, a ShadowRoot, or a legacy shadow root.
@@ -297,6 +299,7 @@ public:
     virtual bool sheetLoaded() { return true; }
     virtual void startLoadingDynamicSheet() { ASSERT_NOT_REACHED(); }
 
+    bool attributeStyleDirty() const { return getFlag(AttributeStyleDirtyFlag); }
     bool hasName() const { return getFlag(HasNameFlag); }
     bool hasID() const { return getFlag(HasIDFlag); }
     bool hasClass() const { return getFlag(HasClassFlag); }
@@ -311,6 +314,9 @@ public:
     StyleChangeType styleChangeType() const { return static_cast<StyleChangeType>(m_nodeFlags & StyleChangeMask); }
     bool childNeedsStyleRecalc() const { return getFlag(ChildNeedsStyleRecalcFlag); }
     bool isLink() const { return getFlag(IsLinkFlag); }
+
+    void setAttributeStyleDirty() { setFlag(AttributeStyleDirtyFlag); }
+    void clearAttributeStyleDirty() { clearFlag(AttributeStyleDirtyFlag); }
 
     void setHasName(bool f) { setFlag(f, HasNameFlag); }
     void setHasID(bool f) { setFlag(f, HasIDFlag); }
@@ -632,6 +638,13 @@ public:
     void notifyMutationObserversNodeWillDetach();
 #endif // ENABLE(MUTATION_OBSERVERS)
 
+#if ENABLE(STYLE_SCOPED)
+    void registerScopedHTMLStyleChild();
+    void unregisterScopedHTMLStyleChild();
+#endif
+    bool hasScopedHTMLStyleChild() const;
+    size_t numberOfScopedHTMLStyleChildren() const;
+
 private:
     enum NodeFlags {
         IsTextFlag = 1,
@@ -672,6 +685,8 @@ private:
         HasCustomStyleForRendererFlag = 1 << 29,
 
         HasNameFlag = 1 << 30,
+
+        AttributeStyleDirtyFlag = 1 << 31,
 
 #if ENABLE(SVG)
         DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag | AreSVGAttributesValidFlag

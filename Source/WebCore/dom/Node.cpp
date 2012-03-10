@@ -63,7 +63,7 @@
 #include "HTMLElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLNames.h"
-#include "InspectorInstrumentation.h"
+#include "InspectorCounters.h"
 #include "KeyboardEvent.h"
 #include "LabelsNodeList.h"
 #include "Logging.h"
@@ -86,6 +86,7 @@
 #include "ScopedEventQueue.h"
 #include "SelectorQuery.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "StaticNodeList.h"
 #include "StorageEvent.h"
 #include "TagNodeList.h"
@@ -227,7 +228,10 @@ void Node::dumpStatistics()
                 break;
             }
             case DOCUMENT_FRAGMENT_NODE: {
-                ++fragmentNodes;
+                if (node->isShadowRoot())
+                    ++shadowRootNodes;
+                else
+                    ++fragmentNodes;
                 break;
             }
             case NOTATION_NODE: {
@@ -236,10 +240,6 @@ void Node::dumpStatistics()
             }
             case XPATH_NAMESPACE_NODE: {
                 ++xpathNSNodes;
-                break;
-            }
-            case SHADOW_ROOT_NODE: {
-                ++shadowRootNodes;
                 break;
             }
         }
@@ -352,8 +352,7 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2)
     if ((s1 && s2) && (s1->flowThread() != s2->flowThread()))
         ch = Detach;
 
-    // When either the region thread or the region index has changed,
-    // we need to prepare a separate render region object.
+    // When the region thread has changed, we need to prepare a separate render region object.
     if ((s1 && s2) && (s1->regionThread() != s2->regionThread()))
         ch = Detach;
 
@@ -406,6 +405,8 @@ Node::~Node()
 
     if (doc)
         doc->guardDeref();
+
+    InspectorCounters::decrementCounter(InspectorCounters::NodeCounter);
 }
 
 void Node::setDocument(Document* document)
@@ -632,7 +633,7 @@ void Node::normalize()
             continue;
         }
 
-        Text* text = static_cast<Text*>(node.get());
+        RefPtr<Text> text = toText(node.get());
 
         // Remove empty text nodes.
         if (!text->length()) {
@@ -647,7 +648,7 @@ void Node::normalize()
         while (Node* nextSibling = node->nextSibling()) {
             if (nextSibling->nodeType() != TEXT_NODE)
                 break;
-            RefPtr<Text> nextText = static_cast<Text*>(nextSibling);
+            RefPtr<Text> nextText = toText(nextSibling);
 
             // Remove empty text nodes.
             if (!nextText->length()) {
@@ -810,7 +811,7 @@ bool Node::hasNonEmptyBoundingBox() const
 
 inline static ShadowRoot* shadowRoot(Node* node)
 {
-    return node->isElementNode() ? toElement(node)->shadowRoot() : 0;
+    return node->isElementNode() && toElement(node)->hasShadowRoot() ? toElement(node)->shadowRootList()->youngestShadowRoot() : 0;
 }
 
 inline void Node::setStyleChange(StyleChangeType changeType)
@@ -1339,7 +1340,7 @@ void Node::detach()
     setFlag(InDetachFlag);
 
     if (renderer())
-        renderer()->destroy();
+        renderer()->destroyAndCleanupAnonymousWrappers();
     setRenderer(0);
 
     Document* doc = document();
@@ -1759,11 +1760,13 @@ bool Node::isEqualNode(Node* other) const
         NamedNodeMap* attributes = toElement(this)->updatedAttributes();
         NamedNodeMap* otherAttributes = toElement(other)->updatedAttributes();
 
-        if (attributes && !attributes->mapsEquivalent(otherAttributes))
-            return false;
-
-        if (otherAttributes && !otherAttributes->mapsEquivalent(attributes))
-            return false;
+        if (attributes) {
+            if (!attributes->mapsEquivalent(otherAttributes))
+                return false;
+        } else if (otherAttributes) {
+            if (!otherAttributes->mapsEquivalent(attributes))
+                return false;
+        }
     }
     
     Node* child = firstChild();
@@ -1822,9 +1825,9 @@ bool Node::isDefaultNamespace(const AtomicString& namespaceURIMaybeEmpty) const
             if (elem->prefix().isNull())
                 return elem->namespaceURI() == namespaceURI;
 
-            if (NamedNodeMap* attrs = elem->updatedAttributes()) {
-                for (unsigned i = 0; i < attrs->length(); i++) {
-                    Attribute* attr = attrs->attributeItem(i);
+            if (elem->hasAttributes()) {
+                for (unsigned i = 0; i < elem->attributeCount(); i++) {
+                    Attribute* attr = elem->attributeItem(i);
                     
                     if (attr->localName() == xmlnsAtom)
                         return attr->value() == namespaceURI;
@@ -1844,7 +1847,6 @@ bool Node::isDefaultNamespace(const AtomicString& namespaceURIMaybeEmpty) const
         case NOTATION_NODE:
         case DOCUMENT_TYPE_NODE:
         case DOCUMENT_FRAGMENT_NODE:
-        case SHADOW_ROOT_NODE:
             return false;
         case ATTRIBUTE_NODE: {
             const Attr* attr = static_cast<const Attr*>(this);
@@ -1878,7 +1880,6 @@ String Node::lookupPrefix(const AtomicString &namespaceURI) const
         case NOTATION_NODE:
         case DOCUMENT_FRAGMENT_NODE:
         case DOCUMENT_TYPE_NODE:
-        case SHADOW_ROOT_NODE:
             return String();
         case ATTRIBUTE_NODE: {
             const Attr *attr = static_cast<const Attr *>(this);
@@ -1908,9 +1909,9 @@ String Node::lookupNamespaceURI(const String &prefix) const
             if (!elem->namespaceURI().isNull() && elem->prefix() == prefix)
                 return elem->namespaceURI();
             
-            if (NamedNodeMap* attrs = elem->updatedAttributes()) {
-                for (unsigned i = 0; i < attrs->length(); i++) {
-                    Attribute *attr = attrs->attributeItem(i);
+            if (elem->hasAttributes()) {
+                for (unsigned i = 0; i < elem->attributeCount(); i++) {
+                    Attribute* attr = elem->attributeItem(i);
                     
                     if (attr->prefix() == xmlnsAtom && attr->localName() == prefix) {
                         if (!attr->value().isEmpty())
@@ -1937,7 +1938,6 @@ String Node::lookupNamespaceURI(const String &prefix) const
         case NOTATION_NODE:
         case DOCUMENT_TYPE_NODE:
         case DOCUMENT_FRAGMENT_NODE:
-        case SHADOW_ROOT_NODE:
             return String();
         case ATTRIBUTE_NODE: {
             const Attr *attr = static_cast<const Attr *>(this);
@@ -1962,9 +1962,11 @@ String Node::lookupNamespacePrefix(const AtomicString &_namespaceURI, const Elem
     if (originalElement->lookupNamespaceURI(prefix()) == _namespaceURI)
         return prefix();
     
-    if (NamedNodeMap* attrs = toElement(this)->updatedAttributes()) {
-        for (unsigned i = 0; i < attrs->length(); i++) {
-            Attribute* attr = attrs->attributeItem(i);
+    ASSERT(isElementNode());
+    const Element* thisElement = toElement(this);
+    if (thisElement->hasAttributes()) {
+        for (unsigned i = 0; i < thisElement->attributeCount(); i++) {
+            Attribute* attr = thisElement->attributeItem(i);
             
             if (attr->prefix() == xmlnsAtom && attr->value() == _namespaceURI
                     && originalElement->lookupNamespaceURI(attr->localName()) == _namespaceURI)
@@ -2003,7 +2005,6 @@ static void appendTextContent(const Node* node, bool convertBRsToNewlines, bool&
     case Node::ENTITY_NODE:
     case Node::ENTITY_REFERENCE_NODE:
     case Node::DOCUMENT_FRAGMENT_NODE:
-    case Node::SHADOW_ROOT_NODE:
         isNullString = false;
         for (Node* child = node->firstChild(); child; child = child->nextSibling()) {
             if (child->nodeType() == Node::COMMENT_NODE || child->nodeType() == Node::PROCESSING_INSTRUCTION_NODE)
@@ -2041,8 +2042,7 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
         case ATTRIBUTE_NODE:
         case ENTITY_NODE:
         case ENTITY_REFERENCE_NODE:
-        case DOCUMENT_FRAGMENT_NODE:
-        case SHADOW_ROOT_NODE: {
+        case DOCUMENT_FRAGMENT_NODE: {
             ContainerNode* container = toContainerNode(this);
 #if ENABLE(MUTATION_OBSERVERS)
             ChildListMutationScope mutation(this);
@@ -2105,17 +2105,17 @@ unsigned short Node::compareDocumentPosition(Node* otherNode)
         chain2.append(attr2);
     
     if (attr1 && attr2 && start1 == start2 && start1) {
-        // We are comparing two attributes on the same node.  Crawl our attribute map
-        // and see which one we hit first.
-        NamedNodeMap* map = attr1->ownerElement()->updatedAttributes();
-        unsigned length = map->length();
+        // We are comparing two attributes on the same node. Crawl our attribute map and see which one we hit first.
+        Element* owner1 = attr1->ownerElement();
+        owner1->updatedAttributes(); // Force update invalid attributes.
+        unsigned length = owner1->attributeCount();
         for (unsigned i = 0; i < length; ++i) {
             // If neither of the two determining nodes is a child node and nodeType is the same for both determining nodes, then an 
             // implementation-dependent order between the determining nodes is returned. This order is stable as long as no nodes of
             // the same nodeType are inserted into or removed from the direct container. This would be the case, for example, 
             // when comparing two attributes of the same element, and inserting or removing additional attributes might change 
             // the order between existing attributes.
-            Attribute* attr = map->attributeItem(i);
+            Attribute* attr = owner1->attributeItem(i);
             if (attr1->attr() == attr)
                 return DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC | DOCUMENT_POSITION_FOLLOWING;
             if (attr2->attr() == attr)
@@ -2481,6 +2481,11 @@ static inline HashSet<SVGElementInstance*> instancesForSVGElement(Node* node)
 }
 #endif
 
+static inline bool isTouchEventType(const AtomicString& eventType)
+{
+    return eventType == eventNames().touchstartEvent || eventType == eventNames().touchmoveEvent || eventType == eventNames().touchendEvent || eventType == eventNames().touchcancelEvent;
+}
+
 static inline bool tryAddEventListener(Node* targetNode, const AtomicString& eventType, PassRefPtr<EventListener> listener, bool useCapture)
 {
     if (!targetNode->EventTarget::addEventListener(eventType, listener, useCapture))
@@ -2490,6 +2495,8 @@ static inline bool tryAddEventListener(Node* targetNode, const AtomicString& eve
         document->addListenerTypeIfNeeded(eventType);
         if (eventType == eventNames().mousewheelEvent)
             document->didAddWheelEventHandler();
+        else if (isTouchEventType(eventType))
+            document->didAddTouchEventHandler();
     }
         
     return true;
@@ -2539,6 +2546,8 @@ static inline bool tryRemoveEventListener(Node* targetNode, const AtomicString& 
     if (Document* document = targetNode->document()) {
         if (eventType == eventNames().mousewheelEvent)
             document->didRemoveWheelEventHandler();
+        else if (isTouchEventType(eventType))
+            document->didRemoveTouchEventHandler();
     }
     
     return true;
@@ -2719,6 +2728,39 @@ void Node::notifyMutationObserversNodeWillDetach()
 }
 #endif // ENABLE(MUTATION_OBSERVERS)
 
+#if ENABLE(STYLE_SCOPED)
+bool Node::hasScopedHTMLStyleChild() const
+{
+    return hasRareData() && rareData()->hasScopedHTMLStyleChild();
+}
+
+size_t Node::numberOfScopedHTMLStyleChildren() const
+{
+    return hasRareData() ? rareData()->numberOfScopedHTMLStyleChildren() : 0;
+}
+
+void Node::registerScopedHTMLStyleChild()
+{
+    ensureRareData()->registerScopedHTMLStyleChild();
+}
+
+void Node::unregisterScopedHTMLStyleChild()
+{
+    ASSERT(hasRareData());
+    if (hasRareData())
+        rareData()->unregisterScopedHTMLStyleChild();
+}
+#else
+bool Node::hasScopedHTMLStyleChild() const
+{
+    return 0;
+}
+
+size_t Node::numberOfScopedHTMLStyleChildren() const
+{
+    return 0;
+}
+#endif
 
 void Node::handleLocalEvents(Event* event)
 {

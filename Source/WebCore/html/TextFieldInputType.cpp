@@ -43,6 +43,7 @@
 #include "RenderTextControlSingleLine.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "TextControlInnerElements.h"
 #include "TextEvent.h"
 #include "TextIterator.h"
@@ -77,9 +78,11 @@ bool TextFieldInputType::canSetSuggestedValue()
     return true;
 }
 
-void TextFieldInputType::setValue(const String& sanitizedValue, bool valueChanged, bool sendChangeEvent)
+void TextFieldInputType::setValue(const String& sanitizedValue, bool valueChanged, TextFieldEventBehavior eventBehavior)
 {
-    InputType::setValue(sanitizedValue, valueChanged, sendChangeEvent);
+    // We don't ask InputType::setValue to dispatch events because
+    // TextFieldInputType dispatches events different way from InputType.
+    InputType::setValue(sanitizedValue, valueChanged, DispatchNoEvent);
 
     if (valueChanged)
         element()->updateInnerTextValue();
@@ -89,17 +92,22 @@ void TextFieldInputType::setValue(const String& sanitizedValue, bool valueChange
         element()->setSelectionRange(max, max);
     else
         element()->cacheSelectionInResponseToSetValue(max);
-}
 
-void TextFieldInputType::dispatchChangeEventInResponseToSetValue()
-{
-    // If the user is still editing this field, dispatch an input event rather than a change event.
-    // The change event will be dispatched when editing finishes.
-    if (element()->focused()) {
-        element()->dispatchFormControlInputEvent();
+    if (!valueChanged)
         return;
+
+    if (eventBehavior != DispatchNoEvent) {
+        // If the user is still editing this field, dispatch an input event rather than a change event.
+        // The change event will be dispatched when editing finishes.
+        if (element()->focused())
+            element()->dispatchFormControlInputEvent();
+        else
+            element()->dispatchFormControlChangeEvent();
     }
-    InputType::dispatchChangeEventInResponseToSetValue();
+
+    // FIXME: Why do we do this when eventBehavior == DispatchNoEvent
+    if (!element()->focused() || eventBehavior == DispatchNoEvent)
+        element()->setTextAsOfLastFormControlChangeEvent(sanitizedValue);
 }
 
 void TextFieldInputType::handleKeydownEvent(KeyboardEvent* event)
@@ -189,6 +197,8 @@ bool TextFieldInputType::needsContainer() const
 
 void TextFieldInputType::createShadowSubtree()
 {
+    ASSERT(element()->hasShadowRoot());
+
     ASSERT(!m_innerText);
     ASSERT(!m_innerBlock);
     ASSERT(!m_innerSpinButton);
@@ -201,11 +211,11 @@ void TextFieldInputType::createShadowSubtree()
     ExceptionCode ec = 0;
     m_innerText = TextControlInnerTextElement::create(document);
     if (!createsContainer) {
-        element()->ensureShadowRoot()->appendChild(m_innerText, ec);
+        element()->shadowRootList()->oldestShadowRoot()->appendChild(m_innerText, ec);
         return;
     }
 
-    ShadowRoot* shadowRoot = element()->ensureShadowRoot();
+    ShadowRoot* shadowRoot = element()->shadowRootList()->oldestShadowRoot();
     m_container = HTMLDivElement::create(document);
     m_container->setShadowPseudoId("-webkit-textfield-decoration-container");
     shadowRoot->appendChild(m_container, ec);
@@ -367,7 +377,7 @@ void TextFieldInputType::updatePlaceholderText()
     if (!m_placeholder) {
         m_placeholder = HTMLDivElement::create(element()->document());
         m_placeholder->setShadowPseudoId("-webkit-input-placeholder");
-        element()->shadowRoot()->insertBefore(m_placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling(), ec);
+        element()->shadowRootList()->oldestShadowRoot()->insertBefore(m_placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling(), ec);
         ASSERT(!ec);
     }
     m_placeholder->setInnerText(placeholderText, ec);

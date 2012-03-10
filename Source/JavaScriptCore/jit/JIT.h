@@ -207,34 +207,40 @@ namespace JSC {
         static void compileGetByIdProto(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, ReturnAddressPtr returnAddress)
         {
             JIT jit(globalData, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdProto(stubInfo, structure, prototypeStructure, ident, slot, cachedOffset, returnAddress, callFrame);
         }
 
         static void compileGetByIdSelfList(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* polymorphicStructures, int currentIndex, Structure* structure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset)
         {
             JIT jit(globalData, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdSelfList(stubInfo, polymorphicStructures, currentIndex, structure, ident, slot, cachedOffset);
         }
         static void compileGetByIdProtoList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset)
         {
             JIT jit(globalData, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdProtoList(stubInfo, prototypeStructureList, currentIndex, structure, prototypeStructure, ident, slot, cachedOffset, callFrame);
         }
         static void compileGetByIdChainList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset)
         {
             JIT jit(globalData, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdChainList(stubInfo, prototypeStructureList, currentIndex, structure, chain, count, ident, slot, cachedOffset, callFrame);
         }
 
         static void compileGetByIdChain(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, ReturnAddressPtr returnAddress)
         {
             JIT jit(globalData, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdChain(stubInfo, structure, chain, count, ident, slot, cachedOffset, returnAddress, callFrame);
         }
         
         static void compilePutByIdTransition(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, size_t cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
         {
             JIT jit(globalData, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompilePutByIdTransition(stubInfo, oldStructure, newStructure, cachedOffset, chain, returnAddress, direct);
         }
 
@@ -329,7 +335,7 @@ namespace JSC {
         void emitWriteBarrier(RegisterID owner, RegisterID valueTag, RegisterID scratch, RegisterID scratch2, WriteBarrierMode, WriteBarrierUseKind);
         void emitWriteBarrier(JSCell* owner, RegisterID value, RegisterID scratch, WriteBarrierMode, WriteBarrierUseKind);
 
-        template<typename ClassType, typename StructureType> void emitAllocateBasicJSObject(StructureType, RegisterID result, RegisterID storagePtr);
+        template<typename ClassType, bool destructor, typename StructureType> void emitAllocateBasicJSObject(StructureType, RegisterID result, RegisterID storagePtr);
         template<typename T> void emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID storagePtr);
         void emitAllocateJSFunction(FunctionExecutable*, RegisterID scopeChain, RegisterID result, RegisterID storagePtr);
         
@@ -398,9 +404,9 @@ namespace JSC {
         static const int patchOffsetGetByIdPropertyMapOffset2 = 22;
         static const int patchOffsetGetByIdPutResult = 22;
 #if ENABLE(OPCODE_SAMPLING)
-        static const int patchOffsetGetByIdSlowCaseCall = 37;
+        static const int patchOffsetGetByIdSlowCaseCall = 44;
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 33;
+        static const int patchOffsetGetByIdSlowCaseCall = 40;
 #endif
         static const int patchOffsetOpCallCompareToJump = 6;
 
@@ -421,7 +427,7 @@ namespace JSC {
 #if ENABLE(OPCODE_SAMPLING)
         #error "OPCODE_SAMPLING is not yet supported"
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 40;
+        static const int patchOffsetGetByIdSlowCaseCall = 48;
 #endif
         static const int patchOffsetOpCallCompareToJump = 12;
 
@@ -458,7 +464,7 @@ namespace JSC {
 #if ENABLE(OPCODE_SAMPLING)
         #error "OPCODE_SAMPLING is not yet supported"
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 40;
+        static const int patchOffsetGetByIdSlowCaseCall = 48;
 #endif
         static const int patchOffsetOpCallCompareToJump = 16;
 
@@ -494,7 +500,7 @@ namespace JSC {
 #if ENABLE(OPCODE_SAMPLING)
         #error "OPCODE_SAMPLING is not yet supported"
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 56;
+        static const int patchOffsetGetByIdSlowCaseCall = 64;
 #endif
         static const int patchOffsetOpCallCompareToJump = 32;
         static const int patchOffsetMethodCheckProtoObj = 32;
@@ -512,7 +518,7 @@ namespace JSC {
 #if ENABLE(OPCODE_SAMPLING)
         #error "OPCODE_SAMPLING is not yet supported"
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 56;
+        static const int patchOffsetGetByIdSlowCaseCall = 64;
 #endif
         static const int patchOffsetOpCallCompareToJump = 32;
         static const int patchOffsetMethodCheckProtoObj = 32;
@@ -634,9 +640,9 @@ namespace JSC {
         static const int patchOffsetGetByIdPropertyMapOffset = 28;
         static const int patchOffsetGetByIdPutResult = 28;
 #if ENABLE(OPCODE_SAMPLING)
-        static const int patchOffsetGetByIdSlowCaseCall = 64;
+        static const int patchOffsetGetByIdSlowCaseCall = 72;
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 54;
+        static const int patchOffsetGetByIdSlowCaseCall = 62;
 #endif
         static const int patchOffsetOpCallCompareToJump = 9;
 

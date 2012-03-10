@@ -29,14 +29,7 @@
 
 #include "RenderMathMLSubSup.h"
 
-#include "FontSelector.h"
 #include "MathMLNames.h"
-#include "RenderInline.h"
-#include "RenderTable.h"
-#include "RenderTableCell.h"
-#include "RenderTableRow.h"
-#include "RenderTableSection.h"
-#include "RenderText.h"
 
 namespace WebCore {
     
@@ -50,20 +43,30 @@ RenderMathMLSubSup::RenderMathMLSubSup(Element* element)
     : RenderMathMLBlock(element)
     , m_scripts(0)
 {
-    // Determine what kind of under/over expression we have by element name
+    // Determine what kind of sub/sup expression we have by element name
     if (element->hasLocalName(MathMLNames::msubTag))
         m_kind = Sub;
     else if (element->hasLocalName(MathMLNames::msupTag))
         m_kind = Sup;
-    else if (element->hasLocalName(MathMLNames::msubsupTag))
+    else {
+        ASSERT(element->hasLocalName(MathMLNames::msubsupTag));
         m_kind = SubSup;
-    else 
-        m_kind = SubSup;
+    }
+}
+
+RenderBoxModelObject* RenderMathMLSubSup::base() const
+{
+    RenderObject* baseWrapper = firstChild();
+    if (!baseWrapper)
+        return 0;
+    RenderObject* base = baseWrapper->firstChild();
+    if (!base || !base->isBoxModelObject())
+        return 0;
+    return toRenderBoxModelObject(base);
 }
 
 void RenderMathMLSubSup::addChild(RenderObject* child, RenderObject* beforeChild)
 {
-    
     // Note: The RenderMathMLBlock only allows element children to be added.
     Element* childElement = toElement(child->node());
 
@@ -112,14 +115,22 @@ void RenderMathMLSubSup::addChild(RenderObject* child, RenderObject* beforeChild
     }
 }
 
+RenderMathMLOperator* RenderMathMLSubSup::unembellishedOperator()
+{
+    RenderBoxModelObject* base = this->base();
+    if (!base || !base->isRenderMathMLBlock())
+        return 0;
+    return toRenderMathMLBlock(base)->unembellishedOperator();
+}
+
 void RenderMathMLSubSup::stretchToHeight(int height)
 {
-    RenderObject* base = firstChild();
-    if (!base || !base->firstChild())
+    RenderObject* baseWrapper = firstChild();
+    if (!baseWrapper || !baseWrapper->firstChild())
         return;
     
-    if (base->firstChild() && base->firstChild()->isRenderMathMLBlock()) {
-        RenderMathMLBlock* block = toRenderMathMLBlock(base->firstChild());
+    if (baseWrapper->firstChild() && baseWrapper->firstChild()->isRenderMathMLBlock()) {
+        RenderMathMLBlock* block = toRenderMathMLBlock(baseWrapper->firstChild());
         block->stretchToHeight(static_cast<int>(gSubSupStretch * height));
         
         // Adjust the script placement after we stretch
@@ -161,33 +172,33 @@ void RenderMathMLSubSup::layout()
     RenderBlock::layout();
     
     if (m_kind == SubSup) {
-        if (RenderObject* base = firstChild()) {
+        if (RenderObject* baseWrapper = firstChild()) {
             LayoutUnit maxHeight = 0;
-            RenderObject* current = base->firstChild();
+            RenderObject* current = baseWrapper->firstChild();
             while (current) {
                 LayoutUnit height = getBoxModelObjectHeight(current);
                 if (height > maxHeight)
                     maxHeight = height;
                 current = current->nextSibling();
             }
-            LayoutUnit heightDiff = m_scripts ? (m_scripts->offsetHeight() - maxHeight) / 2 : 0;
+            LayoutUnit heightDiff = m_scripts ? (m_scripts->offsetHeight() - maxHeight) / 2 : zeroLayoutUnit;
             if (heightDiff < 0) 
                 heightDiff = 0;
-            base->style()->setPaddingTop(Length(heightDiff, Fixed));
-            base->setNeedsLayout(true);
+            baseWrapper->style()->setPaddingTop(Length(heightDiff, Fixed));
+            baseWrapper->setNeedsLayout(true);
         }
         setNeedsLayout(true);
         RenderBlock::layout();
     }    
 }
 
-int RenderMathMLSubSup::baselinePosition(FontBaseline, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
+LayoutUnit RenderMathMLSubSup::baselinePosition(FontBaseline, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
 {
     RenderObject* base = firstChild();
     if (!base) 
         return offsetHeight();
     
-    int baseline = offsetHeight();
+    LayoutUnit baseline = offsetHeight();
     if (!base || !base->isBoxModelObject()) 
         return baseline;
 

@@ -135,23 +135,14 @@ namespace JSC {
 
         static void finalize(JSCell*);
 
-        static JSArray* create(JSGlobalData& globalData, Structure* structure, unsigned initialLength = 0)
-        {
-            JSArray* array = new (NotNull, allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
-            array->finishCreation(globalData, initialLength);
-            return array;
-        }
+        static JSArray* create(JSGlobalData&, Structure*, unsigned initialLength = 0);
 
         // tryCreateUninitialized is used for fast construction of arrays whose size and
         // contents are known at time of creation. Clients of this interface must:
         //   - null-check the result (indicating out of memory, or otherwise unable to allocate vector).
         //   - call 'initializeIndex' for all properties in sequence, for 0 <= i < initialLength.
         //   - called 'completeInitialization' after all properties have been initialized.
-        static JSArray* tryCreateUninitialized(JSGlobalData& globalData, Structure* structure, unsigned initialLength)
-        {
-            JSArray* array = new (NotNull, allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
-            return array->tryFinishCreationUninitialized(globalData, initialLength);
-        }
+        static JSArray* tryCreateUninitialized(JSGlobalData&, Structure*, unsigned initialLength);
 
         JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&, bool throwException);
 
@@ -253,6 +244,8 @@ namespace JSC {
 
         JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
+        void enterDictionaryMode(JSGlobalData&);
+
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
         static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
@@ -274,7 +267,6 @@ namespace JSC {
         void setLengthWritable(ExecState*, bool writable);
         void putDescriptor(ExecState*, SparseArrayEntry*, PropertyDescriptor&, PropertyDescriptor& old);
         bool defineOwnNumericProperty(ExecState*, unsigned, PropertyDescriptor&, bool throwException);
-        void enterDictionaryMode(JSGlobalData&);
         void allocateSparseMap(JSGlobalData&);
         void deallocateSparseMap();
 
@@ -298,6 +290,19 @@ namespace JSC {
         SparseArrayValueMap* m_sparseValueMap;
         void* m_subclassData; // A JSArray subclass can use this to fill the vector lazily.
     };
+
+    inline JSArray* JSArray::create(JSGlobalData& globalData, Structure* structure, unsigned initialLength)
+    {
+        JSArray* array = new (NotNull, allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
+        array->finishCreation(globalData, initialLength);
+        return array;
+    }
+
+    inline JSArray* JSArray::tryCreateUninitialized(JSGlobalData& globalData, Structure* structure, unsigned initialLength)
+    {
+        JSArray* array = new (NotNull, allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
+        return array->tryFinishCreationUninitialized(globalData, initialLength);
+    }
 
     JSArray* asArray(JSValue);
 

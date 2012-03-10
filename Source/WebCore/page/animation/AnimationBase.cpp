@@ -451,6 +451,23 @@ public:
         dst->setTransform(blendFunc(anim, a->transform(), b->transform(), progress));
     }
 };
+
+#if ENABLE(CSS_FILTERS)
+class PropertyWrapperAcceleratedFilter : public PropertyWrapper<const FilterOperations&> {
+public:
+    PropertyWrapperAcceleratedFilter()
+        : PropertyWrapper<const FilterOperations&>(CSSPropertyWebkitFilter, &RenderStyle::filter, &RenderStyle::setFilter)
+    {
+    }
+    
+    virtual bool animationIsAccelerated() const { return true; }
+
+    virtual void blend(const AnimationBase* anim, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress) const
+    {
+        dst->setFilter(blendFunc(anim, a->filter(), b->filter(), progress));
+    }
+};
+#endif
 #endif // USE(ACCELERATED_COMPOSITING)
 
 static inline size_t shadowListLength(const ShadowData* shadow)
@@ -1025,13 +1042,15 @@ void AnimationBase::ensurePropertyMap()
 #if USE(ACCELERATED_COMPOSITING)
         gPropertyWrappers->append(new PropertyWrapperAcceleratedOpacity());
         gPropertyWrappers->append(new PropertyWrapperAcceleratedTransform());
+#if ENABLE(CSS_FILTERS)
+        gPropertyWrappers->append(new PropertyWrapperAcceleratedFilter());
+#endif
 #else
         gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyOpacity, &RenderStyle::opacity, &RenderStyle::setOpacity));
         gPropertyWrappers->append(new PropertyWrapper<const TransformOperations&>(CSSPropertyWebkitTransform, &RenderStyle::transform, &RenderStyle::setTransform));
-#endif
-
 #if ENABLE(CSS_FILTERS)
         gPropertyWrappers->append(new PropertyWrapper<const FilterOperations&>(CSSPropertyWebkitFilter, &RenderStyle::filter, &RenderStyle::setFilter));
+#endif
 #endif
 
         gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitColumnRuleColor, MaybeInvalidColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor, &RenderStyle::visitedLinkColumnRuleColor, &RenderStyle::setVisitedLinkColumnRuleColor));
@@ -1673,7 +1692,9 @@ double AnimationBase::fractionalTime(double scale, double elapsedTime, double of
         integralTime = min(integralTime, m_animation->iterationCount() - 1);
     fractionalTime -= integralTime;
 
-    if ((m_animation->direction() == Animation::AnimationDirectionAlternate) && (integralTime & 1))
+    if (((m_animation->direction() == Animation::AnimationDirectionAlternate) && (integralTime & 1))
+        || ((m_animation->direction() == Animation::AnimationDirectionAlternateReverse) && !(integralTime & 1))
+        || m_animation->direction() == Animation::AnimationDirectionReverse)
         fractionalTime = 1 - fractionalTime;
 
     if (scale != 1 || offset)

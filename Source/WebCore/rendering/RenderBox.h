@@ -51,6 +51,10 @@ public:
     LayoutUnit width() const { return m_frameRect.width(); }
     LayoutUnit height() const { return m_frameRect.height(); }
 
+    // FIXME: The implementation for these functions will change once we move to subpixel layout. See bug 60318.
+    int pixelSnappedWidth() const { return m_frameRect.width(); }
+    int pixelSnappedHeight() const { return m_frameRect.height(); }
+
     // These represent your location relative to your container as a physical offset.
     // In layout related methods you almost always want the logical location (e.g. x() and y()).
     LayoutUnit top() const { return topLeftLocation().y(); }
@@ -147,6 +151,7 @@ public:
     // respectively are flipped when compared to their physical counterparts.  For example minX is on the left in vertical-lr,
     // but it is on the right in vertical-rl.
     LayoutRect layoutOverflowRect() const { return m_overflow ? m_overflow->layoutOverflowRect() : clientBoxRect(); }
+    IntRect pixelSnappedLayoutOverflowRect() const { return pixelSnappedIntRect(layoutOverflowRect()); }
     LayoutUnit minYLayoutOverflow() const { return m_overflow? m_overflow->minYLayoutOverflow() : borderTop(); }
     LayoutUnit maxYLayoutOverflow() const { return m_overflow ? m_overflow->maxYLayoutOverflow() : borderTop() + clientHeight(); }
     LayoutUnit minXLayoutOverflow() const { return m_overflow ? m_overflow->minXLayoutOverflow() : borderLeft(); }
@@ -156,9 +161,9 @@ public:
     LayoutUnit logicalRightLayoutOverflow() const { return style()->isHorizontalWritingMode() ? maxXLayoutOverflow() : maxYLayoutOverflow(); }
     
     virtual LayoutRect visualOverflowRect() const { return m_overflow ? m_overflow->visualOverflowRect() : borderBoxRect(); }
-    LayoutUnit minYVisualOverflow() const { return m_overflow? m_overflow->minYVisualOverflow() : 0; }
+    LayoutUnit minYVisualOverflow() const { return m_overflow? m_overflow->minYVisualOverflow() : zeroLayoutUnit; }
     LayoutUnit maxYVisualOverflow() const { return m_overflow ? m_overflow->maxYVisualOverflow() : height(); }
-    LayoutUnit minXVisualOverflow() const { return m_overflow ? m_overflow->minXVisualOverflow() : 0; }
+    LayoutUnit minXVisualOverflow() const { return m_overflow ? m_overflow->minXVisualOverflow() : zeroLayoutUnit; }
     LayoutUnit maxXVisualOverflow() const { return m_overflow ? m_overflow->maxXVisualOverflow() : width(); }
     LayoutUnit logicalLeftVisualOverflow() const { return style()->isHorizontalWritingMode() ? minXVisualOverflow() : minYVisualOverflow(); }
     LayoutUnit logicalRightVisualOverflow() const { return style()->isHorizontalWritingMode() ? maxXVisualOverflow() : maxYVisualOverflow(); }
@@ -183,16 +188,23 @@ public:
     virtual LayoutUnit offsetWidth() const { return width(); }
     virtual LayoutUnit offsetHeight() const { return height(); }
 
+    // FIXME: The implementation for these functions will change once we move to subpixel layout. See bug 60318.
+    virtual int pixelSnappedOffsetWidth() const { return pixelSnappedWidth(); }
+    virtual int pixelSnappedOffsetHeight() const { return pixelSnappedHeight(); }
+
     // More IE extensions.  clientWidth and clientHeight represent the interior of an object
     // excluding border and scrollbar.  clientLeft/Top are just the borderLeftWidth and borderTopWidth.
     LayoutUnit clientLeft() const { return borderLeft(); }
     LayoutUnit clientTop() const { return borderTop(); }
     LayoutUnit clientWidth() const;
     LayoutUnit clientHeight() const;
-    LayoutUnit clientLogicalWidth() const { return style()->isHorizontalWritingMode() ? clientWidth() : clientHeight(); }
-    LayoutUnit clientLogicalHeight() const { return style()->isHorizontalWritingMode() ? clientHeight() : clientWidth(); }
+    LayoutUnit clientLogicalWidth() const { return style()->isHorizontalWritingMode() ? pixelSnappedClientWidth() : pixelSnappedClientHeight(); }
+    LayoutUnit clientLogicalHeight() const { return style()->isHorizontalWritingMode() ? pixelSnappedClientHeight() : pixelSnappedClientWidth(); }
     LayoutUnit clientLogicalBottom() const { return borderBefore() + clientLogicalHeight(); }
     LayoutRect clientBoxRect() const { return LayoutRect(clientLeft(), clientTop(), clientWidth(), clientHeight()); }
+
+    int pixelSnappedClientWidth() const;
+    int pixelSnappedClientHeight() const;
 
     // scrollWidth/scrollHeight will be the same as clientWidth/clientHeight unless the
     // object has overflow:hidden/scroll/auto specified and also has overflow.
@@ -302,7 +314,7 @@ public:
     virtual void computeLogicalHeight();
 
     RenderBoxRegionInfo* renderBoxRegionInfo(RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage, RenderBoxRegionInfoFlags = CacheRenderBoxRegionInfo) const;
-    void computeLogicalWidthInRegion(RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = 0);
+    void computeLogicalWidthInRegion(RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = zeroLayoutUnit);
 
     bool stretchesToViewport() const
     {
@@ -448,6 +460,8 @@ protected:
 
     void paintMaskImages(const PaintInfo&, const LayoutRect&);
 
+    BackgroundBleedAvoidance determineBackgroundBleedAvoidance(GraphicsContext*) const;
+
 #if PLATFORM(MAC)
     void paintCustomHighlight(const LayoutPoint&, const AtomicString& type, bool behindText);
 #endif
@@ -491,8 +505,6 @@ private:
     // These values are used in shrink-to-fit layout systems.
     // These include tables, positioned objects, floats and flexible boxes.
     virtual void computePreferredLogicalWidths() { setPreferredLogicalWidthsDirty(false); }
-
-    BackgroundBleedAvoidance determineBackgroundBleedAvoidance(GraphicsContext*) const;
 
 private:
     // The width/height of the contents + borders + padding.  The x/y location is relative to our container (which is not always our parent).

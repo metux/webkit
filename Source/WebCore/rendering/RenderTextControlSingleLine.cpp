@@ -175,7 +175,7 @@ void RenderTextControlSingleLine::showPopup()
         m_searchPopup->saveRecentSearches(name, m_recentSearches);
     }
 
-    m_searchPopup->popupMenu()->show(absoluteBoundingBoxRect(), document()->view(), -1);
+    m_searchPopup->popupMenu()->show(pixelSnappedIntRect(absoluteBoundingBoxRect()), document()->view(), -1);
 }
 
 void RenderTextControlSingleLine::hidePopup()
@@ -196,7 +196,7 @@ void RenderTextControlSingleLine::paint(PaintInfo& paintInfo, const LayoutPoint&
 
         // Convert the rect into the coords used for painting the content
         contentsRect.moveBy(paintOffset + location());
-        theme()->paintCapsLockIndicator(this, paintInfo, contentsRect);
+        theme()->paintCapsLockIndicator(this, paintInfo, pixelSnappedIntRect(contentsRect));
     }
 }
 
@@ -332,7 +332,7 @@ void RenderTextControlSingleLine::styleDidChange(StyleDifference diff, const Ren
         containerRenderer->style()->setWidth(Length());
     }
     if (HTMLElement* placeholder = inputElement()->placeholderElement())
-        placeholder->ensureInlineStyleDecl()->setProperty(CSSPropertyTextOverflow, textShouldBeTruncated() ? CSSValueEllipsis : CSSValueClip);
+        placeholder->setInlineStyleProperty(CSSPropertyTextOverflow, textShouldBeTruncated() ? CSSValueEllipsis : CSSValueClip);
     setHasOverflowClip(false);
 }
 
@@ -638,9 +638,9 @@ int RenderTextControlSingleLine::clientInsetRight() const
     return height() / 2;
 }
 
-int RenderTextControlSingleLine::clientPaddingLeft() const
+LayoutUnit RenderTextControlSingleLine::clientPaddingLeft() const
 {
-    int padding = paddingLeft();
+    LayoutUnit padding = paddingLeft();
 
     HTMLElement* resultsButton = resultsButtonElement();
     if (RenderBox* resultsRenderer = resultsButton ? resultsButton->renderBox() : 0)
@@ -649,9 +649,9 @@ int RenderTextControlSingleLine::clientPaddingLeft() const
     return padding;
 }
 
-int RenderTextControlSingleLine::clientPaddingRight() const
+LayoutUnit RenderTextControlSingleLine::clientPaddingRight() const
 {
-    int padding = paddingRight();
+    LayoutUnit padding = paddingRight();
 
     HTMLElement* cancelButton = cancelButtonElement();
     if (RenderBox* cancelRenderer = cancelButton ? cancelButton->renderBox() : 0)

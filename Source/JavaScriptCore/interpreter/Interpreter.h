@@ -31,6 +31,7 @@
 
 #include "ArgList.h"
 #include "JSCell.h"
+#include "JSFunction.h"
 #include "JSValue.h"
 #include "JSObject.h"
 #include "Opcode.h"
@@ -42,8 +43,8 @@ namespace JSC {
 
     class CodeBlock;
     class EvalExecutable;
+    class ExecutableBase;
     class FunctionExecutable;
-    class JSFunction;
     class JSGlobalObject;
     class ProgramExecutable;
     class Register;
@@ -60,6 +61,63 @@ namespace JSC {
         DidReachBreakpoint,
         WillLeaveCallFrame,
         WillExecuteStatement
+    };
+
+    enum StackFrameCodeType {
+        StackFrameGlobalCode,
+        StackFrameEvalCode,
+        StackFrameFunctionCode,
+        StackFrameNativeCode
+    };
+
+    struct StackFrame {
+        Strong<JSObject> callee;
+        StackFrameCodeType codeType;
+        Strong<ExecutableBase> executable;
+        int line;
+        UString sourceURL;
+        UString toString(CallFrame* callFrame) const
+        {
+            bool hasSourceURLInfo = !sourceURL.isNull() && !sourceURL.isEmpty();
+            bool hasLineInfo = line > -1;
+            String traceLine;
+            JSObject* stackFrameCallee = callee.get();
+
+            switch (codeType) {
+            case StackFrameEvalCode:
+                if (hasSourceURLInfo) {
+                    traceLine = hasLineInfo ? String::format("eval code@%s:%d", sourceURL.ascii().data(), line) 
+                                            : String::format("eval code@%s", sourceURL.ascii().data());
+                } else
+                    traceLine = String::format("eval code");
+                break;
+            case StackFrameNativeCode: {
+                if (callee) {
+                    UString functionName = getCalculatedDisplayName(callFrame, stackFrameCallee);
+                    traceLine = String::format("%s@[native code]", functionName.ascii().data());
+                } else
+                    traceLine = "[native code]";
+                break;
+            }
+            case StackFrameFunctionCode: {
+                UString functionName = getCalculatedDisplayName(callFrame, stackFrameCallee);
+                if (hasSourceURLInfo) {
+                    traceLine = hasLineInfo ? String::format("%s@%s:%d", functionName.ascii().data(), sourceURL.ascii().data(), line)
+                                            : String::format("%s@%s", functionName.ascii().data(), sourceURL.ascii().data());
+                } else
+                    traceLine = String::format("%s\n", functionName.ascii().data());
+                break;
+            }
+            case StackFrameGlobalCode:
+                if (hasSourceURLInfo) {
+                    traceLine = hasLineInfo ? String::format("global code@%s:%d", sourceURL.ascii().data(), line)
+                                            : String::format("global code@%s", sourceURL.ascii().data());
+                } else
+                    traceLine = String::format("global code");
+                    
+            }
+            return traceLine.impl();
+        }
     };
 
     class TopCallFrameSetter {
@@ -90,10 +148,10 @@ namespace JSC {
         }
     };
 
-#if PLATFORM(IOS)
     // We use a smaller reentrancy limit on iPhone because of the high amount of
     // stack space required on the web thread.
-    enum { MaxLargeThreadReentryDepth = 93, MaxSmallThreadReentryDepth = 16 };
+#if PLATFORM(IOS)
+    enum { MaxLargeThreadReentryDepth = 64, MaxSmallThreadReentryDepth = 16 };
 #else
     enum { MaxLargeThreadReentryDepth = 256, MaxSmallThreadReentryDepth = 16 };
 #endif // PLATFORM(IOS)
@@ -112,7 +170,7 @@ namespace JSC {
         Opcode getOpcode(OpcodeID id)
         {
             ASSERT(m_initialized);
-#if ENABLE(COMPUTED_GOTO_INTERPRETER)
+#if ENABLE(COMPUTED_GOTO_CLASSIC_INTERPRETER)
             return m_opcodeTable[id];
 #else
             return id;
@@ -122,7 +180,7 @@ namespace JSC {
         OpcodeID getOpcodeID(Opcode opcode)
         {
             ASSERT(m_initialized);
-#if ENABLE(COMPUTED_GOTO_INTERPRETER)
+#if ENABLE(COMPUTED_GOTO_CLASSIC_INTERPRETER)
             ASSERT(isOpcode(opcode));
             if (!m_enabled)
                 return static_cast<OpcodeID>(bitwise_cast<uintptr_t>(opcode));
@@ -151,6 +209,8 @@ namespace JSC {
 
         NEVER_INLINE HandlerInfo* throwException(CallFrame*&, JSValue&, unsigned bytecodeOffset);
         NEVER_INLINE void debug(CallFrame*, DebugHookID, int firstLine, int lastLine);
+        static const UString getTraceLine(CallFrame*, StackFrameCodeType, const UString&, int);
+        JS_EXPORT_PRIVATE static void getStackTrace(JSGlobalData*, int line, Vector<StackFrame>& results);
 
         void dumpSampleData(ExecState* exec);
         void startSampling();
@@ -162,7 +222,7 @@ namespace JSC {
         void endRepeatCall(CallFrameClosure&);
         JSValue execute(CallFrameClosure&);
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         NEVER_INLINE bool resolve(CallFrame*, Instruction*, JSValue& exceptionValue);
         NEVER_INLINE bool resolveSkip(CallFrame*, Instruction*, JSValue& exceptionValue);
         NEVER_INLINE bool resolveGlobal(CallFrame*, Instruction*, JSValue& exceptionValue);
@@ -176,7 +236,7 @@ namespace JSC {
         void uncacheGetByID(CodeBlock*, Instruction* vPC);
         void tryCachePutByID(CallFrame*, CodeBlock*, Instruction*, JSValue baseValue, const PutPropertySlot&);
         void uncachePutByID(CodeBlock*, Instruction* vPC);        
-#endif // ENABLE(INTERPRETER)
+#endif // ENABLE(CLASSIC_INTERPRETER)
 
         NEVER_INLINE bool unwindCallFrame(CallFrame*&, JSValue, unsigned& bytecodeOffset, CodeBlock*&);
 
@@ -199,7 +259,7 @@ namespace JSC {
 
         RegisterFile m_registerFile;
         
-#if ENABLE(COMPUTED_GOTO_INTERPRETER)
+#if ENABLE(COMPUTED_GOTO_CLASSIC_INTERPRETER)
         Opcode m_opcodeTable[numOpcodeIDs]; // Maps OpcodeID => Opcode for compiling
         HashMap<Opcode, OpcodeID> m_opcodeIDTable; // Maps Opcode => OpcodeID for decompiling
 #endif
