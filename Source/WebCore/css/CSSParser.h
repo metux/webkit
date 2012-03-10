@@ -42,7 +42,7 @@ namespace WebCore {
 class CSSBorderImageSliceValue;
 class CSSMutableStyleDeclaration;
 class CSSPrimitiveValue;
-class CSSPrimitiveValueCache;
+class CSSValuePool;
 class CSSProperty;
 class CSSRule;
 class CSSRuleList;
@@ -75,7 +75,7 @@ public:
 
     Document* findDocument() const;
 
-    CSSPrimitiveValueCache* primitiveValueCache() const { return m_primitiveValueCache.get(); }
+    CSSValuePool* cssValuePool() const { return m_cssValuePool.get(); }
 
     void addProperty(int propId, PassRefPtr<CSSValue>, bool important, bool implicit = false);
     void rollbackLastProperties(int num);
@@ -125,11 +125,15 @@ public:
     bool parseTransitionShorthand(bool important);
     bool parseAnimationShorthand(bool important);
 
+#if ENABLE(CSS_GRID_LAYOUT)
+    bool parseGridTrackList(int propId, bool important);
+#endif
+
     bool parseDashboardRegions(int propId, bool important);
 
     bool parseShape(int propId, bool important);
 
-    bool parseWrapShape(bool important);
+    bool parseWrapShape(bool shapeInside, bool important);
     PassRefPtr<CSSWrapShape> parseWrapShapeRect(CSSParserValueList* args);
     PassRefPtr<CSSWrapShape> parseWrapShapeCircle(CSSParserValueList* args);
     PassRefPtr<CSSWrapShape> parseWrapShapeEllipse(CSSParserValueList* args);
@@ -188,8 +192,8 @@ public:
     bool parseCrossfade(CSSParserValueList*, RefPtr<CSSValue>&);
 
 #if ENABLE(CSS_FILTERS)
-    bool isValidFilterArgument(CSSParserValue* argument, WebKitCSSFilterValue::FilterOperationType&, unsigned argumentCount);
     PassRefPtr<CSSValueList> parseFilter();
+    PassRefPtr<WebKitCSSFilterValue> parseBuiltinFilterArguments(CSSParserValueList*, WebKitCSSFilterValue::FilterOperationType);
 #if ENABLE(CSS_SHADERS)
     PassRefPtr<WebKitCSSFilterValue> parseCustomFilter(CSSParserValue*);
 #endif
@@ -235,7 +239,7 @@ public:
     CSSRule* createStyleRule(Vector<OwnPtr<CSSParserSelector> >* selectors);
     CSSRule* createFontFaceRule();
     CSSRule* createPageRule(PassOwnPtr<CSSParserSelector> pageSelector);
-    CSSRule* createRegionStylingRule(Vector<OwnPtr<CSSParserSelector> >* regionSelector, CSSRuleList* rules);
+    CSSRule* createRegionRule(Vector<OwnPtr<CSSParserSelector> >* regionSelector, CSSRuleList* rules);
     CSSRule* createMarginAtRule(CSSSelector::MarginBoxType marginBox);
     void startDeclarationsForMarginBox();
     void endDeclarationsForMarginBox();
@@ -275,7 +279,7 @@ public:
     CSSProperty** m_parsedProperties;
     CSSSelectorList* m_selectorListForParseSelector;
 
-    RefPtr<CSSPrimitiveValueCache> m_primitiveValueCache;
+    RefPtr<CSSValuePool> m_cssValuePool;
     unsigned m_numParsedProperties;
     unsigned m_maxParsedProperties;
     unsigned m_numParsedPropertiesBeforeMarginBox;
@@ -340,6 +344,9 @@ private:
     bool parsePage(int propId, bool important);
     bool parseSize(int propId, bool important);
     SizeParameterType parseSizeParameter(CSSValueList* parsedValues, CSSParserValue* value, SizeParameterType prevParamType);
+
+    bool parseFontFaceSrcURI(CSSValueList*);
+    bool parseFontFaceSrcLocal(CSSValueList*);
 
     UChar* m_data;
     UChar* yytext;

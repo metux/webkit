@@ -77,6 +77,7 @@ namespace WebKit {
     macro(WebArchiveDebugModeEnabled, webArchiveDebugModeEnabled, Bool, bool, false) \
     macro(LocalFileContentSniffingEnabled, localFileContentSniffingEnabled, Bool, bool, false) \
     macro(UsesPageCache, usesPageCache, Bool, bool, true) \
+    macro(PageCacheSupportsPlugins, pageCacheSupportsPlugins, Bool, bool, true) \
     macro(AuthorAndUserStylesEnabled, authorAndUserStylesEnabled, Bool, bool, true) \
     macro(PaginateDuringLayoutEnabled, paginateDuringLayoutEnabled, Bool, bool, false) \
     macro(DOMPasteAllowed, domPasteAllowed, Bool, bool, false) \
@@ -98,6 +99,9 @@ namespace WebKit {
     macro(SuppressIncrementalRendering, suppressIncrementalRendering, Bool, bool, false) \
     macro(BackspaceKeyNavigationEnabled, backspaceKeyNavigationEnabled, Bool, bool, true) \
     macro(CaretBrowsingEnabled, caretBrowsingEnabled, Bool, bool, false) \
+    macro(ShouldDisplaySubtitles, shouldDisplaySubtitles, Bool, bool, false) \
+    macro(ShouldDisplayCaptions, shouldDisplayCaptions, Bool, bool, false) \
+    macro(ShouldDisplayTextDescriptions, shouldDisplayTextDescriptions, Bool, bool, false) \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \

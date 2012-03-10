@@ -33,10 +33,11 @@
 #include "CodeOrigin.h"
 #include "CompactJITCodeMap.h"
 #include "DFGCodeBlocks.h"
+#include "DFGExitProfile.h"
 #include "DFGOSREntry.h"
 #include "DFGOSRExit.h"
 #include "EvalCodeCache.h"
-#include "Heuristics.h"
+#include "Options.h"
 #include "Instruction.h"
 #include "JITCode.h"
 #include "JITWriteBarrier.h"
@@ -426,6 +427,11 @@ namespace JSC {
             m_dfgData->osrExit.append(osrExit);
         }
         
+        DFG::OSRExit& lastOSRExit()
+        {
+            return m_dfgData->osrExit.last();
+        }
+        
         void appendSpeculationRecovery(const DFG::SpeculationRecovery& recovery)
         {
             createDFGDataIfNecessary();
@@ -651,12 +657,12 @@ namespace JSC {
         {
             return WTF::genericBinarySearch<ValueProfile, int, getValueProfileBytecodeOffset>(m_valueProfiles, m_valueProfiles.size(), bytecodeOffset);
         }
-        ValueProfile* valueProfileForArgument(int argumentIndex)
+        ValueProfile* valueProfileForArgument(int argument)
         {
-            int index = argumentIndex;
-            if (static_cast<unsigned>(index) >= m_valueProfiles.size())
+            size_t index = argument;
+            if (index >= m_valueProfiles.size())
                 return 0;
-            ValueProfile* result = valueProfile(argumentIndex);
+            ValueProfile* result = valueProfile(index);
             if (result->m_bytecodeOffset != -1)
                 return 0;
             return result;
@@ -676,12 +682,14 @@ namespace JSC {
         
         bool likelyToTakeSlowCase(int bytecodeOffset)
         {
-            return rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter >= Heuristics::likelyToTakeSlowCaseThreshold;
+            unsigned value = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+            return value >= Options::likelyToTakeSlowCaseMinimumCount && static_cast<double>(value) / m_executionEntryCount >= Options::likelyToTakeSlowCaseThreshold;
         }
         
         bool couldTakeSlowCase(int bytecodeOffset)
         {
-            return rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter >= Heuristics::couldTakeSlowCaseThreshold;
+            unsigned value = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+            return value >= Options::couldTakeSlowCaseMinimumCount && static_cast<double>(value) / m_executionEntryCount >= Options::couldTakeSlowCaseThreshold;
         }
         
         RareCaseProfile* addSpecialFastCaseProfile(int bytecodeOffset)
@@ -699,24 +707,26 @@ namespace JSC {
         bool likelyToTakeSpecialFastCase(int bytecodeOffset)
         {
             unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-            return specialFastCaseCount >= Heuristics::likelyToTakeSlowCaseThreshold;
+            return specialFastCaseCount >= Options::likelyToTakeSlowCaseMinimumCount && static_cast<double>(specialFastCaseCount) / m_executionEntryCount >= Options::likelyToTakeSlowCaseThreshold;
         }
         
         bool likelyToTakeDeepestSlowCase(int bytecodeOffset)
         {
             unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-            return (slowCaseCount - specialFastCaseCount) >= Heuristics::likelyToTakeSlowCaseThreshold;
+            unsigned value = slowCaseCount - specialFastCaseCount;
+            return value >= Options::likelyToTakeSlowCaseMinimumCount && static_cast<double>(value) / m_executionEntryCount >= Options::likelyToTakeSlowCaseThreshold;
         }
         
         bool likelyToTakeAnySlowCase(int bytecodeOffset)
         {
             unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-            return (slowCaseCount + specialFastCaseCount) >= Heuristics::likelyToTakeSlowCaseThreshold;
+            unsigned value = slowCaseCount + specialFastCaseCount;
+            return value >= Options::likelyToTakeSlowCaseMinimumCount && static_cast<double>(value) / m_executionEntryCount >= Options::likelyToTakeSlowCaseThreshold;
         }
         
-        void resetRareCaseProfiles();
+        unsigned executionEntryCount() const { return m_executionEntryCount; }
 #endif
 
         unsigned globalResolveInfoCount() const
@@ -792,6 +802,14 @@ namespace JSC {
             ASSERT(hasCodeOrigins());
             return binarySearch<CodeOriginAtCallReturnOffset, unsigned, getCallReturnOffsetForCodeOrigin>(codeOrigins().begin(), codeOrigins().size(), getJITCode().offsetOf(returnAddress.value()))->codeOrigin;
         }
+        
+        bool addFrequentExitSite(const DFG::FrequentExitSite& site)
+        {
+            ASSERT(getJITType() == JITCode::BaselineJIT);
+            return m_exitProfile.add(site);
+        }
+
+        DFG::ExitProfile& exitProfile() { return m_exitProfile; }
 #endif
 
         // Constant Pool
@@ -915,25 +933,25 @@ namespace JSC {
         // to avoid thrashing.
         unsigned reoptimizationRetryCounter() const
         {
-            ASSERT(m_reoptimizationRetryCounter <= Heuristics::reoptimizationRetryCounterMax);
+            ASSERT(m_reoptimizationRetryCounter <= Options::reoptimizationRetryCounterMax);
             return m_reoptimizationRetryCounter;
         }
         
         void countReoptimization()
         {
             m_reoptimizationRetryCounter++;
-            if (m_reoptimizationRetryCounter > Heuristics::reoptimizationRetryCounterMax)
-                m_reoptimizationRetryCounter = Heuristics::reoptimizationRetryCounterMax;
+            if (m_reoptimizationRetryCounter > Options::reoptimizationRetryCounterMax)
+                m_reoptimizationRetryCounter = Options::reoptimizationRetryCounterMax;
         }
         
         int32_t counterValueForOptimizeAfterWarmUp()
         {
-            return Heuristics::executionCounterValueForOptimizeAfterWarmUp << reoptimizationRetryCounter();
+            return Options::executionCounterValueForOptimizeAfterWarmUp << reoptimizationRetryCounter();
         }
         
         int32_t counterValueForOptimizeAfterLongWarmUp()
         {
-            return Heuristics::executionCounterValueForOptimizeAfterLongWarmUp << reoptimizationRetryCounter();
+            return Options::executionCounterValueForOptimizeAfterLongWarmUp << reoptimizationRetryCounter();
         }
         
         int32_t* addressOfExecuteCounter()
@@ -952,7 +970,7 @@ namespace JSC {
         // expensive than executing baseline code.
         void optimizeNextInvocation()
         {
-            m_executeCounter = Heuristics::executionCounterValueForOptimizeNextInvocation;
+            m_executeCounter = Options::executionCounterValueForOptimizeNextInvocation;
         }
         
         // Call this to prevent optimization from happening again. Note that
@@ -962,7 +980,7 @@ namespace JSC {
         // the future as well.
         void dontOptimizeAnytimeSoon()
         {
-            m_executeCounter = Heuristics::executionCounterValueForDontOptimizeAnytimeSoon;
+            m_executeCounter = Options::executionCounterValueForDontOptimizeAnytimeSoon;
         }
         
         // Call this to reinitialize the counter to its starting state,
@@ -1003,7 +1021,7 @@ namespace JSC {
         // in the baseline code.
         void optimizeSoon()
         {
-            m_executeCounter = Heuristics::executionCounterValueForOptimizeSoon << reoptimizationRetryCounter();
+            m_executeCounter = Options::executionCounterValueForOptimizeSoon << reoptimizationRetryCounter();
         }
         
         // The speculative JIT tracks its success rate, so that we can
@@ -1037,17 +1055,17 @@ namespace JSC {
 
 #if ENABLE(JIT)
         // The number of failures that triggers the use of the ratio.
-        unsigned largeFailCountThreshold() { return Heuristics::largeFailCountThresholdBase << baselineVersion()->reoptimizationRetryCounter(); }
-        unsigned largeFailCountThresholdForLoop() { return Heuristics::largeFailCountThresholdBaseForLoop << baselineVersion()->reoptimizationRetryCounter(); }
+        unsigned largeFailCountThreshold() { return Options::largeFailCountThresholdBase << baselineVersion()->reoptimizationRetryCounter(); }
+        unsigned largeFailCountThresholdForLoop() { return Options::largeFailCountThresholdBaseForLoop << baselineVersion()->reoptimizationRetryCounter(); }
 
         bool shouldReoptimizeNow()
         {
-            return Heuristics::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThreshold();
+            return Options::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThreshold();
         }
 
         bool shouldReoptimizeFromLoopNow()
         {
-            return Heuristics::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThresholdForLoop();
+            return Options::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThresholdForLoop();
         }
 #endif
 
@@ -1061,6 +1079,8 @@ namespace JSC {
         void reoptimize()
         {
             ASSERT(replacement() != this);
+            ASSERT(replacement()->alternative() == this);
+            replacement()->tallyFrequentExitSites();
             replacement()->jettison();
             countReoptimization();
             optimizeAfterWarmUp();
@@ -1088,6 +1108,12 @@ namespace JSC {
         
     private:
         friend class DFGCodeBlocks;
+        
+#if ENABLE(DFG_JIT)
+        void tallyFrequentExitSites();
+#else
+        void tallyFrequentExitSites() { }
+#endif
         
 #if !defined(NDEBUG) || ENABLE(OPCODE_SAMPLING)
         void dump(ExecState*, const Vector<Instruction>::const_iterator& begin, Vector<Instruction>::const_iterator&) const;
@@ -1208,11 +1234,16 @@ namespace JSC {
         };
         
         OwnPtr<DFGData> m_dfgData;
+        
+        // This is relevant to non-DFG code blocks that serve as the profiled code block
+        // for DFG code blocks.
+        DFG::ExitProfile m_exitProfile;
 #endif
 #if ENABLE(VALUE_PROFILER)
         SegmentedVector<ValueProfile, 8> m_valueProfiles;
         SegmentedVector<RareCaseProfile, 8> m_rareCaseProfiles;
         SegmentedVector<RareCaseProfile, 8> m_specialFastCaseProfiles;
+        unsigned m_executionEntryCount;
 #endif
 
         Vector<unsigned> m_jumpTargets;

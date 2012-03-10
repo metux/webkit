@@ -58,6 +58,7 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_layoutState(0)
     , m_layoutStateDisableCount(0)
     , m_currentRenderFlowThread(0)
+    , m_currentRenderRegion(0)
 {
     // Clear our anonymous bit, set because RenderObject assumes
     // any renderer with document as the node is anonymous.
@@ -183,6 +184,20 @@ bool RenderView::requiresColumns(int desiredColumnCount) const
         }
     }
     return RenderBlock::requiresColumns(desiredColumnCount);
+}
+
+void RenderView::calcColumnWidth()
+{
+    int columnWidth = contentLogicalWidth();
+    if (m_frameView && style()->hasInlineColumnAxis()) {
+        if (Frame* frame = m_frameView->frame()) {
+            if (Page* page = frame->page()) {
+                if (int pageLength = page->pagination().pageLength)
+                    columnWidth = pageLength;
+            }
+        }
+    }
+    setDesiredColumnCountAndWidth(1, columnWidth);
 }
 
 void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -734,6 +749,24 @@ int RenderView::viewWidth() const
     return width;
 }
 
+int RenderView::viewLogicalHeight() const
+{
+    int height = style()->isHorizontalWritingMode() ? viewHeight() : viewWidth();
+
+    if (hasColumns() && !style()->hasInlineColumnAxis()) {
+        if (Frame* frame = m_frameView->frame()) {
+            if (Page* page = frame->page()) {
+                if (frame == page->mainFrame()) {
+                    if (int pageLength = page->pagination().pageLength)
+                        height = pageLength;
+                }
+            }
+        }
+    }
+
+    return height;
+}
+
 float RenderView::zoomFactor() const
 {
     Frame* frame = m_frameView->frame();
@@ -846,7 +879,7 @@ void RenderView::styleDidChange(StyleDifference diff, const RenderStyle* oldStyl
     }
 }
 
-RenderFlowThread* RenderView::renderFlowThreadWithName(const AtomicString& flowThread)
+RenderFlowThread* RenderView::ensureRenderFlowThreadWithName(const AtomicString& flowThread)
 {
     if (!m_renderFlowThreadList)
         m_renderFlowThreadList = adoptPtr(new RenderFlowThreadList());
@@ -861,7 +894,7 @@ RenderFlowThread* RenderView::renderFlowThreadWithName(const AtomicString& flowT
     RenderFlowThread* flowRenderer = new (renderArena()) RenderFlowThread(document(), flowThread);
     flowRenderer->setStyle(RenderFlowThread::createFlowThreadStyle(style()));
     addChild(flowRenderer);
-    
+
     m_renderFlowThreadList->add(flowRenderer);
     setIsRenderFlowThreadOrderDirty(true);
 
@@ -890,6 +923,13 @@ void RenderView::layoutRenderFlowThreads()
         RenderFlowThread* flowRenderer = *iter;
         flowRenderer->layoutIfNeeded();
     }
+}
+
+RenderBlock::IntervalArena* RenderView::intervalArena()
+{
+    if (!m_intervalArena)
+        m_intervalArena = IntervalArena::create();
+    return m_intervalArena.get();
 }
 
 } // namespace WebCore

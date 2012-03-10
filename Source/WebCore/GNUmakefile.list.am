@@ -303,6 +303,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSHTMLPreElement.h \
 	DerivedSources/WebCore/JSHTMLProgressElement.cpp \
 	DerivedSources/WebCore/JSHTMLProgressElement.h \
+	DerivedSources/WebCore/JSHTMLPropertiesCollection.cpp \
+	DerivedSources/WebCore/JSHTMLPropertiesCollection.h \
 	DerivedSources/WebCore/JSHTMLQuoteElement.cpp \
 	DerivedSources/WebCore/JSHTMLQuoteElement.h \
 	DerivedSources/WebCore/JSHTMLScriptElement.cpp \
@@ -544,6 +546,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSWebGLContextEvent.h \
 	DerivedSources/WebCore/JSWebGLFramebuffer.cpp \
 	DerivedSources/WebCore/JSWebGLFramebuffer.h \
+	DerivedSources/WebCore/JSWebGLLoseContext.cpp \
+	DerivedSources/WebCore/JSWebGLLoseContext.h \
 	DerivedSources/WebCore/JSWebGLProgram.cpp \
 	DerivedSources/WebCore/JSWebGLProgram.h \
 	DerivedSources/WebCore/JSWebGLRenderbuffer.cpp \
@@ -576,8 +580,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSWebKitCSSMatrix.h \
 	DerivedSources/WebCore/JSWebKitCSSTransformValue.cpp \
 	DerivedSources/WebCore/JSWebKitCSSTransformValue.h \
-	DerivedSources/WebCore/JSWebKitLoseContext.cpp \
-	DerivedSources/WebCore/JSWebKitLoseContext.h \
+	DerivedSources/WebCore/JSWebKitNamedFlow.cpp \
+	DerivedSources/WebCore/JSWebKitNamedFlow.h \
 	DerivedSources/WebCore/JSWebKitPoint.cpp \
 	DerivedSources/WebCore/JSWebKitPoint.h \
 	DerivedSources/WebCore/JSWebKitTransitionEvent.cpp \
@@ -706,8 +710,6 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSArrayBufferCustom.cpp \
 	Source/WebCore/bindings/js/JSArrayBufferViewHelper.h \
 	Source/WebCore/bindings/js/JSAttrCustom.cpp \
-	Source/WebCore/bindings/js/JSAudioConstructor.cpp \
-	Source/WebCore/bindings/js/JSAudioConstructor.h \
 	Source/WebCore/bindings/js/JSCDATASectionCustom.cpp \
 	Source/WebCore/bindings/js/JSCSSFontFaceRuleCustom.cpp \
 	Source/WebCore/bindings/js/JSCSSImportRuleCustom.cpp \
@@ -833,8 +835,6 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSNodeFilterCustom.cpp \
 	Source/WebCore/bindings/js/JSNodeIteratorCustom.cpp \
 	Source/WebCore/bindings/js/JSNodeListCustom.cpp \
-	Source/WebCore/bindings/js/JSOptionConstructor.cpp \
-	Source/WebCore/bindings/js/JSOptionConstructor.h \
 	Source/WebCore/bindings/js/JSPeerConnectionCustom.cpp \
 	Source/WebCore/bindings/js/JSPluginElementFunctions.cpp \
 	Source/WebCore/bindings/js/JSPluginElementFunctions.h \
@@ -853,6 +853,9 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSStyleSheetCustom.cpp \
 	Source/WebCore/bindings/js/JSStyleSheetListCustom.cpp \
 	Source/WebCore/bindings/js/JSTextCustom.cpp \
+	Source/WebCore/bindings/js/JSTextTrackCueCustom.cpp \
+	Source/WebCore/bindings/js/JSTextTrackCustom.cpp \
+	Source/WebCore/bindings/js/JSTextTrackCustom.h \
 	Source/WebCore/bindings/js/JSTextTrackListCustom.cpp \
 	Source/WebCore/bindings/js/JSTouchCustom.cpp \
 	Source/WebCore/bindings/js/JSTouchListCustom.cpp \
@@ -982,6 +985,8 @@ webcore_sources += \
 	Source/WebCore/css/CSSCrossfadeValue.h \
 	Source/WebCore/css/CSSCursorImageValue.cpp \
 	Source/WebCore/css/CSSCursorImageValue.h \
+	Source/WebCore/css/CSSElementStyleDeclaration.cpp \
+	Source/WebCore/css/CSSElementStyleDeclaration.h \
 	Source/WebCore/css/CSSFlexValue.cpp \
 	Source/WebCore/css/CSSFlexValue.h \
 	Source/WebCore/css/CSSFontFace.cpp \
@@ -1009,6 +1014,7 @@ webcore_sources += \
 	Source/WebCore/css/CSSInheritedValue.h \
 	Source/WebCore/css/CSSInitialValue.cpp \
 	Source/WebCore/css/CSSInitialValue.h \
+	Source/WebCore/css/CSSInlineStyleDeclaration.h \
 	Source/WebCore/css/CSSLineBoxContainValue.cpp \
 	Source/WebCore/css/CSSLineBoxContainValue.h \
 	Source/WebCore/css/CSSMediaRule.cpp \
@@ -1026,8 +1032,6 @@ webcore_sources += \
 	Source/WebCore/css/CSSParserValues.h \
 	Source/WebCore/css/CSSPrimitiveValue.cpp \
 	Source/WebCore/css/CSSPrimitiveValue.h \
-	Source/WebCore/css/CSSPrimitiveValueCache.cpp \
-	Source/WebCore/css/CSSPrimitiveValueCache.h \
 	Source/WebCore/css/CSSPrimitiveValueMappings.h \
 	Source/WebCore/css/CSSProperty.cpp \
 	Source/WebCore/css/CSSProperty.h \
@@ -1038,8 +1042,6 @@ webcore_sources += \
 	Source/WebCore/css/CSSReflectionDirection.h \
 	Source/WebCore/css/CSSReflectValue.cpp \
 	Source/WebCore/css/CSSReflectValue.h \
-	Source/WebCore/css/CSSRegionStyleRule.cpp \
-	Source/WebCore/css/CSSRegionStyleRule.h \
 	Source/WebCore/css/CSSRule.cpp \
 	Source/WebCore/css/CSSRule.h \
 	Source/WebCore/css/CSSRuleList.cpp \
@@ -1071,6 +1073,8 @@ webcore_sources += \
 	Source/WebCore/css/CSSValue.h \
 	Source/WebCore/css/CSSValueList.cpp \
 	Source/WebCore/css/CSSValueList.h \
+	Source/WebCore/css/CSSValuePool.cpp \
+	Source/WebCore/css/CSSValuePool.h \
 	Source/WebCore/css/DashboardRegion.h \
 	Source/WebCore/css/FontFamilyValue.cpp \
 	Source/WebCore/css/FontFamilyValue.h \
@@ -1119,6 +1123,8 @@ webcore_sources += \
 	Source/WebCore/css/WebKitCSSKeyframesRule.h \
 	Source/WebCore/css/WebKitCSSMatrix.cpp \
 	Source/WebCore/css/WebKitCSSMatrix.h \
+	Source/WebCore/css/WebKitCSSRegionRule.cpp \
+	Source/WebCore/css/WebKitCSSRegionRule.h \
 	Source/WebCore/css/WebKitCSSShaderValue.cpp \
 	Source/WebCore/css/WebKitCSSShaderValue.h \
 	Source/WebCore/css/WebKitCSSTransformValue.cpp \
@@ -1275,6 +1281,8 @@ webcore_sources += \
 	Source/WebCore/dom/MutationCallback.h \
 	Source/WebCore/dom/MutationEvent.cpp \
 	Source/WebCore/dom/MutationEvent.h \
+	Source/WebCore/dom/MutationObserverInterestGroup.cpp \
+	Source/WebCore/dom/MutationObserverInterestGroup.h \
 	Source/WebCore/dom/MutationObserverRegistration.cpp \
 	Source/WebCore/dom/MutationObserverRegistration.h \
 	Source/WebCore/dom/MutationRecord.cpp \
@@ -1387,6 +1395,8 @@ webcore_sources += \
 	Source/WebCore/dom/WebKitAnimationEvent.h \
 	Source/WebCore/dom/WebKitMutationObserver.cpp \
 	Source/WebCore/dom/WebKitMutationObserver.h \
+	Source/WebCore/dom/WebKitNamedFlow.cpp \
+	Source/WebCore/dom/WebKitNamedFlow.h \
 	Source/WebCore/dom/WebKitTransitionEvent.cpp \
 	Source/WebCore/dom/WebKitTransitionEvent.h \
 	Source/WebCore/dom/WheelEvent.cpp \
@@ -1616,10 +1626,6 @@ webcore_sources += \
 	Source/WebCore/html/BaseTextInputType.h \
 	Source/WebCore/html/ButtonInputType.cpp \
 	Source/WebCore/html/ButtonInputType.h \
-	Source/WebCore/html/canvas/ArrayBuffer.cpp \
-	Source/WebCore/html/canvas/ArrayBuffer.h \
-	Source/WebCore/html/canvas/ArrayBufferView.cpp \
-	Source/WebCore/html/canvas/ArrayBufferView.h \
 	Source/WebCore/html/canvas/CanvasContextAttributes.cpp \
 	Source/WebCore/html/canvas/CanvasContextAttributes.h \
 	Source/WebCore/html/canvas/CanvasGradient.cpp \
@@ -1637,24 +1643,6 @@ webcore_sources += \
 	Source/WebCore/html/canvas/CheckedInt.h \
 	Source/WebCore/html/canvas/DataView.cpp \
 	Source/WebCore/html/canvas/DataView.h \
-	Source/WebCore/html/canvas/Float32Array.cpp \
-	Source/WebCore/html/canvas/Float32Array.h \
-	Source/WebCore/html/canvas/Float64Array.cpp \
-	Source/WebCore/html/canvas/Float64Array.h \
-	Source/WebCore/html/canvas/Int16Array.cpp \
-	Source/WebCore/html/canvas/Int16Array.h \
-	Source/WebCore/html/canvas/Int32Array.cpp \
-	Source/WebCore/html/canvas/Int32Array.h \
-	Source/WebCore/html/canvas/Int8Array.cpp \
-	Source/WebCore/html/canvas/Int8Array.h \
-	Source/WebCore/html/canvas/IntegralTypedArrayBase.h \
-	Source/WebCore/html/canvas/TypedArrayBase.h \
-	Source/WebCore/html/canvas/Uint16Array.cpp \
-	Source/WebCore/html/canvas/Uint16Array.h \
-	Source/WebCore/html/canvas/Uint32Array.cpp \
-	Source/WebCore/html/canvas/Uint32Array.h \
-	Source/WebCore/html/canvas/Uint8Array.cpp \
-	Source/WebCore/html/canvas/Uint8Array.h \
 	Source/WebCore/html/DOMSettableTokenList.cpp \
 	Source/WebCore/html/DOMSettableTokenList.h \
 	Source/WebCore/html/DOMTokenList.cpp \
@@ -1817,6 +1805,8 @@ webcore_sources += \
 	Source/WebCore/html/HTMLPreElement.h \
 	Source/WebCore/html/HTMLProgressElement.cpp \
 	Source/WebCore/html/HTMLProgressElement.h \
+	Source/WebCore/html/HTMLPropertiesCollection.cpp \
+	Source/WebCore/html/HTMLPropertiesCollection.h \
 	Source/WebCore/html/HTMLQuoteElement.cpp \
 	Source/WebCore/html/HTMLQuoteElement.h \
 	Source/WebCore/html/HTMLScriptElement.cpp \
@@ -2039,6 +2029,7 @@ webcore_sources += \
 	Source/WebCore/inspector/ContentSearchUtils.h \
 	Source/WebCore/inspector/DOMNodeHighlighter.cpp \
 	Source/WebCore/inspector/DOMNodeHighlighter.h \
+	Source/WebCore/inspector/DOMWrapperVisitor.h \
 	Source/WebCore/inspector/IdentifiersFactory.cpp \
 	Source/WebCore/inspector/IdentifiersFactory.h \
 	Source/WebCore/inspector/InjectedScript.cpp \
@@ -2051,6 +2042,8 @@ webcore_sources += \
 	Source/WebCore/inspector/InspectorAgent.h \
 	Source/WebCore/inspector/InspectorApplicationCacheAgent.cpp \
 	Source/WebCore/inspector/InspectorApplicationCacheAgent.h \
+	Source/WebCore/inspector/InspectorBaseAgent.cpp \
+	Source/WebCore/inspector/InspectorBaseAgent.h \
 	Source/WebCore/inspector/InspectorClient.cpp \
 	Source/WebCore/inspector/InspectorClient.h \
 	Source/WebCore/inspector/InspectorController.cpp \
@@ -2075,6 +2068,9 @@ webcore_sources += \
 	Source/WebCore/inspector/InspectorDOMStorageAgent.h \
 	Source/WebCore/inspector/InspectorDOMStorageResource.cpp \
 	Source/WebCore/inspector/InspectorDOMStorageResource.h \
+	Source/WebCore/inspector/InspectorFileSystemAgent.cpp \
+	Source/WebCore/inspector/InspectorFileSystemAgent.h \
+	Source/WebCore/inspector/InspectorFileSystemInstrumentation.h \
 	Source/WebCore/inspector/InspectorFrontendChannel.h \
 	Source/WebCore/inspector/InspectorFrontendClient.h \
 	Source/WebCore/inspector/InspectorFrontendClientLocal.cpp \
@@ -2083,6 +2079,8 @@ webcore_sources += \
 	Source/WebCore/inspector/InspectorFrontendHost.h \
 	Source/WebCore/inspector/InspectorInstrumentation.cpp \
 	Source/WebCore/inspector/InspectorInstrumentation.h \
+	Source/WebCore/inspector/InspectorMemoryAgent.cpp \
+	Source/WebCore/inspector/InspectorMemoryAgent.h \
 	Source/WebCore/inspector/InspectorPageAgent.cpp \
 	Source/WebCore/inspector/InspectorPageAgent.h \
 	Source/WebCore/inspector/InspectorProfilerAgent.cpp \
@@ -2109,8 +2107,12 @@ webcore_sources += \
 	Source/WebCore/inspector/InstrumentingAgents.h \
 	Source/WebCore/inspector/NetworkResourcesData.cpp \
 	Source/WebCore/inspector/NetworkResourcesData.h \
+	Source/WebCore/inspector/PageConsoleAgent.cpp \
+	Source/WebCore/inspector/PageConsoleAgent.h \
 	Source/WebCore/inspector/PageDebuggerAgent.cpp \
 	Source/WebCore/inspector/PageDebuggerAgent.h \
+	Source/WebCore/inspector/PageRuntimeAgent.cpp \
+	Source/WebCore/inspector/PageRuntimeAgent.h \
 	Source/WebCore/inspector/ScriptArguments.cpp \
 	Source/WebCore/inspector/ScriptArguments.h \
 	Source/WebCore/inspector/ScriptBreakpoint.h \
@@ -2122,10 +2124,14 @@ webcore_sources += \
 	Source/WebCore/inspector/ScriptGCEventListener.h \
 	Source/WebCore/inspector/TimelineRecordFactory.cpp \
 	Source/WebCore/inspector/TimelineRecordFactory.h \
+	Source/WebCore/inspector/WorkerConsoleAgent.cpp \
+	Source/WebCore/inspector/WorkerConsoleAgent.h \
 	Source/WebCore/inspector/WorkerDebuggerAgent.cpp \
 	Source/WebCore/inspector/WorkerDebuggerAgent.h \
 	Source/WebCore/inspector/WorkerInspectorController.cpp \
 	Source/WebCore/inspector/WorkerInspectorController.h \
+	Source/WebCore/inspector/WorkerRuntimeAgent.cpp \
+	Source/WebCore/inspector/WorkerRuntimeAgent.h \
 	Source/WebCore/loader/appcache/ApplicationCache.cpp \
 	Source/WebCore/loader/appcache/ApplicationCacheGroup.cpp \
 	Source/WebCore/loader/appcache/ApplicationCacheGroup.h \
@@ -2183,9 +2189,10 @@ webcore_sources += \
 	Source/WebCore/loader/CrossOriginPreflightResultCache.h \
 	Source/WebCore/loader/TextTrackLoader.cpp \
 	Source/WebCore/loader/TextTrackLoader.h \
+	Source/WebCore/loader/DocumentLoadTiming.cpp \
+	Source/WebCore/loader/DocumentLoadTiming.h \
 	Source/WebCore/loader/DocumentLoader.cpp \
 	Source/WebCore/loader/DocumentLoader.h \
-	Source/WebCore/loader/DocumentLoadTiming.h \
 	Source/WebCore/loader/DocumentThreadableLoader.cpp \
 	Source/WebCore/loader/DocumentThreadableLoader.h \
 	Source/WebCore/loader/DocumentThreadableLoaderClient.h \
@@ -2301,6 +2308,8 @@ webcore_sources += \
 	Source/WebCore/notifications/NotificationCenter.cpp \
 	Source/WebCore/notifications/NotificationCenter.h \
 	Source/WebCore/notifications/NotificationContents.h \
+	Source/WebCore/notifications/NotificationController.cpp \
+	Source/WebCore/notifications/NotificationController.h \
 	Source/WebCore/notifications/Notification.cpp \
 	Source/WebCore/notifications/Notification.h \
 	Source/WebCore/notifications/NotificationPresenter.h \
@@ -2453,6 +2462,7 @@ webcore_sources += \
 	Source/WebCore/platform/animation/Animation.h \
 	Source/WebCore/platform/animation/AnimationList.cpp \
 	Source/WebCore/platform/animation/AnimationList.h \
+	Source/WebCore/platform/animation/AnimationUtilities.h \
 	Source/WebCore/platform/animation/TimingFunction.h \
 	Source/WebCore/platform/Arena.cpp \
 	Source/WebCore/platform/Arena.h \
@@ -2529,9 +2539,6 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/cairo/RefPtrCairo.cpp \
 	Source/WebCore/platform/graphics/cairo/RefPtrCairo.h \
 	Source/WebCore/platform/graphics/cairo/TransformationMatrixCairo.cpp \
-	Source/WebCore/platform/graphics/clutter/GraphicsLayerClutter.h \
-	Source/WebCore/platform/graphics/clutter/GraphicsLayerClutter.cpp \
-	Source/WebCore/platform/graphics/filters/CustomFilterOperation.h \
 	Source/WebCore/platform/graphics/filters/DistantLightSource.cpp \
 	Source/WebCore/platform/graphics/filters/DistantLightSource.h \
 	Source/WebCore/platform/graphics/filters/FEBlend.cpp \
@@ -2572,6 +2579,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/filters/FilterEffect.cpp \
 	Source/WebCore/platform/graphics/filters/FilterEffect.h \
 	Source/WebCore/platform/graphics/filters/FilterOperation.h \
+	Source/WebCore/platform/graphics/filters/FilterOperation.cpp \
 	Source/WebCore/platform/graphics/filters/FilterOperations.cpp \
 	Source/WebCore/platform/graphics/filters/FilterOperations.h \
 	Source/WebCore/platform/graphics/filters/LightSource.cpp \
@@ -2618,6 +2626,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/Font.h \
 	Source/WebCore/platform/graphics/FontMetrics.h \
 	Source/WebCore/platform/graphics/FontOrientation.h \
+	Source/WebCore/platform/graphics/FontPlatformData.h \
 	Source/WebCore/platform/graphics/FontRenderingMode.h \
 	Source/WebCore/platform/graphics/FontSelector.h \
 	Source/WebCore/platform/graphics/FontSmoothingMode.h \
@@ -2774,10 +2783,13 @@ webcore_sources += \
 	Source/WebCore/platform/image-decoders/webp/WEBPImageDecoder.h \
 	Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp \
 	Source/WebCore/platform/image-decoders/png/PNGImageDecoder.h \
+	Source/WebCore/platform/mediastream/MediaStreamCenter.cpp \
+	Source/WebCore/platform/mediastream/MediaStreamCenter.h \
 	Source/WebCore/platform/mediastream/MediaStreamComponent.h \
 	Source/WebCore/platform/mediastream/MediaStreamDescriptor.h \
 	Source/WebCore/platform/mediastream/MediaStreamSource.h \
 	Source/WebCore/platform/mediastream/PeerConnectionHandler.h \
+	Source/WebCore/platform/mediastream/PeerConnectionHandlerClient.h \
 	Source/WebCore/platform/mediastream/gstreamer/PeerConnectionHandler.cpp \
 	Source/WebCore/platform/mock/DeviceOrientationClientMock.cpp \
 	Source/WebCore/platform/mock/DeviceOrientationClientMock.h \
@@ -2836,6 +2848,7 @@ webcore_sources += \
 	Source/WebCore/platform/network/ResourceHandleInternal.h \
 	Source/WebCore/platform/network/ResourceLoadInfo.h \
 	Source/WebCore/platform/network/ResourceLoadPriority.h \
+	Source/WebCore/platform/network/ResourceLoadTiming.cpp \
 	Source/WebCore/platform/network/ResourceLoadTiming.h \
 	Source/WebCore/platform/network/ResourceRequestBase.cpp \
 	Source/WebCore/platform/network/ResourceRequestBase.h \
@@ -2866,12 +2879,14 @@ webcore_sources += \
 	Source/WebCore/platform/network/soup/SoupURIUtils.h \
 	Source/WebCore/platform/NotImplemented.h \
 	Source/WebCore/platform/Pasteboard.h \
+	Source/WebCore/platform/PlatformExportMacros.h \
 	Source/WebCore/platform/PlatformKeyboardEvent.h \
 	Source/WebCore/platform/PlatformMenuDescription.h \
 	Source/WebCore/platform/PlatformMouseEvent.h \
 	Source/WebCore/platform/PlatformScreen.h \
 	Source/WebCore/platform/PlatformWheelEvent.h \
 	Source/WebCore/platform/PODArena.h \
+	Source/WebCore/platform/PODFreeListArena.h \
 	Source/WebCore/platform/PODInterval.h \
 	Source/WebCore/platform/PODIntervalTree.h \
 	Source/WebCore/platform/PODRedBlackTree.h \
@@ -3245,6 +3260,7 @@ webcore_sources += \
 	Source/WebCore/rendering/style/CounterDirectives.h \
 	Source/WebCore/rendering/style/CursorData.h \
 	Source/WebCore/rendering/style/CursorList.h \
+	Source/WebCore/rendering/style/CustomFilterOperation.h \
 	Source/WebCore/rendering/style/DataRef.h \
 	Source/WebCore/rendering/style/FillLayer.cpp \
 	Source/WebCore/rendering/style/FillLayer.h \
@@ -3278,6 +3294,8 @@ webcore_sources += \
 	Source/WebCore/rendering/style/StyleFlexibleBoxData.h \
 	Source/WebCore/rendering/style/StyleGeneratedImage.cpp \
 	Source/WebCore/rendering/style/StyleGeneratedImage.h \
+	Source/WebCore/rendering/style/StyleGridData.cpp \
+	Source/WebCore/rendering/style/StyleGridData.h \
 	Source/WebCore/rendering/style/StyleImage.h \
 	Source/WebCore/rendering/style/StyleInheritedData.cpp \
 	Source/WebCore/rendering/style/StyleInheritedData.h \
@@ -3323,6 +3341,8 @@ webcore_sources += \
 	Source/WebCore/rendering/svg/RenderSVGModelObject.h \
 	Source/WebCore/rendering/svg/RenderSVGPath.cpp \
 	Source/WebCore/rendering/svg/RenderSVGPath.h \
+	Source/WebCore/rendering/svg/RenderSVGRect.cpp \
+	Source/WebCore/rendering/svg/RenderSVGRect.h \
 	Source/WebCore/rendering/svg/RenderSVGResourceClipper.cpp \
 	Source/WebCore/rendering/svg/RenderSVGResourceClipper.h \
 	Source/WebCore/rendering/svg/RenderSVGResourceContainer.cpp \
@@ -3351,6 +3371,8 @@ webcore_sources += \
 	Source/WebCore/rendering/svg/RenderSVGRoot.h \
 	Source/WebCore/rendering/svg/RenderSVGShadowTreeRootContainer.cpp \
 	Source/WebCore/rendering/svg/RenderSVGShadowTreeRootContainer.h \
+	Source/WebCore/rendering/svg/RenderSVGShape.cpp \
+	Source/WebCore/rendering/svg/RenderSVGShape.h \
 	Source/WebCore/rendering/svg/RenderSVGTSpan.cpp \
 	Source/WebCore/rendering/svg/RenderSVGTSpan.h \
 	Source/WebCore/rendering/svg/RenderSVGText.cpp \
@@ -4815,6 +4837,8 @@ webcore_sources += \
 	Source/WebCore/platform/audio/gstreamer/AudioDestinationGStreamer.cpp \
 	Source/WebCore/platform/audio/gstreamer/AudioDestinationGStreamer.h \
 	Source/WebCore/platform/audio/gstreamer/AudioFileReaderGStreamer.cpp \
+	Source/WebCore/platform/audio/gstreamer/WebKitWebAudioSourceGStreamer.cpp \
+	Source/WebCore/platform/audio/gstreamer/WebKitWebAudioSourceGStreamer.h \
 	Source/WebCore/platform/audio/gtk/AudioBusGtk.cpp
 webcore_built_sources += \
 	DerivedSources/WebCore/JSAudioBuffer.cpp \
@@ -4974,6 +4998,8 @@ webcore_sources += \
 	Source/WebCore/html/canvas/WebGLActiveInfo.h \
 	Source/WebCore/html/canvas/WebGLBuffer.cpp \
 	Source/WebCore/html/canvas/WebGLBuffer.h \
+	Source/WebCore/html/canvas/WebGLCompressedTextures.cpp \
+	Source/WebCore/html/canvas/WebGLCompressedTextures.h \
 	Source/WebCore/html/canvas/WebGLContextAttributes.cpp \
 	Source/WebCore/html/canvas/WebGLContextAttributes.h \
 	Source/WebCore/html/canvas/WebGLContextEvent.cpp \
@@ -4986,6 +5012,8 @@ webcore_sources += \
 	Source/WebCore/html/canvas/WebGLFramebuffer.h \
 	Source/WebCore/html/canvas/WebGLGetInfo.cpp \
 	Source/WebCore/html/canvas/WebGLGetInfo.h \
+	Source/WebCore/html/canvas/WebGLLoseContext.cpp \
+	Source/WebCore/html/canvas/WebGLLoseContext.h \
 	Source/WebCore/html/canvas/WebGLObject.cpp \
 	Source/WebCore/html/canvas/WebGLObject.h \
 	Source/WebCore/html/canvas/WebGLProgram.cpp \
@@ -5010,8 +5038,6 @@ webcore_sources += \
 	Source/WebCore/html/canvas/OESTextureFloat.h \
 	Source/WebCore/html/canvas/OESVertexArrayObject.cpp \
 	Source/WebCore/html/canvas/OESVertexArrayObject.h \
-	Source/WebCore/html/canvas/WebKitLoseContext.cpp \
-	Source/WebCore/html/canvas/WebKitLoseContext.h \
 	Source/WebCore/platform/graphics/ANGLEWebKitBridge.cpp \
 	Source/WebCore/platform/graphics/ANGLEWebKitBridge.h \
 	Source/WebCore/platform/graphics/cairo/GraphicsContext3DCairo.cpp \
@@ -5058,3 +5084,29 @@ webcore_sources += \
     Source/WebCore/dom/ScriptedAnimationController.cpp \
     Source/WebCore/dom/ScriptedAnimationController.h
 endif  # END ENABLE_REQUEST_ANIMATION_FRAME
+
+# ---
+# Compile with accelerated compositing support
+# ---
+if USE_ACCELERATED_COMPOSITING
+if USE_CLUTTER
+webcore_sources += \
+	Source/WebCore/platform/clutter/GRefPtrClutter.cpp \
+	Source/WebCore/platform/clutter/GRefPtrClutter.h \
+	Source/WebCore/platform/graphics/clutter/GraphicsLayerClutter.cpp \
+	Source/WebCore/platform/graphics/clutter/GraphicsLayerClutter.h
+endif  # END USE_CLUTTER
+
+if USE_TEXTURE_MAPPER_CAIRO
+webcore_sources += \
+	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
+	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapper.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
+	Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapperPlatformLayer.h
+webcoregtk_sources += \
+	Source/WebCore/platform/graphics/cairo/TextureMapperCairo.cpp \
+	Source/WebCore/platform/graphics/cairo/TextureMapperCairo.h
+endif  # END USE_TEXTURE_MAPPER_CAIRO
+endif  # USE_ACCELERATED_COMPOSITING

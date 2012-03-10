@@ -32,6 +32,7 @@
 
 #if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
 #include "InjectedScript.h"
+#include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
 #include "ScriptBreakpoint.h"
 #include "ScriptDebugListener.h"
@@ -57,22 +58,25 @@ class ScriptValue;
 
 typedef String ErrorString;
 
-class InspectorDebuggerAgent : public ScriptDebugListener {
+class InspectorDebuggerAgent : public InspectorBaseAgent<InspectorDebuggerAgent>, public ScriptDebugListener {
     WTF_MAKE_NONCOPYABLE(InspectorDebuggerAgent); WTF_MAKE_FAST_ALLOCATED;
 public:
     static const char* backtraceObjectGroup;
 
     virtual ~InspectorDebuggerAgent();
 
-    void getCapabilities(ErrorString*, RefPtr<InspectorArray>*);
+    void causesRecompilation(ErrorString*, bool*);
+    void canSetScriptSource(ErrorString*, bool*);
+    void supportsNativeBreakpoints(ErrorString*, bool*);
+
     void enable(ErrorString*);
     void disable(ErrorString*);
-    bool enabled();
-    void restore();
-    void setFrontend(InspectorFrontend*);
-    void clearFrontend();
 
-    void inspectedURLChanged(const String& url);
+    virtual void setFrontend(InspectorFrontend*);
+    virtual void clearFrontend();
+    virtual void restore();
+
+    void didClearMainFrameWindowObject();
 
     // Part of the protocol.
     void setBreakpointsActive(ErrorString*, bool active);
@@ -123,6 +127,7 @@ protected:
 private:
     void enable();
     void disable();
+    bool enabled();
 
     PassRefPtr<InspectorArray> currentCallFrames();
 
@@ -139,8 +144,6 @@ private:
     typedef HashMap<String, Script> ScriptsMap;
     typedef HashMap<String, Vector<String> > BreakpointIdToDebugServerBreakpointIdsMap;
 
-    InstrumentingAgents* m_instrumentingAgents;
-    InspectorState* m_inspectorState;
     InjectedScriptManager* m_injectedScriptManager;
     InspectorFrontend::Debugger* m_frontend;
     ScriptState* m_pausedScriptState;

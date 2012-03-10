@@ -73,7 +73,6 @@ public:
     // The argument is an absolute URL string. The string is assumed to be output of KURL::string() called on a valid
     // KURL object, or indiscernible from such.
     // It is usually best to avoid repeatedly parsing a string, unless memory saving outweigh the possible slow-downs.
-    KURL(ParsedURLStringTag, const char*);
     KURL(ParsedURLStringTag, const String&);
     KURL(ParsedURLStringTag, const URLString&);
 #if USE(GOOGLEURL)
@@ -236,8 +235,6 @@ private:
     static bool protocolIs(const String&, const char*);
 #if USE(GOOGLEURL)
     friend class KURLGooglePrivate;
-    void parse(const char* url, const String* originalString);  // KURLMac calls this.
-    void copyToBuffer(Vector<char, 512>& buffer) const;  // KURLCFNet uses this.
     KURLGooglePrivate m_url;
 #else  // !USE(GOOGLEURL)
     void init(const KURL&, const String&, const TextEncoding&);
@@ -247,7 +244,7 @@ private:
     // optimization: When the source is the same as the fixed-up string,
     // it will use the passed-in string instead of allocating a new one.
     void parse(const String&);
-    void parse(const char* url, const String* originalString);
+    void parse(const char* url, const String* originalString = 0);
 
     String m_string;
     bool m_isValid : 1;

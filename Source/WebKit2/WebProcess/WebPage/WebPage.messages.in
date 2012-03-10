@@ -36,7 +36,6 @@ messages -> WebPage {
     KeyEventSyncForTesting(WebKit::WebKeyboardEvent event) -> (bool handled)
     MouseEvent(WebKit::WebMouseEvent event)
     MouseEventSyncForTesting(WebKit::WebMouseEvent event) -> (bool handled)
-    WheelEvent(WebKit::WebWheelEvent event)
     WheelEventSyncForTesting(WebKit::WebWheelEvent event) -> (bool handled)
 #if ENABLE(GESTURE_EVENTS)
     GestureEvent(WebKit::WebGestureEvent event)
@@ -122,6 +121,7 @@ messages -> WebPage {
     SetFixedLayoutSize(WebCore::IntSize size)
 
     SetPaginationMode(uint32_t mode);
+    SetPageLength(double pageLength);
     SetGapBetweenPages(double gap);
 
     # Find.
@@ -144,6 +144,9 @@ messages -> WebPage {
     # Popup menu.
     DidChangeSelectedIndexForActivePopupMenu(int32_t newIndex);
     SetTextForActivePopupMenu(int32_t index);
+#if PLATFORM(GTK)    
+    FailedToShowPopupMenu();
+#endif    
     
     # Context menu.
     DidSelectItemFromActiveContextMenu(WebKit::WebContextMenuItemData menuItem);
@@ -168,6 +171,9 @@ messages -> WebPage {
 
     # Geolocation
     DidReceiveGeolocationPermissionDecision(uint64_t geolocationID, bool allowed)
+    
+    # Notification
+    DidReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed)
 
     SetWindowResizerSize(WebCore::IntSize intersectsView)
 

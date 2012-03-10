@@ -73,8 +73,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
     suggestedFileName: function()
     {
-        var names = this._scriptsPanel.folderAndDisplayNameForScriptURL(this._uiSourceCode.url);
-        return names.displayName || "untitled.js";
+        return this._uiSourceCode.displayName || "untitled.js";
     },
 
     editContent: function(newContent, callback)
@@ -98,7 +97,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
             this._scriptsPanel.setScriptSourceIsBeingEdited(this._uiSourceCode, false);
     },
 
-    populateLineGutterContextMenu: function(lineNumber, contextMenu)
+    populateLineGutterContextMenu: function(contextMenu, lineNumber)
     {
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Continue to here" : "Continue to Here"), this._model.continueToLine.bind(this._model, this._uiSourceCode, lineNumber));
 
@@ -144,8 +143,9 @@ WebInspector.JavaScriptSourceFrame.prototype = {
         }
     },
 
-    populateTextAreaContextMenu: function(contextMenu)
+    populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
+        WebInspector.SourceFrame.prototype.populateTextAreaContextMenu.call(this, contextMenu, lineNumber);
         var selection = window.getSelection();
         if (selection.type !== "Range" || selection.isCollapsed)
             return;

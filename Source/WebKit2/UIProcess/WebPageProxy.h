@@ -36,6 +36,7 @@
 #if ENABLE(TOUCH_EVENTS)
 #include "NativeWebTouchEvent.h"
 #endif
+#include "NotificationPermissionRequestManagerProxy.h"
 #include "PlatformProcessIdentifier.h"
 #include "SandboxExtension.h"
 #include "ShareableBitmap.h"
@@ -415,6 +416,8 @@ public:
 
     void setPaginationMode(WebCore::Page::Pagination::Mode);
     WebCore::Page::Pagination::Mode paginationMode() const { return m_paginationMode; }
+    void setPageLength(double);
+    double pageLength() const { return m_pageLength; }
     void setGapBetweenPages(double);
     double gapBetweenPages() const { return m_gapBetweenPages; }
     unsigned pageCount() const { return m_pageCount; }
@@ -593,6 +596,9 @@ private:
     virtual void valueChangedForPopupMenu(WebPopupMenuProxy*, int32_t newSelectedIndex);
     virtual void setTextFromItemForPopupMenu(WebPopupMenuProxy*, int32_t index);
     virtual NativeWebMouseEvent* currentlyProcessedMouseDownEvent();
+#if PLATFORM(GTK)
+    virtual void failedToShowPopupMenu();
+#endif    
 
     // Implemented in generated WebPageProxyMessageReceiver.cpp
     void didReceiveWebPageProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
@@ -670,6 +676,7 @@ private:
     void requestGeolocationPermissionForFrame(uint64_t geolocationID, uint64_t frameID, String originIdentifier);
     void runModal();
     void notifyScrollerThumbIsVisibleInRect(const WebCore::IntRect&);
+    void recommendedScrollbarStyleDidChange(int32_t newStyle);
     void didChangeScrollbarsForMainFrame(bool hasHorizontalScrollbar, bool hasVerticalScrollbar);
     void didChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSide, bool pinnedToRightSide);
     void didChangePageCount(unsigned);
@@ -679,6 +686,8 @@ private:
     void reattachToWebProcess();
     void reattachToWebProcessWithItem(WebBackForwardListItem*);
 
+    void requestNotificationPermission(uint64_t notificationID, const String& originIdentifier);
+    
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
 #endif
@@ -686,6 +695,7 @@ private:
 #if PLATFORM(QT)
     void didChangeContentsSize(const WebCore::IntSize&);
     void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&);
+    void focusEditableArea(const WebCore::IntRect& caret, const WebCore::IntRect&);
 #endif
 #if ENABLE(TOUCH_EVENTS)
     void needTouchEvents(bool);
@@ -862,6 +872,7 @@ private:
     ContextMenuState m_activeContextMenuState;
     RefPtr<WebOpenPanelResultListenerProxy> m_openPanelResultListener;
     GeolocationPermissionRequestManagerProxy m_geolocationPermissionRequestManager;
+    NotificationPermissionRequestManagerProxy m_notificationPermissionRequestManager;
 
     double m_estimatedProgress;
 
@@ -899,6 +910,7 @@ private:
     WebCore::IntSize m_fixedLayoutSize;
 
     WebCore::Page::Pagination::Mode m_paginationMode;
+    double m_pageLength;
     double m_gapBetweenPages;
 
     // If the process backing the web page is alive and kicking.

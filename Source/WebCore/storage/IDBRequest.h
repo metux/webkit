@@ -84,10 +84,12 @@ public:
     virtual void onSuccess(PassRefPtr<IDBTransactionBackendInterface>);
     virtual void onSuccess(PassRefPtr<SerializedScriptValue>);
     virtual void onSuccessWithContinuation();
+    virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >& keys, const Vector<RefPtr<IDBKey> >& primaryKeys, const Vector<RefPtr<SerializedScriptValue> >& values) { ASSERT_NOT_REACHED(); } // Not implemented. Callback should not reach the renderer side.
     virtual void onBlocked();
 
     // ActiveDOMObject
-    virtual bool hasPendingActivity() const;
+    virtual bool hasPendingActivity() const OVERRIDE;
+    virtual void stop() OVERRIDE;
 
     // EventTarget
     virtual const AtomicString& interfaceName() const;
@@ -119,7 +121,8 @@ private:
     RefPtr<IDBTransaction> m_transaction;
 
     ReadyState m_readyState;
-    bool m_finished; // Is it possible that we'll fire any more events? If not, we're finished.
+    bool m_requestFinished; // Is it possible that we'll fire any more events? If not, we're finished.
+    bool m_contextStopped;
     Vector<RefPtr<Event> > m_enqueuedEvents;
 
     // Only used if the result type will be a cursor.

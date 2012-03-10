@@ -31,6 +31,7 @@
 #include "CSSPrimitiveValue.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
+#include "CompositeEditCommand.h"
 #include "DeleteButton.h"
 #include "Document.h"
 #include "Editor.h"
@@ -204,7 +205,7 @@ void DeleteButtonController::createDeletionUI()
     RefPtr<HTMLDivElement> container = HTMLDivElement::create(m_target->document());
     container->setIdAttribute(containerElementIdentifier);
 
-    CSSMutableStyleDeclaration* style = container->getInlineStyleDecl();
+    CSSInlineStyleDeclaration* style = container->ensureInlineStyleDecl();
     style->setProperty(CSSPropertyWebkitUserDrag, CSSValueNone);
     style->setProperty(CSSPropertyWebkitUserSelect, CSSValueNone);
     style->setProperty(CSSPropertyWebkitUserModify, CSSValueReadOnly);
@@ -222,7 +223,7 @@ void DeleteButtonController::createDeletionUI()
     const int borderWidth = 4;
     const int borderRadius = 6;
 
-    style = outline->getInlineStyleDecl();
+    style = outline->ensureInlineStyleDecl();
     style->setProperty(CSSPropertyPosition, CSSValueAbsolute);
     style->setProperty(CSSPropertyZIndex, String::number(-1000000));
     style->setProperty(CSSPropertyTop, String::number(-borderWidth - m_target->renderBox()->borderTop()) + "px");
@@ -246,7 +247,7 @@ void DeleteButtonController::createDeletionUI()
     const int buttonHeight = 30;
     const int buttonBottomShadowOffset = 2;
 
-    style = button->getInlineStyleDecl();
+    style = button->ensureInlineStyleDecl();
     style->setProperty(CSSPropertyPosition, CSSValueAbsolute);
     style->setProperty(CSSPropertyZIndex, String::number(1000000));
     style->setProperty(CSSPropertyTop, String::number((-buttonHeight / 2) - m_target->renderBox()->borderTop() - (borderWidth / 2) + buttonBottomShadowOffset) + "px");
@@ -309,12 +310,12 @@ void DeleteButtonController::show(HTMLElement* element)
     }
 
     if (m_target->renderer()->style()->position() == StaticPosition) {
-        m_target->getInlineStyleDecl()->setProperty(CSSPropertyPosition, CSSValueRelative);
+        m_target->ensureInlineStyleDecl()->setProperty(CSSPropertyPosition, CSSValueRelative);
         m_wasStaticPositioned = true;
     }
 
     if (m_target->renderer()->style()->hasAutoZIndex()) {
-        m_target->getInlineStyleDecl()->setProperty(CSSPropertyZIndex, "0");
+        m_target->ensureInlineStyleDecl()->setProperty(CSSPropertyZIndex, "0");
         m_wasAutoZIndex = true;
     }
 }
@@ -330,9 +331,9 @@ void DeleteButtonController::hide()
 
     if (m_target) {
         if (m_wasStaticPositioned)
-            m_target->getInlineStyleDecl()->setProperty(CSSPropertyPosition, CSSValueStatic);
+            m_target->ensureInlineStyleDecl()->setProperty(CSSPropertyPosition, CSSValueStatic);
         if (m_wasAutoZIndex)
-            m_target->getInlineStyleDecl()->setProperty(CSSPropertyZIndex, CSSValueAuto);
+            m_target->ensureInlineStyleDecl()->setProperty(CSSPropertyZIndex, CSSValueAuto);
     }
 
     m_wasStaticPositioned = false;
@@ -360,19 +361,40 @@ void DeleteButtonController::disable()
     m_disableStack++;
 }
 
+class RemoveTargetCommand : public CompositeEditCommand {
+public:
+    static PassRefPtr<RemoveTargetCommand> create(Document* document, PassRefPtr<Node> target)
+    {
+        return adoptRef(new RemoveTargetCommand(document, target));
+    }
+
+private:
+    RemoveTargetCommand(Document* document, PassRefPtr<Node> target)
+        : CompositeEditCommand(document)
+        , m_target(target)
+    { }
+
+    void doApply()
+    {
+        removeNode(m_target);
+    }
+
+private:
+    RefPtr<Node> m_target;
+};
+
 void DeleteButtonController::deleteTarget()
 {
     if (!enabled() || !m_target)
         return;
 
-    RefPtr<Node> element = m_target;
     hide();
 
     // Because the deletion UI only appears when the selection is entirely
     // within the target, we unconditionally update the selection to be
     // a caret where the target had been.
-    Position pos = positionInParentBeforeNode(element.get());
-    applyCommand(RemoveNodeCommand::create(element.release()));
+    Position pos = positionInParentBeforeNode(m_target.get());
+    applyCommand(RemoveTargetCommand::create(m_frame->document(), m_target));
     m_frame->selection()->setSelection(VisiblePosition(pos));
 }
 

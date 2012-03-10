@@ -154,6 +154,20 @@ void JSGlobalData::storeVPtrs()
     JSCell* jsFunction = new (storage) JSFunction(JSCell::VPtrStealingHack);
     CLOBBER_MEMORY();
     JSGlobalData::jsFunctionVPtr = jsFunction->vptr();
+
+    // Until we fully remove our reliance on vptrs, we need to make sure that everybody that 
+    // we think has a unique virtual pointer actually does.
+    if (jsFinalObjectVPtr == jsArrayVPtr
+        || jsFinalObjectVPtr == jsByteArrayVPtr
+        || jsFinalObjectVPtr == jsStringVPtr
+        || jsFinalObjectVPtr == jsFunctionVPtr
+        || jsArrayVPtr == jsByteArrayVPtr
+        || jsArrayVPtr == jsStringVPtr
+        || jsArrayVPtr == jsFunctionVPtr
+        || jsByteArrayVPtr == jsStringVPtr
+        || jsByteArrayVPtr == jsFunctionVPtr
+        || jsStringVPtr == jsFunctionVPtr)
+        CRASH();
 }
 
 JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType threadStackType, HeapSize heapSize)
@@ -340,7 +354,7 @@ JSGlobalData::~JSGlobalData()
     fastDelete(const_cast<HashTable*>(stringTable));
     fastDelete(const_cast<HashTable*>(stringConstructorTable));
 
-    deleteAllValues(opaqueJSClassData);
+    opaqueJSClassData.clear();
 
     delete emptyList;
 
@@ -398,13 +412,48 @@ JSGlobalData*& JSGlobalData::sharedInstanceInternal()
 }
 
 #if ENABLE(JIT)
+static ThunkGenerator thunkGeneratorForIntrinsic(Intrinsic intrinsic)
+{
+    switch (intrinsic) {
+    case CharCodeAtIntrinsic:
+        return charCodeAtThunkGenerator;
+    case CharAtIntrinsic:
+        return charAtThunkGenerator;
+    case FromCharCodeIntrinsic:
+        return fromCharCodeThunkGenerator;
+    case SqrtIntrinsic:
+        return sqrtThunkGenerator;
+    case PowIntrinsic:
+        return powThunkGenerator;
+    case AbsIntrinsic:
+        return absThunkGenerator;
+    case FloorIntrinsic:
+        return floorThunkGenerator;
+    case CeilIntrinsic:
+        return ceilThunkGenerator;
+    case RoundIntrinsic:
+        return roundThunkGenerator;
+    case ExpIntrinsic:
+        return expThunkGenerator;
+    case LogIntrinsic:
+        return logThunkGenerator;
+    default:
+        return 0;
+    }
+}
+
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)
 {
+#if ENABLE(INTERPRETER)
+    if (!canUseJIT())
+        return NativeExecutable::create(*this, function, constructor);
+#endif
     return jitStubs->hostFunctionStub(this, function, constructor);
 }
-NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, ThunkGenerator generator, DFG::Intrinsic intrinsic)
+NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, Intrinsic intrinsic)
 {
-    return jitStubs->hostFunctionStub(this, function, generator, intrinsic);
+    ASSERT(canUseJIT());
+    return jitStubs->hostFunctionStub(this, function, intrinsic != NoIntrinsic ? thunkGeneratorForIntrinsic(intrinsic) : 0, intrinsic);
 }
 #else
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)

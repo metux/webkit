@@ -65,11 +65,6 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         this._windowVisible = false;
     },
 
-    disconnectFromBackend: function()
-    {
-        this._windowVisible = false;
-    },
-
     attach: function()
     {
     },
@@ -115,6 +110,11 @@ WebInspector.InspectorFrontendHostStub.prototype = {
 
     copyText: function()
     {
+    },
+
+    canSaveAs: function(fileName, content)
+    {
+        return true;
     },
 
     saveAs: function(fileName, content)

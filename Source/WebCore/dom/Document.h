@@ -59,10 +59,10 @@ namespace WebCore {
 class AXObjectCache;
 class Attr;
 class CDATASection;
-class CSSPrimitiveValueCache;
 class CSSStyleDeclaration;
 class CSSStyleSelector;
 class CSSStyleSheet;
+class CSSValuePool;
 class CachedCSSStyleSheet;
 class CachedResourceLoader;
 class CachedScript;
@@ -130,6 +130,7 @@ class Text;
 class TextResourceDecoder;
 class DocumentParser;
 class TreeWalker;
+class WebKitNamedFlow;
 class XMLHttpRequest;
 class XPathEvaluator;
 class XPathExpression;
@@ -351,6 +352,8 @@ public:
     virtual PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&);
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
+    PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&);
+
     /**
      * Retrieve all nodes that intersect a rect in the window's document, until it is fully enclosed by
      * the boundaries of a node.
@@ -449,7 +452,7 @@ public:
     virtual bool isMediaDocument() const { return false; }
     virtual bool isFrameSet() const { return false; }
     
-    PassRefPtr<CSSPrimitiveValueCache> cssPrimitiveValueCache() const;
+    PassRefPtr<CSSValuePool> cssValuePool() const;
     
     CSSStyleSelector* styleSelectorIfExists() const { return m_styleSelector.get(); }
 
@@ -737,7 +740,7 @@ public:
     void attachRange(Range*);
     void detachRange(Range*);
 
-    void nodeChildrenChanged(ContainerNode*);
+    void updateRangesAfterChildrenChanged(ContainerNode*);
     // nodeChildrenWillBeRemoved is used when removing all node children at once.
     void nodeChildrenWillBeRemoved(ContainerNode*);
     // nodeWillBeRemoved is only safe when removing one node at a time.
@@ -784,12 +787,12 @@ public:
     void addListenerTypeIfNeeded(const AtomicString& eventType);
 
 #if ENABLE(MUTATION_OBSERVERS)
-    bool hasSubtreeMutationObserverOfType(WebKitMutationObserver::MutationType type) const
+    bool hasMutationObserversOfType(WebKitMutationObserver::MutationType type) const
     {
-        return m_subtreeMutationObserverTypes & type;
+        return m_mutationObserverTypes & type;
     }
-    bool hasSubtreeMutationObserver() const { return m_subtreeMutationObserverTypes; }
-    void addSubtreeMutationObserverTypes(MutationObserverOptions types) { m_subtreeMutationObserverTypes |= types; }
+    bool hasMutationObservers() const { return m_mutationObserverTypes; }
+    void addMutationObserverTypes(MutationObserverOptions types) { m_mutationObserverTypes |= types; }
 #endif
 
     CSSStyleDeclaration* getOverrideStyle(Element*, const String& pseudoElt);
@@ -1102,7 +1105,7 @@ public:
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>, Element*);
-    void webkitCancelRequestAnimationFrame(int id);
+    void webkitCancelAnimationFrame(int id);
     void serviceScriptedAnimations(DOMTimeStamp);
 #endif
 
@@ -1114,7 +1117,7 @@ public:
     unsigned wheelEventHandlerCount() const { return m_wheelEventHandlerCount; }
     void didAddWheelEventHandler();
     void didRemoveWheelEventHandler();
-    
+
     bool visualUpdatesAllowed() const;
 
 #if ENABLE(MICRODATA)
@@ -1123,6 +1126,9 @@ public:
 #endif
     
     bool isInDocumentWrite() { return m_writeRecursionDepth > 0; }
+
+    void suspendScheduledTasks();
+    void resumeScheduledTasks();
 
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
@@ -1171,6 +1177,10 @@ private:
 
     void loadEventDelayTimerFired(Timer<Document>*);
 
+    void pendingTasksTimerFired(Timer<Document>*);
+
+    static void didReceiveTask(void*);
+
 #if ENABLE(PAGE_VISIBILITY_API)
     PageVisibilityState visibilityState() const;
 #endif
@@ -1182,7 +1192,7 @@ private:
     bool m_hasDirtyStyleSelector;
     Vector<OwnPtr<FontData> > m_customFonts;
 
-    mutable RefPtr<CSSPrimitiveValueCache> m_cssPrimitiveValueCache;
+    mutable RefPtr<CSSValuePool> m_cssValuePool;
 
     Frame* m_frame;
     OwnPtr<CachedResourceLoader> m_cachedResourceLoader;
@@ -1257,7 +1267,7 @@ private:
     unsigned short m_listenerTypes;
 
 #if ENABLE(MUTATION_OBSERVERS)
-    MutationObserverOptions m_subtreeMutationObserverTypes;
+    MutationObserverOptions m_mutationObserverTypes;
 #endif
 
     RefPtr<StyleSheetList> m_styleSheets; // All of the stylesheets that are currently in effect for our media type and stylesheet set.
@@ -1431,8 +1441,11 @@ private:
     unsigned m_wheelEventHandlerCount;
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-    OwnPtr<ScriptedAnimationController> m_scriptedAnimationController;
+    RefPtr<ScriptedAnimationController> m_scriptedAnimationController;
 #endif
+
+    Timer<Document> m_pendingTasksTimer;
+    Vector<OwnPtr<Task> > m_pendingTasks;
 };
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.
@@ -1449,8 +1462,8 @@ inline Node::Node(Document* document, ConstructionType type)
     , m_next(0)
     , m_renderer(0)
 {
-    if (m_document)
-        m_document->guardRef();
+    if (document)
+        document->guardRef();
 #if !defined(NDEBUG) || (defined(DUMP_NODE_STATISTICS) && DUMP_NODE_STATISTICS)
     trackForDebugging();
 #endif

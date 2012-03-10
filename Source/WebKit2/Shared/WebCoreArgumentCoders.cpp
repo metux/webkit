@@ -37,6 +37,7 @@
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/GraphicsLayer.h>
 #include <WebCore/Image.h>
+#include <WebCore/KURL.h>
 #include <WebCore/PluginData.h>
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/TextCheckerClient.h>
@@ -624,6 +625,20 @@ bool ArgumentCoder<DragSession>::decode(ArgumentDecoder* decoder, DragSession& r
     return true;
 }
 
+void ArgumentCoder<KURL>::encode(ArgumentEncoder* encoder, const KURL& result)
+{
+    encoder->encode(result.string());
+}
+    
+bool ArgumentCoder<KURL>::decode(ArgumentDecoder* decoder, KURL& result)
+{
+    String urlAsString;
+    if (!decoder->decode(urlAsString))
+        return false;
+    result = KURL(WebCore::ParsedURLString, urlAsString);
+    return true;
+}
+
 #if PLATFORM(QT)
 
 void ArgumentCoder<FloatPoint3D>::encode(ArgumentEncoder* encoder, const FloatPoint3D& floatPoint3D)
@@ -646,7 +661,6 @@ bool ArgumentCoder<Length>::decode(ArgumentDecoder* decoder, Length& length)
 {
     return SimpleArgumentCoder<Length>::decode(decoder, length);
 }
-
 
 void ArgumentCoder<TransformationMatrix>::encode(ArgumentEncoder* encoder, const TransformationMatrix& transformationMatrix)
 {
@@ -830,7 +844,7 @@ void ArgumentCoder<RefPtr<TimingFunction> >::encode(ArgumentEncoder* encoder, co
 void ArgumentCoder<RefPtr<TimingFunction> >::encode(ArgumentEncoder* encoder, const WebCore::TimingFunction* function)
 {
     if (!function) {
-        encoder->encodeInt32(WebCore::TimingFunction::LinearFunction);
+        encoder->encodeEnum(WebCore::TimingFunction::LinearFunction);
         return;
     }
 
@@ -1062,18 +1076,18 @@ static void encodeBoolAndEnumValue(ArgumentEncoder* encoder, bool isSet, T value
         encoder->encodeEnum(value);
 }
 
-void ArgumentCoder<Animation>::encode(ArgumentEncoder* encoder, const Animation& animation)
+void ArgumentCoder<RefPtr<Animation> >::encode(ArgumentEncoder* encoder, const RefPtr<Animation>& animation)
 {
-    encodeBoolAndValue(encoder, animation.isDelaySet(), animation.delay());
-    encodeBoolAndEnumValue(encoder, animation.isDirectionSet(), animation.direction());
-    encodeBoolAndValue(encoder, animation.isDurationSet(), animation.duration());
-    encodeBoolAndValue(encoder, animation.isFillModeSet(), animation.fillMode());
-    encodeBoolAndValue(encoder, animation.isIterationCountSet(), animation.iterationCount());
-    encodeBoolAndValue(encoder, animation.isNameSet(), animation.name());
-    encodeBoolAndEnumValue(encoder, animation.isPlayStateSet(), animation.playState());
-    encodeBoolAndValue(encoder, animation.isPropertySet(), animation.property());
-    encodeBoolAndValue<RefPtr<TimingFunction> >(encoder, animation.isTimingFunctionSet(), animation.timingFunction());
-    encoder->encodeBool(animation.isNoneAnimation());
+    encodeBoolAndValue(encoder, animation->isDelaySet(), animation->delay());
+    encodeBoolAndEnumValue(encoder, animation->isDirectionSet(), animation->direction());
+    encodeBoolAndValue(encoder, animation->isDurationSet(), animation->duration());
+    encodeBoolAndValue(encoder, animation->isFillModeSet(), animation->fillMode());
+    encodeBoolAndValue(encoder, animation->isIterationCountSet(), animation->iterationCount());
+    encodeBoolAndValue(encoder, animation->isNameSet(), animation->name());
+    encodeBoolAndEnumValue(encoder, animation->isPlayStateSet(), animation->playState());
+    encodeBoolAndValue(encoder, animation->isPropertySet(), animation->property());
+    encodeBoolAndValue<RefPtr<TimingFunction> >(encoder, animation->isTimingFunctionSet(), animation->timingFunction());
+    encoder->encodeBool(animation->isNoneAnimation());
 }
 
 
@@ -1099,15 +1113,13 @@ static bool decodeBoolAndEnumValue(ArgumentDecoder* decoder, bool& isSet, T& val
     return decoder->decodeEnum(value);
 }
 
-bool ArgumentCoder<Animation>::decode(ArgumentDecoder* decoder, Animation& animation)
+bool ArgumentCoder<RefPtr<Animation> >::decode(ArgumentDecoder* decoder, RefPtr<Animation>& animation)
 {
     bool isDelaySet, isDirectionSet, isDurationSet, isFillModeSet, isIterationCountSet, isNameSet, isPlayStateSet, isPropertySet, isTimingFunctionSet;
     int property, iterationCount, fillMode;
     double duration;
     RefPtr<TimingFunction> timingFunction;
     String name;
-
-    animation.clearAll();
 
     double delay;
     if (!decodeBoolAndValue(decoder, isDelaySet, delay))
@@ -1133,24 +1145,27 @@ bool ArgumentCoder<Animation>::decode(ArgumentDecoder* decoder, Animation& anima
     if (!decodeBoolAndValue<RefPtr<TimingFunction> >(decoder, isTimingFunctionSet, timingFunction))
         return false;
 
+    animation = Animation::create();
+    animation->clearAll();
+
     if (isDelaySet)
-        animation.setDelay(delay);
+        animation->setDelay(delay);
     if (isDirectionSet)
-        animation.setDirection(direction);
+        animation->setDirection(direction);
     if (isDurationSet)
-        animation.setDuration(duration);
+        animation->setDuration(duration);
     if (isFillModeSet)
-        animation.setFillMode(fillMode);
+        animation->setFillMode(fillMode);
     if (isIterationCountSet)
-        animation.setIterationCount(iterationCount);
+        animation->setIterationCount(iterationCount);
     if (isNameSet)
-        animation.setName(name);
+        animation->setName(name);
     if (isPlayStateSet)
-        animation.setPlayState(playState);
+        animation->setPlayState(playState);
     if (isPropertySet)
-        animation.setProperty(property);
+        animation->setProperty(property);
     if (isTimingFunctionSet)
-        animation.setTimingFunction(timingFunction);
+        animation->setTimingFunction(timingFunction);
 
     return true;
 }
@@ -1195,6 +1210,7 @@ bool ArgumentCoder<KeyframeValueList>::decode(ArgumentDecoder* decoder, WebCore:
 
     for (size_t i = 0; i < size; ++i) {
         float keyTime;
+   
         RefPtr<WebCore::TimingFunction> timingFunction;
         if (!decoder->decodeFloat(keyTime))
             return false;

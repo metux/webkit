@@ -39,9 +39,16 @@ WebInspector.ElementsPanel = function()
     this.registerRequiredCSS("textPrompt.css");
     this.setHideOnDetach();
 
-    this.contentElement = document.createElement("div");
+    const initialSidebarWidth = 325;
+    const minimalContentWidthPercent = 34;
+    this.createSplitView(this.element, WebInspector.SplitView.SidebarPosition.Right, initialSidebarWidth);
+    this.splitView.minimalSidebarWidth = Preferences.minElementsSidebarWidth;
+    this.splitView.minimalMainWidthPercent = minimalContentWidthPercent;
+
+    this.contentElement = this.splitView.mainElement;
     this.contentElement.id = "elements-content";
-    this.contentElement.className = "outline-disclosure source-code";
+    this.contentElement.addStyleClass("outline-disclosure");
+    this.contentElement.addStyleClass("source-code");
     if (!WebInspector.settings.domWordWrap.get())
         this.contentElement.classList.add("nowrap");
     WebInspector.settings.domWordWrap.addChangeListener(this._domWordWrapSettingChanged.bind(this));
@@ -63,7 +70,7 @@ WebInspector.ElementsPanel = function()
     this.sidebarPanes.styles = new WebInspector.StylesSidebarPane(this.sidebarPanes.computedStyle);
     this.sidebarPanes.metrics = new WebInspector.MetricsSidebarPane();
     this.sidebarPanes.properties = new WebInspector.PropertiesSidebarPane();
-    if (Preferences.nativeInstrumentationEnabled)
+    if (Capabilities.nativeInstrumentationEnabled)
         this.sidebarPanes.domBreakpoints = WebInspector.domBreakpointsSidebarPane;
     this.sidebarPanes.eventListeners = new WebInspector.EventListenersSidebarPane();
 
@@ -78,25 +85,14 @@ WebInspector.ElementsPanel = function()
     this.sidebarPanes.styles.addEventListener("style property toggled", this._stylesPaneEdited, this);
     this.sidebarPanes.metrics.addEventListener("metrics edited", this._metricsPaneEdited, this);
 
-    this.sidebarElement = document.createElement("div");
-    this.sidebarElement.id = "elements-sidebar";
-
     for (var pane in this.sidebarPanes) {
         this.sidebarElement.appendChild(this.sidebarPanes[pane].element);
         if (this.sidebarPanes[pane].onattach)
             this.sidebarPanes[pane].onattach();
     }
 
-    this.sidebarResizeElement = document.createElement("div");
-    this.sidebarResizeElement.className = "sidebar-resizer-vertical";
-    this.sidebarResizeElement.addEventListener("mousedown", this.rightSidebarResizerDragStart.bind(this), false);
-
     this.nodeSearchButton = new WebInspector.StatusBarButton(WebInspector.UIString("Select an element in the page to inspect it."), "node-search-status-bar-item");
     this.nodeSearchButton.addEventListener("click", this.toggleSearchingForNode, this);
-
-    this.element.appendChild(this.contentElement);
-    this.element.appendChild(this.sidebarElement);
-    this.element.appendChild(this.sidebarResizeElement);
 
     this._registerShortcuts();
 
@@ -134,7 +130,6 @@ WebInspector.ElementsPanel.prototype = {
         if (this.treeOutline.element.parentElement !== this.contentElement)
             this.contentElement.appendChild(this.treeOutline.element);
 
-        this.sidebarResizeElement.style.right = (this.sidebarElement.offsetWidth - 3) + "px";
         this.updateBreadcrumb();
         this.treeOutline.updateSelection();
         this.treeOutline.setVisible(true);
@@ -142,7 +137,7 @@ WebInspector.ElementsPanel.prototype = {
         if (!this.treeOutline.rootDOMNode)
             WebInspector.domAgent.requestDocument();
 
-        if (Preferences.nativeInstrumentationEnabled)
+        if (Capabilities.nativeInstrumentationEnabled)
             this.sidebarElement.insertBefore(this.sidebarPanes.domBreakpoints.element, this.sidebarPanes.eventListeners.element);
     },
 
@@ -182,7 +177,6 @@ WebInspector.ElementsPanel.prototype = {
 
         if (selectedNode) {
             ConsoleAgent.addInspectedNode(selectedNode.id);
-            WebInspector.extensionServer.notifyObjectSelected(this.name);
             this._lastValidSelectedNode = selectedNode;
         }
     },
@@ -207,7 +201,7 @@ WebInspector.ElementsPanel.prototype = {
             return;
         }
 
-        if (Preferences.nativeInstrumentationEnabled)
+        if (Capabilities.nativeInstrumentationEnabled)
             this.sidebarPanes.domBreakpoints.restoreBreakpoints();
 
         /**
@@ -325,7 +319,7 @@ WebInspector.ElementsPanel.prototype = {
 
     _populateContextMenu: function(contextMenu, node)
     {
-        if (Preferences.nativeInstrumentationEnabled) {
+        if (Capabilities.nativeInstrumentationEnabled) {
             // Add debbuging-related actions
             contextMenu.appendSeparator();
             var pane = this.sidebarPanes.domBreakpoints;
@@ -937,30 +931,8 @@ WebInspector.ElementsPanel.prototype = {
         this.selectedDOMNode().copyNode();
     },
 
-    rightSidebarResizerDragStart: function(event)
+    sidebarResized: function(event)
     {
-        WebInspector.elementDragStart(this.sidebarElement, this.rightSidebarResizerDrag.bind(this), this.rightSidebarResizerDragEnd.bind(this), event, "ew-resize");
-    },
-
-    rightSidebarResizerDragEnd: function(event)
-    {
-        WebInspector.elementDragEnd(event);
-        this.saveSidebarWidth();
-    },
-
-    rightSidebarResizerDrag: function(event)
-    {
-        var x = event.pageX;
-        var newWidth = Number.constrain(window.innerWidth - x, Preferences.minElementsSidebarWidth, window.innerWidth * 0.66);
-        this.setSidebarWidth(newWidth);
-        event.preventDefault();
-    },
-
-    setSidebarWidth: function(newWidth)
-    {
-        this.sidebarElement.style.width = newWidth + "px";
-        this.contentElement.style.right = newWidth + "px";
-        this.sidebarResizeElement.style.right = (newWidth - 3) + "px";
         this.treeOutline.updateSelection();
     },
 
@@ -999,11 +971,6 @@ WebInspector.ElementsPanel.prototype = {
     toggleSearchingForNode: function()
     {
         this.setSearchingForNode(!this.nodeSearchButton.toggled);
-    },
-
-    elementsToRestoreScrollPositionsFor: function()
-    {
-        return [ this.contentElement, this.sidebarElement ];
     }
 }
 

@@ -48,6 +48,7 @@
 #include "Settings.h"
 #include "ShadowContentElement.h"
 #include "ShadowRoot.h"
+#include "SpellChecker.h"
 #include "TextIterator.h"
 
 #if ENABLE(GESTURE_EVENTS)
@@ -90,6 +91,14 @@ static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerType
         return false;
 
     return true;
+}
+
+static SpellChecker* spellchecker(Document* document)
+{
+    if (!document || !document->frame() || !document->frame()->editor())
+        return 0;
+
+    return document->frame()->editor()->spellChecker();
 }
 
 const char* Internals::internalsId = "internals";
@@ -312,6 +321,16 @@ void Internals::setAcceleratedDrawingEnabled(Document* document, bool enabled, E
     }
 
     document->settings()->setAcceleratedDrawingEnabled(enabled);
+}
+
+void Internals::setAcceleratedFiltersEnabled(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->settings()->setAcceleratedFiltersEnabled(enabled);
 }
 
 void Internals::setEnableScrollAnimator(Document* document, bool enabled, ExceptionCode& ec)
@@ -577,6 +596,17 @@ unsigned Internals::lengthFromRange(Element* scope, const Range* range, Exceptio
     return length;
 }
 
+void Internals::setShouldLayoutFixedElementsRelativeToFrame(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->view()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    FrameView* frameView = document->view();
+    frameView->setShouldLayoutFixedElementsRelativeToFrame(enabled);
+}
+
 void Internals::setUnifiedTextCheckingEnabled(Document* document, bool enabled, ExceptionCode& ec)
 {
     if (!document || !document->frame() || !document->frame()->settings()) {
@@ -595,6 +625,40 @@ bool Internals::unifiedTextCheckingEnabled(Document* document, ExceptionCode& ec
     }
 
     return document->frame()->settings()->unifiedTextCheckerEnabled();
+}
+
+int Internals::lastSpellCheckRequestSequence(Document* document, ExceptionCode& ec)
+{
+    SpellChecker* checker = spellchecker(document);
+
+    if (!checker) {
+        ec = INVALID_ACCESS_ERR;
+        return -1;
+    }
+
+    return checker->lastRequestSequence();
+}
+
+int Internals::lastSpellCheckProcessedSequence(Document* document, ExceptionCode& ec)
+{
+    SpellChecker* checker = spellchecker(document);
+
+    if (!checker) {
+        ec = INVALID_ACCESS_ERR;
+        return -1;
+    }
+
+    return checker->lastProcessedSequence();
+}
+
+void Internals::setPerTileDrawingEnabled(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->settings()->setPerTileDrawingEnabled(enabled);
 }
 
 }

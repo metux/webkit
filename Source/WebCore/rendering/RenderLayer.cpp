@@ -88,6 +88,7 @@
 #include "ScaleTransformOperation.h"
 #include "Scrollbar.h"
 #include "ScrollbarTheme.h"
+#include "Settings.h"
 #include "SourceGraphic.h"
 #include "TextStream.h"
 #include "TransformationMatrix.h"
@@ -149,7 +150,7 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_usedTransparency(false)
     , m_paintingInsideReflection(false)
     , m_inOverflowRelayout(false)
-    , m_needsFullRepaint(false)
+    , m_repaintStatus(NeedsNormalRepaint)
     , m_overflowStatusDirty(true)
     , m_visibleContentStatusDirty(true)
     , m_hasVisibleContent(false)
@@ -362,18 +363,18 @@ void RenderLayer::updateLayerPositions(LayoutPoint* offsetFromRoot, UpdateLayerP
         // as the value not using the cached offset, but we can't due to https://bugs.webkit.org/show_bug.cgi?id=37048
         if (flags & CheckForRepaint) {
             if (view && !view->printing()) {
-                if (m_needsFullRepaint) {
+                if (m_repaintStatus & NeedsFullRepaint) {
                     renderer()->repaintUsingContainer(repaintContainer, oldRepaintRect);
                     if (m_repaintRect != oldRepaintRect)
                         renderer()->repaintUsingContainer(repaintContainer, m_repaintRect);
-                } else
+                } else if (shouldRepaintAfterLayout())
                     renderer()->repaintAfterLayoutIfNeeded(repaintContainer, oldRepaintRect, oldOutlineBox, &m_repaintRect, &m_outlineBox);
             }
         }
     } else
         clearRepaintRects();
 
-    m_needsFullRepaint = false;
+    m_repaintStatus = NeedsNormalRepaint;
 
     // Go ahead and update the reflection's position and size.
     if (m_reflection)
@@ -884,6 +885,21 @@ static inline const RenderLayer* compositingContainer(const RenderLayer* layer)
     return layer->isNormalFlowOnly() ? layer->parent() : layer->stackingContext();
 }
 
+inline bool RenderLayer::shouldRepaintAfterLayout() const
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (m_repaintStatus == NeedsNormalRepaint)
+        return true;
+
+    // Composited layers that were moved during a positioned movement only
+    // layout, don't need to be repainted. They just need to be recomposited.
+    ASSERT(m_repaintStatus == NeedsFullRepaintForPositionedMovementLayout);
+    return !isComposited();
+#else
+    return true;
+#endif
+}
+
 #if USE(ACCELERATED_COMPOSITING)
 RenderLayer* RenderLayer::enclosingCompositingLayer(bool includeSelf) const
 {
@@ -1166,7 +1182,7 @@ void RenderLayer::removeOnlyThisLayer()
         RenderLayer* next = current->nextSibling();
         removeChild(current);
         parent->addChild(current, nextSib);
-        current->setNeedsFullRepaint();
+        current->setRepaintStatus(NeedsFullRepaint);
         LayoutPoint offsetFromRoot = offsetFromRootBeforeMove;
         // updateLayerPositions depends on hasLayer() already being false for proper layout.
         ASSERT(!renderer()->hasLayer());
@@ -2557,9 +2573,28 @@ bool RenderLayer::scroll(ScrollDirection direction, ScrollGranularity granularit
     return ScrollableArea::scroll(direction, granularity, multiplier);
 }
 
+class CurrentRenderRegionMaintainer {
+    WTF_MAKE_NONCOPYABLE(CurrentRenderRegionMaintainer);
+public:
+    CurrentRenderRegionMaintainer(RenderView* view, RenderRegion* renderRegion)
+    : m_view(view)
+    , m_renderRegion(view->currentRenderRegion())
+    {
+        m_view->setCurrentRenderRegion(renderRegion);
+    }
+    ~CurrentRenderRegionMaintainer()
+    {
+        m_view->setCurrentRenderRegion(m_renderRegion);
+    }
+private:
+    RenderView* m_view;
+    RenderRegion* m_renderRegion;
+};
+
 void RenderLayer::paint(GraphicsContext* p, const LayoutRect& damageRect, PaintBehavior paintBehavior, RenderObject *paintingRoot,
     RenderRegion* region, PaintLayerFlags paintFlags)
 {
+    CurrentRenderRegionMaintainer renderRegionMaintainer(renderer()->view(), region);
     OverlapTestRequestMap overlapTestRequests;
     paintLayer(this, p, damageRect, paintBehavior, paintingRoot, region, &overlapTestRequests, paintFlags);
     OverlapTestRequestMap::iterator end = overlapTestRequests.end();
@@ -2700,20 +2735,36 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
         
         // Paint into the context that represents the SourceGraphic of the filter.
         GraphicsContext* sourceGraphicsContext = m_filter->inputContext();
+        
+        LayoutPoint layerOrigin;
+        convertToLayerCoords(rootLayer, layerOrigin);
+        
+        bool isRootLayer = paintsWithTransform(paintBehavior) && !(paintFlags & PaintLayerAppliedTransform);
+        if (!isRootLayer) {
+            sourceGraphicsContext->save();
+            sourceGraphicsContext->translate(-layerOrigin.x(), -layerOrigin.y());
+        }
 
         FloatRect paintRect = FloatRect(FloatPoint(), size());
         sourceGraphicsContext->clearRect(paintRect);
 
         // Now do the regular paint into the SourceGraphic.
-        paintLayer(this, sourceGraphicsContext, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, paintFlags | PaintLayerPaintingFilter);
-            
+        // Using PaintLayerAppliedTransform to avoid applying the transform again inside the context.
+        paintLayer(isRootLayer ? this : rootLayer, sourceGraphicsContext, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, 
+                   paintFlags | PaintLayerPaintingFilter | PaintLayerAppliedTransform);
+        
+        if (!isRootLayer)
+            sourceGraphicsContext->restore();
+        
         m_filter->apply();
         
-        LayoutPoint layerOrigin;
-        convertToLayerCoords(rootLayer, layerOrigin);
-        LayoutRect filterBounds = LayoutRect(layerOrigin.x(), layerOrigin.y(), size().width(), size().height());
-        
         // Get the filtered output and draw it in place.
+        GraphicsContextStateSaver stateSaver(*p);
+        TransformationMatrix transform(renderableTransform(paintBehavior));
+        transform.translateRight(layerOrigin.x(), layerOrigin.y());
+        p->concatCTM(transform.toAffineTransform());
+        
+        LayoutRect filterBounds = LayoutRect(0, 0, size().width(), size().height());
         p->drawImageBuffer(m_filter->output(), renderer()->style()->colorSpace(), filterBounds, CompositeSourceOver);
         return;
     }
@@ -2782,12 +2833,21 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
         m_paintingInsideReflection = false;
     }
 
-    // Calculate the clip rects we should use.
+    bool isSelfPaintingLayer = this->isSelfPaintingLayer();
+    bool isPaintingOverlayScrollbars = paintFlags & PaintLayerPaintingOverlayScrollbars;
+    // Outline always needs to be painted even if we have no visible content.
+    bool shouldPaintOutline = isSelfPaintingLayer && !isPaintingOverlayScrollbars;
+    bool shouldPaintContent = m_hasVisibleContent && isSelfPaintingLayer && !isPaintingOverlayScrollbars;
+
+    // Calculate the clip rects we should use only when we need them.
     LayoutRect layerBounds;
     ClipRect damageRect, clipRectToApply, outlineRect;
-    calculateRects(rootLayer, region, paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect, localPaintFlags & PaintLayerTemporaryClipRects);
-    LayoutPoint paintOffset = toPoint(layerBounds.location() - renderBoxLocation());
-                             
+    LayoutPoint paintOffset;
+    if (shouldPaintContent || shouldPaintOutline || isPaintingOverlayScrollbars) {
+        calculateRects(rootLayer, region, paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect, localPaintFlags & PaintLayerTemporaryClipRects);
+        paintOffset = toPoint(layerBounds.location() - renderBoxLocation());
+    }
+
     // Ensure our lists are up-to-date.
     updateLayerListsIfNeeded();
 
@@ -2802,14 +2862,12 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
     if (paintingRoot && !renderer()->isDescendantOf(paintingRoot))
         paintingRootForRenderer = paintingRoot;
 
-    if (overlapTestRequests && isSelfPaintingLayer())
+    if (overlapTestRequests && isSelfPaintingLayer)
         performOverlapTests(*overlapTestRequests, rootLayer, this);
 
-    bool paintingOverlayScrollbars = paintFlags & PaintLayerPaintingOverlayScrollbars;
-
     // We want to paint our layer, but only if we intersect the damage rect.
-    bool shouldPaint = intersectsDamageRect(layerBounds, damageRect.rect(), rootLayer) && m_hasVisibleContent && isSelfPaintingLayer();
-    if (shouldPaint && !selectionOnly && !damageRect.isEmpty() && !paintingOverlayScrollbars) {
+    shouldPaintContent &= intersectsDamageRect(layerBounds, damageRect.rect(), rootLayer);
+    if (shouldPaintContent && !selectionOnly) {
         // Begin transparency layers lazily now that we know we have to paint something.
         if (haveTransparency)
             beginTransparencyLayers(p, rootLayer, paintBehavior);
@@ -2830,7 +2888,7 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
     paintList(m_negZOrderList, rootLayer, p, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, localPaintFlags);
 
     // Now establish the appropriate clip and paint our child RenderObjects.
-    if (shouldPaint && !clipRectToApply.isEmpty() && !paintingOverlayScrollbars) {
+    if (shouldPaintContent && !clipRectToApply.isEmpty()) {
         // Begin transparency layers lazily now that we know we have to paint something.
         if (haveTransparency)
             beginTransparencyLayers(p, rootLayer, paintBehavior);
@@ -2854,8 +2912,8 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
         // Now restore our clip.
         restoreClip(p, paintDirtyRect, clipRectToApply);
     }
-    
-    if (!outlineRect.isEmpty() && isSelfPaintingLayer() && !paintingOverlayScrollbars) {
+
+    if (shouldPaintOutline && !outlineRect.isEmpty()) {
         // Paint our own outline
         PaintInfo paintInfo(p, outlineRect.rect(), PaintPhaseSelfOutline, false, paintingRootForRenderer, region, 0);
         clipToRect(rootLayer, p, paintDirtyRect, outlineRect, DoNotIncludeSelfForBorderRadius);
@@ -2869,7 +2927,7 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
     // Now walk the sorted list of children with positive z-indices.
     paintList(m_posZOrderList, rootLayer, p, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, localPaintFlags);
         
-    if (renderer()->hasMask() && shouldPaint && !selectionOnly && !damageRect.isEmpty() && !paintingOverlayScrollbars) {
+    if (shouldPaintContent && renderer()->hasMask() && !selectionOnly) {
         clipToRect(rootLayer, p, paintDirtyRect, damageRect, DoNotIncludeSelfForBorderRadius); // Mask painting will handle clipping to self.
 
         // Paint the mask.
@@ -2880,7 +2938,7 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
         restoreClip(p, paintDirtyRect, damageRect);
     }
 
-    if (paintingOverlayScrollbars) {
+    if (isPaintingOverlayScrollbars) {
         clipToRect(rootLayer, p, paintDirtyRect, damageRect);
         paintOverflowControls(p, paintOffset, damageRect.rect(), true);
         restoreClip(p, paintDirtyRect, damageRect);
@@ -3039,6 +3097,7 @@ static inline LayoutRect frameVisibleRect(RenderObject* renderer)
 
 bool RenderLayer::hitTest(const HitTestRequest& request, HitTestResult& result)
 {
+    CurrentRenderRegionMaintainer renderRegionMaintainer(renderer()->view(), result.region());
     renderer()->document()->updateLayout();
     
     LayoutRect hitTestArea = renderer()->view()->documentRect();
@@ -3935,8 +3994,10 @@ void RenderLayer::updateHoverActiveState(const HitTestRequest& request, HitTestR
     if (activeNode && !request.active()) {
         // We are clearing the :active chain because the mouse has been released.
         for (RenderObject* curr = activeNode->renderer(); curr; curr = curr->parent()) {
-            if (curr->node() && !curr->isText())
+            if (curr->node() && !curr->isText()) {
+                curr->node()->setActive(false);
                 curr->node()->clearInActiveChain();
+            }
         }
         doc->setActiveNode(0);
     } else {
@@ -3952,6 +4013,9 @@ void RenderLayer::updateHoverActiveState(const HitTestRequest& request, HitTestR
             doc->setActiveNode(newActiveNode);
         }
     }
+    // If the mouse has just been pressed, set :active on the chain. Those (and only those)
+    // nodes should remain :active until the mouse is released.
+    bool allowActiveChanges = !activeNode && doc->activeNode();
 
     // If the mouse is down and if this is a mouse move event, we want to restrict changes in 
     // :hover/:active to only apply to elements that are in the :active chain that we froze
@@ -3994,13 +4058,13 @@ void RenderLayer::updateHoverActiveState(const HitTestRequest& request, HitTestR
 
     size_t removeCount = nodesToRemoveFromChain.size();
     for (size_t i = 0; i < removeCount; ++i) {
-        nodesToRemoveFromChain[i]->setActive(false);
         nodesToRemoveFromChain[i]->setHovered(false);
     }
 
     size_t addCount = nodesToAddToChain.size();
     for (size_t i = 0; i < addCount; ++i) {
-        nodesToAddToChain[i]->setActive(request.active());
+        if (allowActiveChanges)
+            nodesToAddToChain[i]->setActive(true);
         nodesToAddToChain[i]->setHovered(true);
     }
 }
@@ -4044,11 +4108,8 @@ void RenderLayer::dirtyNormalFlowList()
 #endif
 }
 
-void RenderLayer::updateZOrderLists()
+void RenderLayer::updateZOrderListsSlowCase()
 {
-    if (!isStackingContext() || !m_zOrderListsDirty)
-        return;
-
 #if USE(ACCELERATED_COMPOSITING)
     bool includeHiddenLayers = compositor()->inCompositingMode();
 #else
@@ -4383,8 +4444,11 @@ void RenderLayer::updateReflectionStyle()
 void RenderLayer::updateOrRemoveFilterEffect()
 {
     if (hasFilter()) {
-        if (!m_filter)
+        if (!m_filter) {
             m_filter = FilterEffectRenderer::create();
+            RenderingMode renderingMode = renderer()->frame()->page()->settings()->acceleratedFiltersEnabled() ? Accelerated : Unaccelerated;
+            m_filter->setRenderingMode(renderingMode);
+        }
 
         m_filter->build(renderer()->style()->filter(), toRenderBox(renderer())->borderBoxRect());
     } else {

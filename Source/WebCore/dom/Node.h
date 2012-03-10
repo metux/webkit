@@ -48,8 +48,9 @@ namespace WebCore {
 class Attribute;
 class ClassNodeList;
 class ContainerNode;
+class DOMSettableTokenList;
 class Document;
-class DynamicNodeList;
+class DynamicSubtreeNodeList;
 class Element;
 class Event;
 class EventContext;
@@ -81,6 +82,10 @@ class SVGUseElement;
 #endif
 class TagNodeList;
 class TreeScope;
+
+#if ENABLE(MICRODATA)
+class HTMLPropertiesCollection;
+#endif
 
 typedef int ExceptionCode;
 
@@ -512,20 +517,17 @@ public:
     void showTreeForThisAcrossFrame() const;
 #endif
 
-    void removeNodeListCacheIfPossible();
-    void registerDynamicNodeList(DynamicNodeList*);
-    void unregisterDynamicNodeList(DynamicNodeList*);
-    void notifyNodeListsChildrenChanged();
-    void notifyLocalNodeListsChildrenChanged();
-    void notifyNodeListsAttributeChanged();
-    void notifyLocalNodeListsAttributeChanged();
+    void registerDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
+    void unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
+    void invalidateNodeListsCacheAfterAttributeChanged();
+    void invalidateNodeListsCacheAfterChildrenChanged();
     void notifyLocalNodeListsLabelChanged();
     void removeCachedClassNodeList(ClassNodeList*, const String&);
 
     void removeCachedNameNodeList(NameNodeList*, const String&);
     void removeCachedTagNodeList(TagNodeList*, const AtomicString&);
     void removeCachedTagNodeList(TagNodeList*, const QualifiedName&);
-    void removeCachedLabelsNodeList(DynamicNodeList*);
+    void removeCachedLabelsNodeList(DynamicSubtreeNodeList*);
 
     PassRefPtr<NodeList> getElementsByTagName(const AtomicString&);
     PassRefPtr<NodeList> getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName);
@@ -588,6 +590,11 @@ public:
 
 #if ENABLE(MICRODATA)
     void itemTypeAttributeChanged();
+
+    DOMSettableTokenList* itemProp();
+    DOMSettableTokenList* itemRef();
+    DOMSettableTokenList* itemType();
+    HTMLPropertiesCollection* properties();
 #endif
 
 #if ENABLE(MUTATION_OBSERVERS)
@@ -684,7 +691,8 @@ protected:
     void setHasCustomWillOrDidRecalcStyle() { setFlag(true, HasCustomWillOrDidRecalcStyleFlag); }
     
     bool hasCustomStyleForRenderer() const { return getFlag(HasCustomStyleForRendererFlag); }
-    void setHasCustomStyleForRenderer() { setFlag(true, HasCustomStyleForRendererFlag); } 
+    void setHasCustomStyleForRenderer() { setFlag(true, HasCustomStyleForRendererFlag); }
+    void clearHasCustomStyleForRenderer() { clearFlag(HasCustomStyleForRendererFlag); }
 
 private:
     // Do not use this method to change the document of a node until after the node has been
@@ -757,6 +765,12 @@ protected:
     bool hasRareSVGData() const { return getFlag(HasSVGRareDataFlag); }
     void setHasRareSVGData() { setFlag(HasSVGRareDataFlag); }
     void clearHasRareSVGData() { clearFlag(HasSVGRareDataFlag); }
+#endif
+
+#if ENABLE(MICRODATA)
+    void setItemProp(const String&);
+    void setItemRef(const String&);
+    void setItemType(const String&);
 #endif
 };
 

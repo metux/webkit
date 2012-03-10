@@ -85,6 +85,17 @@ using namespace HTMLNames;
 static void* baseOfRenderObjectBeingDeleted;
 #endif
 
+struct SameSizeAsRenderObject {
+    virtual ~SameSizeAsRenderObject() { } // Allocate vtable pointer.
+    void* pointers[5];
+#ifndef NDEBUG
+    unsigned m_debugBitfields : 2;
+#endif
+    unsigned m_bitfields;
+};
+
+COMPILE_ASSERT(sizeof(RenderObject) == sizeof(SameSizeAsRenderObject), RenderObject_should_stay_small);
+
 bool RenderObject::s_affectsParentBlock = false;
 
 void* RenderObject::operator new(size_t sz, RenderArena* renderArena) throw()
@@ -112,9 +123,10 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     if (contentData && !contentData->next() && contentData->isImage() && doc != node) {
         RenderImage* image = new (arena) RenderImage(node);
         image->setStyle(style);
-        if (const StyleImage* styleImage = static_cast<const ImageContentData*>(contentData)->image())
+        if (const StyleImage* styleImage = static_cast<const ImageContentData*>(contentData)->image()) {
             image->setImageResource(RenderImageResourceStyleImage::create(const_cast<StyleImage*>(styleImage)));
-        else
+            image->setIsGeneratedContent();
+        } else
             image->setImageResource(RenderImageResource::create());
         return image;
     }
@@ -145,7 +157,7 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case COMPACT:
         // Only non-replaced block elements can become a region.
         if (!style->regionThread().isEmpty() && doc->renderView())
-            return new (arena) RenderRegion(node, doc->renderView()->renderFlowThreadWithName(style->regionThread()));
+            return new (arena) RenderRegion(node, doc->renderView()->ensureRenderFlowThreadWithName(style->regionThread()));
         return new (arena) RenderBlock(node);
     case LIST_ITEM:
         return new (arena) RenderListItem(node);
@@ -189,36 +201,7 @@ RenderObject::RenderObject(Node* node)
     , m_hasAXObject(false)
     , m_setNeedsLayoutForbidden(false)
 #endif
-    , m_needsLayout(false)
-    , m_needsPositionedMovementLayout(false)
-    , m_normalChildNeedsLayout(false)
-    , m_posChildNeedsLayout(false)
-    , m_needsSimplifiedNormalFlowLayout(false)
-    , m_preferredLogicalWidthsDirty(false)
-    , m_floating(false)
-    , m_positioned(false)
-    , m_relPositioned(false)
-    , m_paintBackground(false)
-    , m_isAnonymous(node == node->document())
-    , m_isText(false)
-    , m_isBox(false)
-    , m_inline(true)
-    , m_replaced(false)
-    , m_horizontalWritingMode(true)
-    , m_isDragging(false)
-    , m_hasLayer(false)
-    , m_hasOverflowClip(false)
-    , m_hasTransform(false)
-    , m_hasReflection(false)
-    , m_hasCounterNodeMap(false)
-    , m_everHadLayout(false)
-    , m_childrenInline(false)
-    , m_marginBeforeQuirk(false) 
-    , m_marginAfterQuirk(false)
-    , m_hasMarkupTruncation(false)
-    , m_selectionState(SelectionNone)
-    , m_hasColumns(false)
-    , m_inRenderFlowThread(false)
+    , m_bitfields(node)
 {
 #ifndef NDEBUG
     renderObjectCounter.increment();
@@ -645,22 +628,22 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
             bool willSkipRelativelyPositionedInlines = !object->isRenderBlock();
             while (object && !object->isRenderBlock()) // Skip relatively positioned inlines and get to the enclosing RenderBlock.
                 object = object->container();
-            if (!object || object->m_posChildNeedsLayout)
+            if (!object || object->posChildNeedsLayout())
                 return;
             if (willSkipRelativelyPositionedInlines)
                 container = object->container();
-            object->m_posChildNeedsLayout = true;
+            object->setPosChildNeedsLayout(true);
             simplifiedNormalFlowLayout = true;
             ASSERT(!object->isSetNeedsLayoutForbidden());
         } else if (simplifiedNormalFlowLayout) {
-            if (object->m_needsSimplifiedNormalFlowLayout)
+            if (object->needsSimplifiedNormalFlowLayout())
                 return;
-            object->m_needsSimplifiedNormalFlowLayout = true;
+            object->setNeedsSimplifiedNormalFlowLayout(true);
             ASSERT(!object->isSetNeedsLayoutForbidden());
         } else {
-            if (object->m_normalChildNeedsLayout)
+            if (object->normalChildNeedsLayout())
                 return;
-            object->m_normalChildNeedsLayout = true;
+            object->setNormalChildNeedsLayout(true);
             ASSERT(!object->isSetNeedsLayoutForbidden());
         }
 
@@ -679,8 +662,8 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
 
 void RenderObject::setPreferredLogicalWidthsDirty(bool b, bool markParents)
 {
-    bool alreadyDirty = m_preferredLogicalWidthsDirty;
-    m_preferredLogicalWidthsDirty = b;
+    bool alreadyDirty = preferredLogicalWidthsDirty();
+    m_bitfields.setPreferredLogicalWidthsDirty(b);
     if (b && !alreadyDirty && markParents && (isText() || (style()->position() != FixedPosition && style()->position() != AbsolutePosition)))
         invalidateContainerPreferredLogicalWidths();
 }
@@ -690,14 +673,14 @@ void RenderObject::invalidateContainerPreferredLogicalWidths()
     // In order to avoid pathological behavior when inlines are deeply nested, we do include them
     // in the chain that we mark dirty (even though they're kind of irrelevant).
     RenderObject* o = isTableCell() ? containingBlock() : container();
-    while (o && !o->m_preferredLogicalWidthsDirty) {
+    while (o && !o->preferredLogicalWidthsDirty()) {
         // Don't invalidate the outermost object of an unrooted subtree. That object will be 
         // invalidated when the subtree is added to the document.
         RenderObject* container = o->isTableCell() ? o->containingBlock() : o->container();
         if (!container && !o->isRenderView())
             break;
 
-        o->m_preferredLogicalWidthsDirty = true;
+        o->m_bitfields.setPreferredLogicalWidthsDirty(true);
         if (o->style()->position() == FixedPosition || o->style()->position() == AbsolutePosition)
             // A positioned object has no effect on the min/max width of its containing block ever.
             // We can optimize this case and not go up any further.
@@ -709,7 +692,13 @@ void RenderObject::invalidateContainerPreferredLogicalWidths()
 void RenderObject::setLayerNeedsFullRepaint()
 {
     ASSERT(hasLayer());
-    toRenderBoxModelObject(this)->layer()->setNeedsFullRepaint(true);
+    toRenderBoxModelObject(this)->layer()->setRepaintStatus(NeedsFullRepaint);
+}
+
+void RenderObject::setLayerNeedsFullRepaintForPositionedMovementLayout()
+{
+    ASSERT(hasLayer());
+    toRenderBoxModelObject(this)->layer()->setRepaintStatus(NeedsFullRepaintForPositionedMovementLayout);
 }
 
 RenderBlock* RenderObject::containingBlock() const
@@ -735,12 +724,7 @@ RenderBlock* RenderObject::containingBlock() const
             o = o->parent();
         }
     } else {
-        while (o && ((o->isInline() && !o->isReplaced()) || o->isTableRow() || o->isTableSection()
-                     || o->isTableCol() || o->isFrameSet() || o->isMedia()
-#if ENABLE(SVG)
-                     || o->isSVGContainer() || o->isSVGRoot()
-#endif
-                     ))
+        while (o && ((o->isInline() && !o->isReplaced()) || !o->isRenderBlock()))
             o = o->parent();
     }
 
@@ -1134,7 +1118,7 @@ void RenderObject::paintOutline(GraphicsContext* graphicsContext, const LayoutRe
 
     Color outlineColor = styleToUse->visitedDependentColor(CSSPropertyOutlineColor);
 
-    LayoutUnit offset = styleToUse->outlineOffset();
+    LayoutUnit outlineOffset = styleToUse->outlineOffset();
 
     if (styleToUse->outlineStyleIsAuto() || hasOutlineAnnotation()) {
         if (!theme()->supportsFocusRing(styleToUse)) {
@@ -1147,13 +1131,14 @@ void RenderObject::paintOutline(GraphicsContext* graphicsContext, const LayoutRe
         return;
 
     LayoutRect inner = paintRect;
-    inner.inflate(offset);
-
-    if (inner.isEmpty())
-        return;
+    inner.inflate(outlineOffset);
 
     LayoutRect outer = inner;
     outer.inflate(outlineWidth);
+
+    // FIXME: This prevents outlines from painting inside the object. See bug 12042
+    if (outer.isEmpty())
+        return;
 
     bool useTransparencyLayer = outlineColor.hasAlpha();
     if (useTransparencyLayer) {
@@ -1521,6 +1506,11 @@ void RenderObject::computeRectForRepaint(RenderBoxModelObject* repaintContainer,
     }
 }
 
+void RenderObject::computeFloatRectForRepaint(RenderBoxModelObject*, FloatRect&, bool) const
+{
+    ASSERT_NOT_REACHED();
+}
+
 void RenderObject::dirtyLinesFromChangedChild(RenderObject*)
 {
 }
@@ -1717,6 +1707,20 @@ StyleDifference RenderObject::adjustStyleDifference(StyleDifference diff, unsign
     return diff;
 }
 
+RenderStyle* RenderObject::styleInRegion() const
+{
+    ASSERT(inRenderFlowThread());
+
+    if (!canHaveRegionStyle()
+        || !((view() && view()->currentRenderRegion() && view()->currentRenderRegion()->hasCustomRegionStyle())))
+        return m_style.get();
+
+    RenderStyle* regionStyle = view()->currentRenderRegion()->renderObjectRegionStyle(this);
+    if (!regionStyle)
+        view()->currentRenderRegion()->computeStyleInRegion(this);
+    return view()->currentRenderRegion()->renderObjectRegionStyle(this);
+}
+
 void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
 {
     if (m_style == style) {
@@ -1831,15 +1835,15 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
 
         // reset style flags
         if (diff == StyleDifferenceLayout || diff == StyleDifferenceLayoutPositionedMovementOnly) {
-            m_floating = false;
-            m_positioned = false;
-            m_relPositioned = false;
+            setFloating(false);
+            setPositioned(false);
+            setRelPositioned(false);
         }
-        m_horizontalWritingMode = true;
-        m_paintBackground = false;
-        m_hasOverflowClip = false;
-        m_hasTransform = false;
-        m_hasReflection = false;
+        setHorizontalWritingMode(true);
+        setPaintBackground(false);
+        setHasOverflowClip(false);
+        setHasTransform(false);
+        setHasReflection(false);
     } else
         s_affectsParentBlock = false;
 
@@ -1891,7 +1895,7 @@ void RenderObject::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
         // to mark the new containing blocks for layout. The change that can
         // directly affect the containing block of this object is a change to
         // the position style.
-        if (m_needsLayout && oldStyle->position() != m_style->position())
+        if (needsLayout() && oldStyle->position() != m_style->position())
             markContainingBlocksForLayout();
 
         if (diff == StyleDifferenceLayout)
@@ -2116,11 +2120,6 @@ LayoutRect RenderObject::localCaretRect(InlineBox*, int, LayoutUnit* extraWidthT
     return LayoutRect();
 }
 
-RenderView* RenderObject::view() const
-{
-    return toRenderView(document()->renderer());
-}
-
 bool RenderObject::isRooted(RenderView** view)
 {
     RenderObject* o = this;
@@ -2228,7 +2227,7 @@ void RenderObject::willBeDestroyed()
     // reevaluation. This apparently redundant check is here for the case when
     // this renderer had no parent at the time remove() was called.
 
-    if (m_hasCounterNodeMap)
+    if (hasCounterNodeMap())
         RenderCounter::destroyCounterNodes(this);
 
     // FIXME: Would like to do this in RenderBoxModelObject, but the timing is so complicated that this can't easily
@@ -2285,8 +2284,8 @@ VisiblePosition RenderObject::positionForPoint(const LayoutPoint&)
 
 void RenderObject::updateDragState(bool dragOn)
 {
-    bool valueChanged = (dragOn != m_isDragging);
-    m_isDragging = dragOn;
+    bool valueChanged = (dragOn != isDragging());
+    setIsDragging(dragOn);
     if (valueChanged && style()->affectedByDragRules() && node())
         node()->setNeedsStyleRecalc();
     for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling())

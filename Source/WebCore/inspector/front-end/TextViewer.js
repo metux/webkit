@@ -98,6 +98,11 @@ WebInspector.TextViewer.prototype = {
         return this._textModel;
     },
 
+    focus: function()
+    {
+        this._mainPanel.element.focus();
+    },
+
     revealLine: function(lineNumber)
     {
         this._mainPanel.revealLine(lineNumber);
@@ -266,6 +271,9 @@ WebInspector.TextViewer.prototype = {
         this._shortcuts[WebInspector.KeyboardShortcut.makeKey(keys.Enter.code, modifiers.CtrlOrMeta)] = commitEditing;
         this._shortcuts[WebInspector.KeyboardShortcut.makeKey(keys.Esc.code)] = cancelEditing;
 
+        var handleEnterKey = this._mainPanel.handleEnterKey.bind(this._mainPanel);
+        this._shortcuts[WebInspector.KeyboardShortcut.makeKey(keys.Enter.code, WebInspector.KeyboardShortcut.Modifiers.None)] = handleEnterKey;
+
         var handleUndo = this._mainPanel.handleUndoRedo.bind(this._mainPanel, false);
         var handleRedo = this._mainPanel.handleUndoRedo.bind(this._mainPanel, true);
         this._shortcuts[WebInspector.KeyboardShortcut.makeKey("z", modifiers.CtrlOrMeta)] = handleUndo;
@@ -279,9 +287,12 @@ WebInspector.TextViewer.prototype = {
 
     _handleKeyDown: function(e)
     {
+        if (this.readOnly)
+            return;
+
         var shortcutKey = WebInspector.KeyboardShortcut.makeKeyFromEvent(e);
         var handler = this._shortcuts[shortcutKey];
-        if (handler && handler.call(this)) {
+        if (handler && handler()) {
             e.preventDefault();
             e.stopPropagation();
         }
@@ -292,10 +303,11 @@ WebInspector.TextViewer.prototype = {
         var contextMenu = new WebInspector.ContextMenu();
         var target = event.target.enclosingNodeOrSelfWithClass("webkit-line-number");
         if (target)
-            this._delegate.populateLineGutterContextMenu(target.lineNumber, contextMenu);
-        else
-            this._delegate.populateTextAreaContextMenu(contextMenu);
-
+            this._delegate.populateLineGutterContextMenu(contextMenu, target.lineNumber);
+        else {
+            target = this._mainPanel._enclosingLineRowOrSelf(event.target);
+            this._delegate.populateTextAreaContextMenu(contextMenu, target && target.lineNumber);
+        }
         var fileName = this._delegate.suggestedFileName();
         if (fileName)
             contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Save as..." : "Save As..."), InspectorFrontendHost.saveAs.bind(InspectorFrontendHost, fileName, this._textModel.text));
@@ -342,9 +354,9 @@ WebInspector.TextViewerDelegate.prototype = {
 
     cancelEditing: function() { },
 
-    populateLineGutterContextMenu: function(lineNumber, contextMenu) { },
+    populateLineGutterContextMenu: function(contextMenu, lineNumber) { },
 
-    populateTextAreaContextMenu: function(contextMenu) { },
+    populateTextAreaContextMenu: function(contextMenu, lineNumber) { },
 
     suggestedFileName: function() { }
 }
@@ -1021,7 +1033,7 @@ WebInspector.TextEditorMainPanel.prototype = {
 
     handleUndoRedo: function(redo)
     {
-        if (this._readOnly || this._dirtyLines)
+        if (this._dirtyLines)
             return false;
 
         this.beginUpdates();
@@ -1044,19 +1056,17 @@ WebInspector.TextEditorMainPanel.prototype = {
 
     handleTabKeyPress: function(shiftKey)
     {
-        if (this._readOnly || this._dirtyLines)
+        if (this._dirtyLines)
             return false;
 
         var selection = this._getSelection();
         if (!selection)
             return false;
 
+        var range = selection.normalize();
+
         this.beginUpdates();
         this._enterTextChangeMode();
-
-        var range = selection;
-        if (range.startLine > range.endLine || (range.startLine === range.endLine && range.startColumn > range.endColumn))
-            range = new WebInspector.TextRange(range.endLine, range.endColumn, range.startLine, range.startColumn);
 
         var newRange;
         if (shiftKey)
@@ -1128,6 +1138,57 @@ WebInspector.TextEditorMainPanel.prototype = {
         this._lastEditedRange = newRange;
 
         return newRange;
+    },
+
+    handleEnterKey: function()
+    {
+        if (this._dirtyLines)
+            return false;
+
+        var range = this._getSelection();
+        if (!range)
+            return false;
+
+        range.normalize();
+
+        if (range.endColumn === 0)
+            return false;
+
+        var line = this._textModel.line(range.startLine);
+        var linePrefix = line.substring(0, range.startColumn);
+        var indentMatch = linePrefix.match(/^\s+/);
+        var currentIndent = indentMatch ? indentMatch[0] : "";
+
+        var textEditorIndent = WebInspector.settings.textEditorIndent.get();
+        var indent = WebInspector.TextEditorModel.endsWithBracketRegex.test(linePrefix) ? currentIndent + textEditorIndent : currentIndent;
+
+        if (!indent)
+            return false;
+
+        this.beginUpdates();
+        this._enterTextChangeMode();
+
+        var lineBreak = this._textModel.lineBreak;
+        var newRange;
+        if (range.isEmpty() && line.substr(range.endColumn - 1, 2) === '{}') {
+            // {|}
+            // becomes
+            // {
+            //     |
+            // }
+            newRange = this._setText(range, lineBreak + indent + lineBreak + currentIndent);
+            newRange.endLine--;
+            newRange.endColumn += textEditorIndent.length;
+        } else
+            newRange = this._setText(range, lineBreak + indent);
+
+        newRange = newRange.collapseToEnd();
+
+        this._exitTextChangeMode(range, newRange);
+        this.endUpdates();
+        this._restoreSelection(newRange, true);
+
+        return true;
     },
 
     _splitChunkOnALine: function(lineNumber, chunkNumber, createSuffixChunk)
@@ -1413,16 +1474,12 @@ WebInspector.TextEditorMainPanel.prototype = {
         var selection = window.getSelection();
         if (!selection.rangeCount)
             return null;
-        var selectionRange = selection.getRangeAt(0);
         // Selection may be outside of the viewer.
-        if (!this._container.isAncestor(selectionRange.startContainer) || !this._container.isAncestor(selectionRange.endContainer))
+        if (!this._container.isAncestor(selection.anchorNode) || !this._container.isAncestor(selection.focusNode))
             return null;
-        var start = this._selectionToPosition(selectionRange.startContainer, selectionRange.startOffset);
-        var end = selectionRange.collapsed ? start : this._selectionToPosition(selectionRange.endContainer, selectionRange.endOffset);
-        if (selection.anchorNode === selectionRange.startContainer && selection.anchorOffset === selectionRange.startOffset)
-            return new WebInspector.TextRange(start.line, start.column, end.line, end.column);
-        else
-            return new WebInspector.TextRange(end.line, end.column, start.line, start.column);
+        var start = this._selectionToPosition(selection.anchorNode, selection.anchorOffset);
+        var end = selection.isCollapsed ? start : this._selectionToPosition(selection.focusNode, selection.focusOffset);
+        return new WebInspector.TextRange(start.line, start.column, end.line, end.column);
     },
 
     /**

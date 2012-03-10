@@ -127,7 +127,12 @@ bool HTMLElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry
         return false;
     }
     if (attrName == dirAttr) {
-        result = hasLocalName(bdoTag) ? eBDO : eUniversal;
+        if (hasLocalName(bdoTag))
+            result = eBDO;
+        else if (hasLocalName(bdiTag))
+            result = eBDI;
+        else
+            result = eUniversal;
         return true;
     }
 
@@ -136,11 +141,11 @@ bool HTMLElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry
 
 static inline int unicodeBidiAttributeForDirAuto(HTMLElement* element)
 {
-    if (element->hasLocalName(bdoTag))
-        return CSSValueBidiOverride;
     if (element->hasLocalName(preTag) || element->hasLocalName(textareaTag))
         return CSSValueWebkitPlaintext;
-    return CSSValueEmbed;
+    // FIXME: For bdo element, dir="auto" should result in "bidi-override isolate" but we don't support having multiple values in unicode-bidi yet.
+    // See https://bugs.webkit.org/show_bug.cgi?id=73164.
+    return CSSValueWebkitIsolate;
 }
 
 static unsigned parseBorderWidthAttribute(Attribute* attr)
@@ -190,10 +195,14 @@ void HTMLElement::parseMappedAttribute(Attribute* attr)
     } else if (attr->name() == langAttr) {
         // FIXME: Implement
     } else if (attr->name() == dirAttr) {
-        if (!equalIgnoringCase(attr->value(), "auto"))
+        bool dirIsAuto = equalIgnoringCase(attr->value(), "auto");
+        if (!dirIsAuto)
             addCSSProperty(attr, CSSPropertyDirection, attr->value());
         dirAttributeChanged(attr);
-        addCSSProperty(attr, CSSPropertyUnicodeBidi, unicodeBidiAttributeForDirAuto(this));
+        if (dirIsAuto)
+            addCSSProperty(attr, CSSPropertyUnicodeBidi, unicodeBidiAttributeForDirAuto(this));
+        else if (!hasTagName(bdiTag) && !hasTagName(bdoTag) && !hasTagName(outputTag))
+            addCSSProperty(attr, CSSPropertyUnicodeBidi, CSSValueEmbed);
     } else if (attr->name() == draggableAttr) {
         const AtomicString& value = attr->value();
         if (equalIgnoringCase(value, "true")) {
@@ -201,6 +210,8 @@ void HTMLElement::parseMappedAttribute(Attribute* attr)
             addCSSProperty(attr, CSSPropertyWebkitUserSelect, CSSValueNone);
         } else if (equalIgnoringCase(value, "false"))
             addCSSProperty(attr, CSSPropertyWebkitUserDrag, CSSValueNone);
+    } else if (attr->name() == nameAttr) {
+        invalidateNodeListsCacheAfterAttributeChanged();
 #if ENABLE(MICRODATA)
     } else if (attr->name() == itempropAttr) {
         setItemProp(attr->value());
@@ -723,9 +734,9 @@ void HTMLElement::setContentEditable(Attribute* attr)
         addCSSProperty(attr, CSSPropertyWebkitLineBreak, CSSValueAfterWhiteSpace);
     } else if (equalIgnoringCase(enabled, "false")) {
         addCSSProperty(attr, CSSPropertyWebkitUserModify, CSSValueReadOnly);
-        attr->decl()->removeProperty(CSSPropertyWordWrap, false);
-        attr->decl()->removeProperty(CSSPropertyWebkitNbspMode, false);
-        attr->decl()->removeProperty(CSSPropertyWebkitLineBreak, false);
+        attr->decl()->removeProperty(CSSPropertyWordWrap);
+        attr->decl()->removeProperty(CSSPropertyWebkitNbspMode);
+        attr->decl()->removeProperty(CSSPropertyWebkitLineBreak);
     } else if (equalIgnoringCase(enabled, "plaintext-only")) {
         addCSSProperty(attr, CSSPropertyWebkitUserModify, CSSValueReadWritePlaintextOnly);
         addCSSProperty(attr, CSSPropertyWordWrap, CSSValueBreakWord);
@@ -997,38 +1008,6 @@ bool HTMLElement::isURLAttribute(Attribute* attribute) const
 }
 
 #if ENABLE(MICRODATA)
-PassRefPtr<DOMSettableTokenList> HTMLElement::itemProp() const
-{
-    if (!m_itemProp)
-        m_itemProp = DOMSettableTokenList::create();
-
-    return m_itemProp;
-}
-
-void HTMLElement::setItemProp(const String& value)
-{
-    if (!m_itemProp)
-        m_itemProp = DOMSettableTokenList::create();
-
-    m_itemProp->setValue(value);
-}
-
-PassRefPtr<DOMSettableTokenList> HTMLElement::itemRef() const
-{
-    if (!m_itemRef)
-        m_itemRef = DOMSettableTokenList::create();
-
-    return m_itemRef;
-}
-
-void HTMLElement::setItemRef(const String& value)
-{
-    if (!m_itemRef)
-        m_itemRef = DOMSettableTokenList::create();
-
-    m_itemRef->setValue(value);
-}
-
 void HTMLElement::setItemValue(const String& value, ExceptionCode& ec)
 {
     if (!hasAttribute(itempropAttr) || hasAttribute(itemscopeAttr)) {
@@ -1058,22 +1037,6 @@ String HTMLElement::itemValueText() const
 void HTMLElement::setItemValueText(const String& value, ExceptionCode& ec)
 {
     setTextContent(value, ec);
-}
-
-PassRefPtr<DOMSettableTokenList> HTMLElement::itemType() const
-{
-    if (!m_itemType)
-        m_itemType = DOMSettableTokenList::create();
-
-    return m_itemType;
-}
-
-void HTMLElement::setItemType(const String& value)
-{
-    if (!m_itemType)
-        m_itemType = DOMSettableTokenList::create();
-
-    m_itemType->setValue(value);
 }
 #endif
 

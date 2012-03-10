@@ -34,14 +34,25 @@ use constant MODE_MODULE  => 10; # 'module' section
 use constant MODE_INTERFACE  => 11; # 'interface' section
 
 # Helper variables
-my @temporaryContent = "";
+my @temporaryContent;
 
-my $parseMode = MODE_UNDEF;
-my $preservedParseMode = MODE_UNDEF;
+my $parseMode;
+my $preservedParseMode;
 
 my $beQuiet; # Should not display anything on STDOUT?
-my $document = 0; # Will hold the resulting 'idlDocument'
-my $parentsOnly = 0; # If 1, parse only enough to populate parents list
+my $document; # Will hold the resulting 'idlDocument'
+my $parentsOnly; # If 1, parse only enough to populate parents list
+
+sub InitializeGlobalData
+{
+    @temporaryContent = "";
+
+    $parseMode = MODE_UNDEF;
+    $preservedParseMode = MODE_UNDEF;
+
+    $document = 0;
+    $parentsOnly = 0;
+}
 
 # Default Constructor
 sub new
@@ -49,7 +60,8 @@ sub new
     my $object = shift;
     my $reference = { };
 
-    $document = 0;
+    InitializeGlobalData();
+
     $beQuiet = shift;
 
     bless($reference, $object);
@@ -154,22 +166,26 @@ sub parseExtendedAttributes
             $str =~ s/^\s*=//;
             if ($name eq "NamedConstructor") {
                 # Parse '=' name '(' arguments ')' ','?
+                my $constructorName;
                 if ($str =~ /^\s*([\w\d]+)/) {
-                    # For now ignore the name, since the name is managed by DOMWindow.idl.
+                    $constructorName = $1;
                     $str =~ s/^\s*([\w\d]+)//;
+                } else {
+                    die("Invalid extended attribute: '$str'\n");
                 }
                 if ($str =~ /^\s*\(/) {
                     # Parse '(' arguments ')' ','?
                     $str =~ s/^\s*\(//;
                     if ($str =~ /^([^)]*)\),?/) {
-                        $attrs{$name} = $1;
-                        $attrs{$name} =~ s/^(.*?)\s*$/$1/;
+                        my $signature = $1;
+                        $signature =~ s/^(.*?)\s*$/$1/;
+                        $attrs{$name} = {"ConstructorName" => $constructorName, "Signature" => $signature};
                         $str =~ s/^([^)]*)\),?//;
                     } else {
                         die("Invalid extended attribute: '$str'\n");
                     }
                 } elsif ($str =~ /^\s*,?/) {
-                    $attrs{$name} = "";
+                    $attrs{$name} = {"ConstructorName" => $constructorName, "Signature" => ""};
                     $str =~ s/^\s*,?//;
                 } else {
                     die("Invalid extended attribute: '$str'\n");
@@ -288,8 +304,8 @@ sub ParseInterface
             $newDataNode->signature(new domSignature());
             $newDataNode->signature->name("NamedConstructor");
             $newDataNode->signature->extendedAttributes($extendedAttributes);
-            parseParameters($newDataNode, $extendedAttributes->{"NamedConstructor"});
-            $extendedAttributes->{"NamedConstructor"} = 1;
+            parseParameters($newDataNode, $extendedAttributes->{"NamedConstructor"}->{"Signature"});
+            $extendedAttributes->{"NamedConstructor"} = $extendedAttributes->{"NamedConstructor"}{"ConstructorName"};
             $dataNode->constructor($newDataNode);
         }
         $dataNode->extendedAttributes($extendedAttributes);
@@ -348,10 +364,11 @@ sub ParseInterface
             } elsif (($line !~ s/^\s*$//g) and ($line !~ /^\s*const/)) {
                 $line =~ /$IDLStructure::interfaceMethodSelector/ or die "Parsing error!\nSource:\n$line\n)";
 
-                my $methodExtendedAttributes = (defined($1) ? $1 : " "); chop($methodExtendedAttributes);
-                my $methodType = (defined($2) ? $2 : die("Parsing error!\nSource:\n$line\n)"));
-                my $methodName = (defined($3) ? $3 : die("Parsing error!\nSource:\n$line\n)"));
-                my $methodSignature = (defined($4) ? $4 : die("Parsing error!\nSource:\n$line\n)"));
+                my $isStatic = defined($1);
+                my $methodExtendedAttributes = (defined($2) ? $2 : " "); chop($methodExtendedAttributes);
+                my $methodType = (defined($3) ? $3 : die("Parsing error!\nSource:\n$line\n)"));
+                my $methodName = (defined($4) ? $4 : die("Parsing error!\nSource:\n$line\n)"));
+                my $methodSignature = (defined($5) ? $5 : die("Parsing error!\nSource:\n$line\n)"));
 
                 ('' =~ /^/); # Reset variables needed for regexp matching
 
@@ -360,6 +377,7 @@ sub ParseInterface
 
                 my $newDataNode = new domFunction();
 
+                $newDataNode->isStatic($isStatic);
                 $newDataNode->signature(new domSignature());
                 $newDataNode->signature->name($methodName);
                 $newDataNode->signature->type($methodType);

@@ -78,7 +78,7 @@ RenderObject* RenderObjectChildList::removeChildNode(RenderObject* owner, Render
     // So that we'll get the appropriate dirty bit set (either that a normal flow child got yanked or
     // that a positioned child got yanked).  We also repaint, so that the area exposed when the child
     // disappears gets repainted properly.
-    if (!owner->documentBeingDestroyed() && fullRemove && oldChild->m_everHadLayout) {
+    if (!owner->documentBeingDestroyed() && fullRemove && oldChild->everHadLayout()) {
         oldChild->setNeedsLayoutAndPrefWidthsRecalc();
         if (oldChild->isBody())
             owner->view()->repaint();
@@ -114,8 +114,11 @@ RenderObject* RenderObjectChildList::removeChildNode(RenderObject* owner, Render
         if (oldChild->isRenderRegion())
             toRenderRegion(oldChild)->detachRegion();
 
-        if (oldChild->inRenderFlowThread() && oldChild->isBox())
+        if (oldChild->inRenderFlowThread() && oldChild->isBox()) {
             oldChild->enclosingRenderFlowThread()->removeRenderBoxRegionInfo(toRenderBox(oldChild));
+            if (oldChild->canHaveRegionStyle())
+                oldChild->enclosingRenderFlowThread()->clearRenderObjectCustomStyle(oldChild);
+        }
 
         if (RenderFlowThread* containerFlowThread = renderFlowThreadContainer(owner))
             containerFlowThread->removeFlowChild(oldChild);

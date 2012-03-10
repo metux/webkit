@@ -33,20 +33,20 @@
 
 #include "GraphicsContext3D.h"
 
-#include "ArrayBuffer.h"
-#include "ArrayBufferView.h"
 #include "WebGLObject.h"
 #include "CanvasRenderingContext.h"
 #include "Extensions3DOpenGL.h"
-#include "Float32Array.h"
 #include "GraphicsContext.h"
 #include "HTMLCanvasElement.h"
 #include "ImageBuffer.h"
 #include "ImageData.h"
-#include "Int32Array.h"
 #include "NotImplemented.h"
-#include "Uint8Array.h"
 #include <cstring>
+#include <wtf/ArrayBuffer.h>
+#include <wtf/ArrayBufferView.h>
+#include <wtf/Float32Array.h>
+#include <wtf/Int32Array.h>
+#include <wtf/Uint8Array.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 
@@ -1432,6 +1432,18 @@ void GraphicsContext3D::texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xo
 
     // FIXME: we will need to deal with PixelStore params when dealing with image buffers that differ from the subimage size
     ::glTexSubImage2D(target, level, xoff, yoff, width, height, format, type, pixels);
+}
+
+void GraphicsContext3D::compressedTexImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Dsizei imageSize, const void* data)
+{
+    makeContextCurrent();
+    ::glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize, data);
+}
+
+void GraphicsContext3D::compressedTexSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Dsizei imageSize, const void* data)
+{
+    makeContextCurrent();
+    ::glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize, data);
 }
 
 Platform3DObject GraphicsContext3D::createBuffer()

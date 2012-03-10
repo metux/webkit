@@ -47,7 +47,6 @@ typedef Vector<RegisteredEventListener, 1> EventListenerVector;
 class EventListenerMap {
 public:
     EventListenerMap();
-    ~EventListenerMap();
 
     bool isEmpty() const;
     bool contains(const AtomicString& eventType) const;
@@ -69,7 +68,7 @@ private:
     struct EventListenerHashMapTraits : HashTraits<WTF::AtomicString> {
         static const int minimumTableSize = 32;
     };
-    typedef HashMap<AtomicString, EventListenerVector*, AtomicStringHash, EventListenerHashMapTraits> EventListenerHashMap;
+    typedef HashMap<AtomicString, OwnPtr<EventListenerVector>, AtomicStringHash, EventListenerHashMapTraits> EventListenerHashMap;
 
     OwnPtr<EventListenerHashMap> m_hashMap;
 

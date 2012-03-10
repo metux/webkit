@@ -263,8 +263,8 @@ public:
     static unsigned dataOffset() { return OBJECT_OFFSETOF(StringImpl, m_data8); }
     static PassRefPtr<StringImpl> createWithTerminatingNullCharacter(const StringImpl&);
 
-    template<size_t inlineCapacity>
-    static PassRefPtr<StringImpl> adopt(Vector<UChar, inlineCapacity>& vector)
+    template<typename CharType, size_t inlineCapacity>
+    static PassRefPtr<StringImpl> adopt(Vector<CharType, inlineCapacity>& vector)
     {
         if (size_t size = vector.size()) {
             ASSERT(vector.data());
@@ -309,6 +309,7 @@ public:
     }
 
     bool has16BitShadow() const { return m_hashAndFlags & s_hashFlagHas16BitShadow; }
+    void upconvertCharacters(unsigned, unsigned) const;
     bool isIdentifier() const { return m_hashAndFlags & s_hashFlagIsIdentifier; }
     void setIsIdentifier(bool isIdentifier)
     {
@@ -557,9 +558,166 @@ bool equal(const StringImpl*, const StringImpl*);
 bool equal(const StringImpl*, const LChar*);
 inline bool equal(const StringImpl* a, const char* b) { return equal(a, reinterpret_cast<const LChar*>(b)); }
 bool equal(const StringImpl*, const LChar*, unsigned);
+inline bool equal(const StringImpl* a, const char* b, unsigned length) { return equal(a, reinterpret_cast<const LChar*>(b), length); }
 inline bool equal(const LChar* a, StringImpl* b) { return equal(b, a); }
 inline bool equal(const char* a, StringImpl* b) { return equal(b, reinterpret_cast<const LChar*>(a)); }
 bool equal(const StringImpl*, const UChar*, unsigned);
+
+// Do comparisons 8 or 4 bytes-at-a-time on architectures where it's safe.
+#if CPU(X86_64)
+ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
+{
+    unsigned dwordLength = length >> 3;
+
+    if (dwordLength) {
+        const uint64_t* aDWordCharacters = reinterpret_cast<const uint64_t*>(a);
+        const uint64_t* bDWordCharacters = reinterpret_cast<const uint64_t*>(b);
+
+        for (unsigned i = 0; i != dwordLength; ++i) {
+            if (*aDWordCharacters++ != *bDWordCharacters++)
+                return false;
+        }
+
+        a = reinterpret_cast<const LChar*>(aDWordCharacters);
+        b = reinterpret_cast<const LChar*>(bDWordCharacters);
+    }
+
+    if (length & 4) {
+        if (*reinterpret_cast<const uint32_t*>(a) != *reinterpret_cast<const uint32_t*>(b))
+            return false;
+
+        a += 4;
+        b += 4;
+    }
+
+    if (length & 2) {
+        if (*reinterpret_cast<const uint16_t*>(a) != *reinterpret_cast<const uint16_t*>(b))
+            return false;
+
+        a += 2;
+        b += 2;
+    }
+
+    if (length & 1 && (*a != *b))
+        return false;
+
+    return true;
+}
+
+ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
+{
+    unsigned dwordLength = length >> 2;
+    
+    if (dwordLength) {
+        const uint64_t* aDWordCharacters = reinterpret_cast<const uint64_t*>(a);
+        const uint64_t* bDWordCharacters = reinterpret_cast<const uint64_t*>(b);
+
+        for (unsigned i = 0; i != dwordLength; ++i) {
+            if (*aDWordCharacters++ != *bDWordCharacters++)
+                return false;
+        }
+
+        a = reinterpret_cast<const UChar*>(aDWordCharacters);
+        b = reinterpret_cast<const UChar*>(bDWordCharacters);
+    }
+
+    if (length & 2) {
+        if (*reinterpret_cast<const uint32_t*>(a) != *reinterpret_cast<const uint32_t*>(b))
+            return false;
+
+        a += 2;
+        b += 2;
+    }
+
+    if (length & 1 && (*a != *b))
+        return false;
+
+    return true;
+}
+#elif CPU(X86)
+ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
+{
+    const uint32_t* aCharacters = reinterpret_cast<const uint32_t*>(a);
+    const uint32_t* bCharacters = reinterpret_cast<const uint32_t*>(b);
+
+    unsigned wordLength = length >> 2;
+    for (unsigned i = 0; i != wordLength; ++i) {
+        if (*aCharacters++ != *bCharacters++)
+            return false;
+    }
+
+    length &= 3;
+
+    if (length) {
+        const LChar* aRemainder = reinterpret_cast<const LChar*>(aCharacters);
+        const LChar* bRemainder = reinterpret_cast<const LChar*>(bCharacters);
+        
+        for (unsigned i = 0; i <  length; ++i) {
+            if (aRemainder[i] != bRemainder[i])
+                return false;
+        }
+    }
+
+    return true;
+}
+
+ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
+{
+    const uint32_t* aCharacters = reinterpret_cast<const uint32_t*>(a);
+    const uint32_t* bCharacters = reinterpret_cast<const uint32_t*>(b);
+    
+    unsigned wordLength = length >> 1;
+    for (unsigned i = 0; i != wordLength; ++i) {
+        if (*aCharacters++ != *bCharacters++)
+            return false;
+    }
+    
+    if (length & 1 && *reinterpret_cast<const UChar*>(aCharacters) != *reinterpret_cast<const UChar*>(bCharacters))
+        return false;
+    
+    return true;
+}
+#else
+ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
+{
+    for (unsigned i = 0; i != length; ++i) {
+        if (a[i] != b[i])
+            return false;
+    }
+
+    return true;
+}
+
+ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
+{
+    for (unsigned i = 0; i != length; ++i) {
+        if (a[i] != b[i])
+            return false;
+    }
+
+    return true;
+}
+#endif
+
+ALWAYS_INLINE bool equal(const LChar* a, const UChar* b, unsigned length)
+{
+    for (unsigned i = 0; i != length; ++i) {
+        if (a[i] != b[i])
+            return false;
+    }
+
+    return true;
+}
+
+ALWAYS_INLINE bool equal(const UChar* a, const LChar* b, unsigned length)
+{
+    for (unsigned i = 0; i != length; ++i) {
+        if (a[i] != b[i])
+            return false;
+    }
+
+    return true;
+}
 
 bool equalIgnoringCase(StringImpl*, StringImpl*);
 bool equalIgnoringCase(StringImpl*, const LChar*);

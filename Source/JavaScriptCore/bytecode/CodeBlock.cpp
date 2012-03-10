@@ -257,7 +257,8 @@ static void printStructureStubInfo(const StructureStubInfo& stubInfo, unsigned i
     case access_get_by_id_proto_list:
         printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_proto_list", pointerToSourceString(stubInfo.u.getByIdProtoList.structureList).utf8().data(), stubInfo.u.getByIdProtoList.listSize);
         return;
-    case access_put_by_id_transition:
+    case access_put_by_id_transition_normal:
+    case access_put_by_id_transition_direct:
         printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(stubInfo.u.putByIdTransition.previousStructure).utf8().data(), pointerToSourceString(stubInfo.u.putByIdTransition.structure).utf8().data(), pointerToSourceString(stubInfo.u.putByIdTransition.chain).utf8().data());
         return;
     case access_put_by_id_replace:
@@ -1432,6 +1433,9 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
 #if ENABLE(JIT)
     , m_globalResolveInfos(other.m_globalResolveInfos)
 #endif
+#if ENABLE(VALUE_PROFILER)
+    , m_executionEntryCount(0)
+#endif
     , m_jumpTargets(other.m_jumpTargets)
     , m_loopTargets(other.m_loopTargets)
     , m_identifiers(other.m_identifiers)
@@ -1480,6 +1484,9 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlo
     , m_codeType(codeType)
     , m_source(sourceProvider)
     , m_sourceOffset(sourceOffset)
+#if ENABLE(VALUE_PROFILER)
+    , m_executionEntryCount(0)
+#endif
     , m_symbolTable(symTab)
     , m_alternative(alternative)
     , m_speculativeSuccessCounter(0)
@@ -2043,16 +2050,9 @@ void MethodCallLinkInfo::reset(RepatchBuffer& repatchBuffer, JITCode::JITType ji
     cachedPrototypeStructure.clearToMaxUnsigned();
     cachedFunction.clear();
     
-    if (jitType == JITCode::DFGJIT) {
-#if ENABLE(DFG_JIT)
-        repatchBuffer.relink(callReturnLocation, operationGetMethodOptimize);
-#else
-        ASSERT_NOT_REACHED();
-#endif
-    } else {
-        ASSERT(jitType == JITCode::BaselineJIT);
-        repatchBuffer.relink(callReturnLocation, cti_op_get_by_id_method_check);
-    }
+    ASSERT_UNUSED(jitType, jitType == JITCode::BaselineJIT);
+    
+    repatchBuffer.relink(callReturnLocation, cti_op_get_by_id_method_check);
 }
 
 void CodeBlock::unlinkCalls()
@@ -2203,7 +2203,7 @@ bool CodeBlock::shouldOptimizeNow()
     dumpValueProfiles();
 #endif
 
-    if (m_optimizationDelayCounter >= Heuristics::maximumOptimizationDelay)
+    if (m_optimizationDelayCounter >= Options::maximumOptimizationDelay)
         return true;
     
     unsigned numberOfNonArgumentValueProfiles = 0;
@@ -2229,9 +2229,9 @@ bool CodeBlock::shouldOptimizeNow()
     printf("Profile hotness: %lf, %lf\n", (double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles, (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles());
 #endif
 
-    if ((!numberOfNonArgumentValueProfiles || (double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles >= Heuristics::desiredProfileLivenessRate)
-        && (!numberOfValueProfiles() || (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles() >= Heuristics::desiredProfileFullnessRate)
-        && static_cast<unsigned>(m_optimizationDelayCounter) + 1 >= Heuristics::minimumOptimizationDelay)
+    if ((!numberOfNonArgumentValueProfiles || (double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles >= Options::desiredProfileLivenessRate)
+        && (!numberOfValueProfiles() || (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles() >= Options::desiredProfileFullnessRate)
+        && static_cast<unsigned>(m_optimizationDelayCounter) + 1 >= Options::minimumOptimizationDelay)
         return true;
     
     ASSERT(m_optimizationDelayCounter < std::numeric_limits<uint8_t>::max());
@@ -2241,15 +2241,27 @@ bool CodeBlock::shouldOptimizeNow()
 }
 #endif
 
-#if ENABLE(VALUE_PROFILER)
-void CodeBlock::resetRareCaseProfiles()
+#if ENABLE(DFG_JIT)
+void CodeBlock::tallyFrequentExitSites()
 {
-    for (unsigned i = 0; i < numberOfRareCaseProfiles(); ++i)
-        rareCaseProfile(i)->m_counter = 0;
-    for (unsigned i = 0; i < numberOfSpecialFastCaseProfiles(); ++i)
-        specialFastCaseProfile(i)->m_counter = 0;
-}
+    ASSERT(getJITType() == JITCode::DFGJIT);
+    ASSERT(alternative()->getJITType() == JITCode::BaselineJIT);
+    ASSERT(!!m_dfgData);
+    
+    CodeBlock* profiledBlock = alternative();
+    
+    for (unsigned i = 0; i < m_dfgData->osrExit.size(); ++i) {
+        DFG::OSRExit& exit = m_dfgData->osrExit[i];
+        
+        if (!exit.considerAddingAsFrequentExitSite(this, profiledBlock))
+            continue;
+        
+#if DFG_ENABLE(DEBUG_VERBOSE)
+        fprintf(stderr, "OSR exit #%u (bc#%u, @%u, %s) for code block %p occurred frequently; counting as frequent exit site.\n", i, exit.m_codeOrigin.bytecodeIndex, exit.m_nodeIndex, DFG::exitKindToString(exit.m_kind), this);
 #endif
+    }
+}
+#endif // ENABLE(DFG_JIT)
 
 #if ENABLE(VERBOSE_VALUE_PROFILE)
 void CodeBlock::dumpValueProfiles()

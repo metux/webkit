@@ -83,8 +83,7 @@ void WebKitMutationObserver::observe(Node* node, MutationObserverOptions options
     MutationObserverRegistration* registration = node->registerMutationObserver(this);
     registration->resetObservation(options, attributeFilter);
 
-    if (registration->isSubtree())
-        node->document()->addSubtreeMutationObserverTypes(registration->mutationTypes());
+    node->document()->addMutationObserverTypes(registration->mutationTypes());
 }
 
 void WebKitMutationObserver::disconnect()
@@ -133,12 +132,19 @@ void WebKitMutationObserver::deliver()
 
 void WebKitMutationObserver::deliverAllMutations()
 {
+    static bool deliveryInProgress = false;
+    if (deliveryInProgress)
+        return;
+    deliveryInProgress = true;
+
     while (!activeMutationObservers().isEmpty()) {
         MutationObserverSet::iterator iter = activeMutationObservers().begin();
         RefPtr<WebKitMutationObserver> observer = *iter;
         activeMutationObservers().remove(iter);
         observer->deliver();
     }
+
+    deliveryInProgress = false;
 }
 
 } // namespace WebCore

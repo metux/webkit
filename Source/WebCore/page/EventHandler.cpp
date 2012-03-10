@@ -292,6 +292,9 @@ static inline bool dispatchSelectStart(Node* node)
 
 bool EventHandler::updateSelectionForMouseDownDispatchingSelectStart(Node* targetNode, const VisibleSelection& newSelection, TextGranularity granularity)
 {
+    if (Position::nodeIsUserSelectNone(targetNode))
+        return false;
+
     if (!dispatchSelectStart(targetNode))
         return false;
 
@@ -928,7 +931,7 @@ DragSourceAction EventHandler::updateDragSourceActionsAllowed() const
     if (!view)
         return DragSourceActionNone;
 
-    return page->dragController()->delegateDragSourceAction(view->contentsToWindow(m_mouseDownPos));
+    return page->dragController()->delegateDragSourceAction(view->contentsToRootView(m_mouseDownPos));
 }
 #endif // ENABLE(DRAG_SUPPORT)
     
@@ -1612,14 +1615,7 @@ bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& mouseEvent, Hi
     if (m_lastScrollbarUnderMouse && m_mousePressed)
         return m_lastScrollbarUnderMouse->mouseMoved(mouseEvent);
 
-    // Mouse events should be treated as "read-only" in prepareMouseEvent if the mouse is 
-    // pressed and we are allowed to select OR if we're updating only scrollbars. This 
-    // means that :hover and :active freeze in the state they were in, rather than updating 
-    // for nodes the mouse moves over while you hold the mouse down (in the mouse pressed case)
-    // or while the window is not key (as in the onlyUpdateScrollbars case).
     HitTestRequest::HitTestRequestType hitType = HitTestRequest::MouseMove;
-    if ((m_mousePressed && m_mouseDownMayStartSelect) || onlyUpdateScrollbars)
-        hitType |= HitTestRequest::ReadOnly;
     if (m_mousePressed)
         hitType |= HitTestRequest::Active;
 
@@ -1765,6 +1761,9 @@ bool EventHandler::dispatchDragEvent(const AtomicString& eventType, Node* dragTa
     RefPtr<MouseEvent> me = MouseEvent::create(eventType,
         true, true, m_frame->document()->defaultView(),
         0, event.globalX(), event.globalY(), event.x(), event.y(),
+#if ENABLE(POINTER_LOCK)
+        event.movementX(), event.movementY(),
+#endif
         event.ctrlKey(), event.altKey(), event.shiftKey(), event.metaKey(),
         0, 0, clipboard);
 
@@ -2340,8 +2339,8 @@ bool EventHandler::sendContextMenuEventForKey()
 
     m_frame->view()->setCursor(pointerCursor());
 
-    IntPoint position = view->contentsToWindow(location);
-    IntPoint globalPosition = view->contentsToScreen(IntRect(location, IntSize())).location();
+    IntPoint position = view->contentsToRootView(location);
+    IntPoint globalPosition = view->hostWindow()->rootViewToScreen(IntRect(position, IntSize())).location();
 
     Node* targetNode = doc->focusedNode();
     if (!targetNode)
@@ -2519,12 +2518,12 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
 
 #if ENABLE(PAN_SCROLLING)
     if (Page* page = m_frame->page()) {
-        if (page->mainFrame()->eventHandler()->m_panScrollInProgress || m_autoscrollInProgress) {
-            // If a key is pressed while the autoscroll/panScroll is in progress then we want to stop
+        if (page->mainFrame()->eventHandler()->m_panScrollInProgress) {
+            // If a key is pressed while the panScroll is in progress then we want to stop
             if (initialKeyEvent.type() == PlatformKeyboardEvent::KeyDown || initialKeyEvent.type() == PlatformKeyboardEvent::RawKeyDown) 
                 stopAutoscrollTimer();
 
-            // If we were in autoscroll/panscroll mode, we swallow the key event
+            // If we were in panscroll mode, we swallow the key event
             return true;
         }
     }
@@ -2758,6 +2757,10 @@ void EventHandler::freeClipboard()
 
 void EventHandler::dragSourceEndedAt(const PlatformMouseEvent& event, DragOperation operation)
 {
+    // Send a hit test request so that RenderLayer gets a chance to update the :hover and :active pseudoclasses.
+    HitTestRequest request(HitTestRequest::MouseUp);
+    prepareMouseEvent(request, event);
+
     if (dragState().m_dragSrc && dragState().shouldDispatchEvents()) {
         dragState().m_dragClipboard->setDestinationOperation(operation);
         // for now we don't care if event handler cancels default behavior, since there is none

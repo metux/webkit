@@ -36,7 +36,6 @@ module core {
     ] InspectorFrontendHost {
         void loaded();
         void closeWindow();
-        void disconnectFromBackend();
         void bringToFront();
         void inspectedURLChanged(in DOMString newURL);
 
@@ -50,6 +49,7 @@ module core {
         DOMString hiddenPanels();
 
         void copyText(in DOMString text);
+        boolean canSaveAs();
         void saveAs(in DOMString fileName, in DOMString content);
 
         [Custom] DOMString platform();

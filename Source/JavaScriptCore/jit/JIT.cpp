@@ -99,7 +99,7 @@ void JIT::emitOptimizationCheck(OptimizationCheckKind kind)
     if (!shouldEmitProfiling())
         return;
     
-    Jump skipOptimize = branchAdd32(Signed, TrustedImm32(kind == LoopOptimizationCheck ? Heuristics::executionCounterIncrementForLoop : Heuristics::executionCounterIncrementForReturn), AbsoluteAddress(m_codeBlock->addressOfExecuteCounter()));
+    Jump skipOptimize = branchAdd32(Signed, TrustedImm32(kind == LoopOptimizationCheck ? Options::executionCounterIncrementForLoop : Options::executionCounterIncrementForReturn), AbsoluteAddress(m_codeBlock->addressOfExecuteCounter()));
     JITStubCall stubCall(this, kind == LoopOptimizationCheck ? cti_optimize_from_loop : cti_optimize_from_ret);
     if (kind == LoopOptimizationCheck)
         stubCall.addArgument(Imm32(m_bytecodeOffset));
@@ -557,18 +557,18 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck)
 #if ENABLE(VALUE_PROFILER)
         ASSERT(m_bytecodeOffset == (unsigned)-1);
         if (shouldEmitProfiling()) {
-            for (int argumentRegister = -RegisterFile::CallFrameHeaderSize - m_codeBlock->m_numParameters; argumentRegister < -RegisterFile::CallFrameHeaderSize; ++argumentRegister) {
+            for (int argument = 0; argument < m_codeBlock->m_numParameters; ++argument) {
                 // If this is a constructor, then we want to put in a dummy profiling site (to
                 // keep things consistent) but we don't actually want to record the dummy value.
-                if (m_codeBlock->m_isConstructor
-                    && argumentRegister == -RegisterFile::CallFrameHeaderSize - m_codeBlock->m_numParameters)
+                if (m_codeBlock->m_isConstructor && !argument)
                     m_codeBlock->addValueProfile(-1);
                 else {
+                    int offset = CallFrame::argumentOffsetIncludingThis(argument) * static_cast<int>(sizeof(Register));
 #if USE(JSVALUE64)
-                    loadPtr(Address(callFrameRegister, argumentRegister * sizeof(Register)), regT0);
+                    loadPtr(Address(callFrameRegister, offset), regT0);
 #elif USE(JSVALUE32_64)
-                    load32(Address(callFrameRegister, argumentRegister * sizeof(Register) + OBJECT_OFFSETOF(JSValue, u.asBits.payload)), regT0);
-                    load32(Address(callFrameRegister, argumentRegister * sizeof(Register) + OBJECT_OFFSETOF(JSValue, u.asBits.tag)), regT1);
+                    load32(Address(callFrameRegister, offset + OBJECT_OFFSETOF(JSValue, u.asBits.payload)), regT0);
+                    load32(Address(callFrameRegister, offset + OBJECT_OFFSETOF(JSValue, u.asBits.tag)), regT1);
 #endif
                     emitValueProfilingSite(FirstProfilingSite);
                 }
@@ -581,6 +581,11 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck)
     }
 
     Label functionBody = label();
+    
+#if ENABLE(VALUE_PROFILER)
+    if (m_canBeOptimized)
+        add32(Imm32(1), AbsoluteAddress(&m_codeBlock->m_executionEntryCount));
+#endif
 
     privateCompileMainPass();
     privateCompileLinkPass();
@@ -602,7 +607,7 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck)
         emitPutImmediateToCallFrameHeader(m_codeBlock, RegisterFile::CodeBlock);
 
         load32(Address(callFrameRegister, RegisterFile::ArgumentCount * static_cast<int>(sizeof(Register))), regT1);
-        branch32(Equal, regT1, TrustedImm32(m_codeBlock->m_numParameters)).linkTo(beginLabel, this);
+        branch32(AboveOrEqual, regT1, TrustedImm32(m_codeBlock->m_numParameters)).linkTo(beginLabel, this);
 
         JITStubCall(this, m_codeBlock->m_isConstructor ? cti_op_construct_arityCheck : cti_op_call_arityCheck).call(callFrameRegister);
 

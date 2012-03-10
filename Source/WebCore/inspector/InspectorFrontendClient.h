@@ -53,11 +53,11 @@ public:
 
     virtual void bringToFront() = 0;
     virtual void closeWindow() = 0;
-    virtual void disconnectFromBackend() = 0;
 
     virtual void requestAttachWindow() = 0;
     virtual void requestDetachWindow() = 0;
     virtual void changeAttachedWindowHeight(unsigned) = 0;
+    virtual bool canSaveAs() = 0;
     virtual void saveAs(const WTF::String& fileName, const WTF::String& content) = 0;
 
     virtual void inspectedURLChanged(const String&) = 0;

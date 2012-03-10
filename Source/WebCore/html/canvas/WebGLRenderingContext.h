@@ -28,15 +28,15 @@
 
 #include "CanvasRenderingContext.h"
 #include "DrawingBuffer.h"
-#include "Float32Array.h"
 #include "GraphicsContext3D.h"
-#include "Int32Array.h"
 #include "PlatformString.h"
 #include "Timer.h"
-#include "Uint8Array.h"
 #include "WebGLGetInfo.h"
 
+#include <wtf/Float32Array.h>
+#include <wtf/Int32Array.h>
 #include <wtf/OwnArrayPtr.h>
+#include <wtf/Uint8Array.h>
 
 namespace WebCore {
 
@@ -50,11 +50,13 @@ class OESTextureFloat;
 class OESVertexArrayObject;
 class WebGLActiveInfo;
 class WebGLBuffer;
+class WebGLCompressedTextures;
 class WebGLContextAttributes;
 class WebGLDebugRendererInfo;
 class WebGLDebugShaders;
 class WebGLExtension;
 class WebGLFramebuffer;
+class WebGLLoseContext;
 class WebGLObject;
 class WebGLProgram;
 class WebGLRenderbuffer;
@@ -62,7 +64,6 @@ class WebGLShader;
 class WebGLTexture;
 class WebGLUniformLocation;
 class WebGLVertexArrayObjectOES;
-class WebKitLoseContext;
 
 typedef int ExceptionCode;
 
@@ -311,6 +312,7 @@ public:
     friend class WebGLObject;
     friend class OESVertexArrayObject;
     friend class WebGLDebugShaders;
+    friend class WebGLCompressedTextures;
 
     WebGLRenderingContext(HTMLCanvasElement*, PassRefPtr<GraphicsContext3D>, GraphicsContext3D::Attributes);
     void initializeNewContext();
@@ -482,9 +484,10 @@ public:
     OwnPtr<OESTextureFloat> m_oesTextureFloat;
     OwnPtr<OESStandardDerivatives> m_oesStandardDerivatives;
     OwnPtr<OESVertexArrayObject> m_oesVertexArrayObject;
-    OwnPtr<WebKitLoseContext> m_webkitLoseContext;
+    OwnPtr<WebGLLoseContext> m_webglLoseContext;
     OwnPtr<WebGLDebugRendererInfo> m_webglDebugRendererInfo;
     OwnPtr<WebGLDebugShaders> m_webglDebugShaders;
+    OwnPtr<WebGLCompressedTextures> m_webglCompressedTextures;
 
     // Helpers for getParameter and others
     WebGLGetInfo getBooleanParameter(GC3Denum);

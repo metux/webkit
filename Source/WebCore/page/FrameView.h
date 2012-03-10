@@ -196,6 +196,9 @@ public:
     int scrollYForFixedPosition() const;
     IntSize scrollOffsetForFixedPosition() const;
 
+    bool shouldLayoutFixedElementsRelativeToFrame() const { return m_shouldLayoutFixedElementsRelativeToFrame; }
+    void setShouldLayoutFixedElementsRelativeToFrame(bool);
+
     void beginDeferredRepaints();
     void endDeferredRepaints();
     void checkStopDelayingDeferredRepaints();
@@ -240,6 +243,7 @@ public:
     void incrementVisuallyNonEmptyPixelCount(const IntSize&);
     void setIsVisuallyNonEmpty() { m_isVisuallyNonEmpty = true; }
     bool isVisuallyNonEmpty() const { return m_isVisuallyNonEmpty; }
+    void enableAutoSizeMode(bool enable, const IntSize& minSize, const IntSize& maxSize);
 
     void forceLayout(bool allowSubtree = false);
     void forceLayoutForPagination(const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkFactor, AdjustViewSizeOrNot);
@@ -292,6 +296,7 @@ public:
     void flushAnyPendingPostLayoutTasks();
 
     virtual bool shouldSuspendScrollAnimations() const;
+    virtual void scrollbarStyleChanged(int newStyle, bool forceUpdate);
 
     void setAnimatorsAreActive();
 
@@ -335,6 +340,7 @@ private:
 
     void forceLayoutParentViewIfNeeded();
     void performPostLayoutTasks();
+    void autoSizeIfEnabled();
 
     virtual void repaintContentRectangle(const IntRect&, bool immediate);
     virtual void contentsResized();
@@ -408,9 +414,9 @@ private:
     bool m_cannotBlitToWindow;
     bool m_isOverlapped;
     bool m_contentIsOpaque;
+    bool m_shouldLayoutFixedElementsRelativeToFrame;
     unsigned m_slowRepaintObjectCount;
     unsigned m_fixedObjectCount;
-
     int m_borderX;
     int m_borderY;
 
@@ -479,6 +485,14 @@ private:
     RenderScrollbarPart* m_scrollCorner;
 
     Page* m_page;
+
+    // If true, automatically resize the frame view around its content.
+    bool m_shouldAutoSize;
+    bool m_inAutoSize;
+    // The lower bound on the size when autosizing.
+    IntSize m_minAutoSize;
+    // The upper bound on the size when autosizing.
+    IntSize m_maxAutoSize;
 
     static double s_deferredRepaintDelay;
     static double s_initialDeferredRepaintDelayDuringLoading;

@@ -254,9 +254,11 @@ z-index
 -webkit-filter
 #endif
 -webkit-flex-align
+-webkit-flex-direction
 -webkit-flex-flow
 -webkit-flex-order
 -webkit-flex-pack
+-webkit-flex-wrap
 -webkit-font-size-delta
 -webkit-highlight
 -webkit-hyphenate-character
@@ -354,7 +356,8 @@ z-index
 -webkit-flow-into
 -webkit-flow-from
 -webkit-region-overflow
--webkit-wrap-shape
+-webkit-wrap-shape-inside
+-webkit-wrap-shape-outside
 -webkit-wrap-margin
 -webkit-wrap-padding
 -webkit-region-break-after
@@ -362,7 +365,11 @@ z-index
 -webkit-region-break-inside
 -webkit-wrap-flow
 -webkit-wrap-through
+-webkit-wrap
 #if defined(ENABLE_TOUCH_EVENTS) && ENABLE_TOUCH_EVENTS
 -webkit-tap-highlight-color
 #endif
-
+#if defined(ENABLE_CSS_GRID_LAYOUT) && ENABLE_CSS_GRID_LAYOUT
+-webkit-grid-columns
+-webkit-grid-rows
+#endif

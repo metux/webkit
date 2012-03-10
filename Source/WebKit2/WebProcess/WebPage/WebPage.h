@@ -102,6 +102,7 @@ namespace WebKit {
 
 class DrawingArea;
 class InjectedBundleBackForwardList;
+class NotificationPermissionRequestManager;
 class PageOverlay;
 class PluginView;
 class SessionState;
@@ -114,6 +115,7 @@ class WebImage;
 class WebInspector;
 class WebKeyboardEvent;
 class WebMouseEvent;
+class WebNotificationClient;
 class WebOpenPanelResultListener;
 class WebPageGroupProxy;
 class WebPopupMenu;
@@ -267,6 +269,7 @@ public:
     void setFixedLayoutSize(const WebCore::IntSize&);
 
     void setPaginationMode(uint32_t /* WebCore::Page::Pagination::Mode */);
+    void setPageLength(double);
     void setGapBetweenPages(double);
 
     bool drawsBackground() const { return m_drawsBackground; }
@@ -307,6 +310,7 @@ public:
 
     FindController& findController() { return m_findController; }
     GeolocationPermissionRequestManager& geolocationPermissionRequestManager() { return m_geolocationPermissionRequestManager; }
+    NotificationPermissionRequestManager* notificationPermissionRequestManager();
 
     void pageDidScroll();
 #if USE(TILED_BACKING_STORE)
@@ -458,6 +462,8 @@ public:
 
     void contextMenuShowing() { m_isShowingContextMenu = true; }
 
+    void wheelEvent(const WebWheelEvent&);
+
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
 
@@ -506,7 +512,6 @@ private:
 
     void mouseEvent(const WebMouseEvent&);
     void mouseEventSyncForTesting(const WebMouseEvent&, bool&);
-    void wheelEvent(const WebWheelEvent&);
     void wheelEventSyncForTesting(const WebWheelEvent&, bool&);
     void keyEvent(const WebKeyboardEvent&);
     void keyEventSyncForTesting(const WebKeyboardEvent&, bool&);
@@ -574,6 +579,10 @@ private:
     void didChangeSelectedIndexForActivePopupMenu(int32_t newIndex);
     void setTextForActivePopupMenu(int32_t index);
 
+#if PLATFORM(GTK)    
+    void failedToShowPopupMenu();
+#endif    
+
     void didChooseFilesForOpenPanel(const Vector<String>&);
     void didCancelForOpenPanel();
 #if ENABLE(WEB_PROCESS_SANDBOX)
@@ -581,6 +590,7 @@ private:
 #endif
 
     void didReceiveGeolocationPermissionDecision(uint64_t geolocationID, bool allowed);
+    void didReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed);
 
     void advanceToNextMisspelling(bool startBeforeSelection);
     void changeSpellingToWord(const String& word);
@@ -687,6 +697,7 @@ private:
     RefPtr<WebContextMenu> m_contextMenu;
     RefPtr<WebOpenPanelResultListener> m_activeOpenPanelResultListener;
     GeolocationPermissionRequestManager m_geolocationPermissionRequestManager;
+    RefPtr<NotificationPermissionRequestManager> m_notificationPermissionRequestManager;
 
     OwnPtr<WebCore::PrintContext> m_printContext;
 

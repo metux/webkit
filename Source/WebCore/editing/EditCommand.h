@@ -29,6 +29,10 @@
 #include "EditAction.h"
 #include "VisibleSelection.h"
 
+#ifndef NDEBUG
+#include <wtf/HashSet.h>
+#endif
+
 namespace WebCore {
 
 class CompositeEditCommand;
@@ -50,28 +54,20 @@ public:
     const VisibleSelection& startingSelection() const { return m_startingSelection; }
     const VisibleSelection& endingSelection() const { return m_endingSelection; }
 
-    Element* startingRootEditableElement() const { return m_startingRootEditableElement.get(); }
-    Element* endingRootEditableElement() const { return m_endingRootEditableElement.get(); }
-
-    virtual bool isTypingCommand() const;
-    virtual bool isCreateLinkCommand() const;
-    
-    virtual bool preservesTypingStyle() const;
-
+    virtual bool isSimpleEditCommand() const { return false; }
+    virtual bool isCompositeEditCommand() const { return false; }
+    virtual bool isEditCommandComposition() const { return false; }
     bool isTopLevelCommand() const { return !m_parent; }
-
-    virtual bool shouldRetainAutocorrectionIndicator() const;
-    virtual void setShouldRetainAutocorrectionIndicator(bool);
 
 protected:
     EditCommand(Document*);
+    EditCommand(Document*, const VisibleSelection&, const VisibleSelection&);
 
     Document* document() const { return m_document.get(); }
+    CompositeEditCommand* parent() const { return m_parent; }
 
-    void setStartingSelection(const VisibleSelection&);
-    void setEndingSelection(const VisibleSelection&);
-
-    void updateLayout() const;
+    virtual void setStartingSelection(const VisibleSelection&);
+    virtual void setEndingSelection(const VisibleSelection&);
 
 private:
     virtual void doApply() = 0;
@@ -81,19 +77,37 @@ private:
     RefPtr<Document> m_document;
     VisibleSelection m_startingSelection;
     VisibleSelection m_endingSelection;
-    RefPtr<Element> m_startingRootEditableElement;
-    RefPtr<Element> m_endingRootEditableElement;
     CompositeEditCommand* m_parent;
 
-    friend void applyCommand(PassRefPtr<EditCommand>);
+    friend void applyCommand(PassRefPtr<CompositeEditCommand>);
 };
 
 class SimpleEditCommand : public EditCommand {
+public:
+
+#ifndef NDEBUG
+    virtual void getNodesInCommand(HashSet<Node*>&) = 0;
+#endif
+
 protected:
     SimpleEditCommand(Document* document) : EditCommand(document) { }
+
+#ifndef NDEBUG
+    void addNodeAndDescendants(Node*, HashSet<Node*>&);
+#endif
+
+private:
+    virtual bool isSimpleEditCommand() const OVERRIDE { return true; }
 };
 
-void applyCommand(PassRefPtr<EditCommand>);
+inline SimpleEditCommand* toSimpleEditCommand(EditCommand* command)
+{
+    ASSERT(command);
+    ASSERT(command->isSimpleEditCommand());
+    return static_cast<SimpleEditCommand*>(command);
+}
+
+void applyCommand(PassRefPtr<CompositeEditCommand>);
 
 } // namespace WebCore
 

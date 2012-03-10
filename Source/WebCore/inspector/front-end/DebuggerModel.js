@@ -40,7 +40,7 @@ WebInspector.DebuggerModel = function()
      */
     this._scripts = {};
 
-    this._capabilitiesObject = {};
+    this._canSetScriptSource = false;
 
     InspectorBackend.registerDebuggerDispatcher(new WebInspector.DebuggerDispatcher(this));
 }
@@ -74,7 +74,7 @@ WebInspector.DebuggerModel.Events = {
     ParsedScriptSource: "parsed-script-source",
     FailedToParseScriptSource: "failed-to-parse-script-source",
     BreakpointResolved: "breakpoint-resolved",
-    Reset: "reset"
+    GlobalObjectCleared: "global-object-cleared"
 }
 
 WebInspector.DebuggerModel.BreakReason = {
@@ -87,22 +87,17 @@ WebInspector.DebuggerModel.BreakReason = {
 WebInspector.DebuggerModel.prototype = {
     enableDebugger: function()
     {
-        /**
-         * @param {Protocol.Error} error
-         * @param {Array.<string>} capabilities
-         */
-        function callback(error, capabilities)
+        function callback(error, result)
         {
-            for (var i = 0; i < capabilities.length; ++i)
-                this._capabilitiesObject[capabilities[i]] = true;
+            this._canSetScriptSource = result;
         }
-        DebuggerAgent.getCapabilities(callback.bind(this));
-        DebuggerAgent.enable();
+        DebuggerAgent.canSetScriptSource(callback.bind(this));
+        DebuggerAgent.enable(this._debuggerWasEnabled.bind(this));
     },
 
     disableDebugger: function()
     {
-        DebuggerAgent.disable();
+        DebuggerAgent.disable(this._debuggerWasDisabled.bind(this));
     },
 
     /**
@@ -110,7 +105,7 @@ WebInspector.DebuggerModel.prototype = {
      */
     canSetScriptSource: function()
     {
-        return !!this._capabilitiesObject[DebuggerAgent.capabilitySetScriptSource];
+        return this._canSetScriptSource;
     },
 
     _debuggerWasEnabled: function()
@@ -218,11 +213,11 @@ WebInspector.DebuggerModel.prototype = {
         this.dispatchEventToListeners(WebInspector.DebuggerModel.Events.BreakpointResolved, {breakpointId: breakpointId, location: location});
     },
 
-    reset: function()
+    _globalObjectCleared: function()
     {
         this._debuggerPausedDetails = null;
         this._scripts = {};
-        this.dispatchEventToListeners(WebInspector.DebuggerModel.Events.Reset);
+        this.dispatchEventToListeners(WebInspector.DebuggerModel.Events.GlobalObjectCleared);
     },
 
     /**
@@ -385,14 +380,9 @@ WebInspector.DebuggerDispatcher.prototype = {
         this._debuggerModel._resumedScript();
     },
 
-    debuggerWasEnabled: function()
+    globalObjectCleared: function()
     {
-        this._debuggerModel._debuggerWasEnabled();
-    },
-
-    debuggerWasDisabled: function()
-    {
-        this._debuggerModel._debuggerWasDisabled();
+        this._debuggerModel._globalObjectCleared();
     },
 
     /**

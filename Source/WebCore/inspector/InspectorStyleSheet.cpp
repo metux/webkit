@@ -212,7 +212,7 @@ static void fillMediaListChain(CSSRule* rule, InspectorArray* mediaArray)
                         sourceURL = "";
                     mediaArray->pushObject(buildMediaObject(mediaList, styleSheet->ownerNode() ? MediaListSourceLinkedSheet : MediaListSourceInlineSheet, sourceURL));
                 }
-                parentRule = styleSheet->parentRule();
+                parentRule = styleSheet->ownerRule();
                 if (parentRule)
                     break;
                 styleSheet = styleSheet->parentStyleSheet();
@@ -253,6 +253,23 @@ PassRefPtr<InspectorObject> InspectorStyle::buildObjectForStyle() const
         result->setObject("range", buildSourceRangeObject(sourceData->styleSourceData->styleBodyRange));
 
     populateObjectWithStyleProperties(result.get());
+
+    return result.release();
+}
+
+PassRefPtr<InspectorArray> InspectorStyle::buildArrayForComputedStyle() const
+{
+    RefPtr<InspectorArray> result = InspectorArray::create();
+    Vector<InspectorStyleProperty> properties;
+    populateAllProperties(&properties);
+
+    for (Vector<InspectorStyleProperty>::iterator it = properties.begin(), itEnd = properties.end(); it != itEnd; ++it) {
+        const CSSPropertySourceData& propertyEntry = it->sourceData;
+        RefPtr<InspectorObject> entry = InspectorObject::create();
+        entry->setString("name", propertyEntry.name);
+        entry->setString("value", propertyEntry.value);
+        result->pushObject(entry);
+    }
 
     return result.release();
 }

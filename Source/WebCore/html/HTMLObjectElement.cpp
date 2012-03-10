@@ -122,6 +122,7 @@ void HTMLObjectElement::parseMappedAttribute(Attribute* attr)
             document->addNamedItem(newName);
         }
         m_name = newName;
+        invalidateNodeListsCacheAfterAttributeChanged();
     } else if (attr->name() == borderAttr)
         applyBorderAttribute(attr);
     else if (isIdAttributeName(attr->name())) {
@@ -289,9 +290,7 @@ bool HTMLObjectElement::hasValidClassId()
 void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
 {
     ASSERT(!renderEmbeddedObject()->pluginCrashedOrWasMissing());
-    // FIXME: We should ASSERT(needsWidgetUpdate()), but currently
-    // FrameView::updateWidget() calls updateWidget(false) without checking if
-    // the widget actually needs updating!
+    ASSERT(needsWidgetUpdate());
     setNeedsWidgetUpdate(false);
     // FIXME: This should ASSERT isFinishedParsingChildren() instead.
     if (!isFinishedParsingChildren())

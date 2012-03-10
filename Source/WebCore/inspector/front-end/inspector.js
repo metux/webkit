@@ -272,6 +272,19 @@ var WebInspector = {
     networkResourceById: function(id)
     {
         return this.panels.network.resourceById(id);
+    },
+
+    get inspectedPageDomain()
+    {
+        var parsedURL = WebInspector.inspectedPageURL && WebInspector.inspectedPageURL.asParsedURL();
+        return parsedURL ? parsedURL.host : "";
+    },
+
+    _initializeCapability: function(name, callback, error, result)
+    {
+        Capabilities[name] = result;
+        if (callback)
+            callback();
     }
 }
 
@@ -294,6 +307,7 @@ WebInspector.Events = {
 
 WebInspector.loaded = function()
 {
+    InspectorBackend.loadFromJSONIfNeeded();
     if ("page" in WebInspector.queryParamsObject) {
         var page = WebInspector.queryParamsObject.page;
         var host = "host" in WebInspector.queryParamsObject ? WebInspector.queryParamsObject.host : window.location.host;
@@ -311,17 +325,26 @@ WebInspector.loaded = function()
 
 WebInspector.doLoadedDone = function()
 {
-    WebInspector.WorkerManager.loaded();
-    InspectorFrontendHost.loaded();
-
+    // Install styles and themes
     WebInspector.installPortStyles();
-
     if (WebInspector.socket)
         document.body.addStyleClass("remote");
 
     if (WebInspector.queryParamsObject.toolbarColor && WebInspector.queryParamsObject.textColor)
         WebInspector.setToolbarColors(WebInspector.queryParamsObject.toolbarColor, WebInspector.queryParamsObject.textColor);
 
+    InspectorFrontendHost.loaded();
+    WebInspector.WorkerManager.loaded();
+
+    DebuggerAgent.causesRecompilation(WebInspector._initializeCapability.bind(WebInspector, "debuggerCausesRecompilation", null));
+    DebuggerAgent.supportsNativeBreakpoints(WebInspector._initializeCapability.bind(WebInspector, "nativeInstrumentationEnabled", null));
+    ProfilerAgent.causesRecompilation(WebInspector._initializeCapability.bind(WebInspector, "profilerCausesRecompilation", null));
+    ProfilerAgent.isSampling(WebInspector._initializeCapability.bind(WebInspector, "samplingCPUProfiler", null));
+    ProfilerAgent.hasHeapProfiler(WebInspector._initializeCapability.bind(WebInspector, "heapProfilerPresent", WebInspector._doLoadedDoneWithCapabilities.bind(WebInspector)));
+}
+
+WebInspector._doLoadedDoneWithCapabilities = function()
+{
     WebInspector.shortcutsScreen = new WebInspector.ShortcutsScreen();
     this._registerShortcuts();
 
@@ -341,7 +364,7 @@ WebInspector.doLoadedDone = function()
     this.consoleView = new WebInspector.ConsoleView(WebInspector.WorkerManager.isWorkerFrontend());
 
     this.networkManager = new WebInspector.NetworkManager();
-    this.resourceTreeModel = new WebInspector.ResourceTreeModel();
+    this.resourceTreeModel = new WebInspector.ResourceTreeModel(this.networkManager);
     this.networkLog = new WebInspector.NetworkLog();
     this.domAgent = new WebInspector.DOMAgent();
     new WebInspector.JavaScriptContextManager(this.resourceTreeModel, this.consoleView);
@@ -349,11 +372,14 @@ WebInspector.doLoadedDone = function()
     InspectorBackend.registerInspectorDispatcher(this);
 
     this.cssModel = new WebInspector.CSSStyleModel();
+    this.timelineManager = new WebInspector.TimelineManager();
+    InspectorBackend.registerDatabaseDispatcher(new WebInspector.DatabaseDispatcher());
+    InspectorBackend.registerDOMStorageDispatcher(new WebInspector.DOMStorageDispatcher());
 
     this.searchController = new WebInspector.SearchController();
     this.advancedSearchController = new WebInspector.AdvancedSearchController();
 
-    if (Preferences.nativeInstrumentationEnabled)
+    if (Capabilities.nativeInstrumentationEnabled)
         this.domBreakpointsSidebarPane = new WebInspector.DOMBreakpointsSidebarPane();
 
     this._createPanels();
@@ -380,16 +406,22 @@ WebInspector.doLoadedDone = function()
 
     this.extensionServer.initExtensions();
 
-    // There is no console agent for workers yet.
-    if (!WebInspector.WorkerManager.isWorkerFrontend())
-        this.console.enableAgent();
+    this.console.enableAgent();
+
+    function showInitialPanel()
+    {
+        if (!WebInspector.inspectorView.currentPanel())
+            WebInspector.showPanel(WebInspector.settings.lastActivePanel.get());
+    }
+
+    InspectorAgent.enable(showInitialPanel);
     DatabaseAgent.enable();
     DOMStorageAgent.enable();
 
-    WebInspector.showPanel(WebInspector.settings.lastActivePanel.get());
 
     WebInspector.CSSCompletions.requestCSSNameCompletions();
     WebInspector.WorkerManager.loadCompleted();
+    InspectorFrontendAPI.loadCompleted();
 }
 
 WebInspector.addPanel = function(panel)
@@ -460,14 +492,6 @@ WebInspector.close = function(event)
     this._isClosing = true;
     this.notifications.dispatchEventToListeners(WebInspector.Events.InspectorClosing);
     InspectorFrontendHost.closeWindow();
-}
-
-WebInspector.disconnectFromBackend = function()
-{
-    if (WebInspector.WorkerManager.isWorkerFrontend())
-        WebInspector.WorkerManager.showWorkerTerminatedScreen();
-    else
-        InspectorFrontendHost.disconnectFromBackend();
 }
 
 WebInspector.documentClick = function(event)
@@ -665,30 +689,6 @@ WebInspector.showPanel = function(panel)
     WebInspector.inspectorView.setCurrentPanel(this.panels[panel]);
 }
 
-WebInspector.startUserInitiatedDebugging = function()
-{
-    WebInspector.inspectorView.setCurrentPanel(this.panels.scripts);
-    WebInspector.debuggerModel.enableDebugger();
-}
-
-WebInspector.reset = function()
-{
-    this.debuggerModel.reset();
-    for (var panelName in this.panels) {
-        var panel = this.panels[panelName];
-        if ("reset" in panel)
-            panel.reset();
-    }
-
-    this.domAgent.hideDOMNodeHighlight();
-
-    if (!WebInspector.settings.preserveConsoleLog.get())
-        this.console.clearMessages();
-    this.extensionServer.notifyInspectorReset();
-    if (this.workerManager)
-        this.workerManager.reset();
-}
-
 WebInspector.bringToFront = function()
 {
     InspectorFrontendHost.bringToFront();
@@ -788,6 +788,7 @@ WebInspector.inspect = function(payload, hints)
     var object = WebInspector.RemoteObject.fromPayload(payload);
     if (object.subtype === "node") {
         // Request node from backend and focus it.
+        WebInspector.inspectorView.setCurrentPanel(WebInspector.panels.elements);
         object.pushNodeToFrontend(WebInspector.updateFocusedNode.bind(WebInspector), object.release.bind(object));
         return;
     }
@@ -808,11 +809,22 @@ WebInspector.updateFocusedNode = function(nodeId)
     this.panels.elements.revealAndSelectNode(nodeId);
 }
 
+WebInspector.populateResourceContextMenu = function(contextMenu, url, preferredLineNumber)
+{
+    var registry = WebInspector.openAnchorLocationRegistry;
+    // Skip 0th handler, as it's 'Use default panel' one.
+    for (var i = 1; i < registry.handlerNames.length; ++i) {
+        var handler = registry.handlerNames[i];
+        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Open using %s" : "Open Using %s", handler),
+            registry.dispatchToHandler.bind(registry, handler, { url: url, preferredLineNumber: preferredLineNumber }));
+    }
+}
+
 WebInspector._showAnchorLocation = function(anchor)
 {
-    if (WebInspector.openAnchorLocationRegistry.dispatch(anchor))
+    if (WebInspector.openAnchorLocationRegistry.dispatch({ url: anchor.href, lineNumber: anchor.lineNumber}))
         return true;
-    var preferedPanel = this.panels[anchor.getAttribute("preferred_panel") || "resources"];
+    var preferedPanel = this.panels[anchor.preferredPanel || "resources"];
     if (WebInspector._showAnchorLocationInPanel(anchor, preferedPanel))
         return true;
     if (preferedPanel !== this.panels.resources && WebInspector._showAnchorLocationInPanel(anchor, this.panels.resources))
@@ -866,7 +878,6 @@ WebInspector.addMainEventListeners = function(doc)
 WebInspector.frontendReused = function()
 {
     this.resourceTreeModel.frontendReused();
-    this.reset();
 }
 
 WebInspector._toolbarItemClicked = function(event)
@@ -879,6 +890,6 @@ WebInspector.installSourceMappingForTest = function(url)
 {
     // FIXME: remove this method when it's possible to set compiler source mappings via UI.
     var sourceMapping = new WebInspector.ClosureCompilerSourceMapping(url);
-    var uiSourceCode = WebInspector.panels.scripts.visibleView._delegate._uiSourceCode;
+    var uiSourceCode = WebInspector.panels.scripts.visibleView._uiSourceCode;
     uiSourceCode.rawSourceCode.setCompilerSourceMapping(sourceMapping);
 }

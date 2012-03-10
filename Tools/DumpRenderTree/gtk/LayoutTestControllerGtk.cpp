@@ -201,8 +201,14 @@ void LayoutTestController::notifyDone()
 
 JSStringRef LayoutTestController::pathToLocalResource(JSContextRef context, JSStringRef url)
 {
-    // Function introduced in r28690. This may need special-casing on Windows.
-    return JSStringRetain(url); // Do nothing on Unix.
+    GOwnPtr<char> urlCString(JSStringCopyUTF8CString(url));
+    if (!g_str_has_prefix(urlCString.get(), "file:///tmp/LayoutTests/"))
+        return JSStringRetain(url);
+
+    const char* layoutTestsSuffix = urlCString.get() + strlen("file:///tmp/");
+    GOwnPtr<char> testPath(g_build_filename(getTopLevelPath().data(), layoutTestsSuffix, NULL));
+    GOwnPtr<char> testURI(g_filename_to_uri(testPath.get(), 0, 0));
+    return JSStringCreateWithUTF8CString(testURI.get());
 }
 
 void LayoutTestController::queueLoad(JSStringRef url, JSStringRef target)
@@ -827,8 +833,13 @@ void LayoutTestController::overridePreference(JSStringRef key, JSStringRef value
         propertyName = "enable-hyperlink-auditing";
     else if (g_str_equal(originalName.get(), "WebKitWebGLEnabled"))
         propertyName = "enable-webgl";
+    else if (g_str_equal(originalName.get(), "WebKitWebAudioEnabled"))
+        propertyName = "enable-webaudio";
     else if (g_str_equal(originalName.get(), "WebKitTabToLinksPreferenceKey")) {
         DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(!g_ascii_strcasecmp(valueAsString.get(), "true") || !g_ascii_strcasecmp(valueAsString.get(), "1"));
+        return;
+    } else if (g_str_equal(originalName.get(), "WebKitHixie76WebSocketProtocolEnabled")) {
+        DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(webkit_web_frame_get_web_view(mainFrame), !g_ascii_strcasecmp(valueAsString.get(), "true") || !g_ascii_strcasecmp(valueAsString.get(), "1"));
         return;
     } else {
         fprintf(stderr, "LayoutTestController::overridePreference tried to override "
@@ -1019,5 +1030,9 @@ void LayoutTestController::focusWebView()
 }
 
 void LayoutTestController::setBackingScaleFactor(double)
+{
+}
+
+void LayoutTestController::simulateDesktopNotificationClick(JSStringRef title)
 {
 }

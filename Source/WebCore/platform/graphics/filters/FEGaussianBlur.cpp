@@ -37,7 +37,7 @@
 #include <wtf/MathExtras.h>
 #include <wtf/ParallelJobs.h>
 
-using std::max;
+using namespace std;
 
 static inline float gaussianKernelFactor()
 {
@@ -88,7 +88,7 @@ inline void boxBlur(ByteArray* srcPixelArray, ByteArray* dstPixelArray,
         for (int channel = 3; channel >= 0; --channel) {
             int sum = 0;
             // Fill the kernel
-            int maxKernelSize = std::min(dxRight, effectWidth);
+            int maxKernelSize = min(dxRight, effectWidth);
             for (int i = 0; i < maxKernelSize; ++i)
                 sum += srcPixelArray->get(line + i * stride + channel);
 
@@ -114,28 +114,31 @@ inline void FEGaussianBlur::platformApplyGeneric(ByteArray* srcPixelArray, ByteA
     int dxRight = 0;
     int dyLeft = 0;
     int dyRight = 0;
+    ByteArray* src = srcPixelArray;
+    ByteArray* dst = tmpPixelArray;
+
     for (int i = 0; i < 3; ++i) {
         if (kernelSizeX) {
             kernelPosition(i, kernelSizeX, dxLeft, dxRight);
-            boxBlur(srcPixelArray, tmpPixelArray, kernelSizeX, dxLeft, dxRight, 4, stride, paintSize.width(), paintSize.height(), isAlphaImage());
-        } else {
-            ByteArray* auxPixelArray = tmpPixelArray;
-            tmpPixelArray = srcPixelArray;
-            srcPixelArray = auxPixelArray;
+            boxBlur(src, dst, kernelSizeX, dxLeft, dxRight, 4, stride, paintSize.width(), paintSize.height(), isAlphaImage());
+            swap(src, dst);
         }
 
         if (kernelSizeY) {
             kernelPosition(i, kernelSizeY, dyLeft, dyRight);
-            boxBlur(tmpPixelArray, srcPixelArray, kernelSizeY, dyLeft, dyRight, stride, 4, paintSize.height(), paintSize.width(), isAlphaImage());
-        } else {
-            ByteArray* auxPixelArray = tmpPixelArray;
-            tmpPixelArray = srcPixelArray;
-            srcPixelArray = auxPixelArray;
+            boxBlur(src, dst, kernelSizeY, dyLeft, dyRight, stride, 4, paintSize.height(), paintSize.width(), isAlphaImage());
+            swap(src, dst);
         }
     }
+
+    // The final result should be stored in srcPixelArray.
+    if (dst == srcPixelArray) {
+        ASSERT(src->length() == dst->length());
+        memcpy(dst->data(), src->data(), src->length());
+    }
+
 }
 
-#if ENABLE(PARALLEL_JOBS)
 void FEGaussianBlur::platformApplyWorker(PlatformApplyParameters* parameters)
 {
     IntSize paintSize(parameters->width, parameters->height);
@@ -147,17 +150,15 @@ void FEGaussianBlur::platformApplyWorker(PlatformApplyParameters* parameters)
         parameters->kernelSizeX, parameters->kernelSizeY, paintSize);
 #endif
 }
-#endif
 
 inline void FEGaussianBlur::platformApply(ByteArray* srcPixelArray, ByteArray* tmpPixelArray, unsigned kernelSizeX, unsigned kernelSizeY, IntSize& paintSize)
 {
-#if ENABLE(PARALLEL_JOBS)
     int scanline = 4 * paintSize.width();
     int extraHeight = 3 * kernelSizeY * 0.5f;
     int optimalThreadNumber = (paintSize.width() * paintSize.height()) / (s_minimalRectDimension + extraHeight * paintSize.width());
 
     if (optimalThreadNumber > 1) {
-        ParallelJobs<PlatformApplyParameters> parallelJobs(&platformApplyWorker, optimalThreadNumber);
+        WTF::ParallelJobs<PlatformApplyParameters> parallelJobs(&platformApplyWorker, optimalThreadNumber);
 
         int jobs = parallelJobs.numberOfJobs();
         if (jobs > 1) {
@@ -216,8 +217,8 @@ inline void FEGaussianBlur::platformApply(ByteArray* srcPixelArray, ByteArray* t
             }
             return;
         }
+        // Fallback to single threaded mode.
     }
-#endif // PARALLEL_JOBS
 
     // The selection here eventually should happen dynamically on some platforms.
 #if CPU(ARM_NEON) && COMPILER(GCC)
@@ -264,6 +265,13 @@ void FEGaussianBlur::determineAbsolutePaintRect()
 
 void FEGaussianBlur::platformApplySoftware()
 {
+#if USE(SKIA)
+    if (filter()->renderingMode() == Accelerated) {
+        platformApplySkia();
+        return;
+    }
+#endif
+
     FilterEffect* in = inputEffect(0);
 
     ByteArray* srcPixelArray = createPremultipliedImageResult();

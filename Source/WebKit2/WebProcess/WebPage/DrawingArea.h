@@ -69,10 +69,12 @@ public:
     virtual void pageBackgroundTransparencyChanged() { }
     virtual void forceRepaint() { }
     virtual void setLayerTreeStateIsFrozen(bool) { }
+    virtual bool layerTreeStateIsFrozen() const { return false; }
 
     virtual void didInstallPageOverlay() { }
     virtual void didUninstallPageOverlay() { }
     virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&) { }
+    virtual void pageCustomRepresentationChanged() { }
 
     virtual void setPaintingEnabled(bool) { }
 

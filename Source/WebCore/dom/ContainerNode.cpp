@@ -713,6 +713,8 @@ void ContainerNode::suspendPostAttachCallbacks()
     if (!s_attachDepth) {
         ASSERT(!s_shouldReEnableMemoryCacheCallsAfterAttach);
         if (Page* page = document()->page()) {
+            // FIXME: How can this call be specific to one Page, while the
+            // s_attachDepth is a global? Doesn't make sense.
             if (page->areMemoryCacheClientCallsEnabled()) {
                 page->setMemoryCacheClientCallsEnabled(false);
                 s_shouldReEnableMemoryCacheCallsAfterAttach = true;
@@ -841,9 +843,8 @@ void ContainerNode::childrenChanged(bool changedByParser, Node* beforeChange, No
 {
     Node::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
     if (!changedByParser && childCountDelta)
-        document()->nodeChildrenChanged(this);
-    if (treeScope()->hasNodeListCaches())
-        notifyNodeListsChildrenChanged();
+        document()->updateRangesAfterChildrenChanged(this);
+    invalidateNodeListsCacheAfterChildrenChanged();
 }
 
 void ContainerNode::cloneChildNodes(ContainerNode *clone)

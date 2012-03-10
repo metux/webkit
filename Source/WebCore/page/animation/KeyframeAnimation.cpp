@@ -56,6 +56,9 @@ KeyframeAnimation::KeyframeAnimation(const Animation* animation, RenderObject* r
 
     // Update the m_transformFunctionListValid flag based on whether the function lists in the keyframes match.
     validateTransformFunctionList();
+#if ENABLE(CSS_FILTERS)
+    checkForMatchingFilterFunctionLists();
+#endif
 }
 
 KeyframeAnimation::~KeyframeAnimation()
@@ -423,24 +426,58 @@ void KeyframeAnimation::validateTransformFunctionList()
         const KeyframeValue& currentKeyframe = m_keyframes[i];
         const TransformOperations* val = &currentKeyframe.style()->transform();
         
-        // A null transform matches anything
+        // An emtpy transform list matches anything.
         if (val->operations().isEmpty())
             continue;
         
-        // If the sizes of the function lists don't match, the lists don't match
-        if (firstVal->operations().size() != val->operations().size())
+        if (!firstVal->operationsMatch(*val))
             return;
-        
-        // If the types of each function are not the same, the lists don't match
-        for (size_t j = 0; j < firstVal->operations().size(); ++j) {
-            if (!firstVal->operations()[j]->isSameType(*val->operations()[j]))
-                return;
-        }
     }
 
     // Keyframes are valid
     m_transformFunctionListValid = true;
 }
+
+#if ENABLE(CSS_FILTERS)
+void KeyframeAnimation::checkForMatchingFilterFunctionLists()
+{
+    m_filterFunctionListsMatch = false;
+
+    if (m_keyframes.size() < 2 || !m_keyframes.containsProperty(CSSPropertyWebkitFilter))
+        return;
+
+    // Empty filters match anything, so find the first non-empty entry as the reference
+    size_t numKeyframes = m_keyframes.size();
+    size_t firstNonEmptyFilterKeyframeIndex = numKeyframes;
+
+    for (size_t i = 0; i < numKeyframes; ++i) {
+        const KeyframeValue& currentKeyframe = m_keyframes[i];
+        if (currentKeyframe.style()->filter().operations().size()) {
+            firstNonEmptyFilterKeyframeIndex = i;
+            break;
+        }
+    }
+    
+    if (firstNonEmptyFilterKeyframeIndex == numKeyframes)
+        return;
+        
+    const FilterOperations* firstVal = &m_keyframes[firstNonEmptyFilterKeyframeIndex].style()->filter();
+    
+    for (size_t i = firstNonEmptyFilterKeyframeIndex + 1; i < numKeyframes; ++i) {
+        const KeyframeValue& currentKeyframe = m_keyframes[i];
+        const FilterOperations* val = &currentKeyframe.style()->filter();
+        
+        // An emtpy filter list matches anything.
+        if (val->operations().isEmpty())
+            continue;
+        
+        if (!firstVal->operationsMatch(*val))
+            return;
+    }
+    
+    m_filterFunctionListsMatch = true;
+}
+#endif
 
 double KeyframeAnimation::timeToNextService()
 {

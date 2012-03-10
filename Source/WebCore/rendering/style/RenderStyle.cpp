@@ -133,6 +133,9 @@ ALWAYS_INLINE RenderStyle::RenderStyle(bool)
 #if ENABLE(CSS_FILTERS)
     rareNonInheritedData.access()->m_filter.init();
 #endif
+#if ENABLE(CSS_GRID_LAYOUT)
+    rareNonInheritedData.access()->m_grid.init();
+#endif
     rareInheritedData.init();
     inherited.init();
 
@@ -318,6 +321,17 @@ bool RenderStyle::inheritedNotEqual(const RenderStyle* other) const
            || rareInheritedData != other->rareInheritedData;
 }
 
+bool RenderStyle::inheritedDataShared(const RenderStyle* other) const
+{
+    // This is a fast check that only looks if the data structures are shared.
+    return inherited_flags == other->inherited_flags
+        && inherited.get() == other->inherited.get()
+#if ENABLE(SVG)
+        && m_svgStyle.get() == other->m_svgStyle.get()
+#endif
+        && rareInheritedData.get() == other->rareInheritedData.get();
+}
+
 static bool positionedObjectMoved(const LengthBox& a, const LengthBox& b)
 {
     // If any unit types are different, then we can't guarantee
@@ -425,6 +439,10 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             && *rareNonInheritedData->m_filter.get() != *other->rareNonInheritedData->m_filter.get()) {
             return StyleDifferenceLayout;
         }
+#endif
+#if ENABLE(CSS_GRID_LAYOUT)
+        if (rareNonInheritedData->m_grid.get() != other->rareNonInheritedData->m_grid.get())
+            return StyleDifferenceLayout;
 #endif
 
 #if !USE(ACCELERATED_COMPOSITING)
@@ -629,7 +647,8 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         // the parent container. For sure, I will have to revisit this code, but for now I've added this in order 
         // to avoid having diff() == StyleDifferenceEqual where wrap-shapes actually differ.
         // Tracking bug: https://bugs.webkit.org/show_bug.cgi?id=62991
-        if (rareNonInheritedData->m_wrapShape != other->rareNonInheritedData->m_wrapShape)
+        if (rareNonInheritedData->m_wrapShapeInside != other->rareNonInheritedData->m_wrapShapeInside
+            || rareNonInheritedData->m_wrapShapeOutside != other->rareNonInheritedData->m_wrapShapeOutside)
             return StyleDifferenceRepaint;
 
 #if USE(ACCELERATED_COMPOSITING)

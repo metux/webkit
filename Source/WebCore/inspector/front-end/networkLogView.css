@@ -125,6 +125,15 @@
     color: white;
 }
 
+.network-log-grid tr.highlighted-row {
+    -webkit-animation: "network-row-highlight-fadeout" 2s 0s;
+}
+
+@-webkit-keyframes network-row-highlight-fadeout {
+    from {background-color: rgba(56, 121, 217, 1); }
+    to { background-color: rgba(56, 121, 217, 0); }
+}
+
 .network-header-subtitle {
     color: gray;
 }
@@ -533,10 +542,6 @@
 
 #network-container.brief-mode th.corner {
     display: none;
-}
-
-#network-container.brief-mode {
-    border-right: 1px solid rgb(163, 163, 163);
 }
 
 #network-container.brief-mode .network-log-grid.data-grid .data-grid-resizer {

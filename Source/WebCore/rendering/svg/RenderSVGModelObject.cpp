@@ -49,9 +49,9 @@ LayoutRect RenderSVGModelObject::clippedOverflowRectForRepaint(RenderBoxModelObj
     return SVGRenderSupport::clippedOverflowRectForRepaint(this, repaintContainer);
 }
 
-void RenderSVGModelObject::computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect& repaintRect, bool fixed) const
+void RenderSVGModelObject::computeFloatRectForRepaint(RenderBoxModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
 {
-    SVGRenderSupport::computeRectForRepaint(this, repaintContainer, repaintRect, fixed);
+    SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
 }
 
 void RenderSVGModelObject::mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool /* fixed */, bool /* useTransforms */, TransformState& transformState, bool* wasFixed) const
@@ -91,8 +91,11 @@ void RenderSVGModelObject::willBeDestroyed()
 
 void RenderSVGModelObject::styleWillChange(StyleDifference diff, const RenderStyle* newStyle)
 {
-    if (diff == StyleDifferenceLayout)
+    if (diff == StyleDifferenceLayout) {
         setNeedsBoundariesUpdate();
+        if (newStyle->hasTransform())
+            setNeedsTransformUpdate();
+    }
     RenderObject::styleWillChange(diff, newStyle);
 }
 
@@ -155,7 +158,7 @@ static bool intersectsAllowingEmpty(const FloatRect& r, const FloatRect& other)
 // image, line, path, polygon, polyline, rect, text and use.
 static bool isGraphicsElement(RenderObject* renderer)
 {
-    return renderer->isSVGPath() || renderer->isSVGText() || renderer->isSVGImage() || renderer->isSVGShadowTreeRootContainer();
+    return renderer->isSVGShape() || renderer->isSVGText() || renderer->isSVGImage() || renderer->isSVGShadowTreeRootContainer();
 }
 
 bool RenderSVGModelObject::checkIntersection(RenderObject* renderer, const FloatRect& rect)

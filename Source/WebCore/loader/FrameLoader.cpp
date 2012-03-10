@@ -35,6 +35,7 @@
 #include "config.h"
 #include "FrameLoader.h"
 
+#include "AXObjectCache.h"
 #include "ApplicationCacheHost.h"
 #include "BackForwardController.h"
 #include "BeforeUnloadEvent.h"
@@ -219,7 +220,7 @@ void FrameLoader::init()
     // This somewhat odd set of steps gives the frame an initial empty document.
     // It would be better if this could be done with even fewer steps.
     m_stateMachine.advanceTo(FrameLoaderStateMachine::CreatingInitialEmptyDocument);
-    setPolicyDocumentLoader(m_client->createDocumentLoader(ResourceRequest(KURL(ParsedURLString, "")), SubstituteData()).get());
+    setPolicyDocumentLoader(m_client->createDocumentLoader(ResourceRequest(KURL(ParsedURLString, emptyString())), SubstituteData()).get());
     setProvisionalDocumentLoader(m_policyDocumentLoader.get());
     setState(FrameStateProvisional);
     m_provisionalDocumentLoader->setResponse(ResourceResponse(KURL(), "text/html", 0, String(), String()));
@@ -375,10 +376,12 @@ void FrameLoader::stopLoading(UnloadEventPolicy unloadEventPolicy)
                         // time into freed memory.
                         RefPtr<DocumentLoader> documentLoader = m_provisionalDocumentLoader;
                         m_pageDismissalEventBeingDispatched = UnloadDismissal;
-                        if (documentLoader && !documentLoader->timing()->unloadEventStart && !documentLoader->timing()->unloadEventEnd) {
+                        if (documentLoader && !documentLoader->timing()->unloadEventStart() && !documentLoader->timing()->unloadEventEnd()) {
                             DocumentLoadTiming* timing = documentLoader->timing();
-                            ASSERT(timing->navigationStart);
-                            m_frame->domWindow()->dispatchTimedEvent(unloadEvent, m_frame->domWindow()->document(), &timing->unloadEventStart, &timing->unloadEventEnd);
+                            ASSERT(timing->navigationStart());
+                            timing->markUnloadEventStart();
+                            m_frame->domWindow()->dispatchEvent(unloadEvent, m_frame->domWindow()->document());
+                            timing->markUnloadEventEnd();
                         } else
                             m_frame->domWindow()->dispatchEvent(unloadEvent, m_frame->domWindow()->document());
                     }
@@ -1114,6 +1117,12 @@ void FrameLoader::prepareForLoadStart()
     if (Page* page = m_frame->page())
         page->progress()->progressStarted(m_frame);
     m_client->dispatchDidStartProvisionalLoad();
+
+    // Notify accessibility.
+    if (AXObjectCache::accessibilityEnabled()) {
+        AXObjectCache::AXLoadingEvent loadingEvent = loadType() == FrameLoadTypeReload ? AXObjectCache::AXLoadingReloaded : AXObjectCache::AXLoadingStarted;
+        m_frame->document()->axObjectCache()->frameLoadingEventNotification(m_frame, loadingEvent);
+    }
 }
 
 void FrameLoader::setupForReplace()
@@ -1764,7 +1773,7 @@ void FrameLoader::commitProvisionalLoad()
     if (pdl) {
         // Check if the destination page is allowed to access the previous page's timing information.
         RefPtr<SecurityOrigin> securityOrigin = SecurityOrigin::create(pdl->request().url());
-        m_documentLoader->timing()->hasSameOriginAsPreviousDocument = securityOrigin->canRequest(m_previousUrl);
+        m_documentLoader->timing()->setHasSameOriginAsPreviousDocument(securityOrigin->canRequest(m_previousUrl));
     }
 
     // Call clientRedirectCancelledOrFinished() here so that the frame load delegate is notified that the redirect's
@@ -2269,10 +2278,19 @@ void FrameLoader::checkLoadCompleteForThisFrame()
                 page->progress()->progressCompleted(m_frame);
 
             const ResourceError& error = dl->mainDocumentError();
-            if (!error.isNull())
+
+            AXObjectCache::AXLoadingEvent loadingEvent;
+            if (!error.isNull()) {
                 m_client->dispatchDidFailLoad(error);
-            else
+                loadingEvent = AXObjectCache::AXLoadingFailed;
+            } else {
                 m_client->dispatchDidFinishLoad();
+                loadingEvent = AXObjectCache::AXLoadingFinished;
+            }
+
+            // Notify accessibility.
+            if (AXObjectCache::accessibilityEnabled())
+                m_frame->document()->axObjectCache()->frameLoadingEventNotification(m_frame, loadingEvent);
 
             return;
         }
@@ -2311,11 +2329,64 @@ void FrameLoader::continueLoadAfterWillSubmitForm()
         notifier()->assignIdentifierToInitialRequest(identifier, m_provisionalDocumentLoader.get(), m_provisionalDocumentLoader->originalRequest());
     }
 
-    ASSERT(!m_provisionalDocumentLoader->timing()->navigationStart);
-    m_provisionalDocumentLoader->timing()->navigationStart = currentTime();
+    m_provisionalDocumentLoader->timing()->markNavigationStart(frame());
 
     if (!m_provisionalDocumentLoader->startLoadingMainResource(identifier))
         m_provisionalDocumentLoader->updateLoading();
+}
+
+static KURL originatingURLFromBackForwardList(Page* page)
+{
+    // FIXME: Can this logic be replaced with m_frame->document()->firstPartyForCookies()?
+    // It has the same meaning of "page a user thinks is the current one".
+
+    KURL originalURL;
+    int backCount = page->backForward()->backCount();
+    for (int backIndex = 0; backIndex <= backCount; backIndex++) {
+        // FIXME: At one point we had code here to check a "was user gesture" flag.
+        // Do we need to restore that logic?
+        HistoryItem* historyItem = page->backForward()->itemAtIndex(-backIndex);
+        if (!historyItem)
+            continue;
+
+        originalURL = historyItem->originalURL(); 
+        if (!originalURL.isNull()) 
+            return originalURL;
+    }
+
+    return KURL();
+}
+
+void FrameLoader::setOriginalURLForDownloadRequest(ResourceRequest& request)
+{
+    KURL originalURL;
+    
+    // If there is no referrer, assume that the download was initiated directly, so current document is
+    // completely unrelated to it. See <rdar://problem/5294691>.
+    // FIXME: Referrer is not sent in many other cases, so we will often miss this important information.
+    // Find a better way to decide whether the download was unrelated to current document.
+    if (!request.httpReferrer().isNull()) {
+        // find the first item in the history that was originated by the user
+        originalURL = originatingURLFromBackForwardList(m_frame->page());
+    }
+
+    if (originalURL.isNull())
+        originalURL = request.url();
+
+    if (!originalURL.protocol().isEmpty() && !originalURL.host().isEmpty()) {
+        unsigned port = originalURL.port();
+
+        // Original URL is needed to show the user where a file was downloaded from. We should make a URL that won't result in downloading the file again.
+        // FIXME: Using host-only URL is a very heavy-handed approach. We should attempt to provide the actual page where the download was initiated from, as a reminder to the user.
+        String hostOnlyURLString;
+        if (port)
+            hostOnlyURLString = makeString(originalURL.protocol(), "://", originalURL.host(), ":", String::number(port));
+        else
+            hostOnlyURLString = makeString(originalURL.protocol(), "://", originalURL.host());
+
+        // FIXME: Rename firstPartyForCookies back to mainDocumentURL. It was a mistake to think that it was only used for cookies.
+        request.setFirstPartyForCookies(KURL(KURL(), hostOnlyURLString));
+    }
 }
 
 void FrameLoader::didFirstLayout()
@@ -2958,11 +3029,11 @@ void FrameLoader::loadProvisionalItemFromCachedPage()
     provisionalLoader->prepareForLoadStart();
 
     m_loadingFromCachedPage = true;
-    
+
     // Should have timing data from previous time(s) the page was shown.
-    ASSERT(provisionalLoader->timing()->navigationStart);
+    ASSERT(provisionalLoader->timing()->navigationStart());
     provisionalLoader->resetTiming();
-    provisionalLoader->timing()->navigationStart = currentTime();    
+    provisionalLoader->timing()->markNavigationStart(frame());
 
     provisionalLoader->setCommitted(true);
     commitProvisionalLoad();

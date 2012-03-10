@@ -169,14 +169,6 @@ void InspectorFrontendHost::closeWindow()
     }
 }
 
-void InspectorFrontendHost::disconnectFromBackend()
-{
-    if (m_client) {
-        m_client->disconnectFromBackend();
-        disconnectClient(); // Disconnect from client.
-    }
-}
-
 void InspectorFrontendHost::bringToFront()
 {
     if (m_client)
@@ -209,17 +201,24 @@ void InspectorFrontendHost::setExtensionAPI(const String& script)
 
 String InspectorFrontendHost::localizedStringsURL()
 {
-    return m_client->localizedStringsURL();
+    return m_client ? m_client->localizedStringsURL() : "";
 }
 
 String InspectorFrontendHost::hiddenPanels()
 {
-    return m_client->hiddenPanels();
+    return m_client ? m_client->hiddenPanels() : "";
 }
 
 void InspectorFrontendHost::copyText(const String& text)
 {
     Pasteboard::generalPasteboard()->writePlainText(text);
+}
+
+bool InspectorFrontendHost::canSaveAs()
+{
+    if (m_client)
+        return m_client->canSaveAs();
+    return false;
 }
 
 void InspectorFrontendHost::saveAs(const String& fileName, const String& content)

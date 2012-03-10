@@ -37,15 +37,6 @@
     content: url(Images/resourceDocumentIcon.png);
 }
 
-#audit-views {
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 200px;
-    bottom: 0;
-    overflow: auto;
-}
-
 .audit-launcher-view {
     z-index: 1000;
     position: absolute;
@@ -241,11 +232,11 @@ body.inactive .audit-launcher-view button, .audit-launcher-view button:disabled 
     margin-top: 1px;
     margin-bottom: 1px;
     word-wrap: break-word;
-    text-indent: -2px;
+    margin-left: -2px;
 }
 
 .audit-result-tree li.parent {
-    text-indent: -12px
+    margin-left: -12px
 }
 
 .audit-result-tree li.parent::before {
@@ -276,6 +267,6 @@ body.inactive .audit-launcher-view button, .audit-launcher-view button:disabled 
 
 .audit-result img {
     float: left;
-    margin-left: -40px;
+    margin-left: -28px;
     margin-top: -1px;
 }

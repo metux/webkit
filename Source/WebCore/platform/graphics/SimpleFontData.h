@@ -158,6 +158,7 @@ public:
 
     const GlyphData& missingGlyphData() const { return m_missingGlyphData; }
     void setMissingGlyphData(const GlyphData& glyphData) { m_missingGlyphData = glyphData; }
+    void updateGlyphWithVariationSelector(UChar32 character, UChar32 selector, Glyph&) const;
 
 #ifndef NDEBUG
     virtual String description() const;
@@ -199,6 +200,7 @@ public:
 #endif
     static void setShouldApplyMacAscentHack(bool);
     static bool shouldApplyMacAscentHack();
+    static float ascentConsideringMacAscentHack(const WCHAR*, float ascent, float descent);
 #endif
 
 #if PLATFORM(WX)

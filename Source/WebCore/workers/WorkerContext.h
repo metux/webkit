@@ -55,6 +55,7 @@ namespace WebCore {
     class EntrySync;
     class ErrorCallback;
     class FileSystemCallback;
+    class IDBFactory;
     class NotificationCenter;
     class ScheduledAction;
     class WorkerInspectorController;
@@ -173,9 +174,15 @@ namespace WebCore {
         void registerObserver(Observer*);
         void unregisterObserver(Observer*);
         void notifyObserversOfStop();
+#if ENABLE(INDEXED_DATABASE)
+        IDBFactory* webkitIndexedDB() const;
+#endif
 
     protected:
         WorkerContext(const KURL&, const String&, WorkerThread*);
+
+        virtual void logExceptionToConsole(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
+        void addMessageToWorkerConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
 
     private:
         virtual void refScriptExecutionContext() { ref(); }
@@ -190,7 +197,6 @@ namespace WebCore {
         virtual KURL virtualCompleteURL(const String&) const;
 
         virtual EventTarget* errorEventTarget();
-        virtual void logExceptionToConsole(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
 
         KURL m_url;
         String m_userAgent;
@@ -216,6 +222,12 @@ namespace WebCore {
         HashSet<Observer*> m_workerObservers;
 
         OwnPtr<WorkerEventQueue> m_eventQueue;
+
+#if ENABLE(INDEXED_DATABASE)
+        mutable RefPtr<IDBFactory> m_idbFactory;
+        mutable RefPtr<IDBFactoryBackendInterface> m_idbFactoryBackendInterface;
+#endif
+
     };
 
 } // namespace WebCore

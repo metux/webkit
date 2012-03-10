@@ -23,6 +23,7 @@
 #include "CSSMutableStyleDeclaration.h"
 
 #include "CSSImageValue.h"
+#include "CSSInlineStyleDeclaration.h"
 #include "CSSParser.h"
 #include "CSSPropertyLonghand.h"
 #include "CSSPropertyNames.h"
@@ -32,8 +33,12 @@
 #include "CSSValueList.h"
 #include "Document.h"
 #include "ExceptionCode.h"
+#include "HTMLNames.h"
 #include "InspectorInstrumentation.h"
+#include "MutationObserverInterestGroup.h"
+#include "MutationRecord.h"
 #include "StyledElement.h"
+#include "WebKitMutationObserver.h"
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
 
@@ -41,32 +46,120 @@ using namespace std;
 
 namespace WebCore {
 
+namespace {
+
+class StyleAttributeMutationScope {
+    WTF_MAKE_NONCOPYABLE(StyleAttributeMutationScope);
+public:
+    StyleAttributeMutationScope(CSSMutableStyleDeclaration* decl)
+    {
+        ++s_scopeCount;
+
+        if (s_scopeCount != 1) {
+            ASSERT(s_currentDecl == decl);
+            return;
+        }
+
+        ASSERT(!s_currentDecl);
+        s_currentDecl = decl;
+
+#if ENABLE(MUTATION_OBSERVERS)
+        if (!s_currentDecl->isInlineStyleDeclaration())
+            return;
+
+        CSSInlineStyleDeclaration* inlineDecl = toCSSInlineStyleDeclaration(s_currentDecl);
+        if (!inlineDecl->element())
+            return;
+
+        m_mutationRecipients = MutationObserverInterestGroup::createForAttributesMutation(inlineDecl->element(), HTMLNames::styleAttr);
+        if (!m_mutationRecipients)
+            return;
+
+        AtomicString oldValue = m_mutationRecipients->isOldValueRequested() ? inlineDecl->element()->getAttribute(HTMLNames::styleAttr) : nullAtom;
+        m_mutation = MutationRecord::createAttributes(inlineDecl->element(), HTMLNames::styleAttr, oldValue);
+#endif
+    }
+
+    ~StyleAttributeMutationScope()
+    {
+        --s_scopeCount;
+        if (s_scopeCount)
+            return;
+
+#if ENABLE(MUTATION_OBSERVERS)
+        if (m_mutation && s_shouldDeliver)
+            m_mutationRecipients->enqueueMutationRecord(m_mutation);
+        s_shouldDeliver = false;
+#endif
+
+        if (!s_shouldNotifyInspector) {
+            s_currentDecl = 0;
+            return;
+        }
+
+        CSSInlineStyleDeclaration* inlineDecl = toCSSInlineStyleDeclaration(s_currentDecl);
+        s_currentDecl = 0;
+        s_shouldNotifyInspector = false;
+        if (inlineDecl->element() && inlineDecl->element()->document())
+            InspectorInstrumentation::didInvalidateStyleAttr(inlineDecl->element()->document(), inlineDecl->element());
+    }
+
+#if ENABLE(MUTATION_OBSERVERS)
+    void enqueueMutationRecord()
+    {
+        s_shouldDeliver = true;
+    }
+#endif
+
+    void didInvalidateStyleAttr()
+    {
+        ASSERT(s_currentDecl->isInlineStyleDeclaration());
+        s_shouldNotifyInspector = true;
+    }
+
+private:
+    static unsigned s_scopeCount;
+    static CSSMutableStyleDeclaration* s_currentDecl;
+    static bool s_shouldNotifyInspector;
+#if ENABLE(MUTATION_OBSERVERS)
+    static bool s_shouldDeliver;
+
+    OwnPtr<MutationObserverInterestGroup> m_mutationRecipients;
+    RefPtr<MutationRecord> m_mutation;
+#endif
+};
+
+unsigned StyleAttributeMutationScope::s_scopeCount = 0;
+CSSMutableStyleDeclaration* StyleAttributeMutationScope::s_currentDecl = 0;
+bool StyleAttributeMutationScope::s_shouldNotifyInspector = false;
+#if ENABLE(MUTATION_OBSERVERS)
+bool StyleAttributeMutationScope::s_shouldDeliver = false;
+#endif
+
+} // namespace
+
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration()
-    : CSSStyleDeclaration(0, /* isMutable */ true)
-    , m_node(0)
+    : CSSStyleDeclaration(0)
 {
     // This constructor is used for various inline style declarations, so disable strict parsing.
     m_strictParsing = false;
 }
 
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent)
-    : CSSStyleDeclaration(parent, /* isMutable */ true)
-    , m_node(0)
+    : CSSStyleDeclaration(parent)
 {
 }
 
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent, const Vector<CSSProperty>& properties)
-    : CSSStyleDeclaration(parent, /* isMutable */ true)
+    : CSSStyleDeclaration(parent)
     , m_properties(properties)
-    , m_node(0)
 {
     m_properties.shrinkToFit();
     // FIXME: This allows duplicate properties.
 }
 
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent, const CSSProperty* const * properties, int numProperties)
-    : CSSStyleDeclaration(parent, /* isMutable */ true)
-    , m_node(0)
+    : CSSStyleDeclaration(parent)
 {
     m_properties.reserveInitialCapacity(numProperties);
     HashMap<int, bool> candidates;
@@ -74,11 +167,14 @@ CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent, const CS
         const CSSProperty *property = properties[i];
         ASSERT(property);
         bool important = property->isImportant();
-        if (candidates.contains(property->id())) {
-            if (!important && candidates.get(property->id()))
+
+        HashMap<int, bool>::iterator it = candidates.find(property->id());
+        if (it != candidates.end()) {
+            if (!important && it->second)
                 continue;
-            removeProperty(property->id(), false);
+            removeProperty(property->id(), false, false);
         }
+
         m_properties.append(*property);
         candidates.set(property->id(), important);
     }
@@ -88,13 +184,10 @@ CSSMutableStyleDeclaration::~CSSMutableStyleDeclaration()
 {
 }
 
-CSSMutableStyleDeclaration& CSSMutableStyleDeclaration::operator=(const CSSMutableStyleDeclaration& other)
+void CSSMutableStyleDeclaration::copyPropertiesFrom(const CSSMutableStyleDeclaration& other)
 {
     ASSERT(!m_iteratorCount);
-    // don't attach it to the same node, just leave the current m_node value
     m_properties = other.m_properties;
-    m_strictParsing = other.m_strictParsing;
-    return *this;
 }
 
 String CSSMutableStyleDeclaration::getPropertyValue(int propertyID) const
@@ -194,6 +287,10 @@ String CSSMutableStyleDeclaration::getPropertyValue(int propertyID) const
                                         CSSPropertyBorderBottomStyle, CSSPropertyBorderLeftStyle };
             return get4Values(properties);
         }
+        case CSSPropertyWebkitFlexFlow: {
+            const int properties[] = { CSSPropertyWebkitFlexDirection, CSSPropertyWebkitFlexWrap };
+            return getShorthandValue(properties);
+        }
         case CSSPropertyFont:
             return fontValue();
         case CSSPropertyMargin: {
@@ -247,6 +344,11 @@ String CSSMutableStyleDeclaration::getPropertyValue(int propertyID) const
                                         CSSPropertyWebkitAnimationIterationCount, CSSPropertyWebkitAnimationDirection,
                                         CSSPropertyWebkitAnimationFillMode };
             return getLayeredShorthandValue(properties);
+        }
+        case CSSPropertyWebkitWrap: {
+            const int properties[3] = { CSSPropertyWebkitWrapFlow, CSSPropertyWebkitWrapMargin,
+                CSSPropertyWebkitWrapPadding };
+            return getShorthandValue(properties);
         }
 #if ENABLE(SVG)
         case CSSPropertyMarker: {
@@ -504,16 +606,18 @@ PassRefPtr<CSSValue> CSSMutableStyleDeclaration::getPropertyCSSValue(int propert
 bool CSSMutableStyleDeclaration::removeShorthandProperty(int propertyID, bool notifyChanged)
 {
     CSSPropertyLonghand longhand = longhandForProperty(propertyID);
-    if (longhand.length()) {
-        removePropertiesInSet(longhand.properties(), longhand.length(), notifyChanged);
-        return true;
-    }
-    return false;
+    if (!longhand.length())
+        return false;
+    return removePropertiesInSet(longhand.properties(), longhand.length(), notifyChanged);
 }
 
 String CSSMutableStyleDeclaration::removeProperty(int propertyID, bool notifyChanged, bool returnText)
 {
     ASSERT(!m_iteratorCount);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
 
     if (removeShorthandProperty(propertyID, notifyChanged)) {
         // FIXME: Return an equivalent shorthand when possible.
@@ -530,30 +634,27 @@ String CSSMutableStyleDeclaration::removeProperty(int propertyID, bool notifyCha
     // and sweeping them when the vector grows too big.
     m_properties.remove(foundProperty - m_properties.data());
 
+#if ENABLE(MUTATION_OBSERVERS)
+    mutationScope.enqueueMutationRecord();
+#endif
+
     if (notifyChanged)
         setNeedsStyleRecalc();
 
     return value;
 }
 
-bool CSSMutableStyleDeclaration::isInlineStyleDeclaration()
-{
-    // FIXME: Ideally, this should be factored better and there
-    // should be a subclass of CSSMutableStyleDeclaration just
-    // for inline style declarations that handles this
-    return m_node && m_node->isStyledElement() && static_cast<StyledElement*>(m_node)->inlineStyleDecl() == this;
-}
-
 void CSSMutableStyleDeclaration::setNeedsStyleRecalc()
 {
-    if (m_node) {
-        if (isInlineStyleDeclaration()) {
-            m_node->setNeedsStyleRecalc(InlineStyleChange);
-            static_cast<StyledElement*>(m_node)->invalidateStyleAttribute();
-            if (m_node->document())
-                InspectorInstrumentation::didInvalidateStyleAttr(m_node->document(), m_node);
-        } else
-            m_node->setNeedsStyleRecalc(FullStyleChange);
+    if (isElementStyleDeclaration() && static_cast<CSSElementStyleDeclaration*>(this)->element()) {
+        StyledElement* element = static_cast<CSSElementStyleDeclaration*>(this)->element();
+        if (!isInlineStyleDeclaration())
+            element->setNeedsStyleRecalc(FullStyleChange);
+        else {
+            element->setNeedsStyleRecalc(InlineStyleChange);
+            element->invalidateStyleAttribute();
+            StyleAttributeMutationScope(this).didInvalidateStyleAttr();
+        }
         return;
     }
 
@@ -597,6 +698,10 @@ bool CSSMutableStyleDeclaration::setProperty(int propertyID, const String& value
 {
     ASSERT(!m_iteratorCount);
 
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
+
     // Setting the value to an empty string just removes the property in both IE and Gecko.
     // Setting it to null seems to produce less consistent results, but we treat it just the same.
     if (value.isEmpty()) {
@@ -610,15 +715,26 @@ bool CSSMutableStyleDeclaration::setProperty(int propertyID, const String& value
     if (!success) {
         // CSS DOM requires raising SYNTAX_ERR here, but this is too dangerous for compatibility,
         // see <http://bugs.webkit.org/show_bug.cgi?id=7296>.
-    } else if (notifyChanged)
+        return false;
+    }
+
+#if ENABLE(MUTATION_OBSERVERS)
+    mutationScope.enqueueMutationRecord();
+#endif
+
+    if (notifyChanged)
         setNeedsStyleRecalc();
 
-    return success;
+    return true;
 }
 
 void CSSMutableStyleDeclaration::setPropertyInternal(const CSSProperty& property, CSSProperty* slot)
 {
     ASSERT(!m_iteratorCount);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
 
     if (!removeShorthandProperty(property.id(), false)) {
         CSSProperty* toReplace = slot ? slot : findPropertyWithId(property.id());
@@ -628,6 +744,10 @@ void CSSMutableStyleDeclaration::setPropertyInternal(const CSSProperty& property
         }
     }
     m_properties.append(property);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    mutationScope.enqueueMutationRecord();
+#endif
 }
 
 bool CSSMutableStyleDeclaration::setProperty(int propertyID, int value, bool important, bool notifyChanged)
@@ -648,14 +768,6 @@ bool CSSMutableStyleDeclaration::setProperty(int propertyID, double value, CSSPr
     return true;
 }
 
-void CSSMutableStyleDeclaration::setStringProperty(int propertyId, const String &value, CSSPrimitiveValue::UnitTypes type, bool important)
-{
-    ASSERT(!m_iteratorCount);
-
-    setPropertyInternal(CSSProperty(propertyId, CSSPrimitiveValue::create(value, type), important));
-    setNeedsStyleRecalc();
-}
-
 void CSSMutableStyleDeclaration::setImageProperty(int propertyId, const String& url, bool important)
 {
     ASSERT(!m_iteratorCount);
@@ -668,9 +780,18 @@ void CSSMutableStyleDeclaration::parseDeclaration(const String& styleDeclaration
 {
     ASSERT(!m_iteratorCount);
 
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
+
     m_properties.clear();
     CSSParser parser(useStrictParsing());
     parser.parseDeclaration(this, styleDeclaration);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    mutationScope.enqueueMutationRecord();
+#endif
+
     setNeedsStyleRecalc();
 }
 
@@ -678,9 +799,17 @@ void CSSMutableStyleDeclaration::addParsedProperties(const CSSProperty* const* p
 {
     ASSERT(!m_iteratorCount);
 
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
+
     m_properties.reserveCapacity(numProperties);
     for (int i = 0; i < numProperties; ++i)
         addParsedProperty(*properties[i]);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    mutationScope.enqueueMutationRecord();
+#endif
 
     // FIXME: This probably should have a call to setNeedsStyleRecalc() if something changed. We may also wish to add
     // a notifyChanged argument to this function to follow the model of other functions in this class.
@@ -690,14 +819,22 @@ void CSSMutableStyleDeclaration::addParsedProperty(const CSSProperty& property)
 {
     ASSERT(!m_iteratorCount);
 
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
+
     // Only add properties that have no !important counterpart present
     if (!getPropertyPriority(property.id()) || property.isImportant()) {
-        removeProperty(property.id(), false);
+        removeProperty(property.id(), false, false);
         m_properties.append(property);
     }
+
+#if ENABLE(MUTATION_OBSERVERS)
+    mutationScope.enqueueMutationRecord();
+#endif
 }
 
-void CSSMutableStyleDeclaration::setLengthProperty(int propertyId, const String& value, bool important, bool /*multiLength*/)
+void CSSMutableStyleDeclaration::setLengthProperty(int propertyId, const String& value, bool important)
 {
     ASSERT(!m_iteratorCount);
 
@@ -783,19 +920,18 @@ String CSSMutableStyleDeclaration::cssText() const
 
 void CSSMutableStyleDeclaration::setCssText(const String& text, ExceptionCode& ec)
 {
-    ASSERT(!m_iteratorCount);
-
     ec = 0;
-    m_properties.clear();
-    CSSParser parser(useStrictParsing());
-    parser.parseDeclaration(this, text);
     // FIXME: Detect syntax errors and set ec.
-    setNeedsStyleRecalc();
+    parseDeclaration(text);
 }
 
 void CSSMutableStyleDeclaration::merge(const CSSMutableStyleDeclaration* other, bool argOverridesOnConflict)
 {
     ASSERT(!m_iteratorCount);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
 
     unsigned size = other->m_properties.size();
     for (unsigned n = 0; n < size; ++n) {
@@ -808,6 +944,11 @@ void CSSMutableStyleDeclaration::merge(const CSSMutableStyleDeclaration* other, 
         } else
             m_properties.append(toMerge);
     }
+
+#if ENABLE(MUTATION_OBSERVERS)
+    mutationScope.enqueueMutationRecord();
+#endif
+
     // FIXME: This probably should have a call to setNeedsStyleRecalc() if something changed. We may also wish to add
     // a notifyChanged argument to this function to follow the model of other functions in this class.
 }
@@ -858,12 +999,16 @@ void CSSMutableStyleDeclaration::removeBlockProperties()
     removePropertiesInSet(blockProperties, numBlockProperties);
 }
 
-void CSSMutableStyleDeclaration::removePropertiesInSet(const int* set, unsigned length, bool notifyChanged)
+bool CSSMutableStyleDeclaration::removePropertiesInSet(const int* set, unsigned length, bool notifyChanged)
 {
     ASSERT(!m_iteratorCount);
 
     if (m_properties.isEmpty())
-        return;
+        return false;
+
+#if ENABLE(MUTATION_OBSERVERS)
+    StyleAttributeMutationScope mutationScope(this);
+#endif
 
     // FIXME: This is always used with static sets and in that case constructing the hash repeatedly is pretty pointless.
     HashSet<int> toRemove;
@@ -887,8 +1032,14 @@ void CSSMutableStyleDeclaration::removePropertiesInSet(const int* set, unsigned 
     bool changed = newProperties.size() != m_properties.size();
     m_properties = newProperties;
 
-    if (changed && notifyChanged)
+    if (notifyChanged) {
+#if ENABLE(MUTATION_OBSERVERS)
+        mutationScope.enqueueMutationRecord();
+#endif
         setNeedsStyleRecalc();
+    }
+
+    return changed;
 }
 
 PassRefPtr<CSSMutableStyleDeclaration> CSSMutableStyleDeclaration::makeMutable()

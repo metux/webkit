@@ -47,15 +47,15 @@ TextTrackCue::TextTrackCue(ScriptExecutionContext* context, const String& id, do
     , m_startTime(start)
     , m_endTime(end)
     , m_content(content)
-    , m_pauseOnExit(pauseOnExit)
     , m_writingDirection(Horizontal)
-    , m_snapToLines(true)
     , m_linePosition(-1)
     , m_textPosition(50)
     , m_cueSize(100)
     , m_cueAlignment(Middle)
-    , m_isActive(false)
     , m_scriptExecutionContext(context)
+    , m_isActive(false)
+    , m_pauseOnExit(pauseOnExit)
+    , m_snapToLines(true)
 {
     parseSettings(settings);
 }
@@ -66,10 +66,10 @@ TextTrackCue::~TextTrackCue()
 
 TextTrack* TextTrackCue::track() const
 {
-    return m_track;
+    return m_track.get();
 }
 
-void TextTrackCue::setTrack(TextTrack* track)
+void TextTrackCue::setTrack(PassRefPtr<TextTrack>track)
 {
     m_track = track;
 }
@@ -139,12 +139,16 @@ void TextTrackCue::setCueHTML(PassRefPtr<DocumentFragment> fragment)
 
 bool TextTrackCue::isActive()
 {
-    return m_isActive;
+    return m_isActive && track() && track()->mode() != TextTrack::DISABLED;
 }
 
 void TextTrackCue::setIsActive(bool active)
 {
     m_isActive = active;
+
+    // When a TextTrack's mode is disabled: No cues are active, no events are fired ...
+    if (!track() || track()->mode() == TextTrack::DISABLED)
+        return;
 
     ExceptionCode ec = 0;
     if (active)

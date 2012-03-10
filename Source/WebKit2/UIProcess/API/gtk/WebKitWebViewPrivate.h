@@ -34,5 +34,11 @@
 void webkitWebViewSetEstimatedLoadProgress(WebKitWebView*, double estimatedLoadProgress);
 void webkitWebViewSetTitle(WebKitWebView*, const CString&);
 void webkitWebViewUpdateURI(WebKitWebView*);
+WKPageRef webkitWebViewCreateNewPage(WebKitWebView*, WKDictionaryRef wkWindowFeatures);
+void webkitWebViewReadyToShowPage(WebKitWebView*);
+void webkitWebViewClosePage(WebKitWebView*);
+void webkitWebViewRunJavaScriptAlert(WebKitWebView*, const CString& message);
+bool webkitWebViewRunJavaScriptConfirm(WebKitWebView*, const CString& message);
+WKStringRef webkitWebViewRunJavaScriptPrompt(WebKitWebView*, const CString& message, const CString& defaultText);
 
 #endif // WebKitWebViewPrivate_h

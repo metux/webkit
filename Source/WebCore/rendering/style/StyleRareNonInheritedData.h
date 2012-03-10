@@ -46,6 +46,9 @@ class StyleDeprecatedFlexibleBoxData;
 class StyleFilterData;
 #endif
 class StyleFlexibleBoxData;
+#if ENABLE(CSS_GRID_LAYOUT)
+class StyleGridData;
+#endif
 class StyleMarqueeData;
 class StyleMultiColData;
 class StyleReflection;
@@ -114,6 +117,10 @@ public:
     DataRef<StyleFilterData> m_filter; // Filter operations (url, sepia, blur, etc.)
 #endif
 
+#if ENABLE(CSS_GRID_LAYOUT)
+    DataRef<StyleGridData> m_grid;
+#endif
+
     OwnPtr<ContentData> m_content;
     OwnPtr<CounterDirectiveMap> m_counterDirectives;
 
@@ -129,7 +136,8 @@ public:
 
     LengthSize m_pageSize;
 
-    RefPtr<CSSWrapShape> m_wrapShape;
+    RefPtr<CSSWrapShape> m_wrapShapeInside;
+    RefPtr<CSSWrapShape> m_wrapShapeOutside;
     Length m_wrapMargin;
     Length m_wrapPadding;
     

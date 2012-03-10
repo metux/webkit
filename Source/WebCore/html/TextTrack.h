@@ -36,6 +36,7 @@
 
 namespace WebCore {
 
+class HTMLMediaElement;
 class TextTrack;
 class TextTrackCue;
 class TextTrackCueList;
@@ -43,7 +44,6 @@ class TextTrackCueList;
 class TextTrackClient {
 public:
     virtual ~TextTrackClient() { }
-    virtual void textTrackReadyStateChanged(TextTrack*) = 0;
     virtual void textTrackKindChanged(TextTrack*) = 0;
     virtual void textTrackModeChanged(TextTrack*) = 0;
     virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*) = 0;
@@ -59,6 +59,9 @@ public:
         return adoptRef(new TextTrack(context, client, kind, label, language, AddTrack));
     }
     virtual ~TextTrack();
+    
+    void setMediaElement(HTMLMediaElement* element) { m_mediaElement = element; }
+    HTMLMediaElement* mediaElement() { return m_mediaElement; }
 
     String kind() const { return m_kind; }
     void setKind(const String&);
@@ -76,27 +79,25 @@ public:
     String language() const { return m_language; }
     void setLanguage(const String& language) { m_language = language; }
 
-    enum ReadyState { NONE = 0, LOADING = 1, LOADED = 2, HTML_ERROR = 3 };
-    ReadyState readyState() const { return m_readyState; }
-
     enum Mode { DISABLED = 0, HIDDEN = 1, SHOWING = 2 };
-    Mode mode() const { return m_mode; }
+    Mode mode() const;
     void setMode(unsigned short, ExceptionCode&);
+
+    bool showingByDefault() const { return m_showingByDefault; }
+    void setShowingByDefault(bool showing) { m_showingByDefault = showing; }
+
+    enum ReadinessState { NotLoaded = 0, Loading = 1, Loaded = 2, FailedToLoad = 3 };
+    ReadinessState readinessState() const { return m_readinessState; }
+    void setReadinessState(ReadinessState state) { m_readinessState = state; }
 
     TextTrackCueList* cues();
     TextTrackCueList* activeCues() const;
-
-    void readyStateChanged();
-    void modeChanged();
 
     virtual void clearClient() { m_client = 0; }
     TextTrackClient* client() { return m_client; }
 
     void addCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
-    void removeCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
-    
-    void newCuesLoaded();
-    void fetchNewestCues(Vector<TextTrackCue*>&);
+    void removeCue(TextTrackCue*, ExceptionCode&);
     
     virtual void fireCueChangeEvent();
     DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
@@ -107,18 +108,18 @@ public:
 protected:
     TextTrack(ScriptExecutionContext*, TextTrackClient*, const String& kind, const String& label, const String& language, TextTrackType);
 
-    void setReadyState(ReadyState);
-
     RefPtr<TextTrackCueList> m_cues;
 
 private:
+    HTMLMediaElement* m_mediaElement;
     String m_kind;
     String m_label;
     String m_language;
-    TextTrack::ReadyState m_readyState;
-    TextTrack::Mode m_mode;
+    Mode m_mode;
     TextTrackClient* m_client;
     TextTrackType m_trackType;
+    ReadinessState m_readinessState;
+    bool m_showingByDefault;
 };
 
 } // namespace WebCore

@@ -40,6 +40,7 @@
 #include "RenderRegion.h"
 #include "RenderView.h"
 #include "TransformState.h"
+#include "WebKitNamedFlow.h"
 
 namespace WebCore {
 
@@ -55,10 +56,15 @@ RenderFlowThread::RenderFlowThread(Node* node, const AtomicString& flowThread)
     setInRenderFlowThread();
 }
 
-RenderFlowThread::~RenderFlowThread()
+void RenderFlowThread::clearRenderRegionRangeMap()
 {
     deleteAllValues(m_regionRangeMap);
     m_regionRangeMap.clear();
+}
+
+RenderFlowThread::~RenderFlowThread()
+{
+    clearRenderRegionRangeMap();
 }
 
 PassRefPtr<RenderStyle> RenderFlowThread::createFlowThreadStyle(RenderStyle* parentStyle)
@@ -304,14 +310,13 @@ private:
 
 void RenderFlowThread::layout()
 {
-    bool regionsChanged = m_regionsInvalidated && m_everHadLayout;
+    bool regionsChanged = m_regionsInvalidated && everHadLayout();
     if (m_regionsInvalidated) {
         m_regionsInvalidated = false;
         m_hasValidRegions = false;
         m_regionsHaveUniformLogicalWidth = true;
         m_regionsHaveUniformLogicalHeight = true;
-        deleteAllValues(m_regionRangeMap);
-        m_regionRangeMap.clear();
+        clearRenderRegionRangeMap();
         LayoutUnit previousRegionLogicalWidth = 0;
         LayoutUnit previousRegionLogicalHeight = 0;
         if (hasRegions()) {
@@ -740,6 +745,32 @@ RenderRegion* RenderFlowThread::lastRegion() const
     return 0;
 }
 
+void RenderFlowThread::clearRenderObjectCustomStyle(const RenderObject* object,
+        const RenderRegion* oldStartRegion, const RenderRegion* oldEndRegion,
+        const RenderRegion* newStartRegion, const RenderRegion* newEndRegion)
+{
+    // Clear the styles for the object in the regions.
+    // The styles are not cleared for the regions that are contained in both ranges.
+    bool insideOldRegionRange = false;
+    bool insideNewRegionRange = false;
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+
+        if (oldStartRegion == region)
+            insideOldRegionRange = true;
+        if (newStartRegion == region)
+            insideNewRegionRange = true;
+
+        if (!(insideOldRegionRange && insideNewRegionRange))
+            region->clearObjectStyleInRegion(object);
+
+        if (oldEndRegion == region)
+            insideOldRegionRange = false;
+        if (newEndRegion == region)
+            insideNewRegionRange = false;
+    }
+}
+
 void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit offsetFromLogicalTopOfFirstPage)
 {
     // FIXME: Not right for differing writing-modes.
@@ -751,6 +782,8 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
         if (range->startRegion() == startRegion && range->endRegion() == endRegion)
             return;
 
+        RenderRegion* oldStartRegion = range->startRegion();
+        RenderRegion* oldEndRegion = range->endRegion();
         // Delete any info that we find before our new startRegion and after our new endRegion.
         for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
             RenderRegion* region = *iter;
@@ -758,14 +791,15 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
                 iter = m_regionList.find(endRegion);
                 continue;
             }
-            
+
             region->removeRenderBoxRegionInfo(box);
 
             if (region == range->endRegion())
                 break;
         }
-        
+
         range->setRange(startRegion, endRegion);
+        clearRenderObjectCustomStyle(box, oldStartRegion, oldEndRegion, startRegion, endRegion);
         return;
     }
     range = new RenderRegionRange(startRegion, endRegion);
@@ -782,5 +816,13 @@ void RenderFlowThread::getRegionRangeForBox(const RenderBox* box, RenderRegion*&
     startRegion = range->startRegion();
     endRegion = range->endRegion();
 }
-    
+
+WebKitNamedFlow* RenderFlowThread::ensureNamedFlow()
+{
+    if (!m_namedFlow)
+        m_namedFlow = WebKitNamedFlow::create();
+
+    return m_namedFlow.get();
+}
+
 } // namespace WebCore

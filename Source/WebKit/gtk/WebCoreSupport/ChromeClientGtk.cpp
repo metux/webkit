@@ -565,6 +565,15 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     const IntRect& rect = m_dirtyRegion.bounds();
     gtk_widget_queue_draw_area(GTK_WIDGET(m_webView), rect.x(), rect.y(), rect.width(), rect.height());
 
+    HashSet<GtkWidget*> children = m_webView->priv->children;
+    HashSet<GtkWidget*>::const_iterator end = children.end();
+    for (HashSet<GtkWidget*>::const_iterator current = children.begin(); current != end; ++current) {
+        if (static_cast<GtkAllocation*>(g_object_get_data(G_OBJECT(*current), "delayed-allocation"))) {
+            gtk_widget_queue_resize_no_redraw(GTK_WIDGET(m_webView));
+            break;
+        }
+    }
+
     m_dirtyRegion = Region();
     m_lastDisplayTime = currentTime();
     m_repaintSoonSourceId = 0;
@@ -636,6 +645,9 @@ PlatformPageClient ChromeClient::platformPageClient() const
 
 void ChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) const
 {
+    if (m_adjustmentWatcher.scrollbarsDisabled())
+        return;
+
     // We need to queue a resize request only if the size changed,
     // otherwise we get into an infinite loop!
     GtkWidget* widget = GTK_WIDGET(m_webView);
@@ -849,6 +861,12 @@ bool ChromeClient::selectItemAlignmentFollowsMenuWritingDirection()
     return true;
 }
 
+bool ChromeClient::hasOpenedPopup() const
+{
+    notImplemented();
+    return false;
+}
+
 PassRefPtr<WebCore::PopupMenu> ChromeClient::createPopupMenu(WebCore::PopupMenuClient* client) const
 {
     return adoptRef(new PopupMenuGtk(client));
@@ -880,21 +898,28 @@ void ChromeClient::exitFullscreenForNode(Node* node)
 #if ENABLE(FULLSCREEN_API)
 bool ChromeClient::supportsFullScreenForElement(const WebCore::Element* element, bool withKeyboard)
 {
-    if (withKeyboard)
-        return false;
-
     return true;
 }
 
 void ChromeClient::enterFullScreenForElement(WebCore::Element* element)
 {
     element->document()->webkitWillEnterFullScreenForElement(element);
+    m_adjustmentWatcher.disableAllScrollbars();
+#if ENABLE(VIDEO)
+    if (element->tagName() == "VIDEO")
+        enterFullscreenForNode(static_cast<Node*>(element));
+#endif
     element->document()->webkitDidEnterFullScreenForElement(element);
 }
 
 void ChromeClient::exitFullScreenForElement(WebCore::Element* element)
 {
     element->document()->webkitWillExitFullScreenForElement(element);
+    m_adjustmentWatcher.enableAllScrollbars();
+#if ENABLE(VIDEO)
+    if (element->tagName() == "VIDEO")
+        webViewExitFullscreen(m_webView);
+#endif
     element->document()->webkitDidExitFullScreenForElement(element);
 }
 #endif
@@ -902,22 +927,32 @@ void ChromeClient::exitFullScreenForElement(WebCore::Element* element)
 #if USE(ACCELERATED_COMPOSITING)
 void ChromeClient::attachRootGraphicsLayer(Frame* frame, GraphicsLayer* rootLayer)
 {
-    notImplemented();
+    if (rootLayer)
+        webViewSetRootGraphicsLayer(m_webView, rootLayer);
+    else
+        webViewDetachRootGraphicsLayer(m_webView);
 }
 
 void ChromeClient::setNeedsOneShotDrawingSynchronization()
 {
-    notImplemented();
+    webViewMarkForSync(m_webView, FALSE);
 }
 
 void ChromeClient::scheduleCompositingLayerSync()
 {
-    notImplemented();
+    webViewMarkForSync(m_webView, TRUE);
 }
 
 ChromeClient::CompositingTriggerFlags ChromeClient::allowedCompositingTriggers() const
 {
-    return 0;
+     if (!platformPageClient())
+        return false;
+#if USE(CLUTTER)
+    // Currently, we only support CSS 3D Transforms.
+    return ThreeDTransformTrigger;
+#else
+    return AllTriggers;
+#endif
 }
 #endif
 

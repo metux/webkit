@@ -34,36 +34,16 @@ class CSSValue;
 typedef int ExceptionCode;
 
 class CSSStyleDeclaration : public RefCounted<CSSStyleDeclaration> {
+    WTF_MAKE_NONCOPYABLE(CSSStyleDeclaration);
 public:
     virtual ~CSSStyleDeclaration() { }
 
     static bool isPropertyName(const String&);
 
-    // FIXME: Refactor so CSSStyleDeclaration never needs to have a style sheet parent.
+    CSSRule* parentRule() const { return m_parentRule; }
+    void setParentRule(CSSRule* rule) { m_parentRule = rule; }
 
-    CSSRule* parentRule() const
-    {
-        return m_parentIsRule ? m_parentRule : 0;
-    }
-
-    void setParentRule(CSSRule* rule)
-    {
-        m_parentIsRule = true;
-        m_parentRule = rule;
-    }
-
-    void setParentStyleSheet(CSSStyleSheet* styleSheet)
-    {
-        m_parentIsRule = false;
-        m_parentStyleSheet = styleSheet;
-    }
-
-    CSSStyleSheet* parentStyleSheet() const
-    {
-        if (!m_parentIsRule)
-            return m_parentStyleSheet;
-        return m_parentRule ? m_parentRule->parentStyleSheet() : 0;
-    }
+    CSSStyleSheet* parentStyleSheet() const;
 
     virtual String cssText() const = 0;
     virtual void setCssText(const String&, ExceptionCode&) = 0;
@@ -85,7 +65,6 @@ public:
     virtual int getPropertyShorthand(int propertyID) const = 0;
     virtual bool isPropertyImplicit(int propertyID) const = 0;
 
-    void setProperty(const String& propertyName, const String& value, ExceptionCode&);
     void setProperty(const String& propertyName, const String& value, const String& priority, ExceptionCode&);
     String removeProperty(const String& propertyName, ExceptionCode&);
     virtual void setProperty(int propertyId, const String& value, bool important, ExceptionCode&) = 0;
@@ -102,27 +81,29 @@ public:
     void showStyle();
 #endif
 
-    bool isMutableStyleDeclaration() const { return m_isMutableStyleDeclaration; }
+    bool isElementStyleDeclaration() const { return m_isElementStyleDeclaration; }
+    bool isInlineStyleDeclaration() const { return m_isInlineStyleDeclaration; }
 
 protected:
-    CSSStyleDeclaration(CSSRule* parentRule = 0, bool isMutable = false);
+    CSSStyleDeclaration(CSSRule* parentRule = 0);
 
     virtual bool cssPropertyMatches(const CSSProperty*) const;
 
-    // These bits are only used by CSSMutableStyleDeclaration but kept here
+    // The bits in this section are only used by specific subclasses but kept here
     // to maximize struct packing.
+
+    // CSSMutableStyleDeclaration bits:
     bool m_strictParsing : 1;
 #ifndef NDEBUG
     unsigned m_iteratorCount : 4;
 #endif
 
+    // CSSElementStyleDeclaration bits:
+    bool m_isElementStyleDeclaration : 1;
+    bool m_isInlineStyleDeclaration : 1;
+
 private:
-    bool m_isMutableStyleDeclaration : 1;
-    bool m_parentIsRule : 1;
-    union {
-        CSSRule* m_parentRule;
-        CSSStyleSheet* m_parentStyleSheet;
-    };
+    CSSRule* m_parentRule;
 };
 
 } // namespace WebCore

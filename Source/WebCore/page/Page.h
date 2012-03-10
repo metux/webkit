@@ -72,6 +72,8 @@ namespace WebCore {
     class InspectorController;
     class MediaCanStartListener;
     class Node;
+    class NotificationController;
+    class NotificationPresenter;
     class PageGroup;
     class PluginData;
     class ProgressTracker;
@@ -79,6 +81,7 @@ namespace WebCore {
     class RenderTheme;
     class VisibleSelection;
     class ScrollableArea;
+    class ScrollingCoordinator;
     class Settings;
     class SpeechInput;
     class SpeechInputClient;
@@ -117,6 +120,7 @@ namespace WebCore {
             DeviceOrientationClient* deviceOrientationClient;
             RefPtr<BackForwardList> backForwardClient;
             SpeechInputClient* speechInputClient;
+            NotificationPresenter* notificationClient;
             UserMediaClient* userMediaClient;
         };
 
@@ -183,12 +187,19 @@ namespace WebCore {
         DeviceMotionController* deviceMotionController() const { return m_deviceMotionController.get(); }
         DeviceOrientationController* deviceOrientationController() const { return m_deviceOrientationController.get(); }
 #endif
+#if ENABLE(NOTIFICATIONS)
+        NotificationController* notificationController() const { return m_notificationController.get(); }
+#endif
 #if ENABLE(INPUT_SPEECH)
         SpeechInput* speechInput();
 #endif
 #if ENABLE(MEDIA_STREAM)
         UserMediaClient* userMediaClient() const { return m_userMediaClient; }
 #endif
+#if ENABLE(THREADED_SCROLLING)
+        ScrollingCoordinator* scrollingCoordinator();
+#endif
+
         Settings* settings() const { return m_settings.get(); }
         ProgressTracker* progress() const { return m_progress.get(); }
         BackForwardController* backForward() const { return m_backForwardController.get(); }
@@ -255,11 +266,18 @@ namespace WebCore {
 
             Pagination()
                 : mode(Unpaginated)
+                , pageLength(0)
                 , gap(0)
             {
             };
 
+            bool operator==(const Pagination& other) const
+            {
+                return mode == other.mode && pageLength == other.pageLength && gap == other.gap;
+            }
+
             Mode mode;
+            unsigned pageLength;
             unsigned gap;
         };
 
@@ -365,12 +383,18 @@ namespace WebCore {
         OwnPtr<DeviceMotionController> m_deviceMotionController;
         OwnPtr<DeviceOrientationController> m_deviceOrientationController;
 #endif
+#if ENABLE(NOTIFICATIONS)
+        OwnPtr<NotificationController> m_notificationController;
+#endif
 #if ENABLE(INPUT_SPEECH)
         SpeechInputClient* m_speechInputClient;
         OwnPtr<SpeechInput> m_speechInput;
 #endif
 #if ENABLE(MEDIA_STREAM)
         UserMediaClient* m_userMediaClient;
+#endif
+#if ENABLE(THREADED_SCROLLING)
+        RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
 #endif
         OwnPtr<Settings> m_settings;
         OwnPtr<ProgressTracker> m_progress;

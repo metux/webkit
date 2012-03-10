@@ -949,6 +949,7 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
     // FIXME: We should pass a BidiRunList into createBidiRunsForLine instead
     // of the resolver owning the runs.
     ASSERT(&topResolver.runs() == &bidiRuns);
+    RenderObject* currentRoot = topResolver.position().root();
     topResolver.createBidiRunsForLine(endOfLine, override, previousLineBrokeCleanly);
 
     while (!topResolver.isolatedRuns().isEmpty()) {
@@ -956,21 +957,31 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
         BidiRun* isolatedRun = topResolver.isolatedRuns().last();
         topResolver.isolatedRuns().removeLast();
 
+        RenderObject* startObj = isolatedRun->object();
+
         // Only inlines make sense with unicode-bidi: isolate (blocks are already isolated).
-        RenderInline* isolatedSpan = toRenderInline(isolatedRun->object());
+        // FIXME: Because enterIsolate is not passed a RenderObject, we have to crawl up the
+        // tree to see which parent inline is the isolate. We could change enterIsolate
+        // to take a RenderObject and do this logic there, but that would be a layering
+        // violation for BidiResolver (which knows nothing about RenderObject).
+        RenderInline* isolatedSpan = toRenderInline(containingIsolate(startObj, currentRoot));
         InlineBidiResolver isolatedResolver;
         isolatedResolver.setStatus(statusWithDirection(isolatedSpan->style()->direction()));
 
         // FIXME: The fact that we have to construct an Iterator here
         // currently prevents this code from moving into BidiResolver.
-        RenderObject* startObj = bidiFirstSkippingEmptyInlines(isolatedSpan, &isolatedResolver);
-        isolatedResolver.setPosition(InlineIterator(isolatedSpan, startObj, 0));
+        if (!bidiFirstSkippingEmptyInlines(isolatedSpan, &isolatedResolver))
+            continue;
+        // The starting position is the beginning of the first run within the isolate that was identified
+        // during the earlier call to createBidiRunsForLine. This can be but is not necessarily the
+        // first run within the isolate.
+        InlineIterator iter = InlineIterator(isolatedSpan, startObj, isolatedRun->m_start);
+        isolatedResolver.setPositionIgnoringNestedIsolates(iter);
 
-        // FIXME: isolatedEnd should probably equal end or the last char in isolatedSpan.
-        InlineIterator isolatedEnd = endOfLine;
+        // We stop at the next end of line; we may re-enter this isolate in the next call to constructBidiRuns().
         // FIXME: What should end and previousLineBrokeCleanly be?
         // rniwa says previousLineBrokeCleanly is just a WinIE hack and could always be false here?
-        isolatedResolver.createBidiRunsForLine(isolatedEnd, NoVisualOverride, previousLineBrokeCleanly);
+        isolatedResolver.createBidiRunsForLine(endOfLine, NoVisualOverride, previousLineBrokeCleanly);
         // Note that we do not delete the runs from the resolver.
         bidiRuns.replaceRunWithRuns(isolatedRun, isolatedResolver.runs());
 
@@ -1206,15 +1217,17 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         // FIXME: Is this check necessary before the first iteration or can it be moved to the end?
         if (checkForEndLineMatch) {
             layoutState.setEndLineMatched(matchedEndLine(layoutState, resolver, cleanLineStart, cleanLineBidiStatus));
-            if (layoutState.endLineMatched())
+            if (layoutState.endLineMatched()) {
+                resolver.setPosition(InlineIterator(resolver.position().root(), 0, 0), 0);
                 break;
+            }
         }
 
         lineMidpointState.reset();
 
         layoutState.lineInfo().setEmpty(true);
 
-        InlineIterator oldEnd = end;
+        const InlineIterator oldEnd = end;
         bool isNewUBAParagraph = layoutState.lineInfo().previousLineBrokeCleanly();
         FloatingObject* lastFloatFromPreviousLine = (m_floatingObjects && !m_floatingObjects->set().isEmpty()) ? m_floatingObjects->set().last() : 0;
         end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines);
@@ -1224,6 +1237,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             resolver.runs().deleteRuns();
             resolver.markCurrentRunEmpty(); // FIXME: This can probably be replaced by an ASSERT (or just removed).
             layoutState.setCheckForFloatsFromLastLine(true);
+            resolver.setPosition(InlineIterator(resolver.position().root(), 0, 0), 0);
             break;
         }
         ASSERT(end != resolver.position());
@@ -1282,7 +1296,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                             lineBox->deleteLine(renderArena());
                             removeFloatingObjectsBelow(lastFloatFromPreviousLine, oldLogicalHeight);
                             setLogicalHeight(oldLogicalHeight + adjustment);
-                            resolver.setPosition(oldEnd);
+                            resolver.setPositionIgnoringNestedIsolates(oldEnd);
                             end = oldEnd;
                             continue;
                         }
@@ -1322,7 +1336,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         }
 
         lineMidpointState.reset();
-        resolver.setPosition(end);
+        resolver.setPosition(end, numberOfIsolateAncestors(end));
     }
 }
 
@@ -1637,7 +1651,8 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
 
     if (last) {
         setLogicalHeight(last->lineBottomWithLeading());
-        resolver.setPosition(InlineIterator(this, last->lineBreakObj(), last->lineBreakPos()));
+        InlineIterator iter = InlineIterator(this, last->lineBreakObj(), last->lineBreakPos());
+        resolver.setPosition(iter, numberOfIsolateAncestors(iter));
         resolver.setStatus(last->lineBreakBidiStatus());
     } else {
         TextDirection direction = style()->direction();
@@ -1646,7 +1661,8 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
             determineParagraphDirection(direction, InlineIterator(this, bidiFirstIncludingEmptyInlines(this), 0));
         }
         resolver.setStatus(BidiStatus(direction, style()->unicodeBidi() == Override));
-        resolver.setPosition(InlineIterator(this, bidiFirstSkippingEmptyInlines(this, &resolver), 0));
+        InlineIterator iter = InlineIterator(this, bidiFirstSkippingEmptyInlines(this, &resolver), 0);
+        resolver.setPosition(iter, numberOfIsolateAncestors(iter));
     }
     return curr;
 }
@@ -1796,11 +1812,14 @@ static inline bool shouldCollapseWhiteSpace(const RenderStyle* style, const Line
         || (whitespacePosition == TrailingWhitespace && style->whiteSpace() == PRE_WRAP && (!lineInfo.isEmpty() || !lineInfo.previousLineBrokeCleanly()));
 }
 
-static bool inlineFlowRequiresLineBox(RenderInline* flow)
+static bool inlineFlowRequiresLineBox(RenderInline* flow, const LineInfo& lineInfo)
 {
     // FIXME: Right now, we only allow line boxes for inlines that are truly empty.
     // We need to fix this, though, because at the very least, inlines containing only
     // ignorable whitespace should should also have line boxes.
+    if (!flow->document()->inQuirksMode() && flow->style(lineInfo.isFirstLine())->lineHeight() != flow->parent()->style(lineInfo.isFirstLine())->lineHeight())
+        return true;
+
     return !flow->firstChild() && flow->hasInlineDirectionBordersPaddingOrMargin();
 }
 
@@ -1809,7 +1828,7 @@ static bool requiresLineBox(const InlineIterator& it, const LineInfo& lineInfo =
     if (it.m_obj->isFloatingOrPositioned())
         return false;
 
-    if (it.m_obj->isRenderInline() && !inlineFlowRequiresLineBox(toRenderInline(it.m_obj)))
+    if (it.m_obj->isRenderInline() && !inlineFlowRequiresLineBox(toRenderInline(it.m_obj), lineInfo))
         return false;
 
     if (!shouldCollapseWhiteSpace(it.m_obj->style(), lineInfo, whitespacePosition) || it.m_obj->isBR())
@@ -1930,11 +1949,16 @@ static void tryHyphenating(RenderText* text, const Font& font, const AtomicStrin
         return;
 
     prefixLength = lastHyphenLocation(text->characters() + lastSpace, pos - lastSpace, min(prefixLength, static_cast<unsigned>(pos - lastSpace - minimumSuffixLength)) + 1, localeIdentifier);
-    // FIXME: The following assumes that the character at lastSpace is a space (and therefore should not factor
-    // into hyphenate-limit-before) unless lastSpace is 0. This is wrong in the rare case of hyphenating
-    // the first word in a text node which has leading whitespace.
-    if (!prefixLength || prefixLength - (lastSpace ? 1 : 0) < static_cast<unsigned>(minimumPrefixLength))
+    if (!prefixLength || prefixLength < static_cast<unsigned>(minimumPrefixLength))
         return;
+
+    // When lastSapce is a space, which it always is except sometimes at the beginning of a line or after collapsed
+    // space, it should not count towards hyphenate-limit-before.
+    if (prefixLength == static_cast<unsigned>(minimumPrefixLength)) {
+        UChar characterAtLastSpace = text->characters()[lastSpace];
+        if (characterAtLastSpace == ' ' || characterAtLastSpace == '\n' || characterAtLastSpace == '\t' || characterAtLastSpace == noBreakSpace)
+            return;
+    }
 
     ASSERT(pos - lastSpace - prefixLength >= static_cast<unsigned>(minimumSuffixLength));
 
@@ -2181,7 +2205,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             // to make sure that we stop to include this object and then start ignoring spaces again.
             // If this object is at the start of the line, we need to behave like list markers and
             // start ignoring spaces.
-            if (inlineFlowRequiresLineBox(flowBox)) {
+            if (inlineFlowRequiresLineBox(flowBox, lineInfo)) {
                 lineInfo.setEmpty(false, m_block, &width);
                 if (ignoringSpaces) {
                     trailingObjects.clear();

@@ -34,6 +34,7 @@
 #include "FocusController.h"
 #include "Frame.h"
 #include "FrameSelection.h"
+#include "HTMLAnchorElement.h"
 #include "HTMLFrameElementBase.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
@@ -77,17 +78,20 @@ SelectorChecker::SelectorChecker(Document* document, bool strictParsing)
 {
 }
 
+// Salt to separate otherwise identical string hashes so a class-selector like .article won't match <article> elements.
+enum { TagNameSalt = 13, IdAttributeSalt = 17, ClassAttributeSalt = 19 };
+
 static inline void collectElementIdentifierHashes(const Element* element, Vector<unsigned, 4>& identifierHashes)
 {
-    identifierHashes.append(element->localName().impl()->existingHash());
+    identifierHashes.append(element->localName().impl()->existingHash() * TagNameSalt);
     if (element->hasID())
-        identifierHashes.append(element->idForStyleResolution().impl()->existingHash());
+        identifierHashes.append(element->idForStyleResolution().impl()->existingHash() * IdAttributeSalt);
     const StyledElement* styledElement = element->isStyledElement() ? static_cast<const StyledElement*>(element) : 0;
     if (styledElement && styledElement->hasClass()) {
         const SpaceSplitString& classNames = styledElement->classNames();
         size_t count = classNames.size();
         for (size_t i = 0; i < count; ++i)
-            identifierHashes.append(classNames[i].impl()->existingHash());
+            identifierHashes.append(classNames[i].impl()->existingHash() * ClassAttributeSalt);
     }
 }
 
@@ -161,13 +165,23 @@ void SelectorChecker::popParent(Element* parent)
 
 static inline void collectDescendantSelectorIdentifierHashes(const CSSSelector* selector, unsigned*& hash, const unsigned* end)
 {
-    if ((selector->m_match == CSSSelector::Id || selector->m_match == CSSSelector::Class) && !selector->value().isEmpty())
-        (*hash++) = selector->value().impl()->existingHash();
+    switch (selector->m_match) {
+    case CSSSelector::Id:
+        if (!selector->value().isEmpty())
+            (*hash++) = selector->value().impl()->existingHash() * IdAttributeSalt;
+        break;
+    case CSSSelector::Class:
+        if (!selector->value().isEmpty())
+            (*hash++) = selector->value().impl()->existingHash() * ClassAttributeSalt;
+        break;
+    default:
+        break;
+    }
     if (hash == end)
         return;
     const AtomicString& localName = selector->tag().localName();
     if (localName != starAtom)
-        (*hash++) = localName.impl()->existingHash();
+        (*hash++) = localName.impl()->existingHash() * TagNameSalt;
 }
 
 void SelectorChecker::collectIdentifierHashes(const CSSSelector* selector, unsigned* identifierHashes, unsigned maximumIdentifierCount)
@@ -225,16 +239,21 @@ EInsideLink SelectorChecker::determineLinkStateSlowCase(Element* element) const
 {
     ASSERT(element->isLink());
 
-    const AtomicString* attr = linkAttribute(element);
-    if (!attr || attr->isNull())
+    const AtomicString* attribute = linkAttribute(element);
+    if (!attribute || attribute->isNull())
         return NotInsideLink;
 
     // An empty href refers to the document itself which is always visited. It is useful to check this explicitly so
     // that visited links can be tested in platform independent manner, without explicit support in the test harness.
-    if (attr->isEmpty())
+    if (attribute->isEmpty())
         return InsideVisitedLink;
+    
+    LinkHash hash;
+    if (element->hasTagName(aTag)) 
+        hash = static_cast<HTMLAnchorElement*>(element)->visitedLinkHash();
+    else
+        hash = visitedLinkHash(m_document->baseURL(), *attribute);
 
-    LinkHash hash = visitedLinkHash(m_document->baseURL(), *attr);
     if (!hash)
         return InsideUnvisitedLink;
 
@@ -249,7 +268,7 @@ EInsideLink SelectorChecker::determineLinkStateSlowCase(Element* element) const
     m_linksCheckedForVisitedState.add(hash);
 
 #if USE(PLATFORM_STRATEGIES)
-    return platformStrategies()->visitedLinkStrategy()->isLinkVisited(page, hash, m_document->baseURL(), *attr) ? InsideVisitedLink : InsideUnvisitedLink;
+    return platformStrategies()->visitedLinkStrategy()->isLinkVisited(page, hash, m_document->baseURL(), *attribute) ? InsideVisitedLink : InsideUnvisitedLink;
 #else
     return page->group().isLinkVisited(hash) ? InsideVisitedLink : InsideUnvisitedLink;
 #endif
@@ -1308,8 +1327,12 @@ void SelectorChecker::visitedStateChanged(LinkHash visitedHash)
     if (!m_linksCheckedForVisitedState.contains(visitedHash))
         return;
     for (Node* node = m_document; node; node = node->traverseNextNode()) {
-        const AtomicString* attr = linkAttribute(node);
-        if (attr && visitedLinkHash(m_document->baseURL(), *attr) == visitedHash)
+        LinkHash hash = 0;
+        if (node->hasTagName(aTag))
+            hash = static_cast<HTMLAnchorElement*>(node)->visitedLinkHash();
+        else if (const AtomicString* attr = linkAttribute(node))
+            hash = visitedLinkHash(m_document->baseURL(), *attr);
+        if (hash == visitedHash)
             node->setNeedsStyleRecalc();
     }
 }

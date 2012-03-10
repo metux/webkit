@@ -859,24 +859,31 @@ Element* AccessibilityRenderObject::actionElement() const
             if (!input->disabled() && (isCheckboxOrRadio() || input->isTextButton()))
                 return input;
         } else if (node->hasTagName(buttonTag))
-            return static_cast<Element*>(node);
+            return toElement(node);
     }
 
     if (isFileUploadButton())
-        return static_cast<Element*>(m_renderer->node());
+        return toElement(m_renderer->node());
             
     if (AccessibilityObject::isARIAInput(ariaRoleAttribute()))
-        return static_cast<Element*>(m_renderer->node());
+        return toElement(m_renderer->node());
 
     if (isImageButton())
-        return static_cast<Element*>(m_renderer->node());
+        return toElement(m_renderer->node());
     
     if (m_renderer->isBoxModelObject() && toRenderBoxModelObject(m_renderer)->isMenuList())
-        return static_cast<Element*>(m_renderer->node());
+        return toElement(m_renderer->node());
 
-    AccessibilityRole role = roleValue();
-    if (role == ButtonRole || role == PopUpButtonRole)
-        return static_cast<Element*>(m_renderer->node()); 
+    switch (roleValue()) {
+    case ButtonRole:
+    case PopUpButtonRole:
+    case TabRole:
+    case MenuItemRole:
+    case ListItemRole:
+        return toElement(m_renderer->node()); 
+    default:
+        break;
+    }
     
     Element* elt = anchorElement();
     if (!elt)
@@ -1890,7 +1897,7 @@ bool AccessibilityRenderObject::accessibilityIsIgnored() const
             Element* elt = static_cast<Element*>(node);
             const AtomicString& alt = elt->getAttribute(altAttr);
             // don't ignore an image that has an alt tag
-            if (!alt.isEmpty())
+            if (!alt.string().containsOnlyWhitespace())
                 return false;
             // informal standard is to ignore images with zero-length alt strings
             if (!alt.isNull())
@@ -3328,32 +3335,18 @@ bool AccessibilityRenderObject::ariaRoleHasPresentationalChildren() const
 
 bool AccessibilityRenderObject::canSetFocusAttribute() const
 {
-    ASSERT(m_renderer);
-    Node* node = m_renderer->node();
+    Node* node = this->node();
 
     // NOTE: It would be more accurate to ask the document whether setFocusedNode() would
     // do anything.  For example, setFocusedNode() will do nothing if the current focused
     // node will not relinquish the focus.
-    if (!node || !node->isElementNode())
+    if (!node)
         return false;
 
-    if (!static_cast<Element*>(node)->isEnabledFormControl())
+    if (node->isElementNode() && !static_cast<Element*>(node)->isEnabledFormControl())
         return false;
 
-    switch (roleValue()) {
-    case WebCoreLinkRole:
-    case ImageMapLinkRole:
-    case TextFieldRole:
-    case TextAreaRole:
-    case ButtonRole:
-    case PopUpButtonRole:
-    case CheckBoxRole:
-    case RadioButtonRole:
-    case SliderRole:
-        return true;
-    default:
-        return node->supportsFocus();
-    }
+    return node->supportsFocus();
 }
     
 bool AccessibilityRenderObject::canSetExpandedAttribute() const
@@ -3507,6 +3500,21 @@ void AccessibilityRenderObject::addTextFieldChildren()
     m_children.append(axSpinButton);
 }
 
+void AccessibilityRenderObject::addAttachmentChildren()
+{
+    if (!isAttachment())
+        return;
+
+    // FrameView's need to be inserted into the AX hierarchy when encountered.
+    Widget* widget = widgetForAttachmentView();
+    if (!widget || !widget->isFrameView())
+        return;
+    
+    AccessibilityObject* axWidget = axObjectCache()->getOrCreate(widget);
+    if (!axWidget->accessibilityIsIgnored())
+        m_children.append(axWidget);
+}
+    
 void AccessibilityRenderObject::addChildren()
 {
     // If the need to add more children in addition to existing children arises, 
@@ -3524,13 +3532,13 @@ void AccessibilityRenderObject::addChildren()
     
     // add all unignored acc children
     for (RefPtr<AccessibilityObject> obj = firstChild(); obj; obj = obj->nextSibling()) {
-        if (obj->accessibilityIsIgnored()) {
+        
+        // If the parent is asking for this child's children, then either it's the first time (and clearing is a no-op), 
+        // or its visibility has changed. In the latter case, this child may have a stale child cached. 
+        // This can prevent aria-hidden changes from working correctly. Hence, whenever a parent is getting children, ensure data is not stale.
+        obj->clearChildren();
 
-            // If the parent is asking for this child's children, then either it's the first time (and clearing is a no-op), 
-            // or its visibility has changed. In the latter case, this child may have a stale child cached. 
-            // This can prevent aria-hidden changes from working correctly. Hence, whenever a parent is getting children, ensure data is not stale.
-            obj->clearChildren();
-            
+        if (obj->accessibilityIsIgnored()) {
             AccessibilityChildrenVector children = obj->children();
             unsigned length = children.size();
             for (unsigned i = 0; i < length; ++i)
@@ -3541,13 +3549,7 @@ void AccessibilityRenderObject::addChildren()
         }
     }
     
-    // FrameView's need to be inserted into the AX hierarchy when encountered.
-    if (isAttachment()) {
-        Widget* widget = widgetForAttachmentView();
-        if (widget && widget->isFrameView())
-            m_children.append(axObjectCache()->getOrCreate(widget));
-    }
-    
+    addAttachmentChildren();
     addImageMapChildren();
     addTextFieldChildren();
 }

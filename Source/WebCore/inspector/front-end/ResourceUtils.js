@@ -58,18 +58,19 @@ WebInspector.displayNameForURL = function(url)
     if (resource)
         return resource.displayName;
 
-    if (!WebInspector.mainResource)
+    if (!WebInspector.inspectedPageURL)
         return url.trimURL("");
 
-    var lastPathComponent = WebInspector.mainResource.lastPathComponent;
-    var index = WebInspector.mainResource.url.indexOf(lastPathComponent);
-    if (index !== -1 && index + lastPathComponent.length === WebInspector.mainResource.url.length) {
-        var baseURL = WebInspector.mainResource.url.substring(0, index);
+    var parsedURL = WebInspector.inspectedPageURL.asParsedURL();
+    var lastPathComponent = parsedURL.lastPathComponent;
+    var index = WebInspector.inspectedPageURL.indexOf(lastPathComponent);
+    if (index !== -1 && index + lastPathComponent.length === WebInspector.inspectedPageURL.length) {
+        var baseURL = WebInspector.inspectedPageURL.substring(0, index);
         if (url.indexOf(baseURL) === 0)
             return url.substring(index);
     }
 
-    return url.trimURL(WebInspector.mainResource.domain);
+    return url.trimURL(parsedURL.host);
 }
 
 /**
@@ -134,8 +135,8 @@ WebInspector.linkifyStringAsFragment = function(string)
         var isExternal = !WebInspector.resourceForURL(url);
         var urlNode = WebInspector.linkifyURLAsNode(url, title, undefined, isExternal);
         if (typeof(lineNumber) !== "undefined") {
-            urlNode.setAttribute("line_number", lineNumber);
-            urlNode.setAttribute("preferred_panel", "scripts");
+            urlNode.lineNumber = lineNumber;
+            urlNode.preferredPanel = "scripts";
         }
         
         return urlNode; 
@@ -176,22 +177,6 @@ WebInspector.linkifyURLAsNode = function(url, linkText, classes, isExternal, too
 
 /**
  * @param {string} url
- * @param {string=} linkText
- * @param {string=} classes
- * @param {boolean=} isExternal
- * @param {string=} tooltipText
- * @return {string}
- * @deprecated
- */
-WebInspector.linkifyURL = function(url, linkText, classes, isExternal, tooltipText)
-{
-    // Use the DOM version of this function so as to avoid needing to escape attributes.
-    // FIXME:  Get rid of linkifyURL entirely.
-    return WebInspector.linkifyURLAsNode(url, linkText, classes, isExternal, tooltipText).outerHTML;
-}
-
-/**
- * @param {string} url
  * @param {number=} lineNumber
  * @return {string}
  */
@@ -214,9 +199,20 @@ WebInspector.linkifyResourceAsNode = function(url, lineNumber, classes, tooltipT
 {
     var linkText = WebInspector.formatLinkText(url, lineNumber);
     var anchor = WebInspector.linkifyURLAsNode(url, linkText, classes, false, tooltipText);
-    anchor.setAttribute("preferred_panel", "resources");
-    if (typeof lineNumber !== "undefined")
-        anchor.setAttribute("line_number", lineNumber);
+    anchor.preferredPanel = "resources";
+    anchor.lineNumber = lineNumber;
+    return anchor;
+}
+
+/**
+ * @param {WebInspector.Resource} request
+ * @param {string=} classes
+ */
+WebInspector.linkifyRequestAsNode = function(request, classes)
+{
+    var anchor = WebInspector.linkifyURLAsNode(request.url);
+    anchor.preferredPanel = "network";
+    anchor.requestId  = request.requestId;
     return anchor;
 }
 

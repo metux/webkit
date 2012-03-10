@@ -196,6 +196,7 @@ public:
 
     void adjustRectForColumns(LayoutRect&) const;
     virtual void adjustForColumns(LayoutSize&, const LayoutPoint&) const;
+    void adjustForColumnRect(LayoutSize& offset, const LayoutPoint& pointInContainer) const;
 
     void addContinuationWithOutline(RenderInline*);
     bool paintsContinuationOutline(RenderInline*);
@@ -414,6 +415,8 @@ protected:
     bool simplifiedLayout();
     void simplifiedNormalFlowLayout();
 
+    void setDesiredColumnCountAndWidth(int, LayoutUnit);
+
     void computeOverflow(LayoutUnit oldClientAfterEdge, bool recomputeFloats = false);
     virtual void addOverflowFromChildren();
     void addOverflowFromFloats();
@@ -477,7 +480,7 @@ private:
         FloatWithRect(RenderBox* f)
             : object(f)
             , rect(LayoutRect(f->x() - f->marginLeft(), f->y() - f->marginTop(), f->width() + f->marginLeft() + f->marginRight(), f->height() + f->marginTop() + f->marginBottom()))
-            , everHadLayout(f->m_everHadLayout)
+            , everHadLayout(f->everHadLayout())
         {
         }
 
@@ -750,7 +753,6 @@ private:
 
     LayoutUnit desiredColumnWidth() const;
     unsigned desiredColumnCount() const;
-    void setDesiredColumnCountAndWidth(int count, LayoutUnit width);
 
     void paintContinuationOutlines(PaintInfo&, const LayoutPoint&);
 
@@ -769,7 +771,7 @@ private:
     // Adjust from painting offsets to the local coords of this renderer
     void offsetForContents(LayoutPoint&) const;
 
-    void calcColumnWidth();
+    virtual void calcColumnWidth();
     bool layoutColumns(bool hasSpecifiedPageLogicalHeight, LayoutUnit pageLogicalHeight, LayoutStateMaintainer&);
     void makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, RenderBlock* newBlockBox, RenderObject* newChild);
 
@@ -914,7 +916,7 @@ public:
     RenderRegion* regionAtBlockOffset(LayoutUnit) const;
     RenderRegion* clampToStartAndEndRegions(RenderRegion*) const;
 
-private:
+protected:
     struct FloatingObjectHashFunctions {
         static unsigned hash(FloatingObject* key) { return DefaultHash<RenderBox*>::Hash::hash(key->m_renderer); }
         static bool equal(FloatingObject* a, FloatingObject* b) { return a->m_renderer == b->m_renderer; }
@@ -928,6 +930,7 @@ private:
     typedef FloatingObjectSet::const_iterator FloatingObjectSetIterator;
     typedef PODInterval<int, FloatingObject*> FloatingObjectInterval;
     typedef PODIntervalTree<int, FloatingObject*> FloatingObjectTree;
+    typedef PODFreeListArena<PODRedBlackTree<FloatingObjectInterval>::Node> IntervalArena;
     
     template <FloatingObject::Type FloatTypeValue>
     class FloatIntervalSearchAdapter {
@@ -955,12 +958,13 @@ private:
 
     class FloatingObjects {
     public:
-        FloatingObjects(bool horizontalWritingMode)
+        FloatingObjects(const RenderBlock* renderer, bool horizontalWritingMode)
             : m_placedFloatsTree(UninitializedTree)
             , m_leftObjectsCount(0)
             , m_rightObjectsCount(0)
             , m_positionedObjectsCount(0)
             , m_horizontalWritingMode(horizontalWritingMode)
+            , m_renderer(renderer)
         {
         }
 
@@ -997,6 +1001,7 @@ private:
         unsigned m_rightObjectsCount;
         unsigned m_positionedObjectsCount;
         bool m_horizontalWritingMode;
+        const RenderBlock* m_renderer;
     };
     OwnPtr<FloatingObjects> m_floatingObjects;
     

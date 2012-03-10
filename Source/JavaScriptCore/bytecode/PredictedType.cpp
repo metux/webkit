@@ -42,7 +42,7 @@ const char* predictionToString(PredictedType value)
     if (value == PredictNone)
         return "None";
     
-    static const int size = 96;
+    static const int size = 256;
     static char description[size];
     BoundsCheckedPointer<char> ptr(description, size);
     
@@ -73,6 +73,46 @@ const char* predictionToString(PredictedType value)
     else
         isTop = false;
     
+    if (value & PredictInt8Array)
+        ptr.strcat("Int8array");
+    else
+        isTop = false;
+    
+    if (value & PredictInt16Array)
+        ptr.strcat("Int16array");
+    else
+        isTop = false;
+    
+    if (value & PredictInt32Array)
+        ptr.strcat("Int32array");
+    else
+        isTop = false;
+    
+    if (value & PredictUint8Array)
+        ptr.strcat("Uint8array");
+    else
+        isTop = false;
+    
+    if (value & PredictUint16Array)
+        ptr.strcat("Uint16array");
+    else
+        isTop = false;
+    
+    if (value & PredictUint32Array)
+        ptr.strcat("Uint32array");
+    else
+        isTop = false;
+    
+    if (value & PredictFloat32Array)
+        ptr.strcat("Float32array");
+    else
+        isTop = false;
+    
+    if (value & PredictFloat64Array)
+        ptr.strcat("Float64array");
+    else
+        isTop = false;
+    
     if (value & PredictFunction)
         ptr.strcat("Function");
     else
@@ -88,8 +128,13 @@ const char* predictionToString(PredictedType value)
     else
         isTop = false;
     
-    if (value & PredictDouble)
-        ptr.strcat("Double");
+    if (value & PredictDoubleReal)
+        ptr.strcat("Doublereal");
+    else
+        isTop = false;
+    
+    if (value & PredictDoubleNaN)
+        ptr.strcat("Doublenan");
     else
         isTop = false;
     
@@ -129,6 +174,29 @@ PredictedType predictionFromClassInfo(const ClassInfo* classInfo)
     if (classInfo->isSubClassOf(&JSByteArray::s_info))
         return PredictByteArray;
     
+    if (classInfo->typedArrayStorageType != TypedArrayNone) {
+        switch (classInfo->typedArrayStorageType) {
+        case TypedArrayInt8:
+            return PredictInt8Array;
+        case TypedArrayInt16:
+            return PredictInt16Array;
+        case TypedArrayInt32:
+            return PredictInt32Array;
+        case TypedArrayUint8:
+            return PredictUint8Array;
+        case TypedArrayUint16:
+            return PredictUint16Array;
+        case TypedArrayUint32:
+            return PredictUint32Array;
+        case TypedArrayFloat32:
+            return PredictFloat32Array;
+        case TypedArrayFloat64:
+            return PredictFloat64Array;
+        default:
+            break;
+        }
+    }
+    
     if (classInfo->isSubClassOf(&JSObject::s_info))
         return PredictObjectOther;
     
@@ -149,8 +217,12 @@ PredictedType predictionFromValue(JSValue value)
 {
     if (value.isInt32())
         return PredictInt32;
-    if (value.isDouble())
-        return PredictDouble;
+    if (value.isDouble()) {
+        double number = value.asNumber();
+        if (number == number)
+            return PredictDoubleReal;
+        return PredictDoubleNaN;
+    }
     if (value.isCell())
         return predictionFromCell(value.asCell());
     if (value.isBoolean())

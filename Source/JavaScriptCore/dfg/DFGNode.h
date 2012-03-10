@@ -80,6 +80,11 @@ static inline bool nodeCanIgnoreNegativeZero(ArithNodeFlags flags)
     return !(flags & NodeNeedsNegZero);
 }
 
+static inline bool nodeMayOverflow(ArithNodeFlags flags)
+{
+    return !!(flags & NodeMayOverflow);
+}
+
 static inline bool nodeCanSpeculateInteger(ArithNodeFlags flags)
 {
     if (flags & NodeMayOverflow)
@@ -228,12 +233,20 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
     macro(CheckStructure, NodeMustGenerate) \
     macro(PutStructure, NodeMustGenerate | NodeClobbersWorld) \
     macro(GetPropertyStorage, NodeResultStorage) \
+    macro(GetIndexedPropertyStorage, NodeMustGenerate | NodeResultStorage) \
     macro(GetByOffset, NodeResultJS) \
     macro(PutByOffset, NodeMustGenerate | NodeClobbersWorld) \
     macro(GetArrayLength, NodeResultInt32) \
     macro(GetStringLength, NodeResultInt32) \
     macro(GetByteArrayLength, NodeResultInt32) \
-    macro(GetMethod, NodeResultJS | NodeMustGenerate) \
+    macro(GetInt8ArrayLength, NodeResultInt32) \
+    macro(GetInt16ArrayLength, NodeResultInt32) \
+    macro(GetInt32ArrayLength, NodeResultInt32) \
+    macro(GetUint8ArrayLength, NodeResultInt32) \
+    macro(GetUint16ArrayLength, NodeResultInt32) \
+    macro(GetUint32ArrayLength, NodeResultInt32) \
+    macro(GetFloat32ArrayLength, NodeResultInt32) \
+    macro(GetFloat64ArrayLength, NodeResultInt32) \
     macro(GetScopeChain, NodeResultJS) \
     macro(GetScopedVar, NodeResultJS | NodeMustGenerate) \
     macro(PutScopedVar, NodeMustGenerate | NodeClobbersWorld) \
@@ -490,7 +503,6 @@ struct Node {
         case GetById:
         case PutById:
         case PutByIdDirect:
-        case GetMethod:
         case Resolve:
         case ResolveBase:
         case ResolveBaseStrictPut:
@@ -705,7 +717,6 @@ struct Node {
     {
         switch (op) {
         case GetById:
-        case GetMethod:
         case GetByVal:
         case Call:
         case Construct:
@@ -912,6 +923,50 @@ struct Node {
         return !!(prediction() & PredictByteArray);
     }
     
+    bool shouldSpeculateInt8Array()
+    {
+        return prediction() == PredictInt8Array;
+    }
+    
+    bool shouldSpeculateInt16Array()
+    {
+        return prediction() == PredictInt16Array;
+    }
+    
+    bool shouldSpeculateInt32Array()
+    {
+        return prediction() == PredictInt32Array;
+    }
+    
+    bool shouldSpeculateUint8Array()
+    {
+        return prediction() == PredictUint8Array;
+    }
+    
+    bool shouldSpeculateUint16Array()
+    {
+        return prediction() == PredictUint16Array;
+    }
+    
+    bool shouldSpeculateUint32Array()
+    {
+        return prediction() == PredictUint32Array;
+    }
+    
+    bool shouldSpeculateFloat32Array()
+    {
+#if CPU(X86) || CPU(X86_64)
+        return !!(prediction() & PredictFloat32Array);
+#else
+        return false;
+#endif
+    }
+    
+    bool shouldSpeculateFloat64Array()
+    {
+        return prediction() == PredictFloat64Array;
+    }
+    
     bool shouldSpeculateArrayOrOther()
     {
         return isArrayOrOtherPrediction(prediction());
@@ -953,6 +1008,21 @@ struct Node {
     {
         return nodeCanSpeculateInteger(arithNodeFlags());
     }
+    
+#ifndef NDEBUG
+    void dumpChildren(FILE* out)
+    {
+        if (child1() == NoNode)
+            return;
+        fprintf(out, "@%u", child1());
+        if (child2() == NoNode)
+            return;
+        fprintf(out, ", @%u", child2());
+        if (child3() == NoNode)
+            return;
+        fprintf(out, ", @%u", child3());
+    }
+#endif
     
     // This enum value describes the type of the node.
     NodeType op;

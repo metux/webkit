@@ -105,6 +105,7 @@ InspectorFrontendClientLocal::InspectorFrontendClientLocal(InspectorController* 
     , m_frontendPage(frontendPage)
     , m_frontendScriptState(0)
     , m_settings(settings)
+    , m_frontendLoaded(false)
 {
     m_frontendPage->settings()->setAllowFileAccessFromFileURLs(true);
     m_dispatchTask = adoptPtr(new InspectorBackendDispatchTask(inspectorController));
@@ -114,13 +115,15 @@ InspectorFrontendClientLocal::~InspectorFrontendClientLocal()
 {
     if (m_frontendHost)
         m_frontendHost->disconnectClient();
-    m_frontendScriptState = 0;
     m_frontendPage = 0;
+    m_frontendScriptState = 0;
     m_inspectorController = 0;
 }
 
 void InspectorFrontendClientLocal::windowObjectCleared()
 {
+    if (m_frontendHost)
+        m_frontendHost->disconnectClient();
     // FIXME: don't keep reference to the script state
     m_frontendScriptState = scriptStateFromPage(debuggerWorld(), m_frontendPage);
     m_frontendHost = InspectorFrontendHost::create(this, m_frontendPage);
@@ -130,7 +133,10 @@ void InspectorFrontendClientLocal::windowObjectCleared()
 void InspectorFrontendClientLocal::frontendLoaded()
 {
     bringToFront();
-    m_inspectorController->connectFrontend();
+    m_frontendLoaded = true;
+    for (Vector<String>::iterator it = m_evaluateOnLoad.begin(); it != m_evaluateOnLoad.end(); ++it)
+        evaluateOnLoad(*it);
+    m_evaluateOnLoad.clear();
 }
 
 void InspectorFrontendClientLocal::requestAttachWindow()
@@ -172,14 +178,7 @@ void InspectorFrontendClientLocal::moveWindowBy(float x, float y)
 
 void InspectorFrontendClientLocal::setAttachedWindow(bool attached)
 {
-    ScriptObject webInspectorObj;
-    if (!ScriptGlobalObject::get(m_frontendScriptState, "WebInspector", webInspectorObj)) {
-        ASSERT_NOT_REACHED();
-        return;
-    }
-    ScriptFunctionCall function(webInspectorObj, "setAttachedWindow");
-    function.appendArgument(attached);
-    function.call();
+    evaluateAsBoolean(String::format("InspectorFrontendAPI.setAttachedWindow(%s)", attached ? "true" : "false"));
 }
 
 void InspectorFrontendClientLocal::restoreAttachedWindowHeight()
@@ -194,6 +193,52 @@ void InspectorFrontendClientLocal::restoreAttachedWindowHeight()
     setAttachedWindowHeight(constrainedAttachedWindowHeight(preferredHeight, inspectedPageHeight));
 }
 
+bool InspectorFrontendClientLocal::isDebuggingEnabled()
+{
+    if (m_frontendLoaded)
+        return evaluateAsBoolean("[\"isDebuggingEnabled\"]");
+    return false;
+}
+
+void InspectorFrontendClientLocal::setDebuggingEnabled(bool enabled)
+{
+    evaluateOnLoad(String::format("[\"setDebuggingEnabled\", %s]", enabled ? "true" : "false"));
+}
+
+bool InspectorFrontendClientLocal::isTimelineProfilingEnabled()
+{
+    if (m_frontendLoaded)
+        return evaluateAsBoolean("[\"isTimelineProfilingEnabled\"]");
+    return false;
+}
+
+void InspectorFrontendClientLocal::setTimelineProfilingEnabled(bool enabled)
+{
+    evaluateOnLoad(String::format("[\"setTimelineProfilingEnabled\", %s]", enabled ? "true" : "false"));
+}
+
+bool InspectorFrontendClientLocal::isProfilingJavaScript()
+{
+    if (m_frontendLoaded)
+        return evaluateAsBoolean("[\"isProfilingJavaScript\"]");
+    return false;
+}
+
+void InspectorFrontendClientLocal::startProfilingJavaScript()
+{
+    evaluateOnLoad("[\"startProfilingJavaScript\"]");
+}
+
+void InspectorFrontendClientLocal::stopProfilingJavaScript()
+{
+    evaluateOnLoad("[\"stopProfilingJavaScript\"]");
+}
+
+void InspectorFrontendClientLocal::showConsole()
+{
+    evaluateOnLoad("[\"showConsole\"]");
+}
+
 unsigned InspectorFrontendClientLocal::constrainedAttachedWindowHeight(unsigned preferredHeight, unsigned totalWindowHeight)
 {
     using namespace std;
@@ -203,6 +248,22 @@ unsigned InspectorFrontendClientLocal::constrainedAttachedWindowHeight(unsigned 
 void InspectorFrontendClientLocal::sendMessageToBackend(const String& message)
 {
     m_dispatchTask->dispatch(message);
+}
+
+bool InspectorFrontendClientLocal::evaluateAsBoolean(const String& expression)
+{
+    if (!m_frontendPage->mainFrame())
+        return false;
+    ScriptValue value = m_frontendPage->mainFrame()->script()->executeScript(expression);
+    return value.toString(mainWorldScriptState(m_frontendPage->mainFrame())) == "true";
+}
+
+void InspectorFrontendClientLocal::evaluateOnLoad(const String& expression)
+{
+    if (m_frontendLoaded)
+        m_frontendPage->mainFrame()->script()->executeScript("InspectorFrontendAPI.dispatch(" + expression + ")");
+    else
+        m_evaluateOnLoad.append(expression);
 }
 
 } // namespace WebCore

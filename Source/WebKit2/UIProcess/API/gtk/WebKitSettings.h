@@ -266,10 +266,24 @@ webkit_settings_set_enable_tabs_to_links                       (WebKitSettings* 
                                                                 gboolean        enabled);
 
 WEBKIT_API gboolean
+webkit_settings_get_enable_dns_prefetching                     (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_enable_dns_prefetching                     (WebKitSettings *settings,
+                                                                gboolean        enabled);
+
+WEBKIT_API gboolean
 webkit_settings_get_enable_caret_browsing                      (WebKitSettings* settings);
 
 WEBKIT_API void
 webkit_settings_set_enable_caret_browsing                      (WebKitSettings* settings,
+                                                                gboolean enabled);
+
+WEBKIT_API gboolean
+webkit_settings_get_enable_fullscreen                          (WebKitSettings* settings);
+
+WEBKIT_API void
+webkit_settings_set_enable_fullscreen                          (WebKitSettings* settings,
                                                                 gboolean enabled);
 
 G_END_DECLS

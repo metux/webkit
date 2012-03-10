@@ -173,7 +173,11 @@ bool HTMLTextAreaElement::appendFormData(FormDataList& encoding, bool)
 
     const String& text = (m_wrap == HardWrap) ? valueWithHardLineBreaks() : value();
     encoding.appendData(name(), text);
-    return true;
+
+    const AtomicString& dirnameAttrValue = fastGetAttribute(dirnameAttr);
+    if (!dirnameAttrValue.isNull())
+        encoding.appendData(dirnameAttrValue, directionForFormData());
+    return true;    
 }
 
 void HTMLTextAreaElement::reset()
@@ -194,9 +198,6 @@ bool HTMLTextAreaElement::isMouseFocusable() const
 
 void HTMLTextAreaElement::updateFocusAppearance(bool restorePreviousSelection)
 {
-    ASSERT(renderer());
-    ASSERT(!document()->childNeedsAndNotInStyleRecalc());
-
     if (!restorePreviousSelection || !hasCachedSelection()) {
         // If this is the first focus, set a caret at the beginning of the text.  
         // This matches some browsers' behavior; see bug 11746 Comment #15.

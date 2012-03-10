@@ -52,24 +52,25 @@
 #include "RenderBox.h"
 #include "RenderLayer.h"
 #include "Settings.h"
-#include "Uint16Array.h"
 #include "WebGLActiveInfo.h"
 #include "WebGLBuffer.h"
+#include "WebGLCompressedTextures.h"
 #include "WebGLContextAttributes.h"
 #include "WebGLContextEvent.h"
 #include "WebGLDebugRendererInfo.h"
 #include "WebGLDebugShaders.h"
 #include "WebGLFramebuffer.h"
+#include "WebGLLoseContext.h"
 #include "WebGLProgram.h"
 #include "WebGLRenderbuffer.h"
 #include "WebGLShader.h"
 #include "WebGLTexture.h"
 #include "WebGLUniformLocation.h"
-#include "WebKitLoseContext.h"
 
 #include <wtf/ByteArray.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
+#include <wtf/Uint16Array.h>
 #include <wtf/text/StringBuilder.h>
 
 #if PLATFORM(QT)
@@ -541,16 +542,18 @@ void WebGLRenderingContext::markContextChanged()
     m_layerCleared = false;
 #if USE(ACCELERATED_COMPOSITING)
     RenderBox* renderBox = canvas()->renderBox();
-    if (renderBox && renderBox->hasLayer() && renderBox->layer()->hasAcceleratedCompositing())
+    if (renderBox && renderBox->hasLayer() && renderBox->layer()->hasAcceleratedCompositing()) {
+        m_markedCanvasDirty = true;
         renderBox->layer()->contentChanged(RenderLayer::CanvasChanged);
-    else {
+    } else {
 #endif
-        if (!m_markedCanvasDirty)
+        if (!m_markedCanvasDirty) {
+            m_markedCanvasDirty = true;
             canvas()->didDraw(FloatRect(0, 0, canvas()->width(), canvas()->height()));
+        }
 #if USE(ACCELERATED_COMPOSITING)
     }
 #endif
-    m_markedCanvasDirty = true;
 }
 
 bool WebGLRenderingContext::clearIfComposited(GC3Dbitfield mask)
@@ -758,6 +761,10 @@ void WebGLRenderingContext::activeTexture(GC3Denum texture, ExceptionCode& ec)
     }
     m_activeTextureUnit = texture - GraphicsContext3D::TEXTURE0;
     m_context->activeTexture(texture);
+
+    if (m_drawingBuffer)
+        m_drawingBuffer->setActiveTextureUnit(texture);
+
     cleanupAfterGraphicsCall(false);
 }
 
@@ -888,6 +895,10 @@ void WebGLRenderingContext::bindTexture(GC3Denum target, WebGLTexture* texture, 
     if (target == GraphicsContext3D::TEXTURE_2D) {
         m_textureUnits[m_activeTextureUnit].m_texture2DBinding = texture;
         maxLevel = m_maxTextureLevel;
+
+        if (m_drawingBuffer && !m_activeTextureUnit)
+            m_drawingBuffer->setTexture2DBinding(objectOrZero(texture));
+
     } else if (target == GraphicsContext3D::TEXTURE_CUBE_MAP) {
         m_textureUnits[m_activeTextureUnit].m_textureCubeMapBinding = texture;
         maxLevel = m_maxCubeMapTextureLevel;
@@ -1081,9 +1092,10 @@ GC3Denum WebGLRenderingContext::checkFramebufferStatus(GC3Denum target)
     }
     if (!m_framebufferBinding || !m_framebufferBinding->object())
         return GraphicsContext3D::FRAMEBUFFER_COMPLETE;
-    if (m_framebufferBinding->isIncomplete(true))
-        return GraphicsContext3D::FRAMEBUFFER_UNSUPPORTED;
-    unsigned long result = m_context->checkFramebufferStatus(target);
+    GC3Denum result = m_framebufferBinding->checkStatus();
+    if (result != GraphicsContext3D::FRAMEBUFFER_COMPLETE)
+        return result;
+    result = m_context->checkFramebufferStatus(target);
     cleanupAfterGraphicsCall(false);
     return result;
 }
@@ -2113,10 +2125,18 @@ WebGLExtension* WebGLRenderingContext::getExtension(const String& name)
         }
         return m_oesVertexArrayObject.get();
     }
-    if (equalIgnoringCase(name, "WEBKIT_lose_context")) {
-        if (!m_webkitLoseContext)
-            m_webkitLoseContext = WebKitLoseContext::create(this);
-        return m_webkitLoseContext.get();
+    if (equalIgnoringCase(name, "WEBKIT_WEBGL_lose_context")
+        // FIXME: remove this after a certain grace period.
+        || equalIgnoringCase(name, "WEBKIT_lose_context")) {
+        if (!m_webglLoseContext)
+            m_webglLoseContext = WebGLLoseContext::create(this);
+        return m_webglLoseContext.get();
+    }
+    if (equalIgnoringCase(name, "WEBKIT_WEBGL_compressed_textures")) {
+        // Use WEBKIT_ prefix until extension is official.
+        if (!m_webglCompressedTextures)
+            m_webglCompressedTextures = WebGLCompressedTextures::create(this);
+        return m_webglCompressedTextures.get();
     }
 
     if (allowPrivilegedExtensions()) {
@@ -2142,7 +2162,7 @@ WebGLGetInfo WebGLRenderingContext::getFramebufferAttachmentParameter(GC3Denum t
     if (isContextLost() || !validateFramebufferFuncParameters(target, attachment))
         return WebGLGetInfo();
 
-    if (!m_framebufferBinding || !m_framebufferBinding->object() || m_framebufferBinding->isIncomplete(false)) {
+    if (!m_framebufferBinding || !m_framebufferBinding->object()) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
         return WebGLGetInfo();
     }
@@ -2229,6 +2249,8 @@ WebGLGetInfo WebGLRenderingContext::getParameter(GC3Denum pname, ExceptionCode& 
     case GraphicsContext3D::COLOR_WRITEMASK:
         return getBooleanArrayParameter(pname);
     case GraphicsContext3D::COMPRESSED_TEXTURE_FORMATS:
+        if (m_webglCompressedTextures)
+            return m_webglCompressedTextures->getCompressedTextureFormats();
         // Defined as null in the spec
         return WebGLGetInfo();
     case GraphicsContext3D::CULL_FACE:
@@ -2559,7 +2581,9 @@ Vector<String> WebGLRenderingContext::getSupportedExtensions()
         result.append("OES_standard_derivatives");
     if (m_context->getExtensions()->supports("GL_OES_vertex_array_object"))
         result.append("OES_vertex_array_object");
-    result.append("WEBKIT_lose_context");
+    result.append("WEBKIT_WEBGL_lose_context");
+    if (WebGLCompressedTextures::supported(this))
+        result.append("WEBKIT_WEBGL_compressed_textures");
 
     if (allowPrivilegedExtensions()) {
         if (m_context->getExtensions()->supports("GL_ANGLE_translated_shader_source"))
@@ -4287,14 +4311,14 @@ GC3Denum WebGLRenderingContext::getBoundFramebufferColorFormat()
 int WebGLRenderingContext::getBoundFramebufferWidth()
 {
     if (m_framebufferBinding && m_framebufferBinding->object())
-        return m_framebufferBinding->getWidth();
+        return m_framebufferBinding->getColorBufferWidth();
     return m_drawingBuffer ? m_drawingBuffer->size().width() : m_context->getInternalFramebufferSize().width();
 }
 
 int WebGLRenderingContext::getBoundFramebufferHeight()
 {
     if (m_framebufferBinding && m_framebufferBinding->object())
-        return m_framebufferBinding->getHeight();
+        return m_framebufferBinding->getColorBufferHeight();
     return m_drawingBuffer ? m_drawingBuffer->size().height() : m_context->getInternalFramebufferSize().height();
 }
 
@@ -4970,8 +4994,8 @@ void WebGLRenderingContext::maybeRestoreContext(WebGLRenderingContext::LostConte
     case GraphicsContext3D::NO_ERROR:
         // The GraphicsContext3D implementation might not fully
         // support GL_ARB_robustness semantics yet. Alternatively, the
-        // WebGL WEBKIT_lose_context extension might have been used to
-        // force a lost context.
+        // WEBGL_lose_context extension might have been used to force
+        // a lost context.
         break;
     case Extensions3D::GUILTY_CONTEXT_RESET_ARB:
         // The rendering context is not restored if this context was

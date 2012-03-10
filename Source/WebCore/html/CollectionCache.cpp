@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2011 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,54 +21,15 @@
 #include "config.h"
 #include "CollectionCache.h"
 
+#include <wtf/PassOwnPtr.h>
+#include <wtf/text/AtomicString.h>
+
 namespace WebCore {
 
 CollectionCache::CollectionCache()
     : version(0)
 {
     reset();
-}
-
-inline void CollectionCache::copyCacheMap(NodeCacheMap& dest, const NodeCacheMap& src)
-{
-    ASSERT(dest.isEmpty());
-    NodeCacheMap::const_iterator end = src.end();
-    for (NodeCacheMap::const_iterator it = src.begin(); it != end; ++it)
-        dest.add(it->first, new Vector<Element*>(*it->second));
-}
-
-CollectionCache::CollectionCache(const CollectionCache& other)
-    : version(other.version)
-    , current(other.current)
-    , position(other.position)
-    , length(other.length)
-    , elementsArrayPosition(other.elementsArrayPosition)
-    , hasLength(other.hasLength)
-    , hasNameCache(other.hasNameCache)
-{
-    copyCacheMap(idCache, other.idCache);
-    copyCacheMap(nameCache, other.nameCache);
-}
-
-void CollectionCache::swap(CollectionCache& other)
-{
-    std::swap(version, other.version);
-    std::swap(current, other.current);
-    std::swap(position, other.position);
-    std::swap(length, other.length);
-    std::swap(elementsArrayPosition, other.elementsArrayPosition);
-
-    idCache.swap(other.idCache);
-    nameCache.swap(other.nameCache);
-    
-    std::swap(hasLength, other.hasLength);
-    std::swap(hasNameCache, other.hasNameCache);
-}
-
-CollectionCache::~CollectionCache()
-{
-    deleteAllValues(idCache);
-    deleteAllValues(nameCache);
 }
 
 void CollectionCache::reset()
@@ -78,9 +39,7 @@ void CollectionCache::reset()
     length = 0;
     hasLength = false;
     elementsArrayPosition = 0;
-    deleteAllValues(idCache);
     idCache.clear();
-    deleteAllValues(nameCache);
     nameCache.clear();
     hasNameCache = false;
 }
@@ -92,5 +51,13 @@ void CollectionCache::checkConsistency()
     nameCache.checkConsistency();
 }
 #endif
+
+void append(CollectionCache::NodeCacheMap& map, const AtomicString& key, Element* element)
+{
+    OwnPtr<Vector<Element*> >& vector = map.add(key.impl(), nullptr).first->second;
+    if (!vector)
+        vector = adoptPtr(new Vector<Element*>);
+    vector->append(element);
+}
 
 } // namespace WebCore

@@ -52,6 +52,7 @@ enum ValueSourceKind {
     Int32InRegisterFile,
     CellInRegisterFile,
     BooleanInRegisterFile,
+    DoubleInRegisterFile,
     HaveNode
 };
 
@@ -170,8 +171,6 @@ private:
 
     enum UseChildrenMode { CallUseChildren, UseChildrenCalledExplicitly };
     
-    static const double twoToThe32;
-
 public:
     SpeculativeJIT(JITCompiler&);
 
@@ -868,13 +867,11 @@ private:
     void nonSpeculativeBasicArithOp(NodeType op, Node&);
     
 #if USE(JSVALUE64)
-    JITCompiler::Call cachedGetById(GPRReg baseGPR, GPRReg resultGPR, GPRReg scratchGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget = JITCompiler::Jump(), NodeType = GetById);
+    JITCompiler::Call cachedGetById(GPRReg baseGPR, GPRReg resultGPR, GPRReg scratchGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget = JITCompiler::Jump());
     void cachedPutById(GPRReg base, GPRReg value, NodeIndex valueIndex, GPRReg scratchGPR, unsigned identifierNumber, PutKind, JITCompiler::Jump slowPathTarget = JITCompiler::Jump());
-    void cachedGetMethod(GPRReg baseGPR, GPRReg resultGPR, GPRReg scratchGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget = JITCompiler::Jump());
 #elif USE(JSVALUE32_64)
-    JITCompiler::Call cachedGetById(GPRReg basePayloadGPR, GPRReg resultTagGPR, GPRReg resultPayloadGPR, GPRReg scratchGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget = JITCompiler::Jump(), NodeType = GetById);
+    JITCompiler::Call cachedGetById(GPRReg baseTagGPROrNone, GPRReg basePayloadGPR, GPRReg resultTagGPR, GPRReg resultPayloadGPR, GPRReg scratchGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget = JITCompiler::Jump());
     void cachedPutById(GPRReg basePayloadGPR, GPRReg valueTagGPR, GPRReg valuePayloadGPR, NodeIndex valueIndex, GPRReg scratchGPR, unsigned identifierNumber, PutKind, JITCompiler::Jump slowPathTarget = JITCompiler::Jump());
-    void cachedGetMethod(GPRReg basePayloadGPR, GPRReg resultTagGPR, GPRReg resultPayloadGPR, GPRReg scratchGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget = JITCompiler::Jump());
 #endif
 
     void nonSpeculativeNonPeepholeCompareNull(NodeIndex operand, bool invert = false);
@@ -892,20 +889,37 @@ private:
     void compileInstanceOfForObject(Node&, GPRReg valueReg, GPRReg prototypeReg, GPRReg scratchAndResultReg);
     void compileInstanceOf(Node&);
     
-    MacroAssembler::Address addressOfCallData(int idx)
+    // Access to our fixed callee CallFrame.
+    MacroAssembler::Address callFrameSlot(int slot)
     {
-        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + idx) * static_cast<int>(sizeof(Register)));
+        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + slot) * static_cast<int>(sizeof(Register)));
+    }
+
+    // Access to our fixed callee CallFrame.
+    MacroAssembler::Address argumentSlot(int argument)
+    {
+        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + argumentToOperand(argument)) * static_cast<int>(sizeof(Register)));
     }
 
 #if USE(JSVALUE32_64)    
-    MacroAssembler::Address tagOfCallData(int idx)
+    MacroAssembler::Address callFrameTagSlot(int slot)
     {
-        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + idx) * static_cast<int>(sizeof(Register)) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag));
+        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + slot) * static_cast<int>(sizeof(Register)) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag));
     }
 
-    MacroAssembler::Address payloadOfCallData(int idx)
+    MacroAssembler::Address callFramePayloadSlot(int slot)
     {
-        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + idx) * static_cast<int>(sizeof(Register)) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
+        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + slot) * static_cast<int>(sizeof(Register)) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
+    }
+
+    MacroAssembler::Address argumentTagSlot(int argument)
+    {
+        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + argumentToOperand(argument)) * static_cast<int>(sizeof(Register)) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag));
+    }
+
+    MacroAssembler::Address argumentPayloadSlot(int argument)
+    {
+        return MacroAssembler::Address(GPRInfo::callFrameRegister, (m_jit.codeBlock()->m_numCalleeRegisters + argumentToOperand(argument)) * static_cast<int>(sizeof(Register)) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
     }
 #endif
 
@@ -1047,26 +1061,26 @@ private:
     // stack. On other architectures we may need to sort values into the
     // correct registers.
 #if !NUMBER_OF_ARGUMENT_REGISTERS
-    unsigned m_callArgumentIndex;
-    void resetCallArguments() { m_callArgumentIndex = 0; }
+    unsigned m_callArgumentOffset;
+    void resetCallArguments() { m_callArgumentOffset = 0; }
 
     // These methods are using internally to implement the callOperation methods.
     void addCallArgument(GPRReg value)
     {
-        m_jit.poke(value, m_callArgumentIndex++);
+        m_jit.poke(value, m_callArgumentOffset++);
     }
     void addCallArgument(TrustedImm32 imm)
     {
-        m_jit.poke(imm, m_callArgumentIndex++);
+        m_jit.poke(imm, m_callArgumentOffset++);
     }
     void addCallArgument(TrustedImmPtr pointer)
     {
-        m_jit.poke(pointer, m_callArgumentIndex++);
+        m_jit.poke(pointer, m_callArgumentOffset++);
     }
     void addCallArgument(FPRReg value)
     {
-        m_jit.storeDouble(value, JITCompiler::Address(JITCompiler::stackPointerRegister, m_callArgumentIndex * sizeof(void*)));
-        m_callArgumentIndex += sizeof(double) / sizeof(void*);
+        m_jit.storeDouble(value, JITCompiler::Address(JITCompiler::stackPointerRegister, m_callArgumentOffset * sizeof(void*)));
+        m_callArgumentOffset += sizeof(double) / sizeof(void*);
     }
 
     ALWAYS_INLINE void setupArguments(FPRReg arg1)
@@ -1144,6 +1158,15 @@ private:
     }
 
     ALWAYS_INLINE void setupArgumentsWithExecState(GPRReg arg1, GPRReg arg2, TrustedImmPtr arg3)
+    {
+        resetCallArguments();
+        addCallArgument(GPRInfo::callFrameRegister);
+        addCallArgument(arg1);
+        addCallArgument(arg2);
+        addCallArgument(arg3);
+    }
+
+    ALWAYS_INLINE void setupArgumentsWithExecState(GPRReg arg1, TrustedImm32 arg2, TrustedImmPtr arg3)
     {
         resetCallArguments();
         addCallArgument(GPRInfo::callFrameRegister);
@@ -1425,6 +1448,14 @@ private:
         m_jit.move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
     }
 
+    ALWAYS_INLINE void setupArgumentsWithExecState(GPRReg arg1, TrustedImm32 arg2, TrustedImmPtr arg3)
+    {
+        m_jit.move(arg1, GPRInfo::argumentGPR1);
+        m_jit.move(arg2, GPRInfo::argumentGPR2);
+        m_jit.move(arg3, GPRInfo::argumentGPR3);
+        m_jit.move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
+    }
+
     ALWAYS_INLINE void setupArgumentsWithExecState(GPRReg arg1, GPRReg arg2, TrustedImmPtr arg3)
     {
         setupStubArguments(arg1, arg2);
@@ -1525,6 +1556,11 @@ private:
         return appendCallWithExceptionCheckSetResult(operation, result);
     }
     JITCompiler::Call callOperation(J_DFGOperation_ECI operation, GPRReg result, GPRReg arg1, Identifier* identifier)
+    {
+        setupArgumentsWithExecState(arg1, TrustedImmPtr(identifier));
+        return appendCallWithExceptionCheckSetResult(operation, result);
+    }
+    JITCompiler::Call callOperation(J_DFGOperation_EJI operation, GPRReg result, GPRReg arg1, Identifier* identifier)
     {
         setupArgumentsWithExecState(arg1, TrustedImmPtr(identifier));
         return appendCallWithExceptionCheckSetResult(operation, result);
@@ -1685,6 +1721,16 @@ private:
     JITCompiler::Call callOperation(J_DFGOperation_ECI operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1, Identifier* identifier)
     {
         setupArgumentsWithExecState(arg1, TrustedImmPtr(identifier));
+        return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
+    }
+    JITCompiler::Call callOperation(J_DFGOperation_EJI operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1Tag, GPRReg arg1Payload, Identifier* identifier)
+    {
+        setupArgumentsWithExecState(arg1Payload, arg1Tag, TrustedImmPtr(identifier));
+        return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
+    }
+    JITCompiler::Call callOperation(J_DFGOperation_EJI operation, GPRReg resultTag, GPRReg resultPayload, int32_t arg1Tag, GPRReg arg1Payload, Identifier* identifier)
+    {
+        setupArgumentsWithExecState(arg1Payload, TrustedImm32(arg1Tag), TrustedImmPtr(identifier));
         return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
     }
     JITCompiler::Call callOperation(J_DFGOperation_EJA operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1Tag, GPRReg arg1Payload, GPRReg arg2)
@@ -1912,15 +1958,38 @@ private:
     void emitObjectOrOtherBranch(NodeIndex value, BlockIndex taken, BlockIndex notTaken, void *vptr, bool needSpeculationCheck);
     void emitBranch(Node&);
     
+    void compileIntegerCompare(Node&, MacroAssembler::RelationalCondition);
+    void compileDoubleCompare(Node&, MacroAssembler::DoubleCondition);
+    
+    bool compileStrictEqForConstant(Node&, NodeIndex value, JSValue constant);
+    
+    bool compileStrictEq(Node&);
+    
     void compileGetCharCodeAt(Node&);
     void compileGetByValOnString(Node&);
     void compileValueToInt32(Node&);
+    void compileUInt32ToNumber(Node&);
     void compileGetByValOnByteArray(Node&);
     void compilePutByValForByteArray(GPRReg base, GPRReg property, Node&);
-#if USE(JSVALUE32_64)
+    void compileArithMul(Node&);
+    void compileArithMod(Node&);
     void compileSoftModulo(Node&);
-#endif
-
+    void compileGetTypedArrayLength(const TypedArrayDescriptor&, Node&, bool needsSpeculationCheck);
+    enum TypedArraySpeculationRequirements {
+        NoTypedArraySpecCheck,
+        NoTypedArrayTypeSpecCheck,
+        AllTypedArraySpecChecks
+    };
+    enum TypedArraySignedness {
+        SignedTypedArray,
+        UnsignedTypedArray
+    };
+    void compileGetIndexedPropertyStorage(Node&);
+    void compileGetByValOnIntTypedArray(const TypedArrayDescriptor&, Node&, size_t elementSize, TypedArraySpeculationRequirements, TypedArraySignedness);
+    void compilePutByValForIntTypedArray(const TypedArrayDescriptor&, GPRReg base, GPRReg property, Node&, size_t elementSize, TypedArraySpeculationRequirements, TypedArraySignedness);
+    void compileGetByValOnFloatTypedArray(const TypedArrayDescriptor&, Node&, size_t elementSize, TypedArraySpeculationRequirements);
+    void compilePutByValForFloatTypedArray(const TypedArrayDescriptor&, GPRReg base, GPRReg property, Node&, size_t elementSize, TypedArraySpeculationRequirements);
+    
     // It is acceptable to have structure be equal to scratch, so long as you're fine
     // with the structure GPR being clobbered.
     template<typename T>
@@ -1960,37 +2029,37 @@ private:
 #endif
 
     // Add a speculation check without additional recovery.
-    void speculationCheck(JSValueSource jsValueSource, NodeIndex nodeIndex, MacroAssembler::Jump jumpToFail)
+    void speculationCheck(ExitKind kind, JSValueSource jsValueSource, NodeIndex nodeIndex, MacroAssembler::Jump jumpToFail)
     {
         if (!m_compileOkay)
             return;
-        m_jit.codeBlock()->appendOSRExit(OSRExit(jsValueSource, m_jit.valueProfileFor(nodeIndex), jumpToFail, this));
+        m_jit.codeBlock()->appendOSRExit(OSRExit(kind, jsValueSource, m_jit.valueProfileFor(nodeIndex), jumpToFail, this));
     }
     // Add a set of speculation checks without additional recovery.
-    void speculationCheck(JSValueSource jsValueSource, NodeIndex nodeIndex, MacroAssembler::JumpList& jumpsToFail)
+    void speculationCheck(ExitKind kind, JSValueSource jsValueSource, NodeIndex nodeIndex, MacroAssembler::JumpList& jumpsToFail)
     {
         Vector<MacroAssembler::Jump, 16> JumpVector = jumpsToFail.jumps();
         for (unsigned i = 0; i < JumpVector.size(); ++i)
-            speculationCheck(jsValueSource, nodeIndex, JumpVector[i]);
+            speculationCheck(kind, jsValueSource, nodeIndex, JumpVector[i]);
     }
     // Add a speculation check with additional recovery.
-    void speculationCheck(JSValueSource jsValueSource, NodeIndex nodeIndex, MacroAssembler::Jump jumpToFail, const SpeculationRecovery& recovery)
+    void speculationCheck(ExitKind kind, JSValueSource jsValueSource, NodeIndex nodeIndex, MacroAssembler::Jump jumpToFail, const SpeculationRecovery& recovery)
     {
         if (!m_compileOkay)
             return;
         m_jit.codeBlock()->appendSpeculationRecovery(recovery);
-        m_jit.codeBlock()->appendOSRExit(OSRExit(jsValueSource, m_jit.valueProfileFor(nodeIndex), jumpToFail, this, m_jit.codeBlock()->numberOfSpeculationRecoveries()));
+        m_jit.codeBlock()->appendOSRExit(OSRExit(kind, jsValueSource, m_jit.valueProfileFor(nodeIndex), jumpToFail, this, m_jit.codeBlock()->numberOfSpeculationRecoveries()));
     }
 
     // Called when we statically determine that a speculation will fail.
-    void terminateSpeculativeExecution(JSValueRegs jsValueRegs, NodeIndex nodeIndex)
+    void terminateSpeculativeExecution(ExitKind kind, JSValueRegs jsValueRegs, NodeIndex nodeIndex)
     {
 #if DFG_ENABLE(DEBUG_VERBOSE)
         fprintf(stderr, "SpeculativeJIT was terminated.\n");
 #endif
         if (!m_compileOkay)
             return;
-        speculationCheck(jsValueRegs, nodeIndex, m_jit.jump());
+        speculationCheck(kind, jsValueRegs, nodeIndex, m_jit.jump());
         m_compileOkay = false;
     }
     
@@ -2023,7 +2092,7 @@ private:
     ValueSource& valueSourceReferenceForOperand(int operand)
     {
         if (operandIsArgument(operand)) {
-            int argument = operand + m_arguments.size() + RegisterFile::CallFrameHeaderSize;
+            int argument = operandToArgument(operand);
             return m_arguments[argument];
         }
         

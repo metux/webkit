@@ -28,15 +28,17 @@
 #define ScriptProfiler_h
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
+#include "InspectorValues.h"
 #include "ScriptHeapSnapshot.h"
 #include "ScriptProfile.h"
 #include "ScriptState.h"
+#include <wtf/PassRefPtr.h>
 
 
 namespace WebCore {
 
+class DOMWrapperVisitor;
 class InjectedScriptManager;
-class InspectorValue;
 
 class ScriptProfiler {
     WTF_MAKE_NONCOPYABLE(ScriptProfiler);
@@ -55,6 +57,11 @@ public:
     static void start(ScriptState* state, const String& title);
     static PassRefPtr<ScriptProfile> stop(ScriptState* state, const String& title);
     static PassRefPtr<ScriptHeapSnapshot> takeHeapSnapshot(const String&, HeapSnapshotProgress*) { return 0; }
+    static bool causesRecompilation() { return true; }
+    static bool isSampling() { return false; }
+    static bool hasHeapProfiler() { return false; }
+    // FIXME: Implement this counter for JSC. See bug 73936 for more details.
+    static void visitJSDOMWrappers(DOMWrapperVisitor*) { }
 };
 
 } // namespace WebCore

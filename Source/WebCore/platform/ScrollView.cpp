@@ -231,10 +231,15 @@ IntRect ScrollView::visibleContentRect(bool includeScrollbars) const
     if (!m_fixedVisibleContentRect.isEmpty())
         return m_fixedVisibleContentRect;
 
-    int verticalScrollbarWidth = verticalScrollbar() && !verticalScrollbar()->isOverlayScrollbar()
-        && !includeScrollbars ? verticalScrollbar()->width() : 0;
-    int horizontalScrollbarHeight = horizontalScrollbar() && !horizontalScrollbar()->isOverlayScrollbar()
-        && !includeScrollbars ? horizontalScrollbar()->height() : 0;
+    int verticalScrollbarWidth = 0;
+    int horizontalScrollbarHeight = 0;
+
+    if (!includeScrollbars) {
+        if (Scrollbar* verticalBar = verticalScrollbar())
+            verticalScrollbarWidth = !verticalBar->isOverlayScrollbar() ? verticalBar->width() : 0;
+        if (Scrollbar* horizontalBar = horizontalScrollbar())
+            horizontalScrollbarHeight = !horizontalBar->isOverlayScrollbar() ? horizontalBar->height() : 0;
+    }
 
     return IntRect(m_scrollOffset.width(),
                    m_scrollOffset.height(),
@@ -586,8 +591,8 @@ void ScrollView::updateScrollbars(const IntSize& desiredOffset)
 
     IntPoint adjustedScrollPosition = adjustScrollPositionWithinRange(IntPoint(desiredOffset));
     if (adjustedScrollPosition != scrollPosition() || scrollOriginChanged()) {
-        resetScrollOriginChanged();
         ScrollableArea::scrollToOffsetWithoutAnimation(adjustedScrollPosition + IntSize(scrollOrigin().x(), scrollOrigin().y()));
+        resetScrollOriginChanged();
     }
 
     // Make sure the scrollbar offsets are up to date.
@@ -973,8 +978,11 @@ bool ScrollView::isScrollCornerVisible() const
     return !scrollCornerRect().isEmpty();
 }
 
-void ScrollView::scrollbarStyleChanged()
+void ScrollView::scrollbarStyleChanged(int, bool forceUpdate)
 {
+    if (!forceUpdate)
+        return;
+
     contentsResized();
     updateScrollbars(scrollOffset());
 }

@@ -5,29 +5,16 @@
         "hidden": true,
         "types": [],
         "commands": [
+            {
+                "name": "enable",
+                "description": "Enables inspector domain notifications."
+            },
+            {
+                "name": "disable",
+                "description": "Disables inspector domain notifications."
+            }
         ],
         "events": [
-            {
-                "name": "frontendReused"
-            },
-            {
-                "name": "bringToFront"
-            },
-            {
-                "name": "disconnectFromBackend"
-            },
-            {
-                "name": "reset"
-            },
-            {
-                "name": "showPanel",
-                "parameters": [
-                    { "name": "panel", "type": "string" }
-                ]
-            },
-            {
-                "name": "startUserInitiatedDebugging"
-            },
             {
                 "name": "evaluateForTestInFrontend",
                 "parameters": [
@@ -54,6 +41,39 @@
                 "name": "didDestroyWorker",
                 "parameters": [
                     { "name": "id", "type": "integer" }
+                ]
+            }
+        ]
+    },
+    {
+        "domain": "Memory",
+        "hidden": true,
+        "types": [
+            {
+                "id": "NodeCount",
+                "type": "object",
+                "properties": [
+                    { "name": "nodeName", "type": "string" },
+                    { "name": "count", "type": "integer" }
+                ],
+                "description": "Number of nodes with given name."
+            },
+            {
+                "id": "DOMGroup",
+                "type": "object",
+                "properties": [
+                    { "name": "size", "type": "integer" },
+                    { "name": "title", "type": "string" },
+                    { "name": "documentURI", "type": "string", "optional": true },
+                    { "name": "nodeCount", "type": "array", "items": { "$ref": "NodeCount" }}
+                ]
+            }
+        ],
+        "commands": [
+            {
+                "name": "getDOMNodeCount",
+                "returns": [
+                    { "name": "count", "type": "array", "items": { "$ref": "DOMGroup" }}
                 ]
             }
         ]
@@ -119,7 +139,7 @@
                 "description": "Search result for resource.",
                 "properties": [
                     { "name": "url", "type": "string", "description": "Resource URL." },
-                    { "name": "frameId", "type": "string", "description": "Resource frame id." },
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Resource frame id." },
                     { "name": "matchesCount", "type": "number", "description": "Number of matches in the resource content." }
                 ],
                 "hidden": true
@@ -221,7 +241,7 @@
                 "name": "getResourceContent",
                 "description": "Returns content of the given resource.",
                 "parameters": [
-                    { "name": "frameId", "type": "string", "description": "Frame id to get resource for." },
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Frame id to get resource for." },
                     { "name": "url", "type": "string", "description": "URL of the resource to get content for." }
                 ],
                 "returns": [
@@ -234,7 +254,7 @@
                 "name": "searchInResource",
                 "description": "Searches for given string in resource content.",
                 "parameters": [
-                    { "name": "frameId", "type": "string", "description": "Frame id for resource to search in." },
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Frame id for resource to search in." },
                     { "name": "url", "type": "string", "description": "URL of the resource to search in." },
                     { "name": "query", "type": "string", "description": "String to search for."  },
                     { "name": "caseSensitive", "type": "boolean", "optional": true, "description": "If true, search is case sensitive." },
@@ -276,8 +296,7 @@
                 "name": "frameNavigated",
                 "description": "Fired once navigation of the frame has completed. Frame is now associated with the new loader.",
                 "parameters": [
-                    { "name": "frame", "$ref": "Frame", "description": "Frame object." },
-                    { "name": "loaderId", "$ref": "Network.LoaderId", "description": "Loader identifier." }
+                    { "name": "frame", "$ref": "Frame", "description": "Frame object." }
                 ],
                 "hidden": true
             },
@@ -285,7 +304,7 @@
                 "name": "frameDetached",
                 "description": "Fired when frame has been detached from its parent.",
                 "parameters": [
-                    { "name": "frameId", "type": "string", "description": "Id of the frame that has been detached." }
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Id of the frame that has been detached." }
                 ],
                 "hidden": true
             }
@@ -310,8 +329,7 @@
                     { "name": "className", "type": "string", "optional": true, "description": "Object class (constructor) name. Specified for <code>object</code> type values only." },
                     { "name": "value", "type": "any", "optional": true, "description": "Remote object value (in case of primitive values or JSON values if it was requested)." },
                     { "name": "description", "type": "string", "optional": true, "description": "String representation of the object." },
-                    { "name": "objectId", "$ref": "RemoteObjectId", "optional": true, "description": "Unique object identifier (for non-primitive values)." },
-                    { "name": "functionLocation", "$ref": "Debugger.Location", "optional": true, "description": "Function location within owning script." }
+                    { "name": "objectId", "$ref": "RemoteObjectId", "optional": true, "description": "Unique object identifier (for non-primitive values)." }
                 ]
             },
             {
@@ -347,7 +365,7 @@
                     { "name": "objectGroup", "type": "string", "optional": true, "description": "Symbolic group name that can be used to release multiple objects." },
                     { "name": "includeCommandLineAPI", "type": "boolean", "optional": true, "description": "Determines whether Command Line API should be available during the evaluation.", "hidden": true },
                     { "name": "doNotPauseOnExceptions", "type": "boolean", "optional": true, "description": "Specifies whether evaluation should stop on exceptions. Overrides setPauseOnException state.", "hidden": true },
-                    { "name": "frameId", "type": "string", "optional": true, "description": "Specifies in which frame to perform evaluation.", "hidden": true },
+                    { "name": "frameId", "$ref": "Network.FrameId", "optional": true, "description": "Specifies in which frame to perform evaluation.", "hidden": true },
                     { "name": "returnByValue", "type": "boolean", "optional": true, "description": "Whether the result is expected to be a JSON object that should be sent by value." }
                 ],
                 "returns": [
@@ -502,6 +520,12 @@
                 "description": "Unique loader identifier."
             },
             {
+                "id": "FrameId",
+                "type": "string",
+                "description": "Unique frame identifier.",
+                "hidden": true
+            },
+            {
                 "id": "RequestId",
                 "type": "string",
                 "description": "Unique request identifier."
@@ -645,8 +669,22 @@
                 ]
             },
             {
+                "name": "canClearBrowserCache",
+                "description": "Tells whether clearing browser cache is supported.",
+                "returns": [
+                    { "name": "result", "type": "boolean", "description": "True if browser cache can be cleared." }
+                ]
+            },
+            {
                 "name": "clearBrowserCache",
                 "description": "Clears browser cache."
+            },
+            {
+                "name": "canClearBrowserCookies",
+                "description": "Tells whether clearing browser cookies is supported.",
+                "returns": [
+                    { "name": "result", "type": "boolean", "description": "True if browser cookies can be cleared." }
+                ]
             },
             {
                 "name": "clearBrowserCookies",
@@ -666,7 +704,7 @@
                 "description": "Fired when page is about to send HTTP request.",
                 "parameters": [
                     { "name": "requestId", "$ref": "RequestId", "description": "Request identifier." },
-                    { "name": "frameId", "type": "string", "description": "Frame identifier.", "hidden": true },
+                    { "name": "frameId", "$ref": "FrameId", "description": "Frame identifier.", "hidden": true },
                     { "name": "loaderId", "$ref": "LoaderId", "description": "Loader identifier." },
                     { "name": "documentURL", "type": "string", "description": "URL of the document this request is loaded for." },
                     { "name": "request", "$ref": "Request", "description": "Request data." },
@@ -688,6 +726,8 @@
                 "description": "Fired when HTTP response is available.",
                 "parameters": [
                     { "name": "requestId", "$ref": "RequestId", "description": "Request identifier." },
+                    { "name": "frameId", "$ref": "FrameId", "description": "Frame identifier.", "hidden": true },
+                    { "name": "loaderId", "$ref": "LoaderId", "description": "Loader identifier." },
                     { "name": "timestamp", "$ref": "Timestamp", "description": "Timestamp." },
                     { "name": "type", "$ref": "Page.ResourceType", "description": "Resource type." },
                     { "name": "response", "$ref": "Response", "description": "Response data." }
@@ -726,7 +766,7 @@
                 "description": "Fired when HTTP request has been served from memory cache.",
                 "parameters": [
                     { "name": "requestId", "$ref": "RequestId", "description": "Request identifier." },
-                    { "name": "frameId", "type": "string", "description": "Frame identifier.", "hidden": true },
+                    { "name": "frameId", "$ref": "FrameId", "description": "Frame identifier.", "hidden": true },
                     { "name": "loaderId", "$ref": "LoaderId", "description": "Loader identifier." },
                     { "name": "documentURL", "type": "string", "description": "URL of the document this request is loaded for." },
                     { "name": "timestamp", "$ref": "Timestamp", "description": "Timestamp." },
@@ -952,7 +992,7 @@
                 "type": "object",
                 "description": "Frame identifier - manifest URL pair.",
                 "properties": [
-                    { "name": "frameId", "type": "string", "description": "Frame identifier." },
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Frame identifier." },
                     { "name": "manifestURL", "type": "string", "description": "Manifest URL." },
                     { "name": "status", "type": "integer", "description": "Application cache status." }
                 ]
@@ -973,7 +1013,7 @@
             {
                 "name": "getManifestForFrame",
                 "parameters": [
-                    { "name": "frameId", "type": "string", "description": "Identifier of the frame containing document whose manifest is retrieved." }
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Identifier of the frame containing document whose manifest is retrieved." }
                 ],
                 "returns": [
                     { "name": "manifestURL", "type": "string", "description": "Manifest URL for document in the given frame." }
@@ -983,7 +1023,7 @@
             {
                 "name": "getApplicationCacheForFrame",
                 "parameters": [
-                    { "name": "frameId", "type": "string", "description": "Identifier of the frame containing document whose application cache is retrieved." }
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Identifier of the frame containing document whose application cache is retrieved." }
                 ],
                 "returns": [
                     { "name": "applicationCache", "$ref": "ApplicationCache", "description": "Relevant application cache data for the document in given frame." }
@@ -995,7 +1035,7 @@
             {
                 "name": "applicationCacheStatusUpdated",
                 "parameters": [
-                    { "name": "frameId", "type": "string", "description": "Identifier of the frame containing document whose application cache updated status." },
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Identifier of the frame containing document whose application cache updated status." },
                     { "name": "manifestURL", "type": "string", "description": "Manifest URL." },
                     { "name": "status", "type": "integer", "description": "Updated application cache status." }
                 ]
@@ -1006,6 +1046,22 @@
                     { "name": "isNowOnline", "type": "boolean" }
                 ]
             }
+        ]
+    },
+    {
+        "domain": "FileSystem",
+        "hidden": true,
+        "commands": [
+            {
+                "name": "enable",
+                "description": "Enables events from backend."
+            },
+            {
+                "name": "disable",
+                "description": "Disables events from backend.."
+            }
+        ],
+        "events": [
         ]
     },
     {
@@ -1285,7 +1341,7 @@
             {
                 "name": "highlightFrame",
                 "parameters": [
-                    { "name": "frameId", "type": "string", "description": "Identifier of the frame to highlight." },
+                    { "name": "frameId", "$ref": "Network.FrameId", "description": "Identifier of the frame to highlight." },
                     { "name": "contentColor", "$ref": "RGBA", "optional": true, "description": "The content box highlight fill color (default: transparent)." },
                     { "name": "contentOutlineColor", "$ref": "RGBA", "optional": true, "description": "The content box highlight outline color (default: transparent)." }
                 ],
@@ -1434,19 +1490,6 @@
                 "description": "This object identifies a CSS rule in a unique way."
             },
             {
-                "id": "CSSNodeStyles",
-                "type": "object",
-                "properties": [
-                    { "name": "inlineStyle", "$ref": "CSSStyle", "optional": true, "description": "The node's inline style, if any." },
-                    { "name": "computedStyle", "$ref": "CSSComputedStyle", "description": "The node's computed style." },
-                    { "name": "matchedCSSRules", "type": "array", "items": { "$ref": "CSSRule" }, "description": "CSS rules matching this node, from all applicable stylesheets." },
-                    { "name": "styleAttributes", "type": "array", "items": { "$ref": "CSSStyleAttribute" }, "description": "Entries for style-related element attributes (e.g. width=20)."},
-                    { "name": "pseudoElements", "type": "array", "items": { "$ref": "PseudoIdRules" }, "description": "Pseudo style rules for this node." },
-                    { "name": "inherited", "type": "array", "items": { "$ref": "InheritedStyleEntry" }, "description": "A chain of inherited styles (from the immediate node parent up to the DOM tree root)." }
-                ],
-                "description": "A holder for all CSS styles applicable to a particular DOM node."
-            },
-            {
                 "id": "PseudoIdRules",
                 "type": "object",
                 "properties": [
@@ -1498,7 +1541,7 @@
                 "id": "CSSRule",
                 "type": "object",
                 "properties": [
-                    { "name": "ruleId", "$ref": "CSSRuleId", "description": "The CSS rule identifier."},
+                    { "name": "ruleId", "$ref": "CSSRuleId", "optional": true, "description": "The CSS rule identifier (absent for user agent stylesheet and user-specified stylesheet rules)."},
                     { "name": "selectorText", "type": "string", "description": "Rule selector."},
                     { "name": "sourceURL", "type": "string", "optional": true, "description": "Parent stylesheet resource URL (for regular rules)."},
                     { "name": "sourceLine", "type": "integer", "description": "Line ordinal of the rule selector start character in the resource."},
@@ -1523,20 +1566,24 @@
                 "type": "object"
             },
             {
-                "id": "CSSComputedStyle",
-                "type": "object"
+                "id": "CSSComputedStyleProperty",
+                "type": "object",
+                "properties": [
+                    { "name": "name", "type": "string", "description": "Computed style property name." },
+                    { "name": "value", "type": "string", "description": "Computed style property value." }
+                ]
             },            
             {
                 "id": "CSSStyle",
                 "type": "object",
                 "properties": [
-                    { "name": "styleId", "$ref": "CSSStyleId", "description": "The CSS style identifier."},
-                    { "name": "cssProperties", "type": "array", "items": { "$ref": "CSSProperty" }, "description": "CSS properties in the style."},
+                    { "name": "styleId", "$ref": "CSSStyleId", "optional": true, "description": "The CSS style identifier (absent for attribute styles)." },
+                    { "name": "cssProperties", "type": "array", "items": { "$ref": "CSSProperty" }, "description": "CSS properties in the style." },
                     { "name": "shorthandEntries", "type": "array", "items": { "$ref": "ShorthandEntry" }, "description": "Computed values for all shorthands found in the style." },
-                    { "name": "cssText", "type": "string", "optional": true, "description": "Style declaration text (if available)."},
+                    { "name": "cssText", "type": "string", "optional": true, "description": "Style declaration text (if available)." },
                     { "name": "range", "$ref": "SourceRange", "optional": true, "description": "Style declaration range in the enclosing stylesheet (if available)." },
-                    { "name": "width", "type": "integer", "description": "The effective \"width\" property value from this style." },
-                    { "name": "height", "type": "integer", "description": "The effective \"height\" property value from this style." }
+                    { "name": "width", "type": "string", "description": "The effective \"width\" property value from this style." },
+                    { "name": "height", "type": "string", "description": "The effective \"height\" property value from this style." }
                 ],
                 "description": "CSS style representation."
             },
@@ -1548,9 +1595,10 @@
                     { "name": "value", "type": "string", "description": "The property value." },
                     { "name": "priority", "type": "string", "optional": true, "description": "The property priority (implies \"\" if absent)." },
                     { "name": "implicit", "type": "boolean", "optional": true, "description": "Whether the property is implicit (implies <code>false</code> if absent)." },
+                    { "name": "text", "type": "string", "optional": true, "description": "The full property text as specified in the style." },
                     { "name": "parsedOk", "type": "boolean", "optional": true, "description": "Whether the property is understood by the browser (implies <code>true</code> if absent)." },
                     { "name": "status", "type": "string", "enum": ["active", "inactive", "disabled", "style"], "optional": true, "description": "The property status: \"active\" (implied if absent) if the property is effective in the style, \"inactive\" if the property is overridden by a same-named property in this style later on, \"disabled\" if the property is disabled by the user, \"style\" if the property is reported by the browser rather than by the CSS source parser." },
-                    { "name": "shorthandName", "type": "string", "description": "The related shorthand property name (absent if this property is not a longhand)." },
+                    { "name": "shorthandName", "type": "string", "optional": true, "description": "The related shorthand property name (absent if this property is not a longhand)." },
                     { "name": "range", "$ref": "SourceRange", "optional": true, "description": "The entire property range in the enclosing style declaration (if available)." }
                 ],
                 "description": "CSS style effective visual dimensions and source offsets."
@@ -1562,42 +1610,56 @@
                     { "name": "text", "type": "string", "description": "Media query text." },
                     { "name": "source", "type": "string", "enum": ["mediaRule", "importRule", "stylesheet"], "optional": true, "description": "Source of the media query: \"mediaRule\" if specified by a @media rule, \"importRule\" if specified by an @import rule, \"stylesheet\" (implied if absent) if specified by a \"media\" attribute in a stylesheet's LINK or STYLE tag." },
                     { "name": "sourceURL", "type": "string", "optional": true, "description": "URL of the document containing the media query description." },
-                    { "name": "sourceLine", "type": "string", "optional": true, "description": "Line in the document containing the media query (not defined for the \"stylesheet\" source)." }
+                    { "name": "sourceLine", "type": "integer", "optional": true, "description": "Line in the document containing the media query (not defined for the \"stylesheet\" source)." }
                 ],
                 "description": "CSS media query descriptor."
             }
         ],
         "commands": [
             {
-                "name": "getStylesForNode",
+                "name": "enable",
+                "description": "Enables the CSS agent for the given page. Clients should not assume that the CSS agent has been enabled until the result of this command is received."
+            },
+            {
+                "name": "disable",
+                "description": "Disables the CSS agent for the given page."
+            },
+            {
+                "name": "getMatchedStylesForNode",
+                "parameters": [
+                    { "name": "nodeId", "$ref": "DOM.NodeId" },
+                    { "name": "forcedPseudoClasses", "type": "array", "items": { "type": "string", "enum": ["active", "focus", "hover", "visited"] }, "optional": true, "description": "Element pseudo classes to force when computing applicable style rules." },
+                    { "name": "includePseudo", "type": "boolean", "optional": true, "description": "Whether to include pseudo styles (default: true)." },
+                    { "name": "includeInherited", "type": "boolean", "optional": true, "description": "Whether to include inherited styles (default: true)." }
+                ],
+                "returns": [
+                    { "name": "matchedCSSRules", "type": "array", "items": { "$ref": "CSSRule" }, "optional": true, "description": "CSS rules matching this node, from all applicable stylesheets." },
+                    { "name": "pseudoElements", "type": "array", "items": { "$ref": "PseudoIdRules" }, "optional": true, "description": "Pseudo style rules for this node." },
+                    { "name": "inherited", "type": "array", "items": { "$ref": "InheritedStyleEntry" }, "optional": true, "description": "A chain of inherited styles (from the immediate node parent up to the DOM tree root)." }
+                ],
+                "description": "Returns requested styles for a DOM node identified by <code>nodeId</code>."
+            },
+            {
+                "name": "getInlineStylesForNode",
+                "parameters": [
+                    { "name": "nodeId", "$ref": "DOM.NodeId" }
+                ],
+                "returns": [
+                    { "name": "inlineStyle", "$ref": "CSSStyle", "optional": true, "description": "Inline style for the specified DOM node." },
+                    { "name": "styleAttributes", "type": "array", "items": { "$ref": "CSSStyleAttribute" }, "optional": true, "description": "Entries for style-related element attributes (e.g. width=20)."}
+                ],
+                "description": "Returns the styles defined inline (explicitly in the \"style\" attribute and implicitly, using DOM attributes) for a DOM node identified by <code>nodeId</code>."
+            },
+            {
+                "name": "getComputedStyleForNode",
                 "parameters": [
                     { "name": "nodeId", "$ref": "DOM.NodeId" },
                     { "name": "forcedPseudoClasses", "type": "array", "items": { "type": "string", "enum": ["active", "focus", "hover", "visited"] }, "optional": true, "description": "Element pseudo classes to force when computing applicable style rules." }
                 ],
                 "returns": [
-                    { "name": "styles", "$ref": "CSSNodeStyles", "description": "All styles for the specified DOM node." }
-                ],
-                "description": "Returns all styles for a DOM node identified by <code>nodeId</code>."
-            },
-            {
-                "name": "getComputedStyleForNode",
-                "parameters": [
-                    { "name": "nodeId", "$ref": "DOM.NodeId" }
-                ],
-                "returns": [
-                    { "name": "style", "$ref": "CSSStyle", "description": "Computed style for the specified DOM node." }
+                    { "name": "computedStyle", "type": "array", "items": { "$ref": "CSSComputedStyleProperty" }, "description": "Computed style for the specified DOM node." }
                 ],
                 "description": "Returns the computed style for a DOM node identified by <code>nodeId</code>."
-            },
-            {
-                "name": "getInlineStyleForNode",
-                "parameters": [
-                    { "name": "nodeId", "$ref": "DOM.NodeId" }
-                ],
-                "returns": [
-                    { "name": "style", "$ref": "CSSStyle", "description": "Inline style for the specified DOM node." }
-                ],
-                "description": "Returns the inline style (if present) for a DOM node identified by <code>nodeId</code>."
             },
             {
                 "name": "getAllStyleSheets",
@@ -1688,6 +1750,12 @@
                 ],
                 "description": "Returns all supported CSS property names."
             }
+        ],
+        "events": [
+            {
+                "name": "mediaQueryResultChanged",
+                "description": "Fires whenever a MediaQuery result changes (for example, after a browser window has been resized.) The current implementation considers only viewport-dependent media features."
+            }
         ]
     },
     {
@@ -1720,16 +1788,6 @@
         ],
         "events": [
             {
-                "name": "started",
-                "description": "Fired when timeline has been started.",
-                "hidden": true
-            },
-            {
-                "name": "stopped",
-                "description": "Fired when timeline has been stopped.",
-                "hidden": true
-            },
-            {
                 "name": "eventRecorded",
                 "parameters": [
                     { "name": "record", "$ref": "TimelineEvent", "description": "Timeline event record data." }
@@ -1741,9 +1799,6 @@
     {
         "domain": "Debugger",
         "description": "Debugger domain exposes JavaScript debugging capabilities. It allows setting and removing breakpoints, stepping through execution, exploring stack traces, etc.",
-        "capabilities": [
-            { "name": "set-script-source", "description": "Allows setting script source live" }
-        ],
         "types": [
             {
                 "id": "BreakpointId",
@@ -1794,12 +1849,20 @@
         ],
         "commands": [
             {
-                "name": "getCapabilities",
+                "name": "causesRecompilation",
                 "returns": [
-                    { "name": "capabilities", "type": "array", "items": { "type": "string"}, "description": "List of the debugger domain capabilities" }
+                    { "name": "result", "type": "boolean", "description": "True if enabling debugger causes scripts recompilation." }
                 ],
-                "description": "Returns the list of the debugger capabilities.",
-                "hidden": true
+                "hidden": true,
+                "description": "Tells whether enabling debugger causes scripts recompilation."
+            },
+            {
+                "name": "supportsNativeBreakpoints",
+                "returns": [
+                    { "name": "result", "type": "boolean", "description": "True if debugger supports native breakpoints." }
+                ],
+                "hidden": true,
+                "description": "Tells whether debugger supports native breakpoints."
             },
             {
                 "name": "enable",
@@ -1891,6 +1954,13 @@
                 "description": "Searches for given string in script content."
             },
             {
+                "name": "canSetScriptSource",
+                "returns": [
+                    { "name": "result", "type": "boolean", "description": "True if <code>setScriptSource</code> is supported." }
+                ],
+                "description": "Tells whether <code>setScriptSource</code> is supported."
+            },
+            {
                 "name": "setScriptSource",
                 "parameters": [
                     { "name": "scriptId", "$ref": "ScriptId", "description": "Id of the script to edit." },
@@ -1901,7 +1971,6 @@
                     { "name": "callFrames", "type": "array", "optional": true, "items": { "$ref": "CallFrame"}, "description": "New stack trace in case editing has happened while VM was stopped." },
                     { "name": "result", "type": "object", "optional": true, "description": "VM-specific description of the changes applied.", "hidden": true }
                 ],
-                "capability": "set-script-source",
                 "description": "Edits JavaScript source live."
             },
             {
@@ -1949,14 +2018,8 @@
         ],
         "events": [
             {
-                "name": "debuggerWasEnabled",
-                "description": "Fired when debugger gets enabled (deprecated).",
-                "hidden": true
-            },
-            {
-                "name": "debuggerWasDisabled",
-                "description": "Fired when debugger gets disabled (deprecated).",
-                "hidden": true
+                "name": "globalObjectCleared",
+                "description": "Called when global has been cleared and debugger client should reset its state. Happens upon navigation or reload."
             },
             {
                 "name": "scriptParsed",
@@ -2080,16 +2143,28 @@
         ],
         "commands": [
             {
+                "name": "causesRecompilation",
+                "returns": [
+                    { "name": "result", "type": "boolean" }
+                ]
+            },
+            {
+                "name": "isSampling",
+                "returns": [
+                    { "name": "result", "type": "boolean" }
+                ]
+            },
+            {
+                "name": "hasHeapProfiler",
+                "returns": [
+                    { "name": "result", "type": "boolean" }
+                ]
+            },
+            {
                 "name": "enable"
             },
             {
                 "name": "disable"
-            },
-            {
-                "name": "isEnabled",
-                "returns": [
-                    { "name": "state", "type": "boolean" }
-                ]
             },
             {
                 "name": "start"
@@ -2140,12 +2215,6 @@
             }
         ],
         "events": [
-            {
-                "name": "profilerWasEnabled"
-            },
-            {
-                "name": "profilerWasDisabled"
-            },
             {
                 "name": "addProfileHeader",
                 "parameters": [
@@ -2219,7 +2288,6 @@
                     { "name": "value", "type": "boolean" }
                 ]
             }
-
         ],
         "events": [
             {
@@ -2242,6 +2310,9 @@
                     { "name": "workerId", "type": "integer" },
                     { "name": "message", "type": "object" }
                 ]
+            },
+            {
+                "name": "disconnectedFromWorker"
             }
         ]
     }]

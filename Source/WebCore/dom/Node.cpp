@@ -43,6 +43,7 @@
 #include "ClassNodeList.h"
 #include "ContextMenuController.h"
 #include "DOMImplementation.h"
+#include "DOMSettableTokenList.h"
 #include "Document.h"
 #include "DocumentType.h"
 #include "DynamicNodeList.h"
@@ -112,6 +113,10 @@
 
 #if USE(JSC)
 #include <runtime/JSGlobalData.h>
+#endif
+
+#if ENABLE(MICRODATA)
+#include "HTMLPropertiesCollection.h"
 #endif
 
 #define DUMP_NODE_STATISTICS 0
@@ -399,16 +404,17 @@ Node::~Node()
     if (renderer())
         detach();
 
-    if (AXObjectCache::accessibilityEnabled() && m_document && m_document->axObjectCacheExists())
-        m_document->axObjectCache()->removeNodeForUse(this);
+    Document* doc = m_document;
+    if (AXObjectCache::accessibilityEnabled() && doc && doc->axObjectCacheExists())
+        doc->axObjectCache()->removeNodeForUse(this);
     
     if (m_previous)
         m_previous->setNextSibling(0);
     if (m_next)
         m_next->setPreviousSibling(0);
 
-    if (m_document)
-        m_document->guardDeref();
+    if (doc)
+        doc->guardDeref();
 }
 
 #ifdef NDEBUG
@@ -617,16 +623,7 @@ void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
 
 PassRefPtr<NodeList> Node::childNodes()
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        if (treeScope())
-            treeScope()->addNodeListCache();
-    }
-
-    if (!data->nodeLists()->m_childNodeListCaches)
-        data->nodeLists()->m_childNodeListCaches = DynamicNodeList::Caches::create();
-    return ChildNodeList::create(this, data->nodeLists()->m_childNodeListCaches.get());
+    return ChildNodeList::create(this, ensureRareData()->ensureChildNodeListCache());
 }
 
 Node *Node::lastDescendant() const
@@ -926,7 +923,7 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
 void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
 {
     for (Node* n = this; n; n = n->traverseNextNode(this)) {
-        if (n->firstChild())
+        if (n->hasChildNodes())
             n->setChildNeedsStyleRecalc();
         n->setStyleChange(FullStyleChange);
         if (shouldSetAttached == SetAttached)
@@ -996,86 +993,79 @@ unsigned Node::nodeIndex() const
     return count;
 }
 
-void Node::registerDynamicNodeList(DynamicNodeList* list)
+static void removeNodeListCacheIfPossible(Node* node, NodeRareData* data)
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        treeScope()->addNodeListCache();
-    } else if (!treeScope() || !treeScope()->hasNodeListCaches()) {
-        // We haven't been receiving notifications while there were no registered lists, so the cache is invalid now.
-        data->nodeLists()->invalidateCaches();
-    }
-
-    if (list->hasOwnCaches())
-        data->nodeLists()->m_listsWithCaches.add(list);
-}
-
-void Node::unregisterDynamicNodeList(DynamicNodeList* list)
-{
-    ASSERT(rareData());
-    ASSERT(rareData()->nodeLists());
-    if (list->hasOwnCaches()) {
-        NodeRareData* data = rareData();
-        data->nodeLists()->m_listsWithCaches.remove(list);
-        removeNodeListCacheIfPossible();
-    }
-}
-
-inline void Node::notifyLocalNodeListsAttributeChanged()
-{
-    if (!hasRareData())
-        return;
-    NodeRareData* data = rareData();
-    if (!data->nodeLists())
-        return;
-
-    if (!isAttributeNode())
-        data->nodeLists()->invalidateCachesThatDependOnAttributes();
-    else
-        data->nodeLists()->invalidateCaches();
-
-    removeNodeListCacheIfPossible();
-}
-
-void Node::notifyNodeListsAttributeChanged()
-{
-    for (Node *n = this; n; n = n->parentNode())
-        n->notifyLocalNodeListsAttributeChanged();
-}
-
-inline void Node::notifyLocalNodeListsChildrenChanged()
-{
-    if (!hasRareData())
-        return;
-    NodeRareData* data = rareData();
-    if (!data->nodeLists())
-        return;
-
-    data->nodeLists()->invalidateCaches();
-
-    NodeListsNodeData::NodeListSet::iterator end = data->nodeLists()->m_listsWithCaches.end();
-    for (NodeListsNodeData::NodeListSet::iterator i = data->nodeLists()->m_listsWithCaches.begin(); i != end; ++i)
-        (*i)->invalidateCache();
-
-    removeNodeListCacheIfPossible();
-}
-    
-void Node::removeNodeListCacheIfPossible()
-{
-    ASSERT(rareData()->nodeLists());
-
-    NodeRareData* data = rareData();
     if (!data->nodeLists()->isEmpty())
         return;
     data->clearNodeLists();
-    treeScope()->removeNodeListCache();
+    node->treeScope()->removeNodeListCache();
 }
 
-void Node::notifyNodeListsChildrenChanged()
+void Node::registerDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
 {
-    for (Node* n = this; n; n = n->parentNode())
-        n->notifyLocalNodeListsChildrenChanged();
+    NodeRareData* data = ensureRareData();
+    // We haven't been receiving notifications while there were no registered lists, so the cache is invalid now.
+    if (data->nodeLists() && (!treeScope() || !treeScope()->hasNodeListCaches()))
+        data->nodeLists()->invalidateCaches();
+
+    data->ensureNodeLists(this)->m_listsWithCaches.add(list);
+}
+
+void Node::unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
+{
+    ASSERT(hasRareData());
+    ASSERT(rareData()->nodeLists());
+    NodeRareData* data = rareData();
+    data->nodeLists()->m_listsWithCaches.remove(list);
+    removeNodeListCacheIfPossible(this, data);
+}
+
+void Node::invalidateNodeListsCacheAfterAttributeChanged()
+{
+    if (hasRareData() && isAttributeNode()) {
+        NodeRareData* data = rareData();
+        ASSERT(!data->nodeLists());
+        data->clearChildNodeListCache();
+    }
+
+    if (!treeScope()->hasNodeListCaches())
+        return;
+
+    for (Node* node = this; node; node = node->parentNode()) {
+        ASSERT(this == node || !node->isAttributeNode());
+        if (!node->hasRareData())
+            continue;
+        NodeRareData* data = node->rareData();
+        if (!data->nodeLists())
+            continue;
+
+        data->nodeLists()->invalidateCachesThatDependOnAttributes();
+        removeNodeListCacheIfPossible(node, data);
+    }
+}
+
+void Node::invalidateNodeListsCacheAfterChildrenChanged()
+{
+    if (hasRareData())
+        rareData()->clearChildNodeListCache();
+
+    if (!treeScope()->hasNodeListCaches())
+        return;
+    for (Node* node = this; node; node = node->parentNode()) {
+        if (!node->hasRareData())
+            continue;
+        NodeRareData* data = node->rareData();
+        if (!data->nodeLists())
+            continue;
+
+        data->nodeLists()->invalidateCaches();
+
+        NodeListsNodeData::NodeListSet::iterator end = data->nodeLists()->m_listsWithCaches.end();
+        for (NodeListsNodeData::NodeListSet::iterator it = data->nodeLists()->m_listsWithCaches.begin(); it != end; ++it)
+            (*it)->invalidateCache();
+
+        removeNodeListCacheIfPossible(node, data);
+    }
 }
 
 void Node::notifyLocalNodeListsLabelChanged()
@@ -1094,7 +1084,6 @@ void Node::removeCachedClassNodeList(ClassNodeList* list, const String& classNam
 {
     ASSERT(rareData());
     ASSERT(rareData()->nodeLists());
-    ASSERT_UNUSED(list, list->hasOwnCaches());
 
     NodeListsNodeData* data = rareData()->nodeLists();
     ASSERT_UNUSED(list, list == data->m_classNodeListCache.get(className));
@@ -1105,7 +1094,6 @@ void Node::removeCachedNameNodeList(NameNodeList* list, const String& nodeName)
 {
     ASSERT(rareData());
     ASSERT(rareData()->nodeLists());
-    ASSERT_UNUSED(list, list->hasOwnCaches());
 
     NodeListsNodeData* data = rareData()->nodeLists();
     ASSERT_UNUSED(list, list == data->m_nameNodeListCache.get(nodeName));
@@ -1116,7 +1104,6 @@ void Node::removeCachedTagNodeList(TagNodeList* list, const AtomicString& name)
 {
     ASSERT(rareData());
     ASSERT(rareData()->nodeLists());
-    ASSERT_UNUSED(list, list->hasOwnCaches());
 
     NodeListsNodeData* data = rareData()->nodeLists();
     ASSERT_UNUSED(list, list == data->m_tagNodeListCache.get(name.impl()));
@@ -1127,20 +1114,19 @@ void Node::removeCachedTagNodeList(TagNodeList* list, const QualifiedName& name)
 {
     ASSERT(rareData());
     ASSERT(rareData()->nodeLists());
-    ASSERT_UNUSED(list, list->hasOwnCaches());
 
     NodeListsNodeData* data = rareData()->nodeLists();
     ASSERT_UNUSED(list, list == data->m_tagNodeListCacheNS.get(name.impl()));
     data->m_tagNodeListCacheNS.remove(name.impl());
 }
 
-void Node::removeCachedLabelsNodeList(DynamicNodeList* list)
+void Node::removeCachedLabelsNodeList(DynamicSubtreeNodeList* list)
 {
     ASSERT(rareData());
     ASSERT(rareData()->nodeLists());
-    ASSERT_UNUSED(list, list->hasOwnCaches());
-    
+
     NodeListsNodeData* data = rareData()->nodeLists();
+    ASSERT_UNUSED(list, list == data->m_labelsNodeListCache);
     data->m_labelsNodeListCache = 0;
 }
 
@@ -1343,8 +1329,10 @@ void Node::checkAddChild(Node *newChild, ExceptionCode& ec)
 bool Node::isDescendantOf(const Node *other) const
 {
     // Return true if other is an ancestor of this, otherwise false
-    if (!other)
+    if (!other || !other->hasChildNodes() || inDocument() != other->inDocument())
         return false;
+    if (other == other->document())
+        return document() == other && this != document() && inDocument();
     for (const ContainerNode* n = parentNode(); n; n = n->parentNode()) {
         if (n == other)
             return true;
@@ -1356,8 +1344,6 @@ bool Node::contains(const Node* node) const
 {
     if (!node)
         return false;
-    if (document() == this)
-        return node->document() == this && node->inDocument();
     return this == node || node->isDescendantOf(this);
 }
 
@@ -1661,19 +1647,13 @@ PassRefPtr<NodeList> Node::getElementsByTagName(const AtomicString& localName)
     if (localName.isNull())
         return 0;
 
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        treeScope()->addNodeListCache();
-    }
-
     String name = localName;
     if (document()->isHTMLDocument())
         name = localName.lower();
 
     AtomicString localNameAtom = name;
 
-    pair<NodeListsNodeData::TagNodeListCache::iterator, bool> result = data->nodeLists()->m_tagNodeListCache.add(localNameAtom, 0);
+    pair<NodeListsNodeData::TagNodeListCache::iterator, bool> result = ensureRareData()->ensureNodeLists(this)->m_tagNodeListCache.add(localNameAtom, 0);
     if (!result.second)
         return PassRefPtr<TagNodeList>(result.first->second);
 
@@ -1690,19 +1670,14 @@ PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceU
     if (namespaceURI == starAtom)
         return getElementsByTagName(localName);
 
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        treeScope()->addNodeListCache();
-    }
-
     String name = localName;
     if (document()->isHTMLDocument())
         name = localName.lower();
 
     AtomicString localNameAtom = name;
 
-    pair<NodeListsNodeData::TagNodeListCacheNS::iterator, bool> result = data->nodeLists()->m_tagNodeListCacheNS.add(QualifiedName(nullAtom, localNameAtom, namespaceURI).impl(), 0);
+    pair<NodeListsNodeData::TagNodeListCacheNS::iterator, bool> result
+        = ensureRareData()->ensureNodeLists(this)->m_tagNodeListCacheNS.add(QualifiedName(nullAtom, localNameAtom, namespaceURI).impl(), 0);
     if (!result.second)
         return PassRefPtr<TagNodeList>(result.first->second);
 
@@ -1713,13 +1688,7 @@ PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceU
 
 PassRefPtr<NodeList> Node::getElementsByName(const String& elementName)
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        treeScope()->addNodeListCache();
-    }
-
-    pair<NodeListsNodeData::NameNodeListCache::iterator, bool> result = data->nodeLists()->m_nameNodeListCache.add(elementName, 0);
+    pair<NodeListsNodeData::NameNodeListCache::iterator, bool> result = ensureRareData()->ensureNodeLists(this)->m_nameNodeListCache.add(elementName, 0);
     if (!result.second)
         return PassRefPtr<NodeList>(result.first->second);
 
@@ -1730,13 +1699,8 @@ PassRefPtr<NodeList> Node::getElementsByName(const String& elementName)
 
 PassRefPtr<NodeList> Node::getElementsByClassName(const String& classNames)
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        treeScope()->addNodeListCache();
-    }
-
-    pair<NodeListsNodeData::ClassNodeListCache::iterator, bool> result = data->nodeLists()->m_classNodeListCache.add(classNames, 0);
+    pair<NodeListsNodeData::ClassNodeListCache::iterator, bool> result
+        = ensureRareData()->ensureNodeLists(this)->m_classNodeListCache.add(classNames, 0);
     if (!result.second)
         return PassRefPtr<NodeList>(result.first->second);
 
@@ -2425,13 +2389,6 @@ void Node::showTreeForThisAcrossFrame() const
 
 void NodeListsNodeData::invalidateCaches()
 {
-    if (m_childNodeListCaches) {
-        if (m_childNodeListCaches->hasOneRef())
-            m_childNodeListCaches.clear();
-        else
-            m_childNodeListCaches->reset();
-    }
-
     if (m_labelsNodeListCache)
         m_labelsNodeListCache->invalidateCache();
     TagNodeListCache::const_iterator tagCacheEnd = m_tagNodeListCache.end();
@@ -2472,9 +2429,6 @@ void NodeListsNodeData::invalidateMicrodataItemListCaches()
 bool NodeListsNodeData::isEmpty() const
 {
     if (!m_listsWithCaches.isEmpty())
-        return false;
-
-    if (m_childNodeListCaches)
         return false;
 
     if (!m_tagNodeListCache.isEmpty())
@@ -2550,15 +2504,13 @@ void Node::didMoveToNewOwnerDocument()
 #if ENABLE(MUTATION_OBSERVERS)
     if (Vector<OwnPtr<MutationObserverRegistration> >* registry = mutationObserverRegistry()) {
         for (size_t i = 0; i < registry->size(); ++i) {
-            if (registry->at(i)->isSubtree())
-                document()->addSubtreeMutationObserverTypes(registry->at(i)->mutationTypes());
+            document()->addMutationObserverTypes(registry->at(i)->mutationTypes());
         }
     }
 
     if (HashSet<MutationObserverRegistration*>* transientRegistry = transientMutationObserverRegistry()) {
         for (HashSet<MutationObserverRegistration*>::iterator iter = transientRegistry->begin(); iter != transientRegistry->end(); ++iter) {
-            if ((*iter)->isSubtree())
-                document()->addSubtreeMutationObserverTypes((*iter)->mutationTypes());
+            document()->addMutationObserverTypes((*iter)->mutationTypes());
         }
     }
 #endif
@@ -2753,10 +2705,6 @@ void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, 
 void Node::getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, WebKitMutationObserver::MutationType type, const AtomicString& attributeName)
 {
     collectMatchingObserversForMutation(observers, this, type, attributeName);
-
-    if (!document()->hasSubtreeMutationObserverOfType(type))
-        return;
-
     for (Node* node = parentNode(); node; node = node->parentNode())
         collectMatchingObserversForMutation(observers, node, type, attributeName);
 }
@@ -2808,7 +2756,7 @@ void Node::unregisterTransientMutationObserver(MutationObserverRegistration* reg
 
 void Node::notifyMutationObserversNodeWillDetach()
 {
-    if (!document()->hasSubtreeMutationObserver())
+    if (!document()->hasMutationObservers())
         return;
 
     for (Node* node = parentNode(); node; node = node->parentNode()) {
@@ -2859,8 +2807,6 @@ void Node::dispatchSubtreeModifiedEvent()
     
     document()->incDOMTreeVersion();
 
-    notifyNodeListsAttributeChanged(); // FIXME: Can do better some day. Really only care about the name attribute changing.
-    
     if (!document()->hasListenerType(Document::DOMSUBTREEMODIFIED_LISTENER))
         return;
 
@@ -2995,6 +2941,62 @@ void Node::defaultEventHandler(Event* event)
     } else if (event->type() == eventNames().webkitEditableContentChangedEvent) {
         dispatchInputEvent();
     }
+}
+
+#if ENABLE(MICRODATA)
+DOMSettableTokenList* Node::itemProp()
+{
+    return ensureRareData()->itemProp();
+}
+
+void Node::setItemProp(const String& value)
+{
+    ensureRareData()->setItemProp(value);
+}
+
+DOMSettableTokenList* Node::itemRef()
+{
+    return ensureRareData()->itemRef();
+}
+
+void Node::setItemRef(const String& value)
+{
+    ensureRareData()->setItemRef(value);
+}
+
+DOMSettableTokenList* Node::itemType()
+{
+    return ensureRareData()->itemType();
+}
+
+void Node::setItemType(const String& value)
+{
+    ensureRareData()->setItemType(value);
+}
+
+HTMLPropertiesCollection* Node::properties()
+{
+    return ensureRareData()->properties(this);
+}
+#endif
+
+void NodeRareData::createNodeLists(Node* node)
+{
+    ASSERT(node);
+    setNodeLists(NodeListsNodeData::create());
+    if (TreeScope* treeScope = node->treeScope())
+        treeScope->addNodeListCache();
+}
+
+void NodeRareData::clearChildNodeListCache()
+{
+    if (!m_childNodeListCache)
+        return;
+
+    if (m_childNodeListCache->hasOneRef())
+        m_childNodeListCache.clear();
+    else
+        m_childNodeListCache->reset();
 }
 
 } // namespace WebCore

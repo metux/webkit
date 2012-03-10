@@ -37,6 +37,12 @@
 
 namespace WebCore {
 
+enum WhitespaceMode {
+    AllWhitespace,
+    NotAllWhitespace,
+    WhitespaceUnknown
+};
+
 class AtomicHTMLToken;
 class Document;
 class Element;
@@ -61,7 +67,7 @@ public:
     void insertHTMLBodyElement(AtomicHTMLToken&);
     void insertHTMLFormElement(AtomicHTMLToken&, bool isDemoted = false);
     void insertScriptElement(AtomicHTMLToken&);
-    void insertTextNode(const String&);
+    void insertTextNode(const String&, WhitespaceMode = WhitespaceUnknown);
     void insertForeignElement(AtomicHTMLToken&, const AtomicString& namespaceURI);
 
     void insertHTMLHtmlStartTagBeforeHTML(AtomicHTMLToken&);
@@ -80,6 +86,7 @@ public:
     void generateImpliedEndTags();
     void generateImpliedEndTagsWithExclusion(const AtomicString& tagName);
 
+    bool isEmpty() const { return !m_openElements.stackDepth(); }
     Element* currentElement() const { return m_openElements.top(); }
     ContainerNode* currentNode() const { return m_openElements.topNode(); }
     Element* oneBelowTop() const { return m_openElements.oneBelowTop(); }
