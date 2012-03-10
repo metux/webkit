@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebInspector</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse">
@@ -99,39 +99,20 @@ to true otherwise no inspector is available.
 </p>
 <p>
 </p>
-<div class="informalexample">
-  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
-    <tbody>
-      <tr>
-        <td class="listing_lines" align="right"><pre>1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Enable the developer extras */</span>
-WebKitWebSettings <span class="gtkdoc opt">*</span>setting <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-settings">webkit_web_view_get_settings</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">));</span>
-<span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-set">g_object_set</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="gtkdoc opt">(</span>settings<span class="gtkdoc opt">),</span> <span class="string">&quot;enable-developer-extras&quot;</span><span class="gtkdoc opt">,</span> TRUE<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
+<div class="informalexample"><pre class="programlisting">
+/* Enable the developer extras */
+WebKitWebSettings *setting = webkit_web_view_get_settings (WEBKIT_WEB_VIEW(my_webview));
+g_object_set (G_OBJECT(settings), "enable-developer-extras", TRUE, NULL);
 
-<span class="comment">/* load some data or reload to be able to inspect the page*/</span>
-<span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-open">webkit_web_view_open</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">),</span> <span class="string">&quot;http://www.gnome.org&quot;</span><span class="gtkdoc opt">);</span>
+/* load some data or reload to be able to inspect the page*/
+webkit_web_view_open (WEBKIT_WEB_VIEW(my_webview), "http://www.gnome.org");
 
-<span class="comment">/* Embed the inspector somewhere */</span>
-WebKitWebInspector <span class="gtkdoc opt">*</span>inspector <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-inspector">webkit_web_view_get_inspector</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">));</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span> <span class="gtkdoc opt">(</span>inspector<span class="gtkdoc opt">),</span> <span class="string">&quot;inspect-web-view&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>create_gtk_window_around_it<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">);</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span> <span class="gtkdoc opt">(</span>inspector<span class="gtkdoc opt">),</span> <span class="string">&quot;show-window&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>show_inpector_window<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">));</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span> <span class="gtkdoc opt">(</span>inspector<span class="gtkdoc opt">),</span> <span class="string">&quot;notify::inspected-uri&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>inspected_uri_changed_do_stuff<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">);</span></pre></td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-
+/* Embed the inspector somewhere */
+WebKitWebInspector *inspector = webkit_web_view_get_inspector (WEBKIT_WEB_VIEW(my_webview));
+g_signal_connect (G_OBJECT (inspector), "inspect-web-view", G_CALLBACK(create_gtk_window_around_it), NULL);
+g_signal_connect (G_OBJECT (inspector), "show-window", G_CALLBACK(show_inpector_window), NULL));
+g_signal_connect (G_OBJECT (inspector), "notify::inspected-uri", G_CALLBACK(inspected_uri_changed_do_stuff), NULL);
+</pre></div>
 <p>
 </p>
 </div>

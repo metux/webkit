@@ -1,3 +1,31 @@
+2012-03-07  Martin Robinson  <mrobinson@igalia.com>
+
+        Update the NEWS and version for the 1.7.91 release.
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Update.
+
+2012-03-06  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r109760.
+        http://trac.webkit.org/changeset/109760
+        https://bugs.webkit.org/show_bug.cgi?id=80320
+
+        Caused many GTK+ tests to crash (Requested by mrobinson on
+        #webkit).
+
+        * configure.ac:
+
+2012-03-05  Martin Robinson  <mrobinson@igalia.com>
+
+        [soup] Crash while loading http://www.jusco.cn
+        https://bugs.webkit.org/show_bug.cgi?id=68238
+
+        Reviewed by Philippe Normand.
+
+        * configure.ac: Bumped the libsoup dependency to 2.37.90.
+
 2012-02-22  Martin Robinson  <mrobinson@igalia.com>
 
         Update the version information in preparation for the 1.7.90 release.

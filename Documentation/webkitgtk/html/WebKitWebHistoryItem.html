@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebHistoryItem</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList">
@@ -88,21 +88,11 @@ automatically added to the global history.
 </p>
 <p>
 </p>
-<div class="informalexample">
-  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
-    <tbody>
-      <tr>
-        <td class="listing_lines" align="right"><pre>1
-2
-3</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Inject a visited page into the global history */</span>
-<span class="function"><a href="../webkitgtk/WebKitWebHistoryItem.html#webkit-web-history-item-new-with-data">webkit_web_history_item_new_with_data</a></span><span class="gtkdoc opt">(</span><span class="string">&quot;http://www.gnome.org/&quot;</span><span class="gtkdoc opt">,</span> <span class="string">&quot;GNOME: The Free Software Desktop Project&quot;</span><span class="gtkdoc opt">);</span>
-<span class="function"><a href="../webkitgtk/WebKitWebHistoryItem.html#webkit-web-history-item-new-with-data">webkit_web_history_item_new_with_data</a></span><span class="gtkdoc opt">(</span><span class="string">&quot;http://www.webkit.org/&quot;</span><span class="gtkdoc opt">,</span> <span class="string">&quot;The WebKit Open Source Project&quot;</span><span class="gtkdoc opt">);</span></pre></td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-
+<div class="informalexample"><pre class="programlisting">
+/* Inject a visited page into the global history */
+webkit_web_history_item_new_with_data("http://www.gnome.org/", "GNOME: The Free Software Desktop Project");
+webkit_web_history_item_new_with_data("http://www.webkit.org/", "The WebKit Open Source Project");
+</pre></div>
 <p>
 </p>
 </div>

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebSettings</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebFrame.html" title="WebKitWebFrame">
@@ -120,27 +120,14 @@ After creation, a <a class="link" href="WebKitWebSettings.html" title="WebKitWeb
 </p>
 <p>
 </p>
-<div class="informalexample">
-  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
-    <tbody>
-      <tr>
-        <td class="listing_lines" align="right"><pre>1
-2
-3
-4
-5
-6</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Create a new websettings and disable java script */</span>
-WebKitWebSettings <span class="gtkdoc opt">*</span>settings <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/WebKitWebSettings.html#webkit-web-settings-new">webkit_web_settings_new</a></span> <span class="gtkdoc opt">();</span>
-<span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-set">g_object_set</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="gtkdoc opt">(</span>settings<span class="gtkdoc opt">),</span> <span class="string">&quot;enable-scripts&quot;</span><span class="gtkdoc opt">,</span> FALSE<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
+<div class="informalexample"><pre class="programlisting">
+/* Create a new websettings and disable java script */
+WebKitWebSettings *settings = webkit_web_settings_new ();
+g_object_set (G_OBJECT(settings), "enable-scripts", FALSE, NULL);
 
-<span class="comment">/* Apply the result */</span>
-<span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-set-settings">webkit_web_view_set_settings</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">),</span> settings<span class="gtkdoc opt">);</span></pre></td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-
+/* Apply the result */
+webkit_web_view_set_settings (WEBKIT_WEB_VIEW(my_webview), settings);
+</pre></div>
 <p>
 </p>
 </div>
@@ -656,7 +643,7 @@ content from the web should provide a preference for this.
 Path to store persistent HTML5 localStorage databases, which are enabled by
 "enable-html5-local-storage". The default path is $XDG_DATA_HOME/webkit/databases/.
 </p>
-<p>Default value: "/home/kov/.local/share/webkit/databases"</p>
+<p>Default value: "/home/martin/.local/share/webkit/databases"</p>
 <p class="since">Since 1.5.2</p>
 </div>
 <hr>
