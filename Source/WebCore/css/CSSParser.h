@@ -156,7 +156,6 @@ public:
 
     static bool fastParseColor(RGBA32&, const String&, bool strict);
 
-    bool parseFontStyle(bool important);
     bool parseFontVariant(bool important);
     bool parseFontWeight(bool important);
     bool parseFontFaceSrc();
@@ -214,6 +213,7 @@ public:
     bool parseFontFeatureTag(CSSValueList*);
     bool parseFontFeatureSettings(bool important);
 
+    bool cssRegionsEnabled() const;
     bool parseFlowThread(int propId, bool important);
     bool parseRegionThread(int propId, bool important);
 

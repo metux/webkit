@@ -31,8 +31,8 @@
 module storage {
     interface [
         Conditional=FILE_SYSTEM,
-        GenerateNativeConverter,
-        JSGenerateToJS,
+        JSGenerateToNativeObject,
+        JSGenerateToJSObject,
         JSNoStaticTables
     ] DirectoryEntrySync : EntrySync {
         DirectoryReaderSync createReader() raises (FileException);

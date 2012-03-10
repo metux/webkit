@@ -29,8 +29,6 @@
 #include "ContextMenuClient.h"
 #include "ContextMenuController.h"
 #include "DOMWindow.h"
-#include "DeviceMotionController.h"
-#include "DeviceOrientationController.h"
 #include "DocumentMarkerController.h"
 #include "DragController.h"
 #include "EditorClient.h"
@@ -66,6 +64,7 @@
 #include "RenderWidget.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
+#include "ScrollingCoordinator.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
 #include "SpeechInput.h"
@@ -85,10 +84,6 @@
 
 #if ENABLE(MEDIA_STREAM)
 #include "UserMediaClient.h"
-#endif
-
-#if ENABLE(THREADED_SCROLLING)
-#include "ScrollingCoordinator.h"
 #endif
 
 namespace WebCore {
@@ -139,10 +134,6 @@ Page::Page(PageClients& pageClients)
 #endif
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
     , m_geolocationController(GeolocationController::create(this, pageClients.geolocationClient))
-#endif
-#if ENABLE(DEVICE_ORIENTATION)
-    , m_deviceMotionController(RuntimeEnabledFeatures::deviceMotionEnabled() ? DeviceMotionController::create(pageClients.deviceMotionClient) : nullptr)
-    , m_deviceOrientationController(RuntimeEnabledFeatures::deviceOrientationEnabled() ? DeviceOrientationController::create(this, pageClients.deviceOrientationClient) : nullptr)
 #endif
 #if ENABLE(NOTIFICATIONS)
     , m_notificationController(NotificationController::create(this, pageClients.notificationClient))
@@ -211,12 +202,6 @@ Page::~Page()
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
         frame->pageDestroyed();
 
-    if (m_scrollableAreaSet) {
-        ScrollableAreaSet::const_iterator end = m_scrollableAreaSet->end(); 
-        for (ScrollableAreaSet::const_iterator it = m_scrollableAreaSet->begin(); it != end; ++it)
-            (*it)->disconnectFromPage();
-    }
-
     m_editorClient->pageDestroyed();
 
 #if ENABLE(INSPECTOR)
@@ -228,19 +213,22 @@ Page::~Page()
         m_userMediaClient->pageDestroyed();
 #endif
 
-#if ENABLE(THREADED_SCROLLING)
     if (m_scrollingCoordinator)
         m_scrollingCoordinator->pageDestroyed();
-#endif
 
     backForward()->close();
 
 #ifndef NDEBUG
     pageCounter.decrement();
 #endif
+
 }
 
-#if ENABLE(THREADED_SCROLLING)
+ViewportArguments Page::viewportArguments() const
+{
+    return mainFrame() && mainFrame()->document() ? mainFrame()->document()->viewportArguments() : ViewportArguments();
+}
+
 ScrollingCoordinator* Page::scrollingCoordinator()
 {
     if (!m_scrollingCoordinator && m_settings->scrollingCoordinatorEnabled())
@@ -248,7 +236,6 @@ ScrollingCoordinator* Page::scrollingCoordinator()
 
     return m_scrollingCoordinator.get();
 }
-#endif
 
 struct ViewModeInfo {
     const char* name;
@@ -428,15 +415,6 @@ void Page::setNeedsRecalcStyleInAllFrames()
 {
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
         frame->document()->styleSelectorChanged(DeferRecalcStyle);
-}
-
-void Page::updateViewportArguments()
-{
-    if (!mainFrame() || !mainFrame()->document())
-        return;
-
-    m_viewportArguments = mainFrame()->document()->viewportArguments();
-    chrome()->dispatchViewportPropertiesDidChange(m_viewportArguments);
 }
 
 void Page::refreshPlugins(bool reload)
@@ -1030,27 +1008,6 @@ void Page::privateBrowsingStateChanged()
         pluginViewBases[i]->privateBrowsingStateChanged(privateBrowsingEnabled);
 }
 
-void Page::addScrollableArea(ScrollableArea* scrollableArea)
-{
-    if (!m_scrollableAreaSet)
-        m_scrollableAreaSet = adoptPtr(new ScrollableAreaSet);
-    m_scrollableAreaSet->add(scrollableArea);
-}
-
-void Page::removeScrollableArea(ScrollableArea* scrollableArea)
-{
-    if (!m_scrollableAreaSet)
-        return;
-    m_scrollableAreaSet->remove(scrollableArea);
-}
-
-bool Page::containsScrollableArea(ScrollableArea* scrollableArea) const
-{
-    if (!m_scrollableAreaSet)
-        return false;
-    return m_scrollableAreaSet->contains(scrollableArea);
-}
-
 #if !ASSERT_DISABLED
 void Page::checkFrameCountConsistency() const
 {
@@ -1107,7 +1064,7 @@ void Page::addRelevantRepaintedObject(RenderObject* object, const IntRect& objec
 
     // The objects are only relevant if they are being painted within the viewRect().
     if (RenderView* view = object->view()) {
-        if (!objectPaintRect.intersects(view->viewRect()))
+        if (!objectPaintRect.intersects(pixelSnappedIntRect(view->viewRect())))
             return;
     }
 
@@ -1121,6 +1078,17 @@ void Page::addRelevantRepaintedObject(RenderObject* object, const IntRect& objec
     }
 }
 
+void Page::provideSupplement(const AtomicString& name, PassOwnPtr<PageSupplement> supplement)
+{
+    ASSERT(!m_supplements.get(name.impl()));
+    m_supplements.set(name.impl(), supplement);
+}
+
+PageSupplement* Page::requireSupplement(const AtomicString& name)
+{
+    return m_supplements.get(name.impl());
+}
+
 Page::PageClients::PageClients()
     : chromeClient(0)
     , contextMenuClient(0)
@@ -1128,8 +1096,6 @@ Page::PageClients::PageClients()
     , dragClient(0)
     , inspectorClient(0)
     , geolocationClient(0)
-    , deviceMotionClient(0)
-    , deviceOrientationClient(0)
     , speechInputClient(0)
     , notificationClient(0)
     , userMediaClient(0)

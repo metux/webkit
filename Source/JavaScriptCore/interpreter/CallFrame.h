@@ -106,9 +106,21 @@ namespace JSC  {
         ReturnAddressPtr returnPC() const { return ReturnAddressPtr(this[RegisterFile::ReturnPC].vPC()); }
 #endif
         AbstractPC abstractReturnPC(JSGlobalData& globalData) { return AbstractPC(globalData, this); }
+        unsigned bytecodeOffsetForNonDFGCode()
+        {
+            ASSERT(codeBlock());
+            return this[RegisterFile::ArgumentCount].tag();
+        }
+        
+        void setBytecodeOffsetForNonDFGCode(unsigned offset)
+        {
+            ASSERT(codeBlock());
+            this[RegisterFile::ArgumentCount].tag() = static_cast<int32_t>(offset);
+        }
+
 #if ENABLE(DFG_JIT)
         InlineCallFrame* inlineCallFrame() const { return this[RegisterFile::ReturnPC].asInlineCallFrame(); }
-        unsigned codeOriginIndexForDFGWithInlining() const { return this[RegisterFile::ArgumentCount].tag(); }
+        unsigned codeOriginIndexForDFG() const { return this[RegisterFile::ArgumentCount].tag(); }
 #else
         // This will never be called if !ENABLE(DFG_JIT) since all calls should be guarded by
         // isInlineCallFrame(). But to make it easier to write code without having a bunch of
@@ -119,7 +131,7 @@ namespace JSC  {
             return 0;
         }
 #endif
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         Instruction* returnVPC() const { return this[RegisterFile::ReturnPC].vPC(); }
 #endif
 

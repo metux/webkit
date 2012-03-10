@@ -237,7 +237,7 @@ TreeOutline.prototype._forgetChildrenRecursive = function(parentElement)
     var child = parentElement.children[0];
     while (child) {
         this._forgetTreeElement(child);
-        child = child.traverseNextTreeElement(false, this, true);
+        child = child.traverseNextTreeElement(false, parentElement, true);
     }
 }
 
@@ -859,9 +859,11 @@ TreeElement.treeElementDoubleClicked = function(event)
     if (!element || !element.treeElement)
         return;
 
-    if (element.treeElement.ondblclick)
-        element.treeElement.ondblclick.call(element.treeElement, event);
-    else if (element.treeElement.hasChildren && !element.treeElement.expanded)
+    if (element.treeElement.ondblclick) {
+        var handled = element.treeElement.ondblclick.call(element.treeElement, event);
+        if (handled)
+            return;
+    } else if (element.treeElement.hasChildren && !element.treeElement.expanded)
         element.treeElement.expand();
 }
 

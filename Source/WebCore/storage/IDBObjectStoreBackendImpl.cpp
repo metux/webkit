@@ -153,6 +153,14 @@ void IDBObjectStoreBackendImpl::put(PassRefPtr<SerializedScriptValue> prpValue, 
                 ec = IDBDatabaseException::DATA_ERR;
                 return;
             }
+            if (autoIncrement && !keyPathKey) {
+                RefPtr<IDBKey> dummyKey = IDBKey::createNumber(-1);
+                RefPtr<SerializedScriptValue> valueAfterInjection = injectKeyIntoKeyPath(dummyKey, value, objectStore->m_keyPath);
+                if (!valueAfterInjection) {
+                    ec = IDBDatabaseException::DATA_ERR;
+                    return;
+                }
+            }
         }
         if (key && !key->valid()) {
             ec = IDBDatabaseException::DATA_ERR;
@@ -208,12 +216,13 @@ void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<
             if (!key) {
                 RefPtr<IDBKey> autoIncKey = objectStore->genAutoIncrementKey();
                 if (hasKeyPath) {
-                    // FIXME: Add checks in put() to ensure this will always succeed (apart from I/O errors).
-                    // https://bugs.webkit.org/show_bug.cgi?id=77374
                     RefPtr<SerializedScriptValue> valueAfterInjection = injectKeyIntoKeyPath(autoIncKey, value, objectStore->m_keyPath);
+                    ASSERT(valueAfterInjection);
                     if (!valueAfterInjection) {
                         objectStore->resetAutoIncrementKeyCache();
-                        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::DATA_ERR, "The generated key could not be inserted into the object using the keyPath."));
+                        // Checks in put() ensure this should only happen if I/O error occurs.
+                        // FIXME: The Indexed Database specification does not have an error code dedicated to I/O errors.
+                        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Internal error inserting generated key into the object."));
                         return;
                     }
                     value = valueAfterInjection;
@@ -317,41 +326,60 @@ void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<
 
 void IDBObjectStoreBackendImpl::deleteFunction(PassRefPtr<IDBKey> prpKey, PassRefPtr<IDBCallbacks> prpCallbacks, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)
 {
+    RefPtr<IDBKey> key = prpKey;
+    if (!key || !key->valid()) {
+        ec = IDBDatabaseException::DATA_ERR;
+        return;
+    }
+
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return;
+
+    deleteFunction(keyRange.release(), prpCallbacks, transaction, ec);
+}
+
+void IDBObjectStoreBackendImpl::deleteFunction(PassRefPtr<IDBKeyRange> prpKeyRange, PassRefPtr<IDBCallbacks> prpCallbacks, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)
+{
     if (transaction->mode() == IDBTransaction::READ_ONLY) {
         ec = IDBDatabaseException::READ_ONLY_ERR;
         return;
     }
 
     RefPtr<IDBObjectStoreBackendImpl> objectStore = this;
-    RefPtr<IDBKey> key = prpKey;
+    RefPtr<IDBKeyRange> keyRange = prpKeyRange;
     RefPtr<IDBCallbacks> callbacks = prpCallbacks;
-    if (!key || !key->valid()) {
-        ec = IDBDatabaseException::DATA_ERR;
-        return;
-    }
 
-    if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::deleteInternal, objectStore, key, callbacks)))
+    if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::deleteInternal, objectStore, keyRange, callbacks)))
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
-void IDBObjectStoreBackendImpl::deleteInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKey> key, PassRefPtr<IDBCallbacks> callbacks)
+void IDBObjectStoreBackendImpl::deleteInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKeyRange> keyRange, PassRefPtr<IDBCallbacks> callbacks)
 {
-    RefPtr<IDBBackingStore::ObjectStoreRecordIdentifier> recordIdentifier = objectStore->m_backingStore->createInvalidRecordIdentifier();
-    if (!objectStore->m_backingStore->keyExistsInObjectStore(objectStore->m_databaseId, objectStore->id(), *key, recordIdentifier.get())) {
-        callbacks->onSuccess(SerializedScriptValue::booleanValue(false));
-        return;
+    RefPtr<IDBBackingStore::ObjectStoreRecordIdentifier> recordIdentifier;
+
+    RefPtr<IDBBackingStore::Cursor> backingStoreCursor = objectStore->m_backingStore->openObjectStoreCursor(objectStore->m_databaseId, objectStore->id(), keyRange.get(), IDBCursor::NEXT);
+    if (backingStoreCursor) {
+
+        do {
+            recordIdentifier = backingStoreCursor->objectStoreRecordIdentifier();
+
+            for (IndexMap::iterator it = objectStore->m_indexes.begin(); it != objectStore->m_indexes.end(); ++it) {
+                if (!it->second->hasValidId())
+                    continue; // The index object has been created, but does not exist in the database yet.
+
+                bool success = objectStore->m_backingStore->deleteIndexDataForRecord(objectStore->m_databaseId, objectStore->id(), it->second->id(), recordIdentifier.get());
+                ASSERT_UNUSED(success, success);
+            }
+
+            objectStore->m_backingStore->deleteObjectStoreRecord(objectStore->m_databaseId, objectStore->id(), recordIdentifier.get());
+
+        } while (backingStoreCursor->continueFunction(0));
+
+        backingStoreCursor->close();
     }
 
-    for (IndexMap::iterator it = objectStore->m_indexes.begin(); it != objectStore->m_indexes.end(); ++it) {
-        if (!it->second->hasValidId())
-            continue; // The index object has been created, but does not exist in the database yet.
-
-        if (!objectStore->m_backingStore->deleteIndexDataForRecord(objectStore->m_databaseId, objectStore->id(), it->second->id(), recordIdentifier.get()))
-            ASSERT_NOT_REACHED();
-    }
-
-    objectStore->m_backingStore->deleteObjectStoreRecord(objectStore->m_databaseId, objectStore->id(), recordIdentifier.get());
-    callbacks->onSuccess(SerializedScriptValue::booleanValue(true));
+    callbacks->onSuccess(SerializedScriptValue::undefinedValue());
 }
 
 void IDBObjectStoreBackendImpl::clear(PassRefPtr<IDBCallbacks> prpCallbacks, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)

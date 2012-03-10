@@ -159,6 +159,7 @@ namespace WebKit {
 
         virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
         virtual void numWheelEventHandlersChanged(unsigned) { }
+        virtual void numTouchEventHandlersChanged(unsigned) { }
 
 #if USE(ACCELERATED_COMPOSITING) 
         virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*);
@@ -183,6 +184,8 @@ namespace WebKit {
         Vector<IntSize> m_scrollOffsets;
         double m_lastDisplayTime;
         unsigned int m_repaintSoonSourceId;
+
+        void invalidateWidgetRect(const IntRect&);
     };
 }
 

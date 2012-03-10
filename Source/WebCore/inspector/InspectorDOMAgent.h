@@ -51,13 +51,14 @@
 namespace WebCore {
 class ContainerNode;
 class CharacterData;
+class DOMEditor;
 class Document;
 class Element;
 class Event;
 class GraphicsContext;
 class InspectorClient;
-class InspectorDOMAgent;
 class InspectorFrontend;
+class InspectorHistory;
 class InspectorPageAgent;
 class IntRect;
 class HitTestResult;
@@ -106,6 +107,8 @@ public:
         return adoptPtr(new InspectorDOMAgent(instrumentingAgents, pageAgent, client, inspectorState, injectedScriptManager));
     }
 
+    static String toErrorString(const ExceptionCode&);
+
     ~InspectorDOMAgent();
 
     virtual void setFrontend(InspectorFrontend*);
@@ -142,6 +145,10 @@ public:
     virtual void highlightNode(ErrorString*, int nodeId, const RefPtr<InspectorObject>& highlightConfig);
     virtual void highlightFrame(ErrorString*, const String& frameId, const RefPtr<InspectorObject>* color, const RefPtr<InspectorObject>* outlineColor);
     virtual void moveTo(ErrorString*, int nodeId, int targetNodeId, const int* anchorNodeId, int* newNodeId);
+    virtual void setTouchEmulationEnabled(ErrorString*, bool);
+    virtual void undo(ErrorString*);
+    virtual void redo(ErrorString*);
+    virtual void markUndoableState(ErrorString*);
 
     Node* highlightedNode() const;
 
@@ -174,6 +181,8 @@ public:
 
     void drawHighlight(GraphicsContext&) const;
     void getHighlight(Highlight*) const;
+
+    InspectorHistory* history() { return m_history.get(); }
 
     // We represent embedded doms as a part of the same hierarchy. Hence we treat children of frame owners differently.
     // We also skip whitespace text nodes conditionally. Following methods encapsulate these specifics.
@@ -216,6 +225,10 @@ private:
 
     void discardBindings();
 
+#if ENABLE(TOUCH_EVENTS)
+    void updateTouchEventEmulationInPage(bool);
+#endif
+
     InspectorPageAgent* m_pageAgent;
     InspectorClient* m_client;
     InjectedScriptManager* m_injectedScriptManager;
@@ -235,6 +248,8 @@ private:
     OwnPtr<HighlightData> m_highlightData;
     RefPtr<Node> m_nodeToFocus;
     bool m_searchingForNode;
+    OwnPtr<InspectorHistory> m_history;
+    OwnPtr<DOMEditor> m_domEditor;
 };
 
 #endif // ENABLE(INSPECTOR)

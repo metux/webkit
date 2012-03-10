@@ -499,92 +499,6 @@ void Editor::respondToChangedContents(const VisibleSelection& endingSelection)
         client()->respondToChangedContents();
 }
 
-WritingDirection Editor::textDirectionForSelection(bool& hasNestedOrMultipleEmbeddings) const
-{
-    hasNestedOrMultipleEmbeddings = true;
-
-    if (m_frame->selection()->isNone())
-        return NaturalWritingDirection;
-
-    Position position = m_frame->selection()->selection().start().downstream();
-
-    Node* node = position.deprecatedNode();
-    if (!node)
-        return NaturalWritingDirection;
-
-    Position end;
-    if (m_frame->selection()->isRange()) {
-        end = m_frame->selection()->selection().end().upstream();
-
-        Node* pastLast = Range::create(m_frame->document(), position.parentAnchoredEquivalent(), end.parentAnchoredEquivalent())->pastLastNode();
-        for (Node* n = node; n && n != pastLast; n = n->traverseNextNode()) {
-            if (!n->isStyledElement())
-                continue;
-
-            RefPtr<CSSComputedStyleDeclaration> style = computedStyle(n);
-            RefPtr<CSSValue> unicodeBidi = style->getPropertyCSSValue(CSSPropertyUnicodeBidi);
-            if (!unicodeBidi || !unicodeBidi->isPrimitiveValue())
-                continue;
-
-            int unicodeBidiValue = static_cast<CSSPrimitiveValue*>(unicodeBidi.get())->getIdent();
-            if (unicodeBidiValue == CSSValueEmbed || unicodeBidiValue == CSSValueBidiOverride)
-                return NaturalWritingDirection;
-        }
-    }
-
-    if (m_frame->selection()->isCaret()) {
-        RefPtr<EditingStyle> typingStyle = m_frame->selection()->typingStyle();
-        WritingDirection direction;
-        if (typingStyle && typingStyle->textDirection(direction)) {
-            hasNestedOrMultipleEmbeddings = false;
-            return direction;
-        }
-        node = m_frame->selection()->selection().visibleStart().deepEquivalent().deprecatedNode();
-    }
-
-    // The selection is either a caret with no typing attributes or a range in which no embedding is added, so just use the start position
-    // to decide.
-    Node* block = enclosingBlock(node);
-    WritingDirection foundDirection = NaturalWritingDirection;
-
-    for (; node != block; node = node->parentNode()) {
-        if (!node->isStyledElement())
-            continue;
-
-        RefPtr<CSSComputedStyleDeclaration> style = computedStyle(node);
-        RefPtr<CSSValue> unicodeBidi = style->getPropertyCSSValue(CSSPropertyUnicodeBidi);
-        if (!unicodeBidi || !unicodeBidi->isPrimitiveValue())
-            continue;
-
-        int unicodeBidiValue = static_cast<CSSPrimitiveValue*>(unicodeBidi.get())->getIdent();
-        if (unicodeBidiValue == CSSValueNormal)
-            continue;
-
-        if (unicodeBidiValue == CSSValueBidiOverride)
-            return NaturalWritingDirection;
-
-        ASSERT(unicodeBidiValue == CSSValueEmbed);
-        RefPtr<CSSValue> direction = style->getPropertyCSSValue(CSSPropertyDirection);
-        if (!direction || !direction->isPrimitiveValue())
-            continue;
-
-        int directionValue = static_cast<CSSPrimitiveValue*>(direction.get())->getIdent();
-        if (directionValue != CSSValueLtr && directionValue != CSSValueRtl)
-            continue;
-
-        if (foundDirection != NaturalWritingDirection)
-            return NaturalWritingDirection;
-
-        // In the range case, make sure that the embedding element persists until the end of the range.
-        if (m_frame->selection()->isRange() && !end.deprecatedNode()->isDescendantOf(node))
-            return NaturalWritingDirection;
-
-        foundDirection = directionValue == CSSValueLtr ? LeftToRightWritingDirection : RightToLeftWritingDirection;
-    }
-    hasNestedOrMultipleEmbeddings = false;
-    return foundDirection;
-}
-
 bool Editor::hasBidiSelection() const
 {
     if (m_frame->selection()->isNone())
@@ -1502,7 +1416,7 @@ void Editor::setComposition(const String& text, const Vector<CompositionUnderlin
         unsigned extentOffset = extent.deprecatedEditingOffset();
 
         if (baseNode && baseNode == extentNode && baseNode->isTextNode() && baseOffset + text.length() == extentOffset) {
-            m_compositionNode = static_cast<Text*>(baseNode);
+            m_compositionNode = toText(baseNode);
             m_compositionStart = baseOffset;
             m_compositionEnd = extentOffset;
             m_customCompositionUnderlines = underlines;
@@ -2090,7 +2004,7 @@ void Editor::markAndReplaceFor(PassRefPtr<SpellCheckRequest> request, const Vect
             RefPtr<Range> misspellingRange = paragraph.subrange(resultLocation, resultLength);
             if (!m_spellingCorrector->isSpellingMarkerAllowed(misspellingRange))
                 continue;
-            misspellingRange->startContainer()->document()->markers()->addMarker(misspellingRange.get(), DocumentMarker::Spelling);
+            misspellingRange->startContainer()->document()->markers()->addMarker(misspellingRange.get(), DocumentMarker::Spelling, result->replacement);
         } else if (shouldMarkGrammar && result->type == TextCheckingTypeGrammar && paragraph.checkingRangeCovers(resultLocation, resultLength)) {
             ASSERT(resultLength > 0 && resultLocation >= 0);
             for (unsigned j = 0; j < result->details.size(); j++) {
@@ -2318,7 +2232,7 @@ void Editor::deletedAutocorrectionAtPosition(const Position& position, const Str
     m_spellingCorrector->deletedAutocorrectionAtPosition(position, originalString);
 }
 
-PassRefPtr<Range> Editor::rangeForPoint(const LayoutPoint& windowPoint)
+PassRefPtr<Range> Editor::rangeForPoint(const IntPoint& windowPoint)
 {
     Document* document = m_frame->documentAtPoint(windowPoint);
     if (!document)
@@ -2633,7 +2547,7 @@ String Editor::selectedText() const
 
 IntRect Editor::firstRectForRange(Range* range) const
 {
-    int extraWidthToEndOfLine = 0;
+    LayoutUnit extraWidthToEndOfLine = 0;
     ASSERT(range->startContainer());
     ASSERT(range->endContainer());
 
@@ -2745,10 +2659,13 @@ void Editor::applyEditingStyleToElement(Element* element) const
     ASSERT(element->isStyledElement());
     if (!element->isStyledElement())
         return;
-    StylePropertySet* style = static_cast<StyledElement*>(element)->ensureInlineStyleDecl();
-    style->setProperty(CSSPropertyWordWrap, "break-word", false);
-    style->setProperty(CSSPropertyWebkitNbspMode, "space", false);
-    style->setProperty(CSSPropertyWebkitLineBreak, "after-white-space", false);
+
+    // Mutate using the CSSOM wrapper so we get the same event behavior as a script.
+    CSSStyleDeclaration* style = static_cast<StyledElement*>(element)->style();
+    ExceptionCode ec;
+    style->setPropertyInternal(CSSPropertyWordWrap, "break-word", false, ec);
+    style->setPropertyInternal(CSSPropertyWebkitNbspMode, "space", false, ec);
+    style->setPropertyInternal(CSSPropertyWebkitLineBreak, "after-white-space", false, ec);
 }
 
 // Searches from the beginning of the document if nothing is selected.

@@ -32,6 +32,7 @@
 #include "RenderText.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "TextRun.h"
 #include "VisiblePosition.h"
 #include <math.h>
@@ -85,7 +86,7 @@ void RenderFileUploadControl::updateFromElement()
 
 static int nodeWidth(Node* node)
 {
-    return node ? node->renderBox()->width() : 0;
+    return node ? node->renderBox()->width() : zeroLayoutUnit;
 }
 
 int RenderFileUploadControl::maxFilenameWidth() const
@@ -212,9 +213,9 @@ HTMLInputElement* RenderFileUploadControl::uploadButton() const
 {
     HTMLInputElement* input = static_cast<HTMLInputElement*>(node());
 
-    ASSERT(input->shadowRoot());
+    ASSERT(input->hasShadowRoot());
 
-    Node* buttonNode = input->shadowRoot()->firstChild();
+    Node* buttonNode = input->shadowRootList()->oldestShadowRoot()->firstChild();
     return buttonNode && buttonNode->isHTMLElement() && buttonNode->hasTagName(inputTag) ? static_cast<HTMLInputElement*>(buttonNode) : 0;
 }
 

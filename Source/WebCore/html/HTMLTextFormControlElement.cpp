@@ -153,7 +153,7 @@ void HTMLTextFormControlElement::updatePlaceholderVisibility(bool placeholderVal
     if (!placeholder)
         return;
     ExceptionCode ec = 0;
-    placeholder->ensureInlineStyleDecl()->setProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? "visible" : "hidden", ec);
+    placeholder->setInlineStyleProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? "visible" : "hidden", ec);
     ASSERT(!ec);
 }
 
@@ -493,7 +493,7 @@ String HTMLTextFormControlElement::innerTextValue() const
         if (node->hasTagName(brTag))
             result.append(newlineCharacter);
         else if (node->isTextNode())
-            result.append(static_cast<Text*>(node)->data());
+            result.append(toText(node)->data());
     }
     return finishText(result);
 }
@@ -540,7 +540,7 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
         if (node->hasTagName(brTag))
             result.append(newlineCharacter);
         else if (node->isTextNode()) {
-            String data = static_cast<Text*>(node)->data();
+            String data = toText(node)->data();
             unsigned length = data.length();
             unsigned position = 0;
             while (breakNode == node && breakOffset <= length) {

@@ -36,25 +36,21 @@ class StyledElement : public Element {
 public:
     virtual ~StyledElement();
 
-    size_t mappedAttributeCount() const { return attributeMap() ? attributeMap()->mappedAttributeCount() : 0; }
-
-    void addCSSLength(int id, const String& value);
-    void addCSSProperty(int id, const String& value);
-    void addCSSProperty(int id, int value);
-    void addCSSImageProperty(int propertyID, const String& url);
-    void addCSSColor(int id, const String& color);
-    void removeCSSProperties(int id1, int id2 = CSSPropertyInvalid, int id3 = CSSPropertyInvalid, int id4 = CSSPropertyInvalid, int id5 = CSSPropertyInvalid, int id6 = CSSPropertyInvalid, int id7 = CSSPropertyInvalid, int id8 = CSSPropertyInvalid);
-    void removeCSSProperty(int id) { removeCSSProperties(id); }
-
-    virtual PassRefPtr<StylePropertySet> additionalAttributeStyle() { return 0; }
+    virtual StylePropertySet* additionalAttributeStyle() { return 0; }
     void invalidateStyleAttribute();
 
-    StylePropertySet* inlineStyleDecl() const { return attributeMap() ? attributeMap()->inlineStyleDecl() : 0; }
-    StylePropertySet* ensureInlineStyleDecl() { return ensureAttributeMap()->ensureInlineStyleDecl(); }
-    virtual CSSStyleDeclaration* style() OVERRIDE { return ensureInlineStyleDecl()->ensureCSSStyleDeclaration(); }
+    StylePropertySet* inlineStyleDecl() const { return attributeData() ? attributeData()->inlineStyleDecl() : 0; }
+    StylePropertySet* ensureInlineStyleDecl() { return ensureAttributeData()->ensureInlineStyleDecl(this); }
+    
+    // Unlike StylePropertySet setters, these implement invalidation.
+    bool setInlineStyleProperty(int propertyID, int value, bool important = false);
+    bool setInlineStyleProperty(int propertyID, double value, CSSPrimitiveValue::UnitTypes unit, bool important = false);
+    bool setInlineStyleProperty(int propertyID, const String& value, bool important = false);
+    bool removeInlineStyleProperty(int propertyID);
+    
+    virtual CSSStyleDeclaration* style() OVERRIDE { return ensureInlineStyleDecl()->ensureInlineCSSStyleDeclaration(this); }
 
-    StylePropertySet* attributeStyle() const { return attributeMap() ? attributeMap()->attributeStyle() : 0; }
-    StylePropertySet* ensureAttributeStyle() { return ensureAttributeMap()->ensureAttributeStyle(); }
+    StylePropertySet* attributeStyle();
 
     const SpaceSplitString& classNames() const;
 
@@ -68,20 +64,29 @@ protected:
     virtual void parseAttribute(Attribute*);
     virtual void copyNonAttributeProperties(const Element*);
 
+    virtual bool isPresentationAttribute(Attribute*) const { return false; }
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) { }
+
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
     // classAttributeChanged() exists to share code between
     // parseAttribute (called via setAttribute()) and
     // svgAttributeChanged (called when element.className.baseValue is set)
     void classAttributeChanged(const AtomicString& newClassString);
+    
+    virtual void insertedIntoDocument();
+    virtual void removedFromDocument();
 
 private:
     virtual void updateStyleAttribute() const;
+    void inlineStyleChanged();
+
+    void updateAttributeStyle();
 
     void destroyInlineStyleDecl()
     {
-        if (attributeMap())
-            attributeMap()->destroyInlineStyleDecl();
+        if (attributeData())
+            attributeData()->destroyInlineStyleDecl(this);
     }
 };
 
@@ -95,6 +100,13 @@ inline const SpaceSplitString& StyledElement::classNames() const
 inline void StyledElement::invalidateStyleAttribute()
 {
     clearIsStyleAttributeValid();
+}
+
+inline StylePropertySet* StyledElement::attributeStyle()
+{
+    if (attributeStyleDirty())
+        updateAttributeStyle();
+    return attributeData() ? attributeData()->attributeStyle() : 0;
 }
 
 } //namespace

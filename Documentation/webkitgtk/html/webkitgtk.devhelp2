@@ -290,6 +290,7 @@
     <keyword type="property" name="The &quot;default-font-size&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--default-font-size"/>
     <keyword type="property" name="The &quot;default-monospace-font-size&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--default-monospace-font-size"/>
     <keyword type="property" name="The &quot;editing-behavior&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--editing-behavior"/>
+    <keyword type="property" name="The &quot;enable-accelerated-compositing&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-accelerated-compositing"/>
     <keyword type="property" name="The &quot;enable-caret-browsing&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-caret-browsing"/>
     <keyword type="property" name="The &quot;enable-default-context-menu&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-default-context-menu"/>
     <keyword type="property" name="The &quot;enable-developer-extras&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-developer-extras"/>
@@ -563,7 +564,7 @@
     <keyword type="function" name="webkit_spell_checker_get_autocorrect_suggestions_for_misspelled_word ()" link="WebKitSpellChecker.html#webkit-spell-checker-get-autocorrect-suggestions-for-misspelled-word" since="1.5.1"/>
     <keyword type="function" name="webkit_spell_checker_learn_word ()" link="WebKitSpellChecker.html#webkit-spell-checker-learn-word" since="1.5.1"/>
     <keyword type="function" name="webkit_spell_checker_ignore_word ()" link="WebKitSpellChecker.html#webkit-spell-checker-ignore-word" since="1.5.1"/>
-    <keyword type="" name="Logging" link="webkit-environment.html#idp3536840"/>
+    <keyword type="" name="Logging" link="webkit-environment.html#idp10015296"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DEFAULT" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DEFAULT:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>

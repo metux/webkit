@@ -422,7 +422,11 @@ class RawTypes(object):
 
         @staticmethod
         def get_validate_method_params():
-            raise Exception("TODO")
+            class ValidateMethodParams:
+                name = "Boolean"
+                var_type = "bool"
+                as_method_name = "Boolean"
+            return ValidateMethodParams
 
         @staticmethod
         def get_output_pass_model():
@@ -516,7 +520,7 @@ class RawTypes(object):
 
         @staticmethod
         def generate_validate_method(writer):
-            writer.newline("static void assertAny(InspectorValue* value)\n")
+            writer.newline("static void assertAny(InspectorValue*)\n")
             writer.newline("{\n")
             writer.newline("    // No-op.\n")
             writer.newline("}\n\n\n")
@@ -1122,7 +1126,7 @@ class TypeBindings:
     }
 """ % class_name)
 
-                                writer.newline("    typedef StructItemTraits ItemTraits;\n")
+                                writer.newline("    typedef TypeBuilder::StructItemTraits ItemTraits;\n")
 
                                 for prop_data in resolve_data.optional_properties:
                                     prop_name = prop_data.p["name"]
@@ -1167,22 +1171,29 @@ class TypeBindings:
                                     validator_writer.newline("    RefPtr<InspectorObject> object;\n")
                                     validator_writer.newline("    bool castRes = value->asObject(&object);\n")
                                     validator_writer.newline("    ASSERT_UNUSED(castRes, castRes);\n")
-                                    validator_writer.newline("    InspectorObject::iterator it;\n")
                                     for prop_data in resolve_data.main_properties:
-                                        validator_writer.newline("    it = object->find(\"%s\");\n" % prop_data.p["name"])
-                                        validator_writer.newline("    ASSERT(it != object->end());\n")
-                                        validator_writer.newline("    %s(it->second.get());\n" % prop_data.param_type_binding.get_validator_call_text())
-
-                                    validator_writer.newline("    int count = %s;\n" % len(resolve_data.main_properties))
-
-                                    for prop_data in resolve_data.optional_properties:
-                                        validator_writer.newline("    it = object->find(\"%s\");\n" % prop_data.p["name"])
-                                        validator_writer.newline("    if (it != object->end()) {\n")
-                                        validator_writer.newline("        %s(it->second.get());\n" % prop_data.param_type_binding.get_validator_call_text())
-                                        validator_writer.newline("        ++count;\n")
+                                        validator_writer.newline("    {\n")
+                                        it_name = "%sPos" % prop_data.p["name"]
+                                        validator_writer.newline("        InspectorObject::iterator %s;\n" % it_name)
+                                        validator_writer.newline("        %s = object->find(\"%s\");\n" % (it_name, prop_data.p["name"]))
+                                        validator_writer.newline("        ASSERT(%s != object->end());\n" % it_name)
+                                        validator_writer.newline("        %s(%s->second.get());\n" % (prop_data.param_type_binding.get_validator_call_text(), it_name))
                                         validator_writer.newline("    }\n")
 
-                                    validator_writer.newline("    ASSERT(count == object->size());\n")
+                                    validator_writer.newline("    int foundPropertiesCount = %s;\n" % len(resolve_data.main_properties))
+
+                                    for prop_data in resolve_data.optional_properties:
+                                        validator_writer.newline("    {\n")
+                                        it_name = "%sPos" % prop_data.p["name"]
+                                        validator_writer.newline("        InspectorObject::iterator %s;\n" % it_name)
+                                        validator_writer.newline("        %s = object->find(\"%s\");\n" % (it_name, prop_data.p["name"]))
+                                        validator_writer.newline("        if (%s != object->end()) {\n" % it_name)
+                                        validator_writer.newline("            %s(%s->second.get());\n" % (prop_data.param_type_binding.get_validator_call_text(), it_name))
+                                        validator_writer.newline("            ++foundPropertiesCount;\n")
+                                        validator_writer.newline("        }\n")
+                                        validator_writer.newline("    }\n")
+
+                                    validator_writer.newline("    ASSERT(foundPropertiesCount == object->size());\n")
                                     validator_writer.newline("}\n\n\n")
 
                                 writer.newline("};\n\n")
@@ -2143,8 +2154,28 @@ public:
         return adoptRef(new Array<T>());
     }
 
+    static PassRefPtr<Array<T> > runtimeCast(PassRefPtr<InspectorValue> value)
+    {
+        RefPtr<InspectorArray> array;
+        bool castRes = value->asArray(&array);
+        ASSERT_UNUSED(castRes, castRes);
+#if !ASSERT_DISABLED
+        assertCorrectValue(array.get());
+#endif  // !ASSERT_DISABLED
+        COMPILE_ASSERT(sizeof(Array<T>) == sizeof(InspectorArray), type_cast_problem);
+        return static_cast<Array<T>*>(array.get());
+    }
+
 #if """ + VALIDATOR_IFDEF_NAME + """
-    static void assertCorrectValue(InspectorValue* value);
+    static void assertCorrectValue(InspectorValue* value)
+    {
+        RefPtr<InspectorArray> array;
+        bool castRes = value->asArray(&array);
+        ASSERT_UNUSED(castRes, castRes);
+        for (unsigned i = 0; i < array->length(); i++)
+            ArrayItemHelper<T>::Traits::template assertCorrectValue<T>(array->get(i).get());
+    }
+
 #endif // """ + VALIDATOR_IFDEF_NAME + """
 };
 
@@ -2218,16 +2249,6 @@ String getEnumConstantValue(int code) {
 } // namespace TypeBuilder
 
 #if """ + VALIDATOR_IFDEF_NAME + """
-
-template<typename T>
-void TypeBuilder::Array<T>::assertCorrectValue(InspectorValue* value)
-{
-    RefPtr<InspectorArray> array;
-    bool castRes = value->asArray(&array);
-    ASSERT_UNUSED(castRes, castRes);
-    for (unsigned i = 0; i < array->length(); i++)
-        ArrayItemHelper<T>::Traits::template assertCorrectValue<T>(array->get(i).get());
-}
 
 $validatorCode
 
@@ -2517,46 +2538,7 @@ class Generator:
 
                 optional = optional_mask and json_optional
 
-                ad_hoc_type_list = []
-
-                class AdHocTypeContext:
-                    container_full_name_prefix = "<not yet defined>"
-
-                    @staticmethod
-                    def get_type_name_fix():
-                        class NameFix:
-                            class_name = Capitalizer.lower_camel_case_to_upper(parameter_name)
-
-                            @staticmethod
-                            def output_comment(writer):
-                                writer.newline("// Named after parameter name '%s' while generating event %s.\n" % (parameter_name, event_name))
-
-                        return NameFix
-
-                    @staticmethod
-                    def add_type(binding):
-                        ad_hoc_type_list.append(binding)
-
-                param_type_binding = resolve_param_type(json_parameter, domain_name, AdHocTypeContext)
-
-                class EventForwardListener:
-                    @staticmethod
-                    def add_type_data(type_data):
-                        pass
-
-                class EventResolveContext:
-                    forward_listener = EventForwardListener
-
-                for type in ad_hoc_type_list:
-                    type.resolve_inner(EventResolveContext)
-
-                class EventGenerateContext:
-                    validator_writer = "not supported in EventGenerateContext"
-
-                for type in ad_hoc_type_list:
-                    generator = type.get_code_generator()
-                    if generator:
-                        generator.generate_type_builder(ad_hoc_type_writer, EventGenerateContext)
+                param_type_binding = Generator.resolve_type_and_generate_ad_hoc(json_parameter, event_name, domain_name, ad_hoc_type_writer)
 
                 annotated_type = get_annotated_type_text(c_type.get_text(), param_type_binding.get_in_c_type_text(json_optional))
 
@@ -2588,6 +2570,10 @@ class Generator:
         Generator.method_name_enum_list.append("        k%s_%sCmd," % (domain_name, json_command["name"]))
         Generator.method_handler_list.append("            &InspectorBackendDispatcherImpl::%s_%s," % (domain_name, json_command_name))
         Generator.backend_method_declaration_list.append("    void %s_%s(long callId, InspectorObject* requestMessageObject);" % (domain_name, json_command_name))
+
+        ad_hoc_type_output = []
+        Generator.backend_agent_interface_list.append(ad_hoc_type_output)
+        ad_hoc_type_writer = Writer(ad_hoc_type_output, "        ")
 
         Generator.backend_agent_interface_list.append("        virtual void %s(ErrorString*" % json_command_name)
 
@@ -2652,7 +2638,9 @@ class Generator:
 
                 optional = "optional" in json_return and json_return["optional"]
 
-                raw_type = resolve_param_raw_type(json_return, domain_name)
+                return_type_binding = Generator.resolve_type_and_generate_ad_hoc(json_return, json_command_name, domain_name, ad_hoc_type_writer)
+
+                raw_type = return_type_binding.reduce_to_raw_type()
                 setter_type = raw_type.get_setter_name()
                 initializer = raw_type.get_c_initializer()
                 var_type = raw_type.get_c_param_type(ParamType.OUTPUT, None)
@@ -2661,15 +2649,20 @@ class Generator:
                 param = ", %sout_%s" % (raw_type.get_output_pass_model().get_argument_prefix(), json_return_name)
                 cook = "        result->set%s(\"%s\", out_%s);\n" % (setter_type, json_return_name, json_return_name)
                 if optional:
-                        # FIXME: support optional properly. Probably an additional output parameter should be in each case.
-                    if var_type.get_text() == "bool":
+                    # FIXME: support optional properly. Probably an additional output parameter should be in each case.
+                    # FIXME: refactor this condition; it's a hack now.
+                    if var_type.get_text() == "bool" or var_type.get_text().startswith("RefPtr<"):
                         cook = ("        if (out_%s)\n    " % json_return_name) + cook
                     else:
                         cook = "        // FIXME: support optional here.\n" + cook
 
                 method_out_code += code
                 agent_call_param_list.append(param)
-                Generator.backend_agent_interface_list.append(", %s%s out_%s" % (var_type.get_text(), raw_type.get_output_pass_model().get_parameter_type_suffix(), json_return_name))
+
+                annotated_type = get_annotated_type_text(var_type.get_text() + raw_type.get_output_pass_model().get_parameter_type_suffix(),
+                                                         return_type_binding.get_in_c_type_text(optional))
+
+                Generator.backend_agent_interface_list.append(", %s out_%s" % (annotated_type, json_return_name))
                 response_cook_list.append(cook)
 
                 backend_js_reply_param_list.append("\"%s\"" % json_return_name)
@@ -2690,6 +2683,52 @@ class Generator:
 
         Generator.backend_js_domain_initializer_list.append("InspectorBackend.registerCommand(\"%s.%s\", [%s], %s);\n" % (domain_name, json_command_name, js_parameters_text, js_reply_list))
         Generator.backend_agent_interface_list.append(") = 0;\n")
+
+    @staticmethod
+    def resolve_type_and_generate_ad_hoc(json_param, method_name, domain_name, ad_hoc_type_writer):
+        param_name = json_param["name"]
+        ad_hoc_type_list = []
+
+        class AdHocTypeContext:
+            container_full_name_prefix = "<not yet defined>"
+
+            @staticmethod
+            def get_type_name_fix():
+                class NameFix:
+                    class_name = Capitalizer.lower_camel_case_to_upper(param_name)
+
+                    @staticmethod
+                    def output_comment(writer):
+                        writer.newline("// Named after parameter '%s' while generating command/event %s.\n" % (param_name, method_name))
+
+                return NameFix
+
+            @staticmethod
+            def add_type(binding):
+                ad_hoc_type_list.append(binding)
+
+        type_binding = resolve_param_type(json_param, domain_name, AdHocTypeContext)
+
+        class InterfaceForwardListener:
+            @staticmethod
+            def add_type_data(type_data):
+                pass
+
+        class InterfaceResolveContext:
+            forward_listener = InterfaceForwardListener
+
+        for type in ad_hoc_type_list:
+            type.resolve_inner(InterfaceResolveContext)
+
+        class InterfaceGenerateContext:
+            validator_writer = "not supported in InterfaceGenerateContext"
+
+        for type in ad_hoc_type_list:
+            generator = type.get_code_generator()
+            if generator:
+                generator.generate_type_builder(ad_hoc_type_writer, InterfaceGenerateContext)
+
+        return type_binding
 
     @staticmethod
     def process_types(type_map):
@@ -2785,7 +2824,7 @@ backend_js_file = open(output_cpp_dirname + "/InspectorBackendStub.js", "w")
 
 backend_h_file.write(Templates.backend_h.substitute(None,
     virtualSetters=join(Generator.backend_virtual_setters_list, "\n"),
-    agentInterfaces=join(Generator.backend_agent_interface_list, ""),
+    agentInterfaces=join(flatten_list(Generator.backend_agent_interface_list), ""),
     methodNamesEnumContent=join(Generator.method_name_enum_list, "\n")))
 
 backend_cpp_file.write(Templates.backend_cpp.substitute(None,

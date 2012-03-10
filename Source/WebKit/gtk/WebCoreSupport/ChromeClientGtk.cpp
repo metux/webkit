@@ -525,6 +525,20 @@ static void paintWebView(WebKitWebView* webView, Frame* frame, Region dirtyRegio
     gc.restore();
 }
 
+void ChromeClient::invalidateWidgetRect(const IntRect& rect)
+{
+#if USE(ACCELERATED_COMPOSITING)
+    AcceleratedCompositingContext* acContext = m_webView->priv->acceleratedCompositingContext.get();
+    if (acContext->enabled()) {
+        acContext->scheduleRootLayerRepaint(rect);
+        return;
+    }
+#endif
+    gtk_widget_queue_draw_area(GTK_WIDGET(m_webView),
+                               rect.x(), rect.y(),
+                               rect.width(), rect.height());
+}
+
 void ChromeClient::performAllPendingScrolls()
 {
     if (!m_webView->priv->backingStore)
@@ -534,15 +548,12 @@ void ChromeClient::performAllPendingScrolls()
     for (size_t i = 0; i < m_rectsToScroll.size(); i++) {
         IntRect& scrollRect = m_rectsToScroll[i];
         m_webView->priv->backingStore->scroll(scrollRect, m_scrollOffsets[i]);
-        gtk_widget_queue_draw_area(GTK_WIDGET(m_webView),
-                                   scrollRect.x(), scrollRect.y(),
-                                   scrollRect.width(), scrollRect.height());
+        invalidateWidgetRect(scrollRect);
     }
 
     m_rectsToScroll.clear();
     m_scrollOffsets.clear();
 }
-
 
 void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
 {
@@ -559,12 +570,9 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     if (!frame || !frame->contentRenderer() || !frame->view())
         return;
 
-    performAllPendingScrolls();
     frame->view()->updateLayoutAndStyleIfNeededRecursive();
+    performAllPendingScrolls();
     paintWebView(m_webView, frame, m_dirtyRegion);
-
-    const IntRect& rect = m_dirtyRegion.bounds();
-    gtk_widget_queue_draw_area(GTK_WIDGET(m_webView), rect.x(), rect.y(), rect.width(), rect.height());
 
     HashSet<GtkWidget*> children = m_webView->priv->children;
     HashSet<GtkWidget*>::const_iterator end = children.end();
@@ -574,6 +582,14 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
             break;
         }
     }
+
+    const IntRect& rect = m_dirtyRegion.bounds();
+    invalidateWidgetRect(rect);
+
+#if USE(ACCELERATED_COMPOSITING)
+    m_webView->priv->acceleratedCompositingContext->syncLayersNow();
+    m_webView->priv->acceleratedCompositingContext->renderLayersToWindow(rect);
+#endif
 
     m_dirtyRegion = Region();
     m_lastDisplayTime = currentTime();
@@ -791,15 +807,14 @@ void ChromeClient::runOpenPanel(Frame*, PassRefPtr<FileChooser> prpFileChooser)
 
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
         if (gtk_file_chooser_get_select_multiple(GTK_FILE_CHOOSER(dialog))) {
-            GSList* filenames = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
+            GOwnPtr<GSList> filenames(gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog)));
             Vector<String> names;
-            for (GSList* item = filenames ; item ; item = item->next) {
+            for (GSList* item = filenames.get() ; item ; item = item->next) {
                 if (!item->data)
                     continue;
                 names.append(filenameToString(static_cast<char*>(item->data)));
                 g_free(item->data);
             }
-            g_slist_free(filenames);
             chooser->chooseFiles(names);
         } else {
             gchar* filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
@@ -829,6 +844,9 @@ void ChromeClient::setCursor(const Cursor& cursor)
     // Setting the cursor may be an expensive operation in some backends,
     // so don't re-set the cursor if it's already set to the target value.
     GdkWindow* window = gtk_widget_get_window(platformPageClient());
+    if (!window)
+        return;
+
     GdkCursor* currentCursor = gdk_window_get_cursor(window);
     GdkCursor* newCursor = cursor.platformCursor().get();
     if (currentCursor != newCursor)

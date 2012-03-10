@@ -24,11 +24,13 @@
 #include "FrameLoaderTypes.h"
 #include "FindOptions.h"
 #include "LayoutTypes.h"
+#include "PageSupplement.h"
 #include "PageVisibilityState.h"
 #include "PlatformScreen.h"
 #include "PlatformString.h"
 #include "ViewportArguments.h"
 #include <wtf/Forward.h>
+#include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
 
@@ -52,10 +54,6 @@ namespace WebCore {
     class ChromeClient;
     class ContextMenuClient;
     class ContextMenuController;
-    class DeviceMotionClient;
-    class DeviceMotionController;
-    class DeviceOrientationClient;
-    class DeviceOrientationController;
     class Document;
     class DragCaretController;
     class DragClient;
@@ -118,8 +116,6 @@ namespace WebCore {
             DragClient* dragClient;
             InspectorClient* inspectorClient;
             GeolocationClient* geolocationClient;
-            DeviceMotionClient* deviceMotionClient;
-            DeviceOrientationClient* deviceOrientationClient;
             RefPtr<BackForwardList> backForwardClient;
             SpeechInputClient* speechInputClient;
             NotificationPresenter* notificationClient;
@@ -133,8 +129,7 @@ namespace WebCore {
 
         RenderTheme* theme() const { return m_theme.get(); };
 
-        ViewportArguments viewportArguments() const { return m_viewportArguments; }
-        void updateViewportArguments();
+        ViewportArguments viewportArguments() const;
 
         static void refreshPlugins(bool reload);
         PluginData* pluginData() const;
@@ -185,10 +180,6 @@ namespace WebCore {
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
         GeolocationController* geolocationController() const { return m_geolocationController.get(); }
 #endif
-#if ENABLE(DEVICE_ORIENTATION)
-        DeviceMotionController* deviceMotionController() const { return m_deviceMotionController.get(); }
-        DeviceOrientationController* deviceOrientationController() const { return m_deviceOrientationController.get(); }
-#endif
 #if ENABLE(NOTIFICATIONS)
         NotificationController* notificationController() const { return m_notificationController.get(); }
 #endif
@@ -201,9 +192,7 @@ namespace WebCore {
 #if ENABLE(MEDIA_STREAM)
         UserMediaClient* userMediaClient() const { return m_userMediaClient; }
 #endif
-#if ENABLE(THREADED_SCROLLING)
         ScrollingCoordinator* scrollingCoordinator();
-#endif
 
         Settings* settings() const { return m_settings.get(); }
         ProgressTracker* progress() const { return m_progress.get(); }
@@ -334,12 +323,6 @@ namespace WebCore {
         void setJavaScriptURLsAreAllowed(bool);
         bool javaScriptURLsAreAllowed() const;
 
-        typedef HashSet<ScrollableArea*> ScrollableAreaSet;
-        void addScrollableArea(ScrollableArea*);
-        void removeScrollableArea(ScrollableArea*);
-        bool containsScrollableArea(ScrollableArea*) const;
-        const ScrollableAreaSet* scrollableAreaSet() const { return m_scrollableAreaSet.get(); }
-
         // Don't allow more than a certain number of frames in a page.
         // This seems like a reasonable upper bound, and otherwise mutually
         // recursive frameset pages can quickly bring the program to its knees
@@ -359,9 +342,15 @@ namespace WebCore {
         void setRelevantRepaintedObjectsCounterThreshold(uint64_t);
         void startCountingRelevantRepaintedObjects();
         void addRelevantRepaintedObject(RenderObject*, const IntRect& objectPaintRect);
-        
+
+        void provideSupplement(const AtomicString&, PassOwnPtr<PageSupplement>);
+        PageSupplement* requireSupplement(const AtomicString&);
+
     private:
         void initGroup();
+
+        typedef HashMap<AtomicStringImpl*, OwnPtr<PageSupplement> > PageSupplementMap;
+        PageSupplementMap m_supplements;
 
 #if ASSERT_DISABLED
         void checkFrameCountConsistency() const { }
@@ -390,10 +379,6 @@ namespace WebCore {
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
         OwnPtr<GeolocationController> m_geolocationController;
 #endif
-#if ENABLE(DEVICE_ORIENTATION)
-        OwnPtr<DeviceMotionController> m_deviceMotionController;
-        OwnPtr<DeviceOrientationController> m_deviceOrientationController;
-#endif
 #if ENABLE(NOTIFICATIONS)
         OwnPtr<NotificationController> m_notificationController;
 #endif
@@ -407,9 +392,8 @@ namespace WebCore {
 #if ENABLE(MEDIA_STREAM)
         UserMediaClient* m_userMediaClient;
 #endif
-#if ENABLE(THREADED_SCROLLING)
         RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
-#endif
+
         OwnPtr<Settings> m_settings;
         OwnPtr<ProgressTracker> m_progress;
         
@@ -464,11 +448,7 @@ namespace WebCore {
 
         ViewMode m_viewMode;
 
-        ViewportArguments m_viewportArguments;
-
         double m_minimumTimerInterval;
-
-        OwnPtr<ScrollableAreaSet> m_scrollableAreaSet;
 
         bool m_isEditable;
 

@@ -30,6 +30,7 @@
 #include "MouseEvent.h"
 #include "RenderDetails.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "Text.h"
 
 namespace WebCore {
@@ -108,9 +109,11 @@ RenderObject* HTMLDetailsElement::createRenderer(RenderArena* arena, RenderStyle
 
 void HTMLDetailsElement::createShadowSubtree()
 {
-    ASSERT(!shadowRoot());
-    ensureShadowRoot()->appendChild(DetailsSummaryElement::create(document()), ASSERT_NO_EXCEPTION, true);
-    ensureShadowRoot()->appendChild(DetailsContentElement::create(document()), ASSERT_NO_EXCEPTION, true);
+    ASSERT(!hasShadowRoot());
+
+    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
+    root->appendChild(DetailsSummaryElement::create(document()), ASSERT_NO_EXCEPTION, true);
+    root->appendChild(DetailsContentElement::create(document()), ASSERT_NO_EXCEPTION, true);
 }
 
 Element* HTMLDetailsElement::findMainSummary() const
@@ -120,7 +123,7 @@ Element* HTMLDetailsElement::findMainSummary() const
             return toElement(child);
     }
 
-    return static_cast<DetailsSummaryElement*>(shadowRoot()->firstChild())->fallbackSummary();
+    return static_cast<DetailsSummaryElement*>(shadowRootList()->oldestShadowRoot()->firstChild())->fallbackSummary();
 }
 
 void HTMLDetailsElement::parseAttribute(Attribute* attr)

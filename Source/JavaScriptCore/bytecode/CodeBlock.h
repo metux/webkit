@@ -333,7 +333,7 @@ namespace JSC {
         }
 #endif
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         unsigned bytecodeOffset(Instruction* returnAddress)
         {
             return static_cast<Instruction*>(returnAddress) - instructions().begin();
@@ -460,7 +460,7 @@ namespace JSC {
 
         void clearEvalCache();
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         void addPropertyAccessInstruction(unsigned propertyAccessInstruction)
         {
             if (!m_globalData->canUseJIT())
@@ -1075,7 +1075,7 @@ namespace JSC {
         RefPtr<SourceProvider> m_source;
         unsigned m_sourceOffset;
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         Vector<unsigned> m_propertyAccessInstructions;
         Vector<unsigned> m_globalResolveInstructions;
 #endif
@@ -1330,6 +1330,17 @@ namespace JSC {
         CodeBlock* m_codeBlock;
         bool m_oldValueOfShouldDiscardBytecode;
     };
+
+    inline CodeBlock* baselineCodeBlockForOriginAndBaselineCodeBlock(const CodeOrigin& codeOrigin, CodeBlock* baselineCodeBlock)
+    {
+        if (codeOrigin.inlineCallFrame) {
+            ExecutableBase* executable = codeOrigin.inlineCallFrame->executable.get();
+            ASSERT(executable->structure()->classInfo() == &FunctionExecutable::s_info);
+            return static_cast<FunctionExecutable*>(executable)->baselineCodeBlockFor(codeOrigin.inlineCallFrame->isCall ? CodeForCall : CodeForConstruct);
+        }
+        return baselineCodeBlock;
+    }
+    
 
     inline Register& ExecState::r(int index)
     {

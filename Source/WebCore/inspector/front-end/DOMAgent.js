@@ -40,6 +40,7 @@ WebInspector.DOMNode = function(domAgent, doc, payload) {
     this.ownerDocument = doc;
 
     this.id = payload.nodeId;
+    domAgent._idToDOMNode[this.id] = this;
     this._nodeType = payload.nodeType;
     this._nodeName = payload.nodeName;
     this._localName = payload.localName;
@@ -644,7 +645,6 @@ WebInspector.DOMDocument = function(domAgent, payload)
     WebInspector.DOMNode.call(this, domAgent, this, payload);
     this.documentURL = payload.documentURL || "";
     this.xmlVersion = payload.xmlVersion;
-    domAgent._idToDOMNode[this.id] = this;
     this._listeners = {};
 }
 
@@ -660,8 +660,9 @@ WebInspector.DOMAgent = function() {
     this._document = null;
     this._attributeLoadNodeIds = {};
     InspectorBackend.registerDOMDispatcher(new WebInspector.DOMDispatcher(this));
-    if (WebInspector.experimentsSettings.freeFlowDOMEditing.isEnabled())
-        new WebInspector.DOMModelResourceBinding(this);
+    if (WebInspector.settings.emulateTouchEvents.get())
+        this._emulateTouchEventsChanged();
+    WebInspector.settings.emulateTouchEvents.addChangeListener(this._emulateTouchEventsChanged, this);
 }
 
 WebInspector.DOMAgent.Events = {
@@ -673,7 +674,9 @@ WebInspector.DOMAgent.Events = {
     DocumentUpdated: "DocumentUpdated",
     ChildNodeCountUpdated: "ChildNodeCountUpdated",
     InspectElementRequested: "InspectElementRequested",
-    StyleInvalidated: "StyleInvalidated"
+    StyleInvalidated: "StyleInvalidated",
+    UndoRedoRequested: "UndoRedoRequested",
+    UndoRedoCompleted: "UndoRedoCompleted"
 }
 
 WebInspector.DOMAgent.prototype = {
@@ -872,11 +875,9 @@ WebInspector.DOMAgent.prototype = {
     _setDocument: function(payload)
     {
         this._idToDOMNode = {};
-        if (payload && "nodeId" in payload) {
+        if (payload && "nodeId" in payload)
             this._document = new WebInspector.DOMDocument(this, payload);
-            if (this._document.children)
-                this._bindNodes(this._document.children);
-        } else
+        else
             this._document = null;
         this.dispatchEventToListeners(WebInspector.DOMAgent.Events.DocumentUpdated, this._document);
     },
@@ -886,8 +887,7 @@ WebInspector.DOMAgent.prototype = {
      */
     _setDetachedRoot: function(payload)
     {
-        var root = new WebInspector.DOMNode(this, null, payload);
-        this._idToDOMNode[payload.nodeId] = root;
+        new WebInspector.DOMNode(this, null, payload);
     },
 
     /**
@@ -903,20 +903,6 @@ WebInspector.DOMAgent.prototype = {
 
         var parent = this._idToDOMNode[parentId];
         parent._setChildrenPayload(payloads);
-        this._bindNodes(parent.children);
-    },
-
-    /**
-     * @param {Array.<WebInspector.DOMNode>} children
-     */
-    _bindNodes: function(children)
-    {
-        for (var i = 0; i < children.length; ++i) {
-            var child = children[i];
-            this._idToDOMNode[child.id] = child;
-            if (child.children)
-                this._bindNodes(child.children);
-        }
     },
 
     /**
@@ -953,8 +939,18 @@ WebInspector.DOMAgent.prototype = {
         var parent = this._idToDOMNode[parentId];
         var node = this._idToDOMNode[nodeId];
         parent._removeChild(node);
+        this._unbind(node);
         this.dispatchEventToListeners(WebInspector.DOMAgent.Events.NodeRemoved, {node:node, parent:parent});
-        delete this._idToDOMNode[nodeId];
+    },
+
+    /**
+     * @param {DOMAgent.Node} node
+     */
+    _unbind: function(node)
+    {
+        delete this._idToDOMNode[node.id];
+        for (var i = 0; node.children && i < node.children.length; ++i)
+            this._unbind(node.children[i]);
     },
 
     /**
@@ -1118,45 +1114,53 @@ WebInspector.DOMAgent.prototype = {
     {
         function wrapperFunction(error)
         {
+            if (!error)
+                this.markUndoableState();
+
             if (callback)
                 callback.apply(this, arguments);
-            if (error || !WebInspector.experimentsSettings.freeFlowDOMEditing.isEnabled())
-                return;
-            if (this._captureDOMTimer)
-               clearTimeout(this._captureDOMTimer);
-            this._captureDOMTimer = setTimeout(this._captureDOM.bind(this, node), 500);
         }
         return wrapperFunction.bind(this);
     },
 
-    /**
-     * @param {WebInspector.DOMNode} node
-     */
-    _captureDOM: function(node)
+    _emulateTouchEventsChanged: function()
     {
-        delete this._captureDOMTimer;
-        if (!node.ownerDocument)
-            return;
+        DOMAgent.setTouchEmulationEnabled(WebInspector.settings.emulateTouchEvents.get());
+    },
 
-        function callback(error, text)
+    markUndoableState: function()
+    {
+        DOMAgent.markUndoableState();
+    },
+
+    /**
+     * @param {function(?Protocol.Error)=} callback
+     */
+    undo: function(callback)
+    {
+        function mycallback(error)
         {
-            if (error) {
-                console.error(error);
-                return;
-            }
-
-            var url = node.ownerDocument.documentURL;
-            if (!url)
-                return;
-
-            var resource = WebInspector.resourceForURL(url);
-            if (!resource)
-                return;
-
-            resource.addRevision(text);
+            this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoCompleted);
+            callback(error);
         }
-        DOMAgent.getOuterHTML(node.ownerDocument.id, callback);
-        
+
+        this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoRequested);
+        DOMAgent.undo(callback);
+    },
+
+    /**
+     * @param {function(?Protocol.Error)=} callback
+     */
+    redo: function(callback)
+    {
+        function mycallback(error)
+        {
+            this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoCompleted);
+            callback(error);
+        }
+
+        this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoRequested);
+        DOMAgent.redo(callback);
     }
 }
 
@@ -1256,39 +1260,3 @@ WebInspector.DOMDispatcher.prototype = {
  * @type {?WebInspector.DOMAgent}
  */
 WebInspector.domAgent = null;
-
-/**
- * @constructor
- * @implements {WebInspector.ResourceDomainModelBinding}
- */
-WebInspector.DOMModelResourceBinding = function(domAgent)
-{
-    this._domAgent = domAgent;
-    WebInspector.Resource.registerDomainModelBinding(WebInspector.Resource.Type.Document, this);
-}
-
-WebInspector.DOMModelResourceBinding.prototype = {
-    setContent: function(resource, content, majorChange, userCallback)
-    {
-        var frameId = resource.frameId;
-        if (!frameId)
-            return;
-
-        PageAgent.setDocumentContent(frameId, content, callbackWrapper);
-
-        function callbackWrapper(error)
-        {
-            if (majorChange)
-                resource.addRevision(content);
-            if (userCallback)
-                userCallback(error);
-        }
-    },
-
-    canSetContent: function()
-    {
-        return true;
-    }
-}
-
-WebInspector.DOMModelResourceBinding.prototype.__proto__ = WebInspector.ResourceDomainModelBinding.prototype;

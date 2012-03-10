@@ -39,10 +39,12 @@ namespace JSC {
 
 const ClassInfo ExecutableBase::s_info = { "Executable", 0, 0, 0, CREATE_METHOD_TABLE(ExecutableBase) };
 
+#if ENABLE(JIT)
 void ExecutableBase::destroy(JSCell* cell)
 {
     jsCast<ExecutableBase*>(cell)->ExecutableBase::~ExecutableBase();
 }
+#endif
 
 inline void ExecutableBase::clearCode()
 {
@@ -67,10 +69,12 @@ Intrinsic ExecutableBase::intrinsic() const
 
 const ClassInfo NativeExecutable::s_info = { "NativeExecutable", &ExecutableBase::s_info, 0, 0, CREATE_METHOD_TABLE(NativeExecutable) };
 
+#if ENABLE(JIT)
 void NativeExecutable::destroy(JSCell* cell)
 {
     jsCast<NativeExecutable*>(cell)->NativeExecutable::~NativeExecutable();
 }
+#endif
 
 #if ENABLE(DFG_JIT)
 Intrinsic NativeExecutable::intrinsic() const
@@ -100,10 +104,12 @@ void NativeExecutable::finalize(JSCell* cell)
 
 const ClassInfo ScriptExecutable::s_info = { "ScriptExecutable", &ExecutableBase::s_info, 0, 0, CREATE_METHOD_TABLE(ScriptExecutable) };
 
+#if ENABLE(JIT)
 void ScriptExecutable::destroy(JSCell* cell)
 {
     jsCast<ScriptExecutable*>(cell)->ScriptExecutable::~ScriptExecutable();
 }
+#endif
 
 const ClassInfo EvalExecutable::s_info = { "EvalExecutable", &ScriptExecutable::s_info, 0, 0, CREATE_METHOD_TABLE(EvalExecutable) };
 
@@ -137,7 +143,7 @@ FunctionExecutable::FunctionExecutable(JSGlobalData& globalData, const Identifie
     , m_forceUsesArguments(forceUsesArguments)
     , m_parameters(parameters)
     , m_name(name)
-    , m_inferredName(inferredName)
+    , m_inferredName(inferredName.isNull() ? globalData.propertyNames->emptyIdentifier : inferredName)
     , m_symbolTable(0)
 {
 }
@@ -148,7 +154,7 @@ FunctionExecutable::FunctionExecutable(ExecState* exec, const Identifier& name, 
     , m_forceUsesArguments(forceUsesArguments)
     , m_parameters(parameters)
     , m_name(name)
-    , m_inferredName(inferredName)
+    , m_inferredName(inferredName.isNull() ? exec->globalData().propertyNames->emptyIdentifier : inferredName)
     , m_symbolTable(0)
 {
 }
@@ -217,7 +223,7 @@ JSObject* EvalExecutable::compileInternal(ExecState* exec, ScopeChainNode* scope
 #endif
 
 #if ENABLE(JIT)
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
     if (!m_jitCodeForCall)
         Heap::heap(this)->reportExtraMemoryCost(sizeof(*m_evalCodeBlock));
     else
@@ -343,7 +349,7 @@ JSObject* ProgramExecutable::compileInternal(ExecState* exec, ScopeChainNode* sc
 #endif
 
 #if ENABLE(JIT)
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
     if (!m_jitCodeForCall)
         Heap::heap(this)->reportExtraMemoryCost(sizeof(*m_programCodeBlock));
     else
@@ -511,7 +517,7 @@ JSObject* FunctionExecutable::compileForCallInternal(ExecState* exec, ScopeChain
 #endif
 
 #if ENABLE(JIT)
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
     if (!m_jitCodeForCall)
         Heap::heap(this)->reportExtraMemoryCost(sizeof(*m_codeBlockForCall));
     else
@@ -553,7 +559,7 @@ JSObject* FunctionExecutable::compileForConstructInternal(ExecState* exec, Scope
 #endif
 
 #if ENABLE(JIT)
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
     if (!m_jitCodeForConstruct)
         Heap::heap(this)->reportExtraMemoryCost(sizeof(*m_codeBlockForConstruct));
     else

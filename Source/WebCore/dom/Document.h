@@ -36,6 +36,7 @@
 #include "DocumentEventQueue.h"
 #include "DocumentTiming.h"
 #include "IconURL.h"
+#include "InspectorCounters.h"
 #include "IntRect.h"
 #include "LayoutTypes.h"
 #include "PageVisibilityState.h"
@@ -350,6 +351,7 @@ public:
     virtual PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&);
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
+    bool cssRegionsEnabled() const;
     PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&);
 
     /**
@@ -803,6 +805,7 @@ public:
      */
     void processHttpEquiv(const String& equiv, const String& content);
     void processViewport(const String& features);
+    void updateViewportArguments();
     void processReferrerPolicy(const String& policy);
 
     // Returns the owning element in the parent document.
@@ -1111,6 +1114,10 @@ public:
     unsigned wheelEventHandlerCount() const { return m_wheelEventHandlerCount; }
     void didAddWheelEventHandler();
     void didRemoveWheelEventHandler();
+
+    unsigned touchEventHandlerCount() const { return m_touchEventHandlerCount; }
+    void didAddTouchEventHandler();
+    void didRemoveTouchEventHandler();
 
     bool visualUpdatesAllowed() const;
 
@@ -1448,6 +1455,7 @@ private:
     unsigned m_writeRecursionDepth;
     
     unsigned m_wheelEventHandlerCount;
+    unsigned m_touchEventHandlerCount;
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     RefPtr<ScriptedAnimationController> m_scriptedAnimationController;
@@ -1480,6 +1488,7 @@ inline Node::Node(Document* document, ConstructionType type)
 #if !defined(NDEBUG) || (defined(DUMP_NODE_STATISTICS) && DUMP_NODE_STATISTICS)
     trackForDebugging();
 #endif
+    InspectorCounters::incrementCounter(InspectorCounters::NodeCounter);
 }
 
 } // namespace WebCore

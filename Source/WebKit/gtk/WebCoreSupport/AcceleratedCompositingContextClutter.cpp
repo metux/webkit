@@ -36,13 +36,20 @@ namespace WebKit {
 AcceleratedCompositingContext::AcceleratedCompositingContext(WebKitWebView* webView)
     : m_webView(webView)
     , m_rootGraphicsLayer(0)
-    , m_syncTimer(this, &AcceleratedCompositingContext::syncLayersTimeout)
+    , m_syncTimerCallbackId(0)
     , m_rootLayerEmbedder(0)
 {
 }
 
 AcceleratedCompositingContext::~AcceleratedCompositingContext()
 {
+    if (m_syncTimerCallbackId)
+        g_source_remove(m_syncTimerCallbackId);
+}
+
+bool AcceleratedCompositingContext::enabled()
+{
+    return m_rootGraphicsLayer;
 }
 
 bool AcceleratedCompositingContext::renderLayersToWindow(cairo_t* widgetCr, const IntRect& clipRect)
@@ -104,16 +111,51 @@ void AcceleratedCompositingContext::resizeRootLayer(const IntSize& size)
     gtk_widget_size_allocate(GTK_WIDGET(m_webView->priv->rootLayerEmbedder), &allocation);
 }
 
-void AcceleratedCompositingContext::markForSync()
+static gboolean syncLayersTimeoutCallback(AcceleratedCompositingContext* context)
 {
-    if (m_syncTimer.isActive())
-        return;
-    m_syncTimer.startOneShot(0);
+    context->syncLayersTimeout();
+    return FALSE;
 }
 
-void AcceleratedCompositingContext::syncLayersTimeout(Timer<AcceleratedCompositingContext>*)
+void AcceleratedCompositingContext::markForSync()
+{
+    if (m_syncTimerCallbackId)
+        return;
+
+    // We use a GLib timer because otherwise GTK+ event handling during
+    // dragging can starve WebCore timers, which have a lower priority.
+    m_syncTimerCallbackId = g_timeout_add_full(GDK_PRIORITY_EVENTS, 0, reinterpret_cast<GSourceFunc>(syncLayersTimeoutCallback), this, 0);
+}
+
+void AcceleratedCompositingContext::syncLayersTimeout()
 {
     core(m_webView)->mainFrame()->view()->syncCompositingStateIncludingSubframes();
+}
+
+void AcceleratedCompositingContext::notifyAnimationStarted(const WebCore::GraphicsLayer*, double time)
+{
+    ASSERT_NOT_REACHED();
+}
+void AcceleratedCompositingContext::notifySyncRequired(const WebCore::GraphicsLayer*)
+{
+    ASSERT_NOT_REACHED();
+}
+
+void AcceleratedCompositingContext::paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect&)
+{
+    ASSERT_NOT_REACHED();
+}
+
+bool AcceleratedCompositingContext::showDebugBorders(const WebCore::GraphicsLayer*) const
+{
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+bool AcceleratedCompositingContext::showRepaintCounter(const WebCore::GraphicsLayer*) const
+{
+    ASSERT_NOT_REACHED();
+    return false;
 }
 
 } // namespace WebKit

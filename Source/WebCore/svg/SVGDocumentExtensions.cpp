@@ -37,6 +37,7 @@
 #include "SVGSMILElement.h"
 #include "SVGSVGElement.h"
 #include "ScriptableDocumentParser.h"
+#include "XLinkNames.h"
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
@@ -117,15 +118,18 @@ void SVGDocumentExtensions::unpauseAnimations()
         (*itr)->unpauseAnimations();
 }
 
-bool SVGDocumentExtensions::sampleAnimationAtTime(const String& elementId, SVGSMILElement* element, double time)
+void SVGDocumentExtensions::dispatchSVGLoadEventToOutermostSVGElements()
 {
-    ASSERT(element);
-    SMILTimeContainer* container = element->timeContainer();
-    if (!container || container->isPaused())
-        return false;
+    Vector<RefPtr<SVGSVGElement> > timeContainers;
+    timeContainers.appendRange(m_timeContainers.begin(), m_timeContainers.end());
 
-    container->sampleAnimationAtTime(elementId, time);
-    return true;
+    Vector<RefPtr<SVGSVGElement> >::iterator end = timeContainers.end();
+    for (Vector<RefPtr<SVGSVGElement> >::iterator it = timeContainers.begin(); it != end; ++it) {
+        SVGSVGElement* outerSVG = (*it).get();
+        if (!outerSVG->isOutermostSVGSVGElement())
+            continue;
+        outerSVG->sendSVGLoadEventIfPossible();
+    }
 }
 
 void SVGDocumentExtensions::addAnimationElementToTarget(SVGSMILElement* animationElement, SVGElement* targetElement)
@@ -276,8 +280,8 @@ void SVGDocumentExtensions::removeElementFromPendingResources(SVGStyledElement* 
     element->clearHasPendingResourcesIfPossible();
 
     // We use the removePendingResource function here because it deals with set lifetime correctly.
-    Vector<AtomicString>::iterator endVector = toBeRemoved.end();
-    for (Vector<AtomicString>::iterator it = toBeRemoved.begin(); it != endVector; ++it)
+    Vector<AtomicString>::iterator vectorEnd = toBeRemoved.end();
+    for (Vector<AtomicString>::iterator it = toBeRemoved.begin(); it != vectorEnd; ++it)
         removePendingResource(*it);
 }
 
@@ -298,6 +302,74 @@ void SVGDocumentExtensions::removePendingResourceForElement(const AtomicString& 
         removePendingResource(id);
 
     element->clearHasPendingResourcesIfPossible();
+}
+
+HashSet<SVGElement*>* SVGDocumentExtensions::setOfElementsReferencingTarget(SVGElement* referencedElement) const
+{
+    ASSERT(referencedElement);
+    const HashMap<SVGElement*, OwnPtr<HashSet<SVGElement*> > >::const_iterator it = m_elementDependencies.find(referencedElement);
+    if (it == m_elementDependencies.end())
+        return 0;
+    return it->second.get();
+}
+
+void SVGDocumentExtensions::addElementReferencingTarget(SVGElement* referencingElement, SVGElement* referencedElement)
+{
+    ASSERT(referencingElement);
+    ASSERT(referencedElement);
+
+    if (HashSet<SVGElement*>* elements = m_elementDependencies.get(referencedElement)) {
+        elements->add(referencingElement);
+        return;
+    }
+
+    OwnPtr<HashSet<SVGElement*> > elements = adoptPtr(new HashSet<SVGElement*>);
+    elements->add(referencingElement);
+    m_elementDependencies.set(referencedElement, elements.release());
+}
+
+void SVGDocumentExtensions::removeAllTargetReferencesForElement(SVGElement* referencingElement)
+{
+    Vector<SVGElement*> toBeRemoved;
+
+    HashMap<SVGElement*, OwnPtr<HashSet<SVGElement*> > >::iterator end = m_elementDependencies.end();
+    for (HashMap<SVGElement*, OwnPtr<HashSet<SVGElement*> > >::iterator it = m_elementDependencies.begin(); it != end; ++it) {
+        SVGElement* referencedElement = it->first;
+        HashSet<SVGElement*>* referencingElements = it->second.get();
+        HashSet<SVGElement*>::iterator setIt = referencingElements->find(referencingElement);
+        if (setIt == referencingElements->end())
+            continue;
+
+        referencingElements->remove(setIt);
+        if (referencingElements->isEmpty())
+            toBeRemoved.append(referencedElement);
+    }
+
+    Vector<SVGElement*>::iterator vectorEnd = toBeRemoved.end();
+    for (Vector<SVGElement*>::iterator it = toBeRemoved.begin(); it != vectorEnd; ++it)
+        m_elementDependencies.remove(*it);
+}
+
+void SVGDocumentExtensions::removeAllElementReferencesForTarget(SVGElement* referencedElement)
+{
+    ASSERT(referencedElement);
+    HashMap<SVGElement*, OwnPtr<HashSet<SVGElement*> > >::iterator it = m_elementDependencies.find(referencedElement);
+    if (it == m_elementDependencies.end())
+        return;
+    ASSERT(it->first == referencedElement);
+    Vector<SVGElement*> toBeNotified;
+
+    HashSet<SVGElement*>* referencingElements = it->second.get();
+    HashSet<SVGElement*>::iterator setEnd = referencingElements->end();
+    for (HashSet<SVGElement*>::iterator setIt = referencingElements->begin(); setIt != setEnd; ++setIt)
+        toBeNotified.append(*setIt);
+
+    m_elementDependencies.remove(it);
+
+    // Force rebuilding the referencingElement so it knows about this change.
+    Vector<SVGElement*>::iterator vectorEnd = toBeNotified.end();
+    for (Vector<SVGElement*>::iterator vectorIt = toBeNotified.begin(); vectorIt != vectorEnd; ++vectorIt)
+        (*vectorIt)->svgAttributeChanged(XLinkNames::hrefAttr);
 }
 
 }

@@ -52,7 +52,7 @@ public:
     RenderObject* parentRenderer() const;
     RenderObject* nextRenderer() const;
     RenderObject* previousRenderer() const;
-    HTMLContentElement* includer() const;
+    HTMLContentElement* insertionPoint() const;
 
     RenderStyle* style() const;
     void setStyle(PassRefPtr<RenderStyle>);
@@ -67,27 +67,21 @@ public:
     void moveToFlowThreadIfNeeded();
 
 private:
-
-    enum TreeLocation {
-        LocationUndetermined,
-        LocationNotInTree,
-        LocationLightChild,
-        LocationShadowChild,
+    enum AttachingPhase {
+        Calculating,
+        AttachingStraight,
+        AttachingNotInTree,
+        AttachingNotDistributed,
+        AttachingDistributed,
+        AttachingShadowChild,
+        AttachingFallback,
     };
 
-    enum AttachPhase {
-        AttachStraight,
-        AttachContentLight,
-        AttachContentForwarded,
-        AttachContentFallback,
-    };
-
-    TreeLocation m_location;
-    AttachPhase m_phase;
+    AttachingPhase m_phase;
     Node* m_node;
     ContainerNode* m_parentNodeForRenderingAndStyle;
     ShadowRoot* m_visualParentShadowRoot;
-    HTMLContentElement* m_includer;
+    HTMLContentElement* m_insertionPoint;
     RefPtr<RenderStyle> m_style;
     RenderFlowThread* m_parentFlowRenderer;
     AtomicString m_flowThread;
@@ -100,7 +94,7 @@ inline Node* NodeRenderingContext::node() const
 
 inline ContainerNode* NodeRenderingContext::parentNodeForRenderingAndStyle() const
 {
-    ASSERT(m_location != LocationUndetermined);
+    ASSERT(m_phase != Calculating);
     return m_parentNodeForRenderingAndStyle;
 }
 
@@ -109,9 +103,9 @@ inline RenderStyle* NodeRenderingContext::style() const
     return m_style.get();
 }
 
-inline HTMLContentElement* NodeRenderingContext::includer() const
+inline HTMLContentElement* NodeRenderingContext::insertionPoint() const
 {
-    return m_includer;
+    return m_insertionPoint;
 }
 
 class NodeRendererFactory {

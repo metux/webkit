@@ -50,15 +50,14 @@
 #include "RenderTreeAsText.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "SpellChecker.h"
 #include "TextIterator.h"
 
-#if ENABLE(GESTURE_EVENTS)
-#include "PlatformGestureEvent.h"
-#endif
-
-#if ENABLE(SMOOTH_SCROLLING)
-#include "ScrollAnimator.h"
+#if ENABLE(SHADOW_DOM)
+#include "RuntimeEnabledFeatures.h"
+#else
+#include <wtf/UnusedParam.h>
 #endif
 
 #if ENABLE(INPUT_COLOR)
@@ -173,11 +172,11 @@ String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
     return representation;
 }
 
-size_t Internals::numberOfScopedHTMLStyleChildren(const Element* element, ExceptionCode& ec) const
+size_t Internals::numberOfScopedHTMLStyleChildren(const Node* scope, ExceptionCode& ec) const
 {
-    if (element)
+    if (scope && (scope->isElementNode() || scope->isShadowRoot()))
 #if ENABLE(STYLE_SCOPED)
-        return element->numberOfScopedHTMLStyleChildren();
+        return scope->numberOfScopedHTMLStyleChildren();
 #else
         return 0;
 #endif
@@ -193,20 +192,43 @@ Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::ensureShadowRoot(Eleme
         return 0;
     }
 
-    if (ShadowRoot* root = host->shadowRoot())
-        return root;
+    if (host->hasShadowRoot())
+        return host->shadowRootList()->youngestShadowRoot();
 
     return ShadowRoot::create(host, ec).get();
 }
 
 Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::shadowRoot(Element* host, ExceptionCode& ec)
 {
+    // FIXME: Internals::shadowRoot() in tests should be converted to youngestShadowRoot() or oldestShadowRoot().
+    // https://bugs.webkit.org/show_bug.cgi?id=78465
+    return youngestShadowRoot(host, ec);
+}
+
+Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::youngestShadowRoot(Element* host, ExceptionCode& ec)
+{
     if (!host) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
 
-    return host->shadowRoot();
+    if (!host->hasShadowRoot())
+        return 0;
+
+    return host->shadowRootList()->youngestShadowRoot();
+}
+
+Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::oldestShadowRoot(Element* host, ExceptionCode& ec)
+{
+    if (!host) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    if (!host->hasShadowRoot())
+        return 0;
+
+    return host->shadowRootList()->oldestShadowRoot();
 }
 
 void Internals::removeShadowRoot(Element* host, ExceptionCode& ec)
@@ -219,6 +241,15 @@ void Internals::removeShadowRoot(Element* host, ExceptionCode& ec)
     host->removeShadowRoot();
 }
 
+void Internals::setMultipleShadowSubtreesEnabled(bool enabled)
+{
+#if ENABLE(SHADOW_DOM)
+    RuntimeEnabledFeatures::setMultipleShadowSubtreesEnabled(enabled);
+#else
+    UNUSED_PARAM(enabled);
+#endif
+}
+
 Element* Internals::includerFor(Node* node, ExceptionCode& ec)
 {
     if (!node) {
@@ -226,7 +257,7 @@ Element* Internals::includerFor(Node* node, ExceptionCode& ec)
         return 0;
     }
 
-    return NodeRenderingContext(node).includer();
+    return NodeRenderingContext(node).insertionPoint();
 }
 
 String Internals::shadowPseudoId(Element* element, ExceptionCode& ec)
@@ -281,7 +312,7 @@ unsigned Internals::markerCountForNode(Node* node, const String& markerType, Exc
     return node->document()->markers()->markersFor(node, markerTypes).size();
 }
 
-PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
     if (!node) {
         ec = INVALID_ACCESS_ERR;
@@ -297,7 +328,23 @@ PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& marker
     Vector<DocumentMarker*> markers = node->document()->markers()->markersFor(node, markerTypes);
     if (markers.size() <= index)
         return 0;
-    return Range::create(node->document(), node, markers[index]->startOffset(), node, markers[index]->endOffset());
+    return markers[index];
+}
+
+PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+{
+    DocumentMarker* marker = markerAt(node, markerType, index, ec);
+    if (!marker)
+        return 0;
+    return Range::create(node->document(), node, marker->startOffset(), node, marker->endOffset());
+}
+
+String Internals::markerDescriptionForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+{
+    DocumentMarker* marker = markerAt(node, markerType, index, ec);
+    if (!marker)
+        return String();
+    return marker->description();
 }
 
 void Internals::setScrollViewPosition(Document* document, long x, long y, ExceptionCode& ec)
@@ -542,5 +589,15 @@ bool Internals::shouldDisplayTrackKind(Document* document, const String& kind, E
     return false;
 #endif
 }
-    
+
+unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionCode& ec)
+{
+    if (!document) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return document->wheelEventHandlerCount();
+}
+
 }

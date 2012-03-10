@@ -9,10 +9,12 @@ WebKitWebSettings
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -67,6 +69,11 @@ WebKitWebSettings
 </para>
 
 <!-- ##### ARG WebKitWebSettings:editing-behavior ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:enable-accelerated-compositing ##### -->
 <para>
 
 </para>

@@ -282,6 +282,8 @@ public:
 
     LayoutUnit scrollWidth();
     LayoutUnit scrollHeight();
+    int pixelSnappedScrollWidth();
+    int pixelSnappedScrollHeight();
 
     void panScrollFromPoint(const LayoutPoint&);
 
@@ -293,7 +295,7 @@ public:
     // Scrolling methods for layers that can scroll their overflow.
     void scrollByRecursively(LayoutUnit xDelta, LayoutUnit yDelta, ScrollOffsetClamping = ScrollOffsetUnclamped);
 
-    LayoutSize scrolledContentOffset() const { return scrollOffset() + m_scrollOverflow; }
+    IntSize scrolledContentOffset() const { return scrollOffset() + roundedIntSize(m_scrollOverflow); }
 
     int scrollXOffset() const { return m_scrollOffset.width() + scrollOrigin().x(); }
     int scrollYOffset() const { return m_scrollOffset.height() + scrollOrigin().y(); }
@@ -310,8 +312,6 @@ public:
     bool scrollsOverflow() const;
     bool allowsScrolling() const; // Returns true if at least one scrollbar is visible and enabled.
     bool hasScrollbars() const { return m_hBar || m_vBar; }
-    virtual void didAddHorizontalScrollbar(Scrollbar*);
-    virtual void willRemoveHorizontalScrollbar(Scrollbar*);
     void setHasHorizontalScrollbar(bool);
     void setHasVerticalScrollbar(bool);
 
@@ -327,13 +327,13 @@ public:
     int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
     bool hasOverflowControls() const;
-    bool isPointInResizeControl(const LayoutPoint& absolutePoint) const;
-    bool hitTestOverflowControls(HitTestResult&, const LayoutPoint& localPoint);
-    LayoutSize offsetFromResizeCorner(const LayoutPoint& absolutePoint) const;
+    bool isPointInResizeControl(const IntPoint& absolutePoint) const;
+    bool hitTestOverflowControls(HitTestResult&, const IntPoint& localPoint);
+    IntSize offsetFromResizeCorner(const IntPoint& absolutePoint) const;
 
-    void paintOverflowControls(GraphicsContext*, const LayoutPoint&, const LayoutRect& damageRect, bool paintingOverlayControls = false);
-    void paintScrollCorner(GraphicsContext*, const LayoutPoint&, const LayoutRect& damageRect);
-    void paintResizer(GraphicsContext*, const LayoutPoint&, const LayoutRect& damageRect);
+    void paintOverflowControls(GraphicsContext*, const IntPoint&, const IntRect& damageRect, bool paintingOverlayControls = false);
+    void paintScrollCorner(GraphicsContext*, const IntPoint&, const IntRect& damageRect);
+    void paintResizer(GraphicsContext*, const IntPoint&, const IntRect& damageRect);
 
     void updateScrollInfoAfterLayout();
 
@@ -425,6 +425,8 @@ public:
     RenderLayer* ancestorCompositingLayer() const { return enclosingCompositingLayer(false); }
 #endif
 
+    void convertToPixelSnappedLayerCoords(const RenderLayer* ancestorLayer, IntPoint& location) const;
+    void convertToPixelSnappedLayerCoords(const RenderLayer* ancestorLayer, IntRect&) const;
     void convertToLayerCoords(const RenderLayer* ancestorLayer, LayoutPoint& location) const;
     void convertToLayerCoords(const RenderLayer* ancestorLayer, LayoutRect&) const;
 
@@ -524,6 +526,9 @@ public:
 
 #if ENABLE(CSS_FILTERS)
     virtual void filterNeedsRepaint();
+    bool hasFilter() const { return renderer()->hasFilter(); }
+#else
+    bool hasFilter() const { return false; }
 #endif
 
     // Overloaded new operator. Derived classes must override operator new
@@ -565,7 +570,7 @@ public:
 private:
     void updateZOrderListsSlowCase();
 
-    void computeRepaintRects(IntPoint* offsetFromRoot = 0);
+    void computeRepaintRects(LayoutPoint* offsetFromRoot = 0);
     void clearRepaintRects();
 
     void clipToRect(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect, const ClipRect&,
@@ -664,11 +669,10 @@ private:
     virtual IntPoint currentMousePosition() const;
     virtual bool shouldSuspendScrollAnimations() const;
     virtual bool isOnActivePage() const;
+    virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
 
     // Rectangle encompassing the scroll corner and resizer rect.
     IntRect scrollCornerAndResizerRect() const;
-
-    virtual void disconnectFromPage() { m_scrollableAreaPage = 0; }
 
     // NOTE: This should only be called by the overriden setScrollOffset from ScrollableArea.
     void scrollTo(int, int);
@@ -711,11 +715,11 @@ private:
     // Convert a point in absolute coords into layer coords, taking transforms into account
     LayoutPoint absoluteToContents(const LayoutPoint&) const;
 
-    void positionOverflowControls(const LayoutSize&);
+    void positionOverflowControls(const IntSize&);
     void updateScrollCornerStyle();
     void updateResizerStyle();
 
-    void drawPlatformResizerImage(GraphicsContext*, LayoutRect resizerCornerRect);
+    void drawPlatformResizerImage(GraphicsContext*, IntRect resizerCornerRect);
 
     void updatePagination();
     bool isPaginated() const { return m_isPaginated; }
@@ -819,7 +823,7 @@ protected:
     LayoutSize m_scrollOverflow;
     
     // The width/height of our scrolled area.
-    IntSize m_scrollSize;
+    LayoutSize m_scrollSize;
 
     // For layers with overflow, we have a pair of scrollbars.
     RefPtr<Scrollbar> m_hBar;
@@ -841,7 +845,7 @@ protected:
     const RenderLayer* m_clipRectsRoot;   // Root layer used to compute clip rects.
 #endif
 
-    LayoutPoint m_cachedOverlayScrollbarOffset;
+    IntPoint m_cachedOverlayScrollbarOffset;
 
     RenderMarquee* m_marquee; // Used by layers with overflow:marquee
     
@@ -868,8 +872,6 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     OwnPtr<RenderLayerBacking> m_backing;
 #endif
-
-    Page* m_scrollableAreaPage; // Page on which this is registered as a scrollable area.
 };
 
 inline void RenderLayer::updateZOrderLists()
