@@ -5,8 +5,11 @@ webkit (1.7.91-1) experimental; urgency=low
   - removed; applied upstream
   * debian/libwebkitgtk*.symbols:
   - added DRT optional symbols that are different on i386/powerpc
+  * debian/control:
+  - replace dh_clean -k call with dh_prep
+  - bump Build-Depends on debhelper, for dh_prep
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sat, 10 Mar 2012 18:06:37 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sat, 10 Mar 2012 18:35:41 -0300
 
 webkit (1.7.90+svn20120304-1) experimental; urgency=low
 

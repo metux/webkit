@@ -93,7 +93,7 @@ install-stamp: build-stamp
 	dh_testdir
 	dh_testroot
 
-	dh_clean -k
+	dh_prep
 
 ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	$(MAKE) -C build-2.0 install DESTDIR="$(CURDIR)"/debian/tmp-2.0
