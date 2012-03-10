@@ -26,7 +26,6 @@
 #include "config.h"
 #include "RenderTreeAsText.h"
 
-#include "CSSMutableStyleDeclaration.h"
 #include "Document.h"
 #include "Frame.h"
 #include "FrameSelection.h"
@@ -48,6 +47,7 @@
 #include "RenderTableCell.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "StylePropertySet.h"
 #include <wtf/HexNumber.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
@@ -183,8 +183,8 @@ static bool isEmptyOrUnstyledAppleStyleSpan(const Node* node)
     if (!node->hasChildNodes())
         return true;
 
-    CSSMutableStyleDeclaration* inlineStyleDecl = elem->inlineStyleDecl();
-    return (!inlineStyleDecl || inlineStyleDecl->length() == 0);
+    StylePropertySet* inlineStyleDecl = elem->inlineStyleDecl();
+    return (!inlineStyleDecl || inlineStyleDecl->isEmpty());
 }
 
 String quoteAndEscapeNonPrintables(const String& s)

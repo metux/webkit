@@ -105,12 +105,12 @@ HTMLCanvasElement::~HTMLCanvasElement()
     m_context.clear(); // Ensure this goes away before the ImageBuffer.
 }
 
-void HTMLCanvasElement::parseMappedAttribute(Attribute* attr)
+void HTMLCanvasElement::parseAttribute(Attribute* attr)
 {
     const QualifiedName& attrName = attr->name();
     if (attrName == widthAttr || attrName == heightAttr)
         reset();
-    HTMLElement::parseMappedAttribute(attr);
+    HTMLElement::parseAttribute(attr);
 }
 
 RenderObject* HTMLCanvasElement::createRenderer(RenderArena* arena, RenderStyle* style)
@@ -177,7 +177,7 @@ CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type, Canvas
 #if ENABLE(WEBGL)    
     Settings* settings = document()->settings();
     if (settings && settings->webGLEnabled()
-#if !PLATFORM(CHROMIUM) && !PLATFORM(GTK)
+#if !PLATFORM(CHROMIUM) && !PLATFORM(GTK) && !PLATFORM(EFL)
         && settings->acceleratedCompositingEnabled()
 #endif
         ) {
@@ -443,6 +443,22 @@ bool HTMLCanvasElement::shouldAccelerate(const IntSize& size) const
 #endif
 }
 
+bool HTMLCanvasElement::shouldDefer() const
+{
+#if USE(SKIA)
+    if (m_context && !m_context->is2d())
+        return false;
+
+    Settings* settings = document()->settings();
+    if (!settings || !settings->deferred2dCanvasEnabled())
+        return false;
+
+    return true;
+#else
+    return false;
+#endif
+}
+
 void HTMLCanvasElement::createImageBuffer() const
 {
     ASSERT(!m_imageBuffer);
@@ -471,7 +487,8 @@ void HTMLCanvasElement::createImageBuffer() const
 #else
         Unaccelerated;
 #endif
-    m_imageBuffer = ImageBuffer::create(bufferSize, ColorSpaceDeviceRGB, renderingMode);
+    DeferralMode deferralMode = shouldDefer() ? Deferred : NonDeferred;
+    m_imageBuffer = ImageBuffer::create(bufferSize, ColorSpaceDeviceRGB, renderingMode, deferralMode);
     if (!m_imageBuffer)
         return;
     m_imageBuffer->context()->scale(FloatSize(bufferSize.width() / logicalSize.width(), bufferSize.height() / logicalSize.height()));

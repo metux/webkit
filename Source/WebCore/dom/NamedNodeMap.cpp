@@ -30,6 +30,7 @@
 #include "Element.h"
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
+#include "StyledElement.h"
 
 namespace WebCore {
 
@@ -200,9 +201,7 @@ size_t NamedNodeMap::getAttributeItemIndexSlowCase(const String& name, bool shou
 
 void NamedNodeMap::clearAttributes()
 {
-    m_classNames.clear();
-    m_mappedAttributeCount = 0;
-
+    attributeData()->clearClass();
     detachAttributesFromElement();
     m_attributes.clear();
 }
@@ -240,15 +239,12 @@ void NamedNodeMap::setAttributes(const NamedNodeMap& other)
     clearAttributes();
     unsigned newLength = other.length();
     m_attributes.resize(newLength);
+
+    // FIXME: These loops can probably be combined.
     for (unsigned i = 0; i < newLength; i++)
         m_attributes[i] = other.m_attributes[i]->clone();
-
-    // FIXME: This is wasteful.  The class list could be preserved on a copy, and we
-    // wouldn't have to waste time reparsing the attribute.
-    // The derived class, HTMLNamedNodeMap, which manages a parsed class list for the CLASS attribute,
-    // will update its member variable when parse attribute is called.
     for (unsigned i = 0; i < newLength; i++)
-        m_element->attributeChanged(m_attributes[i].get(), true);
+        m_element->attributeChanged(m_attributes[i].get());
 }
 
 void NamedNodeMap::addAttribute(PassRefPtr<Attribute> prpAttribute)
@@ -303,20 +299,10 @@ void NamedNodeMap::replaceAttribute(size_t index, PassRefPtr<Attribute> prpAttri
         m_element->didModifyAttribute(attribute.get());
 }
 
-void NamedNodeMap::setClass(const String& classStr) 
-{ 
-    if (!element()->hasClass()) { 
-        m_classNames.clear(); 
-        return;
-    }
-
-    m_classNames.set(classStr, element()->document()->inQuirksMode()); 
-}
-
 bool NamedNodeMap::mapsEquivalent(const NamedNodeMap* otherMap) const
 {
     if (!otherMap)
-        return false;
+        return isEmpty();
     
     unsigned len = length();
     if (len != otherMap->length())
@@ -332,23 +318,31 @@ bool NamedNodeMap::mapsEquivalent(const NamedNodeMap* otherMap) const
     return true;
 }
 
-bool NamedNodeMap::mappedMapsEquivalent(const NamedNodeMap* otherMap) const
+StylePropertySet* NamedNodeMap::ensureInlineStyleDecl()
 {
-    if (m_mappedAttributeCount != otherMap->m_mappedAttributeCount)
-        return false;
-
-    // The values for each decl must match.
-    for (unsigned i = 0; i < length(); i++) {
-        Attribute* attr = attributeItem(i);
-        if (attr->decl()) {
-            ASSERT(attr->isMappedAttribute());
-
-            Attribute* otherAttr = otherMap->getAttributeItem(attr->name());
-            if (!otherAttr || attr->decl() != otherAttr->decl() || attr->value() != otherAttr->value())
-                return false;
-        }
+    if (!attributeData()->m_inlineStyleDecl) {
+        ASSERT(m_element->isStyledElement());
+        attributeData()->m_inlineStyleDecl = StylePropertySet::createInline(static_cast<StyledElement*>(m_element));
+        attributeData()->m_inlineStyleDecl->setStrictParsing(m_element->isHTMLElement() && !m_element->document()->inQuirksMode());
     }
-    return true;
+    return attributeData()->m_inlineStyleDecl.get();
+}
+
+void NamedNodeMap::destroyInlineStyleDecl()
+{
+    if (!attributeData()->m_inlineStyleDecl)
+        return;
+    attributeData()->m_inlineStyleDecl->clearParentElement();
+    attributeData()->m_inlineStyleDecl = 0;
+}
+
+StylePropertySet* NamedNodeMap::ensureAttributeStyle()
+{
+    if (!attributeData()->m_attributeStyle) {
+        attributeData()->m_attributeStyle = StylePropertySet::create();
+        attributeData()->m_attributeStyle->setStrictParsing(false);
+    }
+    return attributeData()->m_attributeStyle.get();
 }
 
 } // namespace WebCore

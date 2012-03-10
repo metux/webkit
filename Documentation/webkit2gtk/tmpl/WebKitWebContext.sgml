@@ -26,6 +26,14 @@ WebKitWebContext
 </para>
 
 
+<!-- ##### SIGNAL WebKitWebContext::download-started ##### -->
+<para>
+
+</para>
+
+@webkitwebcontext: the object which received the signal.
+@arg1: 
+
 <!-- ##### ENUM WebKitCacheModel ##### -->
 <para>
 
@@ -60,5 +68,15 @@ WebKitWebContext
 
 @context: 
 @cache_model: 
+
+
+<!-- ##### FUNCTION webkit_web_context_download_uri ##### -->
+<para>
+
+</para>
+
+@context: 
+@uri: 
+@Returns: 
 
 

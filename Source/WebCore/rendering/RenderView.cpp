@@ -58,7 +58,6 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_layoutState(0)
     , m_layoutStateDisableCount(0)
     , m_currentRenderFlowThread(0)
-    , m_currentRenderRegion(0)
 {
     // Clear our anonymous bit, set because RenderObject assumes
     // any renderer with document as the node is anonymous.
@@ -198,6 +197,17 @@ void RenderView::calcColumnWidth()
         }
     }
     setDesiredColumnCountAndWidth(1, columnWidth);
+}
+
+ColumnInfo::PaginationUnit RenderView::paginationUnit() const
+{
+    if (m_frameView) {
+        if (Frame* frame = m_frameView->frame()) {
+            if (Page* page = frame->page())
+                return (frame == page->mainFrame() && page->pagination().behavesLikeColumns) ? ColumnInfo::Column : ColumnInfo::Page;
+        }
+    }
+    return ColumnInfo::Page;
 }
 
 void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)

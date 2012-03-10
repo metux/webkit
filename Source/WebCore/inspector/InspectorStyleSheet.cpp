@@ -294,7 +294,7 @@ bool InspectorStyle::setPropertyText(ErrorString* errorString, unsigned index, c
     populateAllProperties(&allProperties);
 
     if (propertyText.stripWhiteSpace().length()) {
-        RefPtr<CSSMutableStyleDeclaration> tempMutableStyle = CSSMutableStyleDeclaration::create();
+        RefPtr<StylePropertySet> tempMutableStyle = StylePropertySet::create();
         RefPtr<CSSStyleSourceData> sourceData = CSSStyleSourceData::create();
         CSSParser p;
         p.parseDeclaration(tempMutableStyle.get(), propertyText + " " + bogusPropertyName + ": none", &sourceData, m_style->parentStyleSheet());
@@ -848,8 +848,7 @@ PassRefPtr<InspectorObject> InspectorStyleSheet::buildObjectForStyle(CSSStyleDec
     if (id.isEmpty()) {
         RefPtr<InspectorObject> bogusStyle = InspectorObject::create();
         bogusStyle->setArray("cssProperties", InspectorArray::create());
-        bogusStyle->setObject("shorthandValues", InspectorObject::create());
-        bogusStyle->setObject("properties", InspectorObject::create());
+        bogusStyle->setObject("shorthandEntries", InspectorObject::create());
         return bogusStyle.release();
     }
     RefPtr<InspectorStyle> inspectorStyle = inspectorStyleForId(id);
@@ -1086,7 +1085,7 @@ void InspectorStyleSheet::revalidateStyle(CSSStyleDeclaration* pageStyle)
     for (unsigned i = 0, size = m_flatRules.size(); i < size; ++i) {
         CSSStyleRule* parsedRule = m_flatRules.at(i);
         if (parsedRule->style() == pageStyle) {
-            if (parsedRule->style()->cssText() != pageStyle->cssText()) {
+            if (parsedRule->declaration()->asText() != pageStyle->cssText()) {
                 // Clear the disabled properties for the invalid style here.
                 m_inspectorStyles.remove(pageStyle);
                 setStyleText(pageStyle, pageStyle->cssText());
@@ -1318,7 +1317,7 @@ bool InspectorStyleSheetForInlineStyle::getStyleAttributeRanges(RefPtr<CSSStyleS
         return true;
     }
 
-    RefPtr<CSSMutableStyleDeclaration> tempDeclaration = CSSMutableStyleDeclaration::create();
+    RefPtr<StylePropertySet> tempDeclaration = StylePropertySet::create();
     CSSParser p;
     p.parseDeclaration(tempDeclaration.get(), m_styleText, result, m_element->document()->elementSheet());
     return true;

@@ -1,118 +1,46 @@
-<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Image ##### -->
-
-
-
-<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Long_Description ##### -->
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_COPY ##### -->
 <para>
 
 </para>
 
 
-<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:See_Also ##### -->
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_CUT ##### -->
 <para>
 
 </para>
 
 
-<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Short_Description ##### -->
-
-
-
-<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Stability_Level ##### -->
-
-
-
-<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Title ##### -->
-WebKitWebLoaderClient
-
-
-<!-- ##### STRUCT WebKitWebLoaderClient ##### -->
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_PASTE ##### -->
 <para>
 
 </para>
 
 
-<!-- ##### SIGNAL WebKitWebLoaderClient::load-committed ##### -->
-<para>
-
-</para>
-
-@webkitwebloaderclient: the object which received the signal.
-@arg1: 
-@Returns: 
-
-<!-- ##### SIGNAL WebKitWebLoaderClient::load-failed ##### -->
-<para>
-
-</para>
-
-@webkitwebloaderclient: the object which received the signal.
-@arg1: 
-@arg2: 
-@arg3: 
-@Returns: 
-
-<!-- ##### SIGNAL WebKitWebLoaderClient::load-finished ##### -->
-<para>
-
-</para>
-
-@webkitwebloaderclient: the object which received the signal.
-@arg1: 
-@Returns: 
-
-<!-- ##### SIGNAL WebKitWebLoaderClient::provisional-load-failed ##### -->
-<para>
-
-</para>
-
-@webkitwebloaderclient: the object which received the signal.
-@arg1: 
-@arg2: 
-@arg3: 
-@Returns: 
-
-<!-- ##### SIGNAL WebKitWebLoaderClient::provisional-load-received-server-redirect ##### -->
-<para>
-
-</para>
-
-@webkitwebloaderclient: the object which received the signal.
-@arg1: 
-@Returns: 
-
-<!-- ##### SIGNAL WebKitWebLoaderClient::provisional-load-started ##### -->
-<para>
-
-</para>
-
-@webkitwebloaderclient: the object which received the signal.
-@arg1: 
-@Returns: 
-
-<!-- ##### FUNCTION webkit_web_view_get_loader_client ##### -->
+<!-- ##### FUNCTION webkit_web_view_can_execute_editing_command ##### -->
 <para>
 
 </para>
 
 @web_view: 
+@command: 
+@callback: 
+@user_data: 
+
+<!-- ##### FUNCTION webkit_web_view_can_execute_editing_command_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
 @Returns: 
 
-<!-- ##### FUNCTION webkit_web_view_load_alternate_html ##### -->
+<!-- ##### FUNCTION webkit_web_view_execute_editing_command ##### -->
 <para>
 
 </para>
 
 @web_view: 
-@content: 
-@base_uri: 
-@unreachable_uri: 
-
-<!-- ##### FUNCTION webkit_web_view_set_loader_client ##### -->
-<para>
-
-</para>
-
-@web_view: 
-@loader_client: 
+@command: 
 

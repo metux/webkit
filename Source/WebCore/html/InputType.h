@@ -183,6 +183,7 @@ public:
     virtual PassRefPtr<HTMLFormElement> formForSubmission() const;
     virtual bool isKeyboardFocusable() const;
     virtual bool shouldUseInputMethod() const;
+    virtual void handleFocusEvent();
     virtual void handleBlurEvent();
     virtual void accessKeyAction(bool sendMouseEvents);
     virtual bool canBeSuccessfulSubmitButton();
@@ -261,6 +262,8 @@ public:
     // input type. If NaN or Infinity is specified, this returns an empty
     // string. This should not be called for types without valueAsNumber.
     virtual String serialize(double) const;
+
+    virtual bool supportsIndeterminateAppearance() const;
 
 protected:
     InputType(HTMLInputElement* element) : m_element(element) { }

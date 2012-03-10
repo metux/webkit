@@ -131,9 +131,6 @@ FrameView::FrameView(Frame* frame)
     , m_fixedObjectCount(0)
     , m_layoutTimer(this, &FrameView::layoutTimerFired)
     , m_layoutRoot(0)
-#if ENABLE(SVG)
-    , m_inLayoutParentView(false)
-#endif
     , m_inSynchronousPostLayout(false)
     , m_postLayoutTasksTimer(this, &FrameView::postLayoutTimerFired)
     , m_isTransparent(false)
@@ -221,7 +218,6 @@ void FrameView::reset()
     m_cannotBlitToWindow = false;
     m_isOverlapped = false;
     m_contentIsOpaque = false;
-    m_shouldLayoutFixedElementsRelativeToFrame = false;
     m_borderX = 30;
     m_borderY = 30;
     m_layoutTimer.stop();
@@ -745,7 +741,7 @@ bool FrameView::syncCompositingStateForThisFrame(Frame* rootFrameForSync)
     root->compositor()->flushPendingLayerChanges(rootFrameForSync == m_frame);
 
 #if ENABLE(FULLSCREEN_API)
-    // The fullScreenRenderer's graphicsLayer  has been re-parented, and the above recursive syncCompositingState
+    // The fullScreenRenderer's graphicsLayer has been re-parented, and the above recursive syncCompositingState
     // call will not cause the subtree under it to repaint.  Explicitly call the syncCompositingState on 
     // the fullScreenRenderer's graphicsLayer here:
     Document* document = m_frame->document();
@@ -900,9 +896,6 @@ static inline void collectFrameViewChildren(FrameView* frameView, Vector<RefPtr<
 inline void FrameView::forceLayoutParentViewIfNeeded()
 {
 #if ENABLE(SVG)
-    if (m_inLayoutParentView)
-        return;
-
     RenderPart* ownerRenderer = m_frame->ownerRenderer();
     if (!ownerRenderer || !ownerRenderer->frame())
         return;
@@ -912,28 +905,22 @@ inline void FrameView::forceLayoutParentViewIfNeeded()
         return;
 
     RenderSVGRoot* svgRoot = toRenderSVGRoot(contentBox);
-    if (!svgRoot->needsSizeNegotiationWithHostDocument())
+    if (svgRoot->everHadLayout() && !svgRoot->needsLayout())
         return;
 
-    ASSERT(!m_inLayoutParentView);
-    TemporaryChange<bool> resetInLayoutParentView(m_inLayoutParentView, true);
-
-    // Clear needs-size-negotiation flag in RenderSVGRoot, so the next call to our
-    // layout() method won't fire the size negotiation logic again.
-    svgRoot->scheduledSizeNegotiationWithHostDocument();
-    ASSERT(!svgRoot->needsSizeNegotiationWithHostDocument());
+    // If the embedded SVG document appears the first time, the ownerRenderer has already finished
+    // layout without knowing about the existence of the embedded SVG document, because RenderReplaced
+    // embeddedContentBox() returns 0, as long as the embedded document isn't loaded yet. Before
+    // bothering to lay out the SVG document, mark the ownerRenderer needing layout and ask its
+    // FrameView for a layout. After that the RenderEmbeddedObject (ownerRenderer) carries the
+    // correct size, which RenderSVGRoot::computeReplacedLogicalWidth/Height rely on, when laying
+    // out for the first time, or when the RenderSVGRoot size has changed dynamically (eg. via <script>).
+    RefPtr<FrameView> frameView = ownerRenderer->frame()->view();
 
     // Mark the owner renderer as needing layout.
     ownerRenderer->setNeedsLayoutAndPrefWidthsRecalc();
 
-    // Immediately relayout the child widgets, which can now calculate the SVG documents
-    // intrinsic size, negotiating with the parent object/embed/iframe.
-    RenderView* rootView = ownerRenderer->frame()->contentRenderer();
-    ASSERT(rootView);
-    rootView->updateWidgetPositions();
-
     // Synchronously enter layout, to layout the view containing the host object/embed/iframe.
-    FrameView* frameView = ownerRenderer->frame()->view();
     ASSERT(frameView);
     frameView->layout();
 #endif
@@ -1072,7 +1059,7 @@ void FrameView::layout(bool allowSubtree)
 
                     m_firstLayout = false;
                     m_firstLayoutCallbackPending = true;
-                    m_lastLayoutSize = LayoutSize(width(), height());
+                    m_lastLayoutSize = LayoutSize(layoutWidth(), layoutHeight());
                     m_lastZoomFactor = root->style()->zoom();
 
                     // Set the initial vMode to AlwaysOn if we're auto.
@@ -1120,6 +1107,7 @@ void FrameView::layout(bool allowSubtree)
 
             m_inLayout = true;
             beginDeferredRepaints();
+            forceLayoutParentViewIfNeeded();
             root->layout();
             endDeferredRepaints();
             m_inLayout = false;
@@ -1207,7 +1195,6 @@ void FrameView::layout(bool allowSubtree)
         return;
 
     page->chrome()->client()->layoutUpdated(frame());
-    forceLayoutParentViewIfNeeded();
 }
 
 RenderBox* FrameView::embeddedContentBox() const
@@ -1416,7 +1403,7 @@ int FrameView::scrollXForFixedPosition() const
     // When the page is scaled, the scaled "viewport" with respect to which fixed object are positioned
     // doesn't move as fast as the content view, so that when the content is scrolled all the way to the
     // end, the bottom of the scaled "viewport" touches the bottom of the real viewport.
-    float dragFactor = shouldLayoutFixedElementsRelativeToFrame() ? 1 : (contentsWidth() - visibleContentWidth * frameScaleFactor) / maxX;
+    float dragFactor = fixedElementsLayoutRelativeToFrame() ? 1 : (contentsWidth() - visibleContentWidth * frameScaleFactor) / maxX;
 
     return x * dragFactor / frameScaleFactor;
 }
@@ -1447,7 +1434,7 @@ int FrameView::scrollYForFixedPosition() const
         return y;
 
     float frameScaleFactor = m_frame->frameScaleFactor();
-    float dragFactor = shouldLayoutFixedElementsRelativeToFrame() ? 1 : (contentsHeight() - visibleContentHeight * frameScaleFactor) / maxY;
+    float dragFactor = fixedElementsLayoutRelativeToFrame() ? 1 : (contentsHeight() - visibleContentHeight * frameScaleFactor) / maxY;
     return y * dragFactor / frameScaleFactor;
 }
 
@@ -1456,18 +1443,15 @@ IntSize FrameView::scrollOffsetForFixedPosition() const
     return IntSize(scrollXForFixedPosition(), scrollYForFixedPosition());
 }
 
-void FrameView::setShouldLayoutFixedElementsRelativeToFrame(bool shouldLayoutFixedElementsRelativeToFrame)
+bool FrameView::fixedElementsLayoutRelativeToFrame() const
 {
-    if (shouldLayoutFixedElementsRelativeToFrame == m_shouldLayoutFixedElementsRelativeToFrame)
-        return;
+    ASSERT(m_frame);
+    if (!m_frame->settings())
+        return false;
 
-    m_shouldLayoutFixedElementsRelativeToFrame = shouldLayoutFixedElementsRelativeToFrame;
-
-    if (!hasFixedObjects())
-        return;
-
-    setNeedsLayout();
+    return m_frame->settings()->fixedElementsLayoutRelativeToFrame();
 }
+
 IntPoint FrameView::currentMousePosition() const
 {
     return m_frame ? m_frame->eventHandler()->currentMousePosition() : IntPoint();
@@ -1714,6 +1698,14 @@ void FrameView::setScrollPosition(const IntPoint& scrollPoint)
     ScrollView::setScrollPosition(scrollPoint);
 }
 
+void FrameView::delegatesScrollingDidChange()
+{
+#if USE(ACCELERATED_COMPOSITING)
+    // When we switch to delgatesScrolling mode, we should destroy the scrolling/clipping layers in RenderLayerCompositor.
+    clearBackingStores();
+#endif
+}
+
 void FrameView::setFixedVisibleContentRect(const IntRect& visibleContentRect)
 {
     IntSize offset = scrollOffset();
@@ -1737,7 +1729,7 @@ void FrameView::scrollPositionChanged()
 #if USE(ACCELERATED_COMPOSITING)
     if (RenderView* root = rootRenderer(this)) {
         if (root->usesCompositing())
-            root->compositor()->frameViewDidScroll(scrollPosition());
+            root->compositor()->frameViewDidScroll();
     }
 #endif
 }
@@ -2288,6 +2280,10 @@ void FrameView::performPostLayoutTasks()
         if (m_firstLayoutCallbackPending) {
             m_firstLayoutCallbackPending = false;
             m_frame->loader()->didFirstLayout();
+            if (Page* page = m_frame->page()) {
+                if (page->mainFrame() == m_frame)
+                    page->startCountingRelevantRepaintedObjects();
+            }
         }
 
         // Ensure that we always send this eventually.
@@ -2311,12 +2307,19 @@ void FrameView::performPostLayoutTasks()
             break;
     }
 
+#if ENABLE(THREADED_SCROLLING)
+    if (Page* page = m_frame->page()) {
+        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+            scrollingCoordinator->frameViewLayoutUpdated(this);
+    }
+#endif
+
     scrollToAnchor();
 
     m_actionScheduler->resume();
 
     if (!root->printing()) {
-        LayoutSize currentSize = LayoutSize(width(), height());
+        LayoutSize currentSize = LayoutSize(layoutWidth(), layoutHeight());
         float currentZoomFactor = root->style()->zoom();
         bool resized = !m_firstLayout && (currentSize != m_lastLayoutSize || currentZoomFactor != m_lastZoomFactor);
         m_lastLayoutSize = currentSize;
@@ -2860,7 +2863,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
     FontCachePurgePreventer fontCachePurgePreventer;
 
 #if USE(ACCELERATED_COMPOSITING)
-    if (!p->paintingDisabled())
+    if (!p->paintingDisabled() && !document->printing())
         syncCompositingStateForThisFrame(m_frame.get());
 #endif
 

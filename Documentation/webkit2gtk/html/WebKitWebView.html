@@ -47,58 +47,59 @@
 <a name="WebKitWebView.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">struct              <a class="link" href="WebKitWebView.html#WebKitWebView-struct" title="struct WebKitWebView">WebKitWebView</a>;
 enum                <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent">WebKitLoadEvent</a>;
-<span class="returnvalue">GtkWidget</span> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new" title="webkit_web_view_new ()">webkit_web_view_new</a>                 (<em class="parameter"><code><span class="type">void</span></code></em>);
-<span class="returnvalue">GtkWidget</span> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()">webkit_web_view_new_with_context</a>    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+enum                <a class="link" href="WebKitWebView.html#WebKitPolicyDecisionType" title="enum WebKitPolicyDecisionType">WebKitPolicyDecisionType</a>;
+<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new" title="webkit_web_view_new ()">webkit_web_view_new</a>                 (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()">webkit_web_view_new_with_context</a>    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
 <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *  <a class="link" href="WebKitWebView.html#webkit-web-view-get-context" title="webkit_web_view_get_context ()">webkit_web_view_get_context</a>         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-uri" title="webkit_web_view_load_uri ()">webkit_web_view_load_uri</a>            (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-html" title="webkit_web_view_load_html ()">webkit_web_view_load_html</a>           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *content</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *base_uri</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-plain-text" title="webkit_web_view_load_plain_text ()">webkit_web_view_load_plain_text</a>     (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *plain_text</code></em>);
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *plain_text</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-request" title="webkit_web_view_load_request ()">webkit_web_view_load_request</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> *request</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-replace-content" title="webkit_web_view_replace_content ()">webkit_web_view_replace_content</a>     (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content_uri</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWebView.html#webkit-web-view-can-go-back" title="webkit_web_view_can_go_back ()">webkit_web_view_can_go_back</a>         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *content</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *content_uri</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *base_uri</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWebView.html#webkit-web-view-can-go-back" title="webkit_web_view_can_go_back ()">webkit_web_view_can_go_back</a>         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-go-back" title="webkit_web_view_go_back ()">webkit_web_view_go_back</a>             (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWebView.html#webkit-web-view-can-go-forward" title="webkit_web_view_can_go_forward ()">webkit_web_view_can_go_forward</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWebView.html#webkit-web-view-can-go-forward" title="webkit_web_view_can_go_forward ()">webkit_web_view_can_go_forward</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-go-forward" title="webkit_web_view_go_forward ()">webkit_web_view_go_forward</a>          (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitWebView.html#webkit-web-view-get-title" title="webkit_web_view_get_title ()">webkit_web_view_get_title</a>           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebView.html#webkit-web-view-get-title" title="webkit_web_view_get_title ()">webkit_web_view_get_title</a>           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-reload" title="webkit_web_view_reload ()">webkit_web_view_reload</a>              (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-reload-bypass-cache" title="webkit_web_view_reload_bypass_cache ()">webkit_web_view_reload_bypass_cache</a> (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-stop-loading" title="webkit_web_view_stop_loading ()">webkit_web_view_stop_loading</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
-<span class="returnvalue">gdouble</span>             <a class="link" href="WebKitWebView.html#webkit-web-view-get-estimated-load-progress" title="webkit_web_view_get_estimated_load_progress ()">webkit_web_view_get_estimated_load_progress</a>
+<a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitWebView.html#webkit-web-view-get-estimated-load-progress" title="webkit_web_view_get_estimated_load_progress ()">webkit_web_view_get_estimated_load_progress</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitWebView.html#webkit-web-view-get-custom-charset" title="webkit_web_view_get_custom_charset ()">webkit_web_view_get_custom_charset</a>  (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebView.html#webkit-web-view-get-custom-charset" title="webkit_web_view_get_custom_charset ()">webkit_web_view_get_custom_charset</a>  (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-set-custom-charset" title="webkit_web_view_set_custom_charset ()">webkit_web_view_set_custom_charset</a>  (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *charset</code></em>);
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *charset</code></em>);
 <a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="returnvalue">WebKitBackForwardList</span></a> * <a class="link" href="WebKitWebView.html#webkit-web-view-get-back-forward-list" title="webkit_web_view_get_back_forward_list ()">webkit_web_view_get_back_forward_list</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-go-to-back-forward-list-item" title="webkit_web_view_go_to_back_forward_list_item ()">webkit_web_view_go_to_back_forward_list_item</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitWebView.html#webkit-web-view-get-uri" title="webkit_web_view_get_uri ()">webkit_web_view_get_uri</a>             (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebView.html#webkit-web-view-get-uri" title="webkit_web_view_get_uri ()">webkit_web_view_get_uri</a>             (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-set-settings" title="webkit_web_view_set_settings ()">webkit_web_view_set_settings</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);
 <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="returnvalue">WebKitSettings</span></a> *    <a class="link" href="WebKitWebView.html#webkit-web-view-get-settings" title="webkit_web_view_get_settings ()">webkit_web_view_get_settings</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="returnvalue">WebKitWindowProperties</span></a> * <a class="link" href="WebKitWebView.html#webkit-web-view-get-window-properties" title="webkit_web_view_get_window_properties ()">webkit_web_view_get_window_properties</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-set-zoom-level" title="webkit_web_view_set_zoom_level ()">webkit_web_view_set_zoom_level</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code><span class="type">gdouble</span> zoom_level</code></em>);
-<span class="returnvalue">gdouble</span>             <a class="link" href="WebKitWebView.html#webkit-web-view-get-zoom-level" title="webkit_web_view_get_zoom_level ()">webkit_web_view_get_zoom_level</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> zoom_level</code></em>);
+<a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitWebView.html#webkit-web-view-get-zoom-level" title="webkit_web_view_get_zoom_level ()">webkit_web_view_get_zoom_level</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebView.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
-   +----GInitiallyUnowned
-         +----GtkWidget
-               +----GtkContainer
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+   +----<a href="../gobject/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
+         +----<a href="../gtk3/GtkWidget.html">GtkWidget</a>
+               +----<a href="../gtk3/GtkContainer.html">GtkContainer</a>
                      +----<a class="link" href="WebKitWebViewBase.html" title="WebKitWebViewBase">WebKitWebViewBase</a>
                            +----WebKitWebView
 </pre>
@@ -107,29 +108,30 @@ const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKi
 <a name="WebKitWebView.implemented-interfaces"></a><h2>Implemented Interfaces</h2>
 <p>
 WebKitWebView implements
- AtkImplementorIface and  GtkBuildable.</p>
+ AtkImplementorIface and  <a href="../gtk3/GtkBuildable.html">GtkBuildable</a>.</p>
 </div>
 <div class="refsect1">
 <a name="WebKitWebView.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitWebView.html#WebKitWebView--estimated-load-progress" title='The "estimated-load-progress" property'>estimated-load-progress</a>"  <span class="type">gdouble</span>               : Read
-  "<a class="link" href="WebKitWebView.html#WebKitWebView--title" title='The "title" property'>title</a>"                    <span class="type">gchar</span>*                : Read
-  "<a class="link" href="WebKitWebView.html#WebKitWebView--uri" title='The "uri" property'>uri</a>"                      <span class="type">gchar</span>*                : Read
+  "<a class="link" href="WebKitWebView.html#WebKitWebView--estimated-load-progress" title='The "estimated-load-progress" property'>estimated-load-progress</a>"  <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read
+  "<a class="link" href="WebKitWebView.html#WebKitWebView--title" title='The "title" property'>title</a>"                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
+  "<a class="link" href="WebKitWebView.html#WebKitWebView--uri" title='The "uri" property'>uri</a>"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitWebView.html#WebKitWebView--web-context" title='The "web-context" property'>web-context</a>"              <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>*     : Read / Write / Construct Only
-  "<a class="link" href="WebKitWebView.html#WebKitWebView--zoom-level" title='The "zoom-level" property'>zoom-level</a>"               <span class="type">gdouble</span>               : Read / Write
+  "<a class="link" href="WebKitWebView.html#WebKitWebView--zoom-level" title='The "zoom-level" property'>zoom-level</a>"               <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read / Write
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebView.signals"></a><h2>Signals</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-close" title='The "close" signal'>close</a>"                                          : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-create" title='The "create" signal'>create</a>"                                         : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'>load-changed</a>"                                   : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'>load-failed</a>"                                    : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-ready-to-show" title='The "ready-to-show" signal'>ready-to-show</a>"                                  : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-script-alert" title='The "script-alert" signal'>script-alert</a>"                                   : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-script-confirm" title='The "script-confirm" signal'>script-confirm</a>"                                 : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebView.html#WebKitWebView-script-prompt" title='The "script-prompt" signal'>script-prompt</a>"                                  : <code class="literal">Run Last</code>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-close" title='The "close" signal'>close</a>"                                          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-create" title='The "create" signal'>create</a>"                                         : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-decide-policy" title='The "decide-policy" signal'>decide-policy</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'>load-changed</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'>load-failed</a>"                                    : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-ready-to-show" title='The "ready-to-show" signal'>ready-to-show</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-script-alert" title='The "script-alert" signal'>script-alert</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-script-confirm" title='The "script-confirm" signal'>script-confirm</a>"                                 : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-script-prompt" title='The "script-prompt" signal'>script-prompt</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
 </pre>
 </div>
 <div class="refsect1">
@@ -191,8 +193,61 @@ or there was an error during the load operation.
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitPolicyDecisionType"></a><h3>enum WebKitPolicyDecisionType</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION,
+    WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION,
+    WEBKIT_POLICY_DECISION_TYPE_RESPONSE,
+} WebKitPolicyDecisionType;
+</pre>
+<p>
+Enum values used for determining the type of a policy decision during
+WebKitWebView::decide-policy.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-POLICY-DECISION-TYPE-NAVIGATION-ACTION:CAPS"></a><span class="term"><code class="literal">WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION</code></span></p></td>
+<td>This type of policy decision
+  is requested when WebKit is about to navigate to a new page in either the
+  main frame or a subframe. Acceptable policy decisions are either
+  <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-use" title="webkit_policy_decision_use ()"><code class="function">webkit_policy_decision_use()</code></a> or <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-ignore" title="webkit_policy_decision_ignore ()"><code class="function">webkit_policy_decision_ignore()</code></a>. This
+  type of policy decision is always a <a class="link" href="WebKitNavigationPolicyDecision.html" title="WebKitNavigationPolicyDecision"><span class="type">WebKitNavigationPolicyDecision</span></a>.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-POLICY-DECISION-TYPE-NEW-WINDOW-ACTION:CAPS"></a><span class="term"><code class="literal">WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION</code></span></p></td>
+<td>This type of policy decision
+  is requested when WebKit is about to create a new window. Acceptable policy
+  decisions are either <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-use" title="webkit_policy_decision_use ()"><code class="function">webkit_policy_decision_use()</code></a> or
+  <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-ignore" title="webkit_policy_decision_ignore ()"><code class="function">webkit_policy_decision_ignore()</code></a>. This type of policy decision is always
+  a <a class="link" href="WebKitNavigationPolicyDecision.html" title="WebKitNavigationPolicyDecision"><span class="type">WebKitNavigationPolicyDecision</span></a>. These decisions are useful for implementing
+  special actions for new windows, such as forcing the new window to open
+  in a tab when a keyboard modifier is active or handling a special
+  target attribute on &lt;a&gt; elements.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-POLICY-DECISION-TYPE-RESPONSE:CAPS"></a><span class="term"><code class="literal">WEBKIT_POLICY_DECISION_TYPE_RESPONSE</code></span></p></td>
+<td>This type of decision is used when WebKit has
+  received a response for a network resource and is about to start the load.
+  Note that these resources include all subresources of a page such as images
+  and stylesheets as well as main documents. Appropriate policy responses to
+  this decision are <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-use" title="webkit_policy_decision_use ()"><code class="function">webkit_policy_decision_use()</code></a>, <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-ignore" title="webkit_policy_decision_ignore ()"><code class="function">webkit_policy_decision_ignore()</code></a>,
+  or <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-download" title="webkit_policy_decision_download ()"><code class="function">webkit_policy_decision_download()</code></a>. This type of policy decision is always
+  a <span class="type">WebKitResponsePolicyDecision</span>. This decision is useful for forcing
+  some types of resources to be downloaded rather than rendered in the WebView
+  or to block the transfer of resources entirely.
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-web-view-new"></a><h3>webkit_web_view_new ()</h3>
-<pre class="programlisting"><span class="returnvalue">GtkWidget</span> *         webkit_web_view_new                 (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         webkit_web_view_new                 (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the default <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>.
 See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()"><code class="function">webkit_web_view_new_with_context()</code></a>.
@@ -208,7 +263,7 @@ See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-conte
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-new-with-context"></a><h3>webkit_web_view_new_with_context ()</h3>
-<pre class="programlisting"><span class="returnvalue">GtkWidget</span> *         webkit_web_view_new_with_context    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         webkit_web_view_new_with_context    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
 <p>
 Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the given <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>.
 </p>
@@ -254,7 +309,7 @@ Gets the web context of <em class="parameter"><code>web_view</code></em>.
 <div class="refsect2">
 <a name="webkit-web-view-load-uri"></a><h3>webkit_web_view_load_uri ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_load_uri            (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);</pre>
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
 <p>
 Requests loading of the specified URI string.
 You can monitor the load operation by connecting to
@@ -279,12 +334,12 @@ You can monitor the load operation by connecting to
 <div class="refsect2">
 <a name="webkit-web-view-load-html"></a><h3>webkit_web_view_load_html ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_load_html           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);</pre>
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *content</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *base_uri</code></em>);</pre>
 <p>
 Load the given <em class="parameter"><code>content</code></em> string with the specified <em class="parameter"><code>base_uri</code></em>.
 Relative URLs in the <em class="parameter"><code>content</code></em> will be resolved against <em class="parameter"><code>base_uri</code></em>.
-When <em class="parameter"><code>base_uri</code></em> is <code class="literal">NULL</code>, it defaults to "about:blank". The mime type
+When <em class="parameter"><code>base_uri</code></em> is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>, it defaults to "about:blank". The mime type
 of the document will be "text/html". You can monitor the load operation
 by connecting to <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
@@ -302,7 +357,7 @@ by connecting to <a class="link" href="WebKitWebView.html#WebKitWebView-load-cha
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>base_uri</code></em> :</span></p></td>
-<td>The base URI for relative locations or <code class="literal">NULL</code>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
+<td>The base URI for relative locations or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -312,7 +367,7 @@ by connecting to <a class="link" href="WebKitWebView.html#WebKitWebView-load-cha
 <div class="refsect2">
 <a name="webkit-web-view-load-plain-text"></a><h3>webkit_web_view_load_plain_text ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_load_plain_text     (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *plain_text</code></em>);</pre>
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *plain_text</code></em>);</pre>
 <p>
 Load the specified <em class="parameter"><code>plain_text</code></em> string into <em class="parameter"><code>web_view</code></em>. The mime type of
 document will be "text/plain". You can monitor the load
@@ -362,9 +417,9 @@ You can monitor the load operation by connecting to
 <div class="refsect2">
 <a name="webkit-web-view-replace-content"></a><h3>webkit_web_view_replace_content ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_replace_content     (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content_uri</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);</pre>
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *content</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *content_uri</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *base_uri</code></em>);</pre>
 <p>
 Replace the content of <em class="parameter"><code>web_view</code></em> with <em class="parameter"><code>content</code></em> using <em class="parameter"><code>content_uri</code></em> as page URI.
 This allows clients to display page-loading errors in the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> itself.
@@ -392,7 +447,7 @@ when replacing content of a <a class="link" href="WebKitWebView.html" title="Web
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>base_uri</code></em> :</span></p></td>
-<td>the base URI for relative locations or <code class="literal">NULL</code>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
+<td>the base URI for relative locations or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -401,7 +456,7 @@ when replacing content of a <a class="link" href="WebKitWebView.html" title="Web
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-can-go-back"></a><h3>webkit_web_view_can_go_back ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_web_view_can_go_back         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_web_view_can_go_back         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Determines whether <em class="parameter"><code>web_view</code></em> has a previous history item.
 </p>
@@ -416,7 +471,7 @@ Determines whether <em class="parameter"><code>web_view</code></em> has a previo
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if able to move back or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if able to move back or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -442,7 +497,7 @@ You can monitor the load operation by connecting to
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-can-go-forward"></a><h3>webkit_web_view_can_go_forward ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_web_view_can_go_forward      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_web_view_can_go_forward      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Determines whether <em class="parameter"><code>web_view</code></em> has a next history item.
 </p>
@@ -457,7 +512,7 @@ Determines whether <em class="parameter"><code>web_view</code></em> has a next h
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if able to move forward or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if able to move forward or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -483,7 +538,7 @@ You can monitor the load operation by connecting to
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-get-title"></a><h3>webkit_web_view_get_title ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_web_view_get_title           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_view_get_title           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Gets the value of the <a class="link" href="WebKitWebView.html#WebKitWebView--title" title='The "title" property'><span class="type">"title"</span></a> property.
 You can connect to notify::title signal of <em class="parameter"><code>web_view</code></em> to
@@ -561,7 +616,7 @@ If there is a loading operation in progress, it will be cancelled and
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-get-estimated-load-progress"></a><h3>webkit_web_view_get_estimated_load_progress ()</h3>
-<pre class="programlisting"><span class="returnvalue">gdouble</span>             webkit_web_view_get_estimated_load_progress
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             webkit_web_view_get_estimated_load_progress
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Gets the value of the <a class="link" href="WebKitWebView.html#WebKitWebView--estimated-load-progress" title='The "estimated-load-progress" property'><span class="type">"estimated-load-progress"</span></a> property.
@@ -587,7 +642,7 @@ load as a range from 0.0 to 1.0.</td>
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-get-custom-charset"></a><h3>webkit_web_view_get_custom_charset ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_web_view_get_custom_charset  (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_view_get_custom_charset  (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Returns the current custom character encoding name of <em class="parameter"><code>web_view</code></em>.
 </p>
@@ -601,7 +656,7 @@ Returns the current custom character encoding name of <em class="parameter"><cod
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the current custom character encoding name or <code class="literal">NULL</code> if no
+<td>the current custom character encoding name or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if no
 custom character encoding has been set.</td>
 </tr>
 </tbody>
@@ -611,12 +666,12 @@ custom character encoding has been set.</td>
 <div class="refsect2">
 <a name="webkit-web-view-set-custom-charset"></a><h3>webkit_web_view_set_custom_charset ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_set_custom_charset  (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *charset</code></em>);</pre>
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *charset</code></em>);</pre>
 <p>
 Sets the current custom character encoding override of <em class="parameter"><code>web_view</code></em>. The custom
 character encoding will override any text encoding detected via HTTP headers or
 META tags. Calling this method will stop any current load operation and reload the
-current page. Setting the custom character encoding to <code class="literal">NULL</code> removes the character
+current page. Setting the custom character encoding to <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> removes the character
 encoding override.
 </p>
 <div class="variablelist"><table border="0">
@@ -629,7 +684,7 @@ encoding override.
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>charset</code></em> :</span></p></td>
-<td>a character encoding name or <code class="literal">NULL</code>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
+<td>a character encoding name or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -690,7 +745,7 @@ You can monitor the load operation by connecting to
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-get-uri"></a><h3>webkit_web_view_get_uri ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_web_view_get_uri             (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_view_get_uri             (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Returns the current active URI of <em class="parameter"><code>web_view</code></em>. The active URI might change during
 a load operation:
@@ -699,7 +754,7 @@ a load operation:
 </p>
 <div class="orderedlist"><ol class="orderedlist" type="1">
 <li class="listitem"><p>
-  When nothing has been loaded yet on <em class="parameter"><code>web_view</code></em> the active URI is <code class="literal">NULL</code>.
+  When nothing has been loaded yet on <em class="parameter"><code>web_view</code></em> the active URI is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>.
 </p></li>
 <li class="listitem">
 <p>
@@ -761,7 +816,7 @@ signal of <em class="parameter"><code>web_view</code></em>.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the current active URI of <em class="parameter"><code>web_view</code></em> or <code class="literal">NULL</code>
+<td>the current active URI of <em class="parameter"><code>web_view</code></em> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
 if nothing has been loaded yet.</td>
 </tr>
 </tbody>
@@ -859,7 +914,7 @@ that the window containing <em class="parameter"><code>web_view</code></em> shou
 <div class="refsect2">
 <a name="webkit-web-view-set-zoom-level"></a><h3>webkit_web_view_set_zoom_level ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_set_zoom_level      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code><span class="type">gdouble</span> zoom_level</code></em>);</pre>
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> zoom_level</code></em>);</pre>
 <p>
 Set the zoom level of <em class="parameter"><code>web_view</code></em>, i.e. the factor by which the
 view contents are scaled with respect to their original size.
@@ -882,7 +937,7 @@ view contents are scaled with respect to their original size.
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-get-zoom-level"></a><h3>webkit_web_view_get_zoom_level ()</h3>
-<pre class="programlisting"><span class="returnvalue">gdouble</span>             webkit_web_view_get_zoom_level      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             webkit_web_view_get_zoom_level      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Get the zoom level of <em class="parameter"><code>web_view</code></em>, i.e. the factor by which the
 view contents are scaled with respect to their original size.
@@ -908,7 +963,7 @@ view contents are scaled with respect to their original size.
 <a name="WebKitWebView.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitWebView--estimated-load-progress"></a><h3>The <code class="literal">"estimated-load-progress"</code> property</h3>
-<pre class="programlisting">  "estimated-load-progress"  <span class="type">gdouble</span>               : Read</pre>
+<pre class="programlisting">  "estimated-load-progress"  <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read</pre>
 <p>
 An estimate of the percent completion for the current loading operation.
 This value will range from 0.0 to 1.0 and, once a load completes,
@@ -924,17 +979,17 @@ and child documents.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView--title"></a><h3>The <code class="literal">"title"</code> property</h3>
-<pre class="programlisting">  "title"                    <span class="type">gchar</span>*                : Read</pre>
+<pre class="programlisting">  "title"                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
 <p>
 The main frame document title of this <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>. If
-the title has not been received yet, it will be <code class="literal">NULL</code>.
+the title has not been received yet, it will be <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>.
 </p>
 <p>Default value: NULL</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView--uri"></a><h3>The <code class="literal">"uri"</code> property</h3>
-<pre class="programlisting">  "uri"                      <span class="type">gchar</span>*                : Read</pre>
+<pre class="programlisting">  "uri"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
 <p>
 The current active URI of the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>.
 See <a class="link" href="WebKitWebView.html#webkit-web-view-get-uri" title="webkit_web_view_get_uri ()"><code class="function">webkit_web_view_get_uri()</code></a> for more details.
@@ -952,7 +1007,7 @@ The <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span 
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView--zoom-level"></a><h3>The <code class="literal">"zoom-level"</code> property</h3>
-<pre class="programlisting">  "zoom-level"               <span class="type">gdouble</span>               : Read / Write</pre>
+<pre class="programlisting">  "zoom-level"               <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read / Write</pre>
 <p>
 The zoom level of the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> content.
 See <a class="link" href="WebKitWebView.html#webkit-web-view-set-zoom-level" title="webkit_web_view_set_zoom_level ()"><code class="function">webkit_web_view_set_zoom_level()</code></a> for more details.
@@ -966,7 +1021,7 @@ See <a class="link" href="WebKitWebView.html#webkit-web-view-set-zoom-level" tit
 <div class="refsect2">
 <a name="WebKitWebView-close"></a><h3>The <code class="literal">"close"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *webView,
-                                                        <span class="type">gpointer</span>       user_data)      : <code class="literal">Run Last</code></pre>
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when closing a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is requested. This occurs when a
 call is made from JavaScript's <code class="function">window.close</code> function.
@@ -990,8 +1045,8 @@ destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><spa
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-create"></a><h3>The <code class="literal">"create"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">GtkWidget</span>*          user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
-                                                        <span class="type">gpointer</span>       user_data)      : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a>*          user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the creation of a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is requested.
 If this signal is handled the signal handler should return the
@@ -1015,8 +1070,31 @@ until the <a class="link" href="WebKitWebView.html#WebKitWebView-ready-to-show" 
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>a newly allocated <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> widget
-or <code class="literal">NULL</code> to propagate the event further. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
+or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to propagate the event further. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
 </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView-decide-policy"></a><h3>The <code class="literal">"decide-policy"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>           *webkitwebview,
+                                                        <a class="link" href="WebKitPolicyDecision.html" title="WebKitPolicyDecision"><span class="type">WebKitPolicyDecision</span></a>    *arg1,
+                                                        <a class="link" href="WebKitWebView.html#WebKitPolicyDecisionType" title="enum WebKitPolicyDecisionType"><span class="type">WebKitPolicyDecisionType</span></a> arg2,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                 user_data)          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>webkitwebview</code></em> :</span></p></td>
+<td>the object which received the signal.</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
 </tr>
 </tbody>
 </table></div>
@@ -1026,7 +1104,7 @@ or <code class="literal">NULL</code> to propagate the event further. <span class
 <a name="WebKitWebView-load-changed"></a><h3>The <code class="literal">"load-changed"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
                                                         <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent"><span class="type">WebKitLoadEvent</span></a> load_event,
-                                                        <span class="type">gpointer</span>        user_data)       : <code class="literal">Run Last</code></pre>
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)       : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the a load operation in <em class="parameter"><code>web_view</code></em> changes.
 The signal is always emitted with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"><code class="literal">WEBKIT_LOAD_STARTED</code></a> when a
@@ -1132,11 +1210,11 @@ load operation.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-load-failed"></a><h3>The <code class="literal">"load-failed"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
                                                         <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent"><span class="type">WebKitLoadEvent</span></a> load_event,
-                                                        <span class="type">gchar</span>          *failing_uri,
-                                                        <span class="type">gpointer</span>        error,
-                                                        <span class="type">gpointer</span>        user_data)        : <code class="literal">Run Last</code></pre>
+                                                        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>          *failing_uri,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        error,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)        : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when an error occurs during a load operation.
 If the error happened when starting to load data for a page
@@ -1167,7 +1245,7 @@ You need to handle the signal if you want to provide your own error page.
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
-<td>the <span class="type">GError</span> that was triggered</td>
+<td>the <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> that was triggered</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
@@ -1180,7 +1258,7 @@ You need to handle the signal if you want to provide your own error page.
 <div class="refsect2">
 <a name="WebKitWebView-ready-to-show"></a><h3>The <code class="literal">"ready-to-show"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
-                                                        <span class="type">gpointer</span>       user_data)      : <code class="literal">Run Last</code></pre>
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted after <a class="link" href="WebKitWebView.html#WebKitWebView-create" title='The "create" signal'><span class="type">"create"</span></a> on the newly created <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
 when it should be displayed to the user. When this signal is emitted
@@ -1206,9 +1284,9 @@ of <em class="parameter"><code>web_view</code></em>. See also <a class="link" hr
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-script-alert"></a><h3>The <code class="literal">"script-alert"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
-                                                        <span class="type">gchar</span>         *message,
-                                                        <span class="type">gpointer</span>       user_data)      : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
+                                                        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>         *message,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when JavaScript code calls <code class="function">window.alert</code>. If the
 signal is not handled a message dialog with a single Close button will be
@@ -1232,8 +1310,8 @@ shown with the message text.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> to stop other handlers from being invoked for the event.
-<code class="literal">FALSE</code> to propagate the event further.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
 </tr>
 </tbody>
 </table></div>
@@ -1241,15 +1319,15 @@ shown with the message text.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-script-confirm"></a><h3>The <code class="literal">"script-confirm"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
-                                                        <span class="type">gchar</span>         *message,
-                                                        <span class="type">gpointer</span>       confirmed,
-                                                        <span class="type">gpointer</span>       user_data)      : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
+                                                        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>         *message,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       confirmed,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when JavaScript code calls <code class="function">confirm</code>. If the
 signal is not handled a message dialog with OK and Cancel buttons will be
 shown with the message text. If OK button is clicked <em class="parameter"><code>confirmed</code></em> will be
-set to <code class="literal">TRUE</code>, otherwise it will be <code class="literal">FALSE</code>.
+set to <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>, otherwise it will be <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -1274,8 +1352,8 @@ set to <code class="literal">TRUE</code>, otherwise it will be <code class="lite
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> to stop other handlers from being invoked for the event.
-<code class="literal">FALSE</code> to propagate the event further.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
 </tr>
 </tbody>
 </table></div>
@@ -1283,16 +1361,16 @@ set to <code class="literal">TRUE</code>, otherwise it will be <code class="lite
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-script-prompt"></a><h3>The <code class="literal">"script-prompt"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
-                                                        <span class="type">gchar</span>         *message,
-                                                        <span class="type">gchar</span>         *text,
-                                                        <span class="type">gpointer</span>       Returns,
-                                                        <span class="type">gpointer</span>       user_data)      : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
+                                                        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>         *message,
+                                                        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>         *text,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       Returns,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when JavaScript code calls <code class="function">prompt</code>. If the
 signal is not handled a message dialog with OK and Cancel buttons and
 a text entry will be shown with the message text. If OK button is clicked
-<em class="parameter"><code>text</code></em> will contain the text entered by the user, otherwise it will be <code class="literal">NULL</code>.
+<em class="parameter"><code>text</code></em> will contain the text entered by the user, otherwise it will be <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -1318,8 +1396,8 @@ a text entry will be shown with the message text. If OK button is clicked
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> to stop other handlers from being invoked for the event.
-<code class="literal">FALSE</code> to propagate the event further.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
 </tr>
 </tbody>
 </table></div>

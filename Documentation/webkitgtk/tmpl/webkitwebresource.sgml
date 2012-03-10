@@ -26,6 +26,37 @@ WebKitWebResource
 </para>
 
 
+<!-- ##### SIGNAL WebKitWebResource::content-length-received ##### -->
+<para>
+
+</para>
+
+@webkitwebresource: the object which received the signal.
+@arg1: 
+
+<!-- ##### SIGNAL WebKitWebResource::load-failed ##### -->
+<para>
+
+</para>
+
+@webkitwebresource: the object which received the signal.
+@arg1: 
+
+<!-- ##### SIGNAL WebKitWebResource::load-finished ##### -->
+<para>
+
+</para>
+
+@webkitwebresource: the object which received the signal.
+
+<!-- ##### SIGNAL WebKitWebResource::response-received ##### -->
+<para>
+
+</para>
+
+@webkitwebresource: the object which received the signal.
+@arg1: 
+
 <!-- ##### ARG WebKitWebResource:encoding ##### -->
 <para>
 

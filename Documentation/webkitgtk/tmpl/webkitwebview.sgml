@@ -331,6 +331,35 @@ WebKitWebView
 
 @webkitwebview: the object which received the signal.
 
+<!-- ##### SIGNAL WebKitWebView::resource-content-length-received ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
+
+<!-- ##### SIGNAL WebKitWebView::resource-load-failed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
+
+<!-- ##### SIGNAL WebKitWebView::resource-load-finished ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+
 <!-- ##### SIGNAL WebKitWebView::resource-request-starting ##### -->
 <para>
 
@@ -341,6 +370,16 @@ WebKitWebView
 @arg2: 
 @arg3: 
 @arg4: 
+
+<!-- ##### SIGNAL WebKitWebView::resource-response-received ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
 
 <!-- ##### SIGNAL WebKitWebView::script-alert ##### -->
 <para>

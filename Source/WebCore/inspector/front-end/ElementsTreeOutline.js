@@ -184,7 +184,7 @@ WebInspector.ElementsTreeOutline.prototype = {
 
     _selectedNodeChanged: function()
     {
-        this._eventSupport.dispatchEventToListeners(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged);
+        this._eventSupport.dispatchEventToListeners(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged, this._selectedDOMNode);
     },
 
     findTreeElement: function(node)
@@ -386,31 +386,39 @@ WebInspector.ElementsTreeOutline.prototype = {
     {
         event.preventDefault();
         var treeElement = this._treeElementFromEvent(event);
-        if (this._nodeBeingDragged && treeElement) {
-            var parentNode;
-            var anchorNode;
+        if (treeElement)
+            this._doMove(treeElement);
+    },
 
-            if (treeElement._elementCloseTag) {
-                // Drop onto closing tag -> insert as last child.
-                parentNode = treeElement.representedObject;
-            } else {
-                var dragTargetNode = treeElement.representedObject;
-                parentNode = dragTargetNode.parentNode;
-                anchorNode = dragTargetNode;
-            }
+    _doMove: function(treeElement)
+    {
+        if (!this._nodeBeingDragged)
+            return;
 
-            function callback(error, newNodeId)
-            {
-                if (error)
-                    return;
+        var parentNode;
+        var anchorNode;
 
-                this._updateModifiedNodes();
-                var newNode = WebInspector.domAgent.nodeForId(newNodeId);
-                if (newNode)
-                    this.selectDOMNode(newNode, true);
-            }
-            this._nodeBeingDragged.moveTo(parentNode, anchorNode, callback.bind(this));
+        if (treeElement._elementCloseTag) {
+            // Drop onto closing tag -> insert as last child.
+            parentNode = treeElement.representedObject;
+        } else {
+            var dragTargetNode = treeElement.representedObject;
+            parentNode = dragTargetNode.parentNode;
+            anchorNode = dragTargetNode;
         }
+
+        function callback(error, newNodeId)
+        {
+            if (error)
+                return;
+
+            this._updateModifiedNodes();
+            var newNode = WebInspector.domAgent.nodeForId(newNodeId);
+            if (newNode)
+                this.selectDOMNode(newNode, true);
+        }
+
+        this._nodeBeingDragged.moveTo(parentNode, anchorNode, callback.bind(this));
 
         delete this._nodeBeingDragged;
     },
@@ -721,6 +729,8 @@ WebInspector.ElementsTreeElement.prototype = {
         this.updateTitle();
         this._preventFollowingLinksOnDoubleClick();
         this.listItemElement.draggable = true;
+        this.listItemElement.addEventListener("click", this._mouseClick.bind(this));
+        this.listItemElement.addEventListener("mousedown", this._mouseDown.bind(this));
     },
 
     _preventFollowingLinksOnDoubleClick: function()
@@ -943,6 +953,7 @@ WebInspector.ElementsTreeElement.prototype = {
             WebInspector.domAgent.highlightDOMNode(this.representedObject.id);
         this.updateSelection();
         this.treeOutline.suppressRevealAndSelect = false;
+        return true;
     },
 
     ondelete: function()
@@ -992,6 +1003,20 @@ WebInspector.ElementsTreeElement.prototype = {
 
         if (this.hasChildren && !this.expanded)
             this.expand();
+    },
+
+    _mouseClick: function(event)
+    {
+        if (this._isSingleClickCandidate)
+            this._startEditingTarget(event.target);
+        this._isSingleClickCandidate = false;
+    },
+
+    _mouseDown: function(event)
+    {
+        if (event.handled || event.which !== 1 || this._editing || this._elementCloseTag || !this.selected)
+            return;
+        this._isSingleClickCandidate = true;
     },
 
     _insertInLastAttributePosition: function(tag, node)
@@ -1062,6 +1087,7 @@ WebInspector.ElementsTreeElement.prototype = {
         // Add free-form node-related actions.
         contextMenu.appendItem(WebInspector.UIString("Edit as HTML"), this._editAsHTML.bind(this));
         contextMenu.appendItem(WebInspector.UIString("Copy as HTML"), this._copyHTML.bind(this));
+        contextMenu.appendItem(WebInspector.UIString("Copy XPath"), this._copyXPath.bind(this));
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Delete node" : "Delete Node"), this.remove.bind(this));
     },
 
@@ -1271,6 +1297,9 @@ WebInspector.ElementsTreeElement.prototype = {
         this._editing = false;
 
         var treeOutline = this.treeOutline;
+        /**
+         * @param {Protocol.Error=} error
+         */
         function moveToNextAttributeIfNeeded(error)
         {
             if (error)
@@ -1320,7 +1349,10 @@ WebInspector.ElementsTreeElement.prototype = {
             }
         }
 
-        this.representedObject.setAttribute(attributeName, newText, moveToNextAttributeIfNeeded.bind(this));
+        if (oldText !== newText)
+            this.representedObject.setAttribute(attributeName, newText, moveToNextAttributeIfNeeded.bind(this));
+        else
+            moveToNextAttributeIfNeeded.call(this);
     },
 
     _tagNameEditingCommitted: function(element, newText, oldText, tagName, moveDirection)
@@ -1518,10 +1550,6 @@ WebInspector.ElementsTreeElement.prototype = {
         var info = {titleDOM: document.createDocumentFragment(), hasChildren: this.hasChildren};
 
         switch (node.nodeType()) {
-            case Node.DOCUMENT_NODE:
-                info.titleDOM.appendChild(document.createTextNode("Document"));
-                break;
-
             case Node.DOCUMENT_FRAGMENT_NODE:
                 info.titleDOM.appendChild(document.createTextNode("Document Fragment"));
                 break;
@@ -1700,6 +1728,11 @@ WebInspector.ElementsTreeElement.prototype = {
     _copyHTML: function()
     {
         this.representedObject.copyNode();
+    },
+
+    _copyXPath: function()
+    {
+        this.representedObject.copyXPath(true);
     },
 
     _highlightSearchResults: function()

@@ -386,6 +386,9 @@
 #define WTF_OS_WINDOWS 1
 #endif
 
+#define WTF_OS_WIN ERROR "USE WINDOWS WITH OS NOT WIN"
+#define WTF_OS_MAC ERROR "USE MAC_OS_X WITH OS NOT MAC"
+
 /* OS(UNIX) - Any Unix-like system */
 #if   OS(AIX)              \
     || OS(ANDROID)          \
@@ -563,10 +566,6 @@
 #if PLATFORM(QT) && OS(DARWIN)
 #define WTF_USE_CF 1
 #define HAVE_DISPATCH_H 1
-#if QT_VERSION >= 0x050000
-/* FIXME: This is a hack to work around a conflict of MacTypes.h defining a Fixed type. */
-#define CF_OPEN_SOURCE 1
-#endif
 #endif
 
 #if OS(DARWIN) && !PLATFORM(GTK) && !PLATFORM(QT)
@@ -673,7 +672,7 @@
 #endif
 #endif
 
-#if !OS(WINDOWS) && !OS(SOLARIS) && !OS(QNX) \
+#if !OS(WINDOWS) && !OS(SOLARIS) \
     && !OS(RVCT) \
     && !OS(ANDROID)
 #define HAVE_TM_GMTOFF 1
@@ -727,6 +726,8 @@
 
 #define HAVE_ERRNO_H 1
 #define HAVE_MMAP 1
+#define HAVE_MADV_FREE_REUSE 1
+#define HAVE_MADV_FREE 1
 #define HAVE_SBRK 1
 #define HAVE_STRINGS_H 1
 #define HAVE_SYS_PARAM_H 1
@@ -1112,7 +1113,11 @@
    since most ports try to support sub-project independence, adding new headers
    to WTF causes many ports to break, and so this way we can address the build
    breakages one port at a time. */
+#if PLATFORM(MAC) || PLATFORM(QT)
+#define WTF_USE_EXPORT_MACROS 1
+#else
 #define WTF_USE_EXPORT_MACROS 0
+#endif
 
 #if (PLATFORM(QT) && !OS(DARWIN)) || PLATFORM(GTK) || PLATFORM(EFL)
 #define WTF_USE_UNIX_DOMAIN_SOCKETS 1
@@ -1165,5 +1170,8 @@
 /* Using V8 implies not using JSC and vice versa */
 #define WTF_USE_JSC !WTF_USE_V8
 
+#if ENABLE(NOTIFICATIONS) && PLATFORM(MAC)
+#define ENABLE_TEXT_NOTIFICATIONS_ONLY 1
+#endif
 
 #endif /* WTF_Platform_h */

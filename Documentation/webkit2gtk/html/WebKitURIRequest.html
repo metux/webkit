@@ -42,21 +42,21 @@
 <div class="refsynopsisdiv">
 <a name="WebKitURIRequest.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">struct              <a class="link" href="WebKitURIRequest.html#WebKitURIRequest-struct" title="struct WebKitURIRequest">WebKitURIRequest</a>;
-<a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="returnvalue">WebKitURIRequest</span></a> *  <a class="link" href="WebKitURIRequest.html#webkit-uri-request-new" title="webkit_uri_request_new ()">webkit_uri_request_new</a>              (<em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitURIRequest.html#webkit-uri-request-get-uri" title="webkit_uri_request_get_uri ()">webkit_uri_request_get_uri</a>          (<em class="parameter"><code><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> *request</code></em>);
+<a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="returnvalue">WebKitURIRequest</span></a> *  <a class="link" href="WebKitURIRequest.html#webkit-uri-request-new" title="webkit_uri_request_new ()">webkit_uri_request_new</a>              (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURIRequest.html#webkit-uri-request-get-uri" title="webkit_uri_request_get_uri ()">webkit_uri_request_get_uri</a>          (<em class="parameter"><code><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> *request</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitURIRequest.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
    +----WebKitURIRequest
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitURIRequest.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitURIRequest.html#WebKitURIRequest--uri" title='The "uri" property'>uri</a>"                      <span class="type">gchar</span>*                : Read / Write / Construct Only
+  "<a class="link" href="WebKitURIRequest.html#WebKitURIRequest--uri" title='The "uri" property'>uri</a>"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct Only
 </pre>
 </div>
 <div class="refsect1">
@@ -75,7 +75,7 @@ const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKi
 <hr>
 <div class="refsect2">
 <a name="webkit-uri-request-new"></a><h3>webkit_uri_request_new ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="returnvalue">WebKitURIRequest</span></a> *  webkit_uri_request_new              (<em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);</pre>
+<pre class="programlisting"><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="returnvalue">WebKitURIRequest</span></a> *  webkit_uri_request_new              (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
 <p>
 Creates a new <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> for the given URI.
 </p>
@@ -97,7 +97,7 @@ Creates a new <a class="link" href="WebKitURIRequest.html" title="WebKitURIReque
 <hr>
 <div class="refsect2">
 <a name="webkit-uri-request-get-uri"></a><h3>webkit_uri_request_get_uri ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_uri_request_get_uri          (<em class="parameter"><code><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> *request</code></em>);</pre>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_uri_request_get_uri          (<em class="parameter"><code><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> *request</code></em>);</pre>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody>
@@ -119,7 +119,7 @@ Creates a new <a class="link" href="WebKitURIRequest.html" title="WebKitURIReque
 <a name="WebKitURIRequest.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitURIRequest--uri"></a><h3>The <code class="literal">"uri"</code> property</h3>
-<pre class="programlisting">  "uri"                      <span class="type">gchar</span>*                : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "uri"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct Only</pre>
 <p>
 The URI to which the request will be made.
 </p>

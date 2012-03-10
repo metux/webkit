@@ -7,7 +7,7 @@
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitURIResponse.html" title="WebKitURIResponse">
-<link rel="next" href="webkit2gtk-WebKitError.html" title="WebKitError">
+<link rel="next" href="WebKitDownload.html" title="WebKitDownload">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -18,7 +18,7 @@
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="webkit2gtk-WebKitError.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitDownload.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
 </tr>
 <tr><td colspan="5" class="shortcuts">
 <a href="#WebKitWindowProperties.synopsis" class="shortcut">Top</a>
@@ -44,41 +44,41 @@
 <pre class="synopsis">struct              <a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties-struct" title="struct WebKitWindowProperties">WebKitWindowProperties</a>;
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-geometry" title="webkit_window_properties_get_geometry ()">webkit_window_properties_get_geometry</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>,
-                                                         <em class="parameter"><code><span class="type">GdkRectangle</span> *geometry</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-toolbar-visible" title="webkit_window_properties_get_toolbar_visible ()">webkit_window_properties_get_toolbar_visible</a>
+                                                         <em class="parameter"><code><a href="../gdk3/gdk3-Points-Rectangles-and-Regions.html#GdkRectangle"><span class="type">GdkRectangle</span></a> *geometry</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-toolbar-visible" title="webkit_window_properties_get_toolbar_visible ()">webkit_window_properties_get_toolbar_visible</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-statusbar-visible" title="webkit_window_properties_get_statusbar_visible ()">webkit_window_properties_get_statusbar_visible</a>
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-statusbar-visible" title="webkit_window_properties_get_statusbar_visible ()">webkit_window_properties_get_statusbar_visible</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-scrollbars-visible" title="webkit_window_properties_get_scrollbars_visible ()">webkit_window_properties_get_scrollbars_visible</a>
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-scrollbars-visible" title="webkit_window_properties_get_scrollbars_visible ()">webkit_window_properties_get_scrollbars_visible</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-menubar-visible" title="webkit_window_properties_get_menubar_visible ()">webkit_window_properties_get_menubar_visible</a>
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-menubar-visible" title="webkit_window_properties_get_menubar_visible ()">webkit_window_properties_get_menubar_visible</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-locationbar-visible" title="webkit_window_properties_get_locationbar_visible ()">webkit_window_properties_get_locationbar_visible</a>
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-locationbar-visible" title="webkit_window_properties_get_locationbar_visible ()">webkit_window_properties_get_locationbar_visible</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-resizable" title="webkit_window_properties_get_resizable ()">webkit_window_properties_get_resizable</a>
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-resizable" title="webkit_window_properties_get_resizable ()">webkit_window_properties_get_resizable</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);
-<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-fullscreen" title="webkit_window_properties_get_fullscreen ()">webkit_window_properties_get_fullscreen</a>
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWindowProperties.html#webkit-window-properties-get-fullscreen" title="webkit_window_properties_get_fullscreen ()">webkit_window_properties_get_fullscreen</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWindowProperties.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
    +----WebKitWindowProperties
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWindowProperties.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--fullscreen" title='The "fullscreen" property'>fullscreen</a>"               <span class="type">gboolean</span>              : Read / Write / Construct Only
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--geometry" title='The "geometry" property'>geometry</a>"                 <span class="type">GdkRectangle</span>*         : Read / Write / Construct Only
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--locationbar-visible" title='The "locationbar-visible" property'>locationbar-visible</a>"      <span class="type">gboolean</span>              : Read / Write / Construct Only
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--menubar-visible" title='The "menubar-visible" property'>menubar-visible</a>"          <span class="type">gboolean</span>              : Read / Write / Construct Only
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--resizable" title='The "resizable" property'>resizable</a>"                <span class="type">gboolean</span>              : Read / Write / Construct Only
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--scrollbars-visible" title='The "scrollbars-visible" property'>scrollbars-visible</a>"       <span class="type">gboolean</span>              : Read / Write / Construct Only
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--statusbar-visible" title='The "statusbar-visible" property'>statusbar-visible</a>"        <span class="type">gboolean</span>              : Read / Write / Construct Only
-  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--toolbar-visible" title='The "toolbar-visible" property'>toolbar-visible</a>"          <span class="type">gboolean</span>              : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--fullscreen" title='The "fullscreen" property'>fullscreen</a>"               <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--geometry" title='The "geometry" property'>geometry</a>"                 <a href="../gdk3/gdk3-Points-Rectangles-and-Regions.html#GdkRectangle"><span class="type">GdkRectangle</span></a>*         : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--locationbar-visible" title='The "locationbar-visible" property'>locationbar-visible</a>"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--menubar-visible" title='The "menubar-visible" property'>menubar-visible</a>"          <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--resizable" title='The "resizable" property'>resizable</a>"                <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--scrollbars-visible" title='The "scrollbars-visible" property'>scrollbars-visible</a>"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--statusbar-visible" title='The "statusbar-visible" property'>statusbar-visible</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only
+  "<a class="link" href="WebKitWindowProperties.html#WebKitWindowProperties--toolbar-visible" title='The "toolbar-visible" property'>toolbar-visible</a>"          <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only
 </pre>
 </div>
 <div class="refsect1">
@@ -91,7 +91,7 @@ scrollbar, statusbar, locationbar should be visible to the user,
 and the request to show the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> fullscreen.
 </p>
 <p>
-The <span class="type">"ready-to-show"</span> signal handler is the proper place
+The <a class="link" href="WebKitWebView.html#WebKitWebView-ready-to-show" title='The "ready-to-show" signal'><span class="type">"ready-to-show"</span></a> signal handler is the proper place
 to apply the initial window properties. Then you can monitor the
 <a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> by connecting to ::notify signal.
 </p>
@@ -206,7 +206,7 @@ to apply the initial window properties. Then you can monitor the
 <a name="webkit-window-properties-get-geometry"></a><h3>webkit_window_properties_get_geometry ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_window_properties_get_geometry
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>,
-                                                         <em class="parameter"><code><span class="type">GdkRectangle</span> *geometry</code></em>);</pre>
+                                                         <em class="parameter"><code><a href="../gdk3/gdk3-Points-Rectangles-and-Regions.html#GdkRectangle"><span class="type">GdkRectangle</span></a> *geometry</code></em>);</pre>
 <p>
 Get the geometry the window should have on the screen when shown.
 </p>
@@ -229,7 +229,7 @@ Get the geometry the window should have on the screen when shown.
 <hr>
 <div class="refsect2">
 <a name="webkit-window-properties-get-toolbar-visible"></a><h3>webkit_window_properties_get_toolbar_visible ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_window_properties_get_toolbar_visible
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_window_properties_get_toolbar_visible
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);</pre>
 <p>
 Get whether the window should have the toolbar visible or not.
@@ -245,7 +245,7 @@ Get whether the window should have the toolbar visible or not.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if toolbar should be visible or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if toolbar should be visible or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -253,7 +253,7 @@ Get whether the window should have the toolbar visible or not.
 <hr>
 <div class="refsect2">
 <a name="webkit-window-properties-get-statusbar-visible"></a><h3>webkit_window_properties_get_statusbar_visible ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_window_properties_get_statusbar_visible
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_window_properties_get_statusbar_visible
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);</pre>
 <p>
 Get whether the window should have the statusbar visible or not.
@@ -269,7 +269,7 @@ Get whether the window should have the statusbar visible or not.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if statusbar should be visible or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if statusbar should be visible or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -277,7 +277,7 @@ Get whether the window should have the statusbar visible or not.
 <hr>
 <div class="refsect2">
 <a name="webkit-window-properties-get-scrollbars-visible"></a><h3>webkit_window_properties_get_scrollbars_visible ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_window_properties_get_scrollbars_visible
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_window_properties_get_scrollbars_visible
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);</pre>
 <p>
 Get whether the window should have the scrollbars visible or not.
@@ -293,7 +293,7 @@ Get whether the window should have the scrollbars visible or not.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if scrollbars should be visible or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if scrollbars should be visible or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -301,7 +301,7 @@ Get whether the window should have the scrollbars visible or not.
 <hr>
 <div class="refsect2">
 <a name="webkit-window-properties-get-menubar-visible"></a><h3>webkit_window_properties_get_menubar_visible ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_window_properties_get_menubar_visible
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_window_properties_get_menubar_visible
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);</pre>
 <p>
 Get whether the window should have the menubar visible or not.
@@ -317,7 +317,7 @@ Get whether the window should have the menubar visible or not.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if menubar should be visible or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if menubar should be visible or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -325,7 +325,7 @@ Get whether the window should have the menubar visible or not.
 <hr>
 <div class="refsect2">
 <a name="webkit-window-properties-get-locationbar-visible"></a><h3>webkit_window_properties_get_locationbar_visible ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_window_properties_get_locationbar_visible
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_window_properties_get_locationbar_visible
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);</pre>
 <p>
 Get whether the window should have the locationbar visible or not.
@@ -341,7 +341,7 @@ Get whether the window should have the locationbar visible or not.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if locationbar should be visible or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if locationbar should be visible or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -349,7 +349,7 @@ Get whether the window should have the locationbar visible or not.
 <hr>
 <div class="refsect2">
 <a name="webkit-window-properties-get-resizable"></a><h3>webkit_window_properties_get_resizable ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_window_properties_get_resizable
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_window_properties_get_resizable
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);</pre>
 <p>
 Get whether the window should be resizable by the user or not.
@@ -365,7 +365,7 @@ Get whether the window should be resizable by the user or not.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if the window should be resizable or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the window should be resizable or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -373,7 +373,7 @@ Get whether the window should be resizable by the user or not.
 <hr>
 <div class="refsect2">
 <a name="webkit-window-properties-get-fullscreen"></a><h3>webkit_window_properties_get_fullscreen ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_window_properties_get_fullscreen
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_window_properties_get_fullscreen
                                                         (<em class="parameter"><code><a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> *window_properties</code></em>);</pre>
 <p>
 Get whether the window should be shown in fullscreen state or not.
@@ -389,7 +389,7 @@ Get whether the window should be shown in fullscreen state or not.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if the window should be fullscreen or <code class="literal">FALSE</code> otherwise.</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the window should be fullscreen or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
 </tr>
 </tbody>
 </table></div>
@@ -399,55 +399,55 @@ Get whether the window should be shown in fullscreen state or not.
 <a name="WebKitWindowProperties.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitWindowProperties--fullscreen"></a><h3>The <code class="literal">"fullscreen"</code> property</h3>
-<pre class="programlisting">  "fullscreen"               <span class="type">gboolean</span>              : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "fullscreen"               <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only</pre>
 <p>Whether window will be displayed fullscreen.</p>
 <p>Default value: FALSE</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWindowProperties--geometry"></a><h3>The <code class="literal">"geometry"</code> property</h3>
-<pre class="programlisting">  "geometry"                 <span class="type">GdkRectangle</span>*         : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "geometry"                 <a href="../gdk3/gdk3-Points-Rectangles-and-Regions.html#GdkRectangle"><span class="type">GdkRectangle</span></a>*         : Read / Write / Construct Only</pre>
 <p>The size and position of the window on the screen.</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWindowProperties--locationbar-visible"></a><h3>The <code class="literal">"locationbar-visible"</code> property</h3>
-<pre class="programlisting">  "locationbar-visible"      <span class="type">gboolean</span>              : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "locationbar-visible"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only</pre>
 <p>Whether the locationbar should be visible for the window.</p>
 <p>Default value: TRUE</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWindowProperties--menubar-visible"></a><h3>The <code class="literal">"menubar-visible"</code> property</h3>
-<pre class="programlisting">  "menubar-visible"          <span class="type">gboolean</span>              : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "menubar-visible"          <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only</pre>
 <p>Whether the menubar should be visible for the window.</p>
 <p>Default value: TRUE</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWindowProperties--resizable"></a><h3>The <code class="literal">"resizable"</code> property</h3>
-<pre class="programlisting">  "resizable"                <span class="type">gboolean</span>              : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "resizable"                <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only</pre>
 <p>Whether the window can be resized.</p>
 <p>Default value: TRUE</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWindowProperties--scrollbars-visible"></a><h3>The <code class="literal">"scrollbars-visible"</code> property</h3>
-<pre class="programlisting">  "scrollbars-visible"       <span class="type">gboolean</span>              : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "scrollbars-visible"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only</pre>
 <p>Whether the scrollbars should be visible for the window.</p>
 <p>Default value: TRUE</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWindowProperties--statusbar-visible"></a><h3>The <code class="literal">"statusbar-visible"</code> property</h3>
-<pre class="programlisting">  "statusbar-visible"        <span class="type">gboolean</span>              : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "statusbar-visible"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only</pre>
 <p>Whether the statusbar should be visible for the window.</p>
 <p>Default value: TRUE</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitWindowProperties--toolbar-visible"></a><h3>The <code class="literal">"toolbar-visible"</code> property</h3>
-<pre class="programlisting">  "toolbar-visible"          <span class="type">gboolean</span>              : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "toolbar-visible"          <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct Only</pre>
 <p>Whether the toolbar should be visible for the window.</p>
 <p>Default value: TRUE</p>
 </div>

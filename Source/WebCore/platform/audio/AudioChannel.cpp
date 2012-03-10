@@ -43,7 +43,7 @@ using namespace VectorMath;
 
 void AudioChannel::scale(float scale)
 {
-    vsmul(data(), 1, &scale, data(), 1, length());
+    vsmul(data(), 1, &scale, mutableData(), 1, length());
 }
 
 void AudioChannel::copyFrom(const AudioChannel* sourceChannel)
@@ -53,7 +53,7 @@ void AudioChannel::copyFrom(const AudioChannel* sourceChannel)
     if (!isSafe)
         return;
 
-    memcpy(data(), sourceChannel->data(), sizeof(float) * length());
+    memcpy(mutableData(), sourceChannel->data(), sizeof(float) * length());
 }
 
 void AudioChannel::copyFromRange(const AudioChannel* sourceChannel, unsigned startFrame, unsigned endFrame)
@@ -72,7 +72,7 @@ void AudioChannel::copyFromRange(const AudioChannel* sourceChannel, unsigned sta
         return;
 
     const float* source = sourceChannel->data();
-    float* destination = data();
+    float* destination = mutableData();
     memcpy(destination, source + startFrame, sizeof(float) * rangeLength);
 }
 
@@ -83,17 +83,14 @@ void AudioChannel::sumFrom(const AudioChannel* sourceChannel)
     if (!isSafe)
         return;
 
-    vadd(data(), 1, sourceChannel->data(), 1, data(), 1, length());
+    vadd(data(), 1, sourceChannel->data(), 1, mutableData(), 1, length());
 }
 
 float AudioChannel::maxAbsValue() const
 {
-    const float* p = data();
-    int n = length();
-
     float max = 0.0f;
-    while (n--)
-        max = std::max(max, fabsf(*p++));
+
+    vmaxmgv(data(), 1, &max, length());
 
     return max;
 }

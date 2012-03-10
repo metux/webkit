@@ -43,17 +43,17 @@
 <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="returnvalue">WebKitWebPlugin</span></a> *   <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugin-for-mimetype" title="webkit_web_plugin_database_get_plugin_for_mimetype ()">webkit_web_plugin_database_get_plugin_for_mimetype</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *database</code></em>,
                                                          <em class="parameter"><code>const <span class="type">char</span> *mime_type</code></em>);
-<span class="returnvalue">GSList</span> *            <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugins" title="webkit_web_plugin_database_get_plugins ()">webkit_web_plugin_database_get_plugins</a>
+<a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="returnvalue">GSList</span></a> *            <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugins" title="webkit_web_plugin_database_get_plugins ()">webkit_web_plugin_database_get_plugins</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *database</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-plugins-list-free" title="webkit_web_plugin_database_plugins_list_free ()">webkit_web_plugin_database_plugins_list_free</a>
-                                                        (<em class="parameter"><code><span class="type">GSList</span> *list</code></em>);
+                                                        (<em class="parameter"><code><a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> *list</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-refresh" title="webkit_web_plugin_database_refresh ()">webkit_web_plugin_database_refresh</a>  (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *database</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebPluginDatabase.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
    +----WebKitWebPluginDatabase
 </pre>
 </div>
@@ -82,7 +82,7 @@ enable/disable individual plugins.
                                                          <em class="parameter"><code>const <span class="type">char</span> *mime_type</code></em>);</pre>
 <p>
 Returns the <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> that is handling <em class="parameter"><code>mimeType</code></em> in the
-<em class="parameter"><code>database</code></em>, or <code class="literal">NULL</code> if there's none doing so.
+<em class="parameter"><code>database</code></em>, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if there's none doing so.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -108,7 +108,7 @@ Returns the <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin">
 <hr>
 <div class="refsect2">
 <a name="webkit-web-plugin-database-get-plugins"></a><h3>webkit_web_plugin_database_get_plugins ()</h3>
-<pre class="programlisting"><span class="returnvalue">GSList</span> *            webkit_web_plugin_database_get_plugins
+<pre class="programlisting"><a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="returnvalue">GSList</span></a> *            webkit_web_plugin_database_get_plugins
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *database</code></em>);</pre>
 <p>
 Returns all <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> available in <em class="parameter"><code>database</code></em>.
@@ -124,7 +124,7 @@ The returned list must be freed with <a class="link" href="WebKitWebPluginDataba
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a <span class="type">GSList</span> of <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a>. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>][<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> WebKitWebPlugin]</span>
+<td>a <a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> of <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a>. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>][<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> WebKitWebPlugin]</span>
 </td>
 </tr>
 </tbody>
@@ -135,7 +135,7 @@ The returned list must be freed with <a class="link" href="WebKitWebPluginDataba
 <div class="refsect2">
 <a name="webkit-web-plugin-database-plugins-list-free"></a><h3>webkit_web_plugin_database_plugins_list_free ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_plugin_database_plugins_list_free
-                                                        (<em class="parameter"><code><span class="type">GSList</span> *list</code></em>);</pre>
+                                                        (<em class="parameter"><code><a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> *list</code></em>);</pre>
 <p>
 </p>
 </div>

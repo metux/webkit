@@ -41,6 +41,16 @@ WebKitWebView
 @webkitwebview: the object which received the signal.
 @Returns: 
 
+<!-- ##### SIGNAL WebKitWebView::decide-policy ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@Returns: 
+
 <!-- ##### SIGNAL WebKitWebView::load-changed ##### -->
 <para>
 
@@ -131,6 +141,15 @@ WebKitWebView
 @WEBKIT_LOAD_REDIRECTED: 
 @WEBKIT_LOAD_COMMITTED: 
 @WEBKIT_LOAD_FINISHED: 
+
+<!-- ##### ENUM WebKitPolicyDecisionType ##### -->
+<para>
+
+</para>
+
+@WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION: 
+@WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION: 
+@WEBKIT_POLICY_DECISION_TYPE_RESPONSE: 
 
 <!-- ##### FUNCTION webkit_web_view_new ##### -->
 <para>

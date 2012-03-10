@@ -35,6 +35,7 @@
 #include "Document.h"
 #include "Element.h"
 #include "Pair.h"
+#include "Rect.h"
 #include "RenderObject.h"
 #include "RenderStyle.h"
 #include "Settings.h"
@@ -46,7 +47,7 @@ using namespace std;
 namespace WebCore {
 
 enum ExpandValueBehavior {SuppressValue = 0, ExpandValue};
-template <ExpandValueBehavior expandValue, CSSPropertyID one = CSSPropertyInvalid, CSSPropertyID two = CSSPropertyInvalid, CSSPropertyID three = CSSPropertyInvalid, CSSPropertyID four = CSSPropertyInvalid>
+template <ExpandValueBehavior expandValue, CSSPropertyID one = CSSPropertyInvalid, CSSPropertyID two = CSSPropertyInvalid, CSSPropertyID three = CSSPropertyInvalid, CSSPropertyID four = CSSPropertyInvalid, CSSPropertyID five = CSSPropertyInvalid>
 class ApplyPropertyExpanding {
 public:
 
@@ -68,6 +69,7 @@ public:
         applyInheritValue<two>(selector);
         applyInheritValue<three>(selector);
         applyInheritValue<four>(selector);
+        applyInheritValue<five>(selector);
     }
 
     template <CSSPropertyID id>
@@ -88,6 +90,7 @@ public:
         applyInitialValue<two>(selector);
         applyInitialValue<three>(selector);
         applyInitialValue<four>(selector);
+        applyInitialValue<five>(selector);
     }
 
     template <CSSPropertyID id>
@@ -111,6 +114,7 @@ public:
         applyValue<two>(selector, value);
         applyValue<three>(selector, value);
         applyValue<four>(selector, value);
+        applyValue<five>(selector, value);
     }
     static PropertyHandler createHandler() { return PropertyHandler(&applyInheritValue, &applyInitialValue, &applyValue); }
 };
@@ -212,6 +216,51 @@ public:
     static PropertyHandler createHandler() { return PropertyHandler(&applyInheritValue, &applyInitialValue, &applyValue); }
 };
 
+class ApplyPropertyClip {
+private:
+    static Length convertToLength(CSSStyleSelector* selector, CSSPrimitiveValue* value)
+    {
+        return value->convertToLength<FixedConversion | PercentConversion | FractionConversion | AutoConversion>(selector->style(), selector->rootElementStyle(), selector->style()->effectiveZoom());
+    }
+public:
+    static void applyInheritValue(CSSStyleSelector* selector)
+    {
+        RenderStyle* parentStyle = selector->parentStyle();
+        if (!parentStyle->hasClip())
+            return applyInitialValue(selector);
+        selector->style()->setClip(parentStyle->clipTop(), parentStyle->clipRight(), parentStyle->clipBottom(), parentStyle->clipLeft());
+        selector->style()->setHasClip(true);
+    }
+
+    static void applyInitialValue(CSSStyleSelector* selector)
+    {
+        selector->style()->setClip(Length(), Length(), Length(), Length());
+        selector->style()->setHasClip(false);
+    }
+
+    static void applyValue(CSSStyleSelector* selector, CSSValue* value)
+    {
+        if (!value->isPrimitiveValue())
+            return;
+
+        CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(value);
+
+        if (Rect* rect = primitiveValue->getRectValue()) {
+            Length top = convertToLength(selector, rect->top());
+            Length right = convertToLength(selector, rect->right());
+            Length bottom = convertToLength(selector, rect->bottom());
+            Length left = convertToLength(selector, rect->left());
+            selector->style()->setClip(top, right, bottom, left);
+            selector->style()->setHasClip(true);
+        } else if (primitiveValue->getIdent() == CSSValueAuto) {
+            selector->style()->setClip(Length(), Length(), Length(), Length());
+            selector->style()->setHasClip(true);
+        }
+    }
+
+    static PropertyHandler createHandler() { return PropertyHandler(&applyInheritValue, &applyInitialValue, &applyValue); }
+};
+
 enum ColorInherit {NoInheritFromParent = 0, InheritFromParent};
 Color defaultInitialColor();
 Color defaultInitialColor() { return Color(); }
@@ -300,6 +349,8 @@ public:
     static void setValue(RenderStyle* style, Length value) { (style->*setterFunction)(value); }
     static void applyValue(CSSStyleSelector* selector, CSSValue* value)
     {
+        float positiveFlex = 0;
+        float negativeFlex = 0;
         if (!value->isPrimitiveValue()) {
             if (!flexDirection || !value->isFlexValue())
                 return;
@@ -307,13 +358,16 @@ public:
             CSSFlexValue* flexValue = static_cast<CSSFlexValue*>(value);
             value = flexValue->preferredSize();
 
-            if (flexDirection == FlexWidth) {
-                selector->style()->setFlexboxWidthPositiveFlex(flexValue->positiveFlex());
-                selector->style()->setFlexboxWidthNegativeFlex(flexValue->negativeFlex());
-            } else if (flexDirection == FlexHeight) {
-                selector->style()->setFlexboxHeightPositiveFlex(flexValue->positiveFlex());
-                selector->style()->setFlexboxHeightNegativeFlex(flexValue->negativeFlex());
-            }
+            positiveFlex = flexValue->positiveFlex();
+            negativeFlex = flexValue->negativeFlex();
+        }
+
+        if (flexDirection == FlexWidth) {
+            selector->style()->setFlexboxWidthPositiveFlex(positiveFlex);
+            selector->style()->setFlexboxWidthNegativeFlex(negativeFlex);
+        } else if (flexDirection == FlexHeight) {
+            selector->style()->setFlexboxHeightPositiveFlex(positiveFlex);
+            selector->style()->setFlexboxHeightNegativeFlex(negativeFlex);
         }
 
         CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(value);
@@ -858,7 +912,7 @@ public:
         NinePieceImage image(getValue(selector->style()));
         switch (modifier) {
         case Outset:
-            image.setOutset(LengthBox());
+            image.setOutset(LengthBox(0));
             break;
         case Repeat:
             image.setHorizontalRule(StretchImageRule);
@@ -1698,12 +1752,12 @@ CSSStyleApplyProperty::CSSStyleApplyProperty()
     setPropertyHandler(CSSPropertyBorderBottomStyle, ApplyPropertyDefault<EBorderStyle, &RenderStyle::borderBottomStyle, EBorderStyle, &RenderStyle::setBorderBottomStyle, EBorderStyle, &RenderStyle::initialBorderStyle>::createHandler());
     setPropertyHandler(CSSPropertyBorderLeftStyle, ApplyPropertyDefault<EBorderStyle, &RenderStyle::borderLeftStyle, EBorderStyle, &RenderStyle::setBorderLeftStyle, EBorderStyle, &RenderStyle::initialBorderStyle>::createHandler());
 
-    setPropertyHandler(CSSPropertyBorderTopWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::borderTopWidth, &RenderStyle::setBorderTopWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
-    setPropertyHandler(CSSPropertyBorderRightWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::borderRightWidth, &RenderStyle::setBorderRightWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
-    setPropertyHandler(CSSPropertyBorderBottomWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::borderBottomWidth, &RenderStyle::setBorderBottomWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
-    setPropertyHandler(CSSPropertyBorderLeftWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::borderLeftWidth, &RenderStyle::setBorderLeftWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
-    setPropertyHandler(CSSPropertyOutlineWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::outlineWidth, &RenderStyle::setOutlineWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
-    setPropertyHandler(CSSPropertyWebkitColumnRuleWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::columnRuleWidth, &RenderStyle::setColumnRuleWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
+    setPropertyHandler(CSSPropertyBorderTopWidth, ApplyPropertyComputeLength<unsigned, &RenderStyle::borderTopWidth, &RenderStyle::setBorderTopWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
+    setPropertyHandler(CSSPropertyBorderRightWidth, ApplyPropertyComputeLength<unsigned, &RenderStyle::borderRightWidth, &RenderStyle::setBorderRightWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
+    setPropertyHandler(CSSPropertyBorderBottomWidth, ApplyPropertyComputeLength<unsigned, &RenderStyle::borderBottomWidth, &RenderStyle::setBorderBottomWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
+    setPropertyHandler(CSSPropertyBorderLeftWidth, ApplyPropertyComputeLength<unsigned, &RenderStyle::borderLeftWidth, &RenderStyle::setBorderLeftWidth, &RenderStyle::initialBorderWidth, NormalDisabled, ThicknessEnabled>::createHandler());
+    setPropertyHandler(CSSPropertyOutlineWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::outlineWidth, &RenderStyle::setOutlineWidth, &RenderStyle::initialOutlineWidth, NormalDisabled, ThicknessEnabled>::createHandler());
+    setPropertyHandler(CSSPropertyWebkitColumnRuleWidth, ApplyPropertyComputeLength<unsigned short, &RenderStyle::columnRuleWidth, &RenderStyle::setColumnRuleWidth, &RenderStyle::initialColumnRuleWidth, NormalDisabled, ThicknessEnabled>::createHandler());
 
     setPropertyHandler(CSSPropertyBorderTop, ApplyPropertyExpanding<SuppressValue, CSSPropertyBorderTopColor, CSSPropertyBorderTopStyle, CSSPropertyBorderTopWidth>::createHandler());
     setPropertyHandler(CSSPropertyBorderRight, ApplyPropertyExpanding<SuppressValue, CSSPropertyBorderRightColor, CSSPropertyBorderRightStyle, CSSPropertyBorderRightWidth>::createHandler());
@@ -1715,7 +1769,7 @@ CSSStyleApplyProperty::CSSStyleApplyProperty()
     setPropertyHandler(CSSPropertyBorderColor, ApplyPropertyExpanding<SuppressValue, CSSPropertyBorderTopColor, CSSPropertyBorderRightColor, CSSPropertyBorderBottomColor, CSSPropertyBorderLeftColor>::createHandler());
     setPropertyHandler(CSSPropertyBorder, ApplyPropertyExpanding<SuppressValue, CSSPropertyBorderStyle, CSSPropertyBorderWidth, CSSPropertyBorderColor>::createHandler());
 
-    setPropertyHandler(CSSPropertyBorderImage, ApplyPropertyBorderImage<Image, CSSPropertyBorderImage, &RenderStyle::borderImage, &RenderStyle::setBorderImage>::createHandler());
+    setPropertyHandler(CSSPropertyBorderImage, ApplyPropertyExpanding<SuppressValue, CSSPropertyBorderImageSource, CSSPropertyBorderImageSlice, CSSPropertyBorderImageWidth, CSSPropertyBorderImageOutset, CSSPropertyBorderImageRepeat>::createHandler());
     setPropertyHandler(CSSPropertyWebkitBorderImage, ApplyPropertyBorderImage<Image, CSSPropertyWebkitBorderImage, &RenderStyle::borderImage, &RenderStyle::setBorderImage>::createHandler());
     setPropertyHandler(CSSPropertyWebkitMaskBoxImage, ApplyPropertyBorderImage<Mask, CSSPropertyWebkitMaskBoxImage, &RenderStyle::maskBoxImage, &RenderStyle::setMaskBoxImage>::createHandler());
 
@@ -1744,6 +1798,8 @@ CSSStyleApplyProperty::CSSStyleApplyProperty()
 
     setPropertyHandler(CSSPropertyLetterSpacing, ApplyPropertyComputeLength<int, &RenderStyle::letterSpacing, &RenderStyle::setLetterSpacing, &RenderStyle::initialLetterWordSpacing, NormalEnabled, ThicknessDisabled, SVGZoomEnabled>::createHandler());
     setPropertyHandler(CSSPropertyWordSpacing, ApplyPropertyComputeLength<int, &RenderStyle::wordSpacing, &RenderStyle::setWordSpacing, &RenderStyle::initialLetterWordSpacing, NormalEnabled, ThicknessDisabled, SVGZoomEnabled>::createHandler());
+
+    setPropertyHandler(CSSPropertyClip, ApplyPropertyClip::createHandler());
 
     setPropertyHandler(CSSPropertyCursor, ApplyPropertyCursor::createHandler());
 

@@ -403,8 +403,12 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
 #endif
     
     m_owningLayer->updateVisibilityStatus();
-    m_graphicsLayer->setContentsVisible(m_owningLayer->hasVisibleContent());
-    
+
+    // m_graphicsLayer is the corresponding GraphicsLayer for this RenderLayer and its non-compositing
+    // descendants. So, the visibility flag for m_graphicsLayer should be true if there are any
+    // non-compositing visible layers.
+    m_graphicsLayer->setContentsVisible(m_owningLayer->hasVisibleContent() || hasVisibleNonCompositingDescendantLayers());
+
     RenderStyle* style = renderer()->style();
     m_graphicsLayer->setPreserves3D(style->transformStyle3D() == TransformStyle3DPreserve3D && !renderer()->hasReflection());
     m_graphicsLayer->setBackfaceVisibility(style->backfaceVisibility() == BackfaceVisibilityVisible);
@@ -816,7 +820,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         return true;
     
     if (renderObject->node() && renderObject->node()->isDocumentNode()) {
-        // Look to see if the root object has a non-simple backgound
+        // Look to see if the root object has a non-simple background
         RenderObject* rootObject = renderObject->document()->documentElement()->renderer();
         if (!rootObject)
             return false;
@@ -838,23 +842,19 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         
         if (hasBoxDecorationsOrBackgroundImage(style))
             return false;
-
-        // Check to see if all the body's children are compositing layers.
-        if (hasVisibleNonCompositingDescendants())
-            return false;
-        
-        return true;
     }
 
     // Check to see if all the renderer's children are compositing layers.
-    if (isVisible && hasVisibleNonCompositingDescendants())
+    if (isVisible && containsNonEmptyRenderers())
+        return false;
+        
+    if (hasVisibleNonCompositingDescendantLayers())
         return false;
     
     return true;
 }
 
-// Conservative test for having no rendered children.
-bool RenderLayerBacking::hasVisibleNonCompositingDescendants() const
+bool RenderLayerBacking::containsNonEmptyRenderers() const
 {
     // Some HTML can cause whitespace text nodes to have renderers, like:
     // <div>
@@ -870,7 +870,12 @@ bool RenderLayerBacking::hasVisibleNonCompositingDescendants() const
                 return true;
         }
     }
+    return false;
+}
 
+// Conservative test for having no rendered children.
+bool RenderLayerBacking::hasVisibleNonCompositingDescendantLayers() const
+{
     if (Vector<RenderLayer*>* normalFlowList = m_owningLayer->normalFlowList()) {
         size_t listSize = normalFlowList->size();
         for (size_t i = 0; i < listSize; ++i) {
@@ -1178,12 +1183,12 @@ void RenderLayerBacking::didCommitChangesForLayer(const GraphicsLayer*) const
     compositor()->didFlushChangesForLayer(m_owningLayer);
 }
 
-bool RenderLayerBacking::showDebugBorders() const
+bool RenderLayerBacking::showDebugBorders(const GraphicsLayer*) const
 {
     return compositor() ? compositor()->compositorShowDebugBorders() : false;
 }
 
-bool RenderLayerBacking::showRepaintCounter() const
+bool RenderLayerBacking::showRepaintCounter(const GraphicsLayer*) const
 {
     return compositor() ? compositor()->compositorShowRepaintCounter() : false;
 }

@@ -51,6 +51,7 @@ namespace JSC {
         TypedArrayInt16,
         TypedArrayInt32,
         TypedArrayUint8,
+        TypedArrayUint8Clamped,
         TypedArrayUint16,
         TypedArrayUint32,
         TypedArrayFloat32,
@@ -95,7 +96,6 @@ namespace JSC {
         bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;
         bool toBoolean(ExecState*) const;
         JS_EXPORT_PRIVATE double toNumber(ExecState*) const;
-        JS_EXPORT_PRIVATE UString toString(ExecState*) const;
         JS_EXPORT_PRIVATE JSObject* toObject(ExecState*, JSGlobalObject*) const;
 
         static void visitChildren(JSCell*, SlotVisitor&);
@@ -152,8 +152,6 @@ namespace JSC {
         static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
 
         // Dummy implementations of override-able static functions for classes to put in their MethodTable
-        static NO_RETURN_DUE_TO_ASSERT void defineGetter(JSObject*, ExecState*, const Identifier&, JSObject*, unsigned);
-        static NO_RETURN_DUE_TO_ASSERT void defineSetter(JSObject*, ExecState*, const Identifier& propertyName, JSObject* setterFunction, unsigned attributes = 0);
         static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
         static NO_RETURN_DUE_TO_ASSERT void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
         static NO_RETURN_DUE_TO_ASSERT void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);

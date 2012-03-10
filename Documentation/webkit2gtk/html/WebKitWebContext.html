@@ -26,6 +26,8 @@
                   <a href="#WebKitWebContext.description" class="shortcut">Description</a>
                    | 
                   <a href="#WebKitWebContext.object-hierarchy" class="shortcut">Object Hierarchy</a>
+                   | 
+                  <a href="#WebKitWebContext.signals" class="shortcut">Signals</a>
 </td></tr>
 </table>
 <div class="refentry">
@@ -45,13 +47,21 @@ enum                <a class="link" href="WebKitWebContext.html#WebKitCacheModel
 <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="returnvalue">WebKitCacheModel</span></a>    <a class="link" href="WebKitWebContext.html#webkit-web-context-get-cache-model" title="webkit_web_context_get_cache_model ()">webkit_web_context_get_cache_model</a>  (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()">webkit_web_context_set_cache_model</a>  (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a> cache_model</code></em>);
+<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="returnvalue">WebKitDownload</span></a> *    <a class="link" href="WebKitWebContext.html#webkit-web-context-download-uri" title="webkit_web_context_download_uri ()">webkit_web_context_download_uri</a>     (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebContext.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
    +----WebKitWebContext
+</pre>
+</div>
+<div class="refsect1">
+<a name="WebKitWebContext.signals"></a><h2>Signals</h2>
+<pre class="synopsis">
+  "<a class="link" href="WebKitWebContext.html#WebKitWebContext-download-started" title='The "download-started" signal'>download-started</a>"                               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
 </pre>
 </div>
 <div class="refsect1">
@@ -186,6 +196,65 @@ WEBKIT_CACHE_MODEL_WEB_BROWSER.
 <td><p><span class="term"><em class="parameter"><code>cache_model</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a>
 </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-download-uri"></a><h3>webkit_web_context_download_uri ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="returnvalue">WebKitDownload</span></a> *    webkit_web_context_download_uri     (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
+<p>
+Requests downloading of the specified URI string.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>uri</code></em> :</span></p></td>
+<td>the URI to download</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a new <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> representing the
+the download operation. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+<div class="refsect1">
+<a name="WebKitWebContext.signal-details"></a><h2>Signal Details</h2>
+<div class="refsect2">
+<a name="WebKitWebContext-download-started"></a><h3>The <code class="literal">"download-started"</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context,
+                                                        <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a>   *download,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>          user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+This signal is emitted when a new download request is made.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> associated with this event</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
 </tr>
 </tbody>
 </table></div>

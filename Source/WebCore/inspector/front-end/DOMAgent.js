@@ -31,10 +31,12 @@
 
 /**
  * @constructor
- * @param {WebInspector.DOMDocument} doc
+ * @param {WebInspector.DOMAgent} domAgent
+ * @param {?WebInspector.DOMDocument} doc
  * @param {DOMAgent.Node} payload
  */
-WebInspector.DOMNode = function(doc, payload) {
+WebInspector.DOMNode = function(domAgent, doc, payload) {
+    this._domAgent = domAgent;
     this.ownerDocument = doc;
 
     this.id = payload.nodeId;
@@ -60,28 +62,43 @@ WebInspector.DOMNode = function(doc, payload) {
     if (payload.children)
         this._setChildrenPayload(payload.children);
 
-    this._computedStyle = null;
-    this.style = null;
-    this._matchedCSSRules = [];
+    if (payload.contentDocument) {
+        this._contentDocument = new WebInspector.DOMDocument(domAgent, payload.contentDocument);
+        this.children = [this._contentDocument];
+        this._renumber();
+    }
 
     if (this._nodeType === Node.ELEMENT_NODE) {
         // HTML and BODY from internal iframes should not overwrite top-level ones.
-        if (!this.ownerDocument.documentElement && this._nodeName === "HTML")
+        if (this.ownerDocument && !this.ownerDocument.documentElement && this._nodeName === "HTML")
             this.ownerDocument.documentElement = this;
-        if (!this.ownerDocument.body && this._nodeName === "BODY")
+        if (this.ownerDocument && !this.ownerDocument.body && this._nodeName === "BODY")
             this.ownerDocument.body = this;
-        if (payload.documentURL)
-            this.documentURL = payload.documentURL;
     } else if (this._nodeType === Node.DOCUMENT_TYPE_NODE) {
         this.publicId = payload.publicId;
         this.systemId = payload.systemId;
         this.internalSubset = payload.internalSubset;
-    } else if (this._nodeType === Node.DOCUMENT_NODE) {
-        this.documentURL = payload.documentURL;
-        this.xmlVersion = payload.xmlVersion;
     } else if (this._nodeType === Node.ATTRIBUTE_NODE) {
         this.name = payload.name;
         this.value = payload.value;
+    }
+}
+
+/**
+ * @constructor
+ * @param {string} value
+ * @param {boolean} optimized
+ */
+WebInspector.DOMNode.XPathStep = function(value, optimized)
+{
+    this.value = value;
+    this.optimized = optimized;
+}
+
+WebInspector.DOMNode.XPathStep.prototype = {
+    toString: function()
+    {
+        return this.value;
     }
 }
 
@@ -128,11 +145,11 @@ WebInspector.DOMNode.prototype = {
 
     /**
      * @param {string} name
-     * @param {function()=} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     setNodeName: function(name, callback)
     {
-        DOMAgent.setNodeName(this.id, name, callback);
+        DOMAgent.setNodeName(this.id, name, WebInspector.domAgent._markRevision(this, callback));
     },
 
     /**
@@ -157,7 +174,7 @@ WebInspector.DOMNode.prototype = {
      */
     setNodeValue: function(value, callback)
     {
-        DOMAgent.setNodeValue(this.id, value, callback);
+        DOMAgent.setNodeValue(this.id, value, WebInspector.domAgent._markRevision(this, callback));
     },
 
     /**
@@ -173,21 +190,21 @@ WebInspector.DOMNode.prototype = {
     /**
      * @param {string} name
      * @param {string} text
-     * @param {function()=} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     setAttribute: function(name, text, callback)
     {
-        DOMAgent.setAttributesAsText(this.id, text, name, callback);
+        DOMAgent.setAttributesAsText(this.id, text, name, WebInspector.domAgent._markRevision(this, callback));
     },
 
     /**
      * @param {string} name
      * @param {string} value
-     * @param {function()=} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     setAttributeValue: function(name, value, callback)
     {
-        DOMAgent.setAttributeValue(this.id, name, value, callback);
+        DOMAgent.setAttributeValue(this.id, name, value, WebInspector.domAgent._markRevision(this, callback));
     },
 
     /**
@@ -200,7 +217,7 @@ WebInspector.DOMNode.prototype = {
 
     /**
      * @param {string} name
-     * @param {function()=} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     removeAttribute: function(name, callback)
     {
@@ -216,8 +233,7 @@ WebInspector.DOMNode.prototype = {
                 }
             }
 
-            if (callback)
-                callback();
+            WebInspector.domAgent._markRevision(this, callback)(error);
         }
         DOMAgent.removeAttribute(this.id, name, mycallback.bind(this));
     },
@@ -237,10 +253,12 @@ WebInspector.DOMNode.prototype = {
          * @this {WebInspector.DOMNode}
          * @param {?Protocol.Error} error
          */
-        function mycallback(error) {
+        function mycallback(error)
+        {
             if (!error && callback)
                 callback(this.children);
         }
+
         DOMAgent.requestChildNodes(this.id, mycallback.bind(this));
     },
 
@@ -258,7 +276,7 @@ WebInspector.DOMNode.prototype = {
      */
     setOuterHTML: function(html, callback)
     {
-        DOMAgent.setOuterHTML(this.id, html, callback);
+        DOMAgent.setOuterHTML(this.id, html, WebInspector.domAgent._markRevision(this, callback));
     },
 
     /**
@@ -266,15 +284,25 @@ WebInspector.DOMNode.prototype = {
      */
     removeNode: function(callback)
     {
-        DOMAgent.removeNode(this.id, callback);
+        DOMAgent.removeNode(this.id, WebInspector.domAgent._markRevision(this, callback));
+    },
+
+    copyNode: function()
+    {
+        function copy(error, text)
+        {
+            if (!error)
+                InspectorFrontendHost.copyText(text);
+        }
+        DOMAgent.getOuterHTML(this.id, copy);
     },
 
     /**
-     * @param {function(?Protocol.Error)=} callback
+     * @param {boolean} optimized
      */
-    copyNode: function(callback)
+    copyXPath: function(optimized)
     {
-        DOMAgent.copyNode(this.id, callback);
+        InspectorFrontendHost.copyText(this.xPath(optimized));
     },
 
     /**
@@ -371,7 +399,7 @@ WebInspector.DOMNode.prototype = {
      */
     _insertChild: function(prev, payload)
     {
-        var node = new WebInspector.DOMNode(this.ownerDocument, payload);
+        var node = new WebInspector.DOMNode(this._domAgent, this.ownerDocument, payload);
         if (!prev) {
             if (!this.children) {
                 // First node
@@ -399,10 +427,14 @@ WebInspector.DOMNode.prototype = {
      */
     _setChildrenPayload: function(payloads)
     {
+        // We set children in the constructor.
+        if (this._contentDocument)
+            return;
+
         this.children = [];
         for (var i = 0; i < payloads.length; ++i) {
             var payload = payloads[i];
-            var node = new WebInspector.DOMNode(this.ownerDocument, payload);
+            var node = new WebInspector.DOMNode(this._domAgent, this.ownerDocument, payload);
             this.children.push(node);
         }
         this._renumber();
@@ -468,26 +500,13 @@ WebInspector.DOMNode.prototype = {
     },
 
     /**
-     * @return {WebInspector.DOMNode}
-     */
-    ownerDocumentElement: function()
-    {
-        // document element is the child of the document / frame owner node that has documentURL property.
-        // FIXME: return document nodes as a part of the DOM tree structure.
-        var node = this;
-        while (node.parentNode && !node.parentNode.documentURL)
-            node = node.parentNode;
-        return node;
-    },
-
-    /**
      * @param {WebInspector.DOMNode} targetNode
      * @param {?WebInspector.DOMNode} anchorNode
      * @param {function(?Protocol.Error)=} callback
      */
     moveTo: function(targetNode, anchorNode, callback)
     {
-        DOMAgent.moveTo(this.id, targetNode.id, anchorNode ? anchorNode.id : undefined, callback);
+        DOMAgent.moveTo(this.id, targetNode.id, anchorNode ? anchorNode.id : undefined, WebInspector.domAgent._markRevision(this, callback));
     },
 
     /**
@@ -496,6 +515,121 @@ WebInspector.DOMNode.prototype = {
     isXMLNode: function()
     {
         return !!this.ownerDocument && !!this.ownerDocument.xmlVersion;
+    },
+
+    /**
+     * @param {boolean} optimized
+     * @return {string}
+     */
+    xPath: function(optimized)
+    {
+        if (this._nodeType === Node.DOCUMENT_NODE)
+            return "/";
+
+        var steps = [];
+        var contextNode = this;
+        while (contextNode) {
+            var step = contextNode._xPathValue(optimized);
+            if (!step)
+                break; // Error - bail out early.
+            steps.push(step);
+            if (step.optimized)
+                break;
+            contextNode = contextNode.parentNode;
+        }
+
+        steps.reverse();
+        return (steps.length && steps[0].optimized ? "" : "/") + steps.join("/");
+    },
+
+    /**
+     * @param {boolean} optimized
+     * @return {WebInspector.DOMNode.XPathStep}
+     */
+    _xPathValue: function(optimized)
+    {
+        var ownValue;
+        var ownIndex = this._xPathIndex();
+        if (ownIndex === -1)
+            return null; // Error.
+
+        switch (this._nodeType) {
+        case Node.ELEMENT_NODE:
+            if (optimized && this.getAttribute("id"))
+                return new WebInspector.DOMNode.XPathStep("//*[@id=\"" + this.getAttribute("id") + "\"]", true);
+            ownValue = this._localName;
+            break;
+        case Node.ATTRIBUTE_NODE:
+            ownValue = "@" + this._nodeName;
+            break;
+        case Node.TEXT_NODE:
+        case Node.CDATA_SECTION_NODE:
+            ownValue = "text()";
+            break;
+        case Node.PROCESSING_INSTRUCTION_NODE:
+            ownValue = "processing-instruction()";
+            break;
+        case Node.COMMENT_NODE:
+            ownValue = "comment()";
+            break;
+        case Node.DOCUMENT_NODE:
+            ownValue = "";
+            break;
+        default:
+            ownValue = "";
+            break;
+        }
+
+        if (ownIndex > 0)
+            ownValue += "[" + ownIndex + "]";
+
+        return new WebInspector.DOMNode.XPathStep(ownValue, this._nodeType === Node.DOCUMENT_NODE);
+    },
+
+    /**
+     * @return {number}
+     */
+    _xPathIndex: function()
+    {
+        // Returns -1 in case of error, 0 if no siblings matching the same expression, <XPath index among the same expression-matching sibling nodes> otherwise.
+        function areNodesSimilar(left, right)
+        {
+            if (left === right)
+                return true;
+
+            if (left._nodeType === Node.ELEMENT_NODE && right._nodeType === Node.ELEMENT_NODE)
+                return left._localName === right._localName;
+
+            if (left._nodeType === right._nodeType)
+                return true;
+
+            // XPath treats CDATA as text nodes.
+            var leftType = left._nodeType === Node.CDATA_SECTION_NODE ? Node.TEXT_NODE : left._nodeType;
+            var rightType = right._nodeType === Node.CDATA_SECTION_NODE ? Node.TEXT_NODE : right._nodeType;
+            return leftType === rightType;
+        }
+
+        var siblings = this.parentNode ? this.parentNode.children : null;
+        if (!siblings)
+            return 0; // Root node - no siblings.
+        var hasSameNamedElements;
+        for (var i = 0; i < siblings.length; ++i) {
+            if (areNodesSimilar(this, siblings[i]) && siblings[i] !== this) {
+                hasSameNamedElements = true;
+                break;
+            }
+        }
+        if (!hasSameNamedElements)
+            return 0;
+        var ownIndex = 1; // XPath indices start with 1.
+        for (var i = 0; i < siblings.length; ++i) {
+            if (areNodesSimilar(this, siblings[i])) {
+                if (siblings[i] === this)
+                    return ownIndex;
+                ++ownIndex;
+            }
+        }
+        return -1; // An error occurred: |this| not found in parent's children.
     }
 }
 
@@ -507,14 +641,11 @@ WebInspector.DOMNode.prototype = {
  */
 WebInspector.DOMDocument = function(domAgent, payload)
 {
-    WebInspector.DOMNode.call(this, this, payload);
-
-    /**
-     * @type {string} Document nodes always have documentURL
-     */
-    this.documentURL;
+    WebInspector.DOMNode.call(this, domAgent, this, payload);
+    this.documentURL = payload.documentURL || "";
+    this.xmlVersion = payload.xmlVersion;
+    domAgent._idToDOMNode[this.id] = this;
     this._listeners = {};
-    this._domAgent = domAgent;
 }
 
 WebInspector.DOMDocument.prototype.__proto__ = WebInspector.DOMNode.prototype;
@@ -743,7 +874,6 @@ WebInspector.DOMAgent.prototype = {
         this._idToDOMNode = {};
         if (payload && "nodeId" in payload) {
             this._document = new WebInspector.DOMDocument(this, payload);
-            this._idToDOMNode[payload.nodeId] = this._document;
             if (this._document.children)
                 this._bindNodes(this._document.children);
         } else
@@ -756,7 +886,7 @@ WebInspector.DOMAgent.prototype = {
      */
     _setDetachedRoot: function(payload)
     {
-        var root = new WebInspector.DOMNode(this._document, payload);
+        var root = new WebInspector.DOMNode(this, null, payload);
         this._idToDOMNode[payload.nodeId] = root;
     },
 
@@ -977,6 +1107,56 @@ WebInspector.DOMAgent.prototype = {
             highlightConfig.marginColor = WebInspector.Color.PageHighlight.Margin.toProtocolRGBA();
 
         return highlightConfig;
+    },
+
+    /**
+     * @param {WebInspector.DOMNode} node
+     * @param {function(?Protocol.Error)=} callback
+     * @return {function(?Protocol.Error)}
+     */
+    _markRevision: function(node, callback)
+    {
+        function wrapperFunction(error)
+        {
+            if (callback)
+                callback.apply(this, arguments);
+            if (error || !WebInspector.experimentsSettings.freeFlowDOMEditing.isEnabled())
+                return;
+            if (this._captureDOMTimer)
+               clearTimeout(this._captureDOMTimer);
+            this._captureDOMTimer = setTimeout(this._captureDOM.bind(this, node), 500);
+        }
+        return wrapperFunction.bind(this);
+    },
+
+    /**
+     * @param {WebInspector.DOMNode} node
+     */
+    _captureDOM: function(node)
+    {
+        delete this._captureDOMTimer;
+        if (!node.ownerDocument)
+            return;
+
+        function callback(error, text)
+        {
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            var url = node.ownerDocument.documentURL;
+            if (!url)
+                return;
+
+            var resource = WebInspector.resourceForURL(url);
+            if (!resource)
+                return;
+
+            resource.addRevision(text);
+        }
+        DOMAgent.getOuterHTML(node.ownerDocument.id, callback);
+        
     }
 }
 
@@ -1090,7 +1270,19 @@ WebInspector.DOMModelResourceBinding = function(domAgent)
 WebInspector.DOMModelResourceBinding.prototype = {
     setContent: function(resource, content, majorChange, userCallback)
     {
-        DOMAgent.setOuterHTML(0, content, userCallback);
+        var frameId = resource.frameId;
+        if (!frameId)
+            return;
+
+        PageAgent.setDocumentContent(frameId, content, callbackWrapper);
+
+        function callbackWrapper(error)
+        {
+            if (majorChange)
+                resource.addRevision(content);
+            if (userCallback)
+                userCallback(error);
+        }
     },
 
     canSetContent: function()

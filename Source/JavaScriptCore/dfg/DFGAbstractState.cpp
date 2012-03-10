@@ -121,6 +121,8 @@ void AbstractState::initialize(Graph& graph)
             root->valuesAtHead.argument(i).set(PredictInt32Array);
         else if (isUint8ArrayPrediction(prediction))
             root->valuesAtHead.argument(i).set(PredictUint8Array);
+        else if (isUint8ClampedArrayPrediction(prediction))
+            root->valuesAtHead.argument(i).set(PredictUint8ClampedArray);
         else if (isUint16ArrayPrediction(prediction))
             root->valuesAtHead.argument(i).set(PredictUint16Array);
         else if (isUint32ArrayPrediction(prediction))
@@ -278,7 +280,7 @@ bool AbstractState::execute(NodeIndex nodeIndex)
             
     case ValueAdd:
     case ArithAdd: {
-        if (Node::shouldSpeculateInteger(m_graph[node.child1()], m_graph[node.child2()]) && node.canSpeculateInteger()) {
+        if (m_graph.addShouldSpeculateInteger(node, m_codeBlock)) {
             forNode(node.child1()).filter(PredictInt32);
             forNode(node.child2()).filter(PredictInt32);
             forNode(nodeIndex).set(PredictInt32);
@@ -296,7 +298,19 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         break;
     }
             
-    case ArithSub:
+    case ArithSub: {
+        if (m_graph.addShouldSpeculateInteger(node, m_codeBlock)) {
+            forNode(node.child1()).filter(PredictInt32);
+            forNode(node.child2()).filter(PredictInt32);
+            forNode(nodeIndex).set(PredictInt32);
+            break;
+        }
+        forNode(node.child1()).filter(PredictNumber);
+        forNode(node.child2()).filter(PredictNumber);
+        forNode(nodeIndex).set(PredictDouble);
+        break;
+    }
+        
     case ArithMul:
     case ArithDiv:
     case ArithMin:
@@ -448,6 +462,12 @@ bool AbstractState::execute(NodeIndex nodeIndex)
             forNode(nodeIndex).set(PredictInt32);
             break;
         }
+        if (m_graph[node.child1()].shouldSpeculateUint8ClampedArray()) {
+            forNode(node.child1()).filter(PredictUint8ClampedArray);
+            forNode(node.child2()).filter(PredictInt32);
+            forNode(nodeIndex).set(PredictInt32);
+            break;
+        }
         if (m_graph[node.child1()].shouldSpeculateUint16Array()) {
             forNode(node.child1()).filter(PredictUint16Array);
             forNode(node.child2()).filter(PredictInt32);
@@ -518,6 +538,12 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         }
         if (m_graph[node.child1()].shouldSpeculateUint8Array()) {
             forNode(node.child1()).filter(PredictUint8Array);
+            forNode(node.child2()).filter(PredictInt32);
+            forNode(node.child3()).filter(PredictNumber);
+            break;
+        }
+        if (m_graph[node.child1()].shouldSpeculateUint8ClampedArray()) {
+            forNode(node.child1()).filter(PredictUint8ClampedArray);
             forNode(node.child2()).filter(PredictInt32);
             forNode(node.child3()).filter(PredictNumber);
             break;
@@ -688,6 +714,7 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         break;
             
     case GetById:
+    case GetByIdFlush:
         if (!node.prediction()) {
             m_isValid = false;
             break;
@@ -726,6 +753,10 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         break;
     case GetUint8ArrayLength:
         forNode(node.child1()).filter(PredictUint8Array);
+        forNode(nodeIndex).set(PredictInt32);
+        break;
+    case GetUint8ClampedArrayLength:
+        forNode(node.child1()).filter(PredictUint8ClampedArray);
         forNode(nodeIndex).set(PredictInt32);
         break;
     case GetUint16ArrayLength:
@@ -794,6 +825,11 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         }
         if (m_graph[node.child1()].shouldSpeculateUint8Array()) {
             forNode(node.child1()).filter(PredictUint8Array);
+            forNode(nodeIndex).clear();
+            break;
+        }
+        if (m_graph[node.child1()].shouldSpeculateUint8ClampedArray()) {
+            forNode(node.child1()).filter(PredictUint8ClampedArray);
             forNode(nodeIndex).clear();
             break;
         }

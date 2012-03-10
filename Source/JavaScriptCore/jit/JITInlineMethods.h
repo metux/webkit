@@ -401,13 +401,13 @@ ALWAYS_INLINE bool JIT::isOperandConstantImmediateChar(unsigned src)
 
 template <typename ClassType, typename StructureType> inline void JIT::emitAllocateBasicJSObject(StructureType structure, RegisterID result, RegisterID storagePtr)
 {
-    MarkedSpace::SizeClass* sizeClass = &m_globalData->heap.sizeClassForObject(sizeof(ClassType));
-    loadPtr(&sizeClass->firstFreeCell, result);
+    MarkedAllocator* allocator = &m_globalData->heap.allocatorForObject(sizeof(ClassType));
+    loadPtr(&allocator->m_firstFreeCell, result);
     addSlowCase(branchTestPtr(Zero, result));
 
     // remove the object from the free list
     loadPtr(Address(result), storagePtr);
-    storePtr(storagePtr, &sizeClass->firstFreeCell);
+    storePtr(storagePtr, &allocator->m_firstFreeCell);
 
     // initialize the object's structure
     storePtr(structure, Address(result, JSCell::structureOffset()));
@@ -486,20 +486,16 @@ inline void JIT::emitValueProfilingSite(ValueProfile* valueProfile)
 #endif
 }
 
-inline void JIT::emitValueProfilingSite(ValueProfilingSiteKind siteKind)
+inline void JIT::emitValueProfilingSite(unsigned bytecodeOffset)
 {
     if (!shouldEmitProfiling())
         return;
-    
-    ValueProfile* valueProfile;
-    if (siteKind == FirstProfilingSite)
-        valueProfile = m_codeBlock->addValueProfile(m_bytecodeOffset);
-    else {
-        ASSERT(siteKind == SubsequentProfilingSite);
-        valueProfile = m_codeBlock->valueProfileForBytecodeOffset(m_bytecodeOffset);
-    }
-    
-    emitValueProfilingSite(valueProfile);
+    emitValueProfilingSite(m_codeBlock->valueProfileForBytecodeOffset(bytecodeOffset));
+}
+
+inline void JIT::emitValueProfilingSite()
+{
+    emitValueProfilingSite(m_bytecodeOffset);
 }
 #endif
 
