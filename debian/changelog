@@ -1,0 +1,644 @@
+webkit (1.2.0-1) unstable; urgency=low
+
+  * New upstream release - this is the first release in the 1.2 stable
+    branch
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 07 Apr 2010 20:18:57 -0300
+
+webkit (1.1.90-1) unstable; urgency=low
+
+  * New upstream release
+  - This marks the preparation for the 1.2 stable branch
+  * debian/copyright:
+  - updated with changes since 1.1.22
+  * debian/libwebkit-1.0-2.symbols:
+  - added new API introduced in 1.1.23
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 17 Mar 2010 15:05:11 -0300
+
+webkit (1.1.22-1) unstable; urgency=low
+
+  * New upstream release
+  - Fixes crash with unknown content types in data:// URIs
+    (Closes: #563695)
+  - Sends Accept header for sub resources, which makes a few sites become
+    happy again (Closes: #563736)
+  * debian/copyright:
+  - updated with changes since 1.1.21
+  * debian/control:
+  - replace gobject-introspection-repository, to avoid failures on upgrade
+    (Closes: #563312)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 16 Feb 2010 11:55:07 -0200
+
+webkit (1.1.21-2) unstable; urgency=low
+
+  * debian/control:
+  - Build-Depend on soup 2.29.90; WebKitGTK+'s configure system checks for
+    this version to enable cookie policy-related features, and we want
+    those on for sure
+  * Import patch from upstream to fix crash when returning to a cached page
+    which has data: uris, and is in the page cache (Closes: #569950)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 15 Feb 2010 11:49:00 -0200
+
+webkit (1.1.21-1) unstable; urgency=low
+
+  * New upstream release
+  - imported a number of fixes to the scrolling code that made navigating
+    the history crashy with page cache enabled (Closes: #569072)
+  * debian/copyright:
+  - updated with changes since 1.1.20.
+  * debian/libwebkit-1.0-2.symbols:
+  - added a symbol that was added in 1.1.21.
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 10 Feb 2010 20:31:38 -0200
+
+webkit (1.1.20-1) unstable; urgency=low
+
+  * New upstream release
+  * debian/copyright:
+  - Updated with changes since 1.1.19.
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 04 Feb 2010 19:30:57 -0200
+
+webkit (1.1.19-1) unstable; urgency=low
+
+  * New upstream release
+  - Fixes crashes related to clearing the clipboard, which many users were
+    experiencing (Closes: #565166)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 20 Jan 2010 20:09:57 -0200
+
+webkit (1.1.18-2) unstable; urgency=low
+
+  * debian/control:
+  - build-depend on gobject-introspection >= 0.6.2, following what the
+    configure script does (Closes: #564453)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Sat, 09 Jan 2010 20:14:23 -0200
+
+webkit (1.1.18-1) unstable; urgency=low
+
+  * New upstream release
+  - adds basic Content-Encoding support, thanks to soup
+    (Closes: #529271)
+  - fixes over-advertising content types as supported by
+    the media player (Closes: #559420)
+  * debian/control:
+  - updated libsoup build requirement (>= 2.28.2)
+  * debian/libwebkit-1.0-2.symbols:
+  - updated with new symbols
+  * debian/copyright:
+  - updated information since 1.1.17
+  * Imported patch from https://bugs.webkit.org/show_bug.cgi?id=30623
+  - I am shipping this patch because I believe it is correct, it is the
+    way to go, it fixes a race, and it needs testing.
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 06 Jan 2010 21:25:06 -0200
+
+webkit (1.1.17-2) unstable; urgency=low
+
+  * debian/control:
+  - bump Standards-Version to 3.8.3
+  * debian/debian/gir1.0-webkit-1.0.install, debian/control,
+    debian/rules, debian/libwebkit-dev.install:
+  - add gir1.0-webkit-1.0 package, and enable introspection support
+  - make libwebkit-dev Replace gir-repository-dev
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 03 Dec 2009 12:16:27 -0200
+
+webkit (1.1.17-1) unstable; urgency=low
+
+  * New upstream release
+  * debian/copyright:
+  - updated with changes since 1.1.16
+  * debian/libwebkit-1.0-2.symbols:
+  - updated
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 02 Dec 2009 23:13:32 -0200
+
+webkit (1.1.16-3) unstable; urgency=low
+
+  * Fix building on kfresbsd-amd64 (Closes: #554718)
+    - Patch by Petr Salinger <Petr.Salinger@seznam.cz>
+  * Fix tightened dependency
+  * debian/rules:
+  - remove rpath from GtkLauncher and DumpRenderTree
+  * debian/control:
+  - depend on chrpath for change above
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 11 Nov 2009 21:21:12 -0200
+
+webkit (1.1.16-2) unstable; urgency=low
+
+  * debian/control:
+  - tighten libwebkit-dev dependency on the library
+    (Closes: #554014)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 02 Nov 2009 17:07:03 -0200
+
+webkit (1.1.16-1) unstable; urgency=low
+
+  * New upstream release
+  * debian/copyright:
+  - updated with the copyright changes since 1.1.15
+  * debian/libwebkit-1.0-2.symbols:
+  - updated with new symbols
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 29 Oct 2009 19:06:20 -0200
+
+webkit (1.1.15.2-1) unstable; urgency=low
+
+  * New upstream (semi-stable) release
+  * Fix building on IA64 (Closes: #547797)
+    Thanks to Colin Watson <cjwatson@ubuntu.com>
+  * Fix building on alpha (Closes: #548499)
+  * Fix building on amd64 FreeBSD
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 06 Oct 2009 21:17:08 +0100
+
+webkit (1.1.15.1-1) unstable; urgency=low
+
+  * New upstream (semi-stable) release
+  * debian/libwebkit-1.0-2.symbols:
+  - remove revisions from the symbol versions
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 24 Sep 2009 09:38:16 -0300
+
+webkit (1.1.15-1) experimental; urgency=low
+
+  * New upstream release
+  - includes fix for crash that will be fixed in 1.1.15.1
+  * debian/copyright:
+  - updated with changes since 1.1.14
+  * debian/libwebkit-1.0-2.symbols:
+  - updated
+  * debian/control:
+  - force same upstream version for -common
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 21 Sep 2009 21:22:43 -0300
+
+webkit (1.1.14-1) experimental; urgency=low
+
+  * New upstream release
+  * debian/copyright:
+  - updated with changes since 1.1.13
+  * debian/control:
+  - made libwebkit-dev Arch: any (Closes: #539511)
+  * debian/libwebkit-1.0-2:
+  - updated
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 09 Sep 2009 11:32:23 -0300
+
+webkit (1.1.13-1) experimental; urgency=low
+
+  * New upstream release
+  - security fixes are already included in this release
+    (Closes: #538346, #538402)
+  * debian/control:
+  - update Build-Depends on libsoup to match upstream requirements
+    (Closes: #542272)
+  - Bump Build-Depends on libsoup2.4-dev to 2.27.91
+  * debian/copyright:
+  - updated with changes since 1.1.12
+  * debian/libwebkit-1.0-2.symbols:
+  - new symbols
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 24 Aug 2009 21:25:59 -0300
+
+webkit (1.1.12-1) unstable; urgency=low
+
+  * New upstream release
+  * debian/copyright:
+  - updated with changes since 1.1.10
+  * debian/libwebkit-1.0-2.symbols:
+  - adding new symbols
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 28 Jul 2009 21:04:56 +0200
+
+webkit (1.1.10-2) unstable; urgency=low
+
+  * debian/rules:
+  - trying to get the package built on s390, by using -gstabs
+    (Closes: #528524)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 24 Jun 2009 23:05:07 -0300
+
+webkit (1.1.10-1) unstable; urgency=low
+
+  * debian/copyright:
+  - updated with the changes up to the current release
+  * debian/libwebkit-1.0-2.symbols:
+  - updated with new symbols
+  * debian/control:
+  - Build-Depend on libgail-dev
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 16 Jun 2009 18:52:32 -0300
+
+webkit (1.1.7-1) unstable; urgency=low
+
+  * New upstream release
+  * debian/libwebkit-1.0-2.symbols:
+  - updated with the new symbols in 1.1.7
+  * debian/libwebkit-dev.install, debian/libwebkit-dev.links,
+    debian/rules:
+  - Build, and ship gtk-doc documentation (Closes: #526683)
+  * debian/copyright:
+  - updated.
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Fri, 15 May 2009 18:30:58 -0300
+
+webkit (1.1.6-2) unstable; urgency=low
+
+  * Imported two changes from upstream to fix building on AMD64
+    (Closes: #527096)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 12 May 2009 15:00:47 -0300
+
+webkit (1.1.6-1) unstable; urgency=low
+
+  [ Mike Hommey ]
+  * New upstream release.
+
+  [ Gustavo Noronha Silva ]
+  * Imported patch from upstream git mirror to avoid a regression in the
+    webkit_web_frame_load_string method.
+    See https://bugs.webkit.org/show_bug.cgi?id=25466
+  * debian/copyright:
+  - updated with changes since the last release
+  * debian/libwebkit-1.0-2.symbols:
+  - updated
+  * debian/control:
+  - added libenchant-dev to the Build-Depends
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 04 May 2009 21:40:15 -0300
+
+webkit (1.1.5-2) unstable; urgency=low
+
+  * Upload to unstable.
+  * debian/libwebkit-1.0-2.symbols:
+  - removed debian revision from the symbol versions
+  * debian/control:
+  - Put the libwebkit-1.0-2-dbg package in the "debug" section.
+  - Build depend on libgstreamer-plugins-base0.10-dev. (Closes: #525554)
+  * debian/rules:
+  - Bump shlibs to fit symbols file.
+
+ -- Mike Hommey <glandium@debian.org>  Sat, 25 Apr 2009 18:42:37 +0200
+
+webkit (1.1.5-1) experimental; urgency=low
+
+  [ Mike Hommey ]
+  * New upstream release:
+  - Filter out all C++ symbols. (Closes: #521569)
+  * debian/control:
+  - Change libwebkit-1.0-common section and priority to fit override.
+  - Bumped Standards-Version to 3.8.1.0. No changes required.
+  * debian/rules:
+  - Patch config.{sub|guess} in autotools/.
+
+  [ Gustavo Noronha Silva ]
+  * debian/copyright:
+  - updated with the copyright changes since last version
+  * debian/libwebkit-1.0-0.symbols:
+  - updated with the new symbols
+  * debian/libwebkit-1.0-common.install:
+  - also install translation files
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 16 Apr 2009 23:20:43 -0300
+
+webkit (1.1.3-3) experimental; urgency=low
+
+  [ Gustavo Noronha Silva ]
+  * debian/control:
+  - make libwebkit-1.0-dev depend on libsoup2.4-dev (>= 2.25.91)
+
+  [ Mike Hommey ]
+  * autotoolsconfig.h.in:
+  - Brown paper bag fix to add missing AC_DEFINEs.
+  * debian/control:
+  - libwebkit-dev doesn't need an outdated conflict with libwebkitgdk-dev.
+  - libwebkit-1.0-2-dbg doesn't need to conflict/replace libwebkit-1.0-1-dbg
+    thanks to the changes in previous release.
+  * debian/rules:
+  - Bump shlibs to fit symbols file.
+  * debian/copyright:
+  - Updated for a small discrepancy I spotted.
+  - Added Gustavo's copyright on debian/* files and updated mine.
+
+ -- Mike Hommey <glandium@debian.org>  Fri, 27 Mar 2009 21:20:48 +0100
+
+webkit (1.1.3-2) experimental; urgency=low
+
+  [ Gustavo Noronha Silva ]
+  * debian/control, debian/libwebkit-1.0-2.install:
+  - move the GtkLauncher and DumpRenderTree binaries to a directory named
+    after the soname of the library, so that different binary incompatible
+    versions of the library are installable in parallel (Closes: #520981)
+  * debian/libwebkit-1.0-2.symbols:
+  - removed debian revision from the symbol versions
+
+  [ Mike Hommey ]
+  * JavaScriptCore/jit/JITStubs.h:
+  - Use the first definition of RETURN_PAIR on x86-64.
+  * JavaScriptCore/assembler/MacroAssemblerX86_64.h,
+    JavaScriptCore/GNUmakefile.am, GNUmakefile.in, configure.ac, configure:
+  - Enable JIT on x86-64.
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 26 Mar 2009 17:46:30 -0300
+
+webkit (1.1.3-1) experimental; urgency=low
+
+  [ Gustavo Noronha Silva ]
+  * New upstream release
+  - correctly scrolls with space bar (Closes: #519883)
+  * debian/copyright:
+  - updated with changes since last release
+  * debian/libwebkit-1.0-2.symbols:
+  - added new symbols
+
+  [ Mike Hommey ]
+  * autotools/symbols.filter, debian/libwebkit-1.0-2.symbols:
+  - Hide JIT implementation specific symbols. (Closes: #519924, #520006)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 17 Mar 2009 15:05:40 -0300
+
+webkit (1.1.1-1) experimental; urgency=low
+
+  * New 1.1.1 upstream release
+  * debian/rules, debian/control, debian/*:
+  - soversion was bumped, so rename packages accordingly
+  * debian/control:
+  - curl is not used anymore, so drop build-dependecy and replace it with
+    libsoup2.4 >= 2.25.91
+  * debian/libwebkit-1.0-2.symbols:
+  - updated symbols file; bumped required version of all symbols to 1.1.1,
+    since we had a soversion bump
+  * debian/copyright:
+  - updated with changes from last release we shipped, and updated
+    download location
+  * debian/control, debian/libwebkit-1.0-common.install:
+  - new package to distribute data files, such as the Web Inspector files
+  - libwebkit-1.0-2 now depends on libwebkit-1.0-common
+  * debian/control:
+  - add myself as an Uploader
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 05 Mar 2009 16:28:43 -0300
+
+webkit (1.0.2~pre.svn37878-1) experimental; urgency=low
+
+  * Upstream 1.0.2 pre-release, taken from svn revision 37878.
+  * debian/rules:
+    - Use configure instead of autogen.sh, now configure is shipped.
+    - Don't remove automake/autoconf generated files.
+    - Bump shlibs because of some new symbols.
+    - Don't need --enable-svg-experimental anymore.
+    - Feed configure with --host and --build.
+    - Use config.guess and config.sub from autotools-dev.
+  * debian/control: Don't build depend on autoconf/automake/libtool, but
+    autotools-dev, instead.
+  * GNUmakefile.am, GNUmakefile.in: Add missing dash in version script option.
+  * debian/libwebkit-1.0-1.symbols: Add new symbols.
+  * WebCore/page/gtk/AXObjectCacheAtk.cpp: printfs being removed upstream,
+    we don't need to #include <stdio.h> anymore.
+  * configure.ac, configure, GNUmakefile.am, GNUmakefile.in: Properly check
+    and link against libpng. bz#21884.
+  * configure.ac, configure: Properly check and link against libpangoft2.
+    bz#21885.
+  * debian/copyright: Updated to fit additions/removals of files upstream.
+
+ -- Mike Hommey <glandium@debian.org>  Sat, 25 Oct 2008 15:19:56 +0200
+
+webkit (1.0.1-4) unstable; urgency=high
+
+  * WebCore/dom/Document.*, WebCore/loader/DocLoader.*: Avoid DoS via
+    crafted CSS import statements. Fixes: CVE-2008-3632. Closes: #499771.
+
+ -- Mike Hommey <glandium@debian.org>  Sat, 27 Sep 2008 08:57:48 +0200
+
+webkit (1.0.1-3) unstable; urgency=low
+
+  * WebCore/platform/graphics/gtk/FontCacheGtk.cpp,
+    WebCore/platform/graphics/gtk/FontGtk.cpp,
+    WebCore/platform/graphics/gtk/FontPlatformData.h,
+    WebCore/platform/graphics/gtk/FontPlatformDataGtk.cpp,
+    WebCore/platform/graphics/gtk/SimpleFontDataGtk.cpp: cherry-picked change
+    from SVN revision 36309 to fix various font selection problems.
+    Closes: #464477.
+
+ -- Mike Hommey <glandium@debian.org>  Sat, 20 Sep 2008 12:02:58 +0200
+
+webkit (1.0.1-2) unstable; urgency=low
+
+  * symbols.filter: As a workaround for #490173, hide all C++ mangled symbols.
+    This will be enough for now, while fixing FTBFS on ARM.
+  * debian/rules: Build with -Wl,--no-relax on alpha, to work around a
+    binutils bug causing FTBFS.
+
+ -- Mike Hommey <glandium@debian.org>  Thu, 10 Jul 2008 21:10:27 +0200
+
+webkit (1.0.1-1) unstable; urgency=low
+
+  * New upstream release. Closes: #489385.
+  * debian/copyright:
+    - Updated to fit additions/removals of files upstream.
+    - Updated where the source was gotten.
+    - Fixed typos for Collabora. Closes: #484661.
+  * JavaScriptCore/wtf/FastMalloc.cpp, JavaScriptCore/wtf/ListHashSet.h,
+    JavaScriptCore/wtf/Platform.h, JavaScriptCore/wtf/Vector.h,
+    WebCore/platform/text/AtomicString.cpp,
+    WebCore/platform/text/StringHash.h: Fixed some alignment problems on sparc
+    (and some that might occur on arm, too). Closes: #487745. Some compiler
+    warnings about alignment remain, but I don't know if they are a real
+    problem yet.
+  * debian/control:
+    - Added build dependency on libxt-dev.
+    - Relax libwebkit-dev dependency on libwebkit-1.0-1.
+    - Bumped Standards-Version to 3.8.0.1. No changes.
+  * WebCore/page/gtk/AXObjectCacheAtk.cpp: Include stdio.h to avoid FTBFS
+    because of undefined printf.
+  * GNUmakefile.am, symbols.filter: Filter out all std::* symbols exported
+    because of stl headers.
+  * debian/libwebkit-1.0-1.symbols: Add symbols file.
+  * debian/rules: Bump shlibs because of some new symbols.
+
+ -- Mike Hommey <glandium@debian.org>  Sun, 06 Jul 2008 15:09:55 +0200
+
+webkit (0~svn32442-1) unstable; urgency=low
+
+  [ Mike Hommey ]
+  * New upstream snapshot
+  * debian/copyright: Updated to fit additions/removals of files upstream.
+  * debian/control: Add libpango1.0-dev to build dependencies and tighten
+    libgtk2.0-dev build dependency. Closes: #477493.
+
+  [ Luca Bruno ]
+  * debian/libwebkit-1.0-1.install, debian/rules: Install GtkLauncher
+    and DumpRenderTree in /usr/lib/webkit-1.0/libexec. Closes: #476514.
+
+ -- Mike Hommey <glandium@debian.org>  Wed, 23 Apr 2008 22:20:25 +0200
+
+webkit (0~svn31841-1) unstable; urgency=low
+
+  * New upstream snapshot
+    + Includes proper Requires in .pc file. Closes: #450949.
+  * debian/copyright: Updated to fit additions/removals of files upstream.
+  * debian/control, debian/rules: Don't build QtWebKit, it will be built from
+    Qt sources.
+  * debian/libqtwebkit*: Removed.
+  * debian/rules: Replaced make calls with $(MAKE).
+  * debian/control, debian/rules: Don't use qmake anymore, but use autotools
+    instead.
+  * debian/libwebkitgtk-dev.install: Remove the .prl file that was generated
+    by qmake.
+  * WebCore/WebCore.pro, WebKit.pro: Revert previous changes, as we don't use
+    qmake anymore.
+  * JavaScriptCore/wtf/ASCIICType.h: Revert what were warning fixes, to avoid
+    diverging too much from upstream.
+  * debian/rules: Clean-up autotools generated files in the clean target.
+  * debian/control, debian/rules, debian/libwebkit*: Rename packages to fit
+    new library SONAME.
+  * debian/control: libwebkit-dev doesn't need to depend on libglib2.0-dev.
+  * debian/libwebkit-1.0-1.install, debian/rules: Install GtkLauncher and
+    DumpRenderTree in /usr/lib/webkit-1.0, and don't rename DumpRenderTree, as
+    Qt homonym lie elsewhere.
+  * debian/libwebkit-1.0-1.preinst, debian/libwebkit-1.0-1.postrm: Don't
+    divert anything, since we don't clash with older files anymore.
+  * debian/rules: Ugly hack to add -Wl,--as-needed without it getting reordered
+    by libtool.
+  * WebKitTools/GNUmakefile.am: Don't build GtkLauncher and DumpRenderTree
+    with rpath.
+
+ -- Mike Hommey <glandium@debian.org>  Sat, 12 Apr 2008 21:40:00 +0200
+
+webkit (0~svn27674-4) unstable; urgency=low
+
+  * debian/rules: Revert change from 0~svn27674-3, which was obviously not
+    enough.
+  * WebKit.pro: Don't build testkjs, that provokes the s390 FTBFSes ; we don't
+    install it anyways. Closes: #466848.
+  * JavaScriptCore/kjs/interpreter.cpp, JavaScriptCore/wtf/ASCIICType.h,
+    WebCore/dom/Position.cpp, WebCore/editing/Selection.cpp,
+    WebCore/editing/SelectionController.cpp,
+    WebCore/editing/VisiblePosition.cpp,
+    WebCore/ksvg2/svg/SVGFontFaceElement.cpp,
+    WebCore/loader/FTPDirectoryParser.cpp,
+    WebCore/loader/icon/IconDatabase.cpp,
+    WebCore/platform/TextCodecLatin1.cpp,
+    WebCore/platform/TextCodecUserDefined.cpp,
+    WebCore/platform/TextStream.cpp,
+    WebCore/platform/image-decoders/jpeg/JPEGImageDecoder.cpp: Fix FTBFS with
+    gcc 4.3 due to missing includes. Closes: #455125.
+
+ -- Mike Hommey <glandium@debian.org>  Thu, 21 Feb 2008 23:01:12 +0100
+
+webkit (0~svn27674-3) unstable; urgency=low
+
+  * debian/rules: Work around #466613 (FTBFS on s390) by building a little bit
+    less optimized (-O1). Thanks to Josselin Mouette.
+  * debian/control:
+    - Add Vcs-Browser and Vcs-Git fields, and turn Homepage indications in
+      descriptions into a control field.
+    - Bumped Standards-Version to 3.7.3.0. No changes.
+
+ -- Mike Hommey <glandium@debian.org>  Wed, 20 Feb 2008 21:49:33 +0100
+
+webkit (0~svn29752-1) experimental; urgency=low
+
+  * New upstream snapshot
+  * debian/copyright: Updated to fit additions/removals of files upstream.
+  * JavaScriptCore/wtf/TCSpinLock.h: Revert our work-around, now that a
+    proper patch has been applied upstream.
+  * WebCore/WebCore.pro: Don't use Qt version as SO version for QtWebKit.
+  * debian/control, debian/rules, debian/lib*0d.install: Bump SO version to
+    1d because of ABI incompatible changes, and change package names
+    accordingly.
+  * debian/rules: Don't remove -lqtwebico from QtWebKit.pc, since it's not
+    here anymore.
+  * debian/rules, debian/lib*1d.install:
+    - Install new Gtk port's DumpRenderTree tool.
+    - Rename both port's DumpRenderTree tools to <port name>DumpRenderTree
+      to avoid conflicting names.
+  * debian/lib*1d.postrm, debian/lib*1d.preinst: Avoid conflicting files with
+    lib*0d packages (*Launcher programs) but allow to install both new and old
+    libraries by using diversions.
+
+ -- Mike Hommey <glandium@debian.org>  Fri, 25 Jan 2008 00:31:51 +0100
+
+webkit (0~svn27674-2) unstable; urgency=low
+
+  * JavaScriptCore/JavaScriptCore.pri: cherry-picked change from revision
+    28692 to fix FTBFS due to lack of -lpthread on the linker command line.
+  * debian/control: Add dependencies on necessary development packages
+    (essentially for header files) to our own development packages.
+
+ -- Mike Hommey <glandium@debian.org>  Sat, 15 Dec 2007 11:04:47 +0100
+
+webkit (0~svn27674-1) unstable; urgency=low
+
+  * New upstream snapshot
+  * debian/copyright: Updated to fit additions/removals of files upstream.
+  * debian/control: Make libwebkitgtk-dev conflict with the old
+    libwebkitgdk-dev. Closes: #449001.
+  * debian/rules: Bump qtwebkit shlibs.
+  * WebKit/qt/Api/qwebpage.cpp: cherry-picked change from revision 27904 to
+    fix crashes when an event is caught outside of the webkit frame in Qt.
+    This occurred, for example, when hovering over the QtLauncher toolbar.
+
+ -- Mike Hommey <glandium@debian.org>  Mon, 19 Nov 2007 23:10:38 +0100
+
+webkit (0~svn26044-1) unstable; urgency=low
+
+  * New upstream snapshot
+  * debian/rules:
+    - Add support for DEB_BUILD_OPTIONS=noopt.
+    - Bump qtwebkit shlibs, and remove versioning on the webkitgtk ones,
+      as the library is new.
+  * debian/copyright: Updated to fit additions/removals of files upstream.
+  * debian/control, debian/rules, debian/libwebkitgtk-dev.install,
+    debian/libwebkitgtk0d.install: Replace occurences of gdk by gtk, and
+    rename libwebkitgdk*, to fit upstream rename of the Gtk port.
+    Closes: #445060.
+
+ -- Mike Hommey <glandium@debian.org>  Fri, 05 Oct 2007 00:05:06 +0200
+
+webkit (0~svn25144-2) unstable; urgency=low
+
+  * JavaScriptCore/wtf/Platform.h:
+    - Also test if __arm__ is defined, which should fix the FTBFS on arm.
+    - Use better defines for our various arm ports.
+  * JavaScriptCore/kjs/ustring.h, WebCore/platform/DeprecatedString.h: Use
+    these new defines. Thanks Riku Voipio.
+  * debian/control: Build depend on Qt >= 4.3. Thanks Hubert Figuiere.
+    Closes: #439672.
+  * debian/rules: Explicitely use qmake-qt4 instead of qmake to avoid build
+    failures when qt3-dev-tools is installed. Thanks Michael Biebl.
+    Closes: #441007.
+
+ -- Mike Hommey <glandium@debian.org>  Thu, 06 Sep 2007 08:12:21 +0200
+
+webkit (0~svn25144-1) unstable; urgency=low
+
+  * New upstream snapshot
+  * debian/copyright: Updated so as to fit what we actually remove (there were
+    missing removals previously, which were not appropriate for the most
+    anyways), and to fit the additions/removals of files upstream.
+  * JavaScriptCore/wtf/TCSpinLock.h: Work around an FTBFS on PPC due to a
+    probable regression in gcc (#438415).
+  * debian/rules:
+    + Change the place we install QtLauncher from, since it moved.
+    + Set binary packages' shlibs correctly.
+    + Use $(CURDIR) variable more safely to avoid problem with build
+      directories with spaces.
+  * WebKitQt/Plugins/Plugins.pro: Build plugins with hidden symbols, so that
+    they don't expose unwanted symbols.
+
+ -- Mike Hommey <glandium@debian.org>  Sun, 19 Aug 2007 15:54:12 +0200
+
+webkit (0~svn24735-1) unstable; urgency=low
+
+  * Initial release. (Closes: #428855)
+
+ -- Mike Hommey <glandium@debian.org>  Wed, 15 Aug 2007 14:19:46 +0200
+

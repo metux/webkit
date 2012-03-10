@@ -1,0 +1,5 @@
+usr/lib/libwebkit-1.0.so
+usr/include/webkit-1.0
+usr/lib/pkgconfig/webkit-1.0.pc
+usr/share/doc/libwebkit-dev
+usr/share/gir-1.0/*.gir
