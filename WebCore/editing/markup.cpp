@@ -408,7 +408,7 @@ static void appendStartMarkup(Vector<UChar>& result, const Node* node, const Ran
                     appendUCharRange(result, ucharRange(node, range));
                     break;
                 } else if (parent->hasTagName(textareaTag)) {
-                    appendEscapedContent(result, ucharRange(node, range), documentIsHTML);
+                    appendEscapedContent(result, ucharRange(node, range), documentIsHTML);                    
                     break;
                 }
             }

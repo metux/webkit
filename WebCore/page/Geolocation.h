@@ -75,7 +75,7 @@ private:
 
     bool isAllowed() const { return m_allowGeolocation == Yes; }
     bool isDenied() const { return m_allowGeolocation == No; }
-
+    
     Geolocation(Frame*);
 
     class GeoNotifier : public RefCounted<GeoNotifier> {

@@ -290,7 +290,7 @@ sub printConstructorInterior
     Settings* settings = document->settings();
     if (!MediaPlayer::isAvailable() || (settings && !settings->isMediaEnabled()))
         return HTMLElement::create($constructorTagName, document);
-
+    
 END
 ;
     }
