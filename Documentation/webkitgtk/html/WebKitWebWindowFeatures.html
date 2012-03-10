@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebWindowFeatures</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitSecurityOrigin.html" title="WebKitSecurityOrigin">
@@ -90,27 +90,15 @@ a <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class=
 </p>
 <p>
 </p>
-<div class="informalexample">
-  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
-    <tbody>
-      <tr>
-        <td class="listing_lines" align="right"><pre>1
-2
-3
-4
-5
-6</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Get the current WebKitWebWindowFeatures */</span>
-WebKitWebWindowFeatures <span class="gtkdoc opt">*</span>features <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-window-features">webkit_web_view_get_window_features</a></span> <span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">);</span>
+<div class="informalexample"><pre class="programlisting">
+/* Get the current WebKitWebWindowFeatures */
+WebKitWebWindowFeatures *features = webkit_web_view_get_window_features (my_webview);
 
-<span class="comment">/* Connect to the property changes */</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="gtkdoc opt">(</span>features<span class="gtkdoc opt">),</span> <span class="string">&quot;notify::menubar-visible&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>make_menu_bar_visible<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">);</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="gtkdoc opt">(</span>features<span class="gtkdoc opt">),</span> <span class="string">&quot;notify::statusbar-visible&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>make_status_bar_visible<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">);</span></pre></td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+/* Connect to the property changes */
+g_signal_connect (G_OBJECT(features), "notify::menubar-visible", G_CALLBACK(make_menu_bar_visible), NULL);
+g_signal_connect (G_OBJECT(features), "notify::statusbar-visible", G_CALLBACK(make_status_bar_visible), NULL);
 
+</pre></div>
 <p>
 </p>
 </div>

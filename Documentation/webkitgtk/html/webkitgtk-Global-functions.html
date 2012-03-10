@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>Global functions</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Global functions">
 <link rel="prev" href="ch01.html" title="Global functions">
@@ -38,7 +38,7 @@
 <div class="refsynopsisdiv">
 <a name="webkitgtk-Global-functions.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis"><a href="../libsoup-2.4/SoupSession.html"><span class="returnvalue">SoupSession</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
-<span class="returnvalue">guint64</span>             <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-web-database-quota" title="webkit_get_default_web_database_quota ()">webkit_get_default_web_database_quota</a>
+<a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-web-database-quota" title="webkit_get_default_web_database_quota ()">webkit_get_default_web_database_quota</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path" title="webkit_get_web_database_directory_path ()">webkit_get_web_database_directory_path</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
@@ -46,7 +46,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-remove-all-web-databases" title="webkit_remove_all_web_databases ()">webkit_remove_all_web_databases</a>     (<em class="parameter"><code><span class="type">void</span></code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-default-web-database-quota" title="webkit_set_default_web_database_quota ()">webkit_set_default_web_database_quota</a>
-                                                        (<em class="parameter"><code><span class="type">guint64</span> defaultQuota</code></em>);
+                                                        (<em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a> defaultQuota</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-web-database-directory-path" title="webkit_set_web_database_directory_path ()">webkit_set_web_database_directory_path</a>
                                                         (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);
 <a class="link" href="WebKitIconDatabase.html" title="WebKitIconDatabase"><span class="returnvalue">WebKitIconDatabase</span></a> * <a class="link" href="webkitgtk-Global-functions.html#webkit-get-icon-database" title="webkit_get_icon_database ()">webkit_get_icon_database</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
@@ -97,7 +97,7 @@ traffic occurs, WebKit will use it instead of the default.
 <hr>
 <div class="refsect2">
 <a name="webkit-get-default-web-database-quota"></a><h3>webkit_get_default_web_database_quota ()</h3>
-<pre class="programlisting"><span class="returnvalue">guint64</span>             webkit_get_default_web_database_quota
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             webkit_get_default_web_database_quota
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 Returns the default quota for Web Database databases. By default
@@ -163,7 +163,7 @@ Removes all web databases from the current database directory path.
 <div class="refsect2">
 <a name="webkit-set-default-web-database-quota"></a><h3>webkit_set_default_web_database_quota ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_default_web_database_quota
-                                                        (<em class="parameter"><code><span class="type">guint64</span> defaultQuota</code></em>);</pre>
+                                                        (<em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a> defaultQuota</code></em>);</pre>
 <p>
 Sets the current path to the directory WebKit will write Web 
 Database databases.
