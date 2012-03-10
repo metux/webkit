@@ -37,7 +37,7 @@
 </tr></table></div>
 <div class="refsynopsisdiv">
 <a name="webkitgtk-Global-functions.synopsis"></a><h2>Synopsis</h2>
-<pre class="synopsis"><a href="/usr/share/gtk-doc/html/libsoup-2.4/SoupSession.html"><span class="returnvalue">SoupSession</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
+<pre class="synopsis"><span class="returnvalue">SoupSession</span> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-web-database-quota" title="webkit_get_default_web_database_quota ()">webkit_get_default_web_database_quota</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path" title="webkit_get_web_database_directory_path ()">webkit_get_web_database_directory_path</a>
@@ -67,18 +67,18 @@ sizes, database quotas, and the HTTP session management.
 <a name="webkitgtk-Global-functions.details"></a><h2>Details</h2>
 <div class="refsect2">
 <a name="webkit-get-default-session"></a><h3>webkit_get_default_session ()</h3>
-<pre class="programlisting"><a href="/usr/share/gtk-doc/html/libsoup-2.4/SoupSession.html"><span class="returnvalue">SoupSession</span></a> *       webkit_get_default_session          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><span class="returnvalue">SoupSession</span> *       webkit_get_default_session          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
-Retrieves the default <a href="/usr/share/gtk-doc/html/libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a> used by all web views.
+Retrieves the default <span class="type">SoupSession</span> used by all web views.
 Note that the session features are added by WebKit on demand,
-so if you insert your own <a href="/usr/share/gtk-doc/html/libsoup-2.4/SoupCookieJar.html"><span class="type">SoupCookieJar</span></a> before any network
+so if you insert your own <span class="type">SoupCookieJar</span> before any network
 traffic occurs, WebKit will use it instead of the default.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the default <a href="/usr/share/gtk-doc/html/libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a>. <span class="annotation">[<a href="http://foldoc.org/transfer%20none"><span class="acronym">transfer none</span></a>]</span>
+<td>the default <span class="type">SoupSession</span>. <span class="annotation">[<a href="http://foldoc.org/transfer%20none"><span class="acronym">transfer none</span></a>]</span>
 </td>
 </tr></tbody>
 </table></div>
