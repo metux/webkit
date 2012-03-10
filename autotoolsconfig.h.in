@@ -15,6 +15,12 @@
 /* Define to enable optimized property access */
 #undef ENABLE_JIT_OPTIMIZE_PROPERTY_ACCESS
 
+/* Define to enable link prefetch support */
+#undef ENABLE_LINK_PREFETCH
+
+/* Define to enable Opcode statistics */
+#undef ENABLE_OPCODE_STATS
+
 /* Define to enable YARR */
 #undef ENABLE_YARR
 
@@ -27,11 +33,14 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define to 1 if you have the <GL/glx.h> header file. */
+#undef HAVE_GL_GLX_H
+
+/* Define to 1 if you have the <GL/gl.h> header file. */
+#undef HAVE_GL_GL_H
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
-
-/* Whether libSoup 2.29.90 features are available */
-#undef HAVE_LIBSOUP_2_29_90
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
