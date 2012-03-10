@@ -1,3 +1,181 @@
+2010-08-25  Cris Neckar  <cdn@chromium.org>
+
+        Reviewed by Darin Adler.
+
+        Added abort condition for RenderCounters when traversing a detached render tree.
+        https://bugs.webkit.org/show_bug.cgi?id=43812
+
+        Test: fast/css/counters/counter-traverse-object-crash.html
+
+        * rendering/RenderCounter.cpp:
+        (WebCore::findPlaceForCounter):
+
+2010-08-23  Abhishek Arya  <inferno@chromium.org>
+
+        Reviewed by Dimitri Glazkov.
+
+        Fix security origin calculation in createPattern. Need to use
+        cachedImage->response().url() instead of cachedImage->url().
+        https://bugs.webkit.org/show_bug.cgi?id=44399.
+
+        Test: http/tests/security/canvas-remote-read-remote-image-redirect.html
+
+        * html/canvas/CanvasRenderingContext2D.cpp:
+        (WebCore::CanvasRenderingContext2D::createPattern):
+
+2010-08-20  Tony Chang  <tony@chromium.org>
+
+        Reviewed by Adam Barth.
+
+        crash when trying to access a stale Node pointer in FocusController::setFocusedNode
+        https://bugs.webkit.org/show_bug.cgi?id=44226
+
+        Test: fast/events/focus-change-crash2.html
+
+        * page/FocusController.cpp:
+        (WebCore::FocusController::setFocusedNode): add a ref to prevent the focused node from being deleted
+
+2010-08-12  Justin Schuh  <jschuh@chromium.org>
+
+        Reviewed by Dumitru Daniliuc.
+
+        Clear PluginData's page pointer on page refresh
+        https://bugs.webkit.org/show_bug.cgi?id=43888
+
+        Test: plugins/access-after-page-destroyed.html
+
+        * page/Page.cpp:
+        (WebCore::Page::refreshPlugins):
+
+2010-07-28  Justin Schuh  <jschuh@chromium.org>
+
+        Reviewed by Nate Chapin.
+
+        Clear PluginData's page pointer on Page destruction
+        https://bugs.webkit.org/show_bug.cgi?id=43147
+
+        Test: plugins/access-after-page-destroyed.html
+
+        * page/Page.cpp:
+        (WebCore::Page::~Page):
+
+2010-08-17  Steve Block  <steveblock@google.com>
+
+        Reviewed by Jeremy Orlow.
+
+        Geolocation clearWatch() needs to protect against invalid IDs
+        https://bugs.webkit.org/show_bug.cgi?id=44096
+
+        If the ID passed to clearWatch() is invalid, we early-out.
+
+        Test: fast/dom/Geolocation/clear-watch-invalid-id-crash.html
+
+        * page/Geolocation.cpp:
+        (WebCore::Geolocation::Watchers::set):
+        (WebCore::Geolocation::Watchers::remove):
+        (WebCore::Geolocation::watchPosition):
+        (WebCore::Geolocation::clearWatch):
+
+2010-07-20  Abhishek Arya  <inferno@chromium.org>
+
+        Reviewed by David Hyatt.
+
+        Check the node is a text node before doing the static cast
+        for editing commands.
+        https://bugs.webkit.org/show_bug.cgi?id=42655
+
+        Test: editing/execCommand/editing-nontext-node-crash.xhtml
+
+        * editing/DeleteSelectionCommand.cpp:
+        (WebCore::DeleteSelectionCommand::fixupWhitespace):
+        * editing/InsertLineBreakCommand.cpp:
+        (WebCore::InsertLineBreakCommand::doApply):
+        * editing/InsertParagraphSeparatorCommand.cpp:
+        (WebCore::InsertParagraphSeparatorCommand::doApply):
+
+2010-07-26  Justin Schuh  <jschuh@chromium.org>
+
+        Reviewed by Darin Fisher.
+
+        Check history state against origin before setting
+        https://bugs.webkit.org/show_bug.cgi?id=42858
+
+        Tests: fast/loader/stateobjects/replacestate-base-illegal.html
+               fast/loader/stateobjects/replacestate-base-legal.html
+
+        * page/History.cpp:
+        (WebCore::History::urlForState):
+        (WebCore::History::stateObjectAdded):
+
+2010-07-12  Tony Chang  <tony@chromium.org>
+
+        Reviewed by David Hyatt.
+
+        crash in FrameView::detachCustomScrollbars
+        https://bugs.webkit.org/show_bug.cgi?id=41196
+
+        Test: scrollbars/hidden-iframe-scrollbar-crash.html
+
+        * page/FrameView.cpp:
+        (WebCore::FrameView::detachCustomScrollbars):
+
+2010-07-02  Ojan Vafai  <ojan@chromium.org>
+
+        Reviewed by Adam Barth.
+
+        Crash in RenderObject::containingBlock when clearing selection in a display:none node.
+        https://bugs.webkit.org/show_bug.cgi?id=41523
+
+        updateStyleIfNeeded before clearing the selection in the RenderView. Otherwise,
+        m_selectionStart and m_selectionEnd in RenderView point to garbage object.
+        This fixes the crash because updateStyleIfNeeded clears the selection before
+        clobbering nodes that contain the selection.
+
+        Test: editing/selection/crash-on-clear-selection.html
+
+        * editing/SelectionController.cpp:
+        (WebCore::SelectionController::updateAppearance):
+
+2010-06-23  Abhishek Arya  <inferno@chromium.org>
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Firing the onchange event on select which changes its size > 1 causes the select
+        object to change from a menulist to a listbox. However, when propogating the events,
+        we do a bad cast assuming the object will remain a menulist. Added proper checks to
+        make sure we check the renderer after the onchange is fired and propogate the event
+        based on correct object type.
+        https://bugs.webkit.org/show_bug.cgi?id=40828 
+
+        Test: fast/events/select-onchange-crash.html
+
+        * dom/SelectElement.cpp:
+        (WebCore::SelectElement::setSelectedIndex):
+
+2010-07-21  Justin Schuh  <jschuh@chromium.org>
+
+        Reviewed by Oliver Hunt.
+
+        Prevent DeleteButtonController enable state from changing when not editing
+        https://bugs.webkit.org/show_bug.cgi?id=42659
+
+        Test: svg/custom/use-invalid-html.xhtml
+
+        * dom/ContainerNode.cpp:
+        (WebCore::ContainerNode::cloneChildNodes):
+
+2010-06-10  Tony Chang  <tony@chromium.org>
+
+        Reviewed by Kent Tamura.
+
+        crash when focus is changed while trying to focus next element
+        https://bugs.webkit.org/show_bug.cgi?id=40407
+
+        Test: fast/events/focus-change-crash.html
+
+        * dom/Element.cpp:
+        (WebCore::Element::focus):
+
 2010-08-10  Abhishek Arya  <inferno@chromium.org>
 
         Reviewed by David Hyatt.

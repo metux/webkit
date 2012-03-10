@@ -46,6 +46,8 @@ namespace WebCore {
 static const char permissionDeniedErrorMessage[] = "User denied Geolocation";
 static const char failedToStartServiceErrorMessage[] = "Failed to start Geolocation service";
 
+static const int firstAvailableWatchId = 1;
+
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
 
 static PassRefPtr<Geoposition> createGeoposition(GeolocationPosition* position)
@@ -153,6 +155,7 @@ void Geolocation::GeoNotifier::timerFired(Timer<GeoNotifier>*)
 
 void Geolocation::Watchers::set(int id, PassRefPtr<GeoNotifier> prpNotifier)
 {
+    ASSERT(id > 0);
     RefPtr<GeoNotifier> notifier = prpNotifier;
 
     m_idToNotifierMap.set(id, notifier.get());
@@ -161,6 +164,7 @@ void Geolocation::Watchers::set(int id, PassRefPtr<GeoNotifier> prpNotifier)
 
 void Geolocation::Watchers::remove(int id)
 {
+    ASSERT(id > 0);
     IdToNotifierMap::iterator iter = m_idToNotifierMap.find(id);
     if (iter == m_idToNotifierMap.end())
         return;
@@ -263,7 +267,7 @@ int Geolocation::watchPosition(PassRefPtr<PositionCallback> successCallback, Pas
     RefPtr<GeoNotifier> notifier = startRequest(successCallback, errorCallback, options);
     ASSERT(notifier);
 
-    static int nextAvailableWatchId = 1;
+    static int nextAvailableWatchId = firstAvailableWatchId;
     // In case of overflow, make sure the ID remains positive, but reuse the ID values.
     if (nextAvailableWatchId < 1)
         nextAvailableWatchId = 1;
@@ -375,6 +379,9 @@ bool Geolocation::haveSuitableCachedPosition(PositionOptions* options)
 
 void Geolocation::clearWatch(int watchId)
 {
+    if (watchId < firstAvailableWatchId)
+        return;
+
     m_watchers.remove(watchId);
     
     if (!hasListeners())
