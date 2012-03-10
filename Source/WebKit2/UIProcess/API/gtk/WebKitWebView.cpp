@@ -92,6 +92,8 @@ struct _WebKitWebViewPrivate {
 
     GRefPtr<WebKitHitTestResult> mouseTargetHitTestResult;
     unsigned mouseTargetModifiers;
+
+    GRefPtr<WebKitFindController> findController;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
@@ -163,6 +165,22 @@ static gboolean webkitWebViewDecidePolicy(WebKitWebView*, WebKitPolicyDecision* 
     return TRUE;
 }
 
+static void zoomTextOnlyChanged(WebKitSettings* settings, GParamSpec*, WebKitWebView* webView)
+{
+    WKPageRef wkPage = toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView)));
+    gboolean zoomTextOnly = webkit_settings_get_zoom_text_only(settings);
+    gdouble pageZoomLevel = zoomTextOnly ? 1 : WKPageGetTextZoomFactor(wkPage);
+    gdouble textZoomLevel = zoomTextOnly ? WKPageGetPageZoomFactor(wkPage) : 1;
+    WKPageSetPageAndTextZoomFactors(wkPage, pageZoomLevel, textZoomLevel);
+}
+
+static void webkitWebViewSetSettings(WebKitWebView* webView, WebKitSettings* settings, WKPageRef wkPage)
+{
+    webView->priv->settings = settings;
+    webkitSettingsAttachSettingsToPage(webView->priv->settings.get(), wkPage);
+    g_signal_connect(settings, "notify::zoom-text-only", G_CALLBACK(zoomTextOnlyChanged), webView);
+}
+
 static void webkitWebViewConstructed(GObject* object)
 {
     if (G_OBJECT_CLASS(webkit_web_view_parent_class)->constructed)
@@ -180,8 +198,9 @@ static void webkitWebViewConstructed(GObject* object)
 
     WebPageProxy* page = webkitWebViewBaseGetPage(webViewBase);
     priv->backForwardList = adoptGRef(webkitBackForwardListCreate(WKPageGetBackForwardList(toAPI(page))));
-    priv->settings = adoptGRef(webkit_settings_new());
-    webkitSettingsAttachSettingsToPage(priv->settings.get(), toAPI(page));
+
+    GRefPtr<WebKitSettings> settings = adoptGRef(webkit_settings_new());
+    webkitWebViewSetSettings(webView, settings.get(), toAPI(page));
 }
 
 static void webkitWebViewSetProperty(GObject* object, guint propId, const GValue* value, GParamSpec* paramSpec)
@@ -1279,8 +1298,8 @@ void webkit_web_view_set_settings(WebKitWebView* webView, WebKitSettings* settin
     if (webView->priv->settings == settings)
         return;
 
-    webView->priv->settings = settings;
-    webkitSettingsAttachSettingsToPage(settings, toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
+    g_signal_handlers_disconnect_by_func(webView->priv->settings.get(), reinterpret_cast<gpointer>(zoomTextOnlyChanged), webView);
+    webkitWebViewSetSettings(webView, settings, toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
 }
 
 /**
@@ -1338,11 +1357,14 @@ void webkit_web_view_set_zoom_level(WebKitWebView* webView, gdouble zoomLevel)
 {
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
-    WKPageRef wkPage = toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView)));
-    if (WKPageGetPageZoomFactor(wkPage) == zoomLevel)
+    if (webkit_web_view_get_zoom_level(webView) == zoomLevel)
         return;
 
-    WKPageSetPageZoomFactor(wkPage, zoomLevel);
+    WKPageRef wkPage = toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView)));
+    if (webkit_settings_get_zoom_text_only(webView->priv->settings.get()))
+        WKPageSetTextZoomFactor(wkPage, zoomLevel);
+    else
+        WKPageSetPageZoomFactor(wkPage, zoomLevel);
     g_object_notify(G_OBJECT(webView), "zoom-level");
 }
 
@@ -1360,9 +1382,9 @@ gdouble webkit_web_view_get_zoom_level(WebKitWebView* webView)
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 1);
 
     WKPageRef wkPage = toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView)));
-    return WKPageGetPageZoomFactor(wkPage);
+    gboolean zoomTextOnly = webkit_settings_get_zoom_text_only(webView->priv->settings.get());
+    return zoomTextOnly ? WKPageGetTextZoomFactor(wkPage) : WKPageGetPageZoomFactor(wkPage);
 }
-
 
 static void didValidateCommand(WKStringRef command, bool isEnabled, int32_t state, WKErrorRef, void* context)
 {
@@ -1435,4 +1457,24 @@ void webkit_web_view_execute_editing_command(WebKitWebView* webView, const char*
     WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
     WKRetainPtr<WKStringRef> wkCommand(AdoptWK, WKStringCreateWithUTF8CString(command));
     WKPageExecuteCommand(toAPI(page), wkCommand.get());
+}
+
+/**
+ * webkit_web_view_get_find_controller:
+ * @web_view: the #WebKitWebView
+ *
+ * Gets the #WebKitFindController that will allow the caller to query
+ * the #WebKitWebView for the text to look for.
+ *
+ * Returns: (transfer none): the #WebKitFindController associated to
+ * this particular #WebKitWebView.
+ */
+WebKitFindController* webkit_web_view_get_find_controller(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    if (!webView->priv->findController)
+        webView->priv->findController = adoptGRef(WEBKIT_FIND_CONTROLLER(g_object_new(WEBKIT_TYPE_FIND_CONTROLLER, "web-view", webView, NULL)));
+
+    return webView->priv->findController.get();
 }
