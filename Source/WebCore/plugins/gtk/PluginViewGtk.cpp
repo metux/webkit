@@ -407,6 +407,9 @@ void PluginView::handleMouseEvent(MouseEvent* event)
     if (!m_isStarted || m_status != PluginStatusLoadedSuccessfully)
         return;
 
+    if (event->button() == RightButton && m_plugin->quirks().contains(PluginQuirkIgnoreRightClickInWindowlessMode))
+        return;
+
     if (event->type() == eventNames().mousedownEvent) {
         if (Page* page = m_parentFrame->page())
             page->focusController()->setActive(true);
@@ -691,7 +694,12 @@ bool PluginView::platformGetValue(NPNVariable variable, void* value, NPError* re
         case NPNVnetscapeWindow: {
             GdkWindow* gdkWindow = gtk_widget_get_window(m_parentFrame->view()->hostWindow()->platformPageClient());
 #if defined(XP_UNIX)
-            *static_cast<Window*>(value) = GDK_WINDOW_XWINDOW(gdk_window_get_toplevel(gdkWindow));
+            GdkWindow* toplevelWindow = gdk_window_get_toplevel(gdkWindow);
+            if (!toplevelWindow) {
+                *result = NPERR_GENERIC_ERROR;
+                return true;
+            }
+            *static_cast<Window*>(value) = GDK_WINDOW_XWINDOW(toplevelWindow);
 #elif defined(GDK_WINDOWING_WIN32)
             *static_cast<HGDIOBJ*>(value) = GDK_WINDOW_HWND(gdkWindow);
 #endif
