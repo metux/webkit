@@ -1,6 +1,8 @@
 webkit (1.7.91-1) experimental; urgency=low
 
   * New development release
+  * debian/patches/05_sparc-needs-alignment.patch:
+  - removed; applied upstream
 
  -- Gustavo Noronha Silva <kov@debian.org>  Sat, 10 Mar 2012 14:50:58 -0300
 
