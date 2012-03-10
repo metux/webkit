@@ -86,6 +86,11 @@ public:
     // drawing an image onto an HTML canvas element with the drawImage API.
     bool taintsCanvas(const KURL&) const;
 
+    // Returns true if this SecurityOrigin can receive drag content from the
+    // initiator. For example, call this function before allowing content to be
+    // dropped onto a target.
+    bool canReceiveDragData(const SecurityOrigin* dragInitiator) const;    
+
     // Returns true for any non-local URL. If document parameter is supplied,
     // its local load policy dictates, otherwise if referrer is non-empty and
     // represents a local file, then the local load is allowed.
