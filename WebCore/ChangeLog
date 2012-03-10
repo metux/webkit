@@ -1,3 +1,919 @@
+2010-05-07  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Rubber-stamped by Kenneth Rohde Christiansen.
+
+        [GTK] Fails to build on GTK+ < 2.14
+        https://bugs.webkit.org/show_bug.cgi?id=38746
+
+        Build fix only. Do basically the same as gtk_adjustment_configure
+        would do if we are bellow GTK+ 2.14.
+
+        * platform/gtk/ScrollViewGtk.cpp:
+        (WebCore::AdjustmentConfigure):
+
+2010-05-07  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Rubber-stamped by Xan Lopez.
+
+        Crash with MgOpenModerna font, with non-UTF-8 character
+        https://bugs.webkit.org/show_bug.cgi?id=37795
+
+        NULL-check the font platform data, for now, to avoid the crash.
+
+        Could not yet figure out a way to get a test written that does not
+        involve adding the font to the tree, but there are doubts about
+        licensing.
+
+        * platform/graphics/cairo/FontCacheCairo.cpp:
+        (WebCore::FontCache::getFontDataForCharacters):
+
+2010-05-06  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Reviewed by Xan Lopez.
+
+        Rework where we get page step and line step from, so we do not
+        depend on scrollbars existing. Caught by API test I forgot to run.
+
+        * platform/gtk/ScrollViewGtk.cpp:
+        (WebCore::ScrollView::setGtkAdjustments):
+
+2010-05-06  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Adjustment resetting uses wrong values, and misses page_size and steps
+        https://bugs.webkit.org/show_bug.cgi?id=38657
+
+        Fix resetting adjustment values. In the page cache case, we were
+        confusing page_size and upper, leading to stray scrollbars
+        sometimes.
+
+        * platform/gtk/ScrollViewGtk.cpp:
+        (WebCore::ScrollView::setGtkAdjustments):
+
+2010-05-05  Martin Robinson  <mrobinson@webkit.org>
+
+        Reviewed by Gustavo Noronha.
+
+        [GTK] Enable DOM clipboard and drag-and-drop access
+        https://bugs.webkit.org/show_bug.cgi?id=30623
+
+        Add support in the PasteboardHelper for images, in preparation for drag-and-drop data.
+
+        No new tests as functionality has not changed.
+
+        * platform/gtk/PasteboardHelper.cpp:
+        (WebCore::PasteboardHelper::fillSelectionData): Add support for images here.
+        (WebCore::PasteboardHelper::targetListForDataObject): Add support for images here.
+
+2010-05-03  Alexey Proskuryakov  <ap@apple.com>
+
+        Reviewed by Adam Barth.
+
+        https://bugs.webkit.org/show_bug.cgi?id=38497
+        <rdar://problem/7759438> Make sure that http URLs always have a host in SecurityOrigin
+
+        This is a hardening fix, and behavior really depends on what an underlying networking layer
+        does. So, no test.
+
+        * page/SecurityOrigin.cpp:
+        (WebCore::schemeRequiresAuthority): List schemes that need an authority for successful loading.
+        (WebCore::SecurityOrigin::SecurityOrigin): Never let e.g. http origins with empty authorities
+        have the same security origin.
+
+2010-05-04  Kent Tamura  <tkent@chromium.org>
+
+        Reviewed by David Levin (and unofficially by Enrica Casucci).
+
+        REGRESSION(r54368): Text drag-and-drop from input/textarea doesn't work
+        if the text is like a URL
+        https://bugs.webkit.org/show_bug.cgi?id=38374
+
+        Since r54368, documentFragmentFromDragData() creates an <a> element
+        with no anchor text for URL-like text dragged from input/textarea
+        element. If such text is dropped to input/textarea element, the text
+        is not inserted.
+        To fix this problem, use the original text or the URL as an anchor
+        text.
+
+        Test: editing/pasteboard/drag-drop-url-text.html
+
+        * page/DragController.cpp:
+        (WebCore::documentFragmentFromDragData):
+
+2010-05-04  Ben Murdoch  <benm@google.com>
+
+        Reviewed by Simon Hausmann.
+
+        Crash in handleTouchEvent: using dangling node ptrs in hashmap
+        https://bugs.webkit.org/show_bug.cgi?id=38514
+
+        When navigating away from a page, if you have your finger still
+        pressed and then lift it on the new page we see a crash if the
+        node got deleted as we still have a dangling pointer in the
+        m_originatingTouchPointTargets hashmap and try to use it as the
+        receiver to dispatch a touchend event.
+
+        Test: fast/events/touch/touch-stale-node-crash.html
+
+        * page/EventHandler.cpp:
+        (WebCore::EventHandler::clear): Clear the hashmap of touch targets.
+
+2010-04-30  Philippe Normand  <pnormand@igalia.com>
+
+        Reviewed by Eric Seidel.
+
+        [GStreamer] endless loop after playback ended
+        https://bugs.webkit.org/show_bug.cgi?id=38384
+
+        At playback end ensure duration() will return a valid duration if
+        we managed to calculate it based on current position.
+
+        Test: media/video-duration-known-after-eos.html
+
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp:
+        (WebCore::MediaPlayerPrivateGStreamer::didEnd):
+
+2010-04-30  Brady Eidson  <beidson@apple.com>
+
+        Reviewed by Eric Carlson.
+
+        <rdar://problem/7902467> - Audio plays upon loading of npr.org but shouldn't
+
+        No new tests. (Currently no way to test such site specific hack behavior)
+
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::HTMLMediaElement):
+        (WebCore::HTMLMediaElement::asyncEventTimerFired): If the event to be dispatched is the canplay
+          event, wrap the dispatch with m_dispatchingCanPlayEvent set.
+        (WebCore::HTMLMediaElement::play): If m_dispatchingCanPlayEvent is true and the site is npr.org, 
+          don't perform the play().
+        * html/HTMLMediaElement.h: Add m_dispatchingCanPlayEvent member.
+
+2010-04-29  Paweł Hajdan, Jr.  <phajdan.jr@chromium.org>
+
+        Reviewed by Jeremy Orlow.
+
+        Fix building with libpng-1.4.
+        https://bugs.webkit.org/show_bug.cgi?id=33287
+
+        No new tests (no behavior change).
+
+        Original patch by John Bowler <jbowler@acm.org>
+
+        * platform/image-encoders/skia/PNGImageEncoder.cpp:
+        (WebCore::PNGImageEncoder::encode):
+
+2010-04-25  Antonio Gomes  <tonikitoo@webkit.org>
+
+        Reviewed by Darin Adler.
+
+        Clicking a scrollbar blurs the currently focused element
+        https://bugs.webkit.org/show_bug.cgi?id=16809
+
+        WebKit ports that do not use native (platform) widgets for rendering the scrollbars
+        are currently mismatching a common behaviour of other browser vendors (including
+        Firefox and Opera): clicking on a frame scrollbar *should not* steal focus from content.
+        WebKit browsers based ports that do use WebCore for handling scrollbars, like QtWebKit for
+        instance, can observe the opposite behaviour.
+
+        Patch fixes this behaviour by checking if current MouseDown event targets a frame scrollbar.
+        If that is the case, it bails out and do not change focus behavior at all.
+
+        It is important to note that the given way this is implemented by this patch, non-frame
+        scrollbars (e.g. a vertical scrollbar of an overflowed textareas or divs) will keep working
+        in the same way as it works currently.
+
+        Tests: scrollbars/scrollbar-click-does-not-blur-content.html
+               scrollbars/scrollbar-iframe-click-does-not-blur-content.html
+
+        * page/EventHandler.cpp:
+        (WebCore::EventHandler::dispatchMouseEvent):
+
+2010-04-28  Martin Robinson  <mrobinson@webkit.org>
+
+        Reviewed by Gustavo Noronha.
+
+        [GTK] Enable DOM clipboard and drag-and-drop access
+        https://bugs.webkit.org/show_bug.cgi?id=30623
+
+        Make ClipboardGtk a "live" DataTransfer object, able to modify
+        the clipboard when setData(...) is called.
+
+        * platform/gtk/ClipboardGtk.cpp:
+        (WebCore::Editor::newGeneralClipboard): Pass the GtkClipboard into the factory method.
+        (WebCore::ClipboardGtk::ClipboardGtk): Create two separate constructors, one for DnD data and one for clipboard data.
+        (WebCore::dataObjectTypeFromHTMLClipboardType): Added.
+        (WebCore::ClipboardGtk::clearData): Clear the member DataObject, optionally write the clipboard.
+        (WebCore::ClipboardGtk::clearAllData): Ditto.
+        (WebCore::joinURIList): Added.
+        (WebCore::ClipboardGtk::getData): Get the data from the clipboard, if possible.
+        (WebCore::ClipboardGtk::setData): Write data to the DataObject and maybe the clipboard.
+        (WebCore::ClipboardGtk::types): Read the clipboard/DataObject to find applicable types.
+        (WebCore::ClipboardGtk::files): Read the clipboard/DataObject to find the files.
+        (WebCore::ClipboardGtk::writeURL): Write to the DataObject and maybe the clipboard.
+        (WebCore::ClipboardGtk::writeRange): Ditto.
+        (WebCore::ClipboardGtk::writePlainText): Ditto.
+        (WebCore::ClipboardGtk::hasData): Query the clipboard/DataObject.
+        * platform/gtk/ClipboardGtk.h: 
+        (WebCore::ClipboardGtk::create): Added one factory for pasteboard-backed DataObjects and one for DnD-backed objects.
+        * platform/gtk/DataObjectGtk.cpp:
+        (WebCore::replaceNonBreakingSpaceWithSpace): Added this helper function to clean &nbsp; from plain text.
+        (WebCore::DataObjectGtk::markup): Actually return the range if it's set.
+        (WebCore::DataObjectGtk::setText): Clean &nbsp; from plain text.
+        (WebCore::DataObjectGtk::clearText): Added.
+        (WebCore::DataObjectGtk::clearMarkup): Added.
+        * platform/gtk/DataObjectGtk.h:
+        (WebCore::DataObjectGtk::clearURIList): Added.
+        (WebCore::DataObjectGtk::clearImage): Added.
+        * platform/gtk/PasteboardHelper.cpp:
+        (WebCore::PasteboardHelper::initializeTargetList): Added target ID's for URI list and Netscape URL targets.
+        (WebCore::urisToKURLVector): Added.
+        (WebCore::PasteboardHelper::getClipboardContents): Added.
+        (WebCore::PasteboardHelper::fillSelectionData): Added logic for URI lists and Netscape URLs.
+        (WebCore::PasteboardHelper::targetListForDataObject): Ditto.
+        * platform/gtk/PasteboardHelper.h: Added default argument to writeClipboardContents and new method.
+
+2010-04-28  Martin Robinson  <mrobinson@webkit.org>
+
+        Reviewed by Gustavo Noronha.
+
+        [GTK] Enable DOM clipboard and drag-and-drop access
+        https://bugs.webkit.org/show_bug.cgi?id=30623
+
+        Use the length of the UTF-8 markup data in bytes when filling GtkSelectionData.
+
+        No new tests, because pasteboard DataTransfer tests will be enabled
+        with the completion of the GTK+ DataTransfer object.
+
+        * platform/gtk/PasteboardGtk.cpp:
+        (WebCore::clipboard_get_contents_cb): Use strlen here instead of g_utf8_strlen.
+
+2010-04-28  Abhishek Arya  <inferno@chromium.org>
+
+        Reviewed by Eric Seidel.
+
+        Convert m_documentUnderMouse, m_dragInitiator to RefPtr.
+        Eliminated unused m_dragInitiator accessor to prevent dereferencing.
+        https://bugs.webkit.org/show_bug.cgi?id=37618
+
+        Test: editing/pasteboard/drag-drop-iframe-refresh-crash.html
+
+        * page/DragController.cpp:
+        (WebCore::DragController::tryDocumentDrag):
+        (WebCore::DragController::concludeEditDrag):
+        * page/DragController.h:
+        (WebCore::DragController::draggingImageURL):
+        (WebCore::DragController::documentUnderMouse):
+
+2010-04-26  Maciej Stachowiak  <mjs@apple.com>
+
+        Reviewed by Darin Adler.
+
+        REGRESSION (r57292): 1.5% page load speed regression from visited link information leak fix
+        https://bugs.webkit.org/show_bug.cgi?id=38131
+
+        I did a number of separate optimizations which speed up style
+        resolution enough to more than make up for the regression. This
+        measures as a total PLT speedup of somewhere between 1.5% and
+        3.7%.
+       
+        Optimizations done:
+        - Cache determineLinkState results, to avoid the need to repeatedly compute
+        the visited link hash for the same element. This directly addresses much
+        of the slowdown, since all elements get their style computed twice now.
+        - Added a fast way to get the length of a CSSMutableStyleDeclaration, and use
+        in CSSStyleSelector::matchRulesForList, since it was hot there.
+        - Hoist some loop invariant code that's not detected by the compiler out of the
+        main loop in matchRulesForList
+        - inline CSSStyleSelector::initElement and locateSharedStyle,
+        since there is only one call site in each case
+        - Inline the common non-line fast case of determineLinkState, and split the rest into
+        out-of-line determineLinkStateSlowCase.
+        - Added inline versions of the functions called by
+        visitedLinkHash (the version called by determineLinkState).
+
+        * css/CSSMutableStyleDeclaration.cpp:
+        (WebCore::CSSMutableStyleDeclaration::length): Implemented in terms of new
+        inline nonvirtual mutableLength().
+        * css/CSSMutableStyleDeclaration.h:
+        (WebCore::CSSMutableStyleDeclaration::mutableLength): Added new nonvirtual
+        inline way to get the length if you know you have a mutable style decl.
+        * css/CSSStyleSelector.cpp:
+        (WebCore::CSSStyleSelector::init): Clear cached link state.
+        (WebCore::CSSStyleSelector::matchRulesForList): hoist some code out of the main
+        loop and get style decl length more efficiently.
+        (WebCore::CSSStyleSelector::initElement): inline (only one call site)
+        (WebCore::CSSStyleSelector::SelectorChecker::determineLinkState): Inline fast
+        case, call slow case.
+        (WebCore::CSSStyleSelector::SelectorChecker::determineLinkStateSlowCase): Split
+        most of the above function into this slow case helper.
+        (WebCore::CSSStyleSelector::canShareStyleWithElement): Use the cache-enabled
+        way to get the current link state.
+        (WebCore::CSSStyleSelector::locateSharedStyle): inline
+        (WebCore::CSSStyleSelector::styleForElement): Use the cache-enabled way
+        to get the current link state.
+        * css/CSSStyleSelector.h:
+        (WebCore::CSSStyleSelector::currentElementLinkState): inline way to
+        get link state for the current element; manages the cache
+        * platform/LinkHash.cpp:
+        (WebCore::visitedLinkHashInline): inline version of below function
+        (WebCore::visitedLinkHash): call the inline version
+        (WebCore::visitedURLInline): inline version of below function
+        (WebCore::visitedURL): call the inline version
+        (WebCore::visitedURL): call inline versions of above two functions
+
+2010-04-26  Geoffrey Garen  <ggaren@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        <rdar://problem/7766413>
+        
+        Fixed a crash seen when using the JavaScriptCore API with WebKit.
+        
+        No layout test because DumpRenderTree doesn't use the JavaScriptCore API
+        in this way.
+
+        * bindings/js/JSEventListener.cpp:
+        (WebCore::JSEventListener::JSEventListener): Don't assign 0 to a WeakGCPtr.
+        JavaScriptCore no longer allows this.
+
+        * bindings/js/ScriptWrappable.h:
+        (WebCore::ScriptWrappable::setWrapper): No need to initialize a WeakGCPtr
+        to 0, or ASSERT a non-0 value before assigning to a WeakGCPtr -- both are
+        default behaviors.
+
+2010-04-25  Kent Tamura  <tkent@chromium.org>
+
+        Reviewed by Darin Adler.
+
+        WebKit crashes with deeply nested divs
+        https://bugs.webkit.org/show_bug.cgi?id=18282
+
+        The HTML parser caps a tree depth by MAX_DOM_TREE_DEPTH defined in
+        TreeDepthLimit.h. This is performance-efficient, but does not work for
+        DOM operations such as Node.appendChild().
+
+        Test: fast/parser/element-nesting-cap.html
+
+        * dom/Node.h:
+        * dom/XMLTokenizer.cpp:
+        (WebCore::XMLTokenizer::pushCurrentNode):
+        * html/HTMLParser.cpp:
+
+        * GNUmakefile.am:
+        * WebCore.gypi:
+        * WebCore.pro:
+        * WebCore.vcproj/WebCore.vcproj:
+        * WebCore.xcodeproj/project.pbxproj:
+        * dom/TreeDepthLimit.h:
+          Added. Define MAX_DOM_TREE_DEPTH. The default value is 5000.
+        * dom/XMLTokenizer.cpp: Use maxDOMTreeDepth.
+        (WebCore::XMLTokenizer::pushCurrentNode):
+        * html/HTMLParser.cpp:
+          Introduce m_treeDepth, which counts the depth of the tree.
+          Unlike m_blocksInStack, it contains the number of non-block nodes.
+        (WebCore::HTMLParser::HTMLParser):
+        (WebCore::HTMLParser::reset):
+        (WebCore::HTMLParser::limitDepth):
+          Renamed from limitBlockDepth. Add check for m_nodeDepth.
+        (WebCore::HTMLParser::insertNodeAfterLimitDepth):
+          Renamed from insertNodeAfterLimitBlockDepth.
+        (WebCore::HTMLParser::parseToken):
+        (WebCore::HTMLParser::handleResidualStyleCloseTagAcrossBlocks):
+        (WebCore::HTMLParser::pushBlock):
+        (WebCore::HTMLParser::popOneBlockCommon):
+        (WebCore::HTMLParser::freeBlock):
+        * html/HTMLParser.h:
+
+2010-04-22  Tony Chang  <tony@chromium.org>
+
+        Reviewed by Dan Bernstein.
+
+        Crash in WebCore::TextIterator::handleTextNode() encountered in Google rich-text products
+        https://bugs.webkit.org/show_bug.cgi?id=37950
+
+        Test: editing/text-iterator/rtl-selection-crash.html
+
+        * editing/TextIterator.cpp:
+        (WebCore::TextIterator::handleTextNode):
+
+2010-04-22  Diego Escalante Urrelo  <descalante@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Mute/unmute button on <video> elements are backwards
+        https://bugs.webkit.org/show_bug.cgi?id=33967
+
+        Fix mute/unmute buttons icons-action relation and explain why their
+        variable names and corresponding icons seem to be misleading but are
+        actually right. Original patch by Mike Hommey.
+
+        * platform/gtk/RenderThemeGtk.cpp:
+        (WebCore::RenderThemeGtk::initMediaStyling):
+
+2010-04-21  Laszlo Gombos  <laszlo.1.gombos@nokia.com>
+
+        Reviewed by Darin Adler.
+
+        Fix build if NPAPI support is disabled
+        https://bugs.webkit.org/show_bug.cgi?id=36621
+
+        No new tests, this is a build fix.
+        Re-submit r56585 with fix for Chromium.
+
+        * plugins/PluginView.cpp: Guard getValueStatic() with
+        NETSCAPE_PLUGIN_API
+        (WebCore::PluginView::getValue):
+        * plugins/PluginView.h: Guard getValue() with NETSCAPE_PLUGIN_API
+        * plugins/PluginViewNone.cpp: Guard platformGetValue() and
+        platformGetValueStatic with NETSCAPE_PLUGIN_API;
+        Guard privateBrowsingStateChanged() and setJavaScriptPaused() with
+        PLATFORM(MAC) or PLATFORM(CHROMIUM)
+
+2010-04-21  Timothy Hatcher  <timothy@apple.com>
+
+        Make UserContentURLPattern correctly check for subdomains and the URL
+        has the same suffix as the pattern. Also improve the parsing of the host.
+
+        https://bugs.webkit.org/show_bug.cgi?id=37357
+
+        Reviewed by Darin Adler.
+
+        * page/UserContentURLPattern.cpp:
+        (WebCore::UserContentURLPattern::parse): Simplify the subdomain pattern parsing to
+        simply check for "*" only or a "*." prefix and then do a substring.
+        (WebCore::UserContentURLPattern::matchesHost): Check that the host has a "." in the
+        position before the suffix to ensure it a subdomain and not just a suffix match.
+
+2010-04-20  Timothy Hatcher  <timothy@apple.com>
+
+        Fix matching of "file:///*" patterns by not trying to compare the host. The host is
+        irrelevant for file URLs.
+
+        Also fix comparisons to be case insensitive.
+
+        https://bugs.webkit.org/show_bug.cgi?id=37889
+
+        Reviewed by Dave Hyatt.
+
+        * page/UserContentURLPattern.cpp:
+        (WebCore::UserContentURLPattern::parse): Use equalIgnoringCase when comparing for "file" schemes.
+        (WebCore::UserContentURLPattern::matches): Use equalIgnoringCase when comparing schemes. Only call
+        matchesHost if the scheme isn't "file".
+        (WebCore::UserContentURLPattern::matchesHost): Call equalIgnoringCase when comparing hosts. The endsWith
+        was already doing a case-insensitive compare, so existing tests worked though this path.
+
+2010-04-20  Martin Robinson  <mrobinson@webkit.org>
+
+        Reviewed by Gustavo Noronha Silva.
+
+        [GTK] Enable DOM clipboard and drag-and-drop access
+        https://bugs.webkit.org/show_bug.cgi?id=30623
+
+        Move most of the PasteboardHelper logic into WebCore. This helps
+        prepare for WebKit2 and leads to a clearer separation of concerns
+        between the WebKit and WebCore layers.
+
+        No new tests as functionality has not changed.
+
+        * GNUmakefile.am: Add PastboardHelper.cpp to list of sources.
+        * platform/Pasteboard.h: Added a getter for the PasteboardHelper and made the member private.
+        * platform/gtk/PasteboardGtk.cpp: Update PasteboardHelper method calls to use new naming.
+        (WebCore::clipboard_get_contents_cb): Ditto.
+        (WebCore::Pasteboard::helper): Added, member is now private.
+        (WebCore::Pasteboard::writeURL): Ditto.
+        (WebCore::Pasteboard::documentFragment): Update to reflect method renaming.
+        (WebCore::Pasteboard::plainText): Ditto.
+        * platform/gtk/PasteboardHelper.cpp: Added.
+        (WebCore::PasteboardHelper::PasteboardHelper): Added.
+        (WebCore::PasteboardHelper::~PasteboardHelper): Added.
+        (WebCore::PasteboardHelper::initializeTargetList): Added, originally from WebKit.
+        (WebCore::widgetFromFrame): Added helper function.
+        (WebCore::PasteboardHelper::getCurrentClipboard): Added, originally from WebKit.
+        (WebCore::PasteboardHelper::getClipboard): Ditto.
+        (WebCore::PasteboardHelper::getPrimarySelectionClipboard): Ditto.
+        (WebCore::PasteboardHelper::targetList): Ditto.
+        (WebCore::PasteboardHelper::fillSelectionData): Ditto.
+        (WebCore::PasteboardHelper::targetListForDataObject): Ditto.
+        (WebCore::getClipboardContentsCallback): Ditto.
+        (WebCore::clearClipboardContentsCallback): Ditto.
+        (WebCore::PasteboardHelper::writeClipboardContents): Ditto.
+        * platform/gtk/PasteboardHelper.h: Moved methods from WebKit to WebCore.
+
+2010-03-28  Alexey Proskuryakov  <ap@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        https://bugs.webkit.org/show_bug.cgi?id=36733
+        Use a common header for Windows virtual key codes on all platforms
+
+        No change in functionality, so no new tests.
+
+        * platform/WindowsKeyboardCodes.h: Added. Define VK_* key codes as macros, matching Windows.
+
+        * platform/KeyboardCodes.h: Removed.
+        * platform/android/KeyboardCodes.h: Removed.
+        * platform/chromium/KeyboardCodesPosix.h: Removed.
+        * platform/chromium/KeyboardCodesWin.h: Removed.
+        * platform/haiku/KeyboardCodes.h: Removed.
+        * platform/wx/KeyboardCodes.h: Removed.
+        Removed platform specific attempts to do the same thing. In fact, platform/KeyboardCodes.h
+        was supposed to be cross-platform, but it didn't have a sufficiently descriptive name, and
+        its name was the same as platform-specific versions, so I chose a new one.
+
+        * platform/chromium/KeyboardCodes.h: Copied from WebCore/platform/chromium/KeyboardCodesWin.h.
+        Chromium redefines Windows constants to different names; keeping the header doing that to
+        avoid breaking Chromium code.
+
+        * GNUmakefile.am:
+        * WebCore.gypi:
+        Replaced KeyboardCodes.h with WindowsKeyboardCodes.h.
+
+        * WebCore.xcodeproj/project.pbxproj:
+        * platform/cocoa/KeyEventCocoa.mm:
+        (WebCore::windowsKeyCodeForKeyCode):
+        (WebCore::windowsKeyCodeForCharCode):
+        Mac used to hardcode the key codes; changed to use VK_* macros.
+
+        * config.h: Removed a hack to include KeyboardCodes.h, it shouldn't be necessary any more.
+
+        * platform/android/KeyEventAndroid.cpp:
+        * platform/brew/PlatformKeyboardEventBrew.cpp:
+        * platform/efl/PlatformKeyboardEventEfl.cpp:
+        * platform/gtk/KeyEventGtk.cpp:
+        * platform/haiku/PlatformKeyboardEventHaiku.cpp:
+        * platform/qt/PlatformKeyboardEventQt.cpp:
+        * platform/wx/KeyboardEventWx.cpp:
+        Changed to include WindowsKeyboardCodes.h.
+
+2010-04-19  Dan Bernstein  <mitz@apple.com>
+
+        Reviewed by Darin Adler.
+
+        Make the fix for <rdar://problem/7873647> from r57759 more robust.
+
+        * rendering/RenderLayer.cpp:
+        (WebCore::RenderLayer::updateHoverActiveState): Use RefPtrs for the Nodes.
+
+2010-04-17  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        Reviewed by Darin Adler.
+
+        Crash while handling SVG font in the wrong namespace imported with @font-face
+        https://bugs.webkit.org/show_bug.cgi?id=18862
+
+        Test: fast/invalid/invalidSVGFont.html
+
+        * loader/CachedFont.cpp:
+        (WebCore::CachedFont::getSVGFontById): Make sure we really get an SVGFontElement by using
+        getElementsByNameNS: the element factory chooses which element to create based on both
+        localName and namespace.
+
+2010-04-16  Dan Bernstein  <mitz@apple.com>
+
+        Reviewed by Simon Fraser.
+
+        <rdar://problem/7873647> Crash when updating hover state
+
+        Test: fast/dynamic/hover-style-recalc-crash.html
+
+        Updating the hover state of an element caused the document to need style
+        recalc, and then updating the hover state of a link caused style recalc,
+        which changed the render tree while updateHoverActiveState() was iterating
+        over it, leading to a crash.
+
+        * rendering/RenderLayer.cpp:
+        (WebCore::RenderLayer::updateHoverActiveState): Collect the nodes to be
+        updated into vectors, then update their active and hover states.
+
+2010-04-15  David Hyatt  <hyatt@apple.com>
+
+        Reviewed by Anders Carlsson.
+
+        https://bugs.webkit.org/show_bug.cgi?id=37567, :first-letter inside a :visited link is wrong color.  Make sure
+        that the pseudo style caching allows visited link styles to hang off other pseudo styles.
+
+        * rendering/RenderBlock.cpp:
+        (WebCore::RenderBlock::updateFirstLetter):
+        * rendering/style/RenderStyle.cpp:
+        (WebCore::RenderStyle::getCachedPseudoStyle):
+
+2010-04-14  Simon Fraser  <simon.fraser@apple.com>
+
+        Reviewed by Dan Bernstein.
+
+        Repaint of fixed, transformed element is broken
+        https://bugs.webkit.org/show_bug.cgi?id=37637
+
+        RenderBox::computeRectForRepaint() failed to set the 'fixed' flag correctly
+        for elements that had both fixed position and a transform. If the element has
+        a transform, 'fixed' should only remain true if the element itself is fixed
+        position.
+        
+        Also cache style()->position() in a local variable for performance.
+        
+        Test: fast/repaint/fixed-tranformed.html
+
+        * rendering/RenderBox.cpp:
+        (WebCore::RenderBox::computeRectForRepaint):
+
+2010-04-14  Alejandro G. Castro  <alex@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        We have to check if the resource handler is cancelled before
+        checking the client, other case it could crash.
+
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::parseDataUrl):
+
+2010-04-13  Dirk Schulze  <krit@webkit.org>
+
+        Reviewed by Eric Seidel.
+
+        REGRESSION(r57511): many new graphics / svg related leaks
+        https://bugs.webkit.org/show_bug.cgi?id=37527
+
+        The content of a HashMap was not correctly deleted. Fixed this
+        in the DTor and in invalidateClient of RenderSVGResourceClipper.
+
+        * rendering/RenderSVGResourceClipper.cpp:
+        (WebCore::RenderSVGResourceClipper::~RenderSVGResourceClipper):
+        (WebCore::RenderSVGResourceClipper::invalidateClient):
+
+2010-04-13  Chang Shu  <chang.shu@nokia.com>
+
+        Reviewed by Darin Fisher.
+
+        https://bugs.webkit.org/show_bug.cgi?id=34653
+
+        Based on W3C spec and Firefox behavior, while invoking XHR Send with parameter
+        as String, the charset in Content-Type should be forced to set to UTF-8.
+
+        Test: http/tests/xmlhttprequest/request-encoding2.html
+
+        * platform/network/HTTPParsers.cpp:
+        (WebCore::extractCharsetFromMediaType):
+        (WebCore::findCharsetInMediaType):
+        * platform/network/HTTPParsers.h:
+        * xml/XMLHttpRequest.cpp:
+        (WebCore::setCharsetInMediaType):
+        (WebCore::XMLHttpRequest::send):
+
+2010-04-12  Dumitru Daniliuc  <dumi@chromium.org>
+
+        Reviewed by Dimitri Glazkov.
+
+        Throwing a SECURITY_ERR when openDatabase() cannot open a database
+        for whatever reason, as required by the spec.
+        https://bugs.webkit.org/show_bug.cgi?id=33916
+
+        * bindings/js/JSDOMWindowCustom.cpp:
+        (WebCore::JSDOMWindow::openDatabase):
+        * bindings/v8/custom/V8DOMWindowCustom.cpp:
+        (WebCore::V8DOMWindow::openDatabaseCallback):
+
+2010-04-10  Chris Evans  <cevans@chromium.org>
+
+        Reviewed by Adam Barth.
+
+        Defense in depth: make sure an SVG document in the <img> context has
+        a unique origin.
+
+        https://bugs.webkit.org/show_bug.cgi?id=37392
+
+        * svg/graphics/SVGImage.cpp:
+        (WebCore::SVGImage::dataChanged):
+          Force the temporary rendering context into a unique origin.
+        * loader/FrameLoader.h:
+        (WebCore::FrameLoader::setForceSandboxFlags):
+          Support for setting sandbox flags that will always be applied.
+        * loader/FrameLoader.cpp:
+        (WebCore::FrameLoader::updateSandboxFlags):
+          Always apply any forced flags.
+
+2010-04-09  Abhishek Arya  <inferno@chromium.org>
+
+        Reviewed by Adam Barth.
+
+        Prevent HTTP responses served with JSON content type from being rendered as HTML. 
+
+        Test: http/tests/security/xss-DENIED-mime-type-execute-as-html.html
+
+        * dom/DOMImplementation.cpp:
+        (WebCore::DOMImplementation::isTextMIMEType): Render application/json as text/plain.
+        * platform/MIMETypeRegistry.cpp:
+        (WebCore::initializeSupportedNonImageMimeTypes): Add a compile assert to prevent addition of new mime types in non-image types. 
+
+2010-04-08  Alexey Proskuryakov  <ap@apple.com>
+
+        Reviewed by Darin Adler.
+
+        https://bugs.webkit.org/show_bug.cgi?id=37181
+        <rdar://problem/7835374> REGRESSION (r54400): Hangs when doing AJAX update with large amount of data
+
+        Test: fast/events/gc-freeze-with-attribute-listeners.html
+
+        The problem was that we were creating JS wrappers for nodes with attribute event listeners,
+        and GC is very slow if there are nodes with wrappers in a detached tree whose root does not
+        have a wrapper.
+
+        * bindings/js/ScriptEventListener.cpp: (WebCore::createAttributeEventListener): Don't create
+        wrappers for attribute event listeners - if there is a node, JSLazyEventListener::initializeJSFunction()
+        will create one.
+
+        * bindings/js/JSNodeCustom.cpp: (WebCore::JSNode::markChildren): Added a FIXME about the problem
+        we are stepping around now.
+
+2010-04-09  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Gustavo Noronha.
+
+        WebGtk GLib-CRITICAL Segmentation fault
+        https://bugs.webkit.org/show_bug.cgi?id=34937
+
+        Do not crash if a plugin does not return anything in
+        NP_GetMIMEDescription. This can happen, and other ports gracefully
+        handle the situation.
+
+        * plugins/gtk/PluginPackageGtk.cpp:
+        (WebCore::PluginPackage::fetchInfo):
+
+2010-04-07  David Hyatt  <hyatt@apple.com>
+
+        Reviewed by Oliver Hunt.
+
+        https://bugs.webkit.org/show_bug.cgi?id=24300, don't leak history info via CSS :visited.
+
+        This patch implements the policy described by David Baron here:
+        
+        http://dbaron.org/mozilla/visited-privacy
+        
+        Added new tests in fast/history.
+
+        * WebCore.base.exp:
+        Expose functions needed for the WebKit SPI used by layout tests.
+
+        * WebCore.xcodeproj/project.pbxproj:
+        * accessibility/AccessibilityRenderObject.cpp:
+        (WebCore::AccessibilityRenderObject::isVisited):
+        Make sure accessibility objects still return visited information.
+        
+        * css/CSSComputedStyleDeclaration.cpp:
+        (WebCore::CSSComputedStyleDeclaration::CSSComputedStyleDeclaration):
+        (WebCore::CSSComputedStyleDeclaration::getPropertyCSSValue):
+        * css/CSSComputedStyleDeclaration.h:
+        (WebCore::computedStyle):
+        Add a boolean to computed style declarations that - if set - causes the computed style
+        to still return :visited information.  For normal Web pages, this will be false.  It is set
+        to true for the Web Inspector and by the WebKit SPI used by the layout tests.
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::CSSStyleSelector::initElement):
+        (WebCore::CSSStyleSelector::SelectorChecker::SelectorChecker):
+        (WebCore::CSSStyleSelector::SelectorChecker::determineLinkState):
+        (WebCore::CSSStyleSelector::SelectorChecker::checkSelector):
+        (WebCore::CSSStyleSelector::canShareStyleWithElement):
+        (WebCore::CSSStyleSelector::styleForElement):
+        (WebCore::CSSStyleSelector::keyframeStylesForAnimation):
+        (WebCore::CSSStyleSelector::pseudoStyleForElement):
+        (WebCore::CSSStyleSelector::pseudoStyleRulesForElement):
+        (WebCore::CSSStyleSelector::checkSelector):
+        (WebCore::CSSStyleSelector::SelectorChecker::checkOneSelector):
+        (WebCore::CSSStyleSelector::applyPropertyToStyle):
+        (WebCore::CSSStyleSelector::getColorFromPrimitiveValue):
+        * css/CSSStyleSelector.h:
+        Rework the style selector to resolve two styles instead of one.  The first forces the link to
+        be unvisited, and the second forces the link to be visited.  The real state of the link is 
+        cached on the principal (unvisited) style.  The visited style hangs off the principal style
+        as a pseudo style (VISITED_LINK).
+
+        * dom/Element.cpp:
+        (WebCore::Element::pseudoStyleCacheIsInvalid):
+        Make sure to deal with the VISITED_LINK pseudo to know when only :visited style info changed.
+
+        * inspector/InspectorDOMAgent.cpp:
+        (WebCore::InspectorDOMAgent::getStyles):
+        Let the Web Inspector see :visited computed styles by default.
+        
+        * platform/LinkHash.cpp:
+        (WebCore::visitedURL):
+        Fix an issue where <a href=""> is not hashed properly to the document's base URI, so it wasn't
+        correctly reported as :visited.
+
+        * rendering/InlineFlowBox.cpp:
+        (WebCore::InlineFlowBox::paintBoxDecorations):
+        (WebCore::InlineFlowBox::paintTextDecorations):
+        * rendering/InlineTextBox.cpp:
+        (WebCore::InlineTextBox::paint):
+        (WebCore::InlineTextBox::paintSelection):
+        * rendering/RenderBlock.cpp:
+        (WebCore::RenderBlock::paintColumnRules):
+        (WebCore::RenderBlock::paintObject):
+        * rendering/RenderBoxModelObject.cpp:
+        (WebCore::RenderBoxModelObject::paintBorder):
+        * rendering/RenderFieldset.cpp:
+        (WebCore::RenderFieldset::paintBorderMinusLegend):
+        * rendering/RenderImage.cpp:
+        (WebCore::RenderImage::paintFocusRings):
+        * rendering/RenderInline.cpp:
+        (WebCore::RenderInline::paintOutline):
+        (WebCore::RenderInline::paintOutlineForLine):
+        * rendering/RenderObject.cpp:
+        (WebCore::RenderObject::drawLineForBoxSide):
+        (WebCore::RenderObject::drawArcForBoxSide):
+        (WebCore::RenderObject::paintOutline):
+        (WebCore::decorationColor):
+        (WebCore::RenderObject::getTextDecorationColors):
+        * rendering/RenderObject.h:
+        * rendering/RenderPath.cpp:
+        (WebCore::RenderPath::paint):
+        * rendering/RenderReplaced.cpp:
+        (WebCore::RenderReplaced::paint):
+        * rendering/RenderSVGContainer.cpp:
+        (WebCore::RenderSVGContainer::paint):
+        * rendering/RenderSVGImage.cpp:
+        (WebCore::RenderSVGImage::paint):
+        * rendering/RenderSVGRoot.cpp:
+        (WebCore::RenderSVGRoot::paint):
+        * rendering/RenderTableCell.cpp:
+        (WebCore::RenderTableCell::collapsedLeftBorder):
+        (WebCore::RenderTableCell::collapsedRightBorder):
+        (WebCore::RenderTableCell::collapsedTopBorder):
+        (WebCore::RenderTableCell::collapsedBottomBorder):
+        (WebCore::RenderTableCell::paintCollapsedBorder):
+        * rendering/style/CollapsedBorderValue.h:
+        (WebCore::CollapsedBorderValue::CollapsedBorderValue):
+        (WebCore::CollapsedBorderValue::color):
+        (WebCore::CollapsedBorderValue::operator==):
+        Patch painting code to fetch visitedDependentColors from the RenderStyle.  Properties that
+        are honored include background-color, color, border colors, outline color, column rules,
+        and fill and stroke (both SVG and our custom versions).
+    
+        * rendering/style/RenderStyle.cpp:
+        (WebCore::RenderStyle::RenderStyle):
+        (WebCore::RenderStyle::diff):
+        (WebCore::borderStyleForColorProperty):
+        (WebCore::colorIncludingFallback):
+        (WebCore::RenderStyle::visitedDependentColor):
+        * rendering/style/RenderStyle.h:
+        (WebCore::):
+        (WebCore::InheritedFlags::NonInheritedFlags::operator==):
+        (WebCore::InheritedFlags::setBitDefaults):
+        (WebCore::InheritedFlags::insideLink):
+        (WebCore::InheritedFlags::isLink):
+        (WebCore::InheritedFlags::setInsideLink):
+        (WebCore::InheritedFlags::setIsLink):
+        * rendering/style/RenderStyleConstants.h:
+        Change how link information is stored.  The noninherited flags now have a bit set for if you're a link
+        or not.  The inherited flags now cache whether you're inside a visited or unvisited link (or no link at
+        all).
+
+        (WebCore::):
+        * svg/graphics/SVGPaintServer.cpp:
+        (WebCore::SVGPaintServer::fillPaintServer):
+        (WebCore::SVGPaintServer::strokePaintServer):
+        Patch SVG fill/stroke painting to honor :visited.
+
+2010-04-08  Benjamin Otte  <otte@gnome.org>
+
+        Reviewed by Gustavo Noronha.
+
+        Fix build with MathML enabled.
+
+        * GNUmakefile.am:
+
+2010-03-29  Chris Evans  <cevans@chromium.org>
+
+        Reviewed by Adam Barth.
+
+        Don't use unique domains for file:// separation: it breaks local
+        databases, and access to your own same-origin iframes. Instead, use
+        path-based access checks.
+
+        https://bugs.webkit.org/show_bug.cgi?id=36692
+
+        Test: fast/xmlhttprequest/xmlhttprequest-no-file-access.html
+
+        * dom/Document.cpp:
+        (WebCore::Document::initSecurityContext): renamed API.
+        * page/SecurityOrigin.h:
+        * page/SecurityOrigin.cpp:
+        (WebCore::SecurityOrigin::SecurityOrigin):
+          Initialize new flag. Take note of file:// path.
+          Copy new fields in copy constructor.
+        (WebCore::SecurityOrigin::canAccess):
+          Take into account path-based origin separation for file://
+        (WebCore::SecurityOrigin::enforceFilePathSeparation):
+          New method to enable file:// path origin separation.
+        (WebCore::SecurityOrigin::toString):
+          Return a null domain for an isolated file origin.
+        (WebCore::SecurityOrigin::isSameSchemeHostPort):
+          Take into account path-based origin separation for file://
+        (WebCore::SecurityOrigin::passesFileCheck):
+          Abstraction of common logic for file:// access checks.
+
 2010-04-01  MORITA Hajime  <morrita@google.com>
 
         Reviewed by Darin Adler.

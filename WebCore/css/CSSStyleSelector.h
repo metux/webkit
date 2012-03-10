@@ -85,12 +85,11 @@ public:
                          bool strictParsing, bool matchAuthorAndUserStyles);
         ~CSSStyleSelector();
 
-        void initElementAndPseudoState(Element*);
         void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);
-        PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false);
+        PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false, bool matchVisitedLinks = false);
         void keyframeStylesForAnimation(Element*, const RenderStyle*, KeyframeList& list);
 
-        PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle = 0);
+        PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle = 0, bool matchVisitedLinks = false);
 
         static PassRefPtr<RenderStyle> styleForDocument(Document*);
 
@@ -101,6 +100,7 @@ public:
 #endif
 
     private:
+        void initElement(Element*);
         RenderStyle* locateSharedStyle();
         Node* locateCousinList(Element* parent, unsigned depth = 1);
         bool canShareStyleWithElement(Node*);
@@ -196,11 +196,12 @@ public:
             SelectorChecker(Document*, bool strictParsing);
 
             bool checkSelector(CSSSelector*, Element*) const;
-            SelectorMatch checkSelector(CSSSelector*, Element*, HashSet<AtomicStringImpl*>* selectorAttrs, PseudoId& dynamicPseudo, bool isAncestor, bool isSubSelector, RenderStyle* = 0, RenderStyle* elementParentStyle = 0) const;
-            bool checkOneSelector(CSSSelector*, Element*, HashSet<AtomicStringImpl*>* selectorAttrs, PseudoId& dynamicPseudo, bool isAncestor, bool isSubSelector, RenderStyle*, RenderStyle* elementParentStyle) const;
-            PseudoState checkPseudoState(Element*, bool checkVisited = true) const;
+            SelectorMatch checkSelector(CSSSelector*, Element*, HashSet<AtomicStringImpl*>* selectorAttrs, PseudoId& dynamicPseudo, bool isSubSelector, bool encounteredLink, RenderStyle* = 0, RenderStyle* elementParentStyle = 0) const;
+            bool checkOneSelector(CSSSelector*, Element*, HashSet<AtomicStringImpl*>* selectorAttrs, PseudoId& dynamicPseudo, bool isSubSelector, RenderStyle*, RenderStyle* elementParentStyle) const;
             bool checkScrollbarPseudoClass(CSSSelector*, PseudoId& dynamicPseudo) const;
 
+            EInsideLink determineLinkState(Element* element) const;
+            EInsideLink determineLinkStateSlowCase(Element* element) const;
             void allVisitedStateChanged();
             void visitedStateChanged(LinkHash visitedHash);
 
@@ -209,6 +210,7 @@ public:
             bool m_collectRulesOnly;
             PseudoId m_pseudoStyle;
             bool m_documentIsHTML;
+            mutable bool m_matchVisitedPseudoClass;
             mutable HashSet<LinkHash, LinkHashHash> m_linksCheckedForVisitedState;
         };
 
@@ -251,6 +253,19 @@ public:
 
         StyleImage* styleImage(CSSValue* value);
 
+
+        EInsideLink currentElementLinkState() const
+        {
+            if (!m_haveCachedLinkState) {
+                m_cachedLinkState = m_checker.determineLinkState(m_element);
+                m_haveCachedLinkState = true;
+            }
+            return m_cachedLinkState;
+        }
+
+        mutable EInsideLink m_cachedLinkState;
+        mutable bool m_haveCachedLinkState;
+
         // We collect the set of decls that match in |m_matchedDecls|.  We then walk the
         // set of matched decls four times, once for those properties that others depend on (like font-size),
         // and then a second time for all the remaining properties.  We then do the same two passes
@@ -279,7 +294,7 @@ public:
         CSSValue* m_lineHeightValue;
         bool m_fontDirty;
         bool m_matchAuthorAndUserStyles;
-
+        
         RefPtr<CSSFontSelector> m_fontSelector;
         HashSet<AtomicStringImpl*> m_selectorAttrs;
         Vector<CSSMutableStyleDeclaration*> m_additionalAttributeStyleDecls;
@@ -346,7 +361,7 @@ public:
         CSSRuleData* m_first;
         CSSRuleData* m_last;
     };
-    
+
 } // namespace WebCore
 
 #endif // CSSStyleSelector_h

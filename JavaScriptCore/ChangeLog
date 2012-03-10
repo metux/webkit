@@ -1,3 +1,123 @@
+2010-05-04  Yongjun Zhang  <yongjun_zhang@apple.com>
+
+        Reviewed by Darin Adler.
+
+        WebKit crashes at DebuggerCallFrame::functionName() if m_callFrame is the top global callframe.
+        https://bugs.webkit.org/show_bug.cgi?id=38535
+
+        Don't call asFunction if callee is not a FunctionType to prevent assertion failure
+        in JSCell::isObject().
+
+        * debugger/DebuggerCallFrame.cpp:
+        (JSC::DebuggerCallFrame::functionName):
+        (JSC::DebuggerCallFrame::calculatedFunctionName):
+
+2010-05-04  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Reviewed by Darin Adler.
+
+        Does not work on SPARC because of alignment issues
+        https://bugs.webkit.org/show_bug.cgi?id=38455
+
+        Use AllocAlignmentInteger instead of void* on pageheap_memory to
+        avoid crashing at runtime in some architectures. Investigated by
+        Mike Hommey <mh@glandium.org>, change suggested by Darin Adler.
+
+        * wtf/FastMalloc.cpp:
+
+2010-05-03  Stephanie Lewis  <slewis@apple.com>
+
+        Reviewed by Geoff Garen.
+
+        https://bugs.webkit.org/show_bug.cgi?id=38368
+        <rdar://problem/7834433> REGRESSSION: 1.5% PLT regression due to 56028 
+        (return memory quicker).
+        Instead of returning everything but the smallest spans spread out 
+        the spans kept over several size lists.
+
+        * wtf/FastMalloc.cpp:
+        (WTF::TCMalloc_PageHeap::scavenge):
+
+2010-05-03  Oliver Hunt  <oliver@apple.com>
+
+        Reviewed by Maciej Stachowiak.
+
+        Interpreter crashes due to incorrect refcounting of cached structures.
+        https://bugs.webkit.org/show_bug.cgi?id=38491
+        rdar://problem/7926160
+
+        Make sure we ref/deref structures used for cached custom property getters
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::derefStructures):
+        (JSC::CodeBlock::refStructures):
+
+2010-04-26  Stephanie Lewis  <slewis@apple.com>
+
+        Reviewed by Geoff Garen.
+
+        https://bugs.webkit.org/show_bug.cgi?id=38154 FastMalloc calls madvise too often.
+        <rdar://problem/7834433> REGRESSSION: 1.5% PLT regression due to 56028 (return memory quicker).  
+        To save on madvise calls when recommitting memory recommit the entire span and then carve it
+        instead of carving the span up and only committing the part that will be used immediately.
+
+        * wtf/FastMalloc.cpp:
+        (WTF::TCMalloc_PageHeap::New):
+        (WTF::TCMalloc_PageHeap::AllocLarge):
+        (WTF::TCMalloc_PageHeap::Carve):
+
+2010-04-26  Geoffrey Garen  <ggaren@apple.com>
+
+        Reviewed by Sam Weinig.
+
+        <rdar://problem/7766413>
+        
+        Fixed a crash seen when using the JavaScriptCore API with WebKit.
+        
+        No layout test because DumpRenderTree doesn't use the JavaScriptCore API
+        in this way.
+
+        * interpreter/RegisterFile.cpp:
+        (JSC::RegisterFile::setGlobalObject):
+        (JSC::RegisterFile::clearGlobalObject):
+        (JSC::RegisterFile::globalObject):
+        * interpreter/RegisterFile.h:
+        (JSC::RegisterFile::RegisterFile): Use WeakGCPtr for managing m_globalObject,
+        since it's a weak pointer. (We never noticed this error before because,
+        in WebKit, global objects always have a self-reference in a global variable,
+        so marking the register file's global variables would keep m_globalObject
+        alive. In the JavaScriptCore API, you can allocate a global object with
+        no self-reference.)
+
+        * runtime/JSActivation.h: Removed unneeded #include.
+
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::~JSGlobalObject): Don't use ==, since a weak
+        pointer is 0 when the object it points to runs its destructor.
+
+        * runtime/WeakGCPtr.h:
+        (JSC::WeakGCPtr::clear): Changed to return a bool indicating whether the
+        clear actually happened.
+        (JSC::WeakGCPtr::assign): Changed to forbid assignment of 0 as a shorthand
+        for calling clear(). A client should never clear by assigning 0, since
+        clear() should be conditional on whether the object doing the clearing
+        is still pointed to by the weak pointer. (Otherwise, a zombie object might
+        clear a pointer to a new, valid object.)
+
+2010-04-02  Ruben Van Boxem  <vanboxem.ruben@gmail.com>
+
+        Reviewed by Eric Seidel.
+
+        Mingw-w64 fixes for JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=35607
+
+        * runtime/Collector.cpp: use the msvc code for mingw-w64 (but not mingw-w32)
+        (JSC::Heap::allocateBlock):
+        (JSC::Heap::freeBlockPtr):
+        (JSC::currentThreadStackBase):
+        (JSC::currentThreadStackBase):
+        * wtf/Platform.h: added COMPILER(MINGW64) check to differentiate between mingw.org and mingw-w64 functions
+
 2010-03-23  Mark Rowe  <mrowe@apple.com>
 
         Build fix.

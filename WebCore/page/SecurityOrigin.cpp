@@ -90,6 +90,20 @@ static URLSchemesMap& schemesWithUniqueOrigins()
     return schemesWithUniqueOrigins;
 }
 
+static bool schemeRequiresAuthority(const String& scheme)
+{
+    DEFINE_STATIC_LOCAL(URLSchemesMap, schemes, ());
+
+    if (schemes.isEmpty()) {
+        schemes.add("http");
+        schemes.add("https");
+        schemes.add("ftp");
+    }
+
+    return schemes.contains(scheme);
+}
+
+
 SecurityOrigin::SecurityOrigin(const KURL& url, SandboxFlags sandboxFlags)
     : m_sandboxFlags(sandboxFlags)
     , m_protocol(url.protocol().isNull() ? "" : url.protocol().lower())
@@ -98,10 +112,15 @@ SecurityOrigin::SecurityOrigin(const KURL& url, SandboxFlags sandboxFlags)
     , m_isUnique(isSandboxed(SandboxOrigin) || shouldTreatURLSchemeAsNoAccess(m_protocol))
     , m_universalAccess(false)
     , m_domainWasSetInDOM(false)
+    , m_enforceFilePathSeparation(false)
 {
     // These protocols do not create security origins; the owner frame provides the origin
     if (m_protocol == "about" || m_protocol == "javascript")
         m_protocol = "";
+
+    // For edge case URLs that were probably misparsed, make sure that the origin is unique.
+    if (schemeRequiresAuthority(m_protocol) && m_host.isEmpty())
+        m_isUnique = true;
 
     // document.domain starts as m_host, but can be set by the DOM.
     m_domain = m_host;
@@ -112,6 +131,8 @@ SecurityOrigin::SecurityOrigin(const KURL& url, SandboxFlags sandboxFlags)
         // Directories should never be readable.
         if (!url.hasPath() || url.path().endsWith("/"))
             m_isUnique = true;
+        // Store the path in case we are doing per-file origin checking.
+        m_filePath = url.path();
     }
 
     if (isDefaultPortForProtocol(m_port, m_protocol))
@@ -124,11 +145,13 @@ SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
     , m_host(other->m_host.threadsafeCopy())
     , m_encodedHost(other->m_encodedHost.threadsafeCopy())
     , m_domain(other->m_domain.threadsafeCopy())
+    , m_filePath(other->m_filePath.threadsafeCopy())
     , m_port(other->m_port)
     , m_isUnique(other->m_isUnique)
     , m_universalAccess(other->m_universalAccess)
     , m_domainWasSetInDOM(other->m_domainWasSetInDOM)
     , m_canLoadLocalResources(other->m_canLoadLocalResources)
+    , m_enforceFilePathSeparation(other->m_enforceFilePathSeparation)
 {
 }
 
@@ -186,7 +209,7 @@ bool SecurityOrigin::isDomainRelaxationForbiddenForURLScheme(const String& schem
 }
 
 bool SecurityOrigin::canAccess(const SecurityOrigin* other) const
-{  
+{
     if (m_universalAccess)
         return true;
 
@@ -213,17 +236,31 @@ bool SecurityOrigin::canAccess(const SecurityOrigin* other) const
     // Opera 9 allows access when only one page has set document.domain, but
     // this is a security vulnerability.
 
+    bool canAccess = false;
     if (m_protocol == other->m_protocol) {
         if (!m_domainWasSetInDOM && !other->m_domainWasSetInDOM) {
             if (m_host == other->m_host && m_port == other->m_port)
-                return true;
+                canAccess = true;
         } else if (m_domainWasSetInDOM && other->m_domainWasSetInDOM) {
             if (m_domain == other->m_domain)
-                return true;
+                canAccess = true;
         }
     }
-    
-    return false;
+
+    if (canAccess && isLocal())
+       canAccess = passesFileCheck(other);
+
+    return canAccess;
+}
+
+bool SecurityOrigin::passesFileCheck(const SecurityOrigin* other) const
+{
+    ASSERT(isLocal() && other->isLocal());
+
+    if (!m_enforceFilePathSeparation && !other->m_enforceFilePathSeparation)
+        return true;
+
+    return (m_filePath == other->m_filePath);
 }
 
 bool SecurityOrigin::canRequest(const KURL& url) const
@@ -300,9 +337,10 @@ void SecurityOrigin::grantUniversalAccess()
     m_universalAccess = true;
 }
 
-void SecurityOrigin::makeUnique()
+void SecurityOrigin::enforceFilePathSeparation()
 {
-    m_isUnique = true;
+    ASSERT(isLocal());
+    m_enforceFilePathSeparation = true;
 }
 
 bool SecurityOrigin::isLocal() const
@@ -328,8 +366,11 @@ String SecurityOrigin::toString() const
     if (isUnique())
         return "null";
 
-    if (m_protocol == "file")
-        return String("file://");
+    if (m_protocol == "file") {
+        if (m_enforceFilePathSeparation)
+            return "null";
+        return "file://";
+    }
 
     Vector<UChar> result;
     result.reserveInitialCapacity(m_protocol.length() + m_host.length() + 10);
@@ -496,6 +537,9 @@ bool SecurityOrigin::isSameSchemeHostPort(const SecurityOrigin* other) const
         return false;
 
     if (m_port != other->m_port)
+        return false;
+
+    if (isLocal() && !passesFileCheck(other))
         return false;
 
     return true;

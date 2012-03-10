@@ -45,6 +45,7 @@ RenderSVGResourceClipper::RenderSVGResourceClipper(SVGStyledElement* node)
 
 RenderSVGResourceClipper::~RenderSVGResourceClipper()
 {
+    deleteAllValues(m_clipper);
     m_clipper.clear();
 }
 

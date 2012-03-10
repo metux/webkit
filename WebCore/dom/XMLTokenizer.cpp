@@ -51,6 +51,7 @@
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
 #include "TextResourceDecoder.h"
+#include "TreeDepthLimit.h"
 #include <wtf/StringExtras.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
@@ -86,6 +87,8 @@ void XMLTokenizer::pushCurrentNode(Node* n)
         n->ref();
     m_currentNodeStack.append(m_currentNode);
     m_currentNode = n;
+    if (m_currentNodeStack.size() > maxDOMTreeDepth)
+        handleError(fatal, "Excessive node nesting.", lineNumber(), columnNumber());
 }
 
 void XMLTokenizer::popCurrentNode()
