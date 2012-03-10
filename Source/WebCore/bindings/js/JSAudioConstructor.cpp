@@ -37,7 +37,7 @@ using namespace JSC;
 
 namespace WebCore {
 
-const ClassInfo JSAudioConstructor::s_info = { "AudioConstructor", &DOMConstructorWithDocument::s_info, 0, 0 };
+const ClassInfo JSAudioConstructor::s_info = { "AudioConstructor", &DOMConstructorWithDocument::s_info, 0, 0, CREATE_METHOD_TABLE(JSAudioConstructor) };
 
 JSAudioConstructor::JSAudioConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
     : DOMConstructorWithDocument(structure, globalObject)
@@ -75,7 +75,7 @@ static EncodedJSValue JSC_HOST_CALL constructAudio(ExecState* exec)
         HTMLAudioElement::createForJSConstructor(document, src))));
 }
 
-ConstructType JSAudioConstructor::getConstructData(ConstructData& constructData)
+ConstructType JSAudioConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructAudio;
     return ConstructTypeHost;

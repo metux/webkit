@@ -122,9 +122,7 @@ Settings::Settings(Page* page)
     , m_maximumDecodedImageSize(numeric_limits<size_t>::max())
     , m_deviceWidth(480)
     , m_deviceHeight(854)
-#if ENABLE(DOM_STORAGE)
     , m_sessionStorageQuota(StorageMap::noQuota)
-#endif
     , m_editingBehaviorType(editingBehaviorTypeForPlatform())
     , m_maximumHTMLParserDOMTreeDepth(defaultMaximumHTMLParserDOMTreeDepth)
     , m_isSpatialNavigationEnabled(false)
@@ -167,7 +165,6 @@ Settings::Settings(Page* page)
     , m_localFileContentSniffingEnabled(false)
     , m_inApplicationChromeMode(false)
     , m_offlineWebApplicationCacheEnabled(false)
-    , m_shouldPaintCustomScrollbars(false)
     , m_enforceCSSMIMETypeInNoQuirksMode(true)
     , m_usesEncodingDetector(false)
     , m_allowScriptsToCloseWindows(false)
@@ -188,6 +185,7 @@ Settings::Settings(Page* page)
     , m_experimentalNotificationsEnabled(false)
     , m_webGLEnabled(false)
     , m_openGLMultisamplingEnabled(true)
+    , m_privilegedWebGLExtensionsEnabled(false)
     , m_webAudioEnabled(false)
     , m_acceleratedCanvas2dEnabled(false)
     , m_legacyAcceleratedCanvas2dEnabled(false)
@@ -198,7 +196,15 @@ Settings::Settings(Page* page)
 #if ENABLE(FULLSCREEN_API)
     , m_fullScreenAPIEnabled(false)
 #endif
+#if ENABLE(MOUSE_LOCK_API)
+    , m_mouseLockAPIEnabled(false)
+#endif
     , m_asynchronousSpellCheckingEnabled(false)
+#if USE(UNIFIED_TEXT_CHECKING)
+    , m_unifiedTextCheckerEnabled(true)
+#else
+    , m_unifiedTextCheckerEnabled(false)
+#endif
     , m_memoryInfoEnabled(false)
     , m_interactiveFormValidation(false)
     , m_usePreHTML5ParserQuirks(false)
@@ -216,9 +222,13 @@ Settings::Settings(Page* page)
 #endif
     , m_mediaPlaybackRequiresUserGesture(false)
     , m_mediaPlaybackAllowsInline(true)
+#if OS(SYMBIAN)
+    , m_passwordEchoEnabled(true)
+#else
     , m_passwordEchoEnabled(false)
+#endif
+    , m_suppressIncrementalRendering(false)
     , m_loadsImagesAutomaticallyTimer(this, &Settings::loadsImagesAutomaticallyTimerFired)
-    , m_zoomAnimatorScale(1)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString 
     // hash before trying to use it.
@@ -405,12 +415,10 @@ void Settings::setLocalStorageEnabled(bool localStorageEnabled)
     m_localStorageEnabled = localStorageEnabled;
 }
 
-#if ENABLE(DOM_STORAGE)
 void Settings::setSessionStorageQuota(unsigned sessionStorageQuota)
 {
     m_sessionStorageQuota = sessionStorageQuota;
 }
-#endif
 
 void Settings::setPrivateBrowsingEnabled(bool privateBrowsingEnabled)
 {
@@ -648,11 +656,6 @@ void Settings::setOfflineWebApplicationCacheEnabled(bool enabled)
     m_offlineWebApplicationCacheEnabled = enabled;
 }
 
-void Settings::setShouldPaintCustomScrollbars(bool shouldPaintCustomScrollbars)
-{
-    m_shouldPaintCustomScrollbars = shouldPaintCustomScrollbars;
-}
-
 void Settings::setEnforceCSSMIMETypeInNoQuirksMode(bool enforceCSSMIMETypeInNoQuirksMode)
 {
     m_enforceCSSMIMETypeInNoQuirksMode = enforceCSSMIMETypeInNoQuirksMode;
@@ -788,6 +791,11 @@ void Settings::setOpenGLMultisamplingEnabled(bool enabled)
     m_openGLMultisamplingEnabled = enabled;
 }
 
+void Settings::setPrivilegedWebGLExtensionsEnabled(bool enabled)
+{
+    m_privilegedWebGLExtensionsEnabled = enabled;
+}
+
 void Settings::setAccelerated2dCanvasEnabled(bool enabled)
 {
     m_acceleratedCanvas2dEnabled = enabled;
@@ -811,7 +819,7 @@ void Settings::setLoadDeferringEnabled(bool enabled)
 void Settings::setTiledBackingStoreEnabled(bool enabled)
 {
     m_tiledBackingStoreEnabled = enabled;
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     if (m_page->mainFrame())
         m_page->mainFrame()->setTiledBackingStoreEnabled(enabled);
 #endif

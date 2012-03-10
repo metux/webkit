@@ -39,7 +39,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-const ClassInfo JSNPMethod::s_info = { "NPMethod", &InternalFunction::s_info, 0, 0 };
+const ClassInfo JSNPMethod::s_info = { "NPMethod", &InternalFunction::s_info, 0, 0, CREATE_METHOD_TABLE(JSNPMethod) };
 
 JSNPMethod::JSNPMethod(JSGlobalObject* globalObject, Structure* structure, NPIdentifier npIdentifier)
     : InternalFunction(globalObject, structure)
@@ -77,7 +77,7 @@ static EncodedJSValue JSC_HOST_CALL callMethod(ExecState* exec)
     return throwVMTypeError(exec);
 }
 
-CallType JSNPMethod::getCallData(CallData& callData)
+CallType JSNPMethod::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callMethod;
     return CallTypeHost;

@@ -88,6 +88,7 @@
 
 #if ENABLE(VIDEO_TRACK)
 #include "HTMLTrackElement.h"
+#include "RuntimeEnabledFeatures.h"
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -247,6 +248,9 @@ void HTMLMediaElement::didMoveToNewOwnerDocument()
 
 bool HTMLMediaElement::supportsFocus() const
 {
+    if (ownerDocument()->isMediaDocument())
+        return false;
+
     // If no controls specified, we should still be able to focus the element if it has tabIndex.
     return controls() ||  HTMLElement::supportsFocus();
 }
@@ -726,7 +730,7 @@ void HTMLMediaElement::loadNextSourceChild()
     loadResource(mediaURL, contentType);
 }
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS) && !PLATFORM(CHROMIUM)
+#if !PLATFORM(CHROMIUM)
 static KURL createFileURLForApplicationCacheResource(const String& path)
 {
     // KURL should have a function to create a url from a path, but it does not. This function
@@ -777,7 +781,7 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
     // The resource fetch algorithm 
     m_networkState = NETWORK_LOADING;
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS) && !PLATFORM(CHROMIUM)
+#if !PLATFORM(CHROMIUM)
     // If the url should be loaded from the application cache, pass the url of the cached file
     // to the media engine.
     ApplicationCacheHost* cacheHost = frame->loader()->documentLoader()->applicationCacheHost();
@@ -796,7 +800,7 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
     // cache is an internal detail not exposed through the media element API.
     m_currentSrc = url;
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS) && !PLATFORM(CHROMIUM)
+#if !PLATFORM(CHROMIUM)
     if (resource) {
         url = createFileURLForApplicationCacheResource(resource->path());
         LOG(Media, "HTMLMediaElement::loadResource - will load from app cache -> %s", urlForLogging(url).utf8().data());
@@ -837,13 +841,52 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
 #if ENABLE(VIDEO_TRACK)
 void HTMLMediaElement::loadTextTracks()
 {
+    if (!RuntimeEnabledFeatures::webkitVideoTrackEnabled())
+        return;
+
     for (Node* node = firstChild(); node; node = node->nextSibling()) {
         if (node->hasTagName(trackTag)) {
             HTMLTrackElement* track = static_cast<HTMLTrackElement*>(node);
-            track->load(ActiveDOMObject::scriptExecutionContext());
+            track->load(ActiveDOMObject::scriptExecutionContext(), this);
         }
     }
 }
+
+void HTMLMediaElement::textTrackReadyStateChanged(TextTrack*)
+{
+    // FIXME(62885): Implement.
+}
+
+void HTMLMediaElement::textTrackModeChanged(TextTrack*)
+{
+    // FIXME(62885): Implement.
+}
+
+void HTMLMediaElement::textTrackCreated(TextTrack*)
+{
+    // FIXME(62885): Implement.
+}
+
+void HTMLMediaElement::textTrackAddCues(TextTrack*, const TextTrackCueList*) 
+{
+    // FIXME(62885): Implement.
+}
+
+void HTMLMediaElement::textTrackRemoveCues(TextTrack*, const TextTrackCueList*) 
+{
+    // FIXME(62885): Implement.
+}
+
+void HTMLMediaElement::textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>)
+{
+    // FIXME(62885): Implement.
+}
+
+void HTMLMediaElement::textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>)
+{
+    // FIXME(62885): Implement.
+}
+
 #endif
 
 bool HTMLMediaElement::isSafeToLoadURL(const KURL& url, InvalidSourceAction actionIfInvalid)
@@ -1244,6 +1287,11 @@ void HTMLMediaElement::addPlayedRange(float start, float end)
 bool HTMLMediaElement::supportsSave() const
 {
     return m_player ? m_player->supportsSave() : false;
+}
+
+bool HTMLMediaElement::supportsScanning() const
+{
+    return m_player ? m_player->supportsScanning() : false;
 }
 
 void HTMLMediaElement::prepareToPlay()
@@ -1931,6 +1979,13 @@ float HTMLMediaElement::percentLoaded() const
     return buffered / duration;
 }
 
+#if ENABLE(VIDEO_TRACK)
+PassRefPtr<TextTrack> HTMLMediaElement::addTrack(const String& kind, const String& label, const String& language)
+{
+    return TextTrack::create(this, kind, label, language);
+}
+#endif
+
 bool HTMLMediaElement::havePotentialSourceChild()
 {
     // Stash the current <source> node and next nodes so we can restore them after checking
@@ -2139,6 +2194,10 @@ void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
             m_sentEndEvent = false;
             seek(0, ignoredException);
         } else {
+            if (!m_paused) {
+                m_paused = true;
+                scheduleEvent(eventNames().pauseEvent);
+            }
             if (!m_sentEndEvent) {
                 m_sentEndEvent = true;
                 scheduleEvent(eventNames().endedEvent);
@@ -3006,6 +3065,18 @@ AudioSourceProvider* HTMLMediaElement::audioSourceProvider()
         return m_player->audioSourceProvider();
 
     return 0;
+}
+#endif
+
+#if ENABLE(MICRODATA)
+String HTMLMediaElement::itemValueText() const
+{
+    return getURLAttribute(srcAttr);
+}
+
+void HTMLMediaElement::setItemValueText(const String& value, ExceptionCode& ec)
+{
+    setAttribute(srcAttr, value, ec);
 }
 #endif
 

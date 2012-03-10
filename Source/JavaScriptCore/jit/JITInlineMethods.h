@@ -85,9 +85,9 @@ ALWAYS_INLINE void JIT::emitGetFromCallFrameHeaderPtr(RegisterFile::CallFrameHea
 ALWAYS_INLINE void JIT::emitLoadCharacterString(RegisterID src, RegisterID dst, JumpList& failures)
 {
     failures.append(branchPtr(NotEqual, Address(src), TrustedImmPtr(m_globalData->jsStringVPtr)));
-    failures.append(branchTest32(NonZero, Address(src, OBJECT_OFFSETOF(JSString, m_fiberCount))));
     failures.append(branch32(NotEqual, MacroAssembler::Address(src, ThunkHelpers::jsStringLengthOffset()), TrustedImm32(1)));
     loadPtr(MacroAssembler::Address(src, ThunkHelpers::jsStringValueOffset()), dst);
+    failures.append(branchTest32(Zero, dst));
     loadPtr(MacroAssembler::Address(dst, ThunkHelpers::stringImplDataOffset()), dst);
     load16(MacroAssembler::Address(dst, 0), dst);
 }
@@ -326,6 +326,12 @@ ALWAYS_INLINE JIT::Jump JIT::emitJumpIfNotObject(RegisterID structureReg)
     return branch8(Below, Address(structureReg, Structure::typeInfoTypeOffset()), TrustedImm32(ObjectType));
 }
 
+ALWAYS_INLINE JIT::Jump JIT::emitJumpIfNotType(RegisterID baseReg, RegisterID scratchReg, JSType type)
+{
+    loadPtr(Address(baseReg, JSCell::structureOffset()), scratchReg);
+    return branch8(NotEqual, Address(scratchReg, Structure::typeInfoTypeOffset()), TrustedImm32(type));
+}
+
 #if ENABLE(SAMPLING_FLAGS)
 ALWAYS_INLINE void JIT::setSamplingFlag(int32_t flag)
 {
@@ -394,7 +400,7 @@ ALWAYS_INLINE bool JIT::isOperandConstantImmediateChar(unsigned src)
 
 template <typename ClassType, typename StructureType> inline void JIT::emitAllocateBasicJSObject(StructureType structure, void* vtable, RegisterID result, RegisterID storagePtr)
 {
-    MarkedSpace::SizeClass* sizeClass = &m_globalData->heap.sizeClassFor(sizeof(ClassType));
+    MarkedSpace::SizeClass* sizeClass = &m_globalData->heap.sizeClassForObject(sizeof(ClassType));
     loadPtr(&sizeClass->firstFreeCell, result);
     addSlowCase(branchTestPtr(Zero, result));
 
@@ -465,7 +471,13 @@ inline void JIT::emitValueProfilingSite(ValueProfilingSiteKind siteKind)
         add32(Imm32(3), bucketCounterRegister);
     and32(Imm32(ValueProfile::bucketIndexMask), bucketCounterRegister);
     move(ImmPtr(valueProfile->m_buckets), scratch);
+#if USE(JSVALUE64)
     storePtr(value, BaseIndex(scratch, bucketCounterRegister, TimesEight));
+#elif USE(JSVALUE32_64)
+    const RegisterID valueTag = regT1;
+    store32(value, BaseIndex(scratch, bucketCounterRegister, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.payload)));
+    store32(valueTag, BaseIndex(scratch, bucketCounterRegister, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.tag)));
+#endif
 }
 #endif
 

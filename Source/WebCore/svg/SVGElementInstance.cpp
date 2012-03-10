@@ -37,9 +37,7 @@
 
 namespace WebCore {
 
-#ifndef NDEBUG
-static WTF::RefCountedLeakCounter instanceCounter("WebCoreSVGElementInstance");
-#endif
+DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, instanceCounter, ("WebCoreSVGElementInstance"));
 
 SVGElementInstance::SVGElementInstance(SVGUseElement* correspondingUseElement, SVGUseElement* directUseElement, PassRefPtr<SVGElement> originalElement)
     : m_correspondingUseElement(correspondingUseElement)
@@ -121,6 +119,11 @@ void SVGElementInstance::invalidateAllInstancesOfElement(SVGElement* element)
 
     // Be sure to rebuild use trees, if needed
     element->document()->updateLayoutIgnorePendingStylesheets();
+}
+
+const AtomicString& SVGElementInstance::interfaceName() const
+{
+    return eventNames().interfaceForSVGElementInstance;
 }
 
 ScriptExecutionContext* SVGElementInstance::scriptExecutionContext() const

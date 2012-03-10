@@ -29,6 +29,7 @@
 #include "config.h"
 #include "PredictedType.h"
 
+#include "JSByteArray.h"
 #include "ValueProfile.h"
 #include <wtf/BoundsCheckedPointer.h>
 
@@ -37,44 +38,67 @@ namespace JSC {
 #ifndef NDEBUG
 const char* predictionToString(PredictedType value)
 {
+    if (value == PredictNone)
+        return "None";
+    
     static const int size = 96;
     static char description[size];
     BoundsCheckedPointer<char> ptr(description, size);
     
-    if (!(value & StrongPredictionTag))
-        ptr.strcat("Weak");
+    bool isTop = true;
     
-    if (value & PredictObjectUnknown) {
-        ASSERT(!(value & (PredictObjectMask & ~PredictObjectUnknown)));
-        ptr.strcat("Object");
-    }
-
     if (value & PredictCellOther)
         ptr.strcat("Othercell");
+    else
+        isTop = false;
     
     if (value & PredictObjectOther)
         ptr.strcat("Otherobj");
+    else
+        isTop = false;
     
     if (value & PredictFinalObject)
         ptr.strcat("Final");
+    else
+        isTop = false;
 
     if (value & PredictArray)
         ptr.strcat("Array");
+    else
+        isTop = false;
+    
+    if (value & PredictByteArray)
+        ptr.strcat("ByteArray");
+    else
+        isTop = false;
     
     if (value & PredictString)
         ptr.strcat("String");
+    else
+        isTop = false;
     
     if (value & PredictInt32)
         ptr.strcat("Int");
+    else
+        isTop = false;
     
     if (value & PredictDouble)
         ptr.strcat("Double");
+    else
+        isTop = false;
     
     if (value & PredictBoolean)
         ptr.strcat("Bool");
+    else
+        isTop = false;
     
     if (value & PredictOther)
         ptr.strcat("Other");
+    else
+        isTop = false;
+    
+    if (isTop)
+        return "Top";
     
     *ptr++ = 0;
     
@@ -82,10 +106,8 @@ const char* predictionToString(PredictedType value)
 }
 #endif
 
-PredictedType predictionFromCell(JSCell* cell)
+PredictedType predictionFromClassInfo(const ClassInfo* classInfo)
 {
-    const ClassInfo* classInfo = cell->structure()->classInfo();
-    
     if (classInfo == &JSFinalObject::s_info)
         return PredictFinalObject;
     
@@ -94,11 +116,24 @@ PredictedType predictionFromCell(JSCell* cell)
     
     if (classInfo == &JSString::s_info)
         return PredictString;
+
+    if (classInfo->isSubClassOf(&JSByteArray::s_info))
+        return PredictByteArray;
     
     if (classInfo->isSubClassOf(&JSObject::s_info))
         return PredictObjectOther;
     
     return PredictCellOther;
+}
+
+PredictedType predictionFromStructure(Structure* structure)
+{
+    return predictionFromClassInfo(structure->classInfo());
+}
+
+PredictedType predictionFromCell(JSCell* cell)
+{
+    return predictionFromStructure(cell->structure());
 }
 
 PredictedType predictionFromValue(JSValue value)
@@ -111,6 +146,7 @@ PredictedType predictionFromValue(JSValue value)
         return predictionFromCell(value.asCell());
     if (value.isBoolean())
         return PredictBoolean;
+    ASSERT(value.isUndefinedOrNull());
     return PredictOther;
 }
 

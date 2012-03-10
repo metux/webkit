@@ -29,7 +29,6 @@
  */
 
 #include "config.h"
-
 #include "ErrorEvent.h"
 
 #include "EventNames.h"
@@ -79,9 +78,9 @@ void ErrorEvent::initErrorEvent(const AtomicString& type, bool canBubble, bool c
     m_lineNumber = lineNumber;
 }
 
-bool ErrorEvent::isErrorEvent() const
+const AtomicString& ErrorEvent::interfaceName() const
 {
-    return true;
+    return eventNames().interfaceForErrorEvent;
 }
 
 } // namespace WebCore

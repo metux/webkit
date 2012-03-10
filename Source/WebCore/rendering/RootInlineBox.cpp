@@ -34,6 +34,7 @@
 #include "RenderArena.h"
 #include "RenderBlock.h"
 #include "VerticalPositionCache.h"
+#include <wtf/unicode/Unicode.h>
 
 using namespace std;
 
@@ -44,16 +45,14 @@ static EllipsisBoxMap* gEllipsisBoxMap = 0;
 
 RootInlineBox::RootInlineBox(RenderBlock* block)
     : InlineFlowBox(block)
-    , m_lineBreakObj(0)
     , m_lineBreakPos(0)
+    , m_lineBreakObj(0)
     , m_lineTop(0)
     , m_lineBottom(0)
     , m_lineTopWithLeading(0)
     , m_lineBottomWithLeading(0)
     , m_paginationStrut(0)
-    , m_baselineType(AlphabeticBaseline)
-    , m_hasAnnotationsBefore(false)
-    , m_hasAnnotationsAfter(false)
+    , m_paginatedLineWidth(0)
 {
     setIsHorizontal(block->isHorizontalWritingMode());
 }
@@ -276,6 +275,7 @@ LayoutUnit RootInlineBox::alignBoxesInBlockDirection(LayoutUnit heightOfBlock, G
     maxHeight = max<LayoutUnit>(0, maxHeight); // FIXME: Is this really necessary?
 
     setLineTopBottomPositions(lineTop, lineBottom, heightOfBlock, heightOfBlock + maxHeight);
+    setPaginatedLineWidth(block()->availableLogicalWidthForContent(heightOfBlock));
 
     int annotationsAdjustment = beforeAnnotationsAdjustment();
     if (annotationsAdjustment) {
@@ -512,7 +512,7 @@ InlineBox* RootInlineBox::closestLeafChildForLogicalLeftPosition(int leftPositio
 
 BidiStatus RootInlineBox::lineBreakBidiStatus() const
 { 
-    return BidiStatus(m_lineBreakBidiStatusEor, m_lineBreakBidiStatusLastStrong, m_lineBreakBidiStatusLast, m_lineBreakContext);
+    return BidiStatus(static_cast<WTF::Unicode::Direction>(m_lineBreakBidiStatusEor), static_cast<WTF::Unicode::Direction>(m_lineBreakBidiStatusLastStrong), static_cast<WTF::Unicode::Direction>(m_lineBreakBidiStatusLast), m_lineBreakContext);
 }
 
 void RootInlineBox::setLineBreakInfo(RenderObject* obj, unsigned breakPos, const BidiStatus& status)

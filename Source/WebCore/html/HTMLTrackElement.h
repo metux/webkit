@@ -33,7 +33,7 @@
 
 namespace WebCore {
 
-class HTMLTrackElement : public HTMLElement {
+class HTMLTrackElement : public HTMLElement, private TextTrackLoadingClient {
 public:
     static PassRefPtr<HTMLTrackElement> create(const QualifiedName&, Document*);
 
@@ -48,17 +48,27 @@ public:
     void setSrclang(const String&);
     void setLabel(const String&);
     void setIsDefault(bool);
+    TextTrack* track() const;
     
-    void load(ScriptExecutionContext*);
+    void load(ScriptExecutionContext*, TextTrackClient*);
 
 private:
+
+    // TextTrackLoadingClient
+    virtual void textTrackLoadingCompleted(LoadableTextTrack*, bool);
+
     HTMLTrackElement(const QualifiedName&, Document*);
     virtual ~HTMLTrackElement();
 
     virtual void insertedIntoTree(bool);
     virtual void willRemove();
     virtual bool isURLAttribute(Attribute*) const;
-    
+
+#if ENABLE(MICRODATA)
+    virtual String itemValueText() const OVERRIDE;
+    virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
+#endif
+
     RefPtr<LoadableTextTrack> m_track;
 };
 

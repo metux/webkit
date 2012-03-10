@@ -57,6 +57,7 @@
 #include "WebFrame.h"
 #include "WebFullScreenManager.h"
 #include "WebGeolocationClient.h"
+#include "WebGeometry.h"
 #include "WebImage.h"
 #include "WebInspector.h"
 #include "WebInspectorClient.h"
@@ -118,8 +119,17 @@
 #endif
 #endif
 
+#if PLATFORM(MAC)
+#include "BuiltInPDFView.h"
+#endif
+
 #if PLATFORM(QT)
 #include "HitTestResult.h"
+#include <QMimeData>
+#endif
+
+#if PLATFORM(GTK)
+#include "DataObjectGtk.h"
 #endif
 
 #ifndef NDEBUG
@@ -146,10 +156,8 @@ public:
 private:
     WebPage* m_page;
 };
-    
-#ifndef NDEBUG
-static WTF::RefCountedLeakCounter webPageCounter("WebPage");
-#endif
+
+DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, webPageCounter, ("WebPage"));
 
 PassRefPtr<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParameters& parameters)
 {
@@ -224,6 +232,8 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     platformInitialize();
 
     m_drawingArea = DrawingArea::create(this, parameters);
+    m_drawingArea->setPaintingEnabled(false);
+
     m_mainFrame = WebFrame::createMainFrame(this);
 
     setDrawsBackground(parameters.drawsBackground);
@@ -241,6 +251,8 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     
     if (!parameters.sessionState.isEmpty())
         restoreSession(parameters.sessionState);
+
+    m_drawingArea->setPaintingEnabled(true);
 
 #ifndef NDEBUG
     webPageCounter.increment();
@@ -326,8 +338,14 @@ PassRefPtr<Plugin> WebPage::createPlugin(const Plugin::Parameters& parameters)
         return 0;
     }
 
-    if (pluginPath.isNull())
+    if (pluginPath.isNull()) {
+#if PLATFORM(MAC)
+        if (parameters.mimeType == "application/pdf"
+            || (parameters.mimeType.isEmpty() && parameters.url.path().lower().endsWith(".pdf")))
+            return BuiltInPDFView::create(m_page.get());
+#endif
         return 0;
+    }
 
 #if ENABLE(PLUGIN_PROCESS)
     return PluginProxy::create(pluginPath);
@@ -375,6 +393,46 @@ uint64_t WebPage::renderTreeSize() const
     return size;
 }
 
+void WebPage::setTracksRepaints(bool trackRepaints)
+{
+    if (FrameView* view = mainFrameView())
+        view->setTracksRepaints(trackRepaints);
+}
+
+bool WebPage::isTrackingRepaints() const
+{
+    if (FrameView* view = mainFrameView())
+        return view->isTrackingRepaints();
+
+    return false;
+}
+
+void WebPage::resetTrackedRepaints()
+{
+    if (FrameView* view = mainFrameView())
+        view->resetTrackedRepaints();
+}
+
+PassRefPtr<ImmutableArray> WebPage::trackedRepaintRects()
+{
+    FrameView* view = mainFrameView();
+    if (!view)
+        return ImmutableArray::create();
+
+    const Vector<IntRect>& rects = view->trackedRepaintRects();
+    size_t size = rects.size();
+    if (!size)
+        return ImmutableArray::create();
+
+    Vector<RefPtr<APIObject> > vector;
+    vector.reserveInitialCapacity(size);
+
+    for (size_t i = 0; i < size; ++i)
+        vector.uncheckedAppend(WebRect::create(toAPI(rects[i])));
+
+    return ImmutableArray::adopt(vector);
+}
+
 void WebPage::executeEditingCommand(const String& commandName, const String& argument)
 {
     Frame* frame = m_page->focusController()->focusedOrMainFrame();
@@ -395,7 +453,8 @@ bool WebPage::isEditingCommandEnabled(const String& commandName)
     
 void WebPage::clearMainFrameName()
 {
-    mainFrame()->coreFrame()->tree()->clearName();
+    if (Frame* frame = mainFrame())
+        frame->tree()->clearName();
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -607,32 +666,32 @@ void WebPage::layoutIfNeeded()
         m_mainFrame->coreFrame()->view()->updateLayoutAndStyleIfNeededRecursive();
 
     if (m_underlayPage) {
-        if (FrameView *frameView = m_underlayPage->mainFrame()->coreFrame()->view())
+        if (FrameView *frameView = m_underlayPage->mainFrameView())
             frameView->updateLayoutAndStyleIfNeededRecursive();
     }
 }
 
 void WebPage::setSize(const WebCore::IntSize& viewSize)
 {
-#if ENABLE(TILED_BACKING_STORE)
+    FrameView* view = m_page->mainFrame()->view();
+
+#if USE(TILED_BACKING_STORE)
     // If we are resizing to content ignore external attempts.
-    if (!m_resizesToContentsLayoutSize.isEmpty())
+    if (view->useFixedLayout())
         return;
 #endif
 
     if (m_viewSize == viewSize)
         return;
 
-    Frame* frame = m_page->mainFrame();
-    
-    frame->view()->resize(viewSize);
-    frame->view()->setNeedsLayout();
+    view->resize(viewSize);
+    view->setNeedsLayout();
     m_drawingArea->setNeedsDisplay(IntRect(IntPoint(0, 0), viewSize));
     
     m_viewSize = viewSize;
 }
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
 void WebPage::setFixedVisibleContentRect(const IntRect& rect)
 {
     Frame* frame = m_page->mainFrame();
@@ -642,39 +701,42 @@ void WebPage::setFixedVisibleContentRect(const IntRect& rect)
 
 void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSize)
 {
-    if (m_resizesToContentsLayoutSize == targetLayoutSize)
+    FrameView* view = m_page->mainFrame()->view();
+
+    if (view->fixedLayoutSize() == targetLayoutSize)
         return;
 
-    m_resizesToContentsLayoutSize = targetLayoutSize;
+    bool fixedLayout = !targetLayoutSize.isEmpty();
 
-    Frame* frame = m_page->mainFrame();
-    if (m_resizesToContentsLayoutSize.isEmpty()) {
-        frame->view()->setDelegatesScrolling(false);
-        frame->view()->setUseFixedLayout(false);
-        frame->view()->setPaintsEntireContents(false);
-    } else {
-        frame->view()->setDelegatesScrolling(true);
-        frame->view()->setUseFixedLayout(true);
-        frame->view()->setPaintsEntireContents(true);
-        frame->view()->setFixedLayoutSize(m_resizesToContentsLayoutSize);
+    if (fixedLayout)
+        view->setFixedLayoutSize(targetLayoutSize);
+
+    // Set view attributes based on whether fixed layout is used.
+    view->setDelegatesScrolling(fixedLayout);
+    view->setUseFixedLayout(fixedLayout);
+    view->setPaintsEntireContents(fixedLayout);
+
+    // Schedule a layout to use the new target size.
+    if (!view->layoutPending()) {
+        view->setNeedsLayout();
+        view->scheduleRelayout();
     }
-    frame->view()->forceLayout();
 }
 
 void WebPage::resizeToContentsIfNeeded()
 {
-    if (m_resizesToContentsLayoutSize.isEmpty())
+    FrameView* view = m_page->mainFrame()->view();
+
+    if (!view->useFixedLayout())
         return;
 
-    Frame* frame = m_page->mainFrame();
-
-    IntSize contentSize = frame->view()->contentsSize();
+    IntSize contentSize = view->contentsSize();
     if (contentSize == m_viewSize)
         return;
 
     m_viewSize = contentSize;
-    frame->view()->resize(m_viewSize);
-    frame->view()->setNeedsLayout();
+    view->resize(m_viewSize);
+    view->setNeedsLayout();
 }
 #endif
 
@@ -765,6 +827,11 @@ void WebPage::setPageAndTextZoomFactors(double pageZoomFactor, double textZoomFa
     return frame->setPageAndTextZoomFactors(static_cast<float>(pageZoomFactor), static_cast<float>(textZoomFactor));
 }
 
+void WebPage::windowScreenDidChange(uint64_t displayID)
+{
+    m_page->windowScreenDidChange(static_cast<PlatformDisplayID>(displayID));
+}
+
 void WebPage::scalePage(double scale, const IntPoint& origin)
 {
     m_page->setPageScaleFactor(scale, origin);
@@ -779,7 +846,16 @@ double WebPage::pageScaleFactor() const
 
 void WebPage::setDeviceScaleFactor(float scaleFactor)
 {
+    if (scaleFactor == m_page->deviceScaleFactor())
+        return;
+
     m_page->setDeviceScaleFactor(scaleFactor);
+
+    // Tell all our plug-in views that the device scale factor changed.
+#if PLATFORM(MAC)
+    for (HashSet<PluginView*>::const_iterator it = m_pluginViews.begin(), end = m_pluginViews.end(); it != end; ++it)
+        (*it)->setDeviceScaleFactor(scaleFactor);
+#endif
 }
 
 void WebPage::setUseFixedLayout(bool fixed)
@@ -864,11 +940,16 @@ PassRefPtr<WebImage> WebPage::snapshotInViewCoordinates(const IntRect& rect, Ima
     if (!frameView)
         return 0;
 
-    RefPtr<WebImage> snapshot = WebImage::create(rect.size(), options);
+    IntSize bitmapSize = rect.size();
+    float deviceScaleFactor = corePage()->deviceScaleFactor();
+    bitmapSize.scale(deviceScaleFactor);
+
+    RefPtr<WebImage> snapshot = WebImage::create(bitmapSize, options);
     if (!snapshot->bitmap())
         return 0;
     
     OwnPtr<WebCore::GraphicsContext> graphicsContext = snapshot->bitmap()->createGraphicsContext();
+    graphicsContext->applyDeviceScaleFactor(deviceScaleFactor);
     graphicsContext->translate(-rect.x(), -rect.y());
 
     frameView->updateLayoutAndStyleIfNeededRecursive();
@@ -887,13 +968,14 @@ PassRefPtr<WebImage> WebPage::scaledSnapshotInDocumentCoordinates(const IntRect&
     if (!frameView)
         return 0;
 
-    IntSize size(ceil(rect.width() * scaleFactor), ceil(rect.height() * scaleFactor));
+    float combinedScaleFactor = scaleFactor * corePage()->deviceScaleFactor();
+    IntSize size(ceil(rect.width() * combinedScaleFactor), ceil(rect.height() * combinedScaleFactor));
     RefPtr<WebImage> snapshot = WebImage::create(size, options);
     if (!snapshot->bitmap())
         return 0;
 
     OwnPtr<WebCore::GraphicsContext> graphicsContext = snapshot->bitmap()->createGraphicsContext();
-    graphicsContext->scale(FloatSize(scaleFactor, scaleFactor));
+    graphicsContext->applyDeviceScaleFactor(combinedScaleFactor);
     graphicsContext->translate(-rect.x(), -rect.y());
 
     frameView->updateLayoutAndStyleIfNeededRecursive();
@@ -921,7 +1003,7 @@ void WebPage::pageDidScroll()
     send(Messages::WebPageProxy::PageDidScroll());
 }
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
 void WebPage::pageDidRequestScroll(const IntPoint& point)
 {
     send(Messages::WebPageProxy::PageDidRequestScroll(point));
@@ -1049,6 +1131,22 @@ void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(mouseEvent.type()), handled));
 }
 
+void WebPage::mouseEventSyncForTesting(const WebMouseEvent& mouseEvent, bool& handled)
+{
+    // Don't try to handle any pending mouse events if a context menu is showing.
+    if (m_isShowingContextMenu) {
+        handled = true;
+        return;
+    }
+
+    handled = m_pageOverlay && m_pageOverlay->mouseEvent(mouseEvent);
+
+    if (!handled) {
+        CurrentEvent currentEvent(mouseEvent);
+        handled = handleMouseEvent(mouseEvent, m_page.get());
+    }
+}
+
 static bool handleWheelEvent(const WebWheelEvent& wheelEvent, Page* page)
 {
     Frame* frame = page->mainFrame();
@@ -1072,6 +1170,20 @@ void WebPage::wheelEvent(const WebWheelEvent& wheelEvent)
 
     bool handled = handleWheelEvent(wheelEvent, m_page.get());
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(wheelEvent.type()), handled));
+}
+
+void WebPage::wheelEventSyncForTesting(const WebWheelEvent& wheelEvent, bool& handled)
+{
+    CurrentEvent currentEvent(wheelEvent);
+
+#if PLATFORM(MAC)
+    if (wheelEvent.momentumPhase() == WebWheelEvent::PhaseBegan || wheelEvent.phase() == WebWheelEvent::PhaseBegan)
+        m_drawingArea->disableDisplayThrottling();
+    else if (wheelEvent.momentumPhase() == WebWheelEvent::PhaseEnded || wheelEvent.phase() == WebWheelEvent::PhaseEnded)
+        m_drawingArea->enableDisplayThrottling();
+#endif
+
+    handled = handleWheelEvent(wheelEvent, m_page.get());
 }
 
 static bool handleKeyEvent(const WebKeyboardEvent& keyboardEvent, Page* page)
@@ -1292,13 +1404,21 @@ void WebPage::setFocused(bool isFocused)
     m_page->focusController()->setFocused(isFocused);
 }
 
-void WebPage::setInitialFocus(bool forward)
+void WebPage::setInitialFocus(bool forward, bool isKeyboardEventValid, const WebKeyboardEvent& event)
 {
     if (!m_page || !m_page->focusController())
         return;
 
     Frame* frame = m_page->focusController()->focusedOrMainFrame();
     frame->document()->setFocusedNode(0);
+
+    if (isKeyboardEventValid && event.type() == WebEvent::KeyDown) {
+        PlatformKeyboardEvent platformEvent(platform(event));
+        platformEvent.disambiguateKeyDownEvent(PlatformKeyboardEvent::RawKeyDown);
+        m_page->focusController()->setInitialFocus(forward ? FocusDirectionForward : FocusDirectionBackward, KeyboardEvent::create(platformEvent, frame->document()->defaultView()).get());
+        return;
+    }
+
     m_page->focusController()->setInitialFocus(forward ? FocusDirectionForward : FocusDirectionBackward, 0);
 }
 
@@ -1593,9 +1713,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setFullScreenEnabled(store.getBoolValueForKey(WebPreferencesKey::fullScreenEnabledKey()));
 #endif
 
-#if ENABLE(DOM_STORAGE)
     settings->setLocalStorageDatabasePath(WebProcess::shared().localStorageDirectory());
-#endif
 
 #if USE(AVFOUNDATION)
     settings->setAVFoundationEnabled(store.getBoolValueForKey(WebPreferencesKey::isAVFoundationEnabledKey()));
@@ -1604,6 +1722,13 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #if ENABLE(WEB_SOCKETS)
     settings->setUseHixie76WebSocketProtocol(store.getBoolValueForKey(WebPreferencesKey::hixie76WebSocketProtocolEnabledKey()));
 #endif
+
+#if ENABLE(WEB_AUDIO)
+    settings->setWebAudioEnabled(store.getBoolValueForKey(WebPreferencesKey::webAudioEnabledKey()));
+#endif
+
+    settings->setApplicationChromeMode(store.getBoolValueForKey(WebPreferencesKey::applicationChromeModeKey()));    
+    settings->setSuppressIncrementalRendering(store.getBoolValueForKey(WebPreferencesKey::suppressIncrementalRenderingKey()));
 
     platformPreferencesDidChange(store);
 }
@@ -1691,12 +1816,16 @@ void WebPage::performDragControllerAction(uint64_t action, WebCore::IntPoint cli
     }
 }
 
-#elif PLATFORM(QT)
+#elif PLATFORM(QT) || PLATFORM(GTK)
 void WebPage::performDragControllerAction(uint64_t action, WebCore::DragData dragData)
 {
     if (!m_page) {
         send(Messages::WebPageProxy::DidPerformDragControllerAction(DragOperationNone));
+#if PLATFORM(QT)
         QMimeData* data = const_cast<QMimeData*>(dragData.platformData());
+#elif PLATFORM(GTK)
+        DataObjectGtk* data = const_cast<DataObjectGtk*>(dragData.platformData());
+#endif
         delete data;
         return;
     }
@@ -1723,7 +1852,11 @@ void WebPage::performDragControllerAction(uint64_t action, WebCore::DragData dra
         ASSERT_NOT_REACHED();
     }
     // DragData does not delete its platformData so we need to do that here.
+#if PLATFORM(QT)
     QMimeData* data = const_cast<QMimeData*>(dragData.platformData());
+#elif PLATFORM(GTK)
+    DataObjectGtk* data = const_cast<DataObjectGtk*>(dragData.platformData());
+#endif
     delete data;
 }
 
@@ -1950,7 +2083,9 @@ void WebPage::setTextForActivePopupMenu(int32_t index)
 
 void WebPage::didSelectItemFromActiveContextMenu(const WebContextMenuItemData& item)
 {
-    ASSERT(m_contextMenu);
+    if (!m_contextMenu)
+        return;
+
     m_contextMenu->itemSelected(item);
     m_contextMenu = 0;
 }
@@ -1972,7 +2107,10 @@ void WebPage::clearSelection()
 
 bool WebPage::mainFrameHasCustomRepresentation() const
 {
-    return static_cast<WebFrameLoaderClient*>(mainFrame()->coreFrame()->loader()->client())->frameHasCustomRepresentation();
+    if (Frame* frame = mainFrame())
+        return static_cast<WebFrameLoaderClient*>(frame->loader()->client())->frameHasCustomRepresentation();
+
+    return false;
 }
 
 void WebPage::didChangeScrollOffsetForMainFrame()
@@ -2047,6 +2185,14 @@ void WebPage::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Messag
             m_drawingArea->didReceiveDrawingAreaMessage(connection, messageID, arguments);
         return;
     }
+
+#if USE(TILED_BACKING_STORE) && USE(ACCELERATED_COMPOSITING)
+    if (messageID.is<CoreIPC::MessageClassLayerTreeHost>()) {
+        if (m_drawingArea)
+            m_drawingArea->didReceiveLayerTreeHostMessage(connection, messageID, arguments);
+        return;
+    }
+#endif
     
 #if ENABLE(INSPECTOR)
     if (messageID.is<CoreIPC::MessageClassWebInspector>()) {
@@ -2439,6 +2585,54 @@ void WebPage::simulateMouseUp(int button, WebCore::IntPoint position, int clickC
 void WebPage::simulateMouseMotion(WebCore::IntPoint position, double time)
 {
     mouseEvent(WebMouseEvent(WebMouseEvent::MouseMove, WebMouseEvent::NoButton, position, position, 0, 0, 0, 0, WebMouseEvent::Modifiers(), time));
+}
+
+String WebPage::viewportConfigurationAsText(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
+{
+    ViewportArguments arguments = mainFrame()->document()->viewportArguments();
+    ViewportAttributes attrs = WebCore::computeViewportAttributes(arguments, /* default layout width for non-mobile pages */ 980, deviceWidth, deviceHeight, deviceDPI, IntSize(availableWidth, availableHeight));
+    return String::format("viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", attrs.layoutSize.width(), attrs.layoutSize.height(), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
+}
+
+void WebPage::setCompositionForTesting(const String& compositionString, uint64_t from, uint64_t length)
+{
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    if (!frame || !frame->editor()->canEdit())
+        return;
+
+    Vector<CompositionUnderline> underlines;
+    underlines.append(CompositionUnderline(0, compositionString.length(), Color(Color::black), false));
+    frame->editor()->setComposition(compositionString, underlines, from, from + length);
+}
+
+bool WebPage::hasCompositionForTesting()
+{
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    return frame && frame->editor()->hasComposition();
+}
+
+void WebPage::confirmCompositionForTesting(const String& compositionString)
+{
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    if (!frame || !frame->editor()->canEdit())
+        return;
+
+    if (compositionString.isNull())
+        frame->editor()->confirmComposition();
+    frame->editor()->confirmComposition(compositionString);
+}
+
+Frame* WebPage::mainFrame() const
+{
+    return m_page ? m_page->mainFrame() : 0;
+}
+
+FrameView* WebPage::mainFrameView() const
+{
+    if (Frame* frame = mainFrame())
+        return frame->view();
+    
+    return 0;
 }
 
 } // namespace WebKit

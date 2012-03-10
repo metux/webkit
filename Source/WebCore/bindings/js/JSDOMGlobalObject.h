@@ -28,6 +28,7 @@
 #define JSDOMGlobalObject_h
 
 #include <runtime/JSGlobalObject.h>
+#include <runtime/JSGlobalThis.h>
 
 namespace WebCore {
 
@@ -47,7 +48,9 @@ namespace WebCore {
         struct JSDOMGlobalObjectData;
 
         JSDOMGlobalObject(JSC::JSGlobalData&, JSC::Structure*, PassRefPtr<DOMWrapperWorld>);
-        void finishCreation(JSC::JSGlobalData&, JSC::JSObject* thisValue);
+        virtual ~JSDOMGlobalObject();
+        void finishCreation(JSC::JSGlobalData&);
+        void finishCreation(JSC::JSGlobalData&, JSC::JSGlobalThis*);
 
     public:
         JSDOMStructureMap& structures() { return m_structures; }
@@ -64,7 +67,7 @@ namespace WebCore {
         void setInjectedScript(JSObject*);
         JSObject* injectedScript() const;
 
-        virtual void visitChildren(JSC::SlotVisitor&);
+        static void visitChildren(JSC::JSCell*, JSC::SlotVisitor&);
 
         DOMWrapperWorld* world() { return m_world.get(); }
 

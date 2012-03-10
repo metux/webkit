@@ -30,8 +30,11 @@
 #ifndef CodeBlock_h
 #define CodeBlock_h
 
+#include "CodeOrigin.h"
 #include "CompactJITCodeMap.h"
+#include "DFGOSREntry.h"
 #include "EvalCodeCache.h"
+#include "Heuristics.h"
 #include "Instruction.h"
 #include "JITCode.h"
 #include "JITWriteBarrier.h"
@@ -41,7 +44,6 @@
 #include "PredictionTracker.h"
 #include "RegExpObject.h"
 #include "UString.h"
-#include "WeakReferenceHarvester.h"
 #include "ValueProfile.h"
 #include <wtf/FastAllocBase.h>
 #include <wtf/PassOwnPtr.h>
@@ -119,9 +121,11 @@ namespace JSC {
         CodeLocationDataLabelPtr hotPathBegin;
         CodeLocationNearCall hotPathOther;
         JITWriteBarrier<JSFunction> callee;
+        WriteBarrier<JSFunction> lastSeenCallee;
         bool hasSeenShouldRepatch : 1;
         bool isCall : 1;
         bool isDFG : 1;
+        unsigned bytecodeIndex;
 
         bool isLinked() { return callee; }
         void unlink(JSGlobalData&, RepatchBuffer&);
@@ -180,6 +184,8 @@ namespace JSC {
     // (given as an offset in bytes into the JIT code) back to
     // the bytecode index of the corresponding bytecode operation.
     // This is then used to look up the corresponding handler.
+    // FIXME: This should be made inlining aware! Currently it isn't
+    // because we never inline code that has exception handlers.
     struct CallReturnOffsetToBytecodeOffset {
         CallReturnOffsetToBytecodeOffset(unsigned callReturnOffset, unsigned bytecodeOffset)
             : callReturnOffset(callReturnOffset)
@@ -208,6 +214,11 @@ namespace JSC {
         return callLinkInfo->callReturnLocation.executableAddress();
     }
 
+    inline unsigned getCallLinkInfoBytecodeIndex(CallLinkInfo* callLinkInfo)
+    {
+        return callLinkInfo->bytecodeIndex;
+    }
+
     inline void* getMethodCallLinkInfoReturnLocation(MethodCallLinkInfo* methodCallLinkInfo)
     {
         return methodCallLinkInfo->callReturnLocation.executableAddress();
@@ -224,7 +235,7 @@ namespace JSC {
     }
 #endif
 
-    class CodeBlock: public WeakReferenceHarvester {
+    class CodeBlock {
         WTF_MAKE_FAST_ALLOCATED;
         friend class JIT;
     protected:
@@ -235,15 +246,26 @@ namespace JSC {
 
     public:
         virtual ~CodeBlock();
-        
+
         CodeBlock* alternative() { return m_alternative.get(); }
         PassOwnPtr<CodeBlock> releaseAlternative() { return m_alternative.release(); }
-        
-        void setPredictions(PassOwnPtr<PredictionTracker> predictions) { m_predictions = predictions; }
-        PredictionTracker* predictions() const { return m_predictions.get(); }
+        void setAlternative(PassOwnPtr<CodeBlock> alternative) { m_alternative = alternative; }
+
+#if ENABLE(JIT)
+        CodeBlock* baselineVersion()
+        {
+            CodeBlock* result = replacement();
+            if (!result)
+                return 0; // This can happen if we're in the process of creating the baseline version.
+            while (result->alternative())
+                result = result->alternative();
+            ASSERT(result);
+            ASSERT(result->getJITType() == JITCode::BaselineJIT);
+            return result;
+        }
+#endif
 
         void visitAggregate(SlotVisitor&);
-        void visitWeakReferences(SlotVisitor&);
 
         static void dumpStatistics();
 
@@ -291,6 +313,11 @@ namespace JSC {
         {
             return *(binarySearch<CallLinkInfo, void*, getCallLinkInfoReturnLocation>(m_callLinkInfos.begin(), m_callLinkInfos.size(), returnAddress.value()));
         }
+        
+        CallLinkInfo& getCallLinkInfo(unsigned bytecodeIndex)
+        {
+            return *(binarySearch<CallLinkInfo, unsigned, getCallLinkInfoBytecodeIndex>(m_callLinkInfos.begin(), m_callLinkInfos.size(), bytecodeIndex));
+        }
 
         MethodCallLinkInfo& getMethodCallLinkInfo(ReturnAddressPtr returnAddress)
         {
@@ -333,6 +360,21 @@ namespace JSC {
         {
             return m_jitCodeMap.get();
         }
+        
+        DFG::OSREntryData* appendDFGOSREntryData(unsigned bytecodeIndex, unsigned machineCodeOffset)
+        {
+            DFG::OSREntryData entry;
+            entry.m_bytecodeIndex = bytecodeIndex;
+            entry.m_machineCodeOffset = machineCodeOffset;
+            m_dfgOSREntry.append(entry);
+            return &m_dfgOSREntry.last();
+        }
+        unsigned numberOfDFGOSREntries() const { return m_dfgOSREntry.size(); }
+        DFG::OSREntryData* dfgOSREntryData(unsigned i) { return &m_dfgOSREntry[i]; }
+        DFG::OSREntryData* dfgOSREntryDataForBytecodeIndex(unsigned bytecodeIndex)
+        {
+            return binarySearch<DFG::OSREntryData, unsigned, DFG::getOSREntryDataBytecodeIndex>(m_dfgOSREntry.begin(), m_dfgOSREntry.size(), bytecodeIndex);
+        }
 #endif
 
 #if ENABLE(INTERPRETER)
@@ -349,9 +391,11 @@ namespace JSC {
         void discardBytecode() { m_instructions.clear(); }
 
 #ifndef NDEBUG
+        bool usesOpcode(OpcodeID);
+#endif
+
         unsigned instructionCount() { return m_instructionCount; }
         void setInstructionCount(unsigned instructionCount) { m_instructionCount = instructionCount; }
-#endif
 
 #if ENABLE(JIT)
         void setJITCode(const JITCode& code, MacroAssemblerCodePtr codeWithArityCheck)
@@ -360,9 +404,11 @@ namespace JSC {
             m_jitCodeWithArityCheck = codeWithArityCheck;
         }
         JITCode& getJITCode() { return m_jitCode; }
+        MacroAssemblerCodePtr getJITCodeWithArityCheck() { return m_jitCodeWithArityCheck; }
         JITCode::JITType getJITType() { return m_jitCode.jitType(); }
         ExecutableMemoryHandle* executableMemory() { return getJITCode().getExecutableMemory(); }
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*) = 0;
+        virtual void jettison(JSGlobalData&) = 0;
         virtual CodeBlock* replacement() = 0;
         virtual bool canCompileWithDFG() = 0;
         bool hasOptimizedReplacement()
@@ -480,31 +526,35 @@ namespace JSC {
         }
         ValueProfile* valueProfileForArgument(int argumentIndex)
         {
-            int index = argumentIndex - 1;
+            int index = argumentIndex;
             if (static_cast<unsigned>(index) >= m_valueProfiles.size())
                 return 0;
-            ValueProfile* result = valueProfile(argumentIndex - 1);
+            ValueProfile* result = valueProfile(argumentIndex);
             if (result->m_bytecodeOffset != -1)
                 return 0;
             return result;
         }
         
-        RareCaseProfile* addSlowCaseProfile(int bytecodeOffset)
+        RareCaseProfile* addRareCaseProfile(int bytecodeOffset)
         {
-            m_slowCaseProfiles.append(RareCaseProfile(bytecodeOffset));
-            return &m_slowCaseProfiles.last();
+            m_rareCaseProfiles.append(RareCaseProfile(bytecodeOffset));
+            return &m_rareCaseProfiles.last();
         }
-        unsigned numberOfSlowCaseProfiles() { return m_slowCaseProfiles.size(); }
-        RareCaseProfile* slowCaseProfile(int index) { return &m_slowCaseProfiles[index]; }
-        RareCaseProfile* slowCaseProfileForBytecodeOffset(int bytecodeOffset)
+        unsigned numberOfRareCaseProfiles() { return m_rareCaseProfiles.size(); }
+        RareCaseProfile* rareCaseProfile(int index) { return &m_rareCaseProfiles[index]; }
+        RareCaseProfile* rareCaseProfileForBytecodeOffset(int bytecodeOffset)
         {
-            return WTF::genericBinarySearch<RareCaseProfile, int, getRareCaseProfileBytecodeOffset>(m_slowCaseProfiles, m_slowCaseProfiles.size(), bytecodeOffset);
+            return WTF::genericBinarySearch<RareCaseProfile, int, getRareCaseProfileBytecodeOffset>(m_rareCaseProfiles, m_rareCaseProfiles.size(), bytecodeOffset);
         }
         
-        static uint32_t slowCaseThreshold() { return 100; }
         bool likelyToTakeSlowCase(int bytecodeOffset)
         {
-            return slowCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter >= slowCaseThreshold();
+            return rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter >= Heuristics::likelyToTakeSlowCaseThreshold;
+        }
+        
+        bool couldTakeSlowCase(int bytecodeOffset)
+        {
+            return rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter >= Heuristics::couldTakeSlowCaseThreshold;
         }
         
         RareCaseProfile* addSpecialFastCaseProfile(int bytecodeOffset)
@@ -519,11 +569,24 @@ namespace JSC {
             return WTF::genericBinarySearch<RareCaseProfile, int, getRareCaseProfileBytecodeOffset>(m_specialFastCaseProfiles, m_specialFastCaseProfiles.size(), bytecodeOffset);
         }
         
+        bool likelyToTakeSpecialFastCase(int bytecodeOffset)
+        {
+            unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+            return specialFastCaseCount >= Heuristics::likelyToTakeSlowCaseThreshold;
+        }
+        
         bool likelyToTakeDeepestSlowCase(int bytecodeOffset)
         {
-            unsigned slowCaseCount = slowCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+            unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-            return (slowCaseCount - specialFastCaseCount) >= slowCaseThreshold();
+            return (slowCaseCount - specialFastCaseCount) >= Heuristics::likelyToTakeSlowCaseThreshold;
+        }
+        
+        bool likelyToTakeAnySlowCase(int bytecodeOffset)
+        {
+            unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+            unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+            return (slowCaseCount + specialFastCaseCount) >= Heuristics::likelyToTakeSlowCaseThreshold;
         }
         
         void resetRareCaseProfiles();
@@ -575,6 +638,32 @@ namespace JSC {
         {
             createRareDataIfNecessary();
             return m_rareData->m_callReturnIndexVector;
+        }
+#endif
+
+#if ENABLE(DFG_JIT)
+        SegmentedVector<InlineCallFrame, 4>& inlineCallFrames()
+        {
+            createRareDataIfNecessary();
+            return m_rareData->m_inlineCallFrames;
+        }
+        
+        Vector<CodeOriginAtCallReturnOffset>& codeOrigins()
+        {
+            createRareDataIfNecessary();
+            return m_rareData->m_codeOrigins;
+        }
+        
+        // Having code origins implies that there has been some inlining.
+        bool hasCodeOrigins()
+        {
+            return m_rareData && !!m_rareData->m_codeOrigins.size();
+        }
+        
+        CodeOrigin codeOriginForReturn(ReturnAddressPtr returnAddress)
+        {
+            ASSERT(hasCodeOrigins());
+            return binarySearch<CodeOriginAtCallReturnOffset, unsigned, getCallReturnOffsetForCodeOrigin>(codeOrigins().begin(), codeOrigins().size(), getJITCode().offsetOf(returnAddress.value()))->codeOrigin;
         }
 #endif
 
@@ -665,6 +754,7 @@ namespace JSC {
 
         void shrinkToFit();
         
+        void copyDataFrom(CodeBlock* alternative);
         void copyDataFromAlternative();
         
         // Functions for controlling when tiered compilation kicks in. This
@@ -685,11 +775,30 @@ namespace JSC {
         // trigger files. All CodeBlocks start out with optimizeAfterWarmUp(),
         // as this is called from the CodeBlock constructor.
         
-        // These functions are provided to support calling
-        // optimizeAfterWarmUp() from JIT-generated code.
+        // When we observe a lot of speculation failures, we trigger a
+        // reoptimization. But each time, we increase the optimization trigger
+        // to avoid thrashing.
+        unsigned reoptimizationRetryCounter() const
+        {
+            ASSERT(m_reoptimizationRetryCounter <= Heuristics::reoptimizationRetryCounterMax);
+            return m_reoptimizationRetryCounter;
+        }
+        
+        void countReoptimization()
+        {
+            m_reoptimizationRetryCounter++;
+            if (m_reoptimizationRetryCounter > Heuristics::reoptimizationRetryCounterMax)
+                m_reoptimizationRetryCounter = Heuristics::reoptimizationRetryCounterMax;
+        }
+        
         int32_t counterValueForOptimizeAfterWarmUp()
         {
-            return -1000;
+            return Heuristics::executionCounterValueForOptimizeAfterWarmUp << reoptimizationRetryCounter();
+        }
+        
+        int32_t counterValueForOptimizeAfterLongWarmUp()
+        {
+            return Heuristics::executionCounterValueForOptimizeAfterLongWarmUp << reoptimizationRetryCounter();
         }
         
         int32_t* addressOfExecuteCounter()
@@ -697,12 +806,18 @@ namespace JSC {
             return &m_executeCounter;
         }
         
+        static ptrdiff_t offsetOfExecuteCounter() { return OBJECT_OFFSETOF(CodeBlock, m_executeCounter); }
+
+        int32_t executeCounter() const { return m_executeCounter; }
+        
+        unsigned optimizationDelayCounter() const { return m_optimizationDelayCounter; }
+        
         // Call this to force the next optimization trigger to fire. This is
         // rarely wise, since optimization triggers are typically more
         // expensive than executing baseline code.
         void optimizeNextInvocation()
         {
-            m_executeCounter = 0;
+            m_executeCounter = Heuristics::executionCounterValueForOptimizeNextInvocation;
         }
         
         // Call this to prevent optimization from happening again. Note that
@@ -712,7 +827,7 @@ namespace JSC {
         // the future as well.
         void dontOptimizeAnytimeSoon()
         {
-            m_executeCounter = std::numeric_limits<int32_t>::min();
+            m_executeCounter = Heuristics::executionCounterValueForDontOptimizeAnytimeSoon;
         }
         
         // Call this to reinitialize the counter to its starting state,
@@ -724,6 +839,13 @@ namespace JSC {
         void optimizeAfterWarmUp()
         {
             m_executeCounter = counterValueForOptimizeAfterWarmUp();
+        }
+        
+        // Call this to force an optimization trigger to fire only after
+        // a lot of warm-up.
+        void optimizeAfterLongWarmUp()
+        {
+            m_executeCounter = counterValueForOptimizeAfterLongWarmUp();
         }
         
         // Call this to cause an optimization trigger to fire soon, but
@@ -746,17 +868,66 @@ namespace JSC {
         // in the baseline code.
         void optimizeSoon()
         {
-            m_executeCounter = -100;
+            m_executeCounter = Heuristics::executionCounterValueForOptimizeSoon << reoptimizationRetryCounter();
         }
         
-        // The amount by which the JIT will increment m_executeCounter.
-        static unsigned executeCounterIncrementForLoop() { return 1; }
-        static unsigned executeCounterIncrementForReturn() { return 15; }
+        // The speculative JIT tracks its success rate, so that we can
+        // decide when to reoptimize. It's interesting to note that these
+        // counters may overflow without any protection. The success
+        // counter will overflow before the fail one does, becuase the
+        // fail one is used as a trigger to reoptimize. So the worst case
+        // is that the success counter overflows and we reoptimize without
+        // needing to. But this is harmless. If a method really did
+        // execute 2^32 times then compiling it again probably won't hurt
+        // anyone.
+        
+        void countSpeculationSuccess()
+        {
+            m_speculativeSuccessCounter++;
+        }
+        
+        void countSpeculationFailure()
+        {
+            m_speculativeFailCounter++;
+        }
+        
+        uint32_t speculativeSuccessCounter() const { return m_speculativeSuccessCounter; }
+        uint32_t speculativeFailCounter() const { return m_speculativeFailCounter; }
+        
+        uint32_t* addressOfSpeculativeSuccessCounter() { return &m_speculativeSuccessCounter; }
+        uint32_t* addressOfSpeculativeFailCounter() { return &m_speculativeFailCounter; }
+        
+        static ptrdiff_t offsetOfSpeculativeSuccessCounter() { return OBJECT_OFFSETOF(CodeBlock, m_speculativeSuccessCounter); }
+        static ptrdiff_t offsetOfSpeculativeFailCounter() { return OBJECT_OFFSETOF(CodeBlock, m_speculativeFailCounter); }
+        
+        // The number of failures that triggers the use of the ratio.
+        unsigned largeFailCountThreshold() { return Heuristics::largeFailCountThresholdBase << alternative()->reoptimizationRetryCounter(); }
+        unsigned largeFailCountThresholdForLoop() { return Heuristics::largeFailCountThresholdBaseForLoop << alternative()->reoptimizationRetryCounter(); }
+        
+        bool shouldReoptimizeNow()
+        {
+            return Heuristics::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThreshold();
+        }
+        
+        bool shouldReoptimizeFromLoopNow()
+        {
+            return Heuristics::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThresholdForLoop();
+        }
         
 #if ENABLE(VALUE_PROFILER)
         bool shouldOptimizeNow();
 #else
         bool shouldOptimizeNow() { return false; }
+#endif
+        
+#if ENABLE(JIT)
+        void reoptimize(JSGlobalData& globalData)
+        {
+            ASSERT(replacement() != this);
+            replacement()->jettison(globalData);
+            countReoptimization();
+            optimizeAfterWarmUp();
+        }
 #endif
 
 #if ENABLE(VERBOSE_VALUE_PROFILE)
@@ -794,9 +965,7 @@ namespace JSC {
         JSGlobalData* m_globalData;
 
         Vector<Instruction> m_instructions;
-#ifndef NDEBUG
         unsigned m_instructionCount;
-#endif
 
         int m_thisRegister;
         int m_argumentsRegister;
@@ -827,10 +996,11 @@ namespace JSC {
 #endif
 #if ENABLE(DFG_JIT)
         OwnPtr<CompactJITCodeMap> m_jitCodeMap;
+        Vector<DFG::OSREntryData> m_dfgOSREntry;
 #endif
 #if ENABLE(VALUE_PROFILER)
         SegmentedVector<ValueProfile, 8> m_valueProfiles;
-        SegmentedVector<RareCaseProfile, 8> m_slowCaseProfiles;
+        SegmentedVector<RareCaseProfile, 8> m_rareCaseProfiles;
         SegmentedVector<RareCaseProfile, 8> m_specialFastCaseProfiles;
 #endif
 
@@ -848,10 +1018,11 @@ namespace JSC {
 
         OwnPtr<CodeBlock> m_alternative;
         
-        OwnPtr<PredictionTracker> m_predictions;
-
         int32_t m_executeCounter;
+        uint32_t m_speculativeSuccessCounter;
+        uint32_t m_speculativeFailCounter;
         uint8_t m_optimizationDelayCounter;
+        uint8_t m_reoptimizationRetryCounter;
 
         struct RareData {
            WTF_MAKE_FAST_ALLOCATED;
@@ -877,6 +1048,10 @@ namespace JSC {
             Vector<LineInfo> m_lineInfo;
 #if ENABLE(JIT)
             Vector<CallReturnOffsetToBytecodeOffset> m_callReturnIndexVector;
+#endif
+#if ENABLE(DFG_JIT)
+            SegmentedVector<InlineCallFrame, 4> m_inlineCallFrames;
+            Vector<CodeOriginAtCallReturnOffset> m_codeOrigins;
 #endif
         };
 #if COMPILER(MSVC)
@@ -909,6 +1084,7 @@ namespace JSC {
 #if ENABLE(JIT)
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
+        virtual void jettison(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFG();
 #endif
@@ -935,6 +1111,7 @@ namespace JSC {
 #if ENABLE(JIT)
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
+        virtual void jettison(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFG();
 #endif
@@ -950,7 +1127,7 @@ namespace JSC {
         // as we need to initialise the CodeBlock before we could initialise any RefPtr to hold the shared
         // symbol table, so we just pass as a raw pointer with a ref count of 1.  We then manually deref
         // in the destructor.
-        FunctionCodeBlock(FunctionExecutable* ownerExecutable, CodeType codeType, JSGlobalObject* globalObject, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, bool isConstructor, PassOwnPtr<CodeBlock> alternative)
+        FunctionCodeBlock(FunctionExecutable* ownerExecutable, CodeType codeType, JSGlobalObject* globalObject, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, bool isConstructor, PassOwnPtr<CodeBlock> alternative = nullptr)
             : CodeBlock(ownerExecutable, codeType, globalObject, sourceProvider, sourceOffset, SharedSymbolTable::create().leakRef(), isConstructor, alternative)
         {
         }
@@ -962,6 +1139,7 @@ namespace JSC {
 #if ENABLE(JIT)
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
+        virtual void jettison(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFG();
 #endif
@@ -980,6 +1158,22 @@ namespace JSC {
         ASSERT(index < FirstConstantRegisterIndex);
         return this[index];
     }
+
+#if ENABLE(DFG_JIT)
+    inline bool ExecState::isInlineCallFrame()
+    {
+        if (LIKELY(!codeBlock() || codeBlock()->getJITType() != JITCode::DFGJIT))
+            return false;
+        return isInlineCallFrameSlow();
+    }
+
+    inline ExecState* ExecState::trueCallerFrame()
+    {
+        if (LIKELY(!codeBlock() || codeBlock()->getJITType() != JITCode::DFGJIT))
+            return callerFrame()->removeHostCallFrameFlag();
+        return trueCallerFrameSlow();
+    }
+#endif
     
 } // namespace JSC
 

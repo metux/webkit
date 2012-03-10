@@ -248,6 +248,9 @@ z-index
 -webkit-column-span
 -webkit-column-width
 -webkit-columns
+#if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
+-webkit-filter
+#endif
 #if defined(ENABLE_CSS3_FLEXBOX) && ENABLE_CSS3_FLEXBOX
 -webkit-flex-align
 -webkit-flex-flow
@@ -345,11 +348,14 @@ z-index
 -webkit-user-drag
 -webkit-user-modify
 -webkit-user-select
--webkit-flow
--webkit-content-order
+-webkit-flow-into
+-webkit-flow-from
 -webkit-region-overflow
 -webkit-wrap-shape
 -webkit-region-break-after
 -webkit-region-break-before
 -webkit-region-break-inside
+#if defined(ENABLE_TOUCH_EVENTS) && ENABLE_TOUCH_EVENTS
+-webkit-tap-highlight-color
+#endif
 

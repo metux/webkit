@@ -50,6 +50,7 @@ class Frontend;
 class InjectedScriptManager;
 class InspectorArray;
 class InspectorObject;
+class InspectorState;
 class InstrumentingAgents;
 class KURL;
 class Page;
@@ -61,7 +62,6 @@ typedef String ErrorString;
 class InspectorPageAgent {
     WTF_MAKE_NONCOPYABLE(InspectorPageAgent);
 public:
-
     enum ResourceType {
         DocumentResource,
         StylesheetResource,
@@ -73,7 +73,7 @@ public:
         OtherResource
     };
 
-    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InjectedScriptManager*);
+    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*);
 
     static bool cachedResourceContent(CachedResource*, String* result, bool* base64Encoded);
     static bool sharedBufferContent(PassRefPtr<SharedBuffer>, const String& textEncodingName, bool withBase64Encode, String* result);
@@ -86,14 +86,17 @@ public:
     static String cachedResourceTypeString(const CachedResource&);
 
     // Page API for InspectorFrontend
-    void addScriptToEvaluateOnLoad(ErrorString*, const String& source);
-    void removeAllScriptsToEvaluateOnLoad(ErrorString*);
-    void reload(ErrorString*, const bool* const optionalIgnoreCache);
+    void enable(ErrorString*);
+    void disable(ErrorString*);
+    void addScriptToEvaluateOnLoad(ErrorString*, const String& source, String* result);
+    void removeScriptToEvaluateOnLoad(ErrorString*, const String& identifier);
+    void reload(ErrorString*, const bool* const optionalIgnoreCache, const String* optionalScriptToEvaluateOnLoad);
     void open(ErrorString*, const String& url, const bool* const inNewWindow);
     void getCookies(ErrorString*, RefPtr<InspectorArray>* cookies, WTF::String* cookiesString);
     void deleteCookie(ErrorString*, const String& cookieName, const String& domain);
     void getResourceTree(ErrorString*, RefPtr<InspectorObject>*);
     void getResourceContent(ErrorString*, const String& frameId, const String& url, String* content, bool* base64Encoded);
+    void searchInResource(ErrorString*, const String& frameId, const String& url, const String& query, const bool* const optionalCaseSensitive, const bool* const optionalIsRegex, RefPtr<InspectorArray>*);
     void searchInResources(ErrorString*, const String&, const bool* const caseSensitive, const bool* const isRegex, RefPtr<InspectorArray>*);
 
     // InspectorInstrumentation API
@@ -107,6 +110,7 @@ public:
     // Inspector Controller API
     void setFrontend(InspectorFrontend*);
     void clearFrontend();
+    void restore();
 
     // Cross-agents API
     Frame* mainFrame();
@@ -116,7 +120,7 @@ public:
     String loaderId(DocumentLoader*);
 
 private:
-    InspectorPageAgent(InstrumentingAgents*, Page*, InjectedScriptManager*);
+    InspectorPageAgent(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*);
 
     PassRefPtr<InspectorObject> buildObjectForFrame(Frame*);
     PassRefPtr<InspectorObject> buildObjectForFrameTree(Frame*);
@@ -124,8 +128,11 @@ private:
     InstrumentingAgents* m_instrumentingAgents;
     Page* m_page;
     InjectedScriptManager* m_injectedScriptManager;
+    InspectorState* m_state;
     InspectorFrontend::Page* m_frontend;
-    Vector<String> m_scriptsToEvaluateOnLoad;
+    long m_lastScriptIdentifier;
+    String m_pendingScriptToEvaluateOnLoadOnce;
+    String m_scriptToEvaluateOnLoadOnce;
     HashMap<Frame*, String> m_frameToIdentifier;
     HashMap<String, Frame*> m_identifierToFrame;
     HashMap<DocumentLoader*, String> m_loaderToIdentifier;

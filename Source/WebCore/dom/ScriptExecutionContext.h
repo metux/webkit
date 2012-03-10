@@ -48,6 +48,7 @@
 namespace WebCore {
 
     class Blob;
+    class ContentSecurityPolicy;
     class DOMTimer;
     class DOMURL;
     class EventListener;
@@ -95,7 +96,10 @@ namespace WebCore {
 
         virtual String userAgent(const KURL&) const = 0;
 
+        virtual void disableEval() = 0;
+
         SecurityOrigin* securityOrigin() const { return m_securityOrigin.get(); }
+        ContentSecurityPolicy* contentSecurityPolicy() { return m_contentSecurityPolicy.get(); }
 
         bool sanitizeScriptError(String& errorMessage, int& lineNumber, String& sourceURL);
         void reportException(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
@@ -105,9 +109,10 @@ namespace WebCore {
         bool canSuspendActiveDOMObjects();
         // Active objects can be asked to suspend even if canSuspendActiveDOMObjects() returns 'false' -
         // step-by-step JS debugging is one example.
-        void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension);
-        void resumeActiveDOMObjects();
-        void stopActiveDOMObjects();
+        virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension);
+        virtual void resumeActiveDOMObjects();
+        virtual void stopActiveDOMObjects();
+
         void createdActiveDOMObject(ActiveDOMObject*, void* upcastPointer);
         void destroyedActiveDOMObject(ActiveDOMObject*);
         typedef const HashMap<ActiveDOMObject*, void*> ActiveDOMObjectsMap;
@@ -174,6 +179,8 @@ namespace WebCore {
         //       that already contains content.
         void setSecurityOrigin(PassRefPtr<SecurityOrigin>);
 
+        void setContentSecurityPolicy(PassRefPtr<ContentSecurityPolicy>);
+
     private:
         virtual const KURL& virtualURL() const = 0;
         virtual KURL virtualCompleteURL(const String&) const = 0;
@@ -185,6 +192,7 @@ namespace WebCore {
         void closeMessagePorts();
 
         RefPtr<SecurityOrigin> m_securityOrigin;
+        RefPtr<ContentSecurityPolicy> m_contentSecurityPolicy;
 
         HashSet<MessagePort*> m_messagePorts;
 

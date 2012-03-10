@@ -172,10 +172,11 @@ Structure::Structure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSV
     , m_specificFunctionThrashCount(0)
     , m_preventExtensions(false)
     , m_didTransition(false)
+    , m_staticFunctionReified(false)
 {
 }
 
-const ClassInfo Structure::s_info = { "Structure", 0, 0, 0 };
+const ClassInfo Structure::s_info = { "Structure", 0, 0, 0, CREATE_METHOD_TABLE(Structure) };
 
 Structure::Structure(JSGlobalData& globalData)
     : JSCell(CreatingEarlyCell)
@@ -192,6 +193,7 @@ Structure::Structure(JSGlobalData& globalData)
     , m_specificFunctionThrashCount(0)
     , m_preventExtensions(false)
     , m_didTransition(false)
+    , m_staticFunctionReified(false)
 {
 }
 
@@ -202,7 +204,7 @@ Structure::Structure(JSGlobalData& globalData, const Structure* previous)
     , m_classInfo(previous->m_classInfo)
     , m_propertyStorageCapacity(previous->m_propertyStorageCapacity)
     , m_offset(noOffset)
-    , m_dictionaryKind(NoneDictionaryKind)
+    , m_dictionaryKind(previous->m_dictionaryKind)
     , m_isPinnedPropertyTable(false)
     , m_hasGetterSetterProperties(previous->m_hasGetterSetterProperties)
     , m_hasNonEnumerableProperties(previous->m_hasNonEnumerableProperties)
@@ -210,6 +212,7 @@ Structure::Structure(JSGlobalData& globalData, const Structure* previous)
     , m_specificFunctionThrashCount(previous->m_specificFunctionThrashCount)
     , m_preventExtensions(previous->m_preventExtensions)
     , m_didTransition(true)
+    , m_staticFunctionReified(previous->m_staticFunctionReified)
 {
     if (previous->m_globalObject)
         m_globalObject.set(globalData, this, previous->m_globalObject.get());
@@ -369,7 +372,7 @@ Structure* Structure::changePrototypeTransition(JSGlobalData& globalData, Struct
 
     structure->materializePropertyMapIfNecessary(globalData);
     transition->m_propertyTable = structure->copyPropertyTable(globalData, transition);
-    transition->m_isPinnedPropertyTable = true;
+    transition->pin();
 
     return transition;
 }
@@ -385,7 +388,7 @@ Structure* Structure::despecifyFunctionTransition(JSGlobalData& globalData, Stru
 
     structure->materializePropertyMapIfNecessary(globalData);
     transition->m_propertyTable = structure->copyPropertyTable(globalData, transition);
-    transition->m_isPinnedPropertyTable = true;
+    transition->pin();
 
     if (transition->m_specificFunctionThrashCount == maxSpecificFunctionThrashCount)
         transition->despecifyAllFunctions(globalData);
@@ -405,7 +408,7 @@ Structure* Structure::getterSetterTransition(JSGlobalData& globalData, Structure
 
     structure->materializePropertyMapIfNecessary(globalData);
     transition->m_propertyTable = structure->copyPropertyTable(globalData, transition);
-    transition->m_isPinnedPropertyTable = true;
+    transition->pin();
 
     return transition;
 }
@@ -418,8 +421,8 @@ Structure* Structure::toDictionaryTransition(JSGlobalData& globalData, Structure
 
     structure->materializePropertyMapIfNecessary(globalData);
     transition->m_propertyTable = structure->copyPropertyTable(globalData, transition);
-    transition->m_isPinnedPropertyTable = true;
     transition->m_dictionaryKind = kind;
+    transition->pin();
 
     return transition;
 }
@@ -471,8 +474,8 @@ Structure* Structure::preventExtensionsTransition(JSGlobalData& globalData, Stru
 
     structure->materializePropertyMapIfNecessary(globalData);
     transition->m_propertyTable = structure->copyPropertyTable(globalData, transition);
-    transition->m_isPinnedPropertyTable = true;
     transition->m_preventExtensions = true;
+    transition->pin();
 
     return transition;
 }
@@ -549,8 +552,8 @@ size_t Structure::addPropertyWithoutTransition(JSGlobalData& globalData, const I
         specificValue = 0;
 
     materializePropertyMapIfNecessary(globalData);
-
-    m_isPinnedPropertyTable = true;
+    
+    pin();
 
     size_t offset = putSpecificValue(globalData, propertyName, attributes, specificValue);
     if (propertyStorageSize() > propertyStorageCapacity())
@@ -565,9 +568,16 @@ size_t Structure::removePropertyWithoutTransition(JSGlobalData& globalData, cons
 
     materializePropertyMapIfNecessary(globalData);
 
-    m_isPinnedPropertyTable = true;
+    pin();
     size_t offset = remove(propertyName);
     return offset;
+}
+
+void Structure::pin()
+{
+    m_isPinnedPropertyTable = true;
+    m_previous.clear();
+    m_nameInPrevious.clear();
 }
 
 #if DUMP_PROPERTYMAP_STATS
@@ -724,26 +734,31 @@ void Structure::getPropertyNames(JSGlobalData& globalData, PropertyNameArray& pr
     }
 }
 
-void Structure::visitChildren(SlotVisitor& visitor)
+void Structure::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
-    ASSERT(structure()->typeInfo().overridesVisitChildren());
-    JSCell::visitChildren(visitor);
-    if (m_globalObject)
-        visitor.append(&m_globalObject);
-    if (m_prototype)
-        visitor.append(&m_prototype);
-    if (m_cachedPrototypeChain)
-        visitor.append(&m_cachedPrototypeChain);
-    if (m_previous)
-        visitor.append(&m_previous);
-    if (m_specificValueInPrevious)
-        visitor.append(&m_specificValueInPrevious);
-    if (m_enumerationCache)
-        visitor.append(&m_enumerationCache);
-    if (m_propertyTable) {
-        PropertyTable::iterator end = m_propertyTable->end();
-        for (PropertyTable::iterator ptr = m_propertyTable->begin(); ptr != end; ++ptr) {
+    Structure* thisObject = static_cast<Structure*>(cell);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    JSCell::visitChildren(thisObject, visitor);
+    if (thisObject->m_globalObject)
+        visitor.append(&thisObject->m_globalObject);
+    if (!thisObject->isObject())
+        thisObject->m_cachedPrototypeChain.clear();
+    else {
+        if (thisObject->m_prototype)
+            visitor.append(&thisObject->m_prototype);
+        if (thisObject->m_cachedPrototypeChain)
+            visitor.append(&thisObject->m_cachedPrototypeChain);
+    }
+    if (thisObject->m_previous)
+        visitor.append(&thisObject->m_previous);
+    if (thisObject->m_specificValueInPrevious)
+        visitor.append(&thisObject->m_specificValueInPrevious);
+    if (thisObject->m_enumerationCache)
+        visitor.append(&thisObject->m_enumerationCache);
+    if (thisObject->m_propertyTable) {
+        PropertyTable::iterator end = thisObject->m_propertyTable->end();
+        for (PropertyTable::iterator ptr = thisObject->m_propertyTable->begin(); ptr != end; ++ptr) {
             if (ptr->specificValue)
                 visitor.append(&ptr->specificValue);
         }

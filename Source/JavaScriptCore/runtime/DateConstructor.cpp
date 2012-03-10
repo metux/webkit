@@ -61,7 +61,7 @@ static EncodedJSValue JSC_HOST_CALL dateUTC(ExecState*);
 
 namespace JSC {
 
-const ClassInfo DateConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::dateConstructorTable };
+const ClassInfo DateConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::dateConstructorTable, CREATE_METHOD_TABLE(DateConstructor) };
 
 /* Source for DateConstructor.lut.h
 @begin dateConstructorTable
@@ -85,9 +85,14 @@ void DateConstructor::finishCreation(ExecState* exec, DatePrototype* datePrototy
     putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(7), ReadOnly | DontEnum | DontDelete);
 }
 
-bool DateConstructor::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+bool DateConstructor::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::dateConstructorTable(exec), this, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
+}
+
+bool DateConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::dateConstructorTable(exec), static_cast<DateConstructor*>(cell), propertyName, slot);
 }
 
 bool DateConstructor::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
@@ -156,7 +161,7 @@ static EncodedJSValue JSC_HOST_CALL constructWithDateConstructor(ExecState* exec
     return JSValue::encode(constructDate(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
-ConstructType DateConstructor::getConstructData(ConstructData& constructData)
+ConstructType DateConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructWithDateConstructor;
     return ConstructTypeHost;
@@ -176,7 +181,7 @@ static EncodedJSValue JSC_HOST_CALL callDate(ExecState* exec)
     return JSValue::encode(jsMakeNontrivialString(exec, date, " ", time));
 }
 
-CallType DateConstructor::getCallData(CallData& callData)
+CallType DateConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callDate;
     return CallTypeHost;

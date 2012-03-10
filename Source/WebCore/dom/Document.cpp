@@ -5,7 +5,7 @@
  *           (C) 2006 Alexey Proskuryakov (ap@webkit.org)
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2011 Apple Inc. All rights reserved.
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
- * Copyright (C) 2008, 2009 Google Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2011 Google Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  *
  * This library is free software; you can redistribute it and/or
@@ -31,7 +31,6 @@
 #include "AnimationController.h"
 #include "Attr.h"
 #include "Attribute.h"
-#include "BeforeLoadEvent.h"
 #include "CDATASection.h"
 #include "CSSPrimitiveValueCache.h"
 #include "CSSStyleSelector.h"
@@ -42,15 +41,15 @@
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Comment.h"
-#include "CompositionEvent.h"
 #include "Console.h"
 #include "ContentSecurityPolicy.h"
 #include "CookieJar.h"
-#include "CustomEvent.h"
 #include "DOMImplementation.h"
 #include "DOMWindow.h"
 #include "DateComponents.h"
+#include "DeviceMotionController.h"
 #include "DeviceMotionEvent.h"
+#include "DeviceOrientationController.h"
 #include "DeviceOrientationEvent.h"
 #include "DocumentFragment.h"
 #include "DocumentLoader.h"
@@ -60,8 +59,8 @@
 #include "Editor.h"
 #include "Element.h"
 #include "EntityReference.h"
-#include "ErrorEvent.h"
 #include "Event.h"
+#include "EventFactory.h"
 #include "EventHandler.h"
 #include "EventListener.h"
 #include "EventNames.h"
@@ -75,6 +74,8 @@
 #include "FrameSelection.h"
 #include "FrameTree.h"
 #include "FrameView.h"
+#include "GeolocationController.h"
+#include "HashChangeEvent.h"
 #include "HTMLAllCollection.h"
 #include "HTMLAnchorElement.h"
 #include "HTMLBodyElement.h"
@@ -94,33 +95,26 @@
 #include "HTMLStyleElement.h"
 #include "HTMLTitleElement.h"
 #include "HTTPParsers.h"
-#include "HashChangeEvent.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
 #include "ImageLoader.h"
 #include "InspectorInstrumentation.h"
-#include "KeyboardEvent.h"
 #include "Logging.h"
 #include "MediaQueryList.h"
 #include "MediaQueryMatcher.h"
-#include "MessageEvent.h"
-#include "MouseEvent.h"
 #include "MouseEventWithHitTestResults.h"
-#include "MutationEvent.h"
 #include "NameNodeList.h"
 #include "NestingLevelIncrementer.h"
 #include "NewXMLDocumentParser.h"
 #include "NodeFilter.h"
 #include "NodeIterator.h"
 #include "NodeWithIndex.h"
-#include "OverflowEvent.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "PageTransitionEvent.h"
 #include "PlatformKeyboardEvent.h"
 #include "PopStateEvent.h"
 #include "ProcessingInstruction.h"
-#include "ProgressEvent.h"
 #include "RegisteredEventListener.h"
 #include "RenderArena.h"
 #include "RenderLayer.h"
@@ -140,21 +134,19 @@
 #include "ShadowRoot.h"
 #include "StaticHashSetNodeList.h"
 #include "StyleSheetList.h"
-#include "TextEvent.h"
 #include "TextResourceDecoder.h"
 #include "Timer.h"
 #include "TransformSource.h"
 #include "TreeWalker.h"
-#include "UIEvent.h"
 #include "UserContentURLPattern.h"
-#include "WebKitAnimationEvent.h"
-#include "WebKitTransitionEvent.h"
-#include "WheelEvent.h"
 #include "XMLDocumentParser.h"
 #include "XMLHttpRequest.h"
-#include "XMLHttpRequestProgressEvent.h"
 #include "XMLNSNames.h"
 #include "XMLNames.h"
+#include "XPathEvaluator.h"
+#include "XPathExpression.h"
+#include "XPathNSResolver.h"
+#include "XPathResult.h"
 #include "htmlediting.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/HashFunctions.h>
@@ -167,17 +159,6 @@
 #include "SharedWorkerRepository.h"
 #endif
 
-#if ENABLE(DOM_STORAGE)
-#include "StorageEvent.h"
-#endif
-
-#if ENABLE(XPATH)
-#include "XPathEvaluator.h"
-#include "XPathExpression.h"
-#include "XPathNSResolver.h"
-#include "XPathResult.h"
-#endif
-
 #if ENABLE(XSLT)
 #include "XSLTProcessor.h"
 #endif
@@ -187,14 +168,9 @@
 #include "SVGElementFactory.h"
 #include "SVGNames.h"
 #include "SVGStyleElement.h"
-#include "SVGZoomEvent.h"
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
-#if USE(V8)
-#include "RuntimeEnabledFeatures.h"
-#endif
-#include "TouchEvent.h"
 #include "TouchList.h"
 #endif
 
@@ -202,10 +178,6 @@
 #include "MathMLElement.h"
 #include "MathMLElementFactory.h"
 #include "MathMLNames.h"
-#endif
-
-#if ENABLE(XHTMLMP)
-#include "HTMLNoScriptElement.h"
 #endif
 
 #if ENABLE(FULLSCREEN_API)
@@ -217,25 +189,9 @@
 #include "ScriptedAnimationController.h"
 #endif
 
-#if ENABLE(WEB_AUDIO)
-#include "AudioProcessingEvent.h"
-#include "OfflineAudioCompletionEvent.h"
-#endif
-
-#if ENABLE(MEDIA_STREAM)
-#include "MediaStreamEvent.h"
-#endif
-
-#if ENABLE(INPUT_SPEECH)
-#include "SpeechInputEvent.h"
-#endif
-
-#if ENABLE(WEB_SOCKETS)
-#include "CloseEvent.h"
-#endif
-
-#if ENABLE(WEBGL)
-#include "WebGLContextEvent.h"
+#if ENABLE(MICRODATA)
+#include "MicroDataItemList.h"
+#include "NodeRareData.h"
 #endif
 
 using namespace std;
@@ -517,9 +473,6 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 
     static int docID = 0;
     m_docID = docID++;
-#if ENABLE(XHTMLMP)
-    m_shouldProcessNoScriptElement = !(m_frame && m_frame->script()->canExecuteScripts(NotAboutToExecuteScript));
-#endif
 }
 
 Document::~Document()
@@ -574,7 +527,7 @@ Document::~Document()
             (*m_userSheets)[i]->clearOwnerNode();
     }
 
-    deleteRetiredCustomFonts();
+    deleteCustomFonts();
 
     m_weakReference->clear();
 
@@ -1564,9 +1517,6 @@ void Document::recalcStyle(StyleChange change)
             element->recalcStyle(change);
     }
 
-    // Now that all RenderStyles that pointed to retired fonts have been updated, the fonts can safely be deleted.
-    deleteRetiredCustomFonts();
-
 #if USE(ACCELERATED_COMPOSITING)
     if (view()) {
         bool layoutPending = view()->layoutPending() || renderer()->needsLayout();
@@ -1703,18 +1653,18 @@ PassRefPtr<RenderStyle> Document::styleForPage(int pageIndex)
     return style.release();
 }
 
-void Document::retireCustomFont(FontData* fontData)
+void Document::registerCustomFont(FontData* fontData)
 {
-    m_retiredCustomFonts.append(adoptPtr(fontData));
+    m_customFonts.append(adoptPtr(fontData));
 }
 
-void Document::deleteRetiredCustomFonts()
+void Document::deleteCustomFonts()
 {
-    size_t size = m_retiredCustomFonts.size();
+    size_t size = m_customFonts.size();
     for (size_t i = 0; i < size; ++i)
-        GlyphPageTreeNode::pruneTreeCustomFontData(m_retiredCustomFonts[i].get());
+        GlyphPageTreeNode::pruneTreeCustomFontData(m_customFonts[i].get());
 
-    m_retiredCustomFonts.clear();
+    m_customFonts.clear();
 }
 
 bool Document::isPageBoxVisible(int pageIndex)
@@ -1795,7 +1745,7 @@ void Document::attach()
 {
     ASSERT(!attached());
     ASSERT(!m_inPageCache);
-    ASSERT(!m_axObjectCache);
+    ASSERT(!m_axObjectCache || this != topDocument());
 
     if (!m_renderArena)
         m_renderArena = adoptPtr(new RenderArena);
@@ -1821,7 +1771,9 @@ void Document::detach()
     ASSERT(attached());
     ASSERT(!m_inPageCache);
 
-    clearAXObjectCache();
+    if (this == topDocument())
+        clearAXObjectCache();
+
     stopActiveDOMObjects();
     m_eventQueue->close();
 #if ENABLE(FULLSCREEN_API)
@@ -1886,6 +1838,36 @@ void Document::removeAllEventListeners()
         domWindow->removeAllEventListeners();
     for (Node* node = firstChild(); node; node = node->traverseNextNode())
         node->removeAllEventListeners();
+}
+
+void Document::suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension why)
+{
+    ScriptExecutionContext::suspendActiveDOMObjects(why);
+
+#if ENABLE(DEVICE_ORIENTATION)
+    if (!page())
+        return;
+
+    if (page()->deviceMotionController())
+        page()->deviceMotionController()->suspendEventsForAllListeners(domWindow());
+    if (page()->deviceOrientationController())
+        page()->deviceOrientationController()->suspendEventsForAllListeners(domWindow());
+#endif
+}
+
+void Document::resumeActiveDOMObjects()
+{
+    ScriptExecutionContext::resumeActiveDOMObjects();
+
+#if ENABLE(DEVICE_ORIENTATION)
+    if (!page())
+        return;
+
+    if (page()->deviceMotionController())
+        page()->deviceMotionController()->resumeEventsForAllListeners(domWindow());
+    if (page()->deviceOrientationController())
+        page()->deviceOrientationController()->resumeEventsForAllListeners(domWindow());
+#endif
 }
 
 RenderView* Document::renderView() const
@@ -2223,6 +2205,14 @@ void Document::implicitClose()
             view()->layout();
     }
 
+    // If painting and compositing layer updates were suppressed pending the load event, do these actions now.
+    if (renderer() && settings() && settings()->suppressIncrementalRendering()) {
+#if USE(ACCELERATED_COMPOSITING)
+        view()->updateCompositingLayers();
+#endif
+        renderer()->repaint();
+    }
+
 #if PLATFORM(MAC) || PLATFORM(CHROMIUM)
     if (f && renderObject && this == topDocument() && AXObjectCache::accessibilityEnabled()) {
         // The AX cache may have been cleared at this point, but we need to make sure it contains an
@@ -2356,8 +2346,7 @@ EventTarget* Document::errorEventTarget()
 
 void Document::logExceptionToConsole(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
 {
-    MessageType messageType = callStack ? UncaughtExceptionMessageType : LogMessageType;
-    addMessage(JSMessageSource, messageType, ErrorMessageLevel, errorMessage, lineNumber, sourceURL, callStack);
+    addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, errorMessage, lineNumber, sourceURL, callStack);
 }
 
 void Document::setURL(const KURL& url)
@@ -2429,6 +2418,14 @@ void Document::processBaseElement()
 String Document::userAgent(const KURL& url) const
 {
     return frame() ? frame()->loader()->userAgent(url) : String();
+}
+
+void Document::disableEval()
+{
+    if (!frame())
+        return;
+
+    frame()->script()->disableEval();
 }
 
 CSSStyleSheet* Document::pageUserSheet()
@@ -3153,12 +3150,10 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode)
 
     bool focusChangeBlocked = false;
     RefPtr<Node> oldFocusedNode = m_focusedNode;
+    m_focusedNode = 0;
 
     // Remove focus from the existing focus node (if any)
     if (oldFocusedNode && !oldFocusedNode->inDetach()) {
-        // willBlur() should be called before any status changes.
-        oldFocusedNode->willBlur();
-        m_focusedNode = 0;
         if (oldFocusedNode->active())
             oldFocusedNode->setActive(false);
 
@@ -3203,8 +3198,7 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode)
             else
                 view()->setFocus(false);
         }
-    } else
-        m_focusedNode = 0;
+    }
 
     if (newFocusedNode) {
         if (newFocusedNode == newFocusedNode->rootEditableElement() && !acceptsEditingFocus(newFocusedNode.get())) {
@@ -3484,97 +3478,7 @@ void Document::enqueueDocumentEvent(PassRefPtr<Event> event)
 
 PassRefPtr<Event> Document::createEvent(const String& eventType, ExceptionCode& ec)
 {
-    RefPtr<Event> event;
-    if (eventType == "Event" || eventType == "Events" || eventType == "HTMLEvents")
-        event = Event::create();
-    else if (eventType == "BeforeLoadEvent")
-        event = BeforeLoadEvent::create();
-    else if (eventType == "CompositionEvent")
-        event = CompositionEvent::create();
-    else if (eventType == "CustomEvent")
-        event = CustomEvent::create();
-    else if (eventType == "ErrorEvent")
-        event = ErrorEvent::create();
-    else if (eventType == "HashChangeEvent")
-        event = HashChangeEvent::create();
-    else if (eventType == "KeyboardEvent" || eventType == "KeyboardEvents")
-        event = KeyboardEvent::create();
-    else if (eventType == "MessageEvent")
-        event = MessageEvent::create();
-    else if (eventType == "MouseEvent" || eventType == "MouseEvents")
-        event = MouseEvent::create();
-    else if (eventType == "MutationEvent" || eventType == "MutationEvents")
-        event = MutationEvent::create();
-    else if (eventType == "OverflowEvent")
-        event = OverflowEvent::create();
-    else if (eventType == "PageTransitionEvent")
-        event = PageTransitionEvent::create();
-    else if (eventType == "PopStateEvent")
-        event = PopStateEvent::create(); 
-    else if (eventType == "ProgressEvent")
-        event = ProgressEvent::create();
-    else if (eventType == "TextEvent")
-        event = TextEvent::create();
-    else if (eventType == "UIEvent" || eventType == "UIEvents")
-        event = UIEvent::create();
-    else if (eventType == "WebKitAnimationEvent")
-        event = WebKitAnimationEvent::create();
-    else if (eventType == "WebKitTransitionEvent")
-        event = WebKitTransitionEvent::create();
-    else if (eventType == "WheelEvent")
-        event = WheelEvent::create();
-    else if (eventType == "XMLHttpRequestProgressEvent")
-        event = XMLHttpRequestProgressEvent::create();
-#if ENABLE(WEB_AUDIO)
-    else if (eventType == "AudioProcessingEvent")
-        event = AudioProcessingEvent::create();
-    else if (eventType == "OfflineAudioCompletionEvent")
-        event = OfflineAudioCompletionEvent::create();
-#endif
-#if ENABLE(MEDIA_STREAM)
-    else if (eventType == "MediaStreamEvent")
-        event = MediaStreamEvent::create();
-#endif
-#if ENABLE(INPUT_SPEECH)
-    else if (eventType == "SpeechInputEvent")
-        event = SpeechInputEvent::create();
-#endif
-#if ENABLE(WEB_SOCKETS)
-    else if (eventType == "CloseEvent")
-        event = CloseEvent::create();
-#endif
-#if ENABLE(WEBGL)
-    else if (eventType == "WebGLContextEvent")
-        event = WebGLContextEvent::create();
-#endif
-#if ENABLE(DOM_STORAGE)
-    else if (eventType == "StorageEvent")
-        event = StorageEvent::create();
-#endif
-#if ENABLE(SVG)
-    else if (eventType == "SVGEvents")
-        event = Event::create();
-    else if (eventType == "SVGZoomEvent" || eventType == "SVGZoomEvents")
-        event = SVGZoomEvent::create();
-#endif
-#if ENABLE(TOUCH_EVENTS)
-#if USE(V8)
-    else if (eventType == "TouchEvent" && RuntimeEnabledFeatures::touchEnabled())
-#else
-    else if (eventType == "TouchEvent")
-#endif
-        event = TouchEvent::create();
-#endif
-#if ENABLE(DEVICE_ORIENTATION)
-    else if (eventType == "DeviceMotionEvent")
-        event = DeviceMotionEvent::create();
-    else if (eventType == "DeviceOrientationEvent")
-        event = DeviceOrientationEvent::create();
-#endif
-#if ENABLE(ORIENTATION_EVENTS)
-    else if (eventType == "OrientationEvent")
-        event = Event::create();
-#endif
+    RefPtr<Event> event = EventFactory::create(eventType);
     if (event)
         return event.release();
 
@@ -4064,7 +3968,7 @@ KURL Document::openSearchDescriptionURL()
 
     RefPtr<HTMLCollection> children = head()->children();
     for (Node* child = children->firstItem(); child; child = children->nextItem()) {
-        if (!child->isHTMLElement() || !static_cast<HTMLElement*>(child)->hasTagName(linkTag))
+        if (!child->hasTagName(linkTag))
             continue;
         HTMLLinkElement* linkElement = static_cast<HTMLLinkElement*>(child);
         if (!equalIgnoringCase(linkElement->type(), openSearchMIMEType) || !equalIgnoringCase(linkElement->rel(), openSearchRelation))
@@ -4285,7 +4189,7 @@ void Document::finishedParsing()
 
         f->loader()->finishedParsing();
 
-        InspectorInstrumentation::domContentLoadedEventFired(f.get(), url());
+        InspectorInstrumentation::domContentLoadedEventFired(f.get());
     }
 }
 
@@ -4308,8 +4212,6 @@ Vector<String> Document::formElementsState() const
     }
     return stateVector;
 }
-
-#if ENABLE(XPATH)
 
 PassRefPtr<XPathExpression> Document::createExpression(const String& expression,
                                                        XPathNSResolver* resolver,
@@ -4338,8 +4240,6 @@ PassRefPtr<XPathResult> Document::evaluate(const String& expression,
         m_xpathEvaluator = XPathEvaluator::create();
     return m_xpathEvaluator->evaluate(expression, contextNode, resolver, type, result, ec);
 }
-
-#endif // ENABLE(XPATH)
 
 void Document::setStateForNewFormElements(const Vector<String>& stateVector)
 {
@@ -4431,26 +4331,25 @@ unsigned FormElementKeyHash::hash(const FormElementKey& key)
     return StringHasher::hashMemory<sizeof(FormElementKey)>(&key);
 }
 
-IconURL Document::iconURL(IconType iconType) const
+const Vector<IconURL>& Document::iconURLs() const
 {
-    return m_iconURLs[toIconIndex(iconType)];
+    return m_iconURLs;
 }
 
-void Document::setIconURL(const String& url, const String& mimeType, IconType iconType)
+void Document::addIconURL(const String& url, const String& mimeType, const String& sizes, IconType iconType)
 {
+    if (url.isEmpty())
+        return;
+
     // FIXME - <rdar://problem/4727645> - At some point in the future, we might actually honor the "mimeType"
-    IconURL newURL(KURL(ParsedURLString, url), iconType);
-    if (iconURL(iconType).m_iconURL.isEmpty())
-        setIconURL(newURL);
-    else if (!mimeType.isEmpty())
-        setIconURL(newURL);
-    if (Frame* f = frame())
-        f->loader()->icon()->setURL(newURL);
-}
+    IconURL newURL(KURL(ParsedURLString, url), sizes, mimeType, iconType);
+    m_iconURLs.append(newURL);
 
-void Document::setIconURL(const IconURL& iconURL)
-{
-    m_iconURLs[toIconIndex(iconURL.m_iconType)] = iconURL;
+    if (Frame* f = frame()) {
+        IconURL iconURL = f->loader()->icon()->iconURL(iconType);
+        if (iconURL == newURL)
+            f->loader()->didChangeIcons(iconType);
+    }
 }
 
 void Document::registerFormElementWithFormAttribute(FormAssociatedElement* element)
@@ -4496,7 +4395,7 @@ void Document::initSecurityContext()
         // This can occur via document.implementation.createDocument().
         m_cookieURL = KURL(ParsedURLString, "");
         ScriptExecutionContext::setSecurityOrigin(SecurityOrigin::createEmpty());
-        m_contentSecurityPolicy = ContentSecurityPolicy::create(this);
+        ScriptExecutionContext::setContentSecurityPolicy(ContentSecurityPolicy::create(this));
         return;
     }
 
@@ -4504,7 +4403,7 @@ void Document::initSecurityContext()
     // loading URL with a fresh content security policy.
     m_cookieURL = m_url;
     ScriptExecutionContext::setSecurityOrigin(SecurityOrigin::create(m_url, m_frame->loader()->sandboxFlags()));
-    m_contentSecurityPolicy = ContentSecurityPolicy::create(this);
+    ScriptExecutionContext::setContentSecurityPolicy(ContentSecurityPolicy::create(this));
 
     if (SecurityOrigin::allowSubstituteDataAccessToLocal()) {
         // If this document was loaded with substituteData, then the document can
@@ -4551,7 +4450,7 @@ void Document::initSecurityContext()
         // https://bugs.webkit.org/show_bug.cgi?id=15313
         ScriptExecutionContext::setSecurityOrigin(ownerFrame->document()->securityOrigin());
         // FIXME: Consider moving m_contentSecurityPolicy into SecurityOrigin.
-        m_contentSecurityPolicy = ownerFrame->document()->contentSecurityPolicy();
+        ScriptExecutionContext::setContentSecurityPolicy(ownerFrame->document()->contentSecurityPolicy());
     }
 }
 
@@ -4755,6 +4654,15 @@ void Document::resumeScriptedAnimationControllerCallbacks()
 #endif
 }
 
+void Document::windowScreenDidChange(PlatformDisplayID displayID)
+{
+#if ENABLE(REQUEST_ANIMATION_FRAME)
+    if (m_scriptedAnimationController)
+        m_scriptedAnimationController->windowScreenDidChange(displayID);
+#endif
+}
+
+
 String Document::displayStringModifiedByEncoding(const String& str) const
 {
     if (m_decoder)
@@ -4813,19 +4721,6 @@ MediaCanStartListener* Document::takeAnyMediaCanStartListener()
     m_mediaCanStartListeners.remove(slot);
     return listener;
 }
-
-#if ENABLE(XHTMLMP)
-bool Document::isXHTMLMPDocument() const
-{
-    if (!frame() || !frame()->loader())
-        return false;
-    // As per section 7.2 of OMA-WAP-XHTMLMP-V1_1-20061020-A.pdf, a conforming user agent
-    // MUST accept XHTMLMP document identified as "application/vnd.wap.xhtml+xml"
-    // and SHOULD accept it identified as "application/xhtml+xml" , "application/xhtml+xml" is a 
-    // general MIME type for all XHTML documents, not only for XHTMLMP
-    return loader()->writer()->mimeType() == "application/vnd.wap.xhtml+xml";
-}
-#endif
 
 #if ENABLE(FULLSCREEN_API)
 bool Document::fullScreenIsAllowedForElement(Element* element) const
@@ -5097,7 +4992,7 @@ void Document::loadEventDelayTimerFired(Timer<Document>*)
 int Document::webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback, Element* animationElement)
 {
     if (!m_scriptedAnimationController)
-        m_scriptedAnimationController = ScriptedAnimationController::create(this);
+        m_scriptedAnimationController = ScriptedAnimationController::create(this, page()->displayID());
 
     return m_scriptedAnimationController->registerCallback(callback, animationElement);
 }
@@ -5152,6 +5047,13 @@ void Document::didRemoveWheelEventHandler()
         mainFrame->notifyChromeClientWheelEventHandlerCountChanged();
 }
 
+bool Document::visualUpdatesAllowed() const
+{
+    return !settings()
+        || !settings()->suppressIncrementalRendering()
+        || loadEventFinished();
+}
+
 DocumentLoader* Document::loader() const
 {
     if (!m_frame)
@@ -5166,5 +5068,41 @@ DocumentLoader* Document::loader() const
     
     return loader;
 }
+
+#if ENABLE(MICRODATA)
+PassRefPtr<NodeList> Document::getItems(const String& typeNames)
+{
+    NodeRareData* data = ensureRareData();
+    if (!data->nodeLists()) {
+        data->setNodeLists(NodeListsNodeData::create());
+        treeScope()->addNodeListCache();
+    }
+
+    // Since documet.getItem() is allowed for microdata, typeNames will be null string.
+    // In this case we need to create an unique string identifier to map such request in the cache.
+    String localTypeNames = typeNames.isNull() ? String("http://webkit.org/microdata/undefinedItemType") : typeNames;
+
+    pair<NodeListsNodeData::MicroDataItemListCache::iterator, bool> result = data->nodeLists()->m_microDataItemListCache.add(localTypeNames, 0);
+    if (!result.second)
+        return PassRefPtr<NodeList>(result.first->second);
+
+    RefPtr<MicroDataItemList> list = MicroDataItemList::create(this, typeNames);
+    result.first->second = list.get();
+    return list.release();
+}
+
+void Document::removeCachedMicroDataItemList(MicroDataItemList* list, const String& typeNames)
+{
+    ASSERT(rareData());
+    ASSERT(rareData()->nodeLists());
+    ASSERT_UNUSED(list, list->hasOwnCaches());
+
+    NodeListsNodeData* data = rareData()->nodeLists();
+
+    String localTypeNames = typeNames.isNull() ? String("http://webkit.org/microdata/undefinedItemType") : typeNames;
+    ASSERT_UNUSED(list, list == data->m_microDataItemListCache.get(localTypeNames));
+    data->m_microDataItemListCache.remove(localTypeNames);
+}
+#endif
 
 } // namespace WebCore

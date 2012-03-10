@@ -60,6 +60,11 @@ public:
         TypeDouble,
         TypeUInt64,
         
+        // Geometry types
+        TypePoint,
+        TypeSize,
+        TypeRect,
+        
         // UIProcess types
         TypeApplicationCacheManager,
         TypeBackForwardList,
@@ -77,6 +82,7 @@ public:
         TypeGeolocationPermissionRequest,
         TypeHitTestResult,
         TypeGeolocationPosition,
+        TypeGrammarDetail,
         TypeIconDatabase,
         TypeInspector,
         TypeKeyValueStorageManager,
@@ -88,6 +94,7 @@ public:
         TypePageGroup,
         TypePluginSiteDataManager,
         TypePreferences,
+        TypeTextChecker,
 
         // Bundle types
         TypeBundle,
@@ -106,8 +113,6 @@ public:
 
         // Platform specific
         TypeEditCommandProxy,
-        TypeGrammarDetail,
-        TypeTextChecker,
         TypeView
     };
 

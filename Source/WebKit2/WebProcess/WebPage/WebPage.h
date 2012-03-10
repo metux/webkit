@@ -31,6 +31,7 @@
 #include "FindController.h"
 #include "GeolocationPermissionRequestManager.h"
 #include "ImageOptions.h"
+#include "ImmutableArray.h"
 #include "InjectedBundlePageContextMenuClient.h"
 #include "InjectedBundlePageEditorClient.h"
 #include "InjectedBundlePageFormClient.h"
@@ -48,6 +49,7 @@
 #include <WebCore/Editor.h>
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IntRect.h>
+#include <WebCore/PlatformScreen.h>
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/WebCoreKeyboardUIMode.h>
 #include <wtf/HashMap.h>
@@ -58,6 +60,10 @@
 
 #if PLATFORM(QT)
 #include "ArgumentCodersQt.h"
+#endif
+
+#if PLATFORM(GTK)
+#include "ArgumentCodersGtk.h"
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
@@ -80,6 +86,8 @@ namespace CoreIPC {
 
 namespace WebCore {
     class GraphicsContext;
+    class Frame;
+    class FrameView;
     class KeyboardEvent;
     class Page;
     class PrintContext;
@@ -222,13 +230,22 @@ public:
 
     bool findStringFromInjectedBundle(const String&, FindOptions);
 
-    WebFrame* mainFrame() const { return m_mainFrame.get(); }
+    WebFrame* mainWebFrame() const { return m_mainFrame.get(); }
+
+    WebCore::Frame* mainFrame() const; // May return 0.
+    WebCore::FrameView* mainFrameView() const; // May return 0.
+
     PassRefPtr<Plugin> createPlugin(const Plugin::Parameters&);
 
     EditorState editorState() const;
 
     String renderTreeExternalRepresentation() const;
     uint64_t renderTreeSize() const;
+
+    void setTracksRepaints(bool);
+    bool isTrackingRepaints() const;
+    void resetTrackedRepaints();
+    PassRefPtr<ImmutableArray> trackedRepaintRects();
 
     void executeEditingCommand(const String& commandName, const String& argument);
     bool isEditingCommandEnabled(const String& commandName);
@@ -240,6 +257,7 @@ public:
     double pageZoomFactor() const;
     void setPageZoomFactor(double);
     void setPageAndTextZoomFactors(double pageZoomFactor, double textZoomFactor);
+    void windowScreenDidChange(uint64_t);
 
     void scalePage(double scale, const WebCore::IntPoint& origin);
     double pageScaleFactor() const;
@@ -287,12 +305,9 @@ public:
     GeolocationPermissionRequestManager& geolocationPermissionRequestManager() { return m_geolocationPermissionRequestManager; }
 
     void pageDidScroll();
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
     void setFixedVisibleContentRect(const WebCore::IntRect&);
-
-    bool resizesToContentsEnabled() const { return !m_resizesToContentsLayoutSize.isEmpty(); }
-    WebCore::IntSize resizesToContentsLayoutSize() const { return m_resizesToContentsLayoutSize; }
     void setResizesToContentsUsingLayoutSize(const WebCore::IntSize& targetLayoutSize);
     void resizeToContentsIfNeeded();
 #endif
@@ -362,6 +377,10 @@ public:
     void gestureDidEnd();
 #endif
 
+    void setCompositionForTesting(const String& compositionString, uint64_t from, uint64_t length);
+    bool hasCompositionForTesting();
+    void confirmCompositionForTesting(const String& compositionString);
+
     // FIXME: This a dummy message, to avoid breaking the build for platforms that don't require
     // any synchronous messages, and should be removed when <rdar://problem/8775115> is fixed.
     void dummy(bool&);
@@ -380,7 +399,7 @@ public:
     void clearSelection();
 #if PLATFORM(WIN)
     void performDragControllerAction(uint64_t action, WebCore::IntPoint clientPosition, WebCore::IntPoint globalPosition, uint64_t draggingSourceOperationMask, const WebCore::DragDataMap&, uint32_t flags);
-#elif PLATFORM(QT)
+#elif PLATFORM(QT) || PLATFORM(GTK)
     void performDragControllerAction(uint64_t action, WebCore::DragData);
 #else
     void performDragControllerAction(uint64_t action, WebCore::IntPoint clientPosition, WebCore::IntPoint globalPosition, uint64_t draggingSourceOperationMask, const WTF::String& dragStorageName, uint32_t flags, const SandboxExtension::Handle&);
@@ -422,9 +441,11 @@ public:
     void handleCorrectionPanelResult(const String&);
 #endif
 
+    // For testing purpose.
     void simulateMouseDown(int button, WebCore::IntPoint, int clickCount, WKEventModifiers, double time);
     void simulateMouseUp(int button, WebCore::IntPoint, int clickCount, WKEventModifiers, double time);
     void simulateMouseMotion(WebCore::IntPoint, double time);
+    String viewportConfigurationAsText(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight);
 
     void contextMenuShowing() { m_isShowingContextMenu = true; }
 
@@ -468,14 +489,16 @@ private:
     void tryRestoreScrollPosition();
     void setActive(bool);
     void setFocused(bool);
-    void setInitialFocus(bool);
+    void setInitialFocus(bool forward, bool isKeyboardEventValid, const WebKeyboardEvent&);
     void setWindowResizerSize(const WebCore::IntSize&);
     void setIsInWindow(bool);
     void validateCommand(const String&, uint64_t);
     void executeEditCommand(const String&);
 
     void mouseEvent(const WebMouseEvent&);
+    void mouseEventSyncForTesting(const WebMouseEvent&, bool&);
     void wheelEvent(const WebWheelEvent&);
+    void wheelEventSyncForTesting(const WebWheelEvent&, bool&);
     void keyEvent(const WebKeyboardEvent&);
     void keyEventSyncForTesting(const WebKeyboardEvent&, bool&);
 #if ENABLE(GESTURE_EVENTS)
@@ -633,7 +656,7 @@ private:
     InjectedBundlePageFullScreenClient m_fullScreenClient;
 #endif
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     WebCore::IntSize m_resizesToContentsLayoutSize;
 #endif
 

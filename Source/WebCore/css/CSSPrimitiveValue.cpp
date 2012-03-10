@@ -77,7 +77,6 @@ static inline bool isValidCSSUnitTypeForDoubleConversion(CSSPrimitiveValue::Unit
     case CSSPrimitiveValue:: CSS_COUNTER:
     case CSSPrimitiveValue:: CSS_COUNTER_NAME:
     case CSSPrimitiveValue:: CSS_DASHBOARD_REGION:
-    case CSSPrimitiveValue:: CSS_FROM_FLOW:
     case CSSPrimitiveValue:: CSS_IDENT:
     case CSSPrimitiveValue:: CSS_PAIR:
     case CSSPrimitiveValue:: CSS_PARSER_HEXCOLOR:
@@ -167,12 +166,14 @@ static const AtomicString& valueOrPropertyName(int valueOrPropertyID)
 CSSPrimitiveValue::CSSPrimitiveValue()
     : m_type(0)
     , m_hasCachedCSSText(false)
+    , m_isQuirkValue(false)
 {
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue(int ident)
     : m_type(CSS_IDENT)
     , m_hasCachedCSSText(false)
+    , m_isQuirkValue(false)
 {
     m_value.ident = ident;
 }
@@ -180,6 +181,7 @@ CSSPrimitiveValue::CSSPrimitiveValue(int ident)
 CSSPrimitiveValue::CSSPrimitiveValue(double num, UnitTypes type)
     : m_type(type)
     , m_hasCachedCSSText(false)
+    , m_isQuirkValue(false)
 {
     ASSERT(isfinite(num));
     m_value.num = num;
@@ -188,6 +190,7 @@ CSSPrimitiveValue::CSSPrimitiveValue(double num, UnitTypes type)
 CSSPrimitiveValue::CSSPrimitiveValue(const String& str, UnitTypes type)
     : m_type(type)
     , m_hasCachedCSSText(false)
+    , m_isQuirkValue(false)
 {
     if ((m_value.string = str.impl()))
         m_value.string->ref();
@@ -196,12 +199,14 @@ CSSPrimitiveValue::CSSPrimitiveValue(const String& str, UnitTypes type)
 CSSPrimitiveValue::CSSPrimitiveValue(RGBA32 color)
     : m_type(CSS_RGBCOLOR)
     , m_hasCachedCSSText(false)
+    , m_isQuirkValue(false)
 {
     m_value.rgbcolor = color;
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue(const Length& length)
     : m_hasCachedCSSText(false)
+    , m_isQuirkValue(false)
 {
     switch (length.type()) {
         case Auto:
@@ -236,21 +241,21 @@ void CSSPrimitiveValue::init(PassRefPtr<Counter> c)
 {
     m_type = CSS_COUNTER;
     m_hasCachedCSSText = false;
-    m_value.counter = c.releaseRef();
+    m_value.counter = c.leakRef();
 }
 
 void CSSPrimitiveValue::init(PassRefPtr<Rect> r)
 {
     m_type = CSS_RECT;
     m_hasCachedCSSText = false;
-    m_value.rect = r.releaseRef();
+    m_value.rect = r.leakRef();
 }
 
 void CSSPrimitiveValue::init(PassRefPtr<Quad> quad)
 {
     m_type = CSS_QUAD;
     m_hasCachedCSSText = false;
-    m_value.quad = quad.releaseRef();
+    m_value.quad = quad.leakRef();
 }
 
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -258,7 +263,7 @@ void CSSPrimitiveValue::init(PassRefPtr<DashboardRegion> r)
 {
     m_type = CSS_DASHBOARD_REGION;
     m_hasCachedCSSText = false;
-    m_value.region = r.releaseRef();
+    m_value.region = r.leakRef();
 }
 #endif
 
@@ -266,14 +271,14 @@ void CSSPrimitiveValue::init(PassRefPtr<Pair> p)
 {
     m_type = CSS_PAIR;
     m_hasCachedCSSText = false;
-    m_value.pair = p.releaseRef();
+    m_value.pair = p.leakRef();
 }
 
 void CSSPrimitiveValue::init(PassRefPtr<CSSWrapShape> shape)
 {
     m_type = CSS_SHAPE;
     m_hasCachedCSSText = false;
-    m_value.shape = shape.releaseRef();
+    m_value.shape = shape.leakRef();
 }
 
 CSSPrimitiveValue::~CSSPrimitiveValue()
@@ -287,7 +292,6 @@ void CSSPrimitiveValue::cleanup()
         case CSS_STRING:
         case CSS_URI:
         case CSS_ATTR:
-        case CSS_FROM_FLOW:
         case CSS_PARSER_HEXCOLOR:
             if (m_value.string)
                 m_value.string->deref();
@@ -408,7 +412,7 @@ double CSSPrimitiveValue::computeLengthDouble(RenderStyle* style, RenderStyle* r
     double result = getDoubleValue() * factor;
     if (!applyZoomMultiplier || multiplier == 1.0)
         return result;
-     
+
     // Any original result that was >= 1 should not be allowed to fall below 1.  This keeps border lines from
     // vanishing.
     double zoomedResult = result * multiplier;
@@ -419,7 +423,7 @@ double CSSPrimitiveValue::computeLengthDouble(RenderStyle* style, RenderStyle* r
 
 void CSSPrimitiveValue::setFloatValue(unsigned short, double, ExceptionCode& ec)
 {
-    // Keeping values immutable makes optimizations easier and allows sharing of the primitive value objects. 
+    // Keeping values immutable makes optimizations easier and allows sharing of the primitive value objects.
     // No other engine supports mutating style through this API. Computed style is always read-only anyway.
     // Supporting setter would require making primitive value copy-on-write and taking care of style invalidation.
     ec = NO_MODIFICATION_ALLOWED_ERR;
@@ -564,7 +568,7 @@ bool CSSPrimitiveValue::getDoubleValueInternal(UnitTypes requestedUnitType, doub
 
 void CSSPrimitiveValue::setStringValue(unsigned short, const String&, ExceptionCode& ec)
 {
-    // Keeping values immutable makes optimizations easier and allows sharing of the primitive value objects. 
+    // Keeping values immutable makes optimizations easier and allows sharing of the primitive value objects.
     // No other engine supports mutating style through this API. Computed style is always read-only anyway.
     // Supporting setter would require making primitive value copy-on-write and taking care of style invalidation.
     ec = NO_MODIFICATION_ALLOWED_ERR;
@@ -577,7 +581,6 @@ String CSSPrimitiveValue::getStringValue(ExceptionCode& ec) const
         case CSS_STRING:
         case CSS_ATTR:
         case CSS_URI:
-        case CSS_FROM_FLOW:
             return m_value.string;
         case CSS_IDENT:
             return valueOrPropertyName(m_value.ident);
@@ -595,7 +598,6 @@ String CSSPrimitiveValue::getStringValue() const
         case CSS_STRING:
         case CSS_ATTR:
         case CSS_URI:
-        case CSS_FROM_FLOW:
              return m_value.string;
         case CSS_IDENT:
             return valueOrPropertyName(m_value.ident);
@@ -770,9 +772,6 @@ String CSSPrimitiveValue::cssText() const
         case CSS_STRING:
             text = quoteCSSStringIfNeeded(m_value.string);
             break;
-        case CSS_FROM_FLOW:
-            text = "-webkit-from-flow(" + quoteCSSStringIfNeeded(m_value.string) + ")";
-            break;
         case CSS_URI:
             text = "url(" + quoteCSSURLIfNeeded(m_value.string) + ")";
             break;
@@ -798,19 +797,27 @@ String CSSPrimitiveValue::cssText() const
             text += ")";
             break;
         case CSS_COUNTER: {
+            DEFINE_STATIC_LOCAL(const String, counterParen, ("counter("));
+            DEFINE_STATIC_LOCAL(const String, countersParen, ("counters("));
+            DEFINE_STATIC_LOCAL(const String, commaSpace, (", "));
+
+            StringBuilder result;
             String separator = m_value.counter->separator();
-            text = separator.isEmpty() ? "counter(" : "counters(";
-            text += m_value.counter->identifier();
+            result.append(separator.isEmpty() ? counterParen : countersParen);
+
+            result.append(m_value.counter->identifier());
             if (!separator.isEmpty()) {
-                text += ", ";
-                text += quoteCSSStringIfNeeded(separator);
+                result.append(commaSpace);
+                result.append(quoteCSSStringIfNeeded(separator));
             }
-            const char* listStyleName = getValueName(m_value.counter->listStyleNumber() + CSSValueDisc);
-            if (listStyleName) {
-                text += ", ";
-                text += listStyleName;
+            String listStyle = m_value.counter->listStyle();
+            if (!listStyle.isEmpty()) {
+                result.append(commaSpace);
+                result.append(listStyle);
             }
-            text += ")";
+            result.append(')');
+
+            text = result.toString();
             break;
         }
         case CSS_RECT: {

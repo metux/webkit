@@ -40,7 +40,7 @@ using namespace JSC;
 
 namespace WebCore {
 
-const ClassInfo JSDOMGlobalObject::s_info = { "DOMGlobalObject", &JSGlobalObject::s_info, 0, 0 };
+const ClassInfo JSDOMGlobalObject::s_info = { "DOMGlobalObject", &JSGlobalObject::s_info, 0, 0, CREATE_METHOD_TABLE(JSDOMGlobalObject) };
 
 JSDOMGlobalObject::JSDOMGlobalObject(JSGlobalData& globalData, Structure* structure, PassRefPtr<DOMWrapperWorld> world)
     : JSGlobalObject(globalData, structure)
@@ -49,29 +49,40 @@ JSDOMGlobalObject::JSDOMGlobalObject(JSGlobalData& globalData, Structure* struct
 {
 }
 
-void JSDOMGlobalObject::finishCreation(JSGlobalData& globalData, JSObject* thisValue)
+JSDOMGlobalObject::~JSDOMGlobalObject()
+{
+}
+
+void JSDOMGlobalObject::finishCreation(JSGlobalData& globalData)
+{
+    Base::finishCreation(globalData);
+    ASSERT(inherits(&s_info));
+}
+
+void JSDOMGlobalObject::finishCreation(JSGlobalData& globalData, JSGlobalThis* thisValue)
 {
     Base::finishCreation(globalData, thisValue);
     ASSERT(inherits(&s_info));
 }
 
-void JSDOMGlobalObject::visitChildren(SlotVisitor& visitor)
+void JSDOMGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    JSDOMGlobalObject* thisObject = static_cast<JSDOMGlobalObject*>(cell);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(structure()->typeInfo().overridesVisitChildren());
-    Base::visitChildren(visitor);
+    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    Base::visitChildren(thisObject, visitor);
 
-    JSDOMStructureMap::iterator end = structures().end();
-    for (JSDOMStructureMap::iterator it = structures().begin(); it != end; ++it)
+    JSDOMStructureMap::iterator end = thisObject->structures().end();
+    for (JSDOMStructureMap::iterator it = thisObject->structures().begin(); it != end; ++it)
         visitor.append(&it->second);
 
-    JSDOMConstructorMap::iterator end2 = constructors().end();
-    for (JSDOMConstructorMap::iterator it2 = constructors().begin(); it2 != end2; ++it2)
+    JSDOMConstructorMap::iterator end2 = thisObject->constructors().end();
+    for (JSDOMConstructorMap::iterator it2 = thisObject->constructors().begin(); it2 != end2; ++it2)
         visitor.append(&it2->second);
 
-    if (m_injectedScript)
-        visitor.append(&m_injectedScript);
+    if (thisObject->m_injectedScript)
+        visitor.append(&thisObject->m_injectedScript);
 }
 
 void JSDOMGlobalObject::setCurrentEvent(Event* currentEvent)

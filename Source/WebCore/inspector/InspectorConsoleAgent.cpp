@@ -81,11 +81,14 @@ InspectorConsoleAgent::~InspectorConsoleAgent()
     m_inspectorDOMAgent = 0;
 }
 
-void InspectorConsoleAgent::enable(ErrorString*, int* consoleMessageExpireCount)
+void InspectorConsoleAgent::enable(ErrorString*)
 {
-    *consoleMessageExpireCount = m_expiredConsoleMessageCount;
-
     m_inspectorState->setBoolean(ConsoleAgentState::consoleMessagesEnabled, true);
+
+    if (m_expiredConsoleMessageCount) {
+        ConsoleMessage expiredMessage(OtherMessageSource, LogMessageType, WarningMessageLevel, String::format("%d console messages are not shown.", m_expiredConsoleMessageCount), 0, "", "");
+        expiredMessage.addToFrontend(m_frontend, m_injectedScriptManager);
+    }
 
     size_t messageCount = m_consoleMessages.size();
     for (size_t i = 0; i < messageCount; ++i)
@@ -120,8 +123,7 @@ void InspectorConsoleAgent::restore()
 {
     if (m_inspectorState->getBoolean(ConsoleAgentState::consoleMessagesEnabled)) {
         ErrorString error;
-        int expiredCount;
-        enable(&error, &expiredCount);
+        enable(&error);
     }
 }
 
@@ -211,12 +213,17 @@ void InspectorConsoleAgent::frameWindowDiscarded(DOMWindow* window)
     m_injectedScriptManager->discardInjectedScriptsFor(window);
 }
 
-void InspectorConsoleAgent::resourceRetrievedByXMLHttpRequest(const String& url, const String& sendURL, unsigned sendLineNumber)
+void InspectorConsoleAgent::resourceRetrievedByXMLHttpRequest(unsigned long identifier, const String& url, const String& sendURL, unsigned sendLineNumber)
 {
     if (!m_inspectorAgent->enabled())
         return;
-    if (m_inspectorState->getBoolean(ConsoleAgentState::monitoringXHR))
-        addMessageToConsole(JSMessageSource, LogMessageType, LogMessageLevel, "XHR finished loading: \"" + url + "\".", sendLineNumber, sendURL);
+    if (m_frontend && m_inspectorState->getBoolean(ConsoleAgentState::monitoringXHR)) {
+        String message = "XHR finished loading: \"" + url + "\".";
+        String requestId = IdentifiersFactory::requestId(identifier);
+        addConsoleMessage(adoptPtr(new ConsoleMessage(NetworkMessageSource, LogMessageType, LogMessageLevel, message, sendLineNumber, sendURL, requestId)));
+    }
+
+
 }
 
 void InspectorConsoleAgent::didReceiveResponse(unsigned long identifier, const ResourceResponse& response)
@@ -227,7 +234,7 @@ void InspectorConsoleAgent::didReceiveResponse(unsigned long identifier, const R
     if (response.httpStatusCode() >= 400) {
         String message = "Failed to load resource: the server responded with a status of " + String::number(response.httpStatusCode()) + " (" + response.httpStatusText() + ')';
         String requestId = IdentifiersFactory::requestId(identifier);
-        addConsoleMessage(adoptPtr(new ConsoleMessage(OtherMessageSource, NetworkErrorMessageType, ErrorMessageLevel, message, response.url().string(), requestId)));
+        addConsoleMessage(adoptPtr(new ConsoleMessage(NetworkMessageSource, LogMessageType, ErrorMessageLevel, message, response.url().string(), requestId)));
     }
 }
 
@@ -241,7 +248,7 @@ void InspectorConsoleAgent::didFailLoading(unsigned long identifier, const Resou
     if (!error.localizedDescription().isEmpty())
         message += ": " + error.localizedDescription();
     String requestId = IdentifiersFactory::requestId(identifier);
-    addConsoleMessage(adoptPtr(new ConsoleMessage(OtherMessageSource, NetworkErrorMessageType, ErrorMessageLevel, message, error.failingURL(), requestId)));
+    addConsoleMessage(adoptPtr(new ConsoleMessage(NetworkMessageSource, LogMessageType, ErrorMessageLevel, message, error.failingURL(), requestId)));
 }
 
 void InspectorConsoleAgent::setMonitoringXHREnabled(ErrorString*, bool enabled)

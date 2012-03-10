@@ -24,8 +24,7 @@ module events {
     interface [
         CustomToJS,
         CanBeConstructed,
-        CustomConstructFunction,
-        V8CustomConstructor,
+        CustomConstructor,
         NoStaticTables,
         Polymorphic
     ] Event {
@@ -84,7 +83,6 @@ module events {
 
 #if defined(LANGUAGE_CPP) && LANGUAGE_CPP
         // Extra WebCore methods exposed to allow compile-time casting in C++
-        boolean isMutationEvent();
         boolean isMouseEvent();
         boolean isUIEvent();
 #endif

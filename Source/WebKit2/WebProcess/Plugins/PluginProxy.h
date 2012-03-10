@@ -89,6 +89,7 @@ private:
     virtual bool handleWheelEvent(const WebWheelEvent&);
     virtual bool handleMouseEnterEvent(const WebMouseEvent&);
     virtual bool handleMouseLeaveEvent(const WebMouseEvent&);
+    virtual bool handleContextMenuEvent(const WebMouseEvent&);
     virtual bool handleKeyboardEvent(const WebKeyboardEvent&);
     virtual void setFocus(bool);
     virtual NPObject* pluginScriptableNPObject();
@@ -96,15 +97,22 @@ private:
     virtual void windowFocusChanged(bool);
     virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     virtual void windowVisibilityChanged(bool);
+    virtual void contentsScaleFactorChanged(float);
     virtual uint64_t pluginComplexTextInputIdentifier() const;
     virtual void sendComplexTextInput(const String& textInput);
 #endif
 
     virtual void privateBrowsingStateChanged(bool);
     virtual bool getFormValue(String& formValue);
+    virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity);
+    virtual bool wantsWindowRelativeCoordinates();
+    virtual WebCore::Scrollbar* horizontalScrollbar();
+    virtual WebCore::Scrollbar* verticalScrollbar();
 
     bool needsBackingStore() const;
     uint64_t windowNPObjectID();
+
+    void geometryDidChange();
 
     // Message handlers.
     void loadURL(uint64_t requestID, const String& method, const String& urlString, const String& target, const WebCore::HTTPHeaderMap& headerFields, const Vector<uint8_t>& httpBody, bool allowPopups);
@@ -130,6 +138,9 @@ private:
 
     // The plug-in rect in window coordinates.
     WebCore::IntRect m_frameRect;
+
+    // The plug-in clip rect in window coordinates.
+    WebCore::IntRect m_clipRect;
 
     // This is the backing store that we paint when we're told to paint.
     RefPtr<ShareableBitmap> m_backingStore;

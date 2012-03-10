@@ -9,6 +9,7 @@
  * Copyright (C) 2005 Alexey Proskuryakov <ap@nypop.com>
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2008 Eric Seidel <eric@webkit.org>
+ * Copyright (C) 2008 Google Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -58,10 +59,10 @@
 #include "HTMLNames.h"
 #include "HTMLTableCellElement.h"
 #include "HitTestResult.h"
+#include "ImageBuffer.h"
 #include "InspectorInstrumentation.h"
 #include "Logging.h"
 #include "MediaFeatureNames.h"
-#include "MediaStreamFrameController.h"
 #include "Navigator.h"
 #include "NodeList.h"
 #include "Page.h"
@@ -110,7 +111,11 @@
 #include "SVGDocumentExtensions.h"
 #endif
 
-#if ENABLE(TILED_BACKING_STORE)
+#if ENABLE(MEDIA_STREAM)
+#include "MediaStreamFrameController.h"
+#endif
+
+#if USE(TILED_BACKING_STORE)
 #include "TiledBackingStore.h"
 #endif
 
@@ -120,9 +125,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-#ifndef NDEBUG
-static WTF::RefCountedLeakCounter frameCounter("Frame");
-#endif
+DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, frameCounter, ("Frame"));
 
 static inline Frame* parentFromOwnerElement(HTMLFrameOwnerElement* ownerElement)
 {
@@ -183,7 +186,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     WebKitFontFamilyNames::init();
 
     if (!ownerElement) {
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
         // Top level frame only for now.
         setTiledBackingStoreEnabled(page->settings()->tiledBackingStoreEnabled());
 #endif
@@ -282,7 +285,7 @@ void Frame::setView(PassRefPtr<FrameView> view)
     // pulled from the back/forward cache, reset this flag.
     loader()->resetMultipleFormSubmissionProtection();
     
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     if (m_view && tiledBackingStore())
         m_view->setPaintsEntireContents(true);
 #endif
@@ -746,8 +749,12 @@ void Frame::transferChildFrameToNewDocument()
         // when the Geolocation's iframe is reparented.
         // See https://bugs.webkit.org/show_bug.cgi?id=55577
         // and https://bugs.webkit.org/show_bug.cgi?id=52877
-        if (m_domWindow)
+        if (m_domWindow) {
             m_domWindow->resetGeolocation();
+#if ENABLE(NOTIFICATIONS)
+            m_domWindow->resetNotifications();
+#endif
+        }
 
 #if ENABLE(MEDIA_STREAM)
         if (m_mediaStreamFrameController)
@@ -886,7 +893,7 @@ void Frame::createView(const IntSize& viewportSize,
         view()->setCanHaveScrollbars(owner->scrollingMode() != ScrollbarAlwaysOff);
 }
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
 void Frame::setTiledBackingStoreEnabled(bool enabled)
 {
     if (!enabled) {
@@ -1023,10 +1030,12 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
         page->backForward()->markPagesForFullStyleRecalc();
 }
 
-float Frame::pageScaleFactor() const
+float Frame::frameScaleFactor() const
 {
     Page* page = this->page();
-    if (!page)
+
+    // Main frame is scaled with respect to he container but inner frames are not scaled with respect to the main frame.
+    if (!page || page->mainFrame() != this)
         return 1;
     return page->pageScaleFactor();
 }
@@ -1055,5 +1064,86 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
     
     m_page->chrome()->client()->numWheelEventHandlersChanged(count);
 }
+
+#if !PLATFORM(MAC) && !PLATFORM(WIN) && !PLATFORM(WX)
+struct ScopedFramePaintingState {
+    ScopedFramePaintingState(Frame* theFrame, RenderObject* theRenderer)
+        : frame(theFrame)
+        , renderer(theRenderer)
+        , paintBehavior(frame->view()->paintBehavior())
+        , backgroundColor(frame->view()->baseBackgroundColor())
+    {
+    }
+
+    ~ScopedFramePaintingState()
+    {
+        if (renderer)
+            renderer->updateDragState(false);
+        frame->view()->setPaintBehavior(paintBehavior);
+        frame->view()->setBaseBackgroundColor(backgroundColor);
+        frame->view()->setNodeToDraw(0);
+    }
+
+    Frame* frame;
+    RenderObject* renderer;
+    PaintBehavior paintBehavior;
+    Color backgroundColor;
+};
+
+DragImageRef Frame::nodeImage(Node* node)
+{
+    RenderObject* renderer = node->renderer();
+    if (!renderer)
+        return 0;
+
+    const ScopedFramePaintingState state(this, renderer);
+
+    renderer->updateDragState(true);
+    m_view->setPaintBehavior(state.paintBehavior | PaintBehaviorFlattenCompositingLayers);
+
+    // When generating the drag image for an element, ignore the document background.
+    m_view->setBaseBackgroundColor(colorWithOverrideAlpha(Color::white, 1.0));
+    m_doc->updateLayout();
+    m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
+
+    IntRect topLevelRect;
+    IntRect paintingRect = renderer->paintingRootRect(topLevelRect);
+
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));
+    if (!buffer)
+        return 0;
+    buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
+    buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
+
+    m_view->paintContents(buffer->context(), paintingRect);
+
+    RefPtr<Image> image = buffer->copyImage();
+    return createDragImageFromImage(image.get());
+}
+
+DragImageRef Frame::dragImageForSelection()
+{
+    if (!selection()->isRange())
+        return 0;
+
+    const ScopedFramePaintingState state(this, 0);
+    m_view->setPaintBehavior(PaintBehaviorSelectionOnly);
+    m_doc->updateLayout();
+
+    IntRect paintingRect = enclosingIntRect(selection()->bounds());
+
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));
+    if (!buffer)
+        return 0;
+    buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
+    buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
+
+    m_view->paintContents(buffer->context(), paintingRect);
+
+    RefPtr<Image> image = buffer->copyImage();
+    return createDragImageFromImage(image.get());
+}
+
+#endif
 
 } // namespace WebCore

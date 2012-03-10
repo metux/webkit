@@ -70,9 +70,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-#ifndef NDEBUG
-static WTF::RefCountedLeakCounter webFrameCounter("WebFrame");
-#endif
+DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, webFrameCounter, ("WebFrame"));
 
 static uint64_t generateFrameID()
 {
@@ -323,7 +321,7 @@ bool WebFrame::isFrameSet() const
 bool WebFrame::isMainFrame() const
 {
     if (WebPage* p = page())
-        return p->mainFrame() == this;
+        return p->mainWebFrame() == this;
 
     return false;
 }

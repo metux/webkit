@@ -101,6 +101,9 @@ bool PluginProxy::initialize(const Parameters& parameters)
 #if USE(ACCELERATED_COMPOSITING)
     creationParameters.isAcceleratedCompositingEnabled = controller()->isAcceleratedCompositingEnabled();
 #endif
+#if PLATFORM(MAC)
+    creationParameters.contentsScaleFactor = controller()->contentsScaleFactor();
+#endif
 
     bool result = false;
     uint32_t remoteLayerClientID = 0;
@@ -132,14 +135,21 @@ void PluginProxy::paint(GraphicsContext* graphicsContext, const IntRect& dirtyRe
     if (!needsBackingStore() || !m_backingStore)
         return;
 
+#if PLATFORM(MAC)
+    float contentsScaleFactor = controller()->contentsScaleFactor();
+#else
+    float contentsScaleFactor = 1;
+#endif
+
     if (!m_pluginBackingStoreContainsValidData) {
         m_connection->connection()->sendSync(Messages::PluginControllerProxy::PaintEntirePlugin(), Messages::PluginControllerProxy::PaintEntirePlugin::Reply(), m_pluginInstanceID);
     
         // Blit the plug-in backing store into our own backing store.
         OwnPtr<WebCore::GraphicsContext> graphicsContext = m_backingStore->createGraphicsContext();
+        graphicsContext->applyDeviceScaleFactor(contentsScaleFactor);
         graphicsContext->setCompositeOperation(CompositeCopy);
 
-        m_pluginBackingStore->paint(*graphicsContext, IntPoint(), IntRect(0, 0, m_frameRect.width(), m_frameRect.height()));
+        m_pluginBackingStore->paint(*graphicsContext, contentsScaleFactor, IntPoint(), IntRect(0, 0, m_frameRect.width(), m_frameRect.height()));
 
         m_pluginBackingStoreContainsValidData = true;
     }
@@ -147,7 +157,7 @@ void PluginProxy::paint(GraphicsContext* graphicsContext, const IntRect& dirtyRe
     IntRect dirtyRectInPluginCoordinates = dirtyRect;
     dirtyRectInPluginCoordinates.move(-m_frameRect.x(), -m_frameRect.y());
 
-    m_backingStore->paint(*graphicsContext, dirtyRect.location(), dirtyRectInPluginCoordinates);
+    m_backingStore->paint(*graphicsContext, contentsScaleFactor, dirtyRect.location(), dirtyRectInPluginCoordinates);
 
     if (m_waitingForPaintInResponseToUpdate) {
         m_waitingForPaintInResponseToUpdate = false;
@@ -172,25 +182,32 @@ bool PluginProxy::isTransparent()
     return false;
 }
 
-void PluginProxy::geometryDidChange(const IntRect& frameRect, const IntRect& clipRect)
+void PluginProxy::geometryDidChange()
 {
     ASSERT(m_isStarted);
 
-    m_frameRect = frameRect;
+#if PLATFORM(MAC)
+    float contentsScaleFactor = controller()->contentsScaleFactor();
+#else
+    float contentsScaleFactor = 1;
+#endif
 
     if (m_frameRect.isEmpty() || !needsBackingStore()) {
         ShareableBitmap::Handle pluginBackingStoreHandle;
-        m_connection->connection()->send(Messages::PluginControllerProxy::GeometryDidChange(frameRect, clipRect, pluginBackingStoreHandle), m_pluginInstanceID, CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply);
+        m_connection->connection()->send(Messages::PluginControllerProxy::GeometryDidChange(m_frameRect, m_clipRect, contentsScaleFactor, pluginBackingStoreHandle), m_pluginInstanceID, CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply);
         return;
     }
 
     bool didUpdateBackingStore = false;
+    IntSize backingStoreSize = m_frameRect.size();
+    backingStoreSize.scale(contentsScaleFactor);
+
     if (!m_backingStore) {
-        m_backingStore = ShareableBitmap::create(frameRect.size(), ShareableBitmap::SupportsAlpha);
+        m_backingStore = ShareableBitmap::create(backingStoreSize, ShareableBitmap::SupportsAlpha);
         didUpdateBackingStore = true;
-    } else if (frameRect.size() != m_backingStore->size()) {
+    } else if (backingStoreSize != m_backingStore->size()) {
         // The backing store already exists, just resize it.
-        if (!m_backingStore->resize(frameRect.size()))
+        if (!m_backingStore->resize(backingStoreSize))
             return;
 
         didUpdateBackingStore = true;
@@ -200,7 +217,7 @@ void PluginProxy::geometryDidChange(const IntRect& frameRect, const IntRect& cli
 
     if (didUpdateBackingStore) {
         // Create a new plug-in backing store.
-        m_pluginBackingStore = ShareableBitmap::createShareable(frameRect.size(), ShareableBitmap::SupportsAlpha);
+        m_pluginBackingStore = ShareableBitmap::createShareable(backingStoreSize, ShareableBitmap::SupportsAlpha);
         if (!m_pluginBackingStore)
             return;
 
@@ -213,7 +230,15 @@ void PluginProxy::geometryDidChange(const IntRect& frameRect, const IntRect& cli
         m_pluginBackingStoreContainsValidData = false;
     }
 
-    m_connection->connection()->send(Messages::PluginControllerProxy::GeometryDidChange(frameRect, clipRect, pluginBackingStoreHandle), m_pluginInstanceID, CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply);
+    m_connection->connection()->send(Messages::PluginControllerProxy::GeometryDidChange(m_frameRect, m_clipRect, contentsScaleFactor, pluginBackingStoreHandle), m_pluginInstanceID, CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply);
+}
+
+void PluginProxy::geometryDidChange(const IntRect& frameRect, const IntRect& clipRect)
+{
+    m_frameRect = frameRect;
+    m_clipRect = clipRect;
+
+    geometryDidChange();
 }
 
 void PluginProxy::visibilityDidChange()
@@ -313,6 +338,12 @@ bool PluginProxy::handleMouseLeaveEvent(const WebMouseEvent& mouseLeaveEvent)
     return handled;
 }
 
+bool PluginProxy::handleContextMenuEvent(const WebMouseEvent&)
+{
+    // We don't know if the plug-in has handled mousedown event by displaying a context menu, so we never want WebKit to show a default one.
+    return true;
+}
+
 bool PluginProxy::handleKeyboardEvent(const WebKeyboardEvent& keyboardEvent)
 {
     bool handled = false;
@@ -329,6 +360,10 @@ void PluginProxy::setFocus(bool hasFocus)
 
 NPObject* PluginProxy::pluginScriptableNPObject()
 {
+    // Sending the synchronous Messages::PluginControllerProxy::GetPluginScriptableNPObject message can cause us to dispatch an
+    // incoming synchronous message that ends up destroying the PluginProxy object.
+    PluginController::PluginDestructionProtector protector(controller());
+
     uint64_t pluginScriptableNPObjectID = 0;
     
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::GetPluginScriptableNPObject(), Messages::PluginControllerProxy::GetPluginScriptableNPObject::Reply(pluginScriptableNPObjectID), m_pluginInstanceID))
@@ -356,6 +391,11 @@ void PluginProxy::windowVisibilityChanged(bool isVisible)
     m_connection->connection()->send(Messages::PluginControllerProxy::WindowVisibilityChanged(isVisible), m_pluginInstanceID);
 }
 
+void PluginProxy::contentsScaleFactorChanged(float scaleFactor)
+{
+    geometryDidChange();
+}
+
 uint64_t PluginProxy::pluginComplexTextInputIdentifier() const
 {
     return m_pluginInstanceID;
@@ -365,7 +405,6 @@ void PluginProxy::sendComplexTextInput(const String& textInput)
 {
     m_connection->connection()->send(Messages::PluginControllerProxy::SendComplexTextInput(textInput), m_pluginInstanceID);
 }
-
 #endif
 
 void PluginProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)
@@ -380,6 +419,26 @@ bool PluginProxy::getFormValue(String& formValue)
         return false;
 
     return returnValue;
+}
+
+bool PluginProxy::handleScroll(ScrollDirection, ScrollGranularity)
+{
+    return false;
+}
+
+bool PluginProxy::wantsWindowRelativeCoordinates()
+{
+    return true;
+}
+
+Scrollbar* PluginProxy::horizontalScrollbar()
+{
+    return 0;
+}
+
+Scrollbar* PluginProxy::verticalScrollbar()
+{
+    return 0;
 }
 
 void PluginProxy::loadURL(uint64_t requestID, const String& method, const String& urlString, const String& target, const HTTPHeaderMap& headerFields, const Vector<uint8_t>& httpBody, bool allowPopups)
@@ -479,10 +538,17 @@ void PluginProxy::update(const IntRect& paintedRect)
     paintedRectPluginCoordinates.move(-m_frameRect.x(), -m_frameRect.y());
 
     if (m_backingStore) {
+#if PLATFORM(MAC)
+        float contentsScaleFactor = controller()->contentsScaleFactor();
+#else
+        float contentsScaleFactor = 1;
+#endif
+
         // Blit the plug-in backing store into our own backing store.
         OwnPtr<GraphicsContext> graphicsContext = m_backingStore->createGraphicsContext();
+        graphicsContext->applyDeviceScaleFactor(contentsScaleFactor);
         graphicsContext->setCompositeOperation(CompositeCopy);
-        m_pluginBackingStore->paint(*graphicsContext, paintedRectPluginCoordinates.location(), 
+        m_pluginBackingStore->paint(*graphicsContext, contentsScaleFactor, paintedRectPluginCoordinates.location(), 
                                     paintedRectPluginCoordinates);
     }
 

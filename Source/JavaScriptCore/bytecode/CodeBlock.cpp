@@ -32,6 +32,7 @@
 
 #include "BytecodeGenerator.h"
 #include "DFGCapabilities.h"
+#include "DFGNode.h"
 #include "Debugger.h"
 #include "Interpreter.h"
 #include "JIT.h"
@@ -1428,7 +1429,10 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlo
     , m_sourceOffset(sourceOffset)
     , m_symbolTable(symTab)
     , m_alternative(alternative)
+    , m_speculativeSuccessCounter(0)
+    , m_speculativeFailCounter(0)
     , m_optimizationDelayCounter(0)
+    , m_reoptimizationRetryCounter(0)
 {
     ASSERT(m_source);
     
@@ -1524,8 +1528,6 @@ void EvalCodeCache::visitAggregate(SlotVisitor& visitor)
 
 void CodeBlock::visitAggregate(SlotVisitor& visitor)
 {
-    bool handleWeakReferences = false;
-    
     if (!!m_alternative)
         m_alternative->visitAggregate(visitor);
     visitor.append(&m_globalObject);
@@ -1543,9 +1545,12 @@ void CodeBlock::visitAggregate(SlotVisitor& visitor)
     for (size_t i = 0; i < m_functionDecls.size(); ++i)
         visitor.append(&m_functionDecls[i]);
 #if ENABLE(JIT)
-    for (unsigned i = 0; i < numberOfCallLinkInfos(); ++i)
+    for (unsigned i = 0; i < numberOfCallLinkInfos(); ++i) {
         if (callLinkInfo(i).isLinked())
             visitor.append(&callLinkInfo(i).callee);
+        if (!!callLinkInfo(i).lastSeenCallee)
+            visitor.append(&callLinkInfo(i).lastSeenCallee);
+    }
 #endif
 #if ENABLE(INTERPRETER)
     for (size_t size = m_propertyAccessInstructions.size(), i = 0; i < size; ++i)
@@ -1576,62 +1581,18 @@ void CodeBlock::visitAggregate(SlotVisitor& visitor)
     }
 #endif
 
-#if ENABLE(VALUE_PROFILER)
-    for (unsigned profileIndex = 0; profileIndex < numberOfValueProfiles(); ++profileIndex) {
-        ValueProfile* profile = valueProfile(profileIndex);
-        
-        for (unsigned index = 0; index < ValueProfile::numberOfBuckets; ++index) {
-            if (!profile->m_buckets[index]) {
-                if (!!profile->m_weakBuckets[index])
-                    handleWeakReferences = true;
-                continue;
-            }
-            
-            if (!JSValue::decode(profile->m_buckets[index]).isCell()) {
-                profile->m_weakBuckets[index] = ValueProfile::WeakBucket();
-                continue;
-            }
-            
-            handleWeakReferences = true;
-        }
+#if ENABLE(DFG_JIT)
+    if (hasCodeOrigins()) {
+        // Make sure that executables that we have inlined don't die.
+        // FIXME: If they would have otherwise died, we should probably trigger recompilation.
+        for (size_t i = 0; i < inlineCallFrames().size(); ++i)
+            visitor.append(&inlineCallFrames()[i].executable);
     }
 #endif
-    
-    if (handleWeakReferences)
-        visitor.addWeakReferenceHarvester(this);
-}
 
-void CodeBlock::visitWeakReferences(SlotVisitor&)
-{
 #if ENABLE(VALUE_PROFILER)
-    for (unsigned profileIndex = 0; profileIndex < numberOfValueProfiles(); ++profileIndex) {
-        ValueProfile* profile = valueProfile(profileIndex);
-        
-        for (unsigned index = 0; index < ValueProfile::numberOfBuckets; ++index) {
-            if (!!profile->m_buckets[index]) {
-                JSValue value = JSValue::decode(profile->m_buckets[index]);
-                if (!value.isCell())
-                    continue;
-                
-                JSCell* cell = value.asCell();
-                if (Heap::isMarked(cell))
-                    continue;
-                
-                profile->m_buckets[index] = JSValue::encode(JSValue());
-                profile->m_weakBuckets[index] = cell->structure();
-            }
-            
-            ValueProfile::WeakBucket weak = profile->m_weakBuckets[index];
-            if (!weak || weak.isClassInfo())
-                continue;
-            
-            ASSERT(weak.isStructure());
-            if (Heap::isMarked(weak.asStructure()))
-                continue;
-            
-            profile->m_weakBuckets[index] = weak.asStructure()->classInfo();
-        }
-    }
+    for (unsigned profileIndex = 0; profileIndex < numberOfValueProfiles(); ++profileIndex)
+        valueProfile(profileIndex)->computeUpdatedPrediction();
 #endif
 }
 
@@ -1859,27 +1820,24 @@ inline void replaceExistingEntries(Vector<T>& target, Vector<T>& source)
         target[i] = source[i];
 }
 
-void CodeBlock::copyDataFromAlternative()
+void CodeBlock::copyDataFrom(CodeBlock* alternative)
 {
-    if (!m_alternative)
+    if (!alternative)
         return;
     
-    replaceExistingEntries(m_constantRegisters, m_alternative->m_constantRegisters);
-    replaceExistingEntries(m_functionDecls, m_alternative->m_functionDecls);
-    replaceExistingEntries(m_functionExprs, m_alternative->m_functionExprs);
+    replaceExistingEntries(m_constantRegisters, alternative->m_constantRegisters);
+    replaceExistingEntries(m_functionDecls, alternative->m_functionDecls);
+    replaceExistingEntries(m_functionExprs, alternative->m_functionExprs);
+    if (!!m_rareData && !!alternative->m_rareData)
+        replaceExistingEntries(m_rareData->m_constantBuffers, alternative->m_rareData->m_constantBuffers);
+}
+
+void CodeBlock::copyDataFromAlternative()
+{
+    copyDataFrom(m_alternative.get());
 }
 
 #if ENABLE(JIT)
-// FIXME: Implement OSR. If compileOptimized() is called from somewhere other than the
-// epilogue, do OSR from the old code block to the new one.
-
-// FIXME: After doing successful optimized compilation, reset the profiling counter to -1, so
-// that the next execution of the old code block will jump straight into compileOptimized()
-// and perform OSR.
-
-// FIXME: Ensure that a call to compileOptimized() just does OSR (and resets the counter to -1)
-// if the code had already been compiled.
-
 CodeBlock* ProgramCodeBlock::replacement()
 {
     return &static_cast<ProgramExecutable*>(ownerExecutable())->generatedBytecode();
@@ -1935,6 +1893,27 @@ bool FunctionCodeBlock::canCompileWithDFG()
         return DFG::canCompileFunctionForConstruct(this);
     return DFG::canCompileFunctionForCall(this);
 }
+
+void ProgramCodeBlock::jettison(JSGlobalData& globalData)
+{
+    ASSERT(getJITType() != JITCode::BaselineJIT);
+    ASSERT(this == replacement());
+    static_cast<ProgramExecutable*>(ownerExecutable())->jettisonOptimizedCode(globalData);
+}
+
+void EvalCodeBlock::jettison(JSGlobalData& globalData)
+{
+    ASSERT(getJITType() != JITCode::BaselineJIT);
+    ASSERT(this == replacement());
+    static_cast<EvalExecutable*>(ownerExecutable())->jettisonOptimizedCode(globalData);
+}
+
+void FunctionCodeBlock::jettison(JSGlobalData& globalData)
+{
+    ASSERT(getJITType() != JITCode::BaselineJIT);
+    ASSERT(this == replacement());
+    static_cast<FunctionExecutable*>(ownerExecutable())->jettisonOptimizedCodeFor(globalData, m_isConstructor ? CodeForConstruct : CodeForCall);
+}
 #endif
 
 #if ENABLE(VALUE_PROFILER)
@@ -1948,7 +1927,7 @@ bool CodeBlock::shouldOptimizeNow()
     dumpValueProfiles();
 #endif
 
-    if (m_optimizationDelayCounter >= 5)
+    if (m_optimizationDelayCounter >= Heuristics::maximumOptimizationDelay)
         return true;
     
     unsigned numberOfNonArgumentValueProfiles = 0;
@@ -1974,8 +1953,8 @@ bool CodeBlock::shouldOptimizeNow()
     printf("Profile hotness: %lf, %lf\n", (double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles, (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles());
 #endif
 
-    if ((double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles >= 0.75
-        && (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles() >= 0.5)
+    if ((!numberOfNonArgumentValueProfiles || (double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles >= Heuristics::desiredProfileLivenessRate)
+        && (!numberOfValueProfiles() || (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles() >= Heuristics::desiredProfileFullnessRate))
         return true;
     
     m_optimizationDelayCounter++;
@@ -1987,8 +1966,8 @@ bool CodeBlock::shouldOptimizeNow()
 #if ENABLE(VALUE_PROFILER)
 void CodeBlock::resetRareCaseProfiles()
 {
-    for (unsigned i = 0; i < numberOfSlowCaseProfiles(); ++i)
-        slowCaseProfile(i)->m_counter = 0;
+    for (unsigned i = 0; i < numberOfRareCaseProfiles(); ++i)
+        rareCaseProfile(i)->m_counter = 0;
     for (unsigned i = 0; i < numberOfSpecialFastCaseProfiles(); ++i)
         specialFastCaseProfile(i)->m_counter = 0;
 }
@@ -2002,7 +1981,7 @@ void CodeBlock::dumpValueProfiles()
         ValueProfile* profile = valueProfile(i);
         if (profile->m_bytecodeOffset < 0) {
             ASSERT(profile->m_bytecodeOffset == -1);
-            fprintf(stderr, "   arg = %u: ", i + 1);
+            fprintf(stderr, "   arg = %u: ", i);
         } else
             fprintf(stderr, "   bc = %d: ", profile->m_bytecodeOffset);
         if (!profile->numberOfSamples() && profile->m_prediction == PredictNone) {
@@ -2012,11 +1991,43 @@ void CodeBlock::dumpValueProfiles()
         profile->dump(stderr);
         fprintf(stderr, "\n");
     }
-    fprintf(stderr, "SlowCaseProfile for %p:\n", this);
-    for (unsigned i = 0; i < numberOfSlowCaseProfiles(); ++i) {
-        SlowCaseProfile* profile = slowCaseProfile(i);
+    fprintf(stderr, "RareCaseProfile for %p:\n", this);
+    for (unsigned i = 0; i < numberOfRareCaseProfiles(); ++i) {
+        RareCaseProfile* profile = rareCaseProfile(i);
         fprintf(stderr, "   bc = %d: %u\n", profile->m_bytecodeOffset, profile->m_counter);
     }
+    fprintf(stderr, "SpecialFastCaseProfile for %p:\n", this);
+    for (unsigned i = 0; i < numberOfSpecialFastCaseProfiles(); ++i) {
+        RareCaseProfile* profile = specialFastCaseProfile(i);
+        fprintf(stderr, "   bc = %d: %u\n", profile->m_bytecodeOffset, profile->m_counter);
+    }
+}
+#endif
+
+#ifndef NDEBUG
+bool CodeBlock::usesOpcode(OpcodeID opcodeID)
+{
+    Interpreter* interpreter = globalData()->interpreter;
+    Instruction* instructionsBegin = instructions().begin();
+    unsigned instructionCount = instructions().size();
+    
+    for (unsigned bytecodeOffset = 0; bytecodeOffset < instructionCount; ) {
+        switch (interpreter->getOpcodeID(instructionsBegin[bytecodeOffset].u.opcode)) {
+#define DEFINE_OP(curOpcode, length)        \
+        case curOpcode:                     \
+            if (curOpcode == opcodeID)      \
+                return true;                \
+            bytecodeOffset += length;       \
+            break;
+            FOR_EACH_OPCODE_ID(DEFINE_OP)
+#undef DEFINE_OP
+        default:
+            ASSERT_NOT_REACHED();
+            break;
+        }
+    }
+    
+    return false;
 }
 #endif
 

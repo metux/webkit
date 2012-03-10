@@ -38,17 +38,21 @@
 
 namespace WebCore {
 
-TextTrack::TextTrack(const String& kind, const String& label, const String& language)
+TextTrack::TextTrack(TextTrackClient* client, const String& kind, const String& label, const String& language)
     : m_kind(kind)
     , m_label(label)
     , m_language(language)
-    , m_readyState(TextTrack::NONE)
-    , m_mode(TextTrack::SHOWING)
+    , m_readyState(TextTrack::None)
+    , m_mode(TextTrack::Showing)
+    , m_client(client)
 {
 }
 
 TextTrack::~TextTrack()
 {
+    if (m_client)
+        m_client->textTrackRemoveCues(this, m_cues.get());
+    setClient(0);
 }
 
 String TextTrack::kind() const
@@ -74,6 +78,8 @@ TextTrack::ReadyState TextTrack::readyState() const
 void TextTrack::setReadyState(ReadyState state)
 {
     m_readyState = state;
+    if (m_client)
+        m_client->textTrackReadyStateChanged(this);
 }
 
 TextTrack::Mode TextTrack::mode() const
@@ -85,9 +91,11 @@ void TextTrack::setMode(unsigned short mode, ExceptionCode& ec)
 {
     // 4.8.10.12.5 On setting the mode, if the new value is not either 0, 1, or 2,
     // the user agent must throw an INVALID_ACCESS_ERR exception.
-    if (mode == TextTrack::OFF || mode == TextTrack::HIDDEN || mode == TextTrack::SHOWING)
+    if (mode == TextTrack::Disabled || mode == TextTrack::Hidden || mode == TextTrack::Showing) {
         m_mode = static_cast<Mode>(mode);
-    else
+        if (m_client)
+            m_client->textTrackModeChanged(this);
+    } else
         ec = INVALID_ACCESS_ERR;
 }
 
@@ -102,6 +110,28 @@ PassRefPtr<TextTrackCueList> TextTrack::activeCues() const
     // FIXME(62885): Implement.
     return 0;
 }
+
+void TextTrack::addCue(PassRefPtr<TextTrackCue>, ExceptionCode&)
+{
+    // FIXME(62890): Implement.
+    
+}
+
+void TextTrack::removeCue(PassRefPtr<TextTrackCue>, ExceptionCode&)
+{
+    // FIXME(62890): Implement.
+}
+
+void TextTrack::newCuesLoaded()
+{
+    // FIXME(62890): Implement.
+}
+
+void TextTrack::fetchNewestCues(Vector<TextTrackCue*>&)
+{
+    // FIXME(62890): Implement.
+}
+
 
 } // namespace WebCore
 

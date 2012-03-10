@@ -29,60 +29,91 @@
  */
 
 /**
- * @constructor
+ * @interface
  */
 WebInspector.CompilerSourceMapping = function()
 {
 }
 
 WebInspector.CompilerSourceMapping.prototype = {
-    compiledLocationToSourceLocation: function(lineNumber, columnNumber)
-    {
-        // Should be implemented by subclasses.
-    },
+    /**
+     * @param {number} lineNumber
+     * @param {number} columnNumber
+     * @return {Object}
+     */
+    compiledLocationToSourceLocation: function(lineNumber, columnNumber) { },
 
-    sourceLocationToCompiledLocation: function(sourceURL, lineNumber, columnNumber)
-    {
-        // Should be implemented by subclasses.
-    },
+    /**
+     * @param {string} sourceURL
+     * @param {number} lineNumber
+     * @return {Object}
+     */
+    sourceLocationToCompiledLocation: function(sourceURL, lineNumber) { },
 
-    sources: function()
-    {
-        // Should be implemented by subclasses.
-    }
+    /**
+     * @return {Array.<string>}
+     */
+    sources: function() { }
+}
+
+/**
+ * @constructor
+ */
+WebInspector.ClosureCompilerSourceMappingPayload = function()
+{
+    this.mappings = "";
+    this.sources = [];
 }
 
 /**
  * Implements Source Map V3 consumer. See http://code.google.com/p/closure-compiler/wiki/SourceMaps
  * for format description.
- * @extends {WebInspector.CompilerSourceMapping}
+ * @implements {WebInspector.CompilerSourceMapping}
  * @constructor
+ * @param {WebInspector.ClosureCompilerSourceMappingPayload} mappingPayload
  */
-WebInspector.ClosureCompilerSourceMapping = function(payload)
+WebInspector.ClosureCompilerSourceMapping = function(mappingPayload)
 {
     if (!WebInspector.ClosureCompilerSourceMapping.prototype._base64Map) {
-        base64Digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const base64Digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         WebInspector.ClosureCompilerSourceMapping.prototype._base64Map = {};
         for (var i = 0; i < base64Digits.length; ++i)
             WebInspector.ClosureCompilerSourceMapping.prototype._base64Map[base64Digits.charAt(i)] = i;
     }
 
-    this._sources = payload.sources;
-    this._mappings = this._parsePayload(payload);
+    this._sources = mappingPayload.sources;
+    this._mappings = [];
+    this._reverseMappingsBySourceURL = {};
+    for (var i = 0; i < this._sources.length; ++i)
+        this._reverseMappingsBySourceURL[this._sources[i]] = [];
+    this._parseMappings(mappingPayload);
 }
 
 WebInspector.ClosureCompilerSourceMapping.prototype = {
+    /**
+     * @param {number} lineNumber
+     * @param {number} columnNumber
+     * @return {Object}
+     */
     compiledLocationToSourceLocation: function(lineNumber, columnNumber)
     {
         var mapping = this._findMapping(lineNumber, columnNumber);
-        var sourceURL = this._sources[mapping[2]];
-        return { sourceURL: sourceURL, lineNumber: mapping[3], columnNumber: mapping[4] };
+        return { sourceURL: mapping[2], lineNumber: mapping[3], columnNumber: mapping[4] };
     },
 
-    sourceLocationToCompiledLocation: function(sourceURL, lineNumber, columnNumber)
+    sourceLocationToCompiledLocation: function(sourceURL, lineNumber)
     {
+        var mappings = this._reverseMappingsBySourceURL[sourceURL];
+        for ( ; lineNumber < mappings.length; ++lineNumber) {
+            var mapping = mappings[lineNumber];
+            if (mapping)
+                return { lineNumber: mapping[0], columnNumber: mapping[1] };
+        }
     },
 
+    /**
+     * @return {Array.<string>}
+     */
     sources: function()
     {
         return this._sources;
@@ -106,10 +137,9 @@ WebInspector.ClosureCompilerSourceMapping.prototype = {
         return this._mappings[first];
     },
 
-    _parsePayload: function(payload)
+    _parseMappings: function(mappingPayload)
     {
-        var mappings = [];
-        var stringCharIterator = new WebInspector.ClosureCompilerSourceMapping.StringCharIterator(payload.mappings);
+        var stringCharIterator = new WebInspector.ClosureCompilerSourceMapping.StringCharIterator(mappingPayload.mappings);
 
         var lineNumber = 0;
         var columnNumber = 0;
@@ -117,25 +147,41 @@ WebInspector.ClosureCompilerSourceMapping.prototype = {
         var sourceLineNumber = 0;
         var sourceColumnNumber = 0;
         var nameIndex = 0;
-        do {
+
+        var sourceURL = this._sources[0];
+        var reverseMappings = this._reverseMappingsBySourceURL[sourceURL];
+
+        while (true) {
+            if (stringCharIterator.peek() === ",")
+                stringCharIterator.next();
+            else {
+                while (stringCharIterator.peek() === ";") {
+                    lineNumber += 1;
+                    columnNumber = 0;
+                    stringCharIterator.next();
+                }
+                if (!stringCharIterator.hasNext())
+                    break;
+            }
+
             columnNumber += this._decodeVLQ(stringCharIterator);
-            if (this._isSeparator(stringCharIterator.peek()))
-                continue;
-            sourceIndex += this._decodeVLQ(stringCharIterator);
-            sourceLineNumber += this._decodeVLQ(stringCharIterator);
-            sourceColumnNumber += this._decodeVLQ(stringCharIterator);
-            var mapping = [lineNumber, columnNumber, sourceIndex, sourceLineNumber, sourceColumnNumber];
             if (!this._isSeparator(stringCharIterator.peek())) {
-                nameIndex += this._decodeVLQ(stringCharIterator);
-                mapping.push(nameIndex);
+                var sourceIndexDelta = this._decodeVLQ(stringCharIterator);
+                if (sourceIndexDelta) {
+                    sourceIndex += sourceIndexDelta;
+                    sourceURL = this._sources[sourceIndex];
+                    reverseMappings = this._reverseMappingsBySourceURL[sourceURL];
+                }
+                sourceLineNumber += this._decodeVLQ(stringCharIterator);
+                sourceColumnNumber += this._decodeVLQ(stringCharIterator);
+                if (!this._isSeparator(stringCharIterator.peek()))
+                    nameIndex += this._decodeVLQ(stringCharIterator);
+
+                this._mappings.push([lineNumber, columnNumber, sourceURL, sourceLineNumber, sourceColumnNumber]);
+                if (!reverseMappings[sourceLineNumber])
+                    reverseMappings[sourceLineNumber] = [lineNumber, columnNumber];
             }
-            mappings.push(mapping);
-            if (stringCharIterator.next() === ";") {
-                lineNumber += 1;
-                columnNumber = 0;
-            }
-        } while(stringCharIterator.hasNext());
-        return mappings;
+        }
     },
 
     _isSeparator: function(char)

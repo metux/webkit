@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ * @extends {WebInspector.View}
+ */
 WebInspector.DOMStorageItemsView = function(domStorage)
 {
     WebInspector.View.call(this);
@@ -34,10 +38,10 @@ WebInspector.DOMStorageItemsView = function(domStorage)
 
     this.deleteButton = new WebInspector.StatusBarButton(WebInspector.UIString("Delete"), "delete-storage-status-bar-item");
     this.deleteButton.visible = false;
-    this.deleteButton.addEventListener("click", this._deleteButtonClicked.bind(this), false);
+    this.deleteButton.addEventListener("click", this._deleteButtonClicked, this);
 
     this.refreshButton = new WebInspector.StatusBarButton(WebInspector.UIString("Refresh"), "refresh-storage-status-bar-item");
-    this.refreshButton.addEventListener("click", this._refreshButtonClicked.bind(this), false);
+    this.refreshButton.addEventListener("click", this._refreshButtonClicked, this);
 }
 
 WebInspector.DOMStorageItemsView.prototype = {
@@ -46,15 +50,13 @@ WebInspector.DOMStorageItemsView.prototype = {
         return [this.refreshButton.element, this.deleteButton.element];
     },
 
-    show: function(parentElement)
+    wasShown: function()
     {
-        WebInspector.View.prototype.show.call(this, parentElement);
         this.update();
     },
 
-    hide: function()
+    willHide: function()
     {
-        WebInspector.View.prototype.hide.call(this);
         this.deleteButton.visible = false;
     },
 
@@ -70,15 +72,9 @@ WebInspector.DOMStorageItemsView.prototype = {
             return;
 
         this._dataGrid = this._dataGridForDOMStorageEntries(entries);
-        this.element.appendChild(this._dataGrid.element);
+        this._dataGrid.show(this.element);
         this._dataGrid.autoSizeColumns(10);
         this.deleteButton.visible = true;
-    },
-
-    onResize: function()
-    {
-        if (this._dataGrid)
-            this._dataGrid.updateWidths();
     },
 
     _dataGridForDOMStorageEntries: function(entries)
@@ -107,7 +103,7 @@ WebInspector.DOMStorageItemsView.prototype = {
         }
 
         var dataGrid = new WebInspector.DataGrid(columns, this._editingCallback.bind(this), this._deleteCallback.bind(this));
-        var length = nodes.length;
+        length = nodes.length;
         for (var i = 0; i < length; ++i)
             dataGrid.appendChild(nodes[i]);
         dataGrid.addCreationNode(false);

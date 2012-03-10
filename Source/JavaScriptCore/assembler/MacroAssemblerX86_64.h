@@ -77,7 +77,7 @@ public:
         sub32(imm, Address(scratchRegister));
     }
 
-    void load32(void* address, RegisterID dest)
+    void load32(const void* address, RegisterID dest)
     {
         if (dest == X86Registers::eax)
             m_assembler.movl_mEAX(address);
@@ -298,6 +298,12 @@ public:
         storePtr(scratchRegister, address);
     }
 
+    void storePtr(TrustedImmPtr imm, BaseIndex address)
+    {
+        move(imm, scratchRegister);
+        m_assembler.movq_rm(scratchRegister, address.offset, address.base, address.index, address.scale);
+    }
+    
     DataLabel32 storePtrWithAddressOffsetPatch(RegisterID src, Address address)
     {
         m_assembler.movq_rm_disp32(src, address.offset, address.base);

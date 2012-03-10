@@ -190,16 +190,20 @@ protected:
     RenderBoxModelObject* continuation() const;
     void setContinuation(RenderBoxModelObject*);
 
+    static bool shouldAntialiasLines(GraphicsContext*);
+
 private:
     virtual bool isBoxModelObject() const { return true; }
 
-    LayoutSize calculateFillTileSize(const FillLayer*, LayoutSize scaledSize) const;
+    LayoutSize calculateFillTileSize(const FillLayer*, const LayoutSize& scaledPositioningAreaSize) const;
+    LayoutSize calculateImageIntrinsicDimensions(StyleImage*, const LayoutSize& scaledPositioningAreaSize) const;
 
     RoundedRect getBackgroundRoundedRect(const LayoutRect&, InlineFlowBox*, LayoutUnit inlineBoxWidth, LayoutUnit inlineBoxHeight,
         bool includeLogicalLeftEdge, bool includeLogicalRightEdge);
 
     void clipBorderSidePolygon(GraphicsContext*, const RoundedRect& outerBorder, const RoundedRect& innerBorder,
                                BoxSide, bool firstEdgeMatches, bool secondEdgeMatches);
+    void clipBorderSideForComplexInnerPath(GraphicsContext*, const RoundedRect&, const RoundedRect&, BoxSide, const class BorderEdge[]);
     void paintOneBorderSide(GraphicsContext*, const RenderStyle*, const RoundedRect& outerBorder, const RoundedRect& innerBorder,
                                 const LayoutRect& sideRect, BoxSide, BoxSide adjacentSide1, BoxSide adjacentSide2, const class BorderEdge[],
                                 const Path*, BackgroundBleedAvoidance, bool includeLogicalLeftEdge, bool includeLogicalRightEdge, bool antialias, const Color* overrideColor = 0);

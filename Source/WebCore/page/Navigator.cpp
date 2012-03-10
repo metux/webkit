@@ -35,9 +35,6 @@
 #include "Geolocation.h"
 #include "KURL.h"
 #include "Language.h"
-#include "MediaStreamFrameController.h"
-#include "NavigatorUserMediaErrorCallback.h"
-#include "NavigatorUserMediaSuccessCallback.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "PlatformString.h"
@@ -46,6 +43,12 @@
 #include "StorageNamespace.h"
 #include <wtf/HashSet.h>
 #include <wtf/StdLibExtras.h>
+
+#if ENABLE(MEDIA_STREAM)
+#include "MediaStreamFrameController.h"
+#include "NavigatorUserMediaErrorCallback.h"
+#include "NavigatorUserMediaSuccessCallback.h"
+#endif
 
 namespace WebCore {
 
@@ -167,7 +170,6 @@ Geolocation* Navigator::geolocation() const
     return m_geolocation.get();
 }
 
-#if ENABLE(DOM_STORAGE)
 void Navigator::getStorageUpdates()
 {
     if (!m_frame)
@@ -181,7 +183,6 @@ void Navigator::getStorageUpdates()
     if (localStorage)
         localStorage->unlock();
 }
-#endif
 
 #if ENABLE(REGISTER_PROTOCOL_HANDLER)
 static HashSet<String>* protocolWhitelist;

@@ -41,6 +41,7 @@
 #include "CanvasGradient.h"
 #include "CanvasPattern.h"
 #include "CanvasStyle.h"
+#include "Console.h"
 #include "ExceptionCode.h"
 #include "FloatConversion.h"
 #include "FontCache.h"
@@ -55,6 +56,7 @@
 #include "KURL.h"
 #include "Page.h"
 #include "RenderHTMLCanvas.h"
+#include "ScriptCallStack.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
 #include "StrokeStyleApplier.h"
@@ -83,9 +85,9 @@ using namespace HTMLNames;
 
 static const char* const defaultFont = "10px sans-serif";
 
-static bool isOriginClean(CachedImage* cachedImage, SecurityOrigin* securityOrigin)
+static bool isOriginClean(CachedImage* cachedImage, HTMLImageElement* image, SecurityOrigin* securityOrigin)
 {
-    if (!cachedImage->image()->hasSingleSecurityOrigin())
+    if (!cachedImage->imageForRenderer(image->renderer())->hasSingleSecurityOrigin())
         return false;
     if (cachedImage->passesAccessControlCheck(securityOrigin))
         return true;
@@ -122,10 +124,6 @@ CanvasRenderingContext2D::CanvasRenderingContext2D(HTMLCanvasElement* canvas, bo
 #if !ENABLE(DASHBOARD_SUPPORT)
     ASSERT_UNUSED(usesDashboardCompatibilityMode, !usesDashboardCompatibilityMode);
 #endif
-
-    // Make sure that even if the drawingContext() has a different default
-    // thickness, it is in sync with the canvas thickness.
-    setLineWidth(lineWidth());
 }
 
 void CanvasRenderingContext2D::unwindStateStack()
@@ -196,6 +194,7 @@ CanvasRenderingContext2D::State::State()
     , m_globalAlpha(1)
     , m_globalComposite(CompositeSourceOver)
     , m_invertibleCTM(true)
+    , m_lineDashOffset(0)
     , m_textAlign(StartTextAlign)
     , m_textBaseline(AlphabeticTextBaseline)
     , m_unparsedFont(defaultFont)
@@ -498,6 +497,39 @@ void CanvasRenderingContext2D::setShadowColor(const String& color)
         return;
 
     applyShadow();
+}
+
+const DashArray* CanvasRenderingContext2D::webkitLineDash() const
+{
+    return &state().m_lineDash;
+}
+
+void CanvasRenderingContext2D::setWebkitLineDash(const DashArray& dash)
+{
+    state().m_lineDash = dash;
+
+    GraphicsContext* c = drawingContext();
+    if (!c)
+        return;
+    c->setLineDash(state().m_lineDash, state().m_lineDashOffset);
+}
+
+float CanvasRenderingContext2D::webkitLineDashOffset() const
+{
+    return state().m_lineDashOffset;
+}
+
+void CanvasRenderingContext2D::setWebkitLineDashOffset(float offset)
+{
+    if (!isfinite(offset))
+        return;
+
+    state().m_lineDashOffset = offset;
+
+    GraphicsContext* c = drawingContext();
+    if (!c)
+        return;
+    c->setLineDash(state().m_lineDash, state().m_lineDashOffset);
 }
 
 float CanvasRenderingContext2D::globalAlpha() const
@@ -897,6 +929,14 @@ void CanvasRenderingContext2D::clearPathForDashboardBackwardCompatibilityMode()
 }
 #endif
 
+static bool isFullCanvasCompositeMode(CompositeOperator op)
+{
+    // See 4.8.11.1.3 Compositing
+    // CompositeSourceAtop and CompositeDestinationOut are not listed here as the platforms already
+    // implement the specification's behavior.
+    return op == CompositeSourceIn || op == CompositeSourceOut || op == CompositeDestinationIn || op == CompositeDestinationAtop;
+}
+
 void CanvasRenderingContext2D::fill()
 {
     GraphicsContext* c = drawingContext();
@@ -906,8 +946,8 @@ void CanvasRenderingContext2D::fill()
         return;
 
     if (!m_path.isEmpty()) {
-        if (shouldDisplayTransparencyElsewhere())
-            fillAndDisplayTransparencyElsewhere(m_path);
+        if (isFullCanvasCompositeMode(state().m_globalComposite))
+            fullCanvasCompositedFill(m_path);
         else if (state().m_globalComposite == CompositeCopy) {
             clearCanvas();
             c->fillPath(m_path);
@@ -1012,8 +1052,8 @@ void CanvasRenderingContext2D::fillRect(float x, float y, float width, float hei
 
     FloatRect rect(x, y, width, height);
 
-    if (shouldDisplayTransparencyElsewhere())
-        fillAndDisplayTransparencyElsewhere(rect);
+    if (isFullCanvasCompositeMode(state().m_globalComposite))
+        fullCanvasCompositedFill(rect);
     else if (state().m_globalComposite == CompositeCopy) {
         clearCanvas();
         c->fillRect(rect);
@@ -1190,7 +1230,7 @@ void CanvasRenderingContext2D::applyShadow()
 static LayoutSize size(HTMLImageElement* image)
 {
     if (CachedImage* cachedImage = image->cachedImage())
-        return cachedImage->imageSize(1.0f); // FIXME: Not sure about this.
+        return cachedImage->imageSizeForRenderer(image->renderer(), 1.0f); // FIXME: Not sure about this.
     return IntSize();
 }
 
@@ -1271,10 +1311,12 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
     FloatRect normalizedDstRect = normalizeRect(dstRect);
 
     FloatRect imageRect = FloatRect(FloatPoint(), size(image));
-    if (!imageRect.contains(normalizedSrcRect) || !srcRect.width() || !srcRect.height()) {
+    if (!srcRect.width() || !srcRect.height()) {
         ec = INDEX_SIZE_ERR;
         return;
     }
+    if (!imageRect.contains(normalizedSrcRect))
+        return;
 
     GraphicsContext* c = drawingContext();
     if (!c)
@@ -1288,8 +1330,17 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
 
     checkOrigin(image);
 
-    c->drawImage(cachedImage->image(), ColorSpaceDeviceRGB, normalizedDstRect, normalizedSrcRect, op);
-    didDraw(normalizedDstRect);
+    if (isFullCanvasCompositeMode(op)) {
+        fullCanvasCompositedDrawImage(cachedImage->imageForRenderer(image->renderer()), ColorSpaceDeviceRGB, normalizedDstRect, normalizedSrcRect, op);
+        didDraw(FloatRect(FloatPoint::zero(), canvas()->size()), CanvasDidDrawApplyClip);
+    } else if (op == CompositeCopy) {
+        clearCanvas();
+        c->drawImage(cachedImage->imageForRenderer(image->renderer()), ColorSpaceDeviceRGB, normalizedDstRect, normalizedSrcRect, op);
+        didDraw(FloatRect(FloatPoint::zero(), canvas()->size()), CanvasDidDrawApplyClip);
+    } else {
+        c->drawImage(cachedImage->imageForRenderer(image->renderer()), ColorSpaceDeviceRGB, normalizedDstRect, normalizedSrcRect, op);
+        didDraw(normalizedDstRect);
+    }
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* canvas, float x, float y, ExceptionCode& ec)
@@ -1333,14 +1384,14 @@ void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* sourceCanvas, const 
         return;
     }
 
-    if (!srcCanvasRect.contains(normalizeRect(srcRect)) || !srcRect.width() || !srcRect.height()) {
+    if (!srcRect.width() || !srcRect.height()) {
         ec = INDEX_SIZE_ERR;
         return;
     }
 
     ec = 0;
 
-    if (!dstRect.width() || !dstRect.height())
+    if (!srcCanvasRect.contains(normalizeRect(srcRect)) || !dstRect.width() || !dstRect.height())
         return;
 
     GraphicsContext* c = drawingContext();
@@ -1414,12 +1465,12 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, const FloatRec
         return;
 
     FloatRect videoRect = FloatRect(FloatPoint(), size(video));
-    if (!videoRect.contains(normalizeRect(srcRect)) || !srcRect.width() || !srcRect.height()) {
+    if (!srcRect.width() || !srcRect.height()) {
         ec = INDEX_SIZE_ERR;
         return;
     }
 
-    if (!dstRect.width() || !dstRect.height())
+    if (!videoRect.contains(normalizeRect(srcRect)) || !dstRect.width() || !dstRect.height())
         return;
 
     GraphicsContext* c = drawingContext();
@@ -1477,15 +1528,6 @@ void CanvasRenderingContext2D::clearCanvas()
     c->restore();
 }
 
-bool CanvasRenderingContext2D::shouldDisplayTransparencyElsewhere() const
-{
-    // See 4.8.11.1.3 Compositing
-    // CompositeSourceAtop and CompositeDestinationOut are not listed here as the platforms already
-    // implement the specification's behavior.
-    return state().m_globalComposite == CompositeSourceIn || state().m_globalComposite == CompositeSourceOut
-           || state().m_globalComposite == CompositeDestinationIn || state().m_globalComposite == CompositeDestinationAtop;
-}
-
 Path CanvasRenderingContext2D::transformAreaToDevice(const Path& path) const
 {
     Path transformed(path);
@@ -1501,31 +1543,29 @@ Path CanvasRenderingContext2D::transformAreaToDevice(const FloatRect& rect) cons
     return transformAreaToDevice(path);
 }
 
-template<class T> void CanvasRenderingContext2D::fillAndDisplayTransparencyElsewhere(const T& area)
+template<class T> IntRect CanvasRenderingContext2D::calculateCompositingBufferRect(const T& area, IntSize* croppedOffset)
 {
-    ASSERT(shouldDisplayTransparencyElsewhere());
-
     IntRect canvasRect(0, 0, canvas()->width(), canvas()->height());
     canvasRect = canvas()->baseTransform().mapRect(canvasRect);
     Path path = transformAreaToDevice(area);
     IntRect bufferRect = enclosingIntRect(path.boundingRect());
+    IntPoint originalLocation = bufferRect.location();
     bufferRect.intersect(canvasRect);
+    if (croppedOffset)
+        *croppedOffset = originalLocation - bufferRect.location();
+    return bufferRect;
+}
 
-    if (bufferRect.isEmpty()) {
-        clearCanvas();
-        return;
-    }
-
-    path.translate(FloatSize(-bufferRect.x(), -bufferRect.y()));
-
+PassOwnPtr<ImageBuffer> CanvasRenderingContext2D::createCompositingBuffer(const IntRect& bufferRect)
+{
     RenderingMode renderMode = isAccelerated() ? Accelerated : Unaccelerated;
-    OwnPtr<ImageBuffer> buffer = ImageBuffer::create(bufferRect.size(), ColorSpaceDeviceRGB, renderMode);
-    if (!buffer)
-        return;
+    return ImageBuffer::create(bufferRect.size(), ColorSpaceDeviceRGB, renderMode);
+}
 
-    buffer->context()->setCompositeOperation(CompositeSourceOver);
-    state().m_fillStyle->applyFillColor(buffer->context());
-    buffer->context()->fillPath(path);
+void CanvasRenderingContext2D::compositeBuffer(ImageBuffer* buffer, const IntRect& bufferRect, CompositeOperator op)
+{
+    IntRect canvasRect(0, 0, canvas()->width(), canvas()->height());
+    canvasRect = canvas()->baseTransform().mapRect(canvasRect);
 
     GraphicsContext* c = drawingContext();
     if (!c)
@@ -1533,14 +1573,70 @@ template<class T> void CanvasRenderingContext2D::fillAndDisplayTransparencyElsew
 
     c->save();
     c->setCTM(AffineTransform());
+    c->setCompositeOperation(op);
 
     c->save();
     c->clipOut(bufferRect);
     c->clearRect(canvasRect);
     c->restore();
 
-    c->drawImageBuffer(buffer.get(), ColorSpaceDeviceRGB, bufferRect.location(), state().m_globalComposite);
+    c->drawImageBuffer(buffer, ColorSpaceDeviceRGB, bufferRect.location(), state().m_globalComposite);
     c->restore();
+}
+
+void CanvasRenderingContext2D::fullCanvasCompositedDrawImage(Image* image, ColorSpace styleColorSpace, const FloatRect& dest, const FloatRect& src, CompositeOperator op)
+{
+    ASSERT(isFullCanvasCompositeMode(op));
+
+    IntSize croppedOffset;
+    IntRect bufferRect = calculateCompositingBufferRect(dest, &croppedOffset);
+    if (bufferRect.isEmpty()) {
+        clearCanvas();
+        return;
+    }
+
+    OwnPtr<ImageBuffer> buffer = createCompositingBuffer(bufferRect);
+    if (!buffer)
+        return;
+
+    GraphicsContext* c = drawingContext();
+    if (!c)
+        return;
+
+    FloatRect adjustedDest = dest;
+    adjustedDest.setLocation(FloatPoint(0, 0));
+    AffineTransform effectiveTransform = c->getCTM();
+    IntRect transformedAdjustedRect = enclosingIntRect(effectiveTransform.mapRect(adjustedDest));
+    buffer->context()->translate(-transformedAdjustedRect.location().x(), -transformedAdjustedRect.location().y());
+    buffer->context()->translate(croppedOffset.width(), croppedOffset.height());
+    buffer->context()->concatCTM(effectiveTransform);
+    buffer->context()->drawImage(image, styleColorSpace, adjustedDest, src, CompositeSourceOver);
+
+    compositeBuffer(buffer.get(), bufferRect, op);
+}
+
+template<class T> void CanvasRenderingContext2D::fullCanvasCompositedFill(const T& area)
+{
+    ASSERT(isFullCanvasCompositeMode(state().m_globalComposite));
+
+    IntRect bufferRect = calculateCompositingBufferRect(area, 0);
+    if (bufferRect.isEmpty()) {
+        clearCanvas();
+        return;
+    }
+
+    OwnPtr<ImageBuffer> buffer = createCompositingBuffer(bufferRect);
+    if (!buffer)
+        return;
+
+    Path path = transformAreaToDevice(area);
+    path.translate(FloatSize(-bufferRect.x(), -bufferRect.y()));
+
+    buffer->context()->setCompositeOperation(CompositeSourceOver);
+    state().m_fillStyle->applyFillColor(buffer->context());
+    buffer->context()->fillPath(path);
+
+    compositeBuffer(buffer.get(), bufferRect, state().m_globalComposite);
 }
 
 void CanvasRenderingContext2D::prepareGradientForDashboard(CanvasGradient* gradient) const
@@ -1599,11 +1695,11 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLImageEleme
         return 0;
 
     CachedImage* cachedImage = image->cachedImage();
-    if (!cachedImage || !image->cachedImage()->image())
+    if (!cachedImage || !image->cachedImage()->imageForRenderer(image->renderer()))
         return CanvasPattern::create(Image::nullImage(), repeatX, repeatY, true);
 
-    bool originClean = isOriginClean(cachedImage, canvas()->securityOrigin());
-    return CanvasPattern::create(cachedImage->image(), repeatX, repeatY, originClean);
+    bool originClean = isOriginClean(cachedImage, image, canvas()->securityOrigin());
+    return CanvasPattern::create(cachedImage->imageForRenderer(image->renderer()), repeatX, repeatY, originClean);
 }
 
 PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLCanvasElement* canvas,
@@ -1725,6 +1821,8 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::createImageData(float sw, float 
 PassRefPtr<ImageData> CanvasRenderingContext2D::getImageData(float sx, float sy, float sw, float sh, ExceptionCode& ec) const
 {
     if (!canvas()->originClean()) {
+        DEFINE_STATIC_LOCAL(String, consoleMessage, ("Unable to get image data from canvas because the canvas has been tainted by cross-origin data."));
+        canvas()->document()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, consoleMessage, 1, String(), 0);
         ec = SECURITY_ERR;
         return 0;
     }

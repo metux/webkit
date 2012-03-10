@@ -42,7 +42,7 @@ namespace WebCore {
 // It can easily be increased to support more if the web audio specification is updated.
 const unsigned NumberOfInputs = 6;
 
-AudioChannelMerger::AudioChannelMerger(AudioContext* context, double sampleRate)
+AudioChannelMerger::AudioChannelMerger(AudioContext* context, float sampleRate)
     : AudioNode(context, sampleRate)
 {
     // Create a fixed number of inputs (able to handle the maximum number of channels we deal with).
@@ -51,7 +51,7 @@ AudioChannelMerger::AudioChannelMerger(AudioContext* context, double sampleRate)
 
     addOutput(adoptPtr(new AudioNodeOutput(this, 1)));
     
-    setType(NodeTypeChannelMerger);
+    setNodeType(NodeTypeChannelMerger);
     
     initialize();
 }
@@ -89,7 +89,7 @@ void AudioChannelMerger::reset()
 
 // Any time a connection or disconnection happens on any of our inputs, we potentially need to change the
 // number of channels of our output.
-void AudioChannelMerger::checkNumberOfChannelsForInput(AudioNodeInput* input)
+void AudioChannelMerger::checkNumberOfChannelsForInput(AudioNodeInput*)
 {
     ASSERT(context()->isAudioThread() && context()->isGraphOwner());
 

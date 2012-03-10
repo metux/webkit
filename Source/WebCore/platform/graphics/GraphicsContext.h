@@ -80,10 +80,6 @@ class PlatformContextSkia;
 typedef PlatformContextSkia GraphicsContextPlatformPrivate;
 }
 typedef WebCore::PlatformContextSkia PlatformGraphicsContext;
-#elif PLATFORM(HAIKU)
-class BView;
-typedef BView PlatformGraphicsContext;
-struct pattern;
 #elif OS(WINCE)
 typedef struct HDC__ PlatformGraphicsContext;
 #else
@@ -413,6 +409,15 @@ namespace WebCore {
         void setCTM(const AffineTransform&);
         AffineTransform getCTM() const;
 
+        // Create an image buffer compatible with this context, with suitable resolution
+        // for drawing into the buffer and then into this context.
+        PassOwnPtr<ImageBuffer> createCompatibleBuffer(const IntSize&) const;
+
+        // This function applies the device scale factor to the context, making the context capable of
+        // acting as a base-level context for a HiDPI environment.
+        void applyDeviceScaleFactor(float);
+        void platformApplyDeviceScaleFactor();
+
 #if OS(WINCE) && !PLATFORM(QT)
         void setBitmap(PassRefPtr<SharedBitmap>);
         const AffineTransform& affineTransform() const;
@@ -499,10 +504,6 @@ namespace WebCore {
         void setGdkExposeEvent(GdkEventExpose*);
         GdkWindow* gdkWindow() const;
         GdkEventExpose* gdkExposeEvent() const;
-#endif
-
-#if PLATFORM(HAIKU)
-        pattern getHaikuStrokeStyle();
 #endif
 
         static void adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2, float strokeWidth, StrokeStyle);

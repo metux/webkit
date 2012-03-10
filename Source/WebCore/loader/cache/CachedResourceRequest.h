@@ -43,13 +43,20 @@ namespace WebCore {
 
     class CachedResourceRequest : private SubresourceLoaderClient {
     public:
-        static PassOwnPtr<CachedResourceRequest> load(CachedResourceLoader*, CachedResource*, bool incremental, SecurityCheckPolicy, const ResourceLoaderOptions&);
+        static PassOwnPtr<CachedResourceRequest> load(CachedResourceLoader*, CachedResource*, const ResourceLoaderOptions&);
         ~CachedResourceRequest();
 
         CachedResourceLoader* cachedResourceLoader() const { return m_cachedResourceLoader; }
+        void cancel();
+
+        // FIXME: Like CachedResource::identifier(), this is a lame hack for preflight InspectorInstrumentation in DocumentThreadableLoader.
+        unsigned long identifier() const;
+
+        // FIXME: See CachedRawResource::setDefersLoading() for the relevant rant.
+        void setDefersLoading(bool);
 
     private:
-        CachedResourceRequest(CachedResourceLoader*, CachedResource*, bool incremental);
+        CachedResourceRequest(CachedResourceLoader*, CachedResource*);
         virtual void willSendRequest(SubresourceLoader*, ResourceRequest&, const ResourceResponse&);
         virtual void didReceiveResponse(SubresourceLoader*, const ResourceResponse&);
         virtual void didReceiveData(SubresourceLoader*, const char*, int);
@@ -58,10 +65,14 @@ namespace WebCore {
         virtual void didFail(SubresourceLoader*, const ResourceError&);
         void end();
 
+        virtual void didSendData(SubresourceLoader*, unsigned long long /*bytesSent*/, unsigned long long /*totalBytesToBeSent*/);
+#if PLATFORM(CHROMIUM)
+        virtual void didDownloadData(SubresourceLoader*, int);
+#endif
+
         RefPtr<SubresourceLoader> m_loader;
         CachedResourceLoader* m_cachedResourceLoader;
         CachedResource* m_resource;
-        bool m_incremental;
         bool m_multipart;
         bool m_finishing;
     };

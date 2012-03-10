@@ -47,7 +47,7 @@
 #include "SearchPopupMenu.h"
 
 #if USE(V8)
-#include "V8IsolatedContext.h"
+#include <v8.h>
 #endif
 
 /*
@@ -161,7 +161,7 @@ public:
     virtual void invalidateContentsAndWindow(const IntRect&, bool) { }
     virtual void invalidateContentsForSlowScroll(const IntRect&, bool) {};
     virtual void scroll(const IntSize&, const IntRect&, const IntRect&) { }
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     virtual void delegatedScrollRequested(const IntPoint&) { }
 #endif
 #if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
@@ -184,10 +184,8 @@ public:
     virtual void exceededDatabaseQuota(Frame*, const String&) { }
 #endif
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
     virtual void reachedMaxAppCacheSize(int64_t) { }
     virtual void reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t) { }
-#endif
 
 #if ENABLE(NOTIFICATIONS)
     virtual NotificationPresenter* notificationPresenter() const { return 0; }
@@ -394,9 +392,8 @@ public:
     virtual void registerForIconNotification(bool) { }
 
 #if USE(V8)
-    virtual void didCreateScriptContextForFrame() { }
-    virtual void didDestroyScriptContextForFrame() { }
-    virtual void didCreateIsolatedScriptContext(V8IsolatedContext*) { }
+    virtual void didCreateScriptContext(v8::Handle<v8::Context>, int worldId) { }
+    virtual void willReleaseScriptContext(v8::Handle<v8::Context>, int worldId) { }
     virtual bool allowScriptExtension(const String& extensionName, int extensionGroup) { return false; }
 #endif
 

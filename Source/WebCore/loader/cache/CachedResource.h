@@ -2,7 +2,7 @@
     Copyright (C) 1998 Lars Knoll (knoll@mpi-hd.mpg.de)
     Copyright (C) 2001 Dirk Mueller <mueller@kde.org>
     Copyright (C) 2006 Samuel Weinig (sam.weinig@gmail.com)
-    Copyright (C) 2004, 2005, 2006, 2007 Apple Inc. All rights reserved.
+    Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -63,7 +63,8 @@ public:
         ImageResource,
         CSSStyleSheet,
         Script,
-        FontResource
+        FontResource,
+        RawResource
 #if ENABLE(XSLT)
         , XSLStyleSheet
 #endif
@@ -71,6 +72,9 @@ public:
         , LinkPrefetch
         , LinkPrerender
         , LinkSubresource
+#endif
+#if ENABLE(VIDEO_TRACK)
+        , CueResource
 #endif
     };
 
@@ -85,9 +89,8 @@ public:
 
     CachedResource(const ResourceRequest&, Type);
     virtual ~CachedResource();
-    
-    virtual void load(CachedResourceLoader* cachedResourceLoader)  { load(cachedResourceLoader, false, DoSecurityCheck); }
-    void load(CachedResourceLoader*, bool incremental, SecurityCheckPolicy);
+
+    virtual void load(CachedResourceLoader*, const ResourceLoaderOptions&);
 
     virtual void setEncoding(const String&) { }
     virtual String encoding() const { return String(); }
@@ -115,7 +118,6 @@ public:
         PreloadReferencedWhileComplete
     };
     PreloadResult preloadResult() const { return static_cast<PreloadResult>(m_preloadResult); }
-    void setRequestedFromNetworkingLayer() { m_requestedFromNetworkingLayer = true; }
 
     virtual void didAddClient(CachedResourceClient*);
     virtual void allClientsRemoved() { }
@@ -136,13 +138,15 @@ public:
     void setLoading(bool b) { m_loading = b; }
 
     virtual bool isImage() const { return false; }
-    bool isLinkResource() const
+    bool ignoreForRequestCount() const
     {
+        return false
 #if ENABLE(LINK_PREFETCH)
-        return type() == LinkPrefetch || type() == LinkPrerender || type() == LinkSubresource;
-#else
-        return false;
+            || type() == LinkPrefetch
+            || type() == LinkPrerender
+            || type() == LinkSubresource
 #endif
+            || type() == RawResource;
     }
 
     unsigned accessCount() const { return m_accessCount; }
@@ -168,7 +172,8 @@ public:
 
     SharedBuffer* data() const { ASSERT(!m_purgeableData); return m_data.get(); }
 
-    void setResponse(const ResourceResponse&);
+    virtual void willSendRequest(ResourceRequest&, const ResourceResponse&) { m_requestedFromNetworkingLayer = true; }
+    virtual void setResponse(const ResourceResponse&);
     const ResourceResponse& response() const { return m_response; }
 
     // Sets the serialized metadata retrieved from the platform's cache.
@@ -194,8 +199,7 @@ public:
 
     bool wasCanceled() const { return m_status == Canceled; }
     bool errorOccurred() const { return (m_status == LoadError || m_status == DecodeError); }
-    
-    void setResourceLoaderOptions(const ResourceLoaderOptions& options) { m_options = options; }
+
     bool sendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks == SendCallbacks; }
     
     virtual void destroyDecodedData() { }
@@ -227,6 +231,14 @@ public:
     void switchClientsToRevalidatedResource();
     void clearResourceToRevalidate();
     void updateResponseAfterRevalidation(const ResourceResponse& validatingResponse);
+    
+    virtual void didSendData(unsigned long long /* bytesSent */, unsigned long long /* totalBytesToBeSent */) { }
+#if PLATFORM(CHROMIUM)
+    virtual void didDownloadData(int) { }
+#endif
+
+    void setLoadFinishTime(double finishTime) { m_loadFinishTime = finishTime; }
+    double loadFinishTime() const { return m_loadFinishTime; }
 
 protected:
     void checkNotify();
@@ -242,6 +254,7 @@ protected:
     ResourceRequest m_resourceRequest;
     String m_accept;
     OwnPtr<CachedResourceRequest> m_request;
+    ResourceLoaderOptions m_options;
     ResourceLoadPriority m_loadPriority;
 
     ResourceResponse m_response;
@@ -261,6 +274,7 @@ private:
     RefPtr<CachedMetadata> m_cachedMetadata;
 
     double m_lastDecodedAccessTime; // Used as a "thrash guard" in the cache
+    double m_loadFinishTime;
 
     unsigned m_encodedSize;
     unsigned m_decodedSize;
@@ -278,8 +292,6 @@ private:
 
     unsigned m_type : 3; // Type
     unsigned m_status : 3; // Status
-
-    ResourceLoaderOptions m_options;
 
 #ifndef NDEBUG
     bool m_deleted;

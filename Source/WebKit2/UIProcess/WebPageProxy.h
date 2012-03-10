@@ -55,6 +55,7 @@
 #include "WebUIClient.h"
 #include <WebCore/DragActions.h>
 #include <WebCore/HitTestResult.h>
+#include <WebCore/PlatformScreen.h>
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/TextChecking.h>
 #include <wtf/HashMap.h>
@@ -82,6 +83,7 @@ namespace WebCore {
     class FloatRect;
     class IntSize;
     class ProtectionSpace;
+    struct FileChooserSettings;
     struct TextCheckingResult;
     struct ViewportArguments;
     struct WindowFeatures;
@@ -249,6 +251,10 @@ public:
     void didChangeBackForwardList(WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject> >* removedItems);
     void shouldGoToBackForwardListItem(uint64_t itemID, bool& shouldGoToBackForwardListItem);
 
+    String activeURL() const;
+    String provisionalURL() const;
+    String committedURL() const;
+
     bool willHandleHorizontalScrollEvents() const;
 
     bool canShowMIMEType(const String& mimeType) const;
@@ -262,7 +268,7 @@ public:
     void viewWillStartLiveResize();
     void viewWillEndLiveResize();
 
-    void setInitialFocus(bool);
+    void setInitialFocus(bool forward, bool isKeyboardEventValid, const WebKeyboardEvent&);
     void setWindowResizerSize(const WebCore::IntSize&);
     
     void clearSelection();
@@ -338,7 +344,7 @@ public:
 #if PLATFORM(EFL)
     Evas_Object* viewObject();
 #endif
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     void setFixedVisibleContentRect(const WebCore::IntRect&);
 #endif
 
@@ -391,7 +397,8 @@ public:
     float deviceScaleFactor() const;
     void setIntrinsicDeviceScaleFactor(float);
     void setCustomDeviceScaleFactor(float);
-
+    void windowScreenDidChange(PlatformDisplayID);
+    
     void setUseFixedLayout(bool);
     void setFixedLayoutSize(const WebCore::IntSize&);
     bool useFixedLayout() const { return m_useFixedLayout; };
@@ -467,7 +474,7 @@ public:
 #if PLATFORM(WIN)
     void startDragDrop(const WebCore::IntPoint& imagePoint, const WebCore::IntPoint& dragPoint, uint64_t okEffect, const HashMap<UINT, Vector<String> >& dataMap, uint64_t fileSize, const String& pathname, const SharedMemory::Handle& fileContentHandle, const WebCore::IntSize& dragImageSize, const SharedMemory::Handle& dragImageHandle, bool isLinkDrag);
 #endif
-#if PLATFORM(QT)
+#if PLATFORM(QT) || PLATFORM(GTK)
     void startDrag(const WebCore::DragData&, const ShareableBitmap::Handle& dragImage);
 #endif
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
@@ -502,7 +509,7 @@ public:
 
     void preferencesDidChange();
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     void setResizesToContentsUsingLayoutSize(const WebCore::IntSize&);
 #endif
 
@@ -563,7 +570,9 @@ public:
 
     uint64_t renderTreeSize() const { return m_renderTreeSize; }
 
-    void setShouldSendKeyboardEventSynchronously(bool sync) { m_shouldSendKeyboardEventSynchronously = sync; };
+    void setShouldSendEventsSynchronously(bool sync) { m_shouldSendEventsSynchronously = sync; };
+
+    void printMainFrame();
 
 private:
     WebPageProxy(PageClient*, PassRefPtr<WebProcessProxy>, WebPageGroup*, uint64_t pageID);
@@ -642,14 +651,13 @@ private:
     void screenToWindow(const WebCore::IntPoint& screenPoint, WebCore::IntPoint& windowPoint);
     void windowToScreen(const WebCore::IntRect& viewRect, WebCore::IntRect& result);
     void runBeforeUnloadConfirmPanel(const String& message, uint64_t frameID, bool& shouldClose);
-    void didChangeViewportData(const WebCore::ViewportArguments&);
+    void didChangeViewportProperties(const WebCore::ViewportArguments&);
     void pageDidScroll();
-    void runOpenPanel(uint64_t frameID, const WebOpenPanelParameters::Data&);
+    void runOpenPanel(uint64_t frameID, const WebCore::FileChooserSettings&);
     void printFrame(uint64_t frameID);
     void exceededDatabaseQuota(uint64_t frameID, const String& originIdentifier, const String& databaseName, const String& displayName, uint64_t currentQuota, uint64_t currentOriginUsage, uint64_t currentDatabaseUsage, uint64_t expectedUsage, uint64_t& newQuota);
     void requestGeolocationPermissionForFrame(uint64_t geolocationID, uint64_t frameID, String originIdentifier);
     void runModal();
-    void didCompleteRubberBandForMainFrame(const WebCore::IntSize&);
     void notifyScrollerThumbIsVisibleInRect(const WebCore::IntRect&);
     void didChangeScrollbarsForMainFrame(bool hasHorizontalScrollbar, bool hasVerticalScrollbar);
     void didChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSide, bool pinnedToRightSide);
@@ -659,7 +667,7 @@ private:
     void reattachToWebProcess();
     void reattachToWebProcessWithItem(WebBackForwardListItem*);
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
 #endif
 
@@ -774,7 +782,7 @@ private:
     void clearPendingAPIRequestURL() { m_pendingAPIRequestURL = String(); }
     void setPendingAPIRequestURL(const String& pendingAPIRequestURL) { m_pendingAPIRequestURL = pendingAPIRequestURL; }
 
-    void initializeSandboxExtensionHandle(const WebCore::KURL&, SandboxExtension::Handle&);
+    bool maybeInitializeSandboxExtensionHandle(const WebCore::KURL&, SandboxExtension::Handle&);
 
 #if PLATFORM(MAC)
     void substitutionsPanelIsShowing(bool&);
@@ -935,7 +943,7 @@ private:
 
     static WKPageDebugPaintFlags s_debugPaintFlags;
 
-    bool m_shouldSendKeyboardEventSynchronously;
+    bool m_shouldSendEventsSynchronously;
 };
 
 } // namespace WebKit

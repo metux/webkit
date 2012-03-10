@@ -109,7 +109,7 @@ public:
     static void confirmComposition(WebKitWebView*, const char*);
     static bool firstRectForCharacterRange(WebKitWebView*, int location, int length, cairo_rectangle_int_t*);
     static bool selectedRange(WebKitWebView*, int* start, int* length);
-
+    static void doCommand(WebKitWebView*, const char*);
     // GC
     static void gcCollectJavascriptObjects();
     static void gcCollectJavascriptObjectsOnAlternateThread(bool waitUntilDone);
@@ -119,6 +119,12 @@ public:
     static void resetOriginAccessWhiteLists();
     static unsigned int workerThreadCount();
     static bool webkitWebFrameSelectionHasSpellingMarker(WebKitWebFrame*, gint from, gint length);
+
+    static void resetGeolocationClientMock(WebKitWebView*);
+    static void setMockGeolocationPermission(WebKitWebView*, bool allowed);
+    static void setMockGeolocationPosition(WebKitWebView*, double latitude, double longitude, double accuracy);
+    static void setMockGeolocationError(WebKitWebView*, int errorCode, const gchar* errorMessage);
+    static int numberOfPendingGeolocationPermissionRequests(WebKitWebView*);
 
 private:
     static bool s_drtRun;

@@ -29,9 +29,11 @@
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlock.h"
+#include "DFGBasicBlock.h"
 #include "DFGNode.h"
 #include "PredictionTracker.h"
 #include "RegisterFile.h"
+#include <wtf/BitVector.h>
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
 #include <wtf/StdLibExtras.h>
@@ -42,20 +44,6 @@ class CodeBlock;
 class ExecState;
 
 namespace DFG {
-
-typedef uint32_t BlockIndex;
-
-// For every local variable we track any existing get or set of the value.
-// We track the get so that these may be shared, and we track the set to
-// retrieve the current value, and to reference the final definition.
-struct VariableRecord {
-    VariableRecord()
-        : value(NoNode)
-    {
-    }
-
-    NodeIndex value;
-};
 
 struct MethodCheckData {
     // It is safe to refer to these directly because they are shadowed by
@@ -84,32 +72,22 @@ struct MethodCheckData {
     }
 };
 
-typedef Vector <BlockIndex, 2> PredecessorList;
+struct StorageAccessData {
+    size_t offset;
+    unsigned identifierNumber;
+    
+    // NOTE: the offset and identifierNumber do not by themselves
+    // uniquely identify a property. The identifierNumber and a
+    // Structure* do. If those two match, then the offset should
+    // be the same, as well. For any Node that has a StorageAccessData,
+    // it is possible to retrieve the Structure* by looking at the
+    // first child. It should be a CheckStructure, which has the
+    // Structure*.
+};
 
-struct BasicBlock {
-    BasicBlock(unsigned bytecodeBegin, NodeIndex begin, unsigned numArguments, unsigned numLocals)
-        : bytecodeBegin(bytecodeBegin)
-        , begin(begin)
-        , end(NoNode)
-        , isOSRTarget(false)
-        , m_arguments(numArguments)
-        , m_locals(numLocals)
-    {
-    }
-
-    static inline BlockIndex getBytecodeBegin(OwnPtr<BasicBlock>* block)
-    {
-        return (*block)->bytecodeBegin;
-    }
-
-    unsigned bytecodeBegin;
-    NodeIndex begin;
-    NodeIndex end;
-    bool isOSRTarget;
-
-    PredecessorList m_predecessors;
-    Vector <VariableRecord, 8> m_arguments;
-    Vector <VariableRecord, 16> m_locals;
+struct ResolveGlobalData {
+    unsigned identifierNumber;
+    unsigned resolveInfoIndex;
 };
 
 // 
@@ -120,11 +98,6 @@ struct BasicBlock {
 // Nodes that are 'dead' remain in the vector with refCount 0.
 class Graph : public Vector<Node, 64> {
 public:
-    Graph(unsigned numArguments, unsigned numVariables)
-        : m_predictions(numArguments, numVariables)
-    {
-    }
-
     // Mark a node as being referenced.
     void ref(NodeIndex nodeIndex)
     {
@@ -138,59 +111,17 @@ public:
     // CodeBlock is optional, but may allow additional information to be dumped (e.g. Identifier names).
     void dump(CodeBlock* = 0);
     void dump(NodeIndex, CodeBlock* = 0);
+
+    // Dump the code origin of the given node as a diff from the code origin of the
+    // preceding node.
+    void dumpCodeOrigin(NodeIndex);
 #endif
 
-    BlockIndex blockIndexForBytecodeOffset(unsigned bytecodeBegin)
-    {
-        OwnPtr<BasicBlock>* begin = m_blocks.begin();
-        OwnPtr<BasicBlock>* block = binarySearch<OwnPtr<BasicBlock>, unsigned, BasicBlock::getBytecodeBegin>(begin, m_blocks.size(), bytecodeBegin);
-        ASSERT(block >= m_blocks.begin() && block < m_blocks.end());
-        return static_cast<BlockIndex>(block - begin);
-    }
+    BlockIndex blockIndexForBytecodeOffset(Vector<BlockIndex>& blocks, unsigned bytecodeBegin);
 
-    BasicBlock& blockForBytecodeOffset(unsigned bytecodeBegin)
+    bool predictGlobalVar(unsigned varNumber, PredictedType prediction)
     {
-        return *m_blocks[blockIndexForBytecodeOffset(bytecodeBegin)];
-    }
-    
-    PredictionTracker& predictions()
-    {
-        return m_predictions;
-    }
-    
-    bool predict(int operand, PredictedType prediction, PredictionSource source)
-    {
-        return m_predictions.predict(operand, prediction, source);
-    }
-    
-    bool predictGlobalVar(unsigned varNumber, PredictedType prediction, PredictionSource source)
-    {
-        return m_predictions.predictGlobalVar(varNumber, prediction, source);
-    }
-    
-    bool predict(Node& node, PredictedType prediction, PredictionSource source)
-    {
-        switch (node.op) {
-        case GetLocal:
-            return predict(node.local(), prediction, source);
-            break;
-        case GetGlobalVar:
-            return predictGlobalVar(node.varNumber(), prediction, source);
-            break;
-        case GetById:
-        case GetMethod:
-        case GetByVal:
-        case Call:
-        case Construct:
-            return node.predict(prediction, source);
-        default:
-            return false;
-        }
-    }
-
-    PredictedType getPrediction(int operand)
-    {
-        return m_predictions.getPrediction(operand);
+        return m_predictions.predictGlobalVar(varNumber, prediction);
     }
     
     PredictedType getGlobalVarPrediction(unsigned varNumber)
@@ -200,35 +131,12 @@ public:
     
     PredictedType getMethodCheckPrediction(Node& node)
     {
-        return makePrediction(predictionFromCell(m_methodCheckData[node.methodCheckDataIndex()].function), StrongPrediction);
+        return predictionFromCell(m_methodCheckData[node.methodCheckDataIndex()].function);
     }
     
-    PredictedType getPrediction(Node& node)
+    PredictedType getJSConstantPrediction(Node& node, CodeBlock* codeBlock)
     {
-        Node* nodePtr = &node;
-        
-        if (nodePtr->op == ValueToNumber)
-            nodePtr = &(*this)[nodePtr->child1()];
-
-        if (nodePtr->op == ValueToInt32)
-            nodePtr = &(*this)[nodePtr->child1()];
-        
-        switch (nodePtr->op) {
-        case GetLocal:
-            return getPrediction(nodePtr->local());
-        case GetGlobalVar:
-            return getGlobalVarPrediction(nodePtr->varNumber());
-        case GetById:
-        case GetMethod:
-        case GetByVal:
-        case Call:
-        case Construct:
-            return nodePtr->getPrediction();
-        case CheckMethod:
-            return getMethodCheckPrediction(*nodePtr);
-        default:
-            return PredictNone;
-        }
+        return predictionFromValue(node.valueOfJSConstantNode(codeBlock));
     }
     
     // Helper methods to check nodes for constants.
@@ -256,11 +164,11 @@ public:
     {
         return at(nodeIndex).isBooleanConstant(codeBlock);
     }
-    bool isFunctionConstant(CodeBlock* codeBlock, JSGlobalData& globalData, NodeIndex nodeIndex)
+    bool isFunctionConstant(CodeBlock* codeBlock, NodeIndex nodeIndex)
     {
         if (!isJSConstant(nodeIndex))
             return false;
-        if (!getJSFunction(globalData, valueOfJSConstant(codeBlock, nodeIndex)))
+        if (!getJSFunction(valueOfJSConstant(codeBlock, nodeIndex)))
             return false;
         return true;
     }
@@ -277,29 +185,52 @@ public:
     }
     double valueOfNumberConstant(CodeBlock* codeBlock, NodeIndex nodeIndex)
     {
-        return valueOfJSConstantNode(codeBlock, nodeIndex).uncheckedGetNumber();
+        return valueOfJSConstantNode(codeBlock, nodeIndex).asNumber();
     }
     bool valueOfBooleanConstant(CodeBlock* codeBlock, NodeIndex nodeIndex)
     {
-        return valueOfJSConstantNode(codeBlock, nodeIndex).getBoolean();
+        return valueOfJSConstantNode(codeBlock, nodeIndex).asBoolean();
     }
-    JSFunction* valueOfFunctionConstant(CodeBlock* codeBlock, JSGlobalData& globalData, NodeIndex nodeIndex)
+    JSFunction* valueOfFunctionConstant(CodeBlock* codeBlock, NodeIndex nodeIndex)
     {
-        JSCell* function = getJSFunction(globalData, valueOfJSConstant(codeBlock, nodeIndex));
+        JSCell* function = getJSFunction(valueOfJSConstant(codeBlock, nodeIndex));
         ASSERT(function);
         return asFunction(function);
     }
 
 #ifndef NDEBUG
     static const char *opName(NodeType);
+    
+    // This is O(n), and should only be used for verbose dumps.
+    const char* nameOfVariableAccessData(VariableAccessData*);
 #endif
 
-    void predictArgumentTypes(ExecState*, CodeBlock*);
+    void predictArgumentTypes(CodeBlock*);
+    
+    StructureSet* addStructureSet(const StructureSet& structureSet)
+    {
+        ASSERT(structureSet.size());
+        m_structureSet.append(structureSet);
+        return &m_structureSet.last();
+    }
+    
+    StructureTransitionData* addStructureTransitionData(const StructureTransitionData& structureTransitionData)
+    {
+        m_structureTransitionData.append(structureTransitionData);
+        return &m_structureTransitionData.last();
+    }
 
     Vector< OwnPtr<BasicBlock> , 8> m_blocks;
     Vector<NodeIndex, 16> m_varArgChildren;
     Vector<MethodCheckData> m_methodCheckData;
-    unsigned m_preservedVars;
+    Vector<StorageAccessData> m_storageAccessData;
+    Vector<ResolveGlobalData> m_resolveGlobalData;
+    Vector<NodeIndex, 8> m_arguments;
+    SegmentedVector<VariableAccessData, 16> m_variableAccessData;
+    SegmentedVector<StructureSet, 16> m_structureSet;
+    SegmentedVector<StructureTransitionData, 8> m_structureTransitionData;
+    BitVector m_preservedVars;
+    unsigned m_localVars;
     unsigned m_parameterSlots;
 private:
     
@@ -313,6 +244,27 @@ private:
 
     PredictionTracker m_predictions;
 };
+
+class GetBytecodeBeginForBlock {
+public:
+    GetBytecodeBeginForBlock(Graph& graph)
+        : m_graph(graph)
+    {
+    }
+    
+    unsigned operator()(BlockIndex* blockIndex) const
+    {
+        return m_graph.m_blocks[*blockIndex]->bytecodeBegin;
+    }
+
+private:
+    Graph& m_graph;
+};
+
+inline BlockIndex Graph::blockIndexForBytecodeOffset(Vector<BlockIndex>& linkingTargets, unsigned bytecodeBegin)
+{
+    return *WTF::binarySearchWithFunctor<BlockIndex, unsigned>(linkingTargets.begin(), linkingTargets.size(), bytecodeBegin, WTF::KeyMustBePresentInArray, GetBytecodeBeginForBlock(*this));
+}
 
 } } // namespace JSC::DFG
 

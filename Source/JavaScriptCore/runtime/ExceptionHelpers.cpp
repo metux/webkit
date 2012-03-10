@@ -41,11 +41,13 @@
 
 namespace JSC {
 
-const ClassInfo InterruptedExecutionError::s_info = { "InterruptedExecutionError", &Base::s_info, 0, 0 };
+const ClassInfo InterruptedExecutionError::s_info = { "InterruptedExecutionError", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(InterruptedExecutionError) };
 
-UString InterruptedExecutionError::toString(ExecState*) const
+JSValue InterruptedExecutionError::defaultValue(ExecState* exec, PreferredPrimitiveType hint) const
 {
-    return "JavaScript execution exceeded timeout.";
+    if (hint == PreferString)
+        return jsNontrivialString(exec, "JavaScript execution exceeded timeout.");
+    return JSValue(std::numeric_limits<double>::quiet_NaN());
 }
 
 JSObject* createInterruptedExecutionException(JSGlobalData* globalData)
@@ -64,11 +66,13 @@ bool isInterruptedExecutionException(JSValue value)
 }
 
 
-const ClassInfo TerminatedExecutionError::s_info = { "TerminatedExecutionError", &Base::s_info, 0, 0 };
+const ClassInfo TerminatedExecutionError::s_info = { "TerminatedExecutionError", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(TerminatedExecutionError) };
 
-UString TerminatedExecutionError::toString(ExecState*) const
+JSValue TerminatedExecutionError::defaultValue(ExecState* exec, PreferredPrimitiveType hint) const
 {
-    return "JavaScript execution terminated.";
+    if (hint == PreferString)
+        return jsNontrivialString(exec, "JavaScript execution terminated.");
+    return JSValue(std::numeric_limits<double>::quiet_NaN());
 }
 
 JSObject* createTerminatedExecutionException(JSGlobalData* globalData)

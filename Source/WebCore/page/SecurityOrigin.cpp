@@ -132,11 +132,11 @@ SecurityOrigin::SecurityOrigin(const KURL& url, SandboxFlags sandboxFlags)
 
 SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
     : m_sandboxFlags(other->m_sandboxFlags)
-    , m_protocol(other->m_protocol.threadsafeCopy())
-    , m_host(other->m_host.threadsafeCopy())
-    , m_encodedHost(other->m_encodedHost.threadsafeCopy())
-    , m_domain(other->m_domain.threadsafeCopy())
-    , m_filePath(other->m_filePath.threadsafeCopy())
+    , m_protocol(other->m_protocol.isolatedCopy())
+    , m_host(other->m_host.isolatedCopy())
+    , m_encodedHost(other->m_encodedHost.isolatedCopy())
+    , m_domain(other->m_domain.isolatedCopy())
+    , m_filePath(other->m_filePath.isolatedCopy())
     , m_port(other->m_port)
     , m_isUnique(other->m_isUnique)
     , m_universalAccess(other->m_universalAccess)
@@ -164,7 +164,7 @@ PassRefPtr<SecurityOrigin> SecurityOrigin::createEmpty()
     return create(KURL());
 }
 
-PassRefPtr<SecurityOrigin> SecurityOrigin::threadsafeCopy()
+PassRefPtr<SecurityOrigin> SecurityOrigin::isolatedCopy()
 {
     return adoptRef(new SecurityOrigin(this));
 }
@@ -332,9 +332,32 @@ bool SecurityOrigin::isAccessToURLWhiteListed(const KURL& url) const
     return isAccessWhiteListed(targetOrigin.get());
 }
 
+// This is a hack to allow keep navigation to http/https feeds working. To remove this
+// we need to introduce new API akin to registerURLSchemeAsLocal, that registers a
+// protocols navigation policy.
+// feed(|s|search): is considered a 'nesting' scheme by embedders that support it, so it can be
+// local or remote depending on what is nested. Currently we just check if we are nesting
+// http or https, otherwise we ignore the nesting for the purpose of a security check. We need
+// a facility for registering nesting schemes, and some generalized logic for them.
+// This function should be removed as an outcome of https://bugs.webkit.org/show_bug.cgi?id=69196
+static bool isFeedWithNestedProtocolInHTTPFamily(const KURL& url)
+{
+    const String& urlString = url.string();
+    if (!urlString.startsWith("feed", false))
+        return false;
+
+    return urlString.startsWith("feed://", false) 
+        || urlString.startsWith("feed:http:", false) || urlString.startsWith("feed:https:", false)
+        || urlString.startsWith("feeds:http:", false) || urlString.startsWith("feeds:https:", false)
+        || urlString.startsWith("feedsearch:http:", false) || urlString.startsWith("feedsearch:https:", false);
+}
+
 bool SecurityOrigin::canDisplay(const KURL& url) const
 {
     String protocol = url.protocol().lower();
+
+    if (isFeedWithNestedProtocolInHTTPFamily(url))
+        return true;
 
     if (SchemeRegistry::canDisplayOnlyIfCanRequest(protocol))
         return canRequest(url);

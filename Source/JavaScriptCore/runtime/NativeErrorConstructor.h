@@ -68,9 +68,9 @@ namespace JSC {
     private:
         NativeErrorConstructor(JSGlobalObject*, Structure*);
         static const unsigned StructureFlags = OverridesVisitChildren | InternalFunction::StructureFlags;
-        virtual ConstructType getConstructData(ConstructData&);
-        virtual CallType getCallData(CallData&);
-        virtual void visitChildren(SlotVisitor&);
+        static ConstructType getConstructData(JSCell*, ConstructData&);
+        static CallType getCallData(JSCell*, CallData&);
+        static void visitChildren(JSCell*, SlotVisitor&);
 
         WriteBarrier<Structure> m_errorStructure;
     };

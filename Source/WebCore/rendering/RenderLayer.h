@@ -413,26 +413,37 @@ public:
     bool hasAutoZIndex() const { return renderer()->style()->hasAutoZIndex(); }
     int zIndex() const { return renderer()->style()->zIndex(); }
 
+    enum PaintLayerFlag {
+        PaintLayerHaveTransparency = 1,
+        PaintLayerAppliedTransform = 1 << 1,
+        PaintLayerTemporaryClipRects = 1 << 2,
+        PaintLayerPaintingReflection = 1 << 3,
+        PaintLayerPaintingOverlayScrollbars = 1 << 4
+    };
+    
+    typedef unsigned PaintLayerFlags;
+
     // The two main functions that use the layer system.  The paint method
     // paints the layers that intersect the damage rect from back to
     // front.  The hitTest method looks for mouse events by walking
     // layers that intersect the point from front to back.
-    void paint(GraphicsContext*, const LayoutRect& damageRect, PaintBehavior = PaintBehaviorNormal, RenderObject* paintingRoot = 0);
+    void paint(GraphicsContext*, const LayoutRect& damageRect, PaintBehavior = PaintBehaviorNormal, RenderObject* paintingRoot = 0,
+        RenderRegion* = 0, PaintLayerFlags = 0);
     bool hitTest(const HitTestRequest&, HitTestResult&);
     void paintOverlayScrollbars(GraphicsContext*, const LayoutRect& damageRect, PaintBehavior, RenderObject* paintingRoot);
 
     // This method figures out our layerBounds in coordinates relative to
     // |rootLayer}.  It also computes our background and foreground clip rects
     // for painting/event handling.
-    void calculateRects(const RenderLayer* rootLayer, const LayoutRect& paintDirtyRect, LayoutRect& layerBounds,
+    void calculateRects(const RenderLayer* rootLayer, RenderRegion*, const LayoutRect& paintDirtyRect, LayoutRect& layerBounds,
                         ClipRect& backgroundRect, ClipRect& foregroundRect, ClipRect& outlineRect,
                         bool temporaryClipRects = false, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
     // Compute and cache clip rects computed with the given layer as the root
-    void updateClipRects(const RenderLayer* rootLayer, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize);
+    void updateClipRects(const RenderLayer* rootLayer, RenderRegion*, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize);
     // Compute and return the clip rects. If useCached is true, will used previously computed clip rects on ancestors
     // (rather than computing them all from scratch up the parent chain).
-    void calculateClipRects(const RenderLayer* rootLayer, ClipRects&, bool useCached = false, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
+    void calculateClipRects(const RenderLayer* rootLayer, RenderRegion*, ClipRects&, bool useCached = false, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
     ClipRects* clipRects() const { return m_clipRects; }
 
     LayoutRect childrenClipRect() const; // Returns the foreground clip rect of the layer in the document's coordinate space.
@@ -458,10 +469,11 @@ public:
     void updateLayerPositionsAfterScroll(bool fixed = false);
     void setNeedsFullRepaint(bool f = true) { m_needsFullRepaint = f; }
     
-    int staticInlinePosition() const { return m_staticInlinePosition; }
-    int staticBlockPosition() const { return m_staticBlockPosition; }
-    void setStaticInlinePosition(int position) { m_staticInlinePosition = position; }
-    void setStaticBlockPosition(int position) { m_staticBlockPosition = position; }
+    LayoutUnit staticInlinePosition() const { return m_staticInlinePosition; }
+    LayoutUnit staticBlockPosition() const { return m_staticBlockPosition; }
+   
+    void setStaticInlinePosition(LayoutUnit position) { m_staticInlinePosition = position; }
+    void setStaticBlockPosition(LayoutUnit position) { m_staticBlockPosition = position; }
 
     bool hasTransform() const { return renderer()->hasTransform(); }
     // Note that this transform has the transform-origin baked in.
@@ -536,31 +548,21 @@ private:
 
     void updateLayerListsIfNeeded();
     void updateCompositingAndLayerListsIfNeeded();
-    
-    enum PaintLayerFlag {
-        PaintLayerHaveTransparency = 1,
-        PaintLayerAppliedTransform = 1 << 1,
-        PaintLayerTemporaryClipRects = 1 << 2,
-        PaintLayerPaintingReflection = 1 << 3,
-        PaintLayerPaintingOverlayScrollbars = 1 << 4
-    };
-    
-    typedef unsigned PaintLayerFlags;
 
     void paintLayer(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
-                    PaintBehavior, RenderObject* paintingRoot, OverlapTestRequestMap* = 0,
+                    PaintBehavior, RenderObject* paintingRoot, RenderRegion* = 0, OverlapTestRequestMap* = 0,
                     PaintLayerFlags = 0);
     void paintList(Vector<RenderLayer*>*, RenderLayer* rootLayer, GraphicsContext* p,
                    const LayoutRect& paintDirtyRect, PaintBehavior,
-                   RenderObject* paintingRoot, OverlapTestRequestMap*,
+                   RenderObject* paintingRoot, RenderRegion*, OverlapTestRequestMap*,
                    PaintLayerFlags);
     void paintPaginatedChildLayer(RenderLayer* childLayer, RenderLayer* rootLayer, GraphicsContext*,
                                   const LayoutRect& paintDirtyRect, PaintBehavior,
-                                  RenderObject* paintingRoot, OverlapTestRequestMap*,
+                                  RenderObject* paintingRoot, RenderRegion*, OverlapTestRequestMap*,
                                   PaintLayerFlags);
     void paintChildLayerIntoColumns(RenderLayer* childLayer, RenderLayer* rootLayer, GraphicsContext*,
                                     const LayoutRect& paintDirtyRect, PaintBehavior,
-                                    RenderObject* paintingRoot, OverlapTestRequestMap*,
+                                    RenderObject* paintingRoot, RenderRegion*, OverlapTestRequestMap*,
                                     PaintLayerFlags, const Vector<RenderLayer*>& columnLayers, size_t columnIndex);
 
     RenderLayer* hitTestLayer(RenderLayer* rootLayer, RenderLayer* containerLayer, const HitTestRequest& request, HitTestResult& result,
@@ -648,8 +650,8 @@ private:
     bool paintingInsideReflection() const { return m_paintingInsideReflection; }
     void setPaintingInsideReflection(bool b) { m_paintingInsideReflection = b; }
     
-    void parentClipRects(const RenderLayer* rootLayer, ClipRects&, bool temporaryClipRects = false, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
-    ClipRect backgroundClipRect(const RenderLayer* rootLayer, bool temporaryClipRects, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
+    void parentClipRects(const RenderLayer* rootLayer, RenderRegion*, ClipRects&, bool temporaryClipRects = false, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
+    ClipRect backgroundClipRect(const RenderLayer* rootLayer, RenderRegion*, bool temporaryClipRects, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
     RenderLayer* enclosingTransformedAncestor() const;
 
@@ -696,6 +698,43 @@ private:
     }
 
 protected:
+    // The bitfields are up here so they will fall into the padding from ScrollableArea on 64-bit.
+
+    // Keeps track of whether the layer is currently resizing, so events can cause resizing to start and stop.
+    bool m_inResizeMode : 1;
+
+    bool m_scrollDimensionsDirty : 1;
+    bool m_zOrderListsDirty : 1;
+    bool m_normalFlowListDirty: 1;
+    bool m_isNormalFlowOnly : 1;
+
+    bool m_usedTransparency : 1; // Tracks whether we need to close a transparent layer, i.e., whether
+                                 // we ended up painting this layer or any descendants (and therefore need to
+                                 // blend).
+    bool m_paintingInsideReflection : 1;  // A state bit tracking if we are painting inside a replica.
+    bool m_inOverflowRelayout : 1;
+    bool m_needsFullRepaint : 1;
+
+    bool m_overflowStatusDirty : 1;
+    bool m_horizontalOverflow : 1;
+    bool m_verticalOverflow : 1;
+    bool m_visibleContentStatusDirty : 1;
+    bool m_hasVisibleContent : 1;
+    bool m_visibleDescendantStatusDirty : 1;
+    bool m_hasVisibleDescendant : 1;
+
+    bool m_isPaginated : 1; // If we think this layer is split by a multi-column ancestor, then this bit will be set.
+
+    bool m_3DTransformedDescendantStatusDirty : 1;
+    bool m_has3DTransformedDescendant : 1;  // Set on a stacking context layer that has 3D descendants anywhere
+                                            // in a preserves3D hierarchy. Hint to do 3D-aware hit testing.
+#if USE(ACCELERATED_COMPOSITING)
+    bool m_hasCompositingDescendant : 1; // In the z-order tree.
+    bool m_mustOverlapCompositedLayers : 1;
+#endif
+
+    bool m_containsDirtyOverlayScrollbars : 1;
+
     RenderBoxModelObject* m_renderer;
 
     RenderLayer* m_parent;
@@ -744,49 +783,14 @@ protected:
     const RenderLayer* m_clipRectsRoot;   // Root layer used to compute clip rects.
 #endif
 
-    // Keeps track of whether the layer is currently resizing, so events can cause resizing to start and stop.
-    bool m_inResizeMode : 1;
-
-    bool m_scrollDimensionsDirty : 1;
-    bool m_zOrderListsDirty : 1;
-    bool m_normalFlowListDirty: 1;
-    bool m_isNormalFlowOnly : 1;
-
-    bool m_usedTransparency : 1; // Tracks whether we need to close a transparent layer, i.e., whether
-                                 // we ended up painting this layer or any descendants (and therefore need to
-                                 // blend).
-    bool m_paintingInsideReflection : 1;  // A state bit tracking if we are painting inside a replica.
-    bool m_inOverflowRelayout : 1;
-    bool m_needsFullRepaint : 1;
-
-    bool m_overflowStatusDirty : 1;
-    bool m_horizontalOverflow : 1;
-    bool m_verticalOverflow : 1;
-    bool m_visibleContentStatusDirty : 1;
-    bool m_hasVisibleContent : 1;
-    bool m_visibleDescendantStatusDirty : 1;
-    bool m_hasVisibleDescendant : 1;
-
-    bool m_isPaginated : 1; // If we think this layer is split by a multi-column ancestor, then this bit will be set.
-
-    bool m_3DTransformedDescendantStatusDirty : 1;
-    bool m_has3DTransformedDescendant : 1;  // Set on a stacking context layer that has 3D descendants anywhere
-                                            // in a preserves3D hierarchy. Hint to do 3D-aware hit testing.
-#if USE(ACCELERATED_COMPOSITING)
-    bool m_hasCompositingDescendant : 1; // In the z-order tree.
-    bool m_mustOverlapCompositedLayers : 1;
-#endif
-
-    bool m_containsDirtyOverlayScrollbars : 1;
-
     LayoutPoint m_cachedOverlayScrollbarOffset;
 
     RenderMarquee* m_marquee; // Used by layers with overflow:marquee
     
     // Cached normal flow values for absolute positioned elements with static left/top values.
-    int m_staticInlinePosition;
-    int m_staticBlockPosition;
-    
+    LayoutUnit m_staticInlinePosition;
+    LayoutUnit m_staticBlockPosition;
+
     OwnPtr<TransformationMatrix> m_transform;
     
     // May ultimately be extended to many replicas (with their own paint order).

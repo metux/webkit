@@ -30,21 +30,22 @@ namespace JSC {
 
 ASSERT_CLASS_FITS_IN_CELL(NativeErrorConstructor);
 
-const ClassInfo NativeErrorConstructor::s_info = { "Function", &InternalFunction::s_info, 0, 0 };
+const ClassInfo NativeErrorConstructor::s_info = { "Function", &InternalFunction::s_info, 0, 0, CREATE_METHOD_TABLE(NativeErrorConstructor) };
 
 NativeErrorConstructor::NativeErrorConstructor(JSGlobalObject* globalObject, Structure* structure)
     : InternalFunction(globalObject, structure)
 {
 }
 
-void NativeErrorConstructor::visitChildren(SlotVisitor& visitor)
+void NativeErrorConstructor::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    NativeErrorConstructor* thisObject = static_cast<NativeErrorConstructor*>(cell);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(structure()->typeInfo().overridesVisitChildren());
-    InternalFunction::visitChildren(visitor);
-    if (m_errorStructure)
-        visitor.append(&m_errorStructure);
+    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    InternalFunction::visitChildren(thisObject, visitor);
+    if (thisObject->m_errorStructure)
+        visitor.append(&thisObject->m_errorStructure);
 }
 
 static EncodedJSValue JSC_HOST_CALL constructWithNativeErrorConstructor(ExecState* exec)
@@ -55,7 +56,7 @@ static EncodedJSValue JSC_HOST_CALL constructWithNativeErrorConstructor(ExecStat
     return JSValue::encode(ErrorInstance::create(exec, errorStructure, message));
 }
 
-ConstructType NativeErrorConstructor::getConstructData(ConstructData& constructData)
+ConstructType NativeErrorConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructWithNativeErrorConstructor;
     return ConstructTypeHost;
@@ -68,7 +69,7 @@ static EncodedJSValue JSC_HOST_CALL callNativeErrorConstructor(ExecState* exec)
     return JSValue::encode(ErrorInstance::create(exec, errorStructure, message));
 }
 
-CallType NativeErrorConstructor::getCallData(CallData& callData)
+CallType NativeErrorConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callNativeErrorConstructor;
     return CallTypeHost;

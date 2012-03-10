@@ -34,13 +34,14 @@
 #include "config.h"
 #include "EventSource.h"
 
-#include "MemoryCache.h"
+#include "ContentSecurityPolicy.h"
 #include "DOMWindow.h"
 #include "Event.h"
 #include "EventException.h"
 #include "ExceptionCode.h"
-#include "PlatformString.h"
+#include "MemoryCache.h"
 #include "MessageEvent.h"
+#include "PlatformString.h"
 #include "ResourceError.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
@@ -68,7 +69,7 @@ inline EventSource::EventSource(const KURL& url, ScriptExecutionContext* context
 {
 }
 
-PassRefPtr<EventSource> EventSource::create(const String& url, ScriptExecutionContext* context, ExceptionCode& ec)
+PassRefPtr<EventSource> EventSource::create(ScriptExecutionContext* context, const String& url, ExceptionCode& ec)
 {
     if (url.isEmpty()) {
         ec = SYNTAX_ERR;
@@ -83,6 +84,12 @@ PassRefPtr<EventSource> EventSource::create(const String& url, ScriptExecutionCo
 
     // FIXME: Should support at least some cross-origin requests.
     if (!context->securityOrigin()->canRequest(fullURL)) {
+        ec = SECURITY_ERR;
+        return 0;
+    }
+
+    if (!context->contentSecurityPolicy()->allowConnectFromSource(fullURL)) {
+        // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return 0;
     }
@@ -177,6 +184,11 @@ void EventSource::close()
         m_loader->cancel();
 
     m_state = CLOSED;
+}
+
+const AtomicString& EventSource::interfaceName() const
+{
+    return eventNames().interfaceForEventSource;
 }
 
 ScriptExecutionContext* EventSource::scriptExecutionContext() const

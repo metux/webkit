@@ -3,12 +3,12 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebPluginDatabase</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebPlugin.html" title="WebKitWebPlugin">
 <link rel="next" href="WebKitSoupAuthDialog.html" title="WebKitSoupAuthDialog">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -43,17 +43,17 @@
 <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="returnvalue">WebKitWebPlugin</span></a> *   <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugin-for-mimetype" title="webkit_web_plugin_database_get_plugin_for_mimetype ()">webkit_web_plugin_database_get_plugin_for_mimetype</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *Param1</code></em>,
                                                          <em class="parameter"><code>const <span class="type">char</span> *Param2</code></em>);
-<a href="http://library.gnome.org/devel/glib/unstable/glib-Singly-Linked-Lists.html#GSList"><span class="returnvalue">GSList</span></a> *            <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugins" title="webkit_web_plugin_database_get_plugins ()">webkit_web_plugin_database_get_plugins</a>
+<span class="returnvalue">GSList</span> *            <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugins" title="webkit_web_plugin_database_get_plugins ()">webkit_web_plugin_database_get_plugins</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *Param1</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-plugins-list-free" title="webkit_web_plugin_database_plugins_list_free ()">webkit_web_plugin_database_plugins_list_free</a>
-                                                        (<em class="parameter"><code><a href="http://library.gnome.org/devel/glib/unstable/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> *Param1</code></em>);
+                                                        (<em class="parameter"><code><span class="type">GSList</span> *Param1</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebPluginDatabase.html#webkit-web-plugin-database-refresh" title="webkit_web_plugin_database_refresh ()">webkit_web_plugin_database_refresh</a>  (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *Param1</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebPluginDatabase.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  <a href="http://library.gnome.org/devel/gobject/unstable/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+  GObject
    +----WebKitWebPluginDatabase
 </pre>
 </div>
@@ -82,7 +82,7 @@ enable/disable individual plugins.
                                                          <em class="parameter"><code>const <span class="type">char</span> *Param2</code></em>);</pre>
 <p>
 Returns the <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> that is handling <em class="parameter"><code>mimeType</code></em> in the
-<em class="parameter"><code>database</code></em>, or <a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if there's none doing so.
+<em class="parameter"><code>database</code></em>, or <code class="literal">NULL</code> if there's none doing so.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -97,7 +97,7 @@ Returns the <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin">
 <hr>
 <div class="refsect2">
 <a name="webkit-web-plugin-database-get-plugins"></a><h3>webkit_web_plugin_database_get_plugins ()</h3>
-<pre class="programlisting"><a href="http://library.gnome.org/devel/glib/unstable/glib-Singly-Linked-Lists.html#GSList"><span class="returnvalue">GSList</span></a> *            webkit_web_plugin_database_get_plugins
+<pre class="programlisting"><span class="returnvalue">GSList</span> *            webkit_web_plugin_database_get_plugins
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> *Param1</code></em>);</pre>
 <p>
 Returns all <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> available in <em class="parameter"><code>database</code></em>.
@@ -107,7 +107,7 @@ The returned list must be freed with <a class="link" href="WebKitWebPluginDataba
 <col align="left" valign="top">
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a <a href="http://library.gnome.org/devel/glib/unstable/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> of <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a>. <span class="annotation">[<a href="http://foldoc.org/transfer%20full"><span class="acronym">transfer full</span></a>][<a href="http://foldoc.org/element-type"><span class="acronym">element-type</span></a> WebKitWebPlugin]</span>
+<td>a <span class="type">GSList</span> of <a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a>. <span class="annotation">[<a href="http://foldoc.org/transfer%20full"><span class="acronym">transfer full</span></a>][<a href="http://foldoc.org/element-type"><span class="acronym">element-type</span></a> WebKitWebPlugin]</span>
 </td>
 </tr></tbody>
 </table></div>
@@ -117,7 +117,7 @@ The returned list must be freed with <a class="link" href="WebKitWebPluginDataba
 <div class="refsect2">
 <a name="webkit-web-plugin-database-plugins-list-free"></a><h3>webkit_web_plugin_database_plugins_list_free ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_plugin_database_plugins_list_free
-                                                        (<em class="parameter"><code><a href="http://library.gnome.org/devel/glib/unstable/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> *Param1</code></em>);</pre>
+                                                        (<em class="parameter"><code><span class="type">GSList</span> *Param1</code></em>);</pre>
 <p>
 </p>
 </div>
@@ -140,6 +140,6 @@ available.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

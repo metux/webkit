@@ -150,7 +150,7 @@ namespace WebCore {
         virtual void invalidateContentsAndWindow(const IntRect&, bool) = 0;
         virtual void invalidateContentsForSlowScroll(const IntRect&, bool) = 0;
         virtual void scroll(const IntSize&, const IntRect&, const IntRect&) = 0;
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
         virtual void delegatedScrollRequested(const IntPoint&) = 0;
 #endif
         virtual IntPoint screenToWindow(const IntPoint&) const = 0;
@@ -164,7 +164,7 @@ namespace WebCore {
 #endif
         // End methods used by HostWindow.
 
-        virtual void dispatchViewportDataDidChange(const ViewportArguments&) const { }
+        virtual void dispatchViewportPropertiesDidChange(const ViewportArguments&) const { }
 
         virtual void contentsSizeChanged(Frame*, const IntSize&) const = 0;
         virtual void layoutUpdated(Frame*) const { }
@@ -183,7 +183,6 @@ namespace WebCore {
         virtual void exceededDatabaseQuota(Frame*, const String& databaseName) = 0;
 #endif
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
         // Callback invoked when the application cache fails to save a cache object
         // because storing it would grow the database file past its defined maximum
         // size or past the amount of free space on the device. 
@@ -200,7 +199,6 @@ namespace WebCore {
         // other existing caches for the origin that would not be replaced by
         // the new cache.
         virtual void reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t totalSpaceNeeded) = 0;
-#endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
         virtual void dashboardRegionsChanged();
@@ -218,11 +216,6 @@ namespace WebCore {
             
         virtual bool shouldReplaceWithGeneratedFileForUpload(const String& path, String& generatedFilename);
         virtual String generateReplacementFile(const String& path);
-
-        virtual bool paintCustomScrollbar(GraphicsContext*, const FloatRect&, ScrollbarControlSize, 
-                                          ScrollbarControlState, ScrollbarPart pressedPart, bool vertical,
-                                          float value, float proportion, ScrollbarControlPartMask);
-        virtual bool paintCustomScrollCorner(GraphicsContext*, const FloatRect&);
 
         virtual bool paintCustomOverhangArea(GraphicsContext*, const IntRect&, const IntRect&, const IntRect&);
 
@@ -295,7 +288,7 @@ namespace WebCore {
         virtual void setRootFullScreenLayer(GraphicsLayer*) { }
 #endif
         
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
         virtual IntRect visibleRectForTiledBackingStore() const { return IntRect(); }
 #endif
 
@@ -343,6 +336,8 @@ namespace WebCore {
 
         virtual void numWheelEventHandlersChanged(unsigned) = 0;
         
+        virtual bool isSVGImageChromeClient() const { return false; }
+
     protected:
         virtual ~ChromeClient() { }
     };

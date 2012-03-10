@@ -64,8 +64,9 @@ G_DEFINE_TYPE(BrowserWindow, browser_window, GTK_TYPE_WINDOW)
 
 static void activateUriEntryCallback(BrowserWindow* window)
 {
-    const gchar *uri = gtk_entry_get_text(GTK_ENTRY(window->uriEntry));
-    WKPageLoadURL(WKViewGetPage(window->webView), WKURLCreateWithUTF8CString(uri));
+    WKURLRef url = WKURLCreateWithUTF8CString(gtk_entry_get_text(GTK_ENTRY(window->uriEntry)));
+    WKPageLoadURL(WKViewGetPage(window->webView), url);
+    WKRelease(url);
 }
 
 static void goBackCallback(BrowserWindow* window)
@@ -185,6 +186,10 @@ static void browserWindowConstructed(GObject* gObject)
     browserWindowLoaderClientInit(window);
     browserWindowUIClientInit(window);
     browserWindowPolicyClientInit(window);
+
+    WKPageGroupRef groupRef = WKPageGetPageGroup(WKViewGetPage(window->webView));
+    WKPreferencesRef preferencesRef = WKPageGroupGetPreferences(groupRef);
+    WKPreferencesSetDeveloperExtrasEnabled(preferencesRef, true);
 }
 
 static void browser_window_class_init(BrowserWindowClass* klass)
@@ -558,6 +563,19 @@ static GtkWidget* createMessageDialog(GtkWindow *parent, GtkMessageType type, Gt
     return dialog;
 }
 
+static void focus(WKPageRef page, const void *clientInfo)
+{
+    BrowserWindow *window = BROWSER_WINDOW(clientInfo);
+    gtk_widget_grab_focus(GTK_WIDGET(window->webView));
+} 
+
+static void unfocus(WKPageRef page, const void *clientInfo)
+{
+    BrowserWindow *window = BROWSER_WINDOW(clientInfo);
+    if (gtk_widget_is_toplevel(GTK_WIDGET(window)))
+        gtk_window_set_focus(GTK_WINDOW(window), NULL);
+} 
+
 static void runJavaScriptAlert(WKPageRef page, WKStringRef message, WKFrameRef frame, const void *clientInfo)
 {
     GtkWidget *dialog = createMessageDialog(GTK_WINDOW(clientInfo), GTK_MESSAGE_WARNING, GTK_BUTTONS_CLOSE, GTK_RESPONSE_CLOSE, message, frame);
@@ -592,18 +610,17 @@ static WKStringRef runJavaScriptPrompt(WKPageRef page, WKStringRef message, WKSt
     return returnValue;
 }
 
-static void mouseDidMoveOverElement(WKPageRef page, WKEventModifiers modifiers, WKTypeRef userData, const void *clientInfo)
+static void mouseDidMoveOverElement(WKPageRef page, WKHitTestResultRef hitTestResult, WKEventModifiers modifiers, WKTypeRef userData, const void *clientInfo)
 {
     BrowserWindow *window = BROWSER_WINDOW(clientInfo);
     gtk_statusbar_pop(GTK_STATUSBAR(window->statusBar), window->statusBarContextId);
 
-    if (!userData)
+    WKURLRef linkUrlRef = WKHitTestResultCopyAbsoluteLinkURL(hitTestResult);
+    if (!linkUrlRef)
         return;
 
-    if (WKGetTypeID(userData) != WKURLGetTypeID())
-        return;
-
-    gchar *link = WKURLGetCString((WKURLRef)userData);
+    gchar *link = WKURLGetCString(linkUrlRef);
+    WKRelease(linkUrlRef);
     gtk_statusbar_push(GTK_STATUSBAR(window->statusBar), window->statusBarContextId, link);
     g_free(link);
 }
@@ -617,8 +634,8 @@ static void browserWindowUIClientInit(BrowserWindow *window)
         showPage,
         closePage,
         0,      /* takeFocus */
-        0,      /* focus */
-        0,      /* unfocus */
+        focus,
+        unfocus,
         runJavaScriptAlert,
         runJavaScriptConfirm,
         runJavaScriptPrompt,

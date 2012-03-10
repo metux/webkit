@@ -48,6 +48,7 @@
 #include "RegularExpression.h"
 #include "Settings.h"
 #include "TextDocument.h"
+#include "ThreadGlobalData.h"
 #include "XMLNames.h"
 #include <wtf/StdLibExtras.h>
 
@@ -264,13 +265,27 @@ PassRefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, 
     return sheet.release();
 }
 
+static const char* const validXMLMIMETypeChars = "[0-9a-zA-Z_\\-+~!$\\^{}|.%'`#&*]"; // per RFCs: 3023, 2045
+
+XMLMIMETypeRegExp::XMLMIMETypeRegExp() :
+    m_regex(adoptPtr(new RegularExpression(WTF::makeString("^", validXMLMIMETypeChars, "+/", validXMLMIMETypeChars, "+\\+xml$"), TextCaseSensitive)))
+{
+}
+
+XMLMIMETypeRegExp::~XMLMIMETypeRegExp()
+{
+}
+
+bool XMLMIMETypeRegExp::isXMLMIMEType(const String& mimeType)
+{
+    return m_regex->match(mimeType) > -1;
+}
+
 bool DOMImplementation::isXMLMIMEType(const String& mimeType)
 {
     if (mimeType == "text/xml" || mimeType == "application/xml" || mimeType == "text/xsl")
         return true;
-    static const char* const validChars = "[0-9a-zA-Z_\\-+~!$\\^{}|.%'`#&*]"; // per RFCs: 3023, 2045
-    DEFINE_STATIC_LOCAL(RegularExpression, xmlTypeRegExp, (String("^") + validChars + "+/" + validChars + "+\\+xml$", TextCaseSensitive));
-    return xmlTypeRegExp.match(mimeType) > -1;
+    return threadGlobalData().xmlTypeRegExp().isXMLMIMEType(mimeType);
 }
 
 bool DOMImplementation::isTextMIMEType(const String& mimeType)
@@ -302,11 +317,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
     // Plugins cannot take HTML and XHTML from us, and we don't even need to initialize the plugin database for those.
     if (type == "text/html")
         return HTMLDocument::create(frame, url);
-    if (type == "application/xhtml+xml"
-#if ENABLE(XHTMLMP)
-        || type == "application/vnd.wap.xhtml+xml"
-#endif
-        )
+    if (type == "application/xhtml+xml")
         return Document::createXHTML(frame, url);
 
 #if ENABLE(FTPDIR)

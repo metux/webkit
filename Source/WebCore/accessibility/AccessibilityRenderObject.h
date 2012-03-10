@@ -166,7 +166,7 @@ public:
     virtual LayoutRect boundingBoxRect() const;
     virtual LayoutRect elementRect() const;
     virtual LayoutSize size() const;
-    virtual LayoutPoint clickPoint() const;
+    virtual LayoutPoint clickPoint();
     
     void setRenderer(RenderObject* renderer) { m_renderer = renderer; }
     virtual RenderObject* renderer() const { return m_renderer; }
@@ -201,7 +201,6 @@ public:
     virtual FrameView* documentFrameView() const;
     virtual unsigned hierarchicalLevel() const;
 
-    virtual const AccessibilityChildrenVector& children();
     virtual void clearChildren();
     virtual void updateChildrenIfNecessary();
     
@@ -299,6 +298,10 @@ private:
     AccessibilityObject* accessibilityParentForImageMap(HTMLMapElement*) const;
     bool renderObjectIsObservable(RenderObject*) const;
     RenderObject* renderParentObject() const;
+    bool isDescendantOfElementType(const QualifiedName& tagName) const;
+
+    void addTextFieldChildren();
+    void addImageMapChildren();
     
     void ariaSelectedRows(AccessibilityChildrenVector&);
     

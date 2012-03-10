@@ -43,15 +43,12 @@
 #include "ResourceHandle.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
+#include "StorageNamespace.h"
 #include "WindowFeatures.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/StringBuilder.h>
-
-#if ENABLE(DOM_STORAGE)
-#include "StorageNamespace.h"
-#endif
 
 #if ENABLE(INPUT_COLOR)
 #include "ColorChooser.h"
@@ -94,7 +91,7 @@ void Chrome::scroll(const IntSize& scrollDelta, const IntRect& rectToScroll, con
     m_client->scroll(scrollDelta, rectToScroll, clipRect);
 }
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
 void Chrome::delegatedScrollRequested(const IntPoint& scrollPoint)
 {
     m_client->delegatedScrollRequested(scrollPoint);
@@ -185,12 +182,10 @@ Page* Chrome::createWindow(Frame* frame, const FrameLoadRequest& request, const 
 {
     Page* newPage = m_client->createWindow(frame, request, features, action);
 
-#if ENABLE(DOM_STORAGE)
     if (newPage) {
         if (StorageNamespace* oldSessionStorage = m_page->sessionStorage(false))
             newPage->setSessionStorage(oldSessionStorage->copy());
     }
-#endif
 
     return newPage;
 }
@@ -424,21 +419,14 @@ void Chrome::setToolTip(const HitTestResult& result)
         if (Node* node = result.innerNonSharedNode()) {
             if (node->hasTagName(inputTag)) {
                 HTMLInputElement* input = static_cast<HTMLInputElement*>(node);
-                if (input->isFileUpload()) {
-                    FileList* files = input->files();
-                    unsigned listSize = files->length();
-                    if (listSize > 1) {
-                        StringBuilder names;
-                        for (size_t i = 0; i < listSize; ++i) {
-                            names.append(files->item(i)->fileName());
-                            if (i != listSize - 1)
-                                names.append('\n');
-                        }
-                        toolTip = names.toString();
-                        // filename always display as LTR.
-                        toolTipDirection = LTR;
-                    }
-                }
+                toolTip = input->defaultToolTip();
+
+                // FIXME: We should obtain text direction of tooltip from
+                // ChromeClient or platform. As of October 2011, all client
+                // implementations don't use text direction information for
+                // ChromeClient::setToolTip. We'll work on tooltip text
+                // direction during bidi cleanup in form inputs.
+                toolTipDirection = LTR;
             }
         }
     }
@@ -496,9 +484,9 @@ void Chrome::loadIconForFiles(const Vector<String>& filenames, FileIconLoader* l
     m_client->loadIconForFiles(filenames, loader);
 }
 
-void Chrome::dispatchViewportDataDidChange(const ViewportArguments& arguments) const
+void Chrome::dispatchViewportPropertiesDidChange(const ViewportArguments& arguments) const
 {
-    m_client->dispatchViewportDataDidChange(arguments);
+    m_client->dispatchViewportPropertiesDidChange(arguments);
 }
 
 void Chrome::setCursor(const Cursor& cursor)
@@ -557,18 +545,6 @@ String ChromeClient::generateReplacementFile(const String&)
 {
     ASSERT_NOT_REACHED();
     return String();
-}
-
-bool ChromeClient::paintCustomScrollbar(GraphicsContext*, const FloatRect&, ScrollbarControlSize,
-                                        ScrollbarControlState, ScrollbarPart, bool,
-                                        float, float, ScrollbarControlPartMask)
-{
-    return false;
-}
-
-bool ChromeClient::paintCustomScrollCorner(GraphicsContext*, const FloatRect&)
-{
-    return false;
 }
 
 bool ChromeClient::paintCustomOverhangArea(GraphicsContext*, const IntRect&, const IntRect&, const IntRect&)

@@ -265,11 +265,6 @@ bool RenderView::shouldRepaint(const IntRect& r) const
     return true;
 }
 
-RenderBlock* RenderView::containingBlock() const
-{
-    return const_cast<RenderView*>(this);
-}
-
 void RenderView::repaintViewRectangle(const IntRect& ur, bool immediate)
 {
     if (!shouldRepaint(ur))
@@ -334,12 +329,12 @@ void RenderView::computeRectForRepaint(RenderBoxModelObject* repaintContainer, I
         rect = m_layer->transform()->mapRect(rect);
 }
 
-void RenderView::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset)
+void RenderView::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
     rects.append(LayoutRect(accumulatedOffset, m_layer->size()));
 }
 
-void RenderView::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed)
+void RenderView::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 {
     if (wasFixed)
         *wasFixed = false;
@@ -718,9 +713,9 @@ void RenderView::pushLayoutState(RenderObject* root)
     m_layoutState = new (renderArena()) LayoutState(root);
 }
 
-void RenderView::pushLayoutState(RenderFlowThread* flowThread)
+void RenderView::pushLayoutState(RenderFlowThread* flowThread, bool regionsChanged)
 {
-    m_layoutState = new (renderArena()) LayoutState(m_layoutState, flowThread);
+    m_layoutState = new (renderArena()) LayoutState(m_layoutState, flowThread, regionsChanged);
 }
 
 bool RenderView::shouldDisableLayoutStateForSubtree(RenderObject* renderer) const

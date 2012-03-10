@@ -142,7 +142,7 @@ void TextFieldInputType::handleWheelEventForSpinButton(WheelEvent* event)
 
 void TextFieldInputType::forwardEvent(Event* event)
 {
-    if (element()->renderer() && (event->isMouseEvent() || event->isDragEvent() || event->isWheelEvent() || event->type() == eventNames().blurEvent || event->type() == eventNames().focusEvent)) {
+    if (element()->renderer() && (event->isMouseEvent() || event->isDragEvent() || event->hasInterface(eventNames().interfaceForWheelEvent) || event->type() == eventNames().blurEvent || event->type() == eventNames().focusEvent)) {
         RenderTextControlSingleLine* renderTextControl = toRenderTextControlSingleLine(element()->renderer());
         if (event->type() == eventNames().blurEvent) {
             if (RenderBox* innerTextRenderer = innerTextElement()->renderBox()) {
@@ -160,7 +160,7 @@ void TextFieldInputType::forwardEvent(Event* event)
 
 bool TextFieldInputType::shouldSubmitImplicitly(Event* event)
 {
-    return (event->type() == eventNames().textInputEvent && event->isTextEvent() && static_cast<TextEvent*>(event)->data() == "\n") || InputType::shouldSubmitImplicitly(event);
+    return (event->type() == eventNames().textInputEvent && event->hasInterface(eventNames().interfaceForTextEvent) && static_cast<TextEvent*>(event)->data() == "\n") || InputType::shouldSubmitImplicitly(event);
 }
 
 RenderObject* TextFieldInputType::createRenderer(RenderArena* arena, RenderStyle*) const
@@ -299,15 +299,8 @@ static String limitLength(const String& string, int maxLength)
     return string.left(newLength);
 }
 
-String TextFieldInputType::sanitizeValue(const String& proposedValue)
+String TextFieldInputType::sanitizeValue(const String& proposedValue) const
 {
-#if ENABLE(WCSS)
-    if (!element()->isConformToInputMask(proposedValue)) {
-        if (isConformToInputMask(element()->value()))
-            return element->value();
-        return String();
-    }
-#endif
     return limitLength(proposedValue.removeCharacters(isASCIILineBreak), HTMLInputElement::maximumLength);
 }
 
@@ -334,19 +327,6 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent* 
     unsigned appendableLength = maxLength > baseLength ? maxLength - baseLength : 0;
 
     // Truncate the inserted text to avoid violating the maxLength and other constraints.
-#if ENABLE(WCSS)
-    RefPtr<Range> range = element()->document()->frame()->selection()->selection().toNormalizedRange();
-    String candidateString = toRenderTextControlSingleLine(element()->renderer())->text();
-    if (selectionLength)
-        candidateString.replace(range->startOffset(), range->endOffset(), event->text());
-    else
-        candidateString.insert(event->text(), range->startOffset());
-    if (!element()->isConformToInputMask(candidateString)) {
-        event->setText("");
-        return;
-    }
-#endif
-
     String eventText = event->text();
     eventText.replace("\r\n", " ");
     eventText.replace('\r', ' ');

@@ -58,9 +58,7 @@ namespace WebCore {
 using namespace std;
 using namespace HTMLNames;
 
-#ifndef NDEBUG
-static WTF::RefCountedLeakCounter rangeCounter("Range");
-#endif
+DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, rangeCounter, ("Range"));
 
 inline Range::Range(PassRefPtr<Document> ownerDocument)
     : m_ownerDocument(ownerDocument)
@@ -1651,31 +1649,6 @@ Node* Range::firstNode() const
     if (!m_start.offset())
         return m_start.container();
     return m_start.container()->traverseNextSibling();
-}
-
-Position Range::editingStartPosition() const
-{
-    // This function is used by range style computations to avoid bugs like:
-    // <rdar://problem/4017641> REGRESSION (Mail): you can only bold/unbold a selection starting from end of line once
-    // It is important to skip certain irrelevant content at the start of the selection, so we do not wind up 
-    // with a spurious "mixed" style.
-    
-    VisiblePosition visiblePosition = Position(m_start.container(), m_start.offset(), Position::PositionIsOffsetInAnchor);
-    if (visiblePosition.isNull())
-        return Position();
-
-    // if the selection is a caret, just return the position, since the style
-    // behind us is relevant
-    if (collapsed())
-        return visiblePosition.deepEquivalent();
-
-    // if the selection starts just before a paragraph break, skip over it
-    if (isEndOfParagraph(visiblePosition))
-        return visiblePosition.next().deepEquivalent().downstream();
-
-    // otherwise, make sure to be at the start of the first selected node,
-    // instead of possibly at the end of the last node before the selection
-    return visiblePosition.deepEquivalent().downstream();
 }
 
 Node* Range::shadowTreeRootNode() const

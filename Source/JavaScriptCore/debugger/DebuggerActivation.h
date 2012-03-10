@@ -41,12 +41,13 @@ namespace JSC {
             return activation;
         }
 
-        virtual void visitChildren(SlotVisitor&);
+        static void visitChildren(JSCell*, SlotVisitor&);
         virtual UString className() const;
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier& propertyName, PropertySlot&);
-        virtual void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier& propertyName, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
+        static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
         virtual void putWithAttributes(ExecState*, const Identifier& propertyName, JSValue, unsigned attributes);
-        virtual bool deleteProperty(ExecState*, const Identifier& propertyName);
+        static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
         virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
         virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
         virtual void defineGetter(ExecState*, const Identifier& propertyName, JSObject* getterFunction, unsigned attributes);

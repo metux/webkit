@@ -40,6 +40,8 @@ enum JSType {
     // The ObjectType value must come before any JSType that is a subclass of JSObject.
     ObjectType          = 10,
     FinalObjectType     = 11,
+    JSFunctionType      = 12,
+    NumberObjectType    = 13,
 };
 
 } // namespace JSC

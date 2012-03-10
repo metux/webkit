@@ -71,6 +71,7 @@
 #include <gtk/gtk.h>
 
 #if defined(XP_UNIX)
+#define String XtStringType
 #include "RefPtrCairo.h"
 #include "gtk2xtbin.h"
 #define Bool int // this got undefined somewhere
@@ -81,6 +82,7 @@
 #elif defined(GDK_WINDOWING_WIN32)
 #include "PluginMessageThrottlerWin.h"
 #include <gdk/gdkwin32.h>
+#undef String
 #endif
 
 using JSC::ExecState;
@@ -407,9 +409,6 @@ void PluginView::handleMouseEvent(MouseEvent* event)
     if (!m_isStarted || m_status != PluginStatusLoadedSuccessfully)
         return;
 
-    if (event->button() == RightButton && m_plugin->quirks().contains(PluginQuirkIgnoreRightClickInWindowlessMode))
-        return;
-
     if (event->type() == eventNames().mousedownEvent) {
         if (Page* page = m_parentFrame->page())
             page->focusController()->setActive(true);
@@ -507,9 +506,9 @@ void PluginView::setNPWindowIfNeeded()
     if (m_isWindowed && !platformPluginWidget())
         return;
 
-    // If width or height are null, set the clipRect to null, indicating that
-    // the plugin is not visible/scrolled out.
-    if (!m_clipRect.isEmpty()) {
+    if (m_clipRect.isEmpty()) {
+        // If width or height are null, set the clipRect to null,
+        // indicating that the plugin is not visible/scrolled out.
         m_npWindow.clipRect.left = 0;
         m_npWindow.clipRect.right = 0;
         m_npWindow.clipRect.top = 0;
@@ -575,8 +574,25 @@ void PluginView::updateWidgetAllocationAndClip()
     }
 
     GtkAllocation allocation(m_delayedAllocation);
-    gtk_widget_size_allocate(widget, &allocation);
     m_delayedAllocation = IntRect();
+
+    // The goal is to avoid calling gtk_widget_size_allocate when necessary.
+    // It blocks the main loop and if the widget is offscreen or hasn't moved
+    // it isn't required.
+
+    // Don't do anything if the allocation has not changed.
+    GtkAllocation currentAllocation;
+    gtk_widget_get_allocation(widget, &currentAllocation);
+    if (currentAllocation == allocation)
+        return;
+
+    // Don't do anything if both the old and the new allocations are outside the frame.
+    IntRect currentAllocationRect(currentAllocation);
+    currentAllocationRect.intersect(frameRect());
+    if (currentAllocationRect.isEmpty() && m_clipRect.isEmpty())
+        return;
+
+    gtk_widget_size_allocate(widget, &allocation);
 }
 
 void PluginView::setParentVisible(bool visible)
@@ -694,12 +710,7 @@ bool PluginView::platformGetValue(NPNVariable variable, void* value, NPError* re
         case NPNVnetscapeWindow: {
             GdkWindow* gdkWindow = gtk_widget_get_window(m_parentFrame->view()->hostWindow()->platformPageClient());
 #if defined(XP_UNIX)
-            GdkWindow* toplevelWindow = gdk_window_get_toplevel(gdkWindow);
-            if (!toplevelWindow) {
-                *result = NPERR_GENERIC_ERROR;
-                return true;
-            }
-            *static_cast<Window*>(value) = GDK_WINDOW_XWINDOW(toplevelWindow);
+            *static_cast<Window*>(value) = GDK_WINDOW_XWINDOW(gdk_window_get_toplevel(gdkWindow));
 #elif defined(GDK_WINDOWING_WIN32)
             *static_cast<HGDIOBJ*>(value) = GDK_WINDOW_HWND(gdkWindow);
 #endif

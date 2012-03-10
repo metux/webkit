@@ -33,6 +33,7 @@
 
 #include "AbstractDatabase.h"
 #include "ActiveDOMObject.h"
+#include "ContentSecurityPolicy.h"
 #include "Database.h"
 #include "DatabaseCallback.h"
 #include "DatabaseSync.h"
@@ -81,6 +82,8 @@
 #include "FileSystemCallbacks.h"
 #include "LocalFileSystem.h"
 #include "SyncCallbackHelper.h"
+#else
+#include "ExceptionCode.h"
 #endif
 
 namespace WebCore {
@@ -114,6 +117,10 @@ WorkerContext::WorkerContext(const KURL& url, const String& userAgent, WorkerThr
     , m_closing(false)
 {
     setSecurityOrigin(SecurityOrigin::create(url));
+    
+    // FIXME: This should probably adopt the ContentSecurityPolicy of the document
+    // that created this worker or use the header that came with the worker script.
+    setContentSecurityPolicy(ContentSecurityPolicy::create(this));
 }
 
 WorkerContext::~WorkerContext()
@@ -158,6 +165,11 @@ KURL WorkerContext::completeURL(const String& url) const
 String WorkerContext::userAgent(const KURL&) const
 {
     return m_userAgent;
+}
+
+void WorkerContext::disableEval()
+{
+    m_script->disableEval();
 }
 
 WorkerLocation* WorkerContext::location() const

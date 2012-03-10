@@ -222,13 +222,16 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         WKRetainPtr<WKStringRef> pixelResultKey = adoptWK(WKStringCreateWithUTF8CString("PixelResult"));
         WKImageRef pixelResult = static_cast<WKImageRef>(WKDictionaryGetItemForKey(messageBodyDictionary, pixelResultKey.get()));
         ASSERT(!pixelResult || m_dumpPixels);
+        
+        WKRetainPtr<WKStringRef> repaintRectsKey = adoptWK(WKStringCreateWithUTF8CString("RepaintRects"));
+        WKArrayRef repaintRects = static_cast<WKArrayRef>(WKDictionaryGetItemForKey(messageBodyDictionary, repaintRectsKey.get()));        
 
         // Dump text.
         dump(toSTD(textOutput).c_str(), true);
 
         // Dump pixels (if necessary).
         if (m_dumpPixels && pixelResult)
-            dumpPixelsAndCompareWithExpected(pixelResult);
+            dumpPixelsAndCompareWithExpected(pixelResult, repaintRects);
 
         fputs("#EOF\n", stdout);
         fflush(stdout);
@@ -245,12 +248,50 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         TestController::shared().setBeforeUnloadReturnValue(WKBooleanGetValue(beforeUnloadReturnValue));
         return;
     }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "AddChromeInputField")) {
+        TestController::shared().mainWebView()->addChromeInputField();
+        WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallAddChromeInputFieldCallback"));
+        WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), 0);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "RemoveChromeInputField")) {
+        TestController::shared().mainWebView()->removeChromeInputField();
+        WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallRemoveChromeInputFieldCallback"));
+        WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), 0);
+        return;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "FocusWebView")) {
+        TestController::shared().mainWebView()->makeWebViewFirstResponder();
+        WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallFocusWebViewCallback"));
+        WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), 0);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetBackingScaleFactor")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDoubleGetTypeID());
+        double backingScaleFactor = WKDoubleGetValue(static_cast<WKDoubleRef>(messageBody));
+        WKPageSetCustomBackingScaleFactor(TestController::shared().mainWebView()->page(), backingScaleFactor);
+
+        WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallSetBackingScaleFactorCallback"));
+        WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), 0);
+        return;
+    }
 
     ASSERT_NOT_REACHED();
 }
 
-WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedBundle(WKStringRef /*messageName*/, WKTypeRef /*messageBody*/)
+WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody)
 {
+    if (WKStringIsEqualToUTF8CString(messageName, "SetWindowIsKey")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef isKeyValue = static_cast<WKBooleanRef>(messageBody);
+        TestController::shared().mainWebView()->setWindowIsKey(WKBooleanGetValue(isKeyValue));
+        return 0;
+    }
+
     ASSERT_NOT_REACHED();
     return 0;
 }

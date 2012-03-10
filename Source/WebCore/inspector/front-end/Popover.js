@@ -180,6 +180,8 @@ WebInspector.Popover.prototype = {
 
 /**
  * @constructor
+ * @param {function()=} onHide
+ * @param {boolean=} disableOnClick
  */
 WebInspector.PopoverHelper = function(panelElement, getAnchor, showPopover, onHide, disableOnClick)
 {
@@ -226,7 +228,7 @@ WebInspector.PopoverHelper.prototype = {
             this._hidePopoverTimer = setTimeout(doHide, this._timeout / 2);
         }
 
-        this._handleMouseAction(event);
+        this._handleMouseAction(event, false);
     },
 
     _handleMouseAction: function(event, isMouseDown)

@@ -78,15 +78,20 @@ void RenderTableRow::styleDidChange(StyleDifference diff, const RenderStyle* old
 
     if (parent())
         updateBeforeAndAfterContent();
+
+    // If border was changed, notify table.
+    if (parent()) {
+        RenderTable* table = this->table();
+        if (table && !table->selfNeedsLayout() && !table->normalChildNeedsLayout() && oldStyle && oldStyle->border() != style()->border())
+            table->invalidateCollapsedBorders();
+    }
 }
 
 void RenderTableRow::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     // Make sure we don't append things after :after-generated content if we have it.
-    if (!beforeChild) {
-        if (RenderObject* afterContentRenderer = findAfterContentRenderer())
-            beforeChild = anonymousContainer(afterContentRenderer);
-    }
+    if (!beforeChild)
+        beforeChild = findAfterContentRenderer();
 
     if (!child->isTableCell()) {
         RenderObject* last = beforeChild;
@@ -97,6 +102,14 @@ void RenderTableRow::addChild(RenderObject* child, RenderObject* beforeChild)
                 beforeChild = last->firstChild();
             last->addChild(child, beforeChild);
             return;
+        }
+
+        if (beforeChild && !beforeChild->isAnonymous() && beforeChild->parent() == this) {
+            RenderObject* cell = beforeChild->previousSibling();
+            if (cell && cell->isTableCell() && cell->isAnonymous()) {
+                cell->addChild(child);
+                return;
+            }
         }
 
         // If beforeChild is inside an anonymous cell, insert into the cell.
@@ -199,7 +212,7 @@ bool RenderTableRow::nodeAtPoint(const HitTestRequest& request, HitTestResult& r
         // table-specific hit-test method (which we should do for performance reasons anyway),
         // then we can remove this check.
         if (child->isTableCell() && !toRenderBox(child)->hasSelfPaintingLayer()) {
-            LayoutPoint cellPoint = flipForWritingMode(toRenderTableCell(child), accumulatedOffset, ParentToChildFlippingAdjustment);
+            LayoutPoint cellPoint = flipForWritingModeForChild(toRenderTableCell(child), accumulatedOffset);
             if (child->nodeAtPoint(request, result, pointInContainer, cellPoint, action)) {
                 updateHitTestResult(result, pointInContainer - toLayoutSize(cellPoint));
                 return true;

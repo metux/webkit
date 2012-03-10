@@ -121,6 +121,11 @@ id
 incremental
 indeterminate
 ismap
+itemid
+itemprop
+itemref
+itemscope
+itemtype
 keytype
 kind
 label

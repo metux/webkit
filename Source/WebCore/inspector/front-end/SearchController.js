@@ -29,6 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ */
 WebInspector.SearchController = function()
 {
     this.element = document.getElementById("search");
@@ -75,6 +78,11 @@ WebInspector.SearchController.prototype = {
     cancelSearch: function()
     {
         this.element.value = "";
+        this._performSearch("");
+    },
+
+    disableSearchUntilExplicitAction: function(event)
+    {
         this._performSearch("");
     },
 
@@ -125,7 +133,7 @@ WebInspector.SearchController.prototype = {
         if (!this._currentQuery)
             return;
 
-        panel = WebInspector.currentPanel();
+        var panel = WebInspector.currentPanel();
         if (panel.performSearch) {
             function performPanelSearch()
             {
@@ -143,6 +151,10 @@ WebInspector.SearchController.prototype = {
         }
     },
 
+    /**
+     * @param {?number=} matches
+     * @param {number=} currentMatchIndex
+     */
     _updateSearchMatchesCountAndCurrentMatchIndex: function(matches, currentMatchIndex)
     {
         if (matches == null) {
@@ -188,12 +200,12 @@ WebInspector.SearchController.prototype = {
             // If focus belongs here and text is empty - nothing to do, return unhandled.
             // When search was selected manually and is currently blank, we'd like Esc stay unhandled
             // and hit console drawer handler.
-            if (event.target.value === "" && this.currentFocusElement === this.previousFocusElement)
+            if (event.target.value === "" && WebInspector.currentFocusElement === WebInspector.previousFocusElement)
                 return;
             event.preventDefault();
             event.stopPropagation();
 
-            this.cancelSearch(event);
+            this.cancelSearch();
             WebInspector.currentFocusElement = WebInspector.previousFocusElement;
             if (WebInspector.currentFocusElement === event.target)
                 WebInspector.currentFocusElement.currentFocusElement.select();
@@ -222,6 +234,11 @@ WebInspector.SearchController.prototype = {
         this._performSearch(event.target.value, forceSearch, event.shiftKey, false);
     },
 
+    /**
+     * @param {boolean=} forceSearch
+     * @param {boolean=} isBackwardSearch
+     * @param {boolean=} repeatSearch
+     */
     _performSearch: function(query, forceSearch, isBackwardSearch, repeatSearch)
     {
         var isShortSearch = (query.length < 3);
@@ -280,3 +297,8 @@ WebInspector.SearchController.prototype = {
         currentPanel.performSearch(query);
     }
 }
+
+/**
+ * @type {?WebInspector.SearchController}
+ */
+WebInspector.searchController = null;

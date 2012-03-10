@@ -59,6 +59,7 @@ HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Doc
     , m_willValidate(true)
     , m_isValid(true)
     , m_wasChangedSinceLastFormControlChangeEvent(false)
+    , m_hasAutofocused(false)
 {
     if (!this->form())
         setForm(findFormAncestor());
@@ -78,6 +79,26 @@ void HTMLFormControlElement::detach()
 {
     m_validationMessage = nullptr;
     HTMLElement::detach();
+}
+
+String HTMLFormControlElement::formEnctype() const
+{
+    return FormSubmission::Attributes::parseEncodingType(fastGetAttribute(formenctypeAttr));
+}
+
+void HTMLFormControlElement::setFormEnctype(const String& value)
+{
+    setAttribute(formenctypeAttr, value);
+}
+
+String HTMLFormControlElement::formMethod() const
+{
+    return FormSubmission::Attributes::methodString(FormSubmission::Attributes::parseMethodType(fastGetAttribute(formmethodAttr)));
+}
+
+void HTMLFormControlElement::setFormMethod(const String& value)
+{
+    setAttribute(formmethodAttr, value);
 }
 
 bool HTMLFormControlElement::formNoValidate() const
@@ -127,7 +148,7 @@ static bool shouldAutofocus(HTMLFormControlElement* element)
         return false;
     if (element->document()->ignoreAutofocus())
         return false;
-    if (element->isReadOnlyFormControl())
+    if (element->hasAutofocused())
         return false;
 
     // FIXME: Should this set of hasTagName checks be replaced by a
@@ -167,6 +188,7 @@ void HTMLFormControlElement::attach()
         renderer()->updateFromElement();
 
     if (shouldAutofocus(this)) {
+        setAutofocused();
         ref();
         queuePostAttachCallback(focusPostAttach, this);
     }

@@ -82,9 +82,11 @@ namespace WebCore {
     
 namespace {
     
-bool isSampleRateRangeGood(double sampleRate)
+bool isSampleRateRangeGood(float sampleRate)
 {
-    return sampleRate >= 22050 && sampleRate <= 96000;
+    // FIXME: It would be nice if the minimum sample-rate could be less than 44.1KHz,
+    // but that will require some fixes in HRTFPanner::fftSizeForSampleRate(), and some testing there.
+    return sampleRate >= 44100 && sampleRate <= 96000;
 }
 
 }
@@ -103,7 +105,7 @@ PassRefPtr<AudioContext> AudioContext::create(Document* document)
     return adoptRef(new AudioContext(document));
 }
 
-PassRefPtr<AudioContext> AudioContext::createOfflineContext(Document* document, unsigned numberOfChannels, size_t numberOfFrames, double sampleRate, ExceptionCode& ec)
+PassRefPtr<AudioContext> AudioContext::createOfflineContext(Document* document, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate, ExceptionCode& ec)
 {
     ASSERT(document);
 
@@ -143,7 +145,7 @@ AudioContext::AudioContext(Document* document)
 }
 
 // Constructor for offline (non-realtime) rendering.
-AudioContext::AudioContext(Document* document, unsigned numberOfChannels, size_t numberOfFrames, double sampleRate)
+AudioContext::AudioContext(Document* document, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate)
     : ActiveDOMObject(document, this)
     , m_isInitialized(false)
     , m_isAudioThreadFinished(false)
@@ -294,11 +296,8 @@ void AudioContext::refBuffer(PassRefPtr<AudioBuffer> buffer)
     m_allocatedBuffers.append(buffer);
 }
 
-PassRefPtr<AudioBuffer> AudioContext::createBuffer(unsigned numberOfChannels, size_t numberOfFrames, double sampleRate)
+PassRefPtr<AudioBuffer> AudioContext::createBuffer(unsigned numberOfChannels, size_t numberOfFrames, float sampleRate)
 {
-    if (!isSampleRateRangeGood(sampleRate) || numberOfChannels > 10 || !numberOfFrames)
-        return 0;
-    
     return AudioBuffer::create(numberOfChannels, numberOfFrames, sampleRate);
 }
 
@@ -732,14 +731,14 @@ void AudioContext::handleDirtyAudioNodeOutputs()
     m_dirtyAudioNodeOutputs.clear();
 }
 
+const AtomicString& AudioContext::interfaceName() const
+{
+    return eventNames().interfaceForAudioContext;
+}
+
 ScriptExecutionContext* AudioContext::scriptExecutionContext() const
 {
     return document();
-}
-
-AudioContext* AudioContext::toAudioContext()
-{
-    return this;
 }
 
 void AudioContext::startRendering()

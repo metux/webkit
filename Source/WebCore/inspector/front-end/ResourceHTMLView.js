@@ -28,6 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ * @extends {WebInspector.ResourceView}
+ */
 WebInspector.ResourceHTMLView = function(resource)
 {
     WebInspector.ResourceView.call(this, resource);
@@ -40,15 +44,13 @@ WebInspector.ResourceHTMLView.prototype = {
         return true;
     },
 
-    show: function(parentElement)
+    wasShown: function()
     {
-        WebInspector.ResourceView.prototype.show.call(this, parentElement);
         this._createIFrame();
     },
 
-    hide: function(parentElement)
+    willHide: function(parentElement)
     {
-        WebInspector.ResourceView.prototype.hide.call(this, parentElement);
         this.element.removeChildren();
     },
 

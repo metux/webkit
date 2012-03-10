@@ -134,6 +134,9 @@ namespace JSC {
         
 #if ENABLE(DFG_JIT)
         int8_t baseGPR;
+#if USE(JSVALUE32_64)
+        int8_t valueTagGPR;
+#endif
         int8_t valueGPR;
         int8_t scratchGPR;
         int16_t deltaCallToDone;
@@ -144,7 +147,12 @@ namespace JSC {
         union {
             struct {
                 int16_t deltaCheckImmToCall;
+#if USE(JSVALUE64)
                 int16_t deltaCallToLoadOrStore;
+#elif USE(JSVALUE32_64)
+                int16_t deltaCallToTagLoadOrStore;
+                int16_t deltaCallToPayloadLoadOrStore;
+#endif
             } unset;
             struct {
                 WriteBarrierBase<Structure> baseObjectStructure;

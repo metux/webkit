@@ -35,37 +35,23 @@
 
 namespace JSC { namespace DFG {
 
-inline bool predictionIsValid(JSGlobalData* globalData, JSValue value, PredictedType type)
-{
-    // this takes into account only local variable predictions that get enforced
-    // on SetLocal.
-    
-    if (isInt32Prediction(type))
-        return value.isInt32();
-    
-    if (isArrayPrediction(type))
-        return isJSArray(globalData, value);
-    
-    if (isBooleanPrediction(type))
-        return value.isBoolean();
-    
-    return true;
-}
-
 void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIndex)
 {
-#if ENABLE(DFG_OSR_ENTRY)
+#if DFG_ENABLE(OSR_ENTRY)
     ASSERT(codeBlock->getJITType() == JITCode::DFGJIT);
     ASSERT(codeBlock->alternative());
     ASSERT(codeBlock->alternative()->getJITType() == JITCode::BaselineJIT);
-    ASSERT(codeBlock->jitCodeMap());
+    ASSERT(!codeBlock->jitCodeMap());
+    ASSERT(codeBlock->numberOfDFGOSREntries());
 
 #if ENABLE(JIT_VERBOSE_OSR)
     printf("OSR in %p(%p) from bc#%u\n", codeBlock, codeBlock->alternative(), bytecodeIndex);
 #endif
     
     JSGlobalData* globalData = &exec->globalData();
-    CodeBlock* baselineCodeBlock = codeBlock->alternative();
+    OSREntryData* entry = codeBlock->dfgOSREntryDataForBytecodeIndex(bytecodeIndex);
+    
+    ASSERT(entry->m_bytecodeIndex == bytecodeIndex);
     
     // The code below checks if it is safe to perform OSR entry. It may find
     // that it is unsafe to do so, for any number of reasons, which are documented
@@ -91,27 +77,38 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
     //    into a less-likely path. So, the wisest course of action is to simply not
     //    OSR at this time.
     
-    PredictionTracker* predictions = baselineCodeBlock->predictions();
-    
-    if (predictions->numberOfArguments() > exec->argumentCountIncludingThis())
-        return 0;
-    
-    for (unsigned i = 1; i < predictions->numberOfArguments(); ++i) {
-        if (!predictionIsValid(globalData, exec->argument(i - 1), predictions->getArgumentPrediction(i))) {
+    for (size_t argument = 0; argument < entry->m_expectedValues.numberOfArguments(); ++argument) {
+        if (argument >= exec->argumentCountIncludingThis()) {
 #if ENABLE(JIT_VERBOSE_OSR)
-            printf("    OSR failed because argument %u is %s, expected %s.\n", i, exec->argument(i - 1).description(), predictionToString(predictions->getArgumentPrediction(i)));
+            printf("    OSR failed because argument %lu was not passed, expected ", argument);
+            entry->m_expectedValues.argument(argument).dump(stdout);
+            printf(".\n");
+#endif
+            return 0;
+        }
+        
+        JSValue value;
+        if (!argument)
+            value = exec->hostThisValue();
+        else
+            value = exec->argument(argument - 1);
+        
+        if (!entry->m_expectedValues.argument(argument).validate(value)) {
+#if ENABLE(JIT_VERBOSE_OSR)
+            printf("    OSR failed because argument %lu is %s, expected ", argument, value.description());
+            entry->m_expectedValues.argument(argument).dump(stdout);
+            printf(".\n");
 #endif
             return 0;
         }
     }
     
-    // FIXME: we need to know if at an OSR entry, a variable is live. If it isn't
-    // then we shouldn't try to verify its prediction.
-    
-    for (unsigned i = 0; i < predictions->numberOfVariables(); ++i) {
-        if (!predictionIsValid(globalData, exec->registers()[i].jsValue(), predictions->getPrediction(i))) {
+    for (size_t local = 0; local < entry->m_expectedValues.numberOfLocals(); ++local) {
+        if (!entry->m_expectedValues.local(local).validate(exec->registers()[local].jsValue())) {
 #if ENABLE(JIT_VERBOSE_OSR)
-            printf("    OSR failed because variable %u is %s, expected %s.\n", i, exec->registers()[i].jsValue().description(), predictionToString(predictions->getPrediction(i)));
+            printf("    OSR failed because variable %lu is %s, expected ", local, exec->registers()[local].jsValue().description());
+            entry->m_expectedValues.local(local).dump(stdout);
+            printf(".\n");
 #endif
             return 0;
         }
@@ -126,7 +123,7 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
     
     if (!globalData->interpreter->registerFile().grow(&exec->registers()[codeBlock->m_numCalleeRegisters])) {
 #if ENABLE(JIT_VERBOSE_OSR)
-        printf("    OSR failed because stack growth failed..\n");
+        printf("    OSR failed because stack growth failed.\n");
 #endif
         return 0;
     }
@@ -139,37 +136,16 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
     
     exec->setCodeBlock(codeBlock);
     
-    // 4) Find and return the destination machine code address. The DFG stores
-    //    the machine code offsets of OSR targets in a CompactJITCodeMap.
-    //    Decoding it is not super efficient, but we expect that OSR entry
-    //    happens sufficiently rarely, and that OSR entrypoints are sufficiently
-    //    few, that this won't hurt throughput. Note that the only real
-    //    reason why we use a CompactJITCodeMap is to avoid having to introduce
-    //    yet another data structure for mapping between bytecode indices and
-    //    machine code offsets.
+    // 4) Find and return the destination machine code address.
     
-    CompactJITCodeMap::Decoder decoder(codeBlock->jitCodeMap());
-    unsigned machineCodeOffset = std::numeric_limits<unsigned>::max();
-    while (decoder.numberOfEntriesRemaining()) {
-        unsigned currentBytecodeIndex;
-        unsigned currentMachineCodeOffset;
-        decoder.read(currentBytecodeIndex, currentMachineCodeOffset);
-        if (currentBytecodeIndex == bytecodeIndex) {
-            machineCodeOffset = currentMachineCodeOffset;
-            break;
-        }
-    }
-    
-    ASSERT(machineCodeOffset != std::numeric_limits<unsigned>::max());
-    
-    void* result = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(codeBlock->getJITCode().start()) + machineCodeOffset);
+    void* result = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(codeBlock->getJITCode().start()) + entry->m_machineCodeOffset);
     
 #if ENABLE(JIT_VERBOSE_OSR)
     printf("    OSR returning machine code address %p.\n", result);
 #endif
     
     return result;
-#else // ENABLE(DFG_OSR_ENTRY)
+#else // DFG_ENABLE(OSR_ENTRY)
     UNUSED_PARAM(exec);
     UNUSED_PARAM(codeBlock);
     UNUSED_PARAM(bytecodeIndex);

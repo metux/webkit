@@ -45,9 +45,7 @@
 #include "JSSVGException.h"
 #endif
 #include "JSXMLHttpRequestException.h"
-#if ENABLE(XPATH)
 #include "JSXPathException.h"
-#endif
 #include "OperationNotAllowedException.h"
 #include "RangeException.h"
 #include "SQLException.h"
@@ -163,7 +161,7 @@ JSValue jsDateOrNull(ExecState* exec, double value)
 double valueToDate(ExecState* exec, JSValue value)
 {
     if (value.isNumber())
-        return value.uncheckedGetNumber();
+        return value.asNumber();
     if (!value.inherits(&DateInstance::s_info))
         return std::numeric_limits<double>::quiet_NaN();
     return static_cast<DateInstance*>(value.toObject(exec))->internalNumber();
@@ -233,11 +231,9 @@ void setDOMException(ExecState* exec, ExceptionCode ec)
             errorObject = toJS(exec, globalObject, SVGException::create(description).get());
             break;
 #endif
-#if ENABLE(XPATH)
         case XPathExceptionType:
             errorObject = toJS(exec, globalObject, XPathException::create(description));
             break;
-#endif
 #if ENABLE(SQL_DATABASE)
         case SQLExceptionType:
             errorObject = toJS(exec, globalObject, SQLException::create(description));
@@ -308,7 +304,7 @@ Frame* toDynamicFrame(ExecState* exec)
 
 JSValue objectToStringFunctionGetter(ExecState* exec, JSValue, const Identifier& propertyName)
 {
-    return JSFunction::create(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->functionStructure(), 0, propertyName, objectProtoFuncToString);
+    return JSFunction::create(exec, exec->lexicalGlobalObject(), 0, propertyName, objectProtoFuncToString);
 }
 
 Structure* getCachedDOMStructure(JSDOMGlobalObject* globalObject, const ClassInfo* classInfo)

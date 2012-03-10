@@ -91,6 +91,8 @@ WebInspector.ProfileType.prototype = {
 WebInspector.ProfilesPanel = function()
 {
     WebInspector.Panel.call(this, "profiles");
+    this.registerRequiredCSS("heapProfiler.css");
+    this.registerRequiredCSS("profilesPanel.css");
 
     this.createSidebar();
 
@@ -102,8 +104,6 @@ WebInspector.ProfilesPanel = function()
     var panelEnablerButton = WebInspector.UIString("Enable Profiling");
     this.panelEnablerView = new WebInspector.PanelEnablerView("profiles", panelEnablerHeading, panelEnablerDisclaimer, panelEnablerButton);
     this.panelEnablerView.addEventListener("enable clicked", this._enableProfiling, this);
-
-    this.element.appendChild(this.panelEnablerView.element);
 
     this.profileViews = document.createElement("div");
     this.profileViews.id = "profile-views";
@@ -119,7 +119,6 @@ WebInspector.ProfilesPanel = function()
     this.profileViewStatusBarItemsContainer.className = "status-bar-items";
 
     this.welcomeView = new WebInspector.WelcomeView("profiles", WebInspector.UIString("Welcome to the Profiles panel"));
-    this.element.appendChild(this.welcomeView.element);
 
     this._profiles = [];
     this._profilerEnabled = Preferences.profilerAlwaysEnabled;
@@ -171,9 +170,9 @@ WebInspector.ProfilesPanel.prototype = {
         return items;
     },
 
-    show: function()
+    wasShown: function()
     {
-        WebInspector.Panel.prototype.show.call(this);
+        WebInspector.Panel.prototype.wasShown.call(this);
         this._populateProfiles();
     },
 
@@ -185,7 +184,7 @@ WebInspector.ProfilesPanel.prototype = {
         this._profilerEnabled = true;
 
         this._reset();
-        if (this.visible)
+        if (this.isShowing())
             this._populateProfiles();
     },
 
@@ -204,8 +203,12 @@ WebInspector.ProfilesPanel.prototype = {
 
         for (var i = 0; i < this._profiles.length; ++i) {
             var view = this._profiles[i]._profileView;
-            if (view && ("dispose" in view))
-                view.dispose();
+            if (view) {
+                view.detach();
+                if ("dispose" in view)
+                    view.dispose();
+            }
+
             delete this._profiles[i]._profileView;
         }
         delete this.visibleView;
@@ -231,7 +234,7 @@ WebInspector.ProfilesPanel.prototype = {
         this.removeAllListeners();
 
         this._updateInterface();
-        this.welcomeView.show();
+        this.welcomeView.show(this.element);
     },
 
     _clearProfiles: function()
@@ -342,7 +345,7 @@ WebInspector.ProfilesPanel.prototype = {
 
         sidebarParent.appendChild(profileTreeElement);
         if (!profile.isTemporary) {
-            this.welcomeView.hide();
+            this.welcomeView.detach();
             if (!this.visibleView)
                 this.showProfile(profile);
             this.dispatchEventToListeners("profile added");
@@ -513,7 +516,7 @@ WebInspector.ProfilesPanel.prototype = {
     closeVisibleView: function()
     {
         if (this.visibleView)
-            this.visibleView.hide();
+            this.visibleView.detach();
         delete this.visibleView;
     },
 
@@ -538,7 +541,152 @@ WebInspector.ProfilesPanel.prototype = {
         return title;
     },
 
-    get searchableViews()
+    performSearch: function(query)
+    {
+        this.searchCanceled();
+
+        var searchableViews = this._searchableViews();
+        if (!searchableViews || !searchableViews.length)
+            return;
+
+        var parentElement = this.viewsContainerElement;
+        var visibleView = this.visibleView;
+        var sortFuction = this.searchResultsSortFunction;
+
+        var matchesCountUpdateTimeout = null;
+
+        function updateMatchesCount()
+        {
+            WebInspector.searchController.updateSearchMatchesCount(this._totalSearchMatches, this);
+            matchesCountUpdateTimeout = null;
+        }
+
+        function updateMatchesCountSoon()
+        {
+            if (matchesCountUpdateTimeout)
+                return;
+            // Update the matches count every half-second so it doesn't feel twitchy.
+            matchesCountUpdateTimeout = setTimeout(updateMatchesCount.bind(this), 500);
+        }
+
+        function finishedCallback(view, searchMatches)
+        {
+            if (!searchMatches)
+                return;
+
+            this._totalSearchMatches += searchMatches;
+            this._searchResults.push(view);
+
+            if (sortFuction)
+                this._searchResults.sort(sortFuction);
+
+            if (this.searchMatchFound)
+                this.searchMatchFound(view, searchMatches);
+
+            updateMatchesCountSoon.call(this);
+
+            if (view === visibleView)
+                view.jumpToFirstSearchResult();
+        }
+
+        var i = 0;
+        var panel = this;
+        var boundFinishedCallback = finishedCallback.bind(this);
+        var chunkIntervalIdentifier = null;
+
+        // Split up the work into chunks so we don't block the
+        // UI thread while processing.
+
+        function processChunk()
+        {
+            var view = searchableViews[i];
+
+            if (++i >= searchableViews.length) {
+                if (panel._currentSearchChunkIntervalIdentifier === chunkIntervalIdentifier)
+                    delete panel._currentSearchChunkIntervalIdentifier;
+                clearInterval(chunkIntervalIdentifier);
+            }
+
+            if (!view)
+                return;
+
+            view.currentQuery = query;
+            view.performSearch(query, boundFinishedCallback);
+        }
+
+        processChunk();
+
+        chunkIntervalIdentifier = setInterval(processChunk, 25);
+        this._currentSearchChunkIntervalIdentifier = chunkIntervalIdentifier;
+    },
+
+    jumpToNextSearchResult: function()
+    {
+        if (!this.showView || !this._searchResults || !this._searchResults.length)
+            return;
+
+        var showFirstResult = false;
+
+        this._currentSearchResultIndex = this._searchResults.indexOf(this.visibleView);
+        if (this._currentSearchResultIndex === -1) {
+            this._currentSearchResultIndex = 0;
+            showFirstResult = true;
+        }
+
+        var currentView = this._searchResults[this._currentSearchResultIndex];
+
+        if (currentView.showingLastSearchResult()) {
+            if (++this._currentSearchResultIndex >= this._searchResults.length)
+                this._currentSearchResultIndex = 0;
+            currentView = this._searchResults[this._currentSearchResultIndex];
+            showFirstResult = true;
+        }
+
+        if (currentView !== this.visibleView) {
+            this.showView(currentView);
+            WebInspector.searchController.focusSearchField();
+        }
+
+        if (showFirstResult)
+            currentView.jumpToFirstSearchResult();
+        else
+            currentView.jumpToNextSearchResult();
+    },
+
+    jumpToPreviousSearchResult: function()
+    {
+        if (!this.showView || !this._searchResults || !this._searchResults.length)
+            return;
+
+        var showLastResult = false;
+
+        this._currentSearchResultIndex = this._searchResults.indexOf(this.visibleView);
+        if (this._currentSearchResultIndex === -1) {
+            this._currentSearchResultIndex = 0;
+            showLastResult = true;
+        }
+
+        var currentView = this._searchResults[this._currentSearchResultIndex];
+
+        if (currentView.showingFirstSearchResult()) {
+            if (--this._currentSearchResultIndex < 0)
+                this._currentSearchResultIndex = (this._searchResults.length - 1);
+            currentView = this._searchResults[this._currentSearchResultIndex];
+            showLastResult = true;
+        }
+
+        if (currentView !== this.visibleView) {
+            this.showView(currentView);
+            WebInspector.searchController.focusSearchField();
+        }
+
+        if (showLastResult)
+            currentView.jumpToLastSearchResult();
+        else
+            currentView.jumpToPreviousSearchResult();
+    },
+
+    _searchableViews: function()
     {
         var views = [];
 
@@ -563,9 +711,27 @@ WebInspector.ProfilesPanel.prototype = {
         view.profile._profilesTreeElement.searchMatches = matches;
     },
 
-    searchCanceled: function(startingNewSearch)
+    searchCanceled: function()
     {
-        WebInspector.Panel.prototype.searchCanceled.call(this, startingNewSearch);
+        if (this._searchResults) {
+            for (var i = 0; i < this._searchResults.length; ++i) {
+                var view = this._searchResults[i];
+                if (view.searchCanceled)
+                    view.searchCanceled();
+                delete view.currentQuery;
+            }
+        }
+
+        WebInspector.Panel.prototype.searchCanceled.call(this);
+
+        if (this._currentSearchChunkIntervalIdentifier) {
+            clearInterval(this._currentSearchChunkIntervalIdentifier);
+            delete this._currentSearchChunkIntervalIdentifier;
+        }
+
+        this._totalSearchMatches = 0;
+        this._currentSearchResultIndex = 0;
+        this._searchResults = [];
 
         if (!this._profiles)
             return;
@@ -586,7 +752,7 @@ WebInspector.ProfilesPanel.prototype = {
                 this._profileTypeButtonsByIdMap[typeId].removeStyleClass("hidden");
             this.profileViewStatusBarItemsContainer.removeStyleClass("hidden");
             this.clearResultsButton.element.removeStyleClass("hidden");
-            this.panelEnablerView.visible = false;
+            this.panelEnablerView.detach();
         } else {
             this.enableToggleButton.title = WebInspector.UIString("Profiling disabled. Click to enable.");
             this.enableToggleButton.toggled = false;
@@ -594,7 +760,7 @@ WebInspector.ProfilesPanel.prototype = {
                 this._profileTypeButtonsByIdMap[typeId].addStyleClass("hidden");
             this.profileViewStatusBarItemsContainer.addStyleClass("hidden");
             this.clearResultsButton.element.addStyleClass("hidden");
-            this.panelEnablerView.visible = true;
+            this.panelEnablerView.show(this.element);
         }
     },
 
@@ -703,7 +869,7 @@ WebInspector.ProfilesPanel.prototype = {
         profileType.treeElement = oldProfileType.treeElement;
         this._profileTypesByIdMap[profileType.id] = profileType;
         Preferences.detailedHeapProfiles = true;
-        this.hide();
+        this.detach();
         this.show();
     }
 }

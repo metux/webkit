@@ -41,6 +41,7 @@
 #include "Page.h"
 #include "RenderLayer.h"
 #include "RenderView.h"
+#include "SVGImage.h"
 #include <wtf/UnusedParam.h>
 
 using namespace std;
@@ -50,7 +51,7 @@ namespace WebCore {
 using namespace HTMLNames;
 
 RenderImage::RenderImage(Node* node)
-    : RenderReplaced(node, IntSize(0, 0))
+    : RenderReplaced(node, IntSize())
     , m_needsToSetSizeForAltText(false)
     , m_didIncrementVisuallyNonEmptyPixelCount(false)
 {
@@ -82,16 +83,16 @@ static const int maxAltTextHeight = 256;
 IntSize RenderImage::imageSizeForError(CachedImage* newImage) const
 {
     ASSERT_ARG(newImage, newImage);
-    ASSERT_ARG(newImage, newImage->image());
+    ASSERT_ARG(newImage, newImage->imageForRenderer(this));
 
     IntSize imageSize;
     if (newImage->willPaintBrokenImage()) {
-        float deviceScaleFactor = Page::deviceScaleFactor(frame());
+        float deviceScaleFactor = WebCore::deviceScaleFactor(frame());
         pair<Image*, float> brokenImageAndImageScaleFactor = newImage->brokenImage(deviceScaleFactor);
         imageSize = brokenImageAndImageScaleFactor.first->size();
         imageSize.scale(1 / brokenImageAndImageScaleFactor.second);
     } else
-        imageSize = newImage->image()->size();
+        imageSize = newImage->imageForRenderer(this)->size();
 
     // imageSize() returns 0 for the error image. We need the true size of the
     // error image, so we have to get it by grabbing image() directly.
@@ -103,7 +104,7 @@ IntSize RenderImage::imageSizeForError(CachedImage* newImage) const
 bool RenderImage::setImageSizeForAltText(CachedImage* newImage /* = 0 */)
 {
     IntSize imageSize;
-    if (newImage && newImage->image())
+    if (newImage && newImage->imageForRenderer(this))
         imageSize = imageSizeForError(newImage);
     else if (!m_altText.isEmpty() || newImage) {
         // If we'll be displaying either text or an image, add a little padding.
@@ -173,14 +174,20 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
     imageDimensionsChanged(imageSizeChanged, rect);
 }
 
+bool RenderImage::updateIntrinsicSizeIfNeeded(bool imageSizeChanged)
+{
+    if (m_imageResource->imageSize(style()->effectiveZoom()) == intrinsicSize() && !imageSizeChanged)
+        return false;
+    if (m_imageResource->errorOccurred())
+        return imageSizeChanged;
+    setIntrinsicSize(m_imageResource->imageSize(style()->effectiveZoom()));
+    return true;
+}
+
 void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* rect)
 {
     bool shouldRepaint = true;
-
-    if (m_imageResource->imageSize(style()->effectiveZoom()) != intrinsicSize() || imageSizeChanged) {
-        if (!m_imageResource->errorOccurred())
-            setIntrinsicSize(m_imageResource->imageSize(style()->effectiveZoom()));
-
+    if (updateIntrinsicSizeIfNeeded(imageSizeChanged)) {
         // In the case of generated image content using :before/:after, we might not be in the
         // render tree yet.  In that case, we don't need to worry about check for layout, since we'll get a
         // layout when we get added in to the render tree hierarchy later.
@@ -277,7 +284,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
             RefPtr<Image> image = m_imageResource->image();
 
             if (m_imageResource->errorOccurred() && !image->isNull() && usableWidth >= image->width() && usableHeight >= image->height()) {
-                float deviceScaleFactor = Page::deviceScaleFactor(frame());
+                float deviceScaleFactor = WebCore::deviceScaleFactor(frame());
                 // Call brokenImage() explicitly to ensure we get the broken image icon at the appropriate resolution.
                 pair<Image*, float> brokenImageAndImageScaleFactor = m_imageResource->cachedImage()->brokenImage(deviceScaleFactor);
                 image = brokenImageAndImageScaleFactor.first;
@@ -475,102 +482,58 @@ void RenderImage::updateAltText()
         m_altText = static_cast<HTMLImageElement*>(node())->altText();
 }
 
-bool RenderImage::isLogicalWidthSpecified() const
-{
-    switch (style()->logicalWidth().type()) {
-        case Fixed:
-        case Percent:
-            return true;
-        case Auto:
-        case Relative: // FIXME: Shouldn't this case return true?
-        case Intrinsic:
-        case MinIntrinsic:
-            return false;
-        case Undefined:
-            ASSERT_NOT_REACHED();
-            return false;
-    }
-    ASSERT_NOT_REACHED();
-    return false;
-}
-
-bool RenderImage::isLogicalHeightSpecified() const
-{
-    switch (style()->logicalHeight().type()) {
-        case Fixed:
-        case Percent:
-            return true;
-        case Auto:
-        case Relative: // FIXME: Shouldn't this case return true?
-        case Intrinsic:
-        case MinIntrinsic:
-            return false;
-        case Undefined:
-            ASSERT_NOT_REACHED();
-            return false;
-    }
-    ASSERT_NOT_REACHED();
-    return false;
-}
-
 LayoutUnit RenderImage::computeReplacedLogicalWidth(bool includeMaxWidth) const
 {
-    if (m_imageResource->imageHasRelativeWidth())
-        if (RenderObject* cb = isPositioned() ? container() : containingBlock()) {
-            if (cb->isBox())
-                m_imageResource->setImageContainerSize(LayoutSize(toRenderBox(cb)->availableWidth(), toRenderBox(cb)->availableHeight()));
+    // If we've got an explicit width/height assigned, propagate it to the image resource.    
+    if (style()->logicalWidth().isFixed() && style()->logicalHeight().isFixed()) {
+        LayoutUnit width = RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
+        m_imageResource->setContainerSizeForRenderer(IntSize(width, computeReplacedLogicalHeight()));
+        return width;
+    }
+
+    // Propagate the containing block size to the image resource, otherwhise we can't compute our own intrinsic size, if it's relative.
+    RenderBox* contentRenderer = embeddedContentBox();
+    bool hasRelativeWidth = contentRenderer ? contentRenderer->style()->width().isPercent() : m_imageResource->imageHasRelativeWidth();
+    bool hasRelativeHeight = contentRenderer ? contentRenderer->style()->height().isPercent() : m_imageResource->imageHasRelativeHeight();
+
+    if (hasRelativeWidth || hasRelativeHeight) {
+        RenderObject* containingBlock = isPositioned() ? container() : this->containingBlock();
+        if (containingBlock->isBox()) {
+            RenderBox* box = toRenderBox(containingBlock);
+            m_imageResource->setContainerSizeForRenderer(IntSize(box->availableWidth(), box->availableHeight())); // Already contains zooming information.
+            const_cast<RenderImage*>(this)->updateIntrinsicSizeIfNeeded(false);
         }
+    }
 
-    LayoutUnit logicalWidth;
-    if (isLogicalWidthSpecified())
-        logicalWidth = computeReplacedLogicalWidthUsing(style()->logicalWidth());
-    else if (m_imageResource->usesImageContainerSize()) {
-        LayoutSize size = m_imageResource->imageSize(style()->effectiveZoom());
-        logicalWidth = style()->isHorizontalWritingMode() ? size.width() : size.height();
-    } else if (m_imageResource->imageHasRelativeWidth())
-        logicalWidth = 0; // If the image is relatively-sized, set the width to 0 until there is a set container size.
-    else
-        logicalWidth = calcAspectRatioLogicalWidth();
-
-    return computeReplacedLogicalWidthRespectingMinMaxWidth(logicalWidth, includeMaxWidth);
+    return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
 }
 
-LayoutUnit RenderImage::computeReplacedLogicalHeight() const
+void RenderImage::computeIntrinsicRatioInformation(FloatSize& intrinsicRatio, bool& isPercentageIntrinsicSize) const
 {
-    LayoutUnit logicalHeight;
-    if (isLogicalHeightSpecified())
-        logicalHeight = computeReplacedLogicalHeightUsing(style()->logicalHeight());
-    else if (m_imageResource->usesImageContainerSize()) {
-        LayoutSize size = m_imageResource->imageSize(style()->effectiveZoom());
-        logicalHeight = style()->isHorizontalWritingMode() ? size.height() : size.width();
-    } else if (m_imageResource->imageHasRelativeHeight())
-        logicalHeight = 0; // If the image is relatively-sized, set the height to 0 until there is a set container size.
-    else
-        logicalHeight = calcAspectRatioLogicalHeight();
-
-    return computeReplacedLogicalHeightRespectingMinMaxHeight(logicalHeight);
+    // Assure this method is never used for SVGImages.
+    ASSERT(!embeddedContentBox());
+    isPercentageIntrinsicSize = false;
+    if (m_imageResource && m_imageResource->image())
+        intrinsicRatio = m_imageResource->image()->size();
 }
 
-int RenderImage::calcAspectRatioLogicalWidth() const
+bool RenderImage::needsPreferredWidthsRecalculation() const
 {
-    int intrinsicWidth = intrinsicLogicalWidth();
-    int intrinsicHeight = intrinsicLogicalHeight();
-    if (!intrinsicHeight)
+    if (RenderReplaced::needsPreferredWidthsRecalculation())
+        return true;
+    return embeddedContentBox();
+}
+
+RenderBox* RenderImage::embeddedContentBox() const
+{
+    if (!m_imageResource)
         return 0;
-    if (!m_imageResource->hasImage() || m_imageResource->errorOccurred())
-        return intrinsicWidth; // Don't bother scaling.
-    return RenderBox::computeReplacedLogicalHeight() * intrinsicWidth / intrinsicHeight;
-}
 
-int RenderImage::calcAspectRatioLogicalHeight() const
-{
-    int intrinsicWidth = intrinsicLogicalWidth();
-    int intrinsicHeight = intrinsicLogicalHeight();
-    if (!intrinsicWidth)
-        return 0;
-    if (!m_imageResource->hasImage() || m_imageResource->errorOccurred())
-        return intrinsicHeight; // Don't bother scaling.
-    return RenderBox::computeReplacedLogicalWidth() * intrinsicHeight / intrinsicWidth;
+    RefPtr<Image> image = m_imageResource->image();
+    if (image && image->isSVGImage())
+        return static_pointer_cast<SVGImage>(image)->embeddedContentBox();
+
+    return 0;
 }
 
 } // namespace WebCore

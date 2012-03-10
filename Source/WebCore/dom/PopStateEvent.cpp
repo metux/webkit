@@ -33,23 +33,31 @@ namespace WebCore {
 
 PopStateEventInit::PopStateEventInit()
 {
-    state = SerializedScriptValue::create();
 }
 
 PopStateEvent::PopStateEvent()
     : Event(eventNames().popstateEvent, false, true)
+    , m_serializedState(0)
 {
 }
 
 PopStateEvent::PopStateEvent(const AtomicString& type, const PopStateEventInit& initializer)
     : Event(type, initializer)
-    , m_stateObject(initializer.state)
+    , m_state(initializer.state)
+    , m_serializedState(0)
 {
 }
 
-PopStateEvent::PopStateEvent(PassRefPtr<SerializedScriptValue> stateObject)
+PopStateEvent::PopStateEvent(const ScriptValue& state)
     : Event(eventNames().popstateEvent, false, true)
-    , m_stateObject(stateObject)
+    , m_state(state)
+    , m_serializedState(0)
+{
+}
+
+PopStateEvent::PopStateEvent(PassRefPtr<SerializedScriptValue> serializedState)
+    : Event(eventNames().popstateEvent, false, true)
+    , m_serializedState(serializedState)
 {
 }
 
@@ -62,9 +70,14 @@ PassRefPtr<PopStateEvent> PopStateEvent::create()
     return adoptRef(new PopStateEvent);
 }
 
-PassRefPtr<PopStateEvent> PopStateEvent::create(PassRefPtr<SerializedScriptValue> stateObject)
+PassRefPtr<PopStateEvent> PopStateEvent::create(const ScriptValue& state)
 {
-    return adoptRef(new PopStateEvent(stateObject));
+    return adoptRef(new PopStateEvent(state));
+}
+
+PassRefPtr<PopStateEvent> PopStateEvent::create(PassRefPtr<SerializedScriptValue> serializedState)
+{
+    return adoptRef(new PopStateEvent(serializedState));
 }
 
 PassRefPtr<PopStateEvent> PopStateEvent::create(const AtomicString& type, const PopStateEventInit& initializer)
@@ -72,14 +85,19 @@ PassRefPtr<PopStateEvent> PopStateEvent::create(const AtomicString& type, const 
     return adoptRef(new PopStateEvent(type, initializer));
 }
 
-void PopStateEvent::initPopStateEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<SerializedScriptValue> stateObject)
+void PopStateEvent::initPopStateEvent(const AtomicString& type, bool canBubble, bool cancelable, const ScriptValue& state)
 {
     if (dispatched())
         return;
-    
+
     initEvent(type, canBubble, cancelable);
 
-    m_stateObject = stateObject;
+    m_state = state;
+}
+
+const AtomicString& PopStateEvent::interfaceName() const
+{
+    return eventNames().interfaceForPopStateEvent;
 }
 
 } // namespace WebCore

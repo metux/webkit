@@ -6,6 +6,7 @@
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
+ * Copyright (C) 2011 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -37,6 +38,7 @@
 #include "IntRect.h"
 #include "LayoutTypes.h"
 #include "PageVisibilityState.h"
+#include "PlatformScreen.h"
 #include "QualifiedName.h"
 #include "ScriptExecutionContext.h"
 #include "StringWithDirection.h"
@@ -64,7 +66,6 @@ class CachedScript;
 class CanvasRenderingContext;
 class CharacterData;
 class Comment;
-class ContentSecurityPolicy;
 class DOMImplementation;
 class DOMSelection;
 class DOMWindow;
@@ -128,6 +129,10 @@ class TextResourceDecoder;
 class DocumentParser;
 class TreeWalker;
 class XMLHttpRequest;
+class XPathEvaluator;
+class XPathExpression;
+class XPathNSResolver;
+class XPathResult;
 
 #if ENABLE(SVG)
 class SVGDocumentExtensions;
@@ -135,13 +140,6 @@ class SVGDocumentExtensions;
 
 #if ENABLE(XSLT)
 class TransformSource;
-#endif
-
-#if ENABLE(XPATH)
-class XPathEvaluator;
-class XPathExpression;
-class XPathNSResolver;
-class XPathResult;
 #endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -156,6 +154,10 @@ class TouchList;
 #if ENABLE(REQUEST_ANIMATION_FRAME)
 class RequestAnimationFrameCallback;
 class ScriptedAnimationController;
+#endif
+
+#if ENABLE(MICRODATA)
+class MicroDataItemList;
 #endif
 
 typedef int ExceptionCode;
@@ -440,11 +442,6 @@ public:
 #endif
     virtual bool isPluginDocument() const { return false; }
     virtual bool isMediaDocument() const { return false; }
-#if ENABLE(XHTMLMP)
-    bool isXHTMLMPDocument() const; 
-    bool shouldProcessNoscriptElement() const { return m_shouldProcessNoScriptElement; }
-    void setShouldProcessNoscriptElement(bool shouldDo) { m_shouldProcessNoScriptElement = shouldDo; }
-#endif
     virtual bool isFrameSet() const { return false; }
     
     PassRefPtr<CSSPrimitiveValueCache> cssPrimitiveValueCache() const;
@@ -550,7 +547,7 @@ public:
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
-    void retireCustomFont(FontData*);
+    void registerCustomFont(FontData*);
 
     // Returns true if page box (margin boxes and page borders) is visible.
     bool isPageBoxVisible(int pageIndex);
@@ -566,6 +563,10 @@ public:
 
     virtual void attach();
     virtual void detach();
+
+    // Override ScriptExecutionContext methods to do additional work
+    virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
+    virtual void resumeActiveDOMObjects() OVERRIDE;
 
     RenderArena* renderArena() { return m_renderArena.get(); }
 
@@ -611,6 +612,8 @@ public:
     KURL completeURL(const String&) const;
 
     virtual String userAgent(const KURL&) const;
+
+    virtual void disableEval();
 
     CSSStyleSheet* pageUserSheet();
     void clearPageUserSheet();
@@ -822,6 +825,7 @@ public:
     //    inherits its cookieURL but not its URL.
     //
     const KURL& cookieURL() const { return m_cookieURL; }
+    void setCookieURL(const KURL& url) { m_cookieURL = url; }
 
     // The firstPartyForCookies is used to compute whether this document
     // appears in a "third-party" context for the purpose of third-party
@@ -897,7 +901,6 @@ public:
 
     void setDocType(PassRefPtr<DocumentType>);
 
-#if ENABLE(XPATH)
     // XPathEvaluator methods
     PassRefPtr<XPathExpression> createExpression(const String& expression,
                                                  XPathNSResolver* resolver,
@@ -909,17 +912,15 @@ public:
                                      unsigned short type,
                                      XPathResult* result,
                                      ExceptionCode& ec);
-#endif // ENABLE(XPATH)
-    
+
     enum PendingSheetLayout { NoLayoutWithPendingSheets, DidLayoutWithPendingSheets, IgnoreLayoutWithPendingSheets };
 
     bool didLayoutWithPendingStylesheets() const { return m_pendingSheetLayout == DidLayoutWithPendingSheets; }
     
     void setHasNodesWithPlaceholderStyle() { m_hasNodesWithPlaceholderStyle = true; }
 
-    IconURL iconURL(IconType) const;
-    void setIconURL(const String&, const String&, IconType);
-    void setIconURL(const IconURL&);
+    const Vector<IconURL>& iconURLs() const;
+    void addIconURL(const String& url, const String& mimeType, const String& size, IconType);
 
     void setUseSecureKeyboardEntryWhenActive(bool);
     bool useSecureKeyboardEntryWhenActive() const;
@@ -942,6 +943,8 @@ public:
 
     virtual void suspendScriptedAnimationControllerCallbacks();
     virtual void resumeScriptedAnimationControllerCallbacks();
+    
+    void windowScreenDidChange(PlatformDisplayID);
 
     virtual void finishedParsing();
 
@@ -1091,11 +1094,16 @@ public:
 
     void initDNSPrefetch();
 
-    ContentSecurityPolicy* contentSecurityPolicy() { return m_contentSecurityPolicy.get(); }
-
     unsigned wheelEventHandlerCount() const { return m_wheelEventHandlerCount; }
     void didAddWheelEventHandler();
     void didRemoveWheelEventHandler();
+    
+    bool visualUpdatesAllowed() const;
+
+#if ENABLE(MICRODATA)
+    PassRefPtr<NodeList> getItems(const String& typeNames);
+    void removeCachedMicroDataItemList(MicroDataItemList*, const String&);
+#endif
     
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
@@ -1138,7 +1146,7 @@ private:
 
     void createStyleSelector();
 
-    void deleteRetiredCustomFonts();
+    void deleteCustomFonts();
 
     PassRefPtr<NodeList> handleZeroPadding(const HitTestRequest&, HitTestResult&) const;
 
@@ -1153,7 +1161,7 @@ private:
     OwnPtr<CSSStyleSelector> m_styleSelector;
     bool m_didCalculateStyleSelector;
     bool m_hasDirtyStyleSelector;
-    Vector<OwnPtr<FontData> > m_retiredCustomFonts;
+    Vector<OwnPtr<FontData> > m_customFonts;
 
     mutable RefPtr<CSSPrimitiveValueCache> m_cssPrimitiveValueCache;
 
@@ -1315,10 +1323,6 @@ private:
 
     String m_contentLanguage;
 
-#if ENABLE(XHTMLMP)
-    bool m_shouldProcessNoScriptElement;
-#endif
-
     RenderObject* m_savedRenderer;
     
     RefPtr<TextResourceDecoder> m_decoder;
@@ -1331,14 +1335,12 @@ private:
     FixedArray<CollectionCache, NumUnnamedDocumentCachedTypes> m_collectionInfo;
     FixedArray<NamedCollectionMap, NumNamedDocumentCachedTypes> m_nameCollectionInfo;
 
-#if ENABLE(XPATH)
     RefPtr<XPathEvaluator> m_xpathEvaluator;
-#endif
-    
+
 #if ENABLE(SVG)
     OwnPtr<SVGDocumentExtensions> m_svgExtensions;
 #endif
-    
+
 #if ENABLE(DASHBOARD_SUPPORT)
     Vector<DashboardRegionValue> m_dashboardRegions;
     bool m_hasDashboardRegions;
@@ -1349,7 +1351,7 @@ private:
 
     bool m_createRenderers;
     bool m_inPageCache;
-    IconURL m_iconURLs[ICON_COUNT];
+    Vector<IconURL> m_iconURLs;
 
     HashSet<Element*> m_documentActivationCallbackElements;
     HashSet<Element*> m_mediaVolumeCallbackElements;
@@ -1405,8 +1407,6 @@ private:
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     OwnPtr<ScriptedAnimationController> m_scriptedAnimationController;
 #endif
-
-    RefPtr<ContentSecurityPolicy> m_contentSecurityPolicy;
 };
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.
@@ -1417,11 +1417,11 @@ inline bool Node::isDocumentNode() const
 }
 
 inline Node::Node(Document* document, ConstructionType type)
-    : m_document(document)
+    : m_nodeFlags(type)
+    , m_document(document)
     , m_previous(0)
     , m_next(0)
     , m_renderer(0)
-    , m_nodeFlags(type)
 {
     if (m_document)
         m_document->guardRef();

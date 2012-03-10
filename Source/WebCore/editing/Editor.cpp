@@ -79,6 +79,7 @@
 #include "SpellingCorrectionCommand.h"
 #include "Text.h"
 #include "TextCheckerClient.h"
+#include "TextCheckingHelper.h"
 #include "TextEvent.h"
 #include "TextIterator.h"
 #include "TypingCommand.h"
@@ -508,57 +509,6 @@ void Editor::respondToChangedContents(const VisibleSelection& endingSelection)
         client()->respondToChangedContents();
 }
 
-const SimpleFontData* Editor::fontForSelection(bool& hasMultipleFonts) const
-{
-#if !PLATFORM(QT)
-    hasMultipleFonts = false;
-
-    if (!m_frame->selection()->isRange()) {
-        Node* nodeToRemove;
-        RenderStyle* style = styleForSelectionStart(nodeToRemove); // sets nodeToRemove
-
-        const SimpleFontData* result = 0;
-        if (style)
-            result = style->font().primaryFont();
-        
-        if (nodeToRemove) {
-            ExceptionCode ec;
-            nodeToRemove->remove(ec);
-            ASSERT(!ec);
-        }
-
-        return result;
-    }
-
-    const SimpleFontData* font = 0;
-
-    RefPtr<Range> range = m_frame->selection()->toNormalizedRange();
-    Node* startNode = range->editingStartPosition().deprecatedNode();
-    if (startNode) {
-        Node* pastEnd = range->pastLastNode();
-        // In the loop below, n should eventually match pastEnd and not become nil, but we've seen at least one
-        // unreproducible case where this didn't happen, so check for nil also.
-        for (Node* n = startNode; n && n != pastEnd; n = n->traverseNextNode()) {
-            RenderObject* renderer = n->renderer();
-            if (!renderer)
-                continue;
-            // FIXME: Are there any node types that have renderers, but that we should be skipping?
-            const SimpleFontData* f = renderer->style()->font().primaryFont();
-            if (!font)
-                font = f;
-            else if (font != f) {
-                hasMultipleFonts = true;
-                break;
-            }
-        }
-    }
-
-    return font;
-#else
-    return 0;
-#endif
-}
-
 WritingDirection Editor::textDirectionForSelection(bool& hasNestedOrMultipleEmbeddings) const
 {
     hasNestedOrMultipleEmbeddings = true;
@@ -874,72 +824,25 @@ void Editor::applyParagraphStyleToSelection(CSSStyleDeclaration* style, EditActi
 
 bool Editor::selectionStartHasStyle(int propertyID, const String& value) const
 {
-    RefPtr<EditingStyle> style = EditingStyle::create(propertyID, value);
-    RefPtr<EditingStyle> selectionStyle = selectionStartStyle();
-    if (!selectionStyle || !selectionStyle->style())
-        return false;
-    return style->triStateOfStyle(selectionStyle->style()) == TrueTriState;
+    return EditingStyle::create(propertyID, value)->triStateOfStyle(
+        EditingStyle::styleAtSelectionStart(m_frame->selection()->selection(), propertyID == CSSPropertyBackgroundColor).get());
 }
 
 TriState Editor::selectionHasStyle(int propertyID, const String& value) const
 {
-    RefPtr<EditingStyle> style = EditingStyle::create(propertyID, value);
-    if (!m_frame->selection()->isCaretOrRange())
-        return FalseTriState;
-
-    if (m_frame->selection()->isCaret()) {
-        RefPtr<EditingStyle> selectionStyle = selectionStartStyle();
-        if (!selectionStyle || !selectionStyle->style())
-            return FalseTriState;
-        return style->triStateOfStyle(selectionStyle->style());
-    }
-
-    TriState state = FalseTriState;
-    for (Node* node = m_frame->selection()->start().deprecatedNode(); node; node = node->traverseNextNode()) {
-        RefPtr<CSSComputedStyleDeclaration> nodeStyle = computedStyle(node);
-        if (nodeStyle) {
-            TriState nodeState = style->triStateOfStyle(nodeStyle.get(), node->isTextNode() ? EditingStyle::DoNotIgnoreTextOnlyProperties : EditingStyle::IgnoreTextOnlyProperties);
-            if (node == m_frame->selection()->start().deprecatedNode())
-                state = nodeState;
-            else if (state != nodeState && node->isTextNode()) {
-                state = MixedTriState;
-                break;
-            }
-        }
-        if (node == m_frame->selection()->end().deprecatedNode())
-            break;
-    }
-
-    return state;
+    return EditingStyle::create(propertyID, value)->triStateOfStyle(m_frame->selection()->selection());
 }
 
 String Editor::selectionStartCSSPropertyValue(int propertyID)
 {
-    RefPtr<EditingStyle> selectionStyle = selectionStartStyle();
+    RefPtr<EditingStyle> selectionStyle = EditingStyle::styleAtSelectionStart(m_frame->selection()->selection(),
+        propertyID == CSSPropertyBackgroundColor);
     if (!selectionStyle || !selectionStyle->style())
         return String();
 
-    String value = selectionStyle->style()->getPropertyValue(propertyID);
-
-    // If background color is transparent, traverse parent nodes until we hit a different value or document root
-    // Also, if the selection is a range, ignore the background color at the start of selection,
-    // and find the background color of the common ancestor.
-    if (propertyID == CSSPropertyBackgroundColor && (m_frame->selection()->isRange() || hasTransparentBackgroundColor(selectionStyle->style()))) {
-        RefPtr<Range> range(m_frame->selection()->toNormalizedRange());
-        ExceptionCode ec = 0;
-        if (PassRefPtr<CSSValue> value = backgroundColorInEffect(range->commonAncestorContainer(ec)))
-            return value->cssText();
-    }
-
-    if (propertyID == CSSPropertyFontSize) {
-        RefPtr<CSSValue> cssValue = selectionStyle->style()->getPropertyCSSValue(CSSPropertyFontSize);
-        if (cssValue->isPrimitiveValue()) {
-            value = String::number(legacyFontSizeFromCSSValue(m_frame->document(), static_cast<CSSPrimitiveValue*>(cssValue.get()),
-                selectionStyle->shouldUseFixedDefaultFontSize(), AlwaysUseLegacyFontSize));
-        }
-    }
-
-    return value;
+    if (propertyID == CSSPropertyFontSize)
+        return String::number(selectionStyle->legacyFontSize(m_frame->document()));
+    return selectionStyle->style()->getPropertyValue(propertyID);
 }
 
 void Editor::indent()
@@ -1725,45 +1628,11 @@ void Editor::advanceToNextMisspelling(bool startBeforeSelection)
     String badGrammarPhrase;
     String misspelledWord;
 
-#if USE(UNIFIED_TEXT_CHECKING)
-    grammarSearchRange = spellingSearchRange->cloneRange(ec);
     bool isSpelling = true;
     int foundOffset = 0;
-    String foundItem = TextCheckingHelper(client(), spellingSearchRange).findFirstMisspellingOrBadGrammar(isGrammarCheckingEnabled(), isSpelling, foundOffset, grammarDetail);
-    if (isSpelling) {
-        misspelledWord = foundItem;
-        misspellingOffset = foundOffset;
-    } else {
-        badGrammarPhrase = foundItem;
-        grammarPhraseOffset = foundOffset;
-    }
-#else
+    String foundItem;
     RefPtr<Range> firstMisspellingRange;
-    misspelledWord = TextCheckingHelper(client(), spellingSearchRange).findFirstMisspelling(misspellingOffset, false, firstMisspellingRange);
-
-#if USE(GRAMMAR_CHECKING)
-    // Search for bad grammar that occurs prior to the next misspelled word (if any)
-    grammarSearchRange = spellingSearchRange->cloneRange(ec);
-    if (!misspelledWord.isEmpty()) {
-        // Stop looking at start of next misspelled word
-        CharacterIterator chars(grammarSearchRange.get());
-        chars.advance(misspellingOffset);
-        grammarSearchRange->setEnd(chars.range()->startContainer(ec), chars.range()->startOffset(ec), ec);
-    }
-    
-    if (isGrammarCheckingEnabled())
-        badGrammarPhrase = TextCheckingHelper(client(), grammarSearchRange).findFirstBadGrammar(grammarDetail, grammarPhraseOffset, false);
-#endif
-#endif
-    
-    // If we found neither bad grammar nor a misspelled word, wrap and try again (but don't bother if we started at the beginning of the
-    // block rather than at a selection).
-    if (startedWithSelection && !misspelledWord && !badGrammarPhrase) {
-        spellingSearchRange->setStart(topNode, 0, ec);
-        // going until the end of the very first chunk we tested is far enough
-        spellingSearchRange->setEnd(searchEndNodeAfterWrap, searchEndOffsetAfterWrap, ec);
-        
-#if USE(UNIFIED_TEXT_CHECKING)
+    if (unifiedTextCheckerEnabled()) {
         grammarSearchRange = spellingSearchRange->cloneRange(ec);
         foundItem = TextCheckingHelper(client(), spellingSearchRange).findFirstMisspellingOrBadGrammar(isGrammarCheckingEnabled(), isSpelling, foundOffset, grammarDetail);
         if (isSpelling) {
@@ -1773,7 +1642,7 @@ void Editor::advanceToNextMisspelling(bool startBeforeSelection)
             badGrammarPhrase = foundItem;
             grammarPhraseOffset = foundOffset;
         }
-#else
+    } else {
         misspelledWord = TextCheckingHelper(client(), spellingSearchRange).findFirstMisspelling(misspellingOffset, false, firstMisspellingRange);
 
 #if USE(GRAMMAR_CHECKING)
@@ -1784,11 +1653,45 @@ void Editor::advanceToNextMisspelling(bool startBeforeSelection)
             chars.advance(misspellingOffset);
             grammarSearchRange->setEnd(chars.range()->startContainer(ec), chars.range()->startOffset(ec), ec);
         }
-
+    
         if (isGrammarCheckingEnabled())
             badGrammarPhrase = TextCheckingHelper(client(), grammarSearchRange).findFirstBadGrammar(grammarDetail, grammarPhraseOffset, false);
 #endif
+    }
+    
+    // If we found neither bad grammar nor a misspelled word, wrap and try again (but don't bother if we started at the beginning of the
+    // block rather than at a selection).
+    if (startedWithSelection && !misspelledWord && !badGrammarPhrase) {
+        spellingSearchRange->setStart(topNode, 0, ec);
+        // going until the end of the very first chunk we tested is far enough
+        spellingSearchRange->setEnd(searchEndNodeAfterWrap, searchEndOffsetAfterWrap, ec);
+        
+        if (unifiedTextCheckerEnabled()) {
+            grammarSearchRange = spellingSearchRange->cloneRange(ec);
+            foundItem = TextCheckingHelper(client(), spellingSearchRange).findFirstMisspellingOrBadGrammar(isGrammarCheckingEnabled(), isSpelling, foundOffset, grammarDetail);
+            if (isSpelling) {
+                misspelledWord = foundItem;
+                misspellingOffset = foundOffset;
+            } else {
+                badGrammarPhrase = foundItem;
+                grammarPhraseOffset = foundOffset;
+            }
+        } else {
+            misspelledWord = TextCheckingHelper(client(), spellingSearchRange).findFirstMisspelling(misspellingOffset, false, firstMisspellingRange);
+
+#if USE(GRAMMAR_CHECKING)
+            grammarSearchRange = spellingSearchRange->cloneRange(ec);
+            if (!misspelledWord.isEmpty()) {
+                // Stop looking at start of next misspelled word
+                CharacterIterator chars(grammarSearchRange.get());
+                chars.advance(misspellingOffset);
+                grammarSearchRange->setEnd(chars.range()->startContainer(ec), chars.range()->startOffset(ec), ec);
+            }
+
+            if (isGrammarCheckingEnabled())
+                badGrammarPhrase = TextCheckingHelper(client(), grammarSearchRange).findFirstBadGrammar(grammarDetail, grammarPhraseOffset, false);
 #endif
+        }
     }
     
     if (!badGrammarPhrase.isEmpty()) {
@@ -1888,12 +1791,13 @@ Vector<String> Editor::guessesForMisspelledSelection()
 
 Vector<String> Editor::guessesForMisspelledOrUngrammaticalSelection(bool& misspelled, bool& ungrammatical)
 {
-#if USE(UNIFIED_TEXT_CHECKING)
-    RefPtr<Range> range = frame()->selection()->toNormalizedRange();
-    if (!range)
-        return Vector<String>();
-    return TextCheckingHelper(client(), range).guessesForMisspelledOrUngrammaticalRange(isGrammarCheckingEnabled(), misspelled, ungrammatical);
-#else
+    if (unifiedTextCheckerEnabled()) {
+        RefPtr<Range> range = frame()->selection()->toNormalizedRange();
+        if (!range)
+            return Vector<String>();
+        return TextCheckingHelper(client(), range).guessesForMisspelledOrUngrammaticalRange(isGrammarCheckingEnabled(), misspelled, ungrammatical);
+    }
+
     misspelled = isSelectionMisspelled();
     if (misspelled) {
         ungrammatical = false;
@@ -1905,7 +1809,6 @@ Vector<String> Editor::guessesForMisspelledOrUngrammaticalSelection(bool& misspe
     }
     ungrammatical = false;
     return Vector<String>();
-#endif
 }
 
 void Editor::showSpellingGuessPanel()
@@ -1947,40 +1850,37 @@ void Editor::markMisspellingsAndBadGrammar(const VisibleSelection &movingSelecti
 
 void Editor::markMisspellingsAfterTypingToWord(const VisiblePosition &wordStart, const VisibleSelection& selectionAfterTyping, bool doReplacement)
 {
-#if USE(UNIFIED_TEXT_CHECKING)
-    m_spellingCorrector->applyPendingCorrection(selectionAfterTyping);
+    if (unifiedTextCheckerEnabled()) {
+        m_spellingCorrector->applyPendingCorrection(selectionAfterTyping);
 
-    TextCheckingTypeMask textCheckingOptions = 0;
+        TextCheckingTypeMask textCheckingOptions = 0;
 
-    if (isContinuousSpellCheckingEnabled())
-        textCheckingOptions |= TextCheckingTypeSpelling;
+        if (isContinuousSpellCheckingEnabled())
+            textCheckingOptions |= TextCheckingTypeSpelling;
 
 #if USE(AUTOMATIC_TEXT_REPLACEMENT)
-    if (doReplacement 
-        && (isAutomaticQuoteSubstitutionEnabled()
-            || isAutomaticLinkDetectionEnabled()
-            || isAutomaticDashSubstitutionEnabled()
-            || isAutomaticTextReplacementEnabled()
-            || ((textCheckingOptions & TextCheckingTypeSpelling) && isAutomaticSpellingCorrectionEnabled())))
-        textCheckingOptions |= TextCheckingTypeReplacement;
+        if (doReplacement
+            && (isAutomaticQuoteSubstitutionEnabled()
+                || isAutomaticLinkDetectionEnabled()
+                || isAutomaticDashSubstitutionEnabled()
+                || isAutomaticTextReplacementEnabled()
+                || ((textCheckingOptions & TextCheckingTypeSpelling) && isAutomaticSpellingCorrectionEnabled())))
+            textCheckingOptions |= TextCheckingTypeReplacement;
 #endif
-    if (!textCheckingOptions & (TextCheckingTypeSpelling | TextCheckingTypeReplacement))
+        if (!(textCheckingOptions & (TextCheckingTypeSpelling | TextCheckingTypeReplacement)))
+            return;
+
+        if (isGrammarCheckingEnabled())
+            textCheckingOptions |= TextCheckingTypeGrammar;
+
+        VisibleSelection adjacentWords = VisibleSelection(startOfWord(wordStart, LeftWordIfOnBoundary), endOfWord(wordStart, RightWordIfOnBoundary));
+        if (textCheckingOptions & TextCheckingTypeGrammar) {
+            VisibleSelection selectedSentence = VisibleSelection(startOfSentence(wordStart), endOfSentence(wordStart));
+            markAllMisspellingsAndBadGrammarInRanges(textCheckingOptions, adjacentWords.toNormalizedRange().get(), selectedSentence.toNormalizedRange().get());
+        } else
+            markAllMisspellingsAndBadGrammarInRanges(textCheckingOptions, adjacentWords.toNormalizedRange().get(), adjacentWords.toNormalizedRange().get());
         return;
-
-    if (isGrammarCheckingEnabled())
-        textCheckingOptions |= TextCheckingTypeGrammar;
-
-    VisibleSelection adjacentWords = VisibleSelection(startOfWord(wordStart, LeftWordIfOnBoundary), endOfWord(wordStart, RightWordIfOnBoundary));
-    if (textCheckingOptions & TextCheckingTypeGrammar) {
-        VisibleSelection selectedSentence = VisibleSelection(startOfSentence(wordStart), endOfSentence(wordStart));
-        markAllMisspellingsAndBadGrammarInRanges(textCheckingOptions, adjacentWords.toNormalizedRange().get(), selectedSentence.toNormalizedRange().get());
-    } else {
-        markAllMisspellingsAndBadGrammarInRanges(textCheckingOptions, adjacentWords.toNormalizedRange().get(), adjacentWords.toNormalizedRange().get());
     }
-
-#else
-    UNUSED_PARAM(selectionAfterTyping);
-    UNUSED_PARAM(doReplacement);
 
     if (!isContinuousSpellCheckingEnabled())
         return;
@@ -2020,7 +1920,6 @@ void Editor::markMisspellingsAfterTypingToWord(const VisiblePosition &wordStart,
     
     // Check grammar of entire sentence
     markBadGrammar(VisibleSelection(startOfSentence(wordStart), endOfSentence(wordStart)));
-#endif
 }
     
 void Editor::markMisspellingsOrBadGrammar(const VisibleSelection& selection, bool checkSpelling, RefPtr<Range>& firstMisspellingRange)
@@ -2088,7 +1987,8 @@ void Editor::markBadGrammar(const VisibleSelection& selection)
 
 void Editor::markAllMisspellingsAndBadGrammarInRanges(TextCheckingTypeMask textCheckingOptions, Range* spellingRange, Range* grammarRange)
 {
-#if USE(UNIFIED_TEXT_CHECKING)
+    ASSERT(unifiedTextCheckerEnabled());
+
     // There shouldn't be pending autocorrection at this moment.
     ASSERT(!m_spellingCorrector->hasPendingCorrection());
 
@@ -2142,10 +2042,10 @@ void Editor::markAllMisspellingsAndBadGrammarInRanges(TextCheckingTypeMask textC
 
     Vector<TextCheckingResult> results;
     if (shouldMarkGrammar)
-        textChecker()->checkTextOfParagraph(grammarParagraph.textCharacters(), grammarParagraph.textLength(), 
+        checkTextOfParagraph(textChecker(), grammarParagraph.textCharacters(), grammarParagraph.textLength(), 
                                             resolveTextCheckingTypeMask(textCheckingOptions), results);
     else
-        textChecker()->checkTextOfParagraph(spellingParagraph.textCharacters(), spellingParagraph.textLength(), 
+        checkTextOfParagraph(textChecker(), spellingParagraph.textCharacters(), spellingParagraph.textLength(), 
                                             resolveTextCheckingTypeMask(textCheckingOptions), results);
         
 
@@ -2279,17 +2179,12 @@ void Editor::markAllMisspellingsAndBadGrammarInRanges(TextCheckingTypeMask textC
             m_frame->selection()->modify(FrameSelection::AlterationMove, DirectionForward, CharacterGranularity);
         }
     }
-#else
-    ASSERT_NOT_REACHED();
-    UNUSED_PARAM(textCheckingOptions);
-    UNUSED_PARAM(spellingRange);
-    UNUSED_PARAM(grammarRange);
-#endif // USE(UNIFIED_TEXT_CHECKING)
 }
 
 void Editor::changeBackToReplacedString(const String& replacedString)
 {
-#if USE(UNIFIED_TEXT_CHECKING)
+    ASSERT(unifiedTextCheckerEnabled());
+
     if (replacedString.isEmpty())
         return;
 
@@ -2303,28 +2198,25 @@ void Editor::changeBackToReplacedString(const String& replacedString)
     RefPtr<Range> changedRange = paragraph.subrange(paragraph.checkingStart(), replacedString.length());
     changedRange->startContainer()->document()->markers()->addMarker(changedRange.get(), DocumentMarker::Replacement, String());
     m_spellingCorrector->markReversed(changedRange.get());
-#else
-    ASSERT_NOT_REACHED();
-    UNUSED_PARAM(replacedString);
-#endif // USE(UNIFIED_TEXT_CHECKING)
 }
 
 
 void Editor::markMisspellingsAndBadGrammar(const VisibleSelection& spellingSelection, bool markGrammar, const VisibleSelection& grammarSelection)
 {
-#if USE(UNIFIED_TEXT_CHECKING)
-    if (!isContinuousSpellCheckingEnabled())
+    if (unifiedTextCheckerEnabled()) {
+        if (!isContinuousSpellCheckingEnabled())
+            return;
+        TextCheckingTypeMask textCheckingOptions = TextCheckingTypeSpelling | TextCheckingTypeCorrection;
+        if (markGrammar && isGrammarCheckingEnabled())
+            textCheckingOptions |= TextCheckingTypeGrammar;
+        markAllMisspellingsAndBadGrammarInRanges(textCheckingOptions, spellingSelection.toNormalizedRange().get(), grammarSelection.toNormalizedRange().get());
         return;
-    TextCheckingTypeMask textCheckingOptions = TextCheckingTypeSpelling | TextCheckingTypeCorrection;
-    if (markGrammar && isGrammarCheckingEnabled())
-        textCheckingOptions |= TextCheckingTypeGrammar;
-    markAllMisspellingsAndBadGrammarInRanges(textCheckingOptions, spellingSelection.toNormalizedRange().get(), grammarSelection.toNormalizedRange().get());
-#else
+    }
+
     RefPtr<Range> firstMisspellingRange;
     markMisspellings(spellingSelection, firstMisspellingRange);
     if (markGrammar)
         markBadGrammar(grammarSelection);
-#endif
 }
 
 void Editor::unappliedSpellCorrection(const VisibleSelection& selectionOfCorrected, const String& corrected, const String& correction)
@@ -2564,7 +2456,7 @@ bool Editor::insideVisibleArea(const LayoutPoint& point) const
     if (!(container->style()->overflowX() == OHIDDEN || container->style()->overflowY() == OHIDDEN))
         return true;
 
-    LayoutRect rectInPageCoords = container->overflowClipRect(IntPoint());
+    LayoutRect rectInPageCoords = container->overflowClipRect(IntPoint(), 0); // FIXME: Incorrect for CSS regions.
     LayoutRect rectInFrameCoords = LayoutRect(renderer->x() * -1, renderer->y() * -1,
                                               rectInPageCoords.width(), rectInPageCoords.height());
 
@@ -2593,7 +2485,7 @@ bool Editor::insideVisibleArea(Range* range) const
     if (!(container->style()->overflowX() == OHIDDEN || container->style()->overflowY() == OHIDDEN))
         return true;
 
-    LayoutRect rectInPageCoords = container->overflowClipRect(LayoutPoint());
+    LayoutRect rectInPageCoords = container->overflowClipRect(LayoutPoint(), 0); // FIXME: Incorrect for CSS regions.
     LayoutRect rectInFrameCoords = LayoutRect(renderer->x() * -1, renderer->y() * -1,
                                     rectInPageCoords.width(), rectInPageCoords.height());
     LayoutRect resultRect = range->boundingBox();
@@ -2780,31 +2672,6 @@ void Editor::computeAndSetTypingStyle(CSSStyleDeclaration* style, EditAction edi
     m_frame->selection()->setTypingStyle(typingStyle);
 }
 
-PassRefPtr<EditingStyle> Editor::selectionStartStyle() const
-{
-    if (m_frame->selection()->isNone())
-        return 0;
-
-    RefPtr<Range> range(m_frame->selection()->toNormalizedRange());
-    Position position = range->editingStartPosition();
-
-    // If the pos is at the end of a text node, then this node is not fully selected. 
-    // Move it to the next deep equivalent position to avoid removing the style from this node. 
-    // e.g. if pos was at Position("hello", 5) in <b>hello<div>world</div></b>, we want Position("world", 0) instead. 
-    // We only do this for range because caret at Position("hello", 5) in <b>hello</b>world should give you font-weight: bold. 
-    Node* positionNode = position.containerNode(); 
-    if (m_frame->selection()->isRange() && positionNode && positionNode->isTextNode() && position.computeOffsetInContainerNode() == positionNode->maxCharacterOffset()) 
-        position = nextVisuallyDistinctCandidate(position); 
-
-    Element* element = position.element();
-    if (!element)
-        return 0;
-
-    RefPtr<EditingStyle> style = EditingStyle::create(element, EditingStyle::AllProperties);
-    style->mergeTypingStyle(m_frame->document());
-    return style;
-}
-
 void Editor::textFieldDidBeginEditing(Element* e)
 {
     if (client())
@@ -2869,40 +2736,6 @@ void Editor::applyEditingStyleToElement(Element* element) const
     ASSERT(!ec);
     style->setProperty(CSSPropertyWebkitLineBreak, "after-white-space", false, ec);
     ASSERT(!ec);
-}
-
-RenderStyle* Editor::styleForSelectionStart(Node *&nodeToRemove) const
-{
-    nodeToRemove = 0;
-
-    if (m_frame->selection()->isNone())
-        return 0;
-
-    Position position = m_frame->selection()->selection().visibleStart().deepEquivalent();
-    if (!position.isCandidate())
-        return 0;
-    if (!position.deprecatedNode())
-        return 0;
-
-    RefPtr<EditingStyle> typingStyle = m_frame->selection()->typingStyle();
-    if (!typingStyle || !typingStyle->style())
-        return position.deprecatedNode()->renderer()->style();
-
-    RefPtr<Element> styleElement = m_frame->document()->createElement(spanTag, false);
-
-    ExceptionCode ec = 0;
-    String styleText = typingStyle->style()->cssText() + " display: inline";
-    styleElement->setAttribute(styleAttr, styleText.impl(), ec);
-    ASSERT(!ec);
-
-    styleElement->appendChild(m_frame->document()->createEditingTextNode(""), ec);
-    ASSERT(!ec);
-
-    position.deprecatedNode()->parentNode()->appendChild(styleElement, ec);
-    ASSERT(!ec);
-
-    nodeToRemove = styleElement.get();
-    return styleElement->renderer() ? styleElement->renderer()->style() : 0;
 }
 
 // Searches from the beginning of the document if nothing is selected.
@@ -3234,6 +3067,11 @@ TextCheckingTypeMask Editor::resolveTextCheckingTypeMask(TextCheckingTypeMask te
 void Editor::deviceScaleFactorChanged()
 {
     m_deleteButtonController->deviceScaleFactorChanged();
+}
+
+bool Editor::unifiedTextCheckerEnabled() const
+{
+    return WebCore::unifiedTextCheckerEnabled(m_frame);
 }
 
 } // namespace WebCore

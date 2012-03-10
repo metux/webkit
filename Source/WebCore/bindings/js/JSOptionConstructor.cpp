@@ -33,7 +33,7 @@ namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSOptionConstructor);
 
-const ClassInfo JSOptionConstructor::s_info = { "OptionConstructor", &DOMConstructorWithDocument::s_info, 0, 0 };
+const ClassInfo JSOptionConstructor::s_info = { "OptionConstructor", &DOMConstructorWithDocument::s_info, 0, 0, CREATE_METHOD_TABLE(JSOptionConstructor) };
 
 JSOptionConstructor::JSOptionConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
     : DOMConstructorWithDocument(structure, globalObject)
@@ -75,7 +75,7 @@ static EncodedJSValue JSC_HOST_CALL constructHTMLOptionElement(ExecState* exec)
     return JSValue::encode(asObject(toJS(exec, jsConstructor->globalObject(), element.release())));
 }
 
-ConstructType JSOptionConstructor::getConstructData(ConstructData& constructData)
+ConstructType JSOptionConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructHTMLOptionElement;
     return ConstructTypeHost;

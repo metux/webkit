@@ -28,6 +28,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include <dfg/DFGAbstractState.h>
 #include <dfg/DFGJITCodeGenerator.h>
 
 namespace JSC { namespace DFG {
@@ -66,26 +67,59 @@ private:
     GPRReg m_src;
 };
 
+enum ValueSourceKind {
+    SourceNotSet,
+    ValueInRegisterFile,
+    Int32InRegisterFile,
+    CellInRegisterFile,
+    BooleanInRegisterFile,
+    HaveNode
+};
+
 class ValueSource {
 public:
     ValueSource()
-        : m_nodeIndex(NoNode)
+        : m_nodeIndex(nodeIndexFromKind(SourceNotSet))
     {
+    }
+    
+    explicit ValueSource(ValueSourceKind valueSourceKind)
+        : m_nodeIndex(nodeIndexFromKind(valueSourceKind))
+    {
+        ASSERT(kind() != SourceNotSet);
+        ASSERT(kind() != HaveNode);
     }
     
     explicit ValueSource(NodeIndex nodeIndex)
         : m_nodeIndex(nodeIndex)
     {
+        ASSERT(kind() == HaveNode);
+    }
+    
+    static ValueSource forPrediction(PredictedType prediction)
+    {
+        if (isInt32Prediction(prediction))
+            return ValueSource(Int32InRegisterFile);
+        if (isArrayPrediction(prediction) || isByteArrayPrediction(prediction))
+            return ValueSource(CellInRegisterFile);
+        if (isBooleanPrediction(prediction))
+            return ValueSource(BooleanInRegisterFile);
+        return ValueSource(ValueInRegisterFile);
     }
     
     bool isSet() const
     {
-        return m_nodeIndex != NoNode;
+        return kindFromNodeIndex(m_nodeIndex) != SourceNotSet;
+    }
+    
+    ValueSourceKind kind() const
+    {
+        return kindFromNodeIndex(m_nodeIndex);
     }
     
     NodeIndex nodeIndex() const
     {
-        ASSERT(isSet());
+        ASSERT(kind() == HaveNode);
         return m_nodeIndex;
     }
     
@@ -94,6 +128,20 @@ public:
 #endif
     
 private:
+    static NodeIndex nodeIndexFromKind(ValueSourceKind kind)
+    {
+        ASSERT(kind >= SourceNotSet && kind < HaveNode);
+        return NoNode - kind;
+    }
+    
+    static ValueSourceKind kindFromNodeIndex(NodeIndex nodeIndex)
+    {
+        unsigned kind = static_cast<unsigned>(NoNode - nodeIndex);
+        if (kind >= static_cast<unsigned>(HaveNode))
+            return HaveNode;
+        return static_cast<ValueSourceKind>(kind);
+    }
+    
     NodeIndex m_nodeIndex;
 };
     
@@ -102,12 +150,23 @@ private:
 enum ValueRecoveryTechnique {
     // It's already in the register file at the right location.
     AlreadyInRegisterFile,
+    // It's already in the register file but unboxed.
+    AlreadyInRegisterFileAsUnboxedInt32,
+    AlreadyInRegisterFileAsUnboxedCell,
+    AlreadyInRegisterFileAsUnboxedBoolean,
     // It's in a register.
     InGPR,
     UnboxedInt32InGPR,
+    UnboxedBooleanInGPR,
+#if USE(JSVALUE32_64)
+    InPair,
+#endif
     InFPR,
     // It's in the register file, but at a different location.
     DisplacedInRegisterFile,
+    // It's in the register file, at a different location, and it's unboxed.
+    Int32DisplacedInRegisterFile,
+    DoubleDisplacedInRegisterFile,
     // It's a constant.
     Constant,
     // Don't know how to recover it.
@@ -128,18 +187,55 @@ public:
         return result;
     }
     
+    static ValueRecovery alreadyInRegisterFileAsUnboxedInt32()
+    {
+        ValueRecovery result;
+        result.m_technique = AlreadyInRegisterFileAsUnboxedInt32;
+        return result;
+    }
+    
+    static ValueRecovery alreadyInRegisterFileAsUnboxedCell()
+    {
+        ValueRecovery result;
+        result.m_technique = AlreadyInRegisterFileAsUnboxedCell;
+        return result;
+    }
+    
+    static ValueRecovery alreadyInRegisterFileAsUnboxedBoolean()
+    {
+        ValueRecovery result;
+        result.m_technique = AlreadyInRegisterFileAsUnboxedBoolean;
+        return result;
+    }
+    
     static ValueRecovery inGPR(GPRReg gpr, DataFormat dataFormat)
     {
         ASSERT(dataFormat != DataFormatNone);
+#if USE(JSVALUE32_64)
+        ASSERT(dataFormat == DataFormatInteger || dataFormat == DataFormatCell || dataFormat == DataFormatBoolean);
+#endif
         ValueRecovery result;
         if (dataFormat == DataFormatInteger)
             result.m_technique = UnboxedInt32InGPR;
+        else if (dataFormat == DataFormatBoolean)
+            result.m_technique = UnboxedBooleanInGPR;
         else
             result.m_technique = InGPR;
         result.m_source.gpr = gpr;
         return result;
     }
     
+#if USE(JSVALUE32_64)
+    static ValueRecovery inPair(GPRReg tagGPR, GPRReg payloadGPR)
+    {
+        ValueRecovery result;
+        result.m_technique = InPair;
+        result.m_source.pair.tagGPR = tagGPR;
+        result.m_source.pair.payloadGPR = payloadGPR;
+        return result;
+    }
+#endif
+
     static ValueRecovery inFPR(FPRReg fpr)
     {
         ValueRecovery result;
@@ -148,10 +244,23 @@ public:
         return result;
     }
     
-    static ValueRecovery displacedInRegisterFile(VirtualRegister virtualReg)
+    static ValueRecovery displacedInRegisterFile(VirtualRegister virtualReg, DataFormat dataFormat)
     {
         ValueRecovery result;
-        result.m_technique = DisplacedInRegisterFile;
+        switch (dataFormat) {
+        case DataFormatInteger:
+            result.m_technique = Int32DisplacedInRegisterFile;
+            break;
+            
+        case DataFormatDouble:
+            result.m_technique = DoubleDisplacedInRegisterFile;
+            break;
+
+        default:
+            ASSERT(dataFormat != DataFormatNone && dataFormat != DataFormatStorage);
+            result.m_technique = DisplacedInRegisterFile;
+            break;
+        }
         result.m_source.virtualReg = virtualReg;
         return result;
     }
@@ -168,9 +277,23 @@ public:
     
     GPRReg gpr() const
     {
-        ASSERT(m_technique == InGPR || m_technique == UnboxedInt32InGPR);
+        ASSERT(m_technique == InGPR || m_technique == UnboxedInt32InGPR || m_technique == UnboxedBooleanInGPR);
         return m_source.gpr;
     }
+    
+#if USE(JSVALUE32_64)
+    GPRReg tagGPR() const
+    {
+        ASSERT(m_technique == InPair);
+        return m_source.pair.tagGPR;
+    }
+    
+    GPRReg payloadGPR() const
+    {
+        ASSERT(m_technique == InPair);
+        return m_source.pair.payloadGPR;
+    }
+#endif
     
     FPRReg fpr() const
     {
@@ -180,7 +303,7 @@ public:
     
     VirtualRegister virtualRegister() const
     {
-        ASSERT(m_technique == DisplacedInRegisterFile);
+        ASSERT(m_technique == DisplacedInRegisterFile || m_technique == Int32DisplacedInRegisterFile || m_technique == DoubleDisplacedInRegisterFile);
         return m_source.virtualReg;
     }
     
@@ -199,6 +322,12 @@ private:
     union {
         GPRReg gpr;
         FPRReg fpr;
+#if USE(JSVALUE32_64)
+        struct {
+            GPRReg tagGPR;
+            GPRReg payloadGPR;
+        } pair;
+#endif
         VirtualRegister virtualReg;
         EncodedJSValue constant;
     } m_source;
@@ -213,7 +342,7 @@ struct OSRExit {
     
     MacroAssembler::Jump m_check;
     NodeIndex m_nodeIndex;
-    unsigned m_bytecodeIndex;
+    CodeOrigin m_codeOrigin;
     
     unsigned m_recoveryIndex;
     
@@ -236,10 +365,14 @@ struct OSRExit {
     {
         return index - m_arguments.size();
     }
+    int operandForArgument(int argument) const
+    {
+        return argument - m_arguments.size() - RegisterFile::CallFrameHeaderSize;
+    }
     int operandForIndex(int index) const
     {
         if (index < (int)m_arguments.size())
-            return index - m_arguments.size() - RegisterFile::CallFrameHeaderSize;
+            return operandForArgument(index);
         return index - m_arguments.size();
     }
     
@@ -299,11 +432,10 @@ private:
     void compile(BasicBlock&);
 
     void checkArgumentTypes();
-    void initializeVariableTypes();
 
     bool isInteger(NodeIndex nodeIndex)
     {
-        Node& node = m_jit.graph()[nodeIndex];
+        Node& node = at(nodeIndex);
         if (node.hasInt32Result())
             return true;
 
@@ -316,160 +448,61 @@ private:
         return info.isJSInteger();
     }
     
-    bool shouldSpeculateInteger(NodeIndex nodeIndex)
-    {
-        if (isInteger(nodeIndex))
-            return true;
-        
-        if (isInt32Prediction(m_jit.graph().getPrediction(m_jit.graph()[nodeIndex])))
-            return true;
-        
-        return false;
-    }
-    
-    bool shouldSpeculateDouble(NodeIndex nodeIndex)
-    {
-        if (isDoubleConstant(nodeIndex))
-            return true;
-
-        Node& node = m_jit.graph()[nodeIndex];
-
-        VirtualRegister virtualRegister = node.virtualRegister();
-        GenerationInfo& info = m_generationInfo[virtualRegister];
-
-        if (info.isJSDouble())
-            return true;
-        
-        if (isDoublePrediction(m_jit.graph().getPrediction(node)))
-            return true;
-        
-        return false;
-    }
-    
-    bool shouldSpeculateNumber(NodeIndex nodeIndex)
-    {
-        Node& node = m_jit.graph()[nodeIndex];
-        
-        if (node.hasNumberResult())
-            return true;
-        
-        if (isNumberConstant(nodeIndex))
-            return true;
-        
-        VirtualRegister virtualRegister = node.virtualRegister();
-        GenerationInfo& info = m_generationInfo[virtualRegister];
-
-        if (info.isJSInteger() || info.isJSDouble())
-            return true;
-        
-        PredictedType prediction = m_jit.graph().getPrediction(node);
-        
-        if (isNumberPrediction(prediction) || prediction == PredictNone)
-            return true;
-        
-        return false;
-    }
-    
-    bool shouldNotSpeculateInteger(NodeIndex nodeIndex)
-    {
-        if (isDoubleConstant(nodeIndex))
-            return true;
-
-        Node& node = m_jit.graph()[nodeIndex];
-
-        VirtualRegister virtualRegister = node.virtualRegister();
-        GenerationInfo& info = m_generationInfo[virtualRegister];
-
-        if (info.isJSDouble())
-            return true;
-        
-        if (m_jit.graph().getPrediction(node) & PredictDouble)
-            return true;
-        
-        return false;
-    }
-    
-    bool shouldSpeculateFinalObject(NodeIndex nodeIndex)
-    {
-        PredictedType prediction;
-        if (isJSConstant(nodeIndex))
-            prediction = predictionFromValue(valueOfJSConstant(nodeIndex));
-        else
-            prediction = m_jit.graph().getPrediction(m_jit.graph()[nodeIndex]);
-        return isFinalObjectPrediction(prediction);
-    }
-    
-    bool shouldSpeculateArray(NodeIndex nodeIndex)
-    {
-        PredictedType prediction;
-        if (isJSConstant(nodeIndex))
-            prediction = predictionFromValue(valueOfJSConstant(nodeIndex));
-        else
-            prediction = m_jit.graph().getPrediction(m_jit.graph()[nodeIndex]);
-        return isArrayPrediction(prediction);
-    }
-    
-    bool shouldSpeculateObject(NodeIndex nodeIndex)
-    {
-        Node& node = m_jit.graph()[nodeIndex];
-        if (node.op == ConvertThis)
-            return true;
-        PredictedType prediction;
-        if (isJSConstant(nodeIndex))
-            prediction = predictionFromValue(valueOfJSConstant(nodeIndex));
-        else
-            prediction = m_jit.graph().getPrediction(m_jit.graph()[nodeIndex]);
-        return isObjectPrediction(prediction);
-    }
-    
-    bool shouldSpeculateCell(NodeIndex nodeIndex)
-    {
-        if (isJSConstant(nodeIndex) && valueOfJSConstant(nodeIndex).isCell())
-            return true;
-        
-        Node& node = m_jit.graph()[nodeIndex];
-
-        if (isCellPrediction(m_jit.graph().getPrediction(node)))
-            return true;
-
-        VirtualRegister virtualRegister = node.virtualRegister();
-        GenerationInfo& info = m_generationInfo[virtualRegister];
-        
-        if (info.isJSCell())
-            return true;
-        
-        return false;
-    }
-    
-    bool shouldSpeculateInteger(NodeIndex op1, NodeIndex op2)
-    {
-        return !(shouldNotSpeculateInteger(op1) || shouldNotSpeculateInteger(op2)) && (shouldSpeculateInteger(op1) || shouldSpeculateInteger(op2));
-    }
-    
-    bool shouldSpeculateNumber(NodeIndex op1, NodeIndex op2)
-    {
-        return shouldSpeculateNumber(op1) && shouldSpeculateNumber(op2);
-    }
-    
-    bool shouldSpeculateFinalObject(NodeIndex op1, NodeIndex op2)
-    {
-        return (shouldSpeculateFinalObject(op1) && shouldSpeculateObject(op2))
-            || (shouldSpeculateObject(op1) && shouldSpeculateFinalObject(op2));
-    }
-
-    bool shouldSpeculateArray(NodeIndex op1, NodeIndex op2)
-    {
-        return (shouldSpeculateArray(op1) && shouldSpeculateObject(op2))
-            || (shouldSpeculateObject(op1) && shouldSpeculateArray(op2));
-    }
-    
-    bool compare(Node&, MacroAssembler::RelationalCondition, MacroAssembler::DoubleCondition, Z_DFGOperation_EJJ);
+    bool compare(Node&, MacroAssembler::RelationalCondition, MacroAssembler::DoubleCondition, S_DFGOperation_EJJ);
+    bool compilePeepHoleBranch(Node&, MacroAssembler::RelationalCondition, MacroAssembler::DoubleCondition, S_DFGOperation_EJJ);
     void compilePeepHoleIntegerBranch(Node&, NodeIndex branchNodeIndex, JITCompiler::RelationalCondition);
     void compilePeepHoleDoubleBranch(Node&, NodeIndex branchNodeIndex, JITCompiler::DoubleCondition);
-    void compilePeepHoleObjectEquality(Node&, NodeIndex branchNodeIndex, void* vptr);
-    void compileObjectEquality(Node&, void* vptr);
+    void compilePeepHoleObjectEquality(Node&, NodeIndex branchNodeIndex, void* vptr, PredictionChecker);
+    void compileObjectEquality(Node&, void* vptr, PredictionChecker);
+    void compileValueAdd(Node&);
+    void compileObjectOrOtherLogicalNot(NodeIndex value, void* vptr, bool needSpeculationCheck);
+    void compileLogicalNot(Node&);
+    void emitObjectOrOtherBranch(NodeIndex value, BlockIndex taken, BlockIndex notTaken, void *vptr, bool needSpeculationCheck);
+    void emitBranch(Node&);
     
+    void compileGetCharCodeAt(Node&);
+    void compileGetByValOnString(Node&);
+    void compileValueToInt32(Node&);
+    void compileGetByValOnByteArray(Node&);
+    void compilePutByValForByteArray(GPRReg base, GPRReg property, Node&);
+    
+    // It is acceptable to have structure be equal to scratch, so long as you're fine
+    // with the structure GPR being clobbered.
+    template<typename T>
+    void emitAllocateJSFinalObject(T structure, GPRReg resultGPR, GPRReg scratchGPR, MacroAssembler::JumpList& slowPath)
+    {
+        MarkedSpace::SizeClass* sizeClass = &m_jit.globalData()->heap.sizeClassForObject(sizeof(JSFinalObject));
+        
+        m_jit.loadPtr(&sizeClass->firstFreeCell, resultGPR);
+        slowPath.append(m_jit.branchTestPtr(MacroAssembler::Zero, resultGPR));
+        
+        // The object is half-allocated: we have what we know is a fresh object, but
+        // it's still on the GC's free list.
+        
+        // Ditch the structure by placing it into the structure slot, so that we can reuse
+        // scratchGPR.
+        m_jit.storePtr(structure, MacroAssembler::Address(resultGPR, JSObject::structureOffset()));
+        
+        // Now that we have scratchGPR back, remove the object from the free list
+        m_jit.loadPtr(MacroAssembler::Address(resultGPR), scratchGPR);
+        m_jit.storePtr(scratchGPR, &sizeClass->firstFreeCell);
+        
+        // Initialize the object's vtable
+        m_jit.storePtr(MacroAssembler::TrustedImmPtr(m_jit.globalData()->jsFinalObjectVPtr), MacroAssembler::Address(resultGPR));
+        
+        // Initialize the object's inheritorID.
+        m_jit.storePtr(MacroAssembler::TrustedImmPtr(0), MacroAssembler::Address(resultGPR, JSObject::offsetOfInheritorID()));
+        
+        // Initialize the object's property storage pointer.
+        m_jit.addPtr(MacroAssembler::TrustedImm32(sizeof(JSObject)), resultGPR, scratchGPR);
+        m_jit.storePtr(scratchGPR, MacroAssembler::Address(resultGPR, JSFinalObject::offsetOfPropertyStorage()));
+    }
+
+#if USE(JSVALUE64) 
     JITCompiler::Jump convertToDouble(GPRReg value, FPRReg result, GPRReg tmp);
+#elif USE(JSVALUE32_64)
+    JITCompiler::Jump convertToDouble(JSValueOperand&, FPRReg result);
+#endif
 
     // Add a speculation check without additional recovery.
     void speculationCheck(MacroAssembler::Jump jumpToFail)
@@ -490,7 +523,7 @@ private:
     // Called when we statically determine that a speculation will fail.
     void terminateSpeculativeExecution()
     {
-#if ENABLE(DFG_DEBUG_VERBOSE)
+#if DFG_ENABLE(DEBUG_VERBOSE)
         fprintf(stderr, "SpeculativeJIT was terminated.\n");
 #endif
         if (!m_compileOkay)
@@ -516,7 +549,7 @@ private:
     
     // Tracking for which nodes are currently holding the values of arguments and bytecode
     // operand-indexed variables.
-
+    
     ValueSource valueSourceForOperand(int operand)
     {
         return valueSourceReferenceForOperand(operand);
@@ -547,7 +580,9 @@ private:
     Vector<ValueSource, 0> m_arguments;
     Vector<ValueSource, 0> m_variables;
     int m_lastSetOperand;
-    uint32_t m_bytecodeIndexForOSR;
+    CodeOrigin m_codeOriginForOSR;
+    
+    AbstractState m_state;
     
     ValueRecovery computeValueRecoveryFor(const ValueSource&);
 
@@ -775,12 +810,12 @@ private:
 };
 
 inline SpeculativeJIT::SpeculativeJIT(JITCompiler& jit)
-    : JITCodeGenerator(jit, true)
+    : JITCodeGenerator(jit)
     , m_compileOkay(true)
     , m_arguments(jit.codeBlock()->m_numParameters)
-    , m_variables(jit.codeBlock()->m_numVars)
+    , m_variables(jit.graph().m_localVars)
     , m_lastSetOperand(std::numeric_limits<int>::max())
-    , m_bytecodeIndexForOSR(std::numeric_limits<uint32_t>::max())
+    , m_state(m_jit.codeBlock(), m_jit.graph())
 {
 }
 

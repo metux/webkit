@@ -35,6 +35,10 @@
 #include "FrameTree.h"
 #include "FrameView.h"
 #include "GCController.h"
+#include "GeolocationClientMock.h"
+#include "GeolocationController.h"
+#include "GeolocationError.h"
+#include "GeolocationPosition.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
 #include "JSDOMWindow.h"
@@ -575,6 +579,31 @@ void DumpRenderTreeSupportGtk::confirmComposition(WebKitWebView* webView, const 
     editor->confirmComposition();
 }
 
+void DumpRenderTreeSupportGtk::doCommand(WebKitWebView* webView, const char* command)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+    Frame* frame = core(webView)->focusController()->focusedOrMainFrame();
+    if (!frame)
+        return;
+
+    Editor* editor = frame->editor();
+    if (!editor)
+        return;
+
+    String commandString(command);
+    // Remove ending : here.
+    if (commandString.endsWith(":", true))
+        commandString = commandString.left(commandString.length() - 1);
+
+    // Make the first char in upper case.
+    String firstChar = commandString.left(1);
+    commandString = commandString.right(commandString.length() - 1);
+    firstChar.makeUpper();
+    commandString.insert(firstChar, 0);
+
+    editor->command(commandString).execute();
+}
+
 bool DumpRenderTreeSupportGtk::firstRectForCharacterRange(WebKitWebView* webView, int location, int length, cairo_rectangle_int_t* rect)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), false);
@@ -591,9 +620,7 @@ bool DumpRenderTreeSupportGtk::firstRectForCharacterRange(WebKitWebView* webView
     if (!editor)
         return false;
 
-    Element* selectionRoot = frame->selection()->rootEditableElement();
-    Element* scope = selectionRoot ? selectionRoot : frame->document()->documentElement();
-    RefPtr<Range> range = TextIterator::rangeFromLocationAndLength(scope, location, length);
+    RefPtr<Range> range = TextIterator::rangeFromLocationAndLength(frame->selection()->rootEditableElementOrDocumentElement(), location, length);
     if (!range)
         return false;
 
@@ -804,4 +831,60 @@ bool DumpRenderTreeSupportGtk::shouldClose(WebKitWebFrame* frame)
 void DumpRenderTreeSupportGtk::scalePageBy(WebKitWebView* webView, float scaleFactor, float x, float y)
 {
     core(webView)->setPageScaleFactor(scaleFactor, IntPoint(x, y));
+}
+
+void DumpRenderTreeSupportGtk::resetGeolocationClientMock(WebKitWebView* webView)
+{
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+    mock->reset();
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setMockGeolocationPermission(WebKitWebView* webView, bool allowed)
+{
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+    mock->setPermission(allowed);
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setMockGeolocationPosition(WebKitWebView* webView, double latitude, double longitude, double accuracy)
+{
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+
+    double timestamp = g_get_real_time() / 1000000.0;
+    mock->setPosition(GeolocationPosition::create(timestamp, latitude, longitude, accuracy));
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setMockGeolocationError(WebKitWebView* webView, int errorCode, const gchar* errorMessage)
+{
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+
+    GeolocationError::ErrorCode code;
+    switch (errorCode) {
+    case PositionError::PERMISSION_DENIED:
+        code = GeolocationError::PermissionDenied;
+        break;
+    case PositionError::POSITION_UNAVAILABLE:
+    default:
+        code = GeolocationError::PositionUnavailable;
+        break;
+    }
+
+    mock->setError(GeolocationError::create(code, errorMessage));
+#endif
+}
+
+int DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests(WebKitWebView* webView)
+{
+#if ENABLE(CLIENT_BASED_GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+    return mock->numberOfPendingPermissionRequests();
+#else
+    return 0;
+#endif
 }

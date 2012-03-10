@@ -37,42 +37,24 @@ namespace JSC {
     class VPtrHackExecutable;
     namespace DFG {
     class JITCodeGenerator;
+    class JITCompiler;
     }
 
     EncodedJSValue JSC_HOST_CALL callHostFunctionAsConstructor(ExecState*);
 
+    void createDescriptorForThrowingProperty(ExecState*, PropertyDescriptor&, const char* message);
+
     class JSFunction : public JSNonFinalObject {
         friend class JIT;
         friend class DFG::JITCodeGenerator;
+        friend class DFG::JITCompiler;
         friend class JSGlobalData;
 
-        JSFunction(ExecState*, JSGlobalObject*, Structure*);
-        JSFunction(ExecState*, FunctionExecutable*, ScopeChainNode*);
-        
     public:
         typedef JSNonFinalObject Base;
 
-        static JSFunction* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, int length, const Identifier& name, NativeFunction nativeFunction)
-        {
-            ASSERT(structure->globalObject());
-            ASSERT(structure->globalObject() == globalObject);
-            
-            ExecutableBase* executable = (ExecutableBase*)exec->globalData().getHostFunction(nativeFunction);
-            JSFunction* function = new (allocateCell<JSFunction>(*exec->heap())) JSFunction(exec, globalObject, structure);
-            // Can't do this during initialization because getHostFunction might do a GC allocation.
-            function->finishCreation(exec, length, name, executable);
-            return function;
-        }
-
-        static JSFunction* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, int length, const Identifier& name, NativeExecutable* nativeExecutable)
-        {
-            ASSERT(structure->globalObject());
-            ASSERT(structure->globalObject() == globalObject);
-
-            JSFunction* function = new (allocateCell<JSFunction>(*exec->heap())) JSFunction(exec, globalObject, structure);
-            function->finishCreation(exec, length, name, (ExecutableBase*)nativeExecutable);
-            return function;
-        }
+        static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeFunction nativeFunction, NativeFunction nativeConstructor = callHostFunctionAsConstructor);
+        static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeExecutable* nativeExecutable);
 
         static JSFunction* create(ExecState* exec, FunctionExecutable* executable, ScopeChainNode* scopeChain)
         {
@@ -119,13 +101,14 @@ namespace JSC {
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype) 
         {
             ASSERT(globalObject);
-            return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info); 
+            return Structure::create(globalData, globalObject, prototype, TypeInfo(JSFunctionType, StructureFlags), &s_info); 
         }
 
         NativeFunction nativeFunction();
+        NativeFunction nativeConstructor();
 
-        virtual ConstructType getConstructData(ConstructData&);
-        virtual CallType getCallData(CallData&);
+        static ConstructType getConstructData(JSCell*, ConstructData&);
+        static CallType getCallData(JSCell*, CallData&);
 
         static inline size_t offsetOfScopeChain()
         {
@@ -140,21 +123,27 @@ namespace JSC {
     protected:
         const static unsigned StructureFlags = OverridesGetOwnPropertySlot | ImplementsHasInstance | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
 
-        void finishCreation(ExecState*, int length, const Identifier& name, ExecutableBase*);
+        JSFunction(ExecState*, JSGlobalObject*, Structure*);
+        JSFunction(ExecState*, FunctionExecutable*, ScopeChainNode*);
+        
+        void finishCreation(ExecState*, NativeExecutable*, int length, const Identifier& name);
         void finishCreation(ExecState*, FunctionExecutable*, ScopeChainNode*);
+
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+        virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
+        virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode = ExcludeDontEnumProperties);
+
+        static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+
+        static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
+
+        static void visitChildren(JSCell*, SlotVisitor&);
 
     private:
         explicit JSFunction(VPtrStealingHackType);
 
         bool isHostFunctionNonInline() const;
-
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier&, PropertySlot&);
-        virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
-        virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
-        virtual void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
-        virtual bool deleteProperty(ExecState*, const Identifier& propertyName);
-
-        virtual void visitChildren(SlotVisitor&);
 
         static JSValue argumentsGetter(ExecState*, JSValue, const Identifier&);
         static JSValue callerGetter(ExecState*, JSValue, const Identifier&);

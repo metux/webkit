@@ -28,6 +28,8 @@
 
 #if ENABLE(JIT)
 
+// Verbose logging of code generation
+#define ENABLE_JIT_VERBOSE 0
 // Verbose logging for OSR-related code.
 #define ENABLE_JIT_VERBOSE_OSR 0
 
@@ -163,6 +165,7 @@ namespace JSC {
         MacroAssembler::Call hotPathOther;
         MacroAssembler::Call callReturnLocation;
         bool isCall;
+        unsigned bytecodeIndex;
     };
 
     struct MethodCallCompilationInfo {
@@ -312,10 +315,15 @@ namespace JSC {
         void emitLoadDouble(unsigned index, FPRegisterID value);
         void emitLoadInt32ToDouble(unsigned index, FPRegisterID value);
         Jump emitJumpIfNotObject(RegisterID structureReg);
+        Jump emitJumpIfNotType(RegisterID baseReg, RegisterID scratchReg, JSType);
 
         void testPrototype(JSValue, JumpList& failureCases);
 
-        void emitWriteBarrier(RegisterID owner, RegisterID scratch, WriteBarrierUseKind);
+        enum WriteBarrierMode { UnconditionalWriteBarrier, ShouldFilterImmediates };
+        // value register in write barrier is used before any scratch registers
+        // so may safely be the same as either of the scratch registers.
+        void emitWriteBarrier(RegisterID owner, RegisterID valueTag, RegisterID scratch, RegisterID scratch2, WriteBarrierMode, WriteBarrierUseKind);
+        void emitWriteBarrier(JSCell* owner, RegisterID value, RegisterID scratch, WriteBarrierMode, WriteBarrierUseKind);
 
         template<typename ClassType, typename StructureType> void emitAllocateBasicJSObject(StructureType, void* vtable, RegisterID result, RegisterID storagePtr);
         template<typename T> void emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID storagePtr);
@@ -1027,8 +1035,10 @@ namespace JSC {
 #endif
 
 #if ENABLE(DFG_JIT)
+        bool canBeOptimized() { return m_canBeOptimized; }
         bool shouldEmitProfiling() { return m_canBeOptimized; }
 #else
+        bool canBeOptimized() { return false; }
         // Enables use of value profiler with tiered compilation turned off,
         // in which case all code gets profiled.
         bool shouldEmitProfiling() { return true; }
@@ -1073,10 +1083,14 @@ namespace JSC {
 #endif
         WeakRandom m_randomGenerator;
         static CodeRef stringGetByValStubGenerator(JSGlobalData*);
-        
-#if ENABLE(DFG_JIT)
+
+#if ENABLE(VALUE_PROFILER)
         bool m_canBeOptimized;
+#endif
+#if ENABLE(DFG_JIT) || ENABLE(JIT_VERBOSE)
         Label m_startOfCode;
+#endif
+#if ENABLE(DFG_JIT)
         CompactJITCodeMap::Encoder m_jitCodeMapEncoder;
 #endif
     } JIT_CLASS_ALIGNMENT;

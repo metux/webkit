@@ -31,6 +31,7 @@
 #include "NPRuntimeUtilities.h"
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/JSObject.h>
+#include <JavaScriptCore/StrongInlines.h>
 #include <WebCore/Frame.h>  
 #include <WebCore/IdentifierRep.h>
 #include <wtf/text/WTFString.h>
@@ -187,9 +188,9 @@ bool NPJSObject::setProperty(NPIdentifier propertyName, const NPVariant* value)
     JSValue jsValue = m_objectMap->convertNPVariantToJSValue(exec, m_objectMap->globalObject(), *value);
     if (identifierRep->isString()) {
         PutPropertySlot slot;
-        m_jsObject->put(exec, identifierFromIdentifierRep(exec, identifierRep), jsValue, slot);
+        m_jsObject->methodTable()->put(m_jsObject.get(), exec, identifierFromIdentifierRep(exec, identifierRep), jsValue, slot);
     } else
-        m_jsObject->put(exec, identifierRep->number(), jsValue);
+        m_jsObject->methodTable()->putByIndex(m_jsObject.get(), exec, identifierRep->number(), jsValue);
     exec->clearException();
     
     return true;
@@ -212,14 +213,14 @@ bool NPJSObject::removeProperty(NPIdentifier propertyName)
             return false;
         }
         
-        m_jsObject->deleteProperty(exec, identifier);
+        m_jsObject->methodTable()->deleteProperty(m_jsObject.get(), exec, identifier);
     } else {
         if (!m_jsObject->hasProperty(exec, identifierRep->number())) {
             exec->clearException();
             return false;
         }
 
-        m_jsObject->deleteProperty(exec, identifierRep->number());
+        m_jsObject->methodTable()->deletePropertyByIndex(m_jsObject.get(), exec, identifierRep->number());
     }
 
     exec->clearException();

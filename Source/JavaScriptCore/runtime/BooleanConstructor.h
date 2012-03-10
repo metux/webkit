@@ -38,13 +38,20 @@ namespace JSC {
             return constructor;
         }
 
+        static const ClassInfo s_info;
+
+        static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype) 
+        { 
+            return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info); 
+        }
+
     protected:
         void finishCreation(ExecState*, BooleanPrototype*);
 
     private:
         BooleanConstructor(JSGlobalObject*, Structure*);
-        virtual ConstructType getConstructData(ConstructData&);
-        virtual CallType getCallData(CallData&);
+        static ConstructType getConstructData(JSCell*, ConstructData&);
+        static CallType getCallData(JSCell*, CallData&);
     };
 
     JSObject* constructBooleanFromImmediateBoolean(ExecState*, JSGlobalObject*, JSValue);

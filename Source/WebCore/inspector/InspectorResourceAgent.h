@@ -35,6 +35,7 @@
 #include "PlatformString.h"
 
 #include <wtf/PassRefPtr.h>
+#include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
 #if ENABLE(INSPECTOR)
@@ -124,8 +125,8 @@ public:
     void enable(ErrorString*);
     void disable(ErrorString*);
     void setUserAgentOverride(ErrorString*, const String& userAgent);
-    void setExtraHeaders(ErrorString*, PassRefPtr<InspectorObject>);
-    void getResourceContent(ErrorString*, const String& requestId, String* content, bool* base64Encoded);
+    void setExtraHTTPHeaders(ErrorString*, PassRefPtr<InspectorObject>);
+    void getResponseBody(ErrorString*, const String& requestId, String* content, bool* base64Encoded);
     void clearCache(ErrorString*, const String* const optionalPreservedLoaderId);
 
     void clearBrowserCache(ErrorString*);

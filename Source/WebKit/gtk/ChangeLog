@@ -1,12 +1,121 @@
-2012-02-01  Martin Robinson  <mrobinson@igalia.com>
+2011-10-26  Carlos Garcia Campos  <cgarcia@igalia.com>
 
-        Update the NEWS file in preparation for the 1.6.3 release.
+        [GTK] Update NEWS and configure.ac for 1.7.1 release
+        https://bugs.webkit.org/show_bug.cgi?id=70932
+
+        Reviewed by Martin Robinson.
+
+        * NEWS: Added release notes.
+
+2011-10-26  Alejandro G. Castro  <alex@igalia.com>
+
+        [GTK] Fix distcheck compilation
+        https://bugs.webkit.org/show_bug.cgi?id=70921
+
+        Add new files required by doc compilation to the clean process.
+
+        Reviewed by Martin Robinson.
+
+        * docs/GNUmakefile.am:
+
+2011-10-26  Zalan Bujtas  <zbujtas@gmail.com>
+
+        Name viewport change event consistently.
+        https://bugs.webkit.org/show_bug.cgi?id=70901
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Use ViewportPropertiesDidChange term consistently throughout WebKit.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::dispatchViewportPropertiesDidChange):
+        * WebCoreSupport/ChromeClientGtk.h:
+
+2011-10-26  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Remove g_thread_init() calls from gtk-doc scanner too
+        https://bugs.webkit.org/show_bug.cgi?id=70908
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * docs/GNUmakefile.am:
+
+2011-10-25  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] GtkAdjustment watcher updates adjustments too lazily
+        https://bugs.webkit.org/show_bug.cgi?id=70180
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Increase the priority of the GtkAdjustments update in GtkAdjustmentWatcher. This
+        means that adjustments will more quickly represent the state of the WebKitWebView
+        when it scrolls. This fixes out-of-sync scrollbars and some visual artifacts.
+
+        * WebCoreSupport/GtkAdjustmentWatcher.cpp:
+        (WebKit::GtkAdjustmentWatcher::updateAdjustmentsFromScrollbarsLater): Use a timeout
+        with the default priority.
+
+2011-10-24  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Remove g_thread_init() calls
+        https://bugs.webkit.org/show_bug.cgi?id=70717
 
         Reviewed by Xan Lopez.
 
-        * NEWS: Update this file.
+        With newer glib it's not needed anymore and with previous versions
+        it was already called by g_type_init().
 
-2012-01-30  Gustavo Noronha Silva  <gns@gnome.org>
+        * tests/testapplicationcache.c:
+        (main):
+        * tests/testatk.c:
+        (main):
+        * tests/testatkroles.c:
+        (main):
+        * tests/testcopyandpaste.c:
+        (main):
+        * tests/testdomdocument.c:
+        (main):
+        * tests/testdomdomwindow.c:
+        (main):
+        * tests/testdomnode.c:
+        (main):
+        * tests/testdownload.c:
+        (main):
+        * tests/testglobals.c:
+        (main):
+        * tests/testhittestresult.c:
+        (main):
+        * tests/testhttpbackend.c:
+        (main):
+        * tests/testkeyevents.c:
+        (main):
+        * tests/testloading.c:
+        (main):
+        * tests/testmimehandling.c:
+        (main):
+        * tests/testnetworkrequest.c:
+        (main):
+        * tests/testnetworkresponse.c:
+        (main):
+        * tests/testwebbackforwardlist.c:
+        (main):
+        * tests/testwebdatasource.c:
+        (main):
+        * tests/testwebframe.c:
+        (main):
+        * tests/testwebhistoryitem.c:
+        (main):
+        * tests/testwebplugindatabase.c:
+        (main):
+        * tests/testwebresource.c:
+        (main):
+        * tests/testwebsettings.c:
+        (main):
+        * tests/testwebview.c:
+        * tests/testwindow.c:
+        (main):
+
+2011-10-20  Gustavo Noronha Silva  <gns@gnome.org>
 
         [GTK] webkitgtk's pkgconfig file needs to require javascriptcoregtk
         https://bugs.webkit.org/show_bug.cgi?id=70500
@@ -15,7 +124,7 @@
 
         * webkit.pc.in: add javascriptcoregtk to Requires
 
-2012-01-30  Gustavo Noronha Silva  <gns@gnome.org>
+2011-10-19  Gustavo Noronha Silva  <gns@gnome.org>
 
         GTK+ build fix. Rename the INCLUDES variable so it is not picked
         up by random bystanders. Also do some more cleanup on stuff we
@@ -24,7 +133,7 @@
         * GNUmakefile.gtk-doc.am:
         * docs/GNUmakefile.am:
 
-2012-01-30  Gustavo Noronha Silva  <gns@gnome.org>
+2011-10-19  Gustavo Noronha Silva  <gns@gnome.org>
 
         [GTK] Streamline wk1 documentation build
         https://bugs.webkit.org/show_bug.cgi?id=70447
@@ -37,6 +146,113 @@
           to our non-recursive build;
         * docs/GNUmakefile.am: simplification and adaption to work with the
           rest of the build system.
+
+2011-10-19  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk][Geolocation] Build guards missing in geolocation clients
+        https://bugs.webkit.org/show_bug.cgi?id=70420
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Adds build guards that were forgotten when client-based
+        geolocation was introduced in r97746. This should make builds
+        without geolocation support succeed again.
+
+        * WebCoreSupport/GeolocationClientGtk.cpp:
+        * WebCoreSupport/GeolocationClientGtk.h:
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init):
+
+2011-10-18  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Support for client-based geolocation
+        https://bugs.webkit.org/show_bug.cgi?id=64970
+
+        Reviewed by Martin Robinson.
+
+        Add DumpRenderTree support functions for client-based geolocation tests
+        and implement GeolocationClientGtk. The implementation is based on Zecke's
+        implementation of GeolocationService class in WebCore, which is now redundant
+        and subsequently removed.
+
+        * GNUmakefile.am: Add GeolocationClientGtk.* files to compilation.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp: Add support functions to operate
+        with GeolocationClientMock.
+        (DumpRenderTreeSupportGtk::resetGeolocationClientMock):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPermission):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPosition):
+        (DumpRenderTreeSupportGtk::setMockGeolocationError):
+        (DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests):
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        * WebCoreSupport/GeolocationClientGtk.cpp: Added.
+        (WebKit::getPositionCallback):
+        (WebKit::positionChangedCallback):
+        (WebKit::GeolocationClient::GeolocationClient):
+        (WebKit::GeolocationClient::geolocationDestroyed):
+        (WebKit::GeolocationClient::startUpdating):
+        (WebKit::GeolocationClient::stopUpdating):
+        (WebKit::GeolocationClient::setEnableHighAccuracy):
+        (WebKit::GeolocationClient::lastPosition):
+        (WebKit::GeolocationClient::requestPermission):
+        (WebKit::GeolocationClient::cancelPermissionRequest):
+        (WebKit::GeolocationClient::positionChanged):
+        (WebKit::GeolocationClient::updatePosition):
+        (WebKit::GeolocationClient::errorOccured):
+        * WebCoreSupport/GeolocationClientGtk.h: Added.
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init): Use GeolocationClientMock as geolocation client
+        when running in DumpRenderTree.
+
+2011-10-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Make the interface of locationAndLengthFromRange and rangeFromLocationAndLength consistent
+        https://bugs.webkit.org/show_bug.cgi?id=69964
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::firstRectForCharacterRange):
+
+2011-09-28  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Move drag-and-drop code which can be shared with WebKit2 to WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=66890
+
+        Use the new GtkWidgetDragAndDropGlue class to hold the logic that will be
+        common between WebKit1 and WebKit2. Modify WebKitWebView to use this class.
+
+        Reviewed by Philippe Normand.
+
+        * WebCoreSupport/DragClientGtk.cpp:
+        (WebKit::DragClient::startDrag): Inform the drag-and-drop glue about the drag.
+        * webkit/webkitwebview.cpp: Use GtkWidgetDragAndDropGlue wherever this class was
+        maintaining drag-and-drop state itself.
+        * webkit/webkitwebviewprivate.h: Swap out the drag-and-drop state for an instance
+        of the glue class.
+
+2011-09-28  Kaustubh Atrawalkar  <kaustubh@motorola.com>
+
+        [Gtk] Implement textInputController.doCommand
+        https://bugs.webkit.org/show_bug.cgi?id=66496
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::doCommand): Function definition for doCommand 
+        callback. Converted Incoming command to match with WebCore::Editor CommandMap.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+
+2011-09-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Reorganize header files
+        https://bugs.webkit.org/show_bug.cgi?id=65616
+
+        Reviewed by Martin Robinson.
+
+        Install header files under $libwebkitgtkincludedir/webkit.
+
+        * GNUmakefile.am: Use $libwebkitgtkincludedir.
+        * webkit.pc.in: Use webkitgtk-<api-version> as include dir.
 
 2011-09-26  Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
 
@@ -61,6 +277,55 @@
         (webkit_web_view_dispose): unset the adjustments during dispose,
         to avoid late adjustment change notifications hitting the
         adjustment watcher
+
+2011-09-24  Adam Barth  <abarth@webkit.org>
+
+        Always enable ENABLE(OFFLINE_WEB_APPLICATIONS)
+        https://bugs.webkit.org/show_bug.cgi?id=68767
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::reachedApplicationCacheOriginQuota):
+        * WebCoreSupport/ChromeClientGtk.h:
+        * webkit/webkitapplicationcache.cpp:
+        (webkit_application_cache_get_maximum_size):
+        (webkit_application_cache_set_maximum_size):
+        (webkit_application_cache_get_database_directory_path):
+        * webkit/webkitglobals.cpp:
+        (webkitInit):
+
+2011-09-22  Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
+
+        Remove useless empty WebKit namespace.
+
+        Reviewed by Xan Lopez.
+
+        * webkit/webkitglobals.cpp:
+        (webkitInit):
+
+2011-09-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] WebProcess shouldn't use the GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=68062
+
+        Reviewed by Martin Robinson.
+
+        Use WebCore API to create errors in frame loader.
+
+        * WebCoreSupport/AssertMatchingEnums.cpp:
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::cancelledError):
+        (WebKit::FrameLoaderClient::blockedError):
+        (WebKit::FrameLoaderClient::cannotShowURLError):
+        (WebKit::FrameLoaderClient::interruptedForPolicyChangeError):
+        (WebKit::FrameLoaderClient::cannotShowMIMETypeError):
+        (WebKit::FrameLoaderClient::fileDoesNotExistError):
+        (WebKit::FrameLoaderClient::pluginWillHandleLoadError):
+        * webkit/webkiterror.cpp:
+        (webkit_network_error_quark):
+        (webkit_policy_error_quark):
+        (webkit_plugin_error_quark):
 
 2011-09-20  Philippe Normand  <pnormand@igalia.com>
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
- * Copyright (C) 2008, 2009 Google Inc.
+ * Copyright (C) 2008, 2009, 2010, 2011 Google Inc. All rights reserved.
  * Copyright (C) 2011 Igalia S.L.
  * Copyright (C) 2011 Motorola Mobility. All rights reserved.
  *
@@ -336,24 +336,6 @@ void StyledMarkupAccumulator::appendElement(StringBuilder& out, Element* element
     appendCloseTag(out, element);
 }
 
-bool isBlockNodeToRetainAppearance(const Node* node)
-{
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName::QualifiedNameImpl*>, names, ());
-    if (!names.size()) {
-        names.add(addressTag.impl());
-        names.add(blockquoteTag.impl());
-        names.add(h1Tag.impl());
-        names.add(h2Tag.impl());
-        names.add(h3Tag.impl());
-        names.add(h4Tag.impl());
-        names.add(h5Tag.impl());
-        names.add(h6Tag.impl());
-        names.add(listingTag.impl());
-        names.add(preTag.impl());
-    }
-    return node->isElementNode() && names.contains(toElement(node)->tagQName().impl());
-}
-
 Node* StyledMarkupAccumulator::serializeNodes(Node* startNode, Node* pastEnd)
 {
     if (!m_highestNodeToBeSerialized) {
@@ -361,18 +343,8 @@ Node* StyledMarkupAccumulator::serializeNodes(Node* startNode, Node* pastEnd)
         m_highestNodeToBeSerialized = lastClosed;
     }
 
-    Node* parentOfHighestNode = m_highestNodeToBeSerialized ? m_highestNodeToBeSerialized->parentNode() : 0;
-    if (parentOfHighestNode) {
-        m_wrappingStyle = EditingStyle::create(parentOfHighestNode, EditingStyle::EditingInheritablePropertiesAndBackgroundColorInEffect);
-
-        // Styles that Mail blockquotes contribute should only be placed on the Mail blockquote,
-        // to help us differentiate those styles from ones that the user has applied.
-        // This helps us get the color of content pasted into blockquotes right.
-        m_wrappingStyle->removeStyleAddedByNode(enclosingNodeOfType(firstPositionInOrBeforeNode(parentOfHighestNode), isBlockNodeToRetainAppearance, CanCrossEditingBoundary));
-
-        // Call collapseTextDecorationProperties first or otherwise it'll copy the value over from in-effect to text-decorations.
-        m_wrappingStyle->collapseTextDecorationProperties();
-    }
+    if (m_highestNodeToBeSerialized && m_highestNodeToBeSerialized->parentNode())
+        m_wrappingStyle = EditingStyle::wrappingStyleForSerialization(m_highestNodeToBeSerialized->parentNode(), shouldAnnotate());
 
     return traverseNodesForSerialization(startNode, pastEnd, EmitString);
 }
@@ -456,10 +428,33 @@ Node* StyledMarkupAccumulator::traverseNodesForSerialization(Node* startNode, No
     return lastClosed;
 }
 
-static Node* ancestorToRetainStructureAndAppearance(Node* commonAncestor)
+static bool isNonTableCellHTMLBlockElement(const Node* node)
 {
-    Node* commonAncestorBlock = enclosingBlock(commonAncestor);
+    return node->hasTagName(listingTag)
+        || node->hasTagName(olTag)
+        || node->hasTagName(preTag)
+        || node->hasTagName(tableTag)
+        || node->hasTagName(ulTag)
+        || node->hasTagName(xmpTag)
+        || node->hasTagName(h1Tag)
+        || node->hasTagName(h2Tag)
+        || node->hasTagName(h3Tag)
+        || node->hasTagName(h4Tag)
+        || node->hasTagName(h5Tag);
+}
 
+static bool isHTMLBlockElement(const Node* node)
+{
+    return node->hasTagName(tdTag)
+        || node->hasTagName(thTag)
+        || isNonTableCellHTMLBlockElement(node);
+}
+
+// FIXME: Do we want to handle mail quotes here instead?
+// This is currently handled in highestAncestorToWrapMarkup but it might make more
+// sense to move that into here.
+static Node* ancestorToRetainStructureAndAppearanceForBlock(Node* commonAncestorBlock)
+{
     if (!commonAncestorBlock)
         return 0;
 
@@ -471,14 +466,21 @@ static Node* ancestorToRetainStructureAndAppearance(Node* commonAncestor)
         return table;
     }
 
-    if (isBlockNodeToRetainAppearance(commonAncestorBlock)
-        || commonAncestorBlock->hasTagName(olTag)
-        || commonAncestorBlock->hasTagName(tableTag)
-        || commonAncestorBlock->hasTagName(ulTag)
-        || commonAncestorBlock->hasTagName(xmpTag))
+    if (isNonTableCellHTMLBlockElement(commonAncestorBlock))
         return commonAncestorBlock;
 
     return 0;
+}
+
+static inline Node* ancestorToRetainStructureAndAppearance(Node* commonAncestor)
+{
+    return ancestorToRetainStructureAndAppearanceForBlock(enclosingBlock(commonAncestor));
+}
+
+static inline Node* ancestorToRetainStructureAndAppearanceWithNoRenderer(Node* commonAncestor)
+{
+    Node* commonAncestorBlock = enclosingNodeOfType(firstPositionInOrBeforeNode(commonAncestor), isHTMLBlockElement);
+    return ancestorToRetainStructureAndAppearanceForBlock(commonAncestorBlock);
 }
 
 static bool propertyMissingOrEqualToNone(CSSStyleDeclaration* style, int propertyID)
@@ -704,6 +706,92 @@ PassRefPtr<DocumentFragment> createFragmentFromMarkup(Document* document, const 
         completeURLs(fragment.get(), baseURL);
 
     return fragment.release();
+}
+
+static const char fragmentMarkerTag[] = "webkit-fragment-marker";
+
+static bool findNodesSurroundingContext(Document* document, RefPtr<Node>& nodeBeforeContext, RefPtr<Node>& nodeAfterContext)
+{
+    for (Node* node = document->firstChild(); node; node = node->traverseNextNode()) {
+        if (node->nodeType() == Node::COMMENT_NODE && static_cast<CharacterData*>(node)->data() == fragmentMarkerTag) {
+            if (!nodeBeforeContext)
+                nodeBeforeContext = node;
+            else {
+                nodeAfterContext = node;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static void trimFragment(DocumentFragment* fragment, Node* nodeBeforeContext, Node* nodeAfterContext)
+{
+    ExceptionCode ec = 0;
+    Node* next;
+    for (RefPtr<Node> node = fragment->firstChild(); node; node = next) {
+        if (nodeBeforeContext->isDescendantOf(node.get())) {
+            next = node->traverseNextNode();
+            continue;
+        }
+        next = node->traverseNextSibling();
+        ASSERT(!node->contains(nodeAfterContext));
+        node->parentNode()->removeChild(node.get(), ec);
+        if (nodeBeforeContext == node)
+            break;
+    }
+
+    ASSERT(nodeAfterContext->parentNode());
+    for (Node* node = nodeAfterContext; node; node = next) {
+        next = node->traverseNextSibling();
+        node->parentNode()->removeChild(node, ec);
+        ASSERT(!ec);
+    }
+}
+
+PassRefPtr<DocumentFragment> createFragmentFromMarkupWithContext(Document* document, const String& markup, unsigned fragmentStart, unsigned fragmentEnd,
+    const String& baseURL, FragmentScriptingPermission scriptingPermission)
+{
+    // FIXME: Need to handle the case where the markup already contains these markers.
+
+    StringBuilder taggedMarkup;
+    taggedMarkup.append(markup.left(fragmentStart));
+    MarkupAccumulator::appendComment(taggedMarkup, fragmentMarkerTag);
+    taggedMarkup.append(markup.substring(fragmentStart, fragmentEnd - fragmentStart));
+    MarkupAccumulator::appendComment(taggedMarkup, fragmentMarkerTag);
+    taggedMarkup.append(markup.substring(fragmentEnd));
+
+    RefPtr<DocumentFragment> taggedFragment = createFragmentFromMarkup(document, taggedMarkup.toString(), baseURL, scriptingPermission);
+    RefPtr<Document> taggedDocument = Document::create(0, KURL());
+    taggedDocument->takeAllChildrenFrom(taggedFragment.get());
+
+    RefPtr<Node> nodeBeforeContext;
+    RefPtr<Node> nodeAfterContext;
+    if (!findNodesSurroundingContext(taggedDocument.get(), nodeBeforeContext, nodeAfterContext))
+        return 0;
+
+    RefPtr<Range> range = Range::create(taggedDocument.get(),
+        positionAfterNode(nodeBeforeContext.get()).parentAnchoredEquivalent(),
+        positionBeforeNode(nodeAfterContext.get()).parentAnchoredEquivalent());
+
+    ExceptionCode ec = 0;
+    Node* commonAncestor = range->commonAncestorContainer(ec);
+    ASSERT(!ec);
+    Node* specialCommonAncestor = ancestorToRetainStructureAndAppearanceWithNoRenderer(commonAncestor);
+
+    // When there's a special common ancestor outside of the fragment, we must include it as well to
+    // preserve the structure and appearance of the fragment. For example, if the fragment contains
+    // TD, we need to include the enclosing TABLE tag as well.
+    RefPtr<DocumentFragment> fragment = DocumentFragment::create(document);
+    if (specialCommonAncestor) {
+        fragment->appendChild(specialCommonAncestor, ec);
+        ASSERT(!ec);
+    } else
+        fragment->takeAllChildrenFrom(static_cast<ContainerNode*>(commonAncestor));
+
+    trimFragment(fragment.get(), nodeBeforeContext.get(), nodeAfterContext.get());
+
+    return fragment;
 }
 
 String createMarkup(const Node* node, EChildrenOnly childrenOnly, Vector<Node*>* nodes, EAbsoluteURLs shouldResolveURLs)

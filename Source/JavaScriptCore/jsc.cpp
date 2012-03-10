@@ -115,7 +115,6 @@ struct Options {
 };
 
 static const char interactivePrompt[] = "> ";
-static const UString interpreterName("Interpreter");
 
 class StopWatch {
 public:
@@ -161,7 +160,7 @@ public:
 protected:
     void finishCreation(JSGlobalData& globalData, const Vector<UString>& arguments)
     {
-        Base::finishCreation(globalData, this);
+        Base::finishCreation(globalData);
         
         addFunction(globalData, "debug", functionDebug, 1);
         addFunction(globalData, "print", functionPrint, 1);
@@ -183,14 +182,14 @@ protected:
 
         JSObject* array = constructEmptyArray(globalExec());
         for (size_t i = 0; i < arguments.size(); ++i)
-            array->put(globalExec(), i, jsString(globalExec(), arguments[i]));
+            array->methodTable()->putByIndex(array, globalExec(), i, jsString(globalExec(), arguments[i]));
         putDirect(globalData, Identifier(globalExec(), "arguments"), array);
     }
 
     void addFunction(JSGlobalData& globalData, const char* name, NativeFunction function, unsigned arguments)
     {
         Identifier identifier(globalExec(), name);
-        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, functionStructure(), arguments, identifier, function));
+        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier, function));
     }
 };
 COMPILE_ASSERT(!IsInteger<GlobalObject>::value, WTF_IsInteger_GlobalObject_false);
@@ -479,6 +478,8 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
 
 static void runInteractive(GlobalObject* globalObject)
 {
+    UString interpreterName("Interpreter");
+
     while (true) {
 #if HAVE(READLINE) && !RUNNING_FROM_XCODE
         char* line = readline(interactivePrompt);

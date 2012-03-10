@@ -58,7 +58,7 @@ public:
                                  bool cancelableArg,
                                  bool persisted);
 
-    virtual bool isPageTransitionEvent() const { return true; }
+    virtual const AtomicString& interfaceName() const;
 
     bool persisted() const { return m_persisted; }
 

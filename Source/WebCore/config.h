@@ -164,11 +164,6 @@
 #define WTF_USE_NEW_THEME 1
 #endif // PLATFORM(MAC)
 
-#if OS(SYMBIAN)
-#define USE_SYSTEM_MALLOC 1
-#define ENABLE_PASSWORD_ECHO 1
-#endif
-
 #if OS(UNIX) || OS(WINDOWS)
 #define WTF_USE_OS_RANDOMNESS 1
 #endif
@@ -227,3 +222,4 @@ typedef float CGFloat;
 #if PLATFORM(WIN) && HAVE(AVCF)
 #define WTF_USE_AVFOUNDATION 1
 #endif
+

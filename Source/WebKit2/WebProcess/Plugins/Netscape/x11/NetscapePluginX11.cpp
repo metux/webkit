@@ -408,11 +408,6 @@ bool NetscapePlugin::platformHandleMouseEvent(const WebMouseEvent& event)
     if (m_isWindowed)
         return false;
 
-    if ((event.type() == WebEvent::MouseDown || event.type() == WebEvent::MouseUp)
-         && event.button() == WebMouseEvent::RightButton
-         && quirks().contains(PluginQuirks::IgnoreRightClickInWindowlessMode))
-        return false;
-
     XEvent xEvent;
     initializeXEvent(xEvent);
 

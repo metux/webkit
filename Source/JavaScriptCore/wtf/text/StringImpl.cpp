@@ -55,20 +55,17 @@ StringImpl::~StringImpl()
 #endif
 
     BufferOwnership ownership = bufferOwnership();
-    if (ownership != BufferInternal) {
-        if (ownership == BufferOwned) {
-            ASSERT(!m_sharedBuffer);
-            ASSERT(m_data);
-            fastFree(const_cast<UChar*>(m_data));
-        } else if (ownership == BufferSubstring) {
-            ASSERT(m_substringBuffer);
-            m_substringBuffer->deref();
-        } else {
-            ASSERT(ownership == BufferShared);
-            ASSERT(m_sharedBuffer);
-            m_sharedBuffer->deref();
-        }
+    if (ownership == BufferInternal)
+        return;
+    if (ownership == BufferOwned) {
+        ASSERT(m_data);
+        fastFree(const_cast<UChar*>(m_data));
+        return;
     }
+
+    ASSERT(ownership == BufferSubstring);
+    ASSERT(m_substringBuffer);
+    m_substringBuffer->deref();
 }
 
 PassRefPtr<StringImpl> StringImpl::createUninitialized(unsigned length, UChar*& data)
@@ -85,6 +82,26 @@ PassRefPtr<StringImpl> StringImpl::createUninitialized(unsigned length, UChar*& 
         CRASH();
     size_t size = sizeof(StringImpl) + length * sizeof(UChar);
     StringImpl* string = static_cast<StringImpl*>(fastMalloc(size));
+
+    data = reinterpret_cast<UChar*>(string + 1);
+    return adoptRef(new (string) StringImpl(length));
+}
+
+PassRefPtr<StringImpl> StringImpl::reallocate(PassRefPtr<StringImpl> originalString, unsigned length, UChar*& data)
+{
+    ASSERT(originalString->hasOneRef() && originalString->bufferOwnership() == BufferInternal);
+
+    if (!length) {
+        data = 0;
+        return empty();
+    }
+
+    // Same as createUninitialized() except here we use fastRealloc.
+    if (length > ((std::numeric_limits<unsigned>::max() - sizeof(StringImpl)) / sizeof(UChar)))
+        CRASH();
+    size_t size = sizeof(StringImpl) + length * sizeof(UChar);
+    originalString->~StringImpl();
+    StringImpl* string = static_cast<StringImpl*>(fastRealloc(originalString.leakRef(), size));
 
     data = reinterpret_cast<UChar*>(string + 1);
     return adoptRef(new (string) StringImpl(length));
@@ -123,37 +140,6 @@ PassRefPtr<StringImpl> StringImpl::create(const char* string)
     if (length > numeric_limits<unsigned>::max())
         CRASH();
     return create(string, length);
-}
-
-PassRefPtr<StringImpl> StringImpl::create(const UChar* characters, unsigned length, PassRefPtr<SharedUChar> sharedBuffer)
-{
-    ASSERT(characters);
-    ASSERT(minLengthToShare && length >= minLengthToShare);
-    return adoptRef(new StringImpl(characters, length, sharedBuffer));
-}
-
-SharedUChar* StringImpl::sharedBuffer()
-{
-    if (m_length < minLengthToShare)
-        return 0;
-    // All static strings are smaller that the minimim length to share.
-    ASSERT(!isStatic());
-
-    BufferOwnership ownership = bufferOwnership();
-
-    if (ownership == BufferInternal)
-        return 0;
-    if (ownership == BufferSubstring)
-        return m_substringBuffer->sharedBuffer();
-    if (ownership == BufferOwned) {
-        ASSERT(!m_sharedBuffer);
-        m_sharedBuffer = SharedUChar::create(new SharableUChar(m_data)).leakRef();
-        m_refCountAndFlags = (m_refCountAndFlags & ~s_refCountMaskBufferOwnership) | BufferShared;
-    }
-
-    ASSERT(bufferOwnership() == BufferShared);
-    ASSERT(m_sharedBuffer);
-    return m_sharedBuffer;
 }
 
 bool StringImpl::containsOnlyWhitespace()
@@ -1102,20 +1088,6 @@ WTF::Unicode::Direction StringImpl::defaultWritingDirection(bool* hasStrongDirec
     return WTF::Unicode::LeftToRight;
 }
 
-// This is a hot function because it's used when parsing HTML.
-PassRefPtr<StringImpl> StringImpl::createStrippingNullCharactersSlowCase(const UChar* characters, unsigned length)
-{
-    StringBuffer strippedCopy(length);
-    unsigned strippedLength = 0;
-    for (unsigned i = 0; i < length; i++) {
-        if (int c = characters[i])
-            strippedCopy[strippedLength++] = c;
-    }
-    ASSERT(strippedLength < length);  // Only take the slow case when stripping.
-    strippedCopy.shrink(strippedLength);
-    return adopt(strippedCopy);
-}
-
 PassRefPtr<StringImpl> StringImpl::adopt(StringBuffer& buffer)
 {
     unsigned length = buffer.length();
@@ -1136,23 +1108,8 @@ PassRefPtr<StringImpl> StringImpl::createWithTerminatingNullCharacter(const Stri
     memcpy(data, string.m_data, length * sizeof(UChar));
     data[length] = 0;
     terminatedString->m_length--;
-    terminatedString->m_hash = string.m_hash;
-    terminatedString->m_refCountAndFlags |= s_refCountFlagHasTerminatingNullCharacter;
+    terminatedString->m_hashAndFlags = (string.m_hashAndFlags & ~s_flagMask) | s_hashFlagHasTerminatingNullCharacter;
     return terminatedString.release();
-}
-
-PassRefPtr<StringImpl> StringImpl::threadsafeCopy() const
-{
-    return create(m_data, m_length);
-}
-
-PassRefPtr<StringImpl> StringImpl::crossThreadString()
-{
-    if (SharedUChar* sharedBuffer = this->sharedBuffer())
-        return adoptRef(new StringImpl(m_data, m_length, sharedBuffer->crossThreadCopy()));
-
-    // If no shared buffer is available, create a copy.
-    return threadsafeCopy();
 }
 
 } // namespace WTF

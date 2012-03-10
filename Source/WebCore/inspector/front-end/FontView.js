@@ -26,6 +26,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @extends {WebInspector.ResourceView}
+ * @constructor
+ */
 WebInspector.FontView = function(resource)
 {
     WebInspector.ResourceView.call(this, resource);
@@ -58,24 +62,23 @@ WebInspector.FontView.prototype = {
 
         this.fontPreviewElement = document.createElement("div");
         this.fontPreviewElement.innerHTML = WebInspector.FontView._fontInnerHTML;
-        this.fontPreviewElement.style.setProperty("font-family", uniqueFontName, null);
-        this.fontPreviewElement.style.setProperty("visibility", "hidden", null);
+        this.fontPreviewElement.style.setProperty("font-family", uniqueFontName);
+        this.fontPreviewElement.style.setProperty("visibility", "hidden");
 
         this._dummyElement = document.createElement("div");
         this._dummyElement.style.visibility = "hidden";
         this._dummyElement.style.zIndex = "-1";
         this._dummyElement.style.display = "inline";
         this._dummyElement.style.position = "absolute";
-        this._dummyElement.style.setProperty("font-family", uniqueFontName, null);
-        this._dummyElement.style.setProperty("font-size", WebInspector.FontView._measureFontSize + "px", null);
+        this._dummyElement.style.setProperty("font-family", uniqueFontName);
+        this._dummyElement.style.setProperty("font-size", WebInspector.FontView._measureFontSize + "px");
         this._dummyElement.innerHTML = WebInspector.FontView._fontInnerHTML;
 
         this.element.appendChild(this.fontPreviewElement);
     },
 
-    show: function(parentElement)
+    wasShown: function()
     {
-        WebInspector.ResourceView.prototype.show.call(this, parentElement);
         this._createContentIfNeeded();
 
         this.updateFontPreviewSize();
@@ -105,7 +108,7 @@ WebInspector.FontView.prototype = {
 
     updateFontPreviewSize: function()
     {
-        if (!this.fontPreviewElement || !this.visible)
+        if (!this.fontPreviewElement || !this.isShowing())
             return;
 
         this.fontPreviewElement.style.removeProperty("visibility");

@@ -129,7 +129,7 @@ var WebInspector = {
             return;
 
         if (this._currentPanel)
-            this._currentPanel.hide();
+            this._currentPanel.detach();
 
         this._currentPanel = x;
 
@@ -144,10 +144,19 @@ var WebInspector = {
                 WebInspector.userMetrics.panelShown(panelName);
             }
         }
+
+        this._toggleConsoleButton.disabled = this._currentPanel === WebInspector.panels.console;
     },
 
     _createPanels: function()
     {
+        WebInspector.mainPanelsView = new WebInspector.View();
+        WebInspector.mainPanelsView.markAsRoot();
+        WebInspector.mainPanelsView.element.id = "main-panels";
+        WebInspector.mainPanelsView.element.setAttribute("spellcheck", false);
+        var parentElement = document.getElementById("main");
+        WebInspector.mainPanelsView.show(parentElement);
+
         if (WebInspector.WorkerManager.isWorkerFrontend()) {
             this.panels.scripts = new WebInspector.ScriptsPanel(this.debuggerPresentationModel);
             this.panels.console = new WebInspector.ConsolePanel();
@@ -183,10 +192,13 @@ var WebInspector = {
 
         var anchoredStatusBar = document.getElementById("anchored-status-bar-items");
         anchoredStatusBar.appendChild(this._dockToggleButton.element);
-        anchoredStatusBar.appendChild(this.consoleView.toggleConsoleButton.element);
+
+        this._toggleConsoleButton = new WebInspector.StatusBarButton(WebInspector.UIString("Show console."), "console-status-bar-item");
+        this._toggleConsoleButton.addEventListener("click", this._toggleConsoleButtonClicked.bind(this), false);
+        anchoredStatusBar.appendChild(this._toggleConsoleButton.element);
+
         if (this.panels.elements)
             anchoredStatusBar.appendChild(this.panels.elements.nodeSearchButton.element);
-
         anchoredStatusBar.appendChild(this._settingsButton.element);
     },
 
@@ -204,6 +216,44 @@ var WebInspector = {
             InspectorFrontendHost.requestDetachWindow();
             WebInspector.userMetrics.WindowUndocked.record();
         }
+    },
+
+    _toggleConsoleButtonClicked: function()
+    {
+        if (this._toggleConsoleButton.disabled)
+            return;
+
+        this._toggleConsoleButton.toggled = !this._toggleConsoleButton.toggled;
+
+        var animationType = window.event && window.event.shiftKey ? WebInspector.Drawer.AnimationType.Slow : WebInspector.Drawer.AnimationType.Normal;
+        if (this._toggleConsoleButton.toggled) {
+            this._toggleConsoleButton.title = WebInspector.UIString("Hide console.");
+            this.drawer.show(this.consoleView, animationType);
+            this._consoleWasShown = true;
+        } else {
+            this._toggleConsoleButton.title = WebInspector.UIString("Show console.");
+            this.drawer.hide(animationType);
+            delete this._consoleWasShown;
+        }
+    },
+
+    _escPressed: function()
+    {
+        // If drawer was open with some view other than console then just close it.
+        if (!this._consoleWasShown && WebInspector.drawer.visible)
+            this.drawer.hide(WebInspector.Drawer.AnimationType.Immediately);
+        else
+            this._toggleConsoleButtonClicked();            
+    },
+
+    /**
+     * @param {WebInspector.View} view
+     */
+    showViewInDrawer: function(view)
+    {
+        this._toggleConsoleButton.title = WebInspector.UIString("Hide console.");
+        this._toggleConsoleButton.toggled = false;
+        this.drawer.show(view, WebInspector.Drawer.AnimationType.Immediately);
     },
 
     _toggleSettings: function()
@@ -277,7 +327,7 @@ var WebInspector = {
             this._dockToggleButton.toggled = !x;
         }
 
-        // This may be called before onLoadedDone, hence the bulk of inspector objects may
+        // This may be called before doLoadedDone, hence the bulk of inspector objects may
         // not be created yet.
         if (WebInspector.toolbar)
             WebInspector.toolbar.attached = x;
@@ -286,7 +336,7 @@ var WebInspector = {
             WebInspector.searchController.updateSearchLabel();
 
         if (WebInspector.drawer)
-            WebInspector.drawer.updateHeight();
+            WebInspector.drawer.resize();
     },
 
     _updateErrorAndWarningCounts: function()
@@ -307,6 +357,9 @@ var WebInspector = {
         errorWarningElement.removeChildren();
 
         if (errors) {
+            var errorImageElement = document.createElement("img");
+            errorImageElement.id = "error-count-img";
+            errorWarningElement.appendChild(errorImageElement);
             var errorElement = document.createElement("span");
             errorElement.id = "error-count";
             errorElement.textContent = errors;
@@ -314,6 +367,9 @@ var WebInspector = {
         }
 
         if (warnings) {
+            var warningsImageElement = document.createElement("img");
+            warningsImageElement.id = "warning-count-img";
+            errorWarningElement.appendChild(warningsImageElement);
             var warningsElement = document.createElement("span");
             warningsElement.id = "warning-count";
             warningsElement.textContent = warnings;
@@ -343,69 +399,6 @@ var WebInspector = {
             errorWarningElement.title = null;
     },
 
-    buildHighlightConfig: function(mode)
-    {
-        mode = mode || "all";
-        var highlightConfig = { showInfo: mode === "all" };
-        if (mode === "all" || mode === "content") {
-            highlightConfig.contentColor = WebInspector.Color.PageHighlight.Content.toProtocolRGBA();
-            highlightConfig.contentOutlineColor = WebInspector.Color.PageHighlight.ContentOutline.toProtocolRGBA();
-        }
-
-        if (mode === "all" || mode === "padding") {
-            highlightConfig.paddingColor = WebInspector.Color.PageHighlight.Padding.toProtocolRGBA();
-            highlightConfig.paddingOutlineColor = WebInspector.Color.PageHighlight.PaddingOutline.toProtocolRGBA();
-        }
-
-        if (mode === "all" || mode === "border") {
-            highlightConfig.borderColor = WebInspector.Color.PageHighlight.Border.toProtocolRGBA();
-            highlightConfig.borderOutlineColor = WebInspector.Color.PageHighlight.BorderOutline.toProtocolRGBA();
-        }
-
-        if (mode === "all" || mode === "margin") {
-            highlightConfig.marginColor = WebInspector.Color.PageHighlight.Margin.toProtocolRGBA();
-            highlightConfig.marginOutlineColor = WebInspector.Color.PageHighlight.MarginOutline.toProtocolRGBA();
-        }
-
-        return highlightConfig;
-    },
-
-    highlightDOMNode: function(nodeId, mode)
-    {
-        if ("_hideDOMNodeHighlightTimeout" in this) {
-            clearTimeout(this._hideDOMNodeHighlightTimeout);
-            delete this._hideDOMNodeHighlightTimeout;
-        }
-
-        if (this._highlightedDOMNodeId === nodeId)
-            return;
-
-        this._highlightedDOMNodeId = nodeId;
-        if (nodeId)
-            DOMAgent.highlightNode(nodeId, this.buildHighlightConfig(mode));
-        else
-            DOMAgent.hideHighlight();
-    },
-
-    highlightDOMNodeForTwoSeconds: function(nodeId)
-    {
-        this.highlightDOMNode(nodeId);
-        this._hideDOMNodeHighlightTimeout = setTimeout(this.highlightDOMNode.bind(this, 0), 2000);
-    },
-
-    wireElementWithDOMNode: function(element, nodeId)
-    {
-        element.addEventListener("click", this._updateFocusedNode.bind(this, nodeId), false);
-        element.addEventListener("mouseover", this.highlightDOMNode.bind(this, nodeId, "all"), false);
-        element.addEventListener("mouseout", this.highlightDOMNode.bind(this, 0), false);
-    },
-
-    _updateFocusedNode: function(nodeId)
-    {
-        this.setCurrentPanel(this.panels.elements);
-        this.panels.elements.updateFocusedNode(nodeId);
-    },
-
     networkResourceById: function(id)
     {
         return this.panels.network.resourceById(id);
@@ -419,16 +412,6 @@ var WebInspector = {
     resourceForURL: function(url)
     {
         return this.resourceTreeModel.resourceForURL(url);
-    },
-
-    openLinkExternallyLabel: function()
-    {
-        return WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Open link in new tab" : "Open Link in New Tab");
-    },
-
-    copyLinkAddressLabel: function()
-    {
-        return WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Copy link address" : "Copy Link Address");
     }
 }
 
@@ -465,13 +448,12 @@ WebInspector.loaded = function()
     }
     WebInspector.WorkerManager.loaded();
     WebInspector.doLoadedDone();
+    WebInspector.WorkerManager.loadCompleted();
 }
 
 WebInspector.doLoadedDone = function()
 {
     InspectorFrontendHost.loaded();
-
-    this.notifications = new WebInspector.Object();
 
     var platform = WebInspector.platform;
     document.body.addStyleClass("platform-" + platform);
@@ -494,9 +476,11 @@ WebInspector.doLoadedDone = function()
     this.console.addEventListener(WebInspector.ConsoleModel.Events.MessageAdded, this._updateErrorAndWarningCounts, this);
     this.console.addEventListener(WebInspector.ConsoleModel.Events.RepeatCountUpdated, this._updateErrorAndWarningCounts, this);
 
+    this.debuggerModel = new WebInspector.DebuggerModel();
+    this.debuggerPresentationModel = new WebInspector.DebuggerPresentationModel();
+
     this.drawer = new WebInspector.Drawer();
-    this.consoleView = new WebInspector.ConsoleView(this.drawer);
-    this.drawer.visibleView = this.consoleView;
+    this.consoleView = new WebInspector.ConsoleView(WebInspector.WorkerManager.isWorkerFrontend());
 
     this.networkManager = new WebInspector.NetworkManager();
     this.resourceTreeModel = new WebInspector.ResourceTreeModel();
@@ -507,10 +491,9 @@ WebInspector.doLoadedDone = function()
     InspectorBackend.registerInspectorDispatcher(this);
 
     this.cssModel = new WebInspector.CSSStyleModel();
-    this.debuggerModel = new WebInspector.DebuggerModel();
-    this.debuggerPresentationModel = new WebInspector.DebuggerPresentationModel();
 
     this.searchController = new WebInspector.SearchController();
+    this.advancedSearchController = new WebInspector.AdvancedSearchController();
 
     if (Preferences.nativeInstrumentationEnabled)
         this.domBreakpointsSidebarPane = new WebInspector.DOMBreakpointsSidebarPane();
@@ -535,22 +518,22 @@ WebInspector.doLoadedDone = function()
     errorWarningCount.addEventListener("click", this.showConsole.bind(this), false);
     this._updateErrorAndWarningCounts();
 
+    var autoselectPanel = WebInspector.UIString("a panel chosen automatically");
+    var openAnchorLocationSetting = WebInspector.settings.createSetting("openLinkHandler", autoselectPanel);
+    this.openAnchorLocationRegistry = new WebInspector.HandlerRegistry(openAnchorLocationSetting);
+    this.openAnchorLocationRegistry.registerHandler(autoselectPanel, function() { return false; });
+
     this.extensionServer.initExtensions();
 
-    this.console.enableAgent();
-
+    // There is no console agent for workers yet.
+    if (!WebInspector.WorkerManager.isWorkerFrontend())
+        this.console.enableAgent();
     DatabaseAgent.enable();
     DOMStorageAgent.enable();
 
     WebInspector.showPanel(WebInspector.settings.lastActivePanel.get());
 
-    function propertyNamesCallback(error, names)
-    {
-        if (!error)
-            WebInspector.cssNameCompletions = new WebInspector.CSSCompletions(names);
-    }
-    // As a DOMAgent method, this needs to happen after the frontend has loaded and the agent is available.
-    CSSAgent.getSupportedCSSProperties(propertyNamesCallback);
+    WebInspector.CSSCompletions.requestCSSNameCompletions();
 }
 
 WebInspector.addPanel = function(panel)
@@ -607,7 +590,7 @@ WebInspector.windowResize = function(event)
 {
     if (this.currentPanel())
         this.currentPanel().doResize();
-    this.drawer.doResize();
+    this.drawer.resize();
     this.toolbar.resize();
 }
 
@@ -711,6 +694,12 @@ WebInspector.openResource = function(resourceURL, inResourcesPanel)
         PageAgent.open(resourceURL, true);
 }
 
+WebInspector.openRequestInNetworkPanel = function(resource)
+{
+    WebInspector.showPanel("network");
+    WebInspector.panels.network.revealAndHighlightResource(resource);
+}
+
 WebInspector._registerShortcuts = function()
 {
     var shortcut = WebInspector.KeyboardShortcut;
@@ -765,6 +754,7 @@ WebInspector.documentKeyDown = function(event)
     }
 
     WebInspector.searchController.handleShortcut(event);
+    WebInspector.advancedSearchController.handleShortcut(event);
     if (event.handled) {
         event.preventDefault();
         return;
@@ -793,10 +783,7 @@ WebInspector.documentKeyDown = function(event)
 
         case "U+001B": // Escape key
             event.preventDefault();
-            if (this.drawer.fullPanel)
-                return;
-
-            this.drawer.visible = !this.drawer.visible;
+            this._escPressed();
             break;
 
         // Windows and Mac have two different definitions of [, so accept both.
@@ -866,138 +853,6 @@ WebInspector.contextMenuEventFired = function(event)
         event.preventDefault();
 }
 
-WebInspector.animateStyle = function(animations, duration, callback)
-{
-    var interval;
-    var complete = 0;
-    var hasCompleted = false;
-
-    const intervalDuration = (1000 / 30); // 30 frames per second.
-    const animationsLength = animations.length;
-    const propertyUnit = {opacity: ""};
-    const defaultUnit = "px";
-
-    function cubicInOut(t, b, c, d)
-    {
-        if ((t/=d/2) < 1) return c/2*t*t*t + b;
-        return c/2*((t-=2)*t*t + 2) + b;
-    }
-
-    // Pre-process animations.
-    for (var i = 0; i < animationsLength; ++i) {
-        var animation = animations[i];
-        var element = null, start = null, end = null, key = null;
-        for (key in animation) {
-            if (key === "element")
-                element = animation[key];
-            else if (key === "start")
-                start = animation[key];
-            else if (key === "end")
-                end = animation[key];
-        }
-
-        if (!element || !end)
-            continue;
-
-        if (!start) {
-            var computedStyle = element.ownerDocument.defaultView.getComputedStyle(element);
-            start = {};
-            for (key in end)
-                start[key] = parseInt(computedStyle.getPropertyValue(key));
-            animation.start = start;
-        } else
-            for (key in start)
-                element.style.setProperty(key, start[key] + (key in propertyUnit ? propertyUnit[key] : defaultUnit));
-    }
-
-    function animateLoop()
-    {
-        // Advance forward.
-        complete += intervalDuration;
-        var next = complete + intervalDuration;
-
-        // Make style changes.
-        for (var i = 0; i < animationsLength; ++i) {
-            var animation = animations[i];
-            var element = animation.element;
-            var start = animation.start;
-            var end = animation.end;
-            if (!element || !end)
-                continue;
-
-            var style = element.style;
-            for (key in end) {
-                var endValue = end[key];
-                if (next < duration) {
-                    var startValue = start[key];
-                    var newValue = cubicInOut(complete, startValue, endValue - startValue, duration);
-                    style.setProperty(key, newValue + (key in propertyUnit ? propertyUnit[key] : defaultUnit));
-                } else
-                    style.setProperty(key, endValue + (key in propertyUnit ? propertyUnit[key] : defaultUnit));
-            }
-        }
-
-        // End condition.
-        if (complete >= duration) {
-            hasCompleted = true;
-            clearInterval(interval);
-            if (callback)
-                callback();
-        }
-    }
-
-    function forceComplete()
-    {
-        if (!hasCompleted) {
-            complete = duration;
-            animateLoop();
-        }
-    }
-
-    function cancel()
-    {
-        hasCompleted = true;
-        clearInterval(interval);
-    }
-
-    interval = setInterval(animateLoop, intervalDuration);
-    return {
-        cancel: cancel,
-        forceComplete: forceComplete
-    };
-}
-
-WebInspector.elementDragStart = function(element, dividerDrag, elementDragEnd, event, cursor)
-{
-    if (this._elementDraggingEventListener || this._elementEndDraggingEventListener)
-        this.elementDragEnd(event);
-
-    this._elementDraggingEventListener = dividerDrag;
-    this._elementEndDraggingEventListener = elementDragEnd;
-
-    var targetDocument = event.target.ownerDocument;
-    targetDocument.addEventListener("mousemove", dividerDrag, true);
-    targetDocument.addEventListener("mouseup", elementDragEnd, true);
-
-    targetDocument.body.style.cursor = cursor;
-
-    event.preventDefault();
-}
-
-WebInspector.elementDragEnd = function(event)
-{
-    var targetDocument = event.target.ownerDocument;
-    targetDocument.removeEventListener("mousemove", this._elementDraggingEventListener, true);
-    targetDocument.removeEventListener("mouseup", this._elementEndDraggingEventListener, true);
-
-    targetDocument.body.style.removeProperty("cursor");
-
-    delete this._elementDraggingEventListener;
-    delete this._elementEndDraggingEventListener;
-
-    event.preventDefault();
-}
-
 WebInspector.toggleSearchingForNode = function()
 {
     if (this.panels.elements) {
@@ -1008,7 +863,8 @@ WebInspector.toggleSearchingForNode = function()
 
 WebInspector.showConsole = function()
 {
-    this.drawer.showView(this.consoleView);
+    if (WebInspector._toggleConsoleButton && !WebInspector._toggleConsoleButton.toggled)
+        WebInspector._toggleConsoleButtonClicked();
 }
 
 WebInspector.showPanel = function(panel)
@@ -1037,7 +893,7 @@ WebInspector.reset = function()
             panel.reset();
     }
 
-    this.highlightDOMNode(0);
+    this.domAgent.hideDOMNodeHighlight();
 
     if (!WebInspector.settings.preserveConsoleLog.get())
         this.console.clearMessages();
@@ -1065,7 +921,11 @@ WebInspector.didDestroyWorker = function()
         workersPane.removeWorker.apply(workersPane, arguments);
 }
 
-WebInspector.log = function(message, messageLevel)
+/**
+ * @param {string=} messageLevel
+ * @param {boolean=} showConsole
+ */
+WebInspector.log = function(message, messageLevel, showConsole)
 {
     // remember 'this' for setInterval() callback
     var self = this;
@@ -1105,29 +965,15 @@ WebInspector.log = function(message, messageLevel)
     // actually log the message
     function logMessage(message)
     {
-        var repeatCount = 1;
-        if (message == WebInspector.log.lastMessage)
-            repeatCount = WebInspector.log.repeatCount + 1;
-
-        WebInspector.log.lastMessage = message;
-        WebInspector.log.repeatCount = repeatCount;
-
-        // ConsoleMessage expects a proxy object
-        message = WebInspector.RemoteObject.fromPrimitiveValue(message);
-
         // post the message
-        var msg = new WebInspector.ConsoleMessage(
+        var msg = WebInspector.ConsoleMessage.create(
             WebInspector.ConsoleMessage.MessageSource.Other,
-            WebInspector.ConsoleMessage.MessageType.Log,
             messageLevel || WebInspector.ConsoleMessage.MessageLevel.Debug,
-            -1,
-            null,
-            repeatCount,
-            null,
-            [message],
-            null);
+            message);
 
         self.console.addMessage(msg);
+        if (showConsole)
+            WebInspector.showConsole();
     }
 
     // if we can't log the message, queue it
@@ -1172,8 +1018,7 @@ WebInspector.inspect = function(payload, hints)
 
 WebInspector.updateFocusedNode = function(nodeId)
 {
-    this._updateFocusedNode(nodeId);
-    this.highlightDOMNodeForTwoSeconds(nodeId);
+    this.panels.elements.revealAndSelectNode(nodeId);
 }
 
 WebInspector.displayNameForURL = function(url)
@@ -1201,6 +1046,8 @@ WebInspector.displayNameForURL = function(url)
 
 WebInspector._showAnchorLocation = function(anchor)
 {
+    if (WebInspector.openAnchorLocationRegistry.dispatch(anchor))
+        return true;
     var preferedPanel = this.panels[anchor.getAttribute("preferred_panel") || "resources"];
     if (WebInspector._showAnchorLocationInPanel(anchor, preferedPanel))
         return true;
@@ -1220,6 +1067,7 @@ WebInspector._showAnchorLocationInPanel = function(anchor, panel)
         anchor.addStyleClass("webkit-html-resource-link");
     }
 
+    WebInspector.searchController.disableSearchUntilExplicitAction();
     this.setCurrentPanel(panel);
     if (this.drawer)
         this.drawer.immediatelyFinishAnimation();
@@ -1227,7 +1075,7 @@ WebInspector._showAnchorLocationInPanel = function(anchor, panel)
     return true;
 }
 
-WebInspector.linkifyStringAsFragment = function(string)
+WebInspector.linkifyStringAsFragmentWithCustomLinkifier = function(string, linkifier)
 {
     var container = document.createDocumentFragment();
     var linkStringRegEx = /(?:[a-zA-Z][a-zA-Z0-9+.-]{2,}:\/\/|www\.)[\w$\-_+*'=\|\/\\(){}[\]%@&#~,:;.!?]{2,}[\w$\-_+*=\|\/\\({%@&#~]/;
@@ -1239,27 +1087,18 @@ WebInspector.linkifyStringAsFragment = function(string)
             break;
 
         linkString = linkString[0];
-        var title = linkString;
         var linkIndex = string.indexOf(linkString);
         var nonLink = string.substring(0, linkIndex);
         container.appendChild(document.createTextNode(nonLink));
 
-        var profileStringMatches = WebInspector.ProfileType.URLRegExp.exec(title);
-        if (profileStringMatches)
-            title = WebInspector.panels.profiles.displayTitleForProfileLink(profileStringMatches[2], profileStringMatches[1]);
-
+        var title = linkString;
         var realURL = (linkString.indexOf("www.") === 0 ? "http://" + linkString : linkString);
         var lineColumnMatch = lineColumnRegEx.exec(realURL);
         if (lineColumnMatch)
             realURL = realURL.substring(0, realURL.length - lineColumnMatch[0].length);
 
-        var hasResourceWithURL = !!WebInspector.resourceForURL(realURL);
-        var urlNode = WebInspector.linkifyURLAsNode(realURL, title, null, hasResourceWithURL);
-        container.appendChild(urlNode);
-        if (lineColumnMatch) {
-            urlNode.setAttribute("line_number", lineColumnMatch[1]);
-            urlNode.setAttribute("preferred_panel", "scripts");
-        }
+        var linkNode = linkifier(title, realURL, lineColumnMatch ? lineColumnMatch[1] : undefined);
+        container.appendChild(linkNode);
         string = string.substring(linkIndex + linkString.length, string.length);
     }
 
@@ -1267,6 +1106,27 @@ WebInspector.linkifyStringAsFragment = function(string)
         container.appendChild(document.createTextNode(string));
 
     return container;
+}
+
+WebInspector.linkifyStringAsFragment = function(string)
+{
+    function linkifier(title, url, lineNumber)
+    {
+        var profileStringMatches = WebInspector.ProfileType.URLRegExp.exec(title);
+        if (profileStringMatches)
+            title = WebInspector.panels.profiles.displayTitleForProfileLink(profileStringMatches[2], profileStringMatches[1]);
+
+        var isExternal = !WebInspector.resourceForURL(url);
+        var urlNode = WebInspector.linkifyURLAsNode(url, title, null, isExternal);
+        if (typeof(lineNumber) !== "undefined") {
+            urlNode.setAttribute("line_number", lineNumber);
+            urlNode.setAttribute("preferred_panel", "scripts");
+        }
+        
+        return urlNode; 
+    }
+    
+    return WebInspector.linkifyStringAsFragmentWithCustomLinkifier(string, linkifier);
 }
 
 WebInspector.showProfileForURL = function(url)
@@ -1439,168 +1299,9 @@ WebInspector.UIString = function(string)
     return String.vsprintf(string, Array.prototype.slice.call(arguments, 1));
 }
 
-WebInspector.formatLocalized = function(format, substitutions, formatters, initialValue, append)
-{
-    return String.format(WebInspector.UIString(format), substitutions, formatters, initialValue, append);
-}
-
 WebInspector.useLowerCaseMenuTitles = function()
 {
     return WebInspector.platform === "windows" && Preferences.useLowerCaseMenuTitlesOnWindows;
-}
-
-WebInspector.isBeingEdited = function(element)
-{
-    return element.__editing;
-}
-
-WebInspector.markBeingEdited = function(element, value)
-{
-    if (value) {
-        if (element.__editing)
-            return false;
-        element.__editing = true;
-        WebInspector.__editingCount = (WebInspector.__editingCount || 0) + 1;
-    } else {
-        if (!element.__editing)
-            return false;
-        delete element.__editing;
-        --WebInspector.__editingCount;
-    }
-    return true;
-}
-
-WebInspector.isEditingAnyField = function()
-{
-    return !!WebInspector.__editingCount;
-}
-
-// Available config fields (all optional):
-// context: Object - an arbitrary context object to be passed to the commit and cancel handlers
-// commitHandler: Function - handles editing "commit" outcome
-// cancelHandler: Function - handles editing "cancel" outcome
-// customFinishHandler: Function - custom finish handler for the editing session (invoked on keydown)
-// pasteHandler: Function - handles the "paste" event, return values are the same as those for customFinishHandler
-// multiline: Boolean - whether the edited element is multiline
-WebInspector.startEditing = function(element, config)
-{
-    if (!WebInspector.markBeingEdited(element, true))
-        return;
-
-    config = config || {};
-    var committedCallback = config.commitHandler;
-    var cancelledCallback = config.cancelHandler;
-    var pasteCallback = config.pasteHandler;
-    var context = config.context;
-    var oldText = getContent(element);
-    var moveDirection = "";
-
-    element.addStyleClass("editing");
-
-    var oldTabIndex = element.tabIndex;
-    if (element.tabIndex < 0)
-        element.tabIndex = 0;
-
-    function blurEventListener() {
-        editingCommitted.call(element);
-    }
-
-    function getContent(element) {
-        if (element.tagName === "INPUT" && element.type === "text")
-            return element.value;
-        else
-            return element.textContent;
-    }
-
-    function cleanUpAfterEditing() {
-        WebInspector.markBeingEdited(element, false);
-
-        this.removeStyleClass("editing");
-        this.tabIndex = oldTabIndex;
-        this.scrollTop = 0;
-        this.scrollLeft = 0;
-
-        element.removeEventListener("blur", blurEventListener, false);
-        element.removeEventListener("keydown", keyDownEventListener, true);
-        if (pasteCallback)
-            element.removeEventListener("paste", pasteEventListener, true);
-
-        if (element === WebInspector.currentFocusElement || element.isAncestor(WebInspector.currentFocusElement))
-            WebInspector.currentFocusElement = WebInspector.previousFocusElement;
-    }
-
-    function editingCancelled() {
-        if (this.tagName === "INPUT" && this.type === "text")
-            this.value = oldText;
-        else
-            this.textContent = oldText;
-
-        cleanUpAfterEditing.call(this);
-
-        if (cancelledCallback)
-            cancelledCallback(this, context);
-    }
-
-    function editingCommitted() {
-        cleanUpAfterEditing.call(this);
-
-        if (committedCallback)
-            committedCallback(this, getContent(this), oldText, context, moveDirection);
-    }
-
-    function defaultFinishHandler(event)
-    {
-        var isMetaOrCtrl = WebInspector.isMac() ?
-            event.metaKey && !event.shiftKey && !event.ctrlKey && !event.altKey :
-            event.ctrlKey && !event.shiftKey && !event.metaKey && !event.altKey;
-        if (isEnterKey(event) && (event.isMetaOrCtrlForTest || !config.multiline || isMetaOrCtrl))
-            return "commit";
-        else if (event.keyCode === WebInspector.KeyboardShortcut.Keys.Esc.code || event.keyIdentifier === "U+001B")
-            return "cancel";
-        else if (event.keyIdentifier === "U+0009") // Tab key
-            return "move-" + (event.shiftKey ? "backward" : "forward");
-    }
-
-    function handleEditingResult(result, event)
-    {
-        if (result === "commit") {
-            editingCommitted.call(element);
-            event.preventDefault();
-            event.stopPropagation();
-        } else if (result === "cancel") {
-            editingCancelled.call(element);
-            event.preventDefault();
-            event.stopPropagation();
-        } else if (result && result.indexOf("move-") === 0) {
-            moveDirection = result.substring(5);
-            if (event.keyIdentifier !== "U+0009")
-                blurEventListener();
-        }
-    }
-
-    function pasteEventListener(event)
-    {
-        var result = pasteCallback(event);
-        handleEditingResult(result, event);
-    }
-
-    function keyDownEventListener(event)
-    {
-        var handler = config.customFinishHandler || defaultFinishHandler;
-        var result = handler(event);
-        handleEditingResult(result, event);
-    }
-
-    element.addEventListener("blur", blurEventListener, false);
-    element.addEventListener("keydown", keyDownEventListener, true);
-    if (pasteCallback)
-        element.addEventListener("paste", pasteEventListener, true);
-
-    WebInspector.currentFocusElement = element;
-    return {
-        cancel: editingCancelled.bind(element),
-        commit: editingCommitted.bind(element)
-    };
 }
 
 WebInspector._toolbarItemClicked = function(event)
@@ -1652,49 +1353,10 @@ WebInspector.PanelHistory.prototype = {
     }
 }
 
-Number.secondsToString = function(seconds, higherResolution)
+WebInspector.installSourceMappingForTest = function(url)
 {
-    if (seconds === 0)
-        return "0";
-
-    var ms = seconds * 1000;
-    if (higherResolution && ms < 1000)
-        return WebInspector.UIString("%.3fms", ms);
-    else if (ms < 1000)
-        return WebInspector.UIString("%.0fms", ms);
-
-    if (seconds < 60)
-        return WebInspector.UIString("%.2fs", seconds);
-
-    var minutes = seconds / 60;
-    if (minutes < 60)
-        return WebInspector.UIString("%.1fmin", minutes);
-
-    var hours = minutes / 60;
-    if (hours < 24)
-        return WebInspector.UIString("%.1fhrs", hours);
-
-    var days = hours / 24;
-    return WebInspector.UIString("%.1f days", days);
-}
-
-Number.bytesToString = function(bytes, higherResolution)
-{
-    if (typeof higherResolution === "undefined")
-        higherResolution = true;
-
-    if (bytes < 1024)
-        return WebInspector.UIString("%.0fB", bytes);
-
-    var kilobytes = bytes / 1024;
-    if (higherResolution && kilobytes < 1024)
-        return WebInspector.UIString("%.2fKB", kilobytes);
-    else if (kilobytes < 1024)
-        return WebInspector.UIString("%.0fKB", kilobytes);
-
-    var megabytes = kilobytes / 1024;
-    if (higherResolution)
-        return WebInspector.UIString("%.2fMB", megabytes);
-    else
-        return WebInspector.UIString("%.0fMB", megabytes);
+    // FIXME: remove this method when it's possible to set compiler source mappings via UI.
+    var provider = new WebInspector.CompilerSourceMappingProvider(url);
+    var uiSourceCode = WebInspector.panels.scripts.visibleView._delegate._uiSourceCode;
+    uiSourceCode.rawSourceCode.setCompilerSourceMappingProvider(provider);
 }

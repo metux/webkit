@@ -2160,6 +2160,52 @@ static JSValueRef setShouldStayOnPageAfterHandlingBeforeUnloadCallback(JSContext
     return JSValueMakeUndefined(context);
 }
 
+static JSValueRef addChromeInputFieldCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
+    controller->addChromeInputField();
+    // the first argument is a callback that is called once the input field has been added
+    if (argumentCount == 1)
+        JSObjectCallAsFunction(context, JSValueToObject(context, arguments[0], 0), thisObject, 0, 0, 0);
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef removeChromeInputFieldCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
+    controller->removeChromeInputField();
+    // the first argument is a callback that is called once the input field has been added
+    if (argumentCount == 1)
+        JSObjectCallAsFunction(context, JSValueToObject(context, arguments[0], 0), thisObject, 0, 0, 0);
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef focusWebViewCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
+    controller->focusWebView();
+    // the first argument is a callback that is called once the input field has been added
+    if (argumentCount == 1)
+        JSObjectCallAsFunction(context, JSValueToObject(context, arguments[0], 0), thisObject, 0, 0, 0);
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef setBackingScaleFactorCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount != 2)
+        return JSValueMakeUndefined(context);
+
+    double backingScaleFactor = JSValueToNumber(context, arguments[0], exception);
+    ASSERT(!*exception);
+
+    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
+    controller->setBackingScaleFactor(backingScaleFactor);
+
+    // The second argument is a callback that is called once the backing scale factor has been set.
+    JSObjectCallAsFunction(context, JSValueToObject(context, arguments[1], 0), thisObject, 0, 0, 0);
+    return JSValueMakeUndefined(context);
+}
+
 // Static Values
 
 static JSValueRef getGlobalFlagCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
@@ -2436,6 +2482,10 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "setTextDirection", setTextDirectionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "allowRoundingHacks", allowRoundingHacksCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setShouldStayOnPageAfterHandlingBeforeUnload", setShouldStayOnPageAfterHandlingBeforeUnloadCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "addChromeInputField", addChromeInputFieldCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "removeChromeInputField", removeChromeInputFieldCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "focusWebView", focusWebViewCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "setBackingScaleFactor", setBackingScaleFactorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0 }
     };
 

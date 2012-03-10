@@ -40,7 +40,7 @@ namespace JSC {
 
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
         {
-            return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
+            return Structure::create(globalData, globalObject, prototype, TypeInfo(NumberObjectType, StructureFlags), &s_info);
         }
 
     protected:
@@ -49,7 +49,8 @@ namespace JSC {
 
     private:
         NumberPrototype(ExecState*, Structure*);
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier&, PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
     };
 

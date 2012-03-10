@@ -621,3 +621,33 @@ bool WKPreferencesGetMockScrollbarsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->mockScrollbarsEnabled();
 }
+
+void WKPreferencesSetWebAudioEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setWebAudioEnabled(enabled);
+}
+
+bool WKPreferencesGetWebAudioEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->webAudioEnabled();
+}
+
+void WKPreferencesSetApplicationChromeModeEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setApplicationChromeModeEnabled(enabled);
+}
+
+bool WKPreferencesGetApplicationChromeModeEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->applicationChromeMode();
+}
+
+void WKPreferencesSetSuppressIncrementalRendering(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setSuppressIncrementalRendering(enabled);
+}
+
+bool WKPreferencesGetSuppressIncrementalRendering(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->suppressIncrementalRendering();
+}

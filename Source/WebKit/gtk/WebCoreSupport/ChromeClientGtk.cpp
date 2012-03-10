@@ -589,7 +589,6 @@ void ChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseNam
 }
 #endif
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
 void ChromeClient::reachedMaxAppCacheSize(int64_t spaceNeeded)
 {
     // FIXME: Free some space.
@@ -600,7 +599,6 @@ void ChromeClient::reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t)
 {
     notImplemented();
 }
-#endif
 
 void ChromeClient::runOpenPanel(Frame*, PassRefPtr<FileChooser> prpFileChooser)
 {
@@ -642,7 +640,7 @@ void ChromeClient::loadIconForFiles(const Vector<WTF::String>& filenames, WebCor
     loader->notifyFinished(Icon::createIconForFiles(filenames));
 }
 
-void ChromeClient::dispatchViewportDataDidChange(const ViewportArguments& arguments) const
+void ChromeClient::dispatchViewportPropertiesDidChange(const ViewportArguments& arguments) const
 {
     // Recompute the viewport attributes making it valid.
     webkitViewportAttributesRecompute(webkit_web_view_get_viewport_attributes(m_webView));

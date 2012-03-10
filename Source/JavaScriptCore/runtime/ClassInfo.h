@@ -24,11 +24,54 @@
 #define ClassInfo_h
 
 #include "CallFrame.h"
+#include "ConstructData.h"
 
 namespace JSC {
 
     class HashEntry;
     struct HashTable;
+
+    struct MethodTable {
+        typedef void (*VisitChildrenFunctionPtr)(JSCell*, SlotVisitor&);
+        VisitChildrenFunctionPtr visitChildren;
+
+        typedef CallType (*GetCallDataFunctionPtr)(JSCell*, CallData&);
+        GetCallDataFunctionPtr getCallData;
+
+        typedef ConstructType (*GetConstructDataFunctionPtr)(JSCell*, ConstructData&);
+        GetConstructDataFunctionPtr getConstructData;
+
+        typedef void (*PutFunctionPtr)(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+        PutFunctionPtr put;
+
+        typedef void (*PutByIndexFunctionPtr)(JSCell*, ExecState*, unsigned propertyName, JSValue);
+        PutByIndexFunctionPtr putByIndex;
+
+        typedef bool (*DeletePropertyFunctionPtr)(JSCell*, ExecState*, const Identifier&);
+        DeletePropertyFunctionPtr deleteProperty;
+
+        typedef bool (*DeletePropertyByIndexFunctionPtr)(JSCell*, ExecState*, unsigned);
+        DeletePropertyByIndexFunctionPtr deletePropertyByIndex;
+
+        typedef bool (*GetOwnPropertySlotFunctionPtr)(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+        GetOwnPropertySlotFunctionPtr getOwnPropertySlot;
+
+        typedef bool (*GetOwnPropertySlotByIndexFunctionPtr)(JSCell*, ExecState*, unsigned, PropertySlot&);
+        GetOwnPropertySlotByIndexFunctionPtr getOwnPropertySlotByIndex;
+    };
+
+#define CREATE_METHOD_TABLE(ClassName) { \
+        &ClassName::visitChildren, \
+        &ClassName::getCallData, \
+        &ClassName::getConstructData, \
+        &ClassName::put, \
+        &ClassName::putByIndex, \
+        &ClassName::deleteProperty, \
+        &ClassName::deletePropertyByIndex, \
+        &ClassName::getOwnPropertySlot, \
+        &ClassName::getOwnPropertySlotByIndex, \
+    }, \
+    sizeof(ClassName)
 
     struct ClassInfo {
         /**
@@ -61,9 +104,22 @@ namespace JSC {
             return false;
         }
 
+        bool hasStaticProperties() const
+        {
+            for (const ClassInfo* ci = this; ci; ci = ci->parentClass) {
+                if (ci->staticPropHashTable || ci->classPropHashTableGetterFunction)
+                    return true;
+            }
+            return false;
+        }
+
         const HashTable* staticPropHashTable;
         typedef const HashTable* (*ClassPropHashTableGetterFunction)(ExecState*);
         const ClassPropHashTableGetterFunction classPropHashTableGetterFunction;
+
+        MethodTable methodTable;
+
+        size_t cellSize;
     };
 
 } // namespace JSC

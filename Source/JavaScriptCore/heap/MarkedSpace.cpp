@@ -32,54 +32,54 @@ class Structure;
 
 MarkedSpace::MarkedSpace(Heap* heap)
     : m_waterMark(0)
+    , m_nurseryWaterMark(0)
     , m_highWaterMark(0)
     , m_heap(heap)
 {
-    for (size_t cellSize = preciseStep; cellSize < preciseCutoff; cellSize += preciseStep)
+    for (size_t cellSize = preciseStep; cellSize <= preciseCutoff; cellSize += preciseStep)
         sizeClassFor(cellSize).cellSize = cellSize;
 
-    for (size_t cellSize = impreciseStep; cellSize < impreciseCutoff; cellSize += impreciseStep)
+    for (size_t cellSize = impreciseStep; cellSize <= impreciseCutoff; cellSize += impreciseStep)
         sizeClassFor(cellSize).cellSize = cellSize;
 }
 
 void MarkedSpace::addBlock(SizeClass& sizeClass, MarkedBlock* block)
 {
-    block->setInNewSpace(true);
-    sizeClass.nextBlock = block;
-    sizeClass.blockList.append(block);
     ASSERT(!sizeClass.currentBlock);
     ASSERT(!sizeClass.firstFreeCell);
+
+    sizeClass.blockList.append(block);
     sizeClass.currentBlock = block;
-    sizeClass.firstFreeCell = block->blessNewBlockForFastPath();
+    sizeClass.firstFreeCell = block->sweep(MarkedBlock::SweepToFreeList);
 }
 
 void MarkedSpace::removeBlock(MarkedBlock* block)
 {
-    block->setInNewSpace(false);
     SizeClass& sizeClass = sizeClassFor(block->cellSize());
-    if (sizeClass.nextBlock == block)
-        sizeClass.nextBlock = block->next();
+    if (sizeClass.currentBlock == block)
+        sizeClass.currentBlock = 0;
     sizeClass.blockList.remove(block);
 }
 
 void MarkedSpace::resetAllocator()
 {
     m_waterMark = 0;
+    m_nurseryWaterMark = 0;
 
-    for (size_t cellSize = preciseStep; cellSize < preciseCutoff; cellSize += preciseStep)
+    for (size_t cellSize = preciseStep; cellSize <= preciseCutoff; cellSize += preciseStep)
         sizeClassFor(cellSize).resetAllocator();
 
-    for (size_t cellSize = impreciseStep; cellSize < impreciseCutoff; cellSize += impreciseStep)
+    for (size_t cellSize = impreciseStep; cellSize <= impreciseCutoff; cellSize += impreciseStep)
         sizeClassFor(cellSize).resetAllocator();
 }
 
-void MarkedSpace::canonicalizeBlocks()
+void MarkedSpace::canonicalizeCellLivenessData()
 {
-    for (size_t cellSize = preciseStep; cellSize < preciseCutoff; cellSize += preciseStep)
-        sizeClassFor(cellSize).canonicalizeBlock();
+    for (size_t cellSize = preciseStep; cellSize <= preciseCutoff; cellSize += preciseStep)
+        sizeClassFor(cellSize).zapFreeList();
 
-    for (size_t cellSize = impreciseStep; cellSize < impreciseCutoff; cellSize += impreciseStep)
-        sizeClassFor(cellSize).canonicalizeBlock();
+    for (size_t cellSize = impreciseStep; cellSize <= impreciseCutoff; cellSize += impreciseStep)
+        sizeClassFor(cellSize).zapFreeList();
 }
 
 } // namespace JSC

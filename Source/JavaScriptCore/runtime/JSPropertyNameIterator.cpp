@@ -35,7 +35,7 @@ namespace JSC {
 
 ASSERT_CLASS_FITS_IN_CELL(JSPropertyNameIterator);
 
-const ClassInfo JSPropertyNameIterator::s_info = { "JSPropertyNameIterator", 0, 0, 0 };
+const ClassInfo JSPropertyNameIterator::s_info = { "JSPropertyNameIterator", 0, 0, 0, CREATE_METHOD_TABLE(JSPropertyNameIterator) };
 
 inline JSPropertyNameIterator::JSPropertyNameIterator(ExecState* exec, PropertyNameArrayData* propertyNameArrayData, size_t numCacheableSlots)
     : JSCell(exec->globalData(), exec->globalData().propertyNameIteratorStructure.get())
@@ -92,13 +92,14 @@ JSValue JSPropertyNameIterator::get(ExecState* exec, JSObject* base, size_t i)
     return identifier;
 }
 
-void JSPropertyNameIterator::visitChildren(SlotVisitor& visitor)
+void JSPropertyNameIterator::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
-    ASSERT(structure()->typeInfo().overridesVisitChildren());
-    visitor.appendValues(m_jsStrings.get(), m_jsStringsSize);
-    if (m_cachedPrototypeChain)
-        visitor.append(&m_cachedPrototypeChain);
+    JSPropertyNameIterator* thisObject = static_cast<JSPropertyNameIterator*>(cell);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    visitor.appendValues(thisObject->m_jsStrings.get(), thisObject->m_jsStringsSize);
+    if (thisObject->m_cachedPrototypeChain)
+        visitor.append(&thisObject->m_cachedPrototypeChain);
 }
 
 } // namespace JSC

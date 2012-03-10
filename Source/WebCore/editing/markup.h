@@ -45,15 +45,15 @@ namespace WebCore {
 
     PassRefPtr<DocumentFragment> createFragmentFromText(Range* context, const String& text);
     PassRefPtr<DocumentFragment> createFragmentFromMarkup(Document*, const String& markup, const String& baseURL, FragmentScriptingPermission = FragmentScriptingAllowed);
+    PassRefPtr<DocumentFragment> createFragmentFromMarkupWithContext(Document*, const String& markup, unsigned fragmentStart, unsigned fragmentEnd, const String& baseURL, FragmentScriptingPermission);
     PassRefPtr<DocumentFragment> createFragmentFromNodes(Document*, const Vector<Node*>&);
 
     bool isPlainTextMarkup(Node *node);
 
-    bool isBlockNodeToRetainAppearance(const Node*);
     String createMarkup(const Range*,
         Vector<Node*>* = 0, EAnnotateForInterchange = DoNotAnnotateForInterchange, bool convertBlocksToInlines = false, EAbsoluteURLs = DoNotResolveURLs);
     String createMarkup(const Node*, EChildrenOnly = IncludeNode, Vector<Node*>* = 0, EAbsoluteURLs = DoNotResolveURLs);
-
+    
     String createFullMarkup(const Node*);
     String createFullMarkup(const Range*);
 

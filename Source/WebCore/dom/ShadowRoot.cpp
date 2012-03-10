@@ -37,7 +37,7 @@
 namespace WebCore {
 
 ShadowRoot::ShadowRoot(Document* document)
-    : TreeScope(document)
+    : TreeScope(document, CreateShadowRoot)
     , m_applyAuthorSheets(false)
 {
     ASSERT(document);
@@ -117,6 +117,11 @@ void ShadowRoot::hostChildrenChanged()
         return;
     // This results in forced detaching/attaching of the shadow render tree. See ShadowRoot::recalcStyle().
     setNeedsStyleRecalc();
+}
+
+bool ShadowRoot::isInclusionSelectorActive() const
+{
+    return m_inclusions && m_inclusions->hasCandidates();
 }
 
 bool ShadowRoot::hasContentElement() const
