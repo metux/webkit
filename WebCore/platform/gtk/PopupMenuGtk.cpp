@@ -27,6 +27,7 @@
 
 #include "CString.h"
 #include "FrameView.h"
+#include "GtkVersioning.h"
 #include "HostWindow.h"
 #include "PlatformString.h"
 #include <gtk/gtk.h>
@@ -57,7 +58,7 @@ void PopupMenu::show(const IntRect& rect, FrameView* view, int index)
         gtk_container_foreach(GTK_CONTAINER(m_popup.get()), reinterpret_cast<GtkCallback>(menuRemoveItem), this);
 
     int x, y;
-    gdk_window_get_origin(GTK_WIDGET(view->hostWindow()->platformPageClient())->window, &x, &y);
+    gdk_window_get_origin(gtk_widget_get_window(GTK_WIDGET(view->hostWindow()->platformPageClient())), &x, &y);
     m_menuPosition = view->contentsToWindow(rect.location());
     m_menuPosition = IntPoint(m_menuPosition.x() + x, m_menuPosition.y() + y + rect.height());
     m_indexMap.clear();
@@ -88,22 +89,24 @@ void PopupMenu::show(const IntRect& rect, FrameView* view, int index)
     gtk_widget_size_request(GTK_WIDGET(m_popup.get()), &requisition);
     gtk_widget_set_size_request(GTK_WIDGET(m_popup.get()), std::max(rect.width(), requisition.width), -1);
 
-    GList* children = GTK_MENU_SHELL(m_popup.get())->children;
+    GList* children = gtk_container_get_children(GTK_CONTAINER(m_popup.get()));
+    GList* p = children;
     if (size)
         for (int i = 0; i < size; i++) {
             if (i > index)
               break;
 
-            GtkWidget* item = reinterpret_cast<GtkWidget*>(children->data);
+            GtkWidget* item = reinterpret_cast<GtkWidget*>(p->data);
             GtkRequisition itemRequisition;
             gtk_widget_get_child_requisition(item, &itemRequisition);
             m_menuPosition.setY(m_menuPosition.y() - itemRequisition.height);
 
-            children = g_list_next(children);
+            p = g_list_next(p);
         } else
             // Center vertically the empty popup in the combo box area
             m_menuPosition.setY(m_menuPosition.y() - rect.height() / 2);
 
+    g_list_free(children);
     gtk_menu_popup(m_popup.get(), 0, 0, reinterpret_cast<GtkMenuPositionFunc>(menuPositionFunction), this, 0, gtk_get_current_event_time());
 }
 

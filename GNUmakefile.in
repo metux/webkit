@@ -100,26 +100,26 @@ noinst_PROGRAMS = Programs/minidom$(EXEEXT) \
 
 @ENABLE_DEBUG_FALSE@am__append_5 = -DNDEBUG
 @ENABLE_DEBUG_FALSE@am__append_6 = $(SYMBOL_VISIBILITY)
-@ENABLE_DEBUG_TRUE@am__append_7 = \
-@ENABLE_DEBUG_TRUE@	-DG_DISABLE_DEPRECATED \
-@ENABLE_DEBUG_TRUE@	-DGDK_PIXBUF_DISABLE_DEPRECATED \
-@ENABLE_DEBUG_TRUE@	-DGDK_DISABLE_DEPRECATED \
-@ENABLE_DEBUG_TRUE@	-DGTK_DISABLE_DEPRECATED \
-@ENABLE_DEBUG_TRUE@	-DPANGO_DISABLE_DEPRECATED
-
+#webcoregtk_cppflags += \
+#	-DG_DISABLE_DEPRECATED \
+#	-DGDK_PIXBUF_DISABLE_DEPRECATED \
+#	-DGDK_DISABLE_DEPRECATED \
+#	-DGTK_DISABLE_DEPRECATED \
+#	-DPANGO_DISABLE_DEPRECATED \
+#	-DGSEAL_ENABLE
 
 # Might be useful in the future
 #	-DGDK_MULTIHEAD_SAFE \
 #	-DGTK_MULTIHEAD_SAFE
-@ENABLE_COVERAGE_TRUE@am__append_8 = \
+@ENABLE_COVERAGE_TRUE@am__append_7 = \
 @ENABLE_COVERAGE_TRUE@	-DGCC_GENERATE_TEST_COVERAGE_FILES \
 @ENABLE_COVERAGE_TRUE@	-DGCC_INSTRUMENT_PROGRAM_FLOW_ARCS
 
-@ENABLE_INTROSPECTION_TRUE@am__append_9 = JSCore-1.0.gir
-@ENABLE_INTROSPECTION_TRUE@am__append_10 = WebKit-1.0.gir
-@ENABLE_INTROSPECTION_TRUE@am__append_11 = $(libdir)/girepository-1.0
-@ENABLE_INTROSPECTION_TRUE@am__append_12 = $(JSCORE_GIRSOURCES:.gir=.typelib) $(WEBKIT_GIRSOURCES:.gir=.typelib)
-@ENABLE_INTROSPECTION_TRUE@am__append_13 = $(JSCORE_GIRSOURCES) $(WEBKIT_GIRSOURCES) $(typelibs_DATA)
+@ENABLE_INTROSPECTION_TRUE@am__append_8 = JSCore-1.0.gir
+@ENABLE_INTROSPECTION_TRUE@am__append_9 = WebKit-1.0.gir
+@ENABLE_INTROSPECTION_TRUE@am__append_10 = $(libdir)/girepository-1.0
+@ENABLE_INTROSPECTION_TRUE@am__append_11 = $(JSCORE_GIRSOURCES:.gir=.typelib) $(WEBKIT_GIRSOURCES:.gir=.typelib)
+@ENABLE_INTROSPECTION_TRUE@am__append_12 = $(JSCORE_GIRSOURCES) $(WEBKIT_GIRSOURCES) $(typelibs_DATA)
 DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 	$(dist_resources_DATA) $(dist_webinspector_DATA) \
 	$(dist_webinspectorimages_DATA) $(dist_webresources_DATA) \
@@ -135,12 +135,12 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 	$(top_srcdir)/configure ChangeLog INSTALL autotools/compile \
 	autotools/config.guess autotools/config.sub autotools/depcomp \
 	autotools/install-sh autotools/ltmain.sh autotools/missing
-@TARGET_WIN32_TRUE@am__append_14 = \
+@TARGET_WIN32_TRUE@am__append_13 = \
 @TARGET_WIN32_TRUE@	JavaScriptCore/wtf/ThreadSpecificWin.cpp \
 @TARGET_WIN32_TRUE@	JavaScriptCore/jit/ExecutableAllocatorWin.cpp \
 @TARGET_WIN32_TRUE@	JavaScriptCore/runtime/MarkStackWin.cpp
 
-@TARGET_WIN32_FALSE@am__append_15 = \
+@TARGET_WIN32_FALSE@am__append_14 = \
 @TARGET_WIN32_FALSE@	JavaScriptCore/jit/ExecutableAllocatorPosix.cpp \
 @TARGET_WIN32_FALSE@	JavaScriptCore/runtime/MarkStackPosix.cpp
 
@@ -148,7 +148,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # icu unicode backend
 # ----
-@USE_ICU_UNICODE_TRUE@am__append_16 = \
+@USE_ICU_UNICODE_TRUE@am__append_15 = \
 @USE_ICU_UNICODE_TRUE@	JavaScriptCore/wtf/unicode/icu/CollatorICU.cpp \
 @USE_ICU_UNICODE_TRUE@	JavaScriptCore/wtf/unicode/icu/UnicodeIcu.h
 
@@ -156,17 +156,17 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # glib unicode backend
 # ----
-@USE_GLIB_UNICODE_TRUE@am__append_17 = \
+@USE_GLIB_UNICODE_TRUE@am__append_16 = \
 @USE_GLIB_UNICODE_TRUE@	JavaScriptCore/wtf/unicode/glib/UnicodeGLib.h \
 @USE_GLIB_UNICODE_TRUE@	JavaScriptCore/wtf/unicode/glib/UnicodeGLib.cpp \
 @USE_GLIB_UNICODE_TRUE@	JavaScriptCore/wtf/unicode/glib/UnicodeMacrosFromICU.h
 
-@TARGET_X11_TRUE@am__append_18 = \
+@TARGET_X11_TRUE@am__append_17 = \
 @TARGET_X11_TRUE@	WebCore/plugins/gtk/gtk2xtbin.c \
 @TARGET_X11_TRUE@	WebCore/plugins/gtk/gtk2xtbin.h \
 @TARGET_X11_TRUE@	WebCore/plugins/gtk/xembed.h
 
-@TARGET_WIN32_TRUE@am__append_19 = \
+@TARGET_WIN32_TRUE@am__append_18 = \
 @TARGET_WIN32_TRUE@	WebCore/plugins/win/PluginDatabaseWin.cpp \
 @TARGET_WIN32_TRUE@	WebCore/plugins/win/PluginMessageThrottlerWin.cpp \
 @TARGET_WIN32_TRUE@	WebCore/plugins/win/PluginMessageThrottlerWin.h
@@ -175,7 +175,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # icu unicode backend
 # ----
-@USE_ICU_UNICODE_TRUE@am__append_20 = \
+@USE_ICU_UNICODE_TRUE@am__append_19 = \
 @USE_ICU_UNICODE_TRUE@	WebCore/platform/text/TextCodecICU.cpp \
 @USE_ICU_UNICODE_TRUE@	WebCore/platform/text/TextCodecICU.h \
 @USE_ICU_UNICODE_TRUE@	WebCore/platform/text/TextBreakIteratorICU.cpp \
@@ -186,7 +186,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # glib unicode backend
 # ----
-@USE_GLIB_UNICODE_TRUE@am__append_21 = \
+@USE_GLIB_UNICODE_TRUE@am__append_20 = \
 @USE_GLIB_UNICODE_TRUE@	WebCore/platform/text/gtk/TextCodecGtk.cpp \
 @USE_GLIB_UNICODE_TRUE@	WebCore/platform/text/gtk/TextCodecGtk.h \
 @USE_GLIB_UNICODE_TRUE@	WebCore/platform/text/gtk/TextBreakIteratorGtk.cpp
@@ -195,26 +195,26 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ---
 # Channel mesaging support
 # ---
-@ENABLE_CHANNEL_MESSAGING_TRUE@am__append_22 = ENABLE_CHANNEL_MESSAGING=1
-@ENABLE_CHANNEL_MESSAGING_TRUE@am__append_23 = \
+@ENABLE_CHANNEL_MESSAGING_TRUE@am__append_21 = ENABLE_CHANNEL_MESSAGING=1
+@ENABLE_CHANNEL_MESSAGING_TRUE@am__append_22 = \
 @ENABLE_CHANNEL_MESSAGING_TRUE@	-DENABLE_CHANNEL_MESSAGING=1
 
 
 # ---
 # Fast Mobile Scrolling
 # ---
-@ENABLE_FAST_MOBILE_SCROLLING_TRUE@am__append_24 = ENABLE_FAST_MOBILE_SCROLLING=1
-@ENABLE_FAST_MOBILE_SCROLLING_TRUE@am__append_25 = \
+@ENABLE_FAST_MOBILE_SCROLLING_TRUE@am__append_23 = ENABLE_FAST_MOBILE_SCROLLING=1
+@ENABLE_FAST_MOBILE_SCROLLING_TRUE@am__append_24 = \
 @ENABLE_FAST_MOBILE_SCROLLING_TRUE@	-DENABLE_FAST_MOBILE_SCROLLING=1
 
 
 # ---
 # Freetype font backend
 # ---
-@USE_FREETYPE_TRUE@am__append_26 = \
+@USE_FREETYPE_TRUE@am__append_25 = \
 @USE_FREETYPE_TRUE@	-DUSE_FREETYPE=1
 
-@USE_FREETYPE_TRUE@am__append_27 = \
+@USE_FREETYPE_TRUE@am__append_26 = \
 @USE_FREETYPE_TRUE@	WebCore/platform/graphics/cairo/FontCustomPlatformData.cpp \
 @USE_FREETYPE_TRUE@	WebCore/platform/graphics/cairo/FontPlatformDataCairo.cpp \
 @USE_FREETYPE_TRUE@	WebCore/platform/graphics/cairo/GlyphPageTreeNodeCairo.cpp \
@@ -224,10 +224,10 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ---
 # Pango font backend
 # ---
-@USE_PANGO_TRUE@am__append_28 = \
+@USE_PANGO_TRUE@am__append_27 = \
 @USE_PANGO_TRUE@	-DUSE_PANGO=1
 
-@USE_PANGO_TRUE@am__append_29 = \
+@USE_PANGO_TRUE@am__append_28 = \
 @USE_PANGO_TRUE@	WebCore/platform/graphics/gtk/FontCustomPlatformDataPango.cpp \
 @USE_PANGO_TRUE@	WebCore/platform/graphics/gtk/FontPlatformDataPango.cpp \
 @USE_PANGO_TRUE@	WebCore/platform/graphics/gtk/GlyphPageTreeNodePango.cpp \
@@ -237,25 +237,25 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # JavaScript Debugger/Profiler
 # ----
-@ENABLE_JAVASCRIPT_DEBUGGER_TRUE@am__append_30 = ENABLE_JAVASCRIPT_DEBUGGER=1
-@ENABLE_JAVASCRIPT_DEBUGGER_TRUE@am__append_31 = \
+@ENABLE_JAVASCRIPT_DEBUGGER_TRUE@am__append_29 = ENABLE_JAVASCRIPT_DEBUGGER=1
+@ENABLE_JAVASCRIPT_DEBUGGER_TRUE@am__append_30 = \
 @ENABLE_JAVASCRIPT_DEBUGGER_TRUE@	-DENABLE_JAVASCRIPT_DEBUGGER=1
 
-@ENABLE_JAVASCRIPT_DEBUGGER_FALSE@am__append_32 = \
+@ENABLE_JAVASCRIPT_DEBUGGER_FALSE@am__append_31 = \
 @ENABLE_JAVASCRIPT_DEBUGGER_FALSE@	-DENABLE_JAVASCRIPT_DEBUGGER=0
 
 
 # ----
 # Offline Web Applications
 # ----
-@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_33 = ENABLE_OFFLINE_WEB_APPLICATIONS=1
-@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_34 = \
+@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_32 = ENABLE_OFFLINE_WEB_APPLICATIONS=1
+@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_33 = \
 @ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@	WebCore/loader/appcache/DOMApplicationCache.idl
 
-@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_35 = \
+@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_34 = \
 @ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@	-DENABLE_OFFLINE_WEB_APPLICATIONS=1
 
-@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_36 = \
+@ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@am__append_35 = \
 @ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@	WebCore/bindings/js/JSDOMApplicationCacheCustom.cpp \
 @ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@	WebCore/loader/appcache/ApplicationCache.cpp \
 @ENABLE_OFFLINE_WEB_APPLICATIONS_TRUE@	WebCore/loader/appcache/ApplicationCache.h \
@@ -276,18 +276,18 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # Database Support
 # ----
-@ENABLE_DATABASE_TRUE@am__append_37 = ENABLE_DATABASE=1
-@ENABLE_DATABASE_TRUE@am__append_38 = \
+@ENABLE_DATABASE_TRUE@am__append_36 = ENABLE_DATABASE=1
+@ENABLE_DATABASE_TRUE@am__append_37 = \
 @ENABLE_DATABASE_TRUE@	WebCore/storage/Database.idl \
 @ENABLE_DATABASE_TRUE@	WebCore/storage/SQLError.idl \
 @ENABLE_DATABASE_TRUE@	WebCore/storage/SQLResultSet.idl \
 @ENABLE_DATABASE_TRUE@	WebCore/storage/SQLResultSetRowList.idl \
 @ENABLE_DATABASE_TRUE@	WebCore/storage/SQLTransaction.idl
 
-@ENABLE_DATABASE_TRUE@am__append_39 = \
+@ENABLE_DATABASE_TRUE@am__append_38 = \
 @ENABLE_DATABASE_TRUE@	-DENABLE_DATABASE=1
 
-@ENABLE_DATABASE_TRUE@am__append_40 = \
+@ENABLE_DATABASE_TRUE@am__append_39 = \
 @ENABLE_DATABASE_TRUE@	WebCore/bindings/js/JSCustomSQLStatementCallback.cpp \
 @ENABLE_DATABASE_TRUE@	WebCore/bindings/js/JSCustomSQLStatementCallback.h \
 @ENABLE_DATABASE_TRUE@	WebCore/bindings/js/JSCustomSQLStatementErrorCallback.cpp \
@@ -349,36 +349,36 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_DATABASE_TRUE@	WebCore/storage/SQLTransactionCoordinator.cpp \
 @ENABLE_DATABASE_TRUE@	WebCore/storage/SQLTransactionErrorCallback.h
 
-@ENABLE_DATABASE_FALSE@am__append_41 = -DENABLE_DATABASE=0
+@ENABLE_DATABASE_FALSE@am__append_40 = -DENABLE_DATABASE=0
 
 # ----
 # HTML5 datalist Support
 # ----
+@ENABLE_DATALIST_TRUE@am__append_41 = ENABLE_DATALIST=1
 @ENABLE_DATALIST_TRUE@am__append_42 = ENABLE_DATALIST=1
-@ENABLE_DATALIST_TRUE@am__append_43 = ENABLE_DATALIST=1
-@ENABLE_DATALIST_TRUE@am__append_44 = -DENABLE_DATALIST=1
+@ENABLE_DATALIST_TRUE@am__append_43 = -DENABLE_DATALIST=1
 
 # ----
 # HTML5 server-sent events
 # ----
-@ENABLE_EVENTSOURCE_FALSE@am__append_45 = -DENABLE_EVENTSOURCE=0
-@ENABLE_EVENTSOURCE_TRUE@am__append_46 = ENABLE_EVENTSOURCE=1
-@ENABLE_EVENTSOURCE_TRUE@am__append_47 = \
+@ENABLE_EVENTSOURCE_FALSE@am__append_44 = -DENABLE_EVENTSOURCE=0
+@ENABLE_EVENTSOURCE_TRUE@am__append_45 = ENABLE_EVENTSOURCE=1
+@ENABLE_EVENTSOURCE_TRUE@am__append_46 = \
 @ENABLE_EVENTSOURCE_TRUE@	-DENABLE_EVENTSOURCE=1
 
 
 # ----
 # HTML5 client-side session and persistent storage
 # ----
-@ENABLE_DOM_STORAGE_TRUE@am__append_48 = ENABLE_DOM_STORAGE=1
-@ENABLE_DOM_STORAGE_TRUE@am__append_49 = \
+@ENABLE_DOM_STORAGE_TRUE@am__append_47 = ENABLE_DOM_STORAGE=1
+@ENABLE_DOM_STORAGE_TRUE@am__append_48 = \
 @ENABLE_DOM_STORAGE_TRUE@	WebCore/storage/Storage.idl \
 @ENABLE_DOM_STORAGE_TRUE@	WebCore/storage/StorageEvent.idl
 
-@ENABLE_DOM_STORAGE_TRUE@am__append_50 = \
+@ENABLE_DOM_STORAGE_TRUE@am__append_49 = \
 @ENABLE_DOM_STORAGE_TRUE@	-DENABLE_DOM_STORAGE=1
 
-@ENABLE_DOM_STORAGE_TRUE@am__append_51 = \
+@ENABLE_DOM_STORAGE_TRUE@am__append_50 = \
 @ENABLE_DOM_STORAGE_TRUE@	WebCore/bindings/js/JSStorageCustom.cpp \
 @ENABLE_DOM_STORAGE_TRUE@	WebCore/storage/LocalStorageTask.cpp \
 @ENABLE_DOM_STORAGE_TRUE@	WebCore/storage/LocalStorageTask.h \
@@ -408,8 +408,8 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # Icon Database Support
 # ----
-@ENABLE_ICONDATABASE_TRUE@am__append_52 = -DENABLE_ICONDATABASE=1
-@ENABLE_ICONDATABASE_TRUE@am__append_53 = \
+@ENABLE_ICONDATABASE_TRUE@am__append_51 = -DENABLE_ICONDATABASE=1
+@ENABLE_ICONDATABASE_TRUE@am__append_52 = \
 @ENABLE_ICONDATABASE_TRUE@	WebCore/loader/icon/IconDatabase.cpp \
 @ENABLE_ICONDATABASE_TRUE@	WebCore/loader/icon/IconDatabase.h \
 @ENABLE_ICONDATABASE_TRUE@	WebCore/loader/icon/IconDatabaseClient.h \
@@ -418,28 +418,28 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_ICONDATABASE_TRUE@	WebCore/loader/icon/PageURLRecord.cpp \
 @ENABLE_ICONDATABASE_TRUE@	WebCore/loader/icon/PageURLRecord.h
 
-@ENABLE_ICONDATABASE_FALSE@am__append_54 = \
+@ENABLE_ICONDATABASE_FALSE@am__append_53 = \
 @ENABLE_ICONDATABASE_FALSE@	WebCore/loader/icon/IconDatabaseNone.cpp
 
-@ENABLE_ICONDATABASE_FALSE@am__append_55 = -DENABLE_ICONDATABASE=0
+@ENABLE_ICONDATABASE_FALSE@am__append_54 = -DENABLE_ICONDATABASE=0
 
 # ----
 # Orientation Events
 # ----
-@ENABLE_ORIENTATION_EVENTS_TRUE@am__append_56 = ENABLE_ORIENTATION_EVENTS=1
-@ENABLE_ORIENTATION_EVENTS_TRUE@am__append_57 = -DENABLE_ORIENTATION_EVENTS=1
+@ENABLE_ORIENTATION_EVENTS_TRUE@am__append_55 = ENABLE_ORIENTATION_EVENTS=1
+@ENABLE_ORIENTATION_EVENTS_TRUE@am__append_56 = -DENABLE_ORIENTATION_EVENTS=1
 
 # ----
 # Video Support
 # ----
+@ENABLE_VIDEO_TRUE@am__append_57 = ENABLE_VIDEO=1
 @ENABLE_VIDEO_TRUE@am__append_58 = ENABLE_VIDEO=1
-@ENABLE_VIDEO_TRUE@am__append_59 = ENABLE_VIDEO=1
-@ENABLE_VIDEO_TRUE@am__append_60 = -DENABLE_VIDEO=1
-@ENABLE_DEBUG_TRUE@@ENABLE_VIDEO_TRUE@am__append_61 = -DGST_DISABLE_DEPRECATED
-@ENABLE_VIDEO_TRUE@am__append_62 = \
+@ENABLE_VIDEO_TRUE@am__append_59 = -DENABLE_VIDEO=1
+@ENABLE_DEBUG_TRUE@@ENABLE_VIDEO_TRUE@am__append_60 = -DGST_DISABLE_DEPRECATED
+@ENABLE_VIDEO_TRUE@am__append_61 = \
 @ENABLE_VIDEO_TRUE@	WebCore/html/TimeRanges.idl
 
-@ENABLE_VIDEO_TRUE@am__append_63 = \
+@ENABLE_VIDEO_TRUE@am__append_62 = \
 @ENABLE_VIDEO_TRUE@	WebCore/bindings/js/JSAudioConstructor.cpp \
 @ENABLE_VIDEO_TRUE@	WebCore/bindings/js/JSAudioConstructor.h \
 @ENABLE_VIDEO_TRUE@	WebCore/html/HTMLAudioElement.cpp \
@@ -460,7 +460,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_VIDEO_TRUE@	WebCore/rendering/RenderVideo.cpp \
 @ENABLE_VIDEO_TRUE@	WebCore/rendering/RenderVideo.h
 
-@ENABLE_VIDEO_TRUE@am__append_64 = \
+@ENABLE_VIDEO_TRUE@am__append_63 = \
 @ENABLE_VIDEO_TRUE@	WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp \
 @ENABLE_VIDEO_TRUE@	WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h \
 @ENABLE_VIDEO_TRUE@	WebCore/platform/graphics/gstreamer/VideoSinkGStreamer.cpp \
@@ -472,7 +472,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_VIDEO_TRUE@	WebCore/platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp \
 @ENABLE_VIDEO_TRUE@	WebCore/platform/graphics/gstreamer/WebKitWebSourceGStreamer.h
 
-@ENABLE_VIDEO_TRUE@am__append_65 = \
+@ENABLE_VIDEO_TRUE@am__append_64 = \
 @ENABLE_VIDEO_TRUE@	-lgstinterfaces-0.10 \
 @ENABLE_VIDEO_TRUE@	-lgstvideo-0.10 \
 @ENABLE_VIDEO_TRUE@	-lgstpbutils-0.10 \
@@ -482,9 +482,9 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # XHTML-MP Support
 # ----
-@ENABLE_XHTMLMP_TRUE@am__append_66 = ENABLE_XHTMLMP=1
-@ENABLE_XHTMLMP_TRUE@am__append_67 = -DENABLE_XHTMLMP=1
-@ENABLE_XHTMLMP_TRUE@am__append_68 = \
+@ENABLE_XHTMLMP_TRUE@am__append_65 = ENABLE_XHTMLMP=1
+@ENABLE_XHTMLMP_TRUE@am__append_66 = -DENABLE_XHTMLMP=1
+@ENABLE_XHTMLMP_TRUE@am__append_67 = \
 @ENABLE_XHTMLMP_TRUE@	WebCore/html/HTMLNoScriptElement.cpp \
 @ENABLE_XHTMLMP_TRUE@	WebCore/html/HTMLNoScriptElement.h
 
@@ -492,32 +492,32 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # Sandboxed IFrame Support
 # ----
-@ENABLE_SANDBOX_TRUE@am__append_69 = ENABLE_SANDBOX=1
-@ENABLE_SANDBOX_TRUE@am__append_70 = -DENABLE_SANDBOX=1
+@ENABLE_SANDBOX_TRUE@am__append_68 = ENABLE_SANDBOX=1
+@ENABLE_SANDBOX_TRUE@am__append_69 = -DENABLE_SANDBOX=1
 
 # ----
 # Ruby Support
 # ----
-@ENABLE_RUBY_TRUE@am__append_71 = ENABLE_RUBY=1
-@ENABLE_RUBY_TRUE@am__append_72 = -DENABLE_RUBY=1
+@ENABLE_RUBY_TRUE@am__append_70 = ENABLE_RUBY=1
+@ENABLE_RUBY_TRUE@am__append_71 = -DENABLE_RUBY=1
 
 # ----
 # XPath Support
 # ----
-@ENABLE_XPATH_TRUE@am__append_73 = ENABLE_XPATH=1
-@ENABLE_XPATH_TRUE@am__append_74 = -DENABLE_XPATH=1
-@ENABLE_XPATH_TRUE@am__append_75 = \
+@ENABLE_XPATH_TRUE@am__append_72 = ENABLE_XPATH=1
+@ENABLE_XPATH_TRUE@am__append_73 = -DENABLE_XPATH=1
+@ENABLE_XPATH_TRUE@am__append_74 = \
 @ENABLE_XPATH_TRUE@	DerivedSources/XPathGrammar.cpp \
 @ENABLE_XPATH_TRUE@	DerivedSources/XPathGrammar.h
 
-@ENABLE_XPATH_TRUE@am__append_76 = \
+@ENABLE_XPATH_TRUE@am__append_75 = \
 @ENABLE_XPATH_TRUE@	WebCore/xml/XPathEvaluator.idl \
 @ENABLE_XPATH_TRUE@	WebCore/xml/XPathException.idl \
 @ENABLE_XPATH_TRUE@	WebCore/xml/XPathExpression.idl \
 @ENABLE_XPATH_TRUE@	WebCore/xml/XPathNSResolver.idl \
 @ENABLE_XPATH_TRUE@	WebCore/xml/XPathResult.idl
 
-@ENABLE_XPATH_TRUE@am__append_77 = \
+@ENABLE_XPATH_TRUE@am__append_76 = \
 @ENABLE_XPATH_TRUE@	WebCore/xml/NativeXPathNSResolver.cpp \
 @ENABLE_XPATH_TRUE@	WebCore/xml/NativeXPathNSResolver.h \
 @ENABLE_XPATH_TRUE@	WebCore/xml/XPathEvaluator.cpp \
@@ -556,9 +556,9 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # XSLT Support
 # ----
-@ENABLE_XSLT_TRUE@am__append_78 = ENABLE_XSLT=1
-@ENABLE_XSLT_TRUE@am__append_79 = -DENABLE_XSLT=1
-@ENABLE_XSLT_TRUE@am__append_80 = \
+@ENABLE_XSLT_TRUE@am__append_77 = ENABLE_XSLT=1
+@ENABLE_XSLT_TRUE@am__append_78 = -DENABLE_XSLT=1
+@ENABLE_XSLT_TRUE@am__append_79 = \
 @ENABLE_XSLT_TRUE@	WebCore/dom/TransformSourceLibxslt.cpp \
 @ENABLE_XSLT_TRUE@	WebCore/dom/TransformSource.h \
 @ENABLE_XSLT_TRUE@	WebCore/xml/XSLImportRule.cpp \
@@ -577,11 +577,11 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # Web Workers support
 # ----
-@ENABLE_WORKERS_TRUE@am__append_81 = ENABLE_WORKERS=1
-@ENABLE_WORKERS_TRUE@am__append_82 = \
+@ENABLE_WORKERS_TRUE@am__append_80 = ENABLE_WORKERS=1
+@ENABLE_WORKERS_TRUE@am__append_81 = \
 @ENABLE_WORKERS_TRUE@	-DENABLE_WORKERS=1
 
-@ENABLE_WORKERS_TRUE@am__append_83 = \
+@ENABLE_WORKERS_TRUE@am__append_82 = \
 @ENABLE_WORKERS_TRUE@	WebCore/bindings/js/JSAbstractWorkerCustom.cpp \
 @ENABLE_WORKERS_TRUE@	WebCore/bindings/js/JSDedicatedWorkerContextCustom.cpp \
 @ENABLE_WORKERS_TRUE@	WebCore/bindings/js/JSWorkerConstructor.cpp \
@@ -625,11 +625,11 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ---
 # SharedWorker support
 # ---
-@ENABLE_SHARED_WORKERS_TRUE@am__append_84 = ENABLE_SHARED_WORKERS=1
-@ENABLE_SHARED_WORKERS_TRUE@am__append_85 = \
+@ENABLE_SHARED_WORKERS_TRUE@am__append_83 = ENABLE_SHARED_WORKERS=1
+@ENABLE_SHARED_WORKERS_TRUE@am__append_84 = \
 @ENABLE_SHARED_WORKERS_TRUE@	-DENABLE_SHARED_WORKERS=1
 
-@ENABLE_SHARED_WORKERS_TRUE@am__append_86 = \
+@ENABLE_SHARED_WORKERS_TRUE@am__append_85 = \
 @ENABLE_SHARED_WORKERS_TRUE@	WebCore/bindings/js/JSSharedWorkerConstructor.cpp \
 @ENABLE_SHARED_WORKERS_TRUE@	WebCore/bindings/js/JSSharedWorkerConstructor.h \
 @ENABLE_SHARED_WORKERS_TRUE@	WebCore/bindings/js/JSSharedWorkerCustom.cpp \
@@ -646,15 +646,15 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # WML Support
 # ----
-@ENABLE_WML_TRUE@am__append_87 = ENABLE_WML=1
-@ENABLE_WML_TRUE@am__append_88 = \
+@ENABLE_WML_TRUE@am__append_86 = ENABLE_WML=1
+@ENABLE_WML_TRUE@am__append_87 = \
 @ENABLE_WML_TRUE@	DerivedSources/WMLElementFactory.cpp \
 @ENABLE_WML_TRUE@	DerivedSources/WMLNames.cpp
 
-@ENABLE_WML_TRUE@am__append_89 = \
+@ENABLE_WML_TRUE@am__append_88 = \
 @ENABLE_WML_TRUE@	-DENABLE_WML=1
 
-@ENABLE_WML_TRUE@am__append_90 = \
+@ENABLE_WML_TRUE@am__append_89 = \
 @ENABLE_WML_TRUE@	WebCore/wml/WMLAElement.cpp \
 @ENABLE_WML_TRUE@	WebCore/wml/WMLAccessElement.cpp \
 @ENABLE_WML_TRUE@	WebCore/wml/WMLAnchorElement.cpp \
@@ -696,9 +696,9 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # Filters
 # ----
-@ENABLE_FILTERS_TRUE@am__append_91 = ENABLE_FILTERS=1
-@ENABLE_FILTERS_TRUE@am__append_92 = -DENABLE_FILTERS=1
-@ENABLE_FILTERS_TRUE@am__append_93 = \
+@ENABLE_FILTERS_TRUE@am__append_90 = ENABLE_FILTERS=1
+@ENABLE_FILTERS_TRUE@am__append_91 = -DENABLE_FILTERS=1
+@ENABLE_FILTERS_TRUE@am__append_92 = \
 @ENABLE_FILTERS_TRUE@	WebCore/platform/graphics/filters/FEBlend.cpp \
 @ENABLE_FILTERS_TRUE@	WebCore/platform/graphics/filters/FEBlend.h \
 @ENABLE_FILTERS_TRUE@	WebCore/platform/graphics/filters/FEColorMatrix.cpp \
@@ -719,16 +719,16 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_FILTERS_TRUE@	WebCore/platform/graphics/filters/SourceGraphic.cpp \
 @ENABLE_FILTERS_TRUE@	WebCore/platform/graphics/filters/SourceGraphic.h
 
-@ENABLE_FILTERS_TRUE@@ENABLE_SVG_TRUE@am__append_94 = ENABLE_FILTERS=1
+@ENABLE_FILTERS_TRUE@@ENABLE_SVG_TRUE@am__append_93 = ENABLE_FILTERS=1
 
 # ----
 # Geolocation
 # ----
-@ENABLE_GEOLOCATION_TRUE@am__append_95 = ENABLE_GEOLOCATION=1
-@ENABLE_GEOLOCATION_TRUE@am__append_96 = \
+@ENABLE_GEOLOCATION_TRUE@am__append_94 = ENABLE_GEOLOCATION=1
+@ENABLE_GEOLOCATION_TRUE@am__append_95 = \
 @ENABLE_GEOLOCATION_TRUE@	-DENABLE_GEOLOCATION=1
 
-@ENABLE_GEOLOCATION_TRUE@am__append_97 = \
+@ENABLE_GEOLOCATION_TRUE@am__append_96 = \
 @ENABLE_GEOLOCATION_TRUE@	WebCore/platform/gtk/GeolocationServiceGtk.cpp \
 @ENABLE_GEOLOCATION_TRUE@	WebCore/platform/gtk/GeolocationServiceGtk.h
 
@@ -736,11 +736,11 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # MathML support
 # ----
-@ENABLE_MATHML_TRUE@am__append_98 = ENABLE_MATHML=1
-@ENABLE_MATHML_TRUE@am__append_99 = \
+@ENABLE_MATHML_TRUE@am__append_97 = ENABLE_MATHML=1
+@ENABLE_MATHML_TRUE@am__append_98 = \
 @ENABLE_MATHML_TRUE@	-DENABLE_MATHML=1
 
-@ENABLE_MATHML_TRUE@am__append_100 = \
+@ENABLE_MATHML_TRUE@am__append_99 = \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/MathMLElement.cpp \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/MathMLElement.h \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/MathMLInlineContainerElement.cpp \
@@ -762,7 +762,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLUnderOver.cpp \
 @ENABLE_MATHML_TRUE@	WebCore/mathml/RenderMathMLUnderOver.h
 
-@ENABLE_MATHML_TRUE@am__append_101 = \
+@ENABLE_MATHML_TRUE@am__append_100 = \
 @ENABLE_MATHML_TRUE@	DerivedSources/MathMLElementFactory.cpp \
 @ENABLE_MATHML_TRUE@	DerivedSources/MathMLElementFactory.h \
 @ENABLE_MATHML_TRUE@	DerivedSources/MathMLNames.cpp \
@@ -772,11 +772,11 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 # ----
 # Notifications support
 # ----
-@ENABLE_NOTIFICATIONS_TRUE@am__append_102 = ENABLE_NOTIFICATIONS=1
-@ENABLE_NOTIFICATIONS_TRUE@am__append_103 = \
+@ENABLE_NOTIFICATIONS_TRUE@am__append_101 = ENABLE_NOTIFICATIONS=1
+@ENABLE_NOTIFICATIONS_TRUE@am__append_102 = \
 @ENABLE_NOTIFICATIONS_TRUE@	-DENABLE_NOTIFICATIONS=1
 
-@ENABLE_NOTIFICATIONS_TRUE@am__append_104 = \
+@ENABLE_NOTIFICATIONS_TRUE@am__append_103 = \
 @ENABLE_NOTIFICATIONS_TRUE@	WebCore/notifications/Notification.cpp \
 @ENABLE_NOTIFICATIONS_TRUE@	WebCore/notifications/Notification.h \
 @ENABLE_NOTIFICATIONS_TRUE@	WebCore/notifications/NotificationCenter.cpp \
@@ -790,16 +790,16 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 #
 # FIXME: allow a more fine-grained inclusion/generation of sources per SVG feature
 # ----
-@ENABLE_SVG_TRUE@am__append_105 = ENABLE_SVG=1
-@ENABLE_SVG_TRUE@am__append_106 = $(WebCore)/css/SVGCSSPropertyNames.in 
-@ENABLE_SVG_TRUE@am__append_107 = $(WebCore)/css/SVGCSSValueKeywords.in
-@ENABLE_SVG_TRUE@am__append_108 = \
+@ENABLE_SVG_TRUE@am__append_104 = ENABLE_SVG=1
+@ENABLE_SVG_TRUE@am__append_105 = $(WebCore)/css/SVGCSSPropertyNames.in 
+@ENABLE_SVG_TRUE@am__append_106 = $(WebCore)/css/SVGCSSValueKeywords.in
+@ENABLE_SVG_TRUE@am__append_107 = \
 @ENABLE_SVG_TRUE@	DerivedSources/JSSVGElementWrapperFactory.cpp \
 @ENABLE_SVG_TRUE@	DerivedSources/SVGElementFactory.cpp \
 @ENABLE_SVG_TRUE@	DerivedSources/SVGNames.cpp \
 @ENABLE_SVG_TRUE@	DerivedSources/XLinkNames.cpp
 
-@ENABLE_SVG_TRUE@am__append_109 = \
+@ENABLE_SVG_TRUE@am__append_108 = \
 @ENABLE_SVG_TRUE@	WebCore/svg/ElementTimeControl.idl \
 @ENABLE_SVG_TRUE@	WebCore/svg/SVGAElement.idl \
 @ENABLE_SVG_TRUE@	WebCore/svg/SVGAltGlyphElement.idl \
@@ -948,10 +948,10 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_SVG_TRUE@	WebCore/svg/SVGZoomAndPan.idl \
 @ENABLE_SVG_TRUE@	WebCore/svg/SVGZoomEvent.idl
 
-@ENABLE_SVG_TRUE@am__append_110 = \
+@ENABLE_SVG_TRUE@am__append_109 = \
 @ENABLE_SVG_TRUE@	-DENABLE_SVG=1
 
-@ENABLE_SVG_TRUE@am__append_111 = \
+@ENABLE_SVG_TRUE@am__append_110 = \
 @ENABLE_SVG_TRUE@	WebCore/bindings/js/JSSVGContextCache.h \
 @ENABLE_SVG_TRUE@	WebCore/bindings/js/JSSVGElementInstanceCustom.cpp \
 @ENABLE_SVG_TRUE@	WebCore/bindings/js/JSSVGLengthCustom.cpp \
@@ -1364,33 +1364,33 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 
 
 # SVG Features
+@ENABLE_SVG_TRUE@@ENABLE_SVG_USE_TRUE@am__append_111 = ENABLE_SVG_USE=1
 @ENABLE_SVG_TRUE@@ENABLE_SVG_USE_TRUE@am__append_112 = ENABLE_SVG_USE=1
-@ENABLE_SVG_TRUE@@ENABLE_SVG_USE_TRUE@am__append_113 = ENABLE_SVG_USE=1
-@ENABLE_SVG_TRUE@@ENABLE_SVG_USE_TRUE@am__append_114 = -DENABLE_SVG_USE=1
+@ENABLE_SVG_TRUE@@ENABLE_SVG_USE_TRUE@am__append_113 = -DENABLE_SVG_USE=1
+@ENABLE_SVG_FOREIGN_OBJECT_TRUE@@ENABLE_SVG_TRUE@am__append_114 = ENABLE_SVG_FOREIGN_OBJECT=1
 @ENABLE_SVG_FOREIGN_OBJECT_TRUE@@ENABLE_SVG_TRUE@am__append_115 = ENABLE_SVG_FOREIGN_OBJECT=1
-@ENABLE_SVG_FOREIGN_OBJECT_TRUE@@ENABLE_SVG_TRUE@am__append_116 = ENABLE_SVG_FOREIGN_OBJECT=1
-@ENABLE_SVG_FOREIGN_OBJECT_TRUE@@ENABLE_SVG_TRUE@am__append_117 = -DENABLE_SVG_FOREIGN_OBJECT=1
+@ENABLE_SVG_FOREIGN_OBJECT_TRUE@@ENABLE_SVG_TRUE@am__append_116 = -DENABLE_SVG_FOREIGN_OBJECT=1
+@ENABLE_SVG_FONTS_TRUE@@ENABLE_SVG_TRUE@am__append_117 = ENABLE_SVG_FONTS=1
 @ENABLE_SVG_FONTS_TRUE@@ENABLE_SVG_TRUE@am__append_118 = ENABLE_SVG_FONTS=1
-@ENABLE_SVG_FONTS_TRUE@@ENABLE_SVG_TRUE@am__append_119 = ENABLE_SVG_FONTS=1
-@ENABLE_SVG_FONTS_TRUE@@ENABLE_SVG_TRUE@am__append_120 = -DENABLE_SVG_FONTS=1
+@ENABLE_SVG_FONTS_TRUE@@ENABLE_SVG_TRUE@am__append_119 = -DENABLE_SVG_FONTS=1
+@ENABLE_SVG_AS_IMAGE_TRUE@@ENABLE_SVG_TRUE@am__append_120 = ENABLE_SVG_AS_IMAGE=1
 @ENABLE_SVG_AS_IMAGE_TRUE@@ENABLE_SVG_TRUE@am__append_121 = ENABLE_SVG_AS_IMAGE=1
-@ENABLE_SVG_AS_IMAGE_TRUE@@ENABLE_SVG_TRUE@am__append_122 = ENABLE_SVG_AS_IMAGE=1
-@ENABLE_SVG_AS_IMAGE_TRUE@@ENABLE_SVG_TRUE@am__append_123 = -DENABLE_SVG_AS_IMAGE=1
+@ENABLE_SVG_AS_IMAGE_TRUE@@ENABLE_SVG_TRUE@am__append_122 = -DENABLE_SVG_AS_IMAGE=1
+@ENABLE_SVG_ANIMATION_TRUE@@ENABLE_SVG_TRUE@am__append_123 = ENABLE_SVG_ANIMATION=1
 @ENABLE_SVG_ANIMATION_TRUE@@ENABLE_SVG_TRUE@am__append_124 = ENABLE_SVG_ANIMATION=1
-@ENABLE_SVG_ANIMATION_TRUE@@ENABLE_SVG_TRUE@am__append_125 = ENABLE_SVG_ANIMATION=1
-@ENABLE_SVG_ANIMATION_TRUE@@ENABLE_SVG_TRUE@am__append_126 = -DENABLE_SVG_ANIMATION=1
+@ENABLE_SVG_ANIMATION_TRUE@@ENABLE_SVG_TRUE@am__append_125 = -DENABLE_SVG_ANIMATION=1
 
 # ----
 # Web Sockets Support
 # ----
-@ENABLE_WEB_SOCKETS_TRUE@am__append_127 = ENABLE_WEB_SOCKETS=1
-@ENABLE_WEB_SOCKETS_TRUE@am__append_128 = \
+@ENABLE_WEB_SOCKETS_TRUE@am__append_126 = ENABLE_WEB_SOCKETS=1
+@ENABLE_WEB_SOCKETS_TRUE@am__append_127 = \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/websockets/WebSocket.idl
 
-@ENABLE_WEB_SOCKETS_TRUE@am__append_129 = \
+@ENABLE_WEB_SOCKETS_TRUE@am__append_128 = \
 @ENABLE_WEB_SOCKETS_TRUE@	-DENABLE_WEB_SOCKETS=1
 
-@ENABLE_WEB_SOCKETS_TRUE@am__append_130 = \
+@ENABLE_WEB_SOCKETS_TRUE@am__append_129 = \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/bindings/js/JSWebSocketConstructor.cpp \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/bindings/js/JSWebSocketConstructor.h \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/bindings/js/JSWebSocketCustom.cpp \
@@ -1409,36 +1409,36 @@ DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/websockets/WebSocketHandshakeRequest.cpp \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/websockets/WebSocketHandshakeRequest.h
 
-@ENABLE_WEB_SOCKETS_TRUE@@ENABLE_WORKERS_TRUE@am__append_131 = \
+@ENABLE_WEB_SOCKETS_TRUE@@ENABLE_WORKERS_TRUE@am__append_130 = \
 @ENABLE_WEB_SOCKETS_TRUE@@ENABLE_WORKERS_TRUE@	WebCore/websockets/ThreadableWebSocketChannel.cpp \
 @ENABLE_WEB_SOCKETS_TRUE@@ENABLE_WORKERS_TRUE@	WebCore/websockets/ThreadableWebSocketChannel.h \
 @ENABLE_WEB_SOCKETS_TRUE@@ENABLE_WORKERS_TRUE@	WebCore/websockets/ThreadableWebSocketChannelClientWrapper.h \
 @ENABLE_WEB_SOCKETS_TRUE@@ENABLE_WORKERS_TRUE@	WebCore/websockets/WorkerThreadableWebSocketChannel.cpp \
 @ENABLE_WEB_SOCKETS_TRUE@@ENABLE_WORKERS_TRUE@	WebCore/websockets/WorkerThreadableWebSocketChannel.h
 
-@ENABLE_WEB_SOCKETS_TRUE@am__append_132 = \
+@ENABLE_WEB_SOCKETS_TRUE@am__append_131 = \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/platform/network/soup/SocketStreamError.h \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/platform/network/soup/SocketStreamHandle.h \
 @ENABLE_WEB_SOCKETS_TRUE@	WebCore/platform/network/soup/SocketStreamHandleSoup.cpp
 
-@ENABLE_WEB_SOCKETS_FALSE@am__append_133 = -DENABLE_WEB_SOCKETS=0
+@ENABLE_WEB_SOCKETS_FALSE@am__append_132 = -DENABLE_WEB_SOCKETS=0
 
 # ---
 # Blob.slice support
 # ---
-@ENABLE_BLOB_SLICE_TRUE@am__append_134 = ENABLE_BLOB_SLICE=1
-@ENABLE_BLOB_SLICE_TRUE@am__append_135 = -DENABLE_BLOB_SLICE=1
+@ENABLE_BLOB_SLICE_TRUE@am__append_133 = ENABLE_BLOB_SLICE=1
+@ENABLE_BLOB_SLICE_TRUE@am__append_134 = -DENABLE_BLOB_SLICE=1
 
 # Build TestNetscapePlugin only for X11
 # since we don't support plugins for non-X11 builds at the moment.
-@TARGET_X11_TRUE@am__append_136 = \
+@TARGET_X11_TRUE@am__append_135 = \
 @TARGET_X11_TRUE@	TestNetscapePlugin/libtestnetscapeplugin.la
 
-@TARGET_X11_TRUE@am__append_137 = \
+@TARGET_X11_TRUE@am__append_136 = \
 @TARGET_X11_TRUE@	-DTEST_PLUGIN_DIR=\"${shell pwd}/${top_builddir}/TestNetscapePlugin/.libs\" \
 @TARGET_X11_TRUE@	-DFONTS_CONF_FILE=\"${shell pwd}/${srcdir}/WebKitTools/DumpRenderTree/gtk/fonts.conf\"
 
-@TARGET_X11_TRUE@am__append_138 = TestNetscapePlugin/libtestnetscapeplugin.la
+@TARGET_X11_TRUE@am__append_137 = TestNetscapePlugin/libtestnetscapeplugin.la
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/autotools/acinclude.m4 \
@@ -6493,7 +6493,7 @@ GTESTER_REPORT = gtester-report
 noinst_HEADERS := $(IDL_BINDINGS)
 
 # Convenience libraries
-noinst_LTLIBRARIES := libJavaScriptCore.la $(am__append_136)
+noinst_LTLIBRARIES := libJavaScriptCore.la $(am__append_135)
 lib_LIBRARIES := 
 IDL_BINDINGS := WebCore/css/CSSCharsetRule.idl \
 	WebCore/css/CSSFontFaceRule.idl WebCore/css/CSSImportRule.idl \
@@ -6653,9 +6653,9 @@ IDL_BINDINGS := WebCore/css/CSSCharsetRule.idl \
 	WebCore/xml/XMLHttpRequestProgressEvent.idl \
 	WebCore/xml/XMLHttpRequestUpload.idl \
 	WebCore/xml/XMLSerializer.idl WebCore/xml/XSLTProcessor.idl \
-	$(am__append_34) $(am__append_38) $(am__append_49) \
-	$(am__append_62) $(am__append_76) $(am__append_109) \
-	$(am__append_128)
+	$(am__append_33) $(am__append_37) $(am__append_48) \
+	$(am__append_61) $(am__append_75) $(am__append_108) \
+	$(am__append_127)
 TEST_PROGS := Programs/unittests/testhttpbackend \
 	Programs/unittests/testloading Programs/unittests/testglobals \
 	Programs/unittests/testmimehandling \
@@ -6940,8 +6940,8 @@ javascriptcore_sources := JavaScriptCore/API/APICast.h \
 	JavaScriptCore/wtf/unicode/CollatorDefault.cpp \
 	JavaScriptCore/wtf/unicode/UTF8.cpp \
 	JavaScriptCore/wtf/unicode/UTF8.h \
-	JavaScriptCore/wtf/unicode/Unicode.h $(am__append_14) \
-	$(am__append_15) $(am__append_16) $(am__append_17) \
+	JavaScriptCore/wtf/unicode/Unicode.h $(am__append_13) \
+	$(am__append_14) $(am__append_15) $(am__append_16) \
 	JavaScriptCore/wtf/VMTags.h \
 	JavaScriptCore/yarr/RegexCompiler.cpp \
 	JavaScriptCore/yarr/RegexCompiler.h \
@@ -7179,19 +7179,19 @@ webcore_cppflags := -I$(srcdir)/WebCore \
 	-I$(srcdir)/WebCore/websockets -I$(srcdir)/WebCore/wml \
 	-I$(srcdir)/WebCore/workers -I$(srcdir)/WebCore/xml \
 	-I$(top_builddir)/WebCore/bindings/js \
-	-DDATA_DIR=\"${datadir}\" $(am__append_23) $(am__append_25) \
-	-DENABLE_DATAGRID=0 -DENABLE_PROGRESS_TAG=0 $(am__append_31) \
-	$(am__append_32) $(am__append_35) $(am__append_39) \
-	$(am__append_41) $(am__append_44) $(am__append_47) \
-	$(am__append_50) $(am__append_52) $(am__append_55) \
-	$(am__append_57) $(am__append_60) $(am__append_61) \
-	$(am__append_67) $(am__append_70) $(am__append_72) \
-	$(am__append_74) $(am__append_79) $(am__append_82) \
-	$(am__append_85) $(am__append_89) $(am__append_92) \
-	$(am__append_96) $(am__append_99) $(am__append_103) \
-	$(am__append_110) $(am__append_114) $(am__append_117) \
-	$(am__append_120) $(am__append_123) $(am__append_126) \
-	$(am__append_129) $(am__append_133) $(am__append_135)
+	-DDATA_DIR=\"${datadir}\" $(am__append_22) $(am__append_24) \
+	-DENABLE_DATAGRID=0 -DENABLE_PROGRESS_TAG=0 $(am__append_30) \
+	$(am__append_31) $(am__append_34) $(am__append_38) \
+	$(am__append_40) $(am__append_43) $(am__append_46) \
+	$(am__append_49) $(am__append_51) $(am__append_54) \
+	$(am__append_56) $(am__append_59) $(am__append_60) \
+	$(am__append_66) $(am__append_69) $(am__append_71) \
+	$(am__append_73) $(am__append_78) $(am__append_81) \
+	$(am__append_84) $(am__append_88) $(am__append_91) \
+	$(am__append_95) $(am__append_98) $(am__append_102) \
+	$(am__append_109) $(am__append_113) $(am__append_116) \
+	$(am__append_119) $(am__append_122) $(am__append_125) \
+	$(am__append_128) $(am__append_132) $(am__append_134)
 webcore_sources := WebCore/WebCorePrefix.h \
 	WebCore/accessibility/AXObjectCache.cpp \
 	WebCore/accessibility/AXObjectCache.h \
@@ -8613,14 +8613,14 @@ webcore_sources := WebCore/WebCorePrefix.h \
 	WebCore/xml/XMLHttpRequestUpload.cpp \
 	WebCore/xml/XMLHttpRequestUpload.h \
 	WebCore/xml/XMLSerializer.cpp WebCore/xml/XMLSerializer.h \
-	$(am__append_19) $(am__append_36) $(am__append_40) \
-	$(am__append_51) $(am__append_53) $(am__append_54) \
-	$(am__append_63) $(am__append_68) $(am__append_77) \
-	$(am__append_80) $(am__append_83) $(am__append_86) \
-	$(am__append_90) $(am__append_93) $(am__append_100) \
-	$(am__append_104) $(am__append_111) $(am__append_130) \
-	$(am__append_131)
-webcore_libadd := $(am__append_65)
+	$(am__append_18) $(am__append_35) $(am__append_39) \
+	$(am__append_50) $(am__append_52) $(am__append_53) \
+	$(am__append_62) $(am__append_67) $(am__append_76) \
+	$(am__append_79) $(am__append_82) $(am__append_85) \
+	$(am__append_89) $(am__append_92) $(am__append_99) \
+	$(am__append_103) $(am__append_110) $(am__append_129) \
+	$(am__append_130)
+webcore_libadd := $(am__append_64)
 webcore_built_sources := DerivedSources/CSSGrammar.cpp \
 	DerivedSources/CSSGrammar.h DerivedSources/CSSPropertyNames.h \
 	DerivedSources/CSSValueKeywords.h \
@@ -8630,8 +8630,8 @@ webcore_built_sources := DerivedSources/CSSGrammar.cpp \
 	DerivedSources/UserAgentStyleSheets.h \
 	DerivedSources/UserAgentStyleSheetsData.cpp \
 	DerivedSources/XMLNSNames.cpp DerivedSources/XMLNames.cpp \
-	$(am__append_75) $(am__append_88) $(am__append_101) \
-	$(am__append_108)
+	$(am__append_74) $(am__append_87) $(am__append_100) \
+	$(am__append_107)
 webcore_built_nosources := DerivedSources/DocTypeStrings.cpp \
 	DerivedSources/tokenizer.cpp DerivedSources/ColorData.c \
 	$(patsubst %.idl,DerivedSources/JS%.h,$(notdir \
@@ -8663,19 +8663,19 @@ webcore_dist := WebCore/ChangeLog WebCore/LICENSE-APPLE \
 	WebCore/html/HTMLEntityNames.gperf \
 	WebCore/html/HTMLAttributeNames.in WebCore/xml/xmlattrs.in \
 	WebCore/xml/xmlnsattrs.in WebCore/xml/XPathGrammar.y
-webcoregtk_cppflags := $(am__append_7) -DWTF_USE_SOUP=1 \
+webcoregtk_cppflags := -DWTF_USE_SOUP=1 \
 	-I$(srcdir)/WebCore/accessibility/gtk \
 	-I$(srcdir)/WebCore/loader/gtk -I$(srcdir)/WebCore/page/gtk \
 	-I$(srcdir)/WebCore/platform/graphics/cairo \
 	-I$(srcdir)/WebCore/platform/graphics/gstreamer \
 	-I$(srcdir)/WebCore/platform/graphics/gtk \
 	-I$(srcdir)/WebCore/platform/gtk \
-	-I$(srcdir)/WebCore/platform/network/soup $(am__append_26) \
-	$(am__append_28)
+	-I$(srcdir)/WebCore/platform/network/soup $(am__append_25) \
+	$(am__append_27)
 webcoregtk_sources := WebCore/bindings/js/ScriptControllerGtk.cpp \
 	WebCore/plugins/gtk/PluginDataGtk.cpp \
 	WebCore/plugins/gtk/PluginPackageGtk.cpp \
-	WebCore/plugins/gtk/PluginViewGtk.cpp $(am__append_18) \
+	WebCore/plugins/gtk/PluginViewGtk.cpp $(am__append_17) \
 	WebCore/accessibility/gtk/AXObjectCacheAtk.cpp \
 	WebCore/accessibility/gtk/AccessibilityObjectAtk.cpp \
 	WebCore/accessibility/gtk/AccessibilityObjectWrapperAtk.cpp \
@@ -8782,9 +8782,9 @@ webcoregtk_sources := WebCore/bindings/js/ScriptControllerGtk.cpp \
 	WebCore/platform/network/soup/ResourceResponse.h \
 	WebCore/platform/network/soup/GOwnPtrSoup.h \
 	WebCore/platform/network/soup/GOwnPtrSoup.cpp \
-	WebCore/workers/SharedWorkerRepository.h $(am__append_20) \
-	$(am__append_21) $(am__append_27) $(am__append_29) \
-	$(am__append_64) $(am__append_97) $(am__append_132)
+	WebCore/workers/SharedWorkerRepository.h $(am__append_19) \
+	$(am__append_20) $(am__append_26) $(am__append_28) \
+	$(am__append_63) $(am__append_96) $(am__append_131)
 webkitgtk_h_api := $(srcdir)/WebKit/gtk/webkit/webkit.h \
 	$(srcdir)/WebKit/gtk/webkit/webkitdefines.h \
 	$(srcdir)/WebKit/gtk/webkit/webkitdownload.h \
@@ -8875,7 +8875,7 @@ webkitgtk_cleanfiles := $(top_builddir)/stamp-webkitmarshal.cpp \
 # Extra checks and flags
 global_cppflags := -DBUILDING_CAIRO__=1 -DBUILDING_GTK__=1 \
 	-DWTF_CHANGES $(am__append_2) $(am__append_3) $(am__append_4) \
-	$(am__append_5) $(am__append_8) $(am__append_45)
+	$(am__append_5) $(am__append_7) $(am__append_44)
 
 # Default compiler flags
 global_cflags := -Wall -W -Wcast-align -Wchar-subscripts -Wreturn-type \
@@ -8904,10 +8904,10 @@ corekit_cflags := -fno-strict-aliasing $(COVERAGE_CFLAGS) \
 corekit_cppflags := $(global_cppflags) $(webcore_cppflags) \
 	$(webcoregtk_cppflags) $(javascriptcore_cppflags) \
 	$(am__append_1)
-JSCORE_GIRSOURCES := $(am__append_9)
-WEBKIT_GIRSOURCES := $(am__append_10)
-typelibsdir := $(am__append_11)
-typelibs_DATA := $(am__append_12)
+JSCORE_GIRSOURCES := $(am__append_8)
+WEBKIT_GIRSOURCES := $(am__append_9)
+typelibsdir := $(am__append_10)
+typelibs_DATA := $(am__append_11)
 
 # Files that will be distributed
 EXTRA_DIST := WebKit/gtk/JSCore-1.0.gir $(srcdir)/gtk-doc.make \
@@ -8940,7 +8940,7 @@ BUILT_SOURCES := $(javascriptcore_built_sources) \
 
 # Project-wide clean rules
 # Files that will be cleaned
-CLEANFILES := $(am__append_13) \
+CLEANFILES := $(am__append_12) \
 	JavaScriptCore/runtime/ArrayPrototype.lut.h \
 	JavaScriptCore/runtime/DatePrototype.lut.h \
 	JavaScriptCore/runtime/JSONObject.lut.h \
@@ -8951,7 +8951,7 @@ CLEANFILES := $(am__append_13) \
 	JavaScriptCore/runtime/StringPrototype.lut.h \
 	JavaScriptCore/pcre/chartables.c Programs/jsc Programs/minidom \
 	libWebCoreJS.la Programs/GtkLauncher Programs/DumpRenderTree \
-	$(am__append_138) $(top_builddir)/stamp-po $(BUILT_SOURCES) \
+	$(am__append_137) $(top_builddir)/stamp-po $(BUILT_SOURCES) \
 	$(webkitgtk_cleanfiles)
 DISTCLEANFILES := $(MOFILES) $(CLEANFILES) $(builddir)/doltcompile \
 	$(builddir)/doltlibtool
@@ -9138,24 +9138,24 @@ WebCore := $(srcdir)/WebCore
 # ----
 # HTML Progress Element - disable for now, since painting code is missing.
 # ----
-FEATURE_DEFINES := $(am__append_22) $(am__append_24) ENABLE_DATAGRID=0 \
-	ENABLE_PROGRESS_TAG=0 $(am__append_30) $(am__append_33) \
-	$(am__append_37) $(am__append_42) $(am__append_46) \
-	$(am__append_48) $(am__append_56) $(am__append_58) \
-	$(am__append_66) $(am__append_73) $(am__append_78) \
-	$(am__append_81) $(am__append_84) $(am__append_87) \
-	$(am__append_91) $(am__append_95) $(am__append_98) \
-	$(am__append_102) $(am__append_105) $(am__append_112) \
-	$(am__append_115) $(am__append_118) $(am__append_121) \
-	$(am__append_124) $(am__append_127) $(am__append_134)
-SVG_FEATURES := $(am__append_94) $(am__append_113) $(am__append_116) \
-	$(am__append_119) $(am__append_122) $(am__append_125)
-HTML_FEATURES := $(am__append_43) $(am__append_59) $(am__append_69) \
-	$(am__append_71)
+FEATURE_DEFINES := $(am__append_21) $(am__append_23) ENABLE_DATAGRID=0 \
+	ENABLE_PROGRESS_TAG=0 $(am__append_29) $(am__append_32) \
+	$(am__append_36) $(am__append_41) $(am__append_45) \
+	$(am__append_47) $(am__append_55) $(am__append_57) \
+	$(am__append_65) $(am__append_72) $(am__append_77) \
+	$(am__append_80) $(am__append_83) $(am__append_86) \
+	$(am__append_90) $(am__append_94) $(am__append_97) \
+	$(am__append_101) $(am__append_104) $(am__append_111) \
+	$(am__append_114) $(am__append_117) $(am__append_120) \
+	$(am__append_123) $(am__append_126) $(am__append_133)
+SVG_FEATURES := $(am__append_93) $(am__append_112) $(am__append_115) \
+	$(am__append_118) $(am__append_121) $(am__append_124)
+HTML_FEATURES := $(am__append_42) $(am__append_58) $(am__append_68) \
+	$(am__append_70)
 WEBCORE_CSS_PROPERTY_NAMES := $(WebCore)/css/CSSPropertyNames.in \
-	$(am__append_106)
+	$(am__append_105)
 WEBCORE_CSS_VALUE_KEYWORDS := $(WebCore)/css/CSSValueKeywords.in \
-	$(am__append_107)
+	$(am__append_106)
 
 # user agent style sheets
 USER_AGENT_STYLE_SHEETS = \
@@ -9275,7 +9275,7 @@ dumprendertree_cppflags := -I$(srcdir)/WebKitTools/DumpRenderTree \
 	-I$(srcdir)/WebKitTools/DumpRenderTree/gtk \
 	-I$(srcdir)/WebKit/gtk -I$(top_builddir)/WebKit/gtk \
 	$(global_cppflags) $(javascriptcore_cppflags) \
-	$(am__append_137)
+	$(am__append_136)
 Programs_DumpRenderTree_CPPFLAGS = $(dumprendertree_cppflags)
 Programs_DumpRenderTree_SOURCES = \
 	WebKitTools/DumpRenderTree/DumpRenderTree.h \

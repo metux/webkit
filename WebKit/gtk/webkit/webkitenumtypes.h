@@ -1,5 +1,5 @@
 
-/* Generated data (by glib-mkenums) */
+
 
 #ifndef WEBKIT_ENUM_TYPES_H
 #define WEBKIT_ENUM_TYPES_H
@@ -88,5 +88,5 @@ G_END_DECLS
 
 #endif
 
-/* Generated data ends here */
+
 
