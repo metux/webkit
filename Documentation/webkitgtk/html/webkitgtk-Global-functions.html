@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>Global functions</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Global functions">
 <link rel="prev" href="ch01.html" title="Global functions">
@@ -37,10 +37,10 @@
 </tr></table></div>
 <div class="refsynopsisdiv">
 <a name="webkitgtk-Global-functions.synopsis"></a><h2>Synopsis</h2>
-<pre class="synopsis"><span class="returnvalue">SoupSession</span> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
+<pre class="synopsis"><a href="../libsoup-2.4/SoupSession.html"><span class="returnvalue">SoupSession</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
 <span class="returnvalue">guint64</span>             <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-web-database-quota" title="webkit_get_default_web_database_quota ()">webkit_get_default_web_database_quota</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path" title="webkit_get_web_database_directory_path ()">webkit_get_web_database_directory_path</a>
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path" title="webkit_get_web_database_directory_path ()">webkit_get_web_database_directory_path</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="returnvalue">WebKitWebPluginDatabase</span></a> * <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-plugin-database" title="webkit_get_web_plugin_database ()">webkit_get_web_plugin_database</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
@@ -48,12 +48,12 @@ const <span class="returnvalue">gchar</span> *       <a class="link" href="webki
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-default-web-database-quota" title="webkit_set_default_web_database_quota ()">webkit_set_default_web_database_quota</a>
                                                         (<em class="parameter"><code><span class="type">guint64</span> defaultQuota</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-web-database-directory-path" title="webkit_set_web_database_directory_path ()">webkit_set_web_database_directory_path</a>
-                                                        (<em class="parameter"><code>const <span class="type">gchar</span> *path</code></em>);
+                                                        (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);
 <a class="link" href="WebKitIconDatabase.html" title="WebKitIconDatabase"><span class="returnvalue">WebKitIconDatabase</span></a> * <a class="link" href="webkitgtk-Global-functions.html#webkit-get-icon-database" title="webkit_get_icon_database ()">webkit_get_icon_database</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
-<span class="returnvalue">GObject</span> *           <a class="link" href="webkitgtk-Global-functions.html#webkit-get-text-checker" title="webkit_get_text_checker ()">webkit_get_text_checker</a>             (<em class="parameter"><code><span class="type">void</span></code></em>);
-<span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-text-checker" title="webkit_set_text_checker ()">webkit_set_text_checker</a>             (<em class="parameter"><code><span class="type">GObject</span> *checker</code></em>);
+<a href="../gobject/gobject-The-Base-Object-Type.html#GObject"><span class="returnvalue">GObject</span></a> *           <a class="link" href="webkitgtk-Global-functions.html#webkit-get-text-checker" title="webkit_get_text_checker ()">webkit_get_text_checker</a>             (<em class="parameter"><code><span class="type">void</span></code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-text-checker" title="webkit_set_text_checker ()">webkit_set_text_checker</a>             (<em class="parameter"><code><a href="../gobject/gobject-The-Base-Object-Type.html#GObject"><span class="type">GObject</span></a> *checker</code></em>);
 
-const <span class="returnvalue">gchar</span> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-application-cache-get-database-directory-path" title="webkit_application_cache_get_database_directory_path ()">webkit_application_cache_get_database_directory_path</a>
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-application-cache-get-database-directory-path" title="webkit_application_cache_get_database_directory_path ()">webkit_application_cache_get_database_directory_path</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 unsigned long <span class="returnvalue">long</span>  <a class="link" href="webkitgtk-Global-functions.html#webkit-application-cache-get-maximum-size" title="webkit_application_cache_get_maximum_size ()">webkit_application_cache_get_maximum_size</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
@@ -77,18 +77,18 @@ sizes, database quotas, and the HTTP session management.
 <a name="webkitgtk-Global-functions.details"></a><h2>Details</h2>
 <div class="refsect2">
 <a name="webkit-get-default-session"></a><h3>webkit_get_default_session ()</h3>
-<pre class="programlisting"><span class="returnvalue">SoupSession</span> *       webkit_get_default_session          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../libsoup-2.4/SoupSession.html"><span class="returnvalue">SoupSession</span></a> *       webkit_get_default_session          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
-Retrieves the default <span class="type">SoupSession</span> used by all web views.
+Retrieves the default <a href="../libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a> used by all web views.
 Note that the session features are added by WebKit on demand,
-so if you insert your own <span class="type">SoupCookieJar</span> before any network
+so if you insert your own <a href="../libsoup-2.4/SoupCookieJar.html"><span class="type">SoupCookieJar</span></a> before any network
 traffic occurs, WebKit will use it instead of the default.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the default <span class="type">SoupSession</span>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the default <a href="../libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr></tbody>
 </table></div>
@@ -115,7 +115,7 @@ this value is 5MB.
 <hr>
 <div class="refsect2">
 <a name="webkit-get-web-database-directory-path"></a><h3>webkit_get_web_database_directory_path ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_get_web_database_directory_path
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_get_web_database_directory_path
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 Returns the current path to the directory WebKit will write Web 
@@ -181,7 +181,7 @@ Database databases.
 <div class="refsect2">
 <a name="webkit-set-web-database-directory-path"></a><h3>webkit_set_web_database_directory_path ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_web_database_directory_path
-                                                        (<em class="parameter"><code>const <span class="type">gchar</span> *path</code></em>);</pre>
+                                                        (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);</pre>
 <p>
 Sets the current path to the directory WebKit will write Web 
 Database databases.
@@ -215,12 +215,12 @@ Returns the <a class="link" href="WebKitIconDatabase.html" title="WebKitIconData
 <hr>
 <div class="refsect2">
 <a name="webkit-get-text-checker"></a><h3>webkit_get_text_checker ()</h3>
-<pre class="programlisting"><span class="returnvalue">GObject</span> *           webkit_get_text_checker             (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../gobject/gobject-The-Base-Object-Type.html#GObject"><span class="returnvalue">GObject</span></a> *           webkit_get_text_checker             (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> used by WebKit, or <code class="literal">NULL</code> if spell
+<td>the <a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> used by WebKit, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if spell
 checking is not enabled</td>
 </tr></tbody>
 </table></div>
@@ -229,7 +229,7 @@ checking is not enabled</td>
 <hr>
 <div class="refsect2">
 <a name="webkit-set-text-checker"></a><h3>webkit_set_text_checker ()</h3>
-<pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_text_checker             (<em class="parameter"><code><span class="type">GObject</span> *checker</code></em>);</pre>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_text_checker             (<em class="parameter"><code><a href="../gobject/gobject-The-Base-Object-Type.html#GObject"><span class="type">GObject</span></a> *checker</code></em>);</pre>
 <p>
 Sets <em class="parameter"><code>checker</code></em> as the spell checker to be used by WebKit. The API
 accepts GObject since in the future we might accept objects
@@ -240,7 +240,7 @@ grammar checking).
 <col align="left" valign="top">
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>checker</code></em> :</span></p></td>
-<td>a <a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> or <code class="literal">NULL</code>
+<td>a <a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
 </td>
 </tr></tbody>
 </table></div>
@@ -249,7 +249,7 @@ grammar checking).
 <hr>
 <div class="refsect2">
 <a name="webkit-application-cache-get-database-directory-path"></a><h3>webkit_application_cache_get_database_directory_path ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_application_cache_get_database_directory_path
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_application_cache_get_database_directory_path
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 Returns the path to the directory WebKit will write web application
