@@ -56,17 +56,6 @@ RenderFlowThread::RenderFlowThread(Node* node, const AtomicString& flowThread)
     setInRenderFlowThread();
 }
 
-void RenderFlowThread::clearRenderRegionRangeMap()
-{
-    deleteAllValues(m_regionRangeMap);
-    m_regionRangeMap.clear();
-}
-
-RenderFlowThread::~RenderFlowThread()
-{
-    clearRenderRegionRangeMap();
-}
-
 PassRefPtr<RenderStyle> RenderFlowThread::createFlowThreadStyle(RenderStyle* parentStyle)
 {
     RefPtr<RenderStyle> newStyle(RenderStyle::create());
@@ -215,7 +204,9 @@ void RenderFlowThread::addRegionToThread(RenderRegion* renderRegion)
 void RenderFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
 {
     ASSERT(renderRegion);
+    m_regionRangeMap.clear();
     m_regionList.remove(renderRegion);
+
     if (renderRegion->parentFlowThread()) {
         if (!renderRegion->isValid()) {
             renderRegion->parentFlowThread()->m_observerThreadsSet.remove(this);
@@ -316,7 +307,7 @@ void RenderFlowThread::layout()
         m_hasValidRegions = false;
         m_regionsHaveUniformLogicalWidth = true;
         m_regionsHaveUniformLogicalHeight = true;
-        clearRenderRegionRangeMap();
+        m_regionRangeMap.clear();
         LayoutUnit previousRegionLogicalWidth = 0;
         LayoutUnit previousRegionLogicalHeight = 0;
         if (hasRegions()) {
@@ -504,7 +495,7 @@ bool RenderFlowThread::shouldRepaint(const LayoutRect& r) const
 
 void RenderFlowThread::repaintRectangleInRegions(const LayoutRect& repaintRect, bool immediate)
 {
-    if (!shouldRepaint(repaintRect))
+    if (!shouldRepaint(repaintRect) || !hasValidRegionInfo())
         return;
 
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
@@ -598,7 +589,7 @@ LayoutUnit RenderFlowThread::regionRemainingLogicalHeightForLine(LayoutUnit posi
 
 RenderRegion* RenderFlowThread::mapFromFlowToRegion(TransformState& transformState) const
 {
-    if (!hasValidRegions())
+    if (!hasValidRegionInfo())
         return 0;
 
     LayoutRect boxRect = transformState.mappedQuad().enclosingBoundingBox();
@@ -639,7 +630,7 @@ void RenderFlowThread::removeRenderBoxRegionInfo(RenderBox* box)
             break;
     }
     
-    delete m_regionRangeMap.take(box);
+    m_regionRangeMap.remove(box);
 }
 
 bool RenderFlowThread::logicalWidthChangedInRegions(const RenderBlock* block, LayoutUnit offsetFromLogicalTopOfFirstPage)
@@ -659,13 +650,11 @@ bool RenderFlowThread::logicalWidthChangedInRegions(const RenderBlock* block, La
 
         ASSERT(!region->needsLayout());
 
-        RenderBoxRegionInfo* oldInfo = region->takeRenderBoxRegionInfo(block);
+        OwnPtr<RenderBoxRegionInfo> oldInfo = region->takeRenderBoxRegionInfo(block);
         if (!oldInfo)
             continue;
 
         LayoutUnit oldLogicalWidth = oldInfo->logicalWidth();
-        delete oldInfo;
-
         RenderBoxRegionInfo* newInfo = block->renderBoxRegionInfo(region, offsetFromLogicalTopOfFirstPage);
         if (!newInfo || newInfo->logicalWidth() != oldLogicalWidth)
             return true;
@@ -679,7 +668,7 @@ bool RenderFlowThread::logicalWidthChangedInRegions(const RenderBlock* block, La
 
 LayoutUnit RenderFlowThread::contentLogicalWidthOfFirstRegion() const
 {
-    if (!hasValidRegions())
+    if (!hasValidRegionInfo())
         return 0;
     for (RenderRegionList::const_iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
@@ -693,7 +682,7 @@ LayoutUnit RenderFlowThread::contentLogicalWidthOfFirstRegion() const
 
 LayoutUnit RenderFlowThread::contentLogicalHeightOfFirstRegion() const
 {
-    if (!hasValidRegions())
+    if (!hasValidRegionInfo())
         return 0;
     for (RenderRegionList::const_iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
@@ -707,7 +696,7 @@ LayoutUnit RenderFlowThread::contentLogicalHeightOfFirstRegion() const
  
 LayoutUnit RenderFlowThread::contentLogicalLeftOfFirstRegion() const
 {
-    if (!hasValidRegions())
+    if (!hasValidRegionInfo())
         return 0;
     for (RenderRegionList::const_iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
@@ -721,7 +710,7 @@ LayoutUnit RenderFlowThread::contentLogicalLeftOfFirstRegion() const
 
 RenderRegion* RenderFlowThread::firstRegion() const
 {
-    if (!hasValidRegions())
+    if (!hasValidRegionInfo())
         return 0;
     for (RenderRegionList::const_iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
@@ -734,7 +723,7 @@ RenderRegion* RenderFlowThread::firstRegion() const
 
 RenderRegion* RenderFlowThread::lastRegion() const
 {
-    if (!hasValidRegions())
+    if (!hasValidRegionInfo())
         return 0;
     for (RenderRegionList::const_reverse_iterator iter = m_regionList.rbegin(); iter != m_regionList.rend(); ++iter) {
         RenderRegion* region = *iter;
@@ -746,8 +735,8 @@ RenderRegion* RenderFlowThread::lastRegion() const
 }
 
 void RenderFlowThread::clearRenderObjectCustomStyle(const RenderObject* object,
-        const RenderRegion* oldStartRegion, const RenderRegion* oldEndRegion,
-        const RenderRegion* newStartRegion, const RenderRegion* newEndRegion)
+    const RenderRegion* oldStartRegion, const RenderRegion* oldEndRegion,
+    const RenderRegion* newStartRegion, const RenderRegion* newEndRegion)
 {
     // Clear the styles for the object in the regions.
     // The styles are not cleared for the regions that are contained in both ranges.
@@ -776,45 +765,47 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
     // FIXME: Not right for differing writing-modes.
     RenderRegion* startRegion = renderRegionForLine(offsetFromLogicalTopOfFirstPage, true);
     RenderRegion* endRegion = renderRegionForLine(offsetFromLogicalTopOfFirstPage + box->logicalHeight(), true);
-    RenderRegionRange* range = m_regionRangeMap.get(box);
-    if (range) {
-        // If nothing changed, just bail.
-        if (range->startRegion() == startRegion && range->endRegion() == endRegion)
-            return;
-
-        RenderRegion* oldStartRegion = range->startRegion();
-        RenderRegion* oldEndRegion = range->endRegion();
-        // Delete any info that we find before our new startRegion and after our new endRegion.
-        for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
-            RenderRegion* region = *iter;
-            if (region == startRegion) {
-                iter = m_regionList.find(endRegion);
-                continue;
-            }
-
-            region->removeRenderBoxRegionInfo(box);
-
-            if (region == range->endRegion())
-                break;
-        }
-
-        range->setRange(startRegion, endRegion);
-        clearRenderObjectCustomStyle(box, oldStartRegion, oldEndRegion, startRegion, endRegion);
+    RenderRegionRangeMap::iterator it = m_regionRangeMap.find(box);
+    if (it == m_regionRangeMap.end()) {
+        m_regionRangeMap.set(box, RenderRegionRange(startRegion, endRegion));
         return;
     }
-    range = new RenderRegionRange(startRegion, endRegion);
-    m_regionRangeMap.set(box, range);
+
+    // If nothing changed, just bail.
+    RenderRegionRange& range = it->second;
+    if (range.startRegion() == startRegion && range.endRegion() == endRegion)
+        return;
+
+    // Delete any info that we find before our new startRegion and after our new endRegion.
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (region == startRegion) {
+            iter = m_regionList.find(endRegion);
+            continue;
+        }
+
+        region->removeRenderBoxRegionInfo(box);
+
+        if (region == range.endRegion())
+            break;
+    }
+
+    clearRenderObjectCustomStyle(box, range.startRegion(), range.endRegion(), startRegion, endRegion);
+    range.setRange(startRegion, endRegion);
 }
 
 void RenderFlowThread::getRegionRangeForBox(const RenderBox* box, RenderRegion*& startRegion, RenderRegion*& endRegion) const
 {
     startRegion = 0;
     endRegion = 0;
-    RenderRegionRange* range = m_regionRangeMap.get(box);
-    if (!range)
+    RenderRegionRangeMap::const_iterator it = m_regionRangeMap.find(box);
+    if (it == m_regionRangeMap.end())
         return;
-    startRegion = range->startRegion();
-    endRegion = range->endRegion();
+
+    const RenderRegionRange& range = it->second;
+    startRegion = range.startRegion();
+    endRegion = range.endRegion();
+    ASSERT(m_regionList.contains(startRegion) && m_regionList.contains(endRegion));
 }
 
 WebKitNamedFlow* RenderFlowThread::ensureNamedFlow()

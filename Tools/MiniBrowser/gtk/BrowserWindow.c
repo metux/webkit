@@ -26,6 +26,7 @@
  */
 
 #include "BrowserWindow.h"
+#include "BrowserSettingsDialog.h"
 
 enum {
     PROP_0,
@@ -37,10 +38,12 @@ struct _BrowserWindow {
     GtkWindow parent;
 
     GtkWidget *mainBox;
+    GtkWidget *toolbar;
     GtkWidget *uriEntry;
     GtkWidget *backItem;
     GtkWidget *forwardItem;
     GtkWidget *statusLabel;
+    GtkWidget *settingsDialog;
     WebKitWebView *webView;
 
 };
@@ -80,6 +83,19 @@ static void goBackCallback(BrowserWindow *window)
 static void goForwardCallback(BrowserWindow *window)
 {
     webkit_web_view_go_forward(window->webView);
+}
+
+static void settingsCallback(BrowserWindow *window)
+{
+    if (window->settingsDialog) {
+        gtk_window_present(GTK_WINDOW(window->settingsDialog));
+        return;
+    }
+
+    window->settingsDialog = browser_settings_dialog_new(webkit_web_view_get_settings(window->webView));
+    gtk_window_set_transient_for(GTK_WINDOW(window->settingsDialog), GTK_WINDOW(window));
+    g_object_add_weak_pointer(G_OBJECT(window->settingsDialog), (gpointer *)&window->settingsDialog);
+    gtk_widget_show(window->settingsDialog);
 }
 
 static void webViewURIChanged(WebKitWebView *webView, GParamSpec *pspec, BrowserWindow *window)
@@ -175,6 +191,50 @@ static void backForwadlistChanged(WebKitBackForwardList *backForwadlist, WebKitB
     browserWindowUpdateNavigationActions(window, backForwadlist);
 }
 
+static void webViewClose(WebKitWebView *webView, BrowserWindow *window)
+{
+    gtk_widget_destroy(GTK_WIDGET(window));
+}
+
+static void webViewReadyToShow(WebKitWebView *webView, BrowserWindow *window)
+{
+    WebKitWindowProperties *windowProperties = webkit_web_view_get_window_properties(webView);
+
+    GdkRectangle geometry;
+    webkit_window_properties_get_geometry(windowProperties, &geometry);
+    if (geometry.x >= 0 && geometry.y >= 0)
+        gtk_window_move(GTK_WINDOW(window), geometry.x, geometry.y);
+    if (geometry.width > 0 && geometry.height > 0)
+        gtk_window_resize(GTK_WINDOW(window), geometry.width, geometry.height);
+
+    if (!webkit_window_properties_get_toolbar_visible(windowProperties))
+        gtk_widget_hide(window->toolbar);
+    else if (!webkit_window_properties_get_locationbar_visible(windowProperties))
+        gtk_widget_hide(window->uriEntry);
+
+    if (!webkit_window_properties_get_resizable(windowProperties))
+        gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+
+    gtk_widget_show(GTK_WIDGET(window));
+}
+
+static GtkWidget *webViewCreate(WebKitWebView *webView, BrowserWindow *window)
+{
+    WebKitWebView *newWebView = WEBKIT_WEB_VIEW(webkit_web_view_new_with_context(webkit_web_view_get_context(webView)));
+    webkit_web_view_set_settings(newWebView, webkit_web_view_get_settings(webView));
+
+    GtkWidget *newWindow = browser_window_new(newWebView);
+    g_signal_connect(newWebView, "ready-to-show", G_CALLBACK(webViewReadyToShow), newWindow);
+    g_signal_connect(newWebView, "close", G_CALLBACK(webViewClose), newWindow);
+    return GTK_WIDGET(newWebView);
+}
+
+static gboolean webViewLoadFailed(WebKitWebView *webView, WebKitLoadEvent loadEvent, const char *failingURI, GError *error, BrowserWindow *window)
+{
+    gtk_entry_set_progress_fraction(GTK_ENTRY(window->uriEntry), 0.);
+    return FALSE;
+}
+
 static void browserWindowFinalize(GObject *gObject)
 {
     G_OBJECT_CLASS(browser_window_parent_class)->finalize(gObject);
@@ -220,6 +280,7 @@ static void browser_window_init(BrowserWindow *window)
     g_signal_connect_swapped(window->uriEntry, "activate", G_CALLBACK(activateUriEntryCallback), (gpointer)window);
 
     GtkWidget *toolbar = gtk_toolbar_new();
+    window->toolbar = toolbar;
     gtk_orientable_set_orientation(GTK_ORIENTABLE(toolbar), GTK_ORIENTATION_HORIZONTAL);
     gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_BOTH_HORIZ);
 
@@ -234,6 +295,11 @@ static void browser_window_init(BrowserWindow *window)
     window->forwardItem = GTK_WIDGET(item);
     gtk_menu_tool_button_set_menu(GTK_MENU_TOOL_BUTTON(item), 0);
     g_signal_connect_swapped(G_OBJECT(item), "clicked", G_CALLBACK(goForwardCallback), (gpointer)window);
+    gtk_toolbar_insert(GTK_TOOLBAR(toolbar), item, -1);
+    gtk_widget_show(GTK_WIDGET(item));
+
+    item = gtk_tool_button_new_from_stock(GTK_STOCK_PREFERENCES);
+    g_signal_connect_swapped(G_OBJECT(item), "clicked", G_CALLBACK(settingsCallback), window);
     gtk_toolbar_insert(GTK_TOOLBAR(toolbar), item, -1);
     gtk_widget_show(GTK_WIDGET(item));
 
@@ -265,6 +331,8 @@ static void browserWindowConstructed(GObject *gObject)
     g_signal_connect(window->webView, "notify::uri", G_CALLBACK(webViewURIChanged), window);
     g_signal_connect(window->webView, "notify::estimated-load-progress", G_CALLBACK(webViewLoadProgressChanged), window);
     g_signal_connect(window->webView, "notify::title", G_CALLBACK(webViewTitleChanged), window);
+    g_signal_connect(window->webView, "create", G_CALLBACK(webViewCreate), window);
+    g_signal_connect(window->webView, "load-failed", G_CALLBACK(webViewLoadFailed), window);
 
     WebKitBackForwardList *backForwadlist = webkit_web_view_get_back_forward_list(window->webView);
     g_signal_connect(backForwadlist, "changed", G_CALLBACK(backForwadlistChanged), window);

@@ -87,7 +87,7 @@ void IDBObjectStoreBackendImpl::get(PassRefPtr<IDBKey> prpKey, PassRefPtr<IDBCal
     RefPtr<IDBKey> key = prpKey;
     RefPtr<IDBCallbacks> callbacks = prpCallbacks;
     if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::getInternal, objectStore, key, callbacks)))
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
 void IDBObjectStoreBackendImpl::getInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKey> key, PassRefPtr<IDBCallbacks> callbacks)
@@ -151,7 +151,7 @@ void IDBObjectStoreBackendImpl::put(PassRefPtr<SerializedScriptValue> prpValue, 
     // FIXME: This should throw a SERIAL_ERR on structured clone problems.
     // FIXME: This should throw a DATA_ERR when the wrong key/keyPath data is supplied.
     if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::putInternal, objectStore, value, key, putMode, callbacks, transaction)))
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
 PassRefPtr<IDBKey> IDBObjectStoreBackendImpl::selectKeyForPut(IDBObjectStoreBackendImpl* objectStore, IDBKey* key, PutMode putMode, IDBCallbacks* callbacks, RefPtr<SerializedScriptValue>& value)
@@ -334,7 +334,7 @@ void IDBObjectStoreBackendImpl::deleteFunction(PassRefPtr<IDBKey> prpKey, PassRe
     }
 
     if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::deleteInternal, objectStore, key, callbacks)))
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
 void IDBObjectStoreBackendImpl::deleteInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKey> key, PassRefPtr<IDBCallbacks> callbacks)
@@ -368,7 +368,7 @@ void IDBObjectStoreBackendImpl::clear(PassRefPtr<IDBCallbacks> prpCallbacks, IDB
     RefPtr<IDBCallbacks> callbacks = prpCallbacks;
 
     if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::clearInternal, objectStore, callbacks)))
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
 void IDBObjectStoreBackendImpl::clearInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBCallbacks> callbacks)
@@ -397,12 +397,16 @@ public:
             return true;
 
         if (!m_index->multiEntry() || indexKey->type() != IDBKey::ArrayType) {
+            if (!m_index->addingKeyAllowed(indexKey.get()))
+                return false;
             if (!m_backingStore.putIndexDataForRecord(m_databaseId, m_objectStoreId, m_index->id(), *indexKey, recordIdentifier))
                 return false;
         } else {
             ASSERT(m_index->multiEntry());
             ASSERT(indexKey->type() == IDBKey::ArrayType);
             for (size_t i = 0; i < indexKey->array().size(); ++i) {
+                if (!m_index->addingKeyAllowed(indexKey.get()))
+                    return false;
                 if (!m_backingStore.putIndexDataForRecord(m_databaseId, m_objectStoreId, m_index->id(), *indexKey->array()[i], recordIdentifier))
                     return false;
             }
@@ -451,7 +455,7 @@ PassRefPtr<IDBIndexBackendInterface> IDBObjectStoreBackendImpl::createIndex(cons
                                  objectStore, index, transactionPtr),
               createCallbackTask(&IDBObjectStoreBackendImpl::removeIndexFromMap,
                                  objectStore, index))) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
         return 0;
     }
 
@@ -507,7 +511,7 @@ void IDBObjectStoreBackendImpl::deleteIndex(const String& name, IDBTransactionBa
                                  objectStore, index, transactionPtr),
               createCallbackTask(&IDBObjectStoreBackendImpl::addIndexToMap,
                                  objectStore, index))) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
         return;
     }
     m_indexes.remove(name);
@@ -528,7 +532,7 @@ void IDBObjectStoreBackendImpl::openCursor(PassRefPtr<IDBKeyRange> prpRange, uns
     if (!transaction->scheduleTask(
             createCallbackTask(&IDBObjectStoreBackendImpl::openCursorInternal,
                                objectStore, range, direction, callbacks, transactionPtr))) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
     }
 }
 
@@ -544,6 +548,29 @@ void IDBObjectStoreBackendImpl::openCursorInternal(ScriptExecutionContext*, Pass
 
     RefPtr<IDBCursorBackendInterface> cursor = IDBCursorBackendImpl::create(backingStoreCursor.release(), direction, IDBCursorBackendInterface::ObjectStoreCursor, transaction.get(), objectStore.get());
     callbacks->onSuccess(cursor.release());
+}
+
+void IDBObjectStoreBackendImpl::count(PassRefPtr<IDBKeyRange> range, PassRefPtr<IDBCallbacks> callbacks, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)
+{
+    if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::countInternal, this, range, callbacks, transaction)))
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
+}
+
+void IDBObjectStoreBackendImpl::countInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKeyRange> range, PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBTransactionBackendInterface> transaction)
+{
+    uint32_t count = 0;
+    RefPtr<IDBBackingStore::Cursor> backingStoreCursor = objectStore->m_backingStore->openObjectStoreCursor(objectStore->m_databaseId, objectStore->id(), range.get(), IDBCursor::NEXT);
+    if (!backingStoreCursor) {
+        callbacks->onSuccess(SerializedScriptValue::numberValue(count));
+        return;
+    }
+
+    do {
+        ++count;
+    } while (backingStoreCursor->continueFunction(0));
+
+    backingStoreCursor->close();
+    callbacks->onSuccess(SerializedScriptValue::numberValue(count));
 }
 
 void IDBObjectStoreBackendImpl::loadIndexes()

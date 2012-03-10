@@ -60,6 +60,15 @@ WTF_EXPORTDATA DEFINE_GLOBAL(AtomicString, starAtom, "*")
 WTF_EXPORTDATA DEFINE_GLOBAL(AtomicString, xmlAtom, "xml")
 WTF_EXPORTDATA DEFINE_GLOBAL(AtomicString, xmlnsAtom, "xmlns")
 
+NEVER_INLINE unsigned StringImpl::hashSlowCase() const
+{
+    if (is8Bit())
+        setHash(StringHasher::computeHash(m_data8, m_length));
+    else
+        setHash(StringHasher::computeHash(m_data16, m_length));
+    return existingHash();
+}
+
 void AtomicString::init()
 {
     static bool initialized;
@@ -68,13 +77,13 @@ void AtomicString::init()
         ASSERT(isMainThread());
 
         // Use placement new to initialize the globals.
-        new ((void*)&nullAtom) AtomicString;
-        new ((void*)&emptyAtom) AtomicString("");
-        new ((void*)&textAtom) AtomicString("#text");
-        new ((void*)&commentAtom) AtomicString("#comment");
-        new ((void*)&starAtom) AtomicString("*");
-        new ((void*)&xmlAtom) AtomicString("xml");
-        new ((void*)&xmlnsAtom) AtomicString("xmlns");
+        new (NotNull, (void*)&nullAtom) AtomicString;
+        new (NotNull, (void*)&emptyAtom) AtomicString("");
+        new (NotNull, (void*)&textAtom) AtomicString("#text");
+        new (NotNull, (void*)&commentAtom) AtomicString("#comment");
+        new (NotNull, (void*)&starAtom) AtomicString("*");
+        new (NotNull, (void*)&xmlAtom) AtomicString("xml");
+        new (NotNull, (void*)&xmlnsAtom) AtomicString("xmlns");
 
         initialized = true;
     }

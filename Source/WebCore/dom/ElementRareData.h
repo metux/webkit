@@ -25,6 +25,7 @@
 #include "ClassList.h"
 #include "DatasetDOMStringMap.h"
 #include "Element.h"
+#include "HTMLCollection.h"
 #include "NodeRareData.h"
 #include <wtf/OwnPtr.h>
 
@@ -41,6 +42,26 @@ public:
 
     using NodeRareData::needsFocusAppearanceUpdateSoonAfterAttach;
     using NodeRareData::setNeedsFocusAppearanceUpdateSoonAfterAttach;
+
+    typedef FixedArray<OwnPtr<HTMLCollection>, NumNodeCollectionTypes> CachedHTMLCollectionArray;
+
+    bool hasCachedHTMLCollections() const
+    {
+        return m_cachedCollections;
+    }
+
+    HTMLCollection* ensureCachedHTMLCollection(Element* element, CollectionType type)
+    {
+        if (!m_cachedCollections)
+            m_cachedCollections = adoptPtr(new CachedHTMLCollectionArray);
+
+        OwnPtr<HTMLCollection>& collection = (*m_cachedCollections)[type - FirstNodeCollectionType];
+        if (!collection)
+            collection = HTMLCollection::create(element, type);
+        return collection.get();
+    }
+
+    OwnPtr<CachedHTMLCollectionArray> m_cachedCollections;
 
     LayoutSize m_minimumSizeForResizing;
     RefPtr<RenderStyle> m_computedStyle;

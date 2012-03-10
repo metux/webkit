@@ -38,15 +38,15 @@ namespace JSC {
 
         static ErrorInstance* create(JSGlobalData& globalData, Structure* structure, const UString& message)
         {
-            ErrorInstance* instance = new (allocateCell<ErrorInstance>(globalData.heap)) ErrorInstance(globalData, structure);
+            ErrorInstance* instance = new (NotNull, allocateCell<ErrorInstance>(globalData.heap)) ErrorInstance(globalData, structure);
             instance->finishCreation(globalData, message);
             return instance;
         }
         static ErrorInstance* create(ExecState* exec, Structure* structure, JSValue message)
         {
             if (message.isUndefined()) {
-                ErrorInstance* instance = new (allocateCell<ErrorInstance>(*exec->heap())) ErrorInstance(exec->globalData(), structure);
-                instance->finishCreation(exec->globalData(), UString("", 0));
+                ErrorInstance* instance = new (NotNull, allocateCell<ErrorInstance>(*exec->heap())) ErrorInstance(exec->globalData(), structure);
+                instance->finishCreation(exec->globalData(), UString());
                 return instance;
             }
             return create(exec->globalData(), structure, message.toString(exec));
@@ -63,7 +63,8 @@ namespace JSC {
         {
             Base::finishCreation(globalData);
             ASSERT(inherits(&s_info));
-            putDirect(globalData, globalData.propertyNames->message, jsString(&globalData, message), DontEnum);
+            if (!message.isNull())
+                putDirect(globalData, globalData.propertyNames->message, jsString(&globalData, message), DontEnum);
         }
 
         bool m_appendSourceToMessage;

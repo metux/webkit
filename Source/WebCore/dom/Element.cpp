@@ -43,6 +43,8 @@
 #include "FocusController.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "HTMLCollection.h"
+#include "HTMLDocument.h"
 #include "HTMLElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLNames.h"
@@ -163,10 +165,7 @@ PassRefPtr<Element> Element::cloneElementWithoutChildren()
     // This is a sanity check as HTML overloads some of the DOM methods.
     ASSERT(isHTMLElement() == clone->isHTMLElement());
 
-    // Call attributes(true) to force attribute synchronization to occur for SVG and style attributes.
-    if (NamedNodeMap* attributeMap = attributes(true))
-        clone->attributes()->setAttributes(*attributeMap);
-
+    clone->setAttributesFromElement(*this);
     clone->copyNonAttributeProperties(this);
 
     return clone.release();
@@ -181,40 +180,20 @@ void Element::copyNonAttributeProperties(const Element*)
 {
 }
 
-#if ENABLE(MUTATION_OBSERVERS)
-void Element::enqueueAttributesMutationRecordIfRequested(const QualifiedName& attributeName, const AtomicString& oldValue)
+void Element::removeAttribute(const QualifiedName& name)
 {
-    if (isSynchronizingStyleAttribute())
+    if (!m_attributeMap)
         return;
-    if (OwnPtr<MutationObserverInterestGroup> mutationRecipients = MutationObserverInterestGroup::createForAttributesMutation(this, attributeName))
-        mutationRecipients->enqueueMutationRecord(MutationRecord::createAttributes(this, attributeName, oldValue));
-}
-#endif
 
-void Element::removeAttribute(const QualifiedName& name, ExceptionCode& ec)
-{
-    if (m_attributeMap) {
-        ec = 0;
-        RefPtr<Node> attrNode = m_attributeMap->removeNamedItem(name, ec);
-        if (ec == NOT_FOUND_ERR)
-            ec = 0;
-    }
+    m_attributeMap->removeAttribute(name);
 }
 
-void Element::setAttribute(const QualifiedName& name, const AtomicString& value)
+void Element::setBooleanAttribute(const QualifiedName& name, bool value)
 {
-    ExceptionCode ec;
-    setAttribute(name, value, ec);
-}
-
-void Element::setBooleanAttribute(const QualifiedName& name, bool b)
-{
-    if (b)
+    if (value)
         setAttribute(name, emptyAtom);
-    else {
-        ExceptionCode ex;
-        removeAttribute(name, ex);
-    }
+    else
+        removeAttribute(name);
 }
 
 Node::NodeType Element::nodeType() const
@@ -636,50 +615,38 @@ void Element::setAttribute(const AtomicString& name, const AtomicString& value, 
 
     const AtomicString& localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
 
-    // Allocate attribute map if necessary.
-    Attribute* old = attributes(false)->getAttributeItem(localName, false);
-    setAttributeInternal(old, old ? old->name() : QualifiedName(nullAtom, localName, nullAtom), value);
+    size_t index = attributes(false)->getAttributeItemIndex(localName, false);
+    const QualifiedName& qName = index != notFound ? m_attributeMap->attributeItem(index)->name() : QualifiedName(nullAtom, localName, nullAtom);
+    setAttributeInternal(index, qName, value);
 }
 
-void Element::setAttribute(const QualifiedName& name, const AtomicString& value, ExceptionCode&)
+void Element::setAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    // Allocate attribute map if necessary.
-    Attribute* old = attributes(false)->getAttributeItem(name);
-    setAttributeInternal(old, name, value);
+    setAttributeInternal(attributes(false)->getAttributeItemIndex(name), name, value);
 }
 
-inline void Element::setAttributeInternal(Attribute* old, const QualifiedName& name, const AtomicString& value)
+inline void Element::setAttributeInternal(size_t index, const QualifiedName& name, const AtomicString& value)
 {
-#if ENABLE(INSPECTOR)
-    if (!isSynchronizingStyleAttribute())
-        InspectorInstrumentation::willModifyDOMAttr(document(), this);
-#endif
-
-#if ENABLE(MUTATION_OBSERVERS)
-    enqueueAttributesMutationRecordIfRequested(name, old ? old->value() : nullAtom);
-#endif
-
-    document()->incDOMTreeVersion();
-
-    if (isIdAttributeName(name))
-        updateId(old ? old->value() : nullAtom, value);
-
-    if (old && value.isNull())
-        m_attributeMap->removeAttribute(name);
-    else if (!old && !value.isNull())
-        m_attributeMap->addAttribute(createAttribute(name, value));
-    else if (old) {
-        if (Attr* attrNode = old->attr())
-            attrNode->setValue(value);
-        else
-            old->setValue(value);
-        attributeChanged(old);
+    Attribute* old = index != notFound ? m_attributeMap->attributeItem(index) : 0;
+    if (value.isNull()) {
+        if (old)
+            m_attributeMap->removeAttribute(index);
+        return;
     }
 
-#if ENABLE(INSPECTOR)
-    if (!isSynchronizingStyleAttribute())
-        InspectorInstrumentation::didModifyDOMAttr(document(), this, name.localName(), value);
-#endif
+    if (!old) {
+        m_attributeMap->addAttribute(createAttribute(name, value));
+        return;
+    }
+
+    willModifyAttribute(name, old ? old->value() : nullAtom, value);
+
+    if (Attr* attrNode = old->attr())
+        attrNode->setValue(value);
+    else
+        old->setValue(value);
+
+    didModifyAttribute(old);
 }
 
 PassRefPtr<Attribute> Element::createAttribute(const QualifiedName& name, const AtomicString& value)
@@ -697,6 +664,8 @@ void Element::attributeChanged(Attribute* attr, bool)
 
 void Element::updateAfterAttributeChanged(Attribute* attr)
 {
+    invalidateNodeListsCacheAfterAttributeChanged(attr->name());
+
     if (!AXObjectCache::accessibilityEnabled())
         return;
 
@@ -727,8 +696,14 @@ void Element::updateAfterAttributeChanged(Attribute* attr)
     
 void Element::recalcStyleIfNeededAfterAttributeChanged(Attribute* attr)
 {
-    if (document()->attached() && document()->styleSelector()->hasSelectorForAttribute(attr->name().localName()))
-        setNeedsStyleRecalc();
+    if (needsStyleRecalc())
+        return;
+    if (!document()->attached())
+        return;
+    CSSStyleSelector* styleSelector = document()->styleSelectorIfExists();
+    if (styleSelector && !styleSelector->hasSelectorForAttribute(attr->name().localName()))
+        return;
+    setNeedsStyleRecalc();
 }
 
 void Element::idAttributeChanged(Attribute* attr)
@@ -760,22 +735,14 @@ static bool isAttributeToRemove(const QualifiedName& name, const AtomicString& v
     return (name.localName().endsWith(hrefAttr.localName()) || name == srcAttr || name == actionAttr) && protocolIsJavaScript(stripLeadingAndTrailingHTMLSpaces(value));       
 }
 
-void Element::setAttributeMap(PassRefPtr<NamedNodeMap> list, FragmentScriptingPermission scriptingPermission)
+void Element::parserSetAttributeMap(PassOwnPtr<NamedNodeMap> list, FragmentScriptingPermission scriptingPermission)
 {
+    ASSERT(!inDocument());
+    ASSERT(!parentNode());
+
     document()->incDOMTreeVersion();
 
-    // If setting the whole map changes the id attribute, we need to call updateId.
-
-    const QualifiedName& idName = document()->idAttributeName();
-    Attribute* oldId = m_attributeMap ? m_attributeMap->getAttributeItem(idName) : 0;
-    Attribute* newId = list ? list->getAttributeItem(idName) : 0;
-
-    if (oldId || newId)
-        updateId(oldId ? oldId->value() : nullAtom, newId ? newId->value() : nullAtom);
-
-    if (m_attributeMap)
-        m_attributeMap->m_element = 0;
-
+    ASSERT(!m_attributeMap);
     m_attributeMap = list;
 
     if (m_attributeMap) {
@@ -802,7 +769,6 @@ void Element::setAttributeMap(PassRefPtr<NamedNodeMap> list, FragmentScriptingPe
         m_attributeMap->copyAttributesToVector(attributes);
         for (Vector<RefPtr<Attribute> >::iterator iter = attributes.begin(); iter != attributes.end(); ++iter)
             attributeChanged(iter->get());
-        // FIXME: What about attributes that were in the old map that are not in the new map?
     }
 }
 
@@ -910,22 +876,32 @@ void Element::insertedIntoDocument()
     if (ShadowRoot* shadow = shadowRoot())
         shadow->insertedIntoDocument();
 
-    if (hasID()) {
-        if (m_attributeMap) {
+    if (m_attributeMap) {
+        if (hasID()) {
             Attribute* idItem = m_attributeMap->getAttributeItem(document()->idAttributeName());
             if (idItem && !idItem->isNull())
                 updateId(nullAtom, idItem->value());
+        }
+        if (hasName()) {
+            Attribute* nameItem = m_attributeMap->getAttributeItem(HTMLNames::nameAttr);
+            if (nameItem && !nameItem->isNull())
+                updateName(nullAtom, nameItem->value());
         }
     }
 }
 
 void Element::removedFromDocument()
 {
-    if (hasID()) {
-        if (m_attributeMap) {
+    if (m_attributeMap) {
+        if (hasID()) {
             Attribute* idItem = m_attributeMap->getAttributeItem(document()->idAttributeName());
             if (idItem && !idItem->isNull())
                 updateId(idItem->value(), nullAtom);
+        }
+        if (hasName()) {
+            Attribute* nameItem = m_attributeMap->getAttributeItem(HTMLNames::nameAttr);
+            if (nameItem && !nameItem->isNull())
+                updateName(nameItem->value(), nullAtom);
         }
     }
 
@@ -1238,7 +1214,7 @@ void Element::removeShadowRoot()
             oldRoot->detach();
 
         oldRoot->setShadowHost(0);
-        oldRoot->setTreeScopeRecursively(document());
+        document()->adoptIfNeeded(oldRoot.get());
         if (oldRoot->inDocument())
             oldRoot->removedFromDocument();
         else
@@ -1394,32 +1370,6 @@ void Element::finishParsingChildren()
         styleSelector->popParent(this);
 }
 
-void Element::dispatchAttrRemovalEvent(Attribute*)
-{
-    ASSERT(!eventDispatchForbidden());
-
-#if 0
-    if (!document()->hasListenerType(Document::DOMATTRMODIFIED_LISTENER))
-        return;
-    ExceptionCode ec = 0;
-    dispatchScopedEvent(MutationEvent::create(DOMAttrModifiedEvent, true, attr, attr->value(),
-        attr->value(), document()->attrName(attr->id()), MutationEvent::REMOVAL), ec);
-#endif
-}
-
-void Element::dispatchAttrAdditionEvent(Attribute*)
-{
-    ASSERT(!eventDispatchForbidden());
-
-#if 0
-    if (!document()->hasListenerType(Document::DOMATTRMODIFIED_LISTENER))
-        return;
-    ExceptionCode ec = 0;
-    dispatchScopedEvent(MutationEvent::create(DOMAttrModifiedEvent, true, attr, attr->value(),
-        attr->value(), document()->attrName(attr->id()), MutationEvent::ADDITION), ec);
-#endif
-}
-
 #ifndef NDEBUG
 void Element::formatForDebugger(char* buffer, unsigned length) const
 {
@@ -1505,28 +1455,25 @@ void Element::setAttributeNS(const AtomicString& namespaceURI, const AtomicStrin
     if (scriptingPermission == FragmentScriptingNotAllowed && (isEventHandlerAttribute(qName) || isAttributeToRemove(qName, value)))
         return;
 
-    setAttribute(qName, value, ec);
+    setAttribute(qName, value);
 }
 
-void Element::removeAttribute(const String& name, ExceptionCode& ec)
+void Element::removeAttribute(const String& name)
 {
-    InspectorInstrumentation::willModifyDOMAttr(document(), this);
+    if (!m_attributeMap)
+        return;
 
     String localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
+    size_t index = m_attributeMap->getAttributeItemIndex(localName, false);
+    if (index == notFound)
+        return;
 
-    if (m_attributeMap) {
-        ec = 0;
-        RefPtr<Node> attrNode = m_attributeMap->removeNamedItem(localName, ec);
-        if (ec == NOT_FOUND_ERR)
-            ec = 0;
-    }
-    
-    InspectorInstrumentation::didRemoveDOMAttr(document(), this, name);
+    m_attributeMap->removeAttribute(index);
 }
 
-void Element::removeAttributeNS(const String& namespaceURI, const String& localName, ExceptionCode& ec)
+void Element::removeAttributeNS(const String& namespaceURI, const String& localName)
 {
-    removeAttribute(QualifiedName(nullAtom, localName, namespaceURI), ec);
+    removeAttribute(QualifiedName(nullAtom, localName, namespaceURI));
 }
 
 PassRefPtr<Attr> Element::getAttributeNode(const String& name)
@@ -1897,8 +1844,7 @@ int Element::getIntegralAttribute(const QualifiedName& attributeName) const
 void Element::setIntegralAttribute(const QualifiedName& attributeName, int value)
 {
     // FIXME: Need an AtomicString version of String::number.
-    ExceptionCode ec;
-    setAttribute(attributeName, String::number(value), ec);
+    setAttribute(attributeName, String::number(value));
 }
 
 unsigned Element::getUnsignedIntegralAttribute(const QualifiedName& attributeName) const
@@ -1909,8 +1855,7 @@ unsigned Element::getUnsignedIntegralAttribute(const QualifiedName& attributeNam
 void Element::setUnsignedIntegralAttribute(const QualifiedName& attributeName, unsigned value)
 {
     // FIXME: Need an AtomicString version of String::number.
-    ExceptionCode ec;
-    setAttribute(attributeName, String::number(value), ec);
+    setAttribute(attributeName, String::number(value));
 }
 
 #if ENABLE(SVG)
@@ -2020,5 +1965,83 @@ bool Element::fastAttributeLookupAllowed(const QualifiedName& name) const
     return true;
 }
 #endif
+
+void Element::willModifyAttribute(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue)
+{
+    document()->incDOMTreeVersion();
+
+    if (isIdAttributeName(name))
+        updateId(oldValue, newValue);
+    else if (name == HTMLNames::nameAttr)
+        updateName(oldValue, newValue);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    if (!isSynchronizingStyleAttribute()) {
+        if (OwnPtr<MutationObserverInterestGroup> recipients = MutationObserverInterestGroup::createForAttributesMutation(this, name))
+            recipients->enqueueMutationRecord(MutationRecord::createAttributes(this, name, oldValue));
+    }
+#endif
+
+#if ENABLE(INSPECTOR)
+    if (!isSynchronizingStyleAttribute())
+        InspectorInstrumentation::willModifyDOMAttr(document(), this);
+#endif
+}
+
+void Element::didModifyAttribute(Attribute* attr)
+{
+    attributeChanged(attr);
+
+    if (!isSynchronizingStyleAttribute()) {
+        InspectorInstrumentation::didModifyDOMAttr(document(), this, attr->name().localName(), attr->value());
+        dispatchSubtreeModifiedEvent();
+    }
+}
+
+void Element::didRemoveAttribute(Attribute* attr)
+{
+    if (attr->isNull())
+        return;
+
+    AtomicString savedValue = attr->value();
+    attr->setValue(nullAtom);
+    attributeChanged(attr);
+    attr->setValue(savedValue);
+
+    if (!isSynchronizingStyleAttribute()) {
+        InspectorInstrumentation::didRemoveDOMAttr(document(), this, attr->name().localName());
+        dispatchSubtreeModifiedEvent();
+    }
+}
+
+
+void Element::updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName)
+{
+    if (!document()->isHTMLDocument())
+        return;
+
+    if (!oldName.isEmpty())
+        static_cast<HTMLDocument*>(document())->removeNamedItem(oldName);
+
+    if (!newName.isEmpty())
+        static_cast<HTMLDocument*>(document())->addNamedItem(newName);
+}
+
+void Element::updateExtraNamedItemRegistration(const AtomicString& oldId, const AtomicString& newId)
+{
+    if (!document()->isHTMLDocument())
+        return;
+
+    if (!oldId.isEmpty())
+        static_cast<HTMLDocument*>(document())->removeExtraNamedItem(oldId);
+
+    if (!newId.isEmpty())
+        static_cast<HTMLDocument*>(document())->addExtraNamedItem(newId);
+}
+
+HTMLCollection* Element::ensureCachedHTMLCollection(CollectionType type)
+{
+    return ensureRareData()->ensureCachedHTMLCollection(this, type);
+}
 
 } // namespace WebCore

@@ -46,7 +46,7 @@ WebInspector.CompilerSourceMapping.prototype = {
     /**
      * @param {string} sourceURL
      * @param {number} lineNumber
-     * @return {Object}
+     * @return {DebuggerAgent.Location}
      */
     sourceLocationToCompiledLocation: function(sourceURL, lineNumber) { },
 
@@ -72,8 +72,9 @@ WebInspector.ClosureCompilerSourceMappingPayload = function()
  * @implements {WebInspector.CompilerSourceMapping}
  * @constructor
  * @param {string} sourceMappingURL
+ * @param {string} scriptSourceOrigin
  */
-WebInspector.ClosureCompilerSourceMapping = function(sourceMappingURL)
+WebInspector.ClosureCompilerSourceMapping = function(sourceMappingURL, scriptSourceOrigin)
 {
     if (!WebInspector.ClosureCompilerSourceMapping.prototype._base64Map) {
         const base64Digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -82,8 +83,7 @@ WebInspector.ClosureCompilerSourceMapping = function(sourceMappingURL)
             WebInspector.ClosureCompilerSourceMapping.prototype._base64Map[base64Digits.charAt(i)] = i;
     }
 
-    this._sourceMappingURL = sourceMappingURL;
-    this._sources = [];
+    this._sourceMappingURL = this._canonicalizeURL(sourceMappingURL, scriptSourceOrigin);
     this._mappings = [];
     this._reverseMappingsBySourceURL = {};
 }
@@ -97,6 +97,8 @@ WebInspector.ClosureCompilerSourceMapping.prototype = {
         try {
             // FIXME: make sendRequest async.
             var response = InspectorFrontendHost.loadResourceSynchronously(this._sourceMappingURL);
+            if (response.slice(0, 3) === ")]}")
+                response = response.substring(response.indexOf('\n'));
             this._parseMappingPayload(JSON.parse(response));
             return true
         } catch(e) {
@@ -131,7 +133,10 @@ WebInspector.ClosureCompilerSourceMapping.prototype = {
      */
     sources: function()
     {
-        return this._sources;
+        var sources = [];
+        for (var sourceURL in this._reverseMappingsBySourceURL)
+            sources.push(sourceURL);
+        return sources;
     },
 
     /**
@@ -179,25 +184,30 @@ WebInspector.ClosureCompilerSourceMapping.prototype = {
     {
         for (var i = 0; i < sections.length; ++i) {
             var section = sections[i];
-            this._parseMap(section.map, section.offset.line - 1, section.offset.column)
+            this._parseMap(section.map, section.offset.line, section.offset.column)
         }
     },
 
     _parseMap: function(map, lineNumber, columnNumber)
     {
-        var sourceIndex = this._sources.length;
+        var sourceIndex = 0;
         var sourceLineNumber = 0;
         var sourceColumnNumber = 0;
         var nameIndex = 0;
 
+        var sources = [];
         for (var i = 0; i < map.sources.length; ++i) {
-            var url = this._canonicalizeURL(map.sourceRoot, map.sources[i]);
-            this._sources.push(url);
-            this._reverseMappingsBySourceURL[url] = [];
+            var sourceURL = map.sources[i];
+            if (map.sourceRoot)
+                sourceURL = map.sourceRoot + "/" + sourceURL;
+            var url = this._canonicalizeURL(sourceURL, this._sourceMappingURL);
+            sources.push(url);
+            if (!this._reverseMappingsBySourceURL[url])
+                this._reverseMappingsBySourceURL[url] = [];
         }
 
         var stringCharIterator = new WebInspector.ClosureCompilerSourceMapping.StringCharIterator(map.mappings);
-        var sourceURL = this._sources[sourceIndex];
+        var sourceURL = sources[sourceIndex];
         var reverseMappings = this._reverseMappingsBySourceURL[sourceURL];
 
         while (true) {
@@ -218,7 +228,7 @@ WebInspector.ClosureCompilerSourceMapping.prototype = {
                 var sourceIndexDelta = this._decodeVLQ(stringCharIterator);
                 if (sourceIndexDelta) {
                     sourceIndex += sourceIndexDelta;
-                    sourceURL = this._sources[sourceIndex];
+                    sourceURL = sources[sourceIndex];
                     reverseMappings = this._reverseMappingsBySourceURL[sourceURL];
                 }
                 sourceLineNumber += this._decodeVLQ(stringCharIterator);
@@ -255,9 +265,19 @@ WebInspector.ClosureCompilerSourceMapping.prototype = {
         return negative ? -result : result;
     },
 
-    _canonicalizeURL: function(sourceRoot, sourceURL)
+    _canonicalizeURL: function(url, baseURL)
     {
-        return sourceRoot ? sourceRoot + "/" + sourceURL : sourceURL;
+        if (!url || !baseURL || url.asParsedURL())
+            return url;
+
+        var base = baseURL.asParsedURL();
+        if (!base)
+            return url;
+
+        var baseHost = base.scheme + "://" + base.host + (base.port ? ":" + base.port : "");
+        if (url[0] === "/")
+            return baseHost + url;
+        return baseHost + base.firstPathComponents + url;
     },
 
     _VLQ_BASE_SHIFT: 5,

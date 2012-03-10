@@ -56,7 +56,6 @@ public:
     virtual int scrollSize(ScrollbarOrientation orientation) const;
     virtual int scrollPosition(Scrollbar*) const;
     virtual void setScrollOffset(const IntPoint&);
-    virtual void didCompleteRubberBand(const IntSize&) const;
     virtual void notifyPageThatContentAreaWillPaint() const;
     virtual bool isScrollCornerVisible() const;
     virtual void scrollbarStyleChanged(int newStyle, bool forceUpdate);
@@ -301,7 +300,6 @@ protected:
     void calculateOverhangAreasForPainting(IntRect& horizontalOverhangRect, IntRect& verticalOverhangRect);
     virtual void paintOverhangAreas(GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
 
-    virtual void contentsResized() = 0;
     virtual void visibleContentsResized() = 0;
 
     IntRect fixedVisibleContentRect() const { return m_fixedVisibleContentRect; }

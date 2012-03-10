@@ -78,7 +78,11 @@ namespace WebCore {
 #endif
     class HTMLPlugInElement;
     class IntSize;
+#if ENABLE(WEB_INTENTS)
+    class IntentRequest;
+#endif
     class KURL;
+    class MessageEvent;
     class NavigationAction;
     class Page;
     class ProtectionSpace;
@@ -277,7 +281,7 @@ namespace WebCore {
 #if USE(V8)
         virtual void didCreateScriptContext(v8::Handle<v8::Context>, int worldId) = 0;
         virtual void willReleaseScriptContext(v8::Handle<v8::Context>, int worldId) = 0;
-        virtual bool allowScriptExtension(const String& extensionName, int extensionGroup) = 0;
+        virtual bool allowScriptExtension(const String& extensionName, int extensionGroup, int worldId) = 0;
 #endif
 
         virtual void registerForIconNotification(bool listen = true) = 0;
@@ -319,6 +323,13 @@ namespace WebCore {
         virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() = 0;
 
         virtual bool shouldPaintBrokenImage(const KURL&) const { return true; }
+
+        // Returns true if the embedder intercepted the postMessage call
+        virtual bool willCheckAndDispatchMessageEvent(SecurityOrigin* /*target*/, MessageEvent*) const { return false; }
+
+#if ENABLE(WEB_INTENTS)
+        virtual void dispatchIntent(PassRefPtr<IntentRequest> intentRequest) { }
+#endif
     };
 
 } // namespace WebCore

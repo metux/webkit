@@ -93,7 +93,7 @@ namespace JSC {
     };
 
     // This implements ToInt32, defined in ECMA-262 9.5.
-    int32_t toInt32(double);
+    JS_EXPORT_PRIVATE int32_t toInt32(double);
 
     // This implements ToUInt32, defined in ECMA-262 9.6.
     inline uint32_t toUInt32(double number)
@@ -203,7 +203,7 @@ namespace JSC {
         JSObject* toObject(ExecState*, JSGlobalObject*) const;
 
         // Integer conversions.
-        double toInteger(ExecState*) const;
+        JS_EXPORT_PRIVATE double toInteger(ExecState*) const;
         double toIntegerPreserveNaN(ExecState*) const;
         int32_t toInt32(ExecState*) const;
         uint32_t toUInt32(ExecState*) const;
@@ -218,7 +218,6 @@ namespace JSC {
         JSValue get(ExecState*, unsigned propertyName) const;
         JSValue get(ExecState*, unsigned propertyName, PropertySlot&) const;
         void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
-        void putDirect(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
         void put(ExecState*, unsigned propertyName, JSValue);
 
         JSObject* toThisObject(ExecState*) const;
@@ -232,7 +231,7 @@ namespace JSC {
 
         bool isCell() const;
         JSCell* asCell() const;
-        bool isValidCallee();
+        JS_EXPORT_PRIVATE bool isValidCallee();
 
 #ifndef NDEBUG
         char* description();
@@ -245,11 +244,11 @@ namespace JSC {
         JSValue(HashTableDeletedValueTag);
 
         inline const JSValue asValue() const { return *this; }
-        double toNumberSlowCase(ExecState*) const;
-        JSObject* toObjectSlowCase(ExecState*, JSGlobalObject*) const;
-        JSObject* toThisObjectSlowCase(ExecState*) const;
+        JS_EXPORT_PRIVATE double toNumberSlowCase(ExecState*) const;
+        JS_EXPORT_PRIVATE JSObject* toObjectSlowCase(ExecState*, JSGlobalObject*) const;
+        JS_EXPORT_PRIVATE JSObject* toThisObjectSlowCase(ExecState*) const;
 
-        JSObject* synthesizePrototype(ExecState*) const;
+        JS_EXPORT_PRIVATE JSObject* synthesizePrototype(ExecState*) const;
         JSObject* synthesizeObject(ExecState*) const;
 
 #if USE(JSVALUE32_64)

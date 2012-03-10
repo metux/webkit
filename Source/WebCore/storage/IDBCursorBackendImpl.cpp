@@ -47,6 +47,7 @@ IDBCursorBackendImpl::IDBCursorBackendImpl(PassRefPtr<IDBBackingStore::Cursor> c
     , m_cursorType(cursorType)
     , m_transaction(transaction)
     , m_objectStore(objectStore)
+    , m_closed(false)
 {
     m_transaction->registerOpenCursor(this);
 }
@@ -54,6 +55,11 @@ IDBCursorBackendImpl::IDBCursorBackendImpl(PassRefPtr<IDBBackingStore::Cursor> c
 IDBCursorBackendImpl::~IDBCursorBackendImpl()
 {
     m_transaction->unregisterOpenCursor(this);
+    // Order is important, the cursors have to be destructed before the objectStore.
+    m_cursor.clear();
+    m_savedCursor.clear();
+
+    m_objectStore.clear();
 }
 
 unsigned short IDBCursorBackendImpl::direction() const
@@ -91,8 +97,24 @@ void IDBCursorBackendImpl::update(PassRefPtr<SerializedScriptValue> value, PassR
 void IDBCursorBackendImpl::continueFunction(PassRefPtr<IDBKey> prpKey, PassRefPtr<IDBCallbacks> prpCallbacks, ExceptionCode& ec)
 {
     RefPtr<IDBKey> key = prpKey;
+
+    if (m_cursor && key) {
+        ASSERT(m_cursor->key());
+        if (m_direction == IDBCursor::NEXT || m_direction == IDBCursor::NEXT_NO_DUPLICATE) {
+            if (!m_cursor->key()->isLessThan(key.get())) {
+                ec = IDBDatabaseException::DATA_ERR;
+                return;
+            }
+        } else {
+            if (!key->isLessThan(m_cursor->key().get())) {
+                ec = IDBDatabaseException::DATA_ERR;
+                return;
+            }
+        }
+    }
+
     if (!m_transaction->scheduleTask(createCallbackTask(&IDBCursorBackendImpl::continueFunctionInternal, this, key, prpCallbacks)))
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
 // IMPORTANT: If this ever 1) fires an 'error' event and 2) it's possible to fire another event afterwards,
@@ -124,7 +146,7 @@ void IDBCursorBackendImpl::deleteFunction(PassRefPtr<IDBCallbacks> prpCallbacks,
 void IDBCursorBackendImpl::prefetchContinue(int numberToFetch, PassRefPtr<IDBCallbacks> prpCallbacks, ExceptionCode& ec)
 {
     if (!m_transaction->scheduleTask(createCallbackTask(&IDBCursorBackendImpl::prefetchContinueInternal, this, numberToFetch, prpCallbacks)))
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
 void IDBCursorBackendImpl::prefetchContinueInternal(ScriptExecutionContext*, PassRefPtr<IDBCursorBackendImpl> prpCursor, int numberToFetch, PassRefPtr<IDBCallbacks> callbacks)
@@ -149,11 +171,16 @@ void IDBCursorBackendImpl::prefetchContinueInternal(ScriptExecutionContext*, Pas
 
         foundKeys.append(cursor->m_cursor->key());
         foundPrimaryKeys.append(cursor->m_cursor->primaryKey());
-        foundValues.append(SerializedScriptValue::createFromWire(cursor->m_cursor->value()));
+
+        if (cursor->m_cursorType != IDBCursorBackendInterface::IndexKeyCursor)
+            foundValues.append(SerializedScriptValue::createFromWire(cursor->m_cursor->value()));
+        else
+            foundValues.append(SerializedScriptValue::create());
 
         sizeEstimate += cursor->m_cursor->key()->sizeEstimate();
         sizeEstimate += cursor->m_cursor->primaryKey()->sizeEstimate();
-        sizeEstimate += cursor->m_cursor->value().length() * sizeof(UChar);
+        if (cursor->m_cursorType != IDBCursorBackendInterface::IndexKeyCursor)
+            sizeEstimate += cursor->m_cursor->value().length() * sizeof(UChar);
 
         if (sizeEstimate > kMaxSizeEstimate)
             break;
@@ -174,6 +201,8 @@ void IDBCursorBackendImpl::prefetchReset(int usedPrefetches, int unusedPrefetche
     m_cursor = m_savedCursor;
     m_savedCursor = 0;
 
+    if (m_closed)
+        return;
     if (m_cursor) {
         for (int i = 0; i < usedPrefetches; ++i) {
             bool ok = m_cursor->continueFunction();
@@ -184,6 +213,7 @@ void IDBCursorBackendImpl::prefetchReset(int usedPrefetches, int unusedPrefetche
 
 void IDBCursorBackendImpl::close()
 {
+    m_closed = true;
     if (m_cursor)
         m_cursor->close();
 }

@@ -44,6 +44,9 @@
 #ifndef RenderLayer_h
 #define RenderLayer_h
 
+#if ENABLE(CSS_FILTERS)
+#include "FilterEffectObserver.h"
+#endif
 #include "PaintInfo.h"
 #include "RenderBox.h"
 #include "ScrollBehavior.h"
@@ -174,7 +177,7 @@ public:
     void destroy(RenderArena*);
 
     // Overloaded new operator.
-    void* operator new(size_t, RenderArena*) throw();
+    void* operator new(size_t, RenderArena*);
 
     // Overridden to prevent the normal delete from being called.
     void operator delete(void*, size_t);
@@ -208,7 +211,11 @@ private:
     bool m_fixed : 1;
 };
 
-class RenderLayer : public ScrollableArea {
+class RenderLayer : public ScrollableArea
+#if ENABLE(CSS_FILTERS)
+    , public FilterEffectObserver
+#endif
+{
 public:
     friend class RenderReplica;
 
@@ -429,10 +436,11 @@ public:
         PaintLayerAppliedTransform = 1 << 1,
         PaintLayerTemporaryClipRects = 1 << 2,
         PaintLayerPaintingReflection = 1 << 3,
-        PaintLayerPaintingOverlayScrollbars = 1 << 4
-#if ENABLE(CSS_FILTERS)
-        , PaintLayerPaintingFilter = 1 << 5
-#endif
+        PaintLayerPaintingOverlayScrollbars = 1 << 4,
+        PaintLayerPaintingCompositingBackgroundPhase = 1 << 5,
+        PaintLayerPaintingCompositingForegroundPhase = 1 << 6,
+        PaintLayerPaintingCompositingMaskPhase = 1 << 7,
+        PaintLayerPaintingCompositingAllPhases = (PaintLayerPaintingCompositingBackgroundPhase | PaintLayerPaintingCompositingForegroundPhase | PaintLayerPaintingCompositingMaskPhase)
     };
     
     typedef unsigned PaintLayerFlags;
@@ -515,12 +523,12 @@ public:
     bool has3DTransform() const { return m_transform && !m_transform->isAffine(); }
 
 #if ENABLE(CSS_FILTERS)
-    bool hasFilter() const { return renderer()->hasFilter(); }
+    virtual void filterNeedsRepaint();
 #endif
 
     // Overloaded new operator. Derived classes must override operator new
     // in order to allocate out of the RenderArena.
-    void* operator new(size_t, RenderArena*) throw();
+    void* operator new(size_t, RenderArena*);
 
     // Overridden to prevent the normal delete from being called.
     void operator delete(void*, size_t);
@@ -548,6 +556,11 @@ public:
 
     bool containsDirtyOverlayScrollbars() const { return m_containsDirtyOverlayScrollbars; }
     void setContainsDirtyOverlayScrollbars(bool dirtyScrollbars) { m_containsDirtyOverlayScrollbars = dirtyScrollbars; }
+
+#if ENABLE(CSS_FILTERS)
+    bool paintsWithFilters() const;
+    FilterEffectRenderer* filter() const { return m_filter.get(); }
+#endif
 
 private:
     void updateZOrderListsSlowCase();
@@ -580,6 +593,12 @@ private:
     void updateCompositingAndLayerListsIfNeeded();
 
     void paintLayer(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
+                    PaintBehavior, RenderObject* paintingRoot, RenderRegion* = 0, OverlapTestRequestMap* = 0,
+                    PaintLayerFlags = 0);
+    void paintLayerContentsAndReflection(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
+                    PaintBehavior, RenderObject* paintingRoot, RenderRegion* = 0, OverlapTestRequestMap* = 0,
+                    PaintLayerFlags = 0);
+    void paintLayerContents(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
                     PaintBehavior, RenderObject* paintingRoot, RenderRegion* = 0, OverlapTestRequestMap* = 0,
                     PaintLayerFlags = 0);
     void paintList(Vector<RenderLayer*>*, RenderLayer* rootLayer, GraphicsContext* p,
@@ -643,7 +662,6 @@ private:
     virtual IntSize contentsSize() const;
     virtual IntSize overhangAmount() const;
     virtual IntPoint currentMousePosition() const;
-    virtual void didCompleteRubberBand(const IntSize&) const;
     virtual bool shouldSuspendScrollAnimations() const;
     virtual bool isOnActivePage() const;
 
@@ -682,7 +700,6 @@ private:
 
 #if ENABLE(CSS_FILTERS)
     void updateOrRemoveFilterEffect();
-    void updateFilterBackingStore();
 #endif
 
     void parentClipRects(const RenderLayer* rootLayer, RenderRegion*, ClipRects&, bool temporaryClipRects = false, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;

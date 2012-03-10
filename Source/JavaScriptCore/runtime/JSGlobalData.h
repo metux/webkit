@@ -105,18 +105,18 @@ namespace JSC {
 
     struct TypedArrayDescriptor {
         TypedArrayDescriptor()
-            : m_vptr(0)
+            : m_classInfo(0)
             , m_storageOffset(0)
             , m_lengthOffset(0)
         {
         }
-        TypedArrayDescriptor(void* vptr, size_t storageOffset, size_t lengthOffset)
-            : m_vptr(vptr)
+        TypedArrayDescriptor(const ClassInfo* classInfo, size_t storageOffset, size_t lengthOffset)
+            : m_classInfo(classInfo)
             , m_storageOffset(storageOffset)
             , m_lengthOffset(lengthOffset)
         {
         }
-        void* m_vptr;
+        const ClassInfo* m_classInfo;
         size_t m_storageOffset;
         size_t m_lengthOffset;
     };
@@ -134,18 +134,18 @@ namespace JSC {
         enum GlobalDataType { Default, APIContextGroup, APIShared };
         
         struct ClientData {
-            virtual ~ClientData() = 0;
+            JS_EXPORT_PRIVATE virtual ~ClientData() = 0;
         };
 
         bool isSharedInstance() { return globalDataType == APIShared; }
         bool usingAPI() { return globalDataType != Default; }
         static bool sharedInstanceExists();
-        static JSGlobalData& sharedInstance();
+        JS_EXPORT_PRIVATE static JSGlobalData& sharedInstance();
 
-        static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapSize = SmallHeap);
-        static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapSize = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapSize = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapSize = SmallHeap);
         static PassRefPtr<JSGlobalData> createContextGroup(ThreadStackType, HeapSize = SmallHeap);
-        ~JSGlobalData();
+        JS_EXPORT_PRIVATE ~JSGlobalData();
 
         void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
 
@@ -192,13 +192,6 @@ namespace JSC {
         Strong<Structure> functionExecutableStructure;
         Strong<Structure> regExpStructure;
         Strong<Structure> structureChainStructure;
-
-        static void storeVPtrs();
-        static JS_EXPORTDATA void* jsFinalObjectVPtr;
-        static JS_EXPORTDATA void* jsArrayVPtr;
-        static JS_EXPORTDATA void* jsByteArrayVPtr;
-        static JS_EXPORTDATA void* jsStringVPtr;
-        static JS_EXPORTDATA void* jsFunctionVPtr;
 
         IdentifierTable* identifierTable;
         CommonIdentifiers* propertyNames;
@@ -258,6 +251,9 @@ namespace JSC {
 #if ENABLE(JIT)
         ReturnAddressPtr exceptionLocation;
         JSValue hostCallReturnValue;
+        CallFrame* callFrameForThrow;
+        void* targetMachinePCForThrow;
+        Instruction* targetInterpreterPCForThrow;
 #if ENABLE(DFG_JIT)
         uint32_t osrExitIndex;
         void* osrExitJumpDestination;
@@ -312,21 +308,21 @@ namespace JSC {
 
         CachedTranscendentalFunction<sin> cachedSin;
 
-        void resetDateCache();
+        JS_EXPORT_PRIVATE void resetDateCache();
 
-        void startSampling();
-        void stopSampling();
-        void dumpSampleData(ExecState* exec);
+        JS_EXPORT_PRIVATE void startSampling();
+        JS_EXPORT_PRIVATE void stopSampling();
+        JS_EXPORT_PRIVATE void dumpSampleData(ExecState* exec);
         void recompileAllJSFunctions();
         RegExpCache* regExpCache() { return m_regExpCache; }
 #if ENABLE(REGEXP_TRACING)
         void addRegExpToTrace(PassRefPtr<RegExp> regExp);
 #endif
-        void dumpRegExpTrace();
-        void clearBuiltinStructures();
+        JS_EXPORT_PRIVATE void dumpRegExpTrace();
+        JS_EXPORT_PRIVATE void clearBuiltinStructures();
 
         bool isCollectorBusy() { return heap.isBusy(); }
-        void releaseExecutableMemory();
+        JS_EXPORT_PRIVATE void releaseExecutableMemory();
 
 #if ENABLE(GC_VALIDATION)
         bool isInitializingObject() const; 
@@ -340,7 +336,7 @@ namespace JSC {
 #define registerTypedArrayFunction(type, capitalizedType) \
         void registerTypedArrayDescriptor(const capitalizedType##Array*, const TypedArrayDescriptor& descriptor) \
         { \
-            ASSERT(!m_##type##ArrayDescriptor.m_vptr || m_##type##ArrayDescriptor.m_vptr == descriptor.m_vptr); \
+            ASSERT(!m_##type##ArrayDescriptor.m_classInfo || m_##type##ArrayDescriptor.m_classInfo == descriptor.m_classInfo); \
             m_##type##ArrayDescriptor = descriptor; \
         } \
         const TypedArrayDescriptor& type##ArrayDescriptor() const { return m_##type##ArrayDescriptor; }

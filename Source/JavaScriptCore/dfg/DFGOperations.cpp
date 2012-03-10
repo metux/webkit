@@ -144,7 +144,7 @@ static inline void putByVal(ExecState* exec, JSValue baseValue, uint32_t index, 
 {
     JSGlobalData* globalData = &exec->globalData();
 
-    if (isJSArray(globalData, baseValue)) {
+    if (isJSArray(baseValue)) {
         JSArray* array = asArray(baseValue);
         if (array->canSetIndex(index)) {
             array->setIndex(*globalData, index, value);
@@ -155,7 +155,7 @@ static inline void putByVal(ExecState* exec, JSValue baseValue, uint32_t index, 
         return;
     }
 
-    if (isJSByteArray(globalData, baseValue) && asByteArray(baseValue)->canAccessIndex(index)) {
+    if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(index)) {
         JSByteArray* byteArray = asByteArray(baseValue);
         // FIXME: the JITstub used to relink this to an optimized form!
         if (value.isInt32()) {
@@ -269,18 +269,16 @@ EncodedJSValue DFG_OPERATION operationValueAddNotNumber(ExecState* exec, Encoded
 
 static inline EncodedJSValue getByVal(ExecState* exec, JSCell* base, uint32_t index)
 {
-    JSGlobalData* globalData = &exec->globalData();
-
     // FIXME: the JIT used to handle these in compiled code!
-    if (isJSArray(globalData, base) && asArray(base)->canGetIndex(index))
+    if (isJSArray(base) && asArray(base)->canGetIndex(index))
         return JSValue::encode(asArray(base)->getIndex(index));
 
     // FIXME: the JITstub used to relink this to an optimized form!
-    if (isJSString(globalData, base) && asString(base)->canGetIndex(index))
+    if (isJSString(base) && asString(base)->canGetIndex(index))
         return JSValue::encode(asString(base)->getIndex(exec, index));
 
     // FIXME: the JITstub used to relink this to an optimized form!
-    if (isJSByteArray(globalData, base) && asByteArray(base)->canAccessIndex(index))
+    if (isJSByteArray(base) && asByteArray(base)->canAccessIndex(index))
         return JSValue::encode(asByteArray(base)->getIndex(exec, index));
 
     return JSValue::encode(JSValue(base).get(exec, index));
@@ -413,9 +411,9 @@ EncodedJSValue DFG_OPERATION operationArrayPush(ExecState* exec, EncodedJSValue 
     return JSValue::encode(jsNumber(array->length()));
 }
         
-EncodedJSValue DFG_OPERATION operationArrayPop(ExecState*, JSArray* array)
+EncodedJSValue DFG_OPERATION operationArrayPop(ExecState* exec, JSArray* array)
 {
-    return JSValue::encode(array->pop());
+    return JSValue::encode(array->pop(exec));
 }
         
 void DFG_OPERATION operationPutByIdStrict(ExecState* exec, EncodedJSValue encodedValue, JSCell* base, Identifier* propertyName)
@@ -433,13 +431,15 @@ void DFG_OPERATION operationPutByIdNonStrict(ExecState* exec, EncodedJSValue enc
 void DFG_OPERATION operationPutByIdDirectStrict(ExecState* exec, EncodedJSValue encodedValue, JSCell* base, Identifier* propertyName)
 {
     PutPropertySlot slot(true);
-    JSValue(base).putDirect(exec, *propertyName, JSValue::decode(encodedValue), slot);
+    ASSERT(base->isObject());
+    asObject(base)->putDirect(exec->globalData(), *propertyName, JSValue::decode(encodedValue), slot);
 }
 
 void DFG_OPERATION operationPutByIdDirectNonStrict(ExecState* exec, EncodedJSValue encodedValue, JSCell* base, Identifier* propertyName)
 {
     PutPropertySlot slot(false);
-    JSValue(base).putDirect(exec, *propertyName, JSValue::decode(encodedValue), slot);
+    ASSERT(base->isObject());
+    asObject(base)->putDirect(exec->globalData(), *propertyName, JSValue::decode(encodedValue), slot);
 }
 
 V_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(operationPutByIdStrictOptimize);
@@ -478,14 +478,14 @@ V_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(operationPutByIdDirectStrictOptimize
 void DFG_OPERATION operationPutByIdDirectStrictOptimizeWithReturnAddress(ExecState* exec, EncodedJSValue encodedValue, JSCell* base, Identifier* propertyName, ReturnAddressPtr returnAddress)
 {
     JSValue value = JSValue::decode(encodedValue);
-    JSValue baseValue(base);
     PutPropertySlot slot(true);
     
-    baseValue.putDirect(exec, *propertyName, value, slot);
+    ASSERT(base->isObject());
+    asObject(base)->putDirect(exec->globalData(), *propertyName, value, slot);
     
     StructureStubInfo& stubInfo = exec->codeBlock()->getStubInfo(returnAddress);
     if (stubInfo.seen)
-        dfgRepatchPutByID(exec, baseValue, *propertyName, slot, stubInfo, Direct);
+        dfgRepatchPutByID(exec, base, *propertyName, slot, stubInfo, Direct);
     else
         stubInfo.seen = true;
 }
@@ -494,14 +494,14 @@ V_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(operationPutByIdDirectNonStrictOptim
 void DFG_OPERATION operationPutByIdDirectNonStrictOptimizeWithReturnAddress(ExecState* exec, EncodedJSValue encodedValue, JSCell* base, Identifier* propertyName, ReturnAddressPtr returnAddress)
 {
     JSValue value = JSValue::decode(encodedValue);
-    JSValue baseValue(base);
     PutPropertySlot slot(false);
     
-    baseValue.putDirect(exec, *propertyName, value, slot);
+    ASSERT(base->isObject());
+    asObject(base)->putDirect(exec->globalData(), *propertyName, value, slot);
     
     StructureStubInfo& stubInfo = exec->codeBlock()->getStubInfo(returnAddress);
     if (stubInfo.seen)
-        dfgRepatchPutByID(exec, baseValue, *propertyName, slot, stubInfo, Direct);
+        dfgRepatchPutByID(exec, base, *propertyName, slot, stubInfo, Direct);
     else
         stubInfo.seen = true;
 }
@@ -658,7 +658,7 @@ inline void* linkFor(ExecState* execCallee, ReturnAddressPtr returnAddress, Code
             return 0;
         }
         codeBlock = &functionExecutable->generatedBytecodeFor(kind);
-        if (execCallee->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->m_numParameters))
+        if (execCallee->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->numParameters()))
             codePtr = functionExecutable->generatedJITCodeWithArityCheckFor(kind);
         else
             codePtr = functionExecutable->generatedJITCodeFor(kind).addressForCall();
@@ -795,12 +795,12 @@ EncodedJSValue DFG_OPERATION operationNewRegexp(ExecState* exec, void* regexpPtr
     return JSValue::encode(RegExpObject::create(exec->globalData(), exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->regExpStructure(), regexp));
 }
 
-DFGHandlerEncoded DFG_OPERATION lookupExceptionHandler(ExecState* exec, ReturnAddressPtr faultLocation)
+DFGHandlerEncoded DFG_OPERATION lookupExceptionHandler(ExecState* exec, uint32_t callIndex)
 {
     JSValue exceptionValue = exec->exception();
     ASSERT(exceptionValue);
 
-    unsigned vPCIndex = exec->codeBlock()->bytecodeOffset(faultLocation);
+    unsigned vPCIndex = exec->codeBlock()->bytecodeOffsetForCallAtIndex(callIndex);
     HandlerInfo* handler = exec->globalData().interpreter->throwException(exec, exceptionValue, vPCIndex);
 
     void* catchRoutine = handler ? handler->nativeCode.executableAddress() : (void*)ctiOpThrowNotCaught;

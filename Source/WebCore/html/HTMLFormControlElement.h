@@ -75,6 +75,8 @@ public:
 
     void setName(const AtomicString& name);
 
+    virtual const AtomicString& formControlName() const OVERRIDE;
+    virtual const AtomicString& formControlType() const OVERRIDE = 0;
     virtual bool isEnabledFormControl() const { return !disabled(); }
     virtual bool isReadOnlyFormControl() const { return readOnly(); }
 
@@ -118,9 +120,8 @@ protected:
     virtual void removedFromTree(bool deep);
     virtual void insertedIntoDocument();
     virtual void removedFromDocument();
-    virtual void willMoveToNewOwnerDocument();
+    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
-    virtual const AtomicString& formControlName() const;
     virtual bool supportsFocus() const;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
@@ -135,8 +136,6 @@ protected:
     virtual bool recalcWillValidate() const;
 
 private:
-    virtual const AtomicString& formControlType() const = 0;
-
     virtual void refFormAssociatedElement() { ref(); }
     virtual void derefFormAssociatedElement() { deref(); }
 
@@ -168,25 +167,6 @@ private:
     bool m_wasChangedSinceLastFormControlChangeEvent : 1;
 
     bool m_hasAutofocused : 1;
-};
-
-// FIXME: Give this class its own header file.
-class HTMLFormControlElementWithState : public HTMLFormControlElement {
-public:
-    virtual ~HTMLFormControlElementWithState();
-
-    virtual bool canContainRangeEndPoint() const { return false; }
-
-protected:
-    HTMLFormControlElementWithState(const QualifiedName& tagName, Document*, HTMLFormElement*);
-
-    virtual bool shouldAutocomplete() const;
-    virtual void finishParsingChildren();
-    virtual void willMoveToNewOwnerDocument();
-    virtual void didMoveToNewOwnerDocument();
-
-private:
-    virtual bool shouldSaveAndRestoreFormControlState() const;
 };
 
 } // namespace

@@ -36,6 +36,7 @@ WebInspector.DebuggerPresentationModel = function()
 {
     // FIXME: apply formatter from outside as a generic mapping.
     this._formatter = new WebInspector.ScriptFormatter();
+    this._rawSourceCodes = [];
     this._rawSourceCodeForScriptId = {};
     this._rawSourceCodeForURL = {};
     this._rawSourceCodeForDocumentURL = {};
@@ -82,14 +83,14 @@ WebInspector.DebuggerPresentationModel.prototype = {
 
     /**
      * @param {WebInspector.PresentationCallFrame} callFrame
-     * @return {WebInspector.Placard}
+     * @return {WebInspector.DebuggerPresentationModel.CallFramePlacard}
      */
     createPlacard: function(callFrame)
     {
         return new WebInspector.DebuggerPresentationModel.CallFramePlacard(callFrame);
     },
 
-    /*
+    /**
      * @param {DebuggerAgent.Location} rawLocation
      * @return {?WebInspector.UILocation}
      */
@@ -124,7 +125,7 @@ WebInspector.DebuggerPresentationModel.prototype = {
      */
     _addScript: function(script)
     {
-        var resource;
+        var resource = null;
         var isInlineScript = false;
         if (script.isInlineScript()) {
             resource = WebInspector.networkManager.inflightResourceForURL(script.sourceURL) || WebInspector.resourceForURL(script.sourceURL);
@@ -139,7 +140,12 @@ WebInspector.DebuggerPresentationModel.prototype = {
             }
         }
 
-        rawSourceCode = new WebInspector.RawSourceCode(script.scriptId, script, resource, this._formatter, this._formatSource);
+        var compilerSourceMapping = null;
+        if (WebInspector.settings.sourceMapsEnabled.get() && script.sourceMapURL)
+            compilerSourceMapping = new WebInspector.ClosureCompilerSourceMapping(script.sourceMapURL, script.sourceURL);
+
+        var rawSourceCode = new WebInspector.RawSourceCode(script.scriptId, script, resource, this._formatter, this._formatSource, compilerSourceMapping);
+        this._rawSourceCodes.push(rawSourceCode);
         this._bindScriptToRawSourceCode(script, rawSourceCode);
 
         if (isInlineScript)
@@ -176,10 +182,10 @@ WebInspector.DebuggerPresentationModel.prototype = {
     uiSourceCodes: function()
     {
         var result = [];
-        for (var id in this._rawSourceCodeForScriptId) {
-            var uiSourceCodeList = this._rawSourceCodeForScriptId[id].sourceMapping.uiSourceCodeList();
-            for (var i = 0; i < uiSourceCodeList.length; ++i)
-                result.push(uiSourceCodeList[i]);
+        for (var i = 0; i < this._rawSourceCodes.length; ++i) {
+            var uiSourceCodeList = this._rawSourceCodes[i].sourceMapping.uiSourceCodeList();
+            for (var j = 0; j < uiSourceCodeList.length; ++j)
+                result.push(uiSourceCodeList[j]);
         }
         return result;
     },
@@ -331,18 +337,8 @@ WebInspector.DebuggerPresentationModel.prototype = {
 
         this._formatSource = formatSource;
         this._breakpointManager.reset();
-        for (var id in this._rawSourceCodeForScriptId)
-            this._rawSourceCodeForScriptId[id].setFormatted(this._formatSource);
-    },
-
-    /**
-     * @param {WebInspector.UISourceCode} uiSourceCode
-     * @param {string} sourceMappingURL
-     */
-    setCompilerSourceMapping: function(uiSourceCode, sourceMappingURL)
-    {
-        var sourceMapping = new WebInspector.ClosureCompilerSourceMapping(sourceMappingURL);
-        uiSourceCode.rawSourceCode.setCompilerSourceMapping(sourceMapping);
+        for (var i = 0; i < this._rawSourceCodes.length; ++i)
+            this._rawSourceCodes[i].setFormatted(this._formatSource);
     },
 
     /**
@@ -351,7 +347,7 @@ WebInspector.DebuggerPresentationModel.prototype = {
     _consoleMessageAdded: function(event)
     {
         var message = /** @type {WebInspector.ConsoleMessage} */ event.data;
-        if (!message.url || !message.isErrorOrWarning() || !message.message)
+        if (!message.url || !message.isErrorOrWarning())
             return;
 
         var rawSourceCode = this._rawSourceCodeForScriptWithURL(message.url);
@@ -382,8 +378,8 @@ WebInspector.DebuggerPresentationModel.prototype = {
 
     _consoleCleared: function()
     {
-        for (var id in this._rawSourceCodeForScriptId)
-            this._rawSourceCodeForScriptId[id].messages = [];
+        for (var i = 0; i < this._rawSourceCodes.length; ++i)
+            this._rawSourceCodes[i].messages = [];
         this.dispatchEventToListeners(WebInspector.DebuggerPresentationModel.Events.ConsoleMessagesCleared);
     },
 
@@ -468,6 +464,13 @@ WebInspector.DebuggerPresentationModel.prototype = {
     removeBreakpoint: function(uiSourceCode, lineNumber)
     {
         this._breakpointManager.removeBreakpoint(uiSourceCode, lineNumber);
+    },
+
+    /**
+     */
+    removeAllBreakpoints: function()
+    {
+        this._breakpointManager.removeAllBreakpoints();
     },
 
     /**
@@ -654,15 +657,16 @@ WebInspector.DebuggerPresentationModel.prototype = {
 
     _debuggerReset: function()
     {
-        for (var id in this._rawSourceCodeForScriptId) {
-            var rawSourceCode = this._rawSourceCodeForScriptId[id];
+        for (var i = 0; i < this._rawSourceCodes.length; ++i) {
+            var rawSourceCode = this._rawSourceCodes[i];
             if (rawSourceCode.sourceMapping) {
                 var uiSourceCodeList = rawSourceCode.sourceMapping.uiSourceCodeList();
-                for (var i = 0; i < uiSourceCodeList.length; ++i)
-                    this.dispatchEventToListeners(WebInspector.DebuggerPresentationModel.Events.UISourceCodeRemoved, uiSourceCodeList[i]);
+                for (var j = 0; j < uiSourceCodeList.length; ++j)
+                    this.dispatchEventToListeners(WebInspector.DebuggerPresentationModel.Events.UISourceCodeRemoved, uiSourceCodeList[j]);
             }
             rawSourceCode.removeAllListeners();
         }
+        this._rawSourceCodes = [];
         this._rawSourceCodeForScriptId = {};
         this._rawSourceCodeForURL = {};
         this._rawSourceCodeForDocumentURL = {};
@@ -749,7 +753,7 @@ WebInspector.PresentationCallFrame.prototype = {
      * @param {string} objectGroup
      * @param {boolean} includeCommandLineAPI
      * @param {boolean} returnByValue
-     * @param {function(?RuntimeAgent.RemoteObject, boolean)=} callback
+     * @param {function(?RuntimeAgent.RemoteObject, boolean=)=} callback
      */
     evaluate: function(code, objectGroup, includeCommandLineAPI, returnByValue, callback)
     {
@@ -757,7 +761,7 @@ WebInspector.PresentationCallFrame.prototype = {
          * @this {WebInspector.PresentationCallFrame}
          * @param {?Protocol.Error} error
          * @param {RuntimeAgent.RemoteObject} result
-         * @param {boolean} wasThrown
+         * @param {boolean=} wasThrown
          */
         function didEvaluateOnCallFrame(error, result, wasThrown)
         {
@@ -846,7 +850,7 @@ WebInspector.DebuggerPresentationModelResourceBinding.prototype = {
      * @param {WebInspector.Resource} resource
      * @param {string} content
      * @param {boolean} majorChange
-     * @param {function(?Protocol.Error)} userCallback
+     * @param {function(?string)} userCallback
      */
     setContent: function(resource, content, majorChange, userCallback)
     {
@@ -865,21 +869,22 @@ WebInspector.DebuggerPresentationModelResourceBinding.prototype = {
     /**
      * @param {WebInspector.UISourceCode} uiSourceCode
      * @param {string} content
-     * @param {function(?Protocol.Error)} userCallback
-     * @param {string} oldContent
+     * @param {function(?string)} userCallback
+     * @param {?string} oldContent
+     * @param {?string} oldContentEncoded
      */
-    _setContentWithInitialContent: function(uiSourceCode, content, userCallback, oldContent)
+    _setContentWithInitialContent: function(uiSourceCode, content, userCallback, oldContent, oldContentEncoded)
     {
         /**
          * @this {WebInspector.DebuggerPresentationModelResourceBinding}
-         * @param {?Protocol.Error} error
+         * @param {?string} error
          */
         function callback(error)
         {
             if (userCallback)
                 userCallback(error);
             if (!error)
-                this._presentationModel._updateBreakpointsAfterLiveEdit(uiSourceCode, oldContent, content);
+                this._presentationModel._updateBreakpointsAfterLiveEdit(uiSourceCode, oldContent || "", content);
         }
         this._presentationModel.setScriptSource(uiSourceCode, content, callback.bind(this));
     }

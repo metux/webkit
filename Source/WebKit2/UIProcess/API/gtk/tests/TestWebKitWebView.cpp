@@ -38,16 +38,6 @@ static void testWebViewCustomCharset(WebViewTest* test, gconstpointer)
     g_assert(!webkit_web_view_get_custom_charset(test->m_webView));
 }
 
-static void testWebViewsShareClients(Test* test, gconstpointer)
-{
-    GRefPtr<GtkWidget> webView1 = webkit_web_view_new();
-    GRefPtr<GtkWidget> webView2 = webkit_web_view_new();
-    WebKitWebLoaderClient* client1 = webkit_web_view_get_loader_client(WEBKIT_WEB_VIEW(webView1.get()));
-    WebKitWebLoaderClient* client2 = webkit_web_view_get_loader_client(WEBKIT_WEB_VIEW(webView2.get()));
-    g_assert(client1);
-    g_assert(client1 == client2);
-}
-
 static void testWebViewSettings(WebViewTest* test, gconstpointer)
 {
     WebKitSettings* defaultSettings = webkit_web_view_get_settings(test->m_webView);
@@ -75,6 +65,26 @@ static void testWebViewSettings(WebViewTest* test, gconstpointer)
     settings = webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webView2.get()));
     g_assert(settings == newSettings2.get());
     g_assert(webkit_settings_get_enable_javascript(settings));
+}
+
+static void replaceContentTitleChangedCallback(WebViewTest* test)
+{
+    g_main_loop_quit(test->m_mainLoop);
+}
+
+static void replaceContentLoadCallback()
+{
+    g_assert_not_reached();
+}
+
+static void testWebViewReplaceContent(WebViewTest* test, gconstpointer)
+{
+    g_signal_connect_swapped(test->m_webView, "notify::title", G_CALLBACK(replaceContentTitleChangedCallback), test);
+    g_signal_connect(test->m_webView, "load-changed", G_CALLBACK(replaceContentLoadCallback), test);
+    g_signal_connect(test->m_webView, "load-failed", G_CALLBACK(replaceContentLoadCallback), test);
+    test->replaceContent("<html><head><title>Content Replaced</title></head><body>New Content</body></html>",
+                         "http://foo.com/bar", 0);
+    g_main_loop_run(test->m_mainLoop);
 }
 
 static const char* kAlertDialogMessage = "WebKitGTK+ alert dialog message";
@@ -347,15 +357,23 @@ static void testWebViewWindowProperties(UIClientTest* test, gconstpointer)
     g_assert_cmpint(events[2], ==, UIClientTest::Close);
 }
 
+static void testWebViewZoomLevel(WebViewTest* test, gconstpointer)
+{
+    g_assert_cmpfloat(webkit_web_view_get_zoom_level(test->m_webView), ==, 1);
+    webkit_web_view_set_zoom_level(test->m_webView, 2.5);
+    g_assert_cmpfloat(webkit_web_view_get_zoom_level(test->m_webView), ==, 2.5);
+}
+
 void beforeAll()
 {
     WebViewTest::add("WebKitWebView", "default-context", testWebViewDefaultContext);
     WebViewTest::add("WebKitWebView", "custom-charset", testWebViewCustomCharset);
-    Test::add("WebKitWebView", "webviews-share-clients", testWebViewsShareClients);
     WebViewTest::add("WebKitWebView", "settings", testWebViewSettings);
+    WebViewTest::add("WebKitWebView", "replace-content", testWebViewReplaceContent);
     UIClientTest::add("WebKitWebView", "create-ready-close", testWebViewCreateReadyClose);
     UIClientTest::add("WebKitWebView", "javascript-dialogs", testWebViewJavaScriptDialogs);
     UIClientTest::add("WebKitWebView", "window-properties", testWebViewWindowProperties);
+    WebViewTest::add("WebKitWebView", "zoom-level", testWebViewZoomLevel);
 }
 
 void afterAll()

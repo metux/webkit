@@ -49,7 +49,7 @@ class SelectorChecker {
 public:
     SelectorChecker(Document*, bool strictParsing);
 
-    enum SelectorMatch { SelectorMatches, SelectorFailsLocally, SelectorFailsCompletely };
+    enum SelectorMatch { SelectorMatches, SelectorFailsLocally, SelectorFailsAllSiblings, SelectorFailsCompletely };
     enum VisitedMatchType { VisitedMatchDisabled, VisitedMatchEnabled };
     bool checkSelector(CSSSelector*, Element*, bool isFastCheckableSelector = false) const;
     SelectorMatch checkSelector(CSSSelector*, Element*, PseudoId& dynamicPseudo, bool isSubSelector, VisitedMatchType, RenderStyle* = 0, RenderStyle* elementParentStyle = 0) const;
@@ -90,6 +90,9 @@ public:
     enum LinkMatchMask { MatchLink = 1, MatchVisited = 2, MatchAll = MatchLink | MatchVisited };
     static unsigned determineLinkMatchType(const CSSSelector*);
 
+    // Find the ids or classes selectors are scoped to. The selectors only apply to elements in subtrees where the root element matches the scope.
+    static bool determineSelectorScopes(const CSSSelectorList&, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes);
+
 private:
     bool checkOneSelector(CSSSelector*, Element*, PseudoId& dynamicPseudo, bool isSubSelector, VisitedMatchType, RenderStyle*, RenderStyle* elementParentStyle) const;
     bool checkScrollbarPseudoClass(CSSSelector*, PseudoId& dynamicPseudo) const;
@@ -112,7 +115,7 @@ private:
     mutable HashSet<LinkHash, LinkHashHash> m_linksCheckedForVisitedState;
 
     struct ParentStackFrame {
-        ParentStackFrame() { }
+        ParentStackFrame() : element(0) { }
         ParentStackFrame(Element* element) : element(element) { }
         Element* element;
         Vector<unsigned, 4> identifierHashes;

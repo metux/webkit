@@ -52,6 +52,11 @@ void Arguments::visitChildren(JSCell* cell, SlotVisitor& visitor)
         visitor.append(&thisObject->d->activation);
 }
 
+void Arguments::destroy(JSCell* cell)
+{
+    jsCast<Arguments*>(cell)->Arguments::~Arguments();
+}
+
 void Arguments::copyToArguments(ExecState* exec, CallFrame* callFrame, uint32_t length)
 {
     if (UNLIKELY(d->overrodeLength)) {
@@ -104,8 +109,7 @@ void Arguments::createStrictModeCallerIfNecessary(ExecState* exec)
 
     d->overrodeCaller = true;
     PropertyDescriptor descriptor;
-    JSValue thrower = createTypeErrorFunction(exec, "Unable to access caller of strict mode function");
-    descriptor.setAccessorDescriptor(thrower, thrower, DontEnum | DontDelete | Getter | Setter);
+    descriptor.setAccessorDescriptor(globalObject()->throwTypeErrorGetterSetter(exec), DontEnum | DontDelete | Accessor);
     methodTable()->defineOwnProperty(this, exec, exec->propertyNames().caller, descriptor, false);
 }
 
@@ -116,8 +120,7 @@ void Arguments::createStrictModeCalleeIfNecessary(ExecState* exec)
     
     d->overrodeCallee = true;
     PropertyDescriptor descriptor;
-    JSValue thrower = createTypeErrorFunction(exec, "Unable to access callee of strict mode function");
-    descriptor.setAccessorDescriptor(thrower, thrower, DontEnum | DontDelete | Getter | Setter);
+    descriptor.setAccessorDescriptor(globalObject()->throwTypeErrorGetterSetter(exec), DontEnum | DontDelete | Accessor);
     methodTable()->defineOwnProperty(this, exec, exec->propertyNames().callee, descriptor, false);
 }
 

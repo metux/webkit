@@ -25,6 +25,7 @@
 #ifndef Node_h
 #define Node_h
 
+#include "EditingBoundary.h"
 #include "EventTarget.h"
 #include "KURLHash.h"
 #include "LayoutTypes.h"
@@ -104,6 +105,7 @@ enum StyleChangeType {
 class Node : public EventTarget, public ScriptWrappable, public TreeShared<ContainerNode> {
     friend class Document;
     friend class TreeScope;
+    friend class TreeScopeAdopter;
 
 public:
     enum NodeType {
@@ -276,7 +278,8 @@ public:
     Element* enclosingBlockFlowElement() const;
     
     Element* rootEditableElement() const;
-    
+    Element* rootEditableElement(EditableType) const;
+
     bool inSameContainingBlockFlowElement(Node*);
 
     // Called by the parser when this element's close tag is reached,
@@ -295,6 +298,7 @@ public:
     virtual bool sheetLoaded() { return true; }
     virtual void startLoadingDynamicSheet() { ASSERT_NOT_REACHED(); }
 
+    bool hasName() const { return getFlag(HasNameFlag); }
     bool hasID() const { return getFlag(HasIDFlag); }
     bool hasClass() const { return getFlag(HasClassFlag); }
     bool active() const { return getFlag(IsActiveFlag); }
@@ -309,6 +313,7 @@ public:
     bool childNeedsStyleRecalc() const { return getFlag(ChildNeedsStyleRecalcFlag); }
     bool isLink() const { return getFlag(IsLinkFlag); }
 
+    void setHasName(bool f) { setFlag(f, HasNameFlag); }
     void setHasID(bool f) { setFlag(f, HasIDFlag); }
     void setHasClass(bool f) { setFlag(f, HasClassFlag); }
     void setChildNeedsStyleRecalc() { setFlag(ChildNeedsStyleRecalcFlag); }
@@ -351,8 +356,30 @@ public:
     bool isContentEditable();
     bool isContentRichlyEditable();
 
-    bool rendererIsEditable() const { return rendererIsEditable(Editable); }
-    bool rendererIsRichlyEditable() const { return rendererIsEditable(RichlyEditable); }
+    bool rendererIsEditable(EditableType editableType = ContentIsEditable) const
+    {
+        switch (editableType) {
+        case ContentIsEditable:
+            return rendererIsEditable(Editable);
+        case HasEditableAXRole:
+            return isEditableToAccessibility(Editable);
+        }
+        ASSERT_NOT_REACHED();
+        return false;
+    }
+
+    bool rendererIsRichlyEditable(EditableType editableType = ContentIsEditable) const
+    {
+        switch (editableType) {
+        case ContentIsEditable:
+            return rendererIsEditable(RichlyEditable);
+        case HasEditableAXRole:
+            return isEditableToAccessibility(RichlyEditable);
+        }
+        ASSERT_NOT_REACHED();
+        return false;
+    }
+
     virtual bool shouldUseInputMethod();
     virtual LayoutRect getRect() const;
     LayoutRect renderRect(bool* isReplaced);
@@ -380,9 +407,6 @@ public:
     }
 
     TreeScope* treeScope() const;
-
-    // Used by the basic DOM methods (e.g., appendChild()).
-    void setTreeScopeRecursively(TreeScope*, bool includeRoot = true);
 
     // Returns true if this node is associated with a document and is in its associated document's
     // node tree, false otherwise.
@@ -519,7 +543,7 @@ public:
 
     void registerDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
     void unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
-    void invalidateNodeListsCacheAfterAttributeChanged();
+    void invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName&);
     void invalidateNodeListsCacheAfterChildrenChanged();
     void notifyLocalNodeListsLabelChanged();
     void removeCachedClassNodeList(ClassNodeList*, const String&);
@@ -645,6 +669,8 @@ private:
         HasCustomWillOrDidRecalcStyleFlag = 1 << 28,
         HasCustomStyleForRendererFlag = 1 << 29,
 
+        HasNameFlag = 1 << 30,
+
 #if ENABLE(SVG)
         DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag | AreSVGAttributesValidFlag
 #else
@@ -652,7 +678,7 @@ private:
 #endif
     };
 
-    // 2 bits remaining
+    // 1 bit remaining
 
     bool getFlag(NodeFlags mask) const { return m_nodeFlags & mask; }
     void setFlag(bool f, NodeFlags mask) const { m_nodeFlags = (m_nodeFlags & ~mask) | (-(int32_t)f & mask); } 
@@ -674,8 +700,7 @@ protected:
     };
     Node(Document*, ConstructionType);
 
-    virtual void willMoveToNewOwnerDocument();
-    virtual void didMoveToNewOwnerDocument();
+    virtual void didMoveToNewDocument(Document* oldDocument);
     
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const { }
     void setTabIndexExplicitly(short);
@@ -695,13 +720,14 @@ protected:
     void clearHasCustomStyleForRenderer() { clearFlag(HasCustomStyleForRendererFlag); }
 
 private:
-    // Do not use this method to change the document of a node until after the node has been
-    // removed from its previous document.
-    void setDocumentRecursively(Document*);
+    // These API should be only used for a tree scope migration.
+    // setTreeScope() returns NodeRareData to save extra nodeRareData() invocations on the caller site.
+    NodeRareData* setTreeScope(TreeScope*);
     void setDocument(Document*);
 
     enum EditableLevel { Editable, RichlyEditable };
     bool rendererIsEditable(EditableLevel) const;
+    bool isEditableToAccessibility(EditableLevel) const;
 
     void setStyleChange(StyleChangeType);
 

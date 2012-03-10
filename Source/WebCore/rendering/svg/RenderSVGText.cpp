@@ -5,7 +5,7 @@
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2008 Rob Buis <buis@kde.org>
  * Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
- * Copyright (C) Research In Motion Limited 2010. All rights reserved.
+ * Copyright (C) Research In Motion Limited 2010-2012. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -43,6 +43,7 @@
 #include "SVGRootInlineBox.h"
 #include "SVGTextElement.h"
 #include "SVGTextLayoutAttributesBuilder.h"
+#include "SVGTextRunRenderingContext.h"
 #include "SVGTransformList.h"
 #include "SVGURIReference.h"
 #include "SimpleFontData.h"
@@ -140,8 +141,7 @@ void RenderSVGText::layout()
 
     if (m_needsPositioningValuesUpdate) {
         // Perform SVG text layout phase one (see SVGTextLayoutAttributesBuilder for details).
-        SVGTextLayoutAttributesBuilder layoutAttributesBuilder;
-        layoutAttributesBuilder.buildLayoutAttributesForTextSubtree(this);
+        m_layoutAttributesBuilder.buildLayoutAttributesForWholeTree(this);
         m_needsReordering = true;
         m_needsPositioningValuesUpdate = false;
         updateCachedBoundariesInParents = true;
@@ -290,6 +290,40 @@ RenderBlock* RenderSVGText::firstLineBlock() const
 // in a SVG text element context.
 void RenderSVGText::updateFirstLetter()
 {
+}
+
+static inline void recursiveCollectLayoutAttributes(RenderObject* start, Vector<SVGTextLayoutAttributes>& attributes)
+{
+    for (RenderObject* child = start->firstChild(); child; child = child->nextSibling()) {
+        if (child->isSVGInlineText()) {
+            attributes.append(toRenderSVGInlineText(child)->layoutAttributes());
+            continue;
+        }
+
+        recursiveCollectLayoutAttributes(child, attributes);
+    }
+}
+
+void RenderSVGText::rebuildLayoutAttributes(bool performFullRebuild)
+{
+    // FIXME: For now we always rebuild the whole tree, as it used to be.
+    performFullRebuild = true;
+    if (performFullRebuild)
+        m_layoutAttributes.clear();
+
+    if (m_layoutAttributes.isEmpty()) {
+        recursiveCollectLayoutAttributes(this, m_layoutAttributes);
+        if (m_layoutAttributes.isEmpty() || !performFullRebuild)
+            return;
+
+        m_layoutAttributesBuilder.rebuildMetricsForWholeTree(this);
+        return;
+    }
+
+    /* FIXME: Enable this once we rebuild subtrees, instead of the full tree
+    Vector<SVGTextLayoutAttributes*> affectedAttributes;
+    rebuildLayoutAttributes(affectedAttributes);
+    */
 }
 
 }

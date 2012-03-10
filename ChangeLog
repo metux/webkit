@@ -1,3 +1,554 @@
+2012-01-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Update NEWS and configure.ac for 1.7.4 release
+        https://bugs.webkit.org/show_bug.cgi?id=76375
+
+        Reviewed by Philippe Normand.
+
+        * configure.ac: Bumped version number.
+
+2012-01-16  Shinya Kawanaka  <shinyak@google.com>
+
+        [crash] Renderer crashes when spell checking a disabled input field.
+        https://bugs.webkit.org/show_bug.cgi?id=75941
+
+        Reviewed by Hajime Morita.
+
+        * ManualTests/editing-disabled-node-replace-crash.html: Added.
+
+2012-01-13  Simon Fraser  <simon.fraser@apple.com>
+
+        Unmatched transparency layer begin/end on a filtered element with an opacity ancestor
+        https://bugs.webkit.org/show_bug.cgi?id=76329
+
+        Reviewed by Dan Bernstein.
+        
+        Manual test with a filtered element as a descendant of an element with
+        opacity. Doing a Find is necessary to exercise the test.
+
+        * ManualTests/filters/opacity-above-filter.html: Added.
+
+2012-01-13  Eli Fidler  <efidler@rim.com>
+
+        GCC compiler version is not detected properly for QNX qcc variant
+        https://bugs.webkit.org/show_bug.cgi?id=76288
+
+        Reviewed by Rob Buis.
+
+        Provide an alternative way of getting the compiler version for GCC variants
+        that don't support -dumpversion (such as qcc).
+
+        * Source/cmake/WebKitHelpers.cmake:
+
+2012-01-13  Gregg Tavares  <gman@google.com>
+
+        Add WebGLContextGroup as step toward sharing WebGL resources
+        https://bugs.webkit.org/show_bug.cgi?id=75906
+
+        The WebGL Working Group will soon add the ability to share
+        WebGL resources among WebGL contexts. This is the necessary
+        prep work. NO API changes.
+
+        Added WebGLSharedObject for objects that are shared vs
+        WebGLContextObject for objects that are not.
+
+        Reviewed by Kenneth Russell.
+
+        No new tests. No change in behavior.
+
+        * GNUmakefile.list.am:
+        * WebCore.gypi:
+        * html/canvas/OESVertexArrayObject.cpp:
+        (WebCore::OESVertexArrayObject::createVertexArrayOES):
+        (WebCore::OESVertexArrayObject::deleteVertexArrayOES):
+        (WebCore::OESVertexArrayObject::isVertexArrayOES):
+        (WebCore::OESVertexArrayObject::bindVertexArrayOES):
+        * html/canvas/WebGLBuffer.cpp:
+        (WebCore::WebGLBuffer::WebGLBuffer):
+        (WebCore::WebGLBuffer::~WebGLBuffer):
+        (WebCore::WebGLBuffer::deleteObjectImpl):
+        * html/canvas/WebGLBuffer.h:
+        * html/canvas/WebGLContextGroup.cpp: Added.
+        (WebCore::WebGLContextGroup::create):
+        (WebCore::WebGLContextGroup::WebGLContextGroup):
+        (WebCore::WebGLContextGroup::~WebGLContextGroup):
+        (WebCore::WebGLContextGroup::getAGraphicsContext3D):
+        (WebCore::WebGLContextGroup::addContext):
+        (WebCore::WebGLContextGroup::removeContext):
+        (WebCore::WebGLContextGroup::removeObject):
+        (WebCore::WebGLContextGroup::addObject):
+        (WebCore::WebGLContextGroup::detachAndRemoveAllObjects):
+        (WebCore::WebGLContextGroup::loseContextGroup):
+        * html/canvas/WebGLContextGroup.h: Copied from Source/WebCore/html/canvas/WebGLShader.h.
+        * html/canvas/WebGLContextObject.cpp: Copied from Source/WebCore/html/canvas/WebGLShader.cpp.
+        (WebCore::WebGLContextObject::WebGLContextObject):
+        (WebCore::WebGLContextObject::~WebGLContextObject):
+        (WebCore::WebGLContextObject::detachContext):
+        (WebCore::WebGLContextObject::getAGraphicsContext3D):
+        * html/canvas/WebGLContextObject.h: Copied from Source/WebCore/html/canvas/WebGLShader.h.
+        (WebCore::WebGLContextObject::context):
+        (WebCore::WebGLContextObject::validate):
+        (WebCore::WebGLContextObject::hasGroupOrContext):
+        * html/canvas/WebGLFramebuffer.cpp:
+        (WebCore::WebGLFramebuffer::WebGLFramebuffer):
+        (WebCore::WebGLFramebuffer::~WebGLFramebuffer):
+        (WebCore::WebGLFramebuffer::setAttachmentForBoundFramebuffer):
+        (WebCore::WebGLFramebuffer::getAttachment):
+        (WebCore::WebGLFramebuffer::removeAttachmentFromBoundFramebuffer):
+        (WebCore::WebGLFramebuffer::checkStatus):
+        (WebCore::WebGLFramebuffer::onAccess):
+        (WebCore::WebGLFramebuffer::deleteObjectImpl):
+        (WebCore::WebGLFramebuffer::initializeRenderbuffers):
+        * html/canvas/WebGLFramebuffer.h:
+        * html/canvas/WebGLObject.cpp:
+        (WebCore::WebGLObject::WebGLObject):
+        (WebCore::WebGLObject::~WebGLObject):
+        (WebCore::WebGLObject::deleteObject):
+        (WebCore::WebGLObject::detach):
+        (WebCore::WebGLObject::onDetached):
+        * html/canvas/WebGLObject.h:
+        * html/canvas/WebGLProgram.cpp:
+        (WebCore::WebGLProgram::WebGLProgram):
+        (WebCore::WebGLProgram::~WebGLProgram):
+        (WebCore::WebGLProgram::deleteObjectImpl):
+        (WebCore::WebGLProgram::cacheActiveAttribLocations):
+        * html/canvas/WebGLProgram.h:
+        * html/canvas/WebGLRenderbuffer.cpp:
+        (WebCore::WebGLRenderbuffer::~WebGLRenderbuffer):
+        (WebCore::WebGLRenderbuffer::WebGLRenderbuffer):
+        (WebCore::WebGLRenderbuffer::deleteObjectImpl):
+        * html/canvas/WebGLRenderbuffer.h:
+        * html/canvas/WebGLRenderingContext.cpp:
+        (WebCore::WebGLRenderingContext::WebGLRenderingContext):
+        (WebCore::WebGLRenderingContext::initializeNewContext):
+        (WebCore::WebGLRenderingContext::~WebGLRenderingContext):
+        (WebCore::WebGLRenderingContext::clearIfComposited):
+        (WebCore::WebGLRenderingContext::checkObjectToBeBound):
+        (WebCore::WebGLRenderingContext::clear):
+        (WebCore::WebGLRenderingContext::copyTexImage2D):
+        (WebCore::WebGLRenderingContext::copyTexSubImage2D):
+        (WebCore::WebGLRenderingContext::createBuffer):
+        (WebCore::WebGLRenderingContext::createFramebuffer):
+        (WebCore::WebGLRenderingContext::createTexture):
+        (WebCore::WebGLRenderingContext::createProgram):
+        (WebCore::WebGLRenderingContext::createRenderbuffer):
+        (WebCore::WebGLRenderingContext::createShader):
+        (WebCore::WebGLRenderingContext::deleteObject):
+        (WebCore::WebGLRenderingContext::deleteRenderbuffer):
+        (WebCore::WebGLRenderingContext::deleteTexture):
+        (WebCore::WebGLRenderingContext::detachShader):
+        (WebCore::WebGLRenderingContext::validateElementArraySize):
+        (WebCore::WebGLRenderingContext::validateIndexArrayConservative):
+        (WebCore::WebGLRenderingContext::validateIndexArrayPrecise):
+        (WebCore::WebGLRenderingContext::validateWebGLObject):
+        (WebCore::WebGLRenderingContext::drawArrays):
+        (WebCore::WebGLRenderingContext::drawElements):
+        (WebCore::WebGLRenderingContext::framebufferRenderbuffer):
+        (WebCore::WebGLRenderingContext::framebufferTexture2D):
+        (WebCore::WebGLRenderingContext::getFramebufferAttachmentParameter):
+        (WebCore::WebGLRenderingContext::linkProgram):
+        (WebCore::WebGLRenderingContext::readPixels):
+        (WebCore::WebGLRenderingContext::useProgram):
+        (WebCore::WebGLRenderingContext::removeSharedObject):
+        (WebCore::WebGLRenderingContext::addSharedObject):
+        (WebCore::WebGLRenderingContext::removeContextObject):
+        (WebCore::WebGLRenderingContext::addContextObject):
+        (WebCore::WebGLRenderingContext::detachAndRemoveAllObjects):
+        (WebCore::WebGLRenderingContext::initVertexAttrib0):
+        (WebCore::WebGLRenderingContext::loseContext):
+        (WebCore::WebGLRenderingContext::loseContextImpl):
+        * html/canvas/WebGLRenderingContext.h:
+        (WebCore::WebGLRenderingContext::contextGroup):
+        * html/canvas/WebGLShader.cpp:
+        (WebCore::WebGLShader::WebGLShader):
+        (WebCore::WebGLShader::~WebGLShader):
+        (WebCore::WebGLShader::deleteObjectImpl):
+        * html/canvas/WebGLShader.h:
+        * html/canvas/WebGLSharedObject.cpp: Copied from Source/WebCore/html/canvas/WebGLRenderbuffer.cpp.
+        (WebCore::WebGLSharedObject::WebGLSharedObject):
+        (WebCore::WebGLSharedObject::~WebGLSharedObject):
+        (WebCore::WebGLSharedObject::detachContextGroup):
+        (WebCore::WebGLSharedObject::getAGraphicsContext3D):
+        * html/canvas/WebGLSharedObject.h: Copied from Source/WebCore/html/canvas/WebGLShader.h.
+        (WebCore::WebGLSharedObject::contextGroup):
+        (WebCore::WebGLSharedObject::isBuffer):
+        (WebCore::WebGLSharedObject::isFramebuffer):
+        (WebCore::WebGLSharedObject::isProgram):
+        (WebCore::WebGLSharedObject::isRenderbuffer):
+        (WebCore::WebGLSharedObject::isShader):
+        (WebCore::WebGLSharedObject::isTexture):
+        (WebCore::WebGLSharedObject::validate):
+        (WebCore::WebGLSharedObject::hasGroupOrContext):
+        * html/canvas/WebGLTexture.cpp:
+        (WebCore::WebGLTexture::WebGLTexture):
+        (WebCore::WebGLTexture::~WebGLTexture):
+        (WebCore::WebGLTexture::deleteObjectImpl):
+        * html/canvas/WebGLTexture.h:
+        * html/canvas/WebGLVertexArrayObjectOES.cpp:
+        (WebCore::WebGLVertexArrayObjectOES::WebGLVertexArrayObjectOES):
+        (WebCore::WebGLVertexArrayObjectOES::~WebGLVertexArrayObjectOES):
+        (WebCore::WebGLVertexArrayObjectOES::deleteObjectImpl):
+        * html/canvas/WebGLVertexArrayObjectOES.h:
+
+2012-01-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r104805.
+        http://trac.webkit.org/changeset/104805
+        https://bugs.webkit.org/show_bug.cgi?id=76180
+
+        Breaks apple win compilation. (Requested by vsevik on
+        #webkit).
+
+        * Source/autotools/symbols.filter:
+
+2012-01-12  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        Make the new WTF module build on Qt
+        https://bugs.webkit.org/show_bug.cgi?id=76163
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WebKit.pro: Build the new WTF instead of the old one.
+
+2012-01-12  Shinya Kawanaka  <shinyak@google.com>
+
+        ShadowContentElement should be able to use query.
+        https://bugs.webkit.org/show_bug.cgi?id=75302
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter: Exposed necessary symbols.
+
+2012-01-11  Ulan Degenbaev  <ulan@chromium.org>
+
+        [v8] Int16Array.set(array, offset) fails on first execution
+        https://bugs.webkit.org/show_bug.cgi?id=76040
+
+        Reviewed by Kenneth Russell.
+
+        * LayoutTests/fast/canvas/webgl/array-set-with-offset-expected.txt: Added.
+        * LayoutTests/fast/canvas/webgl/array-set-with-offset.html: Added.
+        * Source/WebCore/bindings/v8/custom/V8ArrayBufferViewCustom.cpp:
+        * Source/WebCore/bindings/v8/custom/V8ArrayBufferViewCustom.h:
+
+2012-01-11  Eli Fidler  <efidler@rim.com>
+
+        Fix OpenGL dependency in CMake build system
+        https://bugs.webkit.org/show_bug.cgi?id=73559
+
+        Reviewed by Daniel Bates.
+
+        Apparently the EFL port uses desktop OpenGL to implement WebGL, but
+        other ports such as BlackBerry use other libraries like OpenGL ES 2.0 or
+        ANGLE.
+
+        * Source/cmake/OptionsCommon.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+
+2012-01-09  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [AC] Simplify accelerated compositing build options
+        https://bugs.webkit.org/show_bug.cgi?id=75518
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Remove the --enable-3d-rendering option. It's enabled by
+        default now when accelerated compositing is enabled.
+        * GNUmakefile.am: Automatically enable 3D rendering when accelerated compositing
+        is turned on.
+
+2012-01-04  Jon Lee  <jonlee@apple.com>
+
+        Clicking on the cancel button on readonly and disabled search fields darkens as if the search field was editable
+        https://bugs.webkit.org/show_bug.cgi?id=69886
+        <rdar://problem/10070187>
+
+        Reviewed by Adele Peterson.
+
+        * ManualTests/search-cancel-button.html: Added.
+
+2012-01-06  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix compilation of app code against QtWebKit master header file
+
+        Unreviewed trivial build fix.
+
+        * Source/sync.profile: Exclude util.h and testwindow.h from the master header
+        file, because it cannot be used outside of the WebKit source tree.
+
+2012-01-06  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Move listing of include paths and libs to pri files in sources
+
+        Includepaths are sometimes modified by non-Qt contributors so keeping
+        them in files inside Sources makes it more likely that they are updated
+        along with project files for the other ports.
+
+        Using pri files instead of prf files for this also has the benefit that
+        the include() from the main target file can be parsed and followed by
+        Qt Creator -- something that does not work with load().
+
+        Dependency from a target to a library through the WEBKIT variable are
+        handled through forwarding-files in Tools/qmake/mkspecs/modules, which
+        set the source root of the module and include the right pri file.
+
+        Ideally we'd use the variant of include() that takes an optional
+        namespace to read the variables into, or the fromfile() function,
+        but both of these add an overhead of about 40% on the total qmake
+        runtime, due to making a deep copy of all the variables in the
+        project or re-reading all the prf files from scratch.
+
+        Reviewed by Simon Hausmann.
+        Reviewed by Ossy.
+
+        * WebKit.pro:
+
+2012-01-06  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Add a few more files ot OTHER_FILES
+
+        Rubber-stamped by Simon Hausmann.
+
+        * WebKit.pro:
+
+2012-01-05  Ulan Degenbaev  <ulan@chromium.org>
+
+        [v8] Null pointer exception if a typed array constructor set to a primitive value.
+        https://bugs.webkit.org/show_bug.cgi?id=75532
+
+        Make sure that V8ArrayBufferViewCustomScript.js does not throw exception.
+
+        Reviewed by Kenneth Russell.
+
+        * LayoutTests/fast/canvas/webgl/array-buffer-view-crash-when-reassigned-expected.txt: Added.
+        * LayoutTests/fast/canvas/webgl/array-buffer-view-crash-when-reassigned.html: Added.
+        * Source/WebCore/bindings/v8/custom/V8ArrayBufferViewCustom.cpp:
+        * Source/WebCore/bindings/v8/custom/V8ArrayBufferViewCustomScript.js:
+
+2012-01-05  Zeno Albisser  <zeno@webkit.org>
+
+        [Qt][WK2] Implement custom URL schemes defined in QML.
+        https://bugs.webkit.org/show_bug.cgi?id=74931
+
+        Add new classes to the export map.
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Source/qtwebkit-export.map:
+
+2012-01-05  Fady Samuel  <fsamuel@chromium.org>
+
+        Move scalePageBy from eventSender to window.internals
+        https://bugs.webkit.org/show_bug.cgi?id=64512
+
+        Reviewed by Simon Fraser.
+
+        * Source/autotools/symbols.filter:
+
+2012-01-04  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Move WebMimeRegistry and dependencies to Source/Platform
+        https://bugs.webkit.org/show_bug.cgi?id=74583
+
+        Reviewed by Darin Fisher.
+
+        Update .gitignore for Source/Platform/Platform.gyp/ generated project files.
+
+        * .gitignore:
+
+2012-01-04  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Introduce new qmake variable 'WEBKIT' for signaling dependencies
+
+        The custom qmake variable 'WEBKIT' is used for signaling that a
+        target depends in some way on other subproject of the WebKit
+        project. For now this is limited to the set of intermediate
+        libraries: wtf, javascriptcore, webcore, and webkit2.
+
+        This replaces the previous convension of using load(foo) for
+        just include paths, and CONFIG += foo to also link against foo.
+
+        Adding a dependency results in additional include paths being
+        available, and potentially linking to the library. This is
+        decided by the build system based on conditions such as what
+        kind of target is being built and the general build config.
+
+        An advantage to his approach is that it simplifies the individual
+        foo.prf files, for example by allowing us to use INCLUDEPATH +=
+        and LIBS += as normal instead of prepending.
+
+        Reviewed by Simon Hausmann.
+
+        * Source/api.pri:
+
+2012-01-04  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Move use of $$qtLibraryTarget() to a single place
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Source/api.pri:
+
+2012-01-04  Mary Wu  <mary.wu@torchmobile.com.cn>
+
+        Enable DOWNLOAD_ATTRIBUTE in BlackBerry porting
+        https://bugs.webkit.org/show_bug.cgi?id=75238
+
+        Reviewed by Antonio Gomes.
+
+        * Source/cmakeconfig.h.cmake: Modified to add a new cmakedefine ENABLE_DOWNLOAD_ATTRIBUTE.
+
+2012-01-03  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Clean up detection of fontconfig
+
+        We decide in features.prf whether or not fontconfig is available, and
+        set the HAVE_FONTCONFIG define accordingly. All leaf project files
+        should use this define to decide whether or not to link against
+        fontconfig, not do their own detection.
+
+        We don't need to add link_pkgconfig to CONFIG in each project file,
+        as we selectivly enable that configuration in defaults_post when
+        needed.
+
+        Reviewed by Ossy.
+
+        * Source/api.pri:
+
+2012-01-02  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add a way to change web view settings in MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=71568
+
+        Reviewed by Philippe Normand.
+
+        * GNUmakefile.am: Initialize minibrowser_built_sources.
+
+2011-12-28  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK] Fix compilation issue when selecting opengl for Accelerated compositing
+        https://bugs.webkit.org/show_bug.cgi?id=75309
+
+        Reviewed by Martin Robinson.
+
+        Replace WTF_USE_TEXTURE_MAPPER_OPENGL to WTF_USE_TEXTURE_MAPPER_GL
+
+        * GNUmakefile.am:
+
+2011-12-28  Dan Bernstein  <mitz@apple.com>
+
+        Entering "make" in Source builds only JavaScriptGlue and ANGLE
+        https://bugs.webkit.org/show_bug.cgi?id=75318
+
+        Reviewed by Anders Carlsson.
+
+        * Makefile: Changed to make Source and Tools.
+        * Source/Makefile: Changed to make all projects in Source.
+
+2011-12-27  Kentaro Hara  <haraken@chromium.org>
+
+        WIP: Enable the [Supplemental] IDL on Gtk
+        https://bugs.webkit.org/show_bug.cgi?id=74972
+
+        Reviewed by Adam Barth.
+
+        This patch adds dom_binding_idls, which is used in Source/WebCore/GNUmakefile.list.am.
+
+        * GNUmakefile.am:
+
+2011-12-22  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Enable blob for the BlackBerry porting
+        https://bugs.webkit.org/show_bug.cgi?id=75074
+
+        Reviewed by George Staikos.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+
+2011-12-22  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][WK2] Add an option to build WebKit2.
+        https://bugs.webkit.org/show_bug.cgi?id=61999
+
+        Reviewed by Eric Seidel.
+
+        * Source/cmake/OptionsEfl.cmake: Set WebKit2_LIBRARY_NAME.
+
+2011-12-22  Daniel Jalkut  <jalkut@red-sweater.com>
+
+        ManualTests HTML template should be simplified
+        https://bugs.webkit.org/show_bug.cgi?id=75025
+
+        Reviewed by Ryosuke Niwa.
+
+        * ManualTests/template.html:
+
+2011-12-22  Daniel Jalkut  <jalkut@red-sweater.com>
+
+        WebKit editing throws exception when monochrome color dragged onto text
+        https://bugs.webkit.org/show_bug.cgi?id=74775
+
+        Reviewed by Ryosuke Niwa.
+
+        * ManualTests/drag-color-to-contenteditable.html: Added.
+
+2011-12-21  Daniel Bates  <dbates@webkit.org>
+
+        Add CMake option to only build JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=74979
+
+        Reviewed by Rob Buis.
+
+        Towards adding CMake support to script Tools/Scripts/build-jsc, add a CMake
+        option to only build JavaScriptCore.
+
+        * CMakeLists.txt: Defined ENABLE_WEBCORE to build WebCore. If the option
+        ONLY_BUILD_JAVASCRIPTCORE is specified then don't build WebCore, WebKit, or WebKit2.
+        * Source/CMakeLists.txt:
+        * Source/cmake/WebKitFS.cmake:
+
+2011-12-20  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        emacs: unreviewed. add settings for editing js files.
+
+        * .dir-locals.el:
+
+2011-12-20  Rafael Brandao  <rafael.lobo@openbossa.org>
+
+        [Qt][WK2] Implement favicon support
+        https://bugs.webkit.org/show_bug.cgi?id=71082
+
+        Reviewed by Simon Hausmann.
+
+        * Source/qtwebkit-export.map: Added new classes.
+
+2011-12-18  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        Rename EditCommandQt to UndoStepQt
+        https://bugs.webkit.org/show_bug.cgi?id=74754
+
+        Reviewed by Ryosuke Niwa.
+
+        * Source/api.pri:
+
+2011-12-16  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        De-virtualize destructors
+        https://bugs.webkit.org/show_bug.cgi?id=74331
+
+        Reviewed by Geoffrey Garen.
+
+        * Source/autotools/symbols.filter: Removed symbol no longer present.
+
+2011-12-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Update NEWS and configure.ac for 1.7.3 release
+        https://bugs.webkit.org/show_bug.cgi?id=74699
+
+        Reviewed by Philippe Normand.
+
+        * configure.ac: Bumped version number.
+
 2011-12-15  Raphael Kubo da Costa  <kubo@profusion.mobi>
 
         [CMake] Remove ENABLE_DATAGRID from the buildsystem.

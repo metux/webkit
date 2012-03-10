@@ -103,7 +103,7 @@ void InspectorProfilerAgent::addProfileFinishedMessageToConsole(PassRefPtr<Scrip
     RefPtr<ScriptProfile> profile = prpProfile;
     String title = profile->title();
     String message = makeString("Profile \"webkit-profile://", CPUProfileType, '/', encodeWithURLEscapeSequences(title), '#', String::number(profile->uid()), "\" finished.");
-    m_consoleAgent->addMessageToConsole(JSMessageSource, LogMessageType, LogMessageLevel, message, lineNumber, sourceURL);
+    m_consoleAgent->addMessageToConsole(JSMessageSource, LogMessageType, LogMessageLevel, message, sourceURL, lineNumber);
 }
 
 void InspectorProfilerAgent::addStartProfilingMessageToConsole(const String& title, unsigned lineNumber, const String& sourceURL)
@@ -111,7 +111,7 @@ void InspectorProfilerAgent::addStartProfilingMessageToConsole(const String& tit
     if (!m_frontend)
         return;
     String message = makeString("Profile \"webkit-profile://", CPUProfileType, '/', encodeWithURLEscapeSequences(title), "#0\" started.");
-    m_consoleAgent->addMessageToConsole(JSMessageSource, LogMessageType, LogMessageLevel, message, lineNumber, sourceURL);
+    m_consoleAgent->addMessageToConsole(JSMessageSource, LogMessageType, LogMessageLevel, message, sourceURL, lineNumber);
 }
 
 void InspectorProfilerAgent::collectGarbage(WebCore::ErrorString*)
@@ -192,14 +192,14 @@ String InspectorProfilerAgent::getCurrentUserInitiatedProfileName(bool increment
     return makeString(UserInitiatedProfileName, '.', String::number(m_currentUserInitiatedProfileNumber));
 }
 
-void InspectorProfilerAgent::getProfileHeaders(ErrorString*, RefPtr<InspectorArray>* headers)
+void InspectorProfilerAgent::getProfileHeaders(ErrorString*, RefPtr<InspectorArray>& headers)
 {
     ProfilesMap::iterator profilesEnd = m_profiles.end();
     for (ProfilesMap::iterator it = m_profiles.begin(); it != profilesEnd; ++it)
-        (*headers)->pushObject(createProfileHeader(*it->second));
+        headers->pushObject(createProfileHeader(*it->second));
     HeapSnapshotsMap::iterator snapshotsEnd = m_snapshots.end();
     for (HeapSnapshotsMap::iterator it = m_snapshots.begin(); it != snapshotsEnd; ++it)
-        (*headers)->pushObject(createSnapshotHeader(*it->second));
+        headers->pushObject(createSnapshotHeader(*it->second));
 }
 
 namespace {
@@ -217,21 +217,21 @@ private:
 
 } // namespace
 
-void InspectorProfilerAgent::getProfile(ErrorString*, const String& type, unsigned uid, RefPtr<InspectorObject>* profileObject)
+void InspectorProfilerAgent::getProfile(ErrorString*, const String& type, unsigned uid, RefPtr<InspectorObject>& profileObject)
 {
     if (type == CPUProfileType) {
         ProfilesMap::iterator it = m_profiles.find(uid);
         if (it != m_profiles.end()) {
-            *profileObject = createProfileHeader(*it->second);
-            (*profileObject)->setObject("head", it->second->buildInspectorObjectForHead());
+            profileObject = createProfileHeader(*it->second);
+            profileObject->setObject("head", it->second->buildInspectorObjectForHead());
             if (it->second->bottomUpHead())
-                (*profileObject)->setObject("bottomUpHead", it->second->buildInspectorObjectForBottomUpHead());
+                profileObject->setObject("bottomUpHead", it->second->buildInspectorObjectForBottomUpHead());
         }
     } else if (type == HeapProfileType) {
         HeapSnapshotsMap::iterator it = m_snapshots.find(uid);
         if (it != m_snapshots.end()) {
             RefPtr<ScriptHeapSnapshot> snapshot = it->second;
-            *profileObject = createSnapshotHeader(*snapshot);
+            profileObject = createSnapshotHeader(*snapshot);
             if (m_frontend) {
                 OutputStream stream(m_frontend, uid);
                 snapshot->writeJSON(&stream);
@@ -279,6 +279,8 @@ void InspectorProfilerAgent::clearFrontend()
 {
     m_frontend = 0;
     stop();
+    ErrorString error;
+    disable(&error);
 }
 
 void InspectorProfilerAgent::restore()
@@ -385,11 +387,11 @@ void InspectorProfilerAgent::toggleRecordButton(bool isProfiling)
         m_frontend->setRecordingProfile(isProfiling);
 }
 
-void InspectorProfilerAgent::getObjectByHeapObjectId(ErrorString* error, int id, RefPtr<InspectorObject>* result)
+void InspectorProfilerAgent::getObjectByHeapObjectId(ErrorString* error, int id, RefPtr<InspectorObject>& result)
 {
     RefPtr<InspectorValue> heapObject = ScriptProfiler::objectByHeapObjectId(id, m_injectedScriptManager);
     if (!heapObject->isNull())
-        heapObject->asObject(result);
+        heapObject->asObject(&result);
     else
         *error = "Object is not available.";
 }

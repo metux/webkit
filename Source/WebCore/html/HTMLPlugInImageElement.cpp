@@ -51,7 +51,7 @@ HTMLPlugInImageElement::HTMLPlugInImageElement(const QualifiedName& tagName, Doc
 HTMLPlugInImageElement::~HTMLPlugInImageElement()
 {
     if (m_needsDocumentActivationCallbacks)
-        document()->unregisterForDocumentActivationCallbacks(this);
+        document()->unregisterForPageCacheSuspensionCallbacks(this);
 }
 
 RenderEmbeddedObject* HTMLPlugInImageElement::renderEmbeddedObject() const
@@ -127,7 +127,7 @@ RenderObject* HTMLPlugInImageElement::createRenderer(RenderArena* arena, RenderS
     // inactive or reactivates so it can clear the renderer before going into the page cache.
     if (!m_needsDocumentActivationCallbacks) {
         m_needsDocumentActivationCallbacks = true;
-        document()->registerForDocumentActivationCallbacks(this);
+        document()->registerForPageCacheSuspensionCallbacks(this);
     }
     
     // Fallback content breaks the DOM->Renderer class relationship of this
@@ -202,26 +202,20 @@ void HTMLPlugInImageElement::finishParsingChildren()
         setNeedsStyleRecalc();    
 }
 
-void HTMLPlugInImageElement::willMoveToNewOwnerDocument()
+void HTMLPlugInImageElement::didMoveToNewDocument(Document* oldDocument)
 {
-    if (m_needsDocumentActivationCallbacks)
-        document()->unregisterForDocumentActivationCallbacks(this);
+    if (m_needsDocumentActivationCallbacks) {
+        if (oldDocument)
+            oldDocument->unregisterForPageCacheSuspensionCallbacks(this);
+        document()->registerForPageCacheSuspensionCallbacks(this);
+    }
 
     if (m_imageLoader)
-        m_imageLoader->elementWillMoveToNewOwnerDocument();
-
-    HTMLPlugInElement::willMoveToNewOwnerDocument();
+        m_imageLoader->elementDidMoveToNewDocument();
+    HTMLPlugInElement::didMoveToNewDocument(oldDocument);
 }
 
-void HTMLPlugInImageElement::didMoveToNewOwnerDocument()
-{
-    if (m_needsDocumentActivationCallbacks)
-        document()->registerForDocumentActivationCallbacks(this);   
-    
-    HTMLPlugInElement::didMoveToNewOwnerDocument();
-}
-
-void HTMLPlugInImageElement::documentWillBecomeInactive()
+void HTMLPlugInImageElement::documentWillSuspendForPageCache()
 {
     if (RenderStyle* rs = renderStyle()) {
         m_customStyleForPageCache = RenderStyle::clone(rs);
@@ -233,10 +227,10 @@ void HTMLPlugInImageElement::documentWillBecomeInactive()
     if (m_customStyleForPageCache)
         recalcStyle(Force);
         
-    HTMLPlugInElement::documentWillBecomeInactive();
+    HTMLPlugInElement::documentWillSuspendForPageCache();
 }
 
-void HTMLPlugInImageElement::documentDidBecomeActive()
+void HTMLPlugInImageElement::documentDidResumeFromPageCache()
 {
     clearHasCustomStyleForRenderer();
 
@@ -245,7 +239,7 @@ void HTMLPlugInImageElement::documentDidBecomeActive()
         recalcStyle(Force);
     }
     
-    HTMLPlugInElement::documentDidBecomeActive();
+    HTMLPlugInElement::documentDidResumeFromPageCache();
 }
 
 PassRefPtr<RenderStyle> HTMLPlugInImageElement::customStyleForRenderer()

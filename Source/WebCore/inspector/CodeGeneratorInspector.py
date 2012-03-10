@@ -43,6 +43,7 @@ DOMAIN_DEFINE_NAME_MAP = {
     "Debugger": "JAVASCRIPT_DEBUGGER",
     "DOMDebugger": "JAVASCRIPT_DEBUGGER",
     "FileSystem": "FILE_SYSTEM",
+    "IndexedDB": "INDEXED_DATABASE",
     "Profiler": "JAVASCRIPT_DEBUGGER",
     "Worker": "WORKERS",
 }
@@ -51,6 +52,7 @@ DOMAIN_DEFINE_NAME_MAP = {
 # Manually-filled map of type name replacements.
 TYPE_NAME_FIX_MAP = {
     "RGBA": "Rgba",  # RGBA is reported to be conflicting with a define name in Windows CE.
+    "": "Empty",
 }
 
 
@@ -251,6 +253,10 @@ class RawTypes(object):
         def is_event_param_check_optional():
             return False
 
+        @staticmethod
+        def get_output_argument_prefix():
+            return "&"
+
     class String(BaseType):
         @classmethod
         def get_c_param_type(cls, param_type, optional):
@@ -372,6 +378,10 @@ class RawTypes(object):
         def is_event_param_check_optional():
             return True
 
+        @staticmethod
+        def get_output_argument_prefix():
+            return ""
+
         _plain_c_type = CParamType("RefPtr<InspectorObject>")
         _ref_c_type = CParamType("PassRefPtr<InspectorObject>")
 
@@ -432,6 +442,10 @@ class RawTypes(object):
         def is_event_param_check_optional():
             return True
 
+        @staticmethod
+        def get_output_argument_prefix():
+            return ""
+
         _plain_c_type = CParamType("RefPtr<InspectorArray>")
         _ref_c_type = CParamType("PassRefPtr<InspectorArray>")
 
@@ -455,111 +469,262 @@ def fix_type_name(json_name):
             class_name = fixed
 
             @staticmethod
-            def output_comment(output):
-                output.append("// Type originally was named '%s'.\n" % json_name)
+            def output_comment(writer):
+                writer.newline("// Type originally was named '%s'.\n" % json_name)
     else:
 
         class Result(object):
             class_name = json_name
 
             @staticmethod
-            def output_comment(output):
+            def output_comment(writer):
                 pass
 
     return Result
 
 
+class Writer:
+    def __init__(self, output, indent):
+        self.output = output
+        self.indent = indent
+
+    def newline(self, str):
+        if (self.indent):
+            self.output.append(self.indent)
+        self.output.append(str)
+
+    def append(self, str):
+        self.output.append(str)
+
+    def newline_multiline(self, str):
+        parts = str.split('\n')
+        self.newline(parts[0])
+        for p in parts[1:]:
+            self.output.append('\n')
+            if p:
+                self.newline(p)
+
+    def append_multiline(self, str):
+        parts = str.split('\n')
+        self.append(parts[0])
+        for p in parts[1:]:
+            self.output.append('\n')
+            if p:
+                self.newline(p)
+
+    def get_indented(self, additional_indent):
+        return Writer(self.output, self.indent + additional_indent)
+
+    def insert_writer(self, additional_indent):
+        new_output = []
+        self.output.append(new_output)
+        return Writer(new_output, self.indent + additional_indent)
+
+
+class EnumConstants:
+    map_ = {}
+    constants_ = []
+
+    @classmethod
+    def add_constant(cls, value):
+        if value in cls.map_:
+            return cls.map_[value]
+        else:
+            pos = len(cls.map_)
+            cls.map_[value] = pos
+            cls.constants_.append(value)
+            return pos
+
+    @classmethod
+    def get_enum_constant_code(cls):
+        output = []
+        for item in cls.constants_:
+            output.append("    \"" + item + "\"")
+        return join(output, ",\n") + "\n"
+
 
 class TypeBindings:
     @staticmethod
-    def create_for_named_type_declaration(json_type, context_domain_name):
+    def create_named_type_declaration(json_typable, context_domain_name, type_data):
+        json_type = type_data.get_json_type()
+
+        class Helper:
+            is_ad_hoc = False
+            full_name_prefix = "TypeBuilder::" + context_domain_name + "::"
+
+            @staticmethod
+            def write_doc(writer):
+                if "description" in json_type:
+                    writer.newline("/* ")
+                    writer.append(json_type["description"])
+                    writer.append(" */\n")
+
+            @staticmethod
+            def add_to_forward_listener(forward_listener):
+                forward_listener.add_type_data(type_data)
+
+
         fixed_type_name = fix_type_name(json_type["id"])
+        return TypeBindings.create_type_declaration_(json_typable, context_domain_name, fixed_type_name, Helper)
 
-        def write_doc(output):
-            if "description" in json_type:
-                output.append("/* ")
-                output.append(json_type["description"])
-                output.append(" */\n")
+    @staticmethod
+    def create_ad_hoc_type_declaration(json_typable, context_domain_name, ad_hoc_type_context):
+        class Helper:
+            is_ad_hoc = True
+            full_name_prefix = ""
 
-        if json_type["type"] == "string":
-            if "enum" in json_type:
+            @staticmethod
+            def write_doc(writer):
+                pass
+
+            @staticmethod
+            def add_to_forward_listener(forward_listener):
+                pass
+        fixed_type_name = ad_hoc_type_context.get_type_name_fix()
+        return TypeBindings.create_type_declaration_(json_typable, context_domain_name, fixed_type_name, Helper)
+
+    @staticmethod
+    def create_type_declaration_(json_typable, context_domain_name, fixed_type_name, helper):
+        if json_typable["type"] == "string":
+            if "enum" in json_typable:
 
                 class EnumBinding:
                     @staticmethod
-                    def generate_type_builder(output, forward_listener):
-                        enum = json_type["enum"]
-                        write_doc(output)
-                        enum_name = fixed_type_name.class_name
-                        fixed_type_name.output_comment(output)
-                        output.append("namespace ")
-                        output.append(enum_name)
-                        output.append(" {\n")
-                        for enum_item in enum:
-                            item_c_name = enum_item.replace('-', '_')
-                            output.append("const char* const ")
-                            output.append(Capitalizer.upper_camel_case_to_lower(item_c_name))
-                            output.append(" = \"")
-                            output.append(enum_item)
-                            output.append("\";\n")
-                        output.append("} // namespace ")
-                        output.append(enum_name)
-                        output.append("\n\n")
+                    def get_code_generator():
+                        #FIXME: generate ad-hoc enums too once we figure out how to better implement them in C++.
+                        comment_out = helper.is_ad_hoc
+
+                        class CodeGenerator:
+                            @staticmethod
+                            def generate_type_builder(writer, forward_listener):
+                                enum = json_typable["enum"]
+                                helper.write_doc(writer)
+                                enum_name = fixed_type_name.class_name
+                                fixed_type_name.output_comment(writer)
+                                writer.newline("struct ")
+                                writer.append(enum_name)
+                                writer.append(" {\n")
+                                writer.newline("    enum Enum {\n")
+                                for enum_item in enum:
+                                    enum_pos = EnumConstants.add_constant(enum_item)
+
+                                    item_c_name = enum_item.replace('-', '_')
+                                    item_c_name = Capitalizer.lower_camel_case_to_upper(item_c_name)
+                                    if item_c_name in TYPE_NAME_FIX_MAP:
+                                        item_c_name = TYPE_NAME_FIX_MAP[item_c_name]
+                                    writer.newline("        ")
+                                    writer.append(item_c_name)
+                                    writer.append(" = ")
+                                    writer.append("%s" % enum_pos)
+                                    writer.append(",\n")
+                                writer.newline("    };\n")
+                                writer.newline("}; // struct ")
+                                writer.append(enum_name)
+                                writer.append("\n\n")
+
+                            @staticmethod
+                            def register_use(forward_listener):
+                                pass
+
+                        return CodeGenerator
+
+                    @classmethod
+                    def get_in_c_type_text(cls, optional):
+                        return helper.full_name_prefix + fixed_type_name.class_name + "::Enum"
+
+                    @staticmethod
+                    def get_setter_value_expression_pattern():
+                        return "getEnumConstantValue(%s)"
+
+                    @staticmethod
+                    def reduce_to_raw_type():
+                        return RawTypes.String
 
                 return EnumBinding
             else:
 
                 class PlainString:
                     @staticmethod
-                    def generate_type_builder(output, forward_listener):
-                        write_doc(output)
-                        fixed_type_name.output_comment(output)
-                        output.append("typedef String ")
-                        output.append(fixed_type_name.class_name)
-                        output.append(";\n\n")
+                    def get_code_generator():
+                        if helper.is_ad_hoc:
+                            return
+
+                        class CodeGenerator:
+                            @staticmethod
+                            def generate_type_builder(writer, forward_listener):
+                                helper.write_doc(writer)
+                                fixed_type_name.output_comment(writer)
+                                writer.newline("typedef String ")
+                                writer.append(fixed_type_name.class_name)
+                                writer.append(";\n\n")
+
+                            @staticmethod
+                            def register_use(forward_listener):
+                                pass
+
+                        return CodeGenerator
+
+                    @staticmethod
+                    def reduce_to_raw_type():
+                        return RawTypes.String
+
+                    @staticmethod
+                    def get_setter_value_expression_pattern():
+                        return None
+
+                    @classmethod
+                    def get_in_c_type_text(cls, optional):
+                        #FIXME: return a typedef name instead.
+                        return cls.reduce_to_raw_type().get_c_param_type(ParamType.EVENT, optional).get_text()
+
                 return PlainString
 
-        elif json_type["type"] == "object":
-            if "properties" in json_type:
+        elif json_typable["type"] == "object":
+            if "properties" in json_typable:
 
                 class ClassBinding:
                     @staticmethod
-                    def generate_type_builder(output, forward_listener):
-                        write_doc(output)
-                        class_name = fixed_type_name.class_name
-                        fixed_type_name.output_comment(output)
-                        output.append("class ")
-                        output.append(class_name)
-                        output.append(" : public InspectorObject {\n")
-                        output.append("public:\n")
+                    def get_code_generator():
+                        class CodeGenerator:
+                            @classmethod
+                            def generate_type_builder(cls, writer, forward_listener):
+                                helper.write_doc(writer)
+                                class_name = fixed_type_name.class_name
+                                fixed_type_name.output_comment(writer)
+                                writer.newline("class ")
+                                writer.append(class_name)
+                                writer.append(" : public InspectorObject {\n")
+                                writer.newline("public:\n")
+                                ad_hoc_type_writer = writer.insert_writer("    ")
 
-                        properties = json_type["properties"]
-                        main_properties = []
-                        optional_properties = []
-                        for p in properties:
-                            if "optional" in p and p["optional"]:
-                                optional_properties.append(p)
-                            else:
-                                main_properties.append(p)
+                                properties = json_typable["properties"]
+                                main_properties = []
+                                optional_properties = []
+                                for p in properties:
+                                    if "optional" in p and p["optional"]:
+                                        optional_properties.append(p)
+                                    else:
+                                        main_properties.append(p)
 
-                        output.append(
+                                writer.newline_multiline(
 """    enum {
-        NO_FIELDS_SET = 0,
+        NoFieldsSet = 0,
 """)
 
-                        state_enum_items = []
-                        if len(main_properties) > 0:
-                            pos = 0
-                            for p in main_properties:
-                                item_name = Capitalizer.camel_case_to_capitalized_with_underscores(p["name"]) + "_SET"
-                                state_enum_items.append(item_name)
-                                output.append("        %s = 1 << %s,\n" % (item_name, pos))
-                                pos += 1
-                            all_fields_set_value = "(" + (" | ".join(state_enum_items)) + ")"
-                        else:
-                            all_fields_set_value = "0"
+                                state_enum_items = []
+                                if len(main_properties) > 0:
+                                    pos = 0
+                                    for p in main_properties:
+                                        item_name = Capitalizer.lower_camel_case_to_upper(p["name"]) + "Set"
+                                        state_enum_items.append(item_name)
+                                        writer.newline("        %s = 1 << %s,\n" % (item_name, pos))
+                                        pos += 1
+                                    all_fields_set_value = "(" + (" | ".join(state_enum_items)) + ")"
+                                else:
+                                    all_fields_set_value = "0"
 
-                        output.append(
-"""        ALL_FIELDS_SET = %s
+                                writer.newline_multiline(
+"""        AllFieldsSet = %s
     };
 
     template<int STATE>
@@ -574,37 +739,48 @@ class TypeBindings:
 
         Builder(PassRefPtr<%s> ptr)
         {
-            COMPILE_ASSERT(STATE == NO_FIELDS_SET, builder_created_in_non_init_state);
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
             m_result = ptr;
         }
         friend class %s;
     public:
 """ % (all_fields_set_value, class_name, class_name))
 
-                        pos = 0
-                        for prop in main_properties:
-                            prop_name = prop["name"]
-                            param_raw_type = resolve_param_raw_type(prop, context_domain_name)
-                            output.append("""
+                                pos = 0
+                                for prop in main_properties:
+                                    prop_name = prop["name"]
+
+                                    ad_hoc_type_context = cls.AdHocTypeContextImpl(prop_name, fixed_type_name.class_name, ad_hoc_type_writer, forward_listener)
+
+                                    param_type_binding = resolve_param_type(prop, context_domain_name, ad_hoc_type_context)
+                                    param_raw_type = param_type_binding.reduce_to_raw_type()
+                                    for param_type_opt in MethodGenerateModes.get_modes(param_type_binding):
+                                        writer.newline_multiline("""
         Builder<STATE | %s>& set%s(%s value)
         {
             COMPILE_ASSERT(!(STATE & %s), property_%s_already_set);
-            m_result->set%s("%s", value);
+            m_result->set%s("%s", %s);
             return castState<%s>();
         }
 """
-                            % (state_enum_items[pos],
-                               Capitalizer.lower_camel_case_to_upper(prop_name),
-                               param_raw_type.get_c_param_type(ParamType.TYPE_BUILDER_OUTPUT, False).get_text(),
-                               state_enum_items[pos], prop_name,
-                               param_raw_type.get_setter_name(), prop_name, state_enum_items[pos]))
+                                        % (state_enum_items[pos],
+                                           Capitalizer.lower_camel_case_to_upper(prop_name),
+                                           param_type_opt.get_c_param_type_text(param_type_binding),
+                                           state_enum_items[pos], prop_name,
+                                           param_raw_type.get_setter_name(), prop_name,
+                                           param_type_opt.get_setter_value_expression(param_type_binding, "value"),
+                                           state_enum_items[pos]))
 
-                            pos += 1
+                                        code_generator = param_type_binding.get_code_generator()
+                                        if code_generator:
+                                            code_generator.register_use(forward_listener)
 
-                        output.append("""
+                                    pos += 1
+
+                                writer.newline_multiline("""
         operator RefPtr<%s>& ()
         {
-            COMPILE_ASSERT(STATE == ALL_FIELDS_SET, result_is_not_ready);
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
             return *reinterpret_cast<RefPtr<%s>*>(&m_result);
         }
 
@@ -615,53 +791,168 @@ class TypeBindings:
     };
 
 """
-                        % (class_name, class_name, class_name, class_name))
+                                % (class_name, class_name, class_name, class_name))
 
-                        output.append("    /*\n")
-                        output.append("     * Synthetic constructor:\n")
-                        output.append("     * RefPtr<%s> result = %s::create()" % (class_name, class_name))
-                        for prop in main_properties:
-                            output.append("\n     *     .set%s(...)" % Capitalizer.lower_camel_case_to_upper(prop["name"]))
-                        output.append(";\n     */\n")
+                                writer.newline("    /*\n")
+                                writer.newline("     * Synthetic constructor:\n")
+                                writer.newline("     * RefPtr<%s> result = %s::create()" % (class_name, class_name))
+                                for prop in main_properties:
+                                    writer.append_multiline("\n     *     .set%s(...)" % Capitalizer.lower_camel_case_to_upper(prop["name"]))
+                                writer.append_multiline(";\n     */\n")
 
-                        output.append(
-"""    static Builder<NO_FIELDS_SET> create()
+                                writer.newline_multiline(
+"""    static Builder<NoFieldsSet> create()
     {
-        return Builder<NO_FIELDS_SET>(adoptRef(new %s()));
+        return Builder<NoFieldsSet>(adoptRef(new %s()));
     }
 """ % class_name)
 
-                        for prop in optional_properties:
-                            param_raw_type = resolve_param_raw_type(prop, context_domain_name)
-                            setter_name = "set%s" % Capitalizer.lower_camel_case_to_upper(prop["name"])
-                            output.append("\n    void %s" % setter_name)
-                            output.append("(%s value)\n" % param_raw_type.get_c_param_type(ParamType.TYPE_BUILDER_OUTPUT, False).get_text())
-                            output.append("    {\n")
-                            output.append("        this->set%s(\"%s\", value);\n" % (param_raw_type.get_setter_name(), prop["name"]))
-                            output.append("    }\n")
+                                for prop in optional_properties:
+                                    prop_name = prop["name"]
+                                    ad_hoc_type_context = cls.AdHocTypeContextImpl(prop_name, fixed_type_name.class_name, ad_hoc_type_writer, forward_listener)
 
-                            if setter_name in INSPECTOR_OBJECT_SETTER_NAMES:
-                                output.append("    using InspectorObject::%s;\n\n" % setter_name)
+                                    param_type_binding = resolve_param_type(prop, context_domain_name, ad_hoc_type_context)
+                                    setter_name = "set%s" % Capitalizer.lower_camel_case_to_upper(prop_name)
 
-                        output.append("};\n\n")
+                                    for param_type_opt in MethodGenerateModes.get_modes(param_type_binding):
+                                        writer.append_multiline("\n    void %s" % setter_name)
+                                        writer.append("(%s value)\n" % param_type_opt.get_c_param_type_text(param_type_binding))
+                                        writer.newline("    {\n")
+                                        writer.newline("        this->set%s(\"%s\", %s);\n"
+                                            % (param_type_binding.reduce_to_raw_type().get_setter_name(), prop["name"],
+                                               param_type_opt.get_setter_value_expression(param_type_binding, "value")))
+                                        writer.newline("    }\n")
+
+                                    code_generator = param_type_binding.get_code_generator()
+                                    if code_generator:
+                                        code_generator.register_use(forward_listener)
+
+                                    if setter_name in INSPECTOR_OBJECT_SETTER_NAMES:
+                                        writer.newline("    using InspectorObject::%s;\n\n" % setter_name)
+
+                                writer.newline("};\n\n")
+
+                            class AdHocTypeContextImpl:
+                                def __init__(self, property_name, class_name, writer, forward_listener):
+                                    self.property_name = property_name
+                                    self.class_name = class_name
+                                    self.writer = writer
+                                    self.forward_listener = forward_listener
+
+                                def get_type_name_fix(self):
+                                    class NameFix:
+                                        class_name = Capitalizer.lower_camel_case_to_upper(self.property_name)
+
+                                        @staticmethod
+                                        def output_comment(writer):
+                                            writer.newline("// Named after property name '%s' while generating %s.\n" % (self.property_name, self.class_name))
+
+                                    return NameFix
+
+                                def call_generate_type_builder(self, code_generator):
+                                    code_generator.generate_type_builder(self.writer, self.forward_listener)
+
+                            @staticmethod
+                            def generate_forward_declaration(writer):
+                                class_name = fixed_type_name.class_name
+                                writer.newline("class ")
+                                writer.append(class_name)
+                                writer.append(";\n")
+
+                            @staticmethod
+                            def register_use(forward_listener):
+                                helper.add_to_forward_listener(forward_listener)
+
+                        return CodeGenerator
+
+                    @classmethod
+                    def get_in_c_type_text(cls, optional):
+                        return "PassRefPtr<" + helper.full_name_prefix + fixed_type_name.class_name + ">"
+
+                    @staticmethod
+                    def get_setter_value_expression_pattern():
+                        return None
+
+                    @staticmethod
+                    def reduce_to_raw_type():
+                        return RawTypes.Object
+
                 return ClassBinding
             else:
 
                 class PlainObjectBinding:
                     @staticmethod
-                    def generate_type_builder(output, forward_listener):
-                        # No-op
+                    def get_code_generator():
                         pass
-                return PlainObjectBinding
-        else:
-            raw_type = RawTypes.get(json_type["type"])
 
-            class RawTypesBinding:
-                @staticmethod
-                def generate_type_builder(output, forward_listener):
-                    # No-op
-                    pass
-            return RawTypesBinding
+                    @classmethod
+                    def get_in_c_type_text(cls, optional):
+                        return cls.reduce_to_raw_type().get_c_param_type(ParamType.EVENT, optional).get_text()
+
+                    @staticmethod
+                    def get_setter_value_expression_pattern():
+                        return None
+
+                    @staticmethod
+                    def reduce_to_raw_type():
+                        return RawTypes.Object
+
+                return PlainObjectBinding
+        elif json_typable["type"] == "array":
+            if "items" in json_typable:
+
+                class CodeGenerator:
+                    @staticmethod
+                    def generate_type_builder(writer, forward_listener):
+
+                        class AdHocTypeContext:
+                            @staticmethod
+                            def get_type_name_fix():
+                                class NameFix:
+                                    class_name = fixed_type_name.class_name + "Item"
+
+                                    @staticmethod
+                                    def output_comment(writer):
+                                        fixed_type_name.output_comment(writer)
+                                        writer.newline("// Named as an item of array.\n")
+
+                                return NameFix
+
+                            @staticmethod
+                            def call_generate_type_builder(code_generator):
+                                code_generator.generate_type_builder(writer, forward_listener)
+
+                        resolve_param_type(json_typable["items"], context_domain_name, AdHocTypeContext)
+
+                    @staticmethod
+                    def register_use(forward_listener):
+                        pass
+
+                default_binding_code_generator = CodeGenerator
+
+        else:
+            default_binding_code_generator = None
+
+        raw_type = RawTypes.get(json_typable["type"])
+
+        class RawTypesBinding:
+            @staticmethod
+            def get_code_generator():
+                return default_binding_code_generator
+
+            @classmethod
+            def get_in_c_type_text(cls, optional):
+                return cls.reduce_to_raw_type().get_c_param_type(ParamType.EVENT, optional).get_text()
+
+            @staticmethod
+            def get_setter_value_expression_pattern():
+                return None
+
+            @staticmethod
+            def reduce_to_raw_type():
+                return raw_type
+
+        return RawTypesBinding
 
 
 class TypeData(object):
@@ -676,13 +967,16 @@ class TypeData(object):
         json_type_name = json_type["type"]
         raw_type = RawTypes.get(json_type_name)
         self.raw_type_ = raw_type
-        self.binding_ = TypeBindings.create_for_named_type_declaration(json_type, json_domain["domain"])
+        self.binding_ = TypeBindings.create_named_type_declaration(json_type, json_domain["domain"], self)
 
     def get_raw_type(self):
         return self.raw_type_
 
     def get_binding(self):
         return self.binding_
+
+    def get_json_type(self):
+        return self.json_type_
 
 
 class DomainData:
@@ -726,6 +1020,20 @@ class TypeMap:
     def get(self, domain_name, type_name):
         return self.map_[domain_name][type_name]
 
+
+def resolve_param_type(json_parameter, scope_domain_name, ad_hoc_type_context):
+    if "$ref" in json_parameter:
+        json_ref = json_parameter["$ref"]
+        type_data = get_ref_data(json_ref, scope_domain_name)
+        return type_data.get_binding()
+    elif "type" in json_parameter:
+        result = TypeBindings.create_ad_hoc_type_declaration(json_parameter, scope_domain_name, ad_hoc_type_context)
+        code_generator = result.get_code_generator()
+        if code_generator:
+            ad_hoc_type_context.call_generate_type_builder(code_generator)
+        return result
+    else:
+        raise Exception("Unknown type")
 
 def resolve_param_raw_type(json_parameter, scope_domain_name):
     if "$ref" in json_parameter:
@@ -844,6 +1152,10 @@ typedef String ErrorString;
 #if ENABLE(INSPECTOR)
 
 namespace TypeBuilder {
+${forwards}
+
+String getEnumConstantValue(int code);
+
 ${typeBuilders}
 } // namespace TypeBuilder
 
@@ -1286,6 +1598,17 @@ $constructorInit{
 
 $methods
 
+namespace TypeBuilder {
+
+const char* const enum_constant_values[] = {
+$enumConstantValues};
+
+String getEnumConstantValue(int code) {
+    return enum_constant_values[code];
+}
+
+} // namespace TypeBuilder
+
 } // namespace WebCore
 
 #endif // ENABLE(INSPECTOR)
@@ -1306,6 +1629,66 @@ $domainInitializers
 
 type_map = TypeMap(json_api)
 
+
+def get_annotated_type_text(raw_type, annotated_type):
+    if annotated_type != raw_type:
+        return "/*%s*/ %s" % (annotated_type, raw_type)
+    else:
+        return raw_type
+
+
+# Chooses method generate modes for a particular type. A particular setter
+# can be generated as one method with a simple parameter type,
+# as one method with a raw type name and commented annotation about expected
+# specialized type name or as overloaded method when raw and specialized
+# parameter types require different behavior.
+class MethodGenerateModes:
+    @classmethod
+    def get_modes(cls, type_binding):
+        if type_binding.get_setter_value_expression_pattern():
+            # In raw and strict modes method code is actually different.
+            return [cls.StrictParameterMode, cls.RawParameterMode]
+        else:
+            # In raw and strict modes method code is the same.
+            # Only put strict parameter type in comments.
+            return [cls.CombinedMode]
+
+    class StrictParameterMode:
+        @staticmethod
+        def get_c_param_type_text(type_binding):
+            return type_binding.get_in_c_type_text(False)
+
+        @staticmethod
+        def get_setter_value_expression(param_type_binding, value_ref):
+            pattern = param_type_binding.get_setter_value_expression_pattern()
+            if pattern:
+                return pattern % value_ref
+            else:
+                return value_ref
+
+    class RawParameterMode:
+        @staticmethod
+        def get_c_param_type_text(type_binding):
+            return type_binding.reduce_to_raw_type().get_c_param_type(ParamType.TYPE_BUILDER_OUTPUT, False).get_text()
+
+        @staticmethod
+        def get_setter_value_expression(param_type_binding, value_ref):
+            return value_ref
+
+    class CombinedMode:
+        @staticmethod
+        def get_c_param_type_text(type_binding):
+            return get_annotated_type_text(type_binding.reduce_to_raw_type().get_c_param_type(ParamType.TYPE_BUILDER_OUTPUT, False).get_text(),
+                type_binding.get_in_c_type_text(False))
+
+        @staticmethod
+        def get_setter_value_expression(param_type_binding, value_ref):
+            pattern = param_type_binding.get_setter_value_expression_pattern()
+            if pattern:
+                return pattern % value_ref
+            else:
+                return value_ref
+
 class Generator:
     frontend_class_field_lines = []
     frontend_domain_class_lines = []
@@ -1325,6 +1708,7 @@ class Generator:
     backend_include_list = []
     frontend_constructor_init_list = []
     type_builder_fragments = []
+    type_builder_forwards = []
 
     @staticmethod
     def go():
@@ -1371,7 +1755,7 @@ class Generator:
             Generator.frontend_domain_class_lines.append(Templates.frontend_domain_class.substitute(None,
                 domainClassName=domain_name,
                 domainFieldName=domain_name_lower,
-                frontendDomainMethodDeclarations=join(frontend_method_declaration_lines, "")))
+                frontendDomainMethodDeclarations=join(flatten_list(frontend_method_declaration_lines), "")))
 
             if "commands" in json_domain:
                 for json_command in json_domain["commands"]:
@@ -1416,10 +1800,18 @@ class Generator:
 
     @staticmethod
     def process_event(json_event, domain_name, frontend_method_declaration_lines):
+        class NoOpForwardListener:
+            @staticmethod
+            def add_type_data(type_data):
+                pass
+
         event_name = json_event["name"]
         parameter_list = []
         method_line_list = []
         backend_js_event_param_list = []
+        ad_hoc_type_output = []
+        frontend_method_declaration_lines.append(ad_hoc_type_output)
+        ad_hoc_type_writer = Writer(ad_hoc_type_output, "        ")
         if "parameters" in json_event:
             method_line_list.append("    RefPtr<InspectorObject> paramsObject = InspectorObject::create();\n")
             for json_parameter in json_event["parameters"]:
@@ -1436,7 +1828,27 @@ class Generator:
 
                 optional = optional_mask and json_optional
 
-                parameter_list.append("%s %s" % (c_type.get_text(), parameter_name))
+                class AdHocTypeContext:
+                    @staticmethod
+                    def get_type_name_fix():
+                        class NameFix:
+                            class_name = Capitalizer.lower_camel_case_to_upper(parameter_name)
+
+                            @staticmethod
+                            def output_comment(writer):
+                                writer.newline("// Named after parameter name '%s' while generating event %s.\n" % (parameter_name, event_name))
+
+                        return NameFix
+
+                    @staticmethod
+                    def call_generate_type_builder(code_generator):
+                        code_generator.generate_type_builder(ad_hoc_type_writer, NoOpForwardListener)
+
+                param_type_binding = resolve_param_type(json_parameter, domain_name, AdHocTypeContext)
+
+                annotated_type = get_annotated_type_text(c_type.get_text(), param_type_binding.get_in_c_type_text(json_optional))
+
+                parameter_list.append("%s %s" % (annotated_type, parameter_name))
 
                 setter_argument = c_type.get_setter_format() % parameter_name
 
@@ -1515,16 +1927,23 @@ class Generator:
             for json_return in json_command["returns"]:
 
                 json_return_name = json_return["name"]
+
+                optional = "optional" in json_return and json_return["optional"]
+
                 raw_type = resolve_param_raw_type(json_return, domain_name)
                 setter_type = raw_type.get_setter_name()
                 initializer = raw_type.get_c_initializer()
                 var_type = raw_type.get_c_param_type(ParamType.OUTPUT, None)
 
                 code = "    %s out_%s = %s;\n" % (var_type.get_text(), json_return_name, initializer)
-                param = ", &out_%s" % json_return_name
+                param = ", %sout_%s" % (raw_type.get_output_argument_prefix(), json_return_name)
                 cook = "        result->set%s(\"%s\", out_%s);\n" % (setter_type, json_return_name, json_return_name)
-                if var_type.get_text() == "bool" and "optional" in json_return and json_return["optional"]:
-                    cook = ("        if (out_%s)\n    " % json_return_name) + cook
+                if optional:
+                    if var_type.get_text() == "bool":
+                        cook = ("        if (out_%s)\n    " % json_return_name) + cook
+                    else:
+                        # FIXME: support optionals.
+                        cook = "        // FIXME: support optional here.\n" + cook
 
                 method_out_code += code
                 agent_call_param_list.append(param)
@@ -1553,28 +1972,79 @@ class Generator:
         output = Generator.type_builder_fragments
 
         class ForwardListener:
-            pass
+            type_data_set = set()
+            already_declared_set = set()
 
-        for domain_data in type_map.domains():
+            @classmethod
+            def add_type_data(cls, type_data):
+                if type_data not in cls.already_declared_set:
+                    cls.type_data_set.add(type_data)
 
-            domain_fixes = DomainNameFixes.get_fixed_data(domain_data.name())
-            domain_guard = domain_fixes.get_guard()
+        def generate_all_domains_code(out, type_data_callback):
+            writer = Writer(out, "")
+            for domain_data in type_map.domains():
+                domain_fixes = DomainNameFixes.get_fixed_data(domain_data.name())
+                domain_guard = domain_fixes.get_guard()
 
-            if domain_guard:
-                domain_guard.generate_open(output)
+                namespace_declared = []
 
-            output.append("namespace ")
-            output.append(domain_data.name())
-            output.append(" {\n")
-            for type_data in domain_data.types():
-                type_data.get_binding().generate_type_builder(output, ForwardListener)
+                def namespace_lazy_generator():
+                    if not namespace_declared:
+                        if domain_guard:
+                            domain_guard.generate_open(out)
+                        writer.newline("namespace ")
+                        writer.append(domain_data.name())
+                        writer.append(" {\n")
+                        # What is a better way to change value from outer scope?
+                        namespace_declared.append(True)
+                    return writer
 
-            output.append("} // ")
-            output.append(domain_data.name())
-            output.append("\n\n")
+                for type_data in domain_data.types():
+                    type_data_callback(type_data, namespace_lazy_generator)
 
-            if domain_guard:
-                domain_guard.generate_close(output)
+                if namespace_declared:
+                    writer.append("} // ")
+                    writer.append(domain_data.name())
+                    writer.append("\n\n")
+
+                    if domain_guard:
+                        domain_guard.generate_close(out)
+
+        def call_type_builder(type_data, writer_getter):
+            # Do not generate forwards for this type any longer.
+            ForwardListener.already_declared_set.add(type_data)
+
+            code_generator = type_data.get_binding().get_code_generator()
+            # Call lazy getter even if we don't generat anything.
+            writer = writer_getter()
+            if code_generator:
+                code_generator.generate_type_builder(writer, ForwardListener)
+
+        generate_all_domains_code(output, call_type_builder)
+
+        Generator.type_builder_forwards.append("// Forward declarations.\n")
+
+        def generate_forward_callback(type_data, writer_getter):
+            if type_data in ForwardListener.type_data_set:
+                binding = type_data.get_binding()
+                binding.get_code_generator().generate_forward_declaration(writer_getter())
+        generate_all_domains_code(Generator.type_builder_forwards, generate_forward_callback)
+
+        Generator.type_builder_forwards.append("// End of forward declarations.\n")
+
+
+def flatten_list(input):
+    res = []
+
+    def fill_recursive(l):
+        for item in l:
+            if isinstance(item, list):
+                fill_recursive(item)
+            else:
+                res.append(item)
+    fill_recursive(input)
+    return res
+
 
 Generator.go()
 
@@ -1590,7 +2060,8 @@ backend_js_file = open(output_cpp_dirname + "/InspectorBackendStub.js", "w")
 frontend_h_file.write(Templates.frontend_h.substitute(None,
          fieldDeclarations=join(Generator.frontend_class_field_lines, ""),
          domainClassList=join(Generator.frontend_domain_class_lines, ""),
-         typeBuilders=join(Generator.type_builder_fragments, "")))
+         typeBuilders=join(flatten_list(Generator.type_builder_fragments), ""),
+         forwards=join(Generator.type_builder_forwards, "")))
 
 backend_h_file.write(Templates.backend_h.substitute(None,
     constructorInit=join(Generator.backend_constructor_init_list, "\n"),
@@ -1602,7 +2073,8 @@ backend_h_file.write(Templates.backend_h.substitute(None,
 
 frontend_cpp_file.write(Templates.frontend_cpp.substitute(None,
     constructorInit=join(Generator.frontend_constructor_init_list, ""),
-    methods=join(Generator.frontend_method_list, "\n")))
+    methods=join(Generator.frontend_method_list, "\n"),
+    enumConstantValues=EnumConstants.get_enum_constant_code()))
 
 backend_cpp_file.write(Templates.backend_cpp.substitute(None,
     methodNameDeclarations=join(Generator.backend_method_name_declaration_list, "\n"),

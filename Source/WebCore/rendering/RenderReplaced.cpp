@@ -88,7 +88,7 @@ void RenderReplaced::layout()
     computeLogicalHeight();
 
     m_overflow.clear();
-    addBoxShadowAndBorderOverflow();
+    addVisualEffectOverflow();
     updateLayerTransform();
     
     repainter.repaintAfterLayout();
@@ -527,9 +527,6 @@ LayoutRect RenderReplaced::clippedOverflowRectForRepaint(RenderBoxModelObject* r
     }
 
     if (style()) {
-        if (style()->hasAppearance())
-            // The theme may wish to inflate the rect used when repainting.
-            theme()->adjustRepaintRect(this, r);
         if (v)
             r.inflate(style()->outlineSize());
     }

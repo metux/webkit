@@ -111,14 +111,6 @@ void HTMLEmbedElement::parseMappedAttribute(Attribute* attr)
             addCSSLength(attr, CSSPropertyWidth, "0");
             addCSSLength(attr, CSSPropertyHeight, "0");
         }
-    } else if (attr->name() == nameAttr) {
-        if (inDocument() && document()->isHTMLDocument()) {
-            HTMLDocument* document = static_cast<HTMLDocument*>(this->document());
-            document->removeNamedItem(m_name);
-            document->addNamedItem(value);
-        }
-        m_name = value;
-        invalidateNodeListsCacheAfterAttributeChanged();
     } else
         HTMLPlugInImageElement::parseMappedAttribute(attr);
 }
@@ -219,44 +211,6 @@ void HTMLEmbedElement::insertedIntoDocument()
     HTMLPlugInImageElement::insertedIntoDocument();
     if (!inDocument())
         return;
-
-    if (document()->isHTMLDocument())
-        static_cast<HTMLDocument*>(document())->addNamedItem(m_name);
-
-    String width = getAttribute(widthAttr);
-    String height = getAttribute(heightAttr);
-    if (!width.isEmpty() || !height.isEmpty()) {
-        Node* n = parentNode();
-        while (n && !n->hasTagName(objectTag))
-            n = n->parentNode();
-        if (n) {
-            if (!width.isEmpty())
-                static_cast<HTMLObjectElement*>(n)->setAttribute(widthAttr, width);
-            if (!height.isEmpty())
-                static_cast<HTMLObjectElement*>(n)->setAttribute(heightAttr, height);
-        }
-    }
-}
-
-void HTMLEmbedElement::removedFromDocument()
-{
-    if (document()->isHTMLDocument())
-        static_cast<HTMLDocument*>(document())->removeNamedItem(m_name);
-
-    HTMLPlugInImageElement::removedFromDocument();
-}
-
-void HTMLEmbedElement::attributeChanged(Attribute* attr, bool preserveDecls)
-{
-    HTMLPlugInImageElement::attributeChanged(attr, preserveDecls);
-
-    if ((attr->name() == widthAttr || attr->name() == heightAttr) && !attr->isEmpty()) {
-        ContainerNode* n = parentNode();
-        while (n && !n->hasTagName(objectTag))
-            n = n->parentNode();
-        if (n)
-            static_cast<HTMLObjectElement*>(n)->setAttribute(attr->name(), attr->value());
-    }
 }
 
 bool HTMLEmbedElement::isURLAttribute(Attribute* attr) const

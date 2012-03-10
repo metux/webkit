@@ -241,9 +241,6 @@ void RenderBox::clearRenderBoxRegionInfo()
         return;
 
     RenderFlowThread* flowThread = enclosingRenderFlowThread();
-    if (!flowThread->hasValidRegions())
-        return;
-
     flowThread->removeRenderBoxRegionInfo(this);
 }
 
@@ -412,7 +409,7 @@ void RenderBox::updateBoxModelInfoFromStyle()
     if (isRootObject || isViewObject)
         setHasBoxDecorations(true);
 
-    setPositioned(style()->position() == AbsolutePosition || style()->position() == FixedPosition);
+    setPositioned(style()->isPositioned());
     setFloating(style()->isFloating() && (!isPositioned() || style()->floating() == PositionedFloat));
 
     // We also handle <body> and <html>, whose overflow applies to the viewport.
@@ -861,23 +858,12 @@ void RenderBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 
 void RenderBox::paintRootBoxFillLayers(const PaintInfo& paintInfo)
 {
-    const FillLayer* bgLayer = style()->backgroundLayers();
-    Color bgColor = style()->visitedDependentColor(CSSPropertyBackgroundColor);
-    RenderObject* bodyObject = 0;
-    if (!hasBackground() && node() && node()->hasTagName(HTMLNames::htmlTag)) {
-        // Locate the <body> element using the DOM.  This is easier than trying
-        // to crawl around a render tree with potential :before/:after content and
-        // anonymous blocks created by inline <body> tags etc.  We can locate the <body>
-        // render object very easily via the DOM.
-        HTMLElement* body = document()->body();
-        bodyObject = (body && body->hasLocalName(bodyTag)) ? body->renderer() : 0;
-        if (bodyObject) {
-            bgLayer = bodyObject->style()->backgroundLayers();
-            bgColor = bodyObject->style()->visitedDependentColor(CSSPropertyBackgroundColor);
-        }
-    }
+    RenderObject* rootBackgroundRenderer = rendererForRootBackground();
+    
+    const FillLayer* bgLayer = rootBackgroundRenderer->style()->backgroundLayers();
+    Color bgColor = rootBackgroundRenderer->style()->visitedDependentColor(CSSPropertyBackgroundColor);
 
-    paintFillLayers(paintInfo, bgColor, bgLayer, view()->backgroundRect(this), BackgroundBleedNone, CompositeSourceOver, bodyObject);
+    paintFillLayers(paintInfo, bgColor, bgLayer, view()->backgroundRect(this), BackgroundBleedNone, CompositeSourceOver, rootBackgroundRenderer);
 }
 
 BackgroundBleedAvoidance RenderBox::determineBackgroundBleedAvoidance(GraphicsContext* context) const
@@ -1411,7 +1397,7 @@ LayoutSize RenderBox::offsetFromContainer(RenderObject* o, const LayoutPoint& po
         offset += relativePositionOffset();
 
     if (!isInline() || isReplaced()) {
-        if (style()->position() != AbsolutePosition && style()->position() != FixedPosition && o->hasColumns()) {
+        if (!style()->isPositioned() && o->hasColumns()) {
             RenderBlock* block = toRenderBlock(o);
             LayoutRect columnRect(frameRect());
             block->adjustStartEdgeForWritingModeIncludingColumns(columnRect);
@@ -1510,10 +1496,6 @@ LayoutRect RenderBox::clippedOverflowRectForRepaint(RenderBoxModelObject* repain
     }
     
     if (style()) {
-        if (style()->hasAppearance())
-            // The theme may wish to inflate the rect used when repainting.
-            theme()->adjustRepaintRect(this, r);
-
         // We have to use maximalOutlineSize() because a child might have an outline
         // that projects outside of our overflowRect.
         if (v) {
@@ -1571,6 +1553,19 @@ void RenderBox::computeRectForRepaint(RenderBoxModelObject* repaintContainer, La
 
     if (isWritingModeRoot() && !isPositioned())
         flipForWritingMode(rect);
+
+#if ENABLE(CSS_FILTERS)
+    if (style()->hasFilterOutsets()) {
+        LayoutUnit topOutset;
+        LayoutUnit rightOutset;
+        LayoutUnit bottomOutset;
+        LayoutUnit leftOutset;
+        style()->filter().getOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
+        rect.move(-leftOutset, -topOutset);
+        rect.expand(leftOutset + rightOutset, topOutset + bottomOutset);
+    }
+#endif
+
     LayoutPoint topLeft = rect.location();
     topLeft.move(x(), y());
 
@@ -1798,8 +1793,13 @@ bool RenderBox::sizesToIntrinsicLogicalWidth(LogicalWidthType widthType) const
     // Flexible box items should shrink wrap, so we lay them out at their intrinsic widths.
     // In the case of columns that have a stretch alignment, we go ahead and layout at the
     // stretched size to avoid an extra layout when applying alignment.
-    if (parent()->isFlexibleBox() && (!parent()->style()->isColumnFlexDirection() || style()->flexAlign() != AlignStretch))
-        return true;
+    if (parent()->isFlexibleBox()) {
+        if (!parent()->style()->isColumnFlexDirection())
+            return true;
+        EFlexAlign itemAlign = style()->flexItemAlign();
+        if (itemAlign != AlignStretch && (itemAlign != AlignAuto || parent()->style()->flexAlign() != AlignStretch))
+            return true;
+    }
 
     // Flexible horizontal boxes lay out children at their intrinsic widths.  Also vertical boxes
     // that don't stretch their kids lay out their children at their intrinsic widths.
@@ -3516,9 +3516,9 @@ bool RenderBox::avoidsFloats() const
     return isReplaced() || hasOverflowClip() || isHR() || isLegend() || isWritingModeRoot() || isDeprecatedFlexItem();
 }
 
-void RenderBox::addBoxShadowAndBorderOverflow()
+void RenderBox::addVisualEffectOverflow()
 {
-    if (!style()->boxShadow() && !style()->hasBorderImageOutsets())
+    if (!style()->boxShadow() && !style()->hasBorderImageOutsets() && !style()->hasFilterOutsets())
         return;
 
     bool isFlipped = style()->isFlippedBlocksWritingMode();
@@ -3561,6 +3561,21 @@ void RenderBox::addBoxShadowAndBorderOverflow()
         overflowMaxY = max(overflowMaxY, borderBox.maxY() + ((!isFlipped || !isHorizontal) ? borderOutsetBottom : borderOutsetTop));
     }
 
+#if ENABLE(CSS_FILTERS)
+    // Compute any filter outset overflow.
+    if (style()->hasFilterOutsets()) {
+        LayoutUnit filterOutsetLeft;
+        LayoutUnit filterOutsetRight;
+        LayoutUnit filterOutsetTop;
+        LayoutUnit filterOutsetBottom;
+        style()->getFilterOutsets(filterOutsetTop, filterOutsetRight, filterOutsetBottom, filterOutsetLeft);
+        
+        overflowMinX = min(overflowMinX, borderBox.x() - filterOutsetLeft);
+        overflowMaxX = max(overflowMaxX, borderBox.maxX() + filterOutsetRight);
+        overflowMinY = min(overflowMinY, borderBox.y() - filterOutsetTop);
+        overflowMaxY = max(overflowMaxY, borderBox.maxY() + filterOutsetBottom);
+    }
+#endif
     // Add in the final overflow with shadows and outsets combined.
     addVisualOverflow(LayoutRect(overflowMinX, overflowMinY, overflowMaxX - overflowMinX, overflowMaxY - overflowMinY));
 }

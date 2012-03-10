@@ -91,6 +91,11 @@ FocusController::FocusController(Page* page)
 {
 }
 
+PassOwnPtr<FocusController> FocusController::create(Page* page)
+{
+    return adoptPtr(new FocusController(page));
+}
+
 void FocusController::setFocusedFrame(PassRefPtr<Frame> frame)
 {
     ASSERT(!frame || frame->page() == m_page);
@@ -239,7 +244,7 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, Keyb
 
     Node* currentNode = document->focusedNode();
     // FIXME: Not quite correct when it comes to focus transitions leaving/entering the WebView itself
-    bool caretBrowsing = focusedOrMainFrame()->settings()->caretBrowsingEnabled();
+    bool caretBrowsing = frame->settings() && frame->settings()->caretBrowsingEnabled();
 
     if (caretBrowsing && !currentNode)
         currentNode = frame->selection()->start().deprecatedNode();
@@ -573,9 +578,9 @@ void FocusController::setActive(bool active)
             HashSet<ScrollableArea*>::const_iterator end = scrollableAreas->end(); 
             for (HashSet<ScrollableArea*>::const_iterator it = scrollableAreas->begin(); it != end; ++it) {
                 if (!active)
-                    (*it)->scrollAnimator()->contentAreaDidHide();
+                    (*it)->contentAreaDidHide();
                 else
-                    (*it)->scrollAnimator()->contentAreaDidShow();
+                    (*it)->contentAreaDidShow();
             }
         }
     }

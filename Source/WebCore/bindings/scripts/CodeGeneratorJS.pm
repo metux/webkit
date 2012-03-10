@@ -28,6 +28,8 @@ package CodeGeneratorJS;
 
 use strict;
 
+use constant FileNamePrefix => "JS";
+
 my ($codeGenerator, $IMPL, $HEADER, $DEPS);
 
 my $module = "";
@@ -120,9 +122,10 @@ sub GenerateInterface
     my $name = $dataNode->name;
 
     # Open files for writing
-    my $headerFileName = "$outputDir/JS$name.h";
-    my $implFileName = "$outputDir/JS$name.cpp";
-    my $depsFileName = "$outputDir/JS$name.dep";
+    my $prefix = FileNamePrefix;
+    my $headerFileName = "$outputDir/$prefix$name.h";
+    my $implFileName = "$outputDir/$prefix$name.cpp";
+    my $depsFileName = "$outputDir/$prefix$name.dep";
 
     # Remove old dependency file.
     unlink($depsFileName);
@@ -148,15 +151,15 @@ sub GenerateAttributeEventListenerCall
         $wrapperObject = "asObject(correspondingElementWrapper)";
 
         push(@GenerateEventListenerImpl, <<END);
-    JSValue correspondingElementWrapper = toJS(exec, castedThis->globalObject(), imp->correspondingElement());
+    JSValue correspondingElementWrapper = toJS(exec, castedThis->globalObject(), impl->correspondingElement());
     if (correspondingElementWrapper.isObject())
 END
 
-        # Add leading whitespace to format the imp->set... line correctly
+        # Add leading whitespace to format the impl->set... line correctly
         push(@GenerateEventListenerImpl, "    ");
     }
 
-    push(@GenerateEventListenerImpl, "    imp->set$implSetterFunctionName(createJSAttributeEventListener(exec, value, $wrapperObject));\n");
+    push(@GenerateEventListenerImpl, "    impl->set$implSetterFunctionName(createJSAttributeEventListener(exec, value, $wrapperObject));\n");
     return @GenerateEventListenerImpl;
 }
 
@@ -175,7 +178,7 @@ sub GenerateEventListenerCall
         $wrapperObject = "asObject(correspondingElementWrapper)";
 
         push(@GenerateEventListenerImpl, <<END);
-    JSValue correspondingElementWrapper = toJS(exec, castedThis->globalObject(), imp->correspondingElement());
+    JSValue correspondingElementWrapper = toJS(exec, castedThis->globalObject(), impl->correspondingElement());
     if (!correspondingElementWrapper.isObject())
         return JSValue::encode(jsUndefined());
 END
@@ -185,7 +188,7 @@ END
     JSValue listener = exec->argument(1);
     if (!listener.isObject())
         return JSValue::encode(jsUndefined());
-    imp->${functionName}EventListener(ustringToAtomicString(exec->argument(0).toString(exec)), JSEventListener::create(asObject(listener), $wrapperObject, false, currentWorld(exec))$passRefPtrHandling, exec->argument(2).toBoolean(exec));
+    impl->${functionName}EventListener(ustringToAtomicString(exec->argument(0).toString(exec)), JSEventListener::create(asObject(listener), $wrapperObject, false, currentWorld(exec))$passRefPtrHandling, exec->argument(2).toBoolean(exec));
     return JSValue::encode(jsUndefined());
 END
     return @GenerateEventListenerImpl;
@@ -519,7 +522,7 @@ sub GenerateGetOwnPropertyDescriptorBody
         if ($interfaceName eq "DOMWindow") {
             push(@implContent, "    if (!thisObject->allowsAccessFrom(exec))\n");
         } else {
-            push(@implContent, "    if (!allowsAccessFromFrame(exec, thisObject->impl()->frame()))\n");
+            push(@implContent, "    if (!allowAccessToFrame(exec, thisObject->impl()->frame()))\n");
         }
         push(@implContent, "        return false;\n");
     }
@@ -745,14 +748,14 @@ sub GenerateHeader
     if ($interfaceName eq "DOMWindow") {
         push(@headerContent, "    static $className* create(JSC::JSGlobalData& globalData, JSC::Structure* structure, PassRefPtr<$implType> impl, JSDOMWindowShell* windowShell)\n");
         push(@headerContent, "    {\n");
-        push(@headerContent, "        $className* ptr = new (JSC::allocateCell<$className>(globalData.heap)) ${className}(globalData, structure, impl, windowShell);\n");
+        push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(globalData.heap)) ${className}(globalData, structure, impl, windowShell);\n");
         push(@headerContent, "        ptr->finishCreation(globalData, windowShell);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif ($dataNode->extendedAttributes->{"IsWorkerContext"}) {
         push(@headerContent, "    static $className* create(JSC::JSGlobalData& globalData, JSC::Structure* structure, PassRefPtr<$implType> impl)\n");
         push(@headerContent, "    {\n");
-        push(@headerContent, "        $className* ptr = new (JSC::allocateCell<$className>(globalData.heap)) ${className}(globalData, structure, impl);\n");
+        push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(globalData.heap)) ${className}(globalData, structure, impl);\n");
         push(@headerContent, "        ptr->finishCreation(globalData);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
@@ -760,7 +763,7 @@ sub GenerateHeader
         AddIncludesForTypeInHeader($implType) unless $svgPropertyOrListPropertyType;
         push(@headerContent, "    static $className* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<$implType> impl)\n");
         push(@headerContent, "    {\n");
-        push(@headerContent, "        $className* ptr = new (JSC::allocateCell<$className>(globalObject->globalData().heap)) $className(structure, globalObject, impl);\n");
+        push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(globalObject->globalData().heap)) $className(structure, globalObject, impl);\n");
         push(@headerContent, "        ptr->finishCreation(globalObject->globalData());\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
@@ -813,6 +816,10 @@ sub GenerateHeader
         push(@headerContent, "    bool putDelegate(JSC::ExecState*, const JSC::Identifier&, JSC::JSValue, JSC::PutPropertySlot&);\n") if $dataNode->extendedAttributes->{"DelegatingPutFunction"};
     }
 
+    if (!$hasParent) {
+        push(@headerContent, "    static void destroy(JSC::JSCell*);\n");
+    }
+
     # Class info
     push(@headerContent, "    static const JSC::ClassInfo s_info;\n\n");
 
@@ -830,7 +837,7 @@ sub GenerateHeader
     push(@headerContent, "    }\n\n");
 
     # Custom pushEventHandlerScope function
-    push(@headerContent, "    virtual JSC::ScopeChainNode* pushEventHandlerScope(JSC::ExecState*, JSC::ScopeChainNode*) const;\n\n") if $dataNode->extendedAttributes->{"CustomPushEventHandlerScope"};
+    push(@headerContent, "    JSC::ScopeChainNode* pushEventHandlerScope(JSC::ExecState*, JSC::ScopeChainNode*) const;\n\n") if $dataNode->extendedAttributes->{"CustomPushEventHandlerScope"};
 
     # Custom call functions
     push(@headerContent, "    static JSC::CallType getCallData(JSC::JSCell*, JSC::CallData&);\n\n") if $dataNode->extendedAttributes->{"CustomCall"};
@@ -861,7 +868,6 @@ sub GenerateHeader
 
     # Override toBoolean to return false for objects that want to 'MasqueradesAsUndefined'.
     if ($dataNode->extendedAttributes->{"MasqueradesAsUndefined"}) {
-        push(@headerContent, "    virtual bool toBoolean(JSC::ExecState*) const { return false; };\n");
         $structureFlags{"JSC::MasqueradesAsUndefined"} = 1;
     }
 
@@ -876,8 +882,8 @@ sub GenerateHeader
         foreach (@{$dataNode->attributes}) {
             my $attribute = $_;
             $numCustomAttributes++ if $attribute->signature->extendedAttributes->{"Custom"} || $attribute->signature->extendedAttributes->{"JSCCustom"};
-            $numCustomAttributes++ if ($attribute->signature->extendedAttributes->{"CustomGetter"} || $attribute->signature->extendedAttributes->{"JSCCustomGetter"}) && !$attribute->signature->extendedAttributes->{"ImplementedBy"};
-            $numCustomAttributes++ if ($attribute->signature->extendedAttributes->{"CustomSetter"} || $attribute->signature->extendedAttributes->{"JSCCustomSetter"}) && !$attribute->signature->extendedAttributes->{"ImplementedBy"};
+            $numCustomAttributes++ if ($attribute->signature->extendedAttributes->{"CustomGetter"} || $attribute->signature->extendedAttributes->{"JSCCustomGetter"});
+            $numCustomAttributes++ if ($attribute->signature->extendedAttributes->{"CustomSetter"} || $attribute->signature->extendedAttributes->{"JSCCustomSetter"});
             if ($attribute->signature->extendedAttributes->{"CachedAttribute"}) {
                 push(@headerContent, "    JSC::WriteBarrier<JSC::Unknown> m_" . $attribute->signature->name . ";\n");
                 $numCachedAttributes++;
@@ -896,17 +902,12 @@ sub GenerateHeader
         push(@headerContent, "\n    // Custom attributes\n");
 
         foreach my $attribute (@{$dataNode->attributes}) {
-            if ($attribute->signature->extendedAttributes->{"Custom"} || $attribute->signature->extendedAttributes->{"JSCCustom"}) {
-                push(@headerContent, "    JSC::JSValue " . $codeGenerator->WK_lcfirst($attribute->signature->name) . "(JSC::ExecState*) const;\n");
-                if ($attribute->type !~ /^readonly/) {
-                    push(@headerContent, "    void set" . $codeGenerator->WK_ucfirst($attribute->signature->name) . "(JSC::ExecState*, JSC::JSValue);\n");
-                }
-            } elsif (($attribute->signature->extendedAttributes->{"CustomGetter"} || $attribute->signature->extendedAttributes->{"JSCCustomGetter"}) && !$attribute->signature->extendedAttributes->{"ImplementedBy"}) {
-                push(@headerContent, "    JSC::JSValue " . $codeGenerator->WK_lcfirst($attribute->signature->name) . "(JSC::ExecState*) const;\n");
-            } elsif (($attribute->signature->extendedAttributes->{"CustomSetter"} || $attribute->signature->extendedAttributes->{"JSCCustomSetter"}) && !$attribute->signature->extendedAttributes->{"ImplementedBy"}) {
-                if ($attribute->type !~ /^readonly/) {
-                    push(@headerContent, "    void set" . $codeGenerator->WK_ucfirst($attribute->signature->name) . "(JSC::ExecState*, JSC::JSValue);\n");
-                }
+            if ($attribute->signature->extendedAttributes->{"Custom"} || $attribute->signature->extendedAttributes->{"JSCCustom"} || $attribute->signature->extendedAttributes->{"CustomGetter"} || $attribute->signature->extendedAttributes->{"JSCCustomGetter"}) {
+                my $methodName = $codeGenerator->WK_lcfirst($attribute->signature->name);
+                push(@headerContent, "    JSC::JSValue " . $methodName . "(JSC::ExecState*) const;\n");
+            }
+            if (($attribute->signature->extendedAttributes->{"Custom"} || $attribute->signature->extendedAttributes->{"JSCCustom"} || $attribute->signature->extendedAttributes->{"CustomSetter"} || $attribute->signature->extendedAttributes->{"JSCCustomSetter"}) && $attribute->type !~ /^readonly/) {
+                push(@headerContent, "    void set" . $codeGenerator->WK_ucfirst($attribute->signature->name) . "(JSC::ExecState*, JSC::JSValue);\n");
             }
         }
     }
@@ -928,6 +929,7 @@ sub GenerateHeader
     if (!$hasParent) {
         push(@headerContent, "    $implType* impl() const { return m_impl; }\n");
         push(@headerContent, "    void releaseImpl() { m_impl->deref(); m_impl = 0; }\n\n");
+        push(@headerContent, "    void releaseImplIfNotNull() { if (m_impl) { m_impl->deref(); m_impl = 0; } }\n\n");
         push(@headerContent, "private:\n");
         push(@headerContent, "    $implType* m_impl;\n");
     } elsif ($dataNode->extendedAttributes->{"GenerateNativeConverter"}) {
@@ -1057,7 +1059,7 @@ sub GenerateHeader
 
     push(@headerContent, "    static ${className}Prototype* create(JSC::JSGlobalData& globalData, JSC::JSGlobalObject* globalObject, JSC::Structure* structure)\n");
     push(@headerContent, "    {\n");
-    push(@headerContent, "        ${className}Prototype* ptr = new (JSC::allocateCell<${className}Prototype>(globalData.heap)) ${className}Prototype(globalData, globalObject, structure);\n");
+    push(@headerContent, "        ${className}Prototype* ptr = new (NotNull, JSC::allocateCell<${className}Prototype>(globalData.heap)) ${className}Prototype(globalData, globalObject, structure);\n");
     push(@headerContent, "        ptr->finishCreation(globalData);\n");
     push(@headerContent, "        return ptr;\n");
     push(@headerContent, "    }\n\n");
@@ -1369,7 +1371,10 @@ sub GenerateImplementation
     push(@implContent, "\nusing namespace JSC;\n\n");
     push(@implContent, "namespace WebCore {\n\n");
 
-    push(@implContent, "ASSERT_CLASS_FITS_IN_CELL($className);\n\n");
+    push(@implContent, "ASSERT_CLASS_FITS_IN_CELL($className);\n");
+    if ($interfaceName ne "DOMWindow" && !$dataNode->extendedAttributes->{"IsWorkerContext"}) {
+        push(@implContent, "ASSERT_HAS_TRIVIAL_DESTRUCTOR($className);\n\n");
+    }
 
     my $numAttributes = GenerateAttributesHashTable($object, $dataNode);
 
@@ -1501,9 +1506,9 @@ sub GenerateImplementation
         push(@implContent, "{\n");
         push(@implContent, "    return getHashTableForGlobalData(exec->globalData(), &${className}PrototypeTable);\n");
         push(@implContent, "}\n\n");
-        push(@implContent, "const ClassInfo ${className}Prototype::s_info = { \"${visibleClassName}Prototype\", &JSC::JSNonFinalObject::s_info, 0, get${className}PrototypeTable, CREATE_METHOD_TABLE(${className}Prototype) };\n\n");
+        push(@implContent, "const ClassInfo ${className}Prototype::s_info = { \"${visibleClassName}Prototype\", &Base::s_info, 0, get${className}PrototypeTable, CREATE_METHOD_TABLE(${className}Prototype) };\n\n");
     } else {
-        push(@implContent, "const ClassInfo ${className}Prototype::s_info = { \"${visibleClassName}Prototype\", &JSC::JSNonFinalObject::s_info, &${className}PrototypeTable, 0, CREATE_METHOD_TABLE(${className}Prototype) };\n\n");
+        push(@implContent, "const ClassInfo ${className}Prototype::s_info = { \"${visibleClassName}Prototype\", &Base::s_info, &${className}PrototypeTable, 0, CREATE_METHOD_TABLE(${className}Prototype) };\n\n");
     }
     if ($interfaceName ne "DOMWindow" && !$dataNode->extendedAttributes->{"IsWorkerContext"}) {
         push(@implContent, "JSObject* ${className}Prototype::self(ExecState* exec, JSGlobalObject* globalObject)\n");
@@ -1511,6 +1516,7 @@ sub GenerateImplementation
         push(@implContent, "    return getDOMPrototype<${className}>(exec, globalObject);\n");
         push(@implContent, "}\n\n");
     }
+
     if ($numConstants > 0 || $numFunctions > 0 || $dataNode->extendedAttributes->{"DelegatingPrototypeGetOwnPropertySlot"}) {
         push(@implContent, "bool ${className}Prototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)\n");
         push(@implContent, "{\n");
@@ -1571,7 +1577,7 @@ sub GenerateImplementation
         push(@implContent, "}\n\n");
     }
 
-    push(@implContent, "const ClassInfo $className" . "::s_info = { \"${visibleClassName}\", &" . $parentClassName . "::s_info, ");
+    push(@implContent, "const ClassInfo $className" . "::s_info = { \"${visibleClassName}\", &Base::s_info, ");
 
     if ($numAttributes > 0 && !$dataNode->extendedAttributes->{"NoStaticTables"}) {
         push(@implContent, "&${className}Table");
@@ -1621,7 +1627,7 @@ sub GenerateImplementation
         push(@implContent, "{\n");
         push(@implContent, "    Base::finishCreation(globalData);\n");
         if (IsTypedArrayType($implType) and ($implType ne "ArrayBufferView") and ($implType ne "ArrayBuffer")) {
-            push(@implContent, "    TypedArrayDescriptor descriptor(vptr(), OBJECT_OFFSETOF(${className}, m_storage), OBJECT_OFFSETOF(${className}, m_storageLength));\n");
+            push(@implContent, "    TypedArrayDescriptor descriptor(&${className}::s_info, OBJECT_OFFSETOF(${className}, m_storage), OBJECT_OFFSETOF(${className}, m_storageLength));\n");
             push(@implContent, "    globalData.registerTypedArrayDescriptor(impl(), descriptor);\n");
             push(@implContent, "    m_storage = impl()->data();\n");
             push(@implContent, "    m_storageLength = impl()->length();\n");
@@ -1638,6 +1644,20 @@ sub GenerateImplementation
         } else {
             push(@implContent, "    return ${className}Prototype::create(exec->globalData(), globalObject, ${className}Prototype::createStructure(globalObject->globalData(), globalObject, globalObject->objectPrototype()));\n");
         }
+        push(@implContent, "}\n\n");
+    }
+
+    if (!$hasParent) {
+        # FIXME: This destroy function should not be necessary, as 
+        # a finalizer should be called for each DOM object wrapper.
+        # However, that seems not to be the case, so this has been
+        # added back to avoid leaking while we figure out why the
+        # finalizers are not always getting called. The work tracking
+        # the finalizer issue is being tracked in http://webkit.org/b/75451
+        push(@implContent, "void ${className}::destroy(JSC::JSCell* cell)\n");
+        push(@implContent, "{\n");
+        push(@implContent, "    ${className}* thisObject = jsCast<${className}*>(cell);\n");
+        push(@implContent, "    thisObject->releaseImplIfNotNull();\n");
         push(@implContent, "}\n\n");
     }
 
@@ -1712,32 +1732,26 @@ sub GenerateImplementation
                 }
 
                 if ($attribute->signature->extendedAttributes->{"Custom"} || $attribute->signature->extendedAttributes->{"JSCCustom"} || $attribute->signature->extendedAttributes->{"CustomGetter"} || $attribute->signature->extendedAttributes->{"JSCCustomGetter"}) {
-                    if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
-                        my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
-                        $implIncludes{"JS${implementedBy}.h"} = 1;
-                        push(@implContent, "    return JS${implementedBy}::$implGetterFunctionName(castedThis, exec);\n");
-                    } else {
-                        push(@implContent, "    return castedThis->$implGetterFunctionName(exec);\n");
-                    }
-                } elsif ($attribute->signature->extendedAttributes->{"CheckNodeSecurity"}) {
+                    push(@implContent, "    return castedThis->$implGetterFunctionName(exec);\n");
+                } elsif ($attribute->signature->extendedAttributes->{"allowAccessToNode"}) {
                     $implIncludes{"JSDOMBinding.h"} = 1;
-                    push(@implContent, "    $implClassName* imp = static_cast<$implClassName*>(castedThis->impl());\n");
-                    push(@implContent, "    return checkNodeSecurity(exec, imp->$implGetterFunctionName()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "imp->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
+                    push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
+                    push(@implContent, "    return allowAccessToNode(exec, impl->$implGetterFunctionName()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
                 } elsif ($attribute->signature->extendedAttributes->{"CheckFrameSecurity"}) {
                     $implIncludes{"Document.h"} = 1;
                     $implIncludes{"JSDOMBinding.h"} = 1;
-                    push(@implContent, "    $implClassName* imp = static_cast<$implClassName*>(castedThis->impl());\n");
-                    push(@implContent, "    return checkNodeSecurity(exec, imp->contentDocument()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "imp->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
+                    push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
+                    push(@implContent, "    return allowAccessToNode(exec, impl->contentDocument()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
                 } elsif ($type eq "EventListener") {
                     $implIncludes{"EventListener.h"} = 1;
                     push(@implContent, "    UNUSED_PARAM(exec);\n");
-                    push(@implContent, "    $implClassName* imp = static_cast<$implClassName*>(castedThis->impl());\n");
-                    push(@implContent, "    if (EventListener* listener = imp->$implGetterFunctionName()) {\n");
+                    push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
+                    push(@implContent, "    if (EventListener* listener = impl->$implGetterFunctionName()) {\n");
                     push(@implContent, "        if (const JSEventListener* jsListener = JSEventListener::cast(listener)) {\n");
                     if ($implClassName eq "Document" || $implClassName eq "WorkerContext" || $implClassName eq "SharedWorkerContext" || $implClassName eq "DedicatedWorkerContext") {
-                        push(@implContent, "            if (JSObject* jsFunction = jsListener->jsFunction(imp))\n");
+                        push(@implContent, "            if (JSObject* jsFunction = jsListener->jsFunction(impl))\n");
                     } else {
-                        push(@implContent, "            if (JSObject* jsFunction = jsListener->jsFunction(imp->scriptExecutionContext()))\n");
+                        push(@implContent, "            if (JSObject* jsFunction = jsListener->jsFunction(impl->scriptExecutionContext()))\n");
                     }
                     push(@implContent, "                return jsFunction;\n");
                     push(@implContent, "        }\n");
@@ -1762,11 +1776,11 @@ sub GenerateImplementation
                     if ($svgListPropertyType) {
                         push(@implContent, "    JSValue result =  " . NativeToJSValue($attribute->signature, 0, $implClassName, "castedThis->impl()->$implGetterFunctionName()", "castedThis") . ";\n");
                     } elsif ($svgPropertyOrListPropertyType) {
-                        push(@implContent, "    $svgPropertyOrListPropertyType& imp = castedThis->impl()->propertyReference();\n");
+                        push(@implContent, "    $svgPropertyOrListPropertyType& impl = castedThis->impl()->propertyReference();\n");
                         if ($svgPropertyOrListPropertyType eq "float") { # Special case for JSSVGNumber
-                            push(@implContent, "    JSValue result =  " . NativeToJSValue($attribute->signature, 0, $implClassName, "imp", "castedThis") . ";\n");
+                            push(@implContent, "    JSValue result =  " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl", "castedThis") . ";\n");
                         } else {
-                            push(@implContent, "    JSValue result =  " . NativeToJSValue($attribute->signature, 0, $implClassName, "imp.$implGetterFunctionName()", "castedThis") . ";\n");
+                            push(@implContent, "    JSValue result =  " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl.$implGetterFunctionName()", "castedThis") . ";\n");
                         }
                     } else {
                         my ($functionName, @arguments) = $codeGenerator->GetterExpression(\%implIncludes, $interfaceName, $attribute);
@@ -1774,13 +1788,13 @@ sub GenerateImplementation
                             my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
                             $implIncludes{"${implementedBy}.h"} = 1;
                             $functionName = "${implementedBy}::${functionName}";
-                            unshift(@arguments, "imp");
+                            unshift(@arguments, "impl");
                         } else {
-                            $functionName = "imp->${functionName}";
+                            $functionName = "impl->${functionName}";
                         }
 
                         my $jsType = NativeToJSValue($attribute->signature, 0, $implClassName, "${functionName}(" . join(", ", @arguments) . ")", "castedThis");
-                        push(@implContent, "    $implClassName* imp = static_cast<$implClassName*>(castedThis->impl());\n");
+                        push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
                         if ($codeGenerator->IsSVGAnimatedType($type)) {
                             push(@implContent, "    RefPtr<$type> obj = $jsType;\n");
                             push(@implContent, "    JSValue result =  toJS(exec, castedThis->globalObject(), obj.get());\n");
@@ -1795,11 +1809,11 @@ sub GenerateImplementation
                 } else {
                     push(@implContent, "    ExceptionCode ec = 0;\n");                    
                     if ($svgPropertyOrListPropertyType) {
-                        push(@implContent, "    $svgPropertyOrListPropertyType imp(*castedThis->impl());\n");
-                        push(@implContent, "    JSC::JSValue result = " . NativeToJSValue($attribute->signature, 0, $implClassName, "imp.$implGetterFunctionName(ec)", "castedThis") . ";\n");
+                        push(@implContent, "    $svgPropertyOrListPropertyType impl(*castedThis->impl());\n");
+                        push(@implContent, "    JSC::JSValue result = " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl.$implGetterFunctionName(ec)", "castedThis") . ";\n");
                     } else {
-                        push(@implContent, "    $implClassName* imp = static_cast<$implClassName*>(castedThis->impl());\n");
-                        push(@implContent, "    JSC::JSValue result = " . NativeToJSValue($attribute->signature, 0, $implClassName, "imp->$implGetterFunctionName(ec)", "castedThis") . ";\n");
+                        push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
+                        push(@implContent, "    JSC::JSValue result = " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl->$implGetterFunctionName(ec)", "castedThis") . ";\n");
                     }
 
                     push(@implContent, "    setDOMException(exec, ec);\n");
@@ -1895,19 +1909,13 @@ sub GenerateImplementation
                             if ($interfaceName eq "DOMWindow") {
                                 push(@implContent, "    if (!static_cast<$className*>(thisObject)->allowsAccessFrom(exec))\n");
                             } else {
-                                push(@implContent, "    if (!allowsAccessFromFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
+                                push(@implContent, "    if (!allowAccessToFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
                             }
                             push(@implContent, "        return;\n");
                         }
 
                         if ($attribute->signature->extendedAttributes->{"Custom"} || $attribute->signature->extendedAttributes->{"JSCCustom"} || $attribute->signature->extendedAttributes->{"CustomSetter"} || $attribute->signature->extendedAttributes->{"JSCCustomSetter"}) {
-                            if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
-                                my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
-                                $implIncludes{"JS${implementedBy}.h"} = 1;
-                                push(@implContent, "    JS${implementedBy}::set$implSetterFunctionName(static_cast<$className*>(thisObject), exec, value);\n");
-                            } else {
-                                push(@implContent, "    static_cast<$className*>(thisObject)->set$implSetterFunctionName(exec, value);\n");
-                            }
+                            push(@implContent, "    static_cast<$className*>(thisObject)->set$implSetterFunctionName(exec, value);\n");
                         } elsif ($type eq "EventListener") {
                             $implIncludes{"JSEventListener.h"} = 1;
                             push(@implContent, "    UNUSED_PARAM(exec);\n");
@@ -1916,10 +1924,10 @@ sub GenerateImplementation
                             if ($windowEventListener) {
                                 push(@implContent, "    JSDOMGlobalObject* globalObject = castedThis->globalObject();\n");
                             }
-                            push(@implContent, "    $implClassName* imp = static_cast<$implClassName*>(castedThis->impl());\n");
+                            push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
                             if ((($interfaceName eq "DOMWindow") or ($interfaceName eq "WorkerContext")) and $name eq "onerror") {
                                 $implIncludes{"JSErrorHandler.h"} = 1;
-                                push(@implContent, "    imp->set$implSetterFunctionName(createJSErrorHandler(exec, value, thisObject));\n");
+                                push(@implContent, "    impl->set$implSetterFunctionName(createJSErrorHandler(exec, value, thisObject));\n");
                             } else {
                                 push(@implContent, GenerateAttributeEventListenerCall($className, $implSetterFunctionName, $windowEventListener));
                             }
@@ -1944,7 +1952,7 @@ sub GenerateImplementation
                             push(@implContent, "    static_cast<$className*>(thisObject)->putDirect(exec->globalData(), Identifier(exec, \"$name\"), value);\n");
                         } else {
                             push(@implContent, "    $className* castedThis = static_cast<$className*>(thisObject);\n");
-                            push(@implContent, "    $implType* imp = static_cast<$implType*>(castedThis->impl());\n");
+                            push(@implContent, "    $implType* impl = static_cast<$implType*>(castedThis->impl());\n");
                             push(@implContent, "    ExceptionCode ec = 0;\n") if @{$attribute->setterExceptions};
 
                             # If the "StrictTypeChecking" extended attribute is present, and the attribute's type is an
@@ -1967,17 +1975,17 @@ sub GenerateImplementation
                             my $nativeValue = JSValueToNative($attribute->signature, "value");
                             if ($svgPropertyOrListPropertyType) {
                                 if ($svgPropertyType) {
-                                    push(@implContent, "    if (imp->role() == AnimValRole) {\n");
+                                    push(@implContent, "    if (impl->role() == AnimValRole) {\n");
                                     push(@implContent, "        setDOMException(exec, NO_MODIFICATION_ALLOWED_ERR);\n");
                                     push(@implContent, "        return;\n");
                                     push(@implContent, "    }\n");
                                     $implIncludes{"ExceptionCode.h"} = 1;
                                 }
-                                push(@implContent, "    $svgPropertyOrListPropertyType& podImp = imp->propertyReference();\n");
+                                push(@implContent, "    $svgPropertyOrListPropertyType& podImpl = impl->propertyReference();\n");
                                 if ($svgPropertyOrListPropertyType eq "float") { # Special case for JSSVGNumber
-                                    push(@implContent, "    podImp = $nativeValue;\n");
+                                    push(@implContent, "    podImpl = $nativeValue;\n");
                                 } else {
-                                    push(@implContent, "    podImp.set$implSetterFunctionName($nativeValue");
+                                    push(@implContent, "    podImpl.set$implSetterFunctionName($nativeValue");
                                     push(@implContent, ", ec") if @{$attribute->setterExceptions};
                                     push(@implContent, ");\n");
                                     push(@implContent, "    setDOMException(exec, ec);\n") if @{$attribute->setterExceptions};
@@ -1985,9 +1993,9 @@ sub GenerateImplementation
                                 if ($svgPropertyType) {
                                     if (@{$attribute->setterExceptions}) {
                                         push(@implContent, "    if (!ec)\n"); 
-                                        push(@implContent, "        imp->commitChange();\n");
+                                        push(@implContent, "        impl->commitChange();\n");
                                     } else {
-                                        push(@implContent, "    imp->commitChange();\n");
+                                        push(@implContent, "    impl->commitChange();\n");
                                     }
                                 }
                             } else {
@@ -1996,10 +2004,10 @@ sub GenerateImplementation
                                 if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
                                     my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
                                     $implIncludes{"${implementedBy}.h"} = 1;
-                                    unshift(@arguments, "imp");
+                                    unshift(@arguments, "impl");
                                     $functionName = "${implementedBy}::${functionName}";
                                 } else {
-                                    $functionName = "imp->${functionName}";
+                                    $functionName = "impl->${functionName}";
                                 }
                                 push(@arguments, "ec") if @{$attribute->setterExceptions};
                                 push(@implContent, "    ${functionName}(" . join(", ", @arguments) . ");\n");
@@ -2023,7 +2031,7 @@ sub GenerateImplementation
                     if ($interfaceName eq "DOMWindow") {
                         push(@implContent, "    if (!static_cast<$className*>(thisObject)->allowsAccessFrom(exec))\n");
                     } else {
-                        push(@implContent, "    if (!allowsAccessFromFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
+                        push(@implContent, "    if (!allowAccessToFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
                     }
                     push(@implContent, "        return;\n");
                 }
@@ -2120,13 +2128,13 @@ sub GenerateImplementation
             if ($isCustom) {
                 push(@implContent, "    return JSValue::encode(castedThis->" . $functionImplementationName . "(exec));\n") unless ($function->isStatic);
             } else {
-                push(@implContent, "    $implType* imp = static_cast<$implType*>(castedThis->impl());\n") unless ($function->isStatic);
+                push(@implContent, "    $implType* impl = static_cast<$implType*>(castedThis->impl());\n") unless ($function->isStatic);
                 if ($svgPropertyType and !$function->isStatic) {
-                    push(@implContent, "    if (imp->role() == AnimValRole) {\n");
+                    push(@implContent, "    if (impl->role() == AnimValRole) {\n");
                     push(@implContent, "        setDOMException(exec, NO_MODIFICATION_ALLOWED_ERR);\n");
                     push(@implContent, "        return JSValue::encode(jsUndefined());\n");
                     push(@implContent, "    }\n");
-                    push(@implContent, "    $svgPropertyType& podImp = imp->propertyReference();\n");
+                    push(@implContent, "    $svgPropertyType& podImpl = impl->propertyReference();\n");
                     $implIncludes{"ExceptionCode.h"} = 1;
                 }
 
@@ -2137,7 +2145,7 @@ sub GenerateImplementation
                 }
 
                 if ($function->signature->extendedAttributes->{"SVGCheckSecurityDocument"} and !$function->isStatic) {
-                    push(@implContent, "    if (!checkNodeSecurity(exec, imp->getSVGDocument(" . (@{$function->raisesExceptions} ? "ec" : "") .")))\n");
+                    push(@implContent, "    if (!allowAccessToNode(exec, impl->getSVGDocument(" . (@{$function->raisesExceptions} ? "ec" : "") .")))\n");
                     push(@implContent, "        return JSValue::encode(jsUndefined());\n");
                     $implIncludes{"JSDOMBinding.h"} = 1;
                 }
@@ -2148,8 +2156,8 @@ sub GenerateImplementation
                     push(@implContent, GenerateEventListenerCall($className, "remove"));
                 } else {
                     my $numParameters = @{$function->parameters};
-                    my ($functionString, $paramIndex) = GenerateParametersCheck(\@implContent, $function, $dataNode, $numParameters, $implClassName, $functionImplementationName, $svgPropertyType, $svgPropertyOrListPropertyType, $svgListPropertyType);
-                    GenerateImplementationFunctionCall($function, $functionString, $paramIndex, "    ", $svgPropertyType, $implClassName);
+                    my ($functionString, $dummy) = GenerateParametersCheck(\@implContent, $function, $dataNode, $numParameters, $implClassName, $functionImplementationName, $svgPropertyType, $svgPropertyOrListPropertyType, $svgListPropertyType);
+                    GenerateImplementationFunctionCall($function, $functionString, "    ", $svgPropertyType, $implClassName);
                 }
             }
 
@@ -2300,7 +2308,7 @@ sub GenerateImplementation
                 $rootString .= "    void* root = WebCore::root(element);\n";
             } elsif ($interfaceName eq "CanvasRenderingContext") {
                 $rootString  = "    void* root = WebCore::root(js${implClassName}->impl()->canvas());\n";
-            } elsif ($interfaceName eq "HTMLCollection") {
+            } elsif ($interfaceName eq "HTMLCollection" or $interfaceName eq "HTMLAllCollection") {
                 $rootString  = "    void* root = WebCore::root(js${implClassName}->impl()->base());\n";
             } else {
                 $rootString  = "    void* root = WebCore::root(js${implClassName}->impl());\n";
@@ -2386,19 +2394,23 @@ sub GenerateParametersCheck
     my $svgPropertyOrListPropertyType = shift;
     my $svgListPropertyType = shift;
 
-    my $paramIndex = 0;
     my $argsIndex = 0;
     my $hasOptionalArguments = 0;
 
-    my $functionBase = "";
+    my @arguments;
+    my $functionName;
     if ($function->isStatic) {
-        $functionBase = "${implClassName}::";
+        $functionName = "${implClassName}::${functionImplementationName}";
+    } elsif ($function->signature->extendedAttributes->{"ImplementedBy"}) {
+        my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
+        AddToImplIncludes("${implementedBy}.h");
+        unshift(@arguments, "impl");
+        $functionName = "${implementedBy}::${functionImplementationName}";
     } elsif ($svgPropertyOrListPropertyType and !$svgListPropertyType) {
-        $functionBase = "podImp.";
+        $functionName = "podImpl.${functionImplementationName}";
     } else {
-        $functionBase = "imp->";
+        $functionName = "impl->${functionImplementationName}";
     }
-    my $functionString = "$functionBase$functionImplementationName(";
 
     if ($function->signature->extendedAttributes->{"CustomArgumentHandling"} and !$function->isStatic) {
         push(@$outputArray, "    RefPtr<ScriptArguments> scriptArguments(createScriptArguments(exec, $numParameters));\n");
@@ -2411,12 +2423,7 @@ sub GenerateParametersCheck
     my $callWith = $function->signature->extendedAttributes->{"CallWith"};
     if ($callWith and !$function->signature->extendedAttributes->{"Constructor"}) {
         my $callWithArg = "COMPILE_ASSERT(false)";
-        if ($callWith eq "DynamicFrame") {
-            push(@$outputArray, "    Frame* dynamicFrame = toDynamicFrame(exec);\n");
-            push(@$outputArray, "    if (!dynamicFrame)\n");
-            push(@$outputArray, "        return JSValue::encode(jsUndefined());\n");
-            $callWithArg = "dynamicFrame";
-        } elsif ($callWith eq "ScriptState") {
+        if ($callWith eq "ScriptState") {
             $callWithArg = "exec";
         } elsif ($callWith eq "ScriptExecutionContext") {
             push(@$outputArray, "    ScriptExecutionContext* scriptContext = static_cast<JSDOMGlobalObject*>(exec->lexicalGlobalObject())->scriptExecutionContext();\n");
@@ -2424,9 +2431,7 @@ sub GenerateParametersCheck
             push(@$outputArray, "        return JSValue::encode(jsUndefined());\n");
             $callWithArg = "scriptContext"; 
         }
-        $functionString .= ", " if $paramIndex;
-        $functionString .= $callWithArg;
-        $paramIndex++;
+        push @arguments, $callWithArg;
     }
 
     $implIncludes{"ExceptionCode.h"} = 1;
@@ -2445,7 +2450,16 @@ sub GenerateParametersCheck
                 $hasOptionalArguments = 1;
             }
             push(@$outputArray, "    if (argsCount <= $argsIndex) {\n");
-            GenerateImplementationFunctionCall($function, $functionString, $paramIndex, "    " x 2, $svgPropertyType, $implClassName);
+
+            my @optionalCallbackArguments = @arguments;
+            if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
+                push @optionalCallbackArguments, "scriptArguments, callStack";
+            }
+            if (@{$function->raisesExceptions}) {
+                push @optionalCallbackArguments, "ec";
+            }
+            my $functionString = "$functionName(" . join(", ", @optionalCallbackArguments) . ")";
+            GenerateImplementationFunctionCall($function, $functionString, "    " x 2, $svgPropertyType, $implClassName);
             push(@$outputArray, "    }\n\n");
         }
 
@@ -2526,27 +2540,23 @@ sub GenerateParametersCheck
             }
         }
 
-        $functionString .= ", " if $paramIndex;
-
         if ($argType eq "NodeFilter") {
-            $functionString .= "$name.get()";
+            push @arguments, "$name.get()";
         } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($argType) and not $implClassName =~ /List$/) {
-            $functionString .= "$name->propertyReference()";
+            push @arguments, "$name->propertyReference()";
         } else {
-            $functionString .= $name;
+            push @arguments, $name;
         }
         $argsIndex++;
-        $paramIndex++;
     }
 
-    if ($function->signature->extendedAttributes->{"NeedsUserGestureCheck"}) {
-        $functionString .= ", " if $paramIndex;
-        $functionString .= "ScriptController::processingUserGesture()";
-        $paramIndex++;
-        $implIncludes{"ScriptController.h"} = 1;
+    if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
+        push @arguments, "scriptArguments, callStack";
     }
-
-    return ($functionString, $paramIndex);
+    if (@{$function->raisesExceptions}) {
+        push @arguments, "ec";
+    }
+    return ("$functionName(" . join(", ", @arguments) . ")", scalar @arguments);
 }
 
 sub GenerateCallbackHeader
@@ -2711,22 +2721,9 @@ sub GenerateImplementationFunctionCall()
 {
     my $function = shift;
     my $functionString = shift;
-    my $paramIndex = shift;
     my $indent = shift;
     my $svgPropertyType = shift;
     my $implClassName = shift;
-
-    if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
-        $functionString .= ", " if $paramIndex;
-        $paramIndex += 2;
-        $functionString .= "scriptArguments, callStack";
-    }
-
-    if (@{$function->raisesExceptions}) {
-        $functionString .= ", " if $paramIndex;
-        $functionString .= "ec";
-    }
-    $functionString .= ")";
 
     if ($function->signature->type eq "void") {
         push(@implContent, $indent . "$functionString;\n");
@@ -2735,9 +2732,9 @@ sub GenerateImplementationFunctionCall()
         if ($svgPropertyType and !$function->isStatic) {
             if (@{$function->raisesExceptions}) {
                 push(@implContent, $indent . "if (!ec)\n"); 
-                push(@implContent, $indent . "    imp->commitChange();\n");
+                push(@implContent, $indent . "    impl->commitChange();\n");
             } else {
-                push(@implContent, $indent . "imp->commitChange();\n");
+                push(@implContent, $indent . "impl->commitChange();\n");
             }
         }
 
@@ -3009,8 +3006,8 @@ sub NativeToJSValue
         my $tearOffType = $codeGenerator->GetSVGTypeNeedingTearOff($type);
         if ($codeGenerator->IsSVGTypeWithWritablePropertiesNeedingTearOff($type) and $inFunctionCall eq 0 and not defined $signature->extendedAttributes->{"Immutable"}) {
             my $getter = $value;
-            $getter =~ s/imp\.//;
-            $getter =~ s/imp->//;
+            $getter =~ s/impl\.//;
+            $getter =~ s/impl->//;
             $getter =~ s/\(\)//;
             my $updateMethod = "&${implClassName}::update" . $codeGenerator->WK_ucfirst($getter);
 
@@ -3029,10 +3026,10 @@ sub NativeToJSValue
             } else {
                 AddToImplIncludes("SVGStaticPropertyTearOff.h", $conditional);
                 $tearOffType =~ s/SVGPropertyTearOff</SVGStaticPropertyTearOff<$implClassName, /;
-                $value = "${tearOffType}::create(imp, $value, $updateMethod)";
+                $value = "${tearOffType}::create(impl, $value, $updateMethod)";
             }
         } elsif ($tearOffType =~ /SVGStaticListPropertyTearOff/) {
-            $value = "${tearOffType}::create(imp, $value)";
+            $value = "${tearOffType}::create(impl, $value)";
         } elsif (not $tearOffType =~ /SVG(Point|PathSeg)List/) {
             $value = "${tearOffType}::create($value)";
         }
@@ -3315,7 +3312,7 @@ sub GenerateConstructorDeclaration
     push(@$outputArray, "    typedef DOMConstructorObject Base;\n");
     push(@$outputArray, "    static $constructorClassName* create(JSC::ExecState* exec, JSC::Structure* structure, JSDOMGlobalObject* globalObject)\n");
     push(@$outputArray, "    {\n");
-    push(@$outputArray, "        $constructorClassName* ptr = new (JSC::allocateCell<$constructorClassName>(*exec->heap())) $constructorClassName(structure, globalObject);\n");
+    push(@$outputArray, "        $constructorClassName* ptr = new (NotNull, JSC::allocateCell<$constructorClassName>(*exec->heap())) $constructorClassName(structure, globalObject);\n");
     push(@$outputArray, "        ptr->finishCreation(exec, globalObject);\n");
     push(@$outputArray, "        return ptr;\n");
     push(@$outputArray, "    }\n\n");
@@ -3350,7 +3347,7 @@ public:
 
     static JS${interfaceName}NamedConstructor* create(JSC::ExecState* exec, JSC::Structure* structure, JSDOMGlobalObject* globalObject)
     {
-        JS${interfaceName}NamedConstructor* constructor = new (JSC::allocateCell<JS${interfaceName}NamedConstructor>(*exec->heap())) JS${interfaceName}NamedConstructor(structure, globalObject);
+        JS${interfaceName}NamedConstructor* constructor = new (NotNull, JSC::allocateCell<JS${interfaceName}NamedConstructor>(*exec->heap())) JS${interfaceName}NamedConstructor(structure, globalObject);
         constructor->finishCreation(exec, globalObject);
         return constructor;
     }
@@ -3388,13 +3385,15 @@ sub GenerateConstructorDefinition
     my $numberOfconstructParameters = $dataNode->extendedAttributes->{"ConstructorParameters"};
 
     if ($generatingNamedConstructor) {
-        push(@$outputArray, "const ClassInfo ${constructorClassName}::s_info = { \"${visibleClassName}Constructor\", &DOMConstructorObject::s_info, 0, 0, CREATE_METHOD_TABLE($constructorClassName) };\n\n");
+        push(@$outputArray, "const ClassInfo ${constructorClassName}::s_info = { \"${visibleClassName}Constructor\", &Base::s_info, 0, 0, CREATE_METHOD_TABLE($constructorClassName) };\n\n");
         push(@$outputArray, "${constructorClassName}::${constructorClassName}(Structure* structure, JSDOMGlobalObject* globalObject)\n");
         push(@$outputArray, "    : DOMConstructorWithDocument(structure, globalObject)\n");
         push(@$outputArray, "{\n");
         push(@$outputArray, "}\n\n");
     } else {
-        push(@$outputArray, "const ClassInfo ${constructorClassName}::s_info = { \"${visibleClassName}Constructor\", &DOMConstructorObject::s_info, &${constructorClassName}Table, 0, CREATE_METHOD_TABLE($constructorClassName) };\n\n");
+        push(@$outputArray, "ASSERT_HAS_TRIVIAL_DESTRUCTOR(${constructorClassName});\n\n");
+
+        push(@$outputArray, "const ClassInfo ${constructorClassName}::s_info = { \"${visibleClassName}Constructor\", &Base::s_info, &${constructorClassName}Table, 0, CREATE_METHOD_TABLE($constructorClassName) };\n\n");
         push(@$outputArray, "${constructorClassName}::${constructorClassName}(Structure* structure, JSDOMGlobalObject* globalObject)\n");
         push(@$outputArray, "    : DOMConstructorObject(structure, globalObject)\n");
         push(@$outputArray, "{\n");

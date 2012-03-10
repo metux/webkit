@@ -122,6 +122,11 @@ JSGlobalObject::~JSGlobalObject()
     }
 }
 
+void JSGlobalObject::destroy(JSCell* cell)
+{
+    jsCast<JSGlobalObject*>(cell)->JSGlobalObject::~JSGlobalObject();
+}
+
 void JSGlobalObject::init(JSObject* thisValue)
 {
     ASSERT(JSLock::currentThreadIsHoldingLock());
@@ -143,12 +148,12 @@ void JSGlobalObject::put(JSCell* cell, ExecState* exec, const Identifier& proper
     JSGlobalObject* thisObject = jsCast<JSGlobalObject*>(cell);
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(thisObject));
 
-    if (thisObject->symbolTablePut(exec->globalData(), propertyName, value))
+    if (thisObject->symbolTablePut(exec, propertyName, value, slot.isStrictMode()))
         return;
     JSVariableObject::put(thisObject, exec, propertyName, value, slot);
 }
 
-void JSGlobalObject::putWithAttributes(JSObject* object, ExecState* exec, const Identifier& propertyName, JSValue value, unsigned attributes)
+void JSGlobalObject::putDirectVirtual(JSObject* object, ExecState* exec, const Identifier& propertyName, JSValue value, unsigned attributes)
 {
     JSGlobalObject* thisObject = jsCast<JSGlobalObject*>(object);
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(thisObject));
@@ -162,7 +167,7 @@ void JSGlobalObject::putWithAttributes(JSObject* object, ExecState* exec, const 
     if (!valueBefore) {
         JSValue valueAfter = thisObject->getDirect(exec->globalData(), propertyName);
         if (valueAfter)
-            JSObject::putWithAttributes(thisObject, exec, propertyName, valueAfter, attributes);
+            JSObject::putDirectVirtual(thisObject, exec, propertyName, valueAfter, attributes);
     }
 }
 
@@ -199,7 +204,6 @@ void JSGlobalObject::reset(JSValue prototype)
     m_boundFunctionStructure.set(exec->globalData(), this, JSBoundFunction::createStructure(exec->globalData(), this, m_functionPrototype.get()));
     m_namedFunctionStructure.set(exec->globalData(), this, Structure::addPropertyTransition(exec->globalData(), m_functionStructure.get(), exec->globalData().propertyNames->name, DontDelete | ReadOnly | DontEnum, 0, m_functionNameOffset));
     m_internalFunctionStructure.set(exec->globalData(), this, InternalFunction::createStructure(exec->globalData(), this, m_functionPrototype.get()));
-    m_strictModeTypeErrorFunctionStructure.set(exec->globalData(), this, StrictModeTypeErrorFunction::createStructure(exec->globalData(), this, m_functionPrototype.get()));
     JSFunction* callFunction = 0;
     JSFunction* applyFunction = 0;
     m_functionPrototype->addFunctionProperties(exec, this, &callFunction, &applyFunction);
@@ -294,12 +298,13 @@ void JSGlobalObject::reset(JSValue prototype)
     m_evalFunction.set(exec->globalData(), this, JSFunction::create(exec, this, 1, exec->propertyNames().eval, globalFuncEval));
     putDirectWithoutTransition(exec->globalData(), exec->propertyNames().eval, m_evalFunction.get(), DontEnum);
 
+    putDirectWithoutTransition(exec->globalData(), Identifier(exec, "JSON"), JSONObject::create(exec, this, JSONObject::createStructure(exec->globalData(), this, m_objectPrototype.get())), DontEnum);
+
     GlobalPropertyInfo staticGlobals[] = {
         GlobalPropertyInfo(Identifier(exec, "Math"), MathObject::create(exec, this, MathObject::createStructure(exec->globalData(), this, m_objectPrototype.get())), DontEnum | DontDelete),
         GlobalPropertyInfo(Identifier(exec, "NaN"), jsNaN(), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(Identifier(exec, "Infinity"), jsNumber(std::numeric_limits<double>::infinity()), DontEnum | DontDelete | ReadOnly),
-        GlobalPropertyInfo(Identifier(exec, "undefined"), jsUndefined(), DontEnum | DontDelete | ReadOnly),
-        GlobalPropertyInfo(Identifier(exec, "JSON"), JSONObject::create(exec, this, JSONObject::createStructure(exec->globalData(), this, m_objectPrototype.get())), DontEnum | DontDelete)
+        GlobalPropertyInfo(Identifier(exec, "undefined"), jsUndefined(), DontEnum | DontDelete | ReadOnly)
     };
     addStaticGlobals(staticGlobals, WTF_ARRAY_LENGTH(staticGlobals));
 
@@ -378,7 +383,6 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitIfNeeded(visitor, &thisObject->m_regExpStructure);
     visitIfNeeded(visitor, &thisObject->m_stringObjectStructure);
     visitIfNeeded(visitor, &thisObject->m_internalFunctionStructure);
-    visitIfNeeded(visitor, &thisObject->m_strictModeTypeErrorFunctionStructure);
 
     if (thisObject->m_registerArray) {
         // Outside the execution of global code, when our variables are torn off,

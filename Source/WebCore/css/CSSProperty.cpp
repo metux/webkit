@@ -318,7 +318,9 @@ bool CSSProperty::isInheritedProperty(unsigned propertyID)
     case CSSPropertyWebkitBoxDirection:
     case CSSPropertyWebkitColorCorrection:
     case CSSPropertyWebkitFontFeatureSettings:
+    case CSSPropertyWebkitFontKerning:
     case CSSPropertyWebkitFontSmoothing:
+    case CSSPropertyWebkitFontVariantLigatures:
     case CSSPropertyWebkitLocale:
     case CSSPropertyWebkitHighlight:
     case CSSPropertyWebkitHyphenateCharacter:
@@ -559,6 +561,7 @@ bool CSSProperty::isInheritedProperty(unsigned propertyID)
     case CSSPropertyWebkitFlexOrder:
     case CSSPropertyWebkitFlexPack:
     case CSSPropertyWebkitFlexAlign:
+    case CSSPropertyWebkitFlexItemAlign:
     case CSSPropertyWebkitFlexDirection:
     case CSSPropertyWebkitFlexFlow:
     case CSSPropertyWebkitFlexWrap:

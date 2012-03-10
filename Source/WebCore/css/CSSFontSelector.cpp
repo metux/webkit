@@ -234,7 +234,7 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
     for (int i = 0; i < srcLength; i++) {
         // An item in the list either specifies a string (local font name) or a URL (remote font to download).
         CSSFontFaceSrcValue* item = static_cast<CSSFontFaceSrcValue*>(srcList->itemWithoutBoundsCheck(i));
-        CSSFontFaceSource* source = 0;
+        OwnPtr<CSSFontFaceSource> source;
 
 #if ENABLE(SVG_FONTS)
         foundSVGFont = item->isSVGFontFaceSrc() || item->svgFontFaceElement();
@@ -243,10 +243,9 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
             Settings* settings = m_document ? m_document->frame() ? m_document->frame()->settings() : 0 : 0;
             bool allowDownloading = foundSVGFont || (settings && settings->downloadableBinaryFontsEnabled());
             if (allowDownloading && item->isSupportedFormat() && m_document) {
-                ResourceRequest request(m_document->completeURL(item->resource()));
-                CachedFont* cachedFont = m_document->cachedResourceLoader()->requestFont(request);
+                CachedFont* cachedFont = item->cachedFont(m_document);
                 if (cachedFont) {
-                    source = new CSSFontFaceSource(item->resource(), cachedFont);
+                    source = adoptPtr(new CSSFontFaceSource(item->resource(), cachedFont));
 #if ENABLE(SVG_FONTS)
                     if (foundSVGFont)
                         source->setHasExternalSVGFont(true);
@@ -254,7 +253,7 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
                 }
             }
         } else {
-            source = new CSSFontFaceSource(item->resource());
+            source = adoptPtr(new CSSFontFaceSource(item->resource()));
         }
 
         if (!fontFace)
@@ -264,7 +263,7 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
 #if ENABLE(SVG_FONTS)
             source->setSVGFontFaceElement(item->svgFontFaceElement());
 #endif
-            fontFace->addSource(source);
+            fontFace->addSource(source.release());
         }
     }
 
@@ -286,9 +285,9 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
     for (int i = 0; i < familyLength; i++) {
         CSSPrimitiveValue* item = static_cast<CSSPrimitiveValue*>(familyList->itemWithoutBoundsCheck(i));
         String familyName;
-        if (item->primitiveType() == CSSPrimitiveValue::CSS_STRING)
+        if (item->isString())
             familyName = static_cast<FontFamilyValue*>(item)->familyName();
-        else if (item->primitiveType() == CSSPrimitiveValue::CSS_IDENT) {
+        else if (item->isIdent()) {
             // We need to use the raw text for all the generic family types, since @font-face is a way of actually
             // defining what font to use for those types.
             String familyName;
@@ -332,7 +331,7 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
 
                 for (unsigned i = 0; i < numLocallyInstalledFaces; ++i) {
                     RefPtr<CSSFontFace> locallyInstalledFontFace = CSSFontFace::create(static_cast<FontTraitsMask>(locallyInstalledFontsTraitsMasks[i]), true);
-                    locallyInstalledFontFace->addSource(new CSSFontFaceSource(familyName));
+                    locallyInstalledFontFace->addSource(adoptPtr(new CSSFontFaceSource(familyName)));
                     ASSERT(locallyInstalledFontFace->isValid());
                     familyLocallyInstalledFaces->append(locallyInstalledFontFace);
                 }
@@ -616,6 +615,8 @@ void CSSFontSelector::beginLoadTimerFired(Timer<WebCore::CSSFontSelector>*)
         // Balances incrementRequestCount() in beginLoadingFontSoon().
         cachedResourceLoader->decrementRequestCount(fontsToBeginLoading[i].get());
     }
+    // Ensure that if the request count reaches zero, the frame loader will know about it.
+    cachedResourceLoader->loadDone();
 }
 
 }

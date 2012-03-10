@@ -31,7 +31,7 @@
 #ifndef ColorInputType_h
 #define ColorInputType_h
 
-#include "ColorChooser.h"
+#include "ColorChooserClient.h"
 #include "InputType.h"
 
 #if ENABLE(INPUT_COLOR)
@@ -43,26 +43,28 @@ public:
     static PassOwnPtr<InputType> create(HTMLInputElement*);
     virtual ~ColorInputType();
 
-private:
-    ColorInputType(HTMLInputElement* element) : InputType(element) { }
-    virtual bool isColorControl() const;
-    virtual const AtomicString& formControlType() const;
-    virtual bool supportsRequired() const;
-    virtual String fallbackValue() const OVERRIDE;
-    virtual String sanitizeValue(const String&) const;
-    virtual Color valueAsColor() const;
-    virtual void createShadowSubtree();
-    virtual void setValue(const String&, bool valueChanged, bool sendChangeEvent);
-    virtual void handleDOMActivateEvent(Event*);
-    virtual void detach();
-
     // ColorChooserClient implementation.
     virtual void didChooseColor(const Color&) OVERRIDE;
-    virtual void didCleanup() OVERRIDE;
+    virtual void didEndChooser() OVERRIDE;
 
-    void cleanupColorChooser();
+private:
+    ColorInputType(HTMLInputElement* element) : InputType(element) { }
+    virtual bool isColorControl() const OVERRIDE;
+    virtual const AtomicString& formControlType() const OVERRIDE;
+    virtual bool supportsRequired() const OVERRIDE;
+    virtual String fallbackValue() const OVERRIDE;
+    virtual String sanitizeValue(const String&) const OVERRIDE;
+    virtual Color valueAsColor() const OVERRIDE;
+    virtual void createShadowSubtree() OVERRIDE;
+    virtual void setValue(const String&, bool valueChanged, bool sendChangeEvent) OVERRIDE;
+    virtual void handleDOMActivateEvent(Event*) OVERRIDE;
+    virtual void detach() OVERRIDE;
+
+    void endColorChooser();
     void updateColorSwatch();
     HTMLElement* shadowColorSwatch() const;
+
+    OwnPtr<ColorChooser> m_chooser;
 };
 
 } // namespace WebCore

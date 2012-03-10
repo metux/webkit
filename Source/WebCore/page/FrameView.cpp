@@ -66,6 +66,7 @@
 
 #include <wtf/CurrentTime.h>
 #include <wtf/TemporaryChange.h>
+#include <wtf/UnusedParam.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -82,6 +83,10 @@
 
 #if USE(TILED_BACKING_STORE)
 #include "TiledBackingStore.h"
+#endif
+
+#if ENABLE(THREADED_SCROLLING)
+#include "ScrollingCoordinator.h"
 #endif
 
 namespace WebCore {
@@ -129,7 +134,6 @@ FrameView::FrameView(Frame* frame)
 #if ENABLE(SVG)
     , m_inLayoutParentView(false)
 #endif
-    , m_hasPendingPostLayoutTasks(false)
     , m_inSynchronousPostLayout(false)
     , m_postLayoutTasksTimer(this, &FrameView::postLayoutTimerFired)
     , m_isTransparent(false)
@@ -181,7 +185,7 @@ PassRefPtr<FrameView> FrameView::create(Frame* frame, const IntSize& initialSize
 
 FrameView::~FrameView()
 {
-    if (m_hasPendingPostLayoutTasks) {
+    if (m_postLayoutTasksTimer.isActive()) {
         m_postLayoutTasksTimer.stop();
         m_actionScheduler->clear();
     }
@@ -227,7 +231,6 @@ void FrameView::reset()
     m_layoutSchedulingEnabled = true;
     m_inLayout = false;
     m_inSynchronousPostLayout = false;
-    m_hasPendingPostLayoutTasks = false;
     m_layoutCount = 0;
     m_nestedLayoutCount = 0;
     m_postLayoutTasksTimer.stop();
@@ -511,7 +514,7 @@ void FrameView::setContentsSize(const IntSize& size)
     m_deferSetNeedsLayouts++;
 
     ScrollView::setContentsSize(size);
-    scrollAnimator()->contentsResized();
+    ScrollView::contentsResized();
     
     Page* page = frame() ? frame()->page() : 0;
     if (!page)
@@ -643,14 +646,15 @@ void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, Scrollbar
     }    
 }
 
-#if ENABLE(FULLSCREEN_API) && USE(ACCELERATED_COMPOSITING)
+#if USE(ACCELERATED_COMPOSITING)
+
+#if ENABLE(FULLSCREEN_API)
 static bool isDocumentRunningFullScreenAnimation(Document* document)
 {
     return document->webkitIsFullScreen() && document->fullScreenRenderer() && document->isAnimatingFullScreen();
 }
 #endif
-    
-#if USE(ACCELERATED_COMPOSITING)
+
 void FrameView::updateCompositingLayers()
 {
     RenderView* root = rootRenderer(this);
@@ -715,7 +719,7 @@ GraphicsLayer* FrameView::layerForScrollCorner() const
     return root->compositor()->layerForScrollCorner();
 }
 
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
 GraphicsLayer* FrameView::layerForOverhangAreas() const
 {
     RenderView* root = rootRenderer(this);
@@ -864,7 +868,7 @@ void FrameView::didMoveOnscreen()
     RenderView* root = rootRenderer(this);
     if (root)
         root->didMoveOnscreen();
-    scrollAnimator()->contentAreaDidShow();
+    contentAreaDidShow();
 }
 
 void FrameView::willMoveOffscreen()
@@ -872,7 +876,7 @@ void FrameView::willMoveOffscreen()
     RenderView* root = rootRenderer(this);
     if (root)
         root->willMoveOffscreen();
-    scrollAnimator()->contentAreaDidHide();
+    contentAreaDidHide();
 }
 
 RenderObject* FrameView::layoutRoot(bool onlyDuringLayout) const
@@ -989,11 +993,10 @@ void FrameView::layout(bool allowSubtree)
     {
         TemporaryChange<bool> changeSchedulingEnabled(m_layoutSchedulingEnabled, false);
 
-        if (!m_nestedLayoutCount && !m_inSynchronousPostLayout && m_hasPendingPostLayoutTasks && !inSubframeLayoutWithFrameFlattening) {
+        if (!m_nestedLayoutCount && !m_inSynchronousPostLayout && m_postLayoutTasksTimer.isActive() && !inSubframeLayoutWithFrameFlattening) {
             // This is a new top-level layout. If there are any remaining tasks from the previous
             // layout, finish them now.
             m_inSynchronousPostLayout = true;
-            m_postLayoutTasksTimer.stop();
             performPostLayoutTasks();
             m_inSynchronousPostLayout = false;
         }
@@ -1165,7 +1168,7 @@ void FrameView::layout(bool allowSubtree)
         updateOverflowStatus(layoutWidth() < contentsWidth(),
                              layoutHeight() < contentsHeight());
 
-    if (!m_hasPendingPostLayoutTasks) {
+    if (!m_postLayoutTasksTimer.isActive()) {
         if (!m_inSynchronousPostLayout) {
             if (inSubframeLayoutWithFrameFlattening) {
                 if (RenderView* root = rootRenderer(this))
@@ -1178,12 +1181,11 @@ void FrameView::layout(bool allowSubtree)
             }
         }
         
-        if (!m_hasPendingPostLayoutTasks && (needsLayout() || m_inSynchronousPostLayout || inSubframeLayoutWithFrameFlattening)) {
+        if (!m_postLayoutTasksTimer.isActive() && (needsLayout() || m_inSynchronousPostLayout || inSubframeLayoutWithFrameFlattening)) {
             // If we need layout or are already in a synchronous call to postLayoutTasks(), 
             // defer widget updates and event dispatch until after we return. postLayoutTasks()
             // can make us need to update again, and we can get stuck in a nasty cycle unless
             // we call it through the timer here.
-            m_hasPendingPostLayoutTasks = true;
             m_postLayoutTasksTimer.startOneShot(0);
             if (needsLayout()) {
                 m_actionScheduler->pause();
@@ -1730,6 +1732,7 @@ void FrameView::scrollPositionChangedViaPlatformWidget()
 void FrameView::scrollPositionChanged()
 {
     frame()->eventHandler()->sendScrollEvent();
+    frame()->eventHandler()->dispatchFakeMouseMoveEventSoon();
 
 #if USE(ACCELERATED_COMPOSITING)
     if (RenderView* root = rootRenderer(this)) {
@@ -1821,7 +1824,7 @@ void FrameView::repaintContentRectangle(const IntRect& r, bool immediate)
 
 void FrameView::contentsResized()
 {
-    scrollAnimator()->contentsResized();
+    ScrollView::contentsResized();
     setNeedsLayout();
 }
 
@@ -2087,8 +2090,6 @@ void FrameView::setNeedsLayout()
 
 void FrameView::unscheduleRelayout()
 {
-    m_postLayoutTasksTimer.stop();
-
     if (!m_layoutTimer.isActive())
         return;
 
@@ -2270,16 +2271,15 @@ bool FrameView::updateWidgets()
 
 void FrameView::flushAnyPendingPostLayoutTasks()
 {
-    if (!m_hasPendingPostLayoutTasks)
+    if (!m_postLayoutTasksTimer.isActive())
         return;
 
-    m_postLayoutTasksTimer.stop();
     performPostLayoutTasks();
 }
 
 void FrameView::performPostLayoutTasks()
 {
-    m_hasPendingPostLayoutTasks = false;
+    m_postLayoutTasksTimer.stop();
 
     m_frame->selection()->setCaretRectNeedsUpdate();
     m_frame->selection()->updateAppearance();
@@ -2521,38 +2521,6 @@ IntRect FrameView::windowResizerRect() const
     return page->chrome()->windowResizerRect();
 }
 
-void FrameView::didStartRubberBand(const IntSize& initialOverhang) const
-{
-    Page* page = m_frame->page();
-    if (!page)
-        return;
-    page->chrome()->client()->didCompleteRubberBandForFrame(m_frame.get(), initialOverhang);
-}
-
-void FrameView::didCompleteRubberBand(const IntSize& initialOverhang) const
-{
-    Page* page = m_frame->page();
-    if (!page)
-        return;
-    page->chrome()->client()->didCompleteRubberBandForFrame(m_frame.get(), initialOverhang);
-}
-
-void FrameView::didStartAnimatedScroll() const
-{
-    Page* page = m_frame->page();
-    if (!page)
-        return;
-    page->chrome()->client()->didStartAnimatedScroll();
-}
-
-void FrameView::didCompleteAnimatedScroll() const
-{
-    Page* page = m_frame->page();
-    if (!page)
-        return;
-    page->chrome()->client()->didCompleteAnimatedScroll();
-}
-
 void FrameView::setVisibleScrollerThumbRect(const IntRect& scrollerThumb)
 {
     Page* page = m_frame->page();
@@ -2622,13 +2590,16 @@ void FrameView::setAnimatorsAreActive()
 void FrameView::notifyPageThatContentAreaWillPaint() const
 {
     Page* page = m_frame->page();
+    if (!page)
+        return;
+
     const HashSet<ScrollableArea*>* scrollableAreas = page->scrollableAreaSet();
     if (!scrollableAreas)
         return;
 
     HashSet<ScrollableArea*>::const_iterator end = scrollableAreas->end(); 
     for (HashSet<ScrollableArea*>::const_iterator it = scrollableAreas->begin(); it != end; ++it)
-        (*it)->scrollAnimator()->contentAreaWillPaint();
+        (*it)->contentAreaWillPaint();
 }
 
 bool FrameView::scrollAnimatorEnabled() const

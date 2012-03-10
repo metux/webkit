@@ -29,6 +29,7 @@
 #if ENABLE(NOTIFICATIONS)
 
 #include "NotificationPresenter.h"
+#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
@@ -40,6 +41,13 @@ NotificationController::NotificationController(Page* page, NotificationPresenter
 
 NotificationController::~NotificationController()
 {
+    if (m_client)
+        m_client->notificationControllerDestroyed();
+}
+
+PassOwnPtr<NotificationController> NotificationController::create(Page* page, NotificationPresenter* client)
+{
+    return adoptPtr(new NotificationController(page, client));
 }
 
 } // namespace WebCore

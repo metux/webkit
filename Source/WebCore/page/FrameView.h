@@ -343,7 +343,7 @@ private:
     void autoSizeIfEnabled();
 
     virtual void repaintContentRectangle(const IntRect&, bool immediate);
-    virtual void contentsResized();
+    virtual void contentsResized() OVERRIDE;
     virtual void visibleContentsResized();
 
     // Override ScrollView methods to do point conversion via renderers, in order to
@@ -358,20 +358,16 @@ private:
     virtual bool isActive() const;
     virtual void getTickmarks(Vector<IntRect>&) const;
     virtual void scrollTo(const IntSize&);
-    virtual void didStartRubberBand(const IntSize&) const;
-    virtual void didCompleteRubberBand(const IntSize&) const;
-    virtual void didStartAnimatedScroll() const;
-    virtual void didCompleteAnimatedScroll() const;
     virtual void setVisibleScrollerThumbRect(const IntRect&);
     virtual bool isOnActivePage() const;
     virtual ScrollableArea* enclosingScrollableArea() const;
 
 #if USE(ACCELERATED_COMPOSITING)
-    virtual GraphicsLayer* layerForHorizontalScrollbar() const;
-    virtual GraphicsLayer* layerForVerticalScrollbar() const;
-    virtual GraphicsLayer* layerForScrollCorner() const;
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
-    virtual GraphicsLayer* layerForOverhangAreas() const;
+    virtual GraphicsLayer* layerForHorizontalScrollbar() const OVERRIDE;
+    virtual GraphicsLayer* layerForVerticalScrollbar() const OVERRIDE;
+    virtual GraphicsLayer* layerForScrollCorner() const OVERRIDE;
+#if ENABLE(RUBBER_BANDING)
+    virtual GraphicsLayer* layerForOverhangAreas() const OVERRIDE;
 #endif
 #endif
 
@@ -429,7 +425,6 @@ private:
 #if ENABLE(SVG)
     bool m_inLayoutParentView;
 #endif
-    bool m_hasPendingPostLayoutTasks;
     bool m_inSynchronousPostLayout;
     int m_layoutCount;
     unsigned m_nestedLayoutCount;

@@ -57,7 +57,6 @@
 #include <wtf/StdLibExtras.h>
 
 #if ENABLE(INPUT_COLOR)
-#include "ColorChooser.h"
 #include "ColorInputType.h"
 #endif
 
@@ -114,14 +113,15 @@ void HTMLInputElement::createShadowSubtree()
 
 HTMLInputElement::~HTMLInputElement()
 {
-    if (needsActivationCallback())
-        document()->unregisterForDocumentActivationCallbacks(this);
+    if (needsSuspensionCallback())
+        document()->unregisterForPageCacheSuspensionCallbacks(this);
 
+    // Need to remove form association while this is still an HTMLInputElement
+    // so that virtual functions are called correctly.
+    setForm(0);
+    // setForm(0) may register this to a document-level radio button group.
+    // We should unregister it to avoid accessing a deleted object.
     document()->checkedRadioButtons().removeButton(this);
-
-    // Need to remove this from the form while it is still an HTMLInputElement,
-    // so can't wait for the base class's destructor to do it.
-    removeFromForm();
 }
 
 const AtomicString& HTMLInputElement::formControlName() const
@@ -180,8 +180,7 @@ bool HTMLInputElement::shouldAutocomplete() const
 
 void HTMLInputElement::updateCheckedRadioButtons()
 {
-    if (attached() && checked())
-        checkedRadioButtons().addButton(this);
+    checkedRadioButtons().addButton(this);
 
     if (form()) {
         const Vector<FormAssociatedElement*>& controls = form()->associatedElements();
@@ -197,14 +196,13 @@ void HTMLInputElement::updateCheckedRadioButtons()
         }
     } else {
         typedef Document::FormElementListHashSet::const_iterator Iterator;
-        Iterator end = document()->getFormElements()->end();
-        for (Iterator it = document()->getFormElements()->begin(); it != end; ++it) {
-            Element* element = *it;
-            if (element->formControlName() != name())
+        Iterator end = document()->formElements()->end();
+        for (Iterator it = document()->formElements()->begin(); it != end; ++it) {
+            HTMLFormControlElementWithState* control = *it;
+            if (control->formControlName() != name())
                 continue;
-            if (element->formControlType() != type())
+            if (control->formControlType() != type())
                 continue;
-            HTMLFormControlElement* control = static_cast<HTMLFormControlElement*>(element);
             if (control->form())
                 continue;
             control->setNeedsValidityCheck();
@@ -533,10 +531,9 @@ void HTMLInputElement::setType(const String& type)
     // We should write a test case to show that setting to the empty string does not remove the
     // attribute in other browsers and then fix this. Note that setting to null *does* remove
     // the attribute and setAttribute implements that.
-    if (type.isEmpty()) {
-        ExceptionCode ec;
-        removeAttribute(typeAttr, ec);
-    } else
+    if (type.isEmpty())
+        removeAttribute(typeAttr);
+    else
         setAttribute(typeAttr, type);
 }
 
@@ -562,7 +559,7 @@ void HTMLInputElement::updateType()
         detach();
 
     bool didStoreValue = m_inputType->storesValueSeparateFromAttribute();
-    bool neededActivationCallback = needsActivationCallback();
+    bool neededSuspensionCallback = needsSuspensionCallback();
     bool didRespectHeightAndWidth = m_inputType->shouldRespectHeightAndWidthAttributes();
 
     m_inputType->destroyShadowSubtree();
@@ -587,10 +584,10 @@ void HTMLInputElement::updateType()
 
     m_wasModifiedByUser = false;
 
-    if (neededActivationCallback)
-        unregisterForActivationCallbackIfNeeded();
+    if (neededSuspensionCallback)
+        unregisterForSuspensionCallbackIfNeeded();
     else
-        registerForActivationCallbackIfNeeded();
+        registerForSuspensionCallbackIfNeeded();
 
     if (didRespectHeightAndWidth != m_inputType->shouldRespectHeightAndWidthAttributes()) {
         NamedNodeMap* map = attributeMap();
@@ -735,7 +732,7 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
     } else if (attr->name() == autocompleteAttr) {
         if (equalIgnoringCase(attr->value(), "off")) {
             m_autocomplete = Off;
-            registerForActivationCallbackIfNeeded();
+            registerForSuspensionCallbackIfNeeded();
         } else {
             bool needsToUnregister = m_autocomplete == Off;
 
@@ -745,7 +742,7 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
                 m_autocomplete = On;
 
             if (needsToUnregister)
-                unregisterForActivationCallbackIfNeeded();
+                unregisterForSuspensionCallbackIfNeeded();
         }
     } else if (attr->name() == typeAttr) {
         updateType();
@@ -1306,8 +1303,10 @@ void HTMLInputElement::setDefaultValue(const String &value)
     setAttribute(valueAttr, value);
 }
 
-void HTMLInputElement::setDefaultName(const AtomicString& name)
+void HTMLInputElement::setInitialName(const AtomicString& name)
 {
+    ASSERT(hasTagName(isindexTag));
+    ASSERT(m_name.isNull());
     m_name = name;
 }
 
@@ -1462,21 +1461,21 @@ bool HTMLInputElement::isOutOfRange() const
     return m_inputType->supportsRangeLimitation() && (rangeUnderflow(value()) || rangeOverflow(value()));
 }
 
-bool HTMLInputElement::needsActivationCallback()
+bool HTMLInputElement::needsSuspensionCallback()
 {
     return m_autocomplete == Off || m_inputType->shouldResetOnDocumentActivation();
 }
 
-void HTMLInputElement::registerForActivationCallbackIfNeeded()
+void HTMLInputElement::registerForSuspensionCallbackIfNeeded()
 {
-    if (needsActivationCallback())
-        document()->registerForDocumentActivationCallbacks(this);
+    if (needsSuspensionCallback())
+        document()->registerForPageCacheSuspensionCallbacks(this);
 }
 
-void HTMLInputElement::unregisterForActivationCallbackIfNeeded()
+void HTMLInputElement::unregisterForSuspensionCallbackIfNeeded()
 {
-    if (!needsActivationCallback())
-        document()->unregisterForDocumentActivationCallbacks(this);
+    if (!needsSuspensionCallback())
+        document()->unregisterForPageCacheSuspensionCallbacks(this);
 }
 
 bool HTMLInputElement::isRequiredFormControl() const
@@ -1499,30 +1498,53 @@ void HTMLInputElement::onSearch()
     dispatchEvent(Event::create(eventNames().searchEvent, true, false));
 }
 
-void HTMLInputElement::documentDidBecomeActive()
+void HTMLInputElement::documentDidResumeFromPageCache()
 {
-    ASSERT(needsActivationCallback());
+    ASSERT(needsSuspensionCallback());
     reset();
 }
 
-void HTMLInputElement::willMoveToNewOwnerDocument()
+void HTMLInputElement::willChangeForm()
 {
-    m_inputType->willMoveToNewOwnerDocument();
-
-    // Always unregister for cache callbacks when leaving a document, even if we would otherwise like to be registered
-    if (needsActivationCallback())
-        document()->unregisterForDocumentActivationCallbacks(this);
-
-    document()->checkedRadioButtons().removeButton(this);
-
-    HTMLTextFormControlElement::willMoveToNewOwnerDocument();
+    checkedRadioButtons().removeButton(this);
+    HTMLTextFormControlElement::willChangeForm();
 }
 
-void HTMLInputElement::didMoveToNewOwnerDocument()
+void HTMLInputElement::didChangeForm()
 {
-    registerForActivationCallbackIfNeeded();
+    HTMLTextFormControlElement::didChangeForm();
+    checkedRadioButtons().addButton(this);
+}
 
-    HTMLTextFormControlElement::didMoveToNewOwnerDocument();
+void HTMLInputElement::insertedIntoDocument()
+{
+    HTMLTextFormControlElement::insertedIntoDocument();
+    ASSERT(inDocument());
+    checkedRadioButtons().addButton(this);
+}
+
+void HTMLInputElement::removedFromDocument()
+{
+    ASSERT(inDocument());
+    checkedRadioButtons().removeButton(this);
+    HTMLTextFormControlElement::removedFromDocument();
+}
+
+void HTMLInputElement::didMoveToNewDocument(Document* oldDocument)
+{
+    m_inputType->willMoveToNewOwnerDocument();
+    bool needsSuspensionCallback = this->needsSuspensionCallback();
+    if (oldDocument) {
+        // Always unregister for cache callbacks when leaving a document, even if we would otherwise like to be registered
+        if (needsSuspensionCallback)
+            oldDocument->unregisterForPageCacheSuspensionCallbacks(this);
+        oldDocument->checkedRadioButtons().removeButton(this);
+    }
+
+    if (needsSuspensionCallback)
+        document()->registerForPageCacheSuspensionCallbacks(this);
+
+    HTMLTextFormControlElement::didMoveToNewDocument(oldDocument);
 }
 
 void HTMLInputElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
@@ -1542,10 +1564,7 @@ void HTMLInputElement::selectColorInColorChooser(const Color& color)
 {
     if (!m_inputType->isColorControl())
         return;
-    RefPtr<ColorChooser> chooser = static_cast<ColorInputType*>(m_inputType.get())->chooser();
-    if (!chooser)
-        return;
-    chooser->didChooseColor(color);
+    static_cast<ColorInputType*>(m_inputType.get())->didChooseColor(color);
 }
 #endif
     
@@ -1585,7 +1604,7 @@ HTMLOptionElement* HTMLInputElement::selectedOption() const
     HTMLDataListElement* sourceElement = dataList();
     if (!sourceElement)
         return 0;
-    RefPtr<HTMLCollection> options = sourceElement->options();
+    HTMLCollection* options = sourceElement->options();
     if (!options)
         return 0;
     unsigned length = options->length();

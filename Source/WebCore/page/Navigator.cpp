@@ -59,36 +59,18 @@
 namespace WebCore {
 
 Navigator::Navigator(Frame* frame)
-    : m_frame(frame)
+    : DOMWindowProperty(frame)
 {
 }
 
 Navigator::~Navigator()
 {
-    disconnectFrame();
 }
 
 void Navigator::resetGeolocation()
 {
     if (m_geolocation)
         m_geolocation->reset();
-}
-
-void Navigator::disconnectFrame()
-{
-    if (m_plugins) {
-        m_plugins->disconnectFrame();
-        m_plugins = 0;
-    }
-    if (m_mimeTypes) {
-        m_mimeTypes->disconnectFrame();
-        m_mimeTypes = 0;
-    }
-    if (m_geolocation) {
-        m_geolocation->disconnectFrame();
-        m_geolocation = 0;
-    }
-    m_frame = 0;
 }
 
 // If this function returns true, we need to hide the substring "4." that would otherwise
@@ -310,7 +292,7 @@ void Navigator::webkitGetUserMedia(const String& options, PassRefPtr<NavigatorUs
 #endif
 
 #if ENABLE(GAMEPAD)
-GamepadList* Navigator::webkitGamepads()
+GamepadList* Navigator::gamepads()
 {
     if (!m_gamepads)
         m_gamepads = GamepadList::create();

@@ -57,6 +57,7 @@
 #include "WebGLCompressedTextures.h"
 #include "WebGLContextAttributes.h"
 #include "WebGLContextEvent.h"
+#include "WebGLContextGroup.h"
 #include "WebGLDebugRendererInfo.h"
 #include "WebGLDebugShaders.h"
 #include "WebGLFramebuffer.h"
@@ -364,11 +365,6 @@ private:
     bool m_changed;
 };
 
-void WebGLRenderingContext::WebGLRenderingContextRestoreTimer::fired()
-{
-    m_context->maybeRestoreContext(RealLostContext);
-}
-
 class WebGLRenderingContextLostCallback : public GraphicsContext3D::ContextLostCallback {
 public:
     explicit WebGLRenderingContextLostCallback(WebGLRenderingContext* cb) : m_context(cb) { }
@@ -412,13 +408,17 @@ WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, Pa
     : CanvasRenderingContext(passedCanvas)
     , m_context(context)
     , m_drawingBuffer(0)
+    , m_dispatchContextLostEventTimer(this, &WebGLRenderingContext::dispatchContextLostEvent)
     , m_restoreAllowed(false)
-    , m_restoreTimer(this)
+    , m_restoreTimer(this, &WebGLRenderingContext::maybeRestoreContext)
     , m_videoCache(4)
     , m_contextLost(false)
+    , m_contextLostMode(SyntheticLostContext)
     , m_attributes(attributes)
 {
     ASSERT(m_context);
+    m_contextGroup = WebGLContextGroup::create();
+    m_contextGroup->addContext(this);
 
 #if PLATFORM(CHROMIUM)
     // Create the DrawingBuffer and initialize the platform layer.
@@ -483,7 +483,7 @@ void WebGLRenderingContext::initializeNewContext()
     m_context->getIntegerv(GraphicsContext3D::MAX_VIEWPORT_DIMS, m_maxViewportDims);
 
     m_defaultVertexArrayObject = WebGLVertexArrayObjectOES::create(this, WebGLVertexArrayObjectOES::VaoTypeDefault);
-    addObject(m_defaultVertexArrayObject.get());
+    addContextObject(m_defaultVertexArrayObject.get());
     m_boundVertexArrayObject = m_defaultVertexArrayObject;
     
     m_vertexAttribValue.resize(m_maxVertexAttribs);
@@ -528,8 +528,27 @@ bool WebGLRenderingContext::allowPrivilegedExtensions() const
 
 WebGLRenderingContext::~WebGLRenderingContext()
 {
+    // Remove all references to WebGLObjects so if they are the last reference
+    // they will be freed before the last context is removed from the context group.
+    m_boundArrayBuffer = 0;
+    m_defaultVertexArrayObject = 0;
+    m_boundVertexArrayObject = 0;
+    m_vertexAttrib0Buffer = 0;
+    m_currentProgram = 0;
+    m_framebufferBinding = 0;
+    m_renderbufferBinding = 0;
+
+    for (size_t i = 0; i < m_textureUnits.size(); ++i) {
+      m_textureUnits[i].m_texture2DBinding = 0;
+      m_textureUnits[i].m_textureCubeMapBinding = 0;
+    }
+
+    m_blackTexture2D = 0;
+    m_blackTextureCubeMap = 0;
+
     detachAndRemoveAllObjects();
     m_context->setContextLostCallback(nullptr);
+    m_contextGroup->removeContext(this);
 }
 
 void WebGLRenderingContext::markContextChanged()
@@ -801,7 +820,7 @@ bool WebGLRenderingContext::checkObjectToBeBound(WebGLObject* object, bool& dele
     if (isContextLost())
         return false;
     if (object) {
-        if (object->context() != this) {
+        if (!object->validate(contextGroup(), this)) {
             m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
             return false;
         }
@@ -1108,7 +1127,7 @@ void WebGLRenderingContext::clear(GC3Dbitfield mask)
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_VALUE);
         return;
     }
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(!isResourceSafe())) {
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), !isResourceSafe())) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION);
         return;
     }
@@ -1193,7 +1212,7 @@ void WebGLRenderingContext::copyTexImage2D(GC3Denum target, GC3Dint level, GC3De
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_VALUE);
         return;
     }
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(!isResourceSafe())) {
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), !isResourceSafe())) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION);
         return;
     }
@@ -1239,7 +1258,7 @@ void WebGLRenderingContext::copyTexSubImage2D(GC3Denum target, GC3Dint level, GC
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
         return;
     }
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(!isResourceSafe())) {
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), !isResourceSafe())) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION);
         return;
     }
@@ -1287,7 +1306,7 @@ PassRefPtr<WebGLBuffer> WebGLRenderingContext::createBuffer()
     if (isContextLost())
         return 0;
     RefPtr<WebGLBuffer> o = WebGLBuffer::create(this);
-    addObject(o.get());
+    addSharedObject(o.get());
     return o;
 }
 
@@ -1296,7 +1315,7 @@ PassRefPtr<WebGLFramebuffer> WebGLRenderingContext::createFramebuffer()
     if (isContextLost())
         return 0;
     RefPtr<WebGLFramebuffer> o = WebGLFramebuffer::create(this);
-    addObject(o.get());
+    addContextObject(o.get());
     return o;
 }
 
@@ -1305,7 +1324,7 @@ PassRefPtr<WebGLTexture> WebGLRenderingContext::createTexture()
     if (isContextLost())
         return 0;
     RefPtr<WebGLTexture> o = WebGLTexture::create(this);
-    addObject(o.get());
+    addSharedObject(o.get());
     return o;
 }
 
@@ -1314,7 +1333,7 @@ PassRefPtr<WebGLProgram> WebGLRenderingContext::createProgram()
     if (isContextLost())
         return 0;
     RefPtr<WebGLProgram> o = WebGLProgram::create(this);
-    addObject(o.get());
+    addSharedObject(o.get());
     return o;
 }
 
@@ -1323,7 +1342,7 @@ PassRefPtr<WebGLRenderbuffer> WebGLRenderingContext::createRenderbuffer()
     if (isContextLost())
         return 0;
     RefPtr<WebGLRenderbuffer> o = WebGLRenderbuffer::create(this);
-    addObject(o.get());
+    addSharedObject(o.get());
     return o;
 }
 
@@ -1338,7 +1357,7 @@ PassRefPtr<WebGLShader> WebGLRenderingContext::createShader(GC3Denum type, Excep
     }
 
     RefPtr<WebGLShader> o = WebGLShader::create(this, type);
-    addObject(o.get());
+    addSharedObject(o.get());
     return o;
 }
 
@@ -1354,12 +1373,14 @@ bool WebGLRenderingContext::deleteObject(WebGLObject* object)
 {
     if (isContextLost() || !object)
         return false;
-    if (object->context() != this) {
+    if (!object->validate(contextGroup(), this)) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
         return false;
     }
     if (object->object())
-        object->deleteObject();
+        // We need to pass in context here because we want
+        // things in this context unbound.
+        object->deleteObject(graphicsContext3D());
     return true;
 }
 
@@ -1415,7 +1436,7 @@ void WebGLRenderingContext::deleteRenderbuffer(WebGLRenderbuffer* renderbuffer)
     if (renderbuffer == m_renderbufferBinding)
         m_renderbufferBinding = 0;
     if (m_framebufferBinding)
-        m_framebufferBinding->removeAttachment(renderbuffer);
+        m_framebufferBinding->removeAttachmentFromBoundFramebuffer(renderbuffer);
 }
 
 void WebGLRenderingContext::deleteShader(WebGLShader* shader)
@@ -1434,7 +1455,7 @@ void WebGLRenderingContext::deleteTexture(WebGLTexture* texture)
             m_textureUnits[i].m_textureCubeMapBinding = 0;
     }
     if (m_framebufferBinding)
-        m_framebufferBinding->removeAttachment(texture);
+        m_framebufferBinding->removeAttachmentFromBoundFramebuffer(texture);
 }
 
 void WebGLRenderingContext::depthFunc(GC3Denum func)
@@ -1476,7 +1497,7 @@ void WebGLRenderingContext::detachShader(WebGLProgram* program, WebGLShader* sha
         return;
     }
     m_context->detachShader(objectOrZero(program), objectOrZero(shader));
-    shader->onDetached();
+    shader->onDetached(graphicsContext3D());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -1688,7 +1709,7 @@ bool WebGLRenderingContext::validateWebGLObject(WebGLObject* object)
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_VALUE);
         return false;
     }
-    if (object->context() != this) {
+    if (!object->validate(contextGroup(), this)) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
         return false;
     }
@@ -1729,7 +1750,7 @@ void WebGLRenderingContext::drawArrays(GC3Denum mode, GC3Dint first, GC3Dsizei c
         }
     }
 
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(!isResourceSafe())) {
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), !isResourceSafe())) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION);
         return;
     }
@@ -1803,7 +1824,7 @@ void WebGLRenderingContext::drawElements(GC3Denum mode, GC3Dsizei count, GC3Denu
         }
     }
 
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(!isResourceSafe())) {
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), !isResourceSafe())) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION);
         return;
     }
@@ -1880,7 +1901,7 @@ void WebGLRenderingContext::framebufferRenderbuffer(GC3Denum target, GC3Denum at
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_ENUM);
         return;
     }
-    if (buffer && buffer->context() != this) {
+    if (buffer && !buffer->validate(contextGroup(), this)) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
         return;
     }
@@ -1918,7 +1939,7 @@ void WebGLRenderingContext::framebufferRenderbuffer(GC3Denum target, GC3Denum at
     default:
         m_context->framebufferRenderbuffer(target, attachment, renderbuffertarget, objectOrZero(buffer));
     }
-    m_framebufferBinding->setAttachment(attachment, buffer);
+    m_framebufferBinding->setAttachmentForBoundFramebuffer(attachment, buffer);
     if (reattachDepth) {
         Platform3DObject object = objectOrZero(m_framebufferBinding->getAttachment(GraphicsContext3D::DEPTH_ATTACHMENT));
         if (object)
@@ -1951,7 +1972,7 @@ void WebGLRenderingContext::framebufferTexture2D(GC3Denum target, GC3Denum attac
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_VALUE);
         return;
     }
-    if (texture && texture->context() != this) {
+    if (texture && !texture->validate(contextGroup(), this)) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
         return;
     }
@@ -1963,7 +1984,7 @@ void WebGLRenderingContext::framebufferTexture2D(GC3Denum target, GC3Denum attac
         return;
     }
     m_context->framebufferTexture2D(target, attachment, textarget, objectOrZero(texture), level);
-    m_framebufferBinding->setAttachment(attachment, textarget, texture, level);
+    m_framebufferBinding->setAttachmentForBoundFramebuffer(attachment, textarget, texture, level);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -2167,7 +2188,7 @@ WebGLGetInfo WebGLRenderingContext::getFramebufferAttachmentParameter(GC3Denum t
         return WebGLGetInfo();
     }
 
-    WebGLObject* object = m_framebufferBinding->getAttachment(attachment);
+    WebGLSharedObject* object = m_framebufferBinding->getAttachment(attachment);
     if (!object) {
         if (pname == GraphicsContext3D::FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE)
             return WebGLGetInfo(GraphicsContext3D::NONE);
@@ -2943,7 +2964,7 @@ void WebGLRenderingContext::linkProgram(WebGLProgram* program, ExceptionCode& ec
     m_context->getProgramiv(objectOrZero(program), GraphicsContext3D::LINK_STATUS, &value);
     program->setLinkStatus(static_cast<bool>(value));
     // Need to cache link status before caching active attribute locations.
-    program->cacheActiveAttribLocations();
+    program->cacheActiveAttribLocations(graphicsContext3D());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3034,7 +3055,7 @@ void WebGLRenderingContext::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
         return;
     }
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(!isResourceSafe())) {
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), !isResourceSafe())) {
         m_context->synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION);
         return;
     }
@@ -3943,7 +3964,7 @@ void WebGLRenderingContext::useProgram(WebGLProgram* program, ExceptionCode& ec)
     }
     if (m_currentProgram != program) {
         if (m_currentProgram)
-            m_currentProgram->onDetached();
+            m_currentProgram->onDetached(graphicsContext3D());
         m_currentProgram = program;
         m_context->useProgram(objectOrZero(program));
         if (program)
@@ -4093,10 +4114,36 @@ void WebGLRenderingContext::forceLostContext(WebGLRenderingContext::LostContextM
         return;
     }
 
-    loseContext();
+    m_contextGroup->loseContextGroup(mode);
+}
 
-    if (mode == RealLostContext)
-        m_restoreTimer.startOneShot(0);
+void WebGLRenderingContext::loseContextImpl(WebGLRenderingContext::LostContextMode mode)
+{
+    if (isContextLost())
+        return;
+
+    m_contextLost = true;
+    m_contextLostMode = mode;
+
+    detachAndRemoveAllObjects();
+
+    // There is no direct way to clear errors from a GL implementation and
+    // looping until getError() becomes NO_ERROR might cause an infinite loop if
+    // the driver or context implementation had a bug. So, loop a reasonably
+    // large number of times to clear any existing errors.
+    for (int i = 0; i < 100; ++i) {
+        if (m_context->getError() == GraphicsContext3D::NO_ERROR)
+            break;
+    }
+    m_context->synthesizeGLError(GraphicsContext3D::CONTEXT_LOST_WEBGL);
+
+    // Don't allow restoration unless the context lost event has both been
+    // dispatched and its default behavior prevented.
+    m_restoreAllowed = false;
+
+    // Always defer the dispatch of the context lost event, to implement
+    // the spec behavior of queueing a task.
+    m_dispatchContextLostEventTimer.startOneShot(0);
 }
 
 void WebGLRenderingContext::forceRestoreContext()
@@ -4106,7 +4153,14 @@ void WebGLRenderingContext::forceRestoreContext()
         return;
     }
 
-    maybeRestoreContext(SyntheticLostContext);
+    if (!m_restoreAllowed) {
+        if (m_contextLostMode == SyntheticLostContext)
+            m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
+        return;
+    }
+
+    if (!m_restoreTimer.isActive())
+        m_restoreTimer.startOneShot(0);
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -4121,22 +4175,32 @@ PlatformLayer* WebGLRenderingContext::platformLayer() const
 }
 #endif
 
-void WebGLRenderingContext::removeObject(WebGLObject* object)
+void WebGLRenderingContext::removeSharedObject(WebGLSharedObject* object)
 {
-    m_canvasObjects.remove(object);
+    m_contextGroup->removeObject(object);
 }
 
-void WebGLRenderingContext::addObject(WebGLObject* object)
+void WebGLRenderingContext::addSharedObject(WebGLSharedObject* object)
 {
     ASSERT(!isContextLost());
-    removeObject(object);
-    m_canvasObjects.add(object);
+    m_contextGroup->addObject(object);
+}
+
+void WebGLRenderingContext::removeContextObject(WebGLContextObject* object)
+{
+    m_contextObjects.remove(object);
+}
+
+void WebGLRenderingContext::addContextObject(WebGLContextObject* object)
+{
+    ASSERT(!isContextLost());
+    m_contextObjects.add(object);
 }
 
 void WebGLRenderingContext::detachAndRemoveAllObjects()
 {
-    while (m_canvasObjects.size() > 0) {
-        HashSet<WebGLObject*>::iterator it = m_canvasObjects.begin();
+    while (m_contextObjects.size() > 0) {
+        HashSet<WebGLContextObject*>::iterator it = m_contextObjects.begin();
         (*it)->detachContext();
     }
 }
@@ -4628,8 +4692,7 @@ bool WebGLRenderingContext::validateStencilFunc(GC3Denum func)
 
 void WebGLRenderingContext::printWarningToConsole(const String& message)
 {
-    canvas()->document()->frame()->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel,
-                                                                      message, 0, canvas()->document()->url().string());
+    canvas()->document()->frame()->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message, canvas()->document()->url().string());
 }
 
 bool WebGLRenderingContext::validateFramebufferFuncParameters(GC3Denum target, GC3Denum attachment)
@@ -4951,42 +5014,29 @@ void WebGLRenderingContext::restoreStatesAfterVertexAttrib0Simulation()
     m_context->bindBuffer(GraphicsContext3D::ARRAY_BUFFER, objectOrZero(m_boundArrayBuffer.get()));
 }
 
-void WebGLRenderingContext::loseContext()
+void WebGLRenderingContext::dispatchContextLostEvent(Timer<WebGLRenderingContext>*)
 {
-    m_contextLost = true;
-
-    detachAndRemoveAllObjects();
-
-    // There is no direct way to clear errors from a GL implementation and
-    // looping until getError() becomes NO_ERROR might cause an infinite loop if
-    // the driver or context implementation had a bug. So, loop a reasonably
-    // large number of times to clear any existing errors.
-    for (int i = 0; i < 100; ++i) {
-        if (m_context->getError() == GraphicsContext3D::NO_ERROR)
-            break;
-    }
-    m_context->synthesizeGLError(GraphicsContext3D::CONTEXT_LOST_WEBGL);
-
     RefPtr<WebGLContextEvent> event = WebGLContextEvent::create(eventNames().webglcontextlostEvent, false, true, "");
     canvas()->dispatchEvent(event);
     m_restoreAllowed = event->defaultPrevented();
+    if (m_contextLostMode == RealLostContext && m_restoreAllowed)
+        m_restoreTimer.startOneShot(0);
 }
 
-void WebGLRenderingContext::maybeRestoreContext(WebGLRenderingContext::LostContextMode mode)
+void WebGLRenderingContext::maybeRestoreContext(Timer<WebGLRenderingContext>*)
 {
-    if (!m_contextLost) {
-        ASSERT(mode == SyntheticLostContext);
-        m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
+    ASSERT(m_contextLost);
+    if (!m_contextLost)
         return;
-    }
 
-    // The rendering context is not restored unless the default
-    // behavior of the webglcontextlost event was prevented earlier.
-    if (!m_restoreAllowed) {
-        if (mode == SyntheticLostContext)
-            m_context->synthesizeGLError(GraphicsContext3D::INVALID_OPERATION);
+    // The rendering context is not restored unless the default behavior of the
+    // webglcontextlost event was prevented earlier.
+    //
+    // Because of the way m_restoreTimer is set up for real vs. synthetic lost
+    // context events, we don't have to worry about this test short-circuiting
+    // the retry loop for real context lost events.
+    if (!m_restoreAllowed)
         return;
-    }
 
     int contextLostReason = m_context->getExtensions()->getGraphicsResetStatusARB();
 
@@ -5017,7 +5067,7 @@ void WebGLRenderingContext::maybeRestoreContext(WebGLRenderingContext::LostConte
 
     RefPtr<GraphicsContext3D> context(GraphicsContext3D::create(m_attributes, canvas()->document()->view()->root()->hostWindow()));
     if (!context) {
-        if (mode == RealLostContext)
+        if (m_contextLostMode == RealLostContext)
             m_restoreTimer.startOneShot(secondsBetweenRestoreAttempts);
         else
             // This likely shouldn't happen but is the best way to report it to the WebGL app.
@@ -5028,7 +5078,8 @@ void WebGLRenderingContext::maybeRestoreContext(WebGLRenderingContext::LostConte
     // Construct a new drawing buffer with the new GraphicsContext3D.
     if (m_drawingBuffer) {
         m_drawingBuffer->discardResources();
-        m_drawingBuffer = DrawingBuffer::create(m_context.get(), m_drawingBuffer->size(), !m_attributes.preserveDrawingBuffer);
+        m_drawingBuffer = DrawingBuffer::create(context.get(), m_drawingBuffer->size(), !m_attributes.preserveDrawingBuffer);
+        m_drawingBuffer->bind();
     }
 
     m_context = context;

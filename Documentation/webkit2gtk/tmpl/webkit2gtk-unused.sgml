@@ -1,29 +1,118 @@
-<!-- ##### ENUM WebKitLoadStatus ##### -->
+<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Image ##### -->
+
+
+
+<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Long_Description ##### -->
 <para>
 
 </para>
 
-@WEBKIT_LOAD_PROVISIONAL: 
-@WEBKIT_LOAD_REDIRECTED: 
-@WEBKIT_LOAD_COMMITTED: 
-@WEBKIT_LOAD_FINISHED: 
 
-<!-- ##### SIGNAL WebKitWebView::load-failed ##### -->
+<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:See_Also ##### -->
 <para>
 
 </para>
 
-@webkitwebview: the object which received the signal.
+
+<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Short_Description ##### -->
+
+
+
+<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Stability_Level ##### -->
+
+
+
+<!-- ##### SECTION ./tmpl/WebKitWebLoaderClient.sgml:Title ##### -->
+WebKitWebLoaderClient
+
+
+<!-- ##### STRUCT WebKitWebLoaderClient ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SIGNAL WebKitWebLoaderClient::load-committed ##### -->
+<para>
+
+</para>
+
+@webkitwebloaderclient: the object which received the signal.
+@arg1: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebLoaderClient::load-failed ##### -->
+<para>
+
+</para>
+
+@webkitwebloaderclient: the object which received the signal.
 @arg1: 
 @arg2: 
 @arg3: 
 @Returns: 
 
-<!-- ##### SIGNAL WebKitWebView::load-status-changed ##### -->
+<!-- ##### SIGNAL WebKitWebLoaderClient::load-finished ##### -->
 <para>
 
 </para>
 
-@webkitwebview: the object which received the signal.
+@webkitwebloaderclient: the object which received the signal.
 @arg1: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebLoaderClient::provisional-load-failed ##### -->
+<para>
+
+</para>
+
+@webkitwebloaderclient: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebLoaderClient::provisional-load-received-server-redirect ##### -->
+<para>
+
+</para>
+
+@webkitwebloaderclient: the object which received the signal.
+@arg1: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebLoaderClient::provisional-load-started ##### -->
+<para>
+
+</para>
+
+@webkitwebloaderclient: the object which received the signal.
+@arg1: 
+@Returns: 
+
+<!-- ##### FUNCTION webkit_web_view_get_loader_client ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+<!-- ##### FUNCTION webkit_web_view_load_alternate_html ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@content: 
+@base_uri: 
+@unreachable_uri: 
+
+<!-- ##### FUNCTION webkit_web_view_set_loader_client ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@loader_client: 
 

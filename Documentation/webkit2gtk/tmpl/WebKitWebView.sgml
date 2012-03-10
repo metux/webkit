@@ -41,6 +41,25 @@ WebKitWebView
 @webkitwebview: the object which received the signal.
 @Returns: 
 
+<!-- ##### SIGNAL WebKitWebView::load-changed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+
+<!-- ##### SIGNAL WebKitWebView::load-failed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
+@Returns: 
+
 <!-- ##### SIGNAL WebKitWebView::ready-to-show ##### -->
 <para>
 
@@ -98,6 +117,21 @@ WebKitWebView
 
 </para>
 
+<!-- ##### ARG WebKitWebView:zoom-level ##### -->
+<para>
+
+</para>
+
+<!-- ##### ENUM WebKitLoadEvent ##### -->
+<para>
+
+</para>
+
+@WEBKIT_LOAD_STARTED: 
+@WEBKIT_LOAD_REDIRECTED: 
+@WEBKIT_LOAD_COMMITTED: 
+@WEBKIT_LOAD_FINISHED: 
+
 <!-- ##### FUNCTION webkit_web_view_new ##### -->
 <para>
 
@@ -123,24 +157,6 @@ WebKitWebView
 
 @web_view: 
 @Returns: 
-
-
-<!-- ##### FUNCTION webkit_web_view_get_loader_client ##### -->
-<para>
-
-</para>
-
-@web_view: 
-@Returns: 
-
-
-<!-- ##### FUNCTION webkit_web_view_set_loader_client ##### -->
-<para>
-
-</para>
-
-@web_view: 
-@loader_client: 
 
 
 <!-- ##### FUNCTION webkit_web_view_load_uri ##### -->
@@ -171,17 +187,6 @@ WebKitWebView
 @plain_text: 
 
 
-<!-- ##### FUNCTION webkit_web_view_load_alternate_html ##### -->
-<para>
-
-</para>
-
-@web_view: 
-@content: 
-@base_uri: 
-@unreachable_uri: 
-
-
 <!-- ##### FUNCTION webkit_web_view_load_request ##### -->
 <para>
 
@@ -189,6 +194,17 @@ WebKitWebView
 
 @web_view: 
 @request: 
+
+
+<!-- ##### FUNCTION webkit_web_view_replace_content ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@content: 
+@content_uri: 
+@base_uri: 
 
 
 <!-- ##### FUNCTION webkit_web_view_can_go_back ##### -->
@@ -331,6 +347,24 @@ WebKitWebView
 
 
 <!-- ##### FUNCTION webkit_web_view_get_window_properties ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_set_zoom_level ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@zoom_level: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_zoom_level ##### -->
 <para>
 
 </para>

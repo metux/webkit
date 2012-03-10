@@ -36,6 +36,7 @@
 #include "HTMLNames.h"
 #include "LayoutRepainter.h"
 #include "RenderLayer.h"
+#include "RenderTableCaption.h"
 #include "RenderTableCell.h"
 #include "RenderTableCol.h"
 #include "RenderTableSection.h"
@@ -115,8 +116,8 @@ void RenderTable::addChild(RenderObject* child, RenderObject* beforeChild)
 
     bool wrapInAnonymousSection = !child->isPositioned();
 
-    if (child->isRenderBlock() && child->style()->display() == TABLE_CAPTION) {
-        m_captions.append(toRenderBlock(child));
+    if (child->isTableCaption()) {
+        m_captions.append(toRenderTableCaption(child));
         setNeedsSectionRecalc();
         wrapInAnonymousSection = false;
     } else if (child->isTableCol()) {
@@ -215,6 +216,8 @@ void RenderTable::removeChild(RenderObject* oldChild)
 
 void RenderTable::computeLogicalWidth()
 {
+    recalcSectionsIfNeeded();
+
     if (isPositioned())
         computePositionedLogicalWidth();
 
@@ -230,11 +233,9 @@ void RenderTable::computeLogicalWidth()
         // HTML tables size as though CSS width includes border/padding, CSS tables do not.
         LayoutUnit borders = 0;
         if (logicalWidthType != Percent && (!node() || !node()->hasTagName(tableTag))) {
-            bool collapsing = collapseBorders();
-            LayoutUnit borderAndPaddingBefore = borderBefore() + (collapsing ? 0 : paddingBefore());
-            LayoutUnit borderAndPaddingAfter = borderAfter() + (collapsing ? 0 : paddingAfter());
-            borders = borderAndPaddingBefore + borderAndPaddingAfter;
-        }
+            recalcBordersInRowDirection();
+            borders = borderStart() + borderEnd() + (collapseBorders() ? 0 : paddingStart() + paddingEnd());
+         }
         setLogicalWidth(style()->logicalWidth().calcMinValue(containerWidthInInlineDirection) + borders);
         setLogicalWidth(max(minPreferredLogicalWidth(), logicalWidth()));
     } else {
@@ -538,7 +539,7 @@ void RenderTable::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOffs
     info.updatePaintingRootForChildren(this);
 
     for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->isBox() && !toRenderBox(child)->hasSelfPaintingLayer() && (child->isTableSection() || (child->isRenderBlock() && child->style()->display() == TABLE_CAPTION))) {
+        if (child->isBox() && !toRenderBox(child)->hasSelfPaintingLayer() && (child->isTableSection() || child->isTableCaption())) {
             LayoutPoint childPoint = flipForWritingModeForChild(toRenderBox(child), paintOffset);
             child->paint(info, childPoint);
         }
@@ -1209,7 +1210,7 @@ bool RenderTable::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
     // Check kids first.
     if (!hasOverflowClip() || overflowClipRect(adjustedLocation, result.region()).intersects(result.rectForPoint(pointInContainer))) {
         for (RenderObject* child = lastChild(); child; child = child->previousSibling()) {
-            if (child->isBox() && !toRenderBox(child)->hasSelfPaintingLayer() && (child->isTableSection() || (child->isRenderBlock() && child->style()->display() == TABLE_CAPTION))) {
+            if (child->isBox() && !toRenderBox(child)->hasSelfPaintingLayer() && (child->isTableSection() || child->isTableCaption())) {
                 LayoutPoint childPoint = flipForWritingModeForChild(toRenderBox(child), adjustedLocation);
                 if (child->nodeAtPoint(request, result, pointInContainer, childPoint, action)) {
                     updateHitTestResult(result, toLayoutPoint(pointInContainer - childPoint));

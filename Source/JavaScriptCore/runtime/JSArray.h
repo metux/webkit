@@ -27,7 +27,84 @@
 
 namespace JSC {
 
-    typedef HashMap<unsigned, WriteBarrier<Unknown> > SparseArrayValueMap;
+    class JSArray;
+
+    struct SparseArrayEntry : public WriteBarrier<Unknown> {
+        typedef WriteBarrier<Unknown> Base;
+
+        SparseArrayEntry() : attributes(0) {}
+
+        JSValue get(ExecState*, JSArray*) const;
+        void get(PropertySlot&) const;
+        void get(PropertyDescriptor&) const;
+        JSValue getNonSparseMode() const;
+
+        unsigned attributes;
+    };
+
+    class SparseArrayValueMap {
+        typedef HashMap<uint64_t, SparseArrayEntry, WTF::IntHash<uint64_t>, WTF::UnsignedWithZeroKeyHashTraits<uint64_t> > Map;
+
+        enum Flags {
+            Normal = 0,
+            SparseMode = 1,
+            LengthIsReadOnly = 2,
+        };
+
+    public:
+        typedef Map::iterator iterator;
+        typedef Map::const_iterator const_iterator;
+
+        SparseArrayValueMap()
+            : m_flags(Normal)
+            , m_reportedCapacity(0)
+        {
+        }
+
+        void visitChildren(SlotVisitor&);
+
+        bool sparseMode()
+        {
+            return m_flags & SparseMode;
+        }
+
+        void setSparseMode()
+        {
+            m_flags = static_cast<Flags>(m_flags | SparseMode);
+        }
+
+        bool lengthIsReadOnly()
+        {
+            return m_flags & LengthIsReadOnly;
+        }
+
+        void setLengthIsReadOnly()
+        {
+            m_flags = static_cast<Flags>(m_flags | LengthIsReadOnly);
+        }
+
+        // These methods may mutate the contents of the map
+        void put(ExecState*, JSArray*, unsigned, JSValue);
+        std::pair<iterator, bool> add(JSArray*, unsigned);
+        iterator find(unsigned i) { return m_map.find(i); }
+        // This should ASSERT the remove is valid (check the result of the find).
+        void remove(iterator it) { m_map.remove(it); }
+        void remove(unsigned i) { m_map.remove(i); }
+
+        // These methods do not mutate the contents of the map.
+        iterator notFound() { return m_map.end(); }
+        bool isEmpty() const { return m_map.isEmpty(); }
+        bool contains(unsigned i) const { return m_map.contains(i); }
+        size_t size() const { return m_map.size(); }
+        // Only allow const begin/end iteration.
+        const_iterator begin() const { return m_map.begin(); }
+        const_iterator end() const { return m_map.end(); }
+
+    private:
+        Map m_map;
+        Flags m_flags;
+        size_t m_reportedCapacity;
+    };
 
     // This struct holds the actual data values of an array.  A JSArray object points to it's contained ArrayStorage
     // struct by pointing to m_vector.  To access the contained ArrayStorage struct, use the getStorage() and 
@@ -40,87 +117,67 @@ namespace JSC {
         SparseArrayValueMap* m_sparseValueMap;
         void* subclassData; // A JSArray subclass can use this to fill the vector lazily.
         void* m_allocBase; // Pointer to base address returned by malloc().  Keeping this pointer does eliminate false positives from the leak detector.
-        size_t reportedMapCapacity;
 #if CHECK_ARRAY_CONSISTENCY
         bool m_inCompactInitialization;
 #endif
         WriteBarrier<Unknown> m_vector[1];
     };
 
-    // The CreateCompact creation mode is used for fast construction of arrays
-    // whose size and contents are known at time of creation.
-    //
-    // There are two obligations when using this mode:
-    //
-    //   - uncheckedSetIndex() must be used when initializing the array.
-    //   - setLength() must be called after initialization.
-
-    enum ArrayCreationMode { CreateCompact, CreateInitialized };
-
     class JSArray : public JSNonFinalObject {
         friend class Walker;
 
     protected:
-        explicit JSArray(JSGlobalData&, Structure*);
+        JS_EXPORT_PRIVATE explicit JSArray(JSGlobalData&, Structure*);
 
-        void finishCreation(JSGlobalData&);
-        void finishCreation(JSGlobalData&, unsigned initialLength, ArrayCreationMode);
-        void finishCreation(JSGlobalData&, const ArgList&);
-        void finishCreation(JSGlobalData&, const JSValue*, size_t length);
+        JS_EXPORT_PRIVATE void finishCreation(JSGlobalData&, unsigned initialLength = 0);
+        JS_EXPORT_PRIVATE JSArray* tryFinishCreationUninitialized(JSGlobalData&, unsigned initialLength);
     
     public:
         typedef JSNonFinalObject Base;
 
-        JSArray(VPtrStealingHackType);
-        virtual ~JSArray();
+        JS_EXPORT_PRIVATE ~JSArray();
+        JS_EXPORT_PRIVATE static void destroy(JSCell*);
 
-        static JSArray* create(JSGlobalData& globalData, Structure* structure)
+        static JSArray* create(JSGlobalData& globalData, Structure* structure, unsigned initialLength = 0)
         {
-            JSArray* array = new (allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
-            array->finishCreation(globalData);
+            JSArray* array = new (NotNull, allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
+            array->finishCreation(globalData, initialLength);
             return array;
         }
 
-        static JSArray* create(JSGlobalData& globalData, Structure* structure, unsigned initialLength, ArrayCreationMode createMode)
+        // tryCreateUninitialized is used for fast construction of arrays whose size and
+        // contents are known at time of creation. Clients of this interface must:
+        //   - null-check the result (indicating out of memory, or otherwise unable to allocate vector).
+        //   - call 'initializeIndex' for all properties in sequence, for 0 <= i < initialLength.
+        //   - called 'completeInitialization' after all properties have been initialized.
+        static JSArray* tryCreateUninitialized(JSGlobalData& globalData, Structure* structure, unsigned initialLength)
         {
-            JSArray* array = new (allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
-            array->finishCreation(globalData, initialLength, createMode);
-            return array;
+            JSArray* array = new (NotNull, allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
+            return array->tryFinishCreationUninitialized(globalData, initialLength);
         }
 
-        static JSArray* create(JSGlobalData& globalData, Structure* structure, const ArgList& initialValues)
-        {
-            JSArray* array = new (allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
-            array->finishCreation(globalData, initialValues);
-            return array;
-        }
+        JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&, bool throwException);
 
-        static JSArray* create(JSGlobalData& globalData, Structure* structure, const JSValue* values, size_t length)
-        {
-            JSArray* array = new (allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
-            array->finishCreation(globalData, values, length);
-            return array;
-        }
-
-        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
-        static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+        JS_EXPORT_PRIVATE static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
         static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
 
         static JS_EXPORTDATA const ClassInfo s_info;
         
         unsigned length() const { return m_storage->m_length; }
-        void setLength(unsigned); // OK to use on new arrays, but not if it might be a RegExpMatchArray.
+        // OK to use on new arrays, but not if it might be a RegExpMatchArray.
+        bool setLength(ExecState*, unsigned, bool throwException = false);
 
         void sort(ExecState*);
         void sort(ExecState*, JSValue compareFunction, CallType, const CallData&);
         void sortNumeric(ExecState*, JSValue compareFunction, CallType, const CallData&);
 
         void push(ExecState*, JSValue);
-        JSValue pop();
+        JSValue pop(ExecState*);
 
-        void shiftCount(ExecState*, int count);
-        void unshiftCount(ExecState*, int count);
+        void shiftCount(ExecState*, unsigned count);
+        void unshiftCount(ExecState*, unsigned count);
 
         bool canGetIndex(unsigned i) { return i < m_vectorLength && m_storage->m_vector[i]; }
         JSValue getIndex(unsigned i)
@@ -144,14 +201,39 @@ namespace JSC {
             x.set(globalData, this, v);
         }
         
-        void uncheckedSetIndex(JSGlobalData& globalData, unsigned i, JSValue v)
+        inline void initializeIndex(JSGlobalData& globalData, unsigned i, JSValue v)
         {
             ASSERT(canSetIndex(i));
             ArrayStorage *storage = m_storage;
 #if CHECK_ARRAY_CONSISTENCY
             ASSERT(storage->m_inCompactInitialization);
 #endif
-            storage->m_vector[i].set(globalData, this, v);
+            // Check that we are initializing the next index in sequence.
+            ASSERT_UNUSED(i, i == storage->m_length);
+            // tryCreateUninitialized set m_numValuesInVector to the initialLength,
+            // check we do not try to initialize more than this number of properties.
+            ASSERT(storage->m_length < storage->m_numValuesInVector);
+            // It is improtant that we increment length here, so that all newly added
+            // values in the array still get marked during the initialization phase.
+            storage->m_vector[storage->m_length++].set(globalData, this, v);
+        }
+
+        inline void completeInitialization(unsigned newLength)
+        {
+            // Check that we have initialized as meny properties as we think we have.
+            ASSERT_UNUSED(newLength, newLength == m_storage->m_length);
+            // Check that the number of propreties initialized matches the initialLength.
+            ASSERT(m_storage->m_length == m_storage->m_numValuesInVector);
+#if CHECK_ARRAY_CONSISTENCY
+            ASSERT(m_storage->m_inCompactInitialization);
+            m_storage->m_inCompactInitialization = false;
+#endif
+        }
+
+        bool inSparseMode()
+        {
+            SparseArrayValueMap* map = m_storage->m_sparseValueMap;
+            return map && map->sparseMode();
         }
 
         void fillArgList(ExecState*, MarkedArgumentBuffer&);
@@ -172,7 +254,7 @@ namespace JSC {
             return OBJECT_OFFSETOF(JSArray, m_vectorLength);
         }
 
-        static void visitChildren(JSCell*, SlotVisitor&);
+        JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
@@ -182,16 +264,27 @@ namespace JSC {
         static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
         static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
 
-        void* subclassData() const;
-        void setSubclassData(void*);
+        JS_EXPORT_PRIVATE void* subclassData() const;
+        JS_EXPORT_PRIVATE void setSubclassData(void*);
 
     private:
+        bool isLengthWritable()
+        {
+            SparseArrayValueMap* map = m_storage->m_sparseValueMap;
+            return !map || !map->lengthIsReadOnly();
+        }
+
+        void setLengthWritable(ExecState*, bool writable);
+        void putDescriptor(ExecState*, SparseArrayEntry*, PropertyDescriptor&, PropertyDescriptor& old);
+        bool defineOwnNumericProperty(ExecState*, unsigned, PropertyDescriptor&, bool throwException);
+        void enterSparseMode(JSGlobalData&);
+
         bool getOwnPropertySlotSlowCase(ExecState*, unsigned propertyName, PropertySlot&);
-        void putSlowCase(ExecState*, unsigned propertyName, JSValue);
+        void putByIndexBeyondVectorLength(ExecState*, unsigned propertyName, JSValue);
 
         unsigned getNewVectorLength(unsigned desiredLength);
         bool increaseVectorLength(unsigned newLength);
-        bool increaseVectorPrefixLength(unsigned newLength);
+        bool unshiftCountSlowCase(unsigned count);
         
         unsigned compactForSorting();
 
@@ -199,7 +292,7 @@ namespace JSC {
         void checkConsistency(ConsistencyCheckType = NormalConsistencyCheck);
 
         unsigned m_vectorLength; // The valid length of m_vector
-        int m_indexBias; // The number of JSValue sized blocks before ArrayStorage.
+        unsigned m_indexBias; // The number of JSValue sized blocks before ArrayStorage.
         ArrayStorage *m_storage;
     };
 
@@ -216,8 +309,8 @@ namespace JSC {
         return asArray(value.asCell());
     }
 
-    inline bool isJSArray(JSGlobalData* globalData, JSCell* cell) { return cell->vptr() == globalData->jsArrayVPtr; }
-    inline bool isJSArray(JSGlobalData* globalData, JSValue v) { return v.isCell() && isJSArray(globalData, v.asCell()); }
+    inline bool isJSArray(JSCell* cell) { return cell->classInfo() == &JSArray::s_info; }
+    inline bool isJSArray(JSValue v) { return v.isCell() && isJSArray(v.asCell()); }
 
     // Rule from ECMA 15.2 about what an array index is.
     // Must exactly match string form of an unsigned integer, and be less than 2^32 - 1.

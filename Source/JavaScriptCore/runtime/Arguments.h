@@ -59,7 +59,7 @@ namespace JSC {
 
         static Arguments* create(JSGlobalData& globalData, CallFrame* callFrame)
         {
-            Arguments* arguments = new (allocateCell<Arguments>(globalData.heap)) Arguments(callFrame);
+            Arguments* arguments = new (NotNull, allocateCell<Arguments>(globalData.heap)) Arguments(callFrame);
             arguments->finishCreation(callFrame);
             return arguments;
         }
@@ -108,6 +108,7 @@ namespace JSC {
         void finishCreation(CallFrame*);
 
     private:
+        static void destroy(JSCell*);
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
         static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);

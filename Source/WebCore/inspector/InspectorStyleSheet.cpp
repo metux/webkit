@@ -149,7 +149,7 @@ static PassRefPtr<CSSRuleList> asCSSRuleList(CSSStyleSheet* styleSheet)
     if (!styleSheet)
         return 0;
 
-    return CSSRuleList::create(styleSheet, true);
+    return CSSRuleList::create(styleSheet);
 }
 
 static PassRefPtr<CSSRuleList> asCSSRuleList(CSSRule* rule)
@@ -657,6 +657,14 @@ PassRefPtr<InspectorStyleSheet> InspectorStyleSheet::create(const String& id, Pa
     return adoptRef(new InspectorStyleSheet(id, pageStyleSheet, origin, documentURL));
 }
 
+// static
+String InspectorStyleSheet::styleSheetURL(CSSStyleSheet* pageStyleSheet)
+{
+    if (pageStyleSheet && !pageStyleSheet->finalURL().isEmpty())
+        return pageStyleSheet->finalURL().string();
+    return emptyString();
+}
+
 InspectorStyleSheet::InspectorStyleSheet(const String& id, PassRefPtr<CSSStyleSheet> pageStyleSheet, const String& origin, const String& documentURL)
     : m_id(id)
     , m_pageStyleSheet(pageStyleSheet)
@@ -674,9 +682,8 @@ InspectorStyleSheet::~InspectorStyleSheet()
 
 String InspectorStyleSheet::finalURL() const
 {
-    if (m_pageStyleSheet && !m_pageStyleSheet->finalURL().isEmpty())
-        return m_pageStyleSheet->finalURL().string();
-    return m_documentURL;
+    String url = styleSheetURL(m_pageStyleSheet.get());
+    return url.isEmpty() ? m_documentURL : url;
 }
 
 void InspectorStyleSheet::reparseStyleSheet(const String& text)
@@ -704,7 +711,7 @@ bool InspectorStyleSheet::setRuleSelector(const InspectorCSSId& id, const String
     CSSStyleRule* rule = ruleForId(id);
     if (!rule)
         return false;
-    CSSStyleSheet* styleSheet = InspectorCSSAgent::parentStyleSheet(rule);
+    CSSStyleSheet* styleSheet = rule->parentStyleSheet();
     if (!styleSheet || !ensureParsedDataReady())
         return false;
 
@@ -730,7 +737,7 @@ CSSStyleRule* InspectorStyleSheet::addRule(const String& selector)
     m_pageStyleSheet->addRule(selector, "", ec);
     if (ec)
         return 0;
-    RefPtr<CSSRuleList> rules = m_pageStyleSheet->cssRules();
+    RefPtr<CSSRuleList> rules = CSSRuleList::create(m_pageStyleSheet.get());
     ASSERT(rules->length());
     CSSStyleRule* rule = InspectorCSSAgent::asCSSStyleRule(rules->item(rules->length() - 1));
     ASSERT(rule);
@@ -765,7 +772,7 @@ PassRefPtr<InspectorObject> InspectorStyleSheet::buildObjectForStyleSheet()
 
     RefPtr<InspectorObject> result = InspectorObject::create();
     result->setString("styleSheetId", id());
-    RefPtr<CSSRuleList> cssRuleList = CSSRuleList::create(styleSheet, true);
+    RefPtr<CSSRuleList> cssRuleList = CSSRuleList::create(styleSheet);
     RefPtr<InspectorArray> cssRules = buildArrayForRuleList(cssRuleList.get());
     result->setArray("rules", cssRules.release());
 
@@ -800,7 +807,7 @@ PassRefPtr<InspectorObject> InspectorStyleSheet::buildObjectForRule(CSSStyleRule
     RefPtr<InspectorObject> result = InspectorObject::create();
     result->setString("selectorText", rule->selectorText());
     // "sourceURL" is present only for regular rules, otherwise "origin" should be used in the frontend.
-    if (!m_origin.length())
+    if (m_origin == "regular")
         result->setString("sourceURL", finalURL());
     result->setNumber("sourceLine", rule->sourceLine());
     result->setString("origin", m_origin);

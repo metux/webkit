@@ -116,11 +116,19 @@ public:
         UOther
     };
 
-    static bool isUnitTypeLength(int type) { return (type > CSSPrimitiveValue::CSS_PERCENTAGE && type < CSSPrimitiveValue::CSS_DEG) ||
-                                                    type == CSSPrimitiveValue::CSS_REMS; }
+    static bool isUnitTypeLength(int type) { return (type > CSS_PERCENTAGE && type < CSS_DEG) || type == CSS_REMS; }
 
+    bool isFontRelativeLength() const
+    {
+        return m_primitiveUnitType == CSS_EMS || m_primitiveUnitType == CSS_EXS || m_primitiveUnitType == CSS_REMS;
+    }
+    bool isIdent() const { return m_primitiveUnitType == CSS_IDENT; }
     bool isLength() const { return isUnitTypeLength(m_primitiveUnitType); }
-    bool isPercentage() const { return m_primitiveUnitType == CSSPrimitiveValue::CSS_PERCENTAGE; }
+    bool isNumber() const { return m_primitiveUnitType == CSS_NUMBER; }
+    bool isPercentage() const { return m_primitiveUnitType == CSS_PERCENTAGE; }
+    bool isString() const { return m_primitiveUnitType == CSS_STRING; }
+    bool isURI() const { return m_primitiveUnitType == CSS_URI; }
+
 
     static PassRefPtr<CSSPrimitiveValue> createIdentifier(int identifier) { return adoptRef(new CSSPrimitiveValue(identifier)); }
     static PassRefPtr<CSSPrimitiveValue> createColor(unsigned rgbValue) { return adoptRef(new CSSPrimitiveValue(rgbValue)); }
@@ -204,7 +212,8 @@ public:
 
     CSSWrapShape* getShapeValue() const { return m_primitiveUnitType != CSS_SHAPE ? 0 : m_value.shape; }
 
-    int getIdent() const;
+    int getIdent() const { return m_primitiveUnitType == CSS_IDENT ? m_value.ident : 0; }
+
     template<typename T> inline operator T() const; // Defined in CSSPrimitiveValueMappings.h
 
     String customCssText() const;

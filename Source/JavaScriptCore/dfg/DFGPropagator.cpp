@@ -624,6 +624,7 @@ private:
         // These gets ignored because it doesn't do anything.
         case Phantom:
         case InlineStart:
+        case Nop:
             break;
 #else
         default:
@@ -767,13 +768,14 @@ private:
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         m_count = 0;
 #endif
+        // Two stage process: first propagate predictions, then propagate while doing double voting.
+        
         do {
             m_changed = false;
             
             // Forward propagation is near-optimal for both topologically-sorted and
             // DFS-sorted code.
             propagatePredictionsForward();
-            doRoundOfDoubleVoting();
             if (!m_changed)
                 break;
             
@@ -783,7 +785,18 @@ private:
             // found a sound solution and (2) short-circuits backward flow.
             m_changed = false;
             propagatePredictionsBackward();
+        } while (m_changed);
+        
+        do {
+            m_changed = false;
             doRoundOfDoubleVoting();
+            propagatePredictionsForward();
+            if (!m_changed)
+                break;
+            
+            m_changed = false;
+            doRoundOfDoubleVoting();
+            propagatePredictionsBackward();
         } while (m_changed);
     }
     
@@ -915,22 +928,24 @@ private:
                 node.op = GetFloat64ArrayLength;
             else
                 ASSERT_NOT_REACHED();
+            m_graph.deref(m_compileIndex); // No longer MustGenerate
             break;
         }
         case GetIndexedPropertyStorage: {
             PredictedType basePrediction = m_graph[node.child2()].prediction();
             if (!(basePrediction & PredictInt32) && basePrediction) {
-                node.op = Phantom;
-                node.children.fixed.child1 = NoNode;
-                node.children.fixed.child2 = NoNode;
-                node.children.fixed.child3 = NoNode;
+                node.op = Nop;
+                m_graph.clearAndDerefChild1(node);
+                m_graph.clearAndDerefChild2(node);
+                m_graph.clearAndDerefChild3(node);
+                node.setRefCount(0);
             }
             break;
         }
         case GetByVal:
         case StringCharAt:
         case StringCharCodeAt: {
-            if (node.child3() != NoNode && m_graph[node.child3()].op == Phantom)
+            if (node.child3() != NoNode && m_graph[node.child3()].op == Nop)
                 node.children.fixed.child3 = NoNode;
             break;
         }
@@ -1084,8 +1099,10 @@ private:
     
     bool byValIsPure(Node& node)
     {
-        PredictedType prediction = m_graph[node.child2()].prediction();
-        return (prediction & PredictInt32) || !prediction;
+        return m_graph[node.child2()].shouldSpeculateInteger()
+            && ((node.op == PutByVal || node.op == PutByValAlias)
+                ? isActionableMutableArrayPrediction(m_graph[node.child1()].prediction())
+                : isActionableArrayPrediction(m_graph[node.child1()].prediction()));
     }
     
     bool clobbersWorld(NodeIndex nodeIndex)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,6 +64,11 @@ class Widget;
 #endif
 #if PLATFORM(MAC)
 class DisplaySleepDisabler;
+#endif
+
+#if ENABLE(VIDEO_TRACK)
+typedef PODIntervalTree<double, TextTrackCue*> CueIntervalTree;
+typedef Vector<CueIntervalTree::IntervalType> CueList;
 #endif
 
 // FIXME: The inheritance from MediaPlayerClient here should be private inheritance.
@@ -196,6 +201,7 @@ public:
     PassRefPtr<TextTrack> addTrack(const String& kind, ExceptionCode& ec) { return addTrack(kind, emptyString(), emptyString(), ec); }
 
     TextTrackList* textTracks();
+    CueList currentlyActiveCues() const { return m_currentlyActiveCues; }
 
     virtual void trackWasAdded(HTMLTrackElement*);
     virtual void trackWillBeRemoved(HTMLTrackElement*);
@@ -203,6 +209,7 @@ public:
     void configureTextTrack(HTMLTrackElement*);
     void configureTextTracks();
     bool textTracksAreReady() const;
+    void configureTextTrackDisplay();
 
     // TextTrackClient
     virtual void textTrackReadyStateChanged(TextTrack*);
@@ -275,8 +282,7 @@ protected:
     virtual bool isURLAttribute(Attribute*) const;
     virtual void attach();
 
-    virtual void willMoveToNewOwnerDocument();
-    virtual void didMoveToNewOwnerDocument();
+    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
     enum DisplayMode { Unknown, None, Poster, PosterWaitingForVideo, Video };
     DisplayMode displayMode() const { return m_displayMode; }
@@ -394,6 +400,10 @@ private:
     bool userIsInterestedInThisLanguage(const String&) const;
     bool userIsInterestedInThisTrack(HTMLTrackElement*) const;
     HTMLTrackElement* showingTrackWithSameKind(HTMLTrackElement*) const;
+
+    bool ignoreTrackDisplayUpdateRequests() const { return m_ignoreTrackDisplayUpdate > 0; }
+    void beginIgnoringTrackDisplayUpdateRequests() { ++m_ignoreTrackDisplayUpdate; }
+    void endIgnoringTrackDisplayUpdateRequests() { ASSERT(m_ignoreTrackDisplayUpdate); --m_ignoreTrackDisplayUpdate; }
 #endif
 
     // These "internal" functions do not check user gesture restrictions.
@@ -427,13 +437,15 @@ private:
     virtual void mediaCanStart();
 
     void setShouldDelayLoadEvent(bool);
-
     void invalidateCachedTime();
     void refreshCachedTime() const;
 
     bool hasMediaControls();
     bool createMediaControls();
     void configureMediaControls();
+
+    void prepareMediaFragmentURI();
+    void applyMediaFragmentURI();
 
     virtual void* preDispatchEventHandler(Event*);
 
@@ -448,6 +460,11 @@ private:
     bool hasCurrentSrc() const { return !m_currentSrc.isEmpty(); }
     bool isLiveStream() const { return movieLoadType() == MediaPlayer::LiveStream; }
     bool isAutoplaying() const { return m_autoplaying; }
+
+#if PLATFORM(MAC)
+    void updateDisableSleep();
+    bool shouldDisableSleep() const;
+#endif
 
     Timer<HTMLMediaElement> m_loadTimer;
     Timer<HTMLMediaElement> m_asyncEventTimer;
@@ -508,7 +525,10 @@ private:
     mutable float m_cachedTime;
     mutable double m_cachedTimeWallClockUpdateTime;
     mutable double m_minimumWallClockTimeToCacheMediaTime;
-    
+
+    double m_fragmentStartTime;
+    double m_fragmentEndTime;
+
     typedef unsigned PendingLoadFlags;
     PendingLoadFlags m_pendingLoadFlags;
 
@@ -549,12 +569,13 @@ private:
 
 #if ENABLE(VIDEO_TRACK)
     bool m_tracksAreReady : 1;
+    bool m_haveVisibleTextTrack : 1;
+
     RefPtr<TextTrackList> m_textTracks;
     Vector<RefPtr<TextTrack> > m_textTracksWhenResourceSelectionBegan;
-    
-    typedef PODIntervalTree <double, TextTrackCue*> CueIntervalTree;
     CueIntervalTree m_cueTree;
-    Vector<CueIntervalTree::IntervalType> m_currentlyVisibleCues;
+    CueList m_currentlyActiveCues;
+    int m_ignoreTrackDisplayUpdate;
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -588,7 +609,7 @@ template <>
 struct ValueToString<TextTrackCue*> {
     static String string(TextTrackCue* const& cue)
     {
-        return String::format("%p id=%s interval=%f-->%f cue=%s)", cue, cue->id().utf8().data(), cue->startTime(), cue->endTime(), cue->getCueAsSource().utf8().data());
+        return String::format("%p id=%s interval=%f-->%f cue=%s)", cue, cue->id().utf8().data(), cue->startTime(), cue->endTime(), cue->text().utf8().data());
     }
 };
 #endif

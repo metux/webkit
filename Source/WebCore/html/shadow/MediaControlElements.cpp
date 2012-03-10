@@ -34,6 +34,7 @@
 
 #include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
+#include "DOMTokenList.h"
 #include "EventNames.h"
 #include "FloatConversion.h"
 #include "Frame.h"
@@ -47,6 +48,7 @@
 #include "RenderMedia.h"
 #include "RenderSlider.h"
 #include "RenderTheme.h"
+#include "RenderVideo.h"
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "Settings.h"
@@ -184,6 +186,9 @@ void MediaControlPanelElement::setPosition(const LayoutPoint& position)
     style->setProperty(CSSPropertyTop, top, CSSPrimitiveValue::CSS_PX);
     style->setProperty(CSSPropertyMarginLeft, 0.0, CSSPrimitiveValue::CSS_PX);
     style->setProperty(CSSPropertyMarginTop, 0.0, CSSPrimitiveValue::CSS_PX);
+
+    ExceptionCode ignored;
+    classList()->add("dragged", ignored);
 }
 
 void MediaControlPanelElement::resetPosition()
@@ -194,6 +199,9 @@ void MediaControlPanelElement::resetPosition()
     style->removeProperty(CSSPropertyTop);
     style->removeProperty(CSSPropertyMarginLeft);
     style->removeProperty(CSSPropertyMarginTop);
+
+    ExceptionCode ignored;
+    classList()->remove("dragged", ignored);
 }
 
 void MediaControlPanelElement::makeOpaque()
@@ -228,12 +236,12 @@ void MediaControlPanelElement::defaultEventHandler(Event* event)
 
     if (event->isMouseEvent()) {
         LayoutPoint location = static_cast<MouseEvent*>(event)->absoluteLocation();
-        if (event->type() == eventNames().mousedownEvent) {
+        if (event->type() == eventNames().mousedownEvent && event->target() == this) {
             startDrag(location);
             event->setDefaultHandled();
-        } else if (event->type() == eventNames().mousemoveEvent)
+        } else if (event->type() == eventNames().mousemoveEvent && m_isBeingDragged)
             continueDrag(location);
-        else if (event->type() == eventNames().mouseupEvent) {
+        else if (event->type() == eventNames().mouseupEvent && m_isBeingDragged) {
             continueDrag(location);
             endDrag();
             event->setDefaultHandled();
@@ -1114,6 +1122,110 @@ const AtomicString& MediaControlCurrentTimeDisplayElement::shadowPseudoId() cons
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-current-time-display"));
     return id;
 }
+
+// ----------------------------
+
+#if ENABLE(VIDEO_TRACK)
+
+class RenderTextTrackContainerElement : public RenderBlock {
+public:
+    RenderTextTrackContainerElement(Node*);
+    
+private:
+    virtual void layout();
+};
+
+RenderTextTrackContainerElement::RenderTextTrackContainerElement(Node* node)
+    : RenderBlock(node)
+{
+}
+
+void RenderTextTrackContainerElement::layout()
+{
+    RenderBlock::layout();
+    if (style()->display() == NONE)
+        return;
+
+    ASSERT(mediaControlElementType(node()) == MediaTextTrackDisplayContainer);
+
+    LayoutStateDisabler layoutStateDisabler(view());
+    static_cast<MediaControlTextTrackContainerElement*>(node())->updateSizes();
+}
+
+inline MediaControlTextTrackContainerElement::MediaControlTextTrackContainerElement(Document* document)
+    : MediaControlElement(document)
+    , m_fontSize(0)
+    , m_bottom(0)
+{
+}
+
+PassRefPtr<MediaControlTextTrackContainerElement> MediaControlTextTrackContainerElement::create(Document* document)
+{
+    RefPtr<MediaControlTextTrackContainerElement> element = adoptRef(new MediaControlTextTrackContainerElement(document));
+    element->hide();
+    return element.release();
+}
+
+RenderObject* MediaControlTextTrackContainerElement::createRenderer(RenderArena* arena, RenderStyle*)
+{
+    return new (arena) RenderTextTrackContainerElement(this);
+}
+
+const AtomicString& MediaControlTextTrackContainerElement::shadowPseudoId() const
+{
+    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-text-track-container"));
+    return id;
+}
+
+static const float mimimumFontSize = 16;
+static const float videoHeightFontSizePercentage = .05;
+static const float trackBottomMultiplier = .9;
+    
+void MediaControlTextTrackContainerElement::updateSizes()
+{
+    HTMLMediaElement* mediaElement = toParentMediaElement(this);
+    if (!mediaElement || !mediaElement->renderer() || !mediaElement->renderer()->isVideo())
+        return;
+    
+    IntRect videoBox = toRenderVideo(mediaElement->renderer())->videoBox();
+    if (m_videoDisplaySize == videoBox)
+        return;
+    m_videoDisplaySize = videoBox;
+
+    float fontSize = m_videoDisplaySize.size().height() * videoHeightFontSizePercentage;
+    if (fontSize != m_fontSize) {
+        m_fontSize = fontSize;
+        ensureInlineStyleDecl()->setProperty(CSSPropertyFontSize, String::number(fontSize) + "px");
+    }
+
+    LayoutUnit bottom = static_cast<LayoutUnit>(m_videoDisplaySize.y() + m_videoDisplaySize.height() - (m_videoDisplaySize.height() * trackBottomMultiplier));
+    if (bottom != m_bottom) {
+        m_bottom = bottom;
+        ensureInlineStyleDecl()->setProperty(CSSPropertyBottom, String::number(bottom) + "px");
+    }
+}
+
+// ----------------------------
+
+MediaControlTextTrackDisplayElement::MediaControlTextTrackDisplayElement(Document* document)
+    : MediaControlElement(document)
+{
+}
+
+PassRefPtr<MediaControlTextTrackDisplayElement> MediaControlTextTrackDisplayElement::create(Document* document)
+{
+    return adoptRef(new MediaControlTextTrackDisplayElement(document));
+}
+
+const AtomicString& MediaControlTextTrackDisplayElement::shadowPseudoId() const
+{
+    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-text-track-display"));
+    return id;
+}
+
+#endif
+
+// ----------------------------
 
 } // namespace WebCore
 

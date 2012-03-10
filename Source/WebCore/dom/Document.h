@@ -29,7 +29,6 @@
 #define Document_h
 
 #include "CheckedRadioButtons.h"
-#include "CollectionCache.h"
 #include "CollectionType.h"
 #include "Color.h"
 #include "DOMTimeStamp.h"
@@ -93,11 +92,13 @@ class HTMLCollection;
 class HTMLAllCollection;
 class HTMLDocument;
 class HTMLElement;
+class HTMLFormControlElementWithState;
 class HTMLFormElement;
 class HTMLFrameOwnerElement;
 class HTMLHeadElement;
 class HTMLInputElement;
 class HTMLMapElement;
+class HTMLNameCollection;
 class HitTestRequest;
 class HitTestResult;
 class IntPoint;
@@ -201,7 +202,7 @@ struct FormElementKeyHash {
 };
 
 struct FormElementKeyHashTraits : WTF::GenericHashTraits<FormElementKey> {
-    static void constructDeletedValue(FormElementKey& slot) { new (&slot) FormElementKey(WTF::HashTableDeletedValue); }
+    static void constructDeletedValue(FormElementKey& slot) { new (NotNull, &slot) FormElementKey(WTF::HashTableDeletedValue); }
     static bool isDeletedValue(const FormElementKey& value) { return value.isHashTableDeletedValue(); }
 };
 
@@ -210,7 +211,7 @@ enum PageshowEventPersistence {
     PageshowEventPersisted = 1
 };
 
-enum StyleSelectorUpdateFlag { RecalcStyleImmediately, DeferRecalcStyle };
+enum StyleSelectorUpdateFlag { RecalcStyleImmediately, DeferRecalcStyle, RecalcStyleIfNeeded };
 
 class Document : public TreeScope, public ScriptExecutionContext {
 public:
@@ -223,9 +224,6 @@ public:
         return adoptRef(new Document(frame, url, true, false));
     }
     virtual ~Document();
-
-    typedef ListHashSet<Element*, 64> FormElementListHashSet;
-    const FormElementListHashSet* getFormElements() const { return &m_formElementsWithState; }    
 
     MediaQueryMatcher* mediaQueryMatcher();
 
@@ -318,6 +316,7 @@ public:
 #endif
 #if ENABLE(FULLSCREEN_API)
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
 #endif
 #if ENABLE(PAGE_VISIBILITY_API)
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitvisibilitychange);
@@ -333,8 +332,6 @@ public:
     
     Element* documentElement() const
     {
-        if (!m_documentElement)
-            cacheDocumentElement();
         return m_documentElement.get();
     }
     
@@ -412,30 +409,19 @@ public:
 
     PassRefPtr<Node> adoptNode(PassRefPtr<Node> source, ExceptionCode&);
 
-    PassRefPtr<HTMLCollection> images();
-    PassRefPtr<HTMLCollection> embeds();
-    PassRefPtr<HTMLCollection> plugins(); // an alias for embeds() required for the JS DOM bindings.
-    PassRefPtr<HTMLCollection> applets();
-    PassRefPtr<HTMLCollection> links();
-    PassRefPtr<HTMLCollection> forms();
-    PassRefPtr<HTMLCollection> anchors();
-    PassRefPtr<HTMLCollection> objects();
-    PassRefPtr<HTMLCollection> scripts();
-    PassRefPtr<HTMLCollection> windowNamedItems(const String& name);
-    PassRefPtr<HTMLCollection> documentNamedItems(const String& name);
+    HTMLCollection* images();
+    HTMLCollection* embeds();
+    HTMLCollection* plugins(); // an alias for embeds() required for the JS DOM bindings.
+    HTMLCollection* applets();
+    HTMLCollection* links();
+    HTMLCollection* forms();
+    HTMLCollection* anchors();
+    HTMLCollection* objects();
+    HTMLCollection* scripts();
+    HTMLCollection* windowNamedItems(const AtomicString& name);
+    HTMLCollection* documentNamedItems(const AtomicString& name);
 
-    PassRefPtr<HTMLAllCollection> all();
-
-    CollectionCache* collectionInfo(CollectionType type)
-    {
-        ASSERT(type >= FirstUnnamedDocumentCachedType);
-        unsigned index = type - FirstUnnamedDocumentCachedType;
-        ASSERT(index < NumUnnamedDocumentCachedTypes);
-        m_collectionInfo[index].checkConsistency();
-        return &m_collectionInfo[index]; 
-    }
-
-    CollectionCache* nameCollectionInfo(CollectionType, const AtomicString& name);
+    HTMLAllCollection* all();
 
     // Other methods (not part of DOM)
     bool isHTMLDocument() const { return m_isHTML; }
@@ -469,7 +455,7 @@ public:
     }
 
     /**
-     * Updates the pending sheet count and then calls updateStyleSelector.
+     * Updates the pending sheet count and then calls updateActiveStylesheets.
      */
     void removePendingSheet();
 
@@ -504,7 +490,6 @@ public:
      * found and is used to calculate the derived styles for all rendering objects.
      */
     void styleSelectorChanged(StyleSelectorUpdateFlag);
-    void recalcStyleSelector();
 
     bool usesSiblingRules() const { return m_usesSiblingRules || m_usesSiblingRulesOverride; }
     void setUsesSiblingRules(bool b) { m_usesSiblingRulesOverride = b; }
@@ -519,12 +504,14 @@ public:
     void setUsesLinkRules(bool b) { m_usesLinkRules = b; }
 
     // Machinery for saving and restoring state when you leave and then go back to a page.
-    void registerFormElementWithState(Element* e) { m_formElementsWithState.add(e); }
-    void unregisterFormElementWithState(Element* e) { m_formElementsWithState.remove(e); }
+    void registerFormElementWithState(HTMLFormControlElementWithState* control) { m_formElementsWithState.add(control); }
+    void unregisterFormElementWithState(HTMLFormControlElementWithState* control) { m_formElementsWithState.remove(control); }
     Vector<String> formElementsState() const;
     void setStateForNewFormElements(const Vector<String>&);
     bool hasStateForNewFormElements() const;
     bool takeStateForFormElement(AtomicStringImpl* name, AtomicStringImpl* type, String& state);
+    typedef ListHashSet<HTMLFormControlElementWithState*, 64> FormElementListHashSet;
+    const FormElementListHashSet* formElements() const { return &m_formElementsWithState; }
 
     void registerFormElementWithFormAttribute(FormAssociatedElement*);
     void unregisterFormElementWithFormAttribute(FormAssociatedElement*);
@@ -555,7 +542,7 @@ public:
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
-    void registerCustomFont(FontData*);
+    void registerCustomFont(PassOwnPtr<FontData>);
 
     // Returns true if page box (margin boxes and page borders) is visible.
     bool isPageBoxVisible(int pageIndex);
@@ -958,7 +945,6 @@ public:
     bool isDNSPrefetchEnabled() const { return m_isDNSPrefetchEnabled; }
     void parseDNSPrefetchControlHeader(const String&);
 
-    virtual void addMessage(MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
     virtual void postTask(PassOwnPtr<Task>); // Executes the task on context's thread asynchronously.
 
     virtual void suspendScriptedAnimationControllerCallbacks();
@@ -970,13 +956,15 @@ public:
 
     bool inPageCache() const { return m_inPageCache; }
     void setInPageCache(bool flag);
-    
-    // Elements can register themselves for the "documentWillBecomeInactive()" and  
-    // "documentDidBecomeActive()" callbacks
-    void registerForDocumentActivationCallbacks(Element*);
-    void unregisterForDocumentActivationCallbacks(Element*);
+
+    // Elements can register themselves for the "documentWillSuspendForPageCache()" and  
+    // "documentDidResumeFromPageCache()" callbacks
+    void registerForPageCacheSuspensionCallbacks(Element*);
+    void unregisterForPageCacheSuspensionCallbacks(Element*);
+
     void documentWillBecomeInactive();
-    void documentDidBecomeActive();
+    void documentWillSuspendForPageCache();
+    void documentDidResumeFromPageCache();
 
     void registerForMediaVolumeCallbacks(Element*);
     void unregisterForMediaVolumeCallbacks(Element*);
@@ -1110,7 +1098,7 @@ public:
 #endif
 
     virtual EventTarget* errorEventTarget();
-    virtual void logExceptionToConsole(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
+    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>);
 
     void initDNSPrefetch();
 
@@ -1159,17 +1147,25 @@ private:
     virtual const KURL& virtualURL() const; // Same as url(), but needed for ScriptExecutionContext to implement it without a performance loss for direct calls.
     virtual KURL virtualCompleteURL(const String&) const; // Same as completeURL() for the same reason as above.
 
+    virtual void addMessage(MessageSource, MessageType, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>);
+
     virtual double minimumTimerInterval() const;
 
     void updateTitle(const StringWithDirection&);
     void updateFocusAppearanceTimerFired(Timer<Document>*);
     void updateBaseURL();
 
-    void cacheDocumentElement() const;
-
     void buildAccessKeyMap(TreeScope* root);
 
     void createStyleSelector();
+    void clearStyleSelector();
+    void combineCSSFeatureFlags();
+    void resetCSSFeatureFlags();
+    
+    bool updateActiveStylesheets(StyleSelectorUpdateFlag);
+    void collectActiveStylesheets(Vector<RefPtr<StyleSheet> >&);
+    bool testAddedStylesheetRequiresStyleRecalc(CSSStyleSheet*);
+    void analyzeStylesheetChange(StyleSelectorUpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleSelectorReset, bool& requiresFullStyleRecalc);
 
     void deleteCustomFonts();
 
@@ -1184,6 +1180,8 @@ private:
 #if ENABLE(PAGE_VISIBILITY_API)
     PageVisibilityState visibilityState() const;
 #endif
+
+    HTMLCollection* cachedCollection(CollectionType);
 
     int m_guardRefCount;
 
@@ -1256,7 +1254,7 @@ private:
     RefPtr<Node> m_focusedNode;
     RefPtr<Node> m_hoverNode;
     RefPtr<Node> m_activeNode;
-    mutable RefPtr<Element> m_documentElement;
+    RefPtr<Element> m_documentElement;
 
     uint64_t m_domTreeVersion;
     static uint64_t s_globalTreeVersion;
@@ -1271,6 +1269,7 @@ private:
 #endif
 
     RefPtr<StyleSheetList> m_styleSheets; // All of the stylesheets that are currently in effect for our media type and stylesheet set.
+    bool m_hadActiveLoadingStylesheet;
     
     typedef ListHashSet<Node*, 32> StyleSheetCandidateListHashSet;
     StyleSheetCandidateListHashSet m_styleSheetCandidateNodes; // All of the nodes that could potentially provide stylesheets to the document (<link>, <style>, <?xml-stylesheet>)
@@ -1365,9 +1364,12 @@ private:
     
     CheckedRadioButtons m_checkedRadioButtons;
 
-    typedef HashMap<AtomicStringImpl*, CollectionCache*> NamedCollectionMap;
-    FixedArray<CollectionCache, NumUnnamedDocumentCachedTypes> m_collectionInfo;
-    FixedArray<NamedCollectionMap, NumNamedDocumentCachedTypes> m_nameCollectionInfo;
+    OwnPtr<HTMLCollection> m_collections[NumUnnamedDocumentCachedTypes];
+    OwnPtr<HTMLAllCollection> m_allCollection;
+
+    typedef HashMap<AtomicStringImpl*, OwnPtr<HTMLNameCollection> > NamedCollectionMap;
+    NamedCollectionMap m_documentNamedItemCollections;
+    NamedCollectionMap m_windowNamedItemCollections;
 
     RefPtr<XPathEvaluator> m_xpathEvaluator;
 
@@ -1387,7 +1389,7 @@ private:
     bool m_inPageCache;
     Vector<IconURL> m_iconURLs;
 
-    HashSet<Element*> m_documentActivationCallbackElements;
+    HashSet<Element*> m_documentSuspensionCallbackElements;
     HashSet<Element*> m_mediaVolumeCallbackElements;
     HashSet<Element*> m_privateBrowsingStateChangedElements;
 
@@ -1418,6 +1420,7 @@ private:
     RenderFullScreen* m_fullScreenRenderer;
     Timer<Document> m_fullScreenChangeDelayTimer;
     Deque<RefPtr<Element> > m_fullScreenChangeEventTargetQueue;
+    Deque<RefPtr<Element> > m_fullScreenErrorEventTargetQueue;
     bool m_isAnimatingFullScreen;
     LayoutRect m_savedPlaceholderFrameRect;
     RefPtr<RenderStyle> m_savedPlaceholderRenderStyle;
@@ -1446,6 +1449,10 @@ private:
 
     Timer<Document> m_pendingTasksTimer;
     Vector<OwnPtr<Task> > m_pendingTasks;
+    
+#ifndef NDEBUG
+    bool m_updatingStyleSelector;
+#endif
 };
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.

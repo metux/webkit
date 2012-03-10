@@ -61,6 +61,7 @@
 #include "WebFramePolicyListenerProxy.h"
 #include "WebFullScreenManagerProxy.h"
 #include "WebInspectorProxy.h"
+#include "WebNotificationManagerProxy.h"
 #include "WebOpenPanelResultListenerProxy.h"
 #include "WebPageCreationParameters.h"
 #include "WebPageGroup.h"
@@ -967,8 +968,10 @@ void WebPageProxy::handleGestureEvent(const WebGestureEvent& event)
     if (!isValid())
         return;
 
+    m_gestureEventQueue.append(event);
+
     process()->responsivenessTimer()->start();
-    process()->send(Messages::WebPage::GestureEvent(event), m_pageID);
+    process()->send(Messages::EventDispatcher::GestureEvent(m_pageID, event), 0);
 }
 #endif
 
@@ -2426,6 +2429,8 @@ void WebPageProxy::editorStateChanged(const EditorState& editorState)
 
 #if PLATFORM(MAC)
     m_pageClient->updateTextInputState(couldChangeSecureInputState);
+#elif PLATFORM(QT)
+    m_pageClient->updateTextInputState();
 #endif
 }
 
@@ -2907,12 +2912,19 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
         }
         break;
     case WebEvent::MouseDown:
+        break;
 #if ENABLE(GESTURE_EVENTS)
     case WebEvent::GestureScrollBegin:
     case WebEvent::GestureScrollEnd:
-    case WebEvent::GestureSingleTap:
-#endif
+    case WebEvent::GestureSingleTap: {
+        WebGestureEvent event = m_gestureEventQueue.first();
+        MESSAGE_CHECK(type == event.type());
+
+        m_gestureEventQueue.removeFirst();
+        m_pageClient->doneWithGestureEvent(event, handled);
         break;
+    }
+#endif
     case WebEvent::MouseUp:
         m_currentlyProcessedMouseDownEvent = nullptr;
         break;
@@ -3313,23 +3325,36 @@ void WebPageProxy::requestNotificationPermission(uint64_t requestID, const Strin
         request->deny();
 }
 
+void WebPageProxy::showNotification(const String& title, const String& body, const String& originIdentifier, uint64_t notificationID)
+{
+    m_process->context()->notificationManagerProxy()->show(this, title, body, originIdentifier, notificationID);
+}
+
 float WebPageProxy::headerHeight(WebFrameProxy* frame)
 {
+    if (frame->isDisplayingPDFDocument())
+        return 0;
     return m_uiClient.headerHeight(this, frame);
 }
 
 float WebPageProxy::footerHeight(WebFrameProxy* frame)
 {
+    if (frame->isDisplayingPDFDocument())
+        return 0;
     return m_uiClient.footerHeight(this, frame);
 }
 
 void WebPageProxy::drawHeader(WebFrameProxy* frame, const FloatRect& rect)
 {
+    if (frame->isDisplayingPDFDocument())
+        return;
     m_uiClient.drawHeader(this, frame, rect);
 }
 
 void WebPageProxy::drawFooter(WebFrameProxy* frame, const FloatRect& rect)
 {
+    if (frame->isDisplayingPDFDocument())
+        return;
     m_uiClient.drawFooter(this, frame, rect);
 }
 
@@ -3425,7 +3450,7 @@ void WebPageProxy::computePagesForPrinting(WebFrameProxy* frame, const PrintInfo
 }
 
 #if PLATFORM(MAC) || PLATFORM(WIN)
-void WebPageProxy::drawRectToPDF(WebFrameProxy* frame, const IntRect& rect, PassRefPtr<DataCallback> prpCallback)
+void WebPageProxy::drawRectToPDF(WebFrameProxy* frame, const PrintInfo& printInfo, const IntRect& rect, PassRefPtr<DataCallback> prpCallback)
 {
     RefPtr<DataCallback> callback = prpCallback;
     if (!isValid()) {
@@ -3435,10 +3460,10 @@ void WebPageProxy::drawRectToPDF(WebFrameProxy* frame, const IntRect& rect, Pass
     
     uint64_t callbackID = callback->callbackID();
     m_dataCallbacks.set(callbackID, callback.get());
-    process()->send(Messages::WebPage::DrawRectToPDF(frame->frameID(), rect, callbackID), m_pageID, m_isPerformingDOMPrintOperation ? CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply : 0);
+    process()->send(Messages::WebPage::DrawRectToPDF(frame->frameID(), printInfo, rect, callbackID), m_pageID, m_isPerformingDOMPrintOperation ? CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply : 0);
 }
 
-void WebPageProxy::drawPagesToPDF(WebFrameProxy* frame, uint32_t first, uint32_t count, PassRefPtr<DataCallback> prpCallback)
+void WebPageProxy::drawPagesToPDF(WebFrameProxy* frame, const PrintInfo& printInfo, uint32_t first, uint32_t count, PassRefPtr<DataCallback> prpCallback)
 {
     RefPtr<DataCallback> callback = prpCallback;
     if (!isValid()) {
@@ -3448,7 +3473,7 @@ void WebPageProxy::drawPagesToPDF(WebFrameProxy* frame, uint32_t first, uint32_t
     
     uint64_t callbackID = callback->callbackID();
     m_dataCallbacks.set(callbackID, callback.get());
-    process()->send(Messages::WebPage::DrawPagesToPDF(frame->frameID(), first, count, callbackID), m_pageID, m_isPerformingDOMPrintOperation ? CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply : 0);
+    process()->send(Messages::WebPage::DrawPagesToPDF(frame->frameID(), printInfo, first, count, callbackID), m_pageID, m_isPerformingDOMPrintOperation ? CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply : 0);
 }
 #endif
 

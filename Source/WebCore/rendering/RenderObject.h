@@ -265,7 +265,7 @@ public:
 
     // Overloaded new operator.  Derived classes must override operator new
     // in order to allocate out of the RenderArena.
-    void* operator new(size_t, RenderArena*) throw();
+    void* operator new(size_t, RenderArena*);
 
     // Overridden to prevent the normal delete from being called.
     void operator delete(void*, size_t);
@@ -328,6 +328,7 @@ public:
     virtual bool isTable() const { return false; }
     virtual bool isTableCell() const { return false; }
     virtual bool isTableCol() const { return false; }
+    virtual bool isTableCaption() const { return false; }
     virtual bool isTableRow() const { return false; }
     virtual bool isTableSection() const { return false; }
     virtual bool isTextControl() const { return false; }
@@ -342,7 +343,6 @@ public:
 #endif
 
     virtual bool isRenderFlowThread() const { return false; }
-
     bool canHaveRegionStyle() const { return isRenderBlock() && !isAnonymous() && !isRenderFlowThread(); }
 
     bool isRoot() const { return document()->documentElement() == m_node; }
@@ -371,6 +371,7 @@ public:
 
     bool hasCounterNodeMap() const { return m_bitfields.hasCounterNodeMap(); }
     void setHasCounterNodeMap(bool hasCounterNodeMap) { m_bitfields.setHasCounterNodeMap(hasCounterNodeMap); }
+    bool everHadLayout() const { return m_bitfields.everHadLayout(); }
 
     bool childrenInline() const { return m_bitfields.childrenInline(); }
     void setChildrenInline(bool b) { m_bitfields.setChildrenInline(b); }
@@ -851,9 +852,10 @@ public:
         return outlineBoundsForRepaint(0);
     }
 
-protected:
-    bool everHadLayout() const { return m_bitfields.everHadLayout(); }
+    // Return the renderer whose background style is used to paint the root background. Should only be called on the renderer for which isRoot() is true.
+    RenderObject* rendererForRootBackground();
 
+protected:
     // Overrides should call the superclass at the end
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     // Overrides should call the superclass at the start

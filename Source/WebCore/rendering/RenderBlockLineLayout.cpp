@@ -193,6 +193,7 @@ public:
         , m_isEmpty(true)
         , m_previousLineBrokeCleanly(true)
         , m_floatPaginationStrut(0)
+        , m_runsFromLeadingWhitespace(0)
     { }
 
     bool isFirstLine() const { return m_isFirstLine; }
@@ -200,6 +201,9 @@ public:
     bool isEmpty() const { return m_isEmpty; }
     bool previousLineBrokeCleanly() const { return m_previousLineBrokeCleanly; }
     LayoutUnit floatPaginationStrut() const { return m_floatPaginationStrut; }
+    unsigned runsFromLeadingWhitespace() const { return m_runsFromLeadingWhitespace; }
+    void resetRunsFromLeadingWhitespace() { m_runsFromLeadingWhitespace = 0; }
+    void incrementRunsFromLeadingWhitespace() { m_runsFromLeadingWhitespace++; }
 
     void setFirstLine(bool firstLine) { m_isFirstLine = firstLine; }
     void setLastLine(bool lastLine) { m_isLastLine = lastLine; }
@@ -224,6 +228,7 @@ private:
     bool m_isEmpty;
     bool m_previousLineBrokeCleanly;
     LayoutUnit m_floatPaginationStrut;
+    unsigned m_runsFromLeadingWhitespace;
 };
 
 static inline LayoutUnit borderPaddingMarginStart(RenderInline* child)
@@ -479,10 +484,11 @@ RootInlineBox* RenderBlock::constructLine(BidiRunList<BidiRun>& bidiRuns, const 
 
     bool rootHasSelectedChildren = false;
     InlineFlowBox* parentBox = 0;
+    int runCount = bidiRuns.runCount() - lineInfo.runsFromLeadingWhitespace();
     for (BidiRun* r = bidiRuns.firstRun(); r; r = r->next()) {
         // Create a box for our object.
-        bool isOnlyRun = (bidiRuns.runCount() == 1);
-        if (bidiRuns.runCount() == 2 && !r->m_object->isListMarker())
+        bool isOnlyRun = (runCount == 1);
+        if (runCount == 2 && !r->m_object->isListMarker())
             isOnlyRun = (!style()->isLeftToRightDirection() ? bidiRuns.lastRun() : bidiRuns.firstRun())->m_object->isListMarker();
 
         InlineBox* box = createInlineBoxForRenderer(r->m_object, false, isOnlyRun);
@@ -1226,6 +1232,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         lineMidpointState.reset();
 
         layoutState.lineInfo().setEmpty(true);
+        layoutState.lineInfo().resetRunsFromLeadingWhitespace();
 
         const InlineIterator oldEnd = end;
         bool isNewUBAParagraph = layoutState.lineInfo().previousLineBrokeCleanly();
@@ -1861,10 +1868,10 @@ void RenderBlock::LineBreaker::skipTrailingWhitespace(InlineIterator& iterator, 
 {
     while (!iterator.atEnd() && !requiresLineBox(iterator, lineInfo, TrailingWhitespace)) {
         RenderObject* object = iterator.m_obj;
-        if (object->isFloating()) {
-            m_block->insertFloatingObject(toRenderBox(object));
-        } else if (object->isPositioned())
+        if (object->isPositioned())
             setStaticPositions(m_block, toRenderBox(object));
+        else if (object->isFloating())
+            m_block->insertFloatingObject(toRenderBox(object));
         iterator.increment();
     }
 }
@@ -1874,10 +1881,18 @@ void RenderBlock::LineBreaker::skipLeadingWhitespace(InlineBidiResolver& resolve
 {
     while (!resolver.position().atEnd() && !requiresLineBox(resolver.position(), lineInfo, LeadingWhitespace)) {
         RenderObject* object = resolver.position().m_obj;
-        if (object->isFloating())
-            m_block->positionNewFloatOnLine(m_block->insertFloatingObject(toRenderBox(object)), lastFloatFromPreviousLine, lineInfo, width);
-        else if (object->isPositioned())
+        if (object->isPositioned()) {
             setStaticPositions(m_block, toRenderBox(object));
+            if (object->style()->isOriginalDisplayInlineType()) {
+                resolver.runs().addRun(createRun(0, 1, object, resolver));
+                lineInfo.incrementRunsFromLeadingWhitespace();
+            }
+        } else if (object->isFloating())
+            m_block->positionNewFloatOnLine(m_block->insertFloatingObject(toRenderBox(object)), lastFloatFromPreviousLine, lineInfo, width);
+        else if (object->isText() && object->style()->hasTextCombine() && object->isCombineText()) {
+            toRenderCombineText(object)->combineText();
+            continue;
+        }
         resolver.increment();
     }
     resolver.commitExplicitEmbedding();
@@ -2156,21 +2171,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             goto end;
         }
 
-        if (current.m_obj->isFloating()) {
-            RenderBox* floatBox = toRenderBox(current.m_obj);
-            FloatingObject* f = m_block->insertFloatingObject(floatBox);
-            // check if it fits in the current line.
-            // If it does, position it now, otherwise, position
-            // it after moving to next line (in newLine() func)
-            if (floatsFitOnLine && width.fitsOnLine(m_block->logicalWidthForFloat(f))) {
-                m_block->positionNewFloatOnLine(f, lastFloatFromPreviousLine, lineInfo, width);
-                if (lBreak.m_obj == current.m_obj) {
-                    ASSERT(!lBreak.m_pos);
-                    lBreak.increment();
-                }
-            } else
-                floatsFitOnLine = false;
-        } else if (current.m_obj->isPositioned()) {
+        if (current.m_obj->isPositioned()) {
             // If our original display wasn't an inline type, then we can
             // go ahead and determine our static inline position now.
             RenderBox* box = toRenderBox(current.m_obj);
@@ -2195,6 +2196,20 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 trailingObjects.appendBoxIfNeeded(box);
             } else
                 m_positionedObjects.append(box);
+        } else if (current.m_obj->isFloating()) {
+            RenderBox* floatBox = toRenderBox(current.m_obj);
+            FloatingObject* f = m_block->insertFloatingObject(floatBox);
+            // check if it fits in the current line.
+            // If it does, position it now, otherwise, position
+            // it after moving to next line (in newLine() func)
+            if (floatsFitOnLine && width.fitsOnLine(m_block->logicalWidthForFloat(f))) {
+                m_block->positionNewFloatOnLine(f, lastFloatFromPreviousLine, lineInfo, width);
+                if (lBreak.m_obj == current.m_obj) {
+                    ASSERT(!lBreak.m_pos);
+                    lBreak.increment();
+                }
+            } else
+                floatsFitOnLine = false;
         } else if (current.m_obj->isRenderInline()) {
             // Right now, we should only encounter empty inlines here.
             ASSERT(!current.m_obj->firstChild());
@@ -2268,7 +2283,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
 #endif
 
             RenderStyle* style = t->style(lineInfo.isFirstLine());
-            if (style->hasTextCombine() && current.m_obj->isCombineText())
+            if (style->hasTextCombine() && current.m_obj->isCombineText() && !toRenderCombineText(current.m_obj)->isCombined())
                 toRenderCombineText(current.m_obj)->combineText();
 
             const Font& f = style->font();

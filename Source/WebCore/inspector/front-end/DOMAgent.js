@@ -52,7 +52,7 @@ WebInspector.DOMNode = function(doc, payload) {
     this.children = null;
 
     this.nextSibling = null;
-    this.prevSibling = null;
+    this.previousSibling = null;
     this.firstChild = null;
     this.lastChild = null;
     this.parentNode = null;
@@ -422,7 +422,7 @@ WebInspector.DOMNode.prototype = {
             var child = this.children[i];
             child.index = i;
             child.nextSibling = i + 1 < this._childNodeCount ? this.children[i + 1] : null;
-            child.prevSibling = i - 1 >= 0 ? this.children[i - 1] : null;
+            child.previousSibling = i - 1 >= 0 ? this.children[i - 1] : null;
             child.parentNode = this;
         }
     },
@@ -529,6 +529,8 @@ WebInspector.DOMAgent = function() {
     this._document = null;
     this._attributeLoadNodeIds = {};
     InspectorBackend.registerDOMDispatcher(new WebInspector.DOMDispatcher(this));
+    if (WebInspector.experimentsSettings.freeFlowDOMEditing.isEnabled())
+        new WebInspector.DOMModelResourceBinding(this);
 }
 
 WebInspector.DOMAgent.Events = {
@@ -589,7 +591,7 @@ WebInspector.DOMAgent.prototype = {
      */
     pushNodeToFrontend: function(objectId, callback)
     {
-        this._dispatchWhenDocumentAvailable(DOMAgent.requestNode.bind(DOMAgent), objectId, callback);
+        this._dispatchWhenDocumentAvailable(DOMAgent.requestNode.bind(DOMAgent, objectId), callback);
     },
 
     /**
@@ -598,7 +600,8 @@ WebInspector.DOMAgent.prototype = {
      */
     pushNodeByPathToFrontend: function(path, callback)
     {
-        this._dispatchWhenDocumentAvailable(DOMAgent.pushNodeByPathToFrontend.bind(DOMAgent), path, callback);
+        var callbackCast = /** @type {function(*)} */ callback;
+        this._dispatchWhenDocumentAvailable(DOMAgent.pushNodeByPathToFrontend.bind(DOMAgent, path), callbackCast);
     },
 
     /**
@@ -618,18 +621,17 @@ WebInspector.DOMAgent.prototype = {
     },
 
     /**
-     * @param {function(*, function()=)} func
-     * @param {*} arg
-     * @param {function()=} callback
+     * @param {function(function()=)} func
+     * @param {function(*)=} callback
      */
-    _dispatchWhenDocumentAvailable: function(func, arg, callback)
+    _dispatchWhenDocumentAvailable: function(func, callback)
     {
-        var callbackWrapper = this._wrapClientCallback(callback);
+        var callbackWrapper = /** @type {function(?Protocol.Error, *=)} */ this._wrapClientCallback(callback);
 
         function onDocumentAvailable()
         {
             if (this._document)
-                func.call(null, arg, callbackWrapper);
+                func(callbackWrapper);
             else {
                 if (callbackWrapper)
                     callbackWrapper("No document");
@@ -682,12 +684,15 @@ WebInspector.DOMAgent.prototype = {
         /**
          * @this {WebInspector.DOMAgent}
          * @param {DOMAgent.NodeId} nodeId
+         * @param {?Protocol.Error} error
          * @param {Array.<string>} attributes
          */
-        function callback(nodeId, attributes)
+        function callback(nodeId, error, attributes)
         {
-            if (!attributes)
+            if (error) {
+                console.error("Error during DOMAgent operation: " + error);
                 return;
+            }
             var node = this._idToDOMNode[nodeId];
             if (node) {
                 node._setAttributesPayload(attributes);
@@ -698,8 +703,10 @@ WebInspector.DOMAgent.prototype = {
 
         delete this._loadNodeAttributesTimeout;
 
-        for (var nodeId in this._attributeLoadNodeIds)
-            DOMAgent.getAttributes(parseInt(nodeId, 10), this._wrapClientCallback(callback.bind(this, nodeId)));
+        for (var nodeId in this._attributeLoadNodeIds) {
+            var nodeIdAsNumber = parseInt(nodeId, 10);
+            DOMAgent.getAttributes(nodeIdAsNumber, callback.bind(this, nodeIdAsNumber));
+        }
         this._attributeLoadNodeIds = {};
     },
 
@@ -890,21 +897,23 @@ WebInspector.DOMAgent.prototype = {
     /**
      * @param {DOMAgent.NodeId} nodeId
      * @param {string} selectors
-     * @param {function(*)=} callback
+     * @param {function(?DOMAgent.NodeId)=} callback
      */
     querySelector: function(nodeId, selectors, callback)
     {
-        DOMAgent.querySelector(nodeId, selectors, this._wrapClientCallback(callback));
+        var callbackCast = /** @type {function(*)|undefined} */callback;
+        DOMAgent.querySelector(nodeId, selectors, this._wrapClientCallback(callbackCast));
     },
 
     /**
      * @param {DOMAgent.NodeId} nodeId
      * @param {string} selectors
-     * @param {function(*)=} callback
+     * @param {function(?Array.<DOMAgent.NodeId>)=} callback
      */
     querySelectorAll: function(nodeId, selectors, callback)
     {
-        DOMAgent.querySelectorAll(nodeId, selectors, this._wrapClientCallback(callback));
+        var callbackCast = /** @type {function(*)|undefined} */callback;
+        DOMAgent.querySelectorAll(nodeId, selectors, this._wrapClientCallback(callbackCast));
     },
 
     /**
@@ -1067,3 +1076,27 @@ WebInspector.DOMDispatcher.prototype = {
  * @type {?WebInspector.DOMAgent}
  */
 WebInspector.domAgent = null;
+
+/**
+ * @constructor
+ * @implements {WebInspector.ResourceDomainModelBinding}
+ */
+WebInspector.DOMModelResourceBinding = function(domAgent)
+{
+    this._domAgent = domAgent;
+    WebInspector.Resource.registerDomainModelBinding(WebInspector.Resource.Type.Document, this);
+}
+
+WebInspector.DOMModelResourceBinding.prototype = {
+    setContent: function(resource, content, majorChange, userCallback)
+    {
+        DOMAgent.setOuterHTML(0, content, userCallback);
+    },
+
+    canSetContent: function()
+    {
+        return true;
+    }
+}
+
+WebInspector.DOMModelResourceBinding.prototype.__proto__ = WebInspector.ResourceDomainModelBinding.prototype;

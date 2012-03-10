@@ -216,6 +216,46 @@ void ScrollableArea::willEndLiveResize()
     scrollAnimator()->willEndLiveResize();
 }    
 
+void ScrollableArea::contentAreaWillPaint() const
+{
+    scrollAnimator()->contentAreaWillPaint();
+}
+
+void ScrollableArea::mouseEnteredContentArea() const
+{
+    scrollAnimator()->mouseEnteredContentArea();
+}
+
+void ScrollableArea::mouseExitedContentArea() const
+{
+    scrollAnimator()->mouseEnteredContentArea();
+}
+
+void ScrollableArea::mouseMovedInContentArea() const
+{
+    scrollAnimator()->mouseMovedInContentArea();
+}
+
+void ScrollableArea::mouseEnteredScrollbar(Scrollbar* scrollbar) const
+{
+    scrollAnimator()->mouseEnteredScrollbar(scrollbar);
+}
+
+void ScrollableArea::mouseExitedScrollbar(Scrollbar* scrollbar) const
+{
+    scrollAnimator()->mouseExitedScrollbar(scrollbar);
+}
+
+void ScrollableArea::contentAreaDidShow() const
+{
+    scrollAnimator()->contentAreaDidShow();
+}
+
+void ScrollableArea::contentAreaDidHide() const
+{
+    scrollAnimator()->contentAreaDidHide();
+}
+
 void ScrollableArea::didAddVerticalScrollbar(Scrollbar* scrollbar)
 {
     scrollAnimator()->didAddVerticalScrollbar(scrollbar);
@@ -235,6 +275,11 @@ void ScrollableArea::didAddHorizontalScrollbar(Scrollbar* scrollbar)
 
     // <rdar://problem/9797253> AppKit resets the scrollbar's style when you attach a scrollbar
     setScrollbarOverlayStyle(scrollbarOverlayStyle());
+}
+
+void ScrollableArea::contentsResized()
+{
+    scrollAnimator()->contentsResized();
 }
 
 void ScrollableArea::willRemoveHorizontalScrollbar(Scrollbar* scrollbar)

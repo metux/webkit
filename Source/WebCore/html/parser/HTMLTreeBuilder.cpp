@@ -268,6 +268,13 @@ public:
 
     bool isEmpty() const { return m_current == m_end; }
 
+    void skipAtMostOneLeadingNewline()
+    {
+        ASSERT(!isEmpty());
+        if (*m_current == '\n')
+            ++m_current;
+    }
+
     void skipLeadingWhitespace()
     {
         skipLeading<isHTMLSpace>();
@@ -349,6 +356,7 @@ HTMLTreeBuilder::HTMLTreeBuilder(HTMLDocumentParser* parser, HTMLDocument* docum
     , m_isPaused(false)
     , m_insertionMode(InitialMode)
     , m_originalInsertionMode(InitialMode)
+    , m_shouldSkipLeadingNewline(false)
     , m_parser(parser)
     , m_scriptToProcessStartPosition(uninitializedPositionValue1())
     , m_lastScriptElementStartPosition(TextPosition::belowRangePosition())
@@ -367,6 +375,7 @@ HTMLTreeBuilder::HTMLTreeBuilder(HTMLDocumentParser* parser, DocumentFragment* f
     , m_isPaused(false)
     , m_insertionMode(InitialMode)
     , m_originalInsertionMode(InitialMode)
+    , m_shouldSkipLeadingNewline(false)
     , m_parser(parser)
     , m_scriptToProcessStartPosition(uninitializedPositionValue1())
     , m_lastScriptElementStartPosition(TextPosition::belowRangePosition())
@@ -441,7 +450,7 @@ void HTMLTreeBuilder::constructTreeFromToken(HTMLToken& rawToken)
     // HTMLToken. Fortuantely, Character tokens can't cause use to re-enter
     // the parser.
     //
-    // FIXME: Top clearing the rawToken once we start running the parser off
+    // FIXME: Stop clearing the rawToken once we start running the parser off
     // the main thread or once we stop allowing synchronous JavaScript
     // execution from parseMappedAttribute.
     if (rawToken.type() != HTMLTokenTypes::Character)
@@ -462,11 +471,16 @@ void HTMLTreeBuilder::constructTreeFromAtomicToken(AtomicHTMLToken& token)
     else
         processToken(token);
 
-    // Swallowing U+0000 characters isn't in the HTML5 spec, but turning all
-    // the U+0000 characters into replacement characters has compatibility
-    // problems.
-    m_parser->tokenizer()->setForceNullCharacterReplacement(m_insertionMode == TextMode);
-    m_parser->tokenizer()->setShouldAllowCDATA(!m_tree.isEmpty() && !isInHTMLNamespace(m_tree.currentNode()));
+    bool inForeignContent = !m_tree.isEmpty()
+        && !isInHTMLNamespace(m_tree.currentNode())
+        && !HTMLElementStack::isHTMLIntegrationPoint(m_tree.currentNode())
+        && !HTMLElementStack::isMathMLTextIntegrationPoint(m_tree.currentNode());
+
+    m_parser->tokenizer()->setForceNullCharacterReplacement(m_insertionMode == TextMode || inForeignContent);
+    m_parser->tokenizer()->setShouldAllowCDATA(inForeignContent);
+
+    m_tree.executeQueuedTasks();
+    // We might be detached now.
 }
 
 void HTMLTreeBuilder::processToken(AtomicHTMLToken& token)
@@ -476,21 +490,26 @@ void HTMLTreeBuilder::processToken(AtomicHTMLToken& token)
         ASSERT_NOT_REACHED();
         break;
     case HTMLTokenTypes::DOCTYPE:
+        m_shouldSkipLeadingNewline = false;
         processDoctypeToken(token);
         break;
     case HTMLTokenTypes::StartTag:
+        m_shouldSkipLeadingNewline = false;
         processStartTag(token);
         break;
     case HTMLTokenTypes::EndTag:
+        m_shouldSkipLeadingNewline = false;
         processEndTag(token);
         break;
     case HTMLTokenTypes::Comment:
+        m_shouldSkipLeadingNewline = false;
         processComment(token);
         return;
     case HTMLTokenTypes::Character:
         processCharacter(token);
         break;
     case HTMLTokenTypes::EndOfFile:
+        m_shouldSkipLeadingNewline = false;
         processEndOfFile(token);
         break;
     }
@@ -512,7 +531,7 @@ void HTMLTreeBuilder::processDoctypeToken(AtomicHTMLToken& token)
     parseError(token);
 }
 
-void HTMLTreeBuilder::processFakeStartTag(const QualifiedName& tagName, PassRefPtr<NamedNodeMap> attributes)
+void HTMLTreeBuilder::processFakeStartTag(const QualifiedName& tagName, PassOwnPtr<NamedNodeMap> attributes)
 {
     // FIXME: We'll need a fancier conversion than just "localName" for SVG/MathML tags.
     AtomicHTMLToken fakeToken(HTMLTokenTypes::StartTag, tagName.localName(), attributes);
@@ -541,9 +560,9 @@ void HTMLTreeBuilder::processFakePEndTagIfPInButtonScope()
     processEndTag(endP);
 }
 
-PassRefPtr<NamedNodeMap> HTMLTreeBuilder::attributesForIsindexInput(AtomicHTMLToken& token)
+PassOwnPtr<NamedNodeMap> HTMLTreeBuilder::attributesForIsindexInput(AtomicHTMLToken& token)
 {
-    RefPtr<NamedNodeMap> attributes = token.takeAtributes();
+    OwnPtr<NamedNodeMap> attributes = token.takeAttributes();
     if (!attributes)
         attributes = NamedNodeMap::create();
     else {
@@ -751,6 +770,7 @@ void HTMLTreeBuilder::processStartTagForInBody(AtomicHTMLToken& token)
             ASSERT(isParsingFragment());
             return;
         }
+        m_framesetOk = false;
         m_tree.insertHTMLBodyStartTagInBody(token);
         return;
     }
@@ -810,7 +830,7 @@ void HTMLTreeBuilder::processStartTagForInBody(AtomicHTMLToken& token)
     if (token.name() == preTag || token.name() == listingTag) {
         processFakePEndTagIfPInButtonScope();
         m_tree.insertHTMLElement(token);
-        m_parser->tokenizer()->setSkipLeadingNewLineForListing(true);
+        m_shouldSkipLeadingNewline = true;
         m_framesetOk = false;
         return;
     }
@@ -937,7 +957,7 @@ void HTMLTreeBuilder::processStartTagForInBody(AtomicHTMLToken& token)
     }
     if (token.name() == textareaTag) {
         m_tree.insertHTMLElement(token);
-        m_parser->tokenizer()->setSkipLeadingNewLineForListing(true);
+        m_shouldSkipLeadingNewline = true;
         m_parser->tokenizer()->setState(HTMLTokenizerState::RCDATAState);
         m_originalInsertionMode = m_insertionMode;
         m_framesetOk = false;
@@ -980,7 +1000,7 @@ void HTMLTreeBuilder::processStartTagForInBody(AtomicHTMLToken& token)
         return;
     }
     if (token.name() == optgroupTag || token.name() == optionTag) {
-        if (m_tree.openElements()->inScope(optionTag.localName())) {
+        if (m_tree.currentNode()->hasTagName(optionTag)) {
             AtomicHTMLToken endOption(HTMLTokenTypes::EndTag, optionTag.localName());
             processEndTag(endOption);
         }
@@ -1510,12 +1530,14 @@ HTMLElementStack::ElementRecord* HTMLTreeBuilder::furthestBlockForFormattingElem
 // http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#parsing-main-inbody
 void HTMLTreeBuilder::callTheAdoptionAgency(AtomicHTMLToken& token)
 {
-    // The adoption agency algorithm is N^2.  We limit the number of iterations
-    // to stop from hanging the whole browser.  This limit is copied from the
-    // legacy tree builder and might need to be tweaked in the future.
-    static const int adoptionAgencyIterationLimit = 10;
+    // The adoption agency algorithm is N^2. We limit the number of iterations
+    // to stop from hanging the whole browser. This limit is specified in the
+    // adoption agency algorithm: 
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/tree-construction.html#parsing-main-inbody
+    static const int outerIterationLimit = 8;
+    static const int innerIterationLimit = 3;
 
-    for (int i = 0; i < adoptionAgencyIterationLimit; ++i) {
+    for (int i = 0; i < outerIterationLimit; ++i) {
         // 1.
         Element* formattingElement = m_tree.activeFormattingElements()->closestElementInScopeWithName(token.name());
         if (!formattingElement || ((m_tree.openElements()->contains(formattingElement)) && !m_tree.openElements()->inScope(formattingElement))) {
@@ -1548,7 +1570,7 @@ void HTMLTreeBuilder::callTheAdoptionAgency(AtomicHTMLToken& token)
         HTMLElementStack::ElementRecord* node = furthestBlock;
         HTMLElementStack::ElementRecord* nextNode = node->next();
         HTMLElementStack::ElementRecord* lastNode = furthestBlock;
-        for (int i = 0; i < adoptionAgencyIterationLimit; ++i) {
+        for (int i = 0; i < innerIterationLimit; ++i) {
             // 6.1
             node = nextNode;
             ASSERT(node);
@@ -2219,27 +2241,6 @@ void HTMLTreeBuilder::processEndTag(AtomicHTMLToken& token)
     }
 }
 
-class HTMLTreeBuilder::FakeInsertionMode {
-    WTF_MAKE_NONCOPYABLE(FakeInsertionMode);
-public:
-    FakeInsertionMode(HTMLTreeBuilder* treeBuilder, InsertionMode mode)
-        : m_treeBuilder(treeBuilder)
-        , m_originalMode(treeBuilder->insertionMode())
-    {
-        m_treeBuilder->setFakeInsertionMode(mode);
-    }
-
-    ~FakeInsertionMode()
-    {
-        if (m_treeBuilder->isFakeInsertionMode())
-            m_treeBuilder->setInsertionMode(m_originalMode);
-    }
-
-private:
-    HTMLTreeBuilder* m_treeBuilder;
-    InsertionMode m_originalMode;
-};
-
 void HTMLTreeBuilder::processComment(AtomicHTMLToken& token)
 {
     ASSERT(token.type() == HTMLTokenTypes::Comment);
@@ -2272,6 +2273,24 @@ void HTMLTreeBuilder::processCharacter(AtomicHTMLToken& token)
 void HTMLTreeBuilder::processCharacterBuffer(ExternalCharacterTokenBuffer& buffer)
 {
 ReprocessBuffer:
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#parsing-main-inbody
+    // Note that this logic is different than the generic \r\n collapsing
+    // handled in the input stream preprocessor. This logic is here as an
+    // "authoring convenience" so folks can write:
+    //
+    // <pre>
+    // lorem ipsum
+    // lorem ipsum
+    // </pre>
+    //
+    // without getting an extra newline at the start of their <pre> element.
+    if (m_shouldSkipLeadingNewline) {
+        m_shouldSkipLeadingNewline = false;
+        buffer.skipAtMostOneLeadingNewline();
+        if (buffer.isEmpty())
+            return;
+    }
+
     switch (insertionMode()) {
     case InitialMode: {
         ASSERT(insertionMode() == InitialMode);
@@ -2781,7 +2800,7 @@ void HTMLTreeBuilder::processTokenInForeignContent(AtomicHTMLToken& token)
     case HTMLTokenTypes::Character: {
         String characters = String(token.characters().data(), token.characters().size());
         m_tree.insertTextNode(characters);
-        if (m_framesetOk && !isAllWhitespace(characters))
+        if (m_framesetOk && !isAllWhitespaceOrReplacementCharacters(characters))
             m_framesetOk = false;
         break;
     }

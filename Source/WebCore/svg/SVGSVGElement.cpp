@@ -90,7 +90,7 @@ inline SVGSVGElement::SVGSVGElement(const QualifiedName& tagName, Document* doc)
 {
     ASSERT(hasTagName(SVGNames::svgTag));
     registerAnimatedPropertiesForSVGSVGElement();
-    doc->registerForDocumentActivationCallbacks(this);
+    doc->registerForPageCacheSuspensionCallbacks(this);
 }
 
 PassRefPtr<SVGSVGElement> SVGSVGElement::create(const QualifiedName& tagName, Document* document)
@@ -100,22 +100,18 @@ PassRefPtr<SVGSVGElement> SVGSVGElement::create(const QualifiedName& tagName, Do
 
 SVGSVGElement::~SVGSVGElement()
 {
-    document()->unregisterForDocumentActivationCallbacks(this);
+    document()->unregisterForPageCacheSuspensionCallbacks(this);
     // There are cases where removedFromDocument() is not called.
     // see ContainerNode::removeAllChildren, called by its destructor.
     document()->accessSVGExtensions()->removeTimeContainer(this);
 }
 
-void SVGSVGElement::willMoveToNewOwnerDocument()
+void SVGSVGElement::didMoveToNewDocument(Document* oldDocument)
 {
-    document()->unregisterForDocumentActivationCallbacks(this);
-    SVGStyledLocatableElement::willMoveToNewOwnerDocument();
-}
-
-void SVGSVGElement::didMoveToNewOwnerDocument()
-{
-    document()->registerForDocumentActivationCallbacks(this);
-    SVGStyledLocatableElement::didMoveToNewOwnerDocument();
+    if (oldDocument)
+        oldDocument->unregisterForPageCacheSuspensionCallbacks(this);
+    document()->registerForPageCacheSuspensionCallbacks(this);
+    SVGStyledLocatableElement::didMoveToNewDocument(oldDocument);
 }
 
 const AtomicString& SVGSVGElement::contentScriptType() const
@@ -528,9 +524,12 @@ float SVGSVGElement::getCurrentTime() const
     return narrowPrecisionToFloat(m_timeContainer->elapsed().value());
 }
 
-void SVGSVGElement::setCurrentTime(float /* seconds */)
+void SVGSVGElement::setCurrentTime(float seconds)
 {
-    // FIXME: Implement me, bug 12073
+    if (isnan(seconds))
+        return;
+    seconds = max(seconds, 0.0f);
+    m_timeContainer->setElapsed(seconds);
 }
 
 bool SVGSVGElement::selfHasRelativeLengths() const
@@ -657,12 +656,12 @@ void SVGSVGElement::inheritViewAttributes(SVGViewElement* viewElement)
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(object);
 }
     
-void SVGSVGElement::documentWillBecomeInactive()
+void SVGSVGElement::documentWillSuspendForPageCache()
 {
     pauseAnimations();
 }
 
-void SVGSVGElement::documentDidBecomeActive()
+void SVGSVGElement::documentDidResumeFromPageCache()
 {
     unpauseAnimations();
 }

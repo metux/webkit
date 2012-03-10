@@ -46,18 +46,10 @@
  */
 WebInspector.ConsoleMessageImpl = function(source, level, message, linkifier, type, url, line, repeatCount, parameters, stackTrace, request)
 {
-    WebInspector.ConsoleMessage.call();
+    WebInspector.ConsoleMessage.call(this, source, level, url, line, repeatCount);
 
     this._linkifier = linkifier;
-    this.source = source;
     this.type = type || WebInspector.ConsoleMessage.MessageType.Log;
-    this.level = level;
-    this.line = line || 0;
-    this.url = url || null;
-    repeatCount = repeatCount || 1;
-    this.repeatCount = repeatCount;
-    this.repeatDelta = repeatCount;
-    this.totalRepeatCount = repeatCount;
     this._messageText = message;
     this._parameters = parameters;
     this._stackTrace = stackTrace;
@@ -160,9 +152,16 @@ WebInspector.ConsoleMessageImpl.prototype = {
         }
 
         // This is used for inline message bubbles in SourceFrames, or other plain-text representations.
-        this.message = (urlElement ? urlElement.textContent + " " : "") + messageText.textContent;
+        this._message = messageText.textContent;
     },
 
+    get message()
+    {
+        // force message formatting
+        var formattedMessage = this.formattedMessage;
+        return this._message;
+    },
+   
     get formattedMessage()
     {
         if (!this._formattedMessage)
@@ -594,6 +593,14 @@ WebInspector.ConsoleMessageImpl.prototype = {
     get stackTrace()
     {
         return this._stackTrace;
+    },
+
+    /**
+     * @return {WebInspector.ConsoleMessage}
+     */
+    clone: function()
+    {
+        return WebInspector.ConsoleMessage.create(this.source, this.level, this._messageText, this.type, this.url, this.line, this.repeatCount, this._parameters, this._stackTrace, this._request);
     }
 }
 

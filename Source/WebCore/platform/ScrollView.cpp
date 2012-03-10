@@ -325,10 +325,6 @@ int ScrollView::scrollSize(ScrollbarOrientation orientation) const
     return scrollbar ? (scrollbar->totalSize() - scrollbar->visibleSize()) : 0;
 }
 
-void ScrollView::didCompleteRubberBand(const IntSize&) const
-{
-}
-
 void ScrollView::notifyPageThatContentAreaWillPaint() const
 {
 }
@@ -832,9 +828,9 @@ Scrollbar* ScrollView::scrollbarAtPoint(const IntPoint& windowPoint)
         return 0;
 
     IntPoint viewPoint = convertFromContainingWindow(windowPoint);
-    if (m_horizontalScrollbar && m_horizontalScrollbar->frameRect().contains(viewPoint))
+    if (m_horizontalScrollbar && m_horizontalScrollbar->shouldParticipateInHitTesting() && m_horizontalScrollbar->frameRect().contains(viewPoint))
         return m_horizontalScrollbar.get();
-    if (m_verticalScrollbar && m_verticalScrollbar->frameRect().contains(viewPoint))
+    if (m_verticalScrollbar && m_verticalScrollbar->shouldParticipateInHitTesting() && m_verticalScrollbar->frameRect().contains(viewPoint))
         return m_verticalScrollbar.get();
     return 0;
 }
@@ -901,12 +897,22 @@ static void positionScrollbarLayer(GraphicsLayer* graphicsLayer, Scrollbar* scro
 {
     if (!graphicsLayer || !scrollbar)
         return;
-    graphicsLayer->setDrawsContent(true);
+
     IntRect scrollbarRect = scrollbar->frameRect();
     graphicsLayer->setPosition(scrollbarRect.location());
-    if (scrollbarRect.size() != graphicsLayer->size())
-        graphicsLayer->setNeedsDisplay();
+
+    if (scrollbarRect.size() == graphicsLayer->size())
+        return;
+
     graphicsLayer->setSize(scrollbarRect.size());
+
+    if (graphicsLayer->hasContentsLayer()) {
+        graphicsLayer->setContentsRect(IntRect(0, 0, scrollbarRect.width(), scrollbarRect.height()));
+        return;
+    }
+
+    graphicsLayer->setDrawsContent(true);
+    graphicsLayer->setNeedsDisplay();
 }
 
 static void positionScrollCornerLayer(GraphicsLayer* graphicsLayer, const IntRect& cornerRect)
@@ -1069,7 +1075,7 @@ void ScrollView::paint(GraphicsContext* context, const IntRect& rect)
         paintContents(context, documentDirtyRect);
     }
 
-#if USE(ACCELERATED_COMPOSITING) && PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
     if (!layerForOverhangAreas())
         calculateAndPaintOverhangAreas(context, rect);
 #else

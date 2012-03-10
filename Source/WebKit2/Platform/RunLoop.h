@@ -29,6 +29,7 @@
 #define RunLoop_h
 
 #include <wtf/Forward.h>
+#include <wtf/Functional.h>
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/ThreadSpecific.h>
@@ -42,12 +43,6 @@ typedef struct _GMainContext GMainContext;
 typedef int gboolean;
 #endif
 
-class WorkItem;
-
-namespace CoreIPC {
-class BinarySemaphore;
-}
-
 class RunLoop {
 public:
     // Must be called from the main thread.
@@ -56,18 +51,7 @@ public:
     static RunLoop* current();
     static RunLoop* main();
 
-    // FIXME: Get rid of this overload and use WTF::Function everywhere.
-    void scheduleWork(PassOwnPtr<WorkItem>);
-
     void dispatch(const Function<void()>&);
-
-#if PLATFORM(WIN)
-    // The absoluteTime is in seconds, starting on January 1, 1970. The time is assumed to use the
-    // same time zone as WTF::currentTime(). Dispatches sent (not posted) messages to the passed-in
-    // set of HWNDs until the semaphore is signaled or absoluteTime is reached. Returns true if the
-    // semaphore is signaled, false otherwise.
-    static bool dispatchSentMessagesUntil(const Vector<HWND>& windows, CoreIPC::BinarySemaphore&, double absoluteTime);
-#endif
 
     static void run();
     void stop();
@@ -143,8 +127,8 @@ private:
     void performWork();
     void wakeUp();
 
-    Mutex m_workItemQueueLock;
-    Vector<OwnPtr<WorkItem> > m_workItemQueue;
+    Mutex m_functionQueueLock;
+    Vector<Function<void()> > m_functionQueue;
 
 #if PLATFORM(WIN)
     static bool registerRunLoopMessageWindowClass();

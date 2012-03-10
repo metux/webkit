@@ -147,7 +147,7 @@ void RenderInline::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
     m_lineHeight = -1;
 
     if (!m_alwaysCreateLineBoxes) {
-        bool alwaysCreateLineBoxes = hasSelfPaintingLayer() || hasBoxDecorations() || style()->hasPadding() || style()->hasMargin() || style()->hasOutline();
+        bool alwaysCreateLineBoxes = hasSelfPaintingLayer() || hasBoxDecorations() || style()->hasPadding() || style()->hasMargin() || hasOutline();
         if (oldStyle && alwaysCreateLineBoxes) {
             dirtyLineBoxes(false);
             setNeedsLayout(true);
@@ -1053,7 +1053,7 @@ void RenderInline::computeRectForRepaint(RenderBoxModelObject* repaintContainer,
 
     LayoutPoint topLeft = rect.location();
 
-    if (o->isBlockFlow() && style()->position() != AbsolutePosition && style()->position() != FixedPosition) {
+    if (o->isBlockFlow() && !style()->isPositioned()) {
         RenderBlock* cb = toRenderBlock(o);
         if (cb->hasColumns()) {
             LayoutRect repaintRect(topLeft, rect.size());
@@ -1062,6 +1062,18 @@ void RenderInline::computeRectForRepaint(RenderBoxModelObject* repaintContainer,
             rect = repaintRect;
         }
     }
+
+#if ENABLE(CSS_FILTERS)
+    if (style()->hasFilterOutsets()) {
+        LayoutUnit topOutset;
+        LayoutUnit rightOutset;
+        LayoutUnit bottomOutset;
+        LayoutUnit leftOutset;
+        style()->filter().getOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
+        rect.move(-leftOutset, -topOutset);
+        rect.expand(leftOutset + rightOutset, topOutset + bottomOutset);
+    }
+#endif
 
     if (style()->position() == RelativePosition && layer()) {
         // Apply the relative position offset when invalidating a rectangle.  The layer

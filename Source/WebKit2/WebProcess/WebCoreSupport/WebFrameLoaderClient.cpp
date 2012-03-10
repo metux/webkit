@@ -1274,7 +1274,7 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
     }
 #endif
 
-    RefPtr<Plugin> plugin = webPage->createPlugin(parameters);
+    RefPtr<Plugin> plugin = webPage->createPlugin(m_frame, parameters);
     if (!plugin)
         return 0;
     
@@ -1438,7 +1438,14 @@ void WebFrameLoaderClient::didChangeScrollOffset()
 
 PassRefPtr<FrameNetworkingContext> WebFrameLoaderClient::createNetworkingContext()
 {
-    return WebFrameNetworkingContext::create(m_frame->coreFrame());
+    RefPtr<WebFrameNetworkingContext> context = WebFrameNetworkingContext::create(m_frame);
+#if PLATFORM(QT)
+    // We encapsulate the WebPage pointer as a property of the originating QObject.
+    QObject* originatingObject = context->originatingObject();
+    ASSERT(originatingObject);
+    originatingObject->setProperty("PagePointer", QVariant::fromValue(static_cast<void*>(m_frame->page())));
+#endif
+    return context.release();
 }
 
 } // namespace WebKit

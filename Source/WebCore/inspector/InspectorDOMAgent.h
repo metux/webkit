@@ -62,13 +62,15 @@ class InspectorPageAgent;
 class IntRect;
 class HitTestResult;
 class HTMLElement;
-struct HighlightData;
 class InspectorState;
 class InstrumentingAgents;
 class NameNodeMap;
 class Node;
 class RevalidateStyleAttributeTask;
 class ScriptValue;
+
+struct Highlight;
+struct HighlightData;
 
 typedef String ErrorString;
 
@@ -115,8 +117,8 @@ public:
 
     // Methods called from the frontend for DOM nodes inspection.
     void querySelector(ErrorString*, int nodeId, const String& selectors, int* elementId);
-    void querySelectorAll(ErrorString*, int nodeId, const String& selectors, RefPtr<InspectorArray>* result);
-    void getDocument(ErrorString*, RefPtr<InspectorObject>* root);
+    void querySelectorAll(ErrorString*, int nodeId, const String& selectors, RefPtr<InspectorArray>& result);
+    void getDocument(ErrorString*, RefPtr<InspectorObject>& root);
     void requestChildNodes(ErrorString*, int nodeId);
     void setAttributeValue(ErrorString*, int elementId, const String& name, const String& value);
     void setAttributesAsText(ErrorString*, int elementId, const String& text, const String* const name);
@@ -124,14 +126,14 @@ public:
     void removeNode(ErrorString*, int nodeId);
     void setNodeName(ErrorString*, int nodeId, const String& name, int* newId);
     void getOuterHTML(ErrorString*, int nodeId, WTF::String* outerHTML);
-    void setOuterHTML(ErrorString*, int nodeId, const String& outerHTML, int* newId);
+    void setOuterHTML(ErrorString*, int nodeId, const String& outerHTML);
     void setNodeValue(ErrorString*, int nodeId, const String& value);
-    void getEventListenersForNode(ErrorString*, int nodeId, RefPtr<InspectorArray>* listenersArray);
+    void getEventListenersForNode(ErrorString*, int nodeId, RefPtr<InspectorArray>& listenersArray);
     void performSearch(ErrorString*, const String& whitespaceTrimmedQuery, String* searchId, int* resultCount);
-    void getSearchResults(ErrorString*, const String& searchId, int fromIndex, int toIndex, RefPtr<InspectorArray>*);
+    void getSearchResults(ErrorString*, const String& searchId, int fromIndex, int toIndex, RefPtr<InspectorArray>&);
     void discardSearchResults(ErrorString*, const String& searchId);
-    void resolveNode(ErrorString*, int nodeId, const String* const objectGroup, RefPtr<InspectorObject>* result);
-    void getAttributes(ErrorString*, int nodeId, RefPtr<InspectorArray>* result);
+    void resolveNode(ErrorString*, int nodeId, const String* const objectGroup, RefPtr<InspectorObject>& result);
+    void getAttributes(ErrorString*, int nodeId, RefPtr<InspectorArray>& result);
     void setInspectModeEnabled(ErrorString*, bool enabled, const RefPtr<InspectorObject>* highlightConfig);
     void requestNode(ErrorString*, const String& objectId, int* nodeId);
     void pushNodeByPathToFrontend(ErrorString*, const String& path, int* nodeId);
@@ -167,12 +169,12 @@ public:
 
     PassRefPtr<InspectorObject> resolveNode(Node*, const String& objectGroup);
     bool handleMousePress();
-    bool searchingForNodeInPage() const;
     void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags);
     void inspect(Node*);
     void focusNode();
 
     void drawHighlight(GraphicsContext&) const;
+    void getHighlight(Highlight*) const;
 
     // We represent embedded doms as a part of the same hierarchy. Hence we treat children of frame owners differently.
     // We also skip whitespace text nodes conditionally. Following methods encapsulate these specifics.

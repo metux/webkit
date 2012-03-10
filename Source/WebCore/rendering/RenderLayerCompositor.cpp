@@ -56,6 +56,10 @@
 #include "HTMLMediaElement.h"
 #endif
 
+#if ENABLE(THREADED_SCROLLING)
+#include "ScrollingCoordinator.h"
+#endif
+
 #if PROFILE_LAYER_REBUILD
 #include <wtf/CurrentTime.h>
 #endif
@@ -312,9 +316,8 @@ void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 
     if (needHierarchyUpdate) {
         // Update the hierarchy of the compositing layers.
-        CompositingState compState(updateRoot);
         Vector<GraphicsLayer*> childList;
-        rebuildCompositingLayerTree(updateRoot, compState, childList);
+        rebuildCompositingLayerTree(updateRoot, childList);
 
         // Host the document layer in the RenderView's root layer.
         if (updateRoot == rootRenderLayer()) {
@@ -365,11 +368,12 @@ bool RenderLayerCompositor::updateBacking(RenderLayer* layer, CompositingChangeR
             layer->ensureBacking();
 
 #if PLATFORM(MAC) && USE(CA)
-            if (m_renderView->document()->settings()->acceleratedDrawingEnabled())
+            Settings* settings = m_renderView->document()->settings();
+            if (settings && settings->acceleratedDrawingEnabled())
                 layer->backing()->graphicsLayer()->setAcceleratesDrawing(true);
             else if (layer->renderer()->isCanvas()) {
                 HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(layer->renderer()->node());
-                if (canvas->renderingContext() && canvas->renderingContext()->isAccelerated())
+                if (canvas->shouldAccelerate(canvas->size()))
                     layer->backing()->graphicsLayer()->setAcceleratesDrawing(true);
             }
 #endif
@@ -845,7 +849,7 @@ bool RenderLayerCompositor::canAccelerateVideoRendering(RenderVideo* o) const
 }
 #endif
 
-void RenderLayerCompositor::rebuildCompositingLayerTree(RenderLayer* layer, const CompositingState& compositingState, Vector<GraphicsLayer*>& childLayersOfEnclosingLayer)
+void RenderLayerCompositor::rebuildCompositingLayerTree(RenderLayer* layer, Vector<GraphicsLayer*>& childLayersOfEnclosingLayer)
 {
     // Make the layer compositing if necessary, and set up clipping and content layers.
     // Note that we can only do work here that is independent of whether the descendant layers
@@ -874,18 +878,6 @@ void RenderLayerCompositor::rebuildCompositingLayerTree(RenderLayer* layer, cons
     Vector<GraphicsLayer*> layerChildren;
     Vector<GraphicsLayer*>& childList = layerBacking ? layerChildren : childLayersOfEnclosingLayer;
 
-    CompositingState childState = compositingState;
-    if (layer->isComposited())
-        childState.m_compositingAncestor = layer;
-
-#ifndef NDEBUG
-    ++childState.m_depth;
-#endif
-
-    // The children of this stacking context don't need to composite, unless there is
-    // a compositing layer among them, so start by assuming false.
-    childState.m_subtreeIsCompositing = false;
-
     if (layer->isStackingContext()) {
         ASSERT(!layer->m_zOrderListsDirty);
 
@@ -893,7 +885,7 @@ void RenderLayerCompositor::rebuildCompositingLayerTree(RenderLayer* layer, cons
             size_t listSize = negZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = negZOrderList->at(i);
-                rebuildCompositingLayerTree(curLayer, childState, childList);
+                rebuildCompositingLayerTree(curLayer, childList);
             }
         }
 
@@ -907,7 +899,7 @@ void RenderLayerCompositor::rebuildCompositingLayerTree(RenderLayer* layer, cons
         size_t listSize = normalFlowList->size();
         for (size_t i = 0; i < listSize; ++i) {
             RenderLayer* curLayer = normalFlowList->at(i);
-            rebuildCompositingLayerTree(curLayer, childState, childList);
+            rebuildCompositingLayerTree(curLayer, childList);
         }
     }
     
@@ -916,7 +908,7 @@ void RenderLayerCompositor::rebuildCompositingLayerTree(RenderLayer* layer, cons
             size_t listSize = posZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = posZOrderList->at(i);
-                rebuildCompositingLayerTree(curLayer, childState, childList);
+                rebuildCompositingLayerTree(curLayer, childList);
             }
         }
     }
@@ -975,9 +967,14 @@ void RenderLayerCompositor::frameViewDidChangeSize()
         m_scrollLayer->setPosition(FloatPoint(-scrollPosition.x(), -scrollPosition.y()));
         updateOverflowControlsLayers();
 
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
         if (m_layerForOverhangAreas)
             m_layerForOverhangAreas->setSize(frameView->frameRect().size());
+#endif
+
+#if ENABLE(THREADED_SCROLLING)
+        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+            scrollingCoordinator->syncFrameViewGeometry(frameView);
 #endif
     }
 }
@@ -1232,6 +1229,11 @@ void RenderLayerCompositor::updateRootLayerPosition()
         FrameView* frameView = m_renderView->frameView();
         m_clipLayer->setSize(frameView->visibleContentRect(false /* exclude scrollbars */).size());
     }
+
+#if ENABLE(THREADED_SCROLLING)
+    if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+        scrollingCoordinator->syncFrameViewGeometry(m_renderView->frameView());
+#endif
 }
 
 void RenderLayerCompositor::didStartAcceleratedAnimation(CSSPropertyID property)
@@ -1330,6 +1332,7 @@ bool RenderLayerCompositor::requiresCompositingLayer(const RenderLayer* layer) c
              || clipsCompositingDescendants(layer)
              || requiresCompositingForAnimation(renderer)
              || requiresCompositingForFullScreen(renderer)
+             || requiresCompositingForFilters(renderer)
              || requiresCompositingForPosition(renderer, layer);
 }
 
@@ -1515,6 +1518,19 @@ bool RenderLayerCompositor::requiresCompositingForFullScreen(RenderObject* rende
 #endif
 }
 
+bool RenderLayerCompositor::requiresCompositingForFilters(RenderObject* renderer) const
+{
+#if ENABLE(CSS_FILTERS)
+    if (!(m_compositingTriggers & ChromeClient::FilterTrigger))
+        return false;
+
+    return renderer->hasFilter();
+#else
+    UNUSED_PARAM(renderer);
+    return false;
+#endif
+}
+
 bool RenderLayerCompositor::requiresCompositingForPosition(RenderObject* renderer, const RenderLayer* layer) const
 {
     // position:fixed elements that create their own stacking context (e.g. have an explicit z-index,
@@ -1669,19 +1685,31 @@ bool RenderLayerCompositor::requiresScrollCornerLayer() const
     return shouldCompositeOverflowControls(view) && view->isScrollCornerVisible();
 }
 
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
 bool RenderLayerCompositor::requiresOverhangAreasLayer() const
 {
-    // Only if this is a top level frame (not iframe).
-    return !m_renderView->document()->ownerElement();
+    // We don't want a layer if this is a subframe.
+    if (m_renderView->document()->ownerElement())
+        return false;
+
+    // We do want a layer if we have a scrolling coordinator.
+#if ENABLE(THREADED_SCROLLING)
+    if (scrollingCoordinator())
+        return true;
+#endif
+
+    // Chromium always wants a layer.
+#if PLATFORM(CHROMIUM)
+    return true;
+#endif
+
+    return false;
 }
 #endif
 
 void RenderLayerCompositor::updateOverflowControlsLayers()
 {
-    bool layersChanged = false;
-  
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     if (requiresOverhangAreasLayer()) {
         if (!m_layerForOverhangAreas) {
             m_layerForOverhangAreas = GraphicsLayer::create(this);
@@ -1690,57 +1718,77 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
 #endif
             m_layerForOverhangAreas->setDrawsContent(false);
             m_layerForOverhangAreas->setSize(m_renderView->frameView()->frameRect().size());
-            m_overflowControlsHostLayer->addChild(m_layerForOverhangAreas.get());
-            layersChanged = true;
+
+            // We want the overhang areas layer to be positioned below the frame contents,
+            // so insert it below the clip layer.
+            m_overflowControlsHostLayer->addChildBelow(m_layerForOverhangAreas.get(), m_clipLayer.get());
         }
     } else if (m_layerForOverhangAreas) {
         m_layerForOverhangAreas->removeFromParent();
         m_layerForOverhangAreas = nullptr;
-        layersChanged = true;
     }
 #endif
 
     if (requiresHorizontalScrollbarLayer()) {
-        m_layerForHorizontalScrollbar = GraphicsLayer::create(this);
-#ifndef NDEBUG
-        m_layerForHorizontalScrollbar->setName("horizontal scrollbar");
+        if (!m_layerForHorizontalScrollbar) {
+            m_layerForHorizontalScrollbar = GraphicsLayer::create(this);
+    #ifndef NDEBUG
+            m_layerForHorizontalScrollbar->setName("horizontal scrollbar");
+    #endif
+            m_overflowControlsHostLayer->addChild(m_layerForHorizontalScrollbar.get());
+
+#if ENABLE(THREADED_SCROLLING)
+            if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+                scrollingCoordinator->frameViewHorizontalScrollbarLayerDidChange(m_renderView->frameView(), m_layerForHorizontalScrollbar.get());
 #endif
-        m_overflowControlsHostLayer->addChild(m_layerForHorizontalScrollbar.get());
-        layersChanged = true;
+        }
     } else if (m_layerForHorizontalScrollbar) {
         m_layerForHorizontalScrollbar->removeFromParent();
         m_layerForHorizontalScrollbar = nullptr;
-        layersChanged = true;
+
+#if ENABLE(THREADED_SCROLLING)
+        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+            scrollingCoordinator->frameViewHorizontalScrollbarLayerDidChange(m_renderView->frameView(), 0);
+#endif
     }
 
     if (requiresVerticalScrollbarLayer()) {
-        m_layerForVerticalScrollbar = GraphicsLayer::create(this);
-#ifndef NDEBUG
-        m_layerForVerticalScrollbar->setName("vertical scrollbar");
+        if (!m_layerForVerticalScrollbar) {
+            m_layerForVerticalScrollbar = GraphicsLayer::create(this);
+    #ifndef NDEBUG
+            m_layerForVerticalScrollbar->setName("vertical scrollbar");
+    #endif
+            m_overflowControlsHostLayer->addChild(m_layerForVerticalScrollbar.get());
+
+#if ENABLE(THREADED_SCROLLING)
+            if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+                scrollingCoordinator->frameViewVerticalScrollbarLayerDidChange(m_renderView->frameView(), m_layerForVerticalScrollbar.get());
 #endif
-        m_overflowControlsHostLayer->addChild(m_layerForVerticalScrollbar.get());
-        layersChanged = true;
+        }
     } else if (m_layerForVerticalScrollbar) {
         m_layerForVerticalScrollbar->removeFromParent();
         m_layerForVerticalScrollbar = nullptr;
-        layersChanged = true;
+
+#if ENABLE(THREADED_SCROLLING)
+        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+            scrollingCoordinator->frameViewVerticalScrollbarLayerDidChange(m_renderView->frameView(), 0);
+#endif
     }
 
     if (requiresScrollCornerLayer()) {
-        m_layerForScrollCorner = GraphicsLayer::create(this);
-#ifndef NDEBUG
-        m_layerForScrollCorner->setName("scroll corner");
-#endif
-        m_overflowControlsHostLayer->addChild(m_layerForScrollCorner.get());
-        layersChanged = true;
+        if (!m_layerForScrollCorner) {
+            m_layerForScrollCorner = GraphicsLayer::create(this);
+    #ifndef NDEBUG
+            m_layerForScrollCorner->setName("scroll corner");
+    #endif
+            m_overflowControlsHostLayer->addChild(m_layerForScrollCorner.get());
+        }
     } else if (m_layerForScrollCorner) {
         m_layerForScrollCorner->removeFromParent();
         m_layerForScrollCorner = nullptr;
-        layersChanged = true;
     }
 
-    if (layersChanged)
-        m_renderView->frameView()->positionScrollbarLayers();
+    m_renderView->frameView()->positionScrollbarLayers();
 }
 
 void RenderLayerCompositor::ensureRootLayer()
@@ -1791,6 +1839,11 @@ void RenderLayerCompositor::ensureRootLayer()
 
             frameViewDidChangeSize();
             frameViewDidScroll(m_renderView->frameView()->scrollPosition());
+
+#if ENABLE(THREADED_SCROLLING)
+            if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+                scrollingCoordinator->frameViewScrollLayerDidChange(m_renderView->frameView(), m_scrollLayer.get());
+#endif
         }
     } else {
         if (m_overflowControlsHostLayer) {
@@ -1814,7 +1867,7 @@ void RenderLayerCompositor::destroyRootLayer()
 
     detachRootLayer();
 
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     if (m_layerForOverhangAreas) {
         m_layerForOverhangAreas->removeFromParent();
         m_layerForOverhangAreas = nullptr;
@@ -1999,6 +2052,18 @@ void RenderLayerCompositor::deviceOrPageScaleFactorChanged()
     if (GraphicsLayer* rootLayer = viewLayer->backing()->graphicsLayer())
         rootLayer->noteDeviceOrPageScaleFactorChangedIncludingDescendants();
 }
+
+#if ENABLE(THREADED_SCROLLING)
+ScrollingCoordinator* RenderLayerCompositor::scrollingCoordinator() const
+{
+    if (Frame* frame = m_renderView->frameView()->frame()) {
+        if (Page* page = frame->page())
+            return page->scrollingCoordinator();
+    }
+
+    return 0;
+}
+#endif
 
 } // namespace WebCore
 

@@ -163,10 +163,6 @@ module window {
                                                      in [Optional=CallWithDefaultValue] WebKitPoint p);
 
         readonly attribute [EnabledAtRuntime] DOMApplicationCache applicationCache;
-#if defined(ENABLE_SQL_DATABASE) && ENABLE_SQL_DATABASE
-        [EnabledAtRuntime] Database openDatabase(in DOMString name, in DOMString version, in DOMString displayName, in unsigned long estimatedSize, in [Callback, Optional] DatabaseCallback creationCallback)
-            raises(DOMException);
-#endif
 
         readonly attribute [EnabledAtRuntime] Storage sessionStorage
             getter raises(DOMException);
@@ -195,8 +191,6 @@ module window {
         const unsigned short PERSISTENT = 1;
         [EnabledAtRuntime=FileSystem] void webkitRequestFileSystem(in unsigned short type, in long long size, in [Callback] FileSystemCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
         [EnabledAtRuntime=FileSystem] void webkitResolveLocalFileSystemURL(in DOMString url, in [Callback, Optional] EntryCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
-
-        attribute [EnabledAtRuntime=FileSystem] WebKitFlagsConstructor WebKitFlags;
 #endif
 
 #if defined(ENABLE_ORIENTATION_EVENTS) && ENABLE_ORIENTATION_EVENTS
@@ -512,19 +506,16 @@ module window {
 
         attribute DOMStringMapConstructor DOMStringMap;
 
-        attribute [JSCCustomGetter] ArrayBufferConstructor ArrayBuffer; // Usable with new operator
-        attribute [JSCCustomGetter] Int8ArrayConstructor Int8Array; // Usable with new operator
-        attribute [JSCCustomGetter] Uint8ArrayConstructor Uint8Array; // Usable with new operator
-        attribute [JSCCustomGetter] Int16ArrayConstructor Int16Array; // Usable with new operator
-        attribute [JSCCustomGetter] Uint16ArrayConstructor Uint16Array; // Usable with new operator
-        attribute [JSCCustomGetter] Int32ArrayConstructor Int32Array; // Usable with new operator
-        attribute [JSCCustomGetter] Uint32ArrayConstructor Uint32Array; // Usable with new operator
-        attribute [JSCCustomGetter] Float32ArrayConstructor Float32Array; // Usable with new operator
-        attribute [JSCCustomGetter] Float64ArrayConstructor Float64Array; // Usable with new operator
-        attribute [JSCCustomGetter] DataViewConstructor DataView; // Usable with new operator
-
-        attribute [Supplemented, JSCCustomGetter, Conditional=WEB_AUDIO, EnabledAtRuntime] AudioContextConstructor webkitAudioContext; // Usable with new operator
-        attribute [Supplemented, Conditional=WEB_AUDIO] AudioPannerNodeConstructor webkitAudioPannerNode; // Needed for panning model constants
+        attribute ArrayBufferConstructor ArrayBuffer; // Usable with new operator
+        attribute Int8ArrayConstructor Int8Array; // Usable with new operator
+        attribute Uint8ArrayConstructor Uint8Array; // Usable with new operator
+        attribute Int16ArrayConstructor Int16Array; // Usable with new operator
+        attribute Uint16ArrayConstructor Uint16Array; // Usable with new operator
+        attribute Int32ArrayConstructor Int32Array; // Usable with new operator
+        attribute Uint32ArrayConstructor Uint32Array; // Usable with new operator
+        attribute Float32ArrayConstructor Float32Array; // Usable with new operator
+        attribute Float64ArrayConstructor Float64Array; // Usable with new operator
+        attribute DataViewConstructor DataView; // Usable with new operator
 
         // Event Constructors
         attribute EventConstructor Event;
@@ -551,10 +542,7 @@ module window {
         attribute [Conditional=DEVICE_ORIENTATION, EnabledAtRuntime] DeviceMotionEventConstructor DeviceMotionEvent;
         attribute [Conditional=DEVICE_ORIENTATION, EnabledAtRuntime] DeviceOrientationEventConstructor DeviceOrientationEvent;
         attribute [Conditional=TOUCH_EVENTS] TouchEventConstructor TouchEvent;
-        attribute [Supplemented, Conditional=WEB_SOCKETS] CloseEventConstructor CloseEvent;
         attribute StorageEventConstructor StorageEvent;
-        attribute [Supplemented, Conditional=WEB_AUDIO] AudioProcessingEventConstructor AudioProcessingEvent;
-        attribute [Supplemented, Conditional=WEB_AUDIO] OfflineAudioCompletionEventConstructor OfflineAudioCompletionEvent;
         attribute [Conditional=INPUT_SPEECH] SpeechInputEventConstructor SpeechInputEvent;
         attribute [Conditional=MEDIA_STREAM] MediaStreamEventConstructor MediaStreamEvent;
         attribute [Conditional=WEBGL] WebGLContextEventConstructor WebGLContextEvent;
@@ -564,9 +552,9 @@ module window {
         attribute WebKitCSSKeyframeRuleConstructor WebKitCSSKeyframeRule;
         attribute WebKitCSSKeyframesRuleConstructor WebKitCSSKeyframesRule;
 
-        attribute [JSCCustomGetter] WebKitCSSMatrixConstructor WebKitCSSMatrix; // Usable with the new operator
+        attribute WebKitCSSMatrixConstructor WebKitCSSMatrix; // Usable with the new operator
 
-        attribute [JSCCustomGetter] WebKitPointConstructor WebKitPoint; // Usable with new the operator
+        attribute WebKitPointConstructor WebKitPoint; // Usable with new the operator
 
         attribute ClipboardConstructor Clipboard;
 
@@ -578,7 +566,7 @@ module window {
         attribute RangeConstructor Range;
         attribute RangeExceptionConstructor RangeException;
 
-        attribute [JSCCustomGetter] EventSourceConstructor EventSource; // Usable with new the operator
+        attribute EventSourceConstructor EventSource; // Usable with new the operator
 
         // Mozilla has a separate XMLDocument object for XML documents. 
         // We just use Document for this.
@@ -587,27 +575,23 @@ module window {
         attribute DOMParserConstructor DOMParser;
         attribute XMLSerializerConstructor XMLSerializer;
 
-        attribute [JSCCustomGetter] XMLHttpRequestConstructor XMLHttpRequest; // Usable with the new operator
+        attribute XMLHttpRequestConstructor XMLHttpRequest; // Usable with the new operator
         attribute XMLHttpRequestUploadConstructor XMLHttpRequestUpload;
         attribute XMLHttpRequestExceptionConstructor XMLHttpRequestException;
 
-        attribute [JSCCustomGetter,Conditional=XSLT] XSLTProcessorConstructor XSLTProcessor; // Usable with the new operator
+        attribute [Conditional=XSLT] XSLTProcessorConstructor XSLTProcessor; // Usable with the new operator
 
 #if defined(ENABLE_CHANNEL_MESSAGING) && ENABLE_CHANNEL_MESSAGING
         attribute MessagePortConstructor MessagePort;
-        attribute [JSCCustomGetter] MessageChannelConstructor MessageChannel; // Usable with the new operator
+        attribute MessageChannelConstructor MessageChannel; // Usable with the new operator
 #endif
 
 #if defined(ENABLE_WORKERS) && ENABLE_WORKERS
-        attribute [JSCCustomGetter] WorkerConstructor Worker; // Usable with the new operator
+        attribute WorkerConstructor Worker; // Usable with the new operator
 #endif
 
 #if defined(ENABLE_SHARED_WORKERS) && ENABLE_SHARED_WORKERS
         attribute [JSCCustomGetter, EnabledAtRuntime] SharedWorkerConstructor SharedWorker; // Usable with the new operator
-#endif
-
-#if defined(ENABLE_WEB_SOCKETS) && ENABLE_WEB_SOCKETS
-        attribute [Supplemented, JSCCustomGetter, EnabledAtRuntime] WebSocketConstructor WebSocket; // Usable with the new operator
 #endif
 
 #if defined(ENABLE_VIDEO_TRACK) && ENABLE_VIDEO_TRACK
@@ -803,9 +787,6 @@ module window {
         attribute SVGFilterElementConstructor SVGFilterElement;
 #endif
 #endif
-
-        attribute [Conditional=SQL_DATABASE] SQLExceptionConstructor SQLException;
-
 
         attribute DOMFormDataConstructor FormData;
 

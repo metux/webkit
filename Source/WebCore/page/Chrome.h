@@ -38,6 +38,7 @@ namespace WebCore {
     class ChromeClient;
 #if ENABLE(INPUT_COLOR)
     class ColorChooser;
+    class ColorChooserClient;
 #endif
     class FileChooser;
     class FileIconLoader;
@@ -59,8 +60,9 @@ namespace WebCore {
     
     class Chrome : public HostWindow {
     public:
-        Chrome(Page*, ChromeClient*);
         ~Chrome();
+
+        static PassOwnPtr<Chrome> create(Page*, ChromeClient*);
 
         ChromeClient* client() { return m_client; }
 
@@ -153,9 +155,7 @@ namespace WebCore {
         void cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*);
 
 #if ENABLE(INPUT_COLOR)
-        void openColorChooser(ColorChooser*, const Color&);
-        void cleanupColorChooser(ColorChooser*);
-        void setSelectedColorInColorChooser(ColorChooser*, const Color&);
+        PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color& initialColor);
 #endif
 
         void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
@@ -183,6 +183,8 @@ namespace WebCore {
 #endif
 
     private:
+        Chrome(Page*, ChromeClient*);
+
         Page* m_page;
         ChromeClient* m_client;
     };

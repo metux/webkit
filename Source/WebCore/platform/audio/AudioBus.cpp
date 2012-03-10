@@ -34,9 +34,7 @@
 
 #include "DenormalDisabler.h"
 
-#if !PLATFORM(MAC)
 #include "SincResampler.h"
-#endif
 #include "VectorMath.h"
 #include <algorithm>
 #include <assert.h>
@@ -185,7 +183,7 @@ void AudioBus::normalize()
         scale(1.0f / max);
 }
 
-void AudioBus::scale(double scale)
+void AudioBus::scale(float scale)
 {
     for (unsigned i = 0; i < numberOfChannels(); ++i)
         channel(i)->scale(scale);
@@ -244,8 +242,7 @@ void AudioBus::sumFrom(const AudioBus &sourceBus)
         GAIN_DEZIPPER \
     } \
     gain = totalDesiredGain; \
-    for (; k < framesToProcess; ++k)  \
-        OP
+    OP##_V 
 
 #define STEREO_SUM \
     { \
@@ -253,6 +250,12 @@ void AudioBus::sumFrom(const AudioBus &sourceBus)
         float sumR = DenormalDisabler::flushDenormalFloatToZero(*destinationR + gain * *sourceR++); \
         *destinationL++ = sumL; \
         *destinationR++ = sumR; \
+    }
+
+#define STEREO_SUM_V \
+    { \
+        vsma(sourceL, 1, &gain, destinationL, 1, framesToProcess - k); \
+        vsma(sourceR, 1, &gain, destinationR, 1, framesToProcess - k); \
     }
 
 // Mono -> stereo (mix equally into L and R)
@@ -266,11 +269,22 @@ void AudioBus::sumFrom(const AudioBus &sourceBus)
         *destinationR++ = sumR; \
     }
 
+#define MONO2STEREO_SUM_V \
+    { \
+        vsma(sourceL, 1, &gain, destinationL, 1, framesToProcess - k); \
+        vsma(sourceL, 1, &gain, destinationR, 1, framesToProcess - k); \
+    }
+    
 #define MONO_SUM \
     { \
         float sum = DenormalDisabler::flushDenormalFloatToZero(*destinationL + gain * *sourceL++); \
         *destinationL++ = sum; \
     }
+
+#define MONO_SUM_V \
+    { \
+        vsma(sourceL, 1, &gain, destinationL, 1, framesToProcess - k); \
+    } 
 
 #define STEREO_NO_SUM \
     { \
@@ -278,6 +292,12 @@ void AudioBus::sumFrom(const AudioBus &sourceBus)
         float sampleR = *sourceR++; \
         *destinationL++ = DenormalDisabler::flushDenormalFloatToZero(gain * sampleL); \
         *destinationR++ = DenormalDisabler::flushDenormalFloatToZero(gain * sampleR); \
+    }
+
+#define STEREO_NO_SUM_V \
+    { \
+        vsmul(sourceL, 1, &gain, destinationL, 1, framesToProcess - k); \
+        vsmul(sourceR, 1, &gain, destinationR, 1, framesToProcess - k); \
     }
 
 // Mono -> stereo (mix equally into L and R)
@@ -289,19 +309,27 @@ void AudioBus::sumFrom(const AudioBus &sourceBus)
         *destinationR++ = DenormalDisabler::flushDenormalFloatToZero(gain * sample); \
     }
 
+#define MONO2STEREO_NO_SUM_V \
+    { \
+        vsmul(sourceL, 1, &gain, destinationL, 1, framesToProcess - k); \
+        vsmul(sourceL, 1, &gain, destinationR, 1, framesToProcess - k); \
+    }
+
 #define MONO_NO_SUM \
     { \
         float sampleL = *sourceL++; \
         *destinationL++ = DenormalDisabler::flushDenormalFloatToZero(gain * sampleL); \
     }
 
-void AudioBus::processWithGainFromMonoStereo(const AudioBus &sourceBus, double* lastMixGain, double targetGain, bool sumToBus)
+#define MONO_NO_SUM_V \
+    { \
+        vsmul(sourceL, 1, &gain, destinationL, 1, framesToProcess - k); \
+    } 
+
+void AudioBus::processWithGainFromMonoStereo(const AudioBus &sourceBus, float* lastMixGain, float targetGain, bool sumToBus)
 {
     // We don't want to suddenly change the gain from mixing one time slice to the next,
     // so we "de-zipper" by slowly changing the gain each sample-frame until we've achieved the target gain.
-
-    // FIXME: optimize this method (SSE, etc.)
-    // FIXME: targetGain and lastMixGain should be changed to floats instead of doubles.
     
     // Take master bus gain into account as well as the targetGain.
     float totalDesiredGain = static_cast<float>(m_busGain * targetGain);
@@ -351,8 +379,6 @@ void AudioBus::processWithGainFromMonoStereo(const AudioBus &sourceBus, double* 
         if (this == &sourceBus && *lastMixGain == targetGain && targetGain == 1.0)
             return;
 
-        // FIXME: if (framesToDezipper == 0) and DenormalDisabler::flushDenormalFloatToZero() is a NOP (gcc vs. Visual Studio) 
-        // then we can further optimize the PROCESS_WITH_GAIN codepaths below using vsmul().
         if (sourceR && destinationR) {
             // Stereo
             PROCESS_WITH_GAIN(STEREO_NO_SUM)
@@ -366,10 +392,10 @@ void AudioBus::processWithGainFromMonoStereo(const AudioBus &sourceBus, double* 
     }
 
     // Save the target gain as the starting point for next time around.
-    *lastMixGain = static_cast<double>(gain);
+    *lastMixGain = gain;
 }
 
-void AudioBus::processWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain, bool sumToBus)
+void AudioBus::processWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain, bool sumToBus)
 {
     // Make sure we're summing from same type of bus.
     // We *are* able to sum from mono -> stereo
@@ -416,17 +442,16 @@ void AudioBus::copyWithSampleAccurateGainValuesFrom(const AudioBus &sourceBus, f
     }
 }
 
-void AudioBus::copyWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain)
+void AudioBus::copyWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain)
 {
     processWithGainFrom(sourceBus, lastMixGain, targetGain, false);
 }
 
-void AudioBus::sumWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain)
+void AudioBus::sumWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain)
 {
     processWithGainFrom(sourceBus, lastMixGain, targetGain, true);
 }
 
-#if !PLATFORM(MAC)
 PassOwnPtr<AudioBus> AudioBus::createBySampleRateConverting(AudioBus* sourceBus, bool mixToMono, double newSampleRate)
 {
     // sourceBus's sample-rate must be known.
@@ -482,7 +507,6 @@ PassOwnPtr<AudioBus> AudioBus::createBySampleRateConverting(AudioBus* sourceBus,
     destinationBus->setSampleRate(newSampleRate);    
     return destinationBus.release();
 }
-#endif // !PLATFORM(MAC)
 
 PassOwnPtr<AudioBus> AudioBus::createByMixingToMono(AudioBus* sourceBus)
 {

@@ -6,7 +6,6 @@
       <sub name="WebKitWebContext" link="WebKitWebContext.html"/>
       <sub name="WebKitWebView" link="WebKitWebView.html"/>
       <sub name="WebKitWebViewBase" link="WebKitWebViewBase.html"/>
-      <sub name="WebKitWebLoaderClient" link="WebKitWebLoaderClient.html"/>
       <sub name="WebKitBackForwardList" link="WebKitBackForwardList.html"/>
       <sub name="WebKitBackForwardListItem" link="WebKitBackForwardListItem.html"/>
       <sub name="WebKitSettings" link="WebKitSettings.html"/>
@@ -24,17 +23,16 @@
     <keyword type="function" name="webkit_web_context_get_default ()" link="WebKitWebContext.html#webkit-web-context-get-default"/>
     <keyword type="function" name="webkit_web_context_get_cache_model ()" link="WebKitWebContext.html#webkit-web-context-get-cache-model"/>
     <keyword type="function" name="webkit_web_context_set_cache_model ()" link="WebKitWebContext.html#webkit-web-context-set-cache-model"/>
-    <keyword type="struct" name="WebKitWebView" link="WebKitWebView.html#WebKitWebView-struct"/>
+    <keyword type="struct" name="struct WebKitWebView" link="WebKitWebView.html#WebKitWebView-struct"/>
+    <keyword type="enum" name="enum WebKitLoadEvent" link="WebKitWebView.html#WebKitLoadEvent"/>
     <keyword type="function" name="webkit_web_view_new ()" link="WebKitWebView.html#webkit-web-view-new"/>
     <keyword type="function" name="webkit_web_view_new_with_context ()" link="WebKitWebView.html#webkit-web-view-new-with-context"/>
     <keyword type="function" name="webkit_web_view_get_context ()" link="WebKitWebView.html#webkit-web-view-get-context"/>
-    <keyword type="function" name="webkit_web_view_get_loader_client ()" link="WebKitWebView.html#webkit-web-view-get-loader-client"/>
-    <keyword type="function" name="webkit_web_view_set_loader_client ()" link="WebKitWebView.html#webkit-web-view-set-loader-client"/>
     <keyword type="function" name="webkit_web_view_load_uri ()" link="WebKitWebView.html#webkit-web-view-load-uri"/>
     <keyword type="function" name="webkit_web_view_load_html ()" link="WebKitWebView.html#webkit-web-view-load-html"/>
     <keyword type="function" name="webkit_web_view_load_plain_text ()" link="WebKitWebView.html#webkit-web-view-load-plain-text"/>
-    <keyword type="function" name="webkit_web_view_load_alternate_html ()" link="WebKitWebView.html#webkit-web-view-load-alternate-html"/>
     <keyword type="function" name="webkit_web_view_load_request ()" link="WebKitWebView.html#webkit-web-view-load-request"/>
+    <keyword type="function" name="webkit_web_view_replace_content ()" link="WebKitWebView.html#webkit-web-view-replace-content"/>
     <keyword type="function" name="webkit_web_view_can_go_back ()" link="WebKitWebView.html#webkit-web-view-can-go-back"/>
     <keyword type="function" name="webkit_web_view_go_back ()" link="WebKitWebView.html#webkit-web-view-go-back"/>
     <keyword type="function" name="webkit_web_view_can_go_forward ()" link="WebKitWebView.html#webkit-web-view-can-go-forward"/>
@@ -52,24 +50,22 @@
     <keyword type="function" name="webkit_web_view_set_settings ()" link="WebKitWebView.html#webkit-web-view-set-settings"/>
     <keyword type="function" name="webkit_web_view_get_settings ()" link="WebKitWebView.html#webkit-web-view-get-settings"/>
     <keyword type="function" name="webkit_web_view_get_window_properties ()" link="WebKitWebView.html#webkit-web-view-get-window-properties"/>
+    <keyword type="function" name="webkit_web_view_set_zoom_level ()" link="WebKitWebView.html#webkit-web-view-set-zoom-level"/>
+    <keyword type="function" name="webkit_web_view_get_zoom_level ()" link="WebKitWebView.html#webkit-web-view-get-zoom-level"/>
     <keyword type="property" name="The &quot;estimated-load-progress&quot; property" link="WebKitWebView.html#WebKitWebView--estimated-load-progress"/>
     <keyword type="property" name="The &quot;title&quot; property" link="WebKitWebView.html#WebKitWebView--title"/>
     <keyword type="property" name="The &quot;uri&quot; property" link="WebKitWebView.html#WebKitWebView--uri"/>
     <keyword type="property" name="The &quot;web-context&quot; property" link="WebKitWebView.html#WebKitWebView--web-context"/>
+    <keyword type="property" name="The &quot;zoom-level&quot; property" link="WebKitWebView.html#WebKitWebView--zoom-level"/>
     <keyword type="signal" name="The &quot;close&quot; signal" link="WebKitWebView.html#WebKitWebView-close"/>
     <keyword type="signal" name="The &quot;create&quot; signal" link="WebKitWebView.html#WebKitWebView-create"/>
+    <keyword type="signal" name="The &quot;load-changed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-changed"/>
+    <keyword type="signal" name="The &quot;load-failed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-failed"/>
     <keyword type="signal" name="The &quot;ready-to-show&quot; signal" link="WebKitWebView.html#WebKitWebView-ready-to-show"/>
     <keyword type="signal" name="The &quot;script-alert&quot; signal" link="WebKitWebView.html#WebKitWebView-script-alert"/>
     <keyword type="signal" name="The &quot;script-confirm&quot; signal" link="WebKitWebView.html#WebKitWebView-script-confirm"/>
     <keyword type="signal" name="The &quot;script-prompt&quot; signal" link="WebKitWebView.html#WebKitWebView-script-prompt"/>
     <keyword type="struct" name="struct WebKitWebViewBase" link="WebKitWebViewBase.html#WebKitWebViewBase-struct"/>
-    <keyword type="struct" name="WebKitWebLoaderClient" link="WebKitWebLoaderClient.html#WebKitWebLoaderClient-struct"/>
-    <keyword type="signal" name="The &quot;load-committed&quot; signal" link="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-committed"/>
-    <keyword type="signal" name="The &quot;load-failed&quot; signal" link="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-failed"/>
-    <keyword type="signal" name="The &quot;load-finished&quot; signal" link="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-finished"/>
-    <keyword type="signal" name="The &quot;provisional-load-failed&quot; signal" link="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-failed"/>
-    <keyword type="signal" name="The &quot;provisional-load-received-server-redirect&quot; signal" link="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-received-server-redirect"/>
-    <keyword type="signal" name="The &quot;provisional-load-started&quot; signal" link="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-started"/>
     <keyword type="struct" name="struct WebKitBackForwardList" link="WebKitBackForwardList.html#WebKitBackForwardList-struct"/>
     <keyword type="function" name="webkit_back_forward_list_get_length ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-length"/>
     <keyword type="function" name="webkit_back_forward_list_get_current_item ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-current-item"/>
@@ -218,6 +214,10 @@
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS"/>
+    <keyword type="constant" name="WEBKIT_LOAD_STARTED" link="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_LOAD_REDIRECTED" link="WebKitWebView.html#WEBKIT-LOAD-REDIRECTED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_LOAD_COMMITTED" link="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_LOAD_FINISHED" link="WebKitWebView.html#WEBKIT-LOAD-FINISHED:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_FAILED" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-FAILED:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_TRANSPORT" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-TRANSPORT:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_UNKNOWN_PROTOCOL" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-UNKNOWN-PROTOCOL:CAPS"/>

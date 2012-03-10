@@ -90,23 +90,21 @@ public:
     static PassOwnPtr<AudioBus> createBufferFromRange(AudioBus* sourceBuffer, unsigned startFrame, unsigned endFrame);
 
 
-#if !PLATFORM(MAC)
     // Creates a new AudioBus by sample-rate converting sourceBus to the newSampleRate.
     // setSampleRate() must have been previously called on sourceBus.
     // Note: sample-rate conversion is already handled in the file-reading code for the mac port, so we don't need this.
     static PassOwnPtr<AudioBus> createBySampleRateConverting(AudioBus* sourceBus, bool mixToMono, double newSampleRate);
-#endif
 
     // Creates a new AudioBus by mixing all the channels down to mono.
     // If sourceBus is already mono, then the returned AudioBus will simply be a copy.
     static PassOwnPtr<AudioBus> createByMixingToMono(AudioBus* sourceBus);
 
     // Scales all samples by the same amount.
-    void scale(double scale);
+    void scale(float scale);
 
     // Master gain for this bus - used with sumWithGainFrom() below
-    void setGain(double gain) { m_busGain = gain; }
-    double gain() { return m_busGain; }
+    void setGain(float gain) { m_busGain = gain; }
+    float gain() { return m_busGain; }
 
     void reset() { m_isFirstTime = true; } // for de-zippering
 
@@ -121,8 +119,8 @@ public:
     // We scale by targetGain (and our own internal gain m_busGain), performing "de-zippering" to smoothly change from *lastMixGain to (targetGain*m_busGain).
     // The caller is responsible for setting up lastMixGain to point to storage which is unique for every "stream" which will be summed to this bus.
     // This represents the dezippering memory.
-    void copyWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain);
-    void sumWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain);
+    void copyWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain);
+    void sumWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain);
 
     // Copies the sourceBus by scaling with sample-accurate gain values.
     void copyWithSampleAccurateGainValuesFrom(const AudioBus &sourceBus, float* gainValues, unsigned numberOfGainValues);
@@ -138,8 +136,8 @@ public:
 protected:
     AudioBus() { };
 
-    void processWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain, bool sumToBus);
-    void processWithGainFromMonoStereo(const AudioBus &sourceBus, double* lastMixGain, double targetGain, bool sumToBus);
+    void processWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain, bool sumToBus);
+    void processWithGainFromMonoStereo(const AudioBus &sourceBus, float* lastMixGain, float targetGain, bool sumToBus);
 
     size_t m_length;
 
@@ -147,7 +145,7 @@ protected:
 
     int m_layout;
 
-    double m_busGain;
+    float m_busGain;
     bool m_isFirstTime;
     float m_sampleRate; // 0.0 if unknown or N/A
 };

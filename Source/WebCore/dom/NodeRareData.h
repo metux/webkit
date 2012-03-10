@@ -222,7 +222,7 @@ public:
     HTMLPropertiesCollection* properties(Node* node)
     {
         if (!m_properties)
-            m_properties = HTMLPropertiesCollection::create(node);
+            m_properties = adoptPtr(HTMLPropertiesCollection::create(node));
 
         return m_properties.get();
     }
@@ -257,7 +257,7 @@ private:
     mutable RefPtr<DOMSettableTokenList> m_itemProp;
     mutable RefPtr<DOMSettableTokenList> m_itemRef;
     mutable RefPtr<DOMSettableTokenList> m_itemType;
-    mutable RefPtr<HTMLPropertiesCollection> m_properties;
+    mutable OwnPtr<HTMLPropertiesCollection> m_properties;
 #endif
 };
 

@@ -87,6 +87,8 @@ private:
 
     void renderFromBuffer(AudioBus*, unsigned destinationFrameOffset, size_t numberOfFrames);
 
+    inline bool renderSilenceAndFinishIfNotLooping(float* destinationL, float* destinationR, size_t framesToProcess);
+
     // m_buffer holds the sample data which this node outputs.
     RefPtr<AudioBuffer> m_buffer;
 
@@ -127,7 +129,7 @@ private:
     double totalPitchRate();
 
     // m_lastGain provides continuity when we dynamically adjust the gain.
-    double m_lastGain;
+    float m_lastGain;
     
     // We optionally keep track of a panner node which has a doppler shift that is incorporated into the pitch rate.
     RefPtr<AudioPannerNode> m_pannerNode;
