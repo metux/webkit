@@ -12,6 +12,9 @@
       <sub name="WebKitURIRequest" link="WebKitURIRequest.html"/>
       <sub name="WebKitURIResponse" link="WebKitURIResponse.html"/>
       <sub name="WebKitWindowProperties" link="WebKitWindowProperties.html"/>
+      <sub name="WebKitDownload" link="WebKitDownload.html"/>
+      <sub name="WebKitPolicyDecision" link="WebKitPolicyDecision.html"/>
+      <sub name="WebKitNavigationPolicyDecision" link="WebKitNavigationPolicyDecision.html"/>
       <sub name="WebKitError" link="webkit2gtk-WebKitError.html"/>
     </sub>
     <sub name="Index" link="index-all.html"/>
@@ -23,8 +26,11 @@
     <keyword type="function" name="webkit_web_context_get_default ()" link="WebKitWebContext.html#webkit-web-context-get-default"/>
     <keyword type="function" name="webkit_web_context_get_cache_model ()" link="WebKitWebContext.html#webkit-web-context-get-cache-model"/>
     <keyword type="function" name="webkit_web_context_set_cache_model ()" link="WebKitWebContext.html#webkit-web-context-set-cache-model"/>
+    <keyword type="function" name="webkit_web_context_download_uri ()" link="WebKitWebContext.html#webkit-web-context-download-uri"/>
+    <keyword type="signal" name="The &quot;download-started&quot; signal" link="WebKitWebContext.html#WebKitWebContext-download-started"/>
     <keyword type="struct" name="struct WebKitWebView" link="WebKitWebView.html#WebKitWebView-struct"/>
     <keyword type="enum" name="enum WebKitLoadEvent" link="WebKitWebView.html#WebKitLoadEvent"/>
+    <keyword type="enum" name="enum WebKitPolicyDecisionType" link="WebKitWebView.html#WebKitPolicyDecisionType"/>
     <keyword type="function" name="webkit_web_view_new ()" link="WebKitWebView.html#webkit-web-view-new"/>
     <keyword type="function" name="webkit_web_view_new_with_context ()" link="WebKitWebView.html#webkit-web-view-new-with-context"/>
     <keyword type="function" name="webkit_web_view_get_context ()" link="WebKitWebView.html#webkit-web-view-get-context"/>
@@ -59,6 +65,7 @@
     <keyword type="property" name="The &quot;zoom-level&quot; property" link="WebKitWebView.html#WebKitWebView--zoom-level"/>
     <keyword type="signal" name="The &quot;close&quot; signal" link="WebKitWebView.html#WebKitWebView-close"/>
     <keyword type="signal" name="The &quot;create&quot; signal" link="WebKitWebView.html#WebKitWebView-create"/>
+    <keyword type="signal" name="The &quot;decide-policy&quot; signal" link="WebKitWebView.html#WebKitWebView-decide-policy"/>
     <keyword type="signal" name="The &quot;load-changed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-changed"/>
     <keyword type="signal" name="The &quot;load-failed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-failed"/>
     <keyword type="signal" name="The &quot;ready-to-show&quot; signal" link="WebKitWebView.html#WebKitWebView-ready-to-show"/>
@@ -144,6 +151,8 @@
     <keyword type="function" name="webkit_settings_set_enable_caret_browsing ()" link="WebKitSettings.html#webkit-settings-set-enable-caret-browsing"/>
     <keyword type="function" name="webkit_settings_get_enable_fullscreen ()" link="WebKitSettings.html#webkit-settings-get-enable-fullscreen"/>
     <keyword type="function" name="webkit_settings_set_enable_fullscreen ()" link="WebKitSettings.html#webkit-settings-set-enable-fullscreen"/>
+    <keyword type="function" name="webkit_settings_get_print_backgrounds ()" link="WebKitSettings.html#webkit-settings-get-print-backgrounds"/>
+    <keyword type="function" name="webkit_settings_set_print_backgrounds ()" link="WebKitSettings.html#webkit-settings-set-print-backgrounds"/>
     <keyword type="property" name="The &quot;auto-load-images&quot; property" link="WebKitSettings.html#WebKitSettings--auto-load-images"/>
     <keyword type="property" name="The &quot;cursive-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--cursive-font-family"/>
     <keyword type="property" name="The &quot;default-charset&quot; property" link="WebKitSettings.html#WebKitSettings--default-charset"/>
@@ -172,6 +181,7 @@
     <keyword type="property" name="The &quot;minimum-font-size&quot; property" link="WebKitSettings.html#WebKitSettings--minimum-font-size"/>
     <keyword type="property" name="The &quot;monospace-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--monospace-font-family"/>
     <keyword type="property" name="The &quot;pictograph-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--pictograph-font-family"/>
+    <keyword type="property" name="The &quot;print-backgrounds&quot; property" link="WebKitSettings.html#WebKitSettings--print-backgrounds"/>
     <keyword type="property" name="The &quot;sans-serif-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--sans-serif-font-family"/>
     <keyword type="property" name="The &quot;serif-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--serif-font-family"/>
     <keyword type="struct" name="struct WebKitURIRequest" link="WebKitURIRequest.html#WebKitURIRequest-struct"/>
@@ -202,15 +212,49 @@
     <keyword type="property" name="The &quot;scrollbars-visible&quot; property" link="WebKitWindowProperties.html#WebKitWindowProperties--scrollbars-visible"/>
     <keyword type="property" name="The &quot;statusbar-visible&quot; property" link="WebKitWindowProperties.html#WebKitWindowProperties--statusbar-visible"/>
     <keyword type="property" name="The &quot;toolbar-visible&quot; property" link="WebKitWindowProperties.html#WebKitWindowProperties--toolbar-visible"/>
+    <keyword type="struct" name="struct WebKitDownload" link="WebKitDownload.html#WebKitDownload-struct"/>
+    <keyword type="function" name="webkit_download_get_destination ()" link="WebKitDownload.html#webkit-download-get-destination"/>
+    <keyword type="function" name="webkit_download_set_destination ()" link="WebKitDownload.html#webkit-download-set-destination"/>
+    <keyword type="function" name="webkit_download_get_response ()" link="WebKitDownload.html#webkit-download-get-response"/>
+    <keyword type="function" name="webkit_download_cancel ()" link="WebKitDownload.html#webkit-download-cancel"/>
+    <keyword type="function" name="webkit_download_get_estimated_progress ()" link="WebKitDownload.html#webkit-download-get-estimated-progress"/>
+    <keyword type="function" name="webkit_download_get_elapsed_time ()" link="WebKitDownload.html#webkit-download-get-elapsed-time"/>
+    <keyword type="property" name="The &quot;destination&quot; property" link="WebKitDownload.html#WebKitDownload--destination"/>
+    <keyword type="property" name="The &quot;estimated-progress&quot; property" link="WebKitDownload.html#WebKitDownload--estimated-progress"/>
+    <keyword type="property" name="The &quot;response&quot; property" link="WebKitDownload.html#WebKitDownload--response"/>
+    <keyword type="signal" name="The &quot;created-destination&quot; signal" link="WebKitDownload.html#WebKitDownload-created-destination"/>
+    <keyword type="signal" name="The &quot;decide-destination&quot; signal" link="WebKitDownload.html#WebKitDownload-decide-destination"/>
+    <keyword type="signal" name="The &quot;failed&quot; signal" link="WebKitDownload.html#WebKitDownload-failed"/>
+    <keyword type="signal" name="The &quot;finished&quot; signal" link="WebKitDownload.html#WebKitDownload-finished"/>
+    <keyword type="signal" name="The &quot;received-data&quot; signal" link="WebKitDownload.html#WebKitDownload-received-data"/>
+    <keyword type="struct" name="struct WebKitPolicyDecision" link="WebKitPolicyDecision.html#WebKitPolicyDecision-struct"/>
+    <keyword type="function" name="webkit_policy_decision_download ()" link="WebKitPolicyDecision.html#webkit-policy-decision-download"/>
+    <keyword type="function" name="webkit_policy_decision_ignore ()" link="WebKitPolicyDecision.html#webkit-policy-decision-ignore"/>
+    <keyword type="function" name="webkit_policy_decision_use ()" link="WebKitPolicyDecision.html#webkit-policy-decision-use"/>
+    <keyword type="struct" name="struct WebKitNavigationPolicyDecision" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision-struct"/>
+    <keyword type="enum" name="enum WebKitNavigationType" link="WebKitNavigationPolicyDecision.html#WebKitNavigationType"/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_frame_name ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-frame-name"/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_modifiers ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-modifiers"/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_mouse_button ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-mouse-button"/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_navigation_type ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-navigation-type"/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_request ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-request"/>
+    <keyword type="property" name="The &quot;frame-name&quot; property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--frame-name"/>
+    <keyword type="property" name="The &quot;modifiers&quot; property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--modifiers"/>
+    <keyword type="property" name="The &quot;mouse-button&quot; property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--mouse-button"/>
+    <keyword type="property" name="The &quot;navigation-type&quot; property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--navigation-type"/>
+    <keyword type="property" name="The &quot;request&quot; property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--request"/>
     <keyword type="macro" name="WEBKIT_NETWORK_ERROR" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR:CAPS"/>
     <keyword type="macro" name="WEBKIT_PLUGIN_ERROR" link="webkit2gtk-WebKitError.html#WEBKIT-PLUGIN-ERROR:CAPS"/>
     <keyword type="macro" name="WEBKIT_POLICY_ERROR" link="webkit2gtk-WebKitError.html#WEBKIT-POLICY-ERROR:CAPS"/>
+    <keyword type="macro" name="WEBKIT_DOWNLOAD_ERROR" link="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR:CAPS"/>
     <keyword type="enum" name="enum WebKitNetworkError" link="webkit2gtk-WebKitError.html#WebKitNetworkError"/>
     <keyword type="enum" name="enum WebKitPluginError" link="webkit2gtk-WebKitError.html#WebKitPluginError"/>
     <keyword type="enum" name="enum WebKitPolicyError" link="webkit2gtk-WebKitError.html#WebKitPolicyError"/>
+    <keyword type="enum" name="enum WebKitDownloadError" link="webkit2gtk-WebKitError.html#WebKitDownloadError"/>
     <keyword type="function" name="webkit_network_error_quark ()" link="webkit2gtk-WebKitError.html#webkit-network-error-quark"/>
     <keyword type="function" name="webkit_plugin_error_quark ()" link="webkit2gtk-WebKitError.html#webkit-plugin-error-quark"/>
     <keyword type="function" name="webkit_policy_error_quark ()" link="webkit2gtk-WebKitError.html#webkit-policy-error-quark"/>
+    <keyword type="function" name="webkit_download_error_quark ()" link="webkit2gtk-WebKitError.html#webkit-download-error-quark"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS"/>
@@ -218,6 +262,15 @@
     <keyword type="constant" name="WEBKIT_LOAD_REDIRECTED" link="WebKitWebView.html#WEBKIT-LOAD-REDIRECTED:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_COMMITTED" link="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_FINISHED" link="WebKitWebView.html#WEBKIT-LOAD-FINISHED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION" link="WebKitWebView.html#WEBKIT-POLICY-DECISION-TYPE-NAVIGATION-ACTION:CAPS"/>
+    <keyword type="constant" name="WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION" link="WebKitWebView.html#WEBKIT-POLICY-DECISION-TYPE-NEW-WINDOW-ACTION:CAPS"/>
+    <keyword type="constant" name="WEBKIT_POLICY_DECISION_TYPE_RESPONSE" link="WebKitWebView.html#WEBKIT-POLICY-DECISION-TYPE-RESPONSE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_LINK_CLICKED" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-LINK-CLICKED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_FORM_SUBMITTED" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-FORM-SUBMITTED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_BACK_FORWARD" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-BACK-FORWARD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_RELOAD" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-RELOAD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_FORM_RESUBMITTED" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-FORM-RESUBMITTED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_OTHER" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-OTHER:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_FAILED" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-FAILED:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_TRANSPORT" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-TRANSPORT:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_UNKNOWN_PROTOCOL" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-UNKNOWN-PROTOCOL:CAPS"/>
@@ -234,5 +287,8 @@
     <keyword type="constant" name="WEBKIT_POLICY_ERROR_CANNOT_SHOW_URI" link="webkit2gtk-WebKitError.html#WEBKIT-POLICY-ERROR-CANNOT-SHOW-URI:CAPS"/>
     <keyword type="constant" name="WEBKIT_POLICY_ERROR_FRAME_LOAD_INTERRUPTED_BY_POLICY_CHANGE" link="webkit2gtk-WebKitError.html#WEBKIT-POLICY-ERROR-FRAME-LOAD-INTERRUPTED-BY-POLICY-CHANGE:CAPS"/>
     <keyword type="constant" name="WEBKIT_POLICY_ERROR_CANNOT_USE_RESTRICTED_PORT" link="webkit2gtk-WebKitError.html#WEBKIT-POLICY-ERROR-CANNOT-USE-RESTRICTED-PORT:CAPS"/>
+    <keyword type="constant" name="WEBKIT_DOWNLOAD_ERROR_NETWORK" link="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR-NETWORK:CAPS"/>
+    <keyword type="constant" name="WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER" link="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR-CANCELLED-BY-USER:CAPS"/>
+    <keyword type="constant" name="WEBKIT_DOWNLOAD_ERROR_DESTINATION" link="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR-DESTINATION:CAPS"/>
   </functions>
 </book>

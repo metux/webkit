@@ -29,7 +29,6 @@
 
 #include "CSSComputedStyleDeclaration.h"
 #include "CSSImportRule.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSPropertyNames.h"
 #include "CSSPropertySourceData.h"
 #include "CSSRule.h"
@@ -45,6 +44,7 @@
 #include "InstrumentingAgents.h"
 #include "Node.h"
 #include "NodeList.h"
+#include "StylePropertySet.h"
 #include "StyleSheetList.h"
 
 #include <wtf/CurrentTime.h>
@@ -235,6 +235,7 @@ InspectorCSSAgent::InspectorCSSAgent(InstrumentingAgents* instrumentingAgents, I
     , m_lastStyleId(1)
 {
     m_domAgent->setDOMListener(this);
+    m_instrumentingAgents->setInspectorCSSAgent(this);
 }
 
 InspectorCSSAgent::~InspectorCSSAgent()
@@ -330,7 +331,7 @@ void InspectorCSSAgent::recalcStyleForPseudoStateIfNeeded(Element* element, Insp
         element->ownerDocument()->styleSelectorChanged(RecalcStyleImmediately);
 }
 
-void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int nodeId, const RefPtr<InspectorArray>* forcedPseudoClasses, bool* needPseudo, bool* needInherited, RefPtr<InspectorArray>& matchedCSSRules, RefPtr<InspectorArray>& pseudoIdRules, RefPtr<InspectorArray>& inheritedEntries)
+void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int nodeId, const RefPtr<InspectorArray>* forcedPseudoClasses, const bool* needPseudo, const bool* needInherited, RefPtr<InspectorArray>& matchedCSSRules, RefPtr<InspectorArray>& pseudoIdRules, RefPtr<InspectorArray>& inheritedEntries)
 {
     Element* element = elementForId(errorString, nodeId);
     if (!element)
@@ -524,7 +525,6 @@ void InspectorCSSAgent::getSupportedCSSProperties(ErrorString*, RefPtr<Inspector
 void InspectorCSSAgent::startSelectorProfiler(ErrorString*)
 {
     m_currentSelectorProfile = adoptPtr(new SelectorProfile());
-    m_instrumentingAgents->setInspectorCSSAgent(this);
     m_state->setBoolean(CSSAgentState::isSelectorProfiling, true);
 }
 
@@ -538,7 +538,6 @@ void InspectorCSSAgent::stopSelectorProfilerImpl(ErrorString*, RefPtr<InspectorO
     if (!m_state->getBoolean(CSSAgentState::isSelectorProfiling))
         return;
     m_state->setBoolean(CSSAgentState::isSelectorProfiling, false);
-    m_instrumentingAgents->setInspectorCSSAgent(0);
     if (m_frontend && result)
         *result = m_currentSelectorProfile->toInspectorObject();
     m_currentSelectorProfile.clear();
@@ -546,22 +545,26 @@ void InspectorCSSAgent::stopSelectorProfilerImpl(ErrorString*, RefPtr<InspectorO
 
 void InspectorCSSAgent::willMatchRule(const CSSStyleRule* rule)
 {
-    m_currentSelectorProfile->startSelector(rule);
+    if (m_currentSelectorProfile)
+        m_currentSelectorProfile->startSelector(rule);
 }
 
 void InspectorCSSAgent::didMatchRule(bool matched)
 {
-    m_currentSelectorProfile->commitSelector(matched);
+    if (m_currentSelectorProfile)
+        m_currentSelectorProfile->commitSelector(matched);
 }
 
 void InspectorCSSAgent::willProcessRule(const CSSStyleRule* rule)
 {
-    m_currentSelectorProfile->startSelector(rule);
+    if (m_currentSelectorProfile)
+        m_currentSelectorProfile->startSelector(rule);
 }
 
 void InspectorCSSAgent::didProcessRule()
 {
-    m_currentSelectorProfile->commitSelectorTime();
+    if (m_currentSelectorProfile)
+        m_currentSelectorProfile->commitSelectorTime();
 }
 
 InspectorStyleSheetForInlineStyle* InspectorCSSAgent::asInspectorStyleSheet(Element* element)
@@ -713,20 +716,23 @@ PassRefPtr<InspectorArray> InspectorCSSAgent::buildArrayForRuleList(CSSRuleList*
 
 PassRefPtr<InspectorArray> InspectorCSSAgent::buildArrayForAttributeStyles(Element* element)
 {
-    RefPtr<InspectorArray> attrStyles = InspectorArray::create();
-    NamedNodeMap* attributes = element->attributes();
-    for (unsigned i = 0; attributes && i < attributes->length(); ++i) {
-        Attribute* attribute = attributes->attributeItem(i);
-        if (attribute->style()) {
-            RefPtr<InspectorObject> attrStyleObject = InspectorObject::create();
-            String attributeName = attribute->localName();
-            RefPtr<InspectorStyle> inspectorStyle = InspectorStyle::create(InspectorCSSId(), attribute->style(), 0);
-            attrStyleObject->setString("name", attributeName.utf8().data());
-            attrStyleObject->setObject("style", inspectorStyle->buildObjectForStyle());
-            attrStyles->pushObject(attrStyleObject.release());
-        }
-    }
+    // FIXME: Since we no longer have per-attribute style declarations, we should come up
+    //        with a nicer way to present what we do have.
 
+    if (!element->isStyledElement())
+        return InspectorArray::create();
+
+    StylePropertySet* attributeStyle = static_cast<StyledElement*>(element)->attributeStyle();
+    if (!attributeStyle)
+        return InspectorArray::create();
+
+    RefPtr<InspectorObject> attrStyleObject = InspectorObject::create();
+    RefPtr<InspectorStyle> inspectorStyle = InspectorStyle::create(InspectorCSSId(), attributeStyle->ensureCSSStyleDeclaration(), 0);
+    attrStyleObject->setString("name", "");
+    attrStyleObject->setObject("style", inspectorStyle->buildObjectForStyle());
+
+    RefPtr<InspectorArray> attrStyles = InspectorArray::create();
+    attrStyles->pushObject(attrStyleObject.release());
     return attrStyles.release();
 }
 

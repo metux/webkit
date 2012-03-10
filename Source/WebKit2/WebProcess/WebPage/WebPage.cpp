@@ -40,7 +40,6 @@
 #include "PluginProxy.h"
 #include "PluginView.h"
 #include "PrintInfo.h"
-#include "RunLoop.h"
 #include "SessionState.h"
 #include "ShareableBitmap.h"
 #include "WebBackForwardList.h"
@@ -104,6 +103,7 @@
 #include <WebCore/RenderView.h>
 #include <WebCore/ReplaceSelectionCommand.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/RunLoop.h>
 #include <WebCore/SchemeRegistry.h>
 #include <WebCore/ScriptValue.h>
 #include <WebCore/SerializedScriptValue.h>
@@ -134,7 +134,9 @@
 #endif
 
 #if PLATFORM(GTK)
+#include <gtk/gtk.h>
 #include "DataObjectGtk.h"
+#include "WebPrintOperationGtk.h"
 #endif
 
 #ifndef NDEBUG
@@ -189,9 +191,14 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_keyboardEventBeingInterpreted(0)
 #elif PLATFORM(WIN)
     , m_nativeWindow(parameters.nativeWindow)
+#elif PLATFORM(GTK)
+    , m_accessibilityObject(0)
 #endif
     , m_setCanStartMediaTimer(WebProcess::shared().runLoop(), this, &WebPage::setCanStartMediaTimerFired)
     , m_findController(this)
+#if PLATFORM(QT)
+    , m_tapHighlightController(this)
+#endif
     , m_geolocationPermissionRequestManager(this)
     , m_pageID(pageID)
     , m_canRunBeforeUnloadConfirmPanel(parameters.canRunBeforeUnloadConfirmPanel)
@@ -254,6 +261,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     setDrawsTransparentBackground(parameters.drawsTransparentBackground);
 
     setPaginationMode(parameters.paginationMode);
+    setPaginationBehavesLikeColumns(parameters.paginationBehavesLikeColumns);
     setPageLength(parameters.pageLength);
     setGapBetweenPages(parameters.gapBetweenPages);
 
@@ -271,6 +279,8 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
         restoreSession(parameters.sessionState);
 
     m_drawingArea->setPaintingEnabled(true);
+    
+    setMediaVolume(parameters.mediaVolume);
 
 #ifndef NDEBUG
     webPageCounter.increment();
@@ -476,6 +486,13 @@ uint64_t WebPage::renderTreeSize() const
         size += coreFrame->document()->renderArena()->totalRenderArenaSize();
 
     return size;
+}
+
+void WebPage::setPaintedObjectsCounterThreshold(uint64_t threshold)
+{
+    if (!m_page)
+        return;
+    m_page->setRelevantRepaintedObjectsCounterThreshold(threshold);
 }
 
 void WebPage::setTracksRepaints(bool trackRepaints)
@@ -1007,6 +1024,13 @@ void WebPage::setPaginationMode(uint32_t mode)
     m_page->setPagination(pagination);
 }
 
+void WebPage::setPaginationBehavesLikeColumns(bool behavesLikeColumns)
+{
+    Page::Pagination pagination = m_page->pagination();
+    pagination.behavesLikeColumns = behavesLikeColumns;
+    m_page->setPagination(pagination);
+}
+
 void WebPage::setPageLength(double pageLength)
 {
     Page::Pagination pagination = m_page->pagination();
@@ -1420,6 +1444,27 @@ void WebPage::restoreSessionAndNavigateToCurrentItem(const SessionState& session
 }
 
 #if ENABLE(TOUCH_EVENTS)
+#if PLATFORM(QT)
+void WebPage::highlightPotentialActivation(const IntPoint& point)
+{
+    Node* activationNode = 0;
+    Frame* mainframe = m_page->mainFrame();
+
+    if (point != IntPoint::zero()) {
+        HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), /*allowShadowContent*/ false, /*ignoreClipping*/ true);
+        activationNode = result.innerNode();
+
+        if (!activationNode->isFocusable())
+            activationNode = activationNode->enclosingLinkEventParentOrSelf();
+    }
+
+    if (activationNode)
+        tapHighlightController().highlight(activationNode);
+    else
+        tapHighlightController().hideHighlight();
+}
+#endif
+
 static bool handleTouchEvent(const WebTouchEvent& touchEvent, Page* page)
 {
     Frame* frame = page->mainFrame();
@@ -1752,7 +1797,7 @@ void WebPage::getWebArchiveOfFrame(uint64_t frameID, uint64_t callbackID)
 #if PLATFORM(MAC) || PLATFORM(WIN)
     RetainPtr<CFDataRef> data;
     if (WebFrame* frame = WebProcess::shared().webFrame(frameID)) {
-        if ((data = frame->webArchiveData()))
+        if ((data = frame->webArchiveData(0, 0)))
             dataReference = CoreIPC::DataReference(CFDataGetBytePtr(data.get()), CFDataGetLength(data.get()));
     }
 #endif
@@ -1840,10 +1885,20 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setCanvasUsesAcceleratedDrawing(store.getBoolValueForKey(WebPreferencesKey::canvasUsesAcceleratedDrawingKey()) && LayerTreeHost::supportsAcceleratedCompositing());
     settings->setShowDebugBorders(store.getBoolValueForKey(WebPreferencesKey::compositingBordersVisibleKey()));
     settings->setShowRepaintCounter(store.getBoolValueForKey(WebPreferencesKey::compositingRepaintCountersVisibleKey()));
+    settings->setCSSCustomFilterEnabled(store.getBoolValueForKey(WebPreferencesKey::cssCustomFilterEnabledKey()));
     settings->setWebGLEnabled(store.getBoolValueForKey(WebPreferencesKey::webGLEnabledKey()));
     settings->setMediaPlaybackRequiresUserGesture(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackRequiresUserGestureKey()));
     settings->setMediaPlaybackAllowsInline(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackAllowsInlineKey()));
     settings->setMockScrollbarsEnabled(store.getBoolValueForKey(WebPreferencesKey::mockScrollbarsEnabledKey()));
+
+    // <rdar://problem/10697417>: It is necessary to force compositing when accelerate drawing
+    // is enabled on Mac so that scrollbars are always in their own layers.
+#if PLATFORM(MAC)
+    if (settings->acceleratedDrawingEnabled())
+        settings->setForceCompositingMode(LayerTreeHost::supportsAcceleratedCompositing());
+    else
+#endif
+        settings->setForceCompositingMode(store.getBoolValueForKey(WebPreferencesKey::forceCompositingModeKey()) && LayerTreeHost::supportsAcceleratedCompositing());
 
 #if ENABLE(SQL_DATABASE)
     AbstractDatabase::setIsAvailable(store.getBoolValueForKey(WebPreferencesKey::databasesEnabledKey()));
@@ -1876,6 +1931,10 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setShouldDisplaySubtitles(store.getBoolValueForKey(WebPreferencesKey::shouldDisplaySubtitlesKey()));
     settings->setShouldDisplayCaptions(store.getBoolValueForKey(WebPreferencesKey::shouldDisplayCaptionsKey()));
     settings->setShouldDisplayTextDescriptions(store.getBoolValueForKey(WebPreferencesKey::shouldDisplayTextDescriptionsKey()));
+#endif
+
+#if ENABLE(NOTIFICATIONS)
+    settings->setNotificationsEnabled(store.getBoolValueForKey(WebPreferencesKey::notificationsEnabledKey()));
 #endif
 
     platformPreferencesDidChange(store);
@@ -2637,14 +2696,24 @@ void WebPage::beginPrinting(uint64_t frameID, const PrintInfo& printInfo)
     if (!m_printContext)
         m_printContext = adoptPtr(new PrintContext(coreFrame));
 
+    drawingArea()->setLayerTreeStateIsFrozen(true);
     m_printContext->begin(printInfo.availablePaperWidth, printInfo.availablePaperHeight);
 
     float fullPageHeight;
     m_printContext->computePageRects(FloatRect(0, 0, printInfo.availablePaperWidth, printInfo.availablePaperHeight), 0, 0, printInfo.pageSetupScaleFactor, fullPageHeight, true);
+
+#if PLATFORM(GTK)
+    if (!m_printOperation)
+        m_printOperation = WebPrintOperationGtk::create(this, printInfo);
+#endif
 }
 
 void WebPage::endPrinting()
 {
+    drawingArea()->setLayerTreeStateIsFrozen(false);
+#if PLATFORM(GTK)
+    m_printOperation = 0;
+#endif
     m_printContext = nullptr;
 }
 
@@ -2824,7 +2893,23 @@ void WebPage::drawPagesToPDF(uint64_t frameID, const PrintInfo& printInfo, uint3
 
     send(Messages::WebPageProxy::DataCallback(CoreIPC::DataReference(CFDataGetBytePtr(pdfPageData.get()), CFDataGetLength(pdfPageData.get())), callbackID));
 }
+#elif PLATFORM(GTK)
+void WebPage::drawPagesForPrinting(uint64_t frameID, const PrintInfo& printInfo, uint64_t callbackID)
+{
+    beginPrinting(frameID, printInfo);
+    if (m_printContext && m_printOperation) {
+        m_printOperation->startPrint(m_printContext.get(), callbackID);
+        return;
+    }
+
+    send(Messages::WebPageProxy::VoidCallback(callbackID));
+}
 #endif
+
+void WebPage::setMediaVolume(float volume)
+{
+    m_page->setMediaVolume(volume);
+}
 
 void WebPage::runModal()
 {

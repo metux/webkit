@@ -166,6 +166,13 @@ void RenderFlexibleBox::layoutBlock(bool relayoutChildren, int, BlockLayoutPass)
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout());
     LayoutStateMaintainer statePusher(view(), this, IntSize(x(), y()), hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
 
+    if (inRenderFlowThread()) {
+        // Regions changing widths can force us to relayout our children.
+        if (logicalWidthChangedInRegions())
+            relayoutChildren = true;
+    }
+    computeInitialRegionRangeForBlock();
+
     IntSize previousSize = size();
 
     setLogicalHeight(0);
@@ -174,6 +181,14 @@ void RenderFlexibleBox::layoutBlock(bool relayoutChildren, int, BlockLayoutPass)
     computeLogicalHeight();
 
     m_overflow.clear();
+
+    // For overflow:scroll blocks, ensure we have both scrollbars in place always.
+    if (scrollsOverflow()) {
+        if (style()->overflowX() == OSCROLL)
+            layer()->setHasHorizontalScrollbar(true);
+        if (style()->overflowY() == OSCROLL)
+            layer()->setHasVerticalScrollbar(true);
+    }
 
     layoutFlexItems(relayoutChildren);
 
@@ -185,11 +200,18 @@ void RenderFlexibleBox::layoutBlock(bool relayoutChildren, int, BlockLayoutPass)
 
     layoutPositionedObjects(relayoutChildren || isRoot());
 
+    computeRegionRangeForBlock();
+
     // FIXME: css3/flexbox/repaint-rtl-column.html seems to repaint more overflow than it needs to.
     computeOverflow(oldClientAfterEdge);
     statePusher.pop();
 
     updateLayerTransform();
+
+    // Update our scroll information if we're overflow:auto/scroll/hidden now that we know if
+    // we overflow or not.
+    if (hasOverflowClip())
+        layer()->updateScrollInfoAfterLayout();
 
     repainter.repaintAfterLayout();
 
@@ -403,6 +425,11 @@ LayoutUnit RenderFlexibleBox::crossAxisMarginExtentForChild(RenderBox* child) co
     return isHorizontalFlow() ? child->marginTop() + child->marginBottom() : child->marginLeft() + child->marginRight();
 }
 
+LayoutUnit RenderFlexibleBox::crossAxisScrollbarExtent() const
+{
+    return isHorizontalFlow() ? horizontalScrollbarHeight() : verticalScrollbarWidth();
+}
+
 LayoutPoint RenderFlexibleBox::flowAwareLocationForChild(RenderBox* child) const
 {
     return isHorizontalFlow() ? child->location() : child->location().transposedPoint();
@@ -573,21 +600,27 @@ static bool hasPackingSpace(LayoutUnit availableFreeSpace, float totalPositiveFl
     return availableFreeSpace > 0 && !totalPositiveFlexibility;
 }
 
-static LayoutUnit initialPackingOffset(LayoutUnit availableFreeSpace, float totalPositiveFlexibility, EFlexPack flexPack)
+static LayoutUnit initialPackingOffset(LayoutUnit availableFreeSpace, float totalPositiveFlexibility, EFlexPack flexPack, size_t numberOfChildren)
 {
     if (hasPackingSpace(availableFreeSpace, totalPositiveFlexibility)) {
         if (flexPack == PackEnd)
             return availableFreeSpace;
         if (flexPack == PackCenter)
             return availableFreeSpace / 2;
+        if (flexPack == PackDistribute && numberOfChildren)
+            return availableFreeSpace / (2 * numberOfChildren);
     }
     return 0;
 }
 
 static LayoutUnit packingSpaceBetweenChildren(LayoutUnit availableFreeSpace, float totalPositiveFlexibility, EFlexPack flexPack, size_t numberOfChildren)
 {
-    if (hasPackingSpace(availableFreeSpace, totalPositiveFlexibility) && flexPack == PackJustify && numberOfChildren > 1)
-        return availableFreeSpace / (numberOfChildren - 1);
+    if (hasPackingSpace(availableFreeSpace, totalPositiveFlexibility) && numberOfChildren > 1) {
+        if (flexPack == PackJustify)
+            return availableFreeSpace / (numberOfChildren - 1);
+        if (flexPack == PackDistribute)
+            return availableFreeSpace / numberOfChildren;
+    }
     return 0;
 }
 
@@ -629,7 +662,9 @@ static EFlexAlign flexAlignForChild(RenderBox* child)
 void RenderFlexibleBox::layoutAndPlaceChildren(FlexOrderIterator& iterator, const WTF::Vector<LayoutUnit>& childSizes, LayoutUnit availableFreeSpace, float totalPositiveFlexibility)
 {
     LayoutUnit mainAxisOffset = flowAwareBorderStart() + flowAwarePaddingStart();
-    mainAxisOffset += initialPackingOffset(availableFreeSpace, totalPositiveFlexibility, style()->flexPack());
+    mainAxisOffset += initialPackingOffset(availableFreeSpace, totalPositiveFlexibility, style()->flexPack(), childSizes.size());
+    if (style()->flexDirection() == FlowRowReverse)
+        mainAxisOffset += isHorizontalFlow() ? verticalScrollbarWidth() : horizontalScrollbarHeight();
 
     LayoutUnit crossAxisOffset = flowAwareBorderBefore() + flowAwarePaddingBefore();
     LayoutUnit totalMainExtent = mainAxisExtent();
@@ -654,11 +689,10 @@ void RenderFlexibleBox::layoutAndPlaceChildren(FlexOrderIterator& iterator, cons
             maxAscent = std::max(maxAscent, ascent);
             maxDescent = std::max(maxDescent, descent);
 
-            // FIXME: add flowAwareScrollbarLogicalHeight.
             if (crossAxisLength().isAuto())
-                setCrossAxisExtent(std::max(crossAxisExtent(), crossAxisBorderAndPaddingExtent() + crossAxisMarginExtentForChild(child) + maxAscent + maxDescent + scrollbarLogicalHeight()));
+                setCrossAxisExtent(std::max(crossAxisExtent(), crossAxisBorderAndPaddingExtent() + crossAxisMarginExtentForChild(child) + maxAscent + maxDescent + crossAxisScrollbarExtent()));
         } else if (crossAxisLength().isAuto())
-            setCrossAxisExtent(std::max(crossAxisExtent(), crossAxisBorderAndPaddingExtent() + crossAxisMarginExtentForChild(child) + crossAxisExtentForChild(child) + scrollbarLogicalHeight()));
+            setCrossAxisExtent(std::max(crossAxisExtent(), crossAxisBorderAndPaddingExtent() + crossAxisMarginExtentForChild(child) + crossAxisExtentForChild(child) + crossAxisScrollbarExtent()));
 
         mainAxisOffset += flowAwareMarginStartForChild(child);
 
@@ -673,7 +707,7 @@ void RenderFlexibleBox::layoutAndPlaceChildren(FlexOrderIterator& iterator, cons
         mainAxisOffset += packingSpaceBetweenChildren(availableFreeSpace, totalPositiveFlexibility, style()->flexPack(), childSizes.size());
 
         if (isColumnFlow())
-            setLogicalHeight(mainAxisOffset);
+            setLogicalHeight(mainAxisOffset + flowAwareBorderEnd() + flowAwarePaddingEnd() + scrollbarLogicalHeight());
     }
 
     if (style()->flexDirection() == FlowColumnReverse) {
@@ -692,7 +726,8 @@ void RenderFlexibleBox::layoutColumnReverse(FlexOrderIterator& iterator, const W
     // starting from the end of the flexbox. We also don't need to layout anything since we're
     // just moving the children to a new position.
     LayoutUnit mainAxisOffset = logicalHeight() - flowAwareBorderEnd() - flowAwarePaddingEnd();
-    mainAxisOffset -= initialPackingOffset(availableFreeSpace, totalPositiveFlexibility, style()->flexPack());
+    mainAxisOffset -= initialPackingOffset(availableFreeSpace, totalPositiveFlexibility, style()->flexPack(), childSizes.size());
+    mainAxisOffset -= isHorizontalFlow() ? verticalScrollbarWidth() : horizontalScrollbarHeight();
 
     LayoutUnit crossAxisOffset = flowAwareBorderBefore() + flowAwarePaddingBefore();
     size_t i = 0;

@@ -74,17 +74,7 @@ RenderWidget* HTMLEmbedElement::renderWidgetForJSBindings()
     return findWidgetRenderer(this);
 }
 
-bool HTMLEmbedElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const
-{
-    if (attrName == hiddenAttr) {
-        result = eUniversal;
-        return false;
-    }
-        
-    return HTMLPlugInImageElement::mapToEntry(attrName, result);
-}
-
-void HTMLEmbedElement::parseMappedAttribute(Attribute* attr)
+void HTMLEmbedElement::parseAttribute(Attribute* attr)
 {
     const AtomicString& value = attr->value();
   
@@ -108,16 +98,17 @@ void HTMLEmbedElement::parseMappedAttribute(Attribute* attr)
         if (equalIgnoringCase(value.string(), "yes") || equalIgnoringCase(value.string(), "true")) {
             // FIXME: Not dynamic, since we add this but don't remove it, but it may be OK for now
             // that this rarely-used attribute won't work properly if you remove it.
-            addCSSLength(attr, CSSPropertyWidth, "0");
-            addCSSLength(attr, CSSPropertyHeight, "0");
-        }
+            addCSSLength(CSSPropertyWidth, "0");
+            addCSSLength(CSSPropertyHeight, "0");
+        } else
+            removeCSSProperties(CSSPropertyWidth, CSSPropertyHeight);
     } else
-        HTMLPlugInImageElement::parseMappedAttribute(attr);
+        HTMLPlugInImageElement::parseAttribute(attr);
 }
 
 void HTMLEmbedElement::parametersForPlugin(Vector<String>& paramNames, Vector<String>& paramValues)
 {
-    NamedNodeMap* attributes = this->attributes(true);
+    NamedNodeMap* attributes = updatedAttributes();
     if (!attributes)
         return;
 
@@ -154,11 +145,8 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
     Vector<String> paramValues;
     parametersForPlugin(paramNames, paramValues);
 
-    ASSERT(!m_inBeforeLoadEventHandler);
-    m_inBeforeLoadEventHandler = true;
-    bool beforeLoadAllowedLoad = dispatchBeforeLoadEvent(m_url);
-    m_inBeforeLoadEventHandler = false;
-
+    RefPtr<HTMLEmbedElement> protect(this); // Loading the plugin might remove us from the document.
+    bool beforeLoadAllowedLoad = guardedDispatchBeforeLoadEvent(m_url);
     if (!beforeLoadAllowedLoad) {
         if (document()->isPluginDocument()) {
             // Plugins inside plugin documents load differently than other plugins. By the time
@@ -168,8 +156,9 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
         }
         return;
     }
+    if (!renderer()) // Do not load the plugin if beforeload removed this element or its renderer.
+        return;
 
-    RefPtr<HTMLEmbedElement> protect(this); // Loading the plugin might remove us from the document.
     SubframeLoader* loader = document()->frame()->loader()->subframeLoader();
     // FIXME: beforeLoad could have detached the renderer!  Just like in the <object> case above.
     loader->requestObject(this, m_url, getAttribute(nameAttr), m_serviceType, paramNames, paramValues);
@@ -236,9 +225,9 @@ String HTMLEmbedElement::itemValueText() const
     return getURLAttribute(srcAttr);
 }
 
-void HTMLEmbedElement::setItemValueText(const String& value, ExceptionCode& ec)
+void HTMLEmbedElement::setItemValueText(const String& value, ExceptionCode&)
 {
-    setAttribute(srcAttr, value, ec);
+    setAttribute(srcAttr, value);
 }
 #endif
 

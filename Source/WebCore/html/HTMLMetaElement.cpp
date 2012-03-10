@@ -42,7 +42,7 @@ PassRefPtr<HTMLMetaElement> HTMLMetaElement::create(const QualifiedName& tagName
     return adoptRef(new HTMLMetaElement(tagName, document));
 }
 
-void HTMLMetaElement::parseMappedAttribute(Attribute* attr)
+void HTMLMetaElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == http_equivAttr)
         process();
@@ -51,7 +51,7 @@ void HTMLMetaElement::parseMappedAttribute(Attribute* attr)
     else if (attr->name() == nameAttr) {
         // Do nothing
     } else
-        HTMLElement::parseMappedAttribute(attr);
+        HTMLElement::parseAttribute(attr);
 }
 
 void HTMLMetaElement::insertedIntoDocument()
@@ -103,9 +103,9 @@ String HTMLMetaElement::itemValueText() const
     return getAttribute(contentAttr);
 }
 
-void HTMLMetaElement::setItemValueText(const String& value, ExceptionCode& ec)
+void HTMLMetaElement::setItemValueText(const String& value, ExceptionCode&)
 {
-    setAttribute(contentAttr, value, ec);
+    setAttribute(contentAttr, value);
 }
 #endif
 

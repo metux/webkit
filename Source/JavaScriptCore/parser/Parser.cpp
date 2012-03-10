@@ -43,7 +43,7 @@ template <typename LexerType>
 Parser<LexerType>::Parser(JSGlobalData* globalData, const SourceCode& source, FunctionParameters* parameters, JSParserStrictness strictness, JSParserMode parserMode)
     : m_globalData(globalData)
     , m_source(&source)
-    , m_stack(globalData->stack())
+    , m_stack(wtfThreadData().stack())
     , m_error(false)
     , m_errorMessage("Parse error")
     , m_allowsIn(true)
@@ -603,7 +603,6 @@ template <class TreeBuilder> TreeStatement Parser<LexerType>::parseTryStatement(
     ASSERT(match(TRY));
     TreeStatement tryBlock = 0;
     const Identifier* ident = &m_globalData->propertyNames->nullIdentifier;
-    bool catchHasEval = false;
     TreeStatement catchBlock = 0;
     TreeStatement finallyBlock = 0;
     int firstLine = tokenLine();
@@ -626,10 +625,8 @@ template <class TreeBuilder> TreeStatement Parser<LexerType>::parseTryStatement(
         catchScope->preventNewDecls();
         consumeOrFail(CLOSEPAREN);
         matchOrFail(OPENBRACE);
-        int initialEvalCount = context.evalCount();
         catchBlock = parseBlockStatement(context);
         failIfFalseWithMessage(catchBlock, "'try' must have a catch or finally block");
-        catchHasEval = initialEvalCount != context.evalCount();
         failIfFalse(popScope(catchScope, TreeBuilder::NeedsFreeVariableInfo));
     }
     
@@ -640,7 +637,7 @@ template <class TreeBuilder> TreeStatement Parser<LexerType>::parseTryStatement(
         failIfFalse(finallyBlock);
     }
     failIfFalse(catchBlock || finallyBlock);
-    return context.createTryStatement(m_lexer->lastLineNumber(), tryBlock, ident, catchHasEval, catchBlock, finallyBlock, firstLine, lastLine);
+    return context.createTryStatement(m_lexer->lastLineNumber(), tryBlock, ident, catchBlock, finallyBlock, firstLine, lastLine);
 }
 
 template <typename LexerType>
@@ -1243,6 +1240,8 @@ template <typename LexerType>
 template <class TreeBuilder> TreeExpression Parser<LexerType>::parseObjectLiteral(TreeBuilder& context)
 {
     int startOffset = m_token.m_data.intValue;
+    unsigned oldLastLineNumber = m_lexer->lastLineNumber();
+    unsigned oldLineNumber = m_lexer->lineNumber();
     consumeOrFailWithFlags(OPENBRACE, TreeBuilder::DontBuildStrings);
     
     if (match(CLOSEBRACE)) {
@@ -1255,6 +1254,8 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseObjectLitera
     if (!m_syntaxAlreadyValidated && context.getType(property) != PropertyNode::Constant) {
         m_lexer->setOffset(startOffset);
         next();
+        m_lexer->setLastLineNumber(oldLastLineNumber);
+        m_lexer->setLineNumber(oldLineNumber);
         return parseStrictObjectLiteral(context);
     }
     TreePropertyList propertyList = context.createPropertyList(m_lexer->lastLineNumber(), property);
@@ -1269,6 +1270,8 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseObjectLitera
         if (!m_syntaxAlreadyValidated && context.getType(property) != PropertyNode::Constant) {
             m_lexer->setOffset(startOffset);
             next();
+            m_lexer->setLastLineNumber(oldLastLineNumber);
+            m_lexer->setLineNumber(oldLineNumber);
             return parseStrictObjectLiteral(context);
         }
         tail = context.createPropertyList(m_lexer->lastLineNumber(), property, tail);
@@ -1512,23 +1515,20 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
         }
         case OPENPAREN: {
             m_nonTrivialExpressionCount++;
+            int nonLHSCount = m_nonLHSCount;
             if (newCount) {
                 newCount--;
-                if (match(OPENPAREN)) {
-                    int exprEnd = lastTokenEnd();
-                    TreeArguments arguments = parseArguments(context);
-                    failIfFalse(arguments);
-                    base = context.createNewExpr(m_lexer->lastLineNumber(), base, arguments, start, exprEnd, lastTokenEnd());
-                } else
-                    base = context.createNewExpr(m_lexer->lastLineNumber(), base, start, lastTokenEnd());               
+                int exprEnd = lastTokenEnd();
+                TreeArguments arguments = parseArguments(context);
+                failIfFalse(arguments);
+                base = context.createNewExpr(m_lexer->lastLineNumber(), base, arguments, start, exprEnd, lastTokenEnd());           
             } else {
-                int nonLHSCount = m_nonLHSCount;
                 int expressionEnd = lastTokenEnd();
                 TreeArguments arguments = parseArguments(context);
                 failIfFalse(arguments);
                 base = context.makeFunctionCallNode(m_lexer->lastLineNumber(), base, arguments, expressionStart, expressionEnd, lastTokenEnd());
-                m_nonLHSCount = nonLHSCount;
             }
+            m_nonLHSCount = nonLHSCount;
             break;
         }
         case DOT: {

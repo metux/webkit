@@ -29,7 +29,7 @@ module offline {
         EventTarget,
         OmitConstructor,
         DontCheckEnums,
-        GenerateIsReachable=ImplFrame
+        JSGenerateIsReachable=ImplFrame
     ] DOMApplicationCache {
         // update status
         const unsigned short UNCACHED = 0;
@@ -44,6 +44,7 @@ module offline {
             raises(DOMException);
         void swapCache()
             raises(DOMException);
+        void abort();
 
         // events
         attribute EventListener onchecking;

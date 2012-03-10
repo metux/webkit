@@ -178,38 +178,6 @@ bool HTMLInputElement::shouldAutocomplete() const
     return HTMLTextFormControlElement::shouldAutocomplete();
 }
 
-void HTMLInputElement::updateCheckedRadioButtons()
-{
-    checkedRadioButtons().addButton(this);
-
-    if (form()) {
-        const Vector<FormAssociatedElement*>& controls = form()->associatedElements();
-        for (unsigned i = 0; i < controls.size(); ++i) {
-            if (!controls[i]->isFormControlElement())
-                continue;
-            HTMLFormControlElement* control = static_cast<HTMLFormControlElement*>(controls[i]);
-            if (control->name() != name())
-                continue;
-            if (control->type() != type())
-                continue;
-            control->setNeedsValidityCheck();
-        }
-    } else {
-        typedef Document::FormElementListHashSet::const_iterator Iterator;
-        Iterator end = document()->formElements()->end();
-        for (Iterator it = document()->formElements()->begin(); it != end; ++it) {
-            HTMLFormControlElementWithState* control = *it;
-            if (control->formControlName() != name())
-                continue;
-            if (control->formControlType() != type())
-                continue;
-            if (control->form())
-                continue;
-            control->setNeedsValidityCheck();
-        }
-    }
-}
-
 bool HTMLInputElement::isValidValue(const String& value) const
 {
     if (!m_inputType->canSetStringValue()) {
@@ -232,8 +200,6 @@ bool HTMLInputElement::typeMismatch() const
 
 bool HTMLInputElement::valueMissing(const String& value) const
 {
-    if (!isRequiredFormControl() || readOnly() || disabled())
-        return false;
     return m_inputType->valueMissing(value);
 }
 
@@ -506,23 +472,12 @@ bool HTMLInputElement::shouldUseInputMethod()
 
 void HTMLInputElement::handleFocusEvent()
 {
-    if (!isTextField())
-        return;
-    if (isPasswordField() && document()->frame())
-        document()->setUseSecureKeyboardEntryWhenActive(true);
+    m_inputType->handleFocusEvent();
 }
 
 void HTMLInputElement::handleBlurEvent()
 {
     m_inputType->handleBlurEvent();
-    if (!isTextField())
-        return;
-    Frame* frame = document()->frame();
-    if (!frame)
-        return;
-    if (isPasswordField())
-        document()->setUseSecureKeyboardEntryWhenActive(false);
-    frame->editor()->textFieldDidEndEditing(this);
 }
 
 void HTMLInputElement::setType(const String& type)
@@ -547,7 +502,7 @@ void HTMLInputElement::updateType()
 
     if (hadType && !newType->canChangeFromAnotherType()) {
         // Set the attribute back to the old value.
-        // Useful in case we were called from inside parseMappedAttribute.
+        // Useful in case we were called from inside parseAttribute.
         setAttribute(typeAttr, type());
         return;
     }
@@ -593,11 +548,11 @@ void HTMLInputElement::updateType()
         NamedNodeMap* map = attributeMap();
         ASSERT(map);
         if (Attribute* height = map->getAttributeItem(heightAttr))
-            attributeChanged(height, false);
+            attributeChanged(height);
         if (Attribute* width = map->getAttributeItem(widthAttr))
-            attributeChanged(width, false);
+            attributeChanged(width);
         if (Attribute* align = map->getAttributeItem(alignAttr))
-            attributeChanged(align, false);
+            attributeChanged(align);
     }
 
     if (wasAttached) {
@@ -704,31 +659,13 @@ void HTMLInputElement::accessKeyAction(bool sendMouseEvents)
     m_inputType->accessKeyAction(sendMouseEvents);
 }
 
-bool HTMLInputElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const
-{
-    if (((attrName == heightAttr || attrName == widthAttr) && m_inputType->shouldRespectHeightAndWidthAttributes())
-        || attrName == vspaceAttr
-        || attrName == hspaceAttr) {
-        result = eUniversal;
-        return false;
-    }
-
-    if (attrName == alignAttr && m_inputType->shouldRespectAlignAttribute()) {
-        // Share with <img> since the alignment behavior is the same.
-        result = eReplaced;
-        return false;
-    }
-
-    return HTMLElement::mapToEntry(attrName, result);
-}
-
-void HTMLInputElement::parseMappedAttribute(Attribute* attr)
+void HTMLInputElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == nameAttr) {
         checkedRadioButtons().removeButton(this);
         m_name = attr->value();
         checkedRadioButtons().addButton(this);
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     } else if (attr->name() == autocompleteAttr) {
         if (equalIgnoringCase(attr->value(), "off")) {
             m_autocomplete = Off;
@@ -778,20 +715,26 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
     else if (attr->name() == usemapAttr || attr->name() == accesskeyAttr) {
         // FIXME: ignore for the moment
     } else if (attr->name() == vspaceAttr) {
-        addCSSLength(attr, CSSPropertyMarginTop, attr->value());
-        addCSSLength(attr, CSSPropertyMarginBottom, attr->value());
+        addCSSLength(CSSPropertyMarginTop, attr->value());
+        addCSSLength(CSSPropertyMarginBottom, attr->value());
     } else if (attr->name() == hspaceAttr) {
-        addCSSLength(attr, CSSPropertyMarginLeft, attr->value());
-        addCSSLength(attr, CSSPropertyMarginRight, attr->value());
+        addCSSLength(CSSPropertyMarginLeft, attr->value());
+        addCSSLength(CSSPropertyMarginRight, attr->value());
     } else if (attr->name() == alignAttr) {
         if (m_inputType->shouldRespectAlignAttribute())
             addHTMLAlignment(attr);
+        else
+            removeHTMLAlignment();
     } else if (attr->name() == widthAttr) {
         if (m_inputType->shouldRespectHeightAndWidthAttributes())
-            addCSSLength(attr, CSSPropertyWidth, attr->value());
+            addCSSLength(CSSPropertyWidth, attr->value());
+        else
+            removeCSSProperty(CSSPropertyWidth);
     } else if (attr->name() == heightAttr) {
         if (m_inputType->shouldRespectHeightAndWidthAttributes())
-            addCSSLength(attr, CSSPropertyHeight, attr->value());
+            addCSSLength(CSSPropertyHeight, attr->value());
+        else
+            removeCSSProperty(CSSPropertyHeight);
     } else if (attr->name() == borderAttr && isImageButton()) {
         applyBorderAttribute(attr);
     } else if (attr->name() == onsearchAttr) {
@@ -820,10 +763,10 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
         setNeedsValidityCheck();
     else if (attr->name() == disabledAttr) {
         m_inputType->disabledAttributeChanged();
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     } else if (attr->name() == readonlyAttr) {
         m_inputType->readonlyAttributeChanged();
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     }
 #if ENABLE(DATALIST)
     else if (attr->name() == listAttr)
@@ -850,7 +793,7 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
         setAttributeEventListener(eventNames().webkitspeechchangeEvent, createAttributeEventListener(this, attr));
 #endif
     else
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     updateInnerTextValue();
 }
 
@@ -963,13 +906,11 @@ void HTMLInputElement::setChecked(bool nowChecked, bool sendChangeEvent)
     if (checked() == nowChecked)
         return;
 
-    checkedRadioButtons().removeButton(this);
-
     m_reflectsCheckedAttribute = false;
     m_isChecked = nowChecked;
     setNeedsStyleRecalc();
     if (isRadioButton())
-        updateCheckedRadioButtons();
+        checkedRadioButtons().updateCheckedState(this);
     if (renderer() && renderer()->style()->hasAppearance())
         renderer()->theme()->stateChanged(renderer(), CheckedState);
     setNeedsValidityCheck();
@@ -993,7 +934,7 @@ void HTMLInputElement::setChecked(bool nowChecked, bool sendChangeEvent)
 
 void HTMLInputElement::setIndeterminate(bool newValue)
 {
-    if (!m_inputType->isCheckable() || indeterminate() == newValue)
+    if (indeterminate() == newValue)
         return;
 
     m_isIndeterminate = newValue;
@@ -1559,6 +1500,12 @@ bool HTMLInputElement::recalcWillValidate() const
     return m_inputType->supportsValidation() && HTMLTextFormControlElement::recalcWillValidate();
 }
 
+void HTMLInputElement::requiredAttributeChanged()
+{
+    HTMLTextFormControlElement::requiredAttributeChanged();
+    checkedRadioButtons().requiredAttributeChanged(this);
+}
+
 #if ENABLE(INPUT_COLOR)
 void HTMLInputElement::selectColorInColorChooser(const Color& color)
 {
@@ -1868,6 +1815,11 @@ void HTMLInputElement::updateValueIfNeeded()
 String HTMLInputElement::defaultToolTip() const
 {
     return m_inputType->defaultToolTip();
+}
+
+bool HTMLInputElement::isIndeterminate() const 
+{
+    return m_inputType->supportsIndeterminateAppearance() && indeterminate();
 }
 
 } // namespace

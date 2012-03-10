@@ -68,6 +68,51 @@ WebKitWebFrame
 @webkitwebframe: the object which received the signal.
 @arg1: 
 
+<!-- ##### SIGNAL WebKitWebFrame::resource-content-length-received ##### -->
+<para>
+
+</para>
+
+@webkitwebframe: the object which received the signal.
+@arg1: 
+@arg2: 
+
+<!-- ##### SIGNAL WebKitWebFrame::resource-load-failed ##### -->
+<para>
+
+</para>
+
+@webkitwebframe: the object which received the signal.
+@arg1: 
+@arg2: 
+
+<!-- ##### SIGNAL WebKitWebFrame::resource-load-finished ##### -->
+<para>
+
+</para>
+
+@webkitwebframe: the object which received the signal.
+@arg1: 
+
+<!-- ##### SIGNAL WebKitWebFrame::resource-request-starting ##### -->
+<para>
+
+</para>
+
+@webkitwebframe: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
+
+<!-- ##### SIGNAL WebKitWebFrame::resource-response-received ##### -->
+<para>
+
+</para>
+
+@webkitwebframe: the object which received the signal.
+@arg1: 
+@arg2: 
+
 <!-- ##### SIGNAL WebKitWebFrame::scrollbars-policy-changed ##### -->
 <para>
 

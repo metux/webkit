@@ -31,7 +31,6 @@
 #include "BeforeTextInsertedEvent.h"
 #include "BreakBlockquoteCommand.h"
 #include "CSSComputedStyleDeclaration.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "Document.h"
@@ -51,6 +50,7 @@
 #include "RenderObject.h"
 #include "RenderText.h"
 #include "SmartReplace.h"
+#include "StylePropertySet.h"
 #include "TextIterator.h"
 #include "htmlediting.h"
 #include "markup.h"
@@ -481,7 +481,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
 
         StyledElement* element = static_cast<StyledElement*>(node.get());
 
-        CSSMutableStyleDeclaration* inlineStyle = element->inlineStyleDecl();
+        StylePropertySet* inlineStyle = element->inlineStyleDecl();
         RefPtr<EditingStyle> newInlineStyle = EditingStyle::create(inlineStyle);
         if (inlineStyle) {
             ContainerNode* context = element->parentNode();
@@ -502,8 +502,8 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
                 continue;
             } else
                 removeNodeAttribute(element, styleAttr);
-        } else if (newInlineStyle->style()->length() != inlineStyle->length())
-            setNodeAttribute(element, styleAttr, newInlineStyle->style()->cssText());
+        } else if (newInlineStyle->style()->propertyCount() != inlineStyle->propertyCount())
+            setNodeAttribute(element, styleAttr, newInlineStyle->style()->asText());
 
         // FIXME: Tolerate differences in id, class, and style attributes.
         if (isNonTableCellHTMLBlockElement(element) && areIdenticalElements(element, element->parentNode())
@@ -660,7 +660,7 @@ static bool handleStyleSpansBeforeInsertion(ReplacementFragment& fragment, const
 
     Node* wrappingStyleSpan = topNode;
     RefPtr<EditingStyle> styleAtInsertionPos = EditingStyle::create(insertionPos.parentAnchoredEquivalent());
-    String styleText = styleAtInsertionPos->style()->cssText();
+    String styleText = styleAtInsertionPos->style()->asText();
 
     // FIXME: This string comparison is a naive way of comparing two styles.
     // We should be taking the diff and check that the diff is empty.
@@ -720,7 +720,7 @@ void ReplaceSelectionCommand::handleStyleSpans(InsertedNodes& insertedNodes)
         insertedNodes.willRemoveNodePreservingChildren(wrappingStyleSpan);
         removeNodePreservingChildren(wrappingStyleSpan);
     } else
-        setNodeAttribute(wrappingStyleSpan, styleAttr, style->style()->cssText());
+        setNodeAttribute(wrappingStyleSpan, styleAttr, style->style()->asText());
 }
 
 void ReplaceSelectionCommand::mergeEndIfNeeded()

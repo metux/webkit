@@ -42,25 +42,25 @@
 <div class="refsynopsisdiv">
 <a name="WebKitNetworkRequest.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">                    <a class="link" href="WebKitNetworkRequest.html#WebKitNetworkRequest-struct" title="WebKitNetworkRequest">WebKitNetworkRequest</a>;
-<a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="returnvalue">WebKitNetworkRequest</span></a> * <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-new" title="webkit_network_request_new ()">webkit_network_request_new</a>       (<em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-get-uri" title="webkit_network_request_get_uri ()">webkit_network_request_get_uri</a>      (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);
-<span class="returnvalue">SoupMessage</span> *       <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-get-message" title="webkit_network_request_get_message ()">webkit_network_request_get_message</a>  (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);
+<a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="returnvalue">WebKitNetworkRequest</span></a> * <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-new" title="webkit_network_request_new ()">webkit_network_request_new</a>       (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-get-uri" title="webkit_network_request_get_uri ()">webkit_network_request_get_uri</a>      (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);
+<a href="../libsoup-2.4/SoupMessage.html"><span class="returnvalue">SoupMessage</span></a> *       <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-get-message" title="webkit_network_request_get_message ()">webkit_network_request_get_message</a>  (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-set-uri" title="webkit_network_request_set_uri ()">webkit_network_request_set_uri</a>      (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitNetworkRequest.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
    +----WebKitNetworkRequest
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitNetworkRequest.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitNetworkRequest.html#WebKitNetworkRequest--message" title='The "message" property'>message</a>"                  <span class="type">SoupMessage</span>*          : Read / Write / Construct Only
-  "<a class="link" href="WebKitNetworkRequest.html#WebKitNetworkRequest--uri" title='The "uri" property'>uri</a>"                      <span class="type">gchar</span>*                : Read / Write
+  "<a class="link" href="WebKitNetworkRequest.html#WebKitNetworkRequest--message" title='The "message" property'>message</a>"                  <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>*          : Read / Write / Construct Only
+  "<a class="link" href="WebKitNetworkRequest.html#WebKitNetworkRequest--uri" title='The "uri" property'>uri</a>"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
 </pre>
 </div>
 <div class="refsect1">
@@ -70,7 +70,7 @@ This class represents the network related aspects of a navigation
 request. It is used whenever WebKit wants to provide information
 about a request that will be sent, or has been sent. Inside it you
 can find the URI of the request, and, for valid URIs, a
-<span class="type">SoupMessage</span> object, which provides access to further information
+<a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> object, which provides access to further information
 such as headers.
 </p>
 </div>
@@ -85,7 +85,7 @@ such as headers.
 <hr>
 <div class="refsect2">
 <a name="webkit-network-request-new"></a><h3>webkit_network_request_new ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="returnvalue">WebKitNetworkRequest</span></a> * webkit_network_request_new       (<em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);</pre>
+<pre class="programlisting"><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="returnvalue">WebKitNetworkRequest</span></a> * webkit_network_request_new       (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
 <p>
 Creates a new <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> initialized with an URI.
 </p>
@@ -98,7 +98,7 @@ Creates a new <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetw
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a new <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a>, or <code class="literal">NULL</code> if the URI is
+<td>a new <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a>, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the URI is
 invalid.</td>
 </tr>
 </tbody>
@@ -107,7 +107,7 @@ invalid.</td>
 <hr>
 <div class="refsect2">
 <a name="webkit-network-request-get-uri"></a><h3>webkit_network_request_get_uri ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_network_request_get_uri      (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);</pre>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_network_request_get_uri      (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);</pre>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody>
@@ -128,9 +128,9 @@ invalid.</td>
 <hr>
 <div class="refsect2">
 <a name="webkit-network-request-get-message"></a><h3>webkit_network_request_get_message ()</h3>
-<pre class="programlisting"><span class="returnvalue">SoupMessage</span> *       webkit_network_request_get_message  (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);</pre>
+<pre class="programlisting"><a href="../libsoup-2.4/SoupMessage.html"><span class="returnvalue">SoupMessage</span></a> *       webkit_network_request_get_message  (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>);</pre>
 <p>
-Obtains the <span class="type">SoupMessage</span> held and used by the given request. Notice
+Obtains the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> held and used by the given request. Notice
 that modification of the SoupMessage of a request by signal
 handlers is only supported (as in, will only affect what is
 actually sent to the server) where explicitly documented.
@@ -145,7 +145,7 @@ actually sent to the server) where explicitly documented.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <span class="type">SoupMessage</span>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -156,10 +156,10 @@ actually sent to the server) where explicitly documented.
 <div class="refsect2">
 <a name="webkit-network-request-set-uri"></a><h3>webkit_network_request_set_uri ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_network_request_set_uri      (<em class="parameter"><code><a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> *request</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);</pre>
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
 <p>
 Sets the URI held and used by the given request. When the request
-has an associated <span class="type">SoupMessage</span>, its URI will also be set by this
+has an associated <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>, its URI will also be set by this
 call.
 </p>
 <div class="variablelist"><table border="0">
@@ -182,16 +182,16 @@ call.
 <a name="WebKitNetworkRequest.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitNetworkRequest--message"></a><h3>The <code class="literal">"message"</code> property</h3>
-<pre class="programlisting">  "message"                  <span class="type">SoupMessage</span>*          : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "message"                  <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>*          : Read / Write / Construct Only</pre>
 <p>
-The <span class="type">SoupMessage</span> that backs the request.
+The <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> that backs the request.
 </p>
 <p class="since">Since 1.1.10</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitNetworkRequest--uri"></a><h3>The <code class="literal">"uri"</code> property</h3>
-<pre class="programlisting">  "uri"                      <span class="type">gchar</span>*                : Read / Write</pre>
+<pre class="programlisting">  "uri"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write</pre>
 <p>
 The URI to which the request will be made.
 </p>

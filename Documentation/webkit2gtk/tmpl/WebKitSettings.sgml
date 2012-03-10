@@ -166,6 +166,11 @@ WebKitSettings
 
 </para>
 
+<!-- ##### ARG WebKitSettings:print-backgrounds ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitSettings:sans-serif-font-family ##### -->
 <para>
 
@@ -733,5 +738,23 @@ WebKitSettings
 
 @settings: 
 @enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_print_backgrounds ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_print_backgrounds ##### -->
+<para>
+
+</para>
+
+@settings: 
+@print_backgrounds: 
 
 

@@ -41,6 +41,13 @@ WebKitError
 
 
 
+<!-- ##### MACRO WEBKIT_DOWNLOAD_ERROR ##### -->
+<para>
+
+</para>
+
+
+
 <!-- ##### ENUM WebKitNetworkError ##### -->
 <para>
 
@@ -75,6 +82,15 @@ WebKitError
 @WEBKIT_POLICY_ERROR_FRAME_LOAD_INTERRUPTED_BY_POLICY_CHANGE: 
 @WEBKIT_POLICY_ERROR_CANNOT_USE_RESTRICTED_PORT: 
 
+<!-- ##### ENUM WebKitDownloadError ##### -->
+<para>
+
+</para>
+
+@WEBKIT_DOWNLOAD_ERROR_NETWORK: 
+@WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER: 
+@WEBKIT_DOWNLOAD_ERROR_DESTINATION: 
+
 <!-- ##### FUNCTION webkit_network_error_quark ##### -->
 <para>
 
@@ -94,6 +110,15 @@ WebKitError
 
 
 <!-- ##### FUNCTION webkit_policy_error_quark ##### -->
+<para>
+
+</para>
+
+@void: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_download_error_quark ##### -->
 <para>
 
 </para>

@@ -26,6 +26,8 @@
 #define NamedNodeMap_h
 
 #include "Attribute.h"
+#include "CSSPropertyNames.h"
+#include "ElementAttributeData.h"
 #include "SpaceSplitString.h"
 #include <wtf/NotFound.h>
 
@@ -84,12 +86,7 @@ public:
             addAttribute(newAttribute);
     }
 
-    const AtomicString& idForStyleResolution() const { return m_idForStyleResolution; }
-    void setIdForStyleResolution(const AtomicString& newId) { m_idForStyleResolution = newId; }
-
-    // FIXME: These two functions should be merged if possible.
     bool mapsEquivalent(const NamedNodeMap* otherMap) const;
-    bool mappedMapsEquivalent(const NamedNodeMap* otherMap) const;
 
     // These functions do no error checking.
     void addAttribute(PassRefPtr<Attribute>);
@@ -98,18 +95,21 @@ public:
 
     Element* element() const { return m_element; }
 
-    void clearClass() { m_classNames.clear(); }
-    void setClass(const String&);
-    const SpaceSplitString& classNames() const { return m_classNames; }
+    size_t mappedAttributeCount() const;
 
-    bool hasMappedAttributes() const { return m_mappedAttributeCount > 0; }
-    void declRemoved() { m_mappedAttributeCount--; }
-    void declAdded() { m_mappedAttributeCount++; }
+    ElementAttributeData* attributeData() { return &m_attributeData; }
+    const ElementAttributeData* attributeData() const { return &m_attributeData; }
+
+    StylePropertySet* inlineStyleDecl() { return attributeData()->m_inlineStyleDecl.get(); }
+    StylePropertySet* ensureInlineStyleDecl();
+    void destroyInlineStyleDecl();
+
+    StylePropertySet* attributeStyle() const { return attributeData()->m_attributeStyle.get(); }
+    StylePropertySet* ensureAttributeStyle();
 
 private:
-    NamedNodeMap(Element* element) 
-        : m_mappedAttributeCount(0)
-        , m_element(element)
+    NamedNodeMap(Element* element)
+        : m_element(element)
     {
     }
 
@@ -122,11 +122,13 @@ private:
     void clearAttributes();
     void replaceAttribute(size_t index, PassRefPtr<Attribute>);
 
-    int m_mappedAttributeCount;
-    SpaceSplitString m_classNames;
+    // FIXME: NamedNodeMap is being broken up into two classes, one containing data
+    //        for elements with attributes, and one for exposure to the DOM.
+    //        See <http://webkit.org/b/75069> for more information.
+    ElementAttributeData m_attributeData;
+
     Element* m_element;
     Vector<RefPtr<Attribute>, 4> m_attributes;
-    AtomicString m_idForStyleResolution;
 };
 
 inline Attribute* NamedNodeMap::getAttributeItem(const QualifiedName& name) const

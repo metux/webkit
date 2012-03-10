@@ -44,13 +44,13 @@
 <div class="refsynopsisdiv">
 <a name="WebKitWebInspector.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">                    <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-struct" title="WebKitWebInspector">WebKitWebInspector</a>;
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitWebInspector.html#webkit-web-inspector-get-inspected-uri" title="webkit_web_inspector_get_inspected_uri ()">webkit_web_inspector_get_inspected_uri</a>
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebInspector.html#webkit-web-inspector-get-inspected-uri" title="webkit_web_inspector_get_inspected_uri ()">webkit_web_inspector_get_inspected_uri</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>);
 <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="returnvalue">WebKitWebView</span></a> *     <a class="link" href="WebKitWebInspector.html#webkit-web-inspector-get-web-view" title="webkit_web_inspector_get_web_view ()">webkit_web_inspector_get_web_view</a>   (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebInspector.html#webkit-web-inspector-inspect-coordinates" title="webkit_web_inspector_inspect_coordinates ()">webkit_web_inspector_inspect_coordinates</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>,
-                                                         <em class="parameter"><code><span class="type">gdouble</span> x</code></em>,
-                                                         <em class="parameter"><code><span class="type">gdouble</span> y</code></em>);
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> x</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> y</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebInspector.html#webkit-web-inspector-show" title="webkit_web_inspector_show ()">webkit_web_inspector_show</a>           (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebInspector.html#webkit-web-inspector-close" title="webkit_web_inspector_close ()">webkit_web_inspector_close</a>          (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebInspector.html#webkit-web-inspector-inspect-node" title="webkit_web_inspector_inspect_node ()">webkit_web_inspector_inspect_node</a>   (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>,
@@ -60,28 +60,28 @@ const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKi
 <div class="refsect1">
 <a name="WebKitWebInspector.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
    +----WebKitWebInspector
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebInspector.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector--inspected-uri" title='The "inspected-uri" property'>inspected-uri</a>"            <span class="type">gchar</span>*                : Read
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector--javascript-profiling-enabled" title='The "javascript-profiling-enabled" property'>javascript-profiling-enabled</a>" <span class="type">gboolean</span>              : Read / Write
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector--timeline-profiling-enabled" title='The "timeline-profiling-enabled" property'>timeline-profiling-enabled</a>" <span class="type">gboolean</span>              : Read / Write
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector--inspected-uri" title='The "inspected-uri" property'>inspected-uri</a>"            <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector--javascript-profiling-enabled" title='The "javascript-profiling-enabled" property'>javascript-profiling-enabled</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector--timeline-profiling-enabled" title='The "timeline-profiling-enabled" property'>timeline-profiling-enabled</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector--web-view" title='The "web-view" property'>web-view</a>"                 <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>*        : Read
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebInspector.signals"></a><h2>Signals</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-attach-window" title='The "attach-window" signal'>attach-window</a>"                                  : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-close-window" title='The "close-window" signal'>close-window</a>"                                   : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-detach-window" title='The "detach-window" signal'>detach-window</a>"                                  : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-finished" title='The "finished" signal'>finished</a>"                                       : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-inspect-web-view" title='The "inspect-web-view" signal'>inspect-web-view</a>"                               : <code class="literal">Run Last</code>
-  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-show-window" title='The "show-window" signal'>show-window</a>"                                    : <code class="literal">Run Last</code>
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-attach-window" title='The "attach-window" signal'>attach-window</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-close-window" title='The "close-window" signal'>close-window</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-detach-window" title='The "detach-window" signal'>detach-window</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-finished" title='The "finished" signal'>finished</a>"                                       : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-inspect-web-view" title='The "inspect-web-view" signal'>inspect-web-view</a>"                               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebInspector.html#WebKitWebInspector-show-window" title='The "show-window" signal'>show-window</a>"                                    : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
 </pre>
 </div>
 <div class="refsect1">
@@ -146,7 +146,7 @@ g_signal_connect (G_OBJECT (inspector), <span class="number">&quot;notify::inspe
 <hr>
 <div class="refsect2">
 <a name="webkit-web-inspector-get-inspected-uri"></a><h3>webkit_web_inspector_get_inspected_uri ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_web_inspector_get_inspected_uri
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_inspector_get_inspected_uri
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>);</pre>
 <p>
 Obtains the URI that is currently being inspected.
@@ -176,7 +176,7 @@ should not be freed, modified or stored.</td>
 Obtains the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> that is used to render the
 inspector. The <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> instance is created by the
 application, by handling the <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-inspect-web-view" title='The "inspect-web-view" signal'><span class="type">"inspect-web-view"</span></a> signal. This means
-that this method may return <code class="literal">NULL</code> if the user hasn't inspected
+that this method may return <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the user hasn't inspected
 anything.
 </p>
 <div class="variablelist"><table border="0">
@@ -190,7 +190,7 @@ anything.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> instance that is used
-to render the inspector or <code class="literal">NULL</code> if it is not yet created. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+to render the inspector or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if it is not yet created. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -202,13 +202,13 @@ to render the inspector or <code class="literal">NULL</code> if it is not yet cr
 <a name="webkit-web-inspector-inspect-coordinates"></a><h3>webkit_web_inspector_inspect_coordinates ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_inspector_inspect_coordinates
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector</code></em>,
-                                                         <em class="parameter"><code><span class="type">gdouble</span> x</code></em>,
-                                                         <em class="parameter"><code><span class="type">gdouble</span> y</code></em>);</pre>
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> x</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> y</code></em>);</pre>
 <p>
 Causes the Web Inspector to inspect the node that is located at the
 given coordinates of the widget. The coordinates should be relative
 to the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> widget, not to the scrollable content, and
-may be obtained from a <span class="type">GdkEvent</span> directly.
+may be obtained from a <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> directly.
 </p>
 <p>
 This means <em class="parameter"><code>x</code></em>, and <em class="parameter"><code>y</code></em> being zero doesn't guarantee you will hit the
@@ -294,7 +294,7 @@ Causes the Web Inspector to inspect the given node.
 <a name="WebKitWebInspector.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitWebInspector--inspected-uri"></a><h3>The <code class="literal">"inspected-uri"</code> property</h3>
-<pre class="programlisting">  "inspected-uri"            <span class="type">gchar</span>*                : Read</pre>
+<pre class="programlisting">  "inspected-uri"            <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
 <p>
 The URI that is currently being inspected.
 </p>
@@ -304,7 +304,7 @@ The URI that is currently being inspected.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebInspector--javascript-profiling-enabled"></a><h3>The <code class="literal">"javascript-profiling-enabled"</code> property</h3>
-<pre class="programlisting">  "javascript-profiling-enabled" <span class="type">gboolean</span>              : Read / Write</pre>
+<pre class="programlisting">  "javascript-profiling-enabled" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write</pre>
 <p>
 This is enabling JavaScript profiling in the Inspector. This means
 that Console.profiles will return the profiles.
@@ -315,7 +315,7 @@ that Console.profiles will return the profiles.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebInspector--timeline-profiling-enabled"></a><h3>The <code class="literal">"timeline-profiling-enabled"</code> property</h3>
-<pre class="programlisting">  "timeline-profiling-enabled" <span class="type">gboolean</span>              : Read / Write</pre>
+<pre class="programlisting">  "timeline-profiling-enabled" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write</pre>
 <p>
 This is enabling Timeline profiling in the Inspector.
 </p>
@@ -336,8 +336,8 @@ The Web View that renders the Web Inspector itself.
 <a name="WebKitWebInspector.signal-details"></a><h2>Signal Details</h2>
 <div class="refsect2">
 <a name="WebKitWebInspector-attach-window"></a><h3>The <code class="literal">"attach-window"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
-                                                        <span class="type">gpointer</span>            user_data)          : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the inspector should appear at the same window as
 the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> being inspected.
@@ -352,7 +352,7 @@ the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span clas
 <tr>
 <td><p><span class="term"><em class="parameter"><code>return</code></em> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if the signal has been handled</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the signal has been handled</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
@@ -365,8 +365,8 @@ the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span clas
 <hr>
 <div class="refsect2">
 <a name="WebKitWebInspector-close-window"></a><h3>The <code class="literal">"close-window"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
-                                                        <span class="type">gpointer</span>            user_data)          : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the inspector window should be closed. You can
 destroy the window or hide it so that it can be displayed again
@@ -391,7 +391,7 @@ inspects an element.
 <tr>
 <td><p><span class="term"><em class="parameter"><code>return</code></em> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if the signal has been handled</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the signal has been handled</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
@@ -404,8 +404,8 @@ inspects an element.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebInspector-detach-window"></a><h3>The <code class="literal">"detach-window"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
-                                                        <span class="type">gpointer</span>            user_data)          : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the inspector should appear in a separate window.
 </p>
@@ -419,7 +419,7 @@ Emitted when the inspector should appear in a separate window.
 <tr>
 <td><p><span class="term"><em class="parameter"><code>return</code></em> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if the signal has been handled</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the signal has been handled</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
@@ -433,7 +433,7 @@ Emitted when the inspector should appear in a separate window.
 <div class="refsect2">
 <a name="WebKitWebInspector-finished"></a><h3>The <code class="literal">"finished"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
-                                                        <span class="type">gpointer</span>            user_data)          : <code class="literal">Run Last</code></pre>
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the inspection is done. You should release your
 references on the inspector at this time. The inspected
@@ -459,7 +459,7 @@ references on the inspector at this time. The inspected
 <a name="WebKitWebInspector-inspect-web-view"></a><h3>The <code class="literal">"inspect-web-view"</code> signal</h3>
 <pre class="programlisting"><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="returnvalue">WebKitWebView</span></a>*      user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
                                                         <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>      *web_view,
-                                                        <span class="type">gpointer</span>            user_data)          : <code class="literal">Run Last</code></pre>
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the user activates the 'inspect' context menu item
 to inspect a web view. The application which is interested in
@@ -488,7 +488,7 @@ it will do that.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a newly allocated <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> or <code class="literal">NULL</code>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>a newly allocated <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -498,8 +498,8 @@ it will do that.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebInspector-show-window"></a><h3>The <code class="literal">"show-window"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
-                                                        <span class="type">gpointer</span>            user_data)          : <code class="literal">Run Last</code></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> *web_inspector,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the inspector window should be displayed. Notice
 that the window must have been created already by handling
@@ -515,7 +515,7 @@ that the window must have been created already by handling
 <tr>
 <td><p><span class="term"><em class="parameter"><code>return</code></em> :</span></p></td>
 <td>
-<code class="literal">TRUE</code> if the signal has been handled</td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the signal has been handled</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>

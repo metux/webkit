@@ -204,6 +204,7 @@ void RenderFlowThread::addRegionToThread(RenderRegion* renderRegion)
 void RenderFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
 {
     ASSERT(renderRegion);
+
     m_regionRangeMap.clear();
     m_regionList.remove(renderRegion);
 
@@ -296,6 +297,27 @@ public:
         view->setCurrentRenderFlowThread(0);
     }
 private:
+    RenderFlowThread* m_renderFlowThread;
+};
+
+class CurrentRenderFlowThreadDisabler {
+    WTF_MAKE_NONCOPYABLE(CurrentRenderFlowThreadDisabler);
+public:
+    CurrentRenderFlowThreadDisabler(RenderView* view)
+        : m_view(view)
+        , m_renderFlowThread(0)
+    {
+        m_renderFlowThread = m_view->currentRenderFlowThread();
+        if (m_renderFlowThread)
+            view->setCurrentRenderFlowThread(0);
+    }
+    ~CurrentRenderFlowThreadDisabler()
+    {
+        if (m_renderFlowThread)
+            m_view->setCurrentRenderFlowThread(m_renderFlowThread);
+    }
+private:
+    RenderView* m_view;
     RenderFlowThread* m_renderFlowThread;
 };
 
@@ -520,6 +542,10 @@ void RenderFlowThread::repaintRectangleInRegions(const LayoutRect& repaintRect, 
         // Now switch to the region's writing mode coordinate space and let it repaint itself.
         region->flipForWritingMode(clippedRect);
         LayoutStateDisabler layoutStateDisabler(view()); // We can't use layout state to repaint, since the region is somewhere else.
+
+        // Can't use currentFlowThread as it possible to have imbricated flow threads and the wrong one could be used,
+        // so, we let each region figure out the proper enclosing flow thread
+        CurrentRenderFlowThreadDisabler disabler(view());
         region->repaintRectangle(clippedRect, immediate);
     }
 }
@@ -552,6 +578,14 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
     }
 
     return lastValidRegion;
+}
+
+LayoutUnit RenderFlowThread::regionLogicalTopForLine(LayoutUnit position) const
+{
+    RenderRegion* region = renderRegionForLine(position);
+    if (!region)
+        return 0;
+    return isHorizontalWritingMode() ? region->regionRect().y() : region->regionRect().x();
 }
 
 LayoutUnit RenderFlowThread::regionLogicalWidthForLine(LayoutUnit position) const
@@ -620,7 +654,7 @@ void RenderFlowThread::removeRenderBoxRegionInfo(RenderBox* box)
     RenderRegion* startRegion;
     RenderRegion* endRegion;
     getRegionRangeForBox(box, startRegion, endRegion);
-    
+
     for (RenderRegionList::iterator iter = m_regionList.find(startRegion); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
         if (!region->isValid())
@@ -629,7 +663,17 @@ void RenderFlowThread::removeRenderBoxRegionInfo(RenderBox* box)
         if (region == endRegion)
             break;
     }
-    
+
+#ifndef NDEBUG
+    // We have to make sure we did not left any boxes with region info attached in regions.
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid())
+            continue;
+        ASSERT(!region->renderBoxRegionInfo(box));
+    }
+#endif
+
     m_regionRangeMap.remove(box);
 }
 
@@ -734,7 +778,7 @@ RenderRegion* RenderFlowThread::lastRegion() const
     return 0;
 }
 
-void RenderFlowThread::clearRenderObjectCustomStyle(const RenderObject* object,
+void RenderFlowThread::clearRenderBoxCustomStyle(const RenderBox* box,
     const RenderRegion* oldStartRegion, const RenderRegion* oldEndRegion,
     const RenderRegion* newStartRegion, const RenderRegion* newEndRegion)
 {
@@ -751,7 +795,7 @@ void RenderFlowThread::clearRenderObjectCustomStyle(const RenderObject* object,
             insideNewRegionRange = true;
 
         if (!(insideOldRegionRange && insideNewRegionRange))
-            region->clearObjectStyleInRegion(object);
+            region->clearBoxStyleInRegion(box);
 
         if (oldEndRegion == region)
             insideOldRegionRange = false;
@@ -790,7 +834,7 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
             break;
     }
 
-    clearRenderObjectCustomStyle(box, range.startRegion(), range.endRegion(), startRegion, endRegion);
+    clearRenderBoxCustomStyle(box, range.startRegion(), range.endRegion(), startRegion, endRegion);
     range.setRange(startRegion, endRegion);
 }
 

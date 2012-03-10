@@ -436,6 +436,10 @@ bool InputType::shouldUseInputMethod() const
     return false;
 }
 
+void InputType::handleFocusEvent()
+{
+}
+
 void InputType::handleBlurEvent()
 {
 }
@@ -725,6 +729,11 @@ void InputType::readonlyAttributeChanged()
 String InputType::defaultToolTip() const
 {
     return String();
+}
+
+bool InputType::supportsIndeterminateAppearance() const
+{
+    return false;
 }
 
 namespace InputTypeNames {

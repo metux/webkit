@@ -29,7 +29,7 @@
 module core {
 
     interface [
-        NoStaticTables,
+        JSNoStaticTables,
         DontCheckEnums
     ] DOMCoreException {
 
@@ -39,7 +39,7 @@ module core {
 
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
         // Override in a Mozilla compatible format
-        [DontEnum] DOMString toString();
+        [NotEnumerable] DOMString toString();
 #endif
 
         // ExceptionCode

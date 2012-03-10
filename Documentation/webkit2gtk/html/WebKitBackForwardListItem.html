@@ -40,19 +40,19 @@
 <div class="refsynopsisdiv">
 <a name="WebKitBackForwardListItem.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">struct              <a class="link" href="WebKitBackForwardListItem.html#WebKitBackForwardListItem-struct" title="struct WebKitBackForwardListItem">WebKitBackForwardListItem</a>;
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forward-list-item-get-title" title="webkit_back_forward_list_item_get_title ()">webkit_back_forward_list_item_get_title</a>
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forward-list-item-get-title" title="webkit_back_forward_list_item_get_title ()">webkit_back_forward_list_item_get_title</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forward-list-item-get-uri" title="webkit_back_forward_list_item_get_uri ()">webkit_back_forward_list_item_get_uri</a>
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forward-list-item-get-uri" title="webkit_back_forward_list_item_get_uri ()">webkit_back_forward_list_item_get_uri</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);
-const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forward-list-item-get-original-uri" title="webkit_back_forward_list_item_get_original_uri ()">webkit_back_forward_list_item_get_original_uri</a>
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forward-list-item-get-original-uri" title="webkit_back_forward_list_item_get_original_uri ()">webkit_back_forward_list_item_get_original_uri</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitBackForwardListItem.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  GObject
-   +----GInitiallyUnowned
+  <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+   +----<a href="../gobject/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
          +----WebKitBackForwardListItem
 </pre>
 </div>
@@ -72,7 +72,7 @@ const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKi
 <hr>
 <div class="refsect2">
 <a name="webkit-back-forward-list-item-get-title"></a><h3>webkit_back_forward_list_item_get_title ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_back_forward_list_item_get_title
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_back_forward_list_item_get_title
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);</pre>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -84,7 +84,7 @@ const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKi
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the page title of <em class="parameter"><code>list_item</code></em> or <code class="literal">NULL</code>
+<td>the page title of <em class="parameter"><code>list_item</code></em> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
 when the title is empty.</td>
 </tr>
 </tbody>
@@ -93,7 +93,7 @@ when the title is empty.</td>
 <hr>
 <div class="refsect2">
 <a name="webkit-back-forward-list-item-get-uri"></a><h3>webkit_back_forward_list_item_get_uri ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_back_forward_list_item_get_uri
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_back_forward_list_item_get_uri
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);</pre>
 <p>
 This URI may differ from the original URI if the page was,
@@ -110,7 +110,7 @@ See also <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forwar
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the URI of <em class="parameter"><code>list_item</code></em> or <code class="literal">NULL</code>
+<td>the URI of <em class="parameter"><code>list_item</code></em> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
 when the URI is empty.</td>
 </tr>
 </tbody>
@@ -119,7 +119,7 @@ when the URI is empty.</td>
 <hr>
 <div class="refsect2">
 <a name="webkit-back-forward-list-item-get-original-uri"></a><h3>webkit_back_forward_list_item_get_original_uri ()</h3>
-<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_back_forward_list_item_get_original_uri
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_back_forward_list_item_get_original_uri
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);</pre>
 <p>
 See also <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forward-list-item-get-uri" title="webkit_back_forward_list_item_get_uri ()"><code class="function">webkit_back_forward_list_item_get_uri()</code></a>.
@@ -134,7 +134,7 @@ See also <a class="link" href="WebKitBackForwardListItem.html#webkit-back-forwar
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the original URI of <em class="parameter"><code>list_item</code></em> or <code class="literal">NULL</code>
+<td>the original URI of <em class="parameter"><code>list_item</code></em> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
 when the original URI is empty.</td>
 </tr>
 </tbody>

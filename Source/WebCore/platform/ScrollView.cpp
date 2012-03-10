@@ -219,7 +219,11 @@ void ScrollView::setClipsRepaints(bool clipsRepaints)
 
 void ScrollView::setDelegatesScrolling(bool delegatesScrolling)
 {
+    if (m_delegatesScrolling == delegatesScrolling)
+        return;
+
     m_delegatesScrolling = delegatesScrolling;
+    delegatesScrollingDidChange();
 }
 
 #if !PLATFORM(GTK)
@@ -991,6 +995,7 @@ void ScrollView::scrollbarStyleChanged(int, bool forceUpdate)
 
     contentsResized();
     updateScrollbars(scrollOffset());
+    positionScrollbarLayers();
 }
 
 void ScrollView::updateScrollCorner()

@@ -6,7 +6,7 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitWindowProperties.html" title="WebKitWindowProperties">
+<link rel="prev" href="WebKitNavigationPolicyDecision.html" title="WebKitNavigationPolicyDecision">
 <link rel="next" href="index-all.html" title="Index">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
@@ -14,7 +14,7 @@
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
 <tr valign="middle">
-<td><a accesskey="p" href="WebKitWindowProperties.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitNavigationPolicyDecision.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
@@ -40,12 +40,15 @@
 <pre class="synopsis">#define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR:CAPS" title="WEBKIT_NETWORK_ERROR">WEBKIT_NETWORK_ERROR</a>
 #define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-PLUGIN-ERROR:CAPS" title="WEBKIT_PLUGIN_ERROR">WEBKIT_PLUGIN_ERROR</a>
 #define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-POLICY-ERROR:CAPS" title="WEBKIT_POLICY_ERROR">WEBKIT_POLICY_ERROR</a>
+#define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR:CAPS" title="WEBKIT_DOWNLOAD_ERROR">WEBKIT_DOWNLOAD_ERROR</a>
 enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitNetworkError" title="enum WebKitNetworkError">WebKitNetworkError</a>;
 enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitPluginError" title="enum WebKitPluginError">WebKitPluginError</a>;
 enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitPolicyError" title="enum WebKitPolicyError">WebKitPolicyError</a>;
-<span class="returnvalue">GQuark</span>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-network-error-quark" title="webkit_network_error_quark ()">webkit_network_error_quark</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
-<span class="returnvalue">GQuark</span>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-plugin-error-quark" title="webkit_plugin_error_quark ()">webkit_plugin_error_quark</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
-<span class="returnvalue">GQuark</span>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-policy-error-quark" title="webkit_policy_error_quark ()">webkit_policy_error_quark</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
+enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitDownloadError" title="enum WebKitDownloadError">WebKitDownloadError</a>;
+<a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-network-error-quark" title="webkit_network_error_quark ()">webkit_network_error_quark</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-plugin-error-quark" title="webkit_plugin_error_quark ()">webkit_plugin_error_quark</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-policy-error-quark" title="webkit_policy_error_quark ()">webkit_policy_error_quark</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-download-error-quark" title="webkit_download_error_quark ()">webkit_download_error_quark</a>         (<em class="parameter"><code><span class="type">void</span></code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -74,6 +77,14 @@ enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitPoli
 <div class="refsect2">
 <a name="WEBKIT-POLICY-ERROR:CAPS"></a><h3>WEBKIT_POLICY_ERROR</h3>
 <pre class="programlisting">#define WEBKIT_POLICY_ERROR  webkit_policy_error_quark ()
+</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOWNLOAD-ERROR:CAPS"></a><h3>WEBKIT_DOWNLOAD_ERROR</h3>
+<pre class="programlisting">#define WEBKIT_DOWNLOAD_ERROR webkit_download_error_quark ()
 </pre>
 <p>
 </p>
@@ -221,22 +232,62 @@ Enum values used to denote the various policy errors.
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitDownloadError"></a><h3>enum WebKitDownloadError</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_DOWNLOAD_ERROR_NETWORK = 499,
+    WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER = 400,
+    WEBKIT_DOWNLOAD_ERROR_DESTINATION = 401
+} WebKitDownloadError;
+</pre>
+<p>
+Enum values used to denote the various download errors.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-DOWNLOAD-ERROR-NETWORK:CAPS"></a><span class="term"><code class="literal">WEBKIT_DOWNLOAD_ERROR_NETWORK</code></span></p></td>
+<td>Download failure due to network error
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-DOWNLOAD-ERROR-CANCELLED-BY-USER:CAPS"></a><span class="term"><code class="literal">WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER</code></span></p></td>
+<td>Download was cancelled by user
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-DOWNLOAD-ERROR-DESTINATION:CAPS"></a><span class="term"><code class="literal">WEBKIT_DOWNLOAD_ERROR_DESTINATION</code></span></p></td>
+<td>Download failure due to destination error
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-network-error-quark"></a><h3>webkit_network_error_quark ()</h3>
-<pre class="programlisting"><span class="returnvalue">GQuark</span>              webkit_network_error_quark          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_network_error_quark          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 </p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="webkit-plugin-error-quark"></a><h3>webkit_plugin_error_quark ()</h3>
-<pre class="programlisting"><span class="returnvalue">GQuark</span>              webkit_plugin_error_quark           (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_plugin_error_quark           (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 </p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="webkit-policy-error-quark"></a><h3>webkit_policy_error_quark ()</h3>
-<pre class="programlisting"><span class="returnvalue">GQuark</span>              webkit_policy_error_quark           (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_policy_error_quark           (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-download-error-quark"></a><h3>webkit_download_error_quark ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_download_error_quark         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 </p>
 </div>

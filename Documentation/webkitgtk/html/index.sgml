@@ -173,7 +173,11 @@
 <ANCHOR id="WebKitWebView-populate-popup" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-populate-popup">
 <ANCHOR id="WebKitWebView-print-requested" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-print-requested">
 <ANCHOR id="WebKitWebView-redo" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-redo">
+<ANCHOR id="WebKitWebView-resource-content-length-received" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-content-length-received">
+<ANCHOR id="WebKitWebView-resource-load-failed" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-load-failed">
+<ANCHOR id="WebKitWebView-resource-load-finished" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-load-finished">
 <ANCHOR id="WebKitWebView-resource-request-starting" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-request-starting">
+<ANCHOR id="WebKitWebView-resource-response-received" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-response-received">
 <ANCHOR id="WebKitWebView-script-alert" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-script-alert">
 <ANCHOR id="WebKitWebView-script-confirm" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-script-confirm">
 <ANCHOR id="WebKitWebView-script-prompt" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-script-prompt">
@@ -245,6 +249,11 @@
 <ANCHOR id="WebKitWebFrame-hovering-over-link" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-hovering-over-link">
 <ANCHOR id="WebKitWebFrame-load-committed" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-load-committed">
 <ANCHOR id="WebKitWebFrame-load-done" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-load-done">
+<ANCHOR id="WebKitWebFrame-resource-content-length-received" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-content-length-received">
+<ANCHOR id="WebKitWebFrame-resource-load-failed" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-load-failed">
+<ANCHOR id="WebKitWebFrame-resource-load-finished" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-load-finished">
+<ANCHOR id="WebKitWebFrame-resource-request-starting" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-request-starting">
+<ANCHOR id="WebKitWebFrame-resource-response-received" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-response-received">
 <ANCHOR id="WebKitWebFrame-scrollbars-policy-changed" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-scrollbars-policy-changed">
 <ANCHOR id="WebKitWebFrame-title-changed" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-title-changed">
 <ANCHOR id="WebKitWebSettings" href="webkitgtk/WebKitWebSettings.html">
@@ -366,6 +375,13 @@
 <ANCHOR id="WebKitWebNavigationAction.description" href="webkitgtk/WebKitWebNavigationAction.html#WebKitWebNavigationAction.description">
 <ANCHOR id="WebKitWebNavigationAction.details" href="webkitgtk/WebKitWebNavigationAction.html#WebKitWebNavigationAction.details">
 <ANCHOR id="WebKitWebNavigationAction-struct" href="webkitgtk/WebKitWebNavigationAction.html#WebKitWebNavigationAction-struct">
+<ANCHOR id="WebKitWebNavigationReason" href="webkitgtk/WebKitWebNavigationAction.html#WebKitWebNavigationReason">
+<ANCHOR id="WEBKIT-WEB-NAVIGATION-REASON-LINK-CLICKED:CAPS" href="webkitgtk/WebKitWebNavigationAction.html#WEBKIT-WEB-NAVIGATION-REASON-LINK-CLICKED:CAPS">
+<ANCHOR id="WEBKIT-WEB-NAVIGATION-REASON-FORM-SUBMITTED:CAPS" href="webkitgtk/WebKitWebNavigationAction.html#WEBKIT-WEB-NAVIGATION-REASON-FORM-SUBMITTED:CAPS">
+<ANCHOR id="WEBKIT-WEB-NAVIGATION-REASON-BACK-FORWARD:CAPS" href="webkitgtk/WebKitWebNavigationAction.html#WEBKIT-WEB-NAVIGATION-REASON-BACK-FORWARD:CAPS">
+<ANCHOR id="WEBKIT-WEB-NAVIGATION-REASON-RELOAD:CAPS" href="webkitgtk/WebKitWebNavigationAction.html#WEBKIT-WEB-NAVIGATION-REASON-RELOAD:CAPS">
+<ANCHOR id="WEBKIT-WEB-NAVIGATION-REASON-FORM-RESUBMITTED:CAPS" href="webkitgtk/WebKitWebNavigationAction.html#WEBKIT-WEB-NAVIGATION-REASON-FORM-RESUBMITTED:CAPS">
+<ANCHOR id="WEBKIT-WEB-NAVIGATION-REASON-OTHER:CAPS" href="webkitgtk/WebKitWebNavigationAction.html#WEBKIT-WEB-NAVIGATION-REASON-OTHER:CAPS">
 <ANCHOR id="webkit-web-navigation-action-get-button" href="webkitgtk/WebKitWebNavigationAction.html#webkit-web-navigation-action-get-button">
 <ANCHOR id="webkit-web-navigation-action-get-modifier-state" href="webkitgtk/WebKitWebNavigationAction.html#webkit-web-navigation-action-get-modifier-state">
 <ANCHOR id="webkit-web-navigation-action-get-original-uri" href="webkitgtk/WebKitWebNavigationAction.html#webkit-web-navigation-action-get-original-uri">
@@ -493,6 +509,7 @@
 <ANCHOR id="WebKitWebResource.synopsis" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.synopsis">
 <ANCHOR id="WebKitWebResource.object-hierarchy" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.object-hierarchy">
 <ANCHOR id="WebKitWebResource.properties" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.properties">
+<ANCHOR id="WebKitWebResource.signals" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.signals">
 <ANCHOR id="WebKitWebResource.description" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.description">
 <ANCHOR id="WebKitWebResource.details" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.details">
 <ANCHOR id="WebKitWebResource-struct" href="webkitgtk/WebKitWebResource.html#WebKitWebResource-struct">
@@ -507,6 +524,11 @@
 <ANCHOR id="WebKitWebResource--frame-name" href="webkitgtk/WebKitWebResource.html#WebKitWebResource--frame-name">
 <ANCHOR id="WebKitWebResource--mime-type" href="webkitgtk/WebKitWebResource.html#WebKitWebResource--mime-type">
 <ANCHOR id="WebKitWebResource--uri" href="webkitgtk/WebKitWebResource.html#WebKitWebResource--uri">
+<ANCHOR id="WebKitWebResource.signal-details" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.signal-details">
+<ANCHOR id="WebKitWebResource-content-length-received" href="webkitgtk/WebKitWebResource.html#WebKitWebResource-content-length-received">
+<ANCHOR id="WebKitWebResource-load-failed" href="webkitgtk/WebKitWebResource.html#WebKitWebResource-load-failed">
+<ANCHOR id="WebKitWebResource-load-finished" href="webkitgtk/WebKitWebResource.html#WebKitWebResource-load-finished">
+<ANCHOR id="WebKitWebResource-response-received" href="webkitgtk/WebKitWebResource.html#WebKitWebResource-response-received">
 <ANCHOR id="WebKitWebResource.see-also" href="webkitgtk/WebKitWebResource.html#WebKitWebResource.see-also">
 <ANCHOR id="webkitgtk-webkitdownload" href="webkitgtk/webkitgtk-webkitdownload.html">
 <ANCHOR id="webkitgtk-webkitdownload.synopsis" href="webkitgtk/webkitgtk-webkitdownload.html#webkitgtk-webkitdownload.synopsis">
@@ -707,10 +729,6 @@
 <ANCHOR id="webkit-spell-checker-get-autocorrect-suggestions-for-misspelled-word" href="webkitgtk/WebKitSpellChecker.html#webkit-spell-checker-get-autocorrect-suggestions-for-misspelled-word">
 <ANCHOR id="webkit-spell-checker-learn-word" href="webkitgtk/WebKitSpellChecker.html#webkit-spell-checker-learn-word">
 <ANCHOR id="webkit-spell-checker-ignore-word" href="webkitgtk/WebKitSpellChecker.html#webkit-spell-checker-ignore-word">
-<ANCHOR id="webkitgtk-WebKitSpellCheckerEnchant" href="webkitgtk/webkitgtk-WebKitSpellCheckerEnchant.html">
-<ANCHOR id="webkitgtk-WebKitSpellCheckerEnchant.synopsis" href="webkitgtk/webkitgtk-WebKitSpellCheckerEnchant.html#webkitgtk-WebKitSpellCheckerEnchant.synopsis">
-<ANCHOR id="webkitgtk-WebKitSpellCheckerEnchant.description" href="webkitgtk/webkitgtk-WebKitSpellCheckerEnchant.html#webkitgtk-WebKitSpellCheckerEnchant.description">
-<ANCHOR id="webkitgtk-WebKitSpellCheckerEnchant.details" href="webkitgtk/webkitgtk-WebKitSpellCheckerEnchant.html#webkitgtk-WebKitSpellCheckerEnchant.details">
 <ANCHOR id="webkit-environment" href="webkitgtk/webkit-environment.html">
 <ANCHOR id="annotation-glossterm-element-type" href="webkitgtk/annotation-glossary.html#annotation-glossterm-element-type">
 <ANCHOR id="annotation-glossterm-transfer container" href="webkitgtk/annotation-glossary.html#annotation-glossterm-transfer container">
