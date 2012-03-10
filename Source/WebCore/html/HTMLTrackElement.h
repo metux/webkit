@@ -30,6 +30,7 @@
 
 #include "HTMLElement.h"
 #include "LoadableTextTrack.h"
+#include "TextTrack.h"
 
 namespace WebCore {
 
@@ -54,11 +55,21 @@ public:
     bool isDefault() const;
     void setIsDefault(bool);
 
+    enum ReadyState { NONE = 0, LOADING = 1, LOADED = 2, TRACK_ERROR = 3 };
+    ReadyState readyState();
+    void setReadyState(ReadyState);
+
     TextTrack* track();
-    
+
     void scheduleLoad();
-    virtual bool canLoadUrl(LoadableTextTrack*, const KURL&);
-    virtual void didCompleteLoad(LoadableTextTrack*, bool /* loadingFailed */);
+
+    enum LoadStatus { Failure, Success };
+    virtual void didCompleteLoad(LoadableTextTrack*, LoadStatus);
+
+    const AtomicString& mediaElementCrossOriginAttribute() const;
+
+    bool hasBeenConfigured() const { return m_hasBeenConfigured; }
+    void setHasBeenConfigured(bool flag) { m_hasBeenConfigured = flag; }
 
 private:
     HTMLTrackElement(const QualifiedName&, Document*);
@@ -79,7 +90,6 @@ private:
     HTMLMediaElement* mediaElement() const;
 
     // TextTrackClient
-    virtual void textTrackReadyStateChanged(TextTrack*);
     virtual void textTrackModeChanged(TextTrack*);
     virtual void textTrackKindChanged(TextTrack*);
     virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*);
@@ -88,8 +98,10 @@ private:
     virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
 
     LoadableTextTrack* ensureTrack();
+    virtual bool canLoadUrl(const KURL&);
 
     RefPtr<LoadableTextTrack> m_track;
+    bool m_hasBeenConfigured;
 };
 
 }

@@ -7,6 +7,7 @@
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2008, 2009, 2011 Google Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
+ * Copyright (C) Research In Motion Limited 2010-2011. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -32,10 +33,10 @@
 #include "Attr.h"
 #include "Attribute.h"
 #include "CDATASection.h"
-#include "CSSPrimitiveValueCache.h"
 #include "CSSStyleSelector.h"
 #include "CSSStyleSheet.h"
 #include "CSSValueKeywords.h"
+#include "CSSValuePool.h"
 #include "CachedCSSStyleSheet.h"
 #include "CachedResourceLoader.h"
 #include "Chrome.h"
@@ -117,6 +118,7 @@
 #include "ProcessingInstruction.h"
 #include "RegisteredEventListener.h"
 #include "RenderArena.h"
+#include "RenderFlowThread.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
 #include "RenderTextControl.h"
@@ -141,6 +143,7 @@
 #include "TransformSource.h"
 #include "TreeWalker.h"
 #include "UserContentURLPattern.h"
+#include "WebKitNamedFlow.h"
 #include "XMLDocumentParser.h"
 #include "XMLHttpRequest.h"
 #include "XMLNSNames.h"
@@ -379,7 +382,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_compatibilityModeLocked(false)
     , m_domTreeVersion(++s_globalTreeVersion)
 #if ENABLE(MUTATION_OBSERVERS)
-    , m_subtreeMutationObserverTypes(0)
+    , m_mutationObserverTypes(0)
 #endif
     , m_styleSheets(StyleSheetList::create(this))
     , m_readyState(Complete)
@@ -429,6 +432,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_writeRecursionIsTooDeep(false)
     , m_writeRecursionDepth(0)
     , m_wheelEventHandlerCount(0)
+    , m_pendingTasksTimer(this, &Document::pendingTasksTimerFired)
 {
     m_document = this;
 
@@ -609,7 +613,9 @@ void Document::removedLastRef()
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
         // FIXME: consider using ActiveDOMObject.
-        m_scriptedAnimationController = nullptr;
+        if (m_scriptedAnimationController)
+            m_scriptedAnimationController->clearDocumentPointer();
+        m_scriptedAnimationController.clear();
 #endif
 
 #ifndef NDEBUG
@@ -990,6 +996,15 @@ PassRefPtr<Element> Document::createElement(const QualifiedName& qName, bool cre
     return e.release();
 }
 
+PassRefPtr<WebKitNamedFlow> Document::webkitGetFlowByName(const String& flowName)
+{
+    if (!renderer())
+        return 0;
+    if (RenderView* view = renderer()->view())
+        return view->ensureRenderFlowThreadWithName(flowName)->ensureNamedFlow();
+    return 0;
+}
+
 PassRefPtr<Element> Document::createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode& ec)
 {
     String prefix, localName;
@@ -1032,15 +1047,15 @@ void Document::setReadyState(ReadyState readyState)
     switch (readyState) {
     case Loading:
         if (!m_documentTiming.domLoading)
-            m_documentTiming.domLoading = currentTime();
+            m_documentTiming.domLoading = monotonicallyIncreasingTime();
         break;
     case Interactive:
         if (!m_documentTiming.domInteractive)
-            m_documentTiming.domInteractive = currentTime();
+            m_documentTiming.domInteractive = monotonicallyIncreasingTime();
         break;
     case Complete:
         if (!m_documentTiming.domComplete)
-            m_documentTiming.domComplete = currentTime();
+            m_documentTiming.domComplete = monotonicallyIncreasingTime();
         break;
     }
 
@@ -1660,7 +1675,8 @@ void Document::updateLayoutIgnorePendingStylesheets()
         // moment.  If it were more refined, we might be able to do something better.)
         // It's worth noting though that this entire method is a hack, since what we really want to do is
         // suspend JS instead of doing a layout with inaccurate information.
-        if (body() && !body()->renderer() && m_pendingSheetLayout == NoLayoutWithPendingSheets) {
+        HTMLElement* bodyElement = body();
+        if (bodyElement && !bodyElement->renderer() && m_pendingSheetLayout == NoLayoutWithPendingSheets) {
             m_pendingSheetLayout = DidLayoutWithPendingSheets;
             styleSelectorChanged(RecalcStyleImmediately);
         } else if (m_hasNodesWithPlaceholderStyle)
@@ -1750,11 +1766,11 @@ void Document::pageSizeAndMarginsInPixels(int pageIndex, IntSize& pageSize, int&
     marginLeft = style->marginLeft().isAuto() ? marginLeft : style->marginLeft().calcValue(width);
 }
 
-PassRefPtr<CSSPrimitiveValueCache> Document::cssPrimitiveValueCache() const
+PassRefPtr<CSSValuePool> Document::cssValuePool() const
 {
-    if (!m_cssPrimitiveValueCache)
-        m_cssPrimitiveValueCache = CSSPrimitiveValueCache::create();
-    return m_cssPrimitiveValueCache;
+    if (!m_cssValuePool)
+        m_cssValuePool = CSSValuePool::create();
+    return m_cssValuePool;
 }
 
 void Document::setIsViewSource(bool isViewSource)
@@ -1821,7 +1837,9 @@ void Document::detach()
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     // FIXME: consider using ActiveDOMObject.
-    m_scriptedAnimationController = nullptr;
+    if (m_scriptedAnimationController)
+        m_scriptedAnimationController->clearDocumentPointer();
+    m_scriptedAnimationController.clear();
 #endif
 
     RenderObject* render = renderer();
@@ -2263,16 +2281,8 @@ void Document::implicitClose()
             axObjectCache()->postNotification(renderObject, AXObjectCache::AXLoadComplete, true);
         else {
             // AXLoadComplete can only be posted on the top document, so if it's a document
-            // in an iframe that just finished loading, post a notification on the iframe
-            // element instead.
-            ScrollView* scrollView = frame()->view();
-            if (scrollView && scrollView->isFrameView()) {
-                HTMLFrameOwnerElement* owner = static_cast<FrameView*>(scrollView)->frame()->ownerElement();
-                if (owner && owner->renderer()) {
-                    AccessibilityObject* axIFrame = axObjectCache()->getOrCreate(owner->renderer());
-                    axObjectCache()->postNotification(axIFrame, axIFrame->document(), AXObjectCache::AXLayoutComplete, true);
-                }
-            }
+            // in an iframe that just finished loading, post AXLayoutComplete instead.
+            axObjectCache()->postNotification(renderObject, AXObjectCache::AXLayoutComplete, true);
         }
     }
 #endif
@@ -2415,6 +2425,7 @@ void Document::setURL(const KURL& url)
 
 void Document::updateBaseURL()
 {
+    KURL oldBaseURL = m_baseURL;
     // DOM 3 Core: When the Document supports the feature "HTML" [DOM Level 2 HTML], the base URI is computed using
     // first the value of the href attribute of the HTML BASE element if any, and the value of the documentURI attribute
     // from the Document interface otherwise.
@@ -2435,6 +2446,15 @@ void Document::updateBaseURL()
         m_elemSheet->setFinalURL(m_baseURL);
     if (m_mappedElementSheet)
         m_mappedElementSheet->setFinalURL(m_baseURL);
+    
+    if (!equalIgnoringFragmentIdentifier(oldBaseURL, m_baseURL)) {
+        // Base URL change changes any relative visited links.
+        // FIXME: There are other URLs in the tree that would need to be re-evaluated on dynamic base URL change. Style should be invalidated too.
+        for (Node* node = firstChild(); node; node = node->traverseNextNode()) {
+            if (node->hasTagName(aTag))
+                static_cast<HTMLAnchorElement*>(node)->invalidateCachedVisitedLinkHash();
+        }
+    }
 }
 
 void Document::setBaseURLOverride(const KURL& url)
@@ -3087,7 +3107,7 @@ void Document::recalcStyleSelector()
                 if (linkElement->isDisabled())
                     continue;
                 enabledViaScript = linkElement->isEnabledViaScript();
-                if (linkElement->isLoading()) {
+                if (linkElement->isStyleSheetLoading()) {
                     // it is loading but we should still decide which style sheet set to use
                     if (!enabledViaScript && !title.isEmpty() && m_preferredStylesheetSet.isEmpty()) {
                         const AtomicString& rel = e->getAttribute(relAttr);
@@ -3393,7 +3413,7 @@ void Document::moveNodeIteratorsToNewDocument(Node* node, Document* newDocument)
     }
 }
 
-void Document::nodeChildrenChanged(ContainerNode* container)
+void Document::updateRangesAfterChildrenChanged(ContainerNode* container)
 {
     if (!disableRangeMutation(page()) && !m_ranges.isEmpty()) {
         HashSet<Range*>::const_iterator end = m_ranges.end();
@@ -3913,8 +3933,10 @@ void Document::documentWillBecomeInactive()
 
 void Document::documentDidBecomeActive() 
 {
-    HashSet<Element*>::iterator end = m_documentActivationCallbackElements.end();
-    for (HashSet<Element*>::iterator i = m_documentActivationCallbackElements.begin(); i != end; ++i)
+    Vector<Element*> elements;
+    copyToVector(m_documentActivationCallbackElements, elements);
+    Vector<Element*>::iterator end = elements.end();
+    for (Vector<Element*>::iterator i = elements.begin(); i != end; ++i)
         (*i)->documentDidBecomeActive();
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -4249,10 +4271,10 @@ void Document::finishedParsing()
     ASSERT(!scriptableDocumentParser() || m_readyState != Loading);
     setParsing(false);
     if (!m_documentTiming.domContentLoadedEventStart)
-        m_documentTiming.domContentLoadedEventStart = currentTime();
+        m_documentTiming.domContentLoadedEventStart = monotonicallyIncreasingTime();
     dispatchEvent(Event::create(eventNames().DOMContentLoadedEvent, true, false));
     if (!m_documentTiming.domContentLoadedEventEnd)
-        m_documentTiming.domContentLoadedEventEnd = currentTime();
+        m_documentTiming.domContentLoadedEventEnd = monotonicallyIncreasingTime();
 
     if (RefPtr<Frame> f = frame()) {
         // FrameLoader::finishedParsing() might end up calling Document::implicitClose() if all
@@ -4472,7 +4494,7 @@ void Document::initSecurityContext()
     if (!m_frame) {
         // No source for a security context.
         // This can occur via document.implementation.createDocument().
-        m_cookieURL = KURL(ParsedURLString, "");
+        m_cookieURL = KURL(ParsedURLString, emptyString());
         setSecurityOrigin(SecurityOrigin::createUnique());
         setContentSecurityPolicy(ContentSecurityPolicy::create(this));
         return;
@@ -4704,22 +4726,59 @@ public:
     OwnPtr<ScriptExecutionContext::Task> task;
 };
 
-static void performTask(void* ctx)
+void Document::didReceiveTask(void* untypedContext)
 {
     ASSERT(isMainThread());
 
-    PerformTaskContext* context = reinterpret_cast<PerformTaskContext*>(ctx);
+    OwnPtr<PerformTaskContext> context = adoptPtr(static_cast<PerformTaskContext*>(untypedContext));
     ASSERT(context);
 
-    if (Document* document = context->documentReference->document())
-        context->task->performTask(document);
+    Document* document = context->documentReference->document();
+    if (!document)
+        return;
 
-    delete context;
+    Page* page = document->page();
+    if ((page && page->defersLoading()) || !document->m_pendingTasks.isEmpty()) {
+        document->m_pendingTasks.append(context->task.release());
+        return;
+    }
+
+    context->task->performTask(document);
 }
 
 void Document::postTask(PassOwnPtr<Task> task)
 {
-    callOnMainThread(performTask, new PerformTaskContext(m_weakReference, task));
+    callOnMainThread(didReceiveTask, new PerformTaskContext(m_weakReference, task));
+}
+
+void Document::pendingTasksTimerFired(Timer<Document>*)
+{
+    while (!m_pendingTasks.isEmpty()) {
+        OwnPtr<Task> task = m_pendingTasks[0].release();
+        m_pendingTasks.remove(0);
+        task->performTask(this);
+    }
+}
+
+void Document::suspendScheduledTasks()
+{
+    suspendScriptedAnimationControllerCallbacks();
+    suspendActiveDOMObjects(ActiveDOMObject::WillShowDialog);
+    scriptRunner()->suspend();
+    m_pendingTasksTimer.stop();
+    if (m_parser)
+        m_parser->suspendScheduledTasks();
+}
+
+void Document::resumeScheduledTasks()
+{
+    if (m_parser)
+        m_parser->resumeScheduledTasks();
+    if (!m_pendingTasks.isEmpty())
+        m_pendingTasksTimer.startOneShot(0);
+    scriptRunner()->resume();
+    resumeActiveDOMObjects();
+    resumeScriptedAnimationControllerCallbacks();
 }
 
 void Document::suspendScriptedAnimationControllerCallbacks()
@@ -5081,7 +5140,7 @@ int Document::webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallba
     return m_scriptedAnimationController->registerCallback(callback, animationElement);
 }
 
-void Document::webkitCancelRequestAnimationFrame(int id)
+void Document::webkitCancelAnimationFrame(int id)
 {
     if (!m_scriptedAnimationController)
         return;
@@ -5156,17 +5215,13 @@ DocumentLoader* Document::loader() const
 #if ENABLE(MICRODATA)
 PassRefPtr<NodeList> Document::getItems(const String& typeNames)
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        treeScope()->addNodeListCache();
-    }
+    NodeListsNodeData* nodeLists = ensureRareData()->ensureNodeLists(this);
 
     // Since documet.getItem() is allowed for microdata, typeNames will be null string.
     // In this case we need to create an unique string identifier to map such request in the cache.
     String localTypeNames = typeNames.isNull() ? String("http://webkit.org/microdata/undefinedItemType") : typeNames;
 
-    pair<NodeListsNodeData::MicroDataItemListCache::iterator, bool> result = data->nodeLists()->m_microDataItemListCache.add(localTypeNames, 0);
+    pair<NodeListsNodeData::MicroDataItemListCache::iterator, bool> result = nodeLists->m_microDataItemListCache.add(localTypeNames, 0);
     if (!result.second)
         return PassRefPtr<NodeList>(result.first->second);
 

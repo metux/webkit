@@ -46,6 +46,7 @@
 #include "WebIconDatabase.h"
 #include "WebKeyValueStorageManagerProxy.h"
 #include "WebMediaCacheManagerProxy.h"
+#include "WebNotificationManagerProxy.h"
 #include "WebPluginSiteDataManager.h"
 #include "WebPageGroup.h"
 #include "WebMemorySampler.h"
@@ -131,6 +132,7 @@ WebContext::WebContext(ProcessModel processModel, const String& injectedBundlePa
     , m_iconDatabase(WebIconDatabase::create(this))
     , m_keyValueStorageManagerProxy(WebKeyValueStorageManagerProxy::create(this))
     , m_mediaCacheManagerProxy(WebMediaCacheManagerProxy::create(this))
+    , m_notificationManagerProxy(WebNotificationManagerProxy::create(this))
     , m_pluginSiteDataManager(WebPluginSiteDataManager::create(this))
     , m_resourceCacheManagerProxy(WebResourceCacheManagerProxy::create(this))
 #if PLATFORM(WIN)
@@ -147,7 +149,7 @@ WebContext::WebContext(ProcessModel processModel, const String& injectedBundlePa
 
     addLanguageChangeObserver(this, languageChanged);
 
-    WebCore::InitializeLoggingChannelsIfNecessary();
+    WebCore::initializeLoggingChannelsIfNecessary();
 
 #ifndef NDEBUG
     webContextCounter.increment();
@@ -181,6 +183,9 @@ WebContext::~WebContext()
 
     m_mediaCacheManagerProxy->invalidate();
     m_mediaCacheManagerProxy->clearContext();
+    
+    m_notificationManagerProxy->invalidate();
+    m_notificationManagerProxy->clearContext();
 
     m_pluginSiteDataManager->invalidate();
     m_pluginSiteDataManager->clearContext();
@@ -341,11 +346,13 @@ void WebContext::processDidFinishLaunching(WebProcessProxy* process)
     if (m_memorySamplerEnabled) {
         SandboxExtension::Handle sampleLogSandboxHandle;        
         double now = WTF::currentTime();
-        String sampleLogFilePath = String::format("WebProcess%llu", static_cast<uint64_t>(now));
+        String sampleLogFilePath = String::format("WebProcess%llu", static_cast<unsigned long long>(now));
         sampleLogFilePath = SandboxExtension::createHandleForTemporaryFile(sampleLogFilePath, SandboxExtension::WriteOnly, sampleLogSandboxHandle);
         
         m_process->send(Messages::WebProcess::StartMemorySampler(sampleLogSandboxHandle, sampleLogFilePath, m_memorySamplerInterval), 0);
     }
+
+    m_connectionClient.didCreateConnection(this, process->webConnection());
 }
 
 void WebContext::disconnectProcess(WebProcessProxy* process)
@@ -369,6 +376,7 @@ void WebContext::disconnectProcess(WebProcessProxy* process)
     m_geolocationManagerProxy->invalidate();
     m_keyValueStorageManagerProxy->invalidate();
     m_mediaCacheManagerProxy->invalidate();
+    m_notificationManagerProxy->invalidate();
     m_resourceCacheManagerProxy->invalidate();
 
     // When out of process plug-ins are enabled, we don't want to invalidate the plug-in site data
@@ -401,6 +409,8 @@ WebProcessProxy* WebContext::relaunchProcessIfNecessary()
 
 DownloadProxy* WebContext::download(WebPageProxy* initiatingPage, const ResourceRequest& request)
 {
+    ensureWebProcess();
+
     DownloadProxy* download = createDownloadProxy();
     uint64_t initiatingPageID = initiatingPage ? initiatingPage->pageID() : 0;
 
@@ -693,6 +703,11 @@ void WebContext::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Mes
         m_mediaCacheManagerProxy->didReceiveMessage(connection, messageID, arguments);
         return;
     }
+    
+    if (messageID.is<CoreIPC::MessageClassWebNotificationManagerProxy>()) {
+        m_notificationManagerProxy->didReceiveMessage(connection, messageID, arguments);
+        return;
+    }
 
     if (messageID.is<CoreIPC::MessageClassWebResourceCacheManagerProxy>()) {
         m_resourceCacheManagerProxy->didReceiveWebResourceCacheManagerProxyMessage(connection, messageID, arguments);
@@ -774,7 +789,7 @@ void WebContext::startMemorySampler(const double interval)
     // For WebProcess
     SandboxExtension::Handle sampleLogSandboxHandle;    
     double now = WTF::currentTime();
-    String sampleLogFilePath = String::format("WebProcess%llu", static_cast<uint64_t>(now));
+    String sampleLogFilePath = String::format("WebProcess%llu", static_cast<unsigned long long>(now));
     sampleLogFilePath = SandboxExtension::createHandleForTemporaryFile(sampleLogFilePath, SandboxExtension::WriteOnly, sampleLogSandboxHandle);
     
     sendToAllProcesses(Messages::WebProcess::StartMemorySampler(sampleLogSandboxHandle, sampleLogFilePath, interval));
@@ -881,7 +896,7 @@ void WebContext::didGetWebCoreStatistics(const StatisticsData& statisticsData, u
     
 void WebContext::garbageCollectJavaScriptObjects()
 {
-    process()->send(Messages::WebProcess::GarbageCollectJavaScriptObjects(), 0);
+    sendToAllProcesses(Messages::WebProcess::GarbageCollectJavaScriptObjects());
 }
 
 } // namespace WebKit

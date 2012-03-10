@@ -22,7 +22,8 @@
 #ifndef JSDOMBinding_h
 #define JSDOMBinding_h
 
-#include "CSSRule.h"
+#include "CSSElementStyleDeclaration.h"
+#include "CSSImportRule.h"
 #include "CSSStyleSheet.h"
 #include "JSDOMGlobalObject.h"
 #include "JSDOMWrapper.h"
@@ -30,6 +31,7 @@
 #include "Document.h"
 #include "Element.h"
 #include "MediaList.h"
+#include "StyledElement.h"
 #include <heap/Weak.h>
 #include <runtime/FunctionPrototype.h>
 #include <runtime/Lookup.h>
@@ -192,8 +194,8 @@ enum ParameterMissingPolicy {
 
     inline void* root(StyleSheet* styleSheet)
     {
-        if (styleSheet->parentRule())
-            return root(styleSheet->parentRule());
+        if (styleSheet->ownerRule())
+            return root(styleSheet->ownerRule());
         if (styleSheet->ownerNode())
             return root(styleSheet->ownerNode());
         return styleSheet;
@@ -205,17 +207,8 @@ enum ParameterMissingPolicy {
             return root(parentRule);
         if (CSSStyleSheet* styleSheet = style->parentStyleSheet())
             return root(styleSheet);
-        return style;
-    }
-
-    inline void* root(CSSMutableStyleDeclaration* style)
-    {
-        if (CSSRule* parentRule = style->parentRule())
-            return root(parentRule);
-        if (CSSStyleSheet* styleSheet = style->parentStyleSheet())
-            return root(styleSheet);
-        if (Node* node = style->node())
-            return root(node);
+        // A style declaration with an associated element should've returned a style sheet above.
+        ASSERT(!style->isElementStyleDeclaration() || !static_cast<CSSElementStyleDeclaration*>(style)->element());
         return style;
     }
 

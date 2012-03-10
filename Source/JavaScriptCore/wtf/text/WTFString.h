@@ -46,6 +46,14 @@ QT_END_NAMESPACE
 class wxString;
 #endif
 
+#if PLATFORM(BLACKBERRY)
+namespace BlackBerry {
+namespace WebKit {
+    class WebString;
+}
+}
+#endif
+
 namespace WTF {
 
 class CString;
@@ -53,8 +61,7 @@ struct StringHash;
 
 // Declarations of string operations
 
-bool charactersAreAllASCII(const UChar*, size_t);
-bool charactersAreAllLatin1(const UChar*, size_t);
+template<typename CharType> inline bool charactersAreAllASCII(const CharType* characters, size_t length);
 WTF_EXPORT_PRIVATE int charactersToIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_PRIVATE int charactersToIntStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_PRIVATE unsigned charactersToUIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
@@ -82,12 +89,18 @@ WTF_EXPORT_PRIVATE double charactersToDouble(const UChar*, size_t, bool* ok = 0,
 float charactersToFloat(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 float charactersToFloat(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 
+enum FloatConversionFlags {
+    ShouldRoundSignificantFigures = 1 << 0,
+    ShouldRoundDecimalPlaces = 1 << 1,
+    ShouldTruncateTrailingZeros = 1 << 2
+};
+
 template<bool isSpecialCharacter(UChar)> bool isAllSpecialCharacters(const UChar*, size_t);
 
 class String {
 public:
     // Construct a null string, distinguishable from an empty string.
-    WTF_EXPORT_PRIVATE String() { }
+    String() { }
 
     // Construct a string with UTF-16 data.
     WTF_EXPORT_PRIVATE String(const UChar* characters, unsigned length);
@@ -109,9 +122,9 @@ public:
     WTF_EXPORT_PRIVATE String(const char* characters);
 
     // Construct a string referencing an existing StringImpl.
-    WTF_EXPORT_PRIVATE String(StringImpl* impl) : m_impl(impl) { }
-    WTF_EXPORT_PRIVATE String(PassRefPtr<StringImpl> impl) : m_impl(impl) { }
-    WTF_EXPORT_PRIVATE String(RefPtr<StringImpl> impl) : m_impl(impl) { }
+    String(StringImpl* impl) : m_impl(impl) { }
+    String(PassRefPtr<StringImpl> impl) : m_impl(impl) { }
+    String(RefPtr<StringImpl> impl) : m_impl(impl) { }
 
     // Inline the destructor.
     ALWAYS_INLINE ~String() { }
@@ -182,7 +195,7 @@ public:
     WTF_EXPORT_PRIVATE static String number(unsigned long);
     WTF_EXPORT_PRIVATE static String number(long long);
     WTF_EXPORT_PRIVATE static String number(unsigned long long);
-    WTF_EXPORT_PRIVATE static String number(double);
+    WTF_EXPORT_PRIVATE static String number(double, unsigned = ShouldRoundSignificantFigures | ShouldTruncateTrailingZeros, unsigned precision = 6);
 
     // Find a single character or string, also with match function & latin1 forms.
     size_t find(UChar c, unsigned start = 0) const
@@ -334,6 +347,11 @@ public:
     WTF_EXPORT_PRIVATE operator wxString() const;
 #endif
 
+#if PLATFORM(BLACKBERRY)
+    String(const BlackBerry::WebKit::WebString&);
+    operator BlackBerry::WebKit::WebString() const;
+#endif
+
     // String::fromUTF8 will return a null string if
     // the input data contains invalid UTF-8 sequences.
     WTF_EXPORT_PRIVATE static String fromUTF8(const LChar*, size_t);
@@ -355,8 +373,8 @@ public:
         return WTF::Unicode::LeftToRight;
     }
 
-    bool containsOnlyASCII() const { return charactersAreAllASCII(characters(), length()); }
-    bool containsOnlyLatin1() const { return charactersAreAllLatin1(characters(), length()); }
+    bool containsOnlyASCII() const;
+    bool containsOnlyLatin1() const;
     bool containsOnlyWhitespace() const { return !m_impl || m_impl->containsOnlyWhitespace(); }
 
     // Hash table deleted values, which are only constructed and never copied or destroyed.
@@ -383,12 +401,21 @@ inline bool operator==(const String& a, const LChar* b) { return equal(a.impl(),
 inline bool operator==(const String& a, const char* b) { return equal(a.impl(), reinterpret_cast<const LChar*>(b)); }
 inline bool operator==(const LChar* a, const String& b) { return equal(a, b.impl()); }
 inline bool operator==(const char* a, const String& b) { return equal(reinterpret_cast<const LChar*>(a), b.impl()); }
+template<size_t inlineCapacity>
+inline bool operator==(const Vector<char, inlineCapacity>& a, const String& b) { return equal(b.impl(), a.data(), a.size()); }
+template<size_t inlineCapacity>
+inline bool operator==(const String& a, const Vector<char, inlineCapacity>& b) { return b == a; }
+
 
 inline bool operator!=(const String& a, const String& b) { return !equal(a.impl(), b.impl()); }
 inline bool operator!=(const String& a, const LChar* b) { return !equal(a.impl(), b); }
 inline bool operator!=(const String& a, const char* b) { return !equal(a.impl(), reinterpret_cast<const LChar*>(b)); }
 inline bool operator!=(const LChar* a, const String& b) { return !equal(a, b.impl()); }
 inline bool operator!=(const char* a, const String& b) { return !equal(reinterpret_cast<const LChar*>(a), b.impl()); }
+template<size_t inlineCapacity>
+inline bool operator!=(const Vector<char, inlineCapacity>& a, const String& b) { return !(a == b); }
+template<size_t inlineCapacity>
+inline bool operator!=(const String& a, const Vector<char, inlineCapacity>& b) { return b != a; }
 
 inline bool equalIgnoringCase(const String& a, const String& b) { return equalIgnoringCase(a.impl(), b.impl()); }
 inline bool equalIgnoringCase(const String& a, const LChar* b) { return equalIgnoringCase(a.impl(), b); }
@@ -432,6 +459,21 @@ inline const UChar* String::getCharacters<UChar>() const
     return characters16();
 }
 
+inline bool String::containsOnlyLatin1() const
+{
+    if (isEmpty())
+        return true;
+
+    if (is8Bit())
+        return true;
+
+    const UChar* characters = characters16();
+    UChar ored = 0;
+    for (size_t i = 0; i < m_impl->length(); ++i)
+        ored |= characters[i];
+    return !(ored & 0xFF00);
+}
+
 
 #ifdef __OBJC__
 // This is for situations in WebKit where the long standing behavior has been
@@ -440,23 +482,34 @@ inline const UChar* String::getCharacters<UChar>() const
 inline NSString* nsStringNilIfEmpty(const String& str) {  return str.isEmpty() ? nil : (NSString*)str; }
 #endif
 
-inline bool charactersAreAllASCII(const UChar* characters, size_t length)
+template<typename CharType>
+inline bool charactersAreAllASCII(const CharType* characters, size_t length)
 {
-    UChar ored = 0;
+    CharType ored = 0;
     for (size_t i = 0; i < length; ++i)
         ored |= characters[i];
-    return !(ored & 0xFF80);
+
+    CharType lowBits = 0x7F;
+    return !(ored & ~lowBits);
 }
 
-inline bool charactersAreAllLatin1(const UChar* characters, size_t length)
+inline bool String::containsOnlyASCII() const
 {
-    UChar ored = 0;
-    for (size_t i = 0; i < length; ++i)
-        ored |= characters[i];
-    return !(ored & 0xFF00);
+    if (isEmpty())
+        return true;
+
+    if (is8Bit())
+        return charactersAreAllASCII(characters8(), m_impl->length());
+
+    return charactersAreAllASCII(characters16(), m_impl->length());
 }
 
 WTF_EXPORT_PRIVATE int codePointCompare(const String&, const String&);
+
+inline bool codePointCompareLessThan(const String& a, const String& b)
+{
+    return codePointCompare(a.impl(), b.impl()) < 0;
+}
 
 inline size_t find(const LChar* characters, unsigned length, LChar matchCharacter, unsigned index = 0)
 {
@@ -582,7 +635,6 @@ using WTF::emptyString;
 using WTF::append;
 using WTF::appendNumber;
 using WTF::charactersAreAllASCII;
-using WTF::charactersAreAllLatin1;
 using WTF::charactersToIntStrict;
 using WTF::charactersToUIntStrict;
 using WTF::charactersToInt64Strict;
@@ -601,6 +653,7 @@ using WTF::find;
 using WTF::isAllSpecialCharacters;
 using WTF::isSpaceOrNewline;
 using WTF::reverseFind;
+using WTF::ShouldRoundDecimalPlaces;
 
 #include "AtomicString.h"
 #endif

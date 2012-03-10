@@ -89,9 +89,16 @@ LayoutRect RenderSVGText::clippedOverflowRectForRepaint(RenderBoxModelObject* re
     return SVGRenderSupport::clippedOverflowRectForRepaint(this, repaintContainer);
 }
 
-void RenderSVGText::computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect& repaintRect, bool fixed) const
+void RenderSVGText::computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
 {
-    SVGRenderSupport::computeRectForRepaint(this, repaintContainer, repaintRect, fixed);
+    FloatRect repaintRect = rect;
+    computeFloatRectForRepaint(repaintContainer, repaintRect, fixed);
+    rect = enclosingLayoutRect(repaintRect);
+}
+
+void RenderSVGText::computeFloatRectForRepaint(RenderBoxModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
+{
+    SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
 }
 
 void RenderSVGText::mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool /* fixed */, bool /* useTransforms */, TransformState& transformState, bool* wasFixed) const
@@ -166,7 +173,7 @@ void RenderSVGText::layout()
         updateCachedBoundariesInParents = oldBoundaries != objectBoundingBox();
 
     // Invalidate all resources of this client if our layout changed.
-    if (m_everHadLayout && selfNeedsLayout())
+    if (everHadLayout() && selfNeedsLayout())
         SVGResourcesCache::clientLayoutChanged(this);
 
     // If our bounds changed, notify the parents.

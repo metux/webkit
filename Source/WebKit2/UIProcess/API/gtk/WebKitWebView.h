@@ -30,11 +30,12 @@
 
 #include <webkit2/WebKitBackForwardList.h>
 #include <webkit2/WebKitDefines.h>
-#include <webkit2/WebKitNetworkRequest.h>
 #include <webkit2/WebKitWebContext.h>
 #include <webkit2/WebKitWebLoaderClient.h>
 #include <webkit2/WebKitSettings.h>
+#include <webkit2/WebKitURIRequest.h>
 #include <webkit2/WebKitWebViewBase.h>
+#include <webkit2/WebKitWindowProperties.h>
 
 G_BEGIN_DECLS
 
@@ -56,6 +57,20 @@ struct _WebKitWebView {
 
 struct _WebKitWebViewClass {
     WebKitWebViewBaseClass parent;
+
+    GtkWidget *(* create)         (WebKitWebView *web_view);
+    void       (* ready_to_show)  (WebKitWebView *web_view);
+    void       (* close)          (WebKitWebView *web_view);
+
+    gboolean   (* script_alert)   (WebKitWebView *web_view,
+                                   const gchar   *message);
+    gboolean   (* script_confirm) (WebKitWebView *web_view,
+                                   const gchar   *message,
+                                   gboolean      *confirmed);
+    gboolean   (* script_prompt)  (WebKitWebView *web_view,
+                                   const gchar   *message,
+                                   const gchar   *default_text,
+                                   gchar        **text);
 
     /* Padding for future expansion */
     void (*_webkit_reserved0) (void);
@@ -107,7 +122,7 @@ webkit_web_view_load_alternate_html          (WebKitWebView             *web_vie
                                               const gchar               *unreachable_uri);
 WEBKIT_API void
 webkit_web_view_load_request                 (WebKitWebView             *web_view,
-                                              WebKitNetworkRequest      *request);
+                                              WebKitURIRequest          *request);
 
 WEBKIT_API void
 webkit_web_view_stop_loading                 (WebKitWebView             *web_view);
@@ -158,6 +173,9 @@ webkit_web_view_set_settings                 (WebKitWebView             *web_vie
 
 WEBKIT_API WebKitSettings *
 webkit_web_view_get_settings                 (WebKitWebView             *web_view);
+
+WEBKIT_API WebKitWindowProperties *
+webkit_web_view_get_window_properties        (WebKitWebView             *web_view);
 
 G_END_DECLS
 

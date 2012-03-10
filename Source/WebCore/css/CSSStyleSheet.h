@@ -38,21 +38,17 @@ class CSSStyleSheet : public StyleSheet {
 public:
     static PassRefPtr<CSSStyleSheet> create()
     {
-        return adoptRef(new CSSStyleSheet(static_cast<CSSRule*>(0), String(), KURL(), String()));
+        return adoptRef(new CSSStyleSheet(static_cast<CSSImportRule*>(0), String(), KURL(), String()));
     }
     static PassRefPtr<CSSStyleSheet> create(Node* ownerNode)
     {
         return adoptRef(new CSSStyleSheet(ownerNode, String(), KURL(), String()));
     }
-    static PassRefPtr<CSSStyleSheet> create(Node* ownerNode, const String& originalURL, const KURL& finalURL)
-    {
-        return adoptRef(new CSSStyleSheet(ownerNode, originalURL, finalURL, String()));
-    }
     static PassRefPtr<CSSStyleSheet> create(Node* ownerNode, const String& originalURL, const KURL& finalURL, const String& charset)
     {
         return adoptRef(new CSSStyleSheet(ownerNode, originalURL, finalURL, charset));
     }
-    static PassRefPtr<CSSStyleSheet> create(CSSRule* ownerRule, const String& originalURL, const KURL& finalURL, const String& charset)
+    static PassRefPtr<CSSStyleSheet> create(CSSImportRule* ownerRule, const String& originalURL, const KURL& finalURL, const String& charset)
     {
         return adoptRef(new CSSStyleSheet(ownerRule, originalURL, finalURL, charset));
     }
@@ -70,7 +66,6 @@ public:
         return static_cast<CSSStyleSheet*>(parentSheet);
     }
 
-    CSSRule* ownerRule() const { return parentRule(); }
     PassRefPtr<CSSRuleList> cssRules(bool omitCharsetRules = false);
     unsigned insertRule(const String& rule, unsigned index, ExceptionCode&);
     void deleteRule(unsigned index, ExceptionCode&);
@@ -92,7 +87,7 @@ public:
 
     virtual bool isLoading();
 
-    virtual void checkLoaded();
+    void checkLoaded();
     void startLoadingDynamicSheet();
 
     Node* findStyleSheetOwnerNode() const;
@@ -102,7 +97,7 @@ public:
 
     bool loadCompleted() const { return m_loadCompleted; }
 
-    virtual KURL completeURL(const String& url) const;
+    KURL completeURL(const String& url) const;
     void addSubresourceStyleURLs(ListHashSet<KURL>&);
 
     void setStrictParsing(bool b) { m_strictParsing = b; }
@@ -121,7 +116,7 @@ public:
 
 private:
     CSSStyleSheet(Node* ownerNode, const String& originalURL, const KURL& finalURL, const String& charset);
-    CSSStyleSheet(CSSRule* ownerRule, const String& originalURL, const KURL& finalURL, const String& charset);
+    CSSStyleSheet(CSSImportRule* ownerRule, const String& originalURL, const KURL& finalURL, const String& charset);
 
     virtual bool isCSSStyleSheet() const { return true; }
     virtual String type() const { return "text/css"; }

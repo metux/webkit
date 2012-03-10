@@ -187,16 +187,6 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
         info.hotPathOther = linkBuffer.locationOfNearCall(m_jsCalls[i].m_fastCall);
     }
     
-    m_codeBlock->addMethodCallLinkInfos(m_methodGets.size());
-    for (unsigned i = 0; i < m_methodGets.size(); ++i) {
-        MethodCallLinkInfo& info = m_codeBlock->methodCallLinkInfo(i);
-        info.cachedStructure.setLocation(linkBuffer.locationOf(m_methodGets[i].m_structToCompare));
-        info.cachedPrototypeStructure.setLocation(linkBuffer.locationOf(m_methodGets[i].m_protoStructToCompare));
-        info.cachedFunction.setLocation(linkBuffer.locationOf(m_methodGets[i].m_putFunction));
-        info.cachedPrototype.setLocation(linkBuffer.locationOf(m_methodGets[i].m_protoObj));
-        info.callReturnLocation = linkBuffer.locationOf(m_methodGets[i].m_slowCall);
-    }
-    
     MacroAssemblerCodeRef osrExitThunk = globalData()->getCTIStub(osrExitGenerationThunkGenerator);
     CodeLocationLabel target = CodeLocationLabel(osrExitThunk.code());
     for (unsigned i = 0; i < codeBlock()->numberOfOSRExits(); ++i) {
@@ -266,7 +256,7 @@ void JITCompiler::compileFunction(JITCode& entry, MacroAssemblerCodePtr& entryWi
     compileEntry();
 
     load32(Address(GPRInfo::callFrameRegister, RegisterFile::ArgumentCount * static_cast<int>(sizeof(Register))), GPRInfo::regT1);
-    branch32(Equal, GPRInfo::regT1, Imm32(m_codeBlock->m_numParameters)).linkTo(fromArityCheck, this);
+    branch32(AboveOrEqual, GPRInfo::regT1, Imm32(m_codeBlock->m_numParameters)).linkTo(fromArityCheck, this);
     move(stackPointerRegister, GPRInfo::argumentGPR0);
     poke(GPRInfo::callFrameRegister, OBJECT_OFFSETOF(struct JITStackFrame, callFrame) / sizeof(void*));
     Call callArityCheck = call();

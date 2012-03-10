@@ -31,6 +31,7 @@
 
 #include "CurrentTime.h"
 #include "Deque.h"
+#include "Functional.h"
 #include "StdLibExtras.h"
 #include "Threading.h"
 
@@ -70,7 +71,7 @@ public:
 typedef Deque<FunctionWithContext> FunctionQueue;
 
 static bool callbacksPaused; // This global variable is only accessed from main thread.
-#if !PLATFORM(MAC) && !PLATFORM(QT)
+#if !PLATFORM(MAC)
 static ThreadIdentifier mainThreadIdentifier;
 #endif
 
@@ -96,9 +97,7 @@ void initializeMainThread()
         return;
     initializedMainThread = true;
 
-#if !PLATFORM(QT)
     mainThreadIdentifier = currentThread();
-#endif
 
     mainThreadFunctionQueueMutex();
     initializeMainThreadPlatform();
@@ -218,6 +217,18 @@ void cancelCallOnMainThread(MainThreadFunction* function, void* context)
     }
 }
 
+static void callFunctionObject(void* context)
+{
+    Function<void ()>* function = static_cast<Function<void ()>*>(context);
+    (*function)();
+    delete function;
+}
+
+void callOnMainThread(const Function<void ()>& function)
+{
+    callOnMainThread(callFunctionObject, new Function<void ()>(function));
+}
+
 void setMainThreadCallbacksPaused(bool paused)
 {
     ASSERT(isMainThread());
@@ -231,7 +242,7 @@ void setMainThreadCallbacksPaused(bool paused)
         scheduleDispatchFunctionsOnMainThread();
 }
 
-#if !PLATFORM(MAC) && !PLATFORM(QT)
+#if !PLATFORM(MAC)
 bool isMainThread()
 {
     return currentThread() == mainThreadIdentifier;

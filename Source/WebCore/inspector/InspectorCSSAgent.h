@@ -26,6 +26,8 @@
 #define InspectorCSSAgent_h
 
 #include "CSSSelector.h"
+#include "Document.h"
+#include "InspectorBaseAgent.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorStyleSheet.h"
 #include "InspectorValues.h"
@@ -51,22 +53,31 @@ class Node;
 
 #if ENABLE(INSPECTOR)
 
-class InspectorCSSAgent : public InspectorDOMAgent::DOMListener {
+class InspectorCSSAgent : public InspectorBaseAgent<InspectorCSSAgent>, public InspectorDOMAgent::DOMListener {
     WTF_MAKE_NONCOPYABLE(InspectorCSSAgent);
 public:
     static CSSStyleSheet* parentStyleSheet(CSSRule*);
     static CSSStyleRule* asCSSStyleRule(CSSRule*);
 
-    InspectorCSSAgent(InstrumentingAgents*, InspectorDOMAgent*);
+    static PassOwnPtr<InspectorCSSAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state, InspectorDOMAgent* domAgent)
+    {
+        return adoptPtr(new InspectorCSSAgent(instrumentingAgents, state, domAgent));
+    }
     ~InspectorCSSAgent();
 
     bool forcePseudoState(Element*, CSSSelector::PseudoType);
-    void clearFrontend();
+    virtual void setFrontend(InspectorFrontend*);
+    virtual void clearFrontend();
+    virtual void discardAgent();
+    virtual void restore();
+    void enable(ErrorString*);
+    void disable(ErrorString*);
     void reset();
+    void mediaQueryResultChanged();
 
-    void getStylesForNode(ErrorString*, int nodeId, const RefPtr<InspectorArray>* forcedPseudoClasses, RefPtr<InspectorObject>* result);
-    void getInlineStyleForNode(ErrorString*, int nodeId, RefPtr<InspectorObject>* style);
-    void getComputedStyleForNode(ErrorString*, int nodeId, RefPtr<InspectorObject>* style);
+    void getComputedStyleForNode(ErrorString*, int nodeId, const RefPtr<InspectorArray>* forcedPseudoClasses, RefPtr<InspectorArray>* style);
+    void getInlineStylesForNode(ErrorString*, int nodeId, RefPtr<InspectorObject>* inlineStyle, RefPtr<InspectorArray>* attributes);
+    void getMatchedStylesForNode(ErrorString*, int nodeId, const RefPtr<InspectorArray>* forcedPseudoClasses, bool* includePseudo, bool* includeInherited, RefPtr<InspectorArray>* matchedCSSRules, RefPtr<InspectorArray>* pseudoIdRules, RefPtr<InspectorArray>* inheritedEntries);
     void getAllStyleSheets(ErrorString*, RefPtr<InspectorArray>* styleSheetInfos);
     void getStyleSheet(ErrorString*, const String& styleSheetId, RefPtr<InspectorObject>* result);
     void getStyleSheetText(ErrorString*, const String& styleSheetId, String* result);
@@ -78,13 +89,14 @@ public:
     void getSupportedCSSProperties(ErrorString*, RefPtr<InspectorArray>* result);
 
 private:
+    InspectorCSSAgent(InstrumentingAgents*, InspectorState*, InspectorDOMAgent*);
+
     typedef HashMap<String, RefPtr<InspectorStyleSheet> > IdToInspectorStyleSheet;
     typedef HashMap<CSSStyleSheet*, RefPtr<InspectorStyleSheet> > CSSStyleSheetToInspectorStyleSheet;
     typedef HashMap<Node*, RefPtr<InspectorStyleSheetForInlineStyle> > NodeToInspectorStyleSheet; // bogus "stylesheets" with elements' inline styles
     typedef HashMap<RefPtr<Document>, RefPtr<InspectorStyleSheet> > DocumentToViaInspectorStyleSheet; // "via inspector" stylesheets
 
-    static Element* inlineStyleElement(CSSStyleDeclaration*);
-
+    void recalcStyleForPseudoStateIfNeeded(Element*, InspectorArray* forcedPseudoClasses);
     InspectorStyleSheetForInlineStyle* asInspectorStyleSheet(Element* element);
     Element* elementForId(ErrorString*, int nodeId);
     void collectStyleSheets(CSSStyleSheet*, InspectorArray*);
@@ -104,7 +116,7 @@ private:
 
     void clearPseudoState(bool recalcStyles);
 
-    InstrumentingAgents* m_instrumentingAgents;
+    InspectorFrontend::CSS* m_frontend;
     InspectorDOMAgent* m_domAgent;
     RefPtr<Element> m_lastElementWithPseudoState;
     unsigned m_lastPseudoState;

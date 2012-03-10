@@ -38,6 +38,7 @@
 #include "InlineIterator.h"
 #include "InlineTextBox.h"
 #include "LayoutRepainter.h"
+#include "PODFreeListArena.h"
 #include "Page.h"
 #include "PaintInfo.h"
 #include "RenderBoxRegionInfo.h"
@@ -464,7 +465,7 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
     // them from |this| and place them in the clone.
     if (!beforeChild && isAfterContent(lastChild()))
         beforeChild = lastChild();
-    moveChildrenTo(cloneBlock, beforeChild, 0);
+    moveChildrenTo(cloneBlock, beforeChild, 0, true);
     
     // Hook |clone| up as the continuation of the middle block.
     if (!cloneBlock->isAnonymousBlock())
@@ -506,8 +507,7 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
 
         // Now we need to take all of the children starting from the first child
         // *after* currChild and append them all to the clone.
-        RenderObject* afterContent = isAfterContent(cloneBlock->lastChild()) ? cloneBlock->lastChild() : 0;
-        blockCurr->moveChildrenTo(cloneBlock, currChild->nextSibling(), 0, afterContent);
+        blockCurr->moveChildrenTo(cloneBlock, currChild->nextSibling(), 0, true);
 
         // Keep walking up the chain.
         currChild = curr;
@@ -519,7 +519,7 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
 
     // Now take all the children after currChild and remove them from the fromBlock
     // and put them in the toBlock.
-    fromBlock->moveChildrenTo(toBlock, currChild->nextSibling(), 0);
+    fromBlock->moveChildrenTo(toBlock, currChild->nextSibling(), 0, true);
 }
 
 void RenderBlock::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
@@ -555,7 +555,7 @@ void RenderBlock::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
     block->setChildrenInline(false);
     
     if (madeNewBeforeBlock)
-        block->moveChildrenTo(pre, boxFirst, 0);
+        block->moveChildrenTo(pre, boxFirst, 0, true);
 
     splitBlocks(pre, post, newBlockBox, beforeChild, oldCont);
 
@@ -1070,7 +1070,7 @@ void RenderBlock::removeChild(RenderObject* oldChild)
     RenderBox::removeChild(oldChild);
 
     RenderObject* child = prev ? prev : next;
-    if (canMergeAnonymousBlocks && child && !child->previousSibling() && !child->nextSibling() && !isDeprecatedFlexibleBox()) {
+    if (canMergeAnonymousBlocks && child && !child->previousSibling() && !child->nextSibling() && !isFlexibleBoxIncludingDeprecated()) {
         // The removal has knocked us down to containing only a single anonymous
         // box.  We can go ahead and pull the content right back up into our
         // box.
@@ -1199,7 +1199,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     if (!relayoutChildren && simplifiedLayout())
         return;
 
-    LayoutRepainter repainter(*this, m_everHadLayout && checkForRepaintDuringLayout());
+    LayoutRepainter repainter(*this, everHadLayout() && checkForRepaintDuringLayout());
 
     LayoutUnit oldWidth = logicalWidth();
     LayoutUnit oldColumnWidth = desiredColumnWidth();
@@ -1236,7 +1236,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
             }
             setLogicalHeight(0);
         }
-        if (colInfo->columnHeight() != pageLogicalHeight && m_everHadLayout) {
+        if (colInfo->columnHeight() != pageLogicalHeight && everHadLayout()) {
             colInfo->setColumnHeight(pageLogicalHeight);
             pageLogicalHeightChanged = true;
         }
@@ -2071,7 +2071,7 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
     if (!child->needsLayout())
         child->markForPaginationRelayoutIfNeeded();
 
-    bool childHadLayout = child->m_everHadLayout;
+    bool childHadLayout = child->everHadLayout();
     bool childNeededLayout = child->needsLayout();
     if (childNeededLayout)
         child->layout();
@@ -3272,7 +3272,7 @@ RenderBlock::FloatingObject* RenderBlock::insertFloatingObject(RenderBox* o)
 
     // Create the list of special objects if we don't aleady have one
     if (!m_floatingObjects)
-        m_floatingObjects = adoptPtr(new FloatingObjects(isHorizontalWritingMode()));
+        m_floatingObjects = adoptPtr(new FloatingObjects(this, isHorizontalWritingMode()));
     else {
         // Don't insert the object again if it's already in the list
         const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
@@ -3937,7 +3937,7 @@ LayoutUnit RenderBlock::addOverhangingFloats(RenderBlock* child, bool makeChildP
 
                 // We create the floating object list lazily.
                 if (!m_floatingObjects)
-                    m_floatingObjects = adoptPtr(new FloatingObjects(isHorizontalWritingMode()));
+                    m_floatingObjects = adoptPtr(new FloatingObjects(this, isHorizontalWritingMode()));
 
                 m_floatingObjects->add(floatingObj);
             }
@@ -4010,7 +4010,7 @@ void RenderBlock::addIntrudingFloats(RenderBlock* prev, LayoutUnit logicalLeftOf
                 
                 // We create the floating object list lazily.
                 if (!m_floatingObjects)
-                    m_floatingObjects = adoptPtr(new FloatingObjects(isHorizontalWritingMode()));
+                    m_floatingObjects = adoptPtr(new FloatingObjects(this, isHorizontalWritingMode()));
                 m_floatingObjects->add(floatingObj);
             }
         }
@@ -4030,7 +4030,7 @@ bool RenderBlock::containsFloat(RenderBox* renderer)
 
 void RenderBlock::markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove, bool inLayout)
 {
-    if (!m_everHadLayout)
+    if (!everHadLayout())
         return;
 
     setChildNeedsLayout(true, !inLayout);
@@ -4237,49 +4237,100 @@ bool RenderBlock::hitTestFloats(const HitTestRequest& request, HitTestResult& re
     return false;
 }
 
+class ColumnRectIterator {
+    WTF_MAKE_NONCOPYABLE(ColumnRectIterator);
+public:
+    ColumnRectIterator(const RenderBlock& block)
+        : m_block(block)
+        , m_colInfo(block.columnInfo())
+        , m_direction(m_block.style()->isFlippedBlocksWritingMode() ? 1 : -1)
+        , m_isHorizontal(block.isHorizontalWritingMode())
+        , m_logicalLeft(block.logicalLeftOffsetForContent())
+    {
+        int colCount = m_colInfo->columnCount();
+        m_colIndex = colCount - 1;
+        m_currLogicalTopOffset = colCount * m_colInfo->columnHeight() * m_direction;
+        update();
+    }
+
+    void advance()
+    {
+        ASSERT(hasMore());
+        m_colIndex--;
+        update();
+    }
+
+    LayoutRect columnRect() const { return m_colRect; }
+    bool hasMore() const { return m_colIndex >= 0; }
+
+    void adjust(LayoutSize& offset) const
+    {
+        LayoutUnit currLogicalLeftOffset = (m_isHorizontal ? m_colRect.x() : m_colRect.y()) - m_logicalLeft;
+        offset += m_isHorizontal ? LayoutSize(currLogicalLeftOffset, m_currLogicalTopOffset) : LayoutSize(m_currLogicalTopOffset, currLogicalLeftOffset);
+        if (m_colInfo->progressionAxis() == ColumnInfo::BlockAxis) {
+            if (m_isHorizontal)
+                offset.expand(0, m_colRect.y() - m_block.borderTop() - m_block.paddingTop());
+            else
+                offset.expand(m_colRect.x() - m_block.borderLeft() - m_block.paddingLeft(), 0);
+        }
+    }
+
+private:
+    void update()
+    {
+        if (m_colIndex < 0)
+            return;
+
+        m_colRect = m_block.columnRectAt(const_cast<ColumnInfo*>(m_colInfo), m_colIndex);
+        m_block.flipForWritingMode(m_colRect);
+        m_currLogicalTopOffset -= (m_isHorizontal ? m_colRect.height() : m_colRect.width()) * m_direction;
+    }
+
+    const RenderBlock& m_block;
+    const ColumnInfo* const m_colInfo;
+    const int m_direction;
+    const bool m_isHorizontal;
+    const LayoutUnit m_logicalLeft;
+    int m_colIndex;
+    LayoutUnit m_currLogicalTopOffset;
+    LayoutRect m_colRect;
+};
+
 bool RenderBlock::hitTestColumns(const HitTestRequest& request, HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
     // We need to do multiple passes, breaking up our hit testing into strips.
-    ColumnInfo* colInfo = columnInfo();
-    int colCount = columnCount(colInfo);
-    if (!colCount)
+    if (!hasColumns())
         return false;
-    LayoutUnit logicalLeft = logicalLeftOffsetForContent();
-    LayoutUnit currLogicalTopOffset = !style()->isFlippedBlocksWritingMode() ? -colCount * colInfo->columnHeight() : colCount * colInfo->columnHeight();
-    bool isHorizontal = isHorizontalWritingMode();
 
-    for (int i = colCount - 1; i >= 0; i--) {
-        LayoutRect colRect = columnRectAt(colInfo, i);
-        flipForWritingMode(colRect);
-        LayoutUnit currLogicalLeftOffset = (isHorizontal ? colRect.x() : colRect.y()) - logicalLeft;
-        LayoutUnit blockDelta =  (isHorizontal ? colRect.height() : colRect.width());
-        if (style()->isFlippedBlocksWritingMode())
-            currLogicalTopOffset -= blockDelta;
-        else
-            currLogicalTopOffset += blockDelta;
+    for (ColumnRectIterator it(*this); it.hasMore(); it.advance()) {
+        LayoutRect hitRect = result.rectForPoint(pointInContainer);
+        LayoutRect colRect = it.columnRect();
         colRect.moveBy(accumulatedOffset);
-        
-        if (colRect.intersects(result.rectForPoint(pointInContainer))) {
+        if (colRect.intersects(hitRect)) {
             // The point is inside this column.
             // Adjust accumulatedOffset to change where we hit test.
-        
-            LayoutSize offset = isHorizontal ? IntSize(currLogicalLeftOffset, currLogicalTopOffset) : LayoutSize(currLogicalTopOffset, currLogicalLeftOffset);
-            if (colInfo->progressionAxis() == ColumnInfo::BlockAxis) {
-                if (isHorizontal)
-                    offset.expand(0, colRect.y() - accumulatedOffset.y() - borderTop() - paddingTop());
-                else
-                    offset.expand(colRect.x() - accumulatedOffset.x() - borderLeft() - paddingLeft(), 0);
-            }
-
+            LayoutSize offset;
+            it.adjust(offset);
             LayoutPoint finalLocation = accumulatedOffset + offset;
-            if (result.isRectBasedTest() && !colRect.contains(result.rectForPoint(pointInContainer)))
-                hitTestContents(request, result, pointInContainer, finalLocation, hitTestAction);
-            else
+            if (!result.isRectBasedTest() || colRect.contains(hitRect))
                 return hitTestContents(request, result, pointInContainer, finalLocation, hitTestAction) || (hitTestAction == HitTestFloat && hitTestFloats(request, result, pointInContainer, finalLocation));
+
+            hitTestContents(request, result, pointInContainer, finalLocation, hitTestAction);
         }
     }
 
     return false;
+}
+
+void RenderBlock::adjustForColumnRect(LayoutSize& offset, const LayoutPoint& pointInContainer) const
+{
+    for (ColumnRectIterator it(*this); it.hasMore(); it.advance()) {
+        LayoutRect colRect = it.columnRect();
+        if (colRect.contains(pointInContainer)) {
+            it.adjust(offset);
+            return;
+        }
+    }
 }
 
 bool RenderBlock::hitTestContents(const HitTestRequest& request, HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
@@ -4619,10 +4670,10 @@ bool RenderBlock::layoutColumns(bool hasSpecifiedPageLogicalHeight, LayoutUnit p
     // FIXME: We don't balance properly at all in the presence of forced page breaks.  We need to understand what
     // the distance between forced page breaks is so that we can avoid making the minimum column height too tall.
     ColumnInfo* colInfo = columnInfo();
-    int desiredColumnCount = colInfo->desiredColumnCount();
     if (!hasSpecifiedPageLogicalHeight) {
         LayoutUnit columnHeight = pageLogicalHeight;
         int minColumnCount = colInfo->forcedBreaks() + 1;
+        int desiredColumnCount = colInfo->desiredColumnCount();
         if (minColumnCount >= desiredColumnCount) {
             // The forced page breaks are in control of the balancing.  Just set the column height to the
             // maximum page break distance.
@@ -4638,7 +4689,7 @@ bool RenderBlock::layoutColumns(bool hasSpecifiedPageLogicalHeight, LayoutUnit p
         
         if (columnHeight && columnHeight != pageLogicalHeight) {
             statePusher.pop();
-            m_everHadLayout = true;
+            setEverHadLayout(true);
             layoutBlock(false, columnHeight);
             return true;
         }
@@ -5695,6 +5746,26 @@ void RenderBlock::updateFirstLetter()
                     break;
                 }
                 next = next->nextSibling();
+            }
+            if (!remainingText && firstLetterContainer->isAnonymousBlock()) {
+                // The remaining text fragment could have been wrapped in a different anonymous block since creation
+                RenderObject* nextChild;
+                next = firstLetterContainer->nextSibling();
+                while (next && !remainingText) {
+                    if (next->isAnonymousBlock()) {
+                        nextChild = next->firstChild();
+                        while (nextChild) {
+                            if (nextChild->isText() && toRenderText(nextChild)->isTextFragment()
+                                && (toRenderTextFragment(nextChild)->firstLetter() == firstLetter)) {
+                                remainingText = toRenderTextFragment(nextChild);
+                                break;
+                            }
+                            nextChild = nextChild->nextSibling();
+                        }
+                    } else
+                        break;
+                    next = next->nextSibling();
+                }
             }
             if (remainingText) {
                 ASSERT(remainingText->isAnonymous() || remainingText->node()->renderer() == remainingText);
@@ -6940,7 +7011,7 @@ void RenderBlock::FloatingObjects::computePlacedFloatsTree()
     ASSERT(!m_placedFloatsTree.isInitialized());
     if (m_set.isEmpty())
         return;
-    m_placedFloatsTree.initIfNeeded();
+    m_placedFloatsTree.initIfNeeded(m_renderer->view()->intervalArena());
     FloatingObjectSetIterator it = m_set.begin();
     FloatingObjectSetIterator end = m_set.end();
     for (; it != end; ++it) {

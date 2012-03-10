@@ -46,6 +46,8 @@
 #include "HTMLInterchange.h"
 #include "HTMLNames.h"
 #include "NodeList.h"
+#include "NodeRenderStyle.h"
+#include "RenderInline.h"
 #include "RenderObject.h"
 #include "RenderText.h"
 #include "SmartReplace.h"
@@ -372,6 +374,7 @@ ReplaceSelectionCommand::ReplaceSelectionCommand(Document* document, PassRefPtr<
     , m_preventNesting(options & PreventNesting)
     , m_movingParagraph(options & MovingParagraph)
     , m_editAction(editAction)
+    , m_sanitizeFragment(options & SanitizeFragment)
     , m_shouldMergeEnd(false)
 {
 }
@@ -529,11 +532,59 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
             // results. We already know one issue because td elements ignore their display property
             // in quirks mode (which Mail.app is always in). We should look for an alternative.
             if (isBlock(element))
-                element->getInlineStyleDecl()->setProperty(CSSPropertyDisplay, CSSValueInline);
+                element->ensureInlineStyleDecl()->setProperty(CSSPropertyDisplay, CSSValueInline);
             if (element->renderer() && element->renderer()->style()->isFloating())
-                element->getInlineStyleDecl()->setProperty(CSSPropertyFloat, CSSValueNone);
+                element->ensureInlineStyleDecl()->setProperty(CSSPropertyFloat, CSSValueNone);
         }
     }
+}
+
+void ReplaceSelectionCommand::removeRedundantMarkup(InsertedNodes& insertedNodes)
+{
+    Node* pastEndNode = insertedNodes.pastLastLeaf();
+    Node* rootNode = insertedNodes.firstNodeInserted()->parentNode();
+    Vector<Node*> nodesToRemove;
+    
+    // Walk through the inserted nodes, to see if there are elements that could be removed
+    // without affecting the style. The goal is to produce leaner markup even when starting
+    // from a verbose fragment.
+    // We look at inline elements as well as non top level divs that don't have attributes. 
+    for (Node* node = insertedNodes.firstNodeInserted(); node && node != pastEndNode; node = node->traverseNextNode()) {
+        if (node->firstChild() || (node->isTextNode() && node->nextSibling()))
+            continue;
+        
+        Node* startingNode = node->parentNode();
+        RenderStyle* startingStyle = startingNode->renderStyle();
+        if (!startingStyle)
+            continue;
+        Node* currentNode = startingNode;
+        Node* topNodeWithStartingStyle = 0;
+        while (currentNode != rootNode) {
+            if (currentNode->parentNode() != rootNode && isRemovableBlock(currentNode))
+                nodesToRemove.append(currentNode);
+
+            currentNode = currentNode->parentNode();
+            if (!currentNode->renderer() || !currentNode->renderer()->isRenderInline() || toRenderInline(currentNode->renderer())->alwaysCreateLineBoxes())
+                continue;
+
+            if (currentNode && currentNode->firstChild() != currentNode->lastChild()) {
+                topNodeWithStartingStyle = 0;
+                break;
+            }
+            
+            unsigned context;
+            if (currentNode->renderStyle()->diff(startingStyle, context) == StyleDifferenceEqual)
+                topNodeWithStartingStyle = currentNode;
+            
+        }
+        if (topNodeWithStartingStyle) {
+            for (Node* node = startingNode; node != topNodeWithStartingStyle; node = node->parentNode())
+                nodesToRemove.append(node);
+        }
+    }
+    // we perform all the DOM mutations at once.
+    for (size_t i = 0; i < nodesToRemove.size(); ++i)
+        removeNodePreservingChildren(nodesToRemove[i]);
 }
 
 static inline bool nodeHasVisibleRenderText(Text* text)
@@ -646,7 +697,7 @@ void ReplaceSelectionCommand::handleStyleSpans(InsertedNodes& insertedNodes)
     if (!wrappingStyleSpan)
         return;
 
-    RefPtr<EditingStyle> style = EditingStyle::create(wrappingStyleSpan->getInlineStyleDecl());
+    RefPtr<EditingStyle> style = EditingStyle::create(wrappingStyleSpan->ensureInlineStyleDecl());
     ContainerNode* context = wrappingStyleSpan->parentNode();
 
     // If Mail wraps the fragment with a Paste as Quotation blockquote, or if you're pasting into a quoted region,
@@ -1000,6 +1051,9 @@ void ReplaceSelectionCommand::doApply()
     }
 
     removeRedundantStylesAndKeepStyleSpanInline(insertedNodes);
+
+    if (m_sanitizeFragment)
+        removeRedundantMarkup(insertedNodes);
 
     // Setup m_startOfInsertedContent and m_endOfInsertedContent. This should be the last two lines of code that access insertedNodes.
     m_startOfInsertedContent = firstPositionInOrBeforeNode(insertedNodes.firstNodeInserted());

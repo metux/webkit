@@ -99,6 +99,11 @@ WebInspector.SourceFrame.prototype = {
         this.setReadOnly(true);
     },
 
+    focus: function()
+    {
+        this._textViewer.focus();
+    },
+
     get statusBarItems()
     {
         return [this._editButton.element];
@@ -480,12 +485,15 @@ WebInspector.SourceFrame.prototype = {
         rowMessage.repeatCountElement.textContent = WebInspector.UIString(" (repeated %d times)", rowMessage.repeatCount);
     },
 
-    populateLineGutterContextMenu: function(lineNumber, contextMenu)
+    populateLineGutterContextMenu: function(contextMenu, lineNumber)
     {
     },
 
-    populateTextAreaContextMenu: function(contextMenu)
+    populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
+        if (!window.getSelection().isCollapsed)
+            return;
+        WebInspector.populateResourceContextMenu(contextMenu, this._url, lineNumber);
     },
 
     suggestedFileName: function()
@@ -615,14 +623,14 @@ WebInspector.TextViewerDelegateForSourceFrame.prototype = {
         this._sourceFrame.cancelEditing();
     },
 
-    populateLineGutterContextMenu: function(lineNumber, contextMenu)
+    populateLineGutterContextMenu: function(contextMenu, lineNumber)
     {
-        this._sourceFrame.populateLineGutterContextMenu(lineNumber, contextMenu);
+        this._sourceFrame.populateLineGutterContextMenu(contextMenu, lineNumber);
     },
 
-    populateTextAreaContextMenu: function(contextMenu)
+    populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
-        this._sourceFrame.populateTextAreaContextMenu(contextMenu);
+        this._sourceFrame.populateTextAreaContextMenu(contextMenu, lineNumber);
     },
 
     suggestedFileName: function()

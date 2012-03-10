@@ -30,6 +30,10 @@
 #include "AnimationBase.h"
 
 #include "AnimationControllerPrivate.h"
+#include "CSSCrossfadeValue.h"
+#include "CSSImageGeneratorValue.h"
+#include "CSSImageValue.h"
+#include "CSSPrimitiveValue.h"
 #include "CSSPropertyLonghand.h"
 #include "CSSPropertyNames.h"
 #include "CompositeAnimation.h"
@@ -43,6 +47,8 @@
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
 #include "RenderStyle.h"
+#include "StyleCachedImage.h"
+#include "StyleGeneratedImage.h"
 #include "UnitBezier.h"
 #include <algorithm>
 #include <wtf/CurrentTime.h>
@@ -75,12 +81,12 @@ static inline double solveStepsFunction(int numSteps, bool stepAtStart, double t
 
 static inline int blendFunc(const AnimationBase*, int from, int to, double progress)
 {  
-    return lround(from + (to - from) * progress);
+    return blend(from, to, progress);
 }
 
 static inline double blendFunc(const AnimationBase*, double from, double to, double progress)
 {  
-    return from + (to - from) * progress;
+    return blend(from, to, progress);
 }
 
 static inline float blendFunc(const AnimationBase*, float from, float to, double progress)
@@ -88,23 +94,9 @@ static inline float blendFunc(const AnimationBase*, float from, float to, double
     return narrowPrecisionToFloat(from + (to - from) * progress);
 }
 
-static inline Color blendFunc(const AnimationBase* anim, const Color& from, const Color& to, double progress)
+static inline Color blendFunc(const AnimationBase*, const Color& from, const Color& to, double progress)
 {
-    // We need to preserve the state of the valid flag at the end of the animation
-    if (progress == 1 && !to.isValid())
-        return Color();
-
-    // Contrary to the name, RGBA32 actually stores ARGB, so we can initialize Color directly from premultipliedARGBFromColor().
-    // Also, premultipliedARGBFromColor() bails on zero alpha, so special-case that.
-    Color premultFrom = from.alpha() ? premultipliedARGBFromColor(from) : 0;
-    Color premultTo = to.alpha() ? premultipliedARGBFromColor(to) : 0;
-
-    Color premultBlended(blendFunc(anim, premultFrom.red(), premultTo.red(), progress),
-                 blendFunc(anim, premultFrom.green(), premultTo.green(), progress),
-                 blendFunc(anim, premultFrom.blue(), premultTo.blue(), progress),
-                 blendFunc(anim, premultFrom.alpha(), premultTo.alpha(), progress));
-
-    return Color(colorFromPremultipliedARGB(premultBlended.rgb()));
+    return blend(from, to, progress);
 }
 
 static inline Length blendFunc(const AnimationBase*, const Length& from, const Length& to, double progress)
@@ -141,13 +133,13 @@ static inline PassOwnPtr<ShadowData> blendFunc(const AnimationBase* anim, const 
     if (from->style() != to->style())
         return adoptPtr(new ShadowData(*to));
 
-    return adoptPtr(new ShadowData(blendFunc(anim, from->x(), to->x(), progress),
-                                   blendFunc(anim, from->y(), to->y(), progress), 
-                                   blendFunc(anim, from->blur(), to->blur(), progress),
-                                   blendFunc(anim, from->spread(), to->spread(), progress),
+    return adoptPtr(new ShadowData(blend(from->x(), to->x(), progress),
+                                   blend(from->y(), to->y(), progress), 
+                                   blend(from->blur(), to->blur(), progress),
+                                   blend(from->spread(), to->spread(), progress),
                                    blendFunc(anim, from->style(), to->style(), progress),
                                    from->isWebkitBoxShadow(),
-                                   blendFunc(anim, from->color(), to->color(), progress)));
+                                   blend(from->color(), to->color(), progress)));
 }
 
 static inline TransformOperations blendFunc(const AnimationBase* anim, const TransformOperations& from, const TransformOperations& to, double progress)
@@ -189,6 +181,40 @@ static inline TransformOperations blendFunc(const AnimationBase* anim, const Tra
     return result;
 }
 
+#if ENABLE(CSS_FILTERS)
+static inline FilterOperations blendFunc(const AnimationBase* anim, const FilterOperations& from, const FilterOperations& to, double progress)
+{    
+    FilterOperations result;
+
+    // If we have a filter function list, use that to do a per-function animation.
+    if (anim->filterFunctionListsMatch()) {
+        size_t fromSize = from.operations().size();
+        size_t toSize = to.operations().size();
+        size_t size = max(fromSize, toSize);
+        for (size_t i = 0; i < size; i++) {
+            RefPtr<FilterOperation> fromOp = (i < fromSize) ? from.operations()[i].get() : 0;
+            RefPtr<FilterOperation> toOp = (i < toSize) ? to.operations()[i].get() : 0;
+            RefPtr<FilterOperation> blendedOp = toOp ? toOp->blend(fromOp.get(), progress) : (fromOp ? fromOp->blend(0, progress, true) : PassRefPtr<FilterOperation>(0));
+            if (blendedOp)
+                result.operations().append(blendedOp);
+            else {
+                RefPtr<FilterOperation> identityOp = PassthroughFilterOperation::create();
+                if (progress > 0.5)
+                    result.operations().append(toOp ? toOp : identityOp);
+                else
+                    result.operations().append(fromOp ? fromOp : identityOp);
+            }
+        }
+    } else {
+        // If the filter function lists don't match, we could try to cross-fade, but don't yet have a way to represent that in CSS.
+        // For now we'll just fail to animate.
+        result = to;
+    }
+
+    return result;
+}
+#endif // ENABLE(CSS_FILTERS)
+
 static inline EVisibility blendFunc(const AnimationBase* anim, EVisibility from, EVisibility to, double progress)
 {
     // Any non-zero result means we consider the object to be visible.  Only at 0 do we consider the object to be
@@ -223,6 +249,58 @@ static inline SVGLength blendFunc(const AnimationBase*, const SVGLength& from, c
     return to.blend(from, narrowPrecisionToFloat(progress));
 }
 #endif
+
+static inline PassRefPtr<StyleImage> crossfadeBlend(const AnimationBase*, StyleCachedImage* fromStyleImage, StyleCachedImage* toStyleImage, double progress)
+{
+    // If progress is at one of the extremes, we want getComputedStyle to show the image,
+    // not a completed cross-fade, so we hand back one of the existing images.
+    if (!progress)
+        return fromStyleImage;
+    if (progress == 1)
+        return toStyleImage;
+
+    CachedImage* fromCachedImage = static_cast<CachedImage*>(fromStyleImage->data());
+    CachedImage* toCachedImage = static_cast<CachedImage*>(toStyleImage->data());
+
+    RefPtr<CSSImageValue> fromImageValue = CSSImageValue::create(fromCachedImage->url(), fromStyleImage);
+    RefPtr<CSSImageValue> toImageValue = CSSImageValue::create(toCachedImage->url(), toStyleImage);
+    RefPtr<CSSCrossfadeValue> crossfadeValue = CSSCrossfadeValue::create(fromImageValue, toImageValue);
+
+    crossfadeValue->setPercentage(CSSPrimitiveValue::create(progress, CSSPrimitiveValue::CSS_NUMBER));
+
+    return StyleGeneratedImage::create(crossfadeValue.get());
+}
+
+static inline PassRefPtr<StyleImage> blendFunc(const AnimationBase* anim, StyleImage* from, StyleImage* to, double progress)
+{
+    if (!from || !to)
+        return to;
+
+    if (from->isCachedImage() && to->isCachedImage())
+        return crossfadeBlend(anim, static_cast<StyleCachedImage*>(from), static_cast<StyleCachedImage*>(to), progress);
+
+    // FIXME: Support transitioning generated images as well. (gradients, etc.)
+
+    return to;
+}
+
+static inline NinePieceImage blendFunc(const AnimationBase* anim, const NinePieceImage& from, const NinePieceImage& to, double progress)
+{
+    if (!from.hasImage() || !to.hasImage())
+        return to;
+
+    // FIXME (74112): Support transitioning between NinePieceImages that differ by more than image content.
+
+    if (from.imageSlices() != to.imageSlices() || from.borderSlices() != to.borderSlices() || from.outset() != to.outset() || from.fill() != to.fill() || from.horizontalRule() != to.horizontalRule() || from.verticalRule() != to.verticalRule())
+        return to;
+
+    if (from.image()->imageSize(anim->renderer(), 1.0) != to.image()->imageSize(anim->renderer(), 1.0))
+        return to;
+
+    RefPtr<StyleImage> newContentImage = blendFunc(anim, from.image(), to.image(), progress);
+
+    return NinePieceImage(newContentImage, from.imageSlices(), from.fill(), from.borderSlices(), from.outset(), from.horizontalRule(), from.verticalRule());
+}
 
 class PropertyWrapperBase;
 
@@ -293,6 +371,46 @@ public:
 
 protected:
     void (RenderStyle::*m_setter)(T);
+};
+
+template <typename T>
+class RefCountedPropertyWrapper : public PropertyWrapperGetter<T*> {
+public:
+    RefCountedPropertyWrapper(int prop, T* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<T>))
+    : PropertyWrapperGetter<T*>(prop, getter)
+    , m_setter(setter)
+    {
+    }
+
+    virtual void blend(const AnimationBase* anim, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress) const
+    {
+        (dst->*m_setter)(blendFunc(anim, (a->*PropertyWrapperGetter<T*>::m_getter)(), (b->*PropertyWrapperGetter<T*>::m_getter)(), progress));
+    }
+
+protected:
+    void (RenderStyle::*m_setter)(PassRefPtr<T>);
+};
+
+class StyleImagePropertyWrapper : public RefCountedPropertyWrapper<StyleImage> {
+public:
+    StyleImagePropertyWrapper(int prop, StyleImage* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<StyleImage>))
+        : RefCountedPropertyWrapper<StyleImage>(prop, getter, setter)
+    {
+    }
+
+    virtual bool equals(const RenderStyle* a, const RenderStyle* b) const
+    {
+       // If the style pointers are the same, don't bother doing the test.
+       // If either is null, return false. If both are null, return true.
+       if (a == b)
+           return true;
+       if (!a || !b)
+            return false;
+            
+        StyleImage* imageA = (a->*m_getter)();
+        StyleImage* imageB = (b->*m_getter)();
+        return StyleImage::imagesEquivalent(imageA, imageB);
+    }
 };
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -568,6 +686,45 @@ protected:
     void (FillLayer::*m_setter)(T);
 };
 
+template <typename T>
+class FillLayerRefCountedPropertyWrapper : public FillLayerPropertyWrapperGetter<T*> {
+public:
+    FillLayerRefCountedPropertyWrapper(T* (FillLayer::*getter)() const, void (FillLayer::*setter)(PassRefPtr<T>))
+        : FillLayerPropertyWrapperGetter<T*>(getter)
+        , m_setter(setter)
+    {
+    }
+
+    virtual void blend(const AnimationBase* anim, FillLayer* dst, const FillLayer* a, const FillLayer* b, double progress) const
+    {
+        (dst->*m_setter)(blendFunc(anim, (a->*FillLayerPropertyWrapperGetter<T*>::m_getter)(), (b->*FillLayerPropertyWrapperGetter<T*>::m_getter)(), progress));
+    }
+
+protected:
+    void (FillLayer::*m_setter)(PassRefPtr<T>);
+};
+
+class FillLayerStyleImagePropertyWrapper : public FillLayerRefCountedPropertyWrapper<StyleImage> {
+public:
+    FillLayerStyleImagePropertyWrapper(StyleImage* (FillLayer::*getter)() const, void (FillLayer::*setter)(PassRefPtr<StyleImage>))
+        : FillLayerRefCountedPropertyWrapper<StyleImage>(getter, setter)
+    {
+    }
+
+    virtual bool equals(const FillLayer* a, const FillLayer* b) const
+    {
+       // If the style pointers are the same, don't bother doing the test.
+       // If either is null, return false. If both are null, return true.
+       if (a == b)
+           return true;
+       if (!a || !b)
+            return false;
+
+        StyleImage* imageA = (a->*m_getter)();
+        StyleImage* imageB = (b->*m_getter)();
+        return StyleImage::imagesEquivalent(imageA, imageB);
+    }
+};
 
 class FillLayersPropertyWrapper : public PropertyWrapperBase {
 public:
@@ -592,6 +749,9 @@ public:
             case CSSPropertyWebkitBackgroundSize:
             case CSSPropertyWebkitMaskSize:
                 m_fillLayerPropertyWrapper = new FillLayerPropertyWrapper<LengthSize>(&FillLayer::sizeLength, &FillLayer::setSizeLength);
+                break;
+            case CSSPropertyBackgroundImage:
+                m_fillLayerPropertyWrapper = new FillLayerStyleImagePropertyWrapper(&FillLayer::image, &FillLayer::setImage);
                 break;
         }
     }
@@ -774,6 +934,16 @@ void AnimationBase::ensurePropertyMap()
 
         gPropertyWrappers->append(new PropertyWrapper<const Color&>(CSSPropertyBackgroundColor, &RenderStyle::backgroundColor, &RenderStyle::setBackgroundColor));
 
+        gPropertyWrappers->append(new FillLayersPropertyWrapper(CSSPropertyBackgroundImage, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers));
+        gPropertyWrappers->append(new StyleImagePropertyWrapper(CSSPropertyListStyleImage, &RenderStyle::listStyleImage, &RenderStyle::setListStyleImage));
+        gPropertyWrappers->append(new StyleImagePropertyWrapper(CSSPropertyWebkitMaskImage, &RenderStyle::maskImage, &RenderStyle::setMaskImage));
+
+        gPropertyWrappers->append(new StyleImagePropertyWrapper(CSSPropertyBorderImageSource, &RenderStyle::borderImageSource, &RenderStyle::setBorderImageSource));
+        gPropertyWrappers->append(new PropertyWrapper<const NinePieceImage&>(CSSPropertyBorderImage, &RenderStyle::borderImage, &RenderStyle::setBorderImage));
+
+        gPropertyWrappers->append(new StyleImagePropertyWrapper(CSSPropertyWebkitMaskBoxImageSource, &RenderStyle::maskBoxImageSource, &RenderStyle::setMaskBoxImageSource));
+        gPropertyWrappers->append(new PropertyWrapper<const NinePieceImage&>(CSSPropertyWebkitMaskBoxImage, &RenderStyle::maskBoxImage, &RenderStyle::setMaskBoxImage));
+
         gPropertyWrappers->append(new FillLayersPropertyWrapper(CSSPropertyBackgroundPositionX, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers));
         gPropertyWrappers->append(new FillLayersPropertyWrapper(CSSPropertyBackgroundPositionY, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers));
         gPropertyWrappers->append(new FillLayersPropertyWrapper(CSSPropertyBackgroundSize, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers));
@@ -819,6 +989,10 @@ void AnimationBase::ensurePropertyMap()
 #else
         gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyOpacity, &RenderStyle::opacity, &RenderStyle::setOpacity));
         gPropertyWrappers->append(new PropertyWrapper<const TransformOperations&>(CSSPropertyWebkitTransform, &RenderStyle::transform, &RenderStyle::setTransform));
+#endif
+
+#if ENABLE(CSS_FILTERS)
+        gPropertyWrappers->append(new PropertyWrapper<const FilterOperations&>(CSSPropertyWebkitFilter, &RenderStyle::filter, &RenderStyle::setFilter));
 #endif
 
         gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyWebkitColumnRuleColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor));
@@ -896,10 +1070,10 @@ static void addPropertyWrapper(int propertyID, PropertyWrapperBase* wrapper)
 static void addShorthandProperties()
 {
     static const int animatableShorthandProperties[] = {
-        CSSPropertyBackground,      // for background-color, background-position
+        CSSPropertyBackground, // for background-color, background-position, background-image
         CSSPropertyBackgroundPosition,
         CSSPropertyFont, // for font-size, font-weight
-        CSSPropertyWebkitMask,      // for mask-position
+        CSSPropertyWebkitMask, // for mask-position
         CSSPropertyWebkitMaskPosition,
         CSSPropertyBorderTop, CSSPropertyBorderRight, CSSPropertyBorderBottom, CSSPropertyBorderLeft,
         CSSPropertyBorderColor,
@@ -907,6 +1081,7 @@ static void addShorthandProperties()
         CSSPropertyBorderWidth,
         CSSPropertyBorder,
         CSSPropertyBorderSpacing,
+        CSSPropertyListStyle, // for list-style-image
         CSSPropertyMargin,
         CSSPropertyOutline,
         CSSPropertyPadding,
@@ -938,18 +1113,21 @@ static PropertyWrapperBase* wrapperForProperty(int propertyID)
 AnimationBase::AnimationBase(const Animation* transition, RenderObject* renderer, CompositeAnimation* compAnim)
     : m_animState(AnimationStateNew)
     , m_isAnimating(false)
+    , m_isAccelerated(false)
+    , m_transformFunctionListValid(false)
+#if ENABLE(CSS_FILTERS)
+    , m_filterFunctionListsMatch(false)
+#endif
     , m_startTime(0)
     , m_pauseTime(-1)
     , m_requestedStartTime(0)
+    , m_totalDuration(-1)
+    , m_nextIterationDuration(-1)
     , m_object(renderer)
     , m_animation(const_cast<Animation*>(transition))
     , m_compAnim(compAnim)
-    , m_isAccelerated(false)
-    , m_transformFunctionListValid(false)
-    , m_nextIterationDuration(-1)
 {
     // Compute the total duration
-    m_totalDuration = -1;
     if (m_animation->iterationCount() > 0)
         m_totalDuration = m_animation->duration() * m_animation->iterationCount();
 }

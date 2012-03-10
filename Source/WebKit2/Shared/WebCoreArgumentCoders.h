@@ -43,6 +43,8 @@ namespace WebCore {
     class IntRect;
     class IntSize;
     class KeyframeValueList;
+    class KURL;
+    class Notification;
     class ProtectionSpace;
     class ResourceError;
     class ResourceRequest;
@@ -221,6 +223,11 @@ template<> struct ArgumentCoder<WebCore::DragSession> {
     static bool decode(ArgumentDecoder*, WebCore::DragSession&);
 };
 
+template<> struct ArgumentCoder<WebCore::KURL> {
+    static void encode(ArgumentEncoder*, const WebCore::KURL&);
+    static bool decode(ArgumentDecoder*, WebCore::KURL&);
+};
+
 #if PLATFORM(QT)
 template<> struct ArgumentCoder<WebCore::FloatPoint3D> {
     static void encode(ArgumentEncoder*, const WebCore::FloatPoint3D&);
@@ -288,9 +295,9 @@ template<> struct ArgumentCoder<WebCore::TransformOperations> {
     static bool decode(ArgumentDecoder*, WebCore::TransformOperations&);
 };
 
-template<> struct ArgumentCoder<WebCore::Animation> {
-    static void encode(ArgumentEncoder*, const WebCore::Animation&);
-    static bool decode(ArgumentDecoder*, WebCore::Animation&);
+template<> struct ArgumentCoder<RefPtr<WebCore::Animation> > {
+    static void encode(ArgumentEncoder*, const RefPtr<WebCore::Animation>&);
+    static bool decode(ArgumentDecoder*, RefPtr<WebCore::Animation>&);
 };
 #endif
 

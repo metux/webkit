@@ -73,6 +73,12 @@ class RenderLayerCompositor;
 
 enum BorderRadiusClippingRule { IncludeSelfForBorderRadius, DoNotIncludeSelfForBorderRadius };
 
+enum RepaintStatus {
+    NeedsNormalRepaint = 0,
+    NeedsFullRepaint = 1 << 0,
+    NeedsFullRepaintForPositionedMovementLayout = 1 << 1
+};
+
 class ClipRect {
 public:
     ClipRect()
@@ -483,8 +489,8 @@ public:
 
     typedef unsigned UpdateLayerPositionsAfterScrollFlags;
     void updateLayerPositionsAfterScroll(UpdateLayerPositionsAfterScrollFlags = NoFlag);
-    void setNeedsFullRepaint(bool f = true) { m_needsFullRepaint = f; }
-    
+    void setRepaintStatus(RepaintStatus status) { m_repaintStatus = status; }
+
     LayoutUnit staticInlinePosition() const { return m_staticInlinePosition; }
     LayoutUnit staticBlockPosition() const { return m_staticBlockPosition; }
    
@@ -544,12 +550,16 @@ public:
     void setContainsDirtyOverlayScrollbars(bool dirtyScrollbars) { m_containsDirtyOverlayScrollbars = dirtyScrollbars; }
 
 private:
+    void updateZOrderListsSlowCase();
+
     void computeRepaintRects(IntPoint* offsetFromRoot = 0);
     void clearRepaintRects();
 
     void clipToRect(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect, const ClipRect&,
                     BorderRadiusClippingRule = IncludeSelfForBorderRadius);
     void restoreClip(GraphicsContext*, const LayoutRect& paintDirtyRect, const ClipRect&);
+
+    bool shouldRepaintAfterLayout() const;
 
     // The normal operator new is disallowed on all render objects.
     void* operator new(size_t) throw();
@@ -738,7 +748,7 @@ protected:
                                  // blend).
     bool m_paintingInsideReflection : 1;  // A state bit tracking if we are painting inside a replica.
     bool m_inOverflowRelayout : 1;
-    bool m_needsFullRepaint : 1;
+    unsigned m_repaintStatus : 2; // RepaintStatus
 
     bool m_overflowStatusDirty : 1;
     bool m_horizontalOverflow : 1;
@@ -843,6 +853,13 @@ private:
 
     Page* m_scrollableAreaPage; // Page on which this is registered as a scrollable area.
 };
+
+inline void RenderLayer::updateZOrderLists()
+{
+    if (!m_zOrderListsDirty || !isStackingContext())
+        return;
+    updateZOrderListsSlowCase();
+}
 
 } // namespace WebCore
 

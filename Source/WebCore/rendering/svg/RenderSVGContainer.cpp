@@ -55,10 +55,10 @@ void RenderSVGContainer::layout()
     // RenderSVGRoot disables layoutState for the SVG rendering tree.
     ASSERT(!view()->layoutStateEnabled());
 
+    LayoutRepainter repainter(*this, checkForRepaintDuringLayout() || selfWillPaint());
+
     // Allow RenderSVGViewportContainer to update its viewport.
     calcViewport();
-
-    LayoutRepainter repainter(*this, checkForRepaintDuringLayout() || selfWillPaint());
 
     // Allow RenderSVGTransformableContainer to update its transform.
     bool updatedTransform = calculateLocalTransform();
@@ -66,7 +66,7 @@ void RenderSVGContainer::layout()
     SVGRenderSupport::layoutChildren(this, selfNeedsLayout() || SVGRenderSupport::filtersForceContainerLayout(this));
 
     // Invalidate all resources of this client if our layout changed.
-    if (m_everHadLayout && needsLayout())
+    if (everHadLayout() && needsLayout())
         SVGResourcesCache::clientLayoutChanged(this);
 
     // At this point LayoutRepainter already grabbed the old bounds,

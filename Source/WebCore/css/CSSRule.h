@@ -52,7 +52,7 @@ public:
         // 7 used to be VARIABLES_RULE
         WEBKIT_KEYFRAMES_RULE = 8,
         WEBKIT_KEYFRAME_RULE,
-        WEBKIT_REGION_STYLE_RULE
+        WEBKIT_REGION_RULE
     };
 
     Type type() const { return static_cast<Type>(m_type); }
@@ -64,7 +64,7 @@ public:
     bool isMediaRule() const { return type() == MEDIA_RULE; }
     bool isPageRule() const { return type() == PAGE_RULE; }
     bool isStyleRule() const { return type() == STYLE_RULE; }
-    bool isRegionStyleRule() const { return type() == WEBKIT_REGION_STYLE_RULE; }
+    bool isRegionRule() const { return type() == WEBKIT_REGION_RULE; }
     bool isImportRule() const { return type() == IMPORT_RULE; }
 
     bool useStrictParsing() const
@@ -109,7 +109,9 @@ public:
 
 protected:
     CSSRule(CSSStyleSheet* parent, Type type)
-        : m_parentIsRule(false)
+        : m_sourceLine(0)
+        , m_hasCachedSelectorText(false)
+        , m_parentIsRule(false)
         , m_type(type)
         , m_parentStyleSheet(parent)
     {
@@ -120,15 +122,19 @@ protected:
 
     ~CSSRule() { }
 
-private:
-    void destroy();
+    // Only used by CSSStyleRule but kept here to maximize struct packing.
+    signed m_sourceLine : 26;
+    mutable bool m_hasCachedSelectorText : 1;
 
+private:
     bool m_parentIsRule : 1;
-    unsigned m_type : 31; // Plenty of space for additional flags here.
+    unsigned m_type : 4;
     union {
         CSSRule* m_parentRule;
         CSSStyleSheet* m_parentStyleSheet;
     };
+
+    void destroy();
 };
 
 } // namespace WebCore

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2011 Apple Inc. All rights reserved.
  *           (C) 2007, 2008 Nikolas Zimmermann <zimmermann@kde.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@
 #include "CSSPrimitiveValue.h"
 #include "CSSPropertyNames.h"
 #include "CSSSegmentedFontFace.h"
+#include "CSSStyleSelector.h"
 #include "CSSUnicodeRangeValue.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
@@ -55,10 +56,13 @@
 #include "SVGNames.h"
 #endif
 
+using namespace std;
+
 namespace WebCore {
 
 CSSFontSelector::CSSFontSelector(Document* document)
     : m_document(document)
+    , m_beginLoadingTimer(this, &CSSFontSelector::beginLoadTimerFired)
 {
     // FIXME: An old comment used to say there was no need to hold a reference to m_document
     // because "we are guaranteed to be destroyed before the document". But there does not
@@ -70,20 +74,13 @@ CSSFontSelector::CSSFontSelector(Document* document)
 
 CSSFontSelector::~CSSFontSelector()
 {
+    clearDocument();
     fontCache()->removeClient(this);
-    deleteAllValues(m_fontFaces);
-    deleteAllValues(m_locallyInstalledFontFaces);
-    deleteAllValues(m_fonts);
 }
 
 bool CSSFontSelector::isEmpty() const
 {
     return m_fonts.isEmpty();
-}
-
-CachedResourceLoader* CSSFontSelector::cachedResourceLoader() const
-{
-    return m_document ? m_document->cachedResourceLoader() : 0;
 }
 
 void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
@@ -322,20 +319,16 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
         if (familyName.isEmpty())
             continue;
 
-        Vector<RefPtr<CSSFontFace> >* familyFontFaces = m_fontFaces.get(familyName);
+        OwnPtr<Vector<RefPtr<CSSFontFace> > >& familyFontFaces = m_fontFaces.add(familyName, nullptr).first->second;
         if (!familyFontFaces) {
-            familyFontFaces = new Vector<RefPtr<CSSFontFace> >;
-            m_fontFaces.set(familyName, familyFontFaces);
+            familyFontFaces = adoptPtr(new Vector<RefPtr<CSSFontFace> >);
 
             ASSERT(!m_locallyInstalledFontFaces.contains(familyName));
-            Vector<RefPtr<CSSFontFace> >* familyLocallyInstalledFaces;
 
             Vector<unsigned> locallyInstalledFontsTraitsMasks;
             fontCache()->getTraitsInFamily(familyName, locallyInstalledFontsTraitsMasks);
-            unsigned numLocallyInstalledFaces = locallyInstalledFontsTraitsMasks.size();
-            if (numLocallyInstalledFaces) {
-                familyLocallyInstalledFaces = new Vector<RefPtr<CSSFontFace> >;
-                m_locallyInstalledFontFaces.set(familyName, familyLocallyInstalledFaces);
+            if (unsigned numLocallyInstalledFaces = locallyInstalledFontsTraitsMasks.size()) {
+                OwnPtr<Vector<RefPtr<CSSFontFace> > > familyLocallyInstalledFaces = adoptPtr(new Vector<RefPtr<CSSFontFace> >);
 
                 for (unsigned i = 0; i < numLocallyInstalledFaces; ++i) {
                     RefPtr<CSSFontFace> locallyInstalledFontFace = CSSFontFace::create(static_cast<FontTraitsMask>(locallyInstalledFontsTraitsMasks[i]), true);
@@ -343,6 +336,8 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
                     ASSERT(locallyInstalledFontFace->isValid());
                     familyLocallyInstalledFaces->append(locallyInstalledFontFace);
                 }
+
+                m_locallyInstalledFontFaces.set(familyName, familyLocallyInstalledFaces.release());
             }
         }
 
@@ -368,7 +363,11 @@ void CSSFontSelector::dispatchInvalidationCallbacks()
         clients[i]->fontsNeedUpdate(this);
 
     // FIXME: Make Document a FontSelectorClient so that it can simply register for invalidation callbacks.
-    if (!m_document || m_document->inPageCache() || !m_document->renderer())
+    if (!m_document)
+        return;
+    if (CSSStyleSelector* styleSelector = m_document->styleSelectorIfExists())
+        styleSelector->invalidateMatchedDeclarationCache();
+    if (m_document->inPageCache() || !m_document->renderer())
         return;
     m_document->scheduleForcedStyleRecalc();
 }
@@ -520,19 +519,16 @@ FontData* CSSFontSelector::getFontData(const FontDescription& fontDescription, c
         return fontDataForGenericFamily(m_document, fontDescription, familyName);
     }
 
-    HashMap<unsigned, RefPtr<CSSSegmentedFontFace> >* segmentedFontFaceCache = m_fonts.get(family);
-    if (!segmentedFontFaceCache) {
-        segmentedFontFaceCache = new HashMap<unsigned, RefPtr<CSSSegmentedFontFace> >;
-        m_fonts.set(family, segmentedFontFaceCache);
-    }
+    OwnPtr<HashMap<unsigned, RefPtr<CSSSegmentedFontFace> > >& segmentedFontFaceCache = m_fonts.add(family, nullptr).first->second;
+    if (!segmentedFontFaceCache)
+        segmentedFontFaceCache = adoptPtr(new HashMap<unsigned, RefPtr<CSSSegmentedFontFace> >);
 
     FontTraitsMask traitsMask = fontDescription.traitsMask();
 
-    RefPtr<CSSSegmentedFontFace> face = segmentedFontFaceCache->get(traitsMask);
-
+    RefPtr<CSSSegmentedFontFace>& face = segmentedFontFaceCache->add(traitsMask, 0).first->second;
     if (!face) {
         face = CSSSegmentedFontFace::create(this);
-        segmentedFontFaceCache->set(traitsMask, face);
+
         // Collect all matching faces and sort them in order of preference.
         Vector<CSSFontFace*, 32> candidateFontFaces;
         for (int i = familyFontFaces->size() - 1; i >= 0; --i) {
@@ -565,7 +561,7 @@ FontData* CSSFontSelector::getFontData(const FontDescription& fontDescription, c
         }
 
         desiredTraitsMaskForComparison = traitsMask;
-        std::stable_sort(candidateFontFaces.begin(), candidateFontFaces.end(), compareFontFaces);
+        stable_sort(candidateFontFaces.begin(), candidateFontFaces.end(), compareFontFaces);
         unsigned numCandidates = candidateFontFaces.size();
         for (unsigned i = 0; i < numCandidates; ++i)
             face->appendFontFace(candidateFontFaces[i]);
@@ -573,6 +569,53 @@ FontData* CSSFontSelector::getFontData(const FontDescription& fontDescription, c
 
     // We have a face.  Ask it for a font data.  If it cannot produce one, it will fail, and the OS will take over.
     return face->getFontData(fontDescription);
+}
+
+void CSSFontSelector::clearDocument()
+{
+    if (!m_document) {
+        ASSERT(!m_beginLoadingTimer.isActive());
+        ASSERT(m_fontsToBeginLoading.isEmpty());
+        return;
+    }
+
+    m_beginLoadingTimer.stop();
+
+    CachedResourceLoader* cachedResourceLoader = m_document->cachedResourceLoader();
+    for (size_t i = 0; i < m_fontsToBeginLoading.size(); ++i) {
+        // Balances incrementRequestCount() in beginLoadingFontSoon().
+        cachedResourceLoader->decrementRequestCount(m_fontsToBeginLoading[i].get());
+    }
+
+    m_fontsToBeginLoading.clear();
+
+    m_document = 0;
+}
+
+void CSSFontSelector::beginLoadingFontSoon(CachedFont* font)
+{
+    if (!m_document)
+        return;
+
+    m_fontsToBeginLoading.append(font);
+    // Increment the request count now, in order to prevent didFinishLoad from being dispatched
+    // after this font has been requested but before it began loading. Balanced by
+    // decrementRequestCount() in beginLoadTimerFired() and in clearDocument().
+    m_document->cachedResourceLoader()->incrementRequestCount(font);
+    m_beginLoadingTimer.startOneShot(0);
+}
+
+void CSSFontSelector::beginLoadTimerFired(Timer<WebCore::CSSFontSelector>*)
+{
+    Vector<CachedResourceHandle<CachedFont> > fontsToBeginLoading;
+    fontsToBeginLoading.swap(m_fontsToBeginLoading);
+
+    CachedResourceLoader* cachedResourceLoader = m_document->cachedResourceLoader();
+    for (size_t i = 0; i < fontsToBeginLoading.size(); ++i) {
+        fontsToBeginLoading[i]->beginLoadIfNeeded(cachedResourceLoader);
+        // Balances incrementRequestCount() in beginLoadingFontSoon().
+        cachedResourceLoader->decrementRequestCount(fontsToBeginLoading[i].get());
+    }
 }
 
 }

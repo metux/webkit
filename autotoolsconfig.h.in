@@ -3,29 +3,11 @@
 /* Define to enable GObject introspection support */
 #undef ENABLE_INTROSPECTION
 
-/* Define to enable JIT */
-#undef ENABLE_JIT
-
-/* Define to enable optimized arithmetic */
-#undef ENABLE_JIT_OPTIMIZE_ARITHMETIC
-
-/* Define to enable optimizing calls */
-#undef ENABLE_JIT_OPTIMIZE_CALL
-
-/* Define to enable optimized property access */
-#undef ENABLE_JIT_OPTIMIZE_PROPERTY_ACCESS
-
 /* Define to enable link prefetch support */
 #undef ENABLE_LINK_PREFETCH
 
 /* Define to enable Opcode statistics */
 #undef ENABLE_OPCODE_STATS
-
-/* Define to enable YARR */
-#undef ENABLE_YARR
-
-/* Define to enable YARR JIT */
-#undef ENABLE_YARR_JIT
 
 /* The gettext catalog name */
 #undef GETTEXT_PACKAGE
@@ -120,15 +102,6 @@
 
 /* Define if target is X11 */
 #undef WTF_PLATFORM_X11
-
-/* Use alternate JSImmediate */
-#undef WTF_USE_ALTERNATE_JSIMMEDIATE
-
-/* Use stub register */
-#undef WTF_USE_JIT_STUB_ARGUMENT_REGISTER
-
-/* Use stub va_list */
-#undef WTF_USE_JIT_STUB_ARGUMENT_VA_LIST
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 #undef _FILE_OFFSET_BITS

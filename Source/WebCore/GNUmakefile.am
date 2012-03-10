@@ -212,6 +212,14 @@ webcore_cppflags += -DENABLE_DATA_TRANSFER_ITEMS=1
 endif # END ENABLE_DATA_TRANSFER_ITEMS
 
 # ----
+# HTML5 <style scoped> support
+# ----
+if ENABLE_STYLE_SCOPED
+FEATURE_DEFINES += ENABLE_STYLE_SCOPED=1
+webcore_cppflags += -DENABLE_STYLE_SCOPED=1
+endif # END ENABLE_STYLE_SCOPED
+
+# ----
 # Indexed Database API support
 # ----
 if ENABLE_INDEXED_DATABASE
@@ -501,14 +509,6 @@ DerivedSources/WebCore/XLinkNames.cpp : $(WebCore)/dom/make_names.pl $(WebCore)/
 if ENABLE_WEB_AUDIO
 FEATURE_DEFINES += ENABLE_WEB_AUDIO=1
 webcore_cppflags += -DENABLE_WEB_AUDIO=1
-
-if USE_WEBAUDIO_FFTW
-FEATURE_DEFINES += WTF_USE_WEBAUDIO_FFTW=1
-webcore_cppflags += -DWTF_USE_WEBAUDIO_FFTW=1
-webcore_sources += \
-	Source/WebCore/platform/audio/fftw/FFTFrameFFTW.cpp
-endif
-
 endif
 
 # ----
@@ -560,6 +560,26 @@ if ENABLE_3D_RENDERING
 FEATURE_DEFINES += ENABLE_3D_RENDERING=1
 webcore_cppflags += -DENABLE_3D_RENDERING=1
 endif  # END ENABLE_3D_RENDERING
+
+# ---
+# Compile with accelerated compositing support
+# ---
+
+if USE_TEXTURE_MAPPER_CAIRO
+webcore_cppflags += \
+	-I$(srcdir)/Source/WebCore/platform/graphics/texmap
+endif  # END USE_TEXTURE_MAPPER_CAIRO
+
+if USE_TEXTURE_MAPPER_GL
+webcore_cppflags += \
+	-I$(srcdir)/Source/WebCore/platform/graphics/texmap
+endif  # END USETEXTURE_MAPPER_GL
+
+if USE_CLUTTER
+webcore_cppflags += \
+	-I$(srcdir)/Source/WebCore/platform/clutter \
+	-I$(srcdir)/Source/WebCore/platform/graphics/clutter
+endif  # END USE_CLUTTER
 
 # ---
 # MHTML support
@@ -649,8 +669,7 @@ USER_AGENT_STYLE_SHEETS = \
 	$(WebCore)/css/svg.css \
 	$(WebCore)/css/mediaControls.css \
 	$(WebCore)/css/mediaControlsGtk.css \
-	$(WebCore)/css/fullscreen.css \
-	$(WebCore)/css/fullscreenQuickTime.css
+	$(WebCore)/css/fullscreen.css
 
 # new-style JavaScript bindings
 SCRIPTS_BINDINGS = \
@@ -712,6 +731,13 @@ DerivedSources/WebCore/InspectorBackendStub.js: DerivedSources/WebCore/Inspector
 DerivedSources/WebCore/InspectorBackendDispatcher.h: DerivedSources/WebCore/InspectorBackendDispatcher.cpp
 DerivedSources/WebCore/InjectedScriptSource.h: $(WebCore)/inspector/InjectedScriptSource.js
 	perl $(WebCore)/inspector/xxd.pl InjectedScriptSource_js $(WebCore)/inspector/InjectedScriptSource.js $(GENSOURCES_WEBCORE)/InjectedScriptSource.h
+
+if ENABLE_WEB_AUDIO
+# Installing HRTF database wav files
+audiodir = ${datadir}/webkitgtk-@WEBKITGTK_API_VERSION@/resources/audio/
+audio_DATA = $(WebCore)/platform/audio/resources/Composite.wav
+dist_audio_DATA = $(audio_DATA)
+endif  # END ENABLE_WEB_AUDIO
 
 # ANGLE tokenizer & parser
 DerivedSources/ANGLE/glslang.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.l
@@ -781,6 +807,7 @@ libWebCore_la_CPPFLAGS = \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
 	$(CAIRO_CFLAGS) \
+	$(CLUTTER_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
 	$(GEOCLUE_CFLAGS) \

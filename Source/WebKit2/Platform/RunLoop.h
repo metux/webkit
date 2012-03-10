@@ -28,6 +28,7 @@
 #ifndef RunLoop_h
 #define RunLoop_h
 
+#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/ThreadSpecific.h>
@@ -55,7 +56,10 @@ public:
     static RunLoop* current();
     static RunLoop* main();
 
+    // FIXME: Get rid of this overload and use WTF::Function everywhere.
     void scheduleWork(PassOwnPtr<WorkItem>);
+
+    void dispatch(const Function<void()>&);
 
 #if PLATFORM(WIN)
     // The absoluteTime is in seconds, starting on January 1, 1970. The time is assumed to use the

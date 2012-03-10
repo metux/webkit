@@ -101,32 +101,20 @@ WebInspector.ConsoleMessageImpl.prototype = {
         } else if (this.source === WebInspector.ConsoleMessage.MessageSource.Network) {
             if (this._request) {
                 this._stackTrace = this._request.stackTrace;
+                if (this._request.initiator && this._request.initiator.url) {
+                    this.url = this._request.initiator.url;
+                    this.line = this._request.initiator.lineNumber;
+                }
+                messageText = document.createElement("span");
                 if (this.level === WebInspector.ConsoleMessage.MessageLevel.Error) {
-                    messageText = document.createElement("span");
                     messageText.appendChild(document.createTextNode(this._request.requestMethod + " "));
-                    var anchor = WebInspector.linkifyURLAsNode(this._request.url);
-                    anchor.setAttribute("request_id", this._request.requestId);
-                    anchor.setAttribute("preferred_panel", "network");
-                    messageText.appendChild(anchor);
+                    messageText.appendChild(WebInspector.linkifyRequestAsNode(this._request));
                     if (this._request.failed)
                         messageText.appendChild(document.createTextNode(" " + this._request.localizedFailDescription));
                     else
                         messageText.appendChild(document.createTextNode(" " + this._request.statusCode + " (" + this._request.statusText + ")"));
                 } else {
-                    messageText = document.createElement("span");
-                    
-                    function linkifier(title, url, lineNumber)
-                    {
-                        var isExternal = !this._request;
-                        var anchor = WebInspector.linkifyURLAsNode(url, title, undefined, isExternal);
-                        if (this._request) {
-                            anchor.setAttribute("request_id", this._request.requestId);
-                            anchor.setAttribute("preferred_panel", "network");
-                        }
-                        return anchor;
-                    }
-
-                    var fragment = WebInspector.linkifyStringAsFragmentWithCustomLinkifier(this._messageText, linkifier.bind(this));
+                    var fragment = WebInspector.linkifyStringAsFragmentWithCustomLinkifier(this._messageText, WebInspector.linkifyRequestAsNode.bind(null, this._request, ""));
                     messageText.appendChild(fragment);
                 }
             } else {
@@ -142,8 +130,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             messageText = this._format(args);
         }
 
-        // FIXME: we should dump network message origins as well.
-        if (this.source !== WebInspector.ConsoleMessage.MessageSource.Network) {
+        if (this.source !== WebInspector.ConsoleMessage.MessageSource.Network || this._request) {
             if (this._stackTrace && this._stackTrace.length && this._stackTrace[0].url) {
                 var urlElement = this._linkifyCallFrame(this._stackTrace[0]);
                 this._formattedMessage.appendChild(urlElement);
@@ -155,7 +142,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
 
         this._formattedMessage.appendChild(messageText);
 
-        var dumpStackTrace = !!this._stackTrace && (this.source === WebInspector.ConsoleMessage.MessageSource.Network || this.level === WebInspector.ConsoleMessage.MessageLevel.Error || this.type === WebInspector.ConsoleMessage.MessageType.Trace);
+        var dumpStackTrace = !!this._stackTrace && this._stackTrace.length && (this.source === WebInspector.ConsoleMessage.MessageSource.Network || this.level === WebInspector.ConsoleMessage.MessageLevel.Error || this.type === WebInspector.ConsoleMessage.MessageType.Trace);
         if (dumpStackTrace) {
             var ol = document.createElement("ol");
             ol.className = "outline-disclosure";

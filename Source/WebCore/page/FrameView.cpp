@@ -63,7 +63,9 @@
 #include "ScrollAnimator.h"
 #include "Settings.h"
 #include "TextResourceDecoder.h"
+
 #include <wtf/CurrentTime.h>
+#include <wtf/TemporaryChange.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -144,6 +146,8 @@ FrameView::FrameView(Frame* frame)
     , m_deferSetNeedsLayouts(0)
     , m_setNeedsLayoutWasDeferred(false)
     , m_scrollCorner(0)
+    , m_shouldAutoSize(false)
+    , m_inAutoSize(false)
 {
     init();
 
@@ -213,6 +217,7 @@ void FrameView::reset()
     m_cannotBlitToWindow = false;
     m_isOverlapped = false;
     m_contentIsOpaque = false;
+    m_shouldLayoutFixedElementsRelativeToFrame = false;
     m_borderX = 30;
     m_borderY = 30;
     m_layoutTimer.stop();
@@ -399,6 +404,16 @@ void FrameView::setFrameRect(const IntRect& newRect)
     IntRect oldRect = frameRect();
     if (newRect == oldRect)
         return;
+
+#if ENABLE(VIEWPORT)
+    if (useFixedLayout()) {
+        Document* document = m_frame->document();
+        ViewportArguments viewport = document->viewportArguments();
+        Page* page = frame() ? frame()->page() : 0;
+        if (page)
+            page->chrome()->client()->dispatchViewportPropertiesDidChange(viewport);
+    }
+#endif
 
     ScrollView::setFrameRect(newRect);
 
@@ -896,7 +911,8 @@ inline void FrameView::forceLayoutParentViewIfNeeded()
     if (!svgRoot->needsSizeNegotiationWithHostDocument())
         return;
 
-    m_inLayoutParentView = true;
+    ASSERT(!m_inLayoutParentView);
+    TemporaryChange<bool> resetInLayoutParentView(m_inLayoutParentView, true);
 
     // Clear needs-size-negotiation flag in RenderSVGRoot, so the next call to our
     // layout() method won't fire the size negotiation logic again.
@@ -916,8 +932,6 @@ inline void FrameView::forceLayoutParentViewIfNeeded()
     FrameView* frameView = ownerRenderer->frame()->view();
     ASSERT(frameView);
     frameView->layout();
-
-    m_inLayoutParentView = false;
 #endif
 }
 
@@ -969,138 +983,149 @@ void FrameView::layout(bool allowSubtree)
     ASSERT(m_frame->view() == this);
 
     Document* document = m_frame->document();
-
-    m_layoutSchedulingEnabled = false;
-
-    if (!m_nestedLayoutCount && !m_inSynchronousPostLayout && m_hasPendingPostLayoutTasks && !inSubframeLayoutWithFrameFlattening) {
-        // This is a new top-level layout. If there are any remaining tasks from the previous
-        // layout, finish them now.
-        m_inSynchronousPostLayout = true;
-        m_postLayoutTasksTimer.stop();
-        performPostLayoutTasks();
-        m_inSynchronousPostLayout = false;
-    }
-
-    // Viewport-dependent media queries may cause us to need completely different style information.
-    // Check that here.
-    if (document->styleSelector()->affectedByViewportChange())
-        document->styleSelectorChanged(RecalcStyleImmediately);
-
-    // Always ensure our style info is up-to-date.  This can happen in situations where
-    // the layout beats any sort of style recalc update that needs to occur.
-    document->updateStyleIfNeeded();
-    
-    bool subtree = m_layoutRoot;
-
-    // If there is only one ref to this view left, then its going to be destroyed as soon as we exit, 
-    // so there's no point to continuing to layout
-    if (protector->hasOneRef())
-        return;
-
-    RenderObject* root = subtree ? m_layoutRoot : document->renderer();
-    if (!root) {
-        // FIXME: Do we need to set m_size here?
-        m_layoutSchedulingEnabled = true;
-        return;
-    }
-
-    FontCachePurgePreventer fontCachePurgePreventer;
-
-    m_nestedLayoutCount++;
-
-    if (!m_layoutRoot) {
-        Document* document = m_frame->document();
-        Node* body = document->body();
-        if (body && body->renderer()) {
-            if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
-                body->renderer()->setChildNeedsLayout(true);
-            } else if (body->hasTagName(bodyTag)) {
-                if (!m_firstLayout && m_size.height() != layoutHeight() && body->renderer()->enclosingBox()->stretchesToViewport())
-                    body->renderer()->setChildNeedsLayout(true);
-            }
-        }
-        
-#ifdef INSTRUMENT_LAYOUT_SCHEDULING
-        if (m_firstLayout && !m_frame->ownerElement())
-            printf("Elapsed time before first layout: %d\n", document->elapsedTime());
-#endif        
-    }
-
-    ScrollbarMode hMode;
-    ScrollbarMode vMode;    
-    calculateScrollbarModesForLayout(hMode, vMode);
-
-    m_doFullRepaint = !subtree && (m_firstLayout || toRenderView(root)->printing());
-
-    if (!subtree) {
-        // Now set our scrollbar state for the layout.
-        ScrollbarMode currentHMode = horizontalScrollbarMode();
-        ScrollbarMode currentVMode = verticalScrollbarMode();
-
-        if (m_firstLayout || (hMode != currentHMode || vMode != currentVMode)) {
-            if (m_firstLayout) {
-                setScrollbarsSuppressed(true);
-
-                m_firstLayout = false;
-                m_firstLayoutCallbackPending = true;
-                m_lastLayoutSize = LayoutSize(width(), height());
-                m_lastZoomFactor = root->style()->zoom();
-
-                // Set the initial vMode to AlwaysOn if we're auto.
-                if (vMode == ScrollbarAuto)
-                    setVerticalScrollbarMode(ScrollbarAlwaysOn); // This causes a vertical scrollbar to appear.
-                // Set the initial hMode to AlwaysOff if we're auto.
-                if (hMode == ScrollbarAuto)
-                    setHorizontalScrollbarMode(ScrollbarAlwaysOff); // This causes a horizontal scrollbar to disappear.
-
-                setScrollbarModes(hMode, vMode);
-                setScrollbarsSuppressed(false, true);
-            } else
-                setScrollbarModes(hMode, vMode);
-        }
-
-        LayoutSize oldSize = m_size;
-
-        m_size = LayoutSize(layoutWidth(), layoutHeight());
-
-        if (oldSize != m_size) {
-            m_doFullRepaint = true;
-            if (!m_firstLayout) {
-                RenderBox* rootRenderer = document->documentElement() ? document->documentElement()->renderBox() : 0;
-                RenderBox* bodyRenderer = rootRenderer && document->body() ? document->body()->renderBox() : 0;
-                if (bodyRenderer && bodyRenderer->stretchesToViewport())
-                    bodyRenderer->setChildNeedsLayout(true);
-                else if (rootRenderer && rootRenderer->stretchesToViewport())
-                    rootRenderer->setChildNeedsLayout(true);
-            }
-        }
-    }
-
-    RenderLayer* layer = root->enclosingLayer();
-
-    m_actionScheduler->pause();
+    bool subtree;
+    RenderObject* root;
 
     {
-        bool disableLayoutState = false;
-        if (subtree) {
-            RenderView* view = root->view();
-            disableLayoutState = view->shouldDisableLayoutStateForSubtree(root);
-            view->pushLayoutState(root);
+        TemporaryChange<bool> changeSchedulingEnabled(m_layoutSchedulingEnabled, false);
+
+        if (!m_nestedLayoutCount && !m_inSynchronousPostLayout && m_hasPendingPostLayoutTasks && !inSubframeLayoutWithFrameFlattening) {
+            // This is a new top-level layout. If there are any remaining tasks from the previous
+            // layout, finish them now.
+            m_inSynchronousPostLayout = true;
+            m_postLayoutTasksTimer.stop();
+            performPostLayoutTasks();
+            m_inSynchronousPostLayout = false;
         }
-        LayoutStateDisabler layoutStateDisabler(disableLayoutState ? root->view() : 0);
 
-        m_inLayout = true;
-        beginDeferredRepaints();
-        root->layout();
-        endDeferredRepaints();
-        m_inLayout = false;
+        // Viewport-dependent media queries may cause us to need completely different style information.
+        // Check that here.
+        if (document->styleSelector()->affectedByViewportChange()) {
+            document->styleSelectorChanged(RecalcStyleImmediately);
+            InspectorInstrumentation::mediaQueryResultChanged(document);
+        }
 
-        if (subtree)
-            root->view()->popLayoutState(root);
-    }
-    m_layoutRoot = 0;
+        // Always ensure our style info is up-to-date. This can happen in situations where
+        // the layout beats any sort of style recalc update that needs to occur.
+        document->updateStyleIfNeeded();
 
-    m_layoutSchedulingEnabled = true;
+        subtree = m_layoutRoot;
+
+        // If there is only one ref to this view left, then its going to be destroyed as soon as we exit, 
+        // so there's no point to continuing to layout
+        if (protector->hasOneRef())
+            return;
+
+        root = subtree ? m_layoutRoot : document->renderer();
+        if (!root) {
+            // FIXME: Do we need to set m_size here?
+            return;
+        }
+    } // Reset m_layoutSchedulingEnabled to its previous value.
+    // The only reason the scoping was closed here is allow fontCachePurgePreventer
+    // to outlive the change and reset of m_layoutSchedulingEnabled.
+
+    FontCachePurgePreventer fontCachePurgePreventer;
+    RenderLayer* layer;
+    {
+        TemporaryChange<bool> changeSchedulingEnabled(m_layoutSchedulingEnabled, false);
+
+        m_nestedLayoutCount++;
+
+        if (!m_layoutRoot) {
+            Document* document = m_frame->document();
+            Node* body = document->body();
+            if (body && body->renderer()) {
+                if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
+                    body->renderer()->setChildNeedsLayout(true);
+                } else if (body->hasTagName(bodyTag)) {
+                    if (!m_firstLayout && m_size.height() != layoutHeight() && body->renderer()->enclosingBox()->stretchesToViewport())
+                        body->renderer()->setChildNeedsLayout(true);
+                }
+            }
+
+#ifdef INSTRUMENT_LAYOUT_SCHEDULING
+            if (m_firstLayout && !m_frame->ownerElement())
+                printf("Elapsed time before first layout: %d\n", document->elapsedTime());
+#endif        
+        }
+
+        autoSizeIfEnabled();
+
+        ScrollbarMode hMode;
+        ScrollbarMode vMode;    
+        calculateScrollbarModesForLayout(hMode, vMode);
+
+        m_doFullRepaint = !subtree && (m_firstLayout || toRenderView(root)->printing());
+
+        if (!subtree) {
+            // Now set our scrollbar state for the layout.
+            ScrollbarMode currentHMode = horizontalScrollbarMode();
+            ScrollbarMode currentVMode = verticalScrollbarMode();
+
+            if (m_firstLayout || (hMode != currentHMode || vMode != currentVMode)) {
+                if (m_firstLayout) {
+                    setScrollbarsSuppressed(true);
+
+                    m_firstLayout = false;
+                    m_firstLayoutCallbackPending = true;
+                    m_lastLayoutSize = LayoutSize(width(), height());
+                    m_lastZoomFactor = root->style()->zoom();
+
+                    // Set the initial vMode to AlwaysOn if we're auto.
+                    if (vMode == ScrollbarAuto)
+                        setVerticalScrollbarMode(ScrollbarAlwaysOn); // This causes a vertical scrollbar to appear.
+                    // Set the initial hMode to AlwaysOff if we're auto.
+                    if (hMode == ScrollbarAuto)
+                        setHorizontalScrollbarMode(ScrollbarAlwaysOff); // This causes a horizontal scrollbar to disappear.
+
+                    setScrollbarModes(hMode, vMode);
+                    setScrollbarsSuppressed(false, true);
+                } else
+                    setScrollbarModes(hMode, vMode);
+            }
+
+            LayoutSize oldSize = m_size;
+
+            m_size = LayoutSize(layoutWidth(), layoutHeight());
+
+            if (oldSize != m_size) {
+                m_doFullRepaint = true;
+                if (!m_firstLayout) {
+                    RenderBox* rootRenderer = document->documentElement() ? document->documentElement()->renderBox() : 0;
+                    RenderBox* bodyRenderer = rootRenderer && document->body() ? document->body()->renderBox() : 0;
+                    if (bodyRenderer && bodyRenderer->stretchesToViewport())
+                        bodyRenderer->setChildNeedsLayout(true);
+                    else if (rootRenderer && rootRenderer->stretchesToViewport())
+                        rootRenderer->setChildNeedsLayout(true);
+                }
+            }
+        }
+
+        layer = root->enclosingLayer();
+
+        m_actionScheduler->pause();
+
+        {
+            bool disableLayoutState = false;
+            if (subtree) {
+                RenderView* view = root->view();
+                disableLayoutState = view->shouldDisableLayoutStateForSubtree(root);
+                view->pushLayoutState(root);
+            }
+            LayoutStateDisabler layoutStateDisabler(disableLayoutState ? root->view() : 0);
+
+            m_inLayout = true;
+            beginDeferredRepaints();
+            root->layout();
+            endDeferredRepaints();
+            m_inLayout = false;
+
+            if (subtree)
+                root->view()->popLayoutState(root);
+        }
+        m_layoutRoot = 0;
+    } // Reset m_layoutSchedulingEnabled to its previous value.
 
     if (!subtree && !toRenderView(root)->printing())
         adjustViewSize();
@@ -1206,6 +1231,13 @@ void FrameView::addWidgetToUpdate(RenderEmbeddedObject* object)
 {
     if (!m_widgetUpdateSet)
         m_widgetUpdateSet = adoptPtr(new RenderEmbeddedObjectSet);
+
+    // Tell the DOM element that it needs a widget update.
+    Node* node = object->node();
+    if (node->hasTagName(objectTag) || node->hasTagName(embedTag)) {
+        HTMLPlugInImageElement* pluginElement = static_cast<HTMLPlugInImageElement*>(node);
+        pluginElement->setNeedsWidgetUpdate(true);
+    }
 
     m_widgetUpdateSet->add(object);
 }
@@ -1382,7 +1414,7 @@ int FrameView::scrollXForFixedPosition() const
     // When the page is scaled, the scaled "viewport" with respect to which fixed object are positioned
     // doesn't move as fast as the content view, so that when the content is scrolled all the way to the
     // end, the bottom of the scaled "viewport" touches the bottom of the real viewport.
-    float dragFactor = (contentsWidth() - visibleContentWidth * frameScaleFactor) / maxX;
+    float dragFactor = shouldLayoutFixedElementsRelativeToFrame() ? 1 : (contentsWidth() - visibleContentWidth * frameScaleFactor) / maxX;
 
     return x * dragFactor / frameScaleFactor;
 }
@@ -1413,8 +1445,7 @@ int FrameView::scrollYForFixedPosition() const
         return y;
 
     float frameScaleFactor = m_frame->frameScaleFactor();
-    float dragFactor = (contentsHeight() - visibleContentHeight * frameScaleFactor) / maxY;
-
+    float dragFactor = shouldLayoutFixedElementsRelativeToFrame() ? 1 : (contentsHeight() - visibleContentHeight * frameScaleFactor) / maxY;
     return y * dragFactor / frameScaleFactor;
 }
 
@@ -1423,6 +1454,18 @@ IntSize FrameView::scrollOffsetForFixedPosition() const
     return IntSize(scrollXForFixedPosition(), scrollYForFixedPosition());
 }
 
+void FrameView::setShouldLayoutFixedElementsRelativeToFrame(bool shouldLayoutFixedElementsRelativeToFrame)
+{
+    if (shouldLayoutFixedElementsRelativeToFrame == m_shouldLayoutFixedElementsRelativeToFrame)
+        return;
+
+    m_shouldLayoutFixedElementsRelativeToFrame = shouldLayoutFixedElementsRelativeToFrame;
+
+    if (!hasFixedObjects())
+        return;
+
+    setNeedsLayout();
+}
 IntPoint FrameView::currentMousePosition() const
 {
     return m_frame ? m_frame->eventHandler()->currentMousePosition() : IntPoint();
@@ -1505,7 +1548,7 @@ void FrameView::scrollContentsSlowPath(const IntRect& updateRect)
         root->layer()->setBackingNeedsRepaintInRect(visibleContentRect());
     }
     if (RenderPart* frameRenderer = m_frame->ownerRenderer()) {
-        if (frameRenderer->containerForRepaint()) {
+        if (isEnclosedInCompositingLayer()) {
             LayoutRect rect(frameRenderer->borderLeft() + frameRenderer->paddingLeft(),
                             frameRenderer->borderTop() + frameRenderer->paddingTop(),
                             visibleWidth(), visibleHeight());
@@ -1664,11 +1707,9 @@ void FrameView::scrollElementToRect(Element* element, const IntRect& rect)
 
 void FrameView::setScrollPosition(const IntPoint& scrollPoint)
 {
-    bool wasInProgrammaticScroll = m_inProgrammaticScroll;
-    m_inProgrammaticScroll = true;
+    TemporaryChange<bool> changeInProgrammaticScroll(m_inProgrammaticScroll, true);
     m_maintainScrollPositionAnchor = 0;
     ScrollView::setScrollPosition(scrollPoint);
-    m_inProgrammaticScroll = wasInProgrammaticScroll;
 }
 
 void FrameView::setFixedVisibleContentRect(const IntRect& visibleContentRect)
@@ -2063,8 +2104,13 @@ void FrameView::unscheduleRelayout()
 #if ENABLE(REQUEST_ANIMATION_FRAME)
 void FrameView::serviceScriptedAnimations(DOMTimeStamp time)
 {
+    Vector<RefPtr<Document> > documents;
+
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext())
-        frame->document()->serviceScriptedAnimations(time);
+        documents.append(frame->document());
+
+    for (size_t i = 0; i < documents.size(); ++i)
+        documents[i]->serviceScriptedAnimations(time);
 }
 #endif
 
@@ -2174,9 +2220,12 @@ void FrameView::updateWidget(RenderEmbeddedObject* object)
         return;
 
     // FIXME: This could turn into a real virtual dispatch if we defined
-    // updateWidget(bool) on HTMLElement.
-    if (ownerElement->hasTagName(objectTag) || ownerElement->hasTagName(embedTag))
-        static_cast<HTMLPlugInImageElement*>(ownerElement)->updateWidget(CreateAnyWidgetType);
+    // updateWidget(PluginCreationOption) on HTMLElement.
+    if (ownerElement->hasTagName(objectTag) || ownerElement->hasTagName(embedTag)) {
+        HTMLPlugInImageElement* pluginElement = static_cast<HTMLPlugInImageElement*>(ownerElement);
+        if (pluginElement->needsWidgetUpdate())
+            pluginElement->updateWidget(CreateAnyWidgetType);
+    }
     // FIXME: It is not clear that Media elements need or want this updateWidget() call.
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     else if (ownerElement->isMediaElement())
@@ -2280,6 +2329,94 @@ void FrameView::performPostLayoutTasks()
 void FrameView::postLayoutTimerFired(Timer<FrameView>*)
 {
     performPostLayoutTasks();
+}
+
+void FrameView::autoSizeIfEnabled()
+{
+    if (!m_shouldAutoSize)
+        return;
+
+    if (m_inAutoSize)
+        return;
+
+    TemporaryChange<bool> changeInAutoSize(m_inAutoSize, true);
+
+    Document* document = frame()->document();
+    if (!document)
+        return;
+
+    RenderView* documentView = document->renderView();
+    Element* documentElement = document->documentElement();
+    if (!documentView || !documentElement)
+        return;
+
+    RenderBox* documentRenderBox = documentElement->renderBox();
+    if (!documentRenderBox)
+        return;
+
+    // Do the resizing twice. The first time is basically a rough calculation using the preferred width
+    // which may result in a height change during the second iteration.
+    for (int i = 0; i < 2; i++) {
+        // Update various sizes including contentsSize, scrollHeight, etc.
+        document->updateLayoutIgnorePendingStylesheets();
+        IntSize size = frameRect().size();
+        int width = documentView->minPreferredLogicalWidth();
+        int height = documentRenderBox->scrollHeight();
+        IntSize newSize(width, height);
+
+        // Ensure the size is at least the min bounds.
+        newSize = newSize.expandedTo(m_minAutoSize);
+
+        // Check to see if a scrollbar is needed for a given dimension and
+        // if so, increase the other dimension to account for the scrollbar.
+        // Since the dimensions are only for the view rectangle, once a
+        // dimension exceeds the maximum, there is no need to increase it further.
+        if (newSize.width() > m_maxAutoSize.width()) {
+            RefPtr<Scrollbar> localHorizontalScrollbar = horizontalScrollbar();
+            if (!localHorizontalScrollbar)
+                localHorizontalScrollbar = createScrollbar(HorizontalScrollbar);
+            if (!localHorizontalScrollbar->isOverlayScrollbar())
+                newSize.setHeight(newSize.height() + localHorizontalScrollbar->height());
+
+            // Don't bother checking for a vertical scrollbar because the width is at
+            // already greater the maximum.
+        } else if (newSize.height() > m_maxAutoSize.height()) {
+            RefPtr<Scrollbar> localVerticalScrollbar = verticalScrollbar();
+            if (!localVerticalScrollbar)
+                localVerticalScrollbar = createScrollbar(VerticalScrollbar);
+            if (!localVerticalScrollbar->isOverlayScrollbar())
+                newSize.setWidth(newSize.width() + localVerticalScrollbar->width());
+
+            // Don't bother checking for a horizontal scrollbar because the height is
+            // already greater the maximum.
+        }
+
+        // Bound the dimensions by the max bounds and determine what scrollbars to show.
+        ScrollbarMode horizonalScrollbarMode = ScrollbarAlwaysOff;
+        if (newSize.width() > m_maxAutoSize.width()) {
+            newSize.setWidth(m_maxAutoSize.width());
+            horizonalScrollbarMode = ScrollbarAlwaysOn;
+        }
+        ScrollbarMode verticalScrollbarMode = ScrollbarAlwaysOff;
+        if (newSize.height() > m_maxAutoSize.height()) {
+            newSize.setHeight(m_maxAutoSize.height());
+            verticalScrollbarMode = ScrollbarAlwaysOn;
+        }
+
+        if (newSize == size)
+            continue;
+
+        // Avoid doing resizing to a smaller size while the frame is loading to avoid switching to a small size
+        // during an intermediate state (and then changing back to a bigger size as the load progresses).
+        if (!frame()->loader()->isComplete() && (newSize.height() < size.height() || newSize.width() < size.width()))
+            break;
+        resize(newSize.width(), newSize.height());
+        // Force the scrollbar state to avoid the scrollbar code adding them and causing them to be needed. For example,
+        // a vertical scrollbar may cause text to wrap and thus increase the height (which is the only reason the scollbar is needed).
+        setVerticalScrollbarLock(false);
+        setHorizontalScrollbarLock(false);
+        setScrollbarModes(horizonalScrollbarMode, verticalScrollbarMode, true, true);
+    }
 }
 
 void FrameView::updateOverflowStatus(bool horizontalOverflow, bool verticalOverflow)
@@ -2446,6 +2583,19 @@ ScrollableArea* FrameView::enclosingScrollableArea() const
 bool FrameView::shouldSuspendScrollAnimations() const
 {
     return m_frame->loader()->state() != FrameStateComplete;
+}
+
+void FrameView::scrollbarStyleChanged(int newStyle, bool forceUpdate)
+{
+    Page* page = m_frame->page();
+    if (!page)
+        return;
+    if (page->mainFrame() != m_frame)
+        return;
+    page->chrome()->client()->recommendedScrollbarStyleDidChange(newStyle);
+
+    if (forceUpdate)
+        ScrollView::scrollbarStyleChanged(newStyle, forceUpdate);
 }
 
 void FrameView::setAnimatorsAreActive()
@@ -2869,6 +3019,26 @@ void FrameView::flushDeferredRepaints()
     doDeferredRepaints();
 }
 
+void FrameView::enableAutoSizeMode(bool enable, const IntSize& minSize, const IntSize& maxSize)
+{
+    ASSERT(!enable || !minSize.isEmpty());
+    ASSERT(minSize.width() <= maxSize.width());
+    ASSERT(minSize.height() <= maxSize.height());
+
+    if (m_shouldAutoSize == enable && m_minAutoSize == minSize && m_maxAutoSize == maxSize)
+        return;
+
+    m_shouldAutoSize = enable;
+    m_minAutoSize = minSize;
+    m_maxAutoSize = maxSize;
+
+    if (!m_shouldAutoSize)
+        return;
+
+    setNeedsLayout();
+    scheduleRelayout();
+}
+
 void FrameView::forceLayout(bool allowSubtree)
 {
     layout(allowSubtree);
@@ -2897,8 +3067,8 @@ void FrameView::forceLayoutForPagination(const FloatSize& pageSize, const FloatS
         const LayoutRect& documentRect = root->documentRect();
         LayoutUnit docLogicalWidth = horizontalWritingMode ? documentRect.width() : documentRect.height();
         if (docLogicalWidth > pageLogicalWidth) {
-            int expectedPageWidth = std::min<float>(documentRect.width(), originalPageSize.width() * maximumShrinkFactor);
-            int expectedPageHeight = std::min<float>(documentRect.height(), originalPageSize.height() * maximumShrinkFactor);
+            int expectedPageWidth = std::min<float>(documentRect.width(), pageSize.width() * maximumShrinkFactor);
+            int expectedPageHeight = std::min<float>(documentRect.height(), pageSize.height() * maximumShrinkFactor);
             FloatSize maxPageSize = m_frame->resizePageRectsKeepingRatio(FloatSize(originalPageSize.width(), originalPageSize.height()), FloatSize(expectedPageWidth, expectedPageHeight));
             pageLogicalWidth = horizontalWritingMode ? maxPageSize.width() : maxPageSize.height();
             pageLogicalHeight = horizontalWritingMode ? maxPageSize.height() : maxPageSize.width();

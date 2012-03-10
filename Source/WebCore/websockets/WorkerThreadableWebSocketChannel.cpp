@@ -34,7 +34,6 @@
 
 #include "WorkerThreadableWebSocketChannel.h"
 
-#include "ArrayBuffer.h"
 #include "Blob.h"
 #include "CrossThreadTask.h"
 #include "PlatformString.h"
@@ -46,6 +45,7 @@
 #include "WorkerLoaderProxy.h"
 #include "WorkerRunLoop.h"
 #include "WorkerThread.h"
+#include <wtf/ArrayBuffer.h>
 #include <wtf/MainThread.h>
 #include <wtf/PassRefPtr.h>
 
@@ -297,6 +297,18 @@ void WorkerThreadableWebSocketChannel::Peer::didReceiveBinaryData(PassOwnPtr<Vec
 {
     ASSERT(isMainThread());
     m_loaderProxy.postTaskForModeToWorkerContext(createCallbackTask(&workerContextDidReceiveBinaryData, m_workerClientWrapper, binaryData), m_taskMode);
+}
+
+static void workerContextDidUpdateBufferedAmount(ScriptExecutionContext* context, PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper, unsigned long bufferedAmount)
+{
+    ASSERT_UNUSED(context, context->isWorkerContext());
+    workerClientWrapper->didUpdateBufferedAmount(bufferedAmount);
+}
+
+void WorkerThreadableWebSocketChannel::Peer::didUpdateBufferedAmount(unsigned long bufferedAmount)
+{
+    ASSERT(isMainThread());
+    m_loaderProxy.postTaskForModeToWorkerContext(createCallbackTask(&workerContextDidUpdateBufferedAmount, m_workerClientWrapper, bufferedAmount), m_taskMode);
 }
 
 static void workerContextDidStartClosingHandshake(ScriptExecutionContext* context, PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper)

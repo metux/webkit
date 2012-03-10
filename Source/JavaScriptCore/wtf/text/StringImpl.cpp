@@ -205,18 +205,22 @@ const UChar* StringImpl::getData16SlowCase() const
 
     m_copyData16 = static_cast<UChar*>(fastMalloc(len * sizeof(UChar)));
 
-    if (hasTerminatingNullCharacter()) {
-        len--;
-        m_copyData16[len] = '\0';
-    }
-
-    for (size_t i = 0; i < len; i++)
-        m_copyData16[i] = m_data8[i];
-
     m_hashAndFlags |= s_hashFlagHas16BitShadow;
+
+    upconvertCharacters(0, len);
 
     return m_copyData16;
 }
+
+void StringImpl::upconvertCharacters(unsigned start, unsigned end) const
+{
+    ASSERT(is8Bit());
+    ASSERT(has16BitShadow());
+
+    for (size_t i = start; i < end; i++)
+        m_copyData16[i] = m_data8[i];
+}
+    
 
 bool StringImpl::containsOnlyWhitespace()
 {
@@ -709,17 +713,6 @@ float StringImpl::toFloat(bool* ok, bool* didReadNumber)
     if (is8Bit())
         return charactersToFloat(characters8(), m_length, ok, didReadNumber);
     return charactersToFloat(characters16(), m_length, ok, didReadNumber);
-}
-
-static bool equal(const UChar* a, const LChar* b, int length)
-{
-    ASSERT(length >= 0);
-    while (length--) {
-        LChar bc = *b++;
-        if (*a++ != bc)
-            return false;
-    }
-    return true;
 }
 
 bool equalIgnoringCase(const UChar* a, const LChar* b, unsigned length)
@@ -1350,17 +1343,6 @@ bool equal(const StringImpl* a, const StringImpl* b)
     return StringHash::equal(a, b);
 }
 
-template <typename CharTypeL, typename CharTypeR>
-ALWAYS_INLINE static bool equal(const CharTypeL* a, const CharTypeR* b, unsigned length)
-{
-    for (unsigned i = 0; i != length; ++i) {
-        if (a[i] != b[i])
-            return false;
-    }
-    
-    return true;
-}
-
 bool equal(const StringImpl* a, const LChar* b, unsigned length)
 {
     if (!a)
@@ -1420,39 +1402,9 @@ bool equal(const StringImpl* a, const UChar* b, unsigned length)
 
     if (a->length() != length)
         return false;
-    // FIXME: perhaps we should have a more abstract macro that indicates when
-    // going 4 bytes at a time is unsafe
-#if CPU(ARM) || CPU(SH4) || CPU(MIPS) || CPU(SPARC)
-    const UChar* as = a->characters();
-    for (unsigned i = 0; i != length; ++i)
-        if (as[i] != b[i])
-            return false;
-    return true;
-#else
-    if (a->is8Bit()) {
-        const LChar* as = a->characters8();
-        for (unsigned i = 0; i != length; ++i)
-            if (as[i] != b[i])
-                return false;
-        return true;
-    }
-
-    // Do comparison 4-bytes-at-a-time on architectures where it's safe.
-
-    const uint32_t* aCharacters = reinterpret_cast<const uint32_t*>(a->characters16());
-    const uint32_t* bCharacters = reinterpret_cast<const uint32_t*>(b);
-
-    unsigned halfLength = length >> 1;
-    for (unsigned i = 0; i != halfLength; ++i) {
-        if (*aCharacters++ != *bCharacters++)
-            return false;
-    }
-
-    if (length & 1 &&  *reinterpret_cast<const uint16_t*>(aCharacters) != *reinterpret_cast<const uint16_t*>(bCharacters))
-        return false;
-
-    return true;
-#endif
+    if (a->is8Bit())
+        return equal(a->characters8(), b, length);
+    return equal(a->characters16(), b, length);
 }
 
 bool equalIgnoringCase(StringImpl* a, StringImpl* b)

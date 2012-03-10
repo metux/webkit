@@ -45,7 +45,8 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , lineClamp(RenderStyle::initialLineClamp())
     , m_mask(FillLayer(MaskFillLayer))
     , m_pageSize()
-    , m_wrapShape(RenderStyle::initialWrapShape())
+    , m_wrapShapeInside(RenderStyle::initialWrapShapeInside())
+    , m_wrapShapeOutside(RenderStyle::initialWrapShapeOutside())
     , m_wrapMargin(RenderStyle::initialWrapMargin())
     , m_wrapPadding(RenderStyle::initialWrapPadding())
     , m_visitedLinkBackgroundColor(RenderStyle::initialBackgroundColor())
@@ -95,6 +96,9 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
 #if ENABLE(CSS_FILTERS)
     , m_filter(o.m_filter)
 #endif
+#if ENABLE(CSS_GRID_LAYOUT)
+    , m_grid(o.m_grid)
+#endif
     , m_content(o.m_content ? o.m_content->clone() : nullptr)
     , m_counterDirectives(o.m_counterDirectives ? clone(*o.m_counterDirectives) : nullptr)
     , m_boxShadow(o.m_boxShadow ? adoptPtr(new ShadowData(*o.m_boxShadow)) : nullptr)
@@ -104,7 +108,8 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_mask(o.m_mask)
     , m_maskBoxImage(o.m_maskBoxImage)
     , m_pageSize(o.m_pageSize)
-    , m_wrapShape(o.m_wrapShape)
+    , m_wrapShapeInside(o.m_wrapShapeInside)
+    , m_wrapShapeOutside(o.m_wrapShapeOutside)
     , m_wrapMargin(o.m_wrapMargin)
     , m_wrapPadding(o.m_wrapPadding)
     , m_visitedLinkBackgroundColor(o.m_visitedLinkBackgroundColor)
@@ -158,6 +163,9 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
 #if ENABLE(CSS_FILTERS)
         && m_filter == o.m_filter
 #endif
+#if ENABLE(CSS_GRID_LAYOUT)
+        && m_grid == o.m_grid
+#endif
         && contentDataEquivalent(o)
         && counterDataEquivalent(o)
         && userDrag == o.userDrag
@@ -192,7 +200,8 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && (m_flowThread == o.m_flowThread)
         && (m_regionThread == o.m_regionThread)
         && (m_regionOverflow == o.m_regionOverflow)
-        && (m_wrapShape == o.m_wrapShape)
+        && (m_wrapShapeInside == o.m_wrapShapeInside)
+        && (m_wrapShapeOutside == o.m_wrapShapeOutside)
         && (m_wrapFlow == o.m_wrapFlow)
         && (m_wrapThrough == o.m_wrapThrough)
         && (m_wrapMargin == o.m_wrapMargin)

@@ -38,12 +38,14 @@
 #include <WebCore/EditCommand.h>
 #include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameView.h>
 #include <WebCore/HTMLInputElement.h>
 #include <WebCore/HTMLNames.h>
 #include <WebCore/HTMLTextAreaElement.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
+#include <WebCore/TextIterator.h>
 #include <WebCore/UserTypingGestureIndicator.h>
 
 using namespace WebCore;
@@ -181,7 +183,14 @@ void WebEditorClient::respondToChangedSelection(Frame* frame)
     if (!frame)
         return;
 
-    m_page->send(Messages::WebPageProxy::EditorStateChanged(m_page->editorState()));
+    EditorState state = m_page->editorState();
+
+#if PLATFORM(QT)
+    if (Element* scope = frame->selection()->rootEditableElement())
+        m_page->send(Messages::WebPageProxy::FocusEditableArea(state.microFocus, scope->getRect()));
+#endif
+
+    m_page->send(Messages::WebPageProxy::EditorStateChanged(state));
 
 #if PLATFORM(WIN)
     // FIXME: This should also go into the selection state.

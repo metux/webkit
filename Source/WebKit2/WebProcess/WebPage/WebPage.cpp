@@ -35,6 +35,7 @@
 #include "LayerTreeHost.h"
 #include "MessageID.h"
 #include "NetscapePlugin.h"
+#include "NotificationPermissionRequestManager.h"
 #include "PageOverlay.h"
 #include "PluginProxy.h"
 #include "PluginView.h"
@@ -61,6 +62,7 @@
 #include "WebImage.h"
 #include "WebInspector.h"
 #include "WebInspectorClient.h"
+#include "WebNotificationClient.h"
 #include "WebOpenPanelResultListener.h"
 #include "WebPageCreationParameters.h"
 #include "WebPageGroupProxy.h"
@@ -217,6 +219,10 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #if ENABLE(INSPECTOR)
     pageClients.inspectorClient = new WebInspectorClient(this);
 #endif
+#if ENABLE(NOTIFICATIONS)
+    pageClients.notificationClient = new WebNotificationClient(this);
+#endif
+    
     m_page = adoptPtr(new Page(pageClients));
 
     // Qt does not yet call setIsInWindow. Until it does, just leave
@@ -239,10 +245,13 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 
     m_mainFrame = WebFrame::createMainFrame(this);
 
+    setUseFixedLayout(parameters.useFixedLayout);
+
     setDrawsBackground(parameters.drawsBackground);
     setDrawsTransparentBackground(parameters.drawsTransparentBackground);
 
     setPaginationMode(parameters.paginationMode);
+    setPageLength(parameters.pageLength);
     setGapBetweenPages(parameters.gapBetweenPages);
 
     setMemoryCacheMessagesEnabled(parameters.areMemoryCacheClientCallsEnabled);
@@ -373,8 +382,43 @@ EditorState WebPage::editorState() const
     result.isContentRichlyEditable = frame->selection()->isContentRichlyEditable();
     result.isInPasswordField = frame->selection()->isInPasswordField();
     result.hasComposition = frame->editor()->hasComposition();
+
+#if PLATFORM(QT)
+    size_t location = 0;
+    size_t length = 0;
+    Element* scope = frame->selection()->rootEditableElement();
+
+    RefPtr<Range> range;
+    if (result.hasComposition && (range = frame->editor()->compositionRange())) {
+        TextIterator::getLocationAndLengthFromRange(scope, range.get(), location, length);
+        result.compositionStart = location;
+        result.compositionLength = length;
+        result.compositionRect = range->boundingBox();
+    }
+
+    if (!result.selectionIsNone && (range = frame->selection()->selection().firstRange())) {
+        TextIterator::getLocationAndLengthFromRange(scope, range.get(), location, length);
+
+        ExceptionCode ec = 0;
+        RefPtr<Range> tempRange = range->cloneRange(ec);
+        tempRange->setStart(tempRange->startContainer(ec), tempRange->startOffset(ec) + location, ec);
+        IntRect rect = frame->editor()->firstRectForRange(tempRange.get());
+        bool baseIsFirst = frame->selection()->selection().isBaseFirst();
+
+        result.cursorPosition = (baseIsFirst) ? location + length : location;
+        result.anchorPosition = (baseIsFirst) ? location : location + length;
+        result.microFocus = frame->view()->contentsToWindow(rect);
+        result.selectedText = range->text();
+    }
+
+    if (scope && result.isContentEditable && !result.isInPasswordField) {
+        result.surroundingText = scope->innerText();
+        result.surroundingText.remove(result.compositionStart, result.compositionLength);
+    }
+#endif
+
     result.shouldIgnoreCompositionSelectionChange = frame->editor()->ignoreCompositionSelectionChange();
-    
+
     return result;
 }
 
@@ -700,6 +744,8 @@ void WebPage::setSize(const WebCore::IntSize& viewSize)
 #if USE(TILED_BACKING_STORE)
 void WebPage::setFixedVisibleContentRect(const IntRect& rect)
 {
+    ASSERT(m_useFixedLayout);
+
     Frame* frame = m_page->mainFrame();
 
     frame->view()->setFixedVisibleContentRect(rect);
@@ -707,14 +753,14 @@ void WebPage::setFixedVisibleContentRect(const IntRect& rect)
 
 void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSize)
 {
+    ASSERT(m_useFixedLayout);
+    ASSERT(!targetLayoutSize.isEmpty());
+
     FrameView* view = m_page->mainFrame()->view();
 
-    m_useFixedLayout = !targetLayoutSize.isEmpty();
-
-    // Set view attributes based on whether fixed layout is used.
-    view->setDelegatesScrolling(m_useFixedLayout);
-    view->setUseFixedLayout(m_useFixedLayout);
-    view->setPaintsEntireContents(m_useFixedLayout);
+    view->setDelegatesScrolling(true);
+    view->setUseFixedLayout(true);
+    view->setPaintsEntireContents(true);
 
     if (view->fixedLayoutSize() == targetLayoutSize)
         return;
@@ -731,6 +777,8 @@ void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSiz
 
 void WebPage::resizeToContentsIfNeeded()
 {
+    ASSERT(m_useFixedLayout);
+
     FrameView* view = m_page->mainFrame()->view();
 
     if (!view->useFixedLayout())
@@ -747,6 +795,8 @@ void WebPage::resizeToContentsIfNeeded()
 
 void WebPage::setViewportSize(const IntSize& size)
 {
+    ASSERT(m_useFixedLayout);
+
     if (m_viewportSize == size)
         return;
 
@@ -896,11 +946,7 @@ void WebPage::setUseFixedLayout(bool fixed)
 {
     m_useFixedLayout = fixed;
 
-    Frame* frame = m_mainFrame->coreFrame();
-    if (!frame)
-        return;
-
-    FrameView* view = frame->view();
+    FrameView* view = mainFrameView();
     if (!view)
         return;
 
@@ -911,11 +957,7 @@ void WebPage::setUseFixedLayout(bool fixed)
 
 void WebPage::setFixedLayoutSize(const IntSize& size)
 {
-    Frame* frame = m_mainFrame->coreFrame();
-    if (!frame)
-        return;
-    
-    FrameView* view = frame->view();
+    FrameView* view = mainFrameView();
     if (!view)
         return;
 
@@ -927,6 +969,13 @@ void WebPage::setPaginationMode(uint32_t mode)
 {
     Page::Pagination pagination = m_page->pagination();
     pagination.mode = static_cast<Page::Pagination::Mode>(mode);
+    m_page->setPagination(pagination);
+}
+
+void WebPage::setPageLength(double pageLength)
+{
+    Page::Pagination pagination = m_page->pagination();
+    pagination.pageLength = pageLength;
     m_page->setPagination(pagination);
 }
 
@@ -1175,7 +1224,13 @@ void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
     if (!handled) {
         CurrentEvent currentEvent(mouseEvent);
 
-        handled = handleMouseEvent(mouseEvent, m_page.get(), !windowIsFocused());
+        // We need to do a full, normal hit test during this mouse event if the page is active or if a mouse
+        // button is currently pressed. It is possible that neither of those things will be true since on 
+        // Lion when legacy scrollbars are enabled, WebKit receives mouse events all the time. If it is one 
+        // of those cases where the page is not active and the mouse is not pressed, then we can fire a more
+        // efficient scrollbars-only version of the event.
+        bool onlyUpdateScrollbars = !(m_page->focusController()->isActive() || (mouseEvent.button() != WebMouseEvent::NoButton));
+        handled = handleMouseEvent(mouseEvent, m_page.get(), onlyUpdateScrollbars);
     }
 
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(mouseEvent.type()), handled));
@@ -1193,7 +1248,14 @@ void WebPage::mouseEventSyncForTesting(const WebMouseEvent& mouseEvent, bool& ha
 
     if (!handled) {
         CurrentEvent currentEvent(mouseEvent);
-        handled = handleMouseEvent(mouseEvent, m_page.get(), !windowIsFocused());
+
+        // We need to do a full, normal hit test during this mouse event if the page is active or if a mouse
+        // button is currently pressed. It is possible that neither of those things will be true since on 
+        // Lion when legacy scrollbars are enabled, WebKit receives mouse events all the time. If it is one 
+        // of those cases where the page is not active and the mouse is not pressed, then we can fire a more
+        // efficient scrollbars-only version of the event.
+        bool onlyUpdateScrollbars = !(m_page->focusController()->isActive() || (mouseEvent.button() != WebMouseEvent::NoButton));
+        handled = handleMouseEvent(mouseEvent, m_page.get(), onlyUpdateScrollbars);
     }
 }
 
@@ -1731,6 +1793,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #endif
     settings->setLocalFileContentSniffingEnabled(store.getBoolValueForKey(WebPreferencesKey::localFileContentSniffingEnabledKey()));
     settings->setUsesPageCache(store.getBoolValueForKey(WebPreferencesKey::usesPageCacheKey()));
+    settings->setPageCacheSupportsPlugins(store.getBoolValueForKey(WebPreferencesKey::pageCacheSupportsPluginsKey()));
     settings->setAuthorAndUserStylesEnabled(store.getBoolValueForKey(WebPreferencesKey::authorAndUserStylesEnabledKey()));
     settings->setPaginateDuringLayoutEnabled(store.getBoolValueForKey(WebPreferencesKey::paginateDuringLayoutEnabledKey()));
     settings->setDOMPasteAllowed(store.getBoolValueForKey(WebPreferencesKey::domPasteAllowedKey()));
@@ -1788,6 +1851,12 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setBackspaceKeyNavigationEnabled(store.getBoolValueForKey(WebPreferencesKey::backspaceKeyNavigationEnabledKey()));
     settings->setCaretBrowsingEnabled(store.getBoolValueForKey(WebPreferencesKey::caretBrowsingEnabledKey()));
 
+#if ENABLE(VIDEO_TRACK)
+    settings->setShouldDisplaySubtitles(store.getBoolValueForKey(WebPreferencesKey::shouldDisplaySubtitlesKey()));
+    settings->setShouldDisplayCaptions(store.getBoolValueForKey(WebPreferencesKey::shouldDisplayCaptionsKey()));
+    settings->setShouldDisplayTextDescriptions(store.getBoolValueForKey(WebPreferencesKey::shouldDisplayTextDescriptionsKey()));
+#endif
+
     platformPreferencesDidChange(store);
 }
 
@@ -1810,6 +1879,15 @@ WebFullScreenManager* WebPage::fullScreenManager()
     return m_fullScreenManager.get();
 }
 #endif
+
+NotificationPermissionRequestManager* WebPage::notificationPermissionRequestManager()
+{
+    if (m_notificationPermissionRequestManager)
+        return m_notificationPermissionRequestManager.get();
+
+    m_notificationPermissionRequestManager = NotificationPermissionRequestManager::create(this);
+    return m_notificationPermissionRequestManager.get();
+}
 
 #if !PLATFORM(GTK) && !PLATFORM(MAC)
 bool WebPage::handleEditingKeyboardEvent(KeyboardEvent* evt)
@@ -2087,6 +2165,11 @@ void WebPage::didReceiveGeolocationPermissionDecision(uint64_t geolocationID, bo
     m_geolocationPermissionRequestManager.didReceiveGeolocationPermissionDecision(geolocationID, allowed);
 }
 
+void WebPage::didReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed)
+{
+    notificationPermissionRequestManager()->didReceiveNotificationPermissionDecision(notificationID, allowed);
+}
+
 void WebPage::advanceToNextMisspelling(bool startBeforeSelection)
 {
     Frame* frame = m_page->focusController()->focusedOrMainFrame();
@@ -2139,6 +2222,16 @@ void WebPage::setTextForActivePopupMenu(int32_t index)
     m_activePopupMenu->setTextForIndex(index);
 }
 
+#if PLATFORM(GTK)
+void WebPage::failedToShowPopupMenu()
+{
+    if (!m_activePopupMenu)
+        return;
+
+    m_activePopupMenu->client()->popupDidHide();
+}
+#endif
+
 void WebPage::didSelectItemFromActiveContextMenu(const WebContextMenuItemData& item)
 {
     if (!m_contextMenu)
@@ -2150,12 +2243,9 @@ void WebPage::didSelectItemFromActiveContextMenu(const WebContextMenuItemData& i
 
 void WebPage::replaceSelectionWithText(Frame* frame, const String& text)
 {
-    if (frame->selection()->isNone())
-        return;
-
-    RefPtr<DocumentFragment> textFragment = createFragmentFromText(frame->selection()->toNormalizedRange().get(), text);
-    applyCommand(ReplaceSelectionCommand::create(frame->document(), textFragment.release(), ReplaceSelectionCommand::SelectReplacement | ReplaceSelectionCommand::MatchStyle | ReplaceSelectionCommand::PreventNesting));
-    frame->selection()->revealSelection(ScrollAlignment::alignToEdgeIfNeeded);
+    bool selectReplacement = true;
+    bool smartReplace = false;
+    return frame->editor()->replaceSelectionWithText(text, selectReplacement, smartReplace);
 }
 
 void WebPage::clearSelection()

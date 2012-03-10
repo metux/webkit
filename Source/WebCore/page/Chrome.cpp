@@ -508,13 +508,6 @@ void Chrome::scheduleAnimation()
 }
 #endif
 
-#if ENABLE(NOTIFICATIONS)
-NotificationPresenter* Chrome::notificationPresenter() const
-{
-    return m_client->notificationPresenter();
-}
-#endif
-
 // --------
 
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -560,6 +553,11 @@ bool Chrome::selectItemWritingDirectionIsNatural()
 bool Chrome::selectItemAlignmentFollowsMenuWritingDirection()
 {
     return m_client->selectItemAlignmentFollowsMenuWritingDirection();
+}
+
+bool Chrome::hasOpenedPopup() const
+{
+    return m_client->hasOpenedPopup();
 }
 
 PassRefPtr<PopupMenu> Chrome::createPopupMenu(PopupMenuClient* client) const

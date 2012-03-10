@@ -44,10 +44,6 @@ namespace WebCore {
     struct ViewportArguments;
 }
 
-#if PLATFORM(QT)
-class QtWebPageProxy;
-#endif
-
 namespace WebKit {
 
 class DrawingAreaProxy;
@@ -107,6 +103,7 @@ public:
 #if PLATFORM(QT)
     virtual void didChangeContentsSize(const WebCore::IntSize&) = 0;
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
+    virtual void focusEditableArea(const WebCore::IntRect&, const WebCore::IntRect&) = 0;
     virtual void didReceiveMessageFromNavigatorQtObject(const String&) = 0;
     virtual void handleDownloadRequest(DownloadProxy*) = 0;
 #endif
@@ -177,6 +174,7 @@ public:
     virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingCorrectionPanel) = 0;
     virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingCorrectionPanel) = 0;
     virtual void recordAutocorrectionResponse(WebCore::EditorClient::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
+    virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) = 0;
     
     virtual WKView* wkView() const = 0;
 #endif

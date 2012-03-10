@@ -46,7 +46,6 @@ class CSSFontFace;
 class CSSFontFaceRule;
 class CSSImageGeneratorValue;
 class CSSImageValue;
-class CSSRegionStyleRule;
 class CSSRuleList;
 class CSSSelector;
 class CSSStyleApplyProperty;
@@ -64,6 +63,7 @@ class KeyframeList;
 class KeyframeValue;
 class MediaQueryEvaluator;
 class Node;
+class RenderRegion;
 class RuleData;
 class RuleSet;
 class Settings;
@@ -76,6 +76,7 @@ class StyledElement;
 class WebKitCSSKeyframeRule;
 class WebKitCSSKeyframesRule;
 class WebKitCSSFilterValue;
+class WebKitCSSRegionRule;
 class WebKitCSSShaderValue;
 
 class MediaQueryResult {
@@ -104,11 +105,11 @@ public:
     void pushParent(Element* parent) { m_checker.pushParent(parent); }
     void popParent(Element* parent) { m_checker.popParent(parent); }
 
-    PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false);
+    PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false, RenderRegion* regionForStyling = 0);
 
     void keyframeStylesForAnimation(Element*, const RenderStyle*, KeyframeList&);
 
-    PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle = 0);
+    PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle = 0, RenderRegion* regionForStyling = 0);
 
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
@@ -118,6 +119,7 @@ public:
     RenderStyle* parentStyle() const { return m_parentStyle; }
     RenderStyle* rootElementStyle() const { return m_rootElementStyle; }
     Element* element() const { return m_element; }
+    Document* document() const { return m_checker.document(); }
     FontDescription fontDescription() { return style()->fontDescription(); }
     FontDescription parentFontDescription() {return parentStyle()->fontDescription(); }
     void setFontDescription(FontDescription fontDescription) { m_fontDirty |= style()->setFontDescription(fontDescription); }
@@ -128,13 +130,18 @@ public:
 private:
     void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);
     void initElement(Element*);
+    void initForRegionStyling(RenderRegion*);
+    void initRegionRules(RenderRegion*);
     RenderStyle* locateSharedStyle();
     bool matchesRuleSet(RuleSet*);
     Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
-    Node* findSiblingForStyleSharing(Node*, unsigned& count) const;
-    bool canShareStyleWithElement(Node*) const;
+    StyledElement* findSiblingForStyleSharing(Node*, unsigned& count) const;
+    bool canShareStyleWithElement(StyledElement*) const;
 
     PassRefPtr<RenderStyle> styleForKeyframe(const RenderStyle*, const WebKitCSSKeyframeRule*, KeyframeValue&);
+
+    void setRegionForStyling(RenderRegion* region) { m_regionForStyling = region; }
+    RenderRegion* regionForStyling() const { return m_regionForStyling; }
 
 public:
     // These methods will give back the set of rules that matched for a given element (or a pseudo-element).
@@ -199,7 +206,7 @@ public:
 
     void addKeyframeStyle(PassRefPtr<WebKitCSSKeyframesRule>);
     void addPageStyle(PassRefPtr<CSSPageRule>);
-    void addRegionStyleRule(PassRefPtr<CSSRegionStyleRule>);
+    void addRegionRule(PassRefPtr<WebKitCSSRegionRule>);
 
     bool checkRegionStyle(Element*);
 
@@ -209,6 +216,8 @@ public:
     bool usesLinkRules() const { return m_features.usesLinkRules; }
 
     static bool createTransformOperations(CSSValue* inValue, RenderStyle* inStyle, RenderStyle* rootStyle, TransformOperations& outOperations);
+    
+    void invalidateMatchedDeclarationCache();
 
 #if ENABLE(CSS_FILTERS)
     bool createFilterOperations(CSSValue* inValue, RenderStyle* inStyle, RenderStyle* rootStyle, FilterOperations& outOperations);
@@ -241,7 +250,7 @@ private:
     void adjustRenderStyle(RenderStyle* styleToAdjust, RenderStyle* parentStyle, Element*);
 
     void addMatchedRule(const RuleData* rule) { m_matchedRules.append(rule); }
-    void addMatchedDeclaration(CSSMutableStyleDeclaration*, unsigned linkMatchType = SelectorChecker::MatchAll);
+    void addMatchedDeclaration(CSSMutableStyleDeclaration*, unsigned linkMatchType = SelectorChecker::MatchAll, bool regionStyleRule = false);
 
     struct MatchResult {
         MatchResult() : firstUARule(-1), lastUARule(-1), firstAuthorRule(-1), lastAuthorRule(-1), firstUserRule(-1), lastUserRule(-1), isCacheable(true) { }
@@ -264,9 +273,9 @@ private:
 
     void applyMatchedDeclarations(const MatchResult&);
     template <bool firstPass>
-    void applyDeclarations(bool important, int startIndex, int endIndex, bool& inheritedOnly);
+    void applyDeclarations(bool important, int startIndex, int endIndex, bool inheritedOnly);
     template <bool firstPass>
-    void applyDeclaration(CSSMutableStyleDeclaration*, bool isImportant, bool& inheritedOnly);
+    void applyDeclaration(CSSMutableStyleDeclaration*, bool isImportant, bool inheritedOnly);
 
     void matchPageRules(RuleSet*, bool isLeftPage, bool isFirstPage, const String& pageName);
     void matchPageRulesForList(const Vector<RuleData>*, bool isLeftPage, bool isFirstPage, const String& pageName);
@@ -277,6 +286,7 @@ private:
 
     OwnPtr<RuleSet> m_authorStyle;
     OwnPtr<RuleSet> m_userStyle;
+    OwnPtr<RuleSet> m_regionRules;
 
     Features m_features;
 
@@ -288,18 +298,19 @@ private:
     typedef HashMap<AtomicStringImpl*, RefPtr<WebKitCSSKeyframesRule> > KeyframesRuleMap;
     KeyframesRuleMap m_keyframesRuleMap;
 
-    typedef Vector<RefPtr<CSSRegionStyleRule> > RegionStyleRules;
+    typedef Vector<RefPtr<WebKitCSSRegionRule> > RegionStyleRules;
     RegionStyleRules m_regionStyleRules;
 
 public:
     static RenderStyle* styleNotYetAvailable() { return s_styleNotYetAvailable; }
 
-    StyleImage* styleImage(CSSPropertyID, CSSValue*);
-    StyleImage* cachedOrPendingFromValue(CSSPropertyID, CSSImageValue*);
-    StyleImage* generatedOrPendingFromValue(CSSPropertyID, CSSImageGeneratorValue*);
+    PassRefPtr<StyleImage> styleImage(CSSPropertyID, CSSValue*);
+    PassRefPtr<StyleImage> cachedOrPendingFromValue(CSSPropertyID, CSSImageValue*);
+    PassRefPtr<StyleImage> generatedOrPendingFromValue(CSSPropertyID, CSSImageGeneratorValue*);
 
     bool applyPropertyToRegularStyle() const { return m_applyPropertyToRegularStyle; }
     bool applyPropertyToVisitedLinkStyle() const { return m_applyPropertyToVisitedLinkStyle; }
+    bool applyPropertyToRegionStyle() const { return m_applyPropertyToRegionStyle; }
 
 private:
     static RenderStyle* s_styleNotYetAvailable;
@@ -327,47 +338,46 @@ private:
     void mapAnimationProperty(Animation*, CSSValue*);
     void mapAnimationTimingFunction(Animation*, CSSValue*);
 
+public:
     void mapNinePieceImage(CSSPropertyID, CSSValue*, NinePieceImage&);
     void mapNinePieceImageSlice(CSSValue*, NinePieceImage&);
     LengthBox mapNinePieceImageQuad(CSSValue*);
     void mapNinePieceImageRepeat(CSSValue*, NinePieceImage&);
-
+private:
     bool canShareStyleWithControl(StyledElement*) const;
 
     void applyProperty(int id, CSSValue*);
-    void applyPageSizeProperty(CSSValue*);
-    bool pageSizeFromName(CSSPrimitiveValue*, CSSPrimitiveValue*, Length& width, Length& height);
-    Length mmLength(double mm) const;
-    Length inchLength(double inch) const;
 #if ENABLE(SVG)
     void applySVGProperty(int id, CSSValue*);
 #endif
 
-    StyleImage* loadPendingImage(StylePendingImage*);
+    PassRefPtr<StyleImage> loadPendingImage(StylePendingImage*);
     void loadPendingImages();
 
     struct MatchedStyleDeclaration {
         MatchedStyleDeclaration();
         CSSMutableStyleDeclaration* styleDeclaration;
         unsigned linkMatchType;
+        bool regionStyleRule;
     };
     static unsigned computeDeclarationHash(MatchedStyleDeclaration*, unsigned size);
-    const RenderStyle* findFromMatchedDeclarationCache(unsigned hash, const MatchResult&);   
-    void addToMatchedDeclarationCache(const RenderStyle*, unsigned hash, const MatchResult&);
+    struct MatchedStyleDeclarationCacheItem {
+        Vector<MatchedStyleDeclaration> matchedStyleDeclarations;
+        MatchResult matchResult;
+        RefPtr<RenderStyle> renderStyle;
+        RefPtr<RenderStyle> parentRenderStyle;
+    };
+    const MatchedStyleDeclarationCacheItem* findFromMatchedDeclarationCache(unsigned hash, const MatchResult&);
+    void addToMatchedDeclarationCache(const RenderStyle*, const RenderStyle* parentStyle, unsigned hash, const MatchResult&);
 
     // We collect the set of decls that match in |m_matchedDecls|. We then walk the
     // set of matched decls four times, once for those properties that others depend on (like font-size),
     // and then a second time for all the remaining properties. We then do the same two passes
     // for any !important rules.
     Vector<MatchedStyleDeclaration, 64> m_matchedDecls;
-    
-    struct MatchedStyleDeclarationCacheItem {
-        Vector<MatchedStyleDeclaration> matchedStyleDeclarations;
-        MatchResult matchResult;
-        RefPtr<RenderStyle> renderStyle;
-    };
+
     typedef HashMap<unsigned, MatchedStyleDeclarationCacheItem> MatchedStyleDeclarationCache;
-    MatchedStyleDeclarationCache m_matchStyleDeclarationCache;
+    MatchedStyleDeclarationCache m_matchedStyleDeclarationCache;
 
     // A buffer used to hold the set of matched rules for an element, and a temporary buffer used for
     // merge sorting.
@@ -389,6 +399,7 @@ private:
     RenderStyle* m_rootElementStyle;
     Element* m_element;
     StyledElement* m_styledElement;
+    RenderRegion* m_regionForStyling;
     EInsideLink m_elementLinkState;
     ContainerNode* m_parentNode;
     CSSValue* m_lineHeightValue;
@@ -397,11 +408,11 @@ private:
     bool m_sameOriginOnly;
 
     RefPtr<CSSFontSelector> m_fontSelector;
-    Vector<CSSMutableStyleDeclaration*> m_additionalAttributeStyleDecls;
     Vector<MediaQueryResult*> m_viewportDependentMediaQueryResults;
 
     bool m_applyPropertyToRegularStyle;
     bool m_applyPropertyToVisitedLinkStyle;
+    bool m_applyPropertyToRegionStyle;
     const CSSStyleApplyProperty& m_applyProperty;
     
 #if ENABLE(CSS_SHADERS)

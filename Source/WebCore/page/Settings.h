@@ -229,6 +229,9 @@ namespace WebCore {
 
         void setUsesPageCache(bool);
         bool usesPageCache() const { return m_usesPageCache; }
+        
+        void setPageCacheSupportsPlugins(bool pageCacheSupportsPlugins) { m_pageCacheSupportsPlugins = pageCacheSupportsPlugins; }
+        bool pageCacheSupportsPlugins() const { return m_pageCacheSupportsPlugins; }
 
         void setShrinksStandaloneImagesToFit(bool);
         bool shrinksStandaloneImagesToFit() const { return m_shrinksStandaloneImagesToFit; }
@@ -300,6 +303,9 @@ namespace WebCore {
 
         void setAcceleratedDrawingEnabled(bool enabled) { m_acceleratedDrawingEnabled = enabled; }
         bool acceleratedDrawingEnabled() const { return m_acceleratedDrawingEnabled; }
+
+        void setAcceleratedFiltersEnabled(bool enabled) { m_acceleratedFiltersEnabled = enabled; }
+        bool acceleratedFiltersEnabled() const { return m_acceleratedFiltersEnabled; }
 
         void setAcceleratedCompositingEnabled(bool);
         bool acceleratedCompositingEnabled() const { return m_acceleratedCompositingEnabled; }
@@ -486,6 +492,28 @@ namespace WebCore {
         void setVisualWordMovementEnabled(bool enabled) { m_visualWordMovementEnabled = enabled; }
         bool visualWordMovementEnabled() const { return m_visualWordMovementEnabled; }
 
+#if ENABLE(VIDEO_TRACK)
+        void setShouldDisplaySubtitles(bool flag) { m_shouldDisplaySubtitles = flag; }
+        bool shouldDisplaySubtitles() const { return m_shouldDisplaySubtitles; }
+
+        void setShouldDisplayCaptions(bool flag) { m_shouldDisplayCaptions = flag; }
+        bool shouldDisplayCaptions() const { return m_shouldDisplayCaptions; }
+
+        void setShouldDisplayTextDescriptions(bool flag) { m_shouldDisplayTextDescriptions = flag; }
+        bool shouldDisplayTextDescriptions() const { return m_shouldDisplayTextDescriptions; }
+#endif
+
+        void setPerTileDrawingEnabled(bool enabled) { m_perTileDrawingEnabled = enabled; }
+        bool perTileDrawingEnabled() const { return m_perTileDrawingEnabled; }
+
+        void setPartialSwapEnabled(bool enabled) { m_partialSwapEnabled = enabled; }
+        bool partialSwapEnabled() const { return m_partialSwapEnabled; }
+
+#if ENABLE(THREADED_SCROLLING)
+        void setScrollingCoordinatorEnabled(bool enabled) { m_scrollingCoordinatorEnabled = enabled; }
+        bool scrollingCoordinatorEnabled() const { return m_scrollingCoordinatorEnabled; }
+#endif
+
     private:
         Page* m_page;
 
@@ -544,7 +572,8 @@ namespace WebCore {
         bool m_needsLeopardMailQuirks : 1;
         bool m_isDOMPasteAllowed : 1;
         bool m_shrinksStandaloneImagesToFit : 1;
-        bool m_usesPageCache: 1;
+        bool m_usesPageCache : 1;
+        bool m_pageCacheSupportsPlugins : 1;
         bool m_showsURLsInToolTips : 1;
         bool m_showsToolTipOverTruncatedText : 1;
         bool m_forceFTPDirectoryListings : 1;
@@ -562,6 +591,7 @@ namespace WebCore {
         bool m_allowScriptsToCloseWindows : 1;
         bool m_canvasUsesAcceleratedDrawing : 1;
         bool m_acceleratedDrawingEnabled : 1;
+        bool m_acceleratedFiltersEnabled : 1;
         bool m_downloadableBinaryFontsEnabled : 1;
         bool m_xssAuditorEnabled : 1;
         bool m_acceleratedCompositingEnabled : 1;
@@ -611,6 +641,18 @@ namespace WebCore {
         bool m_suppressIncrementalRendering : 1;
         bool m_backspaceKeyNavigationEnabled : 1;
         bool m_visualWordMovementEnabled : 1;
+
+#if ENABLE(VIDEO_TRACK)
+        bool m_shouldDisplaySubtitles : 1;
+        bool m_shouldDisplayCaptions : 1;
+        bool m_shouldDisplayTextDescriptions : 1;
+#endif
+        bool m_perTileDrawingEnabled : 1;
+        bool m_partialSwapEnabled : 1;
+
+#if ENABLE(THREADED_SCROLLING)
+        bool m_scrollingCoordinatorEnabled : 1;
+#endif
 
         Timer<Settings> m_loadsImagesAutomaticallyTimer;
         void loadsImagesAutomaticallyTimerFired(Timer<Settings>*);

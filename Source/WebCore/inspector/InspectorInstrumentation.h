@@ -42,6 +42,7 @@
 namespace WebCore {
 
 class CharacterData;
+class DOMFileSystem;
 class DOMWindow;
 class DOMWrapperWorld;
 class Database;
@@ -76,7 +77,6 @@ typedef pair<InstrumentingAgents*, int> InspectorInstrumentationCookie;
 class InspectorInstrumentation {
 public:
     static void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
-    static void inspectedPageDestroyed(Page*);
 
     static void willInsertDOMNode(Document*, Node*, Node* parent);
     static void didInsertDOMNode(Document*, Node*);
@@ -87,6 +87,7 @@ public:
     static void characterDataModified(Document*, CharacterData*);
     static void didInvalidateStyleAttr(Document*, Node*);
     static void frameWindowDiscarded(Frame*, DOMWindow*);
+    static void mediaQueryResultChanged(Document*);
 
     static void mouseDidMoveOverElement(Page*, const HitTestResult&, unsigned modifierFlags);
     static bool handleMousePress(Page*);
@@ -151,6 +152,10 @@ public:
 
     static void addMessageToConsole(Page*, MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
     static void addMessageToConsole(Page*, MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String&);
+#if ENABLE(WORKERS)
+    static void addMessageToConsole(WorkerContext*, MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
+    static void addMessageToConsole(WorkerContext*, MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String&);
+#endif
     static void consoleCount(Page*, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
     static void startConsoleTiming(Page*, const String& title);
     static void stopConsoleTiming(Page*, const String& title, PassRefPtr<ScriptCallStack>);
@@ -170,6 +175,10 @@ public:
 
 #if ENABLE(SQL_DATABASE)
     static void didOpenDatabase(ScriptExecutionContext*, PassRefPtr<Database>, const String& domain, const String& name, const String& version);
+#endif
+
+#if ENABLE(FILE_SYSTEM)
+    static void didOpenFileSystem(PassRefPtr<DOMFileSystem>);
 #endif
 
     static void didUseDOMStorage(Page*, StorageArea*, bool isLocalStorage, Frame*);
@@ -197,16 +206,17 @@ public:
     static void frontendCreated() { s_frontendCounter += 1; }
     static void frontendDeleted() { s_frontendCounter -= 1; }
     static bool hasFrontends() { return s_frontendCounter; }
+    static bool hasFrontendForScriptContext(ScriptExecutionContext*);
     static bool collectingHTMLParseErrors(Page*);
 #else
     static bool hasFrontends() { return false; }
+    static bool hasFrontendForScriptContext(ScriptExecutionContext*) { return false; }
     static bool collectingHTMLParseErrors(Page*) { return false; }
 #endif
 
 private:
 #if ENABLE(INSPECTOR)
     static void didClearWindowObjectInWorldImpl(InstrumentingAgents*, Frame*, DOMWrapperWorld*);
-    static void inspectedPageDestroyedImpl(InstrumentingAgents*);
 
     static void willInsertDOMNodeImpl(InstrumentingAgents*, Node*, Node* parent);
     static void didInsertDOMNodeImpl(InstrumentingAgents*, Node*);
@@ -218,6 +228,7 @@ private:
     static void characterDataModifiedImpl(InstrumentingAgents*, CharacterData*);
     static void didInvalidateStyleAttrImpl(InstrumentingAgents*, Node*);
     static void frameWindowDiscardedImpl(InstrumentingAgents*, DOMWindow*);
+    static void mediaQueryResultChangedImpl(InstrumentingAgents*);
 
     static void mouseDidMoveOverElementImpl(InstrumentingAgents*, const HitTestResult&, unsigned modifierFlags);
     static bool handleMousePressImpl(InstrumentingAgents*);
@@ -304,6 +315,10 @@ private:
     static void didOpenDatabaseImpl(InstrumentingAgents*, PassRefPtr<Database>, const String& domain, const String& name, const String& version);
 #endif
 
+#if ENABLE(FILE_SYSTEM)
+    static void didOpenFileSystemImpl(InstrumentingAgents*, PassRefPtr<DOMFileSystem>);
+#endif
+
     static void didUseDOMStorageImpl(InstrumentingAgents*, StorageArea*, bool isLocalStorage, Frame*);
 
 #if ENABLE(WORKERS)
@@ -328,6 +343,9 @@ private:
     static InstrumentingAgents* instrumentingAgentsForFrame(Frame*);
     static InstrumentingAgents* instrumentingAgentsForContext(ScriptExecutionContext*);
     static InstrumentingAgents* instrumentingAgentsForDocument(Document*);
+#if ENABLE(WORKERS)
+    static InstrumentingAgents* instrumentingAgentsForWorkerContext(WorkerContext*);
+#endif
 
     static bool collectingHTMLParseErrors(InstrumentingAgents*);
     static void pauseOnNativeEventIfNeeded(InstrumentingAgents*, const String& categoryType, const String& eventName, bool synchronous);
@@ -343,14 +361,6 @@ inline void InspectorInstrumentation::didClearWindowObjectInWorld(Frame* frame, 
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
         didClearWindowObjectInWorldImpl(instrumentingAgents, frame, world);
-#endif
-}
-
-inline void InspectorInstrumentation::inspectedPageDestroyed(Page* page)
-{
-#if ENABLE(INSPECTOR)
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
-        inspectedPageDestroyedImpl(instrumentingAgents);
 #endif
 }
 
@@ -424,6 +434,15 @@ inline void InspectorInstrumentation::frameWindowDiscarded(Frame* frame, DOMWind
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
         frameWindowDiscardedImpl(instrumentingAgents, domWindow);
+#endif
+}
+
+inline void InspectorInstrumentation::mediaQueryResultChanged(Document* document)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
+        mediaQueryResultChangedImpl(instrumentingAgents);
 #endif
 }
 

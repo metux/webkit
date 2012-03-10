@@ -61,9 +61,11 @@ protected:
     CSSStyleRule(CSSStyleSheet* parent, int sourceLine, CSSRule::Type = CSSRule::STYLE_RULE);
 
 private:
+    void cleanup();
+    String generateSelectorText() const;
+
     RefPtr<CSSMutableStyleDeclaration> m_style;
     CSSSelectorList m_selectorList;
-    int m_sourceLine;
 };
 
 } // namespace WebCore

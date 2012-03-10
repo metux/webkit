@@ -23,6 +23,7 @@
 #include "RenderSVGResourceContainer.h"
 
 #include "RenderSVGShadowTreeRootContainer.h"
+#include "RenderView.h"
 #include "SVGResourcesCache.h"
 #include "SVGStyledTransformableElement.h"
 
@@ -52,7 +53,7 @@ RenderSVGResourceContainer::~RenderSVGResourceContainer()
 void RenderSVGResourceContainer::layout()
 {
     // Invalidate all resources if our layout changed.
-    if (m_everHadLayout && selfNeedsLayout())
+    if (everHadLayout() && selfNeedsLayout())
         removeAllClientsFromCache();
 
     RenderSVGHiddenContainer::layout();
@@ -184,7 +185,7 @@ void RenderSVGResourceContainer::registerResource()
 // FIXME: This does not belong here.
 AffineTransform RenderSVGResourceContainer::transformOnNonScalingStroke(RenderObject* object, const AffineTransform& resourceTransform)
 {
-    if (!object->isSVGPath())
+    if (!object->isSVGShape())
         return resourceTransform;
 
     SVGStyledTransformableElement* element = static_cast<SVGStyledTransformableElement*>(object->node());

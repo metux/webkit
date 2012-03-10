@@ -254,7 +254,8 @@ namespace WebCore {
         // WebKit animation extensions
 #if ENABLE(REQUEST_ANIMATION_FRAME)
         int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>, Element*);
-        void webkitCancelRequestAnimationFrame(int id);
+        void webkitCancelAnimationFrame(int id);
+        void webkitCancelRequestAnimationFrame(int id) { webkitCancelAnimationFrame(id); }
 #endif
 
         // Events
@@ -266,7 +267,6 @@ namespace WebCore {
         using EventTarget::dispatchEvent;
         bool dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget> prpTarget);
         void dispatchLoadEvent();
-        void dispatchTimedEvent(PassRefPtr<Event> event, Document* target, double* startTime, double* endTime);
 
         DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(beforeunload);

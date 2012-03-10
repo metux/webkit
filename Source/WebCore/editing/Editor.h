@@ -48,9 +48,10 @@ namespace WebCore {
 
 class CSSStyleDeclaration;
 class Clipboard;
-class SpellingCorrectionController;
+class CompositeEditCommand;
 class DeleteButtonController;
 class EditCommand;
+class EditCommandComposition;
 class EditorClient;
 class EditorInternalCommand;
 class Frame;
@@ -60,9 +61,12 @@ class KillRing;
 class Pasteboard;
 class SimpleFontData;
 class SpellChecker;
+class SpellCheckRequest;
+class SpellingCorrectionController;
 class Text;
 class TextCheckerClient;
 class TextEvent;
+struct TextCheckingResult;
 
 struct CompositionUnderline {
     CompositionUnderline() 
@@ -87,7 +91,7 @@ public:
 
     Frame* frame() const { return m_frame; }
     DeleteButtonController* deleteButtonController() const { return m_deleteButtonController.get(); }
-    EditCommand* lastEditCommand() { return m_lastEditCommand.get(); }
+    CompositeEditCommand* lastEditCommand() { return m_lastEditCommand.get(); }
 
     void handleKeyboardEvent(KeyboardEvent*);
     void handleInputMethodKeydown(KeyboardEvent*);
@@ -163,9 +167,9 @@ public:
     void applyStyleToSelection(CSSStyleDeclaration*, EditAction);
     void applyParagraphStyleToSelection(CSSStyleDeclaration*, EditAction);
 
-    void appliedEditing(PassRefPtr<EditCommand>);
-    void unappliedEditing(PassRefPtr<EditCommand>);
-    void reappliedEditing(PassRefPtr<EditCommand>);
+    void appliedEditing(PassRefPtr<CompositeEditCommand>);
+    void unappliedEditing(PassRefPtr<EditCommandComposition>);
+    void reappliedEditing(PassRefPtr<EditCommandComposition>);
     void unappliedSpellCorrection(const VisibleSelection& selectionOfCorrected, const String& corrected, const String& correction);
 
     void setShouldStyleWithCSS(bool flag) { m_shouldStyleWithCSS = flag; }
@@ -220,6 +224,7 @@ public:
     void markMisspellings(const VisibleSelection&, RefPtr<Range>& firstMisspellingRange);
     void markBadGrammar(const VisibleSelection&);
     void markMisspellingsAndBadGrammar(const VisibleSelection& spellingSelection, bool markGrammar, const VisibleSelection& grammarSelection);
+    void markAndReplaceFor(PassRefPtr<SpellCheckRequest>, const Vector<TextCheckingResult>&);
 
 #if USE(AUTOMATIC_TEXT_REPLACEMENT)
     void uppercaseWord();
@@ -335,6 +340,7 @@ public:
     bool findString(const String&, bool forward, bool caseFlag, bool wrapFlag, bool startInSelection);
 
     PassRefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
+    PassRefPtr<Range> findStringAndScrollToVisible(const String&, Range*, FindOptions);
 
     const VisibleSelection& mark() const; // Mark, to be used as emacs uses it.
     void setMark(const VisibleSelection&);
@@ -369,6 +375,8 @@ public:
     void readSelectionFromPasteboard(const String& pasteboardName);
 #endif
 
+    void replaceSelectionWithFragment(PassRefPtr<DocumentFragment>, bool selectReplacement, bool smartReplace, bool matchStyle);
+    void replaceSelectionWithText(const String&, bool selectReplacement, bool smartReplace);
     bool selectionStartHasMarkerFor(DocumentMarker::MarkerType, int from, int length) const;
     void updateMarkersForWordsAffectedByEditing(bool onlyHandleWordsContainingSelection);
     void deletedAutocorrectionAtPosition(const Position&, const String& originalString);
@@ -378,7 +386,7 @@ public:
 private:
     Frame* m_frame;
     OwnPtr<DeleteButtonController> m_deleteButtonController;
-    RefPtr<EditCommand> m_lastEditCommand;
+    RefPtr<CompositeEditCommand> m_lastEditCommand;
     RefPtr<Node> m_removedAnchor;
     RefPtr<Text> m_compositionNode;
     unsigned m_compositionStart;
@@ -398,8 +406,6 @@ private:
     PassRefPtr<Clipboard> newGeneralClipboard(ClipboardAccessPolicy, Frame*);
     void pasteAsPlainTextWithPasteboard(Pasteboard*);
     void pasteWithPasteboard(Pasteboard*, bool allowPlainText);
-    void replaceSelectionWithFragment(PassRefPtr<DocumentFragment>, bool selectReplacement, bool smartReplace, bool matchStyle);
-    void replaceSelectionWithText(const String&, bool selectReplacement, bool smartReplace);
     void writeSelectionToPasteboard(Pasteboard*);
     void revealSelectionAfterEditingOperation();
     void markMisspellingsOrBadGrammar(const VisibleSelection&, bool checkSpelling, RefPtr<Range>& firstMisspellingRange);

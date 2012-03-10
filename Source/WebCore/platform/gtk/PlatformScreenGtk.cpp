@@ -33,6 +33,7 @@
 
 #include "GtkVersioning.h"
 #include "HostWindow.h"
+#include "NotImplemented.h"
 #include "ScrollView.h"
 #include "Widget.h"
 
@@ -65,6 +66,18 @@ static GdkVisual* getVisual(Widget* widget)
     if (!gtk_widget_get_realized(container))
         container = getToplevel(container);
     return container ? gdk_window_get_visual(gtk_widget_get_window(container)) : 0;
+}
+
+int screenHorizontalDPI(Widget* widget)
+{
+    notImplemented();
+    return 0;
+}
+
+int screenVerticalDPI(Widget* widget)
+{
+    notImplemented();
+    return 0;
 }
 
 int screenDepth(Widget* widget)
@@ -123,13 +136,14 @@ FloatRect screenAvailableRect(Widget* widget)
 
 #if PLATFORM(X11)
     GtkWidget* container = GTK_WIDGET(widget->root()->hostWindow()->platformPageClient());
-    if (!container)
-        return FloatRect();
-
-    if (!gtk_widget_get_realized(container))
+    if (container && !gtk_widget_get_realized(container))
         return screenRect(widget);
 
-    GdkWindow* rootWindow = gtk_widget_get_root_window(container);
+    GdkScreen* screen = container ? getScreen(container) : gdk_screen_get_default();
+    if (!screen)
+        return FloatRect();
+
+    GdkWindow* rootWindow = gdk_screen_get_root_window(screen);
     GdkDisplay* display = gdk_window_get_display(rootWindow);
     Atom xproperty = gdk_x11_get_xatom_by_name_for_display(display, "_NET_WORKAREA");
 

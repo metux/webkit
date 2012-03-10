@@ -246,6 +246,7 @@ webkitgtk_gdom_built_sources += \
 	DerivedSources/webkit/WebKitDOMWebKitAnimationList.cpp \
 	DerivedSources/webkit/WebKitDOMWebKitPoint.cpp \
 	DerivedSources/webkit/WebKitDOMWebKitPointPrivate.h \
+	DerivedSources/webkit/WebKitDOMWebKitNamedFlow.cpp \
 	DerivedSources/webkit/WebKitDOMXPathExpression.cpp \
 	DerivedSources/webkit/WebKitDOMXPathExpressionPrivate.h \
 	DerivedSources/webkit/WebKitDOMXPathNSResolver.cpp \
@@ -375,6 +376,7 @@ webkitgtk_built_h_api += \
 	DerivedSources/webkit/WebKitDOMWebKitAnimation.h \
 	DerivedSources/webkit/WebKitDOMWebKitAnimationList.h \
 	DerivedSources/webkit/WebKitDOMWebKitPoint.h \
+	DerivedSources/webkit/WebKitDOMWebKitNamedFlow.h \
 	DerivedSources/webkit/WebKitDOMDOMMimeType.h \
 	DerivedSources/webkit/WebKitDOMDOMMimeTypeArray.h \
 	DerivedSources/webkit/WebKitDOMDOMPlugin.h \
@@ -424,6 +426,14 @@ webkitgtk_gdom_built_sources += \
 	DerivedSources/webkit/WebKitDOMTextTrackCueListPrivate.h \
 	DerivedSources/webkit/WebKitDOMTrackEvent.cpp \
 	DerivedSources/webkit/WebKitDOMTrackEventPrivate.h
+endif
+
+if ENABLE_MICRODATA
+webkitgtk_built_h_api += \
+	$(top_builddir)/DerivedSources/webkit/WebKitDOMHTMLPropertiesCollection.h
+webkitgtk_gdom_built_sources += \
+	DerivedSources/webkit/WebKitDOMHTMLPropertiesCollection.cpp \
+	DerivedSources/webkit/WebKitDOMHTMLPropertiesCollectionPrivate.h
 endif
 
 gdom_class_list := $(subst WebKitDOM,, $(filter-out %Private, $(basename $(notdir $(webkitgtk_gdom_built_sources)))))

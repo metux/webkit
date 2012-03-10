@@ -52,6 +52,10 @@
 #include <stdlib.h>
 #include <wtf/MainThread.h>
 
+#if USE(CLUTTER)
+#include <clutter-gtk/clutter-gtk.h>
+#endif
+
 static WebKitCacheModel cacheModel = WEBKIT_CACHE_MODEL_DEFAULT;
 
 using namespace WebCore;
@@ -310,7 +314,7 @@ void webkitInit()
     JSC::initializeThreading();
     WTF::initializeMainThread();
 
-    WebCore::InitializeLoggingChannelsIfNecessary();
+    WebCore::initializeLoggingChannelsIfNecessary();
 
     // We make sure the text codecs have been initialized, because
     // that may only be done by the main thread.
@@ -339,6 +343,10 @@ void webkitInit()
     g_object_unref(sniffer);
 
     soup_session_add_feature_by_type(session, SOUP_TYPE_CONTENT_DECODER);
+
+#if USE(CLUTTER)
+    gtk_clutter_init(0, 0);
+#endif
 
     atexit(webkitExit);
 }

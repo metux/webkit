@@ -164,7 +164,6 @@ public:
 
 #ifndef NDEBUG
     // Add a debug call. This call has no effect on JIT code execution state.
-#if CPU(X86_64) || CPU(X86)
     void debugCall(V_DFGDebugOperation_EP function, void* argument)
     {
         EncodedJSValue* buffer = static_cast<EncodedJSValue*>(m_globalData->scratchBufferForSize(sizeof(EncodedJSValue) * (GPRInfo::numberOfRegisters + FPRInfo::numberOfRegisters)));
@@ -175,7 +174,7 @@ public:
             move(TrustedImmPtr(buffer + GPRInfo::numberOfRegisters + i), GPRInfo::regT0);
             storeDouble(FPRInfo::toRegister(i), GPRInfo::regT0);
         }
-#if CPU(X86_64)
+#if CPU(X86_64) || CPU(ARM_THUMB2)
         move(TrustedImmPtr(argument), GPRInfo::argumentGPR1);
         move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
 #elif CPU(X86)
@@ -193,15 +192,6 @@ public:
         for (unsigned i = 0; i < GPRInfo::numberOfRegisters; ++i)
             loadPtr(buffer + i, GPRInfo::toRegister(i));
     }
-#else
-    void debugCall(V_DFGDebugOperation_EP function, void* argument) NO_RETURN_DUE_TO_ASSERT
-    {
-        // debugCall not supported on this platform.
-        UNUSED_PARAM(function);
-        UNUSED_PARAM(argument);
-        ASSERT_NOT_REACHED();
-    }
-#endif
 #endif
 
     // These methods JIT generate dynamic, debug-only checks - akin to ASSERTs.
@@ -225,6 +215,7 @@ public:
     {
         moveDoubleToPtr(fpr, gpr);
         subPtr(GPRInfo::tagTypeNumberRegister, gpr);
+        jitAssertIsJSDouble(gpr);
         return gpr;
     }
     FPRReg unboxDouble(GPRReg gpr, FPRReg fpr)
@@ -294,14 +285,19 @@ public:
         return codeOrigin.inlineCallFrame->callee->jsExecutable()->isStrictMode();
     }
     
-    CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
+    static CodeBlock* baselineCodeBlockForOriginAndBaselineCodeBlock(const CodeOrigin& codeOrigin, CodeBlock* baselineCodeBlock)
     {
         if (codeOrigin.inlineCallFrame) {
             ExecutableBase* executable = codeOrigin.inlineCallFrame->executable.get();
             ASSERT(executable->structure()->classInfo() == &FunctionExecutable::s_info);
             return static_cast<FunctionExecutable*>(executable)->baselineCodeBlockFor(codeOrigin.inlineCallFrame->isCall ? CodeForCall : CodeForConstruct);
         }
-        return baselineCodeBlock();
+        return baselineCodeBlock;
+    }
+    
+    CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
+    {
+        return baselineCodeBlockForOriginAndBaselineCodeBlock(codeOrigin, baselineCodeBlock());
     }
     
     CodeBlock* baselineCodeBlock()
@@ -310,6 +306,8 @@ public:
     }
     
     Vector<BytecodeAndMachineOffset>& decodedCodeMapFor(CodeBlock*);
+    
+    static const double twoToThe32;
 
 protected:
     JSGlobalData* m_globalData;

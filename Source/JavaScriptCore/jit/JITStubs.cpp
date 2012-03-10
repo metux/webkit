@@ -544,7 +544,7 @@ SYMBOL_STRING(ctiTrampoline) ":" "\n"
     "str r1, [sp, #" STRINGIZE_VALUE_OF(REGISTER_FILE_OFFSET) "]" "\n"
     "str r2, [sp, #" STRINGIZE_VALUE_OF(CALLFRAME_OFFSET) "]" "\n"
     "str r3, [sp, #" STRINGIZE_VALUE_OF(EXCEPTION_OFFSET) "]" "\n"
-    "cpy r5, r2" "\n"
+    "mov r5, r2" "\n"
     "mov r6, #512" "\n"
     "blx r0" "\n"
     "ldr r11, [sp, #" STRINGIZE_VALUE_OF(PRESERVED_R11_OFFSET) "]" "\n"
@@ -568,7 +568,7 @@ HIDE_SYMBOL(ctiVMThrowTrampoline) "\n"
 ".thumb" "\n"
 ".thumb_func " THUMB_FUNC_PARAM(ctiVMThrowTrampoline) "\n"
 SYMBOL_STRING(ctiVMThrowTrampoline) ":" "\n"
-    "cpy r0, sp" "\n"
+    "mov r0, sp" "\n"
     "bl " SYMBOL_STRING_RELOCATION(cti_vm_throw) "\n"
     "ldr r11, [sp, #" STRINGIZE_VALUE_OF(PRESERVED_R11_OFFSET) "]" "\n"
     "ldr r10, [sp, #" STRINGIZE_VALUE_OF(PRESERVED_R10_OFFSET) "]" "\n"
@@ -659,7 +659,7 @@ __asm EncodedJSValue ctiTrampoline(void*, RegisterFile*, CallFrame*, JSValue*, P
     str r1, [sp, # REGISTER_FILE_OFFSET ]
     str r2, [sp, # CALLFRAME_OFFSET ]
     str r3, [sp, # EXCEPTION_OFFSET ]
-    cpy r5, r2
+    mov r5, r2
     mov r6, #512
     blx r0
     ldr r11, [sp, # PRESERVED_R11_OFFSET ]
@@ -678,7 +678,7 @@ __asm EncodedJSValue ctiTrampoline(void*, RegisterFile*, CallFrame*, JSValue*, P
 __asm void ctiVMThrowTrampoline()
 {
     PRESERVE8
-    cpy r0, sp
+    mov r0, sp
     bl cti_vm_throw
     ldr r11, [sp, # PRESERVED_R11_OFFSET ]
     ldr r10, [sp, # PRESERVED_R10_OFFSET ]
@@ -760,7 +760,7 @@ __asm void ctiOpThrowNotCaught()
 JITThunks::JITThunks(JSGlobalData* globalData)
     : m_hostFunctionStubMap(adoptPtr(new HostFunctionStubMap))
 {
-    if (!globalData->executableAllocator.isValid())
+    if (!globalData->canUseJIT())
         return;
 
     m_executableMemory = JIT::compileCTIMachineTrampolines(globalData, &m_trampolineStructure);
@@ -852,7 +852,7 @@ NEVER_INLINE void JITThunks::tryCachePutByID(CallFrame* callFrame, CodeBlock* co
         normalizePrototypeChain(callFrame, baseCell);
 
         StructureChain* prototypeChain = structure->prototypeChain(callFrame);
-        stubInfo->initPutByIdTransition(callFrame->globalData(), codeBlock->ownerExecutable(), structure->previousID(), structure, prototypeChain);
+        stubInfo->initPutByIdTransition(callFrame->globalData(), codeBlock->ownerExecutable(), structure->previousID(), structure, prototypeChain, direct);
         JIT::compilePutByIdTransition(callFrame->scopeChain()->globalData, codeBlock, stubInfo, structure->previousID(), structure, slot.cachedOffset(), prototypeChain, returnAddress, direct);
         return;
     }
@@ -2206,46 +2206,31 @@ inline CallFrame* arityCheckFor(CallFrame* callFrame, RegisterFile* registerFile
     JSFunction* callee = asFunction(callFrame->callee());
     ASSERT(!callee->isHostFunction());
     CodeBlock* newCodeBlock = &callee->jsExecutable()->generatedBytecodeFor(kind);
-    int argCount = callFrame->argumentCountIncludingThis();
-    ReturnAddressPtr pc = callFrame->returnPC();
+    int argumentCountIncludingThis = callFrame->argumentCountIncludingThis();
 
-    ASSERT(argCount != newCodeBlock->m_numParameters);
+    // This ensures enough space for the worst case scenario of zero arguments passed by the caller.
+    if (!registerFile->grow(callFrame->registers() + newCodeBlock->m_numParameters + newCodeBlock->m_numCalleeRegisters))
+        return 0;
 
-    CallFrame* oldCallFrame = callFrame->callerFrame();
+    ASSERT(argumentCountIncludingThis < newCodeBlock->m_numParameters);
 
-    Register* r;
-    if (argCount > newCodeBlock->m_numParameters) {
-        size_t numParameters = newCodeBlock->m_numParameters;
-        r = callFrame->registers() + numParameters;
-        Register* newEnd = r + newCodeBlock->m_numCalleeRegisters;
-        if (!registerFile->grow(newEnd))
-            return 0;
+    // Too few arguments -- copy call frame and arguments, then fill in missing arguments with undefined.
+    size_t delta = newCodeBlock->m_numParameters - argumentCountIncludingThis;
+    Register* src = callFrame->registers();
+    Register* dst = callFrame->registers() + delta;
 
-        Register* argv = r - RegisterFile::CallFrameHeaderSize - numParameters - argCount;
-        for (size_t i = 0; i < numParameters; ++i)
-            argv[i + argCount] = argv[i];
-    } else {
-        size_t omittedArgCount = newCodeBlock->m_numParameters - argCount;
-        r = callFrame->registers() + omittedArgCount;
-        Register* newEnd = r + newCodeBlock->m_numCalleeRegisters;
-        if (!registerFile->grow(newEnd))
-            return 0;
+    int i;
+    int end = -CallFrame::offsetFor(argumentCountIncludingThis);
+    for (i = -1; i >= end; --i)
+        dst[i] = src[i];
 
-        Register* argv = r - RegisterFile::CallFrameHeaderSize - omittedArgCount;
-        for (size_t i = 0; i < omittedArgCount; ++i)
-            argv[i] = jsUndefined();
-    }
+    end -= delta;
+    for ( ; i >= end; --i)
+        dst[i] = jsUndefined();
 
-    callFrame = CallFrame::create(r);
-    callFrame->setCallerFrame(oldCallFrame);
-    callFrame->setArgumentCountIncludingThis(argCount);
-    callFrame->setCallee(callee);
-    callFrame->setScopeChain(callee->scope());
-    callFrame->setReturnPC(pc.value());
-    callFrame->setCodeBlock(newCodeBlock);
-
-    ASSERT((void*)callFrame <= registerFile->end());
-    return callFrame;
+    CallFrame* newCallFrame = CallFrame::create(dst);
+    ASSERT((void*)newCallFrame <= registerFile->end());
+    return newCallFrame;
 }
 
 DEFINE_STUB_FUNCTION(void*, op_call_arityCheck)
@@ -2291,7 +2276,7 @@ inline void* lazyLinkFor(CallFrame* callFrame, CodeSpecializationKind kind)
         if (error)
             return 0;
         codeBlock = &functionExecutable->generatedBytecodeFor(kind);
-        if (callFrame->argumentCountIncludingThis() != static_cast<size_t>(codeBlock->m_numParameters)
+        if (callFrame->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->m_numParameters)
             || callLinkInfo->callType == CallLinkInfo::CallVarargs)
             codePtr = functionExecutable->generatedJITCodeWithArityCheckFor(kind);
         else
@@ -2375,24 +2360,17 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_create_arguments)
     return JSValue::encode(JSValue(arguments));
 }
 
-DEFINE_STUB_FUNCTION(EncodedJSValue, op_create_arguments_no_params)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-
-    Arguments* arguments = Arguments::createNoParameters(*stackFrame.globalData, stackFrame.callFrame);
-    return JSValue::encode(JSValue(arguments));
-}
-
 DEFINE_STUB_FUNCTION(void, op_tear_off_activation)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
 
-    ASSERT(stackFrame.callFrame->codeBlock()->needsFullScopeChain());
+    CallFrame* callFrame = stackFrame.callFrame;
+    ASSERT(callFrame->codeBlock()->needsFullScopeChain());
     JSValue activationValue = stackFrame.args[0].jsValue();
     if (!activationValue) {
         if (JSValue v = stackFrame.args[1].jsValue()) {
-            if (!stackFrame.callFrame->codeBlock()->isStrictMode())
-                asArguments(v)->tearOff(*stackFrame.globalData);
+            if (!callFrame->codeBlock()->isStrictMode())
+                asArguments(v)->tearOff(callFrame);
         }
         return;
     }
@@ -2406,8 +2384,9 @@ DEFINE_STUB_FUNCTION(void, op_tear_off_arguments)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
 
-    ASSERT(stackFrame.callFrame->codeBlock()->usesArguments() && !stackFrame.callFrame->codeBlock()->needsFullScopeChain());
-    asArguments(stackFrame.args[0].jsValue())->tearOff(*stackFrame.globalData);
+    CallFrame* callFrame = stackFrame.callFrame;
+    ASSERT(callFrame->codeBlock()->usesArguments() && !callFrame->codeBlock()->needsFullScopeChain());
+    asArguments(stackFrame.args[0].jsValue())->tearOff(callFrame);
 }
 
 DEFINE_STUB_FUNCTION(void, op_profile_will_call)
@@ -3742,11 +3721,11 @@ NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFu
 {
     std::pair<HostFunctionStubMap::iterator, bool> entry = m_hostFunctionStubMap->add(function, Weak<NativeExecutable>());
     if (!*entry.first->second)
-        entry.first->second.set(*globalData, NativeExecutable::create(*globalData, JIT::compileCTINativeCall(globalData, function), function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), constructor, DFG::NoIntrinsic));
+        entry.first->second.set(*globalData, NativeExecutable::create(*globalData, JIT::compileCTINativeCall(globalData, function), function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), constructor, NoIntrinsic));
     return entry.first->second.get();
 }
 
-NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFunction function, ThunkGenerator generator, DFG::Intrinsic intrinsic)
+NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFunction function, ThunkGenerator generator, Intrinsic intrinsic)
 {
     std::pair<HostFunctionStubMap::iterator, bool> entry = m_hostFunctionStubMap->add(function, Weak<NativeExecutable>());
     if (!*entry.first->second) {

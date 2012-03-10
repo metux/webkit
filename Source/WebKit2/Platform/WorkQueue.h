@@ -27,20 +27,21 @@
 #ifndef WorkQueue_h
 #define WorkQueue_h
 
-#if PLATFORM(MAC)
+#if OS(DARWIN)
 #if HAVE(DISPATCH_H)
 #include <dispatch/dispatch.h>
 #endif
 #endif
 
 #include "WorkItem.h"
+#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
 
-#if PLATFORM(QT)
+#if PLATFORM(QT) && !OS(DARWIN)
 #include <QSocketNotifier>
 #include "PlatformProcessIdentifier.h"
 class QObject;
@@ -52,12 +53,22 @@ typedef struct _GMainLoop GMainLoop;
 typedef gboolean (*GSourceFunc) (gpointer data);
 #endif
 
+namespace WTF {
+    template<typename> class Function;
+}
+using WTF::Function;
+
 class WorkQueue {
     WTF_MAKE_NONCOPYABLE(WorkQueue);
 
 public:
     explicit WorkQueue(const char* name);
     ~WorkQueue();
+
+    // Will dispatch the given function to run as soon as possible.
+    void dispatch(const Function<void()>&);
+
+    // FIXME: Get rid of WorkItem everywhere.
 
     // Will schedule the given work item to run as soon as possible.
     void scheduleWork(PassOwnPtr<WorkItem>);
@@ -67,7 +78,7 @@ public:
 
     void invalidate();
 
-#if PLATFORM(MAC)
+#if OS(DARWIN)
     enum MachPortEventType {
         // Fired when there is data on the given receive right.
         MachPortDataAvailable,
@@ -76,9 +87,9 @@ public:
         MachPortDeadNameNotification
     };
     
-    // Will execute the given work item whenever the given mach port event fires.
+    // Will execute the given function whenever the given mach port event fires.
     // Note that this will adopt the mach port and destroy it when the work queue is invalidated.
-    void registerMachPortEventHandler(mach_port_t, MachPortEventType, PassOwnPtr<WorkItem>);
+    void registerMachPortEventHandler(mach_port_t, MachPortEventType, const Function<void()>&);
     void unregisterMachPortEventHandler(mach_port_t);
 #elif PLATFORM(WIN)
     void registerHandle(HANDLE, PassOwnPtr<WorkItem>);
@@ -100,7 +111,7 @@ private:
     void platformInitialize(const char* name);
     void platformInvalidate();
 
-#if PLATFORM(MAC)
+#if OS(DARWIN)
 #if HAVE(DISPATCH_H)
     static void executeWorkItem(void*);
     Mutex m_eventSourcesMutex;

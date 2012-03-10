@@ -217,7 +217,7 @@ void Graph::dump(NodeIndex nodeIndex, CodeBlock* codeBlock)
         VariableAccessData* variableAccessData = node.variableAccessData();
         int operand = variableAccessData->operand();
         if (operandIsArgument(operand))
-            printf("%sarg%u(%s)", hasPrinted ? ", " : "", operand - codeBlock->thisRegister(), nameOfVariableAccessData(variableAccessData));
+            printf("%sarg%u(%s)", hasPrinted ? ", " : "", operandToArgument(operand), nameOfVariableAccessData(variableAccessData));
         else
             printf("%sr%u(%s)", hasPrinted ? ", " : "", operand, nameOfVariableAccessData(variableAccessData));
         hasPrinted = true;
@@ -260,7 +260,7 @@ void Graph::dump(NodeIndex nodeIndex, CodeBlock* codeBlock)
 
     if (!skipped) {
         if (node.hasVariableAccessData())
-            printf("  predicting %s", predictionToString(node.variableAccessData()->prediction()));
+            printf("  predicting %s, double ratio %lf%s", predictionToString(node.variableAccessData()->prediction()), node.variableAccessData()->doubleVoteRatio(), node.variableAccessData()->shouldUseDoubleFormat() ? ", forcing double" : "");
         else if (node.hasVarNumber())
             printf("  predicting %s", predictionToString(getGlobalVarPrediction(node.varNumber())));
         else if (node.hasHeapPrediction())
@@ -275,14 +275,23 @@ void Graph::dump(CodeBlock* codeBlock)
     for (size_t b = 0; b < m_blocks.size(); ++b) {
         BasicBlock* block = m_blocks[b].get();
         printf("Block #%u (bc#%u): %s%s\n", (int)b, block->bytecodeBegin, block->isReachable ? "" : " (skipped)", block->isOSRTarget ? " (OSR target)" : "");
-        printf("  vars: ");
+        printf("  vars before: ");
         if (block->cfaHasVisited)
             dumpOperands(block->valuesAtHead, stdout);
         else
             printf("<empty>");
         printf("\n");
+        printf("  var links: ");
+        dumpOperands(block->variablesAtHead, stdout);
+        printf("\n");
         for (size_t i = block->begin; i < block->end; ++i)
             dump(i, codeBlock);
+        printf("  vars after: ");
+        if (block->cfaHasVisited)
+            dumpOperands(block->valuesAtTail, stdout);
+        else
+            printf("<empty>");
+        printf("\n");
     }
     printf("Phi Nodes:\n");
     for (size_t i = m_blocks.last()->end; i < size(); ++i)

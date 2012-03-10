@@ -56,6 +56,9 @@
 #include "StyleFilterData.h"
 #endif
 #include "StyleFlexibleBoxData.h"
+#if ENABLE(CSS_GRID_LAYOUT)
+#include "StyleGridData.h"
+#endif
 #include "StyleInheritedData.h"
 #include "StyleMarqueeData.h"
 #include "StyleMultiColData.h"
@@ -722,7 +725,14 @@ public:
     int flexOrder() const { return rareNonInheritedData->m_flexibleBox->m_flexOrder; }
     EFlexPack flexPack() const { return static_cast<EFlexPack>(rareNonInheritedData->m_flexibleBox->m_flexPack); }
     EFlexAlign flexAlign() const { return static_cast<EFlexAlign>(rareNonInheritedData->m_flexibleBox->m_flexAlign); }
-    EFlexFlow flexFlow() const { return static_cast<EFlexFlow>(rareNonInheritedData->m_flexibleBox->m_flexFlow); }
+    EFlexDirection flexDirection() const { return static_cast<EFlexDirection>(rareNonInheritedData->m_flexibleBox->m_flexDirection); }
+    bool isColumnFlexDirection() const { return flexDirection() == FlowColumn || flexDirection() == FlowColumnReverse; }
+    EFlexWrap flexWrap() const { return static_cast<EFlexWrap>(rareNonInheritedData->m_flexibleBox->m_flexWrap); }
+
+#if ENABLE(CSS_GRID_LAYOUT)
+    const Vector<Length>& gridColumns() const { return rareNonInheritedData->m_grid->m_gridColumns; }
+    const Vector<Length>& gridRows() const { return rareNonInheritedData->m_grid->m_gridRows; }
+#endif
 
     const ShadowData* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
     void getBoxShadowExtent(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const { getShadowExtent(boxShadow(), top, right, bottom, left); }
@@ -979,7 +989,7 @@ public:
     void setOverflowY(EOverflow v) { noninherited_flags._overflowY = v; }
     void setVisibility(EVisibility v) { inherited_flags._visibility = v; }
     void setVerticalAlign(EVerticalAlign v) { noninherited_flags._vertical_align = v; }
-    void setVerticalAlignLength(Length l) { SET_VAR(m_box, m_verticalAlign, l) }
+    void setVerticalAlignLength(Length length) { setVerticalAlign(LENGTH); SET_VAR(m_box, m_verticalAlign, length) }
 
     void setHasClip(bool b = true) { SET_VAR(visual, hasClip, b) }
     void setClipLeft(Length v) { SET_VAR(visual, clip.m_left, v) }
@@ -1046,6 +1056,8 @@ public:
             accessMaskLayers()->fillUnsetProperties();
         }
     }
+
+    void setMaskImage(PassRefPtr<StyleImage> v) { rareNonInheritedData.access()->m_mask.setImage(v); }
 
     void setMaskBoxImage(const NinePieceImage& b) { SET_VAR(rareNonInheritedData, m_maskBoxImage, b) }
     void setMaskBoxImageSource(PassRefPtr<StyleImage> v) { rareNonInheritedData.access()->m_maskBoxImage.setImage(v); }
@@ -1135,7 +1147,13 @@ public:
     void setFlexOrder(int o) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexOrder, o); }
     void setFlexPack(EFlexPack p) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexPack, p); }
     void setFlexAlign(EFlexAlign a) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexAlign, a); }
-    void setFlexFlow(EFlexFlow flow) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexFlow, flow); }
+    void setFlexDirection(EFlexDirection direction) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexDirection, direction); }
+    void setFlexWrap(EFlexWrap w) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexWrap, w); }
+#if ENABLE(CSS_GRID_LAYOUT)
+    void setGridColumns(const Vector<Length>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridColumns, lengths); }
+    void setGridRows(const Vector<Length>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridRows, lengths); }
+#endif
+
     void setMarqueeIncrement(const Length& f) { SET_VAR(rareNonInheritedData.access()->m_marquee, increment, f); }
     void setMarqueeSpeed(int f) { SET_VAR(rareNonInheritedData.access()->m_marquee, speed, f); }
     void setMarqueeDirection(EMarqueeDirection d) { SET_VAR(rareNonInheritedData.access()->m_marquee, direction, d); }
@@ -1286,13 +1304,22 @@ public:
     void setKerning(SVGLength k) { accessSVGStyle()->setKerning(k); }
 #endif
 
-    void setWrapShape(PassRefPtr<CSSWrapShape> shape)
+    void setWrapShapeInside(PassRefPtr<CSSWrapShape> shape)
     {
-        if (rareNonInheritedData->m_wrapShape != shape)
-            rareNonInheritedData.access()->m_wrapShape = shape;
+        if (rareNonInheritedData->m_wrapShapeInside != shape)
+            rareNonInheritedData.access()->m_wrapShapeInside = shape;
     }
-    CSSWrapShape* wrapShape() const { return rareNonInheritedData->m_wrapShape.get(); }
-    static CSSWrapShape* initialWrapShape() { return 0; }
+    CSSWrapShape* wrapShapeInside() const { return rareNonInheritedData->m_wrapShapeInside.get(); }
+
+    void setWrapShapeOutside(PassRefPtr<CSSWrapShape> shape)
+    {
+        if (rareNonInheritedData->m_wrapShapeOutside != shape)
+            rareNonInheritedData.access()->m_wrapShapeOutside = shape;
+    }
+    CSSWrapShape* wrapShapeOutside() const { return rareNonInheritedData->m_wrapShapeOutside.get(); }
+
+    static CSSWrapShape* initialWrapShapeInside() { return 0; }
+    static CSSWrapShape* initialWrapShapeOutside() { return 0; }
 
     Length wrapPadding() const { return rareNonInheritedData->m_wrapPadding; }
     void setWrapPadding(Length wrapPadding) { SET_VAR(rareNonInheritedData, m_wrapPadding, wrapPadding); }
@@ -1320,6 +1347,7 @@ public:
     const AtomicString& hyphenString() const;
 
     bool inheritedNotEqual(const RenderStyle*) const;
+    bool inheritedDataShared(const RenderStyle*) const;
 
     StyleDifference diff(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
 
@@ -1443,7 +1471,8 @@ public:
     static int initialFlexOrder() { return 0; }
     static EFlexPack initialFlexPack() { return PackStart; }
     static EFlexAlign initialFlexAlign() { return AlignStretch; }
-    static EFlexFlow initialFlexFlow() { return FlowRow; }
+    static EFlexDirection initialFlexDirection() { return FlowRow; }
+    static EFlexWrap initialFlexWrap() { return FlexNoWrap; }
     static int initialMarqueeLoopCount() { return -1; }
     static int initialMarqueeSpeed() { return 85; }
     static Length initialMarqueeIncrement() { return Length(6, Fixed); }
@@ -1499,6 +1528,20 @@ public:
     static StyleImage* initialBorderImageSource() { return 0; }
     static StyleImage* initialMaskBoxImageSource() { return 0; }
     static PrintColorAdjust initialPrintColorAdjust() { return PrintColorAdjustEconomy; }
+
+#if ENABLE(CSS_GRID_LAYOUT)
+    // The initial value is 'none' for grid tracks.
+    static Vector<Length> initialGridTrackValue()
+    {
+        DEFINE_STATIC_LOCAL(Vector<Length>, defaultLength, ());
+        // We need to manually add the Length here as the Length(0) is 'auto'.
+        if (!defaultLength.size())
+            defaultLength.append(Length(Undefined));
+        return defaultLength;
+    }
+    static Vector<Length> initialGridColumns() { return initialGridTrackValue(); }
+    static Vector<Length> initialGridRows() { return initialGridTrackValue(); }
+#endif
 
     static const AtomicString& initialLineGrid() { return nullAtom; }
     static LineGridSnap initialLineGridSnap() { return LineGridSnapNone; }

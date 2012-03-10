@@ -38,6 +38,7 @@ WebInspector.NetworkManager = function()
     this._dispatcher = new WebInspector.NetworkDispatcher(this);
     if (WebInspector.settings.cacheDisabled.get())
         NetworkAgent.setCacheDisabled(true);
+
     NetworkAgent.enable();
 
     WebInspector.settings.cacheDisabled.addChangeListener(this._cacheDisabledSettingChanged, this);
@@ -48,9 +49,12 @@ WebInspector.NetworkManager = function()
 }
 
 WebInspector.NetworkManager.EventTypes = {
+    ResourceTrackingEnabled: "ResourceTrackingEnabled",
+    ResourceTrackingDisabled: "ResourceTrackingDisabled",
     ResourceStarted: "ResourceStarted",
     ResourceUpdated: "ResourceUpdated",
-    ResourceFinished: "ResourceFinished"
+    ResourceFinished: "ResourceFinished",
+    ResourceUpdateDropped: "ResourceUpdateDropped"
 }
 
 WebInspector.NetworkManager.prototype = {
@@ -69,6 +73,18 @@ WebInspector.NetworkManager.prototype = {
             NetworkAgent.getResponseBody(resource.requestId, callbackWrapper);
         else
             PageAgent.getResourceContent(resource.frameId, resource.url, callbackWrapper);
+    },
+
+    enableResourceTracking: function()
+    {
+        var networkAgentEnabled = this.dispatchEventToListeners.bind(this, WebInspector.NetworkManager.EventTypes.ResourceTrackingEnabled);
+        NetworkAgent.enable(networkAgentEnabled);
+    },
+
+    disableResourceTracking: function()
+    {
+        var networkAgentDisabled = this.dispatchEventToListeners.bind(this, WebInspector.NetworkManager.EventTypes.ResourceTrackingDisabled);
+        NetworkAgent.disable(networkAgentDisabled);
     },
 
     inflightResourceForURL: function(url)
@@ -136,11 +152,16 @@ WebInspector.NetworkDispatcher.prototype = {
             resource.timing = response.timing;
 
         if (!this._mimeTypeIsConsistentWithType(resource)) {
-            WebInspector.console.addMessage(WebInspector.ConsoleMessage.create(WebInspector.ConsoleMessage.MessageSource.Other,
+            WebInspector.console.addMessage(WebInspector.ConsoleMessage.create(WebInspector.ConsoleMessage.MessageSource.Network,
                 WebInspector.ConsoleMessage.MessageLevel.Warning,
-                WebInspector.UIString("Resource interpreted as %s but transferred with MIME type %s.", WebInspector.Resource.Type.toUIString(this.type), this.mimeType),
+                WebInspector.UIString("Resource interpreted as %s but transferred with MIME type %s: \"%s\".", WebInspector.Resource.Type.toUIString(resource.type), resource.mimeType, resource.url),
                 WebInspector.ConsoleMessage.MessageType.Log,
-                this.url));
+                "",
+                0,
+                1,
+                [],
+                null,
+                resource));
         }
     },
 
@@ -189,7 +210,7 @@ WebInspector.NetworkDispatcher.prototype = {
             // FIXME: move this check to the backend.
             if (!redirectResponse)
                 return;
-            this.responseReceived(requestId, time, "Other", redirectResponse);
+            this.responseReceived(requestId, frameId, loaderId, time, "Other", redirectResponse);
             resource = this._appendRedirect(requestId, time, request.url);
         } else
             resource = this._createResource(requestId, frameId, loaderId, request.url, documentURL, initiator, stackTrace);
@@ -207,18 +228,26 @@ WebInspector.NetworkDispatcher.prototype = {
             return;
 
         resource.cached = true;
-        this._updateResource(resource);
     },
 
-    responseReceived: function(requestId, time, resourceType, response)
+    responseReceived: function(requestId, frameId, loaderId, time, resourceType, response)
     {
         // FIXME: move this check to the backend.
         if (this._isNull(response))
             return;
 
         var resource = this._inflightResourcesById[requestId];
-        if (!resource)
+        if (!resource) {
+            // We missed the requestWillBeSent.
+            var eventData = {};
+            eventData.url = response.url;
+            eventData.frameId = frameId;
+            eventData.loaderId = loaderId;
+            eventData.resourceType = resourceType;
+            eventData.mimeType = response.mimeType;
+            this._manager.dispatchEventToListeners(WebInspector.NetworkManager.EventTypes.ResourceUpdateDropped, eventData);
             return;
+        }
 
         resource.responseReceivedTime = time;
         resource.type = WebInspector.Resource.Type[resourceType];
@@ -247,7 +276,6 @@ WebInspector.NetworkDispatcher.prototype = {
         var resource = this._inflightResourcesById[requestId];
         if (!resource)
             return;
-
         this._finishResource(resource, finishTime);
     },
 

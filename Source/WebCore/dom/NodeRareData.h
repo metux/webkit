@@ -22,13 +22,10 @@
 #ifndef NodeRareData_h
 #define NodeRareData_h
 
+#include "ChildNodeList.h"
 #include "ClassNodeList.h"
+#include "DOMSettableTokenList.h"
 #include "DynamicNodeList.h"
-
-#if ENABLE(MICRODATA)
-#include "MicroDataItemList.h"
-#endif
-
 #include "MutationObserverRegistration.h"
 #include "NameNodeList.h"
 #include "QualifiedName.h"
@@ -40,6 +37,11 @@
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/StringHash.h>
 
+#if ENABLE(MICRODATA)
+#include "HTMLPropertiesCollection.h"
+#include "MicroDataItemList.h"
+#endif
+
 namespace WebCore {
 
 class LabelsNodeList;
@@ -48,11 +50,9 @@ class TreeScope;
 struct NodeListsNodeData {
     WTF_MAKE_NONCOPYABLE(NodeListsNodeData); WTF_MAKE_FAST_ALLOCATED;
 public:
-    typedef HashSet<DynamicNodeList*> NodeListSet;
+    typedef HashSet<DynamicSubtreeNodeList*> NodeListSet;
     NodeListSet m_listsWithCaches;
-    
-    RefPtr<DynamicNodeList::Caches> m_childNodeListCaches;
-    
+
     typedef HashMap<String, ClassNodeList*> ClassNodeListCache;
     ClassNodeListCache m_classNodeListCache;
 
@@ -125,6 +125,19 @@ public:
     void clearNodeLists() { m_nodeLists.clear(); }
     void setNodeLists(PassOwnPtr<NodeListsNodeData> lists) { m_nodeLists = lists; }
     NodeListsNodeData* nodeLists() const { return m_nodeLists.get(); }
+    NodeListsNodeData* ensureNodeLists(Node* node)
+    {
+        if (!m_nodeLists)
+            createNodeLists(node);
+        return m_nodeLists.get();
+    }
+    void clearChildNodeListCache();
+    DynamicNodeList::Caches* ensureChildNodeListCache()
+    {
+        if (!m_childNodeListCache)
+            m_childNodeListCache = DynamicNodeList::Caches::create();
+        return m_childNodeListCache.get();
+    }
 
     short tabIndex() const { return m_tabIndex; }
     void setTabIndexExplicitly(short index) { m_tabIndex = index; m_tabIndexWasSetExplicitly = true; }
@@ -157,6 +170,64 @@ public:
     }
 #endif
 
+#if ENABLE(MICRODATA)
+    DOMSettableTokenList* itemProp() const
+    {
+        if (!m_itemProp)
+            m_itemProp = DOMSettableTokenList::create();
+
+        return m_itemProp.get();
+    }
+
+    void setItemProp(const String& value)
+    {
+        if (!m_itemProp)
+            m_itemProp = DOMSettableTokenList::create();
+
+        m_itemProp->setValue(value);
+    }
+
+    DOMSettableTokenList* itemRef() const
+    {
+        if (!m_itemRef)
+            m_itemRef = DOMSettableTokenList::create();
+
+        return m_itemRef.get();
+    }
+
+    void setItemRef(const String& value)
+    {
+        if (!m_itemRef)
+            m_itemRef = DOMSettableTokenList::create();
+
+        m_itemRef->setValue(value);
+    }
+
+    DOMSettableTokenList* itemType() const
+    {
+        if (!m_itemType)
+            m_itemType = DOMSettableTokenList::create();
+
+        return m_itemType.get();
+    }
+
+    void setItemType(const String& value)
+    {
+        if (!m_itemType)
+            m_itemType = DOMSettableTokenList::create();
+
+        m_itemType->setValue(value);
+    }
+
+    HTMLPropertiesCollection* properties(Node* node)
+    {
+        if (!m_properties)
+            m_properties = HTMLPropertiesCollection::create(node);
+
+        return m_properties.get();
+    }
+#endif
+
     bool isFocused() const { return m_isFocused; }
     void setFocused(bool focused) { m_isFocused = focused; }
 
@@ -166,8 +237,11 @@ protected:
     void setNeedsFocusAppearanceUpdateSoonAfterAttach(bool needs) { m_needsFocusAppearanceUpdateSoonAfterAttach = needs; }
 
 private:
+    void createNodeLists(Node*);
+
     TreeScope* m_treeScope;
     OwnPtr<NodeListsNodeData> m_nodeLists;
+    RefPtr<DynamicNodeList::Caches> m_childNodeListCache;
     OwnPtr<EventTargetData> m_eventTargetData;
     short m_tabIndex;
     bool m_tabIndexWasSetExplicitly : 1;
@@ -177,6 +251,13 @@ private:
 #if ENABLE(MUTATION_OBSERVERS)
     OwnPtr<Vector<OwnPtr<MutationObserverRegistration> > > m_mutationObserverRegistry;
     OwnPtr<HashSet<MutationObserverRegistration*> > m_transientMutationObserverRegistry;
+#endif
+
+#if ENABLE(MICRODATA)
+    mutable RefPtr<DOMSettableTokenList> m_itemProp;
+    mutable RefPtr<DOMSettableTokenList> m_itemRef;
+    mutable RefPtr<DOMSettableTokenList> m_itemType;
+    mutable RefPtr<HTMLPropertiesCollection> m_properties;
 #endif
 };
 

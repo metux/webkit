@@ -21,6 +21,7 @@
 #include "config.h"
 #include "CSSStyleDeclaration.h"
 
+#include "CSSElementStyleDeclaration.h"
 #include "CSSMutableStyleDeclaration.h"
 #include "CSSParser.h"
 #include "CSSProperty.h"
@@ -38,15 +39,24 @@ using namespace WTF;
 
 namespace WebCore {
 
-CSSStyleDeclaration::CSSStyleDeclaration(CSSRule* parent, bool isMutable)
+CSSStyleDeclaration::CSSStyleDeclaration(CSSRule* parent)
     : m_strictParsing(!parent || parent->useStrictParsing())
 #ifndef NDEBUG
     , m_iteratorCount(0)
 #endif
-    , m_isMutableStyleDeclaration(isMutable)
-    , m_parentIsRule(true)
+    , m_isElementStyleDeclaration(false)
+    , m_isInlineStyleDeclaration(false)
     , m_parentRule(parent)
 {
+}
+
+CSSStyleSheet* CSSStyleDeclaration::parentStyleSheet() const
+{
+    if (parentRule())
+        return parentRule()->parentStyleSheet();
+    if (isElementStyleDeclaration())
+        return static_cast<const CSSElementStyleDeclaration*>(this)->styleSheet();
+    return 0;
 }
 
 PassRefPtr<CSSValue> CSSStyleDeclaration::getPropertyCSSValue(const String& propertyName)
@@ -92,25 +102,11 @@ bool CSSStyleDeclaration::isPropertyImplicit(const String& propertyName)
     return isPropertyImplicit(propID);
 }
 
-void CSSStyleDeclaration::setProperty(const String& propertyName, const String& value, ExceptionCode& ec)
-{
-    size_t important = value.find("!important", 0, false);
-    int propertyID = cssPropertyID(propertyName);
-    if (!propertyID)
-        return;
-    if (important == notFound)
-        setProperty(propertyID, value, false, ec);
-    else
-        setProperty(propertyID, value.left(important - 1), true, ec);
-}
-
 void CSSStyleDeclaration::setProperty(const String& propertyName, const String& value, const String& priority, ExceptionCode& ec)
 {
     int propID = cssPropertyID(propertyName);
-    if (!propID) {
-        // FIXME: Should we raise an exception here?
+    if (!propID)
         return;
-    }
     bool important = priority.find("important", 0, false) != notFound;
     setProperty(propID, value, important, ec);
 }

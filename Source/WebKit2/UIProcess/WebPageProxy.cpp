@@ -31,12 +31,15 @@
 #include "DataReference.h"
 #include "DownloadProxy.h"
 #include "DrawingAreaProxy.h"
+#include "EventDispatcherMessages.h"
 #include "FindIndicator.h"
 #include "Logging.h"
 #include "MessageID.h"
 #include "NativeWebKeyboardEvent.h"
 #include "NativeWebMouseEvent.h"
 #include "NativeWebWheelEvent.h"
+#include "NotificationPermissionRequest.h"
+#include "NotificationPermissionRequestManager.h"
 #include "PageClient.h"
 #include "PrintInfo.h"
 #include "SessionState.h"
@@ -146,6 +149,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_mainFrame(0)
     , m_userAgent(standardUserAgent())
     , m_geolocationPermissionRequestManager(this)
+    , m_notificationPermissionRequestManager(this)
     , m_estimatedProgress(0)
     , m_isInWindow(m_pageClient->isViewInWindow())
     , m_isVisible(m_pageClient->isViewVisible())
@@ -161,6 +165,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_areMemoryCacheClientCallsEnabled(true)
     , m_useFixedLayout(false)
     , m_paginationMode(Page::Pagination::Unpaginated)
+    , m_pageLength(0)
     , m_gapBetweenPages(0)
     , m_isValid(true)
     , m_isClosed(false)
@@ -363,6 +368,7 @@ void WebPageProxy::close()
     }
 
     m_geolocationPermissionRequestManager.invalidateRequests();
+    m_notificationPermissionRequestManager.invalidateRequests();
 
     m_toolTip = String();
 
@@ -934,7 +940,7 @@ void WebPageProxy::handleWheelEvent(const NativeWebWheelEvent& event)
         process()->sendSync(Messages::WebPage::WheelEventSyncForTesting(event), Messages::WebPage::WheelEventSyncForTesting::Reply(handled), m_pageID);
         didReceiveEvent(event.type(), handled);
     } else
-        process()->send(Messages::WebPage::WheelEvent(event), m_pageID);
+        process()->send(Messages::EventDispatcher::WheelEvent(m_pageID, event), 0);
 }
 
 void WebPageProxy::handleKeyboardEvent(const NativeWebKeyboardEvent& event)
@@ -1261,6 +1267,8 @@ void WebPageProxy::setUseFixedLayout(bool fixed)
     if (!isValid())
         return;
 
+    // This check is fine as the value is initialized in the web
+    // process as part of the creation parameters.
     if (fixed == m_useFixedLayout)
         return;
 
@@ -1292,6 +1300,18 @@ void WebPageProxy::setPaginationMode(WebCore::Page::Pagination::Mode mode)
     if (!isValid())
         return;
     process()->send(Messages::WebPage::SetPaginationMode(mode), m_pageID);
+}
+
+void WebPageProxy::setPageLength(double pageLength)
+{
+    if (pageLength == m_pageLength)
+        return;
+
+    m_pageLength = pageLength;
+
+    if (!isValid())
+        return;
+    process()->send(Messages::WebPage::SetPageLength(pageLength), m_pageID);
 }
 
 void WebPageProxy::setGapBetweenPages(double gap)
@@ -2308,6 +2328,11 @@ void WebPageProxy::didFindZoomableArea(const IntPoint& target, const IntRect& ar
     m_pageClient->didFindZoomableArea(target, area);
 }
 
+void WebPageProxy::focusEditableArea(const WebCore::IntRect& caret, const WebCore::IntRect& area)
+{
+    m_pageClient->focusEditableArea(caret, area);
+}
+
 void WebPageProxy::findZoomableAreaForPoint(const IntPoint& point)
 {
     if (!isValid())
@@ -2462,6 +2487,13 @@ NativeWebMouseEvent* WebPageProxy::currentlyProcessedMouseDownEvent()
 {
     return m_currentlyProcessedMouseDownEvent.get();
 }
+
+#if PLATFORM(GTK)
+void WebPageProxy::failedToShowPopupMenu()
+{
+    process()->send(Messages::WebPage::FailedToShowPopupMenu(), m_pageID);
+}
+#endif
 
 void WebPageProxy::showPopupMenu(const IntRect& rect, uint64_t textDirection, const Vector<WebPopupItem>& items, int32_t selectedIndex, const PlatformPopupMenuData& data)
 {
@@ -2898,7 +2930,7 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
             WebWheelEvent newWheelEvent = coalescedWheelEvent(m_wheelEventQueue, m_currentlyProcessedWheelEvents);
 
             process()->responsivenessTimer()->start();
-            process()->send(Messages::WebPage::WheelEvent(newWheelEvent), m_pageID);
+            process()->send(Messages::EventDispatcher::WheelEvent(m_pageID, newWheelEvent), 0);
         }
 
         break;
@@ -3106,6 +3138,7 @@ void WebPageProxy::processDidCrash()
     }
 
     m_geolocationPermissionRequestManager.invalidateRequests();
+    m_notificationPermissionRequestManager.invalidateRequests();
 
     m_toolTip = String();
 
@@ -3189,6 +3222,7 @@ WebPageCreationParameters WebPageProxy::creationParameters() const
     parameters.useFixedLayout = m_useFixedLayout;
     parameters.fixedLayoutSize = m_fixedLayoutSize;
     parameters.paginationMode = m_paginationMode;
+    parameters.pageLength = m_pageLength;
     parameters.gapBetweenPages = m_gapBetweenPages;
     parameters.userAgent = userAgent();
     parameters.sessionState = SessionState(m_backForwardList->entries(), m_backForwardList->currentIndex());
@@ -3267,6 +3301,18 @@ void WebPageProxy::requestGeolocationPermissionForFrame(uint64_t geolocationID, 
         request->deny();
 }
 
+void WebPageProxy::requestNotificationPermission(uint64_t requestID, const String& originIdentifier)
+{
+    if (!isRequestIDValid(requestID))
+        return;
+
+    RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::create(originIdentifier);
+    RefPtr<NotificationPermissionRequest> request = m_notificationPermissionRequestManager.createRequest(requestID);
+    
+    if (!m_uiClient.decidePolicyForNotificationPermissionRequest(this, origin.get(), request.get()))
+        request->deny();
+}
+
 float WebPageProxy::headerHeight(WebFrameProxy* frame)
 {
     return m_uiClient.headerHeight(this, frame);
@@ -3298,6 +3344,13 @@ void WebPageProxy::runModal()
 void WebPageProxy::notifyScrollerThumbIsVisibleInRect(const IntRect& scrollerThumb)
 {
     m_visibleScrollerThumbRect = scrollerThumb;
+}
+
+void WebPageProxy::recommendedScrollbarStyleDidChange(int32_t newStyle)
+{
+#if PLATFORM(MAC)
+    m_pageClient->recommendedScrollbarStyleDidChange(newStyle);
+#endif
 }
 
 void WebPageProxy::didChangeScrollbarsForMainFrame(bool hasHorizontalScrollbar, bool hasVerticalScrollbar)

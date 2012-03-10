@@ -26,14 +26,15 @@
 #include "HTMLDocument.h"
 #include "History.h"
 #include "JSArrayBuffer.h"
-#include "JSAudioConstructor.h"
 #include "JSDataView.h"
 #include "JSEvent.h"
 #include "JSEventListener.h"
 #include "JSEventSource.h"
 #include "JSFloat32Array.h"
 #include "JSFloat64Array.h"
+#include "JSHTMLAudioElement.h"
 #include "JSHTMLCollection.h"
+#include "JSHTMLOptionElement.h"
 #include "JSHistory.h"
 #include "JSImageConstructor.h"
 #include "JSInt16Array.h"
@@ -42,7 +43,6 @@
 #include "JSLocation.h"
 #include "JSMessageChannel.h"
 #include "JSMessagePortCustom.h"
-#include "JSOptionConstructor.h"
 #include "JSUint16Array.h"
 #include "JSUint32Array.h"
 #include "JSUint8Array.h"
@@ -137,12 +137,12 @@ bool JSDOMWindow::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identi
         // The following code is safe for cross-domain and same domain use.
         // It ignores any custom properties that might be set on the DOMWindow (including a custom prototype).
         entry = s_info.propHashTable(exec)->entry(exec, propertyName);
-        if (entry && !(entry->attributes() & Function) && entry->propertyGetter() == jsDOMWindowClosed) {
+        if (entry && !(entry->attributes() & JSC::Function) && entry->propertyGetter() == jsDOMWindowClosed) {
             slot.setCustom(thisObject, entry->propertyGetter());
             return true;
         }
         entry = JSDOMWindowPrototype::s_info.propHashTable(exec)->entry(exec, propertyName);
-        if (entry && (entry->attributes() & Function) && entry->function() == jsDOMWindowPrototypeFunctionClose) {
+        if (entry && (entry->attributes() & JSC::Function) && entry->function() == jsDOMWindowPrototypeFunctionClose) {
             slot.setCustom(thisObject, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionClose, 0>);
             return true;
         }
@@ -170,7 +170,7 @@ bool JSDOMWindow::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identi
     // what prototype is actually set on this object.
     entry = JSDOMWindowPrototype::s_info.propHashTable(exec)->entry(exec, propertyName);
     if (entry) {
-        if (entry->attributes() & Function) {
+        if (entry->attributes() & JSC::Function) {
             if (entry->function() == jsDOMWindowPrototypeFunctionBlur) {
                 if (!allowsAccess) {
                     slot.setCustom(thisObject, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionBlur, 0>);
@@ -281,12 +281,12 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, co
         // The following code is safe for cross-domain and same domain use.
         // It ignores any custom properties that might be set on the DOMWindow (including a custom prototype).
         entry = s_info.propHashTable(exec)->entry(exec, propertyName);
-        if (entry && !(entry->attributes() & Function) && entry->propertyGetter() == jsDOMWindowClosed) {
+        if (entry && !(entry->attributes() & JSC::Function) && entry->propertyGetter() == jsDOMWindowClosed) {
             descriptor.setDescriptor(jsBoolean(true), ReadOnly | DontDelete | DontEnum);
             return true;
         }
         entry = JSDOMWindowPrototype::s_info.propHashTable(exec)->entry(exec, propertyName);
-        if (entry && (entry->attributes() & Function) && entry->function() == jsDOMWindowPrototypeFunctionClose) {
+        if (entry && (entry->attributes() & JSC::Function) && entry->function() == jsDOMWindowPrototypeFunctionClose) {
             PropertySlot slot;
             slot.setCustom(thisObject, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionClose, 0>);
             descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
@@ -488,7 +488,7 @@ JSValue JSDOMWindow::image(ExecState* exec) const
 
 JSValue JSDOMWindow::option(ExecState* exec) const
 {
-    return getDOMConstructor<JSOptionConstructor>(exec, this);
+    return getDOMConstructor<JSHTMLOptionElementNamedConstructor>(exec, this);
 }
 
 #if ENABLE(VIDEO)
@@ -496,7 +496,7 @@ JSValue JSDOMWindow::audio(ExecState* exec) const
 {
     if (!MediaPlayer::isAvailable())
         return jsUndefined();
-    return getDOMConstructor<JSAudioConstructor>(exec, this);
+    return getDOMConstructor<JSHTMLAudioElementNamedConstructor>(exec, this);
 }
 #endif
 
@@ -705,8 +705,22 @@ JSValue JSDOMWindow::showModalDialog(ExecState* exec)
 static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransfer)
 {
     MessagePortArray messagePorts;
-    if (exec->argumentCount() > 2)
-        fillMessagePortArray(exec, exec->argument(1), messagePorts);
+
+    // This function has variable arguments and can be:
+    // Per current spec:
+    //   postMessage(message, targetOrigin)
+    //   postMessage(message, targetOrigin, {sequence of transferrables})
+    // Legacy non-standard implementations in webkit allowed:
+    //   postMessage(message, {sequence of transferrables}, targetOrigin);
+    int targetOriginArgIndex = 1;
+    if (exec->argumentCount() > 2) {
+        int transferablesArgIndex = 2;
+        if (exec->argument(2).isString()) {
+            targetOriginArgIndex = 2;
+            transferablesArgIndex = 1;
+        }
+        fillMessagePortArray(exec, exec->argument(transferablesArgIndex), messagePorts);
+    }
     if (exec->hadException())
         return jsUndefined();
 
@@ -716,7 +730,7 @@ static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransf
     if (exec->hadException())
         return jsUndefined();
 
-    String targetOrigin = valueToStringWithUndefinedOrNullCheck(exec, exec->argument((exec->argumentCount() == 2) ? 1 : 2));
+    String targetOrigin = valueToStringWithUndefinedOrNullCheck(exec, exec->argument(targetOriginArgIndex));
     if (exec->hadException())
         return jsUndefined();
 

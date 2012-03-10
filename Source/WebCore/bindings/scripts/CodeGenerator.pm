@@ -255,6 +255,22 @@ sub GetMethodsAndAttributesFromParentClasses
     return @parentList;
 }
 
+sub FindSuperMethod
+{
+    my ($object, $dataNode, $functionName) = @_;
+    my $indexer;
+    $object->ForAllParents($dataNode, undef, sub {
+        my $interface = shift;
+        foreach my $function (@{$interface->functions}) {
+            if ($function->signature->name eq $functionName) {
+                $indexer = $function->signature;
+                return 'prune';
+            }
+        }
+    });
+    return $indexer;
+}
+
 sub IDLFileForInterface
 {
     my $object = shift;
@@ -499,14 +515,14 @@ sub ContentAttributeName
     return "WebCore::${namespace}::${contentAttributeName}Attr";
 }
 
-sub GetterExpressionPrefix
+sub GetterExpression
 {
     my ($generator, $implIncludes, $interfaceName, $attribute) = @_;
 
     my $contentAttributeName = $generator->ContentAttributeName($implIncludes, $interfaceName, $attribute);
 
     if (!$contentAttributeName) {
-        return $generator->WK_lcfirst($generator->AttributeNameForGetterAndSetter($attribute)) . "(";
+        return ($generator->WK_lcfirst($generator->AttributeNameForGetterAndSetter($attribute)));
     }
 
     my $functionName;
@@ -526,17 +542,17 @@ sub GetterExpressionPrefix
         $functionName = "getAttribute";
     }
 
-    return "$functionName($contentAttributeName"
+    return ($functionName, $contentAttributeName);
 }
 
-sub SetterExpressionPrefix
+sub SetterExpression
 {
     my ($generator, $implIncludes, $interfaceName, $attribute) = @_;
 
     my $contentAttributeName = $generator->ContentAttributeName($implIncludes, $interfaceName, $attribute);
 
     if (!$contentAttributeName) {
-        return "set" . $generator->WK_ucfirst($generator->AttributeNameForGetterAndSetter($attribute)) . "(";
+        return ("set" . $generator->WK_ucfirst($generator->AttributeNameForGetterAndSetter($attribute)));
     }
 
     my $functionName;
@@ -550,7 +566,7 @@ sub SetterExpressionPrefix
         $functionName = "setAttribute";
     }
 
-    return "$functionName($contentAttributeName, "
+    return ($functionName, $contentAttributeName);
 }
 
 sub ShouldCheckEnums
@@ -559,9 +575,25 @@ sub ShouldCheckEnums
     return not $dataNode->extendedAttributes->{"DontCheckEnums"};
 }
 
+sub GenerateConditionalStringFromAttributeValue
+{
+    my $generator = shift;
+    my $conditional = shift;
+
+    my $operator = ($conditional =~ /&/ ? '&' : ($conditional =~ /\|/ ? '|' : ''));
+    if ($operator) {
+        # Avoid duplicated conditions.
+        my %conditions;
+        map { $conditions{$_} = 1 } split('\\' . $operator, $conditional);
+        return "ENABLE(" . join(") $operator$operator ENABLE(", sort keys %conditions) . ")";
+    } else {
+        return "ENABLE(" . $conditional . ")";
+    }
+}
+
 sub GenerateCompileTimeCheckForEnumsIfNeeded
 {
-    my ($object, $dataNode) = @_;
+    my ($generator, $dataNode) = @_;
     my $interfaceName = $dataNode->name;
     my @checks = ();
     # If necessary, check that all constants are available as enums with the same value.
@@ -571,7 +603,18 @@ sub GenerateCompileTimeCheckForEnumsIfNeeded
             my $reflect = $constant->extendedAttributes->{"Reflect"};
             my $name = $reflect ? $reflect : $constant->name;
             my $value = $constant->value;
+            my $conditional = $constant->extendedAttributes->{"Conditional"};
+
+            if ($conditional) {
+                my $conditionalString = $generator->GenerateConditionalStringFromAttributeValue($conditional);
+                push(@checks, "#if ${conditionalString}\n");
+            }
+
             push(@checks, "COMPILE_ASSERT($value == ${interfaceName}::$name, ${interfaceName}Enum${name}IsWrongUseDontCheckEnums);\n");
+
+            if ($conditional) {
+                push(@checks, "#endif\n");
+            }
         }
         push(@checks, "\n");
     }

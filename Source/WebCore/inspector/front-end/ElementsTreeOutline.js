@@ -884,8 +884,10 @@ WebInspector.ElementsTreeElement.prototype = {
         if (childNodeCount > this.expandedChildCount) {
             var targetButtonIndex = expandedChildCount;
             if (!this.expandAllButtonElement) {
-                var item = new TreeElement(null, null, false);
-                item.titleHTML = "<button class=\"show-all-nodes\" value=\"\" />";
+                var button = document.createElement("button");
+                button.className = "show-all-nodes";
+                button.value = "";
+                var item = new TreeElement(button, null, false);
                 item.selectable = false;
                 item.expandAllButton = true;
                 this.insertChild(item, targetButtonIndex);
@@ -1470,8 +1472,11 @@ WebInspector.ElementsTreeElement.prototype = {
             if (rewrittenHref === null) {
                 var attrValueElement = attrSpanElement.createChild("span", "webkit-html-attribute-value");
                 attrValueElement.textContent = value;
-            } else
+            } else {
+                if (value.indexOf("data:") === 0)
+                    value = value.trimMiddle(60);
                 attrSpanElement.appendChild(linkify(rewrittenHref, value, "webkit-html-attribute-value", node.nodeName().toLowerCase() === "a"));
+            }
         } else {
             value = value.replace(/([\/;:\)\]\}])/g, "$1\u200B");
             var attrValueElement = attrSpanElement.createChild("span", "webkit-html-attribute-value");

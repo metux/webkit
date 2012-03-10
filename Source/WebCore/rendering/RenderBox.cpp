@@ -475,7 +475,7 @@ LayoutUnit RenderBox::clientHeight() const
     return height() - borderTop() - borderBottom() - horizontalScrollbarHeight();
 }
 
-LayoutUnit RenderBox::scrollWidth() const
+int RenderBox::scrollWidth() const
 {
     if (hasOverflowClip())
         return layer()->scrollWidth();
@@ -483,10 +483,10 @@ LayoutUnit RenderBox::scrollWidth() const
     // FIXME: Need to work right with writing modes.
     if (style()->isLeftToRightDirection())
         return max(clientWidth(), maxXLayoutOverflow() - borderLeft());
-    return clientWidth() - min<LayoutUnit>(0, minXLayoutOverflow() - borderLeft());
+    return clientWidth() - min(0, minXLayoutOverflow() - borderLeft());
 }
 
-LayoutUnit RenderBox::scrollHeight() const
+int RenderBox::scrollHeight() const
 {
     if (hasOverflowClip())
         return layer()->scrollHeight();
@@ -495,23 +495,23 @@ LayoutUnit RenderBox::scrollHeight() const
     return max(clientHeight(), maxYLayoutOverflow() - borderTop());
 }
 
-LayoutUnit RenderBox::scrollLeft() const
+int RenderBox::scrollLeft() const
 {
     return hasOverflowClip() ? layer()->scrollXOffset() : 0;
 }
 
-LayoutUnit RenderBox::scrollTop() const
+int RenderBox::scrollTop() const
 {
     return hasOverflowClip() ? layer()->scrollYOffset() : 0;
 }
 
-void RenderBox::setScrollLeft(LayoutUnit newLeft)
+void RenderBox::setScrollLeft(int newLeft)
 {
     if (hasOverflowClip())
         layer()->scrollToXOffset(newLeft, RenderLayer::ScrollOffsetClamped);
 }
 
-void RenderBox::setScrollTop(LayoutUnit newTop)
+void RenderBox::setScrollTop(int newTop)
 {
     if (hasOverflowClip())
         layer()->scrollToYOffset(newTop, RenderLayer::ScrollOffsetClamped);
@@ -631,6 +631,11 @@ LayoutRect RenderBox::reflectedRect(const LayoutRect& r) const
     return result;
 }
 
+bool RenderBox::shouldLayoutFixedElementRelativeToFrame(Frame* frame, FrameView* frameView) const
+{
+    return style() && style()->position() == FixedPosition && container()->isRenderView() && frame && frameView && frameView->shouldLayoutFixedElementsRelativeToFrame();
+}
+
 bool RenderBox::includeVerticalScrollbarSize() const
 {
     return hasOverflowClip() && !layer()->hasOverlayScrollbars()
@@ -643,12 +648,12 @@ bool RenderBox::includeHorizontalScrollbarSize() const
         && (style()->overflowX() == OSCROLL || style()->overflowX() == OAUTO);
 }
 
-LayoutUnit RenderBox::verticalScrollbarWidth() const
+int RenderBox::verticalScrollbarWidth() const
 {
     return includeVerticalScrollbarSize() ? layer()->verticalScrollbarWidth() : 0;
 }
 
-LayoutUnit RenderBox::horizontalScrollbarHeight() const
+int RenderBox::horizontalScrollbarHeight() const
 {
     return includeHorizontalScrollbarSize() ? layer()->horizontalScrollbarHeight() : 0;
 }
@@ -950,7 +955,7 @@ void RenderBox::paintBackground(const PaintInfo& paintInfo, const LayoutRect& pa
 {
     if (isRoot())
         paintRootBoxFillLayers(paintInfo);
-    else if (!isBody() || document()->documentElement()->renderer()->hasBackground()) {
+    else if (!isBody() || (document()->documentElement()->renderer() && document()->documentElement()->renderer()->hasBackground())) {
         // The <body> only paints its background if the root element has defined a background
         // independent of the body.
         if (!backgroundIsObscured())
@@ -1393,22 +1398,8 @@ void RenderBox::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, Transfor
         fixed &= isFixedPos;
     } else
         fixed |= isFixedPos;
-    
-    RenderObject* o = container();
-    if (!o)
-        return;
 
-    o->mapAbsoluteToLocalPoint(fixed, useTransforms, transformState);
-
-    LayoutSize containerOffset = offsetFromContainer(o, LayoutPoint());
-
-    bool preserve3D = useTransforms && (o->style()->preserves3D() || style()->preserves3D());
-    if (useTransforms && shouldUseTransformFromContainer(o)) {
-        TransformationMatrix t;
-        getTransformFromContainer(o, containerOffset, t);
-        transformState.applyTransform(t, preserve3D ? TransformState::AccumulateTransform : TransformState::FlattenTransform);
-    } else
-        transformState.move(containerOffset.width(), containerOffset.height(), preserve3D ? TransformState::AccumulateTransform : TransformState::FlattenTransform);
+    RenderBoxModelObject::mapAbsoluteToLocalPoint(fixed, useTransforms, transformState);
 }
 
 LayoutSize RenderBox::offsetFromContainer(RenderObject* o, const LayoutPoint& point) const
@@ -1486,7 +1477,10 @@ void RenderBox::positionLineBox(InlineBox* box)
         box->destroy(renderArena());
     } else if (isReplaced()) {
         setLocation(roundedLayoutPoint(box->topLeft()));
+        // m_inlineBoxWrapper should already be 0. Deleting it is a safeguard against security issues.
         ASSERT(!m_inlineBoxWrapper);
+        if (m_inlineBoxWrapper)
+            deleteLineBoxWrapper();
         m_inlineBoxWrapper = box;
     }
 }
@@ -1801,7 +1795,10 @@ bool RenderBox::sizesToIntrinsicLogicalWidth(LogicalWidthType widthType) const
             return true;
     }
 
-    if (parent()->isFlexibleBox())
+    // Flexible box items should shrink wrap, so we lay them out at their intrinsic widths.
+    // In the case of columns that have a stretch alignment, we go ahead and layout at the
+    // stretched size to avoid an extra layout when applying alignment.
+    if (parent()->isFlexibleBox() && (!parent()->style()->isColumnFlexDirection() || style()->flexAlign() != AlignStretch))
         return true;
 
     // Flexible horizontal boxes lay out children at their intrinsic widths.  Also vertical boxes
@@ -2328,6 +2325,12 @@ void RenderBox::computeBlockDirectionMargins(RenderBlock* containingBlock)
 LayoutUnit RenderBox::containingBlockLogicalWidthForPositioned(const RenderBoxModelObject* containingBlock, RenderRegion* region,
     LayoutUnit offsetFromLogicalTopOfFirstPage, bool checkForPerpendicularWritingMode) const
 {
+    // Container for position:fixed is the frame.
+    Frame* frame = view() ? view()->frame(): 0;
+    FrameView* frameView = view() ? view()->frameView() : 0;
+    if (shouldLayoutFixedElementRelativeToFrame(frame, frameView))
+        return (view()->isHorizontalWritingMode() ? frameView->visibleWidth() : frameView->visibleHeight()) / frame->frameScaleFactor();
+
     if (checkForPerpendicularWritingMode && containingBlock->isHorizontalWritingMode() != isHorizontalWritingMode())
         return containingBlockLogicalHeightForPositioned(containingBlock, false);
 
@@ -2380,6 +2383,11 @@ LayoutUnit RenderBox::containingBlockLogicalWidthForPositioned(const RenderBoxMo
 
 LayoutUnit RenderBox::containingBlockLogicalHeightForPositioned(const RenderBoxModelObject* containingBlock, bool checkForPerpendicularWritingMode) const
 {
+    Frame* frame = view() ? view()->frame(): 0;
+    FrameView* frameView = view() ? view()->frameView() : 0;
+    if (shouldLayoutFixedElementRelativeToFrame(frame, frameView))
+        return (view()->isHorizontalWritingMode() ? frameView->visibleHeight() : frameView->visibleWidth()) / frame->frameScaleFactor();
+
     if (checkForPerpendicularWritingMode && containingBlock->isHorizontalWritingMode() != isHorizontalWritingMode())
         return containingBlockLogicalWidthForPositioned(containingBlock, 0, 0, false);
 

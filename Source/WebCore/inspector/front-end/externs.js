@@ -75,12 +75,6 @@ InspectorBackend.runAfterPendingDispatches = function(message) {}
 // FIXME: remove everything below.
 var WebInspector = {}
 
-WebInspector.extensionServer = {}
-WebInspector.extensionServer.notifyResourceContentCommitted = function(resource, content) {}
-WebInspector.extensionServer.notifyPanelShown = function(panel) {}
-WebInspector.extensionServer.notifyPanelHidden = function(panel) {}
-WebInspector.extensionServer.notifyObjectSelected = function(object) {}
-
 /**
  * @param {NetworkAgent.RequestId} requestId
  * @return {?WebInspector.Resource}
@@ -118,6 +112,8 @@ WebInspector.addMainEventListeners = function(doc) {}
 WebInspector.openResource = function(url, external) {}
 
 WebInspector.openRequestInNetworkPanel = function(request) {}
+
+WebInspector.populateResourceContextMenu = function(contextMenu, url, preferredLineNumber) {}
 
 WebInspector.evaluateInConsole = function(expression) {}
 
@@ -181,3 +177,12 @@ WebInspector.openAnchorLocationRegistry = null;
 WebInspector.showPanelForAnchorNavigation = function(panel)
 {
 }
+
+WebInspector.showPanel = function(panel)
+{
+}
+
+/**
+ * @type {string} 
+ */
+WebInspector.inspectedPageDomain;

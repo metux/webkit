@@ -33,6 +33,7 @@
 
 #if ENABLE(INSPECTOR)
 
+#include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
 #include "InspectorValues.h"
 #include "LayoutTypes.h"
@@ -52,7 +53,7 @@ class ResourceResponse;
 
 typedef String ErrorString;
 
-class InspectorTimelineAgent : ScriptGCEventListener {
+class InspectorTimelineAgent : public InspectorBaseAgent<InspectorTimelineAgent>, ScriptGCEventListener {
     WTF_MAKE_NONCOPYABLE(InspectorTimelineAgent);
 public:
     static PassOwnPtr<InspectorTimelineAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state)
@@ -62,13 +63,12 @@ public:
 
     ~InspectorTimelineAgent();
 
-    void setFrontend(InspectorFrontend*);
-    void clearFrontend();
-    void restore();
+    virtual void setFrontend(InspectorFrontend*);
+    virtual void clearFrontend();
+    virtual void restore();
 
     void start(ErrorString*, int* maxCallStackDepth);
     void stop(ErrorString*);
-    bool started() const;
 
     int id() const { return m_id; }
 
@@ -141,19 +141,17 @@ private:
         
     InspectorTimelineAgent(InstrumentingAgents*, InspectorState*);
 
-    void pushCurrentRecord(PassRefPtr<InspectorObject>, const String& type);
+    void pushCurrentRecord(PassRefPtr<InspectorObject>, const String& type, bool captureCallStack);
     void setHeapSizeStatistic(InspectorObject* record);
         
     void didCompleteCurrentRecord(const String& type);
-    void appendRecord(PassRefPtr<InspectorObject> data, const String& type);
+    void appendRecord(PassRefPtr<InspectorObject> data, const String& type, bool captureCallStack);
 
     void addRecordToTimeline(PassRefPtr<InspectorObject>, const String& type);
 
     void pushGCEventRecords();
     void clearRecordStack();
 
-    InstrumentingAgents* m_instrumentingAgents;
-    InspectorState* m_state;
     InspectorFrontend::Timeline* m_frontend;
 
     Vector<TimelineRecordEntry> m_recordStack;

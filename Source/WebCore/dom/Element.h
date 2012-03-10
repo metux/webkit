@@ -26,7 +26,6 @@
 #define Element_h
 
 #include "Document.h"
-#include "ExceptionCodePlaceholder.h"
 #include "FragmentScriptingPermission.h"
 #include "NamedNodeMap.h"
 #include "ScrollTypes.h"
@@ -365,6 +364,10 @@ public:
     
     PassRefPtr<RenderStyle> styleForRenderer();
 
+#if ENABLE(MUTATION_OBSERVERS)
+    void enqueueAttributesMutationRecordIfRequested(const QualifiedName&, const AtomicString& oldValue);
+#endif
+
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
         : ContainerNode(document, type)
@@ -396,6 +399,7 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
 
+    void setAttributeInternal(Attribute* old, const QualifiedName&, const AtomicString& value);
     virtual PassRefPtr<Attribute> createAttribute(const QualifiedName&, const AtomicString& value);
     
 #ifndef NDEBUG

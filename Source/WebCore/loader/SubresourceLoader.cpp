@@ -41,6 +41,7 @@
 #include "SecurityPolicy.h"
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
@@ -105,6 +106,14 @@ PassRefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedReso
     return subloader.release();
 }
 
+void SubresourceLoader::cancelIfNotFinishing()
+{
+    if (m_state != Initialized)
+        return;
+
+    ResourceLoader::cancel();
+}
+
 bool SubresourceLoader::init(const ResourceRequest& request)
 {
     if (!ResourceLoader::init(request))
@@ -148,8 +157,12 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         if (response.httpStatusCode() == 304) {
             // 304 Not modified / Use local copy
             // Existing resource is ok, just use it updating the expiration time.
+            m_state = Revalidating;
             memoryCache()->revalidationSucceeded(m_resource, response);
-            ResourceLoader::didReceiveResponse(response);
+            if (!reachedTerminalState()) {
+                ResourceLoader::didReceiveResponse(response);
+                didFinishLoading(currentTime());
+            }
             return;
         } 
         // Did not get 304 response, continue as a regular resource load.
@@ -232,7 +245,7 @@ void SubresourceLoader::didReceiveCachedMetadata(const char* data, int length)
 
 void SubresourceLoader::didFinishLoading(double finishTime)
 {
-    if (m_state != Initialized)
+    if (m_state != Initialized && m_state != Revalidating)
         return;
     ASSERT(!reachedTerminalState());
     ASSERT(!m_resource->resourceToRevalidate());
@@ -240,6 +253,7 @@ void SubresourceLoader::didFinishLoading(double finishTime)
     LOG(ResourceLoading, "Received '%s'.", m_resource->url().string().latin1().data());
 
     RefPtr<SubresourceLoader> protect(this);
+    CachedResourceHandle<CachedResource> protectResource(m_resource);
     m_state = Finishing;
     m_resource->setLoadFinishTime(finishTime);
     m_resource->data(resourceData(), true);
@@ -256,6 +270,7 @@ void SubresourceLoader::didFail(const ResourceError& error)
     LOG(ResourceLoading, "Failed to load '%s'.\n", m_resource->url().string().latin1().data());
 
     RefPtr<SubresourceLoader> protect(this);
+    CachedResourceHandle<CachedResource> protectResource(m_resource);
     m_state = Finishing;
     m_resource->error(CachedResource::LoadError);
     if (!m_resource->isPreloaded())

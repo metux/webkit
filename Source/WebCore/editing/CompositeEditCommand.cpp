@@ -70,6 +70,65 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
+PassRefPtr<EditCommandComposition> EditCommandComposition::create(Document* document,
+    const VisibleSelection& startingSelection, const VisibleSelection& endingSelection, bool wasCreateLinkCommand)
+{
+    return adoptRef(new EditCommandComposition(document, startingSelection, endingSelection, wasCreateLinkCommand));
+}
+
+EditCommandComposition::EditCommandComposition(Document* document, const VisibleSelection& startingSelection, const VisibleSelection& endingSelection, bool wasCreateLinkCommand)
+    : EditCommand(document, startingSelection, endingSelection)
+    , m_startingRootEditableElement(startingSelection.rootEditableElement())
+    , m_endingRootEditableElement(endingSelection.rootEditableElement())
+    , m_wasCreateLinkCommand(wasCreateLinkCommand)
+{
+}
+
+void EditCommandComposition::doApply()
+{
+    ASSERT_NOT_REACHED();
+}
+
+void EditCommandComposition::doUnapply()
+{
+    size_t size = m_commands.size();
+    for (size_t i = size; i != 0; --i)
+        m_commands[i - 1]->unapply();
+}
+
+void EditCommandComposition::doReapply()
+{
+    size_t size = m_commands.size();
+    for (size_t i = 0; i != size; ++i)
+        m_commands[i]->reapply();
+}
+
+void EditCommandComposition::append(SimpleEditCommand* command)
+{
+    m_commands.append(command);
+}
+
+void EditCommandComposition::setStartingSelection(const VisibleSelection& selection)
+{
+    EditCommand::setStartingSelection(selection);
+    m_startingRootEditableElement = selection.rootEditableElement();
+}
+
+void EditCommandComposition::setEndingSelection(const VisibleSelection& selection)
+{
+    EditCommand::setEndingSelection(selection);
+    m_endingRootEditableElement = selection.rootEditableElement();
+}
+
+#ifndef NDEBUG
+void EditCommandComposition::getNodesInCommand(HashSet<Node*>& nodes)
+{
+    size_t size = m_commands.size();
+    for (size_t i = 0; i < size; ++i)
+        m_commands[i]->getNodesInCommand(nodes);
+}
+#endif
+
 CompositeEditCommand::CompositeEditCommand(Document *document)
     : EditCommand(document)
 {
@@ -77,41 +136,82 @@ CompositeEditCommand::CompositeEditCommand(Document *document)
 
 CompositeEditCommand::~CompositeEditCommand()
 {
+    ASSERT(isTopLevelCommand() || !m_composition);
 }
 
 void CompositeEditCommand::doUnapply()
 {
-    size_t size = m_commands.size();
-    for (size_t i = size; i != 0; --i)
-        m_commands[i - 1]->unapply();
+    ASSERT_NOT_REACHED();
 }
 
 void CompositeEditCommand::doReapply()
 {
-    size_t size = m_commands.size();
-    for (size_t i = 0; i != size; ++i)
-        m_commands[i]->reapply();
+    ASSERT_NOT_REACHED();
+}
+
+EditCommandComposition* CompositeEditCommand::ensureComposition()
+{
+    CompositeEditCommand* command = this;
+    while (command && command->parent())
+        command = command->parent();
+    if (!command->m_composition)
+        command->m_composition = EditCommandComposition::create(document(), startingSelection(), endingSelection(), isCreateLinkCommand());
+    return command->m_composition.get();
+}
+
+bool CompositeEditCommand::isCreateLinkCommand() const
+{
+    return false;
+}
+
+bool CompositeEditCommand::preservesTypingStyle() const
+{
+    return false;
+}
+
+bool CompositeEditCommand::isTypingCommand() const
+{
+    return false;
+}
+
+bool CompositeEditCommand::shouldRetainAutocorrectionIndicator() const
+{
+    return false;
+}
+
+void CompositeEditCommand::setShouldRetainAutocorrectionIndicator(bool)
+{
 }
 
 //
 // sugary-sweet convenience functions to help create and apply edit commands in composite commands
 //
-void CompositeEditCommand::applyCommandToComposite(PassRefPtr<EditCommand> cmd)
+void CompositeEditCommand::applyCommandToComposite(PassRefPtr<EditCommand> prpCommand)
 {
-    cmd->setParent(this);
-    cmd->apply();
-    m_commands.append(cmd);
+    RefPtr<EditCommand> command = prpCommand;
+    command->setParent(this);
+    command->apply();
+    if (command->isSimpleEditCommand()) {
+        command->setParent(0);
+        ensureComposition()->append(toSimpleEditCommand(command.get()));
+    }
+    m_commands.append(command.release());
 }
 
-void CompositeEditCommand::applyCommandToComposite(PassRefPtr<CompositeEditCommand> command, const VisibleSelection& selection)
+void CompositeEditCommand::applyCommandToComposite(PassRefPtr<CompositeEditCommand> prpCommand, const VisibleSelection& selection)
 {
+    RefPtr<CompositeEditCommand> command = prpCommand;
     command->setParent(this);
     if (selection != command->endingSelection()) {
         command->setStartingSelection(selection);
         command->setEndingSelection(selection);
     }
     command->apply();
-    m_commands.append(command);
+    if (command->isSimpleEditCommand()) {
+        command->setParent(0);
+        ensureComposition()->append(toSimpleEditCommand(command.get()));
+    }
+    m_commands.append(command.release());
 }
 
 void CompositeEditCommand::applyStyle(const EditingStyle* style, EditAction editingAction)
@@ -142,6 +242,19 @@ void CompositeEditCommand::insertParagraphSeparator(bool useDefaultParagraphElem
 void CompositeEditCommand::insertLineBreak()
 {
     applyCommandToComposite(InsertLineBreakCommand::create(document()));
+}
+
+bool CompositeEditCommand::isRemovableBlock(const Node* node)
+{
+    Node* parentNode = node->parentNode();
+    if ((parentNode && parentNode->firstChild() != parentNode->lastChild()) || !node->hasTagName(divTag))
+        return false;
+
+    const NamedNodeMap* attributeMap = node->attributes();
+    if (!attributeMap || attributeMap->isEmpty())
+        return true;
+    
+    return false;
 }
 
 void CompositeEditCommand::insertNodeBefore(PassRefPtr<Node> insertChild, PassRefPtr<Node> refChild)
@@ -661,7 +774,7 @@ PassRefPtr<Node> CompositeEditCommand::addBlockPlaceholderIfNeeded(Element* cont
     if (!container)
         return 0;
 
-    updateLayout();
+    document()->updateLayoutIgnorePendingStylesheets();
 
     RenderObject* renderer = container->renderer();
     if (!renderer || !renderer->isBlockFlow())
@@ -706,7 +819,7 @@ PassRefPtr<Node> CompositeEditCommand::moveParagraphContentsToNewBlockIfNecessar
     if (pos.isNull())
         return 0;
     
-    updateLayout();
+    document()->updateLayoutIgnorePendingStylesheets();
     
     // It's strange that this function is responsible for verifying that pos has not been invalidated
     // by an earlier call to this function.  The caller, applyBlockStyle, should do this.
@@ -1016,7 +1129,7 @@ void CompositeEditCommand::moveParagraphs(const VisiblePosition& startOfParagrap
         // FIXME: Trim text between beforeParagraph and afterParagraph if they aren't equal.
         insertNodeAt(createBreakElement(document()), beforeParagraph.deepEquivalent());
         // Need an updateLayout here in case inserting the br has split a text node.
-        updateLayout();
+        document()->updateLayoutIgnorePendingStylesheets();
     }
 
     RefPtr<Range> startToDestinationRange(Range::create(document(), firstPositionInNode(document()->documentElement()), destination.deepEquivalent().parentAnchoredEquivalent()));

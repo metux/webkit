@@ -68,10 +68,9 @@ PassOwnPtr<InspectorProfilerAgent> InspectorProfilerAgent::create(InstrumentingA
 }
 
 InspectorProfilerAgent::InspectorProfilerAgent(InstrumentingAgents* instrumentingAgents, InspectorConsoleAgent* consoleAgent, Page* inspectedPage, InspectorState* inspectorState, InjectedScriptManager* injectedScriptManager)
-    : m_instrumentingAgents(instrumentingAgents)
+    : InspectorBaseAgent<InspectorProfilerAgent>("Profiler", instrumentingAgents, inspectorState)
     , m_consoleAgent(consoleAgent)
     , m_inspectedPage(inspectedPage)
-    , m_inspectorState(inspectorState)
     , m_injectedScriptManager(injectedScriptManager)
     , m_frontend(0)
     , m_enabled(false)
@@ -138,17 +137,33 @@ PassRefPtr<InspectorObject> InspectorProfilerAgent::createSnapshotHeader(const S
     return header;
 }
 
+
+void InspectorProfilerAgent::causesRecompilation(ErrorString*, bool* result)
+{
+    *result = ScriptProfiler::causesRecompilation();
+}
+
+void InspectorProfilerAgent::isSampling(ErrorString*, bool* result)
+{
+    *result = ScriptProfiler::isSampling();
+}
+
+void InspectorProfilerAgent::hasHeapProfiler(ErrorString*, bool* result)
+{
+    *result = ScriptProfiler::hasHeapProfiler();
+}
+
 void InspectorProfilerAgent::enable(ErrorString*)
 {
     if (enabled())
         return;
-    m_inspectorState->setBoolean(ProfilerAgentState::profilerEnabled, true);
+    m_state->setBoolean(ProfilerAgentState::profilerEnabled, true);
     enable(false);
 }
 
 void InspectorProfilerAgent::disable(ErrorString*)
 {
-    m_inspectorState->setBoolean(ProfilerAgentState::profilerEnabled, false);
+    m_state->setBoolean(ProfilerAgentState::profilerEnabled, false);
     disable();
 }
 
@@ -158,8 +173,6 @@ void InspectorProfilerAgent::disable()
         return;
     m_enabled = false;
     PageScriptDebugServer::shared().recompileAllJSFunctionsSoon();
-    if (m_frontend)
-        m_frontend->profilerWasDisabled();
 }
 
 void InspectorProfilerAgent::enable(bool skipRecompile)
@@ -169,8 +182,6 @@ void InspectorProfilerAgent::enable(bool skipRecompile)
     m_enabled = true;
     if (!skipRecompile)
         PageScriptDebugServer::shared().recompileAllJSFunctionsSoon();
-    if (m_frontend)
-        m_frontend->profilerWasEnabled();
 }
 
 String InspectorProfilerAgent::getCurrentUserInitiatedProfileName(bool incrementProfileNumber)
@@ -242,7 +253,7 @@ void InspectorProfilerAgent::removeProfile(ErrorString*, const String& type, uns
 
 void InspectorProfilerAgent::resetState()
 {
-    stopUserInitiatedProfiling();
+    stop();
     m_profiles.clear();
     m_snapshots.clear();
     m_currentUserInitiatedProfileNumber = 1;
@@ -262,35 +273,34 @@ void InspectorProfilerAgent::resetFrontendProfiles()
 void InspectorProfilerAgent::setFrontend(InspectorFrontend* frontend)
 {
     m_frontend = frontend->profiler();
-    restoreEnablement();
 }
 
 void InspectorProfilerAgent::clearFrontend()
 {
     m_frontend = 0;
-    stopUserInitiatedProfiling();
+    stop();
 }
 
 void InspectorProfilerAgent::restore()
 {
-    // Need to restore enablement state here as in setFrontend m_inspectorState wasn't loaded yet.
+    // Need to restore enablement state here as in setFrontend m_state wasn't loaded yet.
     restoreEnablement();
 
     // Revisit this.
     resetFrontendProfiles();
-    if (m_inspectorState->getBoolean(ProfilerAgentState::userInitiatedProfiling))
-        startUserInitiatedProfiling();
+    if (m_state->getBoolean(ProfilerAgentState::userInitiatedProfiling))
+        start();
 }
 
 void InspectorProfilerAgent::restoreEnablement()
 {
-    if (m_inspectorState->getBoolean(ProfilerAgentState::profilerEnabled)) {
+    if (m_state->getBoolean(ProfilerAgentState::profilerEnabled)) {
         ErrorString error;
         enable(&error);
     }
 }
 
-void InspectorProfilerAgent::startUserInitiatedProfiling()
+void InspectorProfilerAgent::start(ErrorString*)
 {
     if (m_recordingUserInitiatedProfile)
         return;
@@ -308,10 +318,10 @@ void InspectorProfilerAgent::startUserInitiatedProfiling()
     ScriptProfiler::start(scriptState, title);
     addStartProfilingMessageToConsole(title, 0, String());
     toggleRecordButton(true);
-    m_inspectorState->setBoolean(ProfilerAgentState::userInitiatedProfiling, true);
+    m_state->setBoolean(ProfilerAgentState::userInitiatedProfiling, true);
 }
 
-void InspectorProfilerAgent::stopUserInitiatedProfiling(bool ignoreProfile)
+void InspectorProfilerAgent::stop(ErrorString*)
 {
     if (!m_recordingUserInitiatedProfile)
         return;
@@ -325,14 +335,10 @@ void InspectorProfilerAgent::stopUserInitiatedProfiling(bool ignoreProfile)
     ScriptState* scriptState = 0;
 #endif
     RefPtr<ScriptProfile> profile = ScriptProfiler::stop(scriptState, title);
-    if (profile) {
-        if (!ignoreProfile)
-            addProfile(profile, 0, String());
-        else
-            addProfileFinishedMessageToConsole(profile, 0, String());
-    }
+    if (profile)
+        addProfile(profile, 0, String());
     toggleRecordButton(false);
-    m_inspectorState->setBoolean(ProfilerAgentState::userInitiatedProfiling, false);
+    m_state->setBoolean(ProfilerAgentState::userInitiatedProfiling, false);
 }
 
 namespace {

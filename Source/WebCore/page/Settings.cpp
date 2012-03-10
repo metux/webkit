@@ -153,6 +153,7 @@ Settings::Settings(Page* page)
     , m_isDOMPasteAllowed(false)
     , m_shrinksStandaloneImagesToFit(true)
     , m_usesPageCache(false)
+    , m_pageCacheSupportsPlugins(false)
     , m_showsURLsInToolTips(false)
     , m_showsToolTipOverTruncatedText(false)
     , m_forceFTPDirectoryListings(false)
@@ -170,6 +171,7 @@ Settings::Settings(Page* page)
     , m_allowScriptsToCloseWindows(false)
     , m_canvasUsesAcceleratedDrawing(false)
     , m_acceleratedDrawingEnabled(false)
+    , m_acceleratedFiltersEnabled(false)
     // FIXME: This should really be disabled by default as it makes platforms that don't support the feature download files
     // they can't use by. Leaving enabled for now to not change existing behavior.
     , m_downloadableBinaryFontsEnabled(true)
@@ -221,14 +223,20 @@ Settings::Settings(Page* page)
 #endif
     , m_mediaPlaybackRequiresUserGesture(false)
     , m_mediaPlaybackAllowsInline(true)
-#if OS(SYMBIAN)
-    , m_passwordEchoEnabled(true)
-#else
     , m_passwordEchoEnabled(false)
-#endif
     , m_suppressIncrementalRendering(false)
     , m_backspaceKeyNavigationEnabled(true)
     , m_visualWordMovementEnabled(false)
+#if ENABLE(VIDEO_TRACK)
+    , m_shouldDisplaySubtitles(false)
+    , m_shouldDisplayCaptions(false)
+    , m_shouldDisplayTextDescriptions(false)
+#endif
+    , m_perTileDrawingEnabled(false)
+    , m_partialSwapEnabled(false)
+#if ENABLE(THREADED_SCROLLING)
+    , m_scrollingCoordinatorEnabled(false)
+#endif
     , m_loadsImagesAutomaticallyTimer(this, &Settings::loadsImagesAutomaticallyTimerFired)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString 

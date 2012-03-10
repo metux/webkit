@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
  * Copyright (C) 2007-2009 Torch Mobile, Inc.
- * Copyright (C) Research In Motion Limited 2010. All rights reserved.
+ * Copyright (C) 2010, 2011 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -409,6 +409,7 @@
 /* PLATFORM(QT) */
 /* PLATFORM(WX) */
 /* PLATFORM(GTK) */
+/* PLATFORM(BLACKBERRY) */
 /* PLATFORM(MAC) */
 /* PLATFORM(WIN) */
 #if defined(BUILDING_CHROMIUM__)
@@ -419,6 +420,8 @@
 #define WTF_PLATFORM_WX 1
 #elif defined(BUILDING_GTK__)
 #define WTF_PLATFORM_GTK 1
+#elif defined(BUILDING_BLACKBERRY__)
+#define WTF_PLATFORM_BLACKBERRY 1
 #elif OS(DARWIN)
 #define WTF_PLATFORM_MAC 1
 #elif OS(WINDOWS)
@@ -470,6 +473,13 @@
 #endif
 #endif
 
+#if PLATFORM(BLACKBERRY)
+#define ENABLE_DRAG_SUPPORT 0
+#define USE_SYSTEM_MALLOC 1
+#define WTF_USE_MERSENNE_TWISTER_19937 1
+#define WTF_USE_SKIA 1
+#endif
+
 #if PLATFORM(GTK)
 #define WTF_USE_CAIRO 1
 #endif
@@ -478,10 +488,6 @@
 #if OS(WINCE)
 #include <ce_time.h>
 #define WTF_USE_MERSENNE_TWISTER_19937 1
-#endif
-
-#if PLATFORM(QT) && OS(UNIX) && !OS(DARWIN)
-#define WTF_USE_PTHREAD_BASED_QT 1
 #endif
 
 /* On Windows, use QueryPerformanceCounter by default */
@@ -553,6 +559,7 @@
 
 #if PLATFORM(QT) && OS(DARWIN)
 #define WTF_USE_CF 1
+#define HAVE_DISPATCH_H 1
 #endif
 
 #if OS(DARWIN) && !PLATFORM(GTK) && !PLATFORM(QT)
@@ -583,12 +590,10 @@
 #if PLATFORM(IOS_SIMULATOR)
     #define ENABLE_INTERPRETER 1
     #define ENABLE_JIT 0
-    #define ENABLE_YARR 0
     #define ENABLE_YARR_JIT 0
 #else
     #define ENABLE_INTERPRETER 1
     #define ENABLE_JIT 1
-    #define ENABLE_YARR 1
     #define ENABLE_YARR_JIT 1
 #endif
 
@@ -634,6 +639,9 @@
 #define WTF_USE_PTHREADS 1
 #define HAVE_PTHREAD_RWLOCK 1
 #endif
+#elif PLATFORM(QT) && OS(UNIX)
+#define WTF_USE_PTHREADS 1
+#define HAVE_PTHREAD_RWLOCK 1
 #endif
 
 #if !defined(HAVE_ACCESSIBILITY)
@@ -847,6 +855,10 @@
 #define ENABLE_GESTURE_RECOGNIZER 0
 #endif
 
+#if !defined(ENABLE_VIEWPORT)
+#define ENABLE_VIEWPORT 0
+#endif
+
 #if !defined(ENABLE_NOTIFICATIONS)
 #define ENABLE_NOTIFICATIONS 0
 #endif
@@ -1005,14 +1017,6 @@
 #endif
 #endif
 
-#ifndef ENABLE_LARGE_HEAP
-#if CPU(X86) || CPU(X86_64)
-#define ENABLE_LARGE_HEAP 1
-#else
-#define ENABLE_LARGE_HEAP 0
-#endif
-#endif
-
 #if !defined(ENABLE_PAN_SCROLLING) && OS(WINDOWS)
 #define ENABLE_PAN_SCROLLING 1
 #endif
@@ -1058,6 +1062,10 @@
 #define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH 1
 #endif
 
+#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION)
+#define ENABLE_THREADED_SCROLLING 1
+#endif
+
 /* Set up a define for a common error that is intended to cause a build error -- thus the space after Error. */
 #define WTF_PLATFORM_CFNETWORK Error USE_macro_should_be_used_with_CFNETWORK
 
@@ -1081,12 +1089,12 @@
 #define ENABLE_BRANCH_COMPACTION 1
 #endif
 
-#if !defined(ENABLE_THREADING_OPENMP) && defined(_OPENMP)
+#if !defined(ENABLE_THREADING_LIBDISPATCH) && HAVE(DISPATCH_H)
+#define ENABLE_THREADING_LIBDISPATCH 1
+#elif !defined(ENABLE_THREADING_OPENMP) && defined(_OPENMP)
 #define ENABLE_THREADING_OPENMP 1
-#endif
-
-#if !defined(ENABLE_PARALLEL_JOBS) && (ENABLE(THREADING_GENERIC) || ENABLE(THREADING_LIBDISPATCH) || ENABLE(THREADING_OPENMP))
-#define ENABLE_PARALLEL_JOBS 1
+#elif !defined(THREADING_GENERIC)
+#define ENABLE_THREADING_GENERIC 1
 #endif
 
 #if ENABLE(GLIB_SUPPORT)
@@ -1099,15 +1107,15 @@
    breakages one port at a time. */
 #define WTF_USE_EXPORT_MACROS 0
 
-#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
+#if (PLATFORM(QT) && !OS(DARWIN)) || PLATFORM(GTK) || PLATFORM(EFL)
 #define WTF_USE_UNIX_DOMAIN_SOCKETS 1
 #endif
 
-#if !defined(ENABLE_COMPARE_AND_SWAP) && COMPILER(GCC) && (CPU(X86) || CPU(X86_64))
+#if !defined(ENABLE_COMPARE_AND_SWAP) && COMPILER(GCC) && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2))
 #define ENABLE_COMPARE_AND_SWAP 1
 #endif
 
-#if !defined(ENABLE_PARALLEL_GC) && PLATFORM(MAC) && ENABLE(COMPARE_AND_SWAP)
+#if !defined(ENABLE_PARALLEL_GC) && (PLATFORM(MAC) || PLATFORM(IOS)) && ENABLE(COMPARE_AND_SWAP)
 #define ENABLE_PARALLEL_GC 1
 #endif
 
@@ -1121,7 +1129,7 @@
 #define WTF_USE_AVFOUNDATION 1
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || (PLATFORM(WIN) && !OS(WINCE) && !PLATFORM(WIN_CAIRO))
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || (PLATFORM(WIN) && !OS(WINCE) && !PLATFORM(WIN_CAIRO)) || PLATFORM(QT)
 #define WTF_USE_REQUEST_ANIMATION_FRAME_TIMER 1
 #endif
 
@@ -1136,5 +1144,19 @@
 #if PLATFORM(MAC)
 #define WTF_USE_COREAUDIO 1
 #endif
+
+#if PLATFORM(CHROMIUM)
+#if !defined(WTF_USE_V8)
+#define WTF_USE_V8 1
+#endif
+#endif /* PLATFORM(CHROMIUM) */
+
+#if !defined(WTF_USE_V8)
+#define WTF_USE_V8 0
+#endif /* !defined(WTF_USE_V8) */
+
+/* Using V8 implies not using JSC and vice versa */
+#define WTF_USE_JSC !WTF_USE_V8
+
 
 #endif /* WTF_Platform_h */

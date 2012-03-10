@@ -25,7 +25,7 @@
 #include "StyledElement.h"
 
 #include "Attribute.h"
-#include "CSSMutableStyleDeclaration.h"
+#include "CSSInlineStyleDeclaration.h"
 #include "CSSStyleSelector.h"
 #include "CSSStyleSheet.h"
 #include "CSSValueKeywords.h"
@@ -129,19 +129,18 @@ PassRefPtr<Attribute> StyledElement::createAttribute(const QualifiedName& name, 
 
 void StyledElement::createInlineStyleDecl()
 {
-    m_inlineStyleDecl = CSSMutableStyleDeclaration::create();
-    m_inlineStyleDecl->setParentStyleSheet(document()->elementSheet());
-    m_inlineStyleDecl->setNode(this);
+    ASSERT(!m_inlineStyleDecl);
+    m_inlineStyleDecl = CSSInlineStyleDeclaration::create();
+    m_inlineStyleDecl->setElement(this);
     m_inlineStyleDecl->setStrictParsing(isHTMLElement() && !document()->inQuirksMode());
 }
 
 void StyledElement::destroyInlineStyleDecl()
 {
-    if (m_inlineStyleDecl) {
-        m_inlineStyleDecl->setNode(0);
-        m_inlineStyleDecl->setParentStyleSheet(0);
-        m_inlineStyleDecl = 0;
-    }
+    if (!m_inlineStyleDecl)
+        return;
+    m_inlineStyleDecl->setElement(0);
+    m_inlineStyleDecl = 0;
 }
 
 void StyledElement::attributeChanged(Attribute* attr, bool preserveDecls)
@@ -195,8 +194,7 @@ void StyledElement::attributeChanged(Attribute* attr, bool preserveDecls)
         // Add the decl to the table in the appropriate spot.
         setMappedAttributeDecl(entry, attr, attr->decl());
         attr->decl()->setMappedState(entry, attr->name(), attr->value());
-        attr->decl()->setParentStyleSheet(0);
-        attr->decl()->setNode(0);
+        attr->decl()->setElement(0);
         if (attributeMap())
             attributeMap()->declAdded();
     }
@@ -230,6 +228,7 @@ void StyledElement::classAttributeChanged(const AtomicString& newClassString)
     } else if (attributeMap())
         attributeMap()->clearClass();
     setNeedsStyleRecalc();
+    invalidateNodeListsCacheAfterAttributeChanged();
     dispatchSubtreeModifiedEvent();
 }
 
@@ -243,13 +242,13 @@ void StyledElement::parseMappedAttribute(Attribute* attr)
         if (attr->isNull())
             destroyInlineStyleDecl();
         else if (document()->contentSecurityPolicy()->allowInlineStyle())
-            getInlineStyleDecl()->parseDeclaration(attr->value());
+            ensureInlineStyleDecl()->parseDeclaration(attr->value());
         setIsStyleAttributeValid();
         setNeedsStyleRecalc();
     }
 }
 
-CSSMutableStyleDeclaration* StyledElement::getInlineStyleDecl()
+CSSInlineStyleDeclaration* StyledElement::ensureInlineStyleDecl()
 {
     if (!m_inlineStyleDecl)
         createInlineStyleDecl();
@@ -258,7 +257,7 @@ CSSMutableStyleDeclaration* StyledElement::getInlineStyleDecl()
 
 CSSStyleDeclaration* StyledElement::style()
 {
-    return getInlineStyleDecl();
+    return ensureInlineStyleDecl();
 }
 
 void StyledElement::addCSSProperty(Attribute* attribute, int id, const String &value)
@@ -373,41 +372,35 @@ static String parseColorStringWithCrazyLegacyRules(const String& colorString)
 // Color parsing that matches HTML's "rules for parsing a legacy color value"
 void StyledElement::addCSSColor(Attribute* attribute, int id, const String& attributeValue)
 {
-    // The empty string doesn't apply a color. (Just whitespace does, which is why this check occurs before trimming.)
-    if (!attributeValue.length())
+    // An empty string doesn't apply a color. (One containing only whitespace does, which is why this check occurs before stripping.)
+    if (attributeValue.isEmpty())
         return;
-    
-    String color = attributeValue.stripWhiteSpace();
+
+    String colorString = attributeValue.stripWhiteSpace();
 
     // "transparent" doesn't apply a color either.
-    if (equalIgnoringCase(color, "transparent"))
+    if (equalIgnoringCase(colorString, "transparent"))
         return;
 
     if (!attribute->decl())
         createMappedDecl(attribute);
 
-    // If the string is a named CSS color, use that color.
-    Color foundColor;
-    foundColor.setNamedColor(color);
-    if (foundColor.isValid()) {
-        attribute->decl()->setProperty(id, color, false);
+    // If the string is a named CSS color or a 3/6-digit hex color, use that.
+    Color parsedColor(colorString);
+    if (parsedColor.isValid()) {
+        attribute->decl()->setProperty(id, colorString, false);
         return;
     }
 
-    // If the string is a 3 or 6-digit hex color, use that color.
-    if (color[0] == '#' && (color.length() == 4 || color.length() == 7) && attribute->decl()->setProperty(id, color, false))
-        return;
-
-    attribute->decl()->setProperty(id, parseColorStringWithCrazyLegacyRules(color), false);
+    attribute->decl()->setProperty(id, parseColorStringWithCrazyLegacyRules(colorString), false);
 }
 
 void StyledElement::createMappedDecl(Attribute* attr)
 {
     RefPtr<CSSMappedAttributeDeclaration> decl = CSSMappedAttributeDeclaration::create();
     attr->setDecl(decl);
-    decl->setParentStyleSheet(document()->elementSheet());
-    decl->setNode(this);
-    decl->setStrictParsing(false); // Mapped attributes are just always quirky.
+    decl->setElement(this);
+    ASSERT(!decl->useStrictParsing());
 }
 
 unsigned MappedAttributeHash::hash(const MappedAttributeKey& key)
@@ -431,13 +424,19 @@ unsigned MappedAttributeHash::hash(const MappedAttributeKey& key)
     return hasher.hash();
 }
 
-void StyledElement::copyNonAttributeProperties(const Element *sourceElement)
+void StyledElement::copyNonAttributeProperties(const Element* sourceElement)
 {
+    ASSERT(sourceElement);
+    ASSERT(sourceElement->isStyledElement());
+
     const StyledElement* source = static_cast<const StyledElement*>(sourceElement);
-    if (!source->m_inlineStyleDecl)
+    if (!source->inlineStyleDecl())
         return;
 
-    *getInlineStyleDecl() = *source->m_inlineStyleDecl;
+    CSSInlineStyleDeclaration* inlineStyle = ensureInlineStyleDecl();
+    inlineStyle->copyPropertiesFrom(*source->inlineStyleDecl());
+    inlineStyle->setStrictParsing(source->inlineStyleDecl()->useStrictParsing());
+
     setIsStyleAttributeValid(source->isStyleAttributeValid());
     setIsSynchronizingStyleAttribute(source->isSynchronizingStyleAttribute());
     
@@ -446,17 +445,9 @@ void StyledElement::copyNonAttributeProperties(const Element *sourceElement)
 
 void StyledElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
 {
-    if (CSSMutableStyleDeclaration* style = inlineStyleDecl())
-        style->addSubresourceStyleURLs(urls);
-}
-
-
-void StyledElement::didMoveToNewOwnerDocument()
-{
-    if (m_inlineStyleDecl)
-        m_inlineStyleDecl->setParentStyleSheet(document()->elementSheet());
-
-    Element::didMoveToNewOwnerDocument();
+    if (!m_inlineStyleDecl)
+        return;
+    m_inlineStyleDecl->addSubresourceStyleURLs(urls);
 }
 
 }

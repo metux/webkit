@@ -25,17 +25,17 @@
 #ifndef CSSMappedAttributeDeclaration_h
 #define CSSMappedAttributeDeclaration_h
 
-#include "CSSMutableStyleDeclaration.h"
+#include "CSSElementStyleDeclaration.h"
 #include "MappedAttributeEntry.h"
 #include "QualifiedName.h"
 
 namespace WebCore {
 
-class CSSMappedAttributeDeclaration : public CSSMutableStyleDeclaration {
+class CSSMappedAttributeDeclaration : public CSSElementStyleDeclaration {
 public:
     static PassRefPtr<CSSMappedAttributeDeclaration> create()
     {
-        return adoptRef(new CSSMappedAttributeDeclaration(0));
+        return adoptRef(new CSSMappedAttributeDeclaration);
     }
 
     virtual ~CSSMappedAttributeDeclaration();
@@ -48,13 +48,13 @@ public:
     }
 
 private:
-    CSSMappedAttributeDeclaration(CSSRule* parentRule)
-        : CSSMutableStyleDeclaration(parentRule)
+    CSSMappedAttributeDeclaration()
+        : CSSElementStyleDeclaration(/* isInline */ false)
         , m_entryType(eNone)
         , m_attrName(anyQName())
     {
     }
-    
+
     MappedAttributeEntry m_entryType;
     QualifiedName m_attrName;
     AtomicString m_attrValue;

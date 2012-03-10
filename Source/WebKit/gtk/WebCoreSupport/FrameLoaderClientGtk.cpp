@@ -26,8 +26,6 @@
 #include "config.h"
 #include "FrameLoaderClientGtk.h"
 
-#include "AXObjectCache.h"
-#include "AccessibilityObject.h"
 #include "ArchiveResource.h"
 #include "CachedFrame.h"
 #include "Color.h"
@@ -124,51 +122,6 @@ String FrameLoaderClient::userAgent(const KURL& url)
     return String::fromUTF8(userAgentString.get());
 }
 
-static void notifyAccessibilityStatus(WebKitWebFrame* frame, WebKitLoadStatus loadStatus)
-{
-    if (loadStatus != WEBKIT_LOAD_PROVISIONAL
-        && loadStatus != WEBKIT_LOAD_FAILED
-        && loadStatus != WEBKIT_LOAD_FINISHED)
-        return;
-
-    WebKitWebFramePrivate* priv = frame->priv;
-    if (!priv->coreFrame || !priv->coreFrame->document())
-        return;
-
-    RenderView* contentRenderer = priv->coreFrame->contentRenderer();
-    if (!contentRenderer)
-        return;
-
-    AXObjectCache* axObjectCache = priv->coreFrame->document()->axObjectCache();
-    if (!axObjectCache)
-        return;
-
-    AccessibilityObject* coreAxObject = axObjectCache->getOrCreate(contentRenderer);
-    if (!coreAxObject)
-        return;
-
-    AtkObject* axObject = coreAxObject->wrapper();
-    if (!axObject || !ATK_IS_DOCUMENT(axObject))
-        return;
-
-    switch (loadStatus) {
-    case WEBKIT_LOAD_PROVISIONAL:
-        g_signal_emit_by_name(axObject, "state-change", "busy", true);
-        if (core(frame)->loader()->loadType() == FrameLoadTypeReload)
-            g_signal_emit_by_name(axObject, "reload");
-        break;
-    case WEBKIT_LOAD_FAILED:
-        g_signal_emit_by_name(axObject, "load-stopped");
-        g_signal_emit_by_name(axObject, "state-change", "busy", false);
-        break;
-    case WEBKIT_LOAD_FINISHED:
-        g_signal_emit_by_name(axObject, "load-complete");
-        g_signal_emit_by_name(axObject, "state-change", "busy", false);
-    default:
-        break;
-    }
-}
-
 static void notifyStatus(WebKitWebFrame* frame, WebKitLoadStatus loadStatus)
 {
     frame->priv->loadStatus = loadStatus;
@@ -178,9 +131,6 @@ static void notifyStatus(WebKitWebFrame* frame, WebKitLoadStatus loadStatus)
     if (frame == webkit_web_view_get_main_frame(webView)) {
         webView->priv->loadStatus = loadStatus;
         g_object_notify(G_OBJECT(webView), "load-status");
-
-        if (AXObjectCache::accessibilityEnabled())
-            notifyAccessibilityStatus(frame, loadStatus);
     }
 }
 
@@ -792,19 +742,41 @@ void FrameLoaderClient::dispatchDidChangeLocationWithinPage()
         g_object_notify(G_OBJECT(webView), "uri");
 }
 
+void FrameLoaderClient::dispatchDidNavigateWithinPage()
+{
+    WebKitWebView* webView = getViewFromFrame(m_frame);
+    WebKitWebFrame* mainFrame = webView->priv->mainFrame;
+    WebKitWebDataSource* dataSource = webkit_web_frame_get_data_source(mainFrame);
+    bool loaderCompleted = !webkit_web_data_source_is_loading(dataSource);
+
+    if (!loaderCompleted)
+        return;
+
+    // No provisional load started, because:
+    // - It will break (no provisional data source at this point).
+    // - There's no provisional load going on anyway, the URI is being
+    //   programatically changed.
+    // FIXME: this is not ideal, but it seems safer than changing our
+    // current contract with the clients about provisional data
+    // sources not being '0' during the provisional load stage.
+    dispatchDidCommitLoad();
+    dispatchDidFinishLoad();
+}
+
 void FrameLoaderClient::dispatchDidPushStateWithinPage()
 {
-    notImplemented();
+    dispatchDidNavigateWithinPage();
 }
 
 void FrameLoaderClient::dispatchDidReplaceStateWithinPage()
 {
-    notImplemented();
+    dispatchDidNavigateWithinPage();
 }
 
 void FrameLoaderClient::dispatchDidPopStateWithinPage()
 {
-    notImplemented();
+    // No need to do anything, we already called
+    // dispatchDidNavigateWithinPage() in PushStateWithinPage().
 }
 
 void FrameLoaderClient::dispatchWillClose()
@@ -1128,7 +1100,7 @@ void FrameLoaderClient::dispatchDidFailLoad(const ResourceError& error)
     g_error_free(webError);
 }
 
-void FrameLoaderClient::download(ResourceHandle* handle, const ResourceRequest& request, const ResourceRequest&, const ResourceResponse& response)
+void FrameLoaderClient::download(ResourceHandle* handle, const ResourceRequest& request, const ResourceResponse& response)
 {
     GRefPtr<WebKitNetworkRequest> networkRequest(adoptGRef(kitNew(request)));
     WebKitWebView* view = getViewFromFrame(m_frame);

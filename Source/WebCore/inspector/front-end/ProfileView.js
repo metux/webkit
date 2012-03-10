@@ -42,7 +42,7 @@ WebInspector.CPUProfileView = function(profile)
                     "calls": { title: WebInspector.UIString("Calls"), width: "54px", sortable: true },
                     "function": { title: WebInspector.UIString("Function"), disclosure: true, sortable: true } };
 
-    if (Preferences.samplingCPUProfiler) {
+    if (Capabilities.samplingCPUProfiler) {
         delete columns.average;
         delete columns.calls;
     }
@@ -85,6 +85,11 @@ WebInspector.CPUProfileView = function(profile)
     {
         if (error)
             return;
+
+        if (!profile.head) {
+            // Profiling was tentatively terminated with the "Clear all profiles." button.
+            return;
+        }
         this.profile.head = profile.head;
         this._assignParentsInProfile();
         this._changeView();
@@ -566,6 +571,7 @@ WebInspector.CPUProfileType = function()
 {
     WebInspector.ProfileType.call(this, WebInspector.CPUProfileType.TypeId, WebInspector.UIString("CPU PROFILES"));
     this._recording = false;
+    WebInspector.CPUProfileType.instance = this;
 }
 
 WebInspector.CPUProfileType.TypeId = "CPU";
@@ -573,27 +579,45 @@ WebInspector.CPUProfileType.TypeId = "CPU";
 WebInspector.CPUProfileType.prototype = {
     get buttonTooltip()
     {
-        return this._recording ? WebInspector.UIString("Stop profiling.") : WebInspector.UIString("Start profiling.");
+        return this._recording ? WebInspector.UIString("Stop CPU profiling.") : WebInspector.UIString("Start CPU profiling.");
     },
 
     get buttonStyle()
     {
-        return this._recording ? "record-profile-status-bar-item status-bar-item toggled-on" : "record-profile-status-bar-item status-bar-item";
+        return this._recording ? "record-cpu-profile-status-bar-item status-bar-item toggled-on" : "record-cpu-profile-status-bar-item status-bar-item";
     },
 
     buttonClicked: function()
     {
-        this._recording = !this._recording;
-
-        if (this._recording)
-            ProfilerAgent.start();
-        else
-            ProfilerAgent.stop();
+        if (this._recording) {
+            this.stopRecordingProfile();
+            WebInspector.networkManager.enableResourceTracking();
+        } else {
+            WebInspector.networkManager.disableResourceTracking();
+            this.startRecordingProfile();
+        }
     },
 
     get welcomeMessage()
     {
         return WebInspector.UIString("Control CPU profiling by pressing the %s button on the status bar.");
+    },
+
+    isRecordingProfile: function()
+    {
+        return this._recording;
+    },
+
+    startRecordingProfile: function()
+    {
+        this._recording = true;
+        ProfilerAgent.start();
+    },
+
+    stopRecordingProfile: function()
+    {
+        this._recording = false;
+        ProfilerAgent.stop();
     },
 
     setRecordingProfile: function(isProfiling)

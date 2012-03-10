@@ -141,7 +141,7 @@ static int cssyylex(YYSTYPE* yylval, void* parser)
 %token WEBKIT_VALUE_SYM
 %token WEBKIT_MEDIAQUERY_SYM
 %token WEBKIT_SELECTOR_SYM
-%token WEBKIT_REGION_STYLE_RULE_SYM
+%token WEBKIT_REGION_RULE_SYM
 %token <marginBox> TOPLEFTCORNER_SYM
 %token <marginBox> TOPLEFT_SYM
 %token <marginBox> TOPCENTER_SYM
@@ -797,9 +797,9 @@ region_selector:
 ;
 
 region:
-    WEBKIT_REGION_STYLE_RULE_SYM WHITESPACE region_selector '{' maybe_space block_rule_list save_block {
+    WEBKIT_REGION_RULE_SYM WHITESPACE region_selector '{' maybe_space block_rule_list save_block {
         if ($3)
-            $$ = static_cast<CSSParser*>(parser)->createRegionStylingRule($3, $6);
+            $$ = static_cast<CSSParser*>(parser)->createRegionRule($3, $6);
         else
             $$ = 0;
     }
@@ -1476,6 +1476,15 @@ unary_term:
 
 function:
     FUNCTION maybe_space expr ')' maybe_space {
+        CSSParser* p = static_cast<CSSParser*>(parser);
+        CSSParserFunction* f = p->createFloatingFunction();
+        f->name = $1;
+        f->args = adoptPtr(p->sinkFloatingValueList($3));
+        $$.id = 0;
+        $$.unit = CSSParserValue::Function;
+        $$.function = f;
+    } |
+    FUNCTION maybe_space expr TOKEN_EOF {
         CSSParser* p = static_cast<CSSParser*>(parser);
         CSSParserFunction* f = p->createFloatingFunction();
         f->name = $1;

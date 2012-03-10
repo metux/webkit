@@ -37,11 +37,49 @@ class HTMLElement;
 class StyledElement;
 class Text;
 
+class EditCommandComposition : public EditCommand {
+public:
+    static PassRefPtr<EditCommandComposition> create(Document*, const VisibleSelection&, const VisibleSelection&, bool wasCreateLinkCommand);
+
+    virtual void doApply() OVERRIDE;
+    virtual void doUnapply() OVERRIDE;
+    virtual void doReapply() OVERRIDE;
+    void append(SimpleEditCommand*);
+    bool wasCreateLinkCommand() const { return m_wasCreateLinkCommand; }
+
+    Element* startingRootEditableElement() const { return m_startingRootEditableElement.get(); }
+    Element* endingRootEditableElement() const { return m_endingRootEditableElement.get(); }
+
+#ifndef NDEBUG
+    virtual void getNodesInCommand(HashSet<Node*>&);
+#endif
+
+private:
+    EditCommandComposition(Document*, const VisibleSelection& startingSelection, const VisibleSelection& endingSelection, bool wasCreateLinkCommand);
+    virtual bool isEditCommandComposition() const OVERRIDE { return true; }
+    virtual void setStartingSelection(const VisibleSelection&) OVERRIDE;
+    virtual void setEndingSelection(const VisibleSelection&) OVERRIDE;
+
+    Vector<RefPtr<SimpleEditCommand> > m_commands;
+    RefPtr<Element> m_startingRootEditableElement;
+    RefPtr<Element> m_endingRootEditableElement;
+    bool m_wasCreateLinkCommand;
+};
+
 class CompositeEditCommand : public EditCommand {
 public:
     virtual ~CompositeEditCommand();
 
     bool isFirstCommand(EditCommand* command) { return !m_commands.isEmpty() && m_commands.first() == command; }
+    EditCommandComposition* composition() { return m_composition.get(); }
+    EditCommandComposition* ensureComposition();
+
+    virtual bool isCreateLinkCommand() const;
+    virtual bool isTypingCommand() const;
+    virtual bool preservesTypingStyle() const;
+    virtual bool shouldRetainAutocorrectionIndicator() const;
+    virtual void setShouldRetainAutocorrectionIndicator(bool);
+    virtual bool shouldStopCaretBlinking() const { return false; }
 
 protected:
     explicit CompositeEditCommand(Document*);
@@ -59,6 +97,7 @@ protected:
     void deleteSelection(bool smartDelete = false, bool mergeBlocksAfterDelete = true, bool replace = false, bool expandForSpecialElements = true);
     void deleteSelection(const VisibleSelection&, bool smartDelete = false, bool mergeBlocksAfterDelete = true, bool replace = false, bool expandForSpecialElements = true);
     virtual void deleteTextFromNode(PassRefPtr<Text>, unsigned offset, unsigned count);
+    bool isRemovableBlock(const Node*);
     void insertNodeAfter(PassRefPtr<Node>, PassRefPtr<Node> refChild);
     void insertNodeAt(PassRefPtr<Node>, const Position&);
     void insertNodeAtTabSpanPosition(PassRefPtr<Node>, const Position&);
@@ -124,7 +163,25 @@ protected:
 private:
     virtual void doUnapply();
     virtual void doReapply();
+
+    bool isCompositeEditCommand() const OVERRIDE { return true; }
+
+    RefPtr<EditCommandComposition> m_composition;
 };
+
+inline EditCommandComposition* toEditCommandComposition(EditCommand* command)
+{
+    ASSERT(command);
+    ASSERT(command->isEditCommandComposition());
+    return static_cast<EditCommandComposition*>(command);
+}
+
+inline CompositeEditCommand* toCompositeEditCommand(EditCommand* command)
+{
+    ASSERT(command);
+    ASSERT(command->isCompositeEditCommand());
+    return static_cast<CompositeEditCommand*>(command);
+}
 
 } // namespace WebCore
 

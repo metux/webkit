@@ -51,9 +51,6 @@ namespace WebCore {
     class Page;
     class PopupMenu;
     class PopupMenuClient;
-#if ENABLE(NOTIFICATIONS)
-    class NotificationPresenter;
-#endif
     class SearchPopupMenu;
 
     struct FrameLoadRequest;
@@ -175,12 +172,9 @@ namespace WebCore {
         void focusNSView(NSView*);
 #endif
 
-#if ENABLE(NOTIFICATIONS)
-        NotificationPresenter* notificationPresenter() const; 
-#endif
-
         bool selectItemWritingDirectionIsNatural();
         bool selectItemAlignmentFollowsMenuWritingDirection();
+        bool hasOpenedPopup() const;
         PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
         PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
 

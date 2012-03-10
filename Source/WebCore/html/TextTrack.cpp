@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc.  All rights reserved.
+ * Copyright (C) 2011 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -73,12 +74,14 @@ const AtomicString& TextTrack::metadataKeyword()
 
 TextTrack::TextTrack(ScriptExecutionContext* context, TextTrackClient* client, const String& kind, const String& label, const String& language, TextTrackType type)
     : TrackBase(context, TrackBase::TextTrack)
+    , m_mediaElement(0)
     , m_label(label)
     , m_language(language)
-    , m_readyState(TextTrack::NONE)
-    , m_mode(TextTrack::HIDDEN)
+    , m_mode(TextTrack::DISABLED)
     , m_client(client)
     , m_trackType(type)
+    , m_readinessState(NotLoaded)
+    , m_showingByDefault(false)
 {
     setKind(kind);
 }
@@ -119,23 +122,35 @@ void TextTrack::setKind(const String& kind)
         m_client->textTrackKindChanged(this);
 }
 
-void TextTrack::setReadyState(ReadyState state)
-{
-    m_readyState = state;
-    if (m_client)
-        m_client->textTrackReadyStateChanged(this);
-}
-
 void TextTrack::setMode(unsigned short mode, ExceptionCode& ec)
 {
     // 4.8.10.12.5 On setting the mode, if the new value is not either 0, 1, or 2,
     // the user agent must throw an INVALID_ACCESS_ERR exception.
-    if (mode == TextTrack::DISABLED || mode == TextTrack::HIDDEN || mode == TextTrack::SHOWING) {
-        m_mode = static_cast<Mode>(mode);
-        if (m_client)
-            m_client->textTrackModeChanged(this);
-    } else
+    if (mode > TextTrack::SHOWING) {
         ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    if (m_mode == static_cast<Mode>(mode))
+        return;
+
+    // If the new value is 2
+    //  ... Note: If the mode had been showing by default, this will change it to showing, 
+    // even though the value of mode would appear not to change.
+    m_mode = static_cast<Mode>(mode);
+    if (m_mode == TextTrack::SHOWING)
+        setShowingByDefault(false);
+
+    if (m_client)
+        m_client->textTrackModeChanged(this);
+}
+
+TextTrack::Mode TextTrack::mode() const
+{
+    // The text track "showing" and "showing by default" modes return SHOWING (numeric value 2)
+    if (m_showingByDefault)
+        return SHOWING;
+    return m_mode;
 }
 
 TextTrackCueList* TextTrack::cues()
@@ -166,25 +181,69 @@ TextTrackCueList* TextTrack::activeCues() const
     return 0;
 }
 
-void TextTrack::addCue(PassRefPtr<TextTrackCue>, ExceptionCode&)
+void TextTrack::addCue(PassRefPtr<TextTrackCue> prpCue, ExceptionCode& ec)
 {
-    // FIXME(62890): Implement.
+    if (!prpCue)
+        return;
+
+    RefPtr<TextTrackCue> cue = prpCue;
+
+    // 4.8.10.12.4 Text track API
+
+    // The addCue(cue) method of TextTrack objects, when invoked, must run the following steps:
+
+    // 1. If the given cue is already associated with a text track other than 
+    // the method's TextTrack object's text track, then throw an InvalidStateError
+    // exception and abort these steps.
+    TextTrack* cueTrack = cue->track();
+    if (cueTrack && cueTrack != this) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    // 2. Associate cue with the method's TextTrack object's text track, if it is 
+    // not currently associated with a text track.
+    cue->setTrack(this);
+
+    // 3. If the given cue is already listed in the method's TextTrack object's text
+    // track's text track list of cues, then throw an InvalidStateError exception.
+    // 4. Add cue to the method's TextTrack object's text track's text track list of cues.
+    if (!m_cues->add(cue)) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
     
+    if (m_client)
+        m_client->textTrackAddCue(this, cue.get());
 }
 
-void TextTrack::removeCue(PassRefPtr<TextTrackCue>, ExceptionCode&)
+void TextTrack::removeCue(TextTrackCue* cue, ExceptionCode& ec)
 {
-    // FIXME(62890): Implement.
-}
+    if (!cue)
+        return;
 
-void TextTrack::newCuesLoaded()
-{
-    // FIXME(62890): Implement.
-}
+    // 4.8.10.12.4 Text track API
 
-void TextTrack::fetchNewestCues(Vector<TextTrackCue*>&)
-{
-    // FIXME(62890): Implement.
+    // The removeCue(cue) method of TextTrack objects, when invoked, must run the following steps:
+
+    // 1. If the given cue is not associated with the method's TextTrack 
+    // object's text track, then throw an InvalidStateError exception.
+    if (cue->track() != this) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+    
+    // 2. If the given cue is not currently listed in the method's TextTrack 
+    // object's text track's text track list of cues, then throw a NotFoundError exception.
+    // 3. Remove cue from the method's TextTrack object's text track's text track list of cues.
+    if (!m_cues->remove(cue)) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    cue->setTrack(0);
+    if (m_client)
+        m_client->textTrackRemoveCue(this, cue);
 }
 
 void TextTrack::fireCueChangeEvent()

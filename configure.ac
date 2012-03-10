@@ -2,14 +2,14 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [7])
-m4_define([webkit_micro_version], [2])
+m4_define([webkit_micro_version], [3])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
 m4_define([webkit_user_agent_major_version], [535])
-m4_define([webkit_user_agent_minor_version], [10])
+m4_define([webkit_user_agent_minor_version], [14])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=11:2:11
+LIBWEBKITGTK_VERSION=11:3:11
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -101,10 +101,18 @@ fi
 
 # Disable C++0x compat warnings for GCC >= 4.6.0 until we build
 # cleanly with that.
-if test "$CXX" = "g++"; then
-   CXX_VERSION=`$CXX -dumpversion`
-   AX_COMPARE_VERSION([$CXX_VERSION],[ge],[4.6.0],CXXFLAGS="$CXXFLAGS -Wno-c++0x-compat")
-fi
+AC_LANG_PUSH(C++)
+TMPCXXFLAGS=$CXXFLAGS
+CXXFLAGS="-Wall -Werror"
+AC_MSG_CHECKING([if we have to disable C++0x compat warnings for GCC >= 4.6.0])
+AC_TRY_COMPILE([
+namespace std {
+    class nullptr_t { };
+}
+extern std::nullptr_t nullptr;
+], [return 0;],
+CXXFLAGS="$TMPCXXFLAGS", CXXFLAGS="$TMPCXXFLAGS -Wno-c++0x-compat")
+AC_LANG_POP(C++)
 
 # pthread (not needed on Windows)
 if test "$os_win32" = "no"; then
@@ -262,7 +270,7 @@ if test "$with_hildon" = "yes"; then
 fi
 
 # minimum base dependencies
-LIBSOUP_REQUIRED_VERSION=2.33.6
+LIBSOUP_REQUIRED_VERSION=2.37.2.1
 CAIRO_REQUIRED_VERSION=1.10
 FONTCONFIG_REQUIRED_VERSION=2.4
 FREETYPE2_REQUIRED_VERSION=9.0
@@ -278,6 +286,8 @@ GSTREAMER_REQUIRED_VERSION=0.10
 GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=0.10.30
 ENCHANT_REQUIRED_VERSION=0.22
 LIBFFTW_REQUIRED_VERSION=3.2.2
+CLUTTER_REQUIRED_VERSION=1.8.2
+CLUTTER_GTK_REQUIRED_VERSION=1.0.2
 
 # Available modules
 #
@@ -382,12 +392,19 @@ AC_MSG_RESULT([$enable_3d_rendering])
 # check whether to enable WebGL support
 AC_MSG_CHECKING([whether to enable WebGL support])
 AC_ARG_ENABLE(webgl,
-              AC_HELP_STRING([--enable-webgl],
-                             [enable support for WebGL (experimental) [default=no]]),
-              [], [enable_webgl="no"])
+              AC_HELP_STRING([--enable-webgl], [enable support for WebGL [default=yes]]),
+              [], [if test "$with_target" = "x11"; then enable_webgl="yes"; else enable_webgl="no"; fi])
 AC_MSG_RESULT([$enable_webgl])
 
-if test "$enable_webgl" = "yes"; then
+# check whether to enable accelerated compositing support
+AC_MSG_CHECKING([whether to enable accelerated compositing support])
+AC_ARG_WITH(accelerated_compositing,
+            AC_HELP_STRING([--with-accelerated-compositing=@<:@no/opengl/cairo/clutter@:>@],
+                           [use accelerated compositing (experimental) [default=no]]),
+            [], [with_accelerated_compositing="no"])
+AC_MSG_RESULT([$with_accelerated_compositing])
+
+if test "$enable_webgl" = "yes" ||  test "$with_accelerated_compositing" = "opengl" ; then
     AC_CHECK_HEADERS([GL/gl.h], [], AC_MSG_ERROR([OpenGL header not found]))
     AC_CHECK_HEADERS([GL/glx.h], [], AC_MSG_ERROR([GLX header not found]))
     OPENGL_LIBS="-lGL -ldl"
@@ -671,6 +688,14 @@ AC_ARG_ENABLE(file_system,
               [], [enable_file_system="no"])
 AC_MSG_RESULT([$enable_file_system])
 
+# check whether to enable HTML5 <style scoped> support
+AC_MSG_CHECKING([whether to enable HTML5 <style scoped> support])
+AC_ARG_ENABLE(file_system,
+              AC_HELP_STRING([--enable-style-scoped],
+                             [enable support for HTML5 <style scoped> [default=no]]),
+              [], [enable_style_scoped="no"])
+AC_MSG_RESULT([$enable_style_scoped])
+
 # check whether to enable Quota API support
 AC_MSG_CHECKING([whether to enable Quota API support])
 AC_ARG_ENABLE(quota,
@@ -718,11 +743,7 @@ AC_ARG_ENABLE(web_sockets,
 AC_MSG_RESULT([$enable_web_sockets])
 
 # check whether to enable Web Audio support
-AC_MSG_CHECKING([whether to enable Web Audio support])
-AC_ARG_ENABLE(web_audio,
-              AC_HELP_STRING([--enable-web-audio],
-                             [enable support for Web Audio [default=no]]),
-              [],[enable_web_audio="no"])
+enable_web_audio=no
 AC_MSG_RESULT([$enable_web_audio])
 
 # check whether to enable Web Timing support
@@ -794,54 +815,16 @@ case "$with_jsengine" in
 esac
 AC_MSG_RESULT([$with_jsengine])
 
-if test "$with_jsengine" = "jsc"; then
-    AC_MSG_CHECKING([whether to enable JIT compilation])
-    AC_ARG_ENABLE([jit],
-                  AC_HELP_STRING([--enable-jit],
-                                 [Enable JIT compilation default=yes]),
-                  [],[enable_jit="yes"])
-    if test "$enable_jit" = "yes"; then
-        case "$host_cpu" in
-            arm*)
-                AC_DEFINE([ENABLE_JIT], [1], [Define to enable JIT])
-                AC_DEFINE([ENABLE_YARR], [1], [Define to enable YARR])
-                AC_DEFINE([ENABLE_YARR_JIT], [1], [Define to enable YARR JIT])
-            ;;
-            i*86|x86_64)
-                AC_DEFINE([ENABLE_JIT], [1], [Define to enable JIT])
-                AC_DEFINE([ENABLE_YARR], [1], [Define to enable YARR])
-                AC_DEFINE([ENABLE_YARR_JIT], [1], [Define to enable YARR JIT])
-                AC_DEFINE([ENABLE_JIT_OPTIMIZE_CALL], [1], [Define to enable optimizing calls])
-                AC_DEFINE([ENABLE_JIT_OPTIMIZE_PROPERTY_ACCESS], [1], [Define to enable optimized property access])
-                AC_DEFINE([ENABLE_JIT_OPTIMIZE_ARITHMETIC], [1], [Define to enable optimized arithmetic])
-                case "$host_cpu" in
-                    i*86)
-                        AC_DEFINE([WTF_USE_JIT_STUB_ARGUMENT_VA_LIST], [1], [Use stub va_list])
-                    ;;
-                    x86_64)
-                        AC_DEFINE([WTF_USE_JIT_STUB_ARGUMENT_REGISTER], [1], [Use stub register])
-                        AC_DEFINE([WTF_USE_ALTERNATE_JSIMMEDIATE], [1], [Use alternate JSImmediate])
-                    ;;
-                esac
-            ;;
-            sh4)
-                AC_DEFINE([ENABLE_YARR], [1], [Define to enable YARR])
-                AC_DEFINE([ENABLE_YARR_JIT], [1], [Define to enable YARR JIT])
-                AC_DEFINE([ENABLE_JIT], [1], [Define to enable JIT])
-                AC_DEFINE([WTF_USE_JIT_STUB_ARGUMENT_REGISTER], [1], [Use stub register])
-            ;;
-            *)
-                enable_jit="no (CPU '$host_cpu' not supported)"
-            ;;
-        esac
-    else
-            AC_DEFINE([ENABLE_JIT], [0], [Define to enable JIT])
-    fi
-else
-    AC_DEFINE([ENABLE_JIT], [0], [Define to enable JIT])
-    enable_jit="no"
-fi
-
+AC_MSG_CHECKING([whether to enable JIT compilation])
+AC_ARG_ENABLE(jit,
+              AS_HELP_STRING([--enable-jit],
+                             [Enable JIT compilation (default: autodetect)]))
+case "$enable_jit" in
+  yes) JSC_CPPFLAGS="-DENABLE_JIT=1" ;;
+  no) JSC_CPPFLAGS="-DENABLE_JIT=0" ;;
+  *) enable_jit="autodetect" ;;
+esac
+AC_SUBST(JSC_CPPFLAGS)
 AC_MSG_RESULT([$enable_jit])
 
 # Opcode stats
@@ -1063,6 +1046,17 @@ if test "$enable_web_audio" = "yes"; then
     AC_SUBST([LIBFFTW_LIBS])
 fi
 
+if test "$with_accelerated_compositing" = "clutter"; then
+   PKG_CHECK_MODULES(CLUTTER, clutter-1.0 >= $CLUTTER_REQUIRED_VERSION)
+   PKG_CHECK_MODULES([CLUTTER_GTK],
+                     [clutter-gtk-1.0 >= $CLUTTER_GTK_REQUIRED_VERSION])
+
+   AC_SUBST(CLUTTER_CFLAGS)
+   AC_SUBST(CLUTTER_LIBS)
+   AC_SUBST(CLUTTER_GTK_CFLAGS)
+   AC_SUBST(CLUTTER_GTK_LIBS)
+fi
+
 # check for code coverage support
 if test "$enable_coverage" = "yes"; then
    COVERAGE_CFLAGS="-MD"
@@ -1136,8 +1130,11 @@ AM_CONDITIONAL([USE_PANGO], [test "$with_font_backend" = "pango"])
 # GStreamer feature conditional
 AM_CONDITIONAL([USE_GSTREAMER], [test "$have_gstreamer" = "yes"])
 
-# Web Audio feature conditional
-AM_CONDITIONAL([USE_WEBAUDIO_FFTW], [test "$have_fftw" = "yes"])
+# Accelerated compositing conditional
+AM_CONDITIONAL([USE_ACCELERATED_COMPOSITING], [test "$with_accelerated_compositing" = "cairo" || test "$with_accelerated_compositing" = "opengl" || test "$with_accelerated_compositing" = "clutter"])
+AM_CONDITIONAL([USE_TEXTURE_MAPPER_CAIRO], [test "$with_accelerated_compositing" = "cairo"])
+AM_CONDITIONAL([USE_TEXTURE_MAPPER_GL], [test "$with_accelerated_compositing" = "opengl"])
+AM_CONDITIONAL([USE_CLUTTER], [test "$with_accelerated_compositing" = "clutter"])
 
 # WebKit feature conditionals
 AM_CONDITIONAL([ENABLE_DEBUG],[test "$enable_debug_features" = "yes"])
@@ -1159,6 +1156,7 @@ AM_CONDITIONAL([ENABLE_DATALIST],[test "$enable_datalist" = "yes"])
 AM_CONDITIONAL([ENABLE_DETAILS],[test "$enable_details" = "yes"])
 AM_CONDITIONAL([ENABLE_FAST_MOBILE_SCROLLING],[test "$enable_fast_mobile_scrolling" = "yes"])
 AM_CONDITIONAL([ENABLE_FILE_SYSTEM],[test "$enable_file_system" = "yes"])
+AM_CONDITIONAL([ENABLE_STYLE_SCOPED],[test "$enable_style_scoped" = "yes"])
 AM_CONDITIONAL([ENABLE_QUOTA],[test "$enable_quota" = "yes"])
 AM_CONDITIONAL([ENABLE_ICONDATABASE],[test "$enable_icon_database" = "yes"])
 AM_CONDITIONAL([ENABLE_IMAGE_RESIZER],[test "$enable_image_resizer" = "yes"])
@@ -1210,7 +1208,6 @@ GNUmakefile
 
 AC_CONFIG_FILES([
 Source/WebKit/gtk/webkit/webkitversion.h
-Documentation/version.xml:Source/WebKit/gtk/docs/version.xml.in
 ])
 
 AC_CONFIG_FILES([
@@ -1246,6 +1243,8 @@ Build configuration:
  Font backend                                             : $with_font_backend
  Optimized memory allocator                               : $enable_fast_malloc
  JavaScript Engine                                        : $with_jsengine
+ Accelerated Compositing                                  : $with_accelerated_compositing
+
 Features:
  3D Rendering                                             : $enable_3d_rendering
  WebGL                                                    : $enable_webgl
@@ -1305,6 +1304,7 @@ GTK+ configuration:
  GDK target                                               : $with_target
  Hildon UI extensions                                     : $with_hildon
  Introspection support                                    : $enable_introspection
+ Generate documentation                                   : $enable_gtk_doc
 "
 if test "$with_unicode_backend" = "glib"; then
    echo "     >> WARNING: the glib-based unicode backend is slow and incomplete <<"

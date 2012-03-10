@@ -40,7 +40,7 @@
 
 namespace WebCore {
 
-EditCommand::EditCommand(Document* document) 
+EditCommand::EditCommand(Document* document)
     : m_document(document)
     , m_parent(0)
 {
@@ -48,6 +48,16 @@ EditCommand::EditCommand(Document* document)
     ASSERT(m_document->frame());
     setStartingSelection(avoidIntersectionWithNode(m_document->frame()->selection()->selection(), m_document->frame()->editor()->deleteButtonController()->containerElement()));
     setEndingSelection(m_startingSelection);
+}
+
+EditCommand::EditCommand(Document* document, const VisibleSelection& startingSelection, const VisibleSelection& endingSelection)
+    : m_document(document)
+    , m_parent(0)
+{
+    ASSERT(m_document);
+    ASSERT(m_document->frame());
+    setStartingSelection(startingSelection);
+    setEndingSelection(endingSelection);
 }
 
 EditCommand::~EditCommand()
@@ -62,6 +72,7 @@ void EditCommand::apply()
     Frame* frame = m_document->frame();
     
     if (isTopLevelCommand()) {
+        ASSERT(isCompositeEditCommand());
         if (!endingSelection().isContentRichlyEditable()) {
             switch (editingAction()) {
                 case EditActionTyping:
@@ -76,6 +87,7 @@ void EditCommand::apply()
                     return;
             }
         }
+        toCompositeEditCommand(this)->ensureComposition();
     }
     
     // Changes to the document may have been made since the last editing operation that 
@@ -83,7 +95,7 @@ void EditCommand::apply()
     // RemoveNodeCommand, don't require a layout because the high level operations that 
     // use them perform one if one is necessary (like for the creation of VisiblePositions).
     if (isTopLevelCommand())
-        updateLayout();
+        document()->updateLayoutIgnorePendingStylesheets();
 
     {
         EventQueueScope scope;
@@ -94,13 +106,14 @@ void EditCommand::apply()
     }
 
     if (isTopLevelCommand()) {
+        ASSERT(isCompositeEditCommand());
+        CompositeEditCommand* command = toCompositeEditCommand(this);
         // Only need to call appliedEditing for top-level commands, and TypingCommands do it on their
         // own (see TypingCommand::typingAddedToOpenCommand).
-        if (!isTypingCommand())
-            frame->editor()->appliedEditing(this);
+        if (!command->isTypingCommand())
+            frame->editor()->appliedEditing(command);
+        command->setShouldRetainAutocorrectionIndicator(false);
     }
-
-    setShouldRetainAutocorrectionIndicator(false);
 }
 
 void EditCommand::unapply()
@@ -115,15 +128,15 @@ void EditCommand::unapply()
     // RemoveNodeCommand, don't require a layout because the high level operations that 
     // use them perform one if one is necessary (like for the creation of VisiblePositions).
     if (isTopLevelCommand())
-        updateLayout();
+        document()->updateLayoutIgnorePendingStylesheets();
     
     DeleteButtonController* deleteButtonController = frame->editor()->deleteButtonController();
     deleteButtonController->disable();
     doUnapply();
     deleteButtonController->enable();
 
-    if (isTopLevelCommand())
-        frame->editor()->unappliedEditing(this);
+    if (isEditCommandComposition())
+        frame->editor()->unappliedEditing(toEditCommandComposition(this));
 }
 
 void EditCommand::reapply()
@@ -138,15 +151,15 @@ void EditCommand::reapply()
     // RemoveNodeCommand, don't require a layout because the high level operations that 
     // use them perform one if one is necessary (like for the creation of VisiblePositions).
     if (isTopLevelCommand())
-        updateLayout();
+        document()->updateLayoutIgnorePendingStylesheets();
 
     DeleteButtonController* deleteButtonController = frame->editor()->deleteButtonController();
     deleteButtonController->disable();
     doReapply();
     deleteButtonController->enable();
 
-    if (isTopLevelCommand())
-        frame->editor()->reappliedEditing(this);
+    if (isEditCommandComposition())
+        frame->editor()->reappliedEditing(toEditCommandComposition(this));
 }
 
 void EditCommand::doReapply()
@@ -159,12 +172,21 @@ EditAction EditCommand::editingAction() const
     return EditActionUnspecified;
 }
 
+static inline EditCommandComposition* compositionIfPossible(EditCommand* command)
+{
+    if (!command->isCompositeEditCommand())
+        return 0;
+    return toCompositeEditCommand(command)->composition();
+}
+
 void EditCommand::setStartingSelection(const VisibleSelection& s)
 {
-    Element* root = s.rootEditableElement();
     for (EditCommand* cmd = this; ; cmd = cmd->m_parent) {
+        if (EditCommandComposition* composition = compositionIfPossible(cmd)) {
+            ASSERT(cmd->isTopLevelCommand());
+            static_cast<EditCommand*>(composition)->setStartingSelection(s);
+        }
         cmd->m_startingSelection = s;
-        cmd->m_startingRootEditableElement = root;
         if (!cmd->m_parent || cmd->m_parent->isFirstCommand(cmd))
             break;
     }
@@ -172,54 +194,35 @@ void EditCommand::setStartingSelection(const VisibleSelection& s)
 
 void EditCommand::setEndingSelection(const VisibleSelection &s)
 {
-    Element* root = s.rootEditableElement();
     for (EditCommand* cmd = this; cmd; cmd = cmd->m_parent) {
+        if (EditCommandComposition* composition = compositionIfPossible(cmd)) {
+            ASSERT(cmd->isTopLevelCommand());
+            static_cast<EditCommand*>(composition)->setEndingSelection(s);
+        }
         cmd->m_endingSelection = s;
-        cmd->m_endingRootEditableElement = root;
     }
-}
-
-bool EditCommand::preservesTypingStyle() const
-{
-    return false;
-}
-
-bool EditCommand::isTypingCommand() const
-{
-    return false;
-}
-
-bool EditCommand::isCreateLinkCommand() const
-{
-    return false;
-}
-
-bool EditCommand::shouldRetainAutocorrectionIndicator() const
-{
-    return false;
-}
-
-void EditCommand::setShouldRetainAutocorrectionIndicator(bool)
-{
-}
-
-void EditCommand::updateLayout() const
-{
-    document()->updateLayoutIgnorePendingStylesheets();
 }
 
 void EditCommand::setParent(CompositeEditCommand* parent)
 {
-    ASSERT(parent);
-    ASSERT(!m_parent);
+    ASSERT((parent && !m_parent) || (!parent && m_parent));
+    ASSERT(!parent || !isCompositeEditCommand() || !toCompositeEditCommand(this)->composition());
     m_parent = parent;
-    m_startingSelection = parent->m_endingSelection;
-    m_endingSelection = parent->m_endingSelection;
-    m_startingRootEditableElement = parent->m_endingRootEditableElement;
-    m_endingRootEditableElement = parent->m_endingRootEditableElement;
+    if (parent) {
+        m_startingSelection = parent->m_endingSelection;
+        m_endingSelection = parent->m_endingSelection;
+    }
 }
 
-void applyCommand(PassRefPtr<EditCommand> command)
+#ifndef NDEBUG
+void SimpleEditCommand::addNodeAndDescendants(Node* startNode, HashSet<Node*>& nodes)
+{
+    for (Node* node = startNode; node; node = node->traverseNextNode(startNode))
+        nodes.add(node);
+}
+#endif
+
+void applyCommand(PassRefPtr<CompositeEditCommand> command)
 {
     command->apply();
 }

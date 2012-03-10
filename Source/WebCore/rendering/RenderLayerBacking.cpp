@@ -85,7 +85,23 @@ static inline bool isAcceleratedCanvas(RenderObject* renderer)
 RenderLayerBacking::RenderLayerBacking(RenderLayer* layer)
     : m_owningLayer(layer)
     , m_artificiallyInflatedBounds(false)
+    , m_isMainFrameRenderViewLayer(false)
+    , m_usingTiledCacheLayer(false)
 {
+    if (renderer()->isRenderView()) {
+        Frame* frame = toRenderView(renderer())->frameView()->frame();
+        Page* page = frame ? frame->page() : 0;
+        if (page && frame && page->mainFrame() == frame) {
+            m_isMainFrameRenderViewLayer = true;
+
+#if ENABLE(THREADED_SCROLLING)
+            // FIXME: It's a little weird that we base this decision on whether there's a scrolling coordinator or not.
+            if (page->scrollingCoordinator())
+                m_usingTiledCacheLayer = true;
+#endif
+        }
+    }
+    
     createPrimaryGraphicsLayer();
 }
 
@@ -110,6 +126,11 @@ PassOwnPtr<GraphicsLayer> RenderLayerBacking::createGraphicsLayer(const String& 
     return graphicsLayer.release();
 }
 
+bool RenderLayerBacking::shouldUseTileCache(const GraphicsLayer*) const
+{
+    return m_usingTiledCacheLayer;
+}
+
 void RenderLayerBacking::createPrimaryGraphicsLayer()
 {
     String layerName;
@@ -117,12 +138,9 @@ void RenderLayerBacking::createPrimaryGraphicsLayer()
     layerName = nameForLayer();
 #endif
     m_graphicsLayer = createGraphicsLayer(layerName);
-    if (renderer()->isRenderView()) {
-        Frame* frame = toRenderView(renderer())->frameView()->frame();
-        Page* page = frame ? frame->page() : 0;
-        if (page && frame && page->mainFrame() == frame)
-            m_graphicsLayer->setAppliesPageScale();
-    }
+
+    if (m_isMainFrameRenderViewLayer)
+        m_graphicsLayer->setAppliesPageScale();
     
     updateLayerOpacity(renderer()->style());
     updateLayerTransform(renderer()->style());
@@ -1042,6 +1060,9 @@ LayoutRect RenderLayerBacking::contentsBox() const
 
 bool RenderLayerBacking::paintingGoesToWindow() const
 {
+    if (m_usingTiledCacheLayer)
+        return false;
+
     if (m_owningLayer->isRootLayer())
         return compositor()->rootLayerAttachment() != RenderLayerCompositor::RootLayerAttachedViaEnclosingFrame;
     
@@ -1096,12 +1117,15 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
     FontCachePurgePreventer fontCachePurgePreventer;
     
     m_owningLayer->updateLayerListsIfNeeded();
-    
+
+    bool shouldPaintContent = (m_owningLayer->hasVisibleContent() || m_owningLayer->hasVisibleDescendant()) && m_owningLayer->isSelfPaintingLayer();
+    if (!shouldPaintContent)
+        return;
+
     // Calculate the clip rects we should use.
     LayoutRect layerBounds;
     ClipRect damageRect, clipRectToApply, outlineRect;
     m_owningLayer->calculateRects(rootLayer, 0, paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect); // FIXME: Incorrect for CSS regions.
-
     LayoutPoint paintOffset = toPoint(layerBounds.location() - m_owningLayer->renderBoxLocation());
 
     // If this layer's renderer is a child of the paintingRoot, we render unconditionally, which
@@ -1112,9 +1136,7 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
     if (paintingRoot && !renderer()->isDescendantOf(paintingRoot))
         paintingRootForRenderer = paintingRoot;
 
-    bool shouldPaint = (m_owningLayer->hasVisibleContent() || m_owningLayer->hasVisibleDescendant()) && m_owningLayer->isSelfPaintingLayer();
-
-    if (shouldPaint && (paintingPhase & GraphicsLayerPaintBackground)) {
+    if (paintingPhase & GraphicsLayerPaintBackground) {
         // Paint our background first, before painting any child layers.
         // Establish the clip used to paint our background.
         m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, damageRect, DoNotIncludeSelfForBorderRadius);
@@ -1132,7 +1154,7 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
     bool forceBlackText = paintBehavior & PaintBehaviorForceBlackText;
     bool selectionOnly  = paintBehavior & PaintBehaviorSelectionOnly;
 
-    if (shouldPaint && (paintingPhase & GraphicsLayerPaintForeground)) {
+    if (paintingPhase & GraphicsLayerPaintForeground) {
         // Set up the clip used when painting our children.
         m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, clipRectToApply);
         PaintInfo paintInfo(context, clipRectToApply.rect(), 
@@ -1168,8 +1190,8 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
         // Now walk the sorted list of children with positive z-indices.
         m_owningLayer->paintList(m_owningLayer->posZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, 0);
     }
-    
-    if (shouldPaint && (paintingPhase & GraphicsLayerPaintMask)) {
+
+    if (paintingPhase & GraphicsLayerPaintMask) {
         if (renderer()->hasMask() && !selectionOnly && !damageRect.isEmpty()) {
             m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, damageRect, DoNotIncludeSelfForBorderRadius);
 

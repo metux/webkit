@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 Google Inc. All rights reserved.
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2011 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,6 +36,7 @@
 #include "Notification.h"
 
 #include "Document.h"
+#include "ErrorEvent.h"
 #include "EventNames.h"
 #include "NotificationCenter.h"
 #include "NotificationContents.h"
@@ -46,6 +47,11 @@
 #include "WorkerContext.h"
 
 namespace WebCore {
+
+Notification::Notification()
+    : ActiveDOMObject(0, this)
+{
+}
 
 Notification::Notification(const KURL& url, ScriptExecutionContext* context, ExceptionCode& ec, PassRefPtr<NotificationCenter> provider)
     : ActiveDOMObject(context, this)
@@ -80,7 +86,7 @@ Notification::Notification(const NotificationContents& contents, ScriptExecution
         return;
     }
 
-    if (!contents.icon().isEmpty() && !contents.icon().isValid()) {
+    if (!contents.icon.isEmpty() && !contents.icon.isValid()) {
         ec = SYNTAX_ERR;
         return;
     }
@@ -122,6 +128,11 @@ void Notification::show()
         }
     } else
         startLoading();
+#elif PLATFORM(MAC)
+    if (m_state == Idle && m_notificationCenter->presenter()) {
+        m_notificationCenter->presenter()->show(this);
+        m_state = Showing;
+    }
 #else
     // prevent double-showing
     if (m_state == Idle && m_notificationCenter->presenter() && m_notificationCenter->presenter()->show(this))
@@ -223,6 +234,26 @@ void Notification::finishLoading()
             m_state = Showing;
     }
     unsetPendingActivity(this);
+}
+
+void Notification::dispatchShowEvent()
+{
+    dispatchEvent(Event::create(eventNames().showEvent, false, false));
+}
+
+void Notification::dispatchClickEvent()
+{
+    dispatchEvent(Event::create(eventNames().clickEvent, false, false));
+}
+
+void Notification::dispatchCloseEvent()
+{
+    dispatchEvent(Event::create(eventNames().closeEvent, false, false));
+}
+
+void Notification::dispatchErrorEvent()
+{
+    dispatchEvent(ErrorEvent::create());
 }
 
 } // namespace WebCore

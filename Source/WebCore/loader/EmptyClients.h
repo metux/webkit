@@ -140,6 +140,7 @@ public:
 
     virtual bool selectItemWritingDirectionIsNatural() { return false; }
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() { return false; }
+    virtual bool hasOpenedPopup() const OVERRIDE { return false; }
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const { return adoptRef(new EmptyPopupMenu()); }
     virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const { return adoptRef(new EmptySearchPopupMenu()); }
 
@@ -186,10 +187,6 @@ public:
 
     virtual void reachedMaxAppCacheSize(int64_t) { }
     virtual void reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t) { }
-
-#if ENABLE(NOTIFICATIONS)
-    virtual NotificationPresenter* notificationPresenter() const { return 0; }
-#endif
 
 #if ENABLE(DIRECTORY_UPLOAD)
     virtual void enumerateChosenDirectory(FileChooser*) { }
@@ -253,7 +250,7 @@ public:
     virtual void detachedFromParent2() { }
     virtual void detachedFromParent3() { }
 
-    virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceRequest&, const ResourceResponse&) { }
+    virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceResponse&) { }
 
     virtual void assignIdentifierToInitialRequest(unsigned long, DocumentLoader*, const ResourceRequest&) { }
     virtual bool shouldUseCredentialStorage(DocumentLoader*, unsigned long) { return false; }
@@ -590,6 +587,8 @@ public:
     virtual void inspectorDestroyed() { }
     
     virtual void openInspectorFrontend(InspectorController*) { }
+    virtual void closeInspectorFrontend() { }
+    virtual void bringFrontendToFront() { }
 
     virtual void highlight() { }
     virtual void hideHighlight() { }

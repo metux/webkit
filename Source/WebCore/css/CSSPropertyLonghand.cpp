@@ -91,6 +91,9 @@ static void initShorthandMap(ShorthandMap& shorthandMap)
     static const int borderSpacingProperties[] = { CSSPropertyWebkitBorderHorizontalSpacing, CSSPropertyWebkitBorderVerticalSpacing };
     SET_SHORTHAND_MAP_ENTRY(shorthandMap, CSSPropertyBorderSpacing, borderSpacingProperties);
 
+    static const int flexFlowProperties[] = { CSSPropertyWebkitFlexDirection, CSSPropertyWebkitFlexWrap };
+    SET_SHORTHAND_MAP_ENTRY(shorthandMap, CSSPropertyWebkitFlexFlow, flexFlowProperties);
+
     static const int listStyleProperties[] = {
         CSSPropertyListStyleImage,
         CSSPropertyListStylePosition,
@@ -133,6 +136,13 @@ static void initShorthandMap(ShorthandMap& shorthandMap)
         CSSPropertyPaddingLeft
     };
     SET_SHORTHAND_MAP_ENTRY(shorthandMap, CSSPropertyPadding, paddingProperties);
+
+    static const int webkitWrapProperties[] = {
+        CSSPropertyWebkitWrapFlow,
+        CSSPropertyWebkitWrapMargin,
+        CSSPropertyWebkitWrapPadding
+    };
+    SET_SHORTHAND_MAP_ENTRY(shorthandMap, CSSPropertyWebkitWrap, webkitWrapProperties);
 
     static const int textStrokeProperties[] = { CSSPropertyWebkitTextStrokeColor, CSSPropertyWebkitTextStrokeWidth };
     SET_SHORTHAND_MAP_ENTRY(shorthandMap, CSSPropertyWebkitTextStroke, textStrokeProperties);

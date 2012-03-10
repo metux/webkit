@@ -361,7 +361,7 @@ void DeleteSelectionCommand::removeNode(PassRefPtr<Node> node)
         }
         
         // Make sure empty cell has some height, if a placeholder can be inserted.
-        updateLayout();
+        document()->updateLayoutIgnorePendingStylesheets();
         RenderObject *r = node->renderer();
         if (r && r->isTableCell() && toRenderTableCell(r)->contentHeight() <= 0) {
             Position firstEditablePosition = firstEditablePositionInNode(node.get());
@@ -528,7 +528,7 @@ void DeleteSelectionCommand::handleGeneralDelete()
 
 void DeleteSelectionCommand::fixupWhitespace()
 {
-    updateLayout();
+    document()->updateLayoutIgnorePendingStylesheets();
     // FIXME: isRenderedCharacter should be removed, and we should use VisiblePosition::characterAfter and VisiblePosition::characterBefore
     if (m_leadingWhitespace.isNotNull() && !m_leadingWhitespace.isRenderedCharacter() && m_leadingWhitespace.deprecatedNode()->isTextNode()) {
         Text* textNode = static_cast<Text*>(m_leadingWhitespace.deprecatedNode());
@@ -746,6 +746,24 @@ String DeleteSelectionCommand::originalStringForAutocorrectionAtBeginningOfSelec
     return String();
 }
 
+// This method removes div elements with no attributes that have only one child or no children at all.
+void DeleteSelectionCommand::removeRedundantBlocks()
+{
+    Node* node = m_endingPosition.containerNode();
+    Node* rootNode = node->rootEditableElement();
+   
+    while (node != rootNode) {
+        if (isRemovableBlock(node)) {
+            if (node == m_endingPosition.anchorNode())
+                updatePositionForNodeRemoval(m_endingPosition, node);
+            
+            CompositeEditCommand::removeNodePreservingChildren(node);
+            node = m_endingPosition.anchorNode();
+        } else
+            node = node->parentNode();
+    }
+}
+
 void DeleteSelectionCommand::doApply()
 {
     // If selection has not been set to a custom selection when the command was created,
@@ -810,8 +828,10 @@ void DeleteSelectionCommand::doApply()
     
     RefPtr<Node> placeholder = m_needPlaceholder ? createBreakElement(document()).get() : 0;
     
-    if (placeholder)
+    if (placeholder) {
+        removeRedundantBlocks();
         insertNodeAt(placeholder.get(), m_endingPosition);
+    }
 
     rebalanceWhitespaceAt(m_endingPosition);
 

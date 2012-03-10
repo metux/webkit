@@ -165,6 +165,26 @@ global_cppflags += \
 	-DWTF_USE_GSTREAMER=1
 endif
 
+if USE_ACCELERATED_COMPOSITING
+global_cppflags += \
+	-DWTF_USE_ACCELERATED_COMPOSITING=1
+endif
+
+if USE_TEXTURE_MAPPER_CAIRO
+global_cppflags += \
+	-DWTF_USE_TEXTURE_MAPPER_CAIRO=1
+endif
+
+if USE_TEXTURE_MAPPER_GL
+global_cppflags += \
+	-DWTF_USE_TEXTURE_MAPPER_OPENGL=1
+endif
+
+if USE_CLUTTER
+global_cppflags += \
+	-DWTF_USE_CLUTTER=1
+endif
+
 # ----
 # GTK+ 2.x/3.x support
 # ----
@@ -177,7 +197,6 @@ if !ENABLE_DEBUG
 global_cppflags += -DNDEBUG
 else
 global_cppflags += \
-	-DG_DISABLE_DEPRECATED \
 	-DGDK_PIXBUF_DISABLE_DEPRECATED \
 	-DGDK_DISABLE_DEPRECATED \
 	-DGTK_DISABLE_DEPRECATED \
@@ -207,7 +226,6 @@ include Source/WebKit/gtk/GNUmakefile.am
 include Source/WebCore/bindings/gobject/GNUmakefile.am
 include Tools/GNUmakefile.am
 include Source/WebKit/gtk/po/GNUmakefile.am
-include Source/WebKit/gtk/docs/GNUmakefile.am
 include Tools/DumpRenderTree/gtk/GNUmakefile.ImageDiff.am
 
 if ENABLE_WEBKIT2
@@ -265,3 +283,17 @@ clean-local:
 maintainer-clean-local: distclean-local
 distclean-local:
 	-rm -rf $(GENSOURCES) $(GENPROGRAMS)
+
+dist-hook: doc-dist-hook
+doc-dist-hook: docs-build.stamp
+	cp $(WebKit)/NEWS $(distdir)
+	@mkdir -p $(distdir)/Documentation/webkitgtk/html
+	@mkdir -p $(distdir)/Documentation/webkitgtk/tmpl
+	@-cp ./Documentation/webkitgtk/tmpl/*.sgml $(distdir)/Documentation/webkitgtk/tmpl
+	@cp ./Documentation/webkitgtk/html/* $(distdir)/Documentation/webkitgtk/html
+if ENABLE_WEBKIT2
+	@mkdir -p $(distdir)/Documentation/webkit2gtk/html
+	@mkdir -p $(distdir)/Documentation/webkit2gtk/tmpl
+	@-cp ./Documentation/webkit2gtk/tmpl/*.sgml $(distdir)/Documentation/webkit2gtk/tmpl
+	@cp ./Documentation/webkit2gtk/html/* $(distdir)/Documentation/webkit2gtk/html
+endif

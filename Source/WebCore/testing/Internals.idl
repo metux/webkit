@@ -52,6 +52,7 @@ module window {
         void setEnableCompositingForFixedPosition(in Document document, in boolean enabled) raises(DOMException);
         void setEnableCompositingForScrollableFrames(in Document document, in boolean enabled) raises(DOMException);
         void setAcceleratedDrawingEnabled(in Document document, in boolean enabled) raises(DOMException);
+        void setAcceleratedFiltersEnabled(in Document document, in boolean enabled) raises(DOMException);
         void setEnableScrollAnimator(in Document document, in boolean enabled) raises(DOMException);
         void setZoomAnimatorTransform(in Document document, in float scale, in float tx, in float ty) raises(DOMException);
         float getPageScaleFactor(in Document document) raises(DOMException);
@@ -77,8 +78,12 @@ module window {
         unsigned long locationFromRange(in Element scope, in Range range) raises (DOMException);
         unsigned long lengthFromRange(in Element scope, in Range range) raises (DOMException);
 
+        void setShouldLayoutFixedElementsRelativeToFrame(in Document document, in boolean enabled) raises(DOMException);
         void setUnifiedTextCheckingEnabled(in Document document, in boolean enabled) raises (DOMException);
         boolean unifiedTextCheckingEnabled(in Document document) raises (DOMException);
+
+        long lastSpellCheckRequestSequence(in Document document) raises (DOMException);
+        long lastSpellCheckProcessedSequence(in Document document) raises (DOMException);
     };
 }
 

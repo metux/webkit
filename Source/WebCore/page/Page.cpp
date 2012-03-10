@@ -53,6 +53,8 @@
 #include "MediaCanStartListener.h"
 #include "Navigator.h"
 #include "NetworkStateNotifier.h"
+#include "NotificationController.h"
+#include "NotificationPresenter.h"
 #include "PageGroup.h"
 #include "PluginData.h"
 #include "PluginView.h"
@@ -82,6 +84,10 @@
 
 #if ENABLE(MEDIA_STREAM)
 #include "UserMediaClient.h"
+#endif
+
+#if ENABLE(THREADED_SCROLLING)
+#include "ScrollingCoordinator.h"
 #endif
 
 namespace WebCore {
@@ -136,6 +142,9 @@ Page::Page(PageClients& pageClients)
 #if ENABLE(DEVICE_ORIENTATION)
     , m_deviceMotionController(RuntimeEnabledFeatures::deviceMotionEnabled() ? adoptPtr(new DeviceMotionController(pageClients.deviceMotionClient)) : nullptr)
     , m_deviceOrientationController(RuntimeEnabledFeatures::deviceOrientationEnabled() ? adoptPtr(new DeviceOrientationController(this, pageClients.deviceOrientationClient)) : nullptr)
+#endif
+#if ENABLE(NOTIFICATIONS)
+    , m_notificationController(adoptPtr(new NotificationController(this, pageClients.notificationClient)))
 #endif
 #if ENABLE(INPUT_SPEECH)
     , m_speechInputClient(pageClients.speechInputClient)
@@ -205,7 +214,6 @@ Page::~Page()
 
     m_editorClient->pageDestroyed();
 
-    InspectorInstrumentation::inspectedPageDestroyed(this);
 #if ENABLE(INSPECTOR)
     m_inspectorController->inspectedPageDestroyed();
 #endif
@@ -215,12 +223,27 @@ Page::~Page()
         m_userMediaClient->pageDestroyed();
 #endif
 
+#if ENABLE(THREADED_SCROLLING)
+    if (m_scrollingCoordinator)
+        m_scrollingCoordinator->pageDestroyed();
+#endif
+
     backForward()->close();
 
 #ifndef NDEBUG
     pageCounter.decrement();
 #endif
 }
+
+#if ENABLE(THREADED_SCROLLING)
+ScrollingCoordinator* Page::scrollingCoordinator()
+{
+    if (!m_scrollingCoordinator && m_settings->scrollingCoordinatorEnabled())
+        m_scrollingCoordinator = ScrollingCoordinator::create(this);
+
+    return m_scrollingCoordinator.get();
+}
+#endif
 
 struct ViewModeInfo {
     const char* name;
@@ -673,7 +696,7 @@ void Page::setDeviceScaleFactor(float scaleFactor)
 
 void Page::setPagination(const Pagination& pagination)
 {
-    if (m_pagination.mode == pagination.mode && m_pagination.gap == pagination.gap)
+    if (m_pagination == pagination)
         return;
 
     m_pagination = pagination;
@@ -1063,6 +1086,7 @@ Page::PageClients::PageClients()
     , deviceMotionClient(0)
     , deviceOrientationClient(0)
     , speechInputClient(0)
+    , notificationClient(0)
     , userMediaClient(0)
 {
 }

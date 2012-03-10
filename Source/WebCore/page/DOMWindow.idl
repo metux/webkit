@@ -177,23 +177,23 @@ module window {
         readonly attribute [EnabledAtRuntime] NotificationCenter webkitNotifications;
 #endif
 #if defined(ENABLE_INDEXED_DATABASE) && ENABLE_INDEXED_DATABASE
-        readonly attribute [EnabledAtRuntime] IDBFactory webkitIndexedDB;
+        readonly attribute IDBFactory webkitIndexedDB;
 
-        attribute [EnabledAtRuntime] IDBCursorConstructor webkitIDBCursor;
-        attribute [EnabledAtRuntime] IDBDatabaseConstructor webkitIDBDatabase;
-        attribute [EnabledAtRuntime] IDBDatabaseErrorConstructor webkitIDBDatabaseError;
-        attribute [EnabledAtRuntime] IDBDatabaseExceptionConstructor webkitIDBDatabaseException;
-        attribute [EnabledAtRuntime] IDBFactoryConstructor webkitIDBFactory;
-        attribute [EnabledAtRuntime] IDBIndexConstructor webkitIDBIndex;
-        attribute [EnabledAtRuntime] IDBKeyRangeConstructor webkitIDBKeyRange;
-        attribute [EnabledAtRuntime] IDBObjectStoreConstructor webkitIDBObjectStore;
-        attribute [EnabledAtRuntime] IDBRequestConstructor webkitIDBRequest;
-        attribute [EnabledAtRuntime] IDBTransactionConstructor webkitIDBTransaction;
+        attribute IDBCursorConstructor webkitIDBCursor;
+        attribute IDBDatabaseConstructor webkitIDBDatabase;
+        attribute IDBDatabaseErrorConstructor webkitIDBDatabaseError;
+        attribute IDBDatabaseExceptionConstructor webkitIDBDatabaseException;
+        attribute IDBFactoryConstructor webkitIDBFactory;
+        attribute IDBIndexConstructor webkitIDBIndex;
+        attribute IDBKeyRangeConstructor webkitIDBKeyRange;
+        attribute IDBObjectStoreConstructor webkitIDBObjectStore;
+        attribute IDBRequestConstructor webkitIDBRequest;
+        attribute IDBTransactionConstructor webkitIDBTransaction;
 #endif
 #if defined(ENABLE_FILE_SYSTEM) && ENABLE_FILE_SYSTEM
         const unsigned short TEMPORARY = 0;
         const unsigned short PERSISTENT = 1;
-        [EnabledAtRuntime=FileSystem] void webkitRequestFileSystem(in unsigned short type, in long long size, in [Callback, Optional] FileSystemCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
+        [EnabledAtRuntime=FileSystem] void webkitRequestFileSystem(in unsigned short type, in long long size, in [Callback] FileSystemCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
         [EnabledAtRuntime=FileSystem] void webkitResolveLocalFileSystemURL(in DOMString url, in [Callback, Optional] EntryCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
 
         attribute [EnabledAtRuntime=FileSystem] WebKitFlagsConstructor WebKitFlags;
@@ -212,12 +212,12 @@ module window {
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
         [DoNotCheckDomainSecurity, Custom] void postMessage(in SerializedScriptValue message, in DOMString targetOrigin)
             raises(DOMException);
-        [DoNotCheckDomainSecurity, Custom] void postMessage(in SerializedScriptValue message, in Array messagePorts, in DOMString targetOrigin)
+        [DoNotCheckDomainSecurity, Custom] void postMessage(in SerializedScriptValue message, in DOMString targetOrigin, in Array messagePorts)
             raises(DOMException);
 
         [DoNotCheckDomainSecurity, Custom] void webkitPostMessage(in SerializedScriptValue message, in DOMString targetOrigin)
             raises(DOMException);
-        [DoNotCheckDomainSecurity, Custom] void webkitPostMessage(in SerializedScriptValue message, in Array transferList, in DOMString targetOrigin)
+        [DoNotCheckDomainSecurity, Custom] void webkitPostMessage(in SerializedScriptValue message, in DOMString targetOrigin, in Array transferList)
             raises(DOMException);
 #else
         // There's no good way to expose an array via the ObjC bindings, so for now just allow passing in a single port.
@@ -241,9 +241,10 @@ module window {
         void clearInterval(in [Optional=CallWithDefaultValue] long handle);
 
 #if defined(ENABLE_REQUEST_ANIMATION_FRAME)
-        // WebKit animation extensions
+        // WebKit animation extensions, being standardized in the WebPerf WG
         long webkitRequestAnimationFrame(in [Callback] RequestAnimationFrameCallback callback, in [Optional=CallWithDefaultValue] Element element);
-        void webkitCancelRequestAnimationFrame(in long id);
+        void webkitCancelAnimationFrame(in long id);
+        void webkitCancelRequestAnimationFrame(in long id); // This is a deprecated alias for webkitCancelAnimationFrame(). Remove this when removing vendor prefix.
 #endif
 
         // Base64
@@ -488,10 +489,11 @@ module window {
 
         attribute HTMLCollectionConstructor HTMLCollection;
         attribute HTMLAllCollectionConstructor HTMLAllCollection;
+        attribute [Conditional=MICRODATA] HTMLPropertiesCollectionConstructor HTMLPropertiesCollection;
         attribute HTMLUnknownElementConstructor HTMLUnknownElement;
 
         attribute [JSCCustomGetter, CustomConstructor] HTMLImageElementConstructorConstructor Image; // Usable with new operator
-        attribute [JSCCustomGetter, JSCustomConstructor] HTMLOptionElementConstructorConstructor Option; // Usable with new operator
+        attribute [JSCCustomGetter] HTMLOptionElementConstructorConstructor Option; // Usable with new operator
 
         attribute CanvasPatternConstructor CanvasPattern;
         attribute CanvasGradientConstructor CanvasGradient;
@@ -521,8 +523,8 @@ module window {
         attribute [JSCCustomGetter] Float64ArrayConstructor Float64Array; // Usable with new operator
         attribute [JSCCustomGetter] DataViewConstructor DataView; // Usable with new operator
 
-        attribute [JSCCustomGetter,Conditional=WEB_AUDIO,EnabledAtRuntime] AudioContextConstructor webkitAudioContext; // Usable with new operator
-        attribute [Conditional=WEB_AUDIO] AudioPannerNodeConstructor webkitAudioPannerNode; // Needed for panning model constants
+        attribute [Supplemented, JSCCustomGetter, Conditional=WEB_AUDIO, EnabledAtRuntime] AudioContextConstructor webkitAudioContext; // Usable with new operator
+        attribute [Supplemented, Conditional=WEB_AUDIO] AudioPannerNodeConstructor webkitAudioPannerNode; // Needed for panning model constants
 
         // Event Constructors
         attribute EventConstructor Event;
@@ -549,10 +551,10 @@ module window {
         attribute [Conditional=DEVICE_ORIENTATION, EnabledAtRuntime] DeviceMotionEventConstructor DeviceMotionEvent;
         attribute [Conditional=DEVICE_ORIENTATION, EnabledAtRuntime] DeviceOrientationEventConstructor DeviceOrientationEvent;
         attribute [Conditional=TOUCH_EVENTS] TouchEventConstructor TouchEvent;
-        attribute [Conditional=WEB_SOCKETS] CloseEventConstructor CloseEvent;
+        attribute [Supplemented, Conditional=WEB_SOCKETS] CloseEventConstructor CloseEvent;
         attribute StorageEventConstructor StorageEvent;
-        attribute [Conditional=WEB_AUDIO] AudioProcessingEventConstructor AudioProcessingEvent;
-        attribute [Conditional=WEB_AUDIO] OfflineAudioCompletionEventConstructor OfflineAudioCompletionEvent;
+        attribute [Supplemented, Conditional=WEB_AUDIO] AudioProcessingEventConstructor AudioProcessingEvent;
+        attribute [Supplemented, Conditional=WEB_AUDIO] OfflineAudioCompletionEventConstructor OfflineAudioCompletionEvent;
         attribute [Conditional=INPUT_SPEECH] SpeechInputEventConstructor SpeechInputEvent;
         attribute [Conditional=MEDIA_STREAM] MediaStreamEventConstructor MediaStreamEvent;
         attribute [Conditional=WEBGL] WebGLContextEventConstructor WebGLContextEvent;
@@ -605,7 +607,7 @@ module window {
 #endif
 
 #if defined(ENABLE_WEB_SOCKETS) && ENABLE_WEB_SOCKETS
-        attribute [JSCCustomGetter,EnabledAtRuntime] WebSocketConstructor WebSocket; // Usable with the new operator
+        attribute [Supplemented, JSCCustomGetter, EnabledAtRuntime] WebSocketConstructor WebSocket; // Usable with the new operator
 #endif
 
 #if defined(ENABLE_VIDEO_TRACK) && ENABLE_VIDEO_TRACK
@@ -628,7 +630,7 @@ module window {
 
         attribute StorageConstructor Storage;
 
-        attribute [JSCCustomGetter, JSCustomConstructor, Conditional=VIDEO, EnabledAtRuntime] HTMLAudioElementConstructorConstructor Audio; // Usable with the new operator
+        attribute [JSCCustomGetter, Conditional=VIDEO, EnabledAtRuntime] HTMLAudioElementConstructorConstructor Audio; // Usable with the new operator
         attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLAudioElementConstructor HTMLAudioElement;
         attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLMediaElementConstructor HTMLMediaElement;
         attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLVideoElementConstructor HTMLVideoElement;

@@ -1,3 +1,412 @@
+2011-12-14  Jing Zhao  <jingzhao@chromium.org>
+
+        Opening two popup menus by dispatchEvent() makes problems.
+        https://bugs.webkit.org/show_bug.cgi?id=73304
+
+        Reviewed by Kent Tamura.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::hasOpenedPopup): Not implemented.
+        * WebCoreSupport/ChromeClientGtk.h: Overrides hasOpenedPopup().
+
+2011-12-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        WebKit code shouldn't be calling applyCommand directly
+        https://bugs.webkit.org/show_bug.cgi?id=74337
+
+        Reviewed by Darin Adler.
+
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_replace_selection):
+
+2011-12-12  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] gtk_widget_size_allocate for plugin widgets should happen in the WebView size-allocate method
+        https://bugs.webkit.org/show_bug.cgi?id=72805
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Instead of immediately calling gtk_widget_size during painting, defer
+        this until the size-allocate method of the WebView.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::paint): If any child widgets have a pending allocation
+        call gtk_widget_size_allocate.
+        * webkit/webkitwebview.cpp:
+        (updateChildAllocationFromPendingAllocation): Added this helper.
+        (webkit_web_view_size_allocate): Call the helper on all child widgets.
+
+2011-12-09  Joone Hur  <joone.hur@collabora.co.uk>
+
+        [GTK] Initial implementation of Accelerated Compositing using Clutter
+        https://bugs.webkit.org/show_bug.cgi?id=73319
+
+        This patch allows to add a GtkClutterEmbed to embed Clutter Actors in WebKitWebView and 
+        set the root GraphicsLayer to WebKitWebView when Accelerated Compositing needs to be enabled.
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am:
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::attachRootGraphicsLayer): Set the root GraphicsLayer to WebKitWebView.
+        (WebKit::ChromeClient::allowedCompositingTriggers): Allow to support CSS 3D Transforms only.
+        * webkit/webkitglobals.cpp:
+        (webkitInit): Call gtk_clutter_init().
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_size_allocate): Set the size of GtkClutterEmbed when the view is changed.
+        (webkit_web_view_init)
+        (webViewSetRootGraphicsLayer): Add the GtkClutterEmbed to the WebKitWebView as a child.
+        (webViewDetachRootGraphicsLayer): Remove the GtkClutterEmbed from the WebKitWebView.
+        (webViewSyncLayers): Commit layer changes.
+        (webViewMarkForSync): Set to call webViewSyncLayers using g_timeout_add.
+        * webkit/webkitwebviewprivate.h:
+
+2011-12-07  Mary Wu  <mary.wu@torchmobile.com.cn>
+
+        Change function name InitializeLoggingChannelsIfNecessary to follow coding style guideline
+        https://bugs.webkit.org/show_bug.cgi?id=73986
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * webkit/webkitglobals.cpp:
+        (webkitInit):
+
+2011-12-05  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Move emissions of AtkDocument signals down to WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=73750
+
+        Reviewed by Chris Fleizach.
+
+        Removed code for emission of AtkDocument signals.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::notifyStatus): Removed no longer used code.
+
+2011-12-04  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [Gtk] Check for the load-complete event only in the unit tests.
+
+        There is currently a known issue happening in debug builds when
+        reloading the webview if it was loaded before through the function
+        webkit_web_view_load_string, resulting in a ASSERT failing (see
+        bug 50331) so we can't check for the reload event here, since it
+        makes the test to fail. Fortunately, checking for load-complete
+        event is a good enough test, so this small patch is about that.
+
+        Rubber-stamped by Philippe Normand.
+
+        * tests/testatk.c:
+        (testWebkitAtkDocumentLoadingEvents): Don't load and then reload
+        to check events, just load once and check whether the
+        'load-complete' event has happened.
+
+2011-12-03  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        Removing document related events from DRT
+
+        [GTK] Don't log document events in DRT
+        https://bugs.webkit.org/show_bug.cgi?id=73746
+
+        Reviewed by Martin Robinson.
+
+        New unit test to check events when reloading a document. This
+        replaces the former document-reload-events.html layout test.
+
+        * tests/testatk.c:
+        (updateLoadingEventsResult): New, updates a global variable to
+        allow checking later on that the right signals were emmitted.
+        (documentLoadingEventCallback): New, global listener for load-complete
+        and reload signals over the document object (the web area).
+        (testWebkitAtkDocumentLoadingEvents): New unit test, globally
+        connects to document-related signals and check they are properly
+        emitted when reloading the web view.
+        (main): Added new test.
+
+2011-12-03  Xan Lopez  <xlopez@igalia.com>
+
+        [GTK] Implement History API FrameLoaderClient methods
+        https://bugs.webkit.org/show_bug.cgi?id=59017
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Fake the load process when the new HTML5 History APIs are
+        used. Otherwise the UA does not have a chance of updating the URL
+        entry, back/forward buttons, etc.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidNavigateWithinPage): fake a
+        load process.
+        (WebKit::FrameLoaderClient::dispatchDidPushStateWithinPage): call
+        dispatchDidNavigateWithinPage.
+        (WebKit::FrameLoaderClient::dispatchDidReplaceStateWithinPage):
+        ditto.
+        (WebKit::FrameLoaderClient::dispatchDidPopStateWithinPage): do
+        nothing, because push was already called, but note this in a
+        comment.
+        * WebCoreSupport/FrameLoaderClientGtk.h: add the new method.
+
+2011-12-02  Philippe Normand  <pnormand@igalia.com>
+
+        [GStreamer] Fullscreen controller support for the new WebKit Fullscreen API
+        https://bugs.webkit.org/show_bug.cgi?id=66968
+
+        Reviewed by Martin Robinson.
+
+        If the element being fullscreened is a video use the native
+        fullscreen controls.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::enterFullScreenForElement):
+        (WebKit::ChromeClient::exitFullScreenForElement):
+
+2011-12-01  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] scrollbars interfering with fullscreen (in-window) video rendering
+        https://bugs.webkit.org/show_bug.cgi?id=73577
+
+        Reviewed by Martin Robinson.
+
+        Disable scrollbars when switching to fullscreen.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::contentsSizeChanged): Ignore size changes
+        when an element is being displayed fullscreen.
+        (WebKit::ChromeClient::enterFullScreenForElement): Disable
+        scrollbars when entering fullscreen.
+        * WebCoreSupport/GtkAdjustmentWatcher.cpp: Added 2 methods to
+        enable/disable scrollbars and one method to know whether they are
+        enabled or not.
+        (WebKit::GtkAdjustmentWatcher::GtkAdjustmentWatcher):
+        (WebKit::updateAdjustmentFromScrollbar):
+        (WebKit::GtkAdjustmentWatcher::updateAdjustmentsFromScrollbars):
+        (WebKit::GtkAdjustmentWatcher::updateAdjustmentsFromScrollbarsLater):
+        (WebKit::GtkAdjustmentWatcher::disableAllScrollbars):
+        (WebKit::GtkAdjustmentWatcher::enableAllScrollbars):
+        * WebCoreSupport/GtkAdjustmentWatcher.h:
+        (WebKit::GtkAdjustmentWatcher::scrollbarsDisabled):
+
+2011-11-21  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] enable-webaudio websetting
+        https://bugs.webkit.org/show_bug.cgi?id=69836
+
+        Reviewed by Martin Robinson.
+
+        * webkit/webkitwebsettings.cpp: New enable-webaudio boolean
+        setting, set to FALSE by default.
+        (webkit_web_settings_class_init):
+        (webkit_web_settings_set_property):
+        (webkit_web_settings_get_property):
+        * webkit/webkitwebsettingsprivate.h: Ditto.
+        * webkit/webkitwebview.cpp: Update WebCore settings when
+        enable-webaudio value changes.
+        (webkit_web_view_update_settings):
+        (webkit_web_view_settings_notify):
+
+2011-11-30  Alexey Proskuryakov  <ap@apple.com>
+
+        Remove an unneeded argument from FrameLoaderClient::download
+        https://bugs.webkit.org/show_bug.cgi?id=73486
+
+        Reviewed by Andreas Kling.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::download):
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        Updated for the change.
+
+2011-11-30  Alejandro G. Castro  <alex@igalia.com>
+
+        [GTK] Add TextureMapperCairo boilerplate implementation
+        https://bugs.webkit.org/show_bug.cgi?id=73440
+
+        Add texture mapper glue to the widget and chrome client.
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::attachRootGraphicsLayer):
+        (WebKit::ChromeClient::setNeedsOneShotDrawingSynchronization):
+        (WebKit::ChromeClient::scheduleCompositingLayerSync):
+        (WebKit::ChromeClient::allowedCompositingTriggers):
+        * webkit/webkitwebview.cpp:
+        (webViewSetRootGraphicsLayer):
+        (webViewMarkForSync):
+        * webkit/webkitwebviewprivate.h:
+
+2011-11-30  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] HTML5 Youtube video fullscreen button doesn't work
+        https://bugs.webkit.org/show_bug.cgi?id=73456
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::supportsFullScreenForElement): Ignore
+        withKeyboard argument value, like Chrome's implementation.
+
+2011-11-29  Sergio Villar Senin  <svillar@igalia.com>
+
+        [GTK] SIGSEV when a WebKitDownload fails
+        https://bugs.webkit.org/show_bug.cgi?id=72883
+
+        Reviewed by Xan Lopez.
+
+        After r100769 http status codes >= 400 trigger download
+        failures. We must ensure that the download is properly cancelled
+        before clearing the ResourceHandle client to avoid crashes.
+
+        * webkit/webkitdownload.cpp:
+        (DownloadClient::didReceiveResponse):
+
+2011-11-29  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Custom fonts on surlybikes.com and boingboing.net do not load
+        https://bugs.webkit.org/show_bug.cgi?id=69115
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Instead of pretending to be Safari/Linux, pretend to be a Linux Chrome.
+        This fixes pages that assume that if a browser is Safari, but not OS X, it is
+        the iOS version of Safari.
+
+        * tests/testwebsettings.c:
+        (test_webkit_web_settings_user_agent): Update the test to reflect that the
+        user agent does not change.
+        * webkit/webkitwebsettings.cpp:
+        (chromeUserAgent): Renamed this from webkitUserAgent to more accurately
+        describe what it is.
+        (webkit_web_settings_class_init): Just use an empty string when initializing
+        the user agent to reduce code duplication.
+        (webkit_web_settings_set_property): Updated to reflect new method name.
+        (userAgentForURL): We don't need to special case Google Calendar any longer.
+
+2011-11-29  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [Gtk] Regression: text-inserted events lack text inserted and current line
+        https://bugs.webkit.org/show_bug.cgi?id=72830
+
+        Reviewed by Chris Fleizach.
+
+        Updated unit test to handle the new 'text-insert' and
+        'text-remove' signals, instead of the 'text-changed' one.
+
+        * tests/testatk.c:
+        (textChangedCb): Update a global variable with the result of the
+        text change, so we can check its value later.
+        (testWebkitAtkTextChangedNotifications): Connect to the
+        'text-insert' and 'text-remove' signals and check, in a way more
+        carefully way than it was done before, that the signals are being
+        properly emitted, and that the information attached to them is the
+        right one for each case (insert/remove, offset, count and text).
+
+2011-11-28  Stefan Zwanenburg  <stefanhetzwaantje@gmail.com>
+
+        WebKitGTK+-1.7.2 build error due to a reference to gdk_disable_multidevice()
+        https://bugs.webkit.org/show_bug.cgi?id=73206
+
+        Reviewed by Martin Robinson.
+
+        * tests/testatk.c:
+        (initializeTestingFramework): Don't use gdk_disable_multidevice()
+        when using GTK2.
+
+2011-11-26  Pavel Feldman  <pfeldman@google.com>
+
+        Web Inspector: remove disconnectFromBackend from the protocol.
+        https://bugs.webkit.org/show_bug.cgi?id=73127
+
+        Reviewed by Yury Semikhatsky.
+
+        * WebCoreSupport/InspectorClientGtk.cpp:
+        (WebKit::InspectorClient::inspectorDestroyed):
+        (WebKit::InspectorClient::closeInspectorFrontend):
+        * WebCoreSupport/InspectorClientGtk.h:
+
+2011-11-26  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r101193.
+        http://trac.webkit.org/changeset/101193
+        https://bugs.webkit.org/show_bug.cgi?id=73158
+
+        Breaks Windows and Qt minimal. (Requested by pfeldman on
+        #webkit).
+
+        * WebCoreSupport/InspectorClientGtk.cpp:
+        (WebKit::InspectorClient::inspectorDestroyed):
+        (WebKit::InspectorFrontendClient::disconnectFromBackend):
+        * WebCoreSupport/InspectorClientGtk.h:
+
+2011-11-26  Pavel Feldman  <pfeldman@google.com>
+
+        Web Inspector: remove disconnectFromBackend from the protocol.
+        https://bugs.webkit.org/show_bug.cgi?id=73127
+
+        Reviewed by Yury Semikhatsky.
+
+        * WebCoreSupport/InspectorClientGtk.cpp:
+        (WebKit::InspectorClient::inspectorDestroyed):
+        (WebKit::InspectorClient::closeInspectorFrontend):
+        * WebCoreSupport/InspectorClientGtk.h:
+
+2011-11-17  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Integrate build-gtkdoc into build-webkit and make
+        https://bugs.webkit.org/show_bug.cgi?id=72626
+
+        Reviewed by Philippe Normand.
+
+        * docs/GNUmakefile.am: Removed.
+        * docs/version.xml.in: Removed.
+
+2011-11-23  Kaustubh Atrawalkar  <kaustubh@motorola.com>
+
+        Documentation fix for load-committed in webkitwebframe
+        https://bugs.webkit.org/show_bug.cgi?id=72927
+
+        Reviewed by Martin Robinson.
+
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_class_init):
+
+2011-11-22  Pavel Feldman  <pfeldman@google.com>
+
+        Web Inspector: remove Inspector::bringToFront from the protocol.
+        https://bugs.webkit.org/show_bug.cgi?id=72937
+
+        Reviewed by Yury Semikhatsky.
+
+        * WebCoreSupport/InspectorClientGtk.cpp:
+        (WebKit::InspectorClient::bringFrontendToFront):
+        * WebCoreSupport/InspectorClientGtk.h:
+
+2011-11-22  Pavel Feldman  <pfeldman@google.com>
+
+        Web Inspector: strip unused InspectorController methods.
+        https://bugs.webkit.org/show_bug.cgi?id=72886
+
+        Reviewed by Yury Semikhatsky.
+
+        * webkit/webkitwebinspector.cpp:
+        (webkit_web_inspector_set_property):
+        (webkit_web_inspector_get_property):
+
+2011-11-21  Yuta Kitamura  <yutak@chromium.org>
+
+        [GTK] Enable WebSocket hybi tests
+        https://bugs.webkit.org/show_bug.cgi?id=72870
+
+        Reviewed by Xan Lopez.
+
+        Change the settings value through DumpRenderTreeSupportGtk, because we do not
+        want to expose this as a public API.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled):
+        Change the value of a flag in WebCore::Settings.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+
 2011-11-21  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK] Update NEWS and configure.ac for 1.7.2 release

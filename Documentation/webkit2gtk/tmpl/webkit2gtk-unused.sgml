@@ -1,0 +1,29 @@
+<!-- ##### ENUM WebKitLoadStatus ##### -->
+<para>
+
+</para>
+
+@WEBKIT_LOAD_PROVISIONAL: 
+@WEBKIT_LOAD_REDIRECTED: 
+@WEBKIT_LOAD_COMMITTED: 
+@WEBKIT_LOAD_FINISHED: 
+
+<!-- ##### SIGNAL WebKitWebView::load-failed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebView::load-status-changed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+

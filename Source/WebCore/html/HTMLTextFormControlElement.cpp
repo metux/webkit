@@ -153,7 +153,7 @@ void HTMLTextFormControlElement::updatePlaceholderVisibility(bool placeholderVal
     if (!placeholder)
         return;
     ExceptionCode ec = 0;
-    placeholder->getInlineStyleDecl()->setProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? "visible" : "hidden", ec);
+    placeholder->ensureInlineStyleDecl()->setProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? "visible" : "hidden", ec);
     ASSERT(!ec);
 }
 
@@ -568,6 +568,36 @@ HTMLTextFormControlElement* enclosingTextFormControl(const Position& position)
         return 0;
     Node* ancestor = container->shadowAncestorNode();
     return ancestor != container ? toTextFormControl(ancestor) : 0;
+}
+
+static const Element* parentHTMLElement(const Element* element)
+{
+    while (element) {
+        element = element->parentElement();
+        if (element && element->isHTMLElement())
+            return element;
+    }
+    return 0;
+}
+
+String HTMLTextFormControlElement::directionForFormData() const
+{
+    for (const Element* element = this; element; element = parentHTMLElement(element)) {
+        const AtomicString& dirAttributeValue = element->fastGetAttribute(dirAttr);
+        if (dirAttributeValue.isNull())
+            continue;
+
+        if (equalIgnoringCase(dirAttributeValue, "rtl") || equalIgnoringCase(dirAttributeValue, "ltr"))
+            return dirAttributeValue;
+
+        if (equalIgnoringCase(dirAttributeValue, "auto")) {
+            bool isAuto;
+            TextDirection textDirection = static_cast<const HTMLElement*>(element)->directionalityIfhasDirAutoAttribute(isAuto);
+            return textDirection == RTL ? "rtl" : "ltr";
+        }
+    }
+
+    return "ltr";
 }
 
 } // namespace Webcore

@@ -265,19 +265,33 @@ Element.prototype.createChild = function(elementName, className)
 
 DocumentFragment.prototype.createChild = Element.prototype.createChild;
 
+/**
+ * @return {number}
+ */
 Element.prototype.totalOffsetLeft = function()
 {
     var total = 0;
-    for (var element = this; element; element = element.offsetParent)
-        total += element.offsetLeft + (this !== element ? element.clientLeft : 0);
+    for (var element = this; element; element = element.offsetParent) {
+        total += element.offsetLeft 
+        if (this !== element)
+            total += element.clientLeft - element.scrollLeft;
+    }
+        
     return total;
 }
 
+/**
+ * @return {number}
+ */
 Element.prototype.totalOffsetTop = function()
 {
     var total = 0;
-    for (var element = this; element; element = element.offsetParent)
-        total += element.offsetTop + (this !== element ? element.clientTop : 0);
+    for (var element = this; element; element = element.offsetParent) {
+        total += element.offsetTop 
+        if (this !== element)
+            total += element.clientTop - element.scrollTop;
+    }
+        
     return total;
 }
 
@@ -297,6 +311,7 @@ function AnchorBox(x, y, width, height)
 }
 
 /**
+ * @param {Window} targetWindow
  * @return {AnchorBox}
  */
 Element.prototype.offsetRelativeToWindow = function(targetWindow)
@@ -318,33 +333,23 @@ Element.prototype.offsetRelativeToWindow = function(targetWindow)
 }
 
 /**
+ * @param {Window} targetWindow
  * @return {AnchorBox}
  */
-Element.prototype.boxInWindow = function(targetWindow, relativeParent)
+Element.prototype.boxInWindow = function(targetWindow)
 {
     targetWindow = targetWindow || this.ownerDocument.defaultView;
-    var bodyElement = this.ownerDocument.body;
-    relativeParent = relativeParent || bodyElement;
 
     var anchorBox = this.offsetRelativeToWindow(window);
     anchorBox.width = this.offsetWidth;
     anchorBox.height = this.offsetHeight;
 
-    var anchorElement = this;
-    while (anchorElement && anchorElement !== relativeParent && anchorElement !== bodyElement) {
-        if (anchorElement.scrollLeft)
-            anchorBox.x -= anchorElement.scrollLeft;
-        if (anchorElement.scrollTop)
-            anchorBox.y -= anchorElement.scrollTop;
-        anchorElement = anchorElement.parentElement;
-    }
-
-    var parentOffset = relativeParent.offsetRelativeToWindow(window);
-    anchorBox.x -= parentOffset.x;
-    anchorBox.y -= parentOffset.y;
     return anchorBox;
 }
 
+/**
+ * @param {string} text
+ */
 Element.prototype.setTextAndTitle = function(text)
 {
     this.textContent = text;
@@ -453,6 +458,20 @@ String.prototype.asParsedURL = function()
     result.port = match[3];
     result.path = match[4] || "/";
     result.fragment = match[5];
+
+    result.lastPathComponent = "";
+    if (result.path) {
+        // First cut the query params.
+        var path = result.path;
+        var indexOfQuery = path.indexOf("?");
+        if (indexOfQuery !== -1)
+            path = path.substring(0, indexOfQuery);
+
+        // Then take last path component.
+        var lastSlashIndex = path.lastIndexOf("/");
+        if (lastSlashIndex !== -1)
+            result.lastPathComponent = path.substring(lastSlashIndex + 1);
+    } 
     return result;
 }
 
@@ -1129,4 +1148,45 @@ TextDiff.compute = function(baseContent, newContent)
             offset = i - right[i].row;
     }
     return diffData;
+}
+
+/**
+ * @constructor
+ */
+var Map = function()
+{
+    this._map = {};
+}
+
+Map._lastObjectIdentifier = 0;
+
+Map.prototype = {
+    /**
+     * @param {Object} key
+     */
+    put: function(key, value)
+    {
+        var objectIdentifier = key.__identifier;
+        if (!objectIdentifier) {
+            objectIdentifier = ++Map._lastObjectIdentifier;
+            key.__identifier = objectIdentifier;
+        }
+        this._map[objectIdentifier] = value;
+    },
+    
+    /**
+     * @param {Object} key
+     */
+    remove: function(key)
+    {
+        delete this._map[key.__identifier];
+    },
+    
+    /**
+     * @param {Object} key
+     */
+    get: function(key)
+    {
+        return this._map[key.__identifier];
+    },
 }

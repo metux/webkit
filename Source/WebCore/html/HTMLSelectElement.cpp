@@ -45,6 +45,7 @@
 #include "Page.h"
 #include "RenderListBox.h"
 #include "RenderMenuList.h"
+#include "RenderTheme.h"
 #include "ScriptEventListener.h"
 #include "SpatialNavigation.h"
 #include <wtf/text/StringBuilder.h>
@@ -167,7 +168,6 @@ bool HTMLSelectElement::valueMissing() const
     return firstSelectionIndex < 0 || (!firstSelectionIndex && hasPlaceholderLabelOption());
 }
 
-#if ENABLE(NO_LISTBOX_RENDERING)
 void HTMLSelectElement::listBoxSelectItem(int listIndex, bool allowMultiplySelections, bool shift, bool fireOnChangeNow)
 {
     if (!multiple())
@@ -179,7 +179,16 @@ void HTMLSelectElement::listBoxSelectItem(int listIndex, bool allowMultiplySelec
             listBoxOnChange();
     }
 }
-#endif
+
+bool HTMLSelectElement::usesMenuList() const
+{
+    const Page* page = document()->page();
+    RefPtr<RenderTheme> renderTheme = page ? page->theme() : RenderTheme::defaultTheme();
+    if (renderTheme->delegatesMenuListRendering())
+        return true;
+
+    return !m_multiple && m_size <= 1;
+}
 
 int HTMLSelectElement::activeSelectionStartListIndex() const
 {
@@ -682,6 +691,7 @@ void HTMLSelectElement::recalcListItems(bool updateSelectedStates) const
     m_shouldRecalcListItems = false;
 
     HTMLOptionElement* foundSelected = 0;
+    HTMLOptionElement* firstOption = 0;
     for (Node* currentNode = this->firstChild(); currentNode;) {
         if (!currentNode->isHTMLElement()) {
             currentNode = currentNode->traverseNextSibling(this);
@@ -705,12 +715,16 @@ void HTMLSelectElement::recalcListItems(bool updateSelectedStates) const
             m_listItems.append(current);
 
             if (updateSelectedStates && !m_multiple) {
-                if (!foundSelected && (m_size <= 1 || toHTMLOptionElement(current)->selected())) {
-                    foundSelected = toHTMLOptionElement(current);
+                HTMLOptionElement* option = toHTMLOptionElement(current);
+                if (!firstOption)
+                    firstOption = option;
+                if (option->selected()) {
+                    if (foundSelected)
+                        foundSelected->setSelectedState(false);
+                    foundSelected = option;
+                } else if (m_size <= 1 && !foundSelected && !option->disabled()) {
+                    foundSelected = option;
                     foundSelected->setSelectedState(true);
-                } else if (foundSelected && toHTMLOptionElement(current)->selected()) {
-                    foundSelected->setSelectedState(false);
-                    foundSelected = toHTMLOptionElement(current);
                 }
             }
         }
@@ -726,6 +740,9 @@ void HTMLSelectElement::recalcListItems(bool updateSelectedStates) const
         // <select>'s subtree at this point.
         currentNode = currentNode->traverseNextSibling(this);
     }
+
+    if (!foundSelected && m_size <= 1 && firstOption && !firstOption->selected())
+        firstOption->setSelectedState(true);
 }
 
 int HTMLSelectElement::selectedIndex() const
@@ -1033,7 +1050,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
             handled = false;
 
         if (handled && static_cast<size_t>(listIndex) < listItems.size())
-            selectOption(listToOptionIndex(listIndex), DeselectOtherOptions | UserDriven);
+            selectOption(listToOptionIndex(listIndex), DeselectOtherOptions | DispatchChangeEvent | UserDriven);
 
         if (handled)
             event->setDefaultHandled();
@@ -1424,7 +1441,7 @@ void HTMLSelectElement::typeAheadFind(KeyboardEvent* event)
         // Fold the option string and check if its prefix is equal to the folded prefix.
         String text = toHTMLOptionElement(element)->textIndentedToRespectGroupLabel();
         if (stripLeadingWhiteSpace(text).foldCase().startsWith(prefixWithCaseFolded)) {
-            selectOption(listToOptionIndex(index), DeselectOtherOptions | UserDriven);
+            selectOption(listToOptionIndex(index), DeselectOtherOptions | DispatchChangeEvent | UserDriven);
             if (!usesMenuList())
                 listBoxOnChange();
 

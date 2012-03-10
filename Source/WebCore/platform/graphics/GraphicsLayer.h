@@ -68,6 +68,18 @@ namespace WebCore {
 class LayerChromium;
 typedef LayerChromium PlatformLayer;
 }
+#elif PLATFORM(GTK)
+#if USE(TEXTURE_MAPPER_CAIRO) || USE(TEXTURE_MAPPER_GL)
+namespace WebCore {
+class TextureMapperPlatformLayer;
+typedef TextureMapperPlatformLayer PlatformLayer;
+};
+#elif USE(CLUTTER)
+typedef struct _ClutterActor ClutterActor;
+namespace WebCore {
+typedef ClutterActor PlatformLayer;
+};
+#endif
 #else
 typedef void* PlatformLayer;
 #endif
@@ -163,7 +175,20 @@ public:
     {
         deleteAllValues(m_values);
     }
-    
+
+    KeyframeValueList& operator=(const KeyframeValueList& other)
+    {
+        KeyframeValueList copy(other);
+        swap(copy);
+        return *this;
+    }
+
+    void swap(KeyframeValueList& other)
+    {
+        std::swap(m_property, other.m_property);
+        m_values.swap(other.m_values);
+    }
+
     AnimatedPropertyID property() const { return m_property; }
 
     size_t size() const { return m_values.size(); }
@@ -377,7 +402,7 @@ public:
 
     bool usingTiledLayer() const { return m_usingTiledLayer; }
 
-#if PLATFORM(QT)
+#if PLATFORM(QT) || PLATFORM(GTK)
     // This allows several alternative GraphicsLayer implementations in the same port,
     // e.g. if a different GraphicsLayer implementation is needed in WebKit1 vs. WebKit2.
     typedef PassOwnPtr<GraphicsLayer> GraphicsLayerFactory(GraphicsLayerClient*);
@@ -449,7 +474,7 @@ protected:
 
     int m_repaintCount;
 
-#if PLATFORM(QT)
+#if PLATFORM(QT) || PLATFORM(GTK)
     static GraphicsLayer::GraphicsLayerFactory* s_graphicsLayerFactory;
 #endif
 };

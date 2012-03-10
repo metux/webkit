@@ -54,6 +54,7 @@
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
 #include <wtf/Assertions.h>
+#include <wtf/gobject/GlibUtilities.h>
 
 #if PLATFORM(X11)
 #include <fontconfig/fontconfig.h>
@@ -154,6 +155,30 @@ static void initializeGtkFontSettings(const char* testURL)
         g_object_set(settings, "gtk-xft-rgba", "rgb", NULL);
     else
         g_object_set(settings, "gtk-xft-rgba", "none", NULL);
+
+    GdkScreen* screen = gdk_screen_get_default();
+    ASSERT(screen);
+    const cairo_font_options_t* screenOptions = gdk_screen_get_font_options(screen);
+    ASSERT(screenOptions);
+    cairo_font_options_t* options = cairo_font_options_copy(screenOptions);
+    // Turn off text metrics hinting, which quantizes metrics to pixels in device space.
+    cairo_font_options_set_hint_metrics(options, CAIRO_HINT_METRICS_OFF);
+    gdk_screen_set_font_options(screen, options);
+    cairo_font_options_destroy(options);
+}
+
+CString getTopLevelPath()
+{
+    if (const char* topLevelDirectory = g_getenv("WEBKIT_TOP_LEVEL"))
+        return topLevelDirectory;
+
+    // If the environment variable wasn't provided then assume we were built into
+    // WebKitBuild/Debug or WebKitBuild/Release. Obviously this will fail if the build
+    // directory is non-standard, but we can't do much more about this.
+    GOwnPtr<char> parentPath(g_path_get_dirname(getCurrentExecutablePath().data()));
+    GOwnPtr<char> layoutTestsPath(g_build_filename(parentPath.get(), "..", "..", "..", NULL));
+    GOwnPtr<char> absoluteTopLevelPath(realpath(layoutTestsPath.get(), 0));
+    return absoluteTopLevelPath.get();
 }
 
 static void initializeFonts(const char* testURL = 0)
@@ -177,62 +202,21 @@ static void initializeFonts(const char* testURL = 0)
     if (!FcConfigParseAndLoad(config, reinterpret_cast<FcChar8*>(fontConfigFilename.get()), true))
         g_error("Couldn't load font configuration file from: %s", fontConfigFilename.get());
 
-    static const char *const fontDirectories[] = {
-        "/usr/share/fonts/truetype/liberation",
-        "/usr/share/fonts/truetype/ttf-liberation",
-        "/usr/share/fonts/liberation",
-        "/usr/share/fonts/truetype/ttf-dejavu",
-        "/usr/share/fonts/dejavu",
-        "/usr/share/fonts/opentype/stix",
-        "/usr/share/fonts/stix"
-    };
+    CString topLevelPath = getTopLevelPath();
+    GOwnPtr<char> fontsPath(g_build_filename(topLevelPath.data(), "WebKitBuild", "Dependencies",
+                                             "Root", "webkitgtk-test-fonts", NULL));
+    if (!g_file_test(fontsPath.get(), static_cast<GFileTest>(G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+        g_error("Could not locate test fonts at %s. Is WEBKIT_TOP_LEVEL set?", fontsPath.get());
 
-    static const char *const fontPaths[] = {
-        "LiberationMono-BoldItalic.ttf",
-        "LiberationMono-Bold.ttf",
-        "LiberationMono-Italic.ttf",
-        "LiberationMono-Regular.ttf",
-        "LiberationSans-BoldItalic.ttf",
-        "LiberationSans-Bold.ttf",
-        "LiberationSans-Italic.ttf",
-        "LiberationSans-Regular.ttf",
-        "LiberationSerif-BoldItalic.ttf",
-        "LiberationSerif-Bold.ttf",
-        "LiberationSerif-Italic.ttf",
-        "LiberationSerif-Regular.ttf",
-        "DejaVuSans.ttf",
-        "DejaVuSerif.ttf",
+    GOwnPtr<GError> error;
+    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.get(), 0, &error.outPtr()));
+    while (const char* directoryEntry = g_dir_read_name(fontsDirectory.get())) {
+        if (!g_str_has_suffix(directoryEntry, ".ttf") && !g_str_has_suffix(directoryEntry, ".otf"))
+            continue;
+        GOwnPtr<gchar> fontPath(g_build_filename(fontsPath.get(), directoryEntry, NULL));
+        if (!FcConfigAppFontAddFile(config, reinterpret_cast<const FcChar8*>(fontPath.get())))
+            g_error("Could not load font at %s!", fontPath.get());
 
-        // MathML tests require the STIX fonts.
-        "STIXGeneral.otf",
-        "STIXGeneralBolIta.otf",
-        "STIXGeneralBol.otf",
-        "STIXGeneralItalic.otf"
-    };
-
-    // TODO: Some tests use Lucida. We should load these as well, once it becomes
-    // clear how to install these fonts easily on Fedora.
-    for (size_t font = 0; font < G_N_ELEMENTS(fontPaths); font++) {
-        bool found = false;
-        for (size_t path = 0; path < G_N_ELEMENTS(fontDirectories); path++) {
-            GOwnPtr<gchar> fullPath(g_build_filename(fontDirectories[path], fontPaths[font], NULL));
-            if (g_file_test(fullPath.get(), G_FILE_TEST_EXISTS)) {
-                found = true;
-                if (!FcConfigAppFontAddFile(config, reinterpret_cast<const FcChar8*>(fullPath.get())))
-                    g_error("Could not load font at %s!", fullPath.get());
-                else
-                    break;
-            }
-        }
-
-        if (!found) {
-            GOwnPtr<gchar> directoriesDescription;
-            for (size_t path = 0; path < G_N_ELEMENTS(fontDirectories); path++)
-                directoriesDescription.set(g_strjoin(":", directoriesDescription.release(), fontDirectories[path], NULL));
-            g_error("Could not find font %s in %s. Either install this font or file a bug "
-                    "at http://bugs.webkit.org if it is installed in another location.",
-                    fontPaths[font], directoriesDescription.get());
-        }
     }
 
     // Ahem is used by many layout tests.
@@ -476,6 +460,8 @@ static void resetDefaultsToConsistentValues()
     DumpRenderTreeSupportGtk::clearOpener(mainFrame);
 
     DumpRenderTreeSupportGtk::resetGeolocationClientMock(webView);
+
+    DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(webView, true);
 }
 
 static bool useLongRunningServerMode(int argc, char *argv[])

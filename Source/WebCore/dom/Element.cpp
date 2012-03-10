@@ -48,6 +48,7 @@
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "InspectorInstrumentation.h"
+#include "MutationObserverInterestGroup.h"
 #include "MutationRecord.h"
 #include "NodeList.h"
 #include "NodeRenderStyle.h"
@@ -180,11 +181,21 @@ void Element::copyNonAttributeProperties(const Element*)
 {
 }
 
+#if ENABLE(MUTATION_OBSERVERS)
+void Element::enqueueAttributesMutationRecordIfRequested(const QualifiedName& attributeName, const AtomicString& oldValue)
+{
+    if (isSynchronizingStyleAttribute())
+        return;
+    if (OwnPtr<MutationObserverInterestGroup> mutationRecipients = MutationObserverInterestGroup::createForAttributesMutation(this, attributeName))
+        mutationRecipients->enqueueMutationRecord(MutationRecord::createAttributes(this, attributeName, oldValue));
+}
+#endif
+
 void Element::removeAttribute(const QualifiedName& name, ExceptionCode& ec)
 {
     if (m_attributeMap) {
         ec = 0;
-        m_attributeMap->removeNamedItem(name, ec);
+        RefPtr<Node> attrNode = m_attributeMap->removeNamedItem(name, ec);
         if (ec == NOT_FOUND_ERR)
             ec = 0;
     }
@@ -616,48 +627,6 @@ const AtomicString& Element::getAttributeNS(const String& namespaceURI, const St
     return getAttribute(QualifiedName(nullAtom, localName, namespaceURI));
 }
 
-#if ENABLE(MUTATION_OBSERVERS)
-static inline bool hasOldValue(MutationObserverOptions options)
-{
-    return options & WebKitMutationObserver::AttributeOldValue;
-}
-
-static inline bool isOldValueRequested(const HashMap<WebKitMutationObserver*, MutationObserverOptions>& observers)
-{
-    for (HashMap<WebKitMutationObserver*, MutationObserverOptions>::const_iterator iter = observers.begin(); iter != observers.end(); ++iter) {
-        if (hasOldValue(iter->second))
-            return true;
-    }
-    return false;
-}
-
-static void enqueueAttributesMutationRecord(Element* element, const QualifiedName& name, const AtomicString& oldValue)
-{
-    HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions> observers;
-    element->getRegisteredMutationObserversOfType(observers, WebKitMutationObserver::Attributes, name.localName());
-    if (observers.isEmpty())
-        return;
-
-    // FIXME: Factor this logic out to avoid duplication with characterDataOldValue.
-    RefPtr<MutationRecord> mutation = MutationRecord::createAttributes(element, name, isOldValueRequested(observers) ? oldValue : nullAtom);
-    RefPtr<MutationRecord> mutationWithNullOldValue;
-    for (HashMap<WebKitMutationObserver*, MutationObserverOptions>::iterator iter = observers.begin(); iter != observers.end(); ++iter) {
-        WebKitMutationObserver* observer = iter->first;
-        if (hasOldValue(iter->second)) {
-            observer->enqueueMutationRecord(mutation);
-            continue;
-        }
-        if (!mutationWithNullOldValue) {
-            if (mutation->oldValue().isNull())
-                mutationWithNullOldValue = mutation;
-            else
-                mutationWithNullOldValue = MutationRecord::createWithNullOldValue(mutation).get();
-        }
-        observer->enqueueMutationRecord(mutationWithNullOldValue);
-    }
-}
-#endif
-
 void Element::setAttribute(const AtomicString& name, const AtomicString& value, ExceptionCode& ec)
 {
     if (!Document::isValidName(name)) {
@@ -665,61 +634,32 @@ void Element::setAttribute(const AtomicString& name, const AtomicString& value, 
         return;
     }
 
-#if ENABLE(INSPECTOR)
-    if (!isSynchronizingStyleAttribute())
-        InspectorInstrumentation::willModifyDOMAttr(document(), this);
-#endif
-
     const AtomicString& localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
-    QualifiedName attributeName(nullAtom, localName, nullAtom);
-    
+
     // Allocate attribute map if necessary.
     Attribute* old = attributes(false)->getAttributeItem(localName, false);
-
-    document()->incDOMTreeVersion();
-
-#if ENABLE(MUTATION_OBSERVERS)
-    // The call to attributeChanged below may dispatch DOMSubtreeModified, so it's important to enqueue a MutationRecord now.
-    enqueueAttributesMutationRecord(this, attributeName, old ? old->value() : nullAtom);
-#endif
-
-    if (isIdAttributeName(old ? old->name() : attributeName))
-        updateId(old ? old->value() : nullAtom, value);
-
-    if (old && value.isNull())
-        m_attributeMap->removeAttribute(old->name());
-    else if (!old && !value.isNull())
-        m_attributeMap->addAttribute(createAttribute(attributeName, value));
-    else if (old && !value.isNull()) {
-        if (Attr* attrNode = old->attr())
-            attrNode->setValue(value);
-        else
-            old->setValue(value);
-        attributeChanged(old);
-    }
-
-#if ENABLE(INSPECTOR)
-    if (!isSynchronizingStyleAttribute())
-        InspectorInstrumentation::didModifyDOMAttr(document(), this, name, value);
-#endif
+    setAttributeInternal(old, old ? old->name() : QualifiedName(nullAtom, localName, nullAtom), value);
 }
 
 void Element::setAttribute(const QualifiedName& name, const AtomicString& value, ExceptionCode&)
+{
+    // Allocate attribute map if necessary.
+    Attribute* old = attributes(false)->getAttributeItem(name);
+    setAttributeInternal(old, name, value);
+}
+
+inline void Element::setAttributeInternal(Attribute* old, const QualifiedName& name, const AtomicString& value)
 {
 #if ENABLE(INSPECTOR)
     if (!isSynchronizingStyleAttribute())
         InspectorInstrumentation::willModifyDOMAttr(document(), this);
 #endif
 
-    document()->incDOMTreeVersion();
-
-    // Allocate attribute map if necessary.
-    Attribute* old = attributes(false)->getAttributeItem(name);
-
 #if ENABLE(MUTATION_OBSERVERS)
-    // The call to attributeChanged below may dispatch DOMSubtreeModified, so it's important to enqueue a MutationRecord now.
-    enqueueAttributesMutationRecord(this, name, old ? old->value() : nullAtom);
+    enqueueAttributesMutationRecordIfRequested(name, old ? old->value() : nullAtom);
 #endif
+
+    document()->incDOMTreeVersion();
 
     if (isIdAttributeName(name))
         updateId(old ? old->value() : nullAtom, value);
@@ -773,7 +713,9 @@ void Element::updateAfterAttributeChanged(Attribute* attr)
     } else if (attrName == aria_labelAttr || attrName == aria_labeledbyAttr || attrName == altAttr || attrName == titleAttr) {
         // If the content of an element changes due to an attribute change, notify accessibility.
         document()->axObjectCache()->contentChanged(renderer());
-    } else if (attrName == aria_selectedAttr)
+    } else if (attrName == aria_checkedAttr)
+        document()->axObjectCache()->checkedStateChanged(renderer());
+    else if (attrName == aria_selectedAttr)
         document()->axObjectCache()->selectedChildrenChanged(renderer());
     else if (attrName == aria_expandedAttr)
         document()->axObjectCache()->handleAriaExpandedChange(renderer());
@@ -1197,7 +1139,6 @@ void Element::recalcStyle(StyleChange change)
     bool forceCheckOfAnyElementSibling = false;
     for (Node *n = firstChild(); n; n = n->nextSibling()) {
         if (n->isTextNode()) {
-            parentPusher.push();
             static_cast<Text*>(n)->recalcTextStyle(change);
             continue;
         } 
@@ -1264,8 +1205,11 @@ void Element::setShadowRoot(PassRefPtr<ShadowRoot> prpShadowRoot, ExceptionCode&
     shadowRoot->setShadowHost(this);
     if (inDocument())
         shadowRoot->insertedIntoDocument();
-    if (attached())
+    if (attached()) {
         shadowRoot->lazyAttach();
+        for (Node* child = firstChild(); child; child = child->nextSibling())
+            child->detach();
+    }
 }
 
 ShadowRoot* Element::ensureShadowRoot()
@@ -1572,7 +1516,7 @@ void Element::removeAttribute(const String& name, ExceptionCode& ec)
 
     if (m_attributeMap) {
         ec = 0;
-        m_attributeMap->removeNamedItem(localName, ec);
+        RefPtr<Node> attrNode = m_attributeMap->removeNamedItem(localName, ec);
         if (ec == NOT_FOUND_ERR)
             ec = 0;
     }
