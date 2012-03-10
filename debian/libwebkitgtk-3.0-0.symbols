@@ -159,6 +159,7 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  (optional|c++)"WebCore::ShadowRoot::create(WebCore::Element*, int&)@Base" 1.7.5
  (optional|c++)"WebCore::toDocument(JSC::JSValue)@Base" 1.5.2
  (optional|c++)"WebCore::TextIterator::rangeFromLocationAndLength(WebCore::Element*, int, int, bool)@Base" 1.7.4
+ (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Element*, WebCore::Range const*, unsigned int&, unsigned int&)@Base" 1.7.4
  (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Element*, WebCore::Range const*, unsigned long&, unsigned long&)@Base" 1.7.4
  (optional|c++)"WebCore::createWrapper(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Node*)@Base" 1.5.2
  (optional|c++)"WebCore::ScrollableArea::setScrollOffsetFromInternals(WebCore::IntPoint const&)@Base" 1.6.1
@@ -179,6 +180,7 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  (optional|c++)"WebCore::FrameDestructionObserver::frameDestroyed()@Base" 1.7.5
  (optional|c++)"WebCore::FrameDestructionObserver::FrameDestructionObserver(WebCore::Frame*)@Base" 1.7.5
  (optional|c++)"WebCore::FrameDestructionObserver::~FrameDestructionObserver()@Base" 1.7.5
+ (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0u> const&)@Base" 1.7.5
  (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0ul> const&)@Base" 1.7.5
  (optional|c++)"WebCore::Page::setPagination(WebCore::Page::Pagination const&)@Base" 1.7.4
  (optional|c++)"WebCore::Page::setPageScaleFactor(float, WebCore::IntPoint const&)@Base" 1.7.4
