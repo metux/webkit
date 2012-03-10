@@ -400,7 +400,7 @@ bool Editor::shouldInsertFragment(PassRefPtr<DocumentFragment> fragment, PassRef
 
 void Editor::replaceSelectionWithFragment(PassRefPtr<DocumentFragment> fragment, bool selectReplacement, bool smartReplace, bool matchStyle)
 {
-    if (m_frame->selection()->isNone() || !fragment)
+    if (m_frame->selection()->isNone() || !m_frame->selection()->isContentEditable() || !fragment)
         return;
 
     ReplaceSelectionCommand::CommandOptions options = ReplaceSelectionCommand::PreventNesting | ReplaceSelectionCommand::SanitizeFragment;
@@ -889,7 +889,7 @@ void Editor::appliedEditing(PassRefPtr<CompositeEditCommand> cmd)
         // different from the last command
         m_lastEditCommand = cmd;
         if (client())
-            client()->registerCommandForUndo(toCompositeEditCommand(m_lastEditCommand.get())->ensureComposition());
+            client()->registerUndoStep(m_lastEditCommand->ensureComposition());
     }
 
     respondToChangedContents(newSelection);
@@ -907,7 +907,7 @@ void Editor::unappliedEditing(PassRefPtr<EditCommandComposition> cmd)
     
     m_lastEditCommand = 0;
     if (client())
-        client()->registerCommandForRedo(cmd);
+        client()->registerRedoStep(cmd);
     respondToChangedContents(newSelection);
 }
 
@@ -922,7 +922,7 @@ void Editor::reappliedEditing(PassRefPtr<EditCommandComposition> cmd)
     
     m_lastEditCommand = 0;
     if (client())
-        client()->registerCommandForUndo(cmd);
+        client()->registerUndoStep(cmd);
     respondToChangedContents(newSelection);
 }
 
@@ -1005,7 +1005,7 @@ bool Editor::insertTextWithoutSendingTextEvent(const String& text, bool selectIn
             // Reveal the current selection
             if (Frame* editedFrame = document->frame())
                 if (Page* page = editedFrame->page())
-                    page->focusController()->focusedOrMainFrame()->selection()->revealSelection(ScrollAlignment::alignToEdgeIfNeeded);
+                    page->focusController()->focusedOrMainFrame()->selection()->revealSelection(ScrollAlignment::alignCenterIfNeeded);
         }
     }
 
@@ -2339,7 +2339,7 @@ void Editor::revealSelectionAfterEditingOperation()
     if (m_ignoreCompositionSelectionChange)
         return;
 
-    m_frame->selection()->revealSelection(ScrollAlignment::alignToEdgeIfNeeded);
+    m_frame->selection()->revealSelection(ScrollAlignment::alignCenterIfNeeded);
 }
 
 void Editor::setIgnoreCompositionSelectionChange(bool ignore)

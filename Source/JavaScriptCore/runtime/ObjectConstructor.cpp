@@ -55,6 +55,8 @@ static EncodedJSValue JSC_HOST_CALL objectConstructorIsExtensible(ExecState*);
 
 namespace JSC {
 
+ASSERT_HAS_TRIVIAL_DESTRUCTOR(ObjectConstructor);
+
 const ClassInfo ObjectConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::objectConstructorTable, CREATE_METHOD_TABLE(ObjectConstructor) };
 
 /* Source for ObjectConstructor.lut.h
@@ -162,8 +164,10 @@ EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(ExecState
         description->putDirect(exec->globalData(), exec->propertyNames().value, descriptor.value() ? descriptor.value() : jsUndefined(), 0);
         description->putDirect(exec->globalData(), exec->propertyNames().writable, jsBoolean(descriptor.writable()), 0);
     } else {
-        description->putDirect(exec->globalData(), exec->propertyNames().get, descriptor.getter() ? descriptor.getter() : jsUndefined(), 0);
-        description->putDirect(exec->globalData(), exec->propertyNames().set, descriptor.setter() ? descriptor.setter() : jsUndefined(), 0);
+        ASSERT(descriptor.getter());
+        ASSERT(descriptor.setter());
+        description->putDirect(exec->globalData(), exec->propertyNames().get, descriptor.getter(), 0);
+        description->putDirect(exec->globalData(), exec->propertyNames().set, descriptor.setter(), 0);
     }
     
     description->putDirect(exec->globalData(), exec->propertyNames().enumerable, jsBoolean(descriptor.enumerable()), 0);
@@ -249,8 +253,7 @@ static bool toPropertyDescriptor(ExecState* exec, JSValue in, PropertyDescriptor
                 throwError(exec, createTypeError(exec, "Getter must be a function."));
                 return false;
             }
-        } else
-            get = JSValue();
+        }
         desc.setGetter(get);
     }
 
@@ -265,9 +268,7 @@ static bool toPropertyDescriptor(ExecState* exec, JSValue in, PropertyDescriptor
                 throwError(exec, createTypeError(exec, "Setter must be a function."));
                 return false;
             }
-        } else
-            set = JSValue();
-
+        }
         desc.setSetter(set);
     }
 
@@ -297,7 +298,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorDefineProperty(ExecState* exec)
     PropertyDescriptor descriptor;
     if (!toPropertyDescriptor(exec, exec->argument(2), descriptor))
         return JSValue::encode(jsNull());
-    ASSERT((descriptor.attributes() & (Getter | Setter)) || (!descriptor.isAccessorDescriptor()));
+    ASSERT((descriptor.attributes() & Accessor) || (!descriptor.isAccessorDescriptor()));
     ASSERT(!exec->hadException());
     O->methodTable()->defineOwnProperty(O, exec, Identifier(exec, propertyName), descriptor, true);
     return JSValue::encode(O);

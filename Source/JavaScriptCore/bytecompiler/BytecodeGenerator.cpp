@@ -230,7 +230,7 @@ BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, ScopeChainNode* s
 
     // FIXME: Move code that modifies the global object to Interpreter::execute.
     
-    m_codeBlock->m_numParameters = 1; // Allocate space for "this"
+    m_codeBlock->setNumParameters(1); // Allocate space for "this"
     codeBlock->m_numCapturedVars = codeBlock->m_numVars;
     
     if (compilationKind == OptimizingCompilation)
@@ -401,7 +401,7 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
     // Add "this" as a parameter
     int nextParameterIndex = CallFrame::thisArgumentOffset();
     m_thisRegister.setIndex(nextParameterIndex--);
-    ++m_codeBlock->m_numParameters;
+    m_codeBlock->addParameter();
     
     for (size_t i = 0; i < parameters.size(); ++i)
         addParameter(parameters[i], nextParameterIndex--);
@@ -459,7 +459,7 @@ BytecodeGenerator::BytecodeGenerator(EvalNode* evalNode, ScopeChainNode* scopeCh
 
     emitOpcode(op_enter);
     codeBlock->setGlobalData(m_globalData);
-    m_codeBlock->m_numParameters = 1; // Allocate space for "this"
+    m_codeBlock->setNumParameters(1);
 
     const DeclarationStacks::FunctionStack& functionStack = evalNode->functionStack();
     for (size_t i = 0; i < functionStack.size(); ++i)
@@ -500,7 +500,7 @@ void BytecodeGenerator::addParameter(const Identifier& ident, int parameterIndex
 
     // To maintain the calling convention, we have to allocate unique space for
     // each parameter, even if the parameter doesn't make it into the symbol table.
-    ++m_codeBlock->m_numParameters;
+    m_codeBlock->addParameter();
 }
 
 RegisterID* BytecodeGenerator::registerFor(const Identifier& ident)
@@ -1821,6 +1821,8 @@ RegisterID* BytecodeGenerator::emitCall(OpcodeID opcodeID, RegisterID* dst, Regi
     instructions().append(func->index()); // func
     instructions().append(callArguments.argumentCountIncludingThis()); // argCount
     instructions().append(callArguments.registerOffset()); // registerOffset
+    instructions().append(0);
+    instructions().append(0);
     if (dst != ignoredResult()) {
         emitOpcode(op_call_put_result);
         instructions().append(dst->index()); // dst
@@ -1867,7 +1869,7 @@ RegisterID* BytecodeGenerator::emitReturn(RegisterID* src)
         emitOpcode(op_tear_off_activation);
         instructions().append(m_activationRegister->index());
         instructions().append(m_codeBlock->argumentsRegister());
-    } else if (m_codeBlock->usesArguments() && m_codeBlock->m_numParameters != 1 && !m_codeBlock->isStrictMode()) {
+    } else if (m_codeBlock->usesArguments() && m_codeBlock->numParameters() != 1 && !m_codeBlock->isStrictMode()) {
         emitOpcode(op_tear_off_arguments);
         instructions().append(m_codeBlock->argumentsRegister());
     }
@@ -1921,6 +1923,8 @@ RegisterID* BytecodeGenerator::emitConstruct(RegisterID* dst, RegisterID* func, 
     instructions().append(func->index()); // func
     instructions().append(callArguments.argumentCountIncludingThis()); // argCount
     instructions().append(callArguments.registerOffset()); // registerOffset
+    instructions().append(0);
+    instructions().append(0);
     if (dst != ignoredResult()) {
         emitOpcode(op_call_put_result);
         instructions().append(dst->index()); // dst

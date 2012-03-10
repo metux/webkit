@@ -31,7 +31,7 @@
 #include <assembler/LinkBuffer.h>
 #include <assembler/MacroAssembler.h>
 #include <bytecode/CodeBlock.h>
-#include <dfg/DFGAssemblyHelpers.h>
+#include <dfg/DFGCCallHelpers.h>
 #include <dfg/DFGFPRInfo.h>
 #include <dfg/DFGGPRInfo.h>
 #include <dfg/DFGGraph.h>
@@ -147,10 +147,10 @@ struct PropertyAccessRecord {
 // relationship). The JITCompiler holds references to information required during
 // compilation, and also records information used in linking (e.g. a list of all
 // call to be linked).
-class JITCompiler : public AssemblyHelpers {
+class JITCompiler : public CCallHelpers {
 public:
     JITCompiler(JSGlobalData* globalData, Graph& dfg, CodeBlock* codeBlock)
-        : AssemblyHelpers(globalData, codeBlock)
+        : CCallHelpers(globalData, codeBlock)
         , m_graph(dfg)
     {
     }
@@ -178,6 +178,7 @@ public:
     // Add a call out from JIT code, with an exception check.
     Call addExceptionCheck(Call functionCall, CodeOrigin codeOrigin)
     {
+        move(TrustedImm32(m_exceptionChecks.size()), GPRInfo::nonPreservedNonReturnGPR);
 #if USE(JSVALUE64)
         Jump exceptionCheck = branchTestPtr(NonZero, AbsoluteAddress(&globalData()->exception));
 #elif USE(JSVALUE32_64)
@@ -190,6 +191,7 @@ public:
     // Add a call out from JIT code, with a fast exception check that tests if the return value is zero.
     Call addFastExceptionCheck(Call functionCall, CodeOrigin codeOrigin)
     {
+        move(TrustedImm32(m_exceptionChecks.size()), GPRInfo::nonPreservedNonReturnGPR);
         Jump exceptionCheck = branchTestPtr(Zero, GPRInfo::returnValueGPR);
         m_exceptionChecks.append(CallExceptionRecord(functionCall, exceptionCheck, codeOrigin));
         return functionCall;

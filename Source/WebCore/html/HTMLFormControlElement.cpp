@@ -50,7 +50,6 @@ using namespace std;
 
 HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
     : HTMLElement(tagName, document)
-    , FormAssociatedElement(form)
     , m_disabled(false)
     , m_readOnly(false)
     , m_required(false)
@@ -61,18 +60,12 @@ HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Doc
     , m_wasChangedSinceLastFormControlChangeEvent(false)
     , m_hasAutofocused(false)
 {
-    if (!this->form())
-        setForm(findFormAncestor());
-    if (this->form())
-        this->form()->registerFormElement(this);
-
+    setForm(form ? form : findFormAncestor());
     setHasCustomWillOrDidRecalcStyle();
 }
 
 HTMLFormControlElement::~HTMLFormControlElement()
 {
-    if (form())
-        form()->removeFormElement(this);
 }
 
 void HTMLFormControlElement::detach()
@@ -108,11 +101,9 @@ bool HTMLFormControlElement::formNoValidate() const
 
 void HTMLFormControlElement::parseMappedAttribute(Attribute* attr)
 {
-    if (attr->name() == formAttr) {
+    if (attr->name() == formAttr)
         formAttributeChanged();
-        if (!form())
-            document()->checkedRadioButtons().addButton(this);
-    } else if (attr->name() == disabledAttr) {
+    else if (attr->name() == disabledAttr) {
         bool oldDisabled = m_disabled;
         m_disabled = !attr->isNull();
         if (oldDisabled != m_disabled) {
@@ -147,6 +138,8 @@ static bool shouldAutofocus(HTMLFormControlElement* element)
     if (!element->renderer())
         return false;
     if (element->document()->ignoreAutofocus())
+        return false;
+    if (element->document()->isSandboxed(SandboxAutomaticFeatures))
         return false;
     if (element->hasAutofocused())
         return false;
@@ -196,18 +189,15 @@ void HTMLFormControlElement::attach()
     resumePostAttachCallbacks();
 }
 
-void HTMLFormControlElement::willMoveToNewOwnerDocument()
+void HTMLFormControlElement::didMoveToNewDocument(Document* oldDocument)
 {
-    FormAssociatedElement::willMoveToNewOwnerDocument();
-    HTMLElement::willMoveToNewOwnerDocument();
+    FormAssociatedElement::didMoveToNewDocument(oldDocument);
+    HTMLElement::didMoveToNewDocument(oldDocument);
 }
 
 void HTMLFormControlElement::insertedIntoTree(bool deep)
 {
     FormAssociatedElement::insertedIntoTree();
-    if (!form())
-        document()->checkedRadioButtons().addButton(this);
-
     HTMLElement::insertedIntoTree(deep);
 }
 
@@ -354,8 +344,7 @@ bool HTMLFormControlElement::willValidate() const
 
 void HTMLFormControlElement::setNeedsWillValidateCheck()
 {
-    // We need to recalculate willValidte immediately because willValidate
-    // change can causes style change.
+    // We need to recalculate willValidate immediately because willValidate change can causes style change.
     bool newWillValidate = recalcWillValidate();
     if (m_willValidateInitialized && m_willValidate == newWillValidate)
         return;
@@ -499,60 +488,6 @@ PassRefPtr<NodeList> HTMLFormControlElement::labels()
     RefPtr<LabelsNodeList> list = LabelsNodeList::create(this);
     nodeLists->m_labelsNodeListCache = list.get();
     return list.release();
-}
-
-HTMLFormControlElementWithState::HTMLFormControlElementWithState(const QualifiedName& tagName, Document* doc, HTMLFormElement* f)
-    : HTMLFormControlElement(tagName, doc, f)
-{
-    document()->registerFormElementWithState(this);
-}
-
-HTMLFormControlElementWithState::~HTMLFormControlElementWithState()
-{
-    document()->unregisterFormElementWithState(this);
-}
-
-void HTMLFormControlElementWithState::willMoveToNewOwnerDocument()
-{
-    document()->unregisterFormElementWithState(this);
-    HTMLFormControlElement::willMoveToNewOwnerDocument();
-}
-
-void HTMLFormControlElementWithState::didMoveToNewOwnerDocument()
-{
-    document()->registerFormElementWithState(this);
-    HTMLFormControlElement::didMoveToNewOwnerDocument();
-}
-
-bool HTMLFormControlElementWithState::shouldAutocomplete() const
-{
-    if (!form())
-        return true;
-    return form()->shouldAutocomplete();
-}
-
-bool HTMLFormControlElementWithState::shouldSaveAndRestoreFormControlState() const
-{
-    // We don't save/restore control state in a form with autocomplete=off.
-    return attached() && shouldAutocomplete();
-}
-
-void HTMLFormControlElementWithState::finishParsingChildren()
-{
-    HTMLFormControlElement::finishParsingChildren();
-
-    // We don't save state of a control with shouldSaveAndRestoreFormControlState()=false.
-    // But we need to skip restoring process too because a control in another
-    // form might have the same pair of name and type and saved its state.
-    if (!shouldSaveAndRestoreFormControlState())
-        return;
-
-    Document* doc = document();
-    if (doc->hasStateForNewFormElements()) {
-        String state;
-        if (doc->takeStateForFormElement(name().impl(), type().impl(), state))
-            restoreFormControlState(state);
-    }
 }
 
 } // namespace Webcore

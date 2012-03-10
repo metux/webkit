@@ -49,9 +49,9 @@ static inline bool compareTreeOrder(Node* node1, Node* node2)
     return (node2->compareDocumentPosition(node1) & (Node::DOCUMENT_POSITION_PRECEDING | Node::DOCUMENT_POSITION_DISCONNECTED)) == Node::DOCUMENT_POSITION_PRECEDING;
 }
 
-PassRefPtr<HTMLPropertiesCollection> HTMLPropertiesCollection::create(PassRefPtr<Node> itemNode)
+PassOwnPtr<HTMLPropertiesCollection> HTMLPropertiesCollection::create(PassRefPtr<Node> itemNode)
 {
-    return adoptRef(new HTMLPropertiesCollection(itemNode));
+    return adoptPtr(new HTMLPropertiesCollection(itemNode));
 }
 
 HTMLPropertiesCollection::HTMLPropertiesCollection(PassRefPtr<Node> itemNode)

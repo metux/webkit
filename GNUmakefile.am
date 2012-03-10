@@ -55,6 +55,10 @@ IDL_BINDINGS :=
 TEST_PROGS :=
 POFILES :=
 MOFILES :=
+dom_binding_idls :=
+wtf_cppflags:=
+wtf_cflags :=
+wtf_sources :=
 javascriptcore_h_api :=
 javascriptcore_cppflags:=
 javascriptcore_cflags :=
@@ -80,6 +84,7 @@ webkit2_built_sources :=
 webkit2_plugin_process_built_sources :=
 webkittestrunner_built_sources :=
 libwebcoreinternals_built_sources :=
+minibrowser_built_sources :=
 global_cppflags :=
 global_cflags :=
 global_cxxflags :=
@@ -167,7 +172,8 @@ endif
 
 if USE_ACCELERATED_COMPOSITING
 global_cppflags += \
-	-DWTF_USE_ACCELERATED_COMPOSITING=1
+	-DWTF_USE_ACCELERATED_COMPOSITING=1 \
+	-DENABLE_3D_RENDERING=1
 endif
 
 if USE_TEXTURE_MAPPER_CAIRO
@@ -177,7 +183,7 @@ endif
 
 if USE_TEXTURE_MAPPER_GL
 global_cppflags += \
-	-DWTF_USE_TEXTURE_MAPPER_OPENGL=1
+	-DWTF_USE_TEXTURE_MAPPER_GL=1
 endif
 
 if USE_CLUTTER
@@ -217,6 +223,8 @@ EXTRA_DIST += \
 	$(srcdir)/Source/WebKit/LICENSE
 
 # Include module makefiles
+include Source/WTF/GNUmakefile.am
+
 if USE_JSC
 include Source/JavaScriptCore/GNUmakefile.am
 endif

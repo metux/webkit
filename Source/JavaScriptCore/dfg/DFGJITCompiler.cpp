@@ -95,12 +95,16 @@ void JITCompiler::compileBody(SpeculativeJIT& speculative)
     // If any exception checks were linked, generate code to lookup a handler.
     if (didLinkExceptionCheck) {
         // lookupExceptionHandler is passed two arguments, exec (the CallFrame*), and
-        // an identifier for the operation that threw the exception, which we can use
-        // to look up handler information. The identifier we use is the return address
-        // of the call out from JIT code that threw the exception; this is still
-        // available on the stack, just below the stack pointer!
+        // the index into the CodeBlock's callReturnIndexVector corresponding to the
+        // call that threw the exception (this was set in nonPreservedNonReturnGPR, when
+        // the exception check was planted).
+        move(GPRInfo::nonPreservedNonReturnGPR, GPRInfo::argumentGPR1);
         move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
-        getPCAfterCall(GPRInfo::argumentGPR1);
+#if CPU(X86)
+        // FIXME: should use the call abstraction, but this is currently in the SpeculativeJIT layer!
+        poke(GPRInfo::argumentGPR0);
+        poke(GPRInfo::argumentGPR1, 1);
+#endif
         m_calls.append(CallLinkRecord(call(), lookupExceptionHandler));
         // lookupExceptionHandler leaves the handler CallFrame* in the returnValueGPR,
         // and the address of the handler in returnValueGPR2.
@@ -112,7 +116,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
 {
     // Link the code, populate data in CodeBlock data structures.
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    fprintf(stderr, "JIT code for %p start at [%p, %p). Size = %lu.\n", m_codeBlock, linkBuffer.debugAddress(), static_cast<char*>(linkBuffer.debugAddress()) + linkBuffer.debugSize(), linkBuffer.debugSize());
+    fprintf(stderr, "JIT code for %p start at [%p, %p). Size = %zu.\n", m_codeBlock, linkBuffer.debugAddress(), static_cast<char*>(linkBuffer.debugAddress()) + linkBuffer.debugSize(), linkBuffer.debugSize());
 #endif
 
     // Link all calls out from the JIT code to their respective functions.
@@ -255,8 +259,8 @@ void JITCompiler::compileFunction(JITCode& entry, MacroAssemblerCodePtr& entryWi
     Label arityCheck = label();
     compileEntry();
 
-    load32(Address(GPRInfo::callFrameRegister, RegisterFile::ArgumentCount * static_cast<int>(sizeof(Register))), GPRInfo::regT1);
-    branch32(AboveOrEqual, GPRInfo::regT1, Imm32(m_codeBlock->m_numParameters)).linkTo(fromArityCheck, this);
+    load32(AssemblyHelpers::payloadFor((VirtualRegister)RegisterFile::ArgumentCount), GPRInfo::regT1);
+    branch32(AboveOrEqual, GPRInfo::regT1, Imm32(m_codeBlock->numParameters())).linkTo(fromArityCheck, this);
     move(stackPointerRegister, GPRInfo::argumentGPR0);
     poke(GPRInfo::callFrameRegister, OBJECT_OFFSETOF(struct JITStackFrame, callFrame) / sizeof(void*));
     Call callArityCheck = call();

@@ -48,7 +48,7 @@ namespace JSC {
 
         static JSActivation* create(JSGlobalData& globalData, CallFrame* callFrame, FunctionExecutable* funcExec)
         {
-            JSActivation* activation = new (allocateCell<JSActivation>(globalData.heap)) JSActivation(callFrame, funcExec);
+            JSActivation* activation = new (NotNull, allocateCell<JSActivation>(globalData.heap)) JSActivation(callFrame, funcExec);
             activation->finishCreation(callFrame);
             return activation;
         }
@@ -64,7 +64,7 @@ namespace JSC {
 
         static void put(JSCell*, ExecState*, const Identifier&, JSValue, PutPropertySlot&);
 
-        static void putWithAttributes(JSObject*, ExecState*, const Identifier&, JSValue, unsigned attributes);
+        static void putDirectVirtual(JSObject*, ExecState*, const Identifier&, JSValue, unsigned attributes);
         static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
 
         static JSObject* toThisObject(JSCell*, ExecState*);
@@ -83,7 +83,7 @@ namespace JSC {
         bool symbolTableGet(const Identifier&, PropertySlot&);
         bool symbolTableGet(const Identifier&, PropertyDescriptor&);
         bool symbolTableGet(const Identifier&, PropertySlot&, bool& slotIsWriteable);
-        bool symbolTablePut(JSGlobalData&, const Identifier&, JSValue);
+        bool symbolTablePut(ExecState*, const Identifier&, JSValue, bool shouldThrow);
         bool symbolTablePutWithAttributes(JSGlobalData&, const Identifier&, JSValue, unsigned attributes);
 
         static JSValue argumentsGetter(ExecState*, JSValue, const Identifier&);

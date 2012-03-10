@@ -161,6 +161,12 @@ void InspectorFrontendHost::requestDetachWindow()
         m_client->requestDetachWindow();
 }
 
+void InspectorFrontendHost::requestSetDockSide(const String& side)
+{
+    if (m_client)
+        m_client->requestSetDockSide(side);
+}
+
 void InspectorFrontendHost::closeWindow()
 {
     if (m_client) {
@@ -193,10 +199,10 @@ void InspectorFrontendHost::moveWindowBy(float x, float y) const
         m_client->moveWindowBy(x, y);
 }
 
-void InspectorFrontendHost::setExtensionAPI(const String& script)
+void InspectorFrontendHost::setInjectedScriptForOrigin(const String& origin, const String& script)
 {
     ASSERT(m_frontendPage->inspectorController());
-    m_frontendPage->inspectorController()->setInspectorExtensionAPI(script);
+    m_frontendPage->inspectorController()->setInjectedScriptForOrigin(origin, script);
 }
 
 String InspectorFrontendHost::localizedStringsURL()

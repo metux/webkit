@@ -30,6 +30,9 @@
 
 #include "Animation.h"
 #include "Color.h"
+#if ENABLE(CSS_FILTERS)
+#include "FilterOperations.h"
+#endif
 #include "FloatPoint.h"
 #include "FloatPoint3D.h"
 #include "FloatSize.h"
@@ -255,7 +258,7 @@ public:
 
     // Offset is origin of the renderer minus origin of the graphics layer (so either zero or negative).
     IntSize offsetFromRenderer() const { return m_offsetFromRenderer; }
-    void setOffsetFromRenderer(const IntSize& offset) { m_offsetFromRenderer = offset; }
+    void setOffsetFromRenderer(const IntSize&);
 
     // The position of the layer (the location of its top-left corner in its parent)
     const FloatPoint& position() const { return m_position; }
@@ -310,6 +313,13 @@ public:
 
     float opacity() const { return m_opacity; }
     virtual void setOpacity(float opacity) { m_opacity = opacity; }
+
+#if ENABLE(CSS_FILTERS)
+    const FilterOperations& filters() const { return m_filters; }
+    
+    // Returns true if filter can be rendered by the compositor
+    virtual bool setFilters(const FilterOperations& filters) { m_filters = filters; return true; }
+#endif
 
     // Some GraphicsLayers paint only the foreground or the background content
     GraphicsLayerPaintingPhase paintingPhase() const { return m_paintingPhase; }
@@ -410,6 +420,12 @@ public:
 #endif
 
 protected:
+#if ENABLE(CSS_FILTERS)
+    // This method is used by platform GraphicsLayer classes to clear the filters
+    // when compositing is not done in hardware. It is not virtual, so the caller
+    // needs to notifiy the change to the platform layer as needed.
+    void clearFilters() { m_filters.clear(); }
+#endif
 
     typedef Vector<TransformOperation::OperationType> TransformOperationList;
     // Given a list of TransformAnimationValues, return an array of transform operations.
@@ -444,6 +460,10 @@ protected:
     Color m_backgroundColor;
     float m_opacity;
     float m_zPosition;
+    
+#if ENABLE(CSS_FILTERS)
+    FilterOperations m_filters;
+#endif
 
     bool m_backgroundColorSet : 1;
     bool m_contentsOpaque : 1;

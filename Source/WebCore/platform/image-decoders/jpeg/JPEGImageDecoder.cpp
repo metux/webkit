@@ -75,7 +75,11 @@ extern "C" {
 
 #if defined(JCS_EXTENSIONS) && ASSUME_LITTLE_ENDIAN
 #define TURBO_JPEG_RGB_SWIZZLE
+#if USE(SKIA) && (!SK_R32_SHIFT && SK_G32_SHIFT == 8 && SK_B32_SHIFT == 16)
+inline J_COLOR_SPACE rgbOutputColorSpace() { return JCS_EXT_RGBX; }
+#else
 inline J_COLOR_SPACE rgbOutputColorSpace() { return JCS_EXT_BGRX; }
+#endif
 inline bool turboSwizzled(J_COLOR_SPACE colorSpace) { return colorSpace == rgbOutputColorSpace(); }
 #else
 inline J_COLOR_SPACE rgbOutputColorSpace() { return JCS_RGB; }
@@ -111,6 +115,32 @@ struct decoder_source_mgr {
     JPEGImageReader* decoder;
 };
 
+#if USE(ICCJPEG)
+
+#define iccProfileHeaderSize 128
+
+static bool rgbColorProfile(const char* profileData, unsigned profileLength)
+{
+    ASSERT(profileLength >= iccProfileHeaderSize);
+
+    if (!memcmp(&profileData[16], "RGB ", 4))
+        return true;
+    return false;
+}
+
+static bool inputDeviceColorProfile(const char* profileData, unsigned profileLength)
+{
+    ASSERT(profileLength >= iccProfileHeaderSize);
+
+    if (!memcmp(&profileData[12], "mntr", 4))
+        return true;
+    if (!memcmp(&profileData[12], "scnr", 4))
+        return true;
+    return false;
+}
+
+#endif
+
 static ColorProfile readColorProfile(jpeg_decompress_struct* info)
 {
 #if USE(ICCJPEG)
@@ -119,17 +149,20 @@ static ColorProfile readColorProfile(jpeg_decompress_struct* info)
 
     if (!read_icc_profile(info, &profile, &profileLength))
         return ColorProfile();
+
+    // Only accept RGB color profiles from input class devices.
+    bool ignoreProfile = false;
     char* profileData = reinterpret_cast<char*>(profile);
-    // Images with grayscale profiles get "upsampled" by libjpeg. If we use
-    // their color profile, CoreGraphics will "upsample" them
-    // again, resulting in horizontal distortions.
-    if (profileLength >= 20 && !memcmp(&profileData[16], "GRAY", 4)) {
-        free(profile);
-        return ColorProfile();
-    }
+    if (profileLength < iccProfileHeaderSize)
+        ignoreProfile = true;
+    else if (!rgbColorProfile(profileData, profileLength))
+        ignoreProfile = true;
+    else if (!inputDeviceColorProfile(profileData, profileLength))
+        ignoreProfile = true;
 
     ColorProfile colorProfile;
-    colorProfile.append(profileData, profileLength);
+    if (!ignoreProfile)
+        colorProfile.append(profileData, profileLength);
     free(profile);
     return colorProfile;
 #else
@@ -175,10 +208,10 @@ public:
         src->pub.term_source = term_source;
         src->decoder = this;
 
-        // Enable these markers for the ICC color profile.
-        // Apparently there are 16 of these markers.  I don't see anywhere in the header with this constant.
-        for (unsigned i = 0; i < 0xF; ++i)
-            jpeg_save_markers(&m_info, JPEG_APP0 + i, 0xFFFF);
+#if USE(ICCJPEG)
+        // Retain ICC color profile markers for color management.
+        setup_read_icc_profile(&m_info);
+#endif
     }
 
     ~JPEGImageReader()
@@ -232,30 +265,18 @@ public:
             if (jpeg_read_header(&m_info, true) == JPEG_SUSPENDED)
                 return false; // I/O suspension.
 
-            // Let libjpeg take care of gray->RGB and YCbCr->RGB conversions.
             switch (m_info.jpeg_color_space) {
             case JCS_GRAYSCALE:
-                // Grayscale images get "upsampled" by libjpeg.  If we use
-                // their color profile, CoreGraphics will "upsample" them
-                // again, resulting in horizontal distortions.
-                m_decoder->setIgnoreGammaAndColorProfile(true);
-                m_info.out_color_space = JCS_RGB;
-                break;
             case JCS_RGB:
             case JCS_YCbCr:
+                // libjpeg can convert GRAYSCALE and YCbCr image pixels to RGB.
                 m_info.out_color_space = rgbOutputColorSpace();
                 break;
             case JCS_CMYK:
             case JCS_YCCK:
-                // jpeglib cannot convert these to rgb, but it can convert ycck
-                // to cmyk.
+                // libjpeg can convert YCCK to CMYK, but neither to RGB, so we
+                // manually convert CMKY to RGB.
                 m_info.out_color_space = JCS_CMYK;
-
-                // Same as with grayscale images, we convert CMYK images to RGBA
-                // ones. When we keep the color profiles of these CMYK images,
-                // CoreGraphics will convert their colors again. So, we discard
-                // their color profiles to prevent color corruption.
-                m_decoder->setIgnoreGammaAndColorProfile(true);
                 break;
             default:
                 return m_decoder->setFailed();
@@ -280,8 +301,12 @@ public:
             if (!m_decoder->setSize(m_info.image_width, m_info.image_height))
                 return false;
 
-            if (!m_decoder->ignoresGammaAndColorProfile())
-                m_decoder->setColorProfile(readColorProfile(info()));
+            // Allow color management of the decoded RGBA pixels if possible.
+            if (!m_decoder->ignoresGammaAndColorProfile()) {
+                ColorProfile rgbInputDeviceColorProfile = readColorProfile(info());
+                if (!rgbInputDeviceColorProfile.isEmpty())
+                    m_decoder->setColorProfile(rgbInputDeviceColorProfile);
+            }
 
             if (m_decodingSizeOnly) {
                 // We can stop here.  Reduce our buffer length and available

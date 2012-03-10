@@ -36,6 +36,9 @@
 #if ENABLE(TOUCH_EVENTS)
 #include "NativeWebTouchEvent.h"
 #endif
+#if PLATFORM(QT)
+#include "QtNetworkRequestData.h"
+#endif
 #include "NotificationPermissionRequestManagerProxy.h"
 #include "PlatformProcessIdentifier.h"
 #include "SandboxExtension.h"
@@ -92,12 +95,22 @@ namespace WebCore {
     struct WindowFeatures;
 }
 
+#if PLATFORM(QT)
+class QQuickNetworkReply;
+#endif
+
 #if PLATFORM(MAC)
 #ifdef __OBJC__
 @class WKView;
 #else
 class WKView;
 #endif
+#endif
+
+#if PLATFORM(GTK)
+typedef GtkWidget* PlatformWidget;
+#elif PLATFORM(EFL)
+typedef Evas_Object* PlatformWidget;
 #endif
 
 namespace WebKit {
@@ -303,7 +316,17 @@ public:
     
     bool maintainsInactiveSelection() const { return m_maintainsInactiveSelection; }
     void setMaintainsInactiveSelection(bool);
+#if PLATFORM(QT)
+    void registerApplicationScheme(const String& scheme);
+    void resolveApplicationSchemeRequest(QtNetworkRequestData);
+    void sendApplicationSchemeReply(const QQuickNetworkReply*);
+#endif
 
+#if PLATFORM(QT)
+    void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, uint64_t selectionStart, uint64_t selectionEnd, uint64_t replacementRangeStart, uint64_t replacementRangeEnd);
+    void confirmComposition(const String& compositionString, int64_t selectionStart, int64_t selectionLength);
+    void cancelComposition();
+#endif
 #if PLATFORM(MAC)
     void updateWindowIsVisible(bool windowIsVisible);
     void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates, const WebCore::IntPoint& accessibilityViewCoordinates);
@@ -341,11 +364,8 @@ public:
 
     HWND nativeWindow() const;
 #endif
-#if PLATFORM(GTK)
-    GtkWidget* viewWidget();
-#endif
-#if PLATFORM(EFL)
-    Evas_Object* viewObject();
+#if USE(CAIRO) && !PLATFORM(WIN_CAIRO)
+    PlatformWidget viewWidget();
 #endif
 #if USE(TILED_BACKING_STORE)
     void setFixedVisibleContentRect(const WebCore::IntRect&);
@@ -554,8 +574,8 @@ public:
     void endPrinting();
     void computePagesForPrinting(WebFrameProxy*, const PrintInfo&, PassRefPtr<ComputedPagesCallback>);
 #if PLATFORM(MAC) || PLATFORM(WIN)
-    void drawRectToPDF(WebFrameProxy*, const WebCore::IntRect&, PassRefPtr<DataCallback>);
-    void drawPagesToPDF(WebFrameProxy*, uint32_t first, uint32_t count, PassRefPtr<DataCallback>);
+    void drawRectToPDF(WebFrameProxy*, const PrintInfo&, const WebCore::IntRect&, PassRefPtr<DataCallback>);
+    void drawPagesToPDF(WebFrameProxy*, const PrintInfo&, uint32_t first, uint32_t count, PassRefPtr<DataCallback>);
 #endif
 
     const String& pendingAPIRequestURL() const { return m_pendingAPIRequestURL; }
@@ -587,6 +607,9 @@ public:
 
     void printMainFrame();
 
+    // WebPopupMenuProxy::Client
+    virtual NativeWebMouseEvent* currentlyProcessedMouseDownEvent();
+
 private:
     WebPageProxy(PageClient*, PassRefPtr<WebProcessProxy>, WebPageGroup*, uint64_t pageID);
 
@@ -595,7 +618,6 @@ private:
     // WebPopupMenuProxy::Client
     virtual void valueChangedForPopupMenu(WebPopupMenuProxy*, int32_t newSelectedIndex);
     virtual void setTextFromItemForPopupMenu(WebPopupMenuProxy*, int32_t index);
-    virtual NativeWebMouseEvent* currentlyProcessedMouseDownEvent();
 #if PLATFORM(GTK)
     virtual void failedToShowPopupMenu();
 #endif    
@@ -687,6 +709,7 @@ private:
     void reattachToWebProcessWithItem(WebBackForwardListItem*);
 
     void requestNotificationPermission(uint64_t notificationID, const String& originIdentifier);
+    void showNotification(const String& title, const String& body, const String& originIdentifier, uint64_t notificationID);
     
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
@@ -932,6 +955,9 @@ private:
     WebCore::PolicyAction m_syncNavigationActionPolicyAction;
     uint64_t m_syncNavigationActionPolicyDownloadID;
 
+#if ENABLE(GESTURE_EVENTS)
+    Deque<WebGestureEvent> m_gestureEventQueue;
+#endif
     Deque<NativeWebKeyboardEvent> m_keyEventQueue;
     Deque<NativeWebWheelEvent> m_wheelEventQueue;
     Vector<NativeWebWheelEvent> m_currentlyProcessedWheelEvents;
@@ -976,6 +1002,10 @@ private:
     static WKPageDebugPaintFlags s_debugPaintFlags;
 
     bool m_shouldSendEventsSynchronously;
+
+#if PLATFORM(QT)
+    WTF::HashSet<RefPtr<QtNetworkRequestData> > m_applicationSchemeRequests;
+#endif
 };
 
 } // namespace WebKit

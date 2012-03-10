@@ -108,7 +108,7 @@ public:
     virtual bool isCleanupTask() const { return true; }
 };
 
-WorkerContext::WorkerContext(const KURL& url, const String& userAgent, WorkerThread* thread)
+WorkerContext::WorkerContext(const KURL& url, const String& userAgent, WorkerThread* thread, const String& policy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType)
     : m_url(url)
     , m_userAgent(userAgent)
     , m_script(adoptPtr(new WorkerScriptController(this)))
@@ -120,10 +120,8 @@ WorkerContext::WorkerContext(const KURL& url, const String& userAgent, WorkerThr
     , m_eventQueue(WorkerEventQueue::create(this))
 {
     setSecurityOrigin(SecurityOrigin::create(url));
-    
-    // FIXME: This should probably adopt the ContentSecurityPolicy of the document
-    // that created this worker or use the header that came with the worker script.
     setContentSecurityPolicy(ContentSecurityPolicy::create(this));
+    contentSecurityPolicy()->didReceiveHeader(policy, contentSecurityPolicyType);
 }
 
 WorkerContext::~WorkerContext()
@@ -295,28 +293,28 @@ EventTarget* WorkerContext::errorEventTarget()
     return this;
 }
 
-void WorkerContext::logExceptionToConsole(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>)
+void WorkerContext::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>)
 {
     thread()->workerReportingProxy().postExceptionToWorkerObject(errorMessage, lineNumber, sourceURL);
 }
 
-void WorkerContext::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
+void WorkerContext::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
 {
     if (!isContextThread()) {
         postTask(AddConsoleMessageTask::create(source, type, level, message));
         return;
     }
     thread()->workerReportingProxy().postConsoleMessageToWorkerObject(source, type, level, message, lineNumber, sourceURL);
-    addMessageToWorkerConsole(source, type, level, message, lineNumber, sourceURL, callStack);
+    addMessageToWorkerConsole(source, type, level, message, sourceURL, lineNumber, callStack);
 }
 
-void WorkerContext::addMessageToWorkerConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
+void WorkerContext::addMessageToWorkerConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
 {
     ASSERT(isContextThread());
     if (callStack)
         InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, 0, callStack);
     else
-        InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, lineNumber, sourceURL);
+        InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, sourceURL, lineNumber);
 }
 
 #if ENABLE(NOTIFICATIONS)

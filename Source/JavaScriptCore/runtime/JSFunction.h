@@ -35,15 +35,12 @@ namespace JSC {
     class JSGlobalObject;
     class NativeExecutable;
     class SourceCode;
-    class VPtrHackExecutable;
     namespace DFG {
     class SpeculativeJIT;
     class JITCompiler;
     }
 
-    EncodedJSValue JSC_HOST_CALL callHostFunctionAsConstructor(ExecState*);
-
-    void createDescriptorForThrowingProperty(ExecState*, PropertyDescriptor&, const char* message);
+    JS_EXPORT_PRIVATE EncodedJSValue JSC_HOST_CALL callHostFunctionAsConstructor(ExecState*);
 
     class JSFunction : public JSNonFinalObject {
         friend class JIT;
@@ -54,21 +51,20 @@ namespace JSC {
     public:
         typedef JSNonFinalObject Base;
 
-        static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeFunction nativeFunction, NativeFunction nativeConstructor = callHostFunctionAsConstructor);
+        JS_EXPORT_PRIVATE static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeFunction nativeFunction, NativeFunction nativeConstructor = callHostFunctionAsConstructor);
         static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeExecutable* nativeExecutable);
 
         static JSFunction* create(ExecState* exec, FunctionExecutable* executable, ScopeChainNode* scopeChain)
         {
-            JSFunction* function = new (allocateCell<JSFunction>(*exec->heap())) JSFunction(exec, executable, scopeChain);
+            JSFunction* function = new (NotNull, allocateCell<JSFunction>(*exec->heap())) JSFunction(exec, executable, scopeChain);
             ASSERT(function->structure()->globalObject());
             function->finishCreation(exec, executable, scopeChain);
             return function;
         }
         
-        virtual ~JSFunction();
-        virtual void vtableAnchor(); // FIXME: Remove this once optimizations no longer rely on testing vtables
+        static void destroy(JSCell*);
 
-        const UString& name(ExecState*);
+        JS_EXPORT_PRIVATE const UString& name(ExecState*);
         const UString displayName(ExecState*);
         const UString calculatedDisplayName(ExecState*);
 
@@ -98,7 +94,7 @@ namespace JSC {
         inline bool isHostFunction() const;
         FunctionExecutable* jsExecutable() const;
 
-        const SourceCode* sourceCode() const;
+        JS_EXPORT_PRIVATE const SourceCode* sourceCode() const;
 
         static JS_EXPORTDATA const ClassInfo s_info;
 
@@ -127,7 +123,7 @@ namespace JSC {
     protected:
         const static unsigned StructureFlags = OverridesGetOwnPropertySlot | ImplementsHasInstance | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
 
-        JSFunction(ExecState*, JSGlobalObject*, Structure*);
+        JS_EXPORT_PRIVATE JSFunction(ExecState*, JSGlobalObject*, Structure*);
         JSFunction(ExecState*, FunctionExecutable*, ScopeChainNode*);
         
         void finishCreation(ExecState*, NativeExecutable*, int length, const Identifier& name);
@@ -144,9 +140,7 @@ namespace JSC {
         static void visitChildren(JSCell*, SlotVisitor&);
 
     private:
-        explicit JSFunction(VPtrStealingHackType);
-
-        bool isHostFunctionNonInline() const;
+        JS_EXPORT_PRIVATE bool isHostFunctionNonInline() const;
 
         static JSValue argumentsGetter(ExecState*, JSValue, const Identifier&);
         static JSValue callerGetter(ExecState*, JSValue, const Identifier&);

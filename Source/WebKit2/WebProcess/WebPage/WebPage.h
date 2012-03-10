@@ -44,7 +44,7 @@
 #include "Plugin.h"
 #include "SandboxExtension.h"
 #include "ShareableBitmap.h"
-#include "WebEditCommand.h"
+#include "WebUndoStep.h"
 #include <WebCore/DragData.h>
 #include <WebCore/Editor.h>
 #include <WebCore/FrameLoaderTypes.h>
@@ -60,6 +60,12 @@
 
 #if PLATFORM(QT)
 #include "ArgumentCodersQt.h"
+#include "QtNetworkAccessManager.h"
+#include "QtNetworkReply.h"
+#include "QtNetworkReplyData.h"
+#include "QtNetworkRequestData.h"
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #endif
 
 #if PLATFORM(GTK)
@@ -191,8 +197,8 @@ public:
     WebCore::IntRect windowResizerRect() const;
     WebCore::KeyboardUIMode keyboardUIMode();
 
-    WebEditCommand* webEditCommand(uint64_t);
-    void addWebEditCommand(uint64_t, WebEditCommand*);
+    WebUndoStep* webUndoStep(uint64_t);
+    void addWebUndoStep(uint64_t, WebUndoStep*);
     void removeWebEditCommand(uint64_t);
     bool isInRedo() const { return m_isInRedo; }
 
@@ -237,7 +243,7 @@ public:
     WebCore::Frame* mainFrame() const; // May return 0.
     WebCore::FrameView* mainFrameView() const; // May return 0.
 
-    PassRefPtr<Plugin> createPlugin(const Plugin::Parameters&);
+    PassRefPtr<Plugin> createPlugin(WebFrame*, const Plugin::Parameters&);
 
     EditorState editorState() const;
 
@@ -353,6 +359,12 @@ public:
 
     SandboxExtensionTracker& sandboxExtensionTracker() { return m_sandboxExtensionTracker; }
 
+#if PLATFORM(QT)
+    void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, uint64_t selectionStart, uint64_t selectionEnd, uint64_t replacementRangeStart, uint64_t replacementRangeEnd);
+    void confirmComposition(const String& text, int64_t selectionStart, int64_t selectionLength);
+    void cancelComposition();
+#endif
+
 #if PLATFORM(MAC)
     void registerUIProcessAccessibilityTokens(const CoreIPC::DataReference& elemenToken, const CoreIPC::DataReference& windowToken);
     WKAccessibilityWebPageObject* accessibilityRemoteObject();
@@ -422,8 +434,8 @@ public:
     void endPrinting();
     void computePagesForPrinting(uint64_t frameID, const PrintInfo&, uint64_t callbackID);
 #if PLATFORM(MAC) || PLATFORM(WIN)
-    void drawRectToPDF(uint64_t frameID, const WebCore::IntRect&, uint64_t callbackID);
-    void drawPagesToPDF(uint64_t frameID, uint32_t first, uint32_t count, uint64_t callbackID);
+    void drawRectToPDF(uint64_t frameID, const PrintInfo&, const WebCore::IntRect&, uint64_t callbackID);
+    void drawPagesToPDF(uint64_t frameID, const PrintInfo&, uint32_t first, uint32_t count, uint64_t callbackID);
 #endif
 
     bool mainFrameHasCustomRepresentation() const;
@@ -462,7 +474,15 @@ public:
 
     void contextMenuShowing() { m_isShowingContextMenu = true; }
 
+#if PLATFORM(QT)
+    void registerApplicationScheme(const String& scheme);
+    void applicationSchemeReply(const QtNetworkReplyData&);
+    void receivedApplicationSchemeRequest(const QNetworkRequest&, QtNetworkReply*);
+#endif
     void wheelEvent(const WebWheelEvent&);
+#if ENABLE(GESTURE_EVENTS)
+    void gestureEvent(const WebGestureEvent&);
+#endif
 
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
@@ -515,9 +535,6 @@ private:
     void wheelEventSyncForTesting(const WebWheelEvent&, bool&);
     void keyEvent(const WebKeyboardEvent&);
     void keyEventSyncForTesting(const WebKeyboardEvent&, bool&);
-#if ENABLE(GESTURE_EVENTS)
-    void gestureEvent(const WebGestureEvent&);
-#endif
 #if ENABLE(TOUCH_EVENTS)
     void touchEvent(const WebTouchEvent&);
     void touchEventSyncForTesting(const WebTouchEvent&, bool& handled);
@@ -662,7 +679,7 @@ private:
     
     RunLoop::Timer<WebPage> m_setCanStartMediaTimer;
 
-    HashMap<uint64_t, RefPtr<WebEditCommand> > m_editCommandMap;
+    HashMap<uint64_t, RefPtr<WebUndoStep> > m_undoStepMap;
 
     WebCore::IntSize m_windowResizerSize;
 
@@ -720,6 +737,9 @@ private:
 
 #if PLATFORM(WIN)
     bool m_gestureReachedScrollingLimit;
+#endif
+#if PLATFORM(QT)
+    HashMap<String, QtNetworkReply*> m_applicationSchemeReplies;
 #endif
 };
 

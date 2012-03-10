@@ -90,6 +90,13 @@ InspectorBackend.registerCommand("Database.disable", [], []);
 InspectorBackend.registerCommand("Database.getDatabaseTableNames", [{"name": "databaseId", "type": "number", "optional": false}], ["tableNames"]);
 InspectorBackend.registerCommand("Database.executeSQL", [{"name": "databaseId", "type": "number", "optional": false}, {"name": "query", "type": "string", "optional": false}], ["success", "transactionId"]);
 
+// IndexedDB.
+InspectorBackend.registerIndexedDBDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "IndexedDB");
+InspectorBackend.registerEvent("IndexedDB.databaseNamesLoaded", ["frameWithDatabaseNames"]);
+InspectorBackend.registerCommand("IndexedDB.enable", [], []);
+InspectorBackend.registerCommand("IndexedDB.disable", [], []);
+InspectorBackend.registerCommand("IndexedDB.requestDatabaseNamesForFrame", [{"name": "frameId", "type": "string", "optional": false}], []);
+
 // DOMStorage.
 InspectorBackend.registerDOMStorageDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "DOMStorage");
 InspectorBackend.registerEvent("DOMStorage.addDOMStorage", ["storage"]);
@@ -138,7 +145,7 @@ InspectorBackend.registerCommand("DOM.removeAttribute", [{"name": "nodeId", "typ
 InspectorBackend.registerCommand("DOM.getEventListenersForNode", [{"name": "nodeId", "type": "number", "optional": false}], ["listeners"]);
 InspectorBackend.registerCommand("DOM.copyNode", [{"name": "nodeId", "type": "number", "optional": false}], []);
 InspectorBackend.registerCommand("DOM.getOuterHTML", [{"name": "nodeId", "type": "number", "optional": false}], ["outerHTML"]);
-InspectorBackend.registerCommand("DOM.setOuterHTML", [{"name": "nodeId", "type": "number", "optional": false}, {"name": "outerHTML", "type": "string", "optional": false}], ["nodeId"]);
+InspectorBackend.registerCommand("DOM.setOuterHTML", [{"name": "nodeId", "type": "number", "optional": false}, {"name": "outerHTML", "type": "string", "optional": false}], []);
 InspectorBackend.registerCommand("DOM.performSearch", [{"name": "query", "type": "string", "optional": false}], ["searchId", "resultCount"]);
 InspectorBackend.registerCommand("DOM.getSearchResults", [{"name": "searchId", "type": "string", "optional": false}, {"name": "fromIndex", "type": "number", "optional": false}, {"name": "toIndex", "type": "number", "optional": false}], ["nodeIds"]);
 InspectorBackend.registerCommand("DOM.discardSearchResults", [{"name": "searchId", "type": "string", "optional": false}], []);
@@ -170,6 +177,8 @@ InspectorBackend.registerCommand("CSS.toggleProperty", [{"name": "styleId", "typ
 InspectorBackend.registerCommand("CSS.setRuleSelector", [{"name": "ruleId", "type": "object", "optional": false}, {"name": "selector", "type": "string", "optional": false}], ["rule"]);
 InspectorBackend.registerCommand("CSS.addRule", [{"name": "contextNodeId", "type": "number", "optional": false}, {"name": "selector", "type": "string", "optional": false}], ["rule"]);
 InspectorBackend.registerCommand("CSS.getSupportedCSSProperties", [], ["cssProperties"]);
+InspectorBackend.registerCommand("CSS.startSelectorProfiler", [], []);
+InspectorBackend.registerCommand("CSS.stopSelectorProfiler", [], ["profile"]);
 
 // Timeline.
 InspectorBackend.registerTimelineDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Timeline");
@@ -180,7 +189,7 @@ InspectorBackend.registerCommand("Timeline.stop", [], []);
 // Debugger.
 InspectorBackend.registerDebuggerDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Debugger");
 InspectorBackend.registerEvent("Debugger.globalObjectCleared", []);
-InspectorBackend.registerEvent("Debugger.scriptParsed", ["scriptId", "url", "startLine", "startColumn", "endLine", "endColumn", "isContentScript"]);
+InspectorBackend.registerEvent("Debugger.scriptParsed", ["scriptId", "url", "startLine", "startColumn", "endLine", "endColumn", "isContentScript", "sourceMapURL"]);
 InspectorBackend.registerEvent("Debugger.scriptFailedToParse", ["url", "scriptSource", "startLine", "errorLine", "errorMessage"]);
 InspectorBackend.registerEvent("Debugger.breakpointResolved", ["breakpointId", "location"]);
 InspectorBackend.registerEvent("Debugger.paused", ["callFrames", "reason", "data"]);

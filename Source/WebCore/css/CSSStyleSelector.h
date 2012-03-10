@@ -36,6 +36,7 @@
 namespace WebCore {
 
 enum ESmartMinimumForFontSize { DoNotUseSmartMinimumForFontSize, UseSmartMinimumForFontFize };
+enum ERegionStyleEnabled { DoNotUseInRegionStyle, UseInRegionStyle };
 
 class CSSFontSelector;
 class CSSMutableStyleDeclaration;
@@ -113,7 +114,7 @@ public:
 
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
-    static PassRefPtr<RenderStyle> styleForDocument(Document*);
+    static PassRefPtr<RenderStyle> styleForDocument(Document*, CSSFontSelector* = 0);
 
     RenderStyle* style() const { return m_style.get(); }
     RenderStyle* parentStyle() const { return m_parentStyle; }
@@ -126,12 +127,19 @@ public:
     void setZoom(float f) { m_fontDirty |= style()->setZoom(f); }
     void setEffectiveZoom(float f) { m_fontDirty |= style()->setEffectiveZoom(f); }
     void setTextSizeAdjust(bool b) { m_fontDirty |= style()->setTextSizeAdjust(b); }
+    bool hasParentNode() const { return m_parentNode; }
+    
+    void appendAuthorStylesheets(unsigned firstNew, const Vector<RefPtr<StyleSheet> >&);
+    
+    // Find the ids or classes the selectors on a stylesheet are scoped to. The selectors only apply to elements in subtrees where the root element matches the scope.
+    static bool determineStylesheetSelectorScopes(CSSStyleSheet*, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes);
 
 private:
     void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);
     void initElement(Element*);
     void initForRegionStyling(RenderRegion*);
     void initRegionRules(RenderRegion*);
+    void collectFeatures();
     RenderStyle* locateSharedStyle();
     bool matchesRuleSet(RuleSet*);
     Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
@@ -139,7 +147,6 @@ private:
     bool canShareStyleWithElement(StyledElement*) const;
 
     PassRefPtr<RenderStyle> styleForKeyframe(const RenderStyle*, const WebKitCSSKeyframeRule*, KeyframeValue&);
-
     void setRegionForStyling(RenderRegion* region) { m_regionForStyling = region; }
     RenderRegion* regionForStyling() const { return m_regionForStyling; }
 
@@ -163,15 +170,6 @@ public:
     // Given a font size in pixel, this function will return legacy font size between 1 and 7.
     static int legacyFontSize(Document*, int pixelFontSize, bool shouldUseFixedDefaultSize);
 
-private:
-
-    // When the CSS keyword "larger" is used, this function will attempt to match within the keyword
-    // table, and failing that, will simply multiply by 1.2.
-    float largerFontSize(float size, bool quirksMode) const;
-
-    // Like the previous function, but for the keyword "smaller".
-    float smallerFontSize(float size, bool quirksMode) const;
-
 public:
     void setStyle(PassRefPtr<RenderStyle> s) { m_style = s; } // Used by the document when setting up its root style.
 
@@ -183,15 +181,15 @@ public:
 
     static float getComputedSizeFromSpecifiedSize(Document*, float zoomFactor, bool isAbsoluteSize, float specifiedSize, ESmartMinimumForFontSize = UseSmartMinimumForFontFize);
 
-private:
     void setFontSize(FontDescription&, float size);
 
+private:
     static float getComputedSizeFromSpecifiedSize(Document*, RenderStyle*, bool isAbsoluteSize, float specifiedSize, bool useSVGZoomRules);
 
 public:
     bool useSVGZoomRules();
 
-    Color getColorFromPrimitiveValue(CSSPrimitiveValue*, bool forVisitedLink = false) const;
+    Color colorFromPrimitiveValue(CSSPrimitiveValue*, bool forVisitedLink = false) const;
 
     bool hasSelectorForAttribute(const AtomicString&) const;
 
@@ -232,6 +230,7 @@ public:
     struct Features {
         Features();
         ~Features();
+        void clear();
         HashSet<AtomicStringImpl*> idsInRules;
         HashSet<AtomicStringImpl*> attrsInRules;
         OwnPtr<RuleSet> siblingRules;
@@ -250,7 +249,7 @@ private:
     void adjustRenderStyle(RenderStyle* styleToAdjust, RenderStyle* parentStyle, Element*);
 
     void addMatchedRule(const RuleData* rule) { m_matchedRules.append(rule); }
-    void addMatchedDeclaration(CSSMutableStyleDeclaration*, unsigned linkMatchType = SelectorChecker::MatchAll, bool regionStyleRule = false);
+    void addMatchedDeclaration(CSSMutableStyleDeclaration*, unsigned linkMatchType = SelectorChecker::MatchAll, ERegionStyleEnabled useInRegionStyle = DoNotUseInRegionStyle);
 
     struct MatchResult {
         MatchResult() : firstUARule(-1), lastUARule(-1), firstAuthorRule(-1), lastAuthorRule(-1), firstUserRule(-1), lastUserRule(-1), isCacheable(true) { }
@@ -355,10 +354,17 @@ private:
     void loadPendingImages();
 
     struct MatchedStyleDeclaration {
-        MatchedStyleDeclaration();
-        CSSMutableStyleDeclaration* styleDeclaration;
-        unsigned linkMatchType;
-        bool regionStyleRule;
+        MatchedStyleDeclaration() : possiblyPaddedMember(0) { }
+
+        RefPtr<CSSMutableStyleDeclaration> styleDeclaration;
+        union {
+            struct {
+                unsigned linkMatchType : 31;
+                unsigned useInRegionStyle : 1; // ERegionStyleEnabled
+            };
+            // Used to make sure all memory is zero-initialized since we compute the hash over the bytes of this object.
+            void* possiblyPaddedMember;
+        };
     };
     static unsigned computeDeclarationHash(MatchedStyleDeclaration*, unsigned size);
     struct MatchedStyleDeclarationCacheItem {
@@ -370,11 +376,16 @@ private:
     const MatchedStyleDeclarationCacheItem* findFromMatchedDeclarationCache(unsigned hash, const MatchResult&);
     void addToMatchedDeclarationCache(const RenderStyle*, const RenderStyle* parentStyle, unsigned hash, const MatchResult&);
 
+    // Every N additions to the matched declaration cache trigger a sweep where entries holding
+    // the last reference to a style declaration are garbage collected.
+    void sweepMatchedDeclarationCache();
+
     // We collect the set of decls that match in |m_matchedDecls|. We then walk the
     // set of matched decls four times, once for those properties that others depend on (like font-size),
     // and then a second time for all the remaining properties. We then do the same two passes
     // for any !important rules.
     Vector<MatchedStyleDeclaration, 64> m_matchedDecls;
+    unsigned m_matchedDeclarationCacheAdditionsSinceLastSweep;
 
     typedef HashMap<unsigned, MatchedStyleDeclarationCacheItem> MatchedStyleDeclarationCache;
     MatchedStyleDeclarationCache m_matchedStyleDeclarationCache;
@@ -408,7 +419,7 @@ private:
     bool m_sameOriginOnly;
 
     RefPtr<CSSFontSelector> m_fontSelector;
-    Vector<MediaQueryResult*> m_viewportDependentMediaQueryResults;
+    Vector<OwnPtr<MediaQueryResult> > m_viewportDependentMediaQueryResults;
 
     bool m_applyPropertyToRegularStyle;
     bool m_applyPropertyToVisitedLinkStyle;

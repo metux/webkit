@@ -103,11 +103,6 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
-#if ENABLE(INPUT_COLOR)
-#include "ColorChooser.h"
-#include "ColorInputType.h"
-#endif
-
 #if ENABLE(SHARED_WORKERS)
 #include "SharedWorkerRepository.h"
 #endif
@@ -914,7 +909,7 @@ bool FrameLoader::checkIfDisplayInsecureContent(SecurityOrigin* context, const K
     String message = (allowed ? emptyString() : "[blocked] ") + "The page at " +
         m_frame->document()->url().string() + " displayed insecure content from " + url.string() + ".\n";
         
-    m_frame->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message, 1, String());
+    m_frame->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message);
 
     if (allowed)
         m_client->didDisplayInsecureContent();
@@ -932,7 +927,7 @@ bool FrameLoader::checkIfRunInsecureContent(SecurityOrigin* context, const KURL&
     String message = (allowed ? emptyString() : "[blocked] ") + "The page at " +
         m_frame->document()->url().string() + " ran insecure content from " + url.string() + ".\n";
        
-    m_frame->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message, 1, String());
+    m_frame->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message);
 
     if (allowed)
         m_client->didRunInsecureContent(context, url);
@@ -1395,7 +1390,7 @@ void FrameLoader::reportLocalLoadFailed(Frame* frame, const String& url)
     if (!frame)
         return;
 
-    frame->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "Not allowed to load local resource: " + url, 0, String());
+    frame->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "Not allowed to load local resource: " + url);
 }
 
 const ResourceRequest& FrameLoader::initialRequest() const
@@ -1573,7 +1568,7 @@ bool FrameLoader::shouldAllowNavigation(Frame* targetFrame) const
                          targetDocument->url().string() + " from frame with URL " + activeDocument->url().string() + ".\n";
 
         // FIXME: should we print to the console of the activeFrame as well?
-        targetFrame->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 1, String());
+        targetFrame->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
     }
     
     return false;
@@ -1805,7 +1800,7 @@ void FrameLoader::commitProvisionalLoad()
         history()->updateForClientRedirect();
 
     if (m_loadingFromCachedPage) {
-        m_frame->document()->documentDidBecomeActive();
+        m_frame->document()->documentDidResumeFromPageCache();
         
         // Force a layout to update view size and thereby update scrollbars.
         m_frame->view()->forceLayout();
@@ -2590,13 +2585,10 @@ void FrameLoader::addExtraFieldsToRequest(ResourceRequest& request, FrameLoadTyp
     // Make sure we send the Origin header.
     addHTTPOriginIfNeeded(request, String());
 
-#if PLATFORM(MAC) || PLATFORM(WIN)
-    // The Apple Mac and Windows ports have decided not to behave like other
-    // browsers and instead use a quirky fallback array.
-    // FIXME: We should remove this code once CFNetwork implements RFC 6266.
+    // Always try UTF-8. If that fails, try frame encoding (if any) and then the default.
+    // For a newly opened frame with an empty URL, encoding() should not be used, because this methods asks decoder, which uses ISO-8859-1.
     Settings* settings = m_frame->settings();
     request.setResponseContentDispositionEncodingFallbackArray("UTF-8", activeDocumentLoader()->writer()->deprecatedFrameEncoding(), settings ? settings->defaultTextEncodingName() : String());
-#endif
 }
 
 void FrameLoader::addHTTPOriginIfNeeded(ResourceRequest& request, const String& origin)

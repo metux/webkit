@@ -29,7 +29,6 @@
 #include "BinarySemaphore.h"
 #include "CoreIPCMessageKinds.h"
 #include "RunLoop.h"
-#include "WorkItem.h"
 #include <wtf/CurrentTime.h>
 
 using namespace std;
@@ -54,7 +53,7 @@ public:
 #if PLATFORM(WIN)
     bool waitWhileDispatchingSentWin32Messages(double absoluteTime, const Vector<HWND>& windowsToReceiveMessages)
     {
-        return RunLoop::dispatchSentMessagesUntil(windowsToReceiveMessages, m_waitForSyncReplySemaphore, absoluteTime);
+        return Connection::dispatchSentMessagesUntil(windowsToReceiveMessages, m_waitForSyncReplySemaphore, absoluteTime);
     }
 #endif
 

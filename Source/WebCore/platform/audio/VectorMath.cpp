@@ -72,7 +72,89 @@ void vmul(const float* source1P, int sourceStride1, const float* source2P, int s
 #endif
 }
 
+void zvmul(const float* real1P, const float* imag1P, const float* real2P, const float* imag2P, float* realDestP, float* imagDestP, size_t framesToProcess)
+{
+    DSPSplitComplex sc1;
+    DSPSplitComplex sc2;
+    DSPSplitComplex dest;
+    sc1.realp = const_cast<float*>(real1P);
+    sc1.imagp = const_cast<float*>(imag1P);
+    sc2.realp = const_cast<float*>(real2P);
+    sc2.imagp = const_cast<float*>(imag2P);
+    dest.realp = realDestP;
+    dest.imagp = imagDestP;
+#if defined(__ppc__) || defined(__i386__)
+    ::zvmul(&sc1, 1, &sc2, 1, &dest, 1, framesToProcess, 1);
 #else
+    vDSP_zvmul(&sc1, 1, &sc2, 1, &dest, 1, framesToProcess, 1);
+#endif
+}
+
+void vsma(const float* sourceP, int sourceStride, const float* scale, float* destP, int destStride, size_t framesToProcess)
+{
+    vDSP_vsma(sourceP, sourceStride, scale, destP, destStride, destP, destStride, framesToProcess);
+}
+
+void vsvesq(const float* sourceP, int sourceStride, float* sumP, size_t framesToProcess)
+{
+    vDSP_svesq(const_cast<float*>(sourceP), sourceStride, sumP, framesToProcess);
+}
+#else
+
+void vsma(const float* sourceP, int sourceStride, const float* scale, float* destP, int destStride, size_t framesToProcess)
+{
+    int n = framesToProcess;
+
+#ifdef __SSE2__
+    if ((sourceStride == 1) && (destStride == 1)) {
+        float k = *scale;
+
+        // If the sourceP address is not 16-byte aligned, the first several frames (at most three) should be processed seperately.
+        while ((reinterpret_cast<uintptr_t>(sourceP) & 0x0F) && n) {
+            *destP += k * *sourceP;
+            sourceP++;
+            destP++;
+            n--;
+        }
+
+        // Now the sourceP address aligned and start to apply SSE.
+        int tailFrames = n % 4;
+        float* endP = destP + n - tailFrames;
+
+        __m128 pSource;
+        __m128 dest;
+        __m128 temp;
+        __m128 mScale = _mm_set_ps1(k);
+
+        bool destAligned = !(reinterpret_cast<uintptr_t>(destP) & 0x0F);
+
+#define SSE2_MULT_ADD(loadInstr, storeInstr)        \
+            while (destP < endP)                    \
+            {                                       \
+                pSource = _mm_load_ps(sourceP);     \
+                temp = _mm_mul_ps(pSource, mScale); \
+                dest = _mm_##loadInstr##_ps(destP); \
+                dest = _mm_add_ps(dest, temp);      \
+                _mm_##storeInstr##_ps(destP, dest); \
+                sourceP += 4;                       \
+                destP += 4;                         \
+            }
+
+        if (destAligned) 
+            SSE2_MULT_ADD(load, store)
+        else 
+            SSE2_MULT_ADD(loadu, storeu)
+
+        n = tailFrames;
+    }
+#endif
+    while (n) {
+        *destP += *sourceP * *scale;
+        sourceP += sourceStride;
+        destP += destStride;
+        n--;
+    }
+}
 
 void vsmul(const float* sourceP, int sourceStride, const float* scale, float* destP, int destStride, size_t framesToProcess)
 {
@@ -298,6 +380,55 @@ void vmul(const float* source1P, int sourceStride1, const float* source2P, int s
     }
 }
 
+void zvmul(const float* real1P, const float* imag1P, const float* real2P, const float* imag2P, float* realDestP, float* imagDestP, size_t framesToProcess)
+{
+    unsigned i = 0;
+#ifdef __SSE2__
+    // Only use the SSE optimization in the very common case that all addresses are 16-byte aligned. 
+    // Otherwise, fall through to the scalar code below.
+    if (!(reinterpret_cast<uintptr_t>(real1P) & 0x0F)
+        && !(reinterpret_cast<uintptr_t>(imag1P) & 0x0F)
+        && !(reinterpret_cast<uintptr_t>(real2P) & 0x0F)
+        && !(reinterpret_cast<uintptr_t>(imag2P) & 0x0F)
+        && !(reinterpret_cast<uintptr_t>(realDestP) & 0x0F)
+        && !(reinterpret_cast<uintptr_t>(imagDestP) & 0x0F)) {
+        
+        unsigned endSize = framesToProcess - framesToProcess % 4;
+        while (i < endSize) {
+            __m128 real1 = _mm_load_ps(real1P + i);
+            __m128 real2 = _mm_load_ps(real2P + i);
+            __m128 imag1 = _mm_load_ps(imag1P + i);
+            __m128 imag2 = _mm_load_ps(imag2P + i);
+            __m128 real = _mm_mul_ps(real1, real2);
+            real = _mm_sub_ps(real, _mm_mul_ps(imag1, imag2));
+            __m128 imag = _mm_mul_ps(real1, imag2);
+            imag = _mm_add_ps(imag, _mm_mul_ps(imag1, real2));
+            _mm_store_ps(realDestP + i, real);
+            _mm_store_ps(imagDestP + i, imag);
+            i += 4;
+        }
+    }
+#endif
+    for (; i < framesToProcess; ++i) {
+        realDestP[i] = real1P[i] * real2P[i] - imag1P[i] * imag2P[i];
+        imagDestP[i] = real1P[i] * imag2P[i] + imag1P[i] * real2P[i];
+    }
+}
+
+void vsvesq(const float* sourceP, int sourceStride, float* sumP, size_t framesToProcess)
+{
+    // FIXME: optimize for SSE
+    int n = framesToProcess;
+    float sum = 0;
+    while (n--) {
+        float sample = *sourceP;
+        sum += sample * sample;
+        sourceP += sourceStride;
+    }
+
+    ASSERT(sumP);
+    *sumP = sum;
+}
 #endif // OS(DARWIN)
 
 } // namespace VectorMath

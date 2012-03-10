@@ -66,6 +66,11 @@ typedef HashMap<RenderBoxModelObject*, LayerSizeMap> ObjectLayerSizeMap;
 typedef HashMap<const RenderBoxModelObject*, RenderBoxModelObject*> ContinuationMap;
 static ContinuationMap* continuationMap = 0;
 
+// This HashMap is similar to the continuation map, but connects first-letter
+// renderers to their remaining text fragments.
+typedef HashMap<const RenderBoxModelObject*, RenderObject*> FirstLetterRemainingTextMap;
+static FirstLetterRemainingTextMap* firstLetterRemainingTextMap = 0;
+
 class ImageQualityController {
     WTF_MAKE_NONCOPYABLE(ImageQualityController); WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -282,6 +287,11 @@ void RenderBoxModelObject::willBeDestroyed()
 
     // A continuation of this RenderObject should be destroyed at subclasses.
     ASSERT(!continuation());
+
+    // If this is a first-letter object with a remaining text fragment then the
+    // entry needs to be cleared from the map.
+    if (firstLetterRemainingText())
+        setFirstLetterRemainingText(0);
 
     // RenderObject::willBeDestroyed calls back to destroyLayer() for layer destruction
     RenderObject::willBeDestroyed();
@@ -1175,10 +1185,11 @@ bool RenderBoxModelObject::paintNinePieceImage(GraphicsContext* graphicsContext,
 
         // Paint the left edge.
         // Have to scale and tile into the border rect.
-        graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x(), borderImageRect.y() + topWidth, leftWidth,
-                                        destinationHeight),
-                                        IntRect(0, topSlice, leftSlice, sourceHeight),
-                                        FloatSize(leftSideScale, leftSideScale), Image::StretchTile, (Image::TileRule)vRule, op);
+        if (sourceHeight > 0)
+            graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x(), borderImageRect.y() + topWidth, leftWidth,
+                                            destinationHeight),
+                                            IntRect(0, topSlice, leftSlice, sourceHeight),
+                                            FloatSize(leftSideScale, leftSideScale), Image::StretchTile, (Image::TileRule)vRule, op);
     }
 
     if (drawRight) {
@@ -1196,21 +1207,22 @@ bool RenderBoxModelObject::paintNinePieceImage(GraphicsContext* graphicsContext,
                                        LayoutRect(imageWidth - rightSlice, imageHeight - bottomSlice, rightSlice, bottomSlice), op);
 
         // Paint the right edge.
-        graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.maxX() - rightWidth, borderImageRect.y() + topWidth, rightWidth,
-                                        destinationHeight),
-                                        IntRect(imageWidth - rightSlice, topSlice, rightSlice, sourceHeight),
-                                        FloatSize(rightSideScale, rightSideScale),
-                                        Image::StretchTile, (Image::TileRule)vRule, op);
+        if (sourceHeight > 0)
+            graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.maxX() - rightWidth, borderImageRect.y() + topWidth, rightWidth,
+                                            destinationHeight),
+                                            IntRect(imageWidth - rightSlice, topSlice, rightSlice, sourceHeight),
+                                            FloatSize(rightSideScale, rightSideScale),
+                                            Image::StretchTile, (Image::TileRule)vRule, op);
     }
 
     // Paint the top edge.
-    if (drawTop)
+    if (drawTop && sourceWidth > 0)
         graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x() + leftWidth, borderImageRect.y(), destinationWidth, topWidth),
                                         IntRect(leftSlice, 0, sourceWidth, topSlice),
                                         FloatSize(topSideScale, topSideScale), (Image::TileRule)hRule, Image::StretchTile, op);
 
     // Paint the bottom edge.
-    if (drawBottom)
+    if (drawBottom && sourceWidth > 0)
         graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x() + leftWidth, borderImageRect.maxY() - bottomWidth,
                                         destinationWidth, bottomWidth),
                                         IntRect(leftSlice, imageHeight - bottomSlice, sourceWidth, bottomSlice),
@@ -2620,9 +2632,10 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
                 // edges if they are not pixel-aligned. Those are avoided by insetting the clipping path
                 // by one pixel.
                 if (hasOpaqueBackground) {
-                    AffineTransform currentTransformation = context->getCTM();
-                    if (currentTransformation.a() != 1 || (currentTransformation.d() != 1 && currentTransformation.d() != -1)
-                            || currentTransformation.b() || currentTransformation.c())
+                    // FIXME: The function to decide on the policy based on the transform should be a named function.
+                    // FIXME: It's not clear if this check is right. What about integral scale factors?
+                    AffineTransform transform = context->getCTM();
+                    if (transform.a() != 1 || (transform.d() != 1 && transform.d() != -1) || transform.b() || transform.c())
                         rectToClipOut.inflate(-1);
                 }
 
@@ -2711,6 +2724,23 @@ void RenderBoxModelObject::setContinuation(RenderBoxModelObject* continuation)
     }
 }
 
+RenderObject* RenderBoxModelObject::firstLetterRemainingText() const
+{
+    if (!firstLetterRemainingTextMap)
+        return 0;
+    return firstLetterRemainingTextMap->get(this);
+}
+
+void RenderBoxModelObject::setFirstLetterRemainingText(RenderObject* remainingText)
+{
+    if (remainingText) {
+        if (!firstLetterRemainingTextMap)
+            firstLetterRemainingTextMap = new FirstLetterRemainingTextMap;
+        firstLetterRemainingTextMap->set(this, remainingText);
+    } else if (firstLetterRemainingTextMap)
+        firstLetterRemainingTextMap->remove(this);
+}
+
 bool RenderBoxModelObject::shouldAntialiasLines(GraphicsContext* context)
 {
     // FIXME: We may want to not antialias when scaled by an integral value,
@@ -2731,7 +2761,7 @@ void RenderBoxModelObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransform
 
     LayoutSize containerOffset = offsetFromContainer(o, LayoutPoint());
 
-    if (style()->position() != AbsolutePosition && style()->position() != FixedPosition && o->hasColumns()) {
+    if (!style()->isPositioned() && o->hasColumns()) {
         RenderBlock* block = static_cast<RenderBlock*>(o);
         LayoutPoint point(roundedLayoutPoint(transformState.mappedPoint()));
         point -= containerOffset;

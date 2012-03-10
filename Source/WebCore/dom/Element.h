@@ -25,8 +25,10 @@
 #ifndef Element_h
 #define Element_h
 
+#include "CollectionType.h"
 #include "Document.h"
 #include "FragmentScriptingPermission.h"
+#include "HTMLNames.h"
 #include "NamedNodeMap.h"
 #include "ScrollTypes.h"
 
@@ -105,12 +107,13 @@ public:
 #endif
 #if ENABLE(FULLSCREEN_API)
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
 #endif
 
     bool hasAttribute(const QualifiedName&) const;
     const AtomicString& getAttribute(const QualifiedName&) const;
-    void setAttribute(const QualifiedName&, const AtomicString& value, ExceptionCode&);
-    void removeAttribute(const QualifiedName&, ExceptionCode&);
+    void setAttribute(const QualifiedName&, const AtomicString& value);
+    void removeAttribute(const QualifiedName&);
 
     // Typed getters and setters for language bindings.
     int getIntegralAttribute(const QualifiedName& attributeName) const;
@@ -176,8 +179,8 @@ public:
     // Returns the absolute bounding box translated into screen coordinates:
     LayoutRect screenRect() const;
 
-    void removeAttribute(const String& name, ExceptionCode&);
-    void removeAttributeNS(const String& namespaceURI, const String& localName, ExceptionCode&);
+    void removeAttribute(const String& name);
+    void removeAttributeNS(const String& namespaceURI, const String& localName);
 
     PassRefPtr<Attr> getAttributeNode(const String& name);
     PassRefPtr<Attr> getAttributeNodeNS(const String& namespaceURI, const String& localName);
@@ -209,8 +212,6 @@ public:
     void normalizeAttributes();
     String nodeNamePreservingCase() const;
 
-    // convenience methods which ignore exceptions
-    void setAttribute(const QualifiedName&, const AtomicString& value);
     void setBooleanAttribute(const QualifiedName& name, bool);
 
     NamedNodeMap* attributes(bool readonly = false) const;
@@ -218,8 +219,12 @@ public:
     // This method is called whenever an attribute is added, changed or removed.
     virtual void attributeChanged(Attribute*, bool preserveDecls = false);
 
-    void setAttributeMap(PassRefPtr<NamedNodeMap>, FragmentScriptingPermission = FragmentScriptingAllowed);
+    // Only called by the parser immediately after element construction.
+    void parserSetAttributeMap(PassOwnPtr<NamedNodeMap>, FragmentScriptingPermission);
+
     NamedNodeMap* attributeMap() const { return m_attributeMap.get(); }
+
+    void setAttributesFromElement(const Element&);
 
     virtual void copyNonAttributeProperties(const Element* source);
 
@@ -243,9 +248,6 @@ public:
 
     AtomicString computeInheritedLanguage() const;
 
-    void dispatchAttrRemovalEvent(Attribute*);
-    void dispatchAttrAdditionEvent(Attribute*);
-
     virtual void accessKeyAction(bool /*sendToAnyEvent*/) { }
 
     virtual bool isURLAttribute(Attribute*) const;
@@ -266,13 +268,19 @@ public:
     virtual String title() const;
 
     void updateId(const AtomicString& oldId, const AtomicString& newId);
+    void updateName(const AtomicString& oldName, const AtomicString& newName);
+
+    void willModifyAttribute(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue);
+    void willRemoveAttribute(const QualifiedName&, const AtomicString& value);
+    void didModifyAttribute(Attribute*);
+    void didRemoveAttribute(Attribute*);
 
     LayoutSize minimumSizeForResizing() const;
     void setMinimumSizeForResizing(const LayoutSize&);
 
     // Use Document::registerForDocumentActivationCallbacks() to subscribe to these
-    virtual void documentWillBecomeInactive() { }
-    virtual void documentDidBecomeActive() { }
+    virtual void documentWillSuspendForPageCache() { }
+    virtual void documentDidResumeFromPageCache() { }
 
     // Use Document::registerForMediaVolumeCallbacks() to subscribe to this
     virtual void mediaVolumeDidChange() { }
@@ -335,10 +343,6 @@ public:
     virtual const AtomicString& formControlName() const { return nullAtom; }
     virtual const AtomicString& formControlType() const { return nullAtom; }
 
-    virtual bool shouldSaveAndRestoreFormControlState() const { return true; }
-    virtual bool saveFormControlState(String&) const { return false; }
-    virtual void restoreFormControlState(const String&) { }
-
     virtual bool wasChangedSinceLastFormControlChangeEvent() const;
     virtual void setChangedSinceLastFormControlChangeEvent(bool);
     virtual void dispatchFormControlChangeEvent() { }
@@ -364,10 +368,6 @@ public:
     
     PassRefPtr<RenderStyle> styleForRenderer();
 
-#if ENABLE(MUTATION_OBSERVERS)
-    void enqueueAttributesMutationRecordIfRequested(const QualifiedName&, const AtomicString& oldValue);
-#endif
-
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
         : ContainerNode(document, type)
@@ -385,12 +385,17 @@ protected:
     virtual void didRecalcStyle(StyleChange) { }
     virtual PassRefPtr<RenderStyle> customStyleForRenderer();
 
+    virtual bool shouldRegisterAsNamedItem() const { return false; }
+    virtual bool shouldRegisterAsExtraNamedItem() const { return false; }
+
     // The implementation of Element::attributeChanged() calls the following two functions.
     // They are separated to allow a different flow of control in StyledElement::attributeChanged().
     void recalcStyleIfNeededAfterAttributeChanged(Attribute*);
     void updateAfterAttributeChanged(Attribute*);
     
     void idAttributeChanged(Attribute*);
+
+    HTMLCollection* ensureCachedHTMLCollection(CollectionType);
 
 private:
     void scrollByUnits(int units, ScrollGranularity);
@@ -399,7 +404,7 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
 
-    void setAttributeInternal(Attribute* old, const QualifiedName&, const AtomicString& value);
+    void setAttributeInternal(size_t index, const QualifiedName&, const AtomicString& value);
     virtual PassRefPtr<Attribute> createAttribute(const QualifiedName&, const AtomicString& value);
     
 #ifndef NDEBUG
@@ -436,8 +441,11 @@ private:
 
     SpellcheckAttributeState spellcheckAttributeState() const;
 
+    void updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
+    void updateExtraNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
+
 private:
-    mutable RefPtr<NamedNodeMap> m_attributeMap;
+    mutable OwnPtr<NamedNodeMap> m_attributeMap;
 };
     
 inline Element* toElement(Node* node)
@@ -496,6 +504,24 @@ inline NamedNodeMap* Element::attributes(bool readonly) const
     return m_attributeMap.get();
 }
 
+inline void Element::setAttributesFromElement(const Element& other)
+{
+    if (NamedNodeMap* attributeMap = other.attributes(true))
+        attributes(false)->setAttributes(*attributeMap);
+}
+
+inline void Element::updateName(const AtomicString& oldName, const AtomicString& newName)
+{
+    if (!inDocument())
+        return;
+
+    if (oldName == newName)
+        return;
+
+    if (shouldRegisterAsNamedItem())
+        updateNamedItemRegistration(oldName, newName);
+}
+
 inline void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
 {
     if (!inDocument())
@@ -509,6 +535,15 @@ inline void Element::updateId(const AtomicString& oldId, const AtomicString& new
         scope->removeElementById(oldId, this);
     if (!newId.isEmpty())
         scope->addElementById(newId, this);
+
+    if (shouldRegisterAsExtraNamedItem())
+        updateExtraNamedItemRegistration(oldId, newId);
+}
+
+inline void Element::willRemoveAttribute(const QualifiedName& name, const AtomicString& value)
+{
+    if (!value.isNull())
+        willModifyAttribute(name, value, nullAtom);
 }
 
 inline bool Element::fastHasAttribute(const QualifiedName& name) const

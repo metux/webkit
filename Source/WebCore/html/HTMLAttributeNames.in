@@ -246,6 +246,7 @@ onwebkitanimationend
 onwebkitbeginfullscreen
 onwebkitendfullscreen
 onwebkitfullscreenchange
+onwebkitfullscreenerror
 onwebkittransitionend
 open
 optimum
@@ -266,6 +267,7 @@ rel
 required
 results
 rev
+reversed
 role
 rows
 rowspan
@@ -277,6 +279,7 @@ scoped
 scrollamount
 scrolldelay
 scrolling
+select
 selected
 shape
 size

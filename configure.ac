@@ -2,14 +2,14 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [7])
-m4_define([webkit_micro_version], [3])
+m4_define([webkit_micro_version], [4])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
 m4_define([webkit_user_agent_major_version], [535])
-m4_define([webkit_user_agent_minor_version], [14])
+m4_define([webkit_user_agent_minor_version], [18])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=11:3:11
+LIBWEBKITGTK_VERSION=11:4:11
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -381,14 +381,6 @@ AC_ARG_ENABLE(optimizations,
               [if test "$enable_debug" = "yes"; then enable_optimizations="no"; else enable_optimizations="yes"; fi])
 AC_MSG_RESULT([$enable_optimizations])
 
-# check whether to enable 3D rendering support
-AC_MSG_CHECKING([whether to enable support for 3D Rendering])
-AC_ARG_ENABLE(3d_rendering,
-              AC_HELP_STRING([--enable-3d-rendering],
-                             [enable support for 3D Rendering (experimental) [default=no]]),
-              [],[enable_3d_rendering="no"])
-AC_MSG_RESULT([$enable_3d_rendering])
-
 # check whether to enable WebGL support
 AC_MSG_CHECKING([whether to enable WebGL support])
 AC_ARG_ENABLE(webgl,
@@ -410,6 +402,16 @@ if test "$enable_webgl" = "yes" ||  test "$with_accelerated_compositing" = "open
     OPENGL_LIBS="-lGL -ldl"
 fi
 AC_SUBST([OPENGL_LIBS])
+
+if test "$with_accelerated_compositing" = "clutter"; then
+   PKG_CHECK_MODULES(CLUTTER, clutter-1.0 >= $CLUTTER_REQUIRED_VERSION)
+   PKG_CHECK_MODULES([CLUTTER_GTK], [clutter-gtk-1.0 >= $CLUTTER_GTK_REQUIRED_VERSION])
+
+   AC_SUBST(CLUTTER_CFLAGS)
+   AC_SUBST(CLUTTER_LIBS)
+   AC_SUBST(CLUTTER_GTK_CFLAGS)
+   AC_SUBST(CLUTTER_GTK_LIBS)
+fi
 
 # check whether to enable channel messaging support
 AC_MSG_CHECKING([whether to enable HTML5 Channel Messaging support])
@@ -1046,17 +1048,6 @@ if test "$enable_web_audio" = "yes"; then
     AC_SUBST([LIBFFTW_LIBS])
 fi
 
-if test "$with_accelerated_compositing" = "clutter"; then
-   PKG_CHECK_MODULES(CLUTTER, clutter-1.0 >= $CLUTTER_REQUIRED_VERSION)
-   PKG_CHECK_MODULES([CLUTTER_GTK],
-                     [clutter-gtk-1.0 >= $CLUTTER_GTK_REQUIRED_VERSION])
-
-   AC_SUBST(CLUTTER_CFLAGS)
-   AC_SUBST(CLUTTER_LIBS)
-   AC_SUBST(CLUTTER_GTK_CFLAGS)
-   AC_SUBST(CLUTTER_GTK_LIBS)
-fi
-
 # check for code coverage support
 if test "$enable_coverage" = "yes"; then
    COVERAGE_CFLAGS="-MD"
@@ -1138,7 +1129,6 @@ AM_CONDITIONAL([USE_CLUTTER], [test "$with_accelerated_compositing" = "clutter"]
 
 # WebKit feature conditionals
 AM_CONDITIONAL([ENABLE_DEBUG],[test "$enable_debug_features" = "yes"])
-AM_CONDITIONAL([ENABLE_3D_RENDERING],[test "$enable_3d_rendering" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBGL],[test "$enable_webgl" = "yes"])
 AM_CONDITIONAL([ENABLE_BLOB],[test "$enable_blob" = "yes"])
 AM_CONDITIONAL([ENABLE_METER_TAG],[test "$enable_meter_tag" = "yes"])
@@ -1246,7 +1236,6 @@ Build configuration:
  Accelerated Compositing                                  : $with_accelerated_compositing
 
 Features:
- 3D Rendering                                             : $enable_3d_rendering
  WebGL                                                    : $enable_webgl
  Blob support                                             : $enable_blob
  DOM mutation observer support                            : $enable_mutation_observers

@@ -370,16 +370,16 @@ NEVER_INLINE bool Interpreter::resolveThisAndProperty(CallFrame* callFrame, Inst
 ALWAYS_INLINE CallFrame* Interpreter::slideRegisterWindowForCall(CodeBlock* newCodeBlock, RegisterFile* registerFile, CallFrame* callFrame, size_t registerOffset, int argumentCountIncludingThis)
 {
     // This ensures enough space for the worst case scenario of zero arguments passed by the caller.
-    if (!registerFile->grow(callFrame->registers() + registerOffset + newCodeBlock->m_numParameters + newCodeBlock->m_numCalleeRegisters))
+    if (!registerFile->grow(callFrame->registers() + registerOffset + newCodeBlock->numParameters() + newCodeBlock->m_numCalleeRegisters))
         return 0;
 
-    if (argumentCountIncludingThis >= newCodeBlock->m_numParameters) {
+    if (argumentCountIncludingThis >= newCodeBlock->numParameters()) {
         Register* newCallFrame = callFrame->registers() + registerOffset;
         return CallFrame::create(newCallFrame);
     }
 
     // Too few arguments -- copy arguments, then fill in missing arguments with undefined.
-    size_t delta = newCodeBlock->m_numParameters - argumentCountIncludingThis;
+    size_t delta = newCodeBlock->numParameters() - argumentCountIncludingThis;
     CallFrame* newCallFrame = CallFrame::create(callFrame->registers() + registerOffset + delta);
 
     Register* dst = &newCallFrame->uncheckedR(CallFrame::thisArgumentOffset());
@@ -506,7 +506,7 @@ CallFrame* loadVarargs(CallFrame* callFrame, RegisterFile* registerFile, JSValue
         return newCallFrame;
     }
 
-    if (isJSArray(&callFrame->globalData(), arguments)) {
+    if (isJSArray(arguments)) {
         JSArray* array = asArray(arguments);
         unsigned argCount = array->length();
         CallFrame* newCallFrame = CallFrame::create(callFrame->registers() + firstFreeRegister + CallFrame::offsetFor(argCount + 1));
@@ -540,13 +540,42 @@ CallFrame* loadVarargs(CallFrame* callFrame, RegisterFile* registerFile, JSValue
 Interpreter::Interpreter()
     : m_sampleEntryDepth(0)
     , m_reentryDepth(0)
+#if !ASSERT_DISABLED
+    , m_initialized(false)
+#endif
+    , m_enabled(false)
+{
+}
+
+void Interpreter::initialize(bool canUseJIT)
 {
 #if ENABLE(COMPUTED_GOTO_INTERPRETER)
-    privateExecute(InitializeAndReturn, 0, 0);
-
-    for (int i = 0; i < numOpcodeIDs; ++i)
-        m_opcodeIDTable.add(m_opcodeTable[i], static_cast<OpcodeID>(i));
+    if (canUseJIT) {
+        // If the JIT is present, don't use jump destinations for opcodes.
+        
+        for (int i = 0; i < numOpcodeIDs; ++i) {
+            Opcode opcode = bitwise_cast<void*>(static_cast<uintptr_t>(i));
+            m_opcodeTable[i] = opcode;
+        }
+    } else {
+        privateExecute(InitializeAndReturn, 0, 0);
+        
+        for (int i = 0; i < numOpcodeIDs; ++i)
+            m_opcodeIDTable.add(m_opcodeTable[i], static_cast<OpcodeID>(i));
+        
+        m_enabled = true;
+    }
+#else
+    UNUSED_PARAM(canUseJIT);
+#if ENABLE(INTERPRETER)
+    m_enabled = true;
+#else
+    m_enabled = false;
+#endif
 #endif // ENABLE(COMPUTED_GOTO_INTERPRETER)
+#if !ASSERT_DISABLED
+    m_initialized = true;
+#endif
 
 #if ENABLE(OPCODE_SAMPLING)
     enableSampler();
@@ -573,14 +602,14 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
     const Register* end;
     JSValue v;
 
-    it = callFrame->registers() - RegisterFile::CallFrameHeaderSize - codeBlock->m_numParameters;
+    it = callFrame->registers() - RegisterFile::CallFrameHeaderSize - codeBlock->numParameters();
     v = (*it).jsValue();
 #if USE(JSVALUE32_64)
     printf("[this]                     | %10p | %-16s 0x%llx \n", it, v.description(), JSValue::encode(v)); ++it;
 #else
     printf("[this]                     | %10p | %-16s %p \n", it, v.description(), JSValue::encode(v)); ++it;
 #endif
-    end = it + max(codeBlock->m_numParameters - 1, 0); // - 1 to skip "this"
+    end = it + max(codeBlock->numParameters() - 1, 0); // - 1 to skip "this"
     if (it != end) {
         do {
             v = (*it).jsValue();
@@ -639,6 +668,8 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
 bool Interpreter::isOpcode(Opcode opcode)
 {
 #if ENABLE(COMPUTED_GOTO_INTERPRETER)
+    if (!m_enabled)
+        return opcode >= 0 && static_cast<OpcodeID>(bitwise_cast<uintptr_t>(opcode)) <= op_end;
     return opcode != HashTraits<Opcode>::emptyValue()
         && !HashTraits<Opcode>::isDeletedValue(opcode)
         && m_opcodeIDTable.contains(opcode);
@@ -874,7 +905,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, S
                     PutPropertySlot slot;
                     globalObject->methodTable()->put(globalObject, callFrame, JSONPPath[0].m_pathEntryName, JSONPValue, slot);
                 } else
-                    globalObject->methodTable()->putWithAttributes(globalObject, callFrame, JSONPPath[0].m_pathEntryName, JSONPValue, DontEnum | DontDelete);
+                    globalObject->methodTable()->putDirectVirtual(globalObject, callFrame, JSONPPath[0].m_pathEntryName, JSONPValue, DontEnum | DontDelete);
                 // var declarations return undefined
                 result = jsUndefined();
                 continue;
@@ -954,13 +985,13 @@ failedJSONP:
     CodeBlock* codeBlock = &program->generatedBytecode();
 
     Register* oldEnd = m_registerFile.end();
-    Register* newEnd = oldEnd + codeBlock->m_numParameters + RegisterFile::CallFrameHeaderSize + codeBlock->m_numCalleeRegisters;
+    Register* newEnd = oldEnd + codeBlock->numParameters() + RegisterFile::CallFrameHeaderSize + codeBlock->m_numCalleeRegisters;
     if (!m_registerFile.grow(newEnd))
         return checkedReturn(throwStackOverflowError(callFrame));
 
-    CallFrame* newCallFrame = CallFrame::create(oldEnd + codeBlock->m_numParameters + RegisterFile::CallFrameHeaderSize);
-    ASSERT(codeBlock->m_numParameters == 1); // 1 parameter for 'this'.
-    newCallFrame->init(codeBlock, 0, scopeChain, CallFrame::noCaller(), codeBlock->m_numParameters, 0);
+    CallFrame* newCallFrame = CallFrame::create(oldEnd + codeBlock->numParameters() + RegisterFile::CallFrameHeaderSize);
+    ASSERT(codeBlock->numParameters() == 1); // 1 parameter for 'this'.
+    newCallFrame->init(codeBlock, 0, scopeChain, CallFrame::noCaller(), codeBlock->numParameters(), 0);
     newCallFrame->setThisValue(thisObj);
     TopCallFrameSetter topCallFrame(callFrame->globalData(), newCallFrame);
 
@@ -1225,7 +1256,7 @@ CallFrameClosure Interpreter::prepareForRepeatCall(FunctionExecutable* functionE
     }
     newCallFrame->init(codeBlock, 0, scopeChain, callFrame->addHostCallFrameFlag(), argumentCountIncludingThis, function);  
     scopeChain->globalData->topCallFrame = newCallFrame;
-    CallFrameClosure result = { callFrame, newCallFrame, function, functionExecutable, scopeChain->globalData, oldEnd, scopeChain, codeBlock->m_numParameters, argumentCountIncludingThis };
+    CallFrameClosure result = { callFrame, newCallFrame, function, functionExecutable, scopeChain->globalData, oldEnd, scopeChain, codeBlock->numParameters(), argumentCountIncludingThis };
     return result;
 }
 
@@ -1336,8 +1367,8 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
 
     CallFrame* newCallFrame = CallFrame::create(m_registerFile.begin() + globalRegisterOffset);
 
-    ASSERT(codeBlock->m_numParameters == 1); // 1 parameter for 'this'.
-    newCallFrame->init(codeBlock, 0, scopeChain, callFrame->addHostCallFrameFlag(), codeBlock->m_numParameters, 0);
+    ASSERT(codeBlock->numParameters() == 1); // 1 parameter for 'this'.
+    newCallFrame->init(codeBlock, 0, scopeChain, callFrame->addHostCallFrameFlag(), codeBlock->numParameters(), 0);
     newCallFrame->setThisValue(thisValue);
 
     TopCallFrameSetter topCallFrame(callFrame->globalData(), newCallFrame);
@@ -1508,13 +1539,12 @@ NEVER_INLINE void Interpreter::tryCacheGetByID(CallFrame* callFrame, CodeBlock* 
         return;
     }
 
-    JSGlobalData* globalData = &callFrame->globalData();
-    if (isJSArray(globalData, baseValue) && propertyName == callFrame->propertyNames().length) {
+    if (isJSArray(baseValue) && propertyName == callFrame->propertyNames().length) {
         vPC[0] = getOpcode(op_get_array_length);
         return;
     }
 
-    if (isJSString(globalData, baseValue) && propertyName == callFrame->propertyNames().length) {
+    if (isJSString(baseValue) && propertyName == callFrame->propertyNames().length) {
         vPC[0] = getOpcode(op_get_string_length);
         return;
     }
@@ -1653,6 +1683,9 @@ JSValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         #endif // ENABLE(COMPUTED_GOTO_INTERPRETER)
         return JSValue();
     }
+    
+    ASSERT(m_initialized);
+    ASSERT(m_enabled);
     
 #if ENABLE(JIT)
 #if ENABLE(INTERPRETER)
@@ -3218,7 +3251,7 @@ skip_id_custom_self:
 
         int base = vPC[2].u.operand;
         JSValue baseValue = callFrame->r(base).jsValue();
-        if (LIKELY(isJSArray(globalData, baseValue))) {
+        if (LIKELY(isJSArray(baseValue))) {
             int dst = vPC[1].u.operand;
             callFrame->uncheckedR(dst) = jsNumber(asArray(baseValue)->length());
             vPC += OPCODE_LENGTH(op_get_array_length);
@@ -3242,7 +3275,7 @@ skip_id_custom_self:
 
         int base = vPC[2].u.operand;
         JSValue baseValue = callFrame->r(base).jsValue();
-        if (LIKELY(isJSString(globalData, baseValue))) {
+        if (LIKELY(isJSString(baseValue))) {
             int dst = vPC[1].u.operand;
             callFrame->uncheckedR(dst) = jsNumber(asString(baseValue)->length());
             vPC += OPCODE_LENGTH(op_get_string_length);
@@ -3275,10 +3308,12 @@ skip_id_custom_self:
         int direct = vPC[8].u.operand;
 
         JSValue baseValue = callFrame->r(base).jsValue();
+        ASSERT(baseValue.isObject());
+        JSObject* baseObject = asObject(baseValue);
         Identifier& ident = codeBlock->identifier(property);
         PutPropertySlot slot(codeBlock->isStrictMode());
         if (direct)
-            baseValue.putDirect(callFrame, ident, callFrame->r(value).jsValue(), slot);
+            baseObject->putDirect(*globalData, ident, callFrame->r(value).jsValue(), slot);
         else
             baseValue.put(callFrame, ident, callFrame->r(value).jsValue(), slot);
         CHECK_FOR_EXCEPTION();
@@ -3393,10 +3428,12 @@ skip_id_custom_self:
         int direct = vPC[8].u.operand;
 
         JSValue baseValue = callFrame->r(base).jsValue();
+        ASSERT(baseValue.isObject());
+        JSObject* baseObject = asObject(baseValue);
         Identifier& ident = codeBlock->identifier(property);
         PutPropertySlot slot(codeBlock->isStrictMode());
         if (direct)
-            baseValue.putDirect(callFrame, ident, callFrame->r(value).jsValue(), slot);
+            baseObject->putDirect(*globalData, ident, callFrame->r(value).jsValue(), slot);
         else
             baseValue.put(callFrame, ident, callFrame->r(value).jsValue(), slot);
         CHECK_FOR_EXCEPTION();
@@ -3511,15 +3548,15 @@ skip_id_custom_self:
 
         if (LIKELY(subscript.isUInt32())) {
             uint32_t i = subscript.asUInt32();
-            if (isJSArray(globalData, baseValue)) {
+            if (isJSArray(baseValue)) {
                 JSArray* jsArray = asArray(baseValue);
                 if (jsArray->canGetIndex(i))
                     result = jsArray->getIndex(i);
                 else
                     result = jsArray->JSArray::get(callFrame, i);
-            } else if (isJSString(globalData, baseValue) && asString(baseValue)->canGetIndex(i))
+            } else if (isJSString(baseValue) && asString(baseValue)->canGetIndex(i))
                 result = asString(baseValue)->getIndex(callFrame, i);
-            else if (isJSByteArray(globalData, baseValue) && asByteArray(baseValue)->canAccessIndex(i))
+            else if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i))
                 result = asByteArray(baseValue)->getIndex(callFrame, i);
             else
                 result = baseValue.get(callFrame, i);
@@ -3553,13 +3590,13 @@ skip_id_custom_self:
 
         if (LIKELY(subscript.isUInt32())) {
             uint32_t i = subscript.asUInt32();
-            if (isJSArray(globalData, baseValue)) {
+            if (isJSArray(baseValue)) {
                 JSArray* jsArray = asArray(baseValue);
                 if (jsArray->canSetIndex(i))
                     jsArray->setIndex(*globalData, i, callFrame->r(value).jsValue());
                 else
                     jsArray->JSArray::putByIndex(jsArray, callFrame, i, callFrame->r(value).jsValue());
-            } else if (isJSByteArray(globalData, baseValue) && asByteArray(baseValue)->canAccessIndex(i)) {
+            } else if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i)) {
                 JSByteArray* jsByteArray = asByteArray(baseValue);
                 JSValue jsValue = callFrame->r(value).jsValue();
                 if (jsValue.isInt32())

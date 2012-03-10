@@ -300,31 +300,42 @@ void Graph::dump(CodeBlock* codeBlock)
 
 #endif
 
-// FIXME: Convert this method to be iterative, not recursive.
+// FIXME: Convert this to be iterative, not recursive.
+#define DO_TO_CHILDREN(node, thingToDo) do {                            \
+        Node& _node = (node);                                           \
+        if (_node.op & NodeHasVarArgs) {                                \
+            for (unsigned _childIdx = _node.firstChild();               \
+                 _childIdx < _node.firstChild() + _node.numChildren();  \
+                 _childIdx++)                                           \
+                thingToDo(m_varArgChildren[_childIdx]);                 \
+        } else {                                                        \
+            if (_node.child1() == NoNode) {                             \
+                ASSERT(_node.child2() == NoNode                         \
+                       && _node.child3() == NoNode);                    \
+                break;                                                  \
+            }                                                           \
+            thingToDo(_node.child1());                                  \
+                                                                        \
+            if (_node.child2() == NoNode) {                             \
+                ASSERT(_node.child3() == NoNode);                       \
+                break;                                                  \
+            }                                                           \
+            thingToDo(_node.child2());                                  \
+                                                                        \
+            if (_node.child3() == NoNode)                               \
+                break;                                                  \
+            thingToDo(_node.child3());                                  \
+        }                                                               \
+    } while (false)
+
 void Graph::refChildren(NodeIndex op)
 {
-    Node& node = at(op);
+    DO_TO_CHILDREN(at(op), ref);
+}
 
-    if (node.op & NodeHasVarArgs) {
-        for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++)
-            ref(m_varArgChildren[childIdx]);
-    } else {
-        if (node.child1() == NoNode) {
-            ASSERT(node.child2() == NoNode && node.child3() == NoNode);
-            return;
-        }
-        ref(node.child1());
-
-        if (node.child2() == NoNode) {
-            ASSERT(node.child3() == NoNode);
-            return;
-        }
-        ref(node.child2());
-
-        if (node.child3() == NoNode)
-            return;
-        ref(node.child3());
-    }
+void Graph::derefChildren(NodeIndex op)
+{
+    DO_TO_CHILDREN(at(op), deref);
 }
 
 void Graph::predictArgumentTypes(CodeBlock* codeBlock)
@@ -333,8 +344,8 @@ void Graph::predictArgumentTypes(CodeBlock* codeBlock)
     ASSERT(codeBlock->alternative());
 
     CodeBlock* profiledCodeBlock = codeBlock->alternative();
-    ASSERT(codeBlock->m_numParameters >= 1);
-    for (size_t arg = 0; arg < static_cast<size_t>(codeBlock->m_numParameters); ++arg) {
+    ASSERT(codeBlock->numParameters() >= 1);
+    for (size_t arg = 0; arg < static_cast<size_t>(codeBlock->numParameters()); ++arg) {
         ValueProfile* profile = profiledCodeBlock->valueProfileForArgument(arg);
         if (!profile)
             continue;
@@ -342,7 +353,7 @@ void Graph::predictArgumentTypes(CodeBlock* codeBlock)
         at(m_arguments[arg]).variableAccessData()->predict(profile->computeUpdatedPrediction());
         
 #if DFG_ENABLE(DEBUG_VERBOSE)
-        printf("Argument [%lu] prediction: %s\n", arg, predictionToString(at(m_arguments[arg]).variableAccessData()->prediction()));
+        printf("Argument [%zu] prediction: %s\n", arg, predictionToString(at(m_arguments[arg]).variableAccessData()->prediction()));
 #endif
     }
 }

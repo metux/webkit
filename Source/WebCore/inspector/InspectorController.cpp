@@ -52,6 +52,7 @@
 #include "InspectorFileSystemAgent.h"
 #include "InspectorFrontend.h"
 #include "InspectorFrontendClient.h"
+#include "InspectorIndexedDBAgent.h"
 #include "InspectorInstrumentation.h"
 #include "InspectorMemoryAgent.h"
 #include "InspectorPageAgent.h"
@@ -96,6 +97,10 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
     OwnPtr<InspectorDatabaseAgent> databaseAgentPtr(InspectorDatabaseAgent::create(m_instrumentingAgents.get(), m_state.get()));
     InspectorDatabaseAgent* databaseAgent = databaseAgentPtr.get();
     m_agents.append(databaseAgentPtr.release());
+#endif
+
+#if ENABLE(INDEXED_DATABASE)
+    m_agents.append(InspectorIndexedDBAgent::create(m_instrumentingAgents.get(), m_state.get(), pageAgent));
 #endif
 
 #if ENABLE(FILE_SYSTEM)
@@ -158,6 +163,11 @@ InspectorController::~InspectorController()
         (*it)->discardAgent();
 
     ASSERT(!m_inspectorClient);
+}
+
+PassOwnPtr<InspectorController> InspectorController::create(Page* page, InspectorClient* client)
+{
+    return adoptPtr(new InspectorController(page, client));
 }
 
 void InspectorController::inspectedPageDestroyed()
@@ -280,6 +290,11 @@ void InspectorController::drawHighlight(GraphicsContext& context) const
     m_domAgent->drawHighlight(context);
 }
 
+void InspectorController::getHighlight(Highlight* highlight) const
+{
+    m_domAgent->getHighlight(highlight);
+}
+
 void InspectorController::inspect(Node* node)
 {
     if (!enabled())
@@ -300,9 +315,9 @@ Page* InspectorController::inspectedPage() const
     return m_page;
 }
 
-void InspectorController::setInspectorExtensionAPI(const String& source)
+void InspectorController::setInjectedScriptForOrigin(const String& origin, const String& source)
 {
-    m_inspectorAgent->setInspectorExtensionAPI(source);
+    m_inspectorAgent->setInjectedScriptForOrigin(origin, source);
 }
 
 void InspectorController::dispatchMessageFromFrontend(const String& message)

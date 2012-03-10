@@ -33,6 +33,8 @@
 </dt>
 <dt>WebKitCacheModel, <a class="indexterm" href="WebKitWebContext.html#WebKitCacheModel">enum WebKitCacheModel</a>
 </dt>
+<dt>WebKitLoadEvent, <a class="indexterm" href="WebKitWebView.html#WebKitLoadEvent">enum WebKitLoadEvent</a>
+</dt>
 <dt>WebKitNetworkError, <a class="indexterm" href="webkit2gtk-WebKitError.html#WebKitNetworkError">enum WebKitNetworkError</a>
 </dt>
 <dt>WebKitPluginError, <a class="indexterm" href="webkit2gtk-WebKitError.html#WebKitPluginError">enum WebKitPluginError</a>
@@ -115,25 +117,15 @@
 </dt>
 <dt>WebKitWebContext, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext-struct">struct WebKitWebContext</a>
 </dt>
-<dt>WebKitWebLoaderClient, <a class="indexterm" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-struct">WebKitWebLoaderClient</a>
-</dt>
-<dt>WebKitWebLoaderClient::load-committed, <a class="indexterm" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-committed">The "load-committed" signal</a>
-</dt>
-<dt>WebKitWebLoaderClient::load-failed, <a class="indexterm" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-failed">The "load-failed" signal</a>
-</dt>
-<dt>WebKitWebLoaderClient::load-finished, <a class="indexterm" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-finished">The "load-finished" signal</a>
-</dt>
-<dt>WebKitWebLoaderClient::provisional-load-failed, <a class="indexterm" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-failed">The "provisional-load-failed" signal</a>
-</dt>
-<dt>WebKitWebLoaderClient::provisional-load-received-server-redirect, <a class="indexterm" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-received-server-redirect">The "provisional-load-received-server-redirect" signal</a>
-</dt>
-<dt>WebKitWebLoaderClient::provisional-load-started, <a class="indexterm" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-started">The "provisional-load-started" signal</a>
-</dt>
-<dt>WebKitWebView, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-struct">WebKitWebView</a>
+<dt>WebKitWebView, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-struct">struct WebKitWebView</a>
 </dt>
 <dt>WebKitWebView::close, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-close">The "close" signal</a>
 </dt>
 <dt>WebKitWebView::create, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-create">The "create" signal</a>
+</dt>
+<dt>WebKitWebView::load-changed, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-load-changed">The "load-changed" signal</a>
+</dt>
+<dt>WebKitWebView::load-failed, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-load-failed">The "load-failed" signal</a>
 </dt>
 <dt>WebKitWebView::ready-to-show, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-ready-to-show">The "ready-to-show" signal</a>
 </dt>
@@ -150,6 +142,8 @@
 <dt>WebKitWebView:uri, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--uri">The "uri" property</a>
 </dt>
 <dt>WebKitWebView:web-context, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--web-context">The "web-context" property</a>
+</dt>
+<dt>WebKitWebView:zoom-level, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--zoom-level">The "zoom-level" property</a>
 </dt>
 <dt>WebKitWebViewBase, <a class="indexterm" href="WebKitWebViewBase.html#WebKitWebViewBase-struct">struct WebKitWebViewBase</a>
 </dt>
@@ -359,8 +353,6 @@
 </dt>
 <dt>webkit_web_view_get_estimated_load_progress, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-estimated-load-progress">webkit_web_view_get_estimated_load_progress ()</a>
 </dt>
-<dt>webkit_web_view_get_loader_client, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-loader-client">webkit_web_view_get_loader_client ()</a>
-</dt>
 <dt>webkit_web_view_get_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-settings">webkit_web_view_get_settings ()</a>
 </dt>
 <dt>webkit_web_view_get_title, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-title">webkit_web_view_get_title ()</a>
@@ -369,13 +361,13 @@
 </dt>
 <dt>webkit_web_view_get_window_properties, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-window-properties">webkit_web_view_get_window_properties ()</a>
 </dt>
+<dt>webkit_web_view_get_zoom_level, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-zoom-level">webkit_web_view_get_zoom_level ()</a>
+</dt>
 <dt>webkit_web_view_go_back, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-back">webkit_web_view_go_back ()</a>
 </dt>
 <dt>webkit_web_view_go_forward, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-forward">webkit_web_view_go_forward ()</a>
 </dt>
 <dt>webkit_web_view_go_to_back_forward_list_item, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-to-back-forward-list-item">webkit_web_view_go_to_back_forward_list_item ()</a>
-</dt>
-<dt>webkit_web_view_load_alternate_html, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-load-alternate-html">webkit_web_view_load_alternate_html ()</a>
 </dt>
 <dt>webkit_web_view_load_html, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-load-html">webkit_web_view_load_html ()</a>
 </dt>
@@ -393,11 +385,13 @@
 </dt>
 <dt>webkit_web_view_reload_bypass_cache, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-reload-bypass-cache">webkit_web_view_reload_bypass_cache ()</a>
 </dt>
+<dt>webkit_web_view_replace_content, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-replace-content">webkit_web_view_replace_content ()</a>
+</dt>
 <dt>webkit_web_view_set_custom_charset, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-custom-charset">webkit_web_view_set_custom_charset ()</a>
 </dt>
-<dt>webkit_web_view_set_loader_client, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-loader-client">webkit_web_view_set_loader_client ()</a>
-</dt>
 <dt>webkit_web_view_set_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-settings">webkit_web_view_set_settings ()</a>
+</dt>
+<dt>webkit_web_view_set_zoom_level, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-zoom-level">webkit_web_view_set_zoom_level ()</a>
 </dt>
 <dt>webkit_web_view_stop_loading, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-stop-loading">webkit_web_view_stop_loading ()</a>
 </dt>

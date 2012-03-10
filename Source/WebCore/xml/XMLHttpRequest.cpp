@@ -27,13 +27,13 @@
 #include "CrossOriginAccessControl.h"
 #include "DOMFormData.h"
 #include "DOMImplementation.h"
-#include "Document.h"
 #include "Event.h"
 #include "EventException.h"
 #include "EventListener.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "File.h"
+#include "HTMLDocument.h"
 #include "HTTPParsers.h"
 #include "HTTPValidation.h"
 #include "InspectorInstrumentation.h"
@@ -143,6 +143,15 @@ static const XMLHttpRequestStaticData* initializeXMLHttpRequestStaticData()
     return dummy;
 }
 
+static void logConsoleError(ScriptExecutionContext* context, const String& message)
+{
+    if (!context)
+        return;
+    // FIXME: It's not good to report the bad usage without indicating what source line it came from.
+    // We should pass additional parameters so we can tell the console where the mistake occurred.
+    context->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
+}
+
 PassRefPtr<XMLHttpRequest> XMLHttpRequest::create(ScriptExecutionContext* context, PassRefPtr<SecurityOrigin> securityOrigin)
 {
     return adoptRef(new XMLHttpRequest(context, securityOrigin));
@@ -215,30 +224,38 @@ String XMLHttpRequest::responseText(ExceptionCode& ec)
 
 Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
 {
-    if (m_responseTypeCode != ResponseTypeDefault && m_responseTypeCode != ResponseTypeText && m_responseTypeCode != ResponseTypeDocument) {
+    if (m_responseTypeCode != ResponseTypeDefault && m_responseTypeCode != ResponseTypeDocument) {
         ec = INVALID_STATE_ERR;
         return 0;
     }
 
-    if (m_state != DONE)
+    if (m_error || m_state != DONE)
         return 0;
 
     if (!m_createdDocument) {
-        if ((m_response.isHTTP() && !responseIsXML()) || scriptExecutionContext()->isWorkerContext()) {
-            // The W3C spec requires this.
-            m_responseXML = 0;
+        bool isHTML = equalIgnoringCase(responseMIMEType(), "text/html");
+
+        // The W3C spec requires the final MIME type to be some valid XML type, or text/html.
+        // If it is text/html, then the responseType of "document" must have been supplied explicitly.
+        if ((m_response.isHTTP() && !responseIsXML() && !isHTML)
+            || (isHTML && m_responseTypeCode == ResponseTypeDefault)
+            || scriptExecutionContext()->isWorkerContext()) {
+            m_responseDocument = 0;
         } else {
-            m_responseXML = Document::create(0, m_url);
+            if (isHTML)
+                m_responseDocument = HTMLDocument::create(0, m_url);
+            else
+                m_responseDocument = Document::create(0, m_url);
             // FIXME: Set Last-Modified.
-            m_responseXML->setContent(m_responseBuilder.toStringPreserveCapacity());
-            m_responseXML->setSecurityOrigin(securityOrigin());
-            if (!m_responseXML->wellFormed())
-                m_responseXML = 0;
+            m_responseDocument->setContent(m_responseBuilder.toStringPreserveCapacity());
+            m_responseDocument->setSecurityOrigin(securityOrigin());
+            if (!m_responseDocument->wellFormed())
+                m_responseDocument = 0;
         }
         m_createdDocument = true;
     }
 
-    return m_responseXML.get();
+    return m_responseDocument.get();
 }
 
 #if ENABLE(XHR_RESPONSE_BLOB)
@@ -275,8 +292,18 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer(ExceptionCode& ec)
 
 void XMLHttpRequest::setResponseType(const String& responseType, ExceptionCode& ec)
 {
-    if (m_state != OPENED || m_loader) {
+    if (m_state >= LOADING) {
         ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    // Newer functionality is not available to synchronous requests in window contexts, as a spec-mandated 
+    // attempt to discourage synchronous XHR use. responseType is one such piece of functionality.
+    // We'll only disable this functionality for HTTP(S) requests since sync requests for local protocols
+    // such as file: and data: still make sense to allow.
+    if (!m_async && scriptExecutionContext()->isDocument() && m_url.protocolIsInHTTPFamily()) {
+        logConsoleError(scriptExecutionContext(), "XMLHttpRequest.responseType cannot be changed for synchronous HTTP(S) requests made from the window context.");
+        ec = INVALID_ACCESS_ERR;
         return;
     }
 
@@ -344,12 +371,13 @@ void XMLHttpRequest::callReadyStateChangeListener()
         InspectorInstrumentationCookie cookie = InspectorInstrumentation::willLoadXHR(scriptExecutionContext(), this);
         m_progressEventThrottle.dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().loadEvent));
         InspectorInstrumentation::didLoadXHR(cookie);
+        m_progressEventThrottle.dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().loadendEvent));
     }
 }
 
 void XMLHttpRequest::setWithCredentials(bool value, ExceptionCode& ec)
 {
-    if (m_state != OPENED || m_loader) {
+    if (m_state > OPENED || m_loader) {
         ec = INVALID_STATE_ERR;
         return;
     }
@@ -406,7 +434,6 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
     State previousState = m_state;
     m_state = UNSENT;
     m_error = false;
-    m_responseTypeCode = ResponseTypeDefault;
     m_uploadComplete = false;
 
     // clear stuff from possible previous load
@@ -428,6 +455,16 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
     if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectFromSource(url)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
+        return;
+    }
+
+    // Newer functionality is not available to synchronous requests in window contexts, as a spec-mandated 
+    // attempt to discourage synchronous XHR use. responseType is one such piece of functionality.
+    // We'll only disable this functionality for HTTP(S) requests since sync requests for local protocols
+    // such as file: and data: still make sense to allow.
+    if (!async && scriptExecutionContext()->isDocument() && url.protocolIsInHTTPFamily() && m_responseTypeCode != ResponseTypeDefault) {
+        logConsoleError(scriptExecutionContext(), "Synchronous HTTP(S) requests made from the window context cannot have XMLHttpRequest.responseType set.");
+        ec = INVALID_ACCESS_ERR;
         return;
     }
 
@@ -702,11 +739,11 @@ void XMLHttpRequest::abort()
         m_state = UNSENT;
     }
 
-    m_progressEventThrottle.dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
+    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
     if (!m_uploadComplete) {
         m_uploadComplete = true;
         if (m_upload && m_uploadEventsAllowed)
-            m_upload->dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
+            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
     }
 }
 
@@ -740,7 +777,7 @@ void XMLHttpRequest::clearResponseBuffers()
 {
     m_responseBuilder.clear();
     m_createdDocument = false;
-    m_responseXML = 0;
+    m_responseDocument = 0;
 #if ENABLE(XHR_RESPONSE_BLOB)
     m_responseBlob = 0;
 #endif
@@ -766,11 +803,11 @@ void XMLHttpRequest::genericError()
 void XMLHttpRequest::networkError()
 {
     genericError();
-    m_progressEventThrottle.dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().errorEvent));
+    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().errorEvent));
     if (!m_uploadComplete) {
         m_uploadComplete = true;
         if (m_upload && m_uploadEventsAllowed)
-            m_upload->dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().errorEvent));
+            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().errorEvent));
     }
     internalAbort();
 }
@@ -778,11 +815,11 @@ void XMLHttpRequest::networkError()
 void XMLHttpRequest::abortError()
 {
     genericError();
-    m_progressEventThrottle.dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
+    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
     if (!m_uploadComplete) {
         m_uploadComplete = true;
         if (m_upload && m_uploadEventsAllowed)
-            m_upload->dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
+            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
     }
 }
 
@@ -808,15 +845,6 @@ void XMLHttpRequest::overrideMimeType(const String& override)
     m_mimeTypeOverride = override;
 }
 
-static void reportUnsafeUsage(ScriptExecutionContext* context, const String& message)
-{
-    if (!context)
-        return;
-    // FIXME: It's not good to report the bad usage without indicating what source line it came from.
-    // We should pass additional parameters so we can tell the console where the mistake occurred.
-    context->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
-}
-
 void XMLHttpRequest::setRequestHeader(const AtomicString& name, const String& value, ExceptionCode& ec)
 {
     if (m_state != OPENED || m_loader) {
@@ -836,7 +864,7 @@ void XMLHttpRequest::setRequestHeader(const AtomicString& name, const String& va
 
     // A privileged script (e.g. a Dashboard widget) can set any headers.
     if (!securityOrigin()->canLoadLocalResources() && !isAllowedHTTPHeader(name)) {
-        reportUnsafeUsage(scriptExecutionContext(), "Refused to set unsafe header \"" + name + "\"");
+        logConsoleError(scriptExecutionContext(), "Refused to set unsafe header \"" + name + "\"");
         return;
     }
 
@@ -898,12 +926,12 @@ String XMLHttpRequest::getResponseHeader(const AtomicString& name, ExceptionCode
 
     // See comment in getAllResponseHeaders above.
     if (isSetCookieHeader(name) && !securityOrigin()->canLoadLocalResources()) {
-        reportUnsafeUsage(scriptExecutionContext(), "Refused to get unsafe header \"" + name + "\"");
+        logConsoleError(scriptExecutionContext(), "Refused to get unsafe header \"" + name + "\"");
         return String();
     }
 
     if (!m_sameOriginRequest && !isOnAccessControlResponseHeaderWhitelist(name)) {
-        reportUnsafeUsage(scriptExecutionContext(), "Refused to get unsafe header \"" + name + "\"");
+        logConsoleError(scriptExecutionContext(), "Refused to get unsafe header \"" + name + "\"");
         return String();
     }
     return m_response.httpHeaderField(name);
@@ -926,7 +954,9 @@ String XMLHttpRequest::responseMIMEType() const
 
 bool XMLHttpRequest::responseIsXML() const
 {
-    return DOMImplementation::isXMLMIMEType(responseMIMEType());
+    // FIXME: Remove the lower() call when DOMImplementation.isXMLMIMEType() is modified
+    //        to do case insensitive MIME type matching.
+    return DOMImplementation::isXMLMIMEType(responseMIMEType().lower());
 }
 
 int XMLHttpRequest::status(ExceptionCode& ec) const
@@ -971,7 +1001,7 @@ void XMLHttpRequest::didFail(const ResourceError& error)
 
     // Network failures are already reported to Web Inspector by ResourceLoader.
     if (error.domain() == errorDomainWebKitInternal)
-        reportUnsafeUsage(scriptExecutionContext(), "XMLHttpRequest cannot load " + error.failingURL() + ". " + error.localizedDescription());
+        logConsoleError(scriptExecutionContext(), "XMLHttpRequest cannot load " + error.failingURL() + ". " + error.localizedDescription());
 
     m_exceptionCode = XMLHttpRequestException::NETWORK_ERR;
     networkError();
@@ -1022,7 +1052,7 @@ void XMLHttpRequest::didSendData(unsigned long long bytesSent, unsigned long lon
     if (bytesSent == totalBytesToBeSent && !m_uploadComplete) {
         m_uploadComplete = true;
         if (m_uploadEventsAllowed)
-            m_upload->dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().loadEvent));
+            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().loadEvent));
     }
 }
 
@@ -1054,7 +1084,7 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
             m_decoder = TextResourceDecoder::create("application/xml");
             // Don't stop on encoding errors, unlike it is done for other kinds of XML resources. This matches the behavior of previous WebKit versions, Firefox and Opera.
             m_decoder->useLenientXMLDecoding();
-        } else if (responseMIMEType() == "text/html")
+        } else if (equalIgnoringCase(responseMIMEType(), "text/html"))
             m_decoder = TextResourceDecoder::create("text/html", "UTF-8");
         else
             m_decoder = TextResourceDecoder::create("text/plain", "UTF-8");

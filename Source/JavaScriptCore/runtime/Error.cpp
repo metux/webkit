@@ -123,11 +123,11 @@ JSObject* addErrorInfo(JSGlobalData* globalData, JSObject* error, int line, cons
     const UString& sourceURL = source.provider()->url();
 
     if (line != -1)
-        error->putWithAttributes(globalData, Identifier(globalData, linePropertyName), jsNumber(line), ReadOnly | DontDelete);
+        error->putDirect(*globalData, Identifier(globalData, linePropertyName), jsNumber(line), ReadOnly | DontDelete);
     if (sourceID != -1)
-        error->putWithAttributes(globalData, Identifier(globalData, sourceIdPropertyName), jsNumber((double)sourceID), ReadOnly | DontDelete);
+        error->putDirect(*globalData, Identifier(globalData, sourceIdPropertyName), jsNumber((double)sourceID), ReadOnly | DontDelete);
     if (!sourceURL.isNull())
-        error->putWithAttributes(globalData, Identifier(globalData, sourceURLPropertyName), jsString(globalData, sourceURL), ReadOnly | DontDelete);
+        error->putDirect(*globalData, Identifier(globalData, sourceURLPropertyName), jsString(globalData, sourceURL), ReadOnly | DontDelete);
 
     return error;
 }
@@ -170,10 +170,9 @@ ASSERT_CLASS_FITS_IN_CELL(StrictModeTypeErrorFunction);
 
 const ClassInfo StrictModeTypeErrorFunction::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(StrictModeTypeErrorFunction) };
 
-JSValue createTypeErrorFunction(ExecState* exec, const UString& message)
+void StrictModeTypeErrorFunction::destroy(JSCell* cell)
 {
-    JSGlobalObject* globalObject = exec->lexicalGlobalObject();
-    return StrictModeTypeErrorFunction::create(exec, globalObject, globalObject->strictModeTypeErrorFunctionStructure(), message);
+    jsCast<StrictModeTypeErrorFunction*>(cell)->StrictModeTypeErrorFunction::~StrictModeTypeErrorFunction();
 }
 
 } // namespace JSC

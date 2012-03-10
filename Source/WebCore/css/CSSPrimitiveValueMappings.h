@@ -649,6 +649,43 @@ template<> inline CSSPrimitiveValue::operator EFillRepeat() const
     }
 }
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxPack e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (e) {
+    case Start:
+        m_value.ident = CSSValueStart;
+        break;
+    case Center:
+        m_value.ident = CSSValueCenter;
+        break;
+    case End:
+        m_value.ident = CSSValueEnd;
+        break;
+    case Justify:
+        m_value.ident = CSSValueJustify;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator EBoxPack() const
+{
+    switch (m_value.ident) {
+    case CSSValueStart:
+        return Start;
+    case CSSValueEnd:
+        return End;
+    case CSSValueCenter:
+        return Center;
+    case CSSValueJustify:
+        return Justify;
+    default:
+        ASSERT_NOT_REACHED();
+        return Justify;
+    }
+}
+
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxAlignment e)
     : CSSValue(PrimitiveClass)
 {
@@ -669,9 +706,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxAlignment e)
         case BBASELINE:
             m_value.ident = CSSValueBaseline;
             break;
-        case BJUSTIFY:
-            m_value.ident = CSSValueJustify;
-            break;
     }
 }
 
@@ -688,8 +722,6 @@ template<> inline CSSPrimitiveValue::operator EBoxAlignment() const
             return BCENTER;
         case CSSValueBaseline:
             return BBASELINE;
-        case CSSValueJustify:
-            return BJUSTIFY;
         default:
             ASSERT_NOT_REACHED();
             return BSTRETCH;
@@ -1126,6 +1158,9 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexAlign e)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (e) {
+    case AlignAuto:
+        m_value.ident = CSSValueAuto;
+        break;
     case AlignStart:
         m_value.ident = CSSValueStart;
         break;
@@ -1147,6 +1182,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexAlign e)
 template<> inline CSSPrimitiveValue::operator EFlexAlign() const
 {
     switch (m_value.ident) {
+    case CSSValueAuto:
+        return AlignAuto;
     case CSSValueStart:
         return AlignStart;
     case CSSValueEnd:
@@ -2787,6 +2824,41 @@ template<> inline CSSPrimitiveValue::operator EPointerEvents() const
             ASSERT_NOT_REACHED();
             return PE_ALL;
     }
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontDescription::Kerning kerning)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (kerning) {
+    case FontDescription::AutoKerning:
+        m_value.ident = CSSValueAuto;
+        return;
+    case FontDescription::NormalKerning:
+        m_value.ident = CSSValueNormal;
+        return;
+    case FontDescription::NoneKerning:
+        m_value.ident = CSSValueNone;
+        return;
+    }
+
+    ASSERT_NOT_REACHED();
+    m_value.ident = CSSValueAuto;
+}
+
+template<> inline CSSPrimitiveValue::operator FontDescription::Kerning() const
+{
+    switch (m_value.ident) {
+    case CSSValueAuto:
+        return FontDescription::AutoKerning;
+    case CSSValueNormal:
+        return FontDescription::NormalKerning;
+    case CSSValueNone:
+        return FontDescription::NoneKerning;
+    }
+
+    ASSERT_NOT_REACHED();
+    return FontDescription::AutoKerning;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontSmoothingMode smoothing)

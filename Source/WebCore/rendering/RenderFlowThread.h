@@ -58,7 +58,6 @@ typedef ListHashSet<RenderRegion*> RenderRegionList;
 class RenderFlowThread: public RenderBlock {
 public:
     RenderFlowThread(Node*, const AtomicString& flowThread);
-    ~RenderFlowThread();
 
     virtual bool isRenderFlowThread() const { return true; }
 
@@ -91,6 +90,7 @@ public:
     bool hasValidRegions() const { ASSERT(!m_regionsInvalidated); return m_hasValidRegions; }
 
     void invalidateRegions() { m_regionsInvalidated = true; setNeedsLayout(true); }
+    bool hasValidRegionInfo() const { return !m_regionsInvalidated && hasValidRegions(); }
 
     static PassRefPtr<RenderStyle> createFlowThreadStyle(RenderStyle* parentStyle);
 
@@ -126,7 +126,6 @@ public:
     void clearRenderObjectCustomStyle(const RenderObject*,
                                       const RenderRegion* oldStartRegion = 0, const RenderRegion* oldEndRegion = 0,
                                       const RenderRegion* newStartRegion = 0, const RenderRegion* newEndRegion = 0);
-
     WebKitNamedFlow* ensureNamedFlow();
 
 private:
@@ -139,8 +138,6 @@ private:
 
     bool shouldRepaint(const LayoutRect&) const;
 
-    void clearRenderRegionRangeMap();
-
     typedef ListHashSet<RenderObject*> FlowThreadChildList;
     FlowThreadChildList m_flowThreadChildList;
 
@@ -149,6 +146,11 @@ private:
 
     class RenderRegionRange {
     public:
+        RenderRegionRange()
+        {
+            setRange(0, 0);
+        }
+
         RenderRegionRange(RenderRegion* start, RenderRegion* end)
         {
             setRange(start, end);
@@ -179,7 +181,7 @@ private:
     RenderFlowThreadCountedSet m_layoutBeforeThreadsSet;
 
     // A maps from RenderBox
-    typedef HashMap<const RenderBox*, RenderRegionRange*> RenderRegionRangeMap;
+    typedef HashMap<const RenderBox*, RenderRegionRange> RenderRegionRangeMap;
     RenderRegionRangeMap m_regionRangeMap;
 
     bool m_hasValidRegions;

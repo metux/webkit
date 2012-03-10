@@ -33,6 +33,9 @@ namespace JSC {
     struct HashTable;
 
     struct MethodTable {
+        typedef void (*DestroyFunctionPtr)(JSCell*);
+        DestroyFunctionPtr destroy;
+
         typedef void (*VisitChildrenFunctionPtr)(JSCell*, SlotVisitor&);
         VisitChildrenFunctionPtr visitChildren;
 
@@ -85,7 +88,7 @@ namespace JSC {
         HasInstanceFunctionPtr hasInstance;
 
         typedef void (*PutWithAttributesFunctionPtr)(JSObject*, ExecState*, const Identifier& propertyName, JSValue, unsigned attributes);
-        PutWithAttributesFunctionPtr putWithAttributes;
+        PutWithAttributesFunctionPtr putDirectVirtual;
 
         typedef bool (*DefineOwnPropertyFunctionPtr)(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&, bool);
         DefineOwnPropertyFunctionPtr defineOwnProperty;
@@ -114,6 +117,7 @@ struct MemberCheck##member { \
 #define HAS_MEMBER_NAMED(klass, name) (MemberCheck##name<klass>::has)
 
 #define CREATE_METHOD_TABLE(ClassName) { \
+        &ClassName::destroy, \
         &ClassName::visitChildren, \
         &ClassName::getCallData, \
         &ClassName::getConstructData, \
@@ -131,7 +135,7 @@ struct MemberCheck##member { \
         &ClassName::getPropertyNames, \
         &ClassName::className, \
         &ClassName::hasInstance, \
-        &ClassName::putWithAttributes, \
+        &ClassName::putDirectVirtual, \
         &ClassName::defineOwnProperty, \
         &ClassName::getOwnPropertyDescriptor, \
     }, \

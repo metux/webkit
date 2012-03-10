@@ -25,6 +25,7 @@
 #include "GraphicsLayer.h"
 #include "Image.h"
 #include "IntPointHash.h"
+#include "LayerTransform.h"
 #include "TextureMapper.h"
 #include "Timer.h"
 #include "TransformOperations.h"
@@ -39,17 +40,20 @@ namespace WebCore {
 class TextureMapperPlatformLayer;
 class TextureMapperNode;
 class GraphicsLayerTextureMapper;
-class TextureMapperSurfaceManager;
 
 class TextureMapperPaintOptions {
 public:
     BitmapTexture* surface;
     TextureMapper* textureMapper;
-    TextureMapperSurfaceManager* surfaceManager;
 
     float opacity;
     bool isSurface;
-    TextureMapperPaintOptions() : surface(0), textureMapper(0), opacity(1.0), isSurface(false) { }
+    TextureMapperPaintOptions()
+        : surface(0)
+        , textureMapper(0)
+        , opacity(1)
+        , isSurface(false)
+    { }
 };
 
 class TextureMapperAnimation : public RefCounted<TextureMapperAnimation> {
@@ -135,7 +139,12 @@ public:
     };
 
     TextureMapperNode()
-        : m_parent(0), m_effectTarget(0), m_opacity(1.0), m_surfaceManager(0), m_textureMapper(0) { }
+        : m_parent(0)
+        , m_effectTarget(0)
+        , m_opacity(1)
+        , m_centerZ(0)
+        , m_textureMapper(0)
+    { }
 
     virtual ~TextureMapperNode();
 
@@ -167,12 +176,8 @@ public:
 
 private:
     TextureMapperNode* rootLayer();
-    void computeAllTransforms();
-    void computeVisibleRect(const FloatRect& rootVisibleRect);
-    void computePerspectiveTransformIfNeeded();
-    void computeReplicaTransformIfNeeded();
+    void computeTransformsRecursive();
     void computeOverlapsIfNeeded();
-    void computeLocalTransformIfNeeded();
     void computeTiles();
     void swapContentsBuffers();
     int countDescendantsWithContent() const;
@@ -199,19 +204,9 @@ private:
     void applyTransformAnimation(const TextureMapperAnimation&, const TransformOperations* start, const TransformOperations* end, double);
     bool hasOpacityAnimation() const;
     bool hasTransformAnimation() const;
+    bool hasMoreThanOneTile() const;
 
-    struct TransformData {
-        TransformationMatrix target;
-        TransformationMatrix replica;
-        TransformationMatrix forDescendants;
-        TransformationMatrix local;
-        TransformationMatrix base;
-        TransformationMatrix perspective;
-        float centerZ;
-        TransformData() { }
-    };
-
-    TransformData m_transforms;
+    LayerTransform m_transform;
 
     inline FloatRect targetRect() const
     {
@@ -267,6 +262,7 @@ private:
     TextureMapperNode* m_effectTarget;
     FloatSize m_size;
     float m_opacity;
+    float m_centerZ;
     String m_name;
     int m_id;
 
@@ -317,7 +313,6 @@ private:
     };
 
     State m_state;
-    TextureMapperSurfaceManager* m_surfaceManager;
     TextureMapper* m_textureMapper;
 
     Vector<RefPtr<TextureMapperAnimation> > m_animations;

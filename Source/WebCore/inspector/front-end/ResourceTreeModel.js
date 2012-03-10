@@ -157,6 +157,10 @@ WebInspector.ResourceTreeModel.prototype = {
             this._dispatchInspectedURLChanged();
     },
 
+    /**
+     * @param {PageAgent.Frame} framePayload
+     * @return {boolean}
+     */
     _frontendReused: function(framePayload)
     {
         if (!framePayload.parentId && !WebInspector.networkLog.resources.length) {
@@ -167,6 +171,9 @@ WebInspector.ResourceTreeModel.prototype = {
         return false;
     },
 
+    /**
+     * @param {NetworkAgent.FrameId} frameId
+     */
     _frameDetached: function(frameId)
     {
         // Do nothing unless cached resource tree is processed - it will overwrite everything.
@@ -186,14 +193,17 @@ WebInspector.ResourceTreeModel.prototype = {
         }
     },
 
+    /**
+     * @param {WebInspector.Event} event
+     */
     _onResourceUpdated: function(event)
     {
         if (!this._cachedResourcesProcessed)
             return;
 
-        this._addPendingConsoleMessagesToResource(event.data);
+        var resource = /** @type {WebInspector.Resource} */ event.data;
+        this._addPendingConsoleMessagesToResource(resource);
 
-        var resource = event.data;
         if (resource.failed || resource.type === WebInspector.Resource.Type.XHR)
             return;
 
@@ -202,6 +212,9 @@ WebInspector.ResourceTreeModel.prototype = {
             frame._addResource(resource);
     },
 
+    /**
+     * @param {WebInspector.Event} event
+     */
     _onResourceUpdateDropped: function(event)
     {
         if (!this._cachedResourcesProcessed)
@@ -223,11 +236,18 @@ WebInspector.ResourceTreeModel.prototype = {
         frame._addResource(resource);
     },
 
+    /**
+     * @param {NetworkAgent.FrameId} frameId
+     */
     frameForId: function(frameId)
     {
         return this._frames[frameId];
     },
 
+    /**
+     * @param {function(WebInspector.Resource)} callback
+     * @return {boolean}
+     */
     forAllResources: function(callback)
     {
         if (this.mainFrame)
@@ -235,16 +255,22 @@ WebInspector.ResourceTreeModel.prototype = {
         return false;
     },
 
+    /**
+     * @param {WebInspector.Event} event
+     */
     _consoleMessageAdded: function(event)
     {
-        var msg = event.data;
-        var resource = this.resourceForURL(msg.url);
+        var msg = /** @type {WebInspector.ConsoleMessage} */ event.data;
+        var resource = msg.url ? this.resourceForURL(msg.url) : null;
         if (resource)
             this._addConsoleMessageToResource(msg, resource);
         else
             this._addPendingConsoleMessage(msg);
     },
 
+    /**
+     * @param {WebInspector.ConsoleMessage} msg
+     */
     _addPendingConsoleMessage: function(msg)
     {
         if (!msg.url)
@@ -254,6 +280,9 @@ WebInspector.ResourceTreeModel.prototype = {
         this._pendingConsoleMessages[msg.url].push(msg);
     },
 
+    /**
+     * @param {WebInspector.Resource} resource
+     */
     _addPendingConsoleMessagesToResource: function(resource)
     {
         var messages = this._pendingConsoleMessages[resource.url];
@@ -264,6 +293,10 @@ WebInspector.ResourceTreeModel.prototype = {
         }
     },
 
+    /**
+     * @param {WebInspector.ConsoleMessage} msg
+     * @param {WebInspector.Resource} resource
+     */
     _addConsoleMessageToResource: function(msg, resource)
     {
         switch (msg.level) {
@@ -288,12 +321,20 @@ WebInspector.ResourceTreeModel.prototype = {
         this.forAllResources(callback);
     },
 
+    /**
+     * @param {string} url
+     * @return {WebInspector.Resource}
+     */
     resourceForURL: function(url)
     {
         // Workers call into this with no frames available.
         return this.mainFrame ? this.mainFrame.resourceForURL(url) : null;
     },
 
+    /**
+     * @param {WebInspector.ResourceTreeFrame} parentFrame
+     * @param {PageAgent.FrameResourceTree} frameTreePayload
+     */
     _addFramesRecursively: function(parentFrame, frameTreePayload)
     {
         var framePayload = frameTreePayload.frame;
@@ -331,6 +372,7 @@ WebInspector.ResourceTreeModel.prototype = {
     /**
      * @param {PageAgent.Frame} frame
      * @param {string} url
+     * @return {WebInspector.Resource}
      */
     _createResourceFromFramePayload: function(frame, url)
     {
@@ -342,6 +384,7 @@ WebInspector.ResourceTreeModel.prototype = {
      * @param {string} documentURL
      * @param {NetworkAgent.FrameId} frameId
      * @param {NetworkAgent.LoaderId} loaderId
+     * @return {WebInspector.Resource}
      */
     _createResource: function(url, documentURL, frameId, loaderId)
     {
@@ -368,6 +411,7 @@ WebInspector.ResourceTreeFrame = function(model, parentFrame, payload)
     this._loaderId = payload.loaderId;
     this._name = payload.name;
     this._url = payload.url;
+    this._securityOrigin = payload.securityOrigin;
     this._mimeType = payload.mimeType;
 
     /**
@@ -385,31 +429,57 @@ WebInspector.ResourceTreeFrame = function(model, parentFrame, payload)
 }
 
 WebInspector.ResourceTreeFrame.prototype = {
+    /**
+     * @type {string}
+     */
     get id()
     {
         return this._id;
     },
 
+    /**
+     * @type {string}
+     */
     get name()
     {
-        return this._name;
+        return this._name || "";
     },
 
+    /**
+     * @type {string}
+     */
     get url()
     {
         return this._url;
     },
 
+    /**
+     * @type {string}
+     */
+    get securityOrigin()
+    {
+        return this._securityOrigin;
+    },
+
+    /**
+     * @type {string}
+     */
     get loaderId()
     {
         return this._loaderId;
     },
 
+    /**
+     * @type {WebInspector.ResourceTreeFrame}
+     */
     get parentFrame()
     {
         return this._parentFrame;
     },
 
+    /**
+     * @type {Array.<WebInspector.ResourceTreeFrame>}
+     */
     get childFrames()
     {
         return this._childFrames;
@@ -431,6 +501,7 @@ WebInspector.ResourceTreeFrame.prototype = {
         this._loaderId = framePayload.loaderId;
         this._name = framePayload.name;
         this._url = framePayload.url;
+        this._securityOrigin = framePayload.securityOrigin;
         this._mimeType = framePayload.mimeType;
 
         var mainResource = this._resourcesMap[this._url];
@@ -440,6 +511,9 @@ WebInspector.ResourceTreeFrame.prototype = {
             this._addResource(mainResource);
     },
 
+    /**
+     * @type {WebInspector.Resource}
+     */
     get mainResource()
     {
         return this._resourcesMap[this._url];
@@ -506,6 +580,7 @@ WebInspector.ResourceTreeFrame.prototype = {
 
     /**
      * @param {function(WebInspector.Resource)} callback
+     * @return {boolean}
      */
     _callForFrameResources: function(callback)
     {

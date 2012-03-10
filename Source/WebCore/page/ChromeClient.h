@@ -73,6 +73,7 @@ namespace WebCore {
 
 #if ENABLE(INPUT_COLOR)
     class ColorChooser;
+    class ColorChooserClient;
 #endif
 
     class ChromeClient {
@@ -219,9 +220,7 @@ namespace WebCore {
         virtual void cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*) = 0;
 
 #if ENABLE(INPUT_COLOR)
-        virtual void openColorChooser(ColorChooser*, const Color&) = 0;
-        virtual void cleanupColorChooser(ColorChooser*) = 0;
-        virtual void setSelectedColorInColorChooser(ColorChooser*, const Color&) = 0;
+        virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) = 0;
 #endif
 
         virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>) = 0;
@@ -259,6 +258,7 @@ namespace WebCore {
             PluginTrigger = 1 << 2,
             CanvasTrigger = 1 << 3,
             AnimationTrigger = 1 << 4,
+            FilterTrigger = 1 << 5,
             AllTriggers = 0xFFFFFFFF
         };
         typedef unsigned CompositingTriggerFlags;
@@ -312,11 +312,6 @@ namespace WebCore {
 #endif
 
         virtual void postAccessibilityNotification(AccessibilityObject*, AXObjectCache::AXNotification) { }
-
-        virtual void didStartRubberBandForFrame(Frame*, const IntSize&) const { }
-        virtual void didCompleteRubberBandForFrame(Frame*, const IntSize&) const { }
-        virtual void didStartAnimatedScroll() const { }
-        virtual void didCompleteAnimatedScroll() const { }
         
         virtual void notifyScrollerThumbIsVisibleInRect(const IntRect&) { }
         virtual void recommendedScrollbarStyleDidChange(int /*newStyle*/) { }

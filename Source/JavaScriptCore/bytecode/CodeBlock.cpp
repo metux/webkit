@@ -183,6 +183,15 @@ void CodeBlock::printGetByIdOp(ExecState* exec, int location, Vector<Instruction
     it += 4;
 }
 
+void CodeBlock::printCallOp(ExecState* exec, int location, Vector<Instruction>::const_iterator& it, const char* op) const
+{
+    int func = (++it)->u.operand;
+    int argCount = (++it)->u.operand;
+    int registerOffset = (++it)->u.operand;
+    printf("[%4d] %s\t %s, %d, %d\n", location, op, registerName(exec, func).data(), argCount, registerOffset);
+    it += 2;
+}
+
 void CodeBlock::printPutByIdOp(ExecState* exec, int location, Vector<Instruction>::const_iterator& it, const char* op) const
 {
     int r0 = (++it)->u.operand;
@@ -522,7 +531,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
         }
         case op_convert_this: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] convert_this %s\n", location, registerName(exec, r0).data());
+            printf("[%4d] convert_this\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_new_object: {
@@ -1119,17 +1128,11 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             break;
         }
         case op_call: {
-            int func = (++it)->u.operand;
-            int argCount = (++it)->u.operand;
-            int registerOffset = (++it)->u.operand;
-            printf("[%4d] call\t\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
+            printCallOp(exec, location, it, "call");
             break;
         }
         case op_call_eval: {
-            int func = (++it)->u.operand;
-            int argCount = (++it)->u.operand;
-            int registerOffset = (++it)->u.operand;
-            printf("[%4d] call_eval\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
+            printCallOp(exec, location, it, "call_eval");
             break;
         }
         case op_call_varargs: {
@@ -1148,7 +1151,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
         }
         case op_tear_off_arguments: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] tear_off_arguments\t %s\n", location, registerName(exec, r0).data());
+            printf("[%4d] tear_off_arguments %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_ret: {
@@ -1168,10 +1171,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             break;
         }
         case op_construct: {
-            int func = (++it)->u.operand;
-            int argCount = (++it)->u.operand;
-            int registerOffset = (++it)->u.operand;
-            printf("[%4d] construct\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
+            printCallOp(exec, location, it, "construct");
             break;
         }
         case op_strcat: {
@@ -1413,7 +1413,6 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     , m_numCalleeRegisters(other.m_numCalleeRegisters)
     , m_numVars(other.m_numVars)
     , m_numCapturedVars(other.m_numCapturedVars)
-    , m_numParameters(other.m_numParameters)
     , m_isConstructor(other.m_isConstructor)
     , m_shouldDiscardBytecode(false)
     , m_ownerExecutable(*other.m_globalData, other.m_ownerExecutable.get(), other.m_ownerExecutable.get())
@@ -1448,6 +1447,7 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     , m_optimizationDelayCounter(0)
     , m_reoptimizationRetryCounter(0)
 {
+    setNumParameters(other.numParameters());
     optimizeAfterWarmUp();
     
     if (other.m_rareData) {
@@ -1469,9 +1469,9 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlo
     , m_heap(&m_globalObject->globalData().heap)
     , m_numCalleeRegisters(0)
     , m_numVars(0)
-    , m_numParameters(0)
     , m_isConstructor(isConstructor)
     , m_shouldDiscardBytecode(false)
+    , m_numParameters(0)
     , m_ownerExecutable(globalObject->globalData(), ownerExecutable, ownerExecutable)
     , m_globalData(0)
     , m_instructions(adoptRef(new Instructions))
@@ -1535,6 +1535,24 @@ CodeBlock::~CodeBlock()
 
 #if DUMP_CODE_BLOCK_STATISTICS
     liveCodeBlockSet.remove(this);
+#endif
+}
+
+void CodeBlock::setNumParameters(int newValue)
+{
+    m_numParameters = newValue;
+
+#if ENABLE(VALUE_PROFILER)
+    m_argumentValueProfiles.resize(newValue);
+#endif
+}
+
+void CodeBlock::addParameter()
+{
+    m_numParameters++;
+
+#if ENABLE(VALUE_PROFILER)
+    m_argumentValueProfiles.append(ValueProfile());
 #endif
 }
 
@@ -1788,6 +1806,19 @@ void CodeBlock::finalizeUnconditionally()
                 if (verboseUnlinking)
                     printf("Clearing method call in %p.\n", this);
                 m_methodCallLinkInfos[i].reset(repatchBuffer, getJITType());
+
+                StructureStubInfo& stubInfo = getStubInfo(m_methodCallLinkInfos[i].bytecodeIndex);
+
+                AccessType accessType = static_cast<AccessType>(stubInfo.accessType);
+
+                if (accessType != access_unset) {
+                    ASSERT(isGetByIdAccess(accessType));
+                    if (getJITCode().jitType() == JITCode::DFGJIT)
+                        DFG::dfgResetGetByID(repatchBuffer, stubInfo);
+                    else
+                        JIT::resetPatchGetById(repatchBuffer, &stubInfo);
+                    stubInfo.reset();
+                }
             }
         }
     }
@@ -1835,6 +1866,8 @@ void CodeBlock::stronglyVisitStrongReferences(SlotVisitor& visitor)
 #endif
 
 #if ENABLE(VALUE_PROFILER)
+    for (unsigned profileIndex = 0; profileIndex < numberOfArgumentValueProfiles(); ++profileIndex)
+        valueProfileForArgument(profileIndex)->computeUpdatedPrediction();
     for (unsigned profileIndex = 0; profileIndex < numberOfValueProfiles(); ++profileIndex)
         valueProfile(profileIndex)->computeUpdatedPrediction();
 #endif
@@ -2023,38 +2056,6 @@ void CodeBlock::createActivation(CallFrame* callFrame)
 }
     
 #if ENABLE(JIT)
-void CallLinkInfo::unlink(JSGlobalData& globalData, RepatchBuffer& repatchBuffer)
-{
-    ASSERT(isLinked());
-    
-    if (isDFG) {
-#if ENABLE(DFG_JIT)
-        repatchBuffer.relink(CodeLocationCall(callReturnLocation), callType == Construct ? operationLinkConstruct : operationLinkCall);
-#else
-        ASSERT_NOT_REACHED();
-#endif
-    } else
-        repatchBuffer.relink(CodeLocationNearCall(callReturnLocation), callType == Construct ? globalData.jitStubs->ctiVirtualConstructLink() : globalData.jitStubs->ctiVirtualCallLink());
-    hasSeenShouldRepatch = false;
-    callee.clear();
-
-    // It will be on a list if the callee has a code block.
-    if (isOnList())
-        remove();
-}
-
-void MethodCallLinkInfo::reset(RepatchBuffer& repatchBuffer, JITCode::JITType jitType)
-{
-    cachedStructure.clearToMaxUnsigned();
-    cachedPrototype.clear();
-    cachedPrototypeStructure.clearToMaxUnsigned();
-    cachedFunction.clear();
-    
-    ASSERT_UNUSED(jitType, jitType == JITCode::BaselineJIT);
-    
-    repatchBuffer.relink(callReturnLocation, cti_op_get_by_id_method_check);
-}
-
 void CodeBlock::unlinkCalls()
 {
     if (!!m_alternative)
@@ -2206,11 +2207,10 @@ bool CodeBlock::shouldOptimizeNow()
     if (m_optimizationDelayCounter >= Options::maximumOptimizationDelay)
         return true;
     
-    unsigned numberOfNonArgumentValueProfiles = 0;
     unsigned numberOfLiveNonArgumentValueProfiles = 0;
     unsigned numberOfSamplesInProfiles = 0; // If this divided by ValueProfile::numberOfBuckets equals numberOfValueProfiles() then value profiles are full.
-    for (unsigned i = 0; i < numberOfValueProfiles(); ++i) {
-        ValueProfile* profile = valueProfile(i);
+    for (unsigned i = 0; i < totalNumberOfValueProfiles(); ++i) {
+        ValueProfile* profile = getFromAllValueProfiles(i);
         unsigned numSamples = profile->totalNumberOfSamples();
         if (numSamples > ValueProfile::numberOfBuckets)
             numSamples = ValueProfile::numberOfBuckets; // We don't want profiles that are extremely hot to be given more weight.
@@ -2219,18 +2219,17 @@ bool CodeBlock::shouldOptimizeNow()
             profile->computeUpdatedPrediction();
             continue;
         }
-        numberOfNonArgumentValueProfiles++;
         if (profile->numberOfSamples() || profile->m_prediction != PredictNone)
             numberOfLiveNonArgumentValueProfiles++;
         profile->computeUpdatedPrediction();
     }
 
 #if ENABLE(JIT_VERBOSE_OSR)
-    printf("Profile hotness: %lf, %lf\n", (double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles, (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles());
+    printf("Profile hotness: %lf, %lf\n", (double)numberOfLiveNonArgumentValueProfiles / numberOfValueProfiles(), (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles());
 #endif
 
-    if ((!numberOfNonArgumentValueProfiles || (double)numberOfLiveNonArgumentValueProfiles / numberOfNonArgumentValueProfiles >= Options::desiredProfileLivenessRate)
-        && (!numberOfValueProfiles() || (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / numberOfValueProfiles() >= Options::desiredProfileFullnessRate)
+    if ((!numberOfValueProfiles() || (double)numberOfLiveNonArgumentValueProfiles / numberOfValueProfiles() >= Options::desiredProfileLivenessRate)
+        && (!totalNumberOfValueProfiles() || (double)numberOfSamplesInProfiles / ValueProfile::numberOfBuckets / totalNumberOfValueProfiles() >= Options::desiredProfileFullnessRate)
         && static_cast<unsigned>(m_optimizationDelayCounter) + 1 >= Options::minimumOptimizationDelay)
         return true;
     
@@ -2267,8 +2266,8 @@ void CodeBlock::tallyFrequentExitSites()
 void CodeBlock::dumpValueProfiles()
 {
     fprintf(stderr, "ValueProfile for %p:\n", this);
-    for (unsigned i = 0; i < numberOfValueProfiles(); ++i) {
-        ValueProfile* profile = valueProfile(i);
+    for (unsigned i = 0; i < totalNumberOfValueProfiles(); ++i) {
+        ValueProfile* profile = getFromAllValueProfiles(i);
         if (profile->m_bytecodeOffset < 0) {
             ASSERT(profile->m_bytecodeOffset == -1);
             fprintf(stderr, "   arg = %u: ", i);

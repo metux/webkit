@@ -31,6 +31,13 @@
 
 namespace JSC {
 
+ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSCell);
+
+void JSCell::destroy(JSCell* cell)
+{
+    cell->JSCell::~JSCell();
+}
+
 bool JSCell::getString(ExecState* exec, UString&stringValue) const
 {
     if (!isString())
@@ -196,7 +203,7 @@ bool JSCell::hasInstance(JSObject*, ExecState*, JSValue, JSValue)
     return false;
 }
 
-void JSCell::putWithAttributes(JSObject*, ExecState*, const Identifier&, JSValue, unsigned)
+void JSCell::putDirectVirtual(JSObject*, ExecState*, const Identifier&, JSValue, unsigned)
 {
     ASSERT_NOT_REACHED();
 }

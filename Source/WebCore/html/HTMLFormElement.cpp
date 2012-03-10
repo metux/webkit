@@ -92,10 +92,10 @@ PassRefPtr<HTMLFormElement> HTMLFormElement::create(const QualifiedName& tagName
 HTMLFormElement::~HTMLFormElement()
 {
     if (!shouldAutocomplete())
-        document()->unregisterForDocumentActivationCallbacks(this);
+        document()->unregisterForPageCacheSuspensionCallbacks(this);
 
     for (unsigned i = 0; i < m_associatedElements.size(); ++i)
-        m_associatedElements[i]->formDestroyed();
+        m_associatedElements[i]->formWillBeDestroyed();
     for (unsigned i = 0; i < m_imageElements.size(); ++i)
         m_imageElements[i]->m_form = 0;
 }
@@ -132,9 +132,6 @@ bool HTMLFormElement::rendererIsNeeded(const NodeRenderingContext& context)
 
 void HTMLFormElement::insertedIntoDocument()
 {
-    if (document()->isHTMLDocument())
-        static_cast<HTMLDocument*>(document())->addNamedItem(m_name);
-
     HTMLElement::insertedIntoDocument();
 
     if (hasID())
@@ -143,9 +140,6 @@ void HTMLFormElement::insertedIntoDocument()
 
 void HTMLFormElement::removedFromDocument()
 {
-    if (document()->isHTMLDocument())
-        static_cast<HTMLDocument*>(document())->removeNamedItem(m_name);
-
     HTMLElement::removedFromDocument();
 
     if (hasID())
@@ -254,7 +248,7 @@ bool HTMLFormElement::validateInteractively(Event* event)
                 continue;
             String message("An invalid form control with name='%name' is not focusable.");
             message.replace("%name", unhandledAssociatedElement->name());
-            frame->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, ErrorMessageLevel, message, 0, document()->url().string());
+            frame->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, ErrorMessageLevel, message, document()->url().string());
         }
     }
     return false;
@@ -377,23 +371,14 @@ void HTMLFormElement::parseMappedAttribute(Attribute* attr)
         m_attributes.setAcceptCharset(attr->value());
     else if (attr->name() == autocompleteAttr) {
         if (!shouldAutocomplete())
-            document()->registerForDocumentActivationCallbacks(this);
+            document()->registerForPageCacheSuspensionCallbacks(this);
         else
-            document()->unregisterForDocumentActivationCallbacks(this);
+            document()->unregisterForPageCacheSuspensionCallbacks(this);
     } else if (attr->name() == onsubmitAttr)
         setAttributeEventListener(eventNames().submitEvent, createAttributeEventListener(this, attr));
     else if (attr->name() == onresetAttr)
         setAttributeEventListener(eventNames().resetEvent, createAttributeEventListener(this, attr));
-    else if (attr->name() == nameAttr) {
-        const AtomicString& newName = attr->value();
-        if (inDocument() && document()->isHTMLDocument()) {
-            HTMLDocument* document = static_cast<HTMLDocument*>(this->document());
-            document->removeNamedItem(m_name);
-            document->addNamedItem(newName);
-        }
-        m_name = newName;
-        invalidateNodeListsCacheAfterAttributeChanged();
-    } else
+    else
         HTMLElement::parseMappedAttribute(attr);
 }
 
@@ -471,18 +456,11 @@ unsigned HTMLFormElement::formElementIndex(FormAssociatedElement* associatedElem
 
 void HTMLFormElement::registerFormElement(FormAssociatedElement* e)
 {
-    if (e->isFormControlElement()) {
-        HTMLFormControlElement* element = static_cast<HTMLFormControlElement*>(e);
-        document()->checkedRadioButtons().removeButton(element);
-        m_checkedRadioButtons.addButton(element);
-    }
     m_associatedElements.insert(formElementIndex(e), e);
 }
 
 void HTMLFormElement::removeFormElement(FormAssociatedElement* e)
 {
-    if (e->isFormControlElement())
-        m_checkedRadioButtons.removeButton(static_cast<HTMLFormControlElement*>(e));
     unsigned index;
     for (index = 0; index < m_associatedElements.size(); ++index) {
         if (m_associatedElements[index] == e)
@@ -513,9 +491,11 @@ void HTMLFormElement::removeImgElement(HTMLImageElement* e)
     removeFromVector(m_imageElements, e);
 }
 
-PassRefPtr<HTMLCollection> HTMLFormElement::elements()
+HTMLCollection* HTMLFormElement::elements()
 {
-    return HTMLFormCollection::create(this);
+    if (!m_elementsCollection)
+        m_elementsCollection = HTMLFormCollection::create(this);
+    return m_elementsCollection.get();
 }
 
 String HTMLFormElement::name() const
@@ -637,7 +617,7 @@ void HTMLFormElement::getNamedElements(const AtomicString& name, Vector<RefPtr<N
         addElementAlias(static_cast<HTMLFormControlElement*>(namedItems.first().get()), name);
 }
 
-void HTMLFormElement::documentDidBecomeActive()
+void HTMLFormElement::documentDidResumeFromPageCache()
 {
     ASSERT(!shouldAutocomplete());
 
@@ -647,18 +627,15 @@ void HTMLFormElement::documentDidBecomeActive()
     }
 }
 
-void HTMLFormElement::willMoveToNewOwnerDocument()
+void HTMLFormElement::didMoveToNewDocument(Document* oldDocument)
 {
-    if (!shouldAutocomplete())
-        document()->unregisterForDocumentActivationCallbacks(this);
-    HTMLElement::willMoveToNewOwnerDocument();
-}
+    if (!shouldAutocomplete()) {
+        if (oldDocument)
+            oldDocument->unregisterForPageCacheSuspensionCallbacks(this);
+        document()->registerForPageCacheSuspensionCallbacks(this);
+    }
 
-void HTMLFormElement::didMoveToNewOwnerDocument()
-{
-    if (!shouldAutocomplete())
-        document()->registerForDocumentActivationCallbacks(this);
-    HTMLElement::didMoveToNewOwnerDocument();
+    HTMLElement::didMoveToNewDocument(oldDocument);
 }
 
 bool HTMLFormElement::shouldAutocomplete() const

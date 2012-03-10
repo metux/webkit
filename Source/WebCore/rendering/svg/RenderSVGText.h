@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2006 Apple Computer, Inc.
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
- * Copyright (C) Research In Motion Limited 2010. All rights reserved.
+ * Copyright (C) Research In Motion Limited 2010-2012. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -26,10 +26,11 @@
 
 #include "AffineTransform.h"
 #include "RenderSVGBlock.h"
-#include "SVGTextLayoutAttributes.h"
+#include "SVGTextLayoutAttributesBuilder.h"
 
 namespace WebCore {
 
+class RenderSVGInlineText;
 class SVGTextElement;
 
 class RenderSVGText : public RenderSVGBlock {
@@ -47,6 +48,8 @@ public:
 
     Vector<SVGTextLayoutAttributes>& layoutAttributes() { return m_layoutAttributes; }
     bool needsReordering() const { return m_needsReordering; }
+
+    void rebuildLayoutAttributes(bool performFullRebuild = false);
 
 private:
     virtual const char* renderName() const { return "RenderSVGText"; }
@@ -82,6 +85,7 @@ private:
     bool m_needsPositioningValuesUpdate : 1;
     bool m_needsTransformUpdate : 1;
     AffineTransform m_localTransform;
+    SVGTextLayoutAttributesBuilder m_layoutAttributesBuilder;
     Vector<SVGTextLayoutAttributes> m_layoutAttributes;
 };
 

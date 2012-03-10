@@ -31,7 +31,7 @@ namespace JSC {
 
         static ObjectPrototype* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
         {
-            ObjectPrototype* prototype = new (allocateCell<ObjectPrototype>(*exec->heap())) ObjectPrototype(exec, structure);
+            ObjectPrototype* prototype = new (NotNull, allocateCell<ObjectPrototype>(*exec->heap())) ObjectPrototype(exec, structure);
             prototype->finishCreation(exec->globalData(), globalObject);
             return prototype;
         }
@@ -59,7 +59,7 @@ namespace JSC {
         bool m_hasNoPropertiesWithUInt32Names;
     };
 
-    EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState*);
+    JS_EXPORT_PRIVATE EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState*);
 
 } // namespace JSC
 

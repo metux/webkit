@@ -184,6 +184,8 @@ webkitgtk_sources += \
 	Source/WebCore/bindings/gobject/WebKitDOMObject.h \
 	Source/WebCore/bindings/gobject/WebKitHTMLElementWrapperFactory.cpp \
 	Source/WebCore/bindings/gobject/WebKitHTMLElementWrapperFactory.h \
+	Source/WebKit/gtk/WebCoreSupport/AcceleratedCompositingContext.h \
+	Source/WebKit/gtk/WebCoreSupport/AcceleratedCompositingContextClutter.cpp \
 	Source/WebKit/gtk/WebCoreSupport/AssertMatchingEnums.cpp \
 	Source/WebKit/gtk/WebCoreSupport/ChromeClientGtk.cpp \
 	Source/WebKit/gtk/WebCoreSupport/ChromeClientGtk.h \
@@ -420,7 +422,9 @@ webkit_tests_cflags = \
 	$(javascriptcore_cppflags) \
 	$(GLIB_CFLAGS) \
 	$(GTK_CFLAGS) \
-	$(LIBSOUP_CFLAGS)
+	$(LIBSOUP_CFLAGS) \
+	$(XRENDER_LIBS) \
+	$(XT_LIBS)
 
 webkit_tests_ldadd = \
 	libjavascriptcoregtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la \

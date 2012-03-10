@@ -45,6 +45,7 @@ public:
     
     virtual void determineAbsolutePaintRect();
     static void calculateKernelSize(Filter*, unsigned& kernelSizeX, unsigned& kernelSizeY, float stdX, float stdY);
+    static void calculateUnscaledKernelSize(unsigned& kernelSizeX, unsigned& kernelSizeY, float stdX, float stdY);
 
     virtual TextStream& externalRepresentation(TextStream&, int indention) const;
 
@@ -73,7 +74,9 @@ private:
 
     inline void platformApplyGeneric(ByteArray* srcPixelArray, ByteArray* tmpPixelArray, unsigned kernelSizeX, unsigned kernelSizeY, IntSize& paintSize);
     inline void platformApplyNeon(ByteArray* srcPixelArray, ByteArray* tmpPixelArray, unsigned kernelSizeX, unsigned kernelSizeY, IntSize& paintSize);
-    void platformApplySkia();
+#if USE(SKIA)
+    virtual bool platformApplySkia();
+#endif
 
     float m_stdX;
     float m_stdY;

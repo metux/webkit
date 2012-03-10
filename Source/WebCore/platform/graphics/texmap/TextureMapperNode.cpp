@@ -31,40 +31,6 @@ namespace {
 
 namespace WebCore {
 
-class TextureMapperSurfaceManager {
-public:
-    TextureMapper* textureMapper;
-    Vector<RefPtr<BitmapTexture> > surfaces;
-    IntSize viewportSize;
-
-    PassRefPtr<BitmapTexture> getIntermediateSurface()
-    {
-        IntSize newViewportSize = textureMapper->viewportSize();
-        if (newViewportSize != viewportSize) {
-            viewportSize = newViewportSize;
-            surfaces.clear();
-        }
-        if (surfaces.isEmpty()) {
-            RefPtr<BitmapTexture> newSurface = textureMapper->createTexture();
-            newSurface->reset(viewportSize, false);
-            return newSurface.get();
-        }
-        RefPtr<BitmapTexture> surface = surfaces.last();
-        surface->reset(viewportSize, false);
-        surfaces.removeLast();
-        surface->lock();
-        return surface.get();
-    }
-
-    void releaseIntermediateSurface(BitmapTexture* surface)
-    {
-        if (!surface)
-            return;
-        surfaces.append(surface);
-        surface->unlock();
-    }
-};
-
 TextureMapperNode* toTextureMapperNode(GraphicsLayer* layer)
 {
     return layer ? toGraphicsLayerTextureMapper(layer)->node() : 0;
@@ -81,22 +47,7 @@ TextureMapperNode* TextureMapperNode::rootLayer()
 
 void TextureMapperNode::setTransform(const TransformationMatrix& matrix)
 {
-    if (m_transforms.base == matrix)
-        return;
-
-    m_transforms.base = matrix;
-}
-
-void TextureMapperNode::computePerspectiveTransformIfNeeded()
-{
-    if (m_children.isEmpty() || m_state.childrenTransform.isIdentity())
-        return;
-
-    const FloatPoint centerPoint = FloatPoint(m_size.width() / 2, m_size.height() / 2);
-    m_transforms.perspective = TransformationMatrix()
-            .translate(centerPoint.x(), centerPoint.y())
-            .multiply(m_state.childrenTransform)
-            .translate(-centerPoint.x(), -centerPoint.y());
+    m_transform.setLocalTransform(matrix);
 }
 
 int TextureMapperNode::countDescendantsWithContent() const
@@ -115,61 +66,34 @@ void TextureMapperNode::computeOverlapsIfNeeded()
     m_state.mightHaveOverlaps = countDescendantsWithContent() > 1;
 }
 
-void TextureMapperNode::computeReplicaTransformIfNeeded()
-{
-    if (!m_state.replicaLayer)
-        return;
-
-    m_transforms.replica =
-        TransformationMatrix(m_transforms.target)
-            .multiply(m_state.replicaLayer->m_transforms.local)
-            .multiply(TransformationMatrix(m_transforms.target).inverse());
-}
-
-void TextureMapperNode::computeLocalTransformIfNeeded()
-{
-    float originX = m_state.anchorPoint.x() * m_size.width();
-    float originY = m_state.anchorPoint.y() * m_size.height();
-    m_transforms.local =
-        TransformationMatrix()
-        .translate3d(originX + m_state.pos.x(), originY + m_state.pos.y(), m_state.anchorPoint.z() )
-        .multiply(m_transforms.base)
-        .translate3d(-originX, -originY, -m_state.anchorPoint.z());
-}
-
-void TextureMapperNode::computeAllTransforms()
+void TextureMapperNode::computeTransformsRecursive()
 {
     if (m_size.isEmpty() && m_state.masksToBounds)
         return;
 
-    computeLocalTransformIfNeeded();
-    computeReplicaTransformIfNeeded();
-    computePerspectiveTransformIfNeeded();
+    // Compute transforms recursively on the way down to leafs.
+    TransformationMatrix parentTransform;
+    if (m_parent)
+        parentTransform = m_parent->m_transform.combinedForChildren();
+    else if (m_effectTarget)
+        parentTransform = m_effectTarget->m_transform.combined();
+    m_transform.combineTransforms(parentTransform);
 
-    m_transforms.target = TransformationMatrix(m_parent ? m_parent->m_transforms.forDescendants : TransformationMatrix()).multiply(m_transforms.local);
+    m_state.visible = m_state.backfaceVisibility || m_transform.combined().inverse().m33() >= 0;
 
-    m_state.visible = m_state.backfaceVisibility || m_transforms.target.inverse().m33() >= 0;
-    if (!m_state.visible)
-        return;
-
-    // This transform is only applied if using a two-pass for the replica, because the transform needs to be adjusted to the size of the intermediate surface, insteaf of the size of the content layer.
     if (m_parent && m_parent->m_state.preserves3D)
-        m_transforms.centerZ = m_transforms.target.mapPoint(FloatPoint3D(m_size.width() / 2, m_size.height() / 2, 0)).z();
+        m_centerZ = m_transform.combined().mapPoint(FloatPoint3D(m_size.width() / 2, m_size.height() / 2, 0)).z();
 
-    if (!m_children.size())
-        return;
+    if (m_state.maskLayer)
+        m_state.maskLayer->computeTransformsRecursive();
+    if (m_state.replicaLayer)
+        m_state.replicaLayer->computeTransformsRecursive();
+    for (int i = 0; i < m_children.size(); ++i)
+        m_children[i]->computeTransformsRecursive();
 
-    m_transforms.forDescendants = m_transforms.target;
-
-    if (!m_state.preserves3D) {
-        m_transforms.forDescendants = TransformationMatrix(
-                    m_transforms.forDescendants.m11(), m_transforms.forDescendants.m12(), 0, m_transforms.forDescendants.m14(),
-                    m_transforms.forDescendants.m21(), m_transforms.forDescendants.m22(), 0, m_transforms.forDescendants.m24(),
-                    0, 0, 1, 0,
-                    m_transforms.forDescendants.m41(), m_transforms.forDescendants.m42(), 0, m_transforms.forDescendants.m44());
-    }
-
-    m_transforms.forDescendants.multiply(m_transforms.perspective);
+    // Reorder children if needed on the way back up.
+    if (m_state.preserves3D)
+        sortByZOrder(m_children, 0, m_children.size());
 }
 
 void TextureMapperNode::computeTiles()
@@ -192,9 +116,6 @@ void TextureMapperNode::computeTiles()
         for (float x = 0; x < contentRect.width(); x += gTileDimension) {
             FloatRect tileRect(x, y, gTileDimension, gTileDimension);
             tileRect.intersect(contentRect);
-            FloatRect tileRectInRootCoordinates = tileRect;
-            tileRectInRootCoordinates.scale(1.0);
-            tileRectInRootCoordinates = m_transforms.target.mapRect(tileRectInRootCoordinates);
             tilesToAdd.append(tileRect);
         }
     }
@@ -249,6 +170,7 @@ bool TextureMapperNode::collectVisibleContentsRects(NodeRectMap& rectMap, const 
 {
     if (!m_state.visible)
         return false;
+
     bool exists = false;
 
     for (int i = 0; i < m_children.size(); ++i)
@@ -259,14 +181,14 @@ bool TextureMapperNode::collectVisibleContentsRects(NodeRectMap& rectMap, const 
         exists = m_state.replicaLayer->collectVisibleContentsRects(rectMap, rootVisibleRect) || exists;
 
     // Non-invertible layers are not visible.
-    if (!m_transforms.target.isInvertible())
+    if (!m_transform.combined().isInvertible())
         return exists;
 
     static const int tilingThreshold = 256;
 
     IntRect visibleContentsRect(0, 0, m_size.width(), m_size.height());
     if (m_size.width() > tilingThreshold || m_size.height() > tilingThreshold) {
-        IntRect visibleRectInLocalCoordinates = enclosingIntRect(TransformationMatrix(m_transforms.target).inverse().mapRect(rootVisibleRect));
+        IntRect visibleRectInLocalCoordinates = enclosingIntRect(TransformationMatrix(m_transform.combined()).inverse().mapRect(rootVisibleRect));
         if (!visibleRectInLocalCoordinates.isEmpty())
             clampRect(visibleRectInLocalCoordinates, gTileDimension);
         visibleContentsRect.intersect(visibleRectInLocalCoordinates);
@@ -281,6 +203,35 @@ bool TextureMapperNode::collectVisibleContentsRects(NodeRectMap& rectMap, const 
     return true;
 }
 #endif
+
+bool TextureMapperNode::hasMoreThanOneTile() const
+{
+    int tiles = 0;
+
+#if USE(TILED_BACKING_STORE)
+    if (m_state.tileOwnership == ExternallyManagedTiles) {
+        HashMap<int, ExternallyManagedTile>::const_iterator end = m_externallyManagedTiles.end();
+        for (HashMap<int, ExternallyManagedTile>::const_iterator it = m_externallyManagedTiles.begin(); it != end; ++it) {
+            if (it->second.frontBuffer.texture) {
+                if (++tiles > 1)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+#endif
+
+    for (size_t i = 0; i < m_ownedTiles.size(); ++i) {
+        if (m_ownedTiles[i].texture) {
+            if (++tiles > 1)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 
 void TextureMapperNode::renderContent(TextureMapper* textureMapper, GraphicsLayer* layer)
 {
@@ -346,11 +297,9 @@ void TextureMapperNode::paint()
     if (m_size.isEmpty())
         return;
 
-    if (!m_surfaceManager)
-        m_surfaceManager = new TextureMapperSurfaceManager;
-    m_surfaceManager->textureMapper = m_textureMapper;
+    computeTransformsRecursive();
+
     TextureMapperPaintOptions opt;
-    opt.surfaceManager = m_surfaceManager;
     opt.textureMapper = m_textureMapper;
     opt.textureMapper->bindSurface(0);
     paintRecursive(opt);
@@ -409,13 +358,13 @@ void TextureMapperNode::paintSelf(const TextureMapperPaintOptions& options)
 
             float replicaOpacity = 1.0;
             if (m_state.replicaLayer) {
-                replicaMatrix = TransformationMatrix(m_transforms.target).scale(1.0 / tile.scale).multiply(m_state.replicaLayer->m_transforms.local);
+                replicaMatrix = m_state.replicaLayer->m_transform.combined().scale(1.0 / tile.scale);
                 replicaOpacity = opacity * m_state.replicaLayer->m_opacity;
             }
             BitmapTexture& texture = *tile.frontBuffer.texture;
             if (m_state.replicaLayer)
                 options.textureMapper->drawTexture(texture, rect, replicaMatrix, replicaOpacity, replicaMaskTexture ? replicaMaskTexture.get() : maskTexture.get());
-            options.textureMapper->drawTexture(texture, rect, m_transforms.target, opacity, options.isSurface ? 0 : maskTexture.get());
+            options.textureMapper->drawTexture(texture, rect, m_transform.combined(), opacity, options.isSurface ? 0 : maskTexture.get());
         }
         return;
     }
@@ -426,22 +375,22 @@ void TextureMapperNode::paintSelf(const TextureMapperPaintOptions& options)
         BitmapTexture* texture = m_ownedTiles[i].texture.get();
         if (m_state.replicaLayer && !options.isSurface) {
             options.textureMapper->drawTexture(*texture, targetRectForTileRect(targetRect, m_ownedTiles[i].rect),
-                             TransformationMatrix(m_transforms.target).multiply(m_state.replicaLayer->m_transforms.local),
+                             m_state.replicaLayer->m_transform.combined(),
                              opacity * m_state.replicaLayer->m_opacity,
                              replicaMaskTexture ? replicaMaskTexture.get() : maskTexture.get());
         }
 
         const FloatRect rect = targetRectForTileRect(targetRect, m_ownedTiles[i].rect);
-        options.textureMapper->drawTexture(*texture, rect, m_transforms.target, opacity, options.isSurface ? 0 : maskTexture.get());
+        options.textureMapper->drawTexture(*texture, rect, m_transform.combined(), opacity, options.isSurface ? 0 : maskTexture.get());
     }
 
     if (m_currentContent.contentType == MediaContentType && m_currentContent.media) {
         if (m_state.replicaLayer && !options.isSurface)
             m_currentContent.media->paintToTextureMapper(options.textureMapper, targetRect,
-                                                         TransformationMatrix(m_transforms.target).multiply(m_state.replicaLayer->m_transforms.local),
+                                                         m_state.replicaLayer->m_transform.combined(),
                                                          opacity * m_state.replicaLayer->m_opacity,
                                                          replicaMaskTexture ? replicaMaskTexture.get() : maskTexture.get());
-        m_currentContent.media->paintToTextureMapper(options.textureMapper, targetRect, m_transforms.target, opacity, options.isSurface ? 0 : maskTexture.get());
+        m_currentContent.media->paintToTextureMapper(options.textureMapper, targetRect, m_transform.combined(), opacity, options.isSurface ? 0 : maskTexture.get());
     }
 }
 
@@ -449,7 +398,7 @@ int TextureMapperNode::compareGraphicsLayersZValue(const void* a, const void* b)
 {
     TextureMapperNode* const* nodeA = static_cast<TextureMapperNode* const*>(a);
     TextureMapperNode* const* nodeB = static_cast<TextureMapperNode* const*>(b);
-    return int(((*nodeA)->m_transforms.centerZ - (*nodeB)->m_transforms.centerZ) * 1000);
+    return int(((*nodeA)->m_centerZ - (*nodeB)->m_centerZ) * 1000);
 }
 
 void TextureMapperNode::sortByZOrder(Vector<TextureMapperNode* >& array, int first, int last)
@@ -461,7 +410,7 @@ void TextureMapperNode::paintSelfAndChildren(const TextureMapperPaintOptions& op
 {
     bool hasClip = m_state.masksToBounds && !m_children.isEmpty();
     if (hasClip)
-        options.textureMapper->beginClip(m_transforms.forDescendants, FloatRect(0, 0, m_size.width(), m_size.height()));
+        options.textureMapper->beginClip(m_transform.combined(), FloatRect(0, 0, m_size.width(), m_size.height()));
 
     paintSelf(options);
 
@@ -493,40 +442,44 @@ bool TextureMapperNode::paintReflection(const TextureMapperPaintOptions& options
     const bool useIntermediateBufferForReplica = m_state.replicaLayer && options.opacity < 0.99;
     const bool useIntermediateBufferForMask = maskTexture && replicaMaskTexture;
     const FloatRect viewportRect(0, 0, viewportSize.width(), viewportSize.height());
+    // Reverse this layer's transform on the replica's transform and use it with the contents
+    // intermediate surface, applied in the viewport coordinate system.
+    TransformationMatrix replicaMatrix = m_state.replicaLayer->m_transform.combined();
+    replicaMatrix.multiply(m_transform.combined().inverse());
 
     // The mask has to be adjusted to target coordinates.
     if (maskTexture) {
-        maskSurface = options.surfaceManager->getIntermediateSurface();
+        maskSurface = options.textureMapper->acquireTextureFromPool(options.textureMapper->viewportSize());
         options.textureMapper->bindSurface(maskSurface.get());
-        options.textureMapper->drawTexture(*maskTexture.get(), entireRect(), m_transforms.target, 1, 0);
+        options.textureMapper->drawTexture(*maskTexture.get(), entireRect(), m_transform.combined(), 1, 0);
         maskTexture = maskSurface;
     }
 
     // The replica's mask has to be adjusted to target coordinates.
     if (replicaMaskTexture) {
-        replicaMaskSurface = options.surfaceManager->getIntermediateSurface();
+        replicaMaskSurface = options.textureMapper->acquireTextureFromPool(options.textureMapper->viewportSize());
         options.textureMapper->bindSurface(replicaMaskSurface.get());
-        options.textureMapper->drawTexture(*replicaMaskTexture.get(), entireRect(), m_transforms.target, 1, 0);
+        options.textureMapper->drawTexture(*replicaMaskTexture.get(), entireRect(), m_transform.combined(), 1, 0);
         replicaMaskTexture = replicaMaskSurface;
     }
 
     // We might need to apply the mask of the content layer before we draw the reflection, as there might be yet another mask for the reflection itself.
     if (useIntermediateBufferForMask) {
-        RefPtr<BitmapTexture> maskSurface = options.surfaceManager->getIntermediateSurface();
+        RefPtr<BitmapTexture> maskSurface = options.textureMapper->acquireTextureFromPool(options.textureMapper->viewportSize());
         options.textureMapper->bindSurface(maskSurface.get());
         options.textureMapper->drawTexture(*surface.get(), viewportRect, TransformationMatrix(), 1, maskTexture.get());
-        options.surfaceManager->releaseIntermediateSurface(surface.get());
+        options.textureMapper->releaseTextureToPool(surface.get());
         surface = maskSurface;
         maskTexture.clear();
     }
 
     // We blend the layer and its replica in an intermediate buffer before blending into the target surface.
     if (useIntermediateBufferForReplica) {
-        RefPtr<BitmapTexture> replicaSurface = options.surfaceManager->getIntermediateSurface();
+        RefPtr<BitmapTexture> replicaSurface = options.textureMapper->acquireTextureFromPool(options.textureMapper->viewportSize());
         options.textureMapper->bindSurface(replicaSurface.get());
-        options.textureMapper->drawTexture(*surface.get(), viewportRect, m_transforms.replica, m_state.replicaLayer->m_opacity, replicaMaskTexture.get());
+        options.textureMapper->drawTexture(*surface.get(), viewportRect, replicaMatrix, m_state.replicaLayer->m_opacity, replicaMaskTexture.get());
         options.textureMapper->drawTexture(*surface.get(), viewportRect, TransformationMatrix(), 1, maskTexture.get());
-        options.surfaceManager->releaseIntermediateSurface(surface.get());
+        options.textureMapper->releaseTextureToPool(surface.get());
         surface = replicaSurface;
     }
 
@@ -534,13 +487,13 @@ bool TextureMapperNode::paintReflection(const TextureMapperPaintOptions& options
 
     // Draw the reflection.
     if (!useIntermediateBufferForReplica)
-        options.textureMapper->drawTexture(*surface.get(), viewportRect, m_transforms.replica, m_state.replicaLayer->m_opacity, replicaMaskTexture.get());
+        options.textureMapper->drawTexture(*surface.get(), viewportRect, replicaMatrix, m_state.replicaLayer->m_opacity, replicaMaskTexture.get());
 
     // Draw the original.
     options.textureMapper->drawTexture(*surface.get(), viewportRect, TransformationMatrix(), options.opacity, maskTexture.get());
 
-    options.surfaceManager->releaseIntermediateSurface(maskSurface.get());
-    options.surfaceManager->releaseIntermediateSurface(replicaMaskSurface.get());
+    options.textureMapper->releaseTextureToPool(maskSurface.get());
+    options.textureMapper->releaseTextureToPool(replicaMaskSurface.get());
 
     return true;
 }
@@ -553,8 +506,14 @@ void TextureMapperNode::paintRecursive(TextureMapperPaintOptions options)
 
     options.opacity *= m_opacity;
     RefPtr<BitmapTexture> surface;
-    const bool needsTwoPass = ((m_state.replicaLayer || m_state.maskLayer) && !m_children.isEmpty()) || (m_opacity < 0.99 && m_state.mightHaveOverlaps) || (m_opacity < 0.99 && m_state.replicaLayer);
+
+    bool hasReplica = m_state.replicaLayer;
+    bool hasMask = m_state.maskLayer;
+    bool needsBlending = m_opacity < 0.99 || hasMask;
+    bool paintsMoreThanOneTexture = !m_children.isEmpty() || hasMoreThanOneTile() || (hasMask && m_state.maskLayer->hasMoreThanOneTile());
+    bool hasOverlaps = m_state.mightHaveOverlaps || hasReplica;
     const IntSize viewportSize = options.textureMapper->viewportSize();
+    bool needsTwoPass = ((hasReplica || hasMask) && paintsMoreThanOneTexture) || (needsBlending && hasOverlaps);
     options.isSurface = false;
 
     TextureMapperPaintOptions optionsForDescendants(options);
@@ -568,14 +527,15 @@ void TextureMapperNode::paintRecursive(TextureMapperPaintOptions options)
 
     RefPtr<BitmapTexture> maskSurface;
 
-    // The mask has to be adjusted to target coordinates.
     if (m_state.maskLayer) {
-        maskSurface = options.surfaceManager->getIntermediateSurface();
+        maskSurface = options.textureMapper->acquireTextureFromPool(options.textureMapper->viewportSize());
         options.textureMapper->bindSurface(maskSurface.get());
-        options.textureMapper->drawTexture(*m_state.maskLayer->texture(), entireRect(), m_transforms.target, 1.0, 0);
+        TextureMapperPaintOptions optionsForMask(options);
+        optionsForMask.isSurface = true;
+        m_state.maskLayer->paintSelf(optionsForMask);
     }
 
-    surface = options.surfaceManager->getIntermediateSurface();
+    surface = options.textureMapper->acquireTextureFromPool(options.textureMapper->viewportSize());
     optionsForDescendants.surface = surface.get();
     options.isSurface = true;
     optionsForDescendants.opacity = 1;
@@ -585,11 +545,11 @@ void TextureMapperNode::paintRecursive(TextureMapperPaintOptions options)
 
     if (!paintReflection(options, surface.get())) {
         options.textureMapper->bindSurface(options.surface);
-        options.textureMapper->drawTexture(*surface.get(), viewportRect, TransformationMatrix(), options.opacity, 0);
+        options.textureMapper->drawTexture(*surface.get(), viewportRect, TransformationMatrix(), options.opacity, maskSurface.get());
     }
 
-    options.surfaceManager->releaseIntermediateSurface(surface.get());
-    options.surfaceManager->releaseIntermediateSurface(maskSurface.get());
+    options.textureMapper->releaseTextureToPool(surface.get());
+    options.textureMapper->releaseTextureToPool(maskSurface.get());
 }
 
 TextureMapperNode::~TextureMapperNode()
@@ -783,7 +743,13 @@ void TextureMapperNode::syncCompositingStateSelf(GraphicsLayerTextureMapper* gra
     if (!hasOpacityAnimation())
         m_opacity = m_state.opacity;
     if (!hasTransformAnimation())
-        m_transforms.base = m_state.transform;
+        m_transform.setLocalTransform(m_state.transform);
+
+    m_transform.setPosition(m_state.pos);
+    m_transform.setAnchorPoint(m_state.anchorPoint);
+    m_transform.setSize(m_state.size);
+    m_transform.setFlattening(!m_state.preserves3D);
+    m_transform.setChildrenTransform(m_state.childrenTransform);
 }
 
 bool TextureMapperNode::descendantsOrSelfHaveRunningAnimations() const
@@ -975,9 +941,9 @@ void TextureMapperNode::syncAnimations(GraphicsLayerTextureMapper* layer)
             // We apply an animation that very close to the edge, so that the final frame is applied, oterwise we might get, for example, an opacity of 0.01 which is still visible.
             if (anim->fillsForwards()) {
                 if (animation->keyframes.property() == AnimatedPropertyWebkitTransform)
-                    m_state.transform = m_transforms.base;
+                    setTransform(m_state.transform);
                 else if (animation->keyframes.property() == AnimatedPropertyOpacity)
-                    m_opacity = m_state.opacity;
+                    setOpacity(m_state.opacity);
             }
 
             m_animations.remove(i);
@@ -992,8 +958,6 @@ void TextureMapperNode::syncAnimations(GraphicsLayerTextureMapper* layer)
 void TextureMapperNode::syncAnimationsRecursively()
 {
     syncAnimations(0);
-
-    computeAllTransforms();
 
     for (int i = m_children.size() - 1; i >= 0; --i)
         m_children[i]->syncAnimationsRecursively();
@@ -1019,7 +983,6 @@ void TextureMapperNode::syncCompositingState(GraphicsLayerTextureMapper* graphic
 
     syncAnimations(graphicsLayer);
 
-    computeAllTransforms();
     computeTiles();
     computeOverlapsIfNeeded();
 
@@ -1041,9 +1004,6 @@ void TextureMapperNode::syncCompositingState(GraphicsLayerTextureMapper* graphic
         for (int i = m_children.size() - 1; i >= 0; --i)
             m_children[i]->syncCompositingState(0, textureMapper, options);
     }
-
-    if (m_state.preserves3D)
-        sortByZOrder(m_children, 0, m_children.size());
 }
 
 TextureMapperAnimation::TextureMapperAnimation(const KeyframeValueList& values)

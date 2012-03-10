@@ -59,9 +59,16 @@
 
 namespace WebCore {
 
-#ifdef NDEBUG
-COMPILE_ASSERT((sizeof(CSSValue) - sizeof(RefCounted<CSSValue>)) <= 4, CSS_value_packs_into_four_bytes);
-#endif
+class SameSizeAsCSSValue : public RefCounted<SameSizeAsCSSValue> {
+    unsigned char bitfields[2];
+};
+
+COMPILE_ASSERT(sizeof(CSSValue) == sizeof(SameSizeAsCSSValue), CSS_value_should_stay_small);
+
+bool CSSValue::isImplicitInitialValue() const
+{
+    return m_classType == InitialClass && static_cast<const CSSInitialValue*>(this)->isImplicit();
+}
 
 CSSValue::Type CSSValue::cssValueType() const
 {

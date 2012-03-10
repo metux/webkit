@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -88,25 +88,7 @@ void KeyframeAnimation::fetchIntervalEndpointsForProperty(int property, const Re
     if (m_animation->duration() && m_animation->iterationCount() != Animation::IterationCountInfinite)
         elapsedTime = min(elapsedTime, m_animation->duration() * m_animation->iterationCount());
 
-    double fractionalTime = m_animation->duration() ? (elapsedTime / m_animation->duration()) : 1;
-
-    // FIXME: startTime can be before the current animation "frame" time. This is to sync with the frame time
-    // concept in AnimationTimeController. So we need to somehow sync the two. Until then, the possible
-    // error is small and will probably not be noticeable. Until we fix this, remove the assert.
-    // https://bugs.webkit.org/show_bug.cgi?id=52037
-    // ASSERT(fractionalTime >= 0);
-    if (fractionalTime < 0)
-        fractionalTime = 0;
-
-    // FIXME: share this code with AnimationBase::progress().
-    int iteration = static_cast<int>(fractionalTime);
-    if (m_animation->iterationCount() != Animation::IterationCountInfinite)
-        iteration = min(iteration, m_animation->iterationCount() - 1);
-    fractionalTime -= iteration;
-    
-    bool reversing = (m_animation->direction() == Animation::AnimationDirectionAlternate) && (iteration & 1);
-    if (reversing)
-        fractionalTime = 1 - fractionalTime;
+    const double fractionalTime = this->fractionalTime(1, elapsedTime, 0);
 
     size_t numKeyframes = m_keyframes.size();
     if (!numKeyframes)
@@ -249,14 +231,7 @@ void KeyframeAnimation::getAnimatedStyle(RefPtr<RenderStyle>& animatedStyle)
 
 bool KeyframeAnimation::hasAnimationForProperty(int property) const
 {
-    // FIXME: why not just m_keyframes.containsProperty()?
-    HashSet<int>::const_iterator end = m_keyframes.endProperties();
-    for (HashSet<int>::const_iterator it = m_keyframes.beginProperties(); it != end; ++it) {
-        if (*it == property)
-            return true;
-    }
-    
-    return false;
+    return m_keyframes.containsProperty(property);
 }
 
 bool KeyframeAnimation::startAnimation(double timeOffset)
@@ -389,12 +364,7 @@ void KeyframeAnimation::resumeOverriddenAnimations()
 
 bool KeyframeAnimation::affectsProperty(int property) const
 {
-    HashSet<int>::const_iterator end = m_keyframes.endProperties();
-    for (HashSet<int>::const_iterator it = m_keyframes.beginProperties(); it != end; ++it) {
-        if (*it == property)
-            return true;
-    }
-    return false;
+    return m_keyframes.containsProperty(property);
 }
 
 void KeyframeAnimation::validateTransformFunctionList()

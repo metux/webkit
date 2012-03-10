@@ -445,10 +445,11 @@ bool SelectorChecker::isFastCheckableSelector(const CSSSelector* selector)
 }
 
 // Recursive check of selectors and combinators
-// It can return 3 different values:
-// * SelectorMatches         - the selector matches the element e
-// * SelectorFailsLocally    - the selector fails for the element e
-// * SelectorFailsCompletely - the selector fails for e and any sibling or ancestor of e
+// It can return 4 different values:
+// * SelectorMatches          - the selector matches the element e
+// * SelectorFailsLocally     - the selector fails for the element e
+// * SelectorFailsAllSiblings - the selector fails for e and any sibling of e
+// * SelectorFailsCompletely  - the selector fails for e and any sibling or ancestor of e
 SelectorChecker::SelectorMatch SelectorChecker::checkSelector(CSSSelector* sel, Element* e, PseudoId& dynamicPseudo, bool isSubSelector, VisitedMatchType visitedMatchType, RenderStyle* elementStyle, RenderStyle* elementParentStyle) const
 {
 #if ENABLE(SVG)
@@ -488,7 +489,7 @@ SelectorChecker::SelectorMatch SelectorChecker::checkSelector(CSSSelector* sel, 
                 return SelectorFailsCompletely;
             e = static_cast<Element*>(n);
             SelectorMatch match = checkSelector(sel, e, dynamicPseudo, false, visitedMatchType);
-            if (match != SelectorFailsLocally)
+            if (match == SelectorMatches || match == SelectorFailsCompletely)
                 return match;
         }
         break;
@@ -511,7 +512,7 @@ SelectorChecker::SelectorMatch SelectorChecker::checkSelector(CSSSelector* sel, 
             while (n && !n->isElementNode())
                 n = n->previousSibling();
             if (!n)
-                return SelectorFailsLocally;
+                return SelectorFailsAllSiblings;
             e = static_cast<Element*>(n);
             return checkSelector(sel, e, dynamicPseudo, false, visitedMatchType);
         }
@@ -526,10 +527,10 @@ SelectorChecker::SelectorMatch SelectorChecker::checkSelector(CSSSelector* sel, 
             while (n && !n->isElementNode())
                 n = n->previousSibling();
             if (!n)
-                return SelectorFailsLocally;
+                return SelectorFailsAllSiblings;
             e = static_cast<Element*>(n);
             SelectorMatch match = checkSelector(sel, e, dynamicPseudo, false, visitedMatchType);
-            if (match != SelectorFailsLocally)
+            if (match == SelectorMatches || match == SelectorFailsAllSiblings || match == SelectorFailsCompletely)
                 return match;
         };
         break;
@@ -1396,6 +1397,32 @@ unsigned SelectorChecker::determineLinkMatchType(const CSSSelector* selector)
 bool SelectorChecker::isFrameFocused(const Element* element)
 {
     return element->document()->frame() && element->document()->frame()->selection()->isFocusedAndActive();
+}
+
+bool SelectorChecker::determineSelectorScopes(const CSSSelectorList& selectorList, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes)
+{
+    for (CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
+        CSSSelector* scopeSelector = 0;
+        // This picks the widest scope, not the narrowest, to minimize the number of found scopes.
+        for (CSSSelector* current = selector; current; current = current->tagHistory()) {
+            // Prefer ids over classes.
+            if (current->m_match == CSSSelector::Id)
+                scopeSelector = current;
+            else if (current->m_match == CSSSelector::Class && (!scopeSelector || scopeSelector->m_match != CSSSelector::Id))
+                scopeSelector = current;
+            CSSSelector::Relation relation = current->relation();
+            if (relation != CSSSelector::Descendant && relation != CSSSelector::Child && relation != CSSSelector::SubSelector)
+                break;
+        }
+        if (!scopeSelector)
+            return false;
+        ASSERT(scopeSelector->m_match == CSSSelector::Class || scopeSelector->m_match == CSSSelector::Id);
+        if (scopeSelector->m_match == CSSSelector::Id)
+            idScopes.add(scopeSelector->value().impl());
+        else
+            classScopes.add(scopeSelector->value().impl());
+    }
+    return true;
 }
 
 }

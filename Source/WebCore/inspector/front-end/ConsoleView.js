@@ -229,6 +229,12 @@ WebInspector.ConsoleView.prototype = {
         }
     },
 
+    willHide: function()
+    {
+        this.prompt.hideSuggestBox();
+        this.prompt.clearAutoComplete(true);
+    },
+
     wasShown: function()
     {
         if (!this.prompt.isCaretInsidePrompt())
@@ -271,8 +277,8 @@ WebInspector.ConsoleView.prototype = {
 
         function scrollIntoView()
         {
-            this.promptElement.scrollIntoView(true);
             delete this._scrollIntoViewTimer;
+            this.promptElement.scrollIntoView(true);
         }
         this._scrollIntoViewTimer = setTimeout(scrollIntoView.bind(this), 20);
     },

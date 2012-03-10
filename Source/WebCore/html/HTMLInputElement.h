@@ -188,8 +188,6 @@ public:
     String defaultValue() const;
     void setDefaultValue(const String&);
 
-    void setDefaultName(const AtomicString&);
-
     Vector<String> acceptMIMETypes();
     String accept() const;
     String alt() const;
@@ -243,14 +241,18 @@ public:
 protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
     void createShadowSubtree();
+    void setInitialName(const AtomicString&);
     virtual void defaultEventHandler(Event*);
 
 private:
     enum AutoCompleteSetting { Uninitialized, On, Off };
     enum AnyStepHandling { RejectAny, AnyIsDefaultStep };
 
-    virtual void willMoveToNewOwnerDocument();
-    virtual void didMoveToNewOwnerDocument();
+    virtual void willChangeForm() OVERRIDE;
+    virtual void didChangeForm() OVERRIDE;
+    virtual void insertedIntoDocument() OVERRIDE;
+    virtual void removedFromDocument() OVERRIDE;
+    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
@@ -298,13 +300,13 @@ private:
     virtual bool isInRange() const;
     virtual bool isOutOfRange() const;
 
-    virtual void documentDidBecomeActive();
+    virtual void documentDidResumeFromPageCache();
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
-    bool needsActivationCallback();
-    void registerForActivationCallbackIfNeeded();
-    void unregisterForActivationCallbackIfNeeded();
+    bool needsSuspensionCallback();
+    void registerForSuspensionCallbackIfNeeded();
+    void unregisterForSuspensionCallbackIfNeeded();
 
     bool supportsMaxLength() const { return isTextType(); }
     bool isTextType() const;

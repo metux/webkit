@@ -247,10 +247,13 @@ String HTMLSelectElement::value() const
 
 void HTMLSelectElement::setValue(const String &value)
 {
-    if (value.isNull())
+    // We clear the previously selected option(s) when needed, to guarantee calling setSelectedIndex() only once.
+    if (value.isNull()) {
+        setSelectedIndex(-1);
         return;
-    // find the option with value() matching the given parameter
-    // and make it the current selection.
+    }
+
+    // Find the option with value() matching the given parameter and make it the current selection.
     const Vector<HTMLElement*>& items = listItems();
     unsigned optionIndex = 0;
     for (unsigned i = 0; i < items.size(); i++) {
@@ -262,6 +265,8 @@ void HTMLSelectElement::setValue(const String &value)
             optionIndex++;
         }
     }
+
+    setSelectedIndex(-1);
 }
 
 void HTMLSelectElement::parseMappedAttribute(Attribute* attr)
@@ -325,9 +330,11 @@ RenderObject* HTMLSelectElement::createRenderer(RenderArena* arena, RenderStyle*
     return new (arena) RenderListBox(this);
 }
 
-PassRefPtr<HTMLOptionsCollection> HTMLSelectElement::options()
+HTMLOptionsCollection* HTMLSelectElement::options()
 {
-    return HTMLOptionsCollection::create(this);
+    if (!m_optionsCollection)
+        m_optionsCollection = HTMLOptionsCollection::create(this);
+    return m_optionsCollection.get();
 }
 
 void HTMLSelectElement::updateListItemSelectedStates()
@@ -680,8 +687,8 @@ void HTMLSelectElement::setRecalcListItems()
     m_activeSelectionAnchorIndex = -1;
     setOptionsChangedOnRenderer();
     setNeedsStyleRecalc();
-    if (!inDocument())
-        m_collectionInfo.reset();
+    if (!inDocument() && m_optionsCollection)
+        m_optionsCollection->invalidateCacheIfNeeded();
 }
 
 void HTMLSelectElement::recalcListItems(bool updateSelectedStates) const
@@ -1111,13 +1118,6 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
             if (form())
                 form()->submitImplicitly(event, false);
             dispatchChangeEventForMenuList();
-            handled = true;
-        }
-#else
-        int listIndex = optionToListIndex(selectedIndex());
-        if (keyCode == '\r') {
-            // listIndex should already be selected, but this will fire the onchange handler.
-            selectOption(listToOptionIndex(listIndex), DeselectOtherOptions | DispatchChangeEvent | UserDriven);
             handled = true;
         }
 #endif

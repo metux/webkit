@@ -44,9 +44,6 @@ class ScrollableArea {
 public:
     enum ZoomAnimationState { ZoomAnimationContinuing, ZoomAnimationFinishing };
 
-    ScrollableArea();
-    virtual ~ScrollableArea();
-
     bool scroll(ScrollDirection, ScrollGranularity, float multiplier = 1);
     void scrollToOffsetWithoutAnimation(const FloatPoint&);
     void scrollToOffsetWithoutAnimation(ScrollbarOrientation, float offset);
@@ -74,10 +71,21 @@ public:
     void willStartLiveResize();
     void willEndLiveResize();
 
+    void contentAreaWillPaint() const;
+    void mouseEnteredContentArea() const;
+    void mouseExitedContentArea() const;
+    void mouseMovedInContentArea() const;
+    void mouseEnteredScrollbar(Scrollbar*) const;
+    void mouseExitedScrollbar(Scrollbar*) const;
+    void contentAreaDidShow() const;
+    void contentAreaDidHide() const;
+
     void didAddVerticalScrollbar(Scrollbar*);
     void willRemoveVerticalScrollbar(Scrollbar*);
     virtual void didAddHorizontalScrollbar(Scrollbar*);
     virtual void willRemoveHorizontalScrollbar(Scrollbar*);
+
+    virtual void contentsResized();
 
     bool hasOverlayScrollbars() const;
     virtual void setScrollbarOverlayStyle(ScrollbarOverlayStyle);
@@ -133,11 +141,6 @@ public:
     virtual IntSize overhangAmount() const { ASSERT_NOT_REACHED(); return IntSize(); }
     virtual IntPoint currentMousePosition() const { return IntPoint(); }
 
-    virtual void didStartRubberBand(const IntSize&) const { ASSERT_NOT_REACHED(); }
-    virtual void didCompleteRubberBand(const IntSize&) const { ASSERT_NOT_REACHED(); }
-    virtual void didStartAnimatedScroll() const { }
-    virtual void didCompleteAnimatedScroll() const { }
-    
     virtual bool shouldSuspendScrollAnimations() const { return true; }
     virtual void scrollbarStyleChanged(int /*newStyle*/, bool /*forceUpdate*/) { }
     virtual void setVisibleScrollerThumbRect(const IntRect&) { }
@@ -166,6 +169,9 @@ public:
     void setScrollOffsetFromInternals(const IntPoint&);
 
 protected:
+    ScrollableArea();
+    virtual ~ScrollableArea();
+
     void setScrollOrigin(const IntPoint&);
     void setScrollOriginX(int);
     void setScrollOriginY(int);
@@ -178,7 +184,7 @@ protected:
     virtual GraphicsLayer* layerForHorizontalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForVerticalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForScrollCorner() const { return 0; }
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     virtual GraphicsLayer* layerForOverhangAreas() const { return 0; }
 #endif
 #endif

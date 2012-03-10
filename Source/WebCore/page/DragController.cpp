@@ -79,7 +79,7 @@ static PlatformMouseEvent createMouseEvent(DragData* dragData)
     shiftKey = ctrlKey = altKey = metaKey = false;
     PlatformKeyboardEvent::getCurrentModifierState(shiftKey, ctrlKey, altKey, metaKey);
     return PlatformMouseEvent(dragData->clientPosition(), dragData->globalPosition(),
-                              LeftButton, MouseEventMoved, 0, shiftKey, ctrlKey, altKey,
+                              LeftButton, PlatformEvent::MouseMoved, 0, shiftKey, ctrlKey, altKey,
                               metaKey, currentTime());
 }
 
@@ -100,6 +100,11 @@ DragController::DragController(Page* page, DragClient* client)
 DragController::~DragController()
 {
     m_client->dragControllerDestroyed();
+}
+
+PassOwnPtr<DragController> DragController::create(Page* page, DragClient* client)
+{
+    return adoptPtr(new DragController(page, client));
 }
 
 static PassRefPtr<DocumentFragment> documentFragmentFromDragData(DragData* dragData, Frame* frame, RefPtr<Range> context,
@@ -621,6 +626,7 @@ Node* DragController::draggableNode(const Frame* src, Node* startNode, const Int
             if (dragMode == DRAG_AUTO) {
                 if ((m_dragSourceAction & DragSourceActionImage)
                     && node->hasTagName(HTMLNames::imgTag)
+                    && src->settings()
                     && src->settings()->loadsImagesAutomatically()) {
                     state.m_dragType = static_cast<DragSourceAction>(state.m_dragType | DragSourceActionImage);
                     return node;
@@ -719,7 +725,7 @@ bool DragController::startDrag(Frame* src, const DragState& state, DragOperation
     KURL linkURL = hitTestResult.absoluteLinkURL();
     KURL imageURL = hitTestResult.absoluteImageURL();
 
-    IntPoint mouseDraggedPoint = src->view()->windowToContents(dragEvent.pos());
+    IntPoint mouseDraggedPoint = src->view()->windowToContents(dragEvent.position());
 
     m_draggingImageURL = KURL();
     m_sourceDragOperation = srcOp;

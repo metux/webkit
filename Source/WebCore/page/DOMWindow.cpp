@@ -60,6 +60,7 @@
 #include "Frame.h"
 #include "FrameLoadRequest.h"
 #include "FrameLoader.h"
+#include "FrameLoaderClient.h"
 #include "FrameTree.h"
 #include "FrameView.h"
 #include "HTMLFrameOwnerElement.h"
@@ -396,16 +397,13 @@ bool DOMWindow::canShowModalDialogNow(const Frame* frame)
 }
 
 DOMWindow::DOMWindow(Frame* frame)
-    : m_shouldPrintWhenFinishedLoading(false)
-    , m_frame(frame)
+    : FrameDestructionObserver(frame)
+    , m_shouldPrintWhenFinishedLoading(false)
 {
 }
 
 DOMWindow::~DOMWindow()
 {
-    if (m_frame)
-        m_frame->clearFormerDOMWindow(this);
-
     ASSERT(!m_screen);
     ASSERT(!m_selection);
     ASSERT(!m_history);
@@ -472,98 +470,60 @@ void DOMWindow::setSecurityOrigin(SecurityOrigin* securityOrigin)
     m_securityOrigin = securityOrigin;
 }
 
-void DOMWindow::disconnectFrame()
+void DOMWindow::frameDestroyed()
 {
-    m_frame = 0;
+    FrameDestructionObserver::frameDestroyed();
     clear();
+}
+
+void DOMWindow::registerProperty(DOMWindowProperty* property)
+{
+    m_properties.add(property);
+}
+
+void DOMWindow::unregisterProperty(DOMWindowProperty* property)
+{
+    m_properties.remove(property);
 }
 
 void DOMWindow::clear()
 {
-    if (m_screen)
-        m_screen->disconnectFrame();
+    HashSet<DOMWindowProperty*>::iterator stop = m_properties.end();
+    for (HashSet<DOMWindowProperty*>::iterator it = m_properties.begin(); it != stop; ++it)
+        (*it)->disconnectFrame();
+    m_properties.clear();
+
     m_screen = 0;
-
-    if (m_selection)
-        m_selection->disconnectFrame();
     m_selection = 0;
-
-    if (m_history)
-        m_history->disconnectFrame();
     m_history = 0;
-
     m_crypto = 0;
-
-    if (m_locationbar)
-        m_locationbar->disconnectFrame();
     m_locationbar = 0;
-
-    if (m_menubar)
-        m_menubar->disconnectFrame();
     m_menubar = 0;
-
-    if (m_personalbar)
-        m_personalbar->disconnectFrame();
     m_personalbar = 0;
-
-    if (m_scrollbars)
-        m_scrollbars->disconnectFrame();
     m_scrollbars = 0;
-
-    if (m_statusbar)
-        m_statusbar->disconnectFrame();
     m_statusbar = 0;
-
-    if (m_toolbar)
-        m_toolbar->disconnectFrame();
     m_toolbar = 0;
-
-    if (m_console)
-        m_console->disconnectFrame();
     m_console = 0;
-
-    if (m_navigator)
-        m_navigator->disconnectFrame();
     m_navigator = 0;
-
 #if ENABLE(WEB_TIMING)
-    if (m_performance)
-        m_performance->disconnectFrame();
     m_performance = 0;
 #endif
-
-    if (m_location)
-        m_location->disconnectFrame();
     m_location = 0;
-
-    if (m_media)
-        m_media->disconnectFrame();
     m_media = 0;
-
-    if (m_sessionStorage)
-        m_sessionStorage->disconnectFrame();
     m_sessionStorage = 0;
-
-    if (m_localStorage)
-        m_localStorage->disconnectFrame();
     m_localStorage = 0;
-
-    if (m_applicationCache)
-        m_applicationCache->disconnectFrame();
     m_applicationCache = 0;
-
 #if ENABLE(NOTIFICATIONS)
+    // FIXME: Notifications shouldn't have different disconnection logic than
+    // the rest of the DOMWindowProperties.
     resetNotifications();
 #endif
-
 #if ENABLE(INDEXED_DATABASE)
     m_idbFactory = 0;
 #endif
-
 #if ENABLE(BLOB)
     m_domURL = 0;
 #endif
-
 #if ENABLE(QUOTA)
     m_storageInfo = 0;
 #endif
@@ -910,17 +870,25 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
     if (!document())
         return;
 
+    RefPtr<MessageEvent> event = timer->event(document());
+
+    // Give the embedder a chance to intercept this postMessage because this
+    // DOMWindow might be a proxy for another in browsers that support
+    // postMessage calls across WebKit instances.
+    if (isCurrentlyDisplayedInFrame() && m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), PassRefPtr<MessageEvent>(event).leakRef()))
+        return;
+
     if (timer->targetOrigin()) {
-        // Check target origin now since the target document may have changed since the simer was scheduled.
+        // Check target origin now since the target document may have changed since the timer was scheduled.
         if (!timer->targetOrigin()->isSameSchemeHostPort(document()->securityOrigin())) {
             String message = "Unable to post message to " + timer->targetOrigin()->toString() +
                              ". Recipient has origin " + document()->securityOrigin()->toString() + ".\n";
-            console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 0, String());
+            console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
             return;
         }
     }
 
-    dispatchEvent(timer->event(document()));
+    dispatchEvent(event);
 }
 
 DOMSelection* DOMWindow::getSelection()
@@ -1413,23 +1381,6 @@ double DOMWindow::devicePixelRatio() const
     return page->deviceScaleFactor();
 }
 
-#if ENABLE(SQL_DATABASE)
-PassRefPtr<Database> DOMWindow::openDatabase(const String& name, const String& version, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback> creationCallback, ExceptionCode& ec)
-{
-    if (!isCurrentlyDisplayedInFrame())
-        return 0;
-
-    RefPtr<Database> database = 0;
-    if (m_frame && AbstractDatabase::isAvailable() && m_frame->document()->securityOrigin()->canAccessDatabase())
-        database = Database::openDatabase(m_frame->document(), name, version, displayName, estimatedSize, creationCallback, ec);
-
-    if (!database && !ec)
-        ec = SECURITY_ERR;
-
-    return database;
-}
-#endif
-
 void DOMWindow::scrollBy(int x, int y) const
 {
     if (!isCurrentlyDisplayedInFrame())
@@ -1759,7 +1710,7 @@ void DOMWindow::printErrorMessage(const String& message)
         return;
 
     // FIXME: Add arguments so that we can provide a correct source URL and line number.
-    console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 1, String());
+    console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
 }
 
 String DOMWindow::crossDomainAccessErrorMessage(DOMWindow* activeWindow)

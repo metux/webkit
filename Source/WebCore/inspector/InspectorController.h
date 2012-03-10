@@ -59,12 +59,16 @@ class Page;
 class PostWorkerNotificationToFrontendTask;
 class Node;
 
+struct Highlight;
+
 class InspectorController {
     WTF_MAKE_NONCOPYABLE(InspectorController);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    InspectorController(Page*, InspectorClient*);
     ~InspectorController();
+
+    static PassOwnPtr<InspectorController> create(Page*, InspectorClient*);
+
     void inspectedPageDestroyed();
 
     bool enabled() const;
@@ -76,7 +80,7 @@ public:
     void setInspectorFrontendClient(PassOwnPtr<InspectorFrontendClient>);
     bool hasInspectorFrontendClient() const;
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
-    void setInspectorExtensionAPI(const String& source);
+    void setInjectedScriptForOrigin(const String& origin, const String& source);
 
     void dispatchMessageFromFrontend(const String& message);
 
@@ -88,6 +92,7 @@ public:
 
     void inspect(Node*);
     void drawHighlight(GraphicsContext&) const;
+    void getHighlight(Highlight*) const;
     void hideHighlight();
     Node* highlightedNode() const;
 
@@ -104,6 +109,8 @@ public:
     void setResourcesDataSizeLimitsFromInternals(int maximumResourcesContentSize, int maximumSingleResourceContentSize);
 
 private:
+    InspectorController(Page*, InspectorClient*);
+
     friend class PostWorkerNotificationToFrontendTask;
     friend InstrumentingAgents* instrumentationForPage(Page*);
 

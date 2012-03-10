@@ -25,6 +25,7 @@
 // This file would be called String.h, but that conflicts with <string.h>
 // on systems without case-sensitive file systems.
 
+#include "ASCIIFastPath.h"
 #include "StringImpl.h"
 
 #ifdef __OBJC__
@@ -61,7 +62,6 @@ struct StringHash;
 
 // Declarations of string operations
 
-template<typename CharType> inline bool charactersAreAllASCII(const CharType* characters, size_t length);
 WTF_EXPORT_PRIVATE int charactersToIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_PRIVATE int charactersToIntStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_PRIVATE unsigned charactersToUIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
@@ -74,7 +74,7 @@ intptr_t charactersToIntPtrStrict(const LChar*, size_t, bool* ok = 0, int base =
 intptr_t charactersToIntPtrStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
 
 int charactersToInt(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
-int charactersToInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
+WTF_EXPORT_PRIVATE int charactersToInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
 unsigned charactersToUInt(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
 unsigned charactersToUInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
 int64_t charactersToInt64(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
@@ -87,7 +87,7 @@ intptr_t charactersToIntPtr(const UChar*, size_t, bool* ok = 0); // ignores trai
 WTF_EXPORT_PRIVATE double charactersToDouble(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 WTF_EXPORT_PRIVATE double charactersToDouble(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 float charactersToFloat(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
-float charactersToFloat(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
+WTF_EXPORT_PRIVATE float charactersToFloat(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 
 enum FloatConversionFlags {
     ShouldRoundSignificantFigures = 1 << 0,
@@ -214,9 +214,9 @@ public:
         { return m_impl ? m_impl->reverseFind(str.impl(), start) : notFound; }
 
     // Case insensitive string matching.
-    WTF_EXPORT_PRIVATE size_t findIgnoringCase(const LChar* str, unsigned start = 0) const
+    size_t findIgnoringCase(const LChar* str, unsigned start = 0) const
         { return m_impl ? m_impl->findIgnoringCase(str, start) : notFound; }
-    WTF_EXPORT_PRIVATE size_t findIgnoringCase(const String& str, unsigned start = 0) const
+    size_t findIgnoringCase(const String& str, unsigned start = 0) const
         { return m_impl ? m_impl->findIgnoringCase(str.impl(), start) : notFound; }
     size_t reverseFindIgnoringCase(const String& str, unsigned start = UINT_MAX) const
         { return m_impl ? m_impl->reverseFindIgnoringCase(str.impl(), start) : notFound; }
@@ -244,7 +244,7 @@ public:
 
     WTF_EXPORT_PRIVATE void append(const String&);
     WTF_EXPORT_PRIVATE void append(LChar);
-    inline WTF_EXPORT_PRIVATE void append(char c) { append(static_cast<LChar>(c)); };
+    void append(char c) { append(static_cast<LChar>(c)); };
     WTF_EXPORT_PRIVATE void append(UChar);
     WTF_EXPORT_PRIVATE void append(const UChar*, unsigned length);
     WTF_EXPORT_PRIVATE void insert(const String&, unsigned pos);
@@ -356,12 +356,12 @@ public:
     // the input data contains invalid UTF-8 sequences.
     WTF_EXPORT_PRIVATE static String fromUTF8(const LChar*, size_t);
     WTF_EXPORT_PRIVATE static String fromUTF8(const LChar*);
-    inline WTF_EXPORT_PRIVATE static String fromUTF8(const char* s, size_t length) { return fromUTF8(reinterpret_cast<const LChar*>(s), length); };
-    inline WTF_EXPORT_PRIVATE static String fromUTF8(const char* s) { return fromUTF8(reinterpret_cast<const LChar*>(s)); };
+    static String fromUTF8(const char* s, size_t length) { return fromUTF8(reinterpret_cast<const LChar*>(s), length); };
+    static String fromUTF8(const char* s) { return fromUTF8(reinterpret_cast<const LChar*>(s)); };
 
     // Tries to convert the passed in string to UTF-8, but will fall back to Latin-1 if the string is not valid UTF-8.
     WTF_EXPORT_PRIVATE static String fromUTF8WithLatin1Fallback(const LChar*, size_t);
-    inline WTF_EXPORT_PRIVATE static String fromUTF8WithLatin1Fallback(const char* s, size_t length) { return fromUTF8WithLatin1Fallback(reinterpret_cast<const LChar*>(s), length); };
+    static String fromUTF8WithLatin1Fallback(const char* s, size_t length) { return fromUTF8WithLatin1Fallback(reinterpret_cast<const LChar*>(s), length); };
     
     // Determines the writing direction using the Unicode Bidi Algorithm rules P2 and P3.
     WTF::Unicode::Direction defaultWritingDirection(bool* hasStrongDirectionality = 0) const
@@ -379,7 +379,7 @@ public:
 
     // Hash table deleted values, which are only constructed and never copied or destroyed.
     String(WTF::HashTableDeletedValueType) : m_impl(WTF::HashTableDeletedValue) { }
-    WTF_EXPORT_PRIVATE bool isHashTableDeletedValue() const { return m_impl.isHashTableDeletedValue(); }
+    bool isHashTableDeletedValue() const { return m_impl.isHashTableDeletedValue(); }
 
 #ifndef NDEBUG
     void show() const;
@@ -481,17 +481,6 @@ inline bool String::containsOnlyLatin1() const
 // entrenched clients
 inline NSString* nsStringNilIfEmpty(const String& str) {  return str.isEmpty() ? nil : (NSString*)str; }
 #endif
-
-template<typename CharType>
-inline bool charactersAreAllASCII(const CharType* characters, size_t length)
-{
-    CharType ored = 0;
-    for (size_t i = 0; i < length; ++i)
-        ored |= characters[i];
-
-    CharType lowBits = 0x7F;
-    return !(ored & ~lowBits);
-}
 
 inline bool String::containsOnlyASCII() const
 {

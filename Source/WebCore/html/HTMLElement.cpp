@@ -26,6 +26,7 @@
 #include "HTMLElement.h"
 
 #include "Attribute.h"
+#include "CSSParser.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "ChildListMutationScope.h"
@@ -48,6 +49,7 @@
 #include "Settings.h"
 #include "Text.h"
 #include "TextIterator.h"
+#include "XMLNames.h"
 #include "markup.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
@@ -168,6 +170,20 @@ void HTMLElement::applyBorderAttribute(Attribute* attr)
     addCSSProperty(attr, CSSPropertyBorderLeftStyle, CSSValueSolid);
 }
 
+void HTMLElement::mapLanguageAttributeToLocale(Attribute* attribute)
+{
+    ASSERT(attribute && (attribute->name() == langAttr || attribute->name().matches(XMLNames::langAttr)));
+    const AtomicString& value = attribute->value();
+    if (!value.isEmpty()) {
+        // Have to quote so the locale id is treated as a string instead of as a CSS keyword.
+        addCSSProperty(attribute, CSSPropertyWebkitLocale, quoteCSSString(value));
+    } else {
+        // The empty string means the language is explicitly unknown.
+        addCSSProperty(attribute, CSSPropertyWebkitLocale, CSSValueAuto);
+    }
+    setNeedsStyleRecalc();
+}
+
 void HTMLElement::parseMappedAttribute(Attribute* attr)
 {
     if (isIdAttributeName(attr->name()) || attr->name() == classAttr || attr->name() == styleAttr)
@@ -192,8 +208,12 @@ void HTMLElement::parseMappedAttribute(Attribute* attr)
             // Clamp tabindex to the range of 'short' to match Firefox's behavior.
             setTabIndexExplicitly(max(static_cast<int>(std::numeric_limits<short>::min()), min(tabindex, static_cast<int>(std::numeric_limits<short>::max()))));
         }
+    } else if (attr->name().matches(XMLNames::langAttr)) {
+        mapLanguageAttributeToLocale(attr);
     } else if (attr->name() == langAttr) {
-        // FIXME: Implement
+        // xml:lang has a higher priority than lang.
+        if (!fastHasAttribute(XMLNames::langAttr))
+            mapLanguageAttributeToLocale(attr);
     } else if (attr->name() == dirAttr) {
         bool dirIsAuto = equalIgnoringCase(attr->value(), "auto");
         if (!dirIsAuto)
@@ -210,8 +230,6 @@ void HTMLElement::parseMappedAttribute(Attribute* attr)
             addCSSProperty(attr, CSSPropertyWebkitUserSelect, CSSValueNone);
         } else if (equalIgnoringCase(value, "false"))
             addCSSProperty(attr, CSSPropertyWebkitUserDrag, CSSValueNone);
-    } else if (attr->name() == nameAttr) {
-        invalidateNodeListsCacheAfterAttributeChanged();
 #if ENABLE(MICRODATA)
     } else if (attr->name() == itempropAttr) {
         setItemProp(attr->value());
@@ -312,6 +330,8 @@ void HTMLElement::parseMappedAttribute(Attribute* attr)
 #if ENABLE(FULLSCREEN_API)
     } else if (attr->name() == onwebkitfullscreenchangeAttr) {
         setAttributeEventListener(eventNames().webkitfullscreenchangeEvent, createAttributeEventListener(this, attr));
+    } else if (attr->name() == onwebkitfullscreenerrorAttr) {
+        setAttributeEventListener(eventNames().webkitfullscreenerrorEvent, createAttributeEventListener(this, attr));
 #endif
     }
 }
@@ -625,7 +645,7 @@ static Element* contextElementForInsertion(const String& where, Element* element
 {
     if (equalIgnoringCase(where, "beforeBegin") || equalIgnoringCase(where, "afterEnd")) {
         ContainerNode* parent = element->parentNode();
-        if (parent && parent->isDocumentNode()) {
+        if (parent && !parent->isElementNode()) {
             ec = NO_MODIFICATION_ALLOWED_ERR;
             return 0;
         }
@@ -734,9 +754,9 @@ void HTMLElement::setContentEditable(Attribute* attr)
         addCSSProperty(attr, CSSPropertyWebkitLineBreak, CSSValueAfterWhiteSpace);
     } else if (equalIgnoringCase(enabled, "false")) {
         addCSSProperty(attr, CSSPropertyWebkitUserModify, CSSValueReadOnly);
-        attr->decl()->removeProperty(CSSPropertyWordWrap);
-        attr->decl()->removeProperty(CSSPropertyWebkitNbspMode);
-        attr->decl()->removeProperty(CSSPropertyWebkitLineBreak);
+        removeCSSProperty(attr, CSSPropertyWordWrap);
+        removeCSSProperty(attr, CSSPropertyWebkitNbspMode);
+        removeCSSProperty(attr, CSSPropertyWebkitLineBreak);
     } else if (equalIgnoringCase(enabled, "plaintext-only")) {
         addCSSProperty(attr, CSSPropertyWebkitUserModify, CSSValueReadWritePlaintextOnly);
         addCSSProperty(attr, CSSPropertyWordWrap, CSSValueBreakWord);
@@ -748,13 +768,13 @@ void HTMLElement::setContentEditable(Attribute* attr)
 void HTMLElement::setContentEditable(const String& enabled, ExceptionCode& ec)
 {
     if (equalIgnoringCase(enabled, "true"))
-        setAttribute(contenteditableAttr, "true", ec);
+        setAttribute(contenteditableAttr, "true");
     else if (equalIgnoringCase(enabled, "false"))
-        setAttribute(contenteditableAttr, "false", ec);
+        setAttribute(contenteditableAttr, "false");
     else if (equalIgnoringCase(enabled, "plaintext-only"))
         setAttribute(contenteditableAttr, "plaintext-only");
     else if (equalIgnoringCase(enabled, "inherit"))
-        removeAttribute(contenteditableAttr, ec);
+        removeAttribute(contenteditableAttr);
     else
         ec = SYNTAX_ERR;
 }
@@ -807,9 +827,9 @@ void HTMLElement::setTabIndex(int value)
     setAttribute(tabindexAttr, String::number(value));
 }
 
-PassRefPtr<HTMLCollection> HTMLElement::children()
+HTMLCollection* HTMLElement::children()
 {
-    return HTMLCollection::create(this, NodeChildren);
+    return ensureCachedHTMLCollection(NodeChildren);
 }
 
 bool HTMLElement::rendererIsNeeded(const NodeRenderingContext& context)

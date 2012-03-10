@@ -708,7 +708,7 @@ void RenderBlock::addChildIgnoringAnonymousColumnBlocks(RenderObject* newChild, 
 
         ASSERT(beforeChildAnonymousContainer->isTable());
         if ((newChild->isTableCol() && newChild->style()->display() == TABLE_COLUMN_GROUP)
-                || (newChild->isRenderBlock() && newChild->style()->display() == TABLE_CAPTION)
+                || (newChild->isTableCaption())
                 || newChild->isTableSection()
                 || newChild->isTableRow()
                 || newChild->isTableCell()) {
@@ -1451,7 +1451,10 @@ void RenderBlock::computeOverflow(LayoutUnit oldClientAfterEdge, bool recomputeF
     }
         
     // Add visual overflow from box-shadow and border-image-outset.
-    addBoxShadowAndBorderOverflow();
+    addVisualEffectOverflow();
+
+    // Add visual overflow from theme.
+    addVisualOverflowFromTheme();
 }
 
 void RenderBlock::addOverflowFromBlockChildren()
@@ -1491,6 +1494,16 @@ void RenderBlock::addOverflowFromPositionedObjects()
         if (positionedObject->style()->position() != FixedPosition)
             addOverflowFromChild(positionedObject);
     }
+}
+
+void RenderBlock::addVisualOverflowFromTheme()
+{
+    if (!style()->hasAppearance())
+        return;
+
+    IntRect inflatedRect = borderBoxRect();
+    theme()->adjustRepaintRect(this, inflatedRect);
+    addVisualOverflow(inflatedRect);
 }
 
 bool RenderBlock::expandsToEncloseOverhangingFloats() const
@@ -2043,7 +2056,7 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
     LayoutRect oldRect(child->x(), child->y() , child->width(), child->height());
     LayoutUnit oldLogicalTop = logicalTopForChild(child);
 
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
     LayoutSize oldLayoutDelta = view()->layoutDelta();
 #endif
     // Go ahead and position the child as though it didn't collapse with the top.
@@ -3217,6 +3230,8 @@ LayoutUnit RenderBlock::logicalRightSelectionOffset(RenderBlock* rootBlock, Layo
 
 void RenderBlock::insertPositionedObject(RenderBox* o)
 {
+    ASSERT(!isAnonymousBlock());
+
     if (o->isRenderFlowThread())
         return;
     
@@ -5427,29 +5442,6 @@ void RenderBlock::computeBlockPreferredLogicalWidths()
                 floatRightWidth += w;
         } else
             m_maxPreferredLogicalWidth = max(w, m_maxPreferredLogicalWidth);
-
-        // A very specific WinIE quirk.
-        // Example:
-        /*
-           <div style="position:absolute; width:100px; top:50px;">
-              <div style="position:absolute;left:0px;top:50px;height:50px;background-color:green">
-                <table style="width:100%"><tr><td></table>
-              </div>
-           </div>
-        */
-        // In the above example, the inner absolute positioned block should have a computed width
-        // of 100px because of the table.
-        // We can achieve this effect by making the maxwidth of blocks that contain tables
-        // with percentage widths be infinite (as long as they are not inside a table cell).
-        // FIXME: There is probably a bug here with orthogonal writing modes since we check logicalWidth only using the child's writing mode.
-        if (containingBlock && document()->inQuirksMode() && child->style()->logicalWidth().isPercent()
-            && !isTableCell() && child->isTable() && m_maxPreferredLogicalWidth < BLOCK_MAX_WIDTH) {
-            RenderBlock* cb = containingBlock;
-            while (!cb->isRenderView() && !cb->isTableCell())
-                cb = cb->containingBlock();
-            if (!cb->isTableCell())
-                m_maxPreferredLogicalWidth = BLOCK_MAX_WIDTH;
-        }
         
         child = child->nextSibling();
     }
@@ -5739,38 +5731,14 @@ void RenderBlock::updateFirstLetter()
 
             RenderTextFragment* remainingText = 0;
             RenderObject* nextSibling = firstLetter->nextSibling();
-            RenderObject* next = nextSibling;
-            while (next) {
-                if (next->isText() && toRenderText(next)->isTextFragment()) {
-                    remainingText = toRenderTextFragment(next);
-                    break;
-                }
-                next = next->nextSibling();
-            }
-            if (!remainingText && firstLetterContainer->isAnonymousBlock()) {
-                // The remaining text fragment could have been wrapped in a different anonymous block since creation
-                RenderObject* nextChild;
-                next = firstLetterContainer->nextSibling();
-                while (next && !remainingText) {
-                    if (next->isAnonymousBlock()) {
-                        nextChild = next->firstChild();
-                        while (nextChild) {
-                            if (nextChild->isText() && toRenderText(nextChild)->isTextFragment()
-                                && (toRenderTextFragment(nextChild)->firstLetter() == firstLetter)) {
-                                remainingText = toRenderTextFragment(nextChild);
-                                break;
-                            }
-                            nextChild = nextChild->nextSibling();
-                        }
-                    } else
-                        break;
-                    next = next->nextSibling();
-                }
-            }
+            RenderObject* remainingTextObject = toRenderBoxModelObject(firstLetter)->firstLetterRemainingText();
+            if (remainingTextObject && remainingTextObject->isText() && toRenderText(remainingTextObject)->isTextFragment())
+                remainingText = toRenderTextFragment(remainingTextObject);
             if (remainingText) {
                 ASSERT(remainingText->isAnonymous() || remainingText->node()->renderer() == remainingText);
                 // Replace the old renderer with the new one.
                 remainingText->setFirstLetter(newFirstLetter);
+                toRenderBoxModelObject(newFirstLetter)->setFirstLetterRemainingText(remainingText);
             }
             firstLetter->destroy();
             firstLetter = newFirstLetter;
@@ -5848,6 +5816,7 @@ void RenderBlock::updateFirstLetter()
         firstLetterContainer->addChild(remainingText, textObj);
         firstLetterContainer->removeChild(textObj);
         remainingText->setFirstLetter(firstLetter);
+        toRenderBoxModelObject(firstLetter)->setFirstLetterRemainingText(remainingText);
         
         // construct text fragment for the first letter
         RenderTextFragment* letter = 
@@ -6634,7 +6603,7 @@ RenderRegion* RenderBlock::regionAtBlockOffset(LayoutUnit blockOffset) const
         return 0;
 
     RenderFlowThread* flowThread = enclosingRenderFlowThread();
-    if (!flowThread || !flowThread->hasValidRegions())
+    if (!flowThread || !flowThread->hasValidRegionInfo())
         return 0;
 
     return flowThread->renderRegionForLine(offsetFromLogicalTopOfFirstPage() + blockOffset, true);
@@ -6655,7 +6624,7 @@ bool RenderBlock::logicalWidthChangedInRegions() const
         return false;
     
     RenderFlowThread* flowThread = enclosingRenderFlowThread();
-    if (!flowThread || !flowThread->hasValidRegions())
+    if (!flowThread || !flowThread->hasValidRegionInfo())
         return 0;
     
     return flowThread->logicalWidthChangedInRegions(this, offsetFromLogicalTopOfFirstPage());

@@ -33,8 +33,7 @@ module core {
         [OldStyleObjC] void setAttribute(in [Optional=CallWithDefaultValue] DOMString name,
                                          in [Optional=CallWithDefaultValue] DOMString value)
             raises(DOMException);
-        void removeAttribute(in [Optional=CallWithDefaultValue] DOMString name)
-            raises(DOMException);
+        void removeAttribute(in [Optional=CallWithDefaultValue] DOMString name);
         Attr getAttributeNode(in [Optional=CallWithDefaultValue] DOMString name);
         Attr setAttributeNode(in [Optional=CallWithDefaultValue] Attr newAttr)
             raises(DOMException);
@@ -51,8 +50,7 @@ module core {
                                            in [Optional=CallWithDefaultValue] DOMString value)
             raises(DOMException);
         [OldStyleObjC] void removeAttributeNS(in [ConvertNullToNullString] DOMString namespaceURI,
-                                              in DOMString localName)
-            raises(DOMException);
+                                              in DOMString localName);
         [OldStyleObjC] NodeList getElementsByTagNameNS(in [ConvertNullToNullString,Optional=CallWithDefaultValue] DOMString namespaceURI,
                                                        in [Optional=CallWithDefaultValue] DOMString localName);
         [OldStyleObjC] Attr getAttributeNodeNS(in [ConvertNullToNullString,Optional=CallWithDefaultValue] DOMString namespaceURI,
@@ -206,6 +204,7 @@ module core {
         attribute [DontEnum,Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchend;
         attribute [DontEnum,Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchcancel;
         attribute [DontEnum, Conditional=FULLSCREEN_API] EventListener onwebkitfullscreenchange;
+        attribute [DontEnum, Conditional=FULLSCREEN_API] EventListener onwebkitfullscreenerror;
 #endif
     };
 

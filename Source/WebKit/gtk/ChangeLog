@@ -1,3 +1,192 @@
+2012-01-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Update NEWS and configure.ac for 1.7.4 release
+        https://bugs.webkit.org/show_bug.cgi?id=76375
+
+        Reviewed by Philippe Normand.
+
+        * NEWS: Added release notes for 1.7.4.
+
+2012-01-13  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        Unreviewed, rolling out r104905.
+        http://trac.webkit.org/changeset/104905
+        https://bugs.webkit.org/show_bug.cgi?id=76267
+
+        This patch broke tests in the GTK 64bit Debug bot (Requested
+        by msanchez on #webkit).
+
+        * tests/testatk.c:
+        (testWebkitAtkCaretOffsets):
+        (testWebkitAtkTextSelections):
+
+2012-01-13  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] ATK text-caret-moved and text-selection-changed events not being emitted
+        https://bugs.webkit.org/show_bug.cgi?id=76069
+
+        Reviewed by Martin Robinson.
+
+        Update caret browsing related unit tests to check emissions of
+        'text-caret-moved' and 'text-selection-changed' signals.
+
+        * tests/testatk.c:
+        (textCaretMovedCallback): New callback for 'text-caret-moved'.
+        (testWebkitAtkCaretOffsets): Check emissions of 'text-caret-moved'.
+        (textSelectionChangedCallback): New callback for 'text-selection-changed'.
+        (testWebkitAtkTextSelections): Check emissions of 'text-selection-changed'.
+
+2012-01-12  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [Gtk] Removed duplicated unit test.
+
+        The unit test testWebkitAtkGetTextAtOffsetForms is exactly the
+        same test case than testWebkitAtkGetTextAtOffset, so it makes no
+        sense to have it duplicated.
+
+        Rubber-stamped by Martin Robinson.
+
+        * tests/testatk.c:
+        (main): Removed testWebkitAtkGetTextAtOffsetForms.
+
+2012-01-10  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        AX: support helpText() in DumpRenderTree
+        https://bugs.webkit.org/show_bug.cgi?id=40193
+
+        Reviewed by Chris Fleizach.
+
+        Add support for retrieving WebCore's AccessibilityObject's
+        helpText from the GTK DumpRenderTree.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::accessibilityHelpText): Returns result
+        of calling to helpText() over the core accessibility object's.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+
+2012-01-09  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [Gtk] Regression: text-inserted events lack text inserted and current line
+        https://bugs.webkit.org/show_bug.cgi?id=72830
+
+        Reviewed by Martin Robinson.
+
+        Updated unit tests to check that both getting the current position
+        for the caret and the exposed text at, before or after a given
+        offset for an accessible object works as expected.
+
+        * tests/testatk.c:
+        (runGetTextTests): For objects implementing AtkEditableText, try
+        to change the exposed text and retrieve it again as a full line.
+        (testWebkitAtkCaretOffsets): For a text control (a text entry),
+        set the caret offset to a value greater than 1 and retrieve it.
+
+2012-01-05  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [AC] Introduce AcceleratedCompositingContext to isolate different accelerated compositing implementations
+        https://bugs.webkit.org/show_bug.cgi?id=75519
+
+        Reviewed by Alejandro G. Castro.
+
+        Add an AcceleratedCompositingContext which will isolate all the different accelerated compositing
+        implementations from one another. For right now this just includes the Clutter version.
+
+        * GNUmakefile.am: Add the new files to the source list.
+        * WebCoreSupport/AcceleratedCompositingContext.h: Added.
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp: Added. Existing
+        clutter AC code has moved here.
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::attachRootGraphicsLayer): Use the new AccleratedCompositingContext now
+        instead of calling into the WebView.
+        (WebKit::ChromeClient::setNeedsOneShotDrawingSynchronization):Ditto.
+        (WebKit::ChromeClient::scheduleCompositingLayerSync): Ditto.
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_size_allocate): Call in the ACContext.
+        (webkit_web_view_init): Initialize the ACContext.
+        * webkit/webkitwebviewprivate.h: Add the ACContext as a private member.
+
+2012-01-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Use gdk_screen_get_monitor_workarea() when available for screenAvailableRect()
+        https://bugs.webkit.org/show_bug.cgi?id=75435
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Make sure unit tests link to X11.
+
+2011-12-20  Yuta Kitamura  <yutak@chromium.org>
+
+        [GTK] Change default WebSocket protocol to the latest one
+        https://bugs.webkit.org/show_bug.cgi?id=74064
+
+        Reviewed by Martin Robinson.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+        Use hybi WebSocket protocol by default.
+
+2011-12-19  Sam Weinig  <sam@webkit.org>
+
+        More PlatformEvent cleanup
+        https://bugs.webkit.org/show_bug.cgi?id=74831
+
+        Reviewed by Dan Bernstein.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_forward_context_menu_event):
+        (webkit_web_view_get_hit_test_result):
+        Update to use new names, access style.
+
+2011-12-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Rename registerCommandFor(Undo|Redo) to register(Undo|Redo)Step
+        https://bugs.webkit.org/show_bug.cgi?id=74748
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::registerUndoStep):
+        (WebKit::EditorClient::registerRedoStep):
+        * WebCoreSupport/EditorClientGtk.h:
+
+2011-12-16  Sam Weinig  <sam@webkit.org>
+
+        Give PlatformEvents a base class
+        https://bugs.webkit.org/show_bug.cgi?id=74685
+
+        Reviewed by Anders Carlsson.
+
+        Add a base class for PlatformMouseEvent, PlatformKeyboardEvent, PlatformWheelEvent
+        and PlatformGestureEvent and move Type enumeration and modifiers down to it.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::handleKeyboardEvent):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_popup_menu_handler):
+
+2011-12-16  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Only EditCommandComposition should implement unapply and reapply
+        https://bugs.webkit.org/show_bug.cgi?id=74490
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::registerCommandForUndo):
+        (WebKit::EditorClient::registerCommandForRedo):
+        (WebKit::EditorClient::undo):
+        (WebKit::EditorClient::redo):
+        * WebCoreSupport/EditorClientGtk.h:
+
+2011-12-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Update NEWS and configure.ac for 1.7.3 release
+        https://bugs.webkit.org/show_bug.cgi?id=74699
+
+        Reviewed by Philippe Normand.
+
+        * NEWS: Added release notes for 1.7.3.
+
 2011-12-14  Jing Zhao  <jingzhao@chromium.org>
 
         Opening two popup menus by dispatchEvent() makes problems.

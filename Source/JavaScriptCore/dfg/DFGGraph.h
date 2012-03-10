@@ -79,6 +79,36 @@ public:
         if (node.ref())
             refChildren(nodeIndex);
     }
+    
+    void deref(NodeIndex nodeIndex)
+    {
+        if (at(nodeIndex).deref())
+            derefChildren(nodeIndex);
+    }
+    
+    void clearAndDerefChild1(Node& node)
+    {
+        if (node.children.fixed.child1 == NoNode)
+            return;
+        deref(node.children.fixed.child1);
+        node.children.fixed.child1 = NoNode;
+    }
+
+    void clearAndDerefChild2(Node& node)
+    {
+        if (node.children.fixed.child2 == NoNode)
+            return;
+        deref(node.children.fixed.child2);
+        node.children.fixed.child2 = NoNode;
+    }
+
+    void clearAndDerefChild3(Node& node)
+    {
+        if (node.children.fixed.child3 == NoNode)
+            return;
+        deref(node.children.fixed.child3);
+        node.children.fixed.child3 = NoNode;
+    }
 
 #ifndef NDEBUG
     // CodeBlock is optional, but may allow additional information to be dumped (e.g. Identifier names).
@@ -235,6 +265,7 @@ private:
     
     // When a node's refCount goes from 0 to 1, it must (logically) recursively ref all of its children, and vice versa.
     void refChildren(NodeIndex);
+    void derefChildren(NodeIndex);
 
     PredictionTracker m_predictions;
 };

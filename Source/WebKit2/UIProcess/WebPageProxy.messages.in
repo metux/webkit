@@ -123,6 +123,10 @@ messages -> WebPageProxy {
     DidReceiveContentLengthForResource(uint64_t frameID, uint64_t resourceIdentifier, uint64_t contentLength)
     DidFinishLoadForResource(uint64_t frameID, uint64_t resourceIdentifier)
     DidFailLoadForResource(uint64_t frameID, uint64_t resourceIdentifier, WebCore::ResourceError error)
+#if PLATFORM(QT)
+    ResolveApplicationSchemeRequest(WebKit::QtNetworkRequestData request)
+#endif
+
 
     # Custom representations
     DidFinishLoadingDataForCustomRepresentation(WTF::String suggestedFilename, CoreIPC::DataReference data)
@@ -197,6 +201,7 @@ messages -> WebPageProxy {
     
     # Notification messages
     RequestNotificationPermission(uint64_t requestID, WTF::String originIdentifier)
+    ShowNotification(WTF::String title, WTF::String body, WTF::String originIdentifier, uint64_t notificationID)
 
     # Spelling and grammar messages
 #if USE(UNIFIED_TEXT_CHECKING)  

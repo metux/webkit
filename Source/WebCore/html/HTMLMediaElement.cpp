@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,6 +56,7 @@
 #include "MediaControls.h"
 #include "MediaDocument.h"
 #include "MediaError.h"
+#include "MediaFragmentURIParser.h"
 #include "MediaList.h"
 #include "MediaPlayer.h"
 #include "MediaQueryEvaluator.h"
@@ -205,6 +206,8 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document* docum
     , m_cachedTime(invalidMediaTime)
     , m_cachedTimeWallClockUpdateTime(0)
     , m_minimumWallClockTimeToCacheMediaTime(0)
+    , m_fragmentStartTime(invalidMediaTime)
+    , m_fragmentEndTime(invalidMediaTime)
     , m_pendingLoadFlags(0)
     , m_playing(false)
     , m_isWaitingUntilMediaCanStart(false)
@@ -231,7 +234,9 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document* docum
     , m_parsingInProgress(createdByParser)
 #if ENABLE(VIDEO_TRACK)
     , m_tracksAreReady(true)
+    , m_haveVisibleTextTrack(false)
     , m_textTracks(0)
+    , m_ignoreTrackDisplayUpdate(0)
 #endif
 #if ENABLE(WEB_AUDIO)
     , m_audioSourceNode(0)
@@ -276,25 +281,29 @@ HTMLMediaElement::~HTMLMediaElement()
     removeElementFromDocumentMap(this, document());
 }
 
-void HTMLMediaElement::willMoveToNewOwnerDocument()
+void HTMLMediaElement::didMoveToNewDocument(Document* oldDocument)
 {
-    if (m_isWaitingUntilMediaCanStart)
-        document()->removeMediaCanStartListener(this);
-    setShouldDelayLoadEvent(false);
-    document()->unregisterForMediaVolumeCallbacks(this);
-    removeElementFromDocumentMap(this, document());
-    HTMLElement::willMoveToNewOwnerDocument();
-}
-
-void HTMLMediaElement::didMoveToNewOwnerDocument()
-{
-    if (m_isWaitingUntilMediaCanStart)
+    if (m_isWaitingUntilMediaCanStart) {
+        if (oldDocument)
+            oldDocument->removeMediaCanStartListener(this);
         document()->addMediaCanStartListener(this);
-    if (m_readyState < HAVE_CURRENT_DATA)
-        setShouldDelayLoadEvent(true);
+    }
+
+    if (m_shouldDelayLoadEvent) {
+        if (oldDocument)
+            oldDocument->decrementLoadEventDelayCount();
+        document()->incrementLoadEventDelayCount();
+    }
+
+    if (oldDocument) {
+        oldDocument->unregisterForMediaVolumeCallbacks(this);
+        removeElementFromDocumentMap(this, oldDocument);
+    }
+
     document()->registerForMediaVolumeCallbacks(this);
     addElementToDocumentMap(this, document());
-    HTMLElement::didMoveToNewOwnerDocument();
+
+    HTMLElement::didMoveToNewDocument(oldDocument);
 }
 
 bool HTMLMediaElement::supportsFocus() const
@@ -317,6 +326,10 @@ void HTMLMediaElement::attributeChanged(Attribute* attr, bool preserveDecls)
             scheduleLoad(MediaResource);
     } else if (attrName == controlsAttr)
         configureMediaControls();
+#if PLATFORM(MAC)
+    else if (attrName == loopAttr)
+        updateDisableSleep();
+#endif
 }
 
 void HTMLMediaElement::parseMappedAttribute(Attribute* attr)
@@ -940,23 +953,34 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
 #if ENABLE(VIDEO_TRACK)
 void HTMLMediaElement::updateActiveTextTrackCues(float movieTime)
 {
-    Vector<CueIntervalTree::IntervalType> previouslyVisibleCues = m_currentlyVisibleCues;
+    if (ignoreTrackDisplayUpdateRequests())
+        return;
+    
+    CueList previouslyActiveCues = m_currentlyActiveCues;
+    bool activeSetChanged = false;
 
-    m_currentlyVisibleCues = m_cueTree.allOverlaps(m_cueTree.createInterval(movieTime, movieTime));
+    m_currentlyActiveCues = m_cueTree.allOverlaps(m_cueTree.createInterval(movieTime, movieTime));
     
     // FIXME(72171): Events need to be sorted and filtered before dispatching.
 
-    for (size_t i = 0; i < previouslyVisibleCues.size(); ++i) {
-        if (!m_currentlyVisibleCues.contains(previouslyVisibleCues[i]))
-            previouslyVisibleCues[i].data()->setIsActive(false);
+    for (size_t i = 0; i < previouslyActiveCues.size(); ++i) {
+        if (!m_currentlyActiveCues.contains(previouslyActiveCues[i])) {
+            previouslyActiveCues[i].data()->setIsActive(false);
+            activeSetChanged = true;
+        }
     }
-    for (size_t i = 0; i < m_currentlyVisibleCues.size(); ++i) {
-        if (!previouslyVisibleCues.contains(m_currentlyVisibleCues[i]))
-            m_currentlyVisibleCues[i].data()->setIsActive(true);
+    for (size_t i = 0; i < m_currentlyActiveCues.size(); ++i) {
+        if (!previouslyActiveCues.contains(m_currentlyActiveCues[i])) {
+            m_currentlyActiveCues[i].data()->setIsActive(true);
+            activeSetChanged = true;
+        }
     }
     
     // FIXME(72173): Pause the media element for cues going past their endTime
     // during a monotonic time increase.
+
+    if (activeSetChanged && hasMediaControls())
+        mediaControls()->updateTextTrackDisplay();
 }
 
 bool HTMLMediaElement::textTracksAreReady() const
@@ -982,29 +1006,29 @@ void HTMLMediaElement::textTrackReadyStateChanged(TextTrack* track)
 
 void HTMLMediaElement::textTrackModeChanged(TextTrack* track)
 {
-    // 4.8.10.12.3 Sourcing out-of-band text tracks
-    // ... when a text track corresponding to a track element is created with text track
-    // mode set to disabled and subsequently changes its text track mode to hidden, showing,
-    // or showing by default for the first time, the user agent must immediately and synchronously
-    // run the following algorithm ...
-    
-    if (track->trackType() != TextTrack::TrackElement)
-        return;
-    
-    HTMLTrackElement* trackElement;
-    for (Node* node = firstChild(); node; node = node->nextSibling()) {
-        if (!node->hasTagName(trackTag))
-            continue;
-        trackElement = static_cast<HTMLTrackElement*>(node);
-        if (trackElement->track() != track)
-            continue;
+    if (track->trackType() == TextTrack::TrackElement) {
+        // 4.8.10.12.3 Sourcing out-of-band text tracks
+        // ... when a text track corresponding to a track element is created with text track
+        // mode set to disabled and subsequently changes its text track mode to hidden, showing,
+        // or showing by default for the first time, the user agent must immediately and synchronously
+        // run the following algorithm ...
 
-        // Mark this track as "configured" so configureTextTrack won't change the mode again.
-        trackElement->setHasBeenConfigured(true);
-        if (track->mode() != TextTrack::DISABLED && trackElement->readyState() == HTMLTrackElement::NONE)
-            trackElement->scheduleLoad();
-        break;
+        for (Node* node = firstChild(); node; node = node->nextSibling()) {
+            if (!node->hasTagName(trackTag))
+                continue;
+            HTMLTrackElement* trackElement = static_cast<HTMLTrackElement*>(node);
+            if (trackElement->track() != track)
+                continue;
+            
+            // Mark this track as "configured" so configureTextTrack won't change the mode again.
+            trackElement->setHasBeenConfigured(true);
+            if (track->mode() != TextTrack::DISABLED && trackElement->readyState() == HTMLTrackElement::NONE)
+                trackElement->scheduleLoad();
+            break;
+        }
     }
+
+    configureTextTrackDisplay();
 }
 
 void HTMLMediaElement::textTrackKindChanged(TextTrack*)
@@ -1014,24 +1038,32 @@ void HTMLMediaElement::textTrackKindChanged(TextTrack*)
 
 void HTMLMediaElement::textTrackAddCues(TextTrack*, const TextTrackCueList* cues) 
 {
+    beginIgnoringTrackDisplayUpdateRequests();
     for (size_t i = 0; i < cues->length(); ++i)
         textTrackAddCue(cues->item(i)->track(), cues->item(i));
+    endIgnoringTrackDisplayUpdateRequests();
+    updateActiveTextTrackCues(currentTime());
 }
 
 void HTMLMediaElement::textTrackRemoveCues(TextTrack*, const TextTrackCueList* cues) 
 {
+    beginIgnoringTrackDisplayUpdateRequests();
     for (size_t i = 0; i < cues->length(); ++i)
         textTrackRemoveCue(cues->item(i)->track(), cues->item(i));
+    endIgnoringTrackDisplayUpdateRequests();
+    updateActiveTextTrackCues(currentTime());
 }
 
 void HTMLMediaElement::textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue> cue)
 {
     m_cueTree.add(m_cueTree.createInterval(cue->startTime(), cue->endTime(), cue.get()));
+    updateActiveTextTrackCues(currentTime());
 }
 
 void HTMLMediaElement::textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue> cue)
 {
     m_cueTree.remove(m_cueTree.createInterval(cue->startTime(), cue->endTime(), cue.get()));
+    updateActiveTextTrackCues(currentTime());
 }
 
 #endif
@@ -1242,6 +1274,9 @@ void HTMLMediaElement::setNetworkState(MediaPlayer::NetworkState state)
     if (state == MediaPlayer::Idle) {
         if (m_networkState > NETWORK_IDLE) {
             m_progressEventTimer.stop();
+            if (hasMediaControls() && m_player->bytesLoaded() != m_previousProgress)
+                mediaControls()->bufferingProgressed();
+
             scheduleEvent(eventNames().suspendEvent);
             setShouldDelayLoadEvent(false);
         }
@@ -1257,6 +1292,8 @@ void HTMLMediaElement::setNetworkState(MediaPlayer::NetworkState state)
     if (state == MediaPlayer::Loaded) {
         if (m_networkState != NETWORK_IDLE) {
             m_progressEventTimer.stop();
+            if (hasMediaControls() && m_player->bytesLoaded() != m_previousProgress)
+                mediaControls()->bufferingProgressed();
 
             // Schedule one last progress event so we guarantee that at least one is fired
             // for files that load very quickly.
@@ -1325,6 +1362,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
     }
 
     if (m_readyState >= HAVE_METADATA && oldState < HAVE_METADATA && tracksAreReady) {
+        prepareMediaFragmentURI();
         scheduleEvent(eventNames().durationchangeEvent);
         scheduleEvent(eventNames().loadedmetadataEvent);
         if (hasMediaControls())
@@ -1340,6 +1378,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
         shouldUpdateDisplayState = true;
         scheduleEvent(eventNames().loadeddataEvent);
         setShouldDelayLoadEvent(false);
+        applyMediaFragmentURI();
     }
 
     bool isPotentiallyPlaying = potentiallyPlaying();
@@ -1359,7 +1398,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
         if (isPotentiallyPlaying && oldState <= HAVE_CURRENT_DATA)
             scheduleEvent(eventNames().playingEvent);
 
-        if (m_autoplaying && m_paused && autoplay()) {
+        if (m_autoplaying && m_paused && autoplay() && !document()->isSandboxed(SandboxAutomaticFeatures)) {
             m_paused = false;
             invalidateCachedTime();
             scheduleEvent(eventNames().playEvent);
@@ -1418,6 +1457,8 @@ void HTMLMediaElement::progressEventTimerFired(Timer<HTMLMediaElement>*)
         m_sentStalledEvent = false;
         if (renderer())
             renderer()->updateFromElement();
+        if (hasMediaControls())
+            mediaControls()->bufferingProgressed();
     }
 }
 
@@ -1692,8 +1733,12 @@ float HTMLMediaElement::startTime() const
 
 double HTMLMediaElement::initialTime() const
 {
+    if (m_fragmentStartTime != invalidMediaTime)
+        return m_fragmentStartTime;
+
     if (!m_player)
         return 0;
+
     return m_player->initialTime();
 }
 
@@ -1972,6 +2017,9 @@ void HTMLMediaElement::setLoop(bool b)
 {
     LOG(Media, "HTMLMediaElement::setLoop(%s)", boolString(b));
     setBooleanAttribute(loopAttr, b);
+#if PLATFORM(MAC)
+    updateDisableSleep();
+#endif
 }
 
 bool HTMLMediaElement::controls() const
@@ -2102,13 +2150,22 @@ void HTMLMediaElement::startPlaybackProgressTimer()
 void HTMLMediaElement::playbackProgressTimerFired(Timer<HTMLMediaElement>*)
 {
     ASSERT(m_player);
+
+    if (m_fragmentEndTime != invalidMediaTime && currentTime() >= m_fragmentEndTime && m_playbackRate > 0) {
+        m_fragmentEndTime = invalidMediaTime;
+        if (!m_mediaController && !m_paused) {
+            // changes paused to true and fires a simple event named pause at the media element.
+            pauseInternal();
+        }
+    }
+    
+    scheduleTimeupdateEvent(true);
+
     if (!m_playbackRate)
         return;
 
-    scheduleTimeupdateEvent(true);
-    if (hasMediaControls())
+    if (!m_paused && hasMediaControls())
         mediaControls()->playbackProgressed();
-    // FIXME: deal with cue ranges here
     
 #if ENABLE(VIDEO_TRACK)
     updateActiveTextTrackCues(currentTime());
@@ -2289,10 +2346,10 @@ bool HTMLMediaElement::userIsInterestedInThisTrack(HTMLTrackElement* trackElemen
 
     // If ... the user has indicated an interest in having a track with this text track kind, text track language, ... 
     Settings* settings = document()->settings();
+    if (!settings)
+        return false;
 
     if (kind == TextTrack::subtitlesKeyword() || kind == TextTrack::captionsKeyword()) {
-        if (!settings)
-            return false;
         if (kind == TextTrack::subtitlesKeyword() && !settings->shouldDisplaySubtitles())
             return false;
         if (kind == TextTrack::captionsKeyword() && !settings->shouldDisplayCaptions())
@@ -2301,7 +2358,7 @@ bool HTMLMediaElement::userIsInterestedInThisTrack(HTMLTrackElement* trackElemen
     }
 
     if (kind == TextTrack::descriptionsKeyword()) {
-        if (!settings || !settings->shouldDisplayTextDescriptions())
+        if (!settings->shouldDisplayTextDescriptions())
             return false;
         return userIsInterestedInThisLanguage(trackElement->srclang());
     }
@@ -2694,10 +2751,7 @@ void HTMLMediaElement::mediaPlayerRateChanged(MediaPlayer*)
         invalidateCachedTime();
 
 #if PLATFORM(MAC)
-    if (m_player->paused() && m_sleepDisabler)
-        m_sleepDisabler = nullptr;
-    else if (!m_player->paused() && !m_sleepDisabler)
-        m_sleepDisabler = DisplaySleepDisabler::create("com.apple.WebCore: HTMLMediaElement playback");
+    updateDisableSleep();
 #endif
 
     endProcessingMediaPlayerCallback();
@@ -3452,6 +3506,9 @@ bool HTMLMediaElement::createMediaControls()
         return false;
 
     controls->setMediaController(m_mediaController ? m_mediaController.get() : static_cast<MediaControllerInterface*>(this));
+    controls->reset();
+    if (isFullscreen())
+        controls->enteredFullscreen();
 
     ensureShadowRoot()->appendChild(controls, ec);
     return true;
@@ -3466,17 +3523,40 @@ void HTMLMediaElement::configureMediaControls()
         return;
     }
 
-    if (!hasMediaControls()) {
-        if (!createMediaControls())
-            return;
-        mediaControls()->reset();
-    }
+    if (!hasMediaControls() && !createMediaControls())
+        return;
+
     mediaControls()->show();
 #else
     if (m_player)
         m_player->setControls(controls());
 #endif
 }
+
+#if ENABLE(VIDEO_TRACK)
+void HTMLMediaElement::configureTextTrackDisplay()
+{
+    ASSERT(m_textTracks);
+
+    bool haveVisibleTextTrack = false;
+    for (unsigned i = 0; i < m_textTracks->length(); ++i) {
+        if (m_textTracks->item(i)->mode() == TextTrack::SHOWING) {
+            haveVisibleTextTrack = true;
+            break;
+        }
+    }
+
+    if (m_haveVisibleTextTrack == haveVisibleTextTrack)
+        return;
+    m_haveVisibleTextTrack = haveVisibleTextTrack;
+
+    if (!m_haveVisibleTextTrack && !hasMediaControls())
+        return;
+    if (!hasMediaControls() && !createMediaControls())
+        return;
+    mediaControls()->updateTextTrackDisplay();
+}
+#endif
 
 void* HTMLMediaElement::preDispatchEventHandler(Event* event)
 {
@@ -3589,11 +3669,11 @@ void HTMLMediaElement::setController(PassRefPtr<MediaController> controller)
 
     m_mediaController = controller;
 
-    if (hasMediaControls())
-        mediaControls()->setMediaController(m_mediaController ? m_mediaController.get() : static_cast<MediaControllerInterface*>(this));
-
     if (m_mediaController)
         m_mediaController->addMediaElement(this);
+
+    if (hasMediaControls())
+        mediaControls()->setMediaController(m_mediaController ? m_mediaController.get() : static_cast<MediaControllerInterface*>(this));
 }
 
 void HTMLMediaElement::updateMediaController()
@@ -3632,6 +3712,55 @@ bool HTMLMediaElement::isBlockedOnMediaController() const
 
     return false;
 }
+
+void HTMLMediaElement::prepareMediaFragmentURI()
+{
+    MediaFragmentURIParser fragmentParser(m_currentSrc);
+    float dur = duration();
+    
+    double start = fragmentParser.startTime();
+    if (start != MediaFragmentURIParser::invalidTimeValue() && start > 0) {
+        m_fragmentStartTime = start;
+        if (m_fragmentStartTime > dur)
+            m_fragmentStartTime = dur;
+    } else
+        m_fragmentStartTime = invalidMediaTime;
+    
+    double end = fragmentParser.endTime();
+    if (end != MediaFragmentURIParser::invalidTimeValue() && end > 0 && end > m_fragmentStartTime) {
+        m_fragmentEndTime = end;
+        if (m_fragmentEndTime > dur)
+            m_fragmentEndTime = dur;
+    } else
+        m_fragmentEndTime = invalidMediaTime;
+    
+    if (m_fragmentStartTime != invalidMediaTime && m_readyState < HAVE_FUTURE_DATA)
+        prepareToPlay();
+}
+
+void HTMLMediaElement::applyMediaFragmentURI()
+{
+    if (m_fragmentStartTime != invalidMediaTime) {
+        ExceptionCode ignoredException;
+        m_sentEndEvent = false;
+        seek(m_fragmentStartTime, ignoredException);
+    }
+}
+
+#if PLATFORM(MAC)
+void HTMLMediaElement::updateDisableSleep()
+{
+    if (!shouldDisableSleep() && m_sleepDisabler)
+        m_sleepDisabler = nullptr;
+    else if (shouldDisableSleep() && !m_sleepDisabler)
+        m_sleepDisabler = DisplaySleepDisabler::create("com.apple.WebCore: HTMLMediaElement playback");
+}
+
+bool HTMLMediaElement::shouldDisableSleep() const
+{
+    return m_player && !m_player->paused() && hasVideo() && hasAudio() && !loop();
+}
+#endif
 
 }
 

@@ -40,6 +40,9 @@ class RenderPart;
 #if ENABLE(VIDEO)
 class RenderVideo;
 #endif
+#if ENABLE(THREADED_SCROLLING)
+class ScrollingCoordinator;
+#endif
 
 enum CompositingUpdateType {
     CompositingUpdateAfterLayoutOrStyleChange,
@@ -204,7 +207,7 @@ public:
     GraphicsLayer* layerForHorizontalScrollbar() const { return m_layerForHorizontalScrollbar.get(); }
     GraphicsLayer* layerForVerticalScrollbar() const { return m_layerForVerticalScrollbar.get(); }
     GraphicsLayer* layerForScrollCorner() const { return m_layerForScrollCorner.get(); }
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     GraphicsLayer* layerForOverhangAreas() const { return m_layerForOverhangAreas.get(); }
 #endif
 
@@ -245,7 +248,7 @@ private:
     void computeCompositingRequirements(RenderLayer*, OverlapMap*, struct CompositingState&, bool& layersChanged);
     
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
-    void rebuildCompositingLayerTree(RenderLayer* layer, const struct CompositingState&, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer);
+    void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer);
 
     // Recurses down the tree, updating layer geometry only.
     void updateLayerTreeGeometry(RenderLayer*);
@@ -282,6 +285,7 @@ private:
     bool requiresCompositingForFrame(RenderObject*) const;
     bool requiresCompositingWhenDescendantsAreCompositing(RenderObject*) const;
     bool requiresCompositingForFullScreen(RenderObject*) const;
+    bool requiresCompositingForFilters(RenderObject*) const;
     bool requiresCompositingForScrollableFrame() const;
     bool requiresCompositingForPosition(RenderObject*, const RenderLayer*) const;
 
@@ -289,8 +293,12 @@ private:
     bool requiresHorizontalScrollbarLayer() const;
     bool requiresVerticalScrollbarLayer() const;
     bool requiresScrollCornerLayer() const;
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     bool requiresOverhangAreasLayer() const;
+#endif
+
+#if ENABLE(THREADED_SCROLLING)
+    ScrollingCoordinator* scrollingCoordinator() const;
 #endif
 
 private:
@@ -331,7 +339,7 @@ private:
     OwnPtr<GraphicsLayer> m_layerForHorizontalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForVerticalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForScrollCorner;
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     OwnPtr<GraphicsLayer> m_layerForOverhangAreas;
 #endif
 #if PROFILE_LAYER_REBUILD

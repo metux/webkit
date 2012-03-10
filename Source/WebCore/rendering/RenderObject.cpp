@@ -38,6 +38,7 @@
 #include "Frame.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
+#include "HTMLElement.h"
 #include "HTMLNames.h"
 #include "HitTestResult.h"
 #include "Page.h"
@@ -54,6 +55,7 @@
 #include "RenderRegion.h"
 #include "RenderRuby.h"
 #include "RenderRubyText.h"
+#include "RenderTableCaption.h"
 #include "RenderTableCell.h"
 #include "RenderTableCol.h"
 #include "RenderTableRow.h"
@@ -98,7 +100,7 @@ COMPILE_ASSERT(sizeof(RenderObject) == sizeof(SameSizeAsRenderObject), RenderObj
 
 bool RenderObject::s_affectsParentBlock = false;
 
-void* RenderObject::operator new(size_t sz, RenderArena* renderArena) throw()
+void* RenderObject::operator new(size_t sz, RenderArena* renderArena)
 {
     return renderArena->allocate(sz);
 }
@@ -176,7 +178,7 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case TABLE_CELL:
         return new (arena) RenderTableCell(node);
     case TABLE_CAPTION:
-        return new (arena) RenderBlock(node);
+        return new (arena) RenderTableCaption(node);
     case BOX:
     case INLINE_BOX:
         return new (arena) RenderDeprecatedFlexibleBox(node);
@@ -286,7 +288,7 @@ void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
 
     if (newChild->isTableCol() && newChild->style()->display() == TABLE_COLUMN_GROUP)
         needsTable = !isTable();
-    else if (newChild->isRenderBlock() && newChild->style()->display() == TABLE_CAPTION)
+    else if (newChild->isTableCaption())
         needsTable = !isTable();
     else if (newChild->isTableSection())
         needsTable = !isTable();
@@ -624,7 +626,7 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
         RenderObject* container = object->container();
         if (!container && !object->isRenderView())
             return;
-        if (!last->isText() && (last->style()->position() == FixedPosition || last->style()->position() == AbsolutePosition)) {
+        if (!last->isText() && last->style()->isPositioned()) {
             bool willSkipRelativelyPositionedInlines = !object->isRenderBlock();
             while (object && !object->isRenderBlock()) // Skip relatively positioned inlines and get to the enclosing RenderBlock.
                 object = object->container();
@@ -664,7 +666,7 @@ void RenderObject::setPreferredLogicalWidthsDirty(bool b, bool markParents)
 {
     bool alreadyDirty = preferredLogicalWidthsDirty();
     m_bitfields.setPreferredLogicalWidthsDirty(b);
-    if (b && !alreadyDirty && markParents && (isText() || (style()->position() != FixedPosition && style()->position() != AbsolutePosition)))
+    if (b && !alreadyDirty && markParents && (isText() || !style()->isPositioned()))
         invalidateContainerPreferredLogicalWidths();
 }
 
@@ -681,7 +683,7 @@ void RenderObject::invalidateContainerPreferredLogicalWidths()
             break;
 
         o->m_bitfields.setPreferredLogicalWidthsDirty(true);
-        if (o->style()->position() == FixedPosition || o->style()->position() == AbsolutePosition)
+        if (o->style()->isPositioned())
             // A positioned object has no effect on the min/max width of its containing block ever.
             // We can optimize this case and not go up any further.
             break;
@@ -709,13 +711,17 @@ RenderBlock* RenderObject::containingBlock() const
             o = o->parent();
     } else if (!isText() && m_style->position() == AbsolutePosition) {
         while (o && (o->style()->position() == StaticPosition || (o->isInline() && !o->isReplaced())) && !o->isRenderView() && !(o->hasTransform() && o->isRenderBlock())) {
-            // For relpositioned inlines, we return the nearest enclosing block.  We don't try
+            // For relpositioned inlines, we return the nearest non-anonymous enclosing block. We don't try
             // to return the inline itself.  This allows us to avoid having a positioned objects
             // list in all RenderInlines and lets us return a strongly-typed RenderBlock* result
             // from this method.  The container() method can actually be used to obtain the
             // inline directly.
-            if (o->style()->position() == RelativePosition && o->isInline() && !o->isReplaced())
-                return o->containingBlock();
+            if (o->style()->position() == RelativePosition && o->isInline() && !o->isReplaced()) {
+                RenderBlock* relPositionedInlineContainingBlock = o->containingBlock();
+                while (relPositionedInlineContainingBlock->isAnonymousBlock())
+                    relPositionedInlineContainingBlock = relPositionedInlineContainingBlock->containingBlock();
+                return relPositionedInlineContainingBlock;
+            }
 #if ENABLE(SVG)
             if (o->isSVGForeignObject()) //foreignObject is the containing block for contents inside it
                 break;
@@ -2135,6 +2141,23 @@ bool RenderObject::isRooted(RenderView** view)
     return true;
 }
 
+RenderObject* RenderObject::rendererForRootBackground()
+{
+    ASSERT(isRoot());
+    if (!hasBackground() && node() && node()->hasTagName(HTMLNames::htmlTag)) {
+        // Locate the <body> element using the DOM. This is easier than trying
+        // to crawl around a render tree with potential :before/:after content and
+        // anonymous blocks created by inline <body> tags etc. We can locate the <body>
+        // render object very easily via the DOM.
+        HTMLElement* body = document()->body();
+        RenderObject* bodyObject = (body && body->hasLocalName(bodyTag)) ? body->renderer() : 0;
+        if (bodyObject)
+            return bodyObject;
+    }
+    
+    return this;
+}
+
 bool RenderObject::hasOutlineAnnotation() const
 {
     return node() && node()->isLink() && document()->printing();
@@ -2478,6 +2501,8 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
                 linethrough = decorationColor(curr);
             }
         }
+        if (curr->isFloating() || curr->isPositioned())
+            return;
         curr = curr->parent();
         if (curr && curr->isAnonymousBlock() && toRenderBlock(curr)->continuation())
             curr = toRenderBlock(curr)->continuation();

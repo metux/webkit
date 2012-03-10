@@ -31,6 +31,8 @@ namespace WebCore {
 class Color;
 class CSSMutableStyleDeclaration;
 class CSSPrimitiveValue;
+class CSSValueList;
+class CSSValuePool;
 class Node;
 class RenderStyle;
 class ShadowData;
@@ -84,6 +86,9 @@ private:
 #if ENABLE(CSS_FILTERS)
     PassRefPtr<CSSValue> valueForFilter(RenderStyle*) const;
 #endif
+
+    PassRefPtr<CSSValueList> getCSSPropertyValuesForShorthandProperties(const int* properties, size_t) const;
+    PassRefPtr<CSSValueList> getCSSPropertyValuesForSidesShorthand(const int* properties) const;
 
     RefPtr<Node> m_node;
     PseudoId m_pseudoElementSpecifier;

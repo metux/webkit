@@ -949,7 +949,7 @@ void WebProcess::garbageCollectJavaScriptObjects()
 }
 
 #if ENABLE(PLUGIN_PROCESS)
-void WebProcess::pluginProcessCrashed(const String& pluginPath)
+void WebProcess::pluginProcessCrashed(CoreIPC::Connection*, const String& pluginPath)
 {
     m_pluginProcessConnectionManager.pluginProcessCrashed(pluginPath);
 }
@@ -960,7 +960,8 @@ void WebProcess::downloadRequest(uint64_t downloadID, uint64_t initiatingPageID,
     WebPage* initiatingPage = initiatingPageID ? webPage(initiatingPageID) : 0;
 
     ResourceRequest requestWithOriginalURL = request;
-    initiatingPage->mainFrame()->loader()->setOriginalURLForDownloadRequest(requestWithOriginalURL);
+    if (initiatingPage)
+        initiatingPage->mainFrame()->loader()->setOriginalURLForDownloadRequest(requestWithOriginalURL);
 
     DownloadManager::shared().startDownload(downloadID, initiatingPage, requestWithOriginalURL);
 }

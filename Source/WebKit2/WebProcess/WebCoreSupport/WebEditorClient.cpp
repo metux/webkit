@@ -35,7 +35,6 @@
 #include "WebProcess.h"
 #include <WebCore/ArchiveResource.h>
 #include <WebCore/DocumentFragment.h>
-#include <WebCore/EditCommand.h>
 #include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
@@ -46,6 +45,7 @@
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/TextIterator.h>
+#include <WebCore/UndoStep.h>
 #include <WebCore/UserTypingGestureIndicator.h>
 
 using namespace WebCore;
@@ -186,8 +186,9 @@ void WebEditorClient::respondToChangedSelection(Frame* frame)
     EditorState state = m_page->editorState();
 
 #if PLATFORM(QT)
-    if (Element* scope = frame->selection()->rootEditableElement())
-        m_page->send(Messages::WebPageProxy::FocusEditableArea(state.microFocus, scope->getRect()));
+    // FIXME: Move this to act on the vkb visibility change.
+    if (state.isContentEditable)
+        m_page->send(Messages::WebPageProxy::FocusEditableArea(state.cursorRect, state.editorRect));
 #endif
 
     m_page->send(Messages::WebPageProxy::EditorStateChanged(state));
@@ -220,21 +221,21 @@ void WebEditorClient::didSetSelectionTypesForPasteboard()
     notImplemented();
 }
 
-void WebEditorClient::registerCommandForUndo(PassRefPtr<EditCommand> command)
+void WebEditorClient::registerUndoStep(PassRefPtr<UndoStep> step)
 {
     // FIXME: Add assertion that the command being reapplied is the same command that is
     // being passed to us.
     if (m_page->isInRedo())
         return;
 
-    RefPtr<WebEditCommand> webCommand = WebEditCommand::create(command);
-    m_page->addWebEditCommand(webCommand->commandID(), webCommand.get());
-    uint32_t editAction = static_cast<uint32_t>(webCommand->command()->editingAction());
+    RefPtr<WebUndoStep> webStep = WebUndoStep::create(step);
+    m_page->addWebUndoStep(webStep->stepID(), webStep.get());
+    uint32_t editAction = static_cast<uint32_t>(webStep->step()->editingAction());
 
-    m_page->send(Messages::WebPageProxy::RegisterEditCommandForUndo(webCommand->commandID(), editAction));
+    m_page->send(Messages::WebPageProxy::RegisterEditCommandForUndo(webStep->stepID(), editAction));
 }
 
-void WebEditorClient::registerCommandForRedo(PassRefPtr<EditCommand>)
+void WebEditorClient::registerRedoStep(PassRefPtr<UndoStep>)
 {
 }
 
@@ -279,7 +280,7 @@ void WebEditorClient::redo()
     m_page->sendSync(Messages::WebPageProxy::ExecuteUndoRedo(static_cast<uint32_t>(WebPageProxy::Redo)), Messages::WebPageProxy::ExecuteUndoRedo::Reply(result));
 }
 
-#if !PLATFORM(GTK) && !PLATFORM(MAC)
+#if !PLATFORM(GTK) && !PLATFORM(MAC) && !PLATFORM(EFL)
 void WebEditorClient::handleKeyboardEvent(KeyboardEvent* event)
 {
     if (m_page->handleEditingKeyboardEvent(event))

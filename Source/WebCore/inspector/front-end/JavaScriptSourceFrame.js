@@ -37,13 +37,14 @@
  */
 WebInspector.JavaScriptSourceFrame = function(scriptsPanel, model, uiSourceCode)
 {
-    WebInspector.SourceFrame.call(this, uiSourceCode.url);
-
     this._scriptsPanel = scriptsPanel;
     this._model = model;
     this._uiSourceCode = uiSourceCode;
     this._popoverObjectGroup = "popover";
     this._breakpoints = {};
+
+    WebInspector.SourceFrame.call(this, uiSourceCode.url);
+
     this._popoverHelper = new WebInspector.ObjectPopoverHelper(this.textViewer.element,
             this._getPopoverAnchor.bind(this), this._onShowPopover.bind(this), this._onHidePopover.bind(this), true);
 
@@ -53,6 +54,11 @@ WebInspector.JavaScriptSourceFrame = function(scriptsPanel, model, uiSourceCode)
 }
 
 WebInspector.JavaScriptSourceFrame.prototype = {
+    get uiSourceCode()
+    {
+        return this._uiSourceCode;
+    },
+
     // View events
     willHide: function()
     {
@@ -73,7 +79,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
     suggestedFileName: function()
     {
-        return this._uiSourceCode.displayName || "untitled.js";
+        return this._uiSourceCode.fileName || "untitled.js";
     },
 
     editContent: function(newContent, callback)
@@ -90,7 +96,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
     setReadOnly: function(readOnly)
     {
-        if (!readOnly)
+        if (this._popoverHelper && !readOnly)
             this._popoverHelper.hidePopover();
         WebInspector.SourceFrame.prototype.setReadOnly.call(this, readOnly);
         if (readOnly)
@@ -147,12 +153,12 @@ WebInspector.JavaScriptSourceFrame.prototype = {
     {
         WebInspector.SourceFrame.prototype.populateTextAreaContextMenu.call(this, contextMenu, lineNumber);
         var selection = window.getSelection();
-        if (selection.type !== "Range" || selection.isCollapsed)
-            return;
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Add to watch" : "Add to Watch"),
-                this._scriptsPanel.addToWatch.bind(this._scriptsPanel, selection.toString()));
-
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Evaluate in console" : "Evaluate in Console"), WebInspector.evaluateInConsole.bind(WebInspector, selection.toString()));
+        if (selection.type === "Range" && !selection.isCollapsed) {
+            var addToWatchLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Add to watch" : "Add to Watch");
+            contextMenu.appendItem(addToWatchLabel, this._scriptsPanel.addToWatch.bind(this._scriptsPanel, selection.toString()));
+            var evaluateLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Evaluate in console" : "Evaluate in Console");
+            contextMenu.appendItem(evaluateLabel, WebInspector.evaluateInConsole.bind(WebInspector, selection.toString()));
+        }
     },
 
     afterTextChanged: function(oldRange, newRange)
@@ -197,10 +203,13 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
     cancelEditing: function()
     {
+        if (WebInspector.experimentsSettings.sourceFrameAlwaysEditable.isEnabled())
+            return false;
+
         WebInspector.SourceFrame.prototype.cancelEditing.call(this);
-        
+
         if (!this._javaScriptSourceFrameState)
-            return;
+            return true;
 
         if (typeof this._javaScriptSourceFrameState.executionLineNumber === "number") {
             this.clearExecutionLine();
@@ -220,6 +229,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
         }
 
         delete this._javaScriptSourceFrameState;
+        return true;
     },
 
     didEditContent: function(error)

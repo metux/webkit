@@ -192,7 +192,6 @@ Settings::Settings(Page* page)
     , m_privilegedWebGLExtensionsEnabled(false)
     , m_webAudioEnabled(false)
     , m_acceleratedCanvas2dEnabled(false)
-    , m_legacyAcceleratedCanvas2dEnabled(false)
     , m_loadDeferringEnabled(true)
     , m_tiledBackingStoreEnabled(false)
     , m_paginateDuringLayoutEnabled(false)
@@ -243,6 +242,11 @@ Settings::Settings(Page* page)
     // hash before trying to use it.
     AtomicString::init();
 }
+
+PassOwnPtr<Settings> Settings::create(Page* page)
+{
+    return adoptPtr(new Settings(page));
+} 
 
 const AtomicString& Settings::standardFontFamily(UScriptCode script) const
 {
@@ -803,11 +807,6 @@ void Settings::setPrivilegedWebGLExtensionsEnabled(bool enabled)
 void Settings::setAccelerated2dCanvasEnabled(bool enabled)
 {
     m_acceleratedCanvas2dEnabled = enabled;
-}
-
-void Settings::setLegacyAccelerated2dCanvasEnabled(bool enabled)
-{
-    m_legacyAcceleratedCanvas2dEnabled = enabled;
 }
 
 void Settings::setMinimumAccelerated2dCanvasSize(int numPixels)

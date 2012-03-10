@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  *
@@ -90,6 +90,7 @@
 #include "TagNodeList.h"
 #include "Text.h"
 #include "TextEvent.h"
+#include "TreeScopeAdopter.h"
 #include "UIEvent.h"
 #include "UIEventWithKeyState.h"
 #include "WebKitAnimationEvent.h"
@@ -417,55 +418,30 @@ Node::~Node()
         doc->guardDeref();
 }
 
-#ifdef NDEBUG
-
-static inline void setWillMoveToNewOwnerDocumentWasCalled(bool)
-{
-}
-
-static inline void setDidMoveToNewOwnerDocumentWasCalled(bool)
-{
-}
-
-#else
-    
-static bool willMoveToNewOwnerDocumentWasCalled;
-static bool didMoveToNewOwnerDocumentWasCalled;
-
-static void setWillMoveToNewOwnerDocumentWasCalled(bool wasCalled)
-{
-    willMoveToNewOwnerDocumentWasCalled = wasCalled;
-}
-
-static void setDidMoveToNewOwnerDocumentWasCalled(bool wasCalled)
-{
-    didMoveToNewOwnerDocumentWasCalled = wasCalled;
-}
-    
-#endif
-    
 void Node::setDocument(Document* document)
 {
     ASSERT(!inDocument() || m_document == document);
     if (inDocument() || m_document == document)
         return;
 
-    document->guardRef();
+    m_document = document;
+}
 
-    setWillMoveToNewOwnerDocumentWasCalled(false);
-    willMoveToNewOwnerDocument();
-    ASSERT(willMoveToNewOwnerDocumentWasCalled);
+NodeRareData* Node::setTreeScope(TreeScope* scope)
+{
+    if (!scope) {
+        if (hasRareData()) {
+            NodeRareData* data = rareData();
+            data->setTreeScope(0);
+            return data;
+        }
 
-    if (m_document) {
-        m_document->moveNodeIteratorsToNewDocument(this, document);
-        m_document->guardDeref();
+        return 0;
     }
 
-    m_document = document;
-
-    setDidMoveToNewOwnerDocumentWasCalled(false);
-    didMoveToNewOwnerDocument();
-    ASSERT(didMoveToNewOwnerDocumentWasCalled);
+    NodeRareData* data = ensureRareData();
+    data->setTreeScope(scope);
+    return data;
 }
 
 TreeScope* Node::treeScope() const
@@ -475,53 +451,6 @@ TreeScope* Node::treeScope() const
         return m_document;
     TreeScope* scope = rareData()->treeScope();
     return scope ? scope : m_document;
-}
-
-void Node::setTreeScopeRecursively(TreeScope* newTreeScope, bool includeRoot)
-{
-    ASSERT(this);
-    ASSERT(!includeRoot || !isDocumentNode());
-    ASSERT(newTreeScope);
-    ASSERT(!m_deletionHasBegun);
-
-    TreeScope* currentTreeScope = treeScope();
-    if (currentTreeScope == newTreeScope)
-        return;
-
-    Document* currentDocument = document();
-    Document* newDocument = newTreeScope->document();
-    // If an element is moved from a document and then eventually back again the collection cache for
-    // that element may contain stale data as changes made to it will have updated the DOMTreeVersion
-    // of the document it was moved to. By increasing the DOMTreeVersion of the donating document here
-    // we ensure that the collection cache will be invalidated as needed when the element is moved back.
-    if (currentDocument && currentDocument != newDocument)
-        currentDocument->incDOMTreeVersion();
-
-    for (Node* node = includeRoot ? this : traverseNextNode(this); node; node = node->traverseNextNode(this)) {
-        if (newTreeScope == newDocument) {
-            if (node->hasRareData())
-                node->rareData()->setTreeScope(0);
-            // Setting the new document tree scope will be handled implicitly
-            // by setDocument() below.
-        } else
-            node->ensureRareData()->setTreeScope(newTreeScope);
-
-        if (node->hasRareData() && node->rareData()->nodeLists()) {
-            if (currentTreeScope)
-                currentTreeScope->removeNodeListCache();
-            newTreeScope->addNodeListCache();
-        }
-
-        node->setDocument(newDocument);
-
-        if (!node->isElementNode())
-            continue;
-        if (ShadowRoot* shadowRoot = toElement(node)->shadowRoot()) {
-            shadowRoot->setParentTreeScope(newTreeScope);
-            if (currentDocument != newDocument)
-                shadowRoot->setDocumentRecursively(newDocument);
-        }
-    }
 }
 
 NodeRareData* Node::rareData() const
@@ -806,6 +735,25 @@ bool Node::rendererIsEditable(EditableLevel editableLevel) const
     return false;
 }
 
+bool Node::isEditableToAccessibility(EditableLevel editableLevel) const
+{
+    if (rendererIsEditable(editableLevel))
+        return true;
+
+    // FIXME: Respect editableLevel for ARIA editable elements.
+    if (editableLevel == RichlyEditable)
+        return false;
+
+    ASSERT(document());
+    ASSERT(AXObjectCache::accessibilityEnabled());
+    ASSERT(document()->axObjectCacheExists());
+
+    if (document() && AXObjectCache::accessibilityEnabled() && document()->axObjectCacheExists())
+        return document()->axObjectCache()->rootAXEditableElement(this);
+
+    return false;
+}
+
 bool Node::shouldUseInputMethod()
 {
     return isContentEditable();
@@ -867,19 +815,6 @@ bool Node::hasNonEmptyBoundingBox() const
 inline static ShadowRoot* shadowRoot(Node* node)
 {
     return node->isElementNode() ? toElement(node)->shadowRoot() : 0;
-}
-
-void Node::setDocumentRecursively(Document* newDocument)
-{
-    ASSERT(document() != newDocument);
-
-    for (Node* node = this; node; node = node->traverseNextNode(this)) {
-        node->setDocument(newDocument);
-        if (!node->isElementNode())
-            continue;
-        if (ShadowRoot* shadow = shadowRoot(node))
-            shadow->setDocumentRecursively(newDocument);
-    }
 }
 
 inline void Node::setStyleChange(StyleChangeType changeType)
@@ -1020,13 +955,22 @@ void Node::unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
     removeNodeListCacheIfPossible(this, data);
 }
 
-void Node::invalidateNodeListsCacheAfterAttributeChanged()
+void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& attrName)
 {
     if (hasRareData() && isAttributeNode()) {
         NodeRareData* data = rareData();
         ASSERT(!data->nodeLists());
         data->clearChildNodeListCache();
     }
+
+    // This list should be sync'ed with NodeListsNodeData.
+    if (attrName != classAttr
+#if ENABLE(MICRODATA)
+        && attrName != itemscopeAttr
+        && attrName != itempropAttr
+#endif
+        && attrName != nameAttr)
+        return;
 
     if (!treeScope()->hasNodeListCaches())
         return;
@@ -1621,6 +1565,14 @@ Element *Node::enclosingBlockFlowElement() const
             return static_cast<Element *>(n);
     }
     return 0;
+}
+
+Element* Node::rootEditableElement(EditableType editableType) const
+{
+    if (editableType == HasEditableAXRole)
+        return const_cast<Element*>(document()->axObjectCache()->rootAXEditableElement(this));
+
+    return rootEditableElement();
 }
 
 Element* Node::rootEditableElement() const
@@ -2488,16 +2440,9 @@ void Node::removedFromDocument()
     clearInDocument();
 }
 
-void Node::willMoveToNewOwnerDocument()
+void Node::didMoveToNewDocument(Document* oldDocument)
 {
-    ASSERT(!willMoveToNewOwnerDocumentWasCalled);
-    setWillMoveToNewOwnerDocumentWasCalled(true);
-}
-
-void Node::didMoveToNewOwnerDocument()
-{
-    ASSERT(!didMoveToNewOwnerDocumentWasCalled);
-    setDidMoveToNewOwnerDocumentWasCalled(true);
+    TreeScopeAdopter::ensureDidMoveToNewDocumentWasCalled(oldDocument);
 
     // FIXME: Event listener types for this node should be set on the new owner document here.
 

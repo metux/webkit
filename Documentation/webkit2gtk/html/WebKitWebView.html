@@ -45,14 +45,11 @@
 </tr></table></div>
 <div class="refsynopsisdiv">
 <a name="WebKitWebView.synopsis"></a><h2>Synopsis</h2>
-<pre class="synopsis">                    <a class="link" href="WebKitWebView.html#WebKitWebView-struct" title="WebKitWebView">WebKitWebView</a>;
+<pre class="synopsis">struct              <a class="link" href="WebKitWebView.html#WebKitWebView-struct" title="struct WebKitWebView">WebKitWebView</a>;
+enum                <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent">WebKitLoadEvent</a>;
 <span class="returnvalue">GtkWidget</span> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new" title="webkit_web_view_new ()">webkit_web_view_new</a>                 (<em class="parameter"><code><span class="type">void</span></code></em>);
 <span class="returnvalue">GtkWidget</span> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()">webkit_web_view_new_with_context</a>    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
 <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *  <a class="link" href="WebKitWebView.html#webkit-web-view-get-context" title="webkit_web_view_get_context ()">webkit_web_view_get_context</a>         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="returnvalue">WebKitWebLoaderClient</span></a> * <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()">webkit_web_view_get_loader_client</a>
-                                                        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
-<span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-set-loader-client" title="webkit_web_view_set_loader_client ()">webkit_web_view_set_loader_client</a>   (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code><a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> *loader_client</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-uri" title="webkit_web_view_load_uri ()">webkit_web_view_load_uri</a>            (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-html" title="webkit_web_view_load_html ()">webkit_web_view_load_html</a>           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
@@ -60,12 +57,12 @@
                                                          <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-plain-text" title="webkit_web_view_load_plain_text ()">webkit_web_view_load_plain_text</a>     (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code>const <span class="type">gchar</span> *plain_text</code></em>);
-<span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-alternate-html" title="webkit_web_view_load_alternate_html ()">webkit_web_view_load_alternate_html</a> (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *unreachable_uri</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-request" title="webkit_web_view_load_request ()">webkit_web_view_load_request</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> *request</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-replace-content" title="webkit_web_view_replace_content ()">webkit_web_view_replace_content</a>     (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
+                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content_uri</code></em>,
+                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);
 <span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWebView.html#webkit-web-view-can-go-back" title="webkit_web_view_can_go_back ()">webkit_web_view_can_go_back</a>         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-go-back" title="webkit_web_view_go_back ()">webkit_web_view_go_back</a>             (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWebView.html#webkit-web-view-can-go-forward" title="webkit_web_view_can_go_forward ()">webkit_web_view_can_go_forward</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
@@ -90,6 +87,9 @@ const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKi
 <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="returnvalue">WebKitSettings</span></a> *    <a class="link" href="WebKitWebView.html#webkit-web-view-get-settings" title="webkit_web_view_get_settings ()">webkit_web_view_get_settings</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="returnvalue">WebKitWindowProperties</span></a> * <a class="link" href="WebKitWebView.html#webkit-web-view-get-window-properties" title="webkit_web_view_get_window_properties ()">webkit_web_view_get_window_properties</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-set-zoom-level" title="webkit_web_view_set_zoom_level ()">webkit_web_view_set_zoom_level</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><span class="type">gdouble</span> zoom_level</code></em>);
+<span class="returnvalue">gdouble</span>             <a class="link" href="WebKitWebView.html#webkit-web-view-get-zoom-level" title="webkit_web_view_get_zoom_level ()">webkit_web_view_get_zoom_level</a>      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -116,6 +116,7 @@ WebKitWebView implements
   "<a class="link" href="WebKitWebView.html#WebKitWebView--title" title='The "title" property'>title</a>"                    <span class="type">gchar</span>*                : Read
   "<a class="link" href="WebKitWebView.html#WebKitWebView--uri" title='The "uri" property'>uri</a>"                      <span class="type">gchar</span>*                : Read
   "<a class="link" href="WebKitWebView.html#WebKitWebView--web-context" title='The "web-context" property'>web-context</a>"              <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>*     : Read / Write / Construct Only
+  "<a class="link" href="WebKitWebView.html#WebKitWebView--zoom-level" title='The "zoom-level" property'>zoom-level</a>"               <span class="type">gdouble</span>               : Read / Write
 </pre>
 </div>
 <div class="refsect1">
@@ -123,6 +124,8 @@ WebKitWebView implements
 <pre class="synopsis">
   "<a class="link" href="WebKitWebView.html#WebKitWebView-close" title='The "close" signal'>close</a>"                                          : <code class="literal">Run Last</code>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-create" title='The "create" signal'>create</a>"                                         : <code class="literal">Run Last</code>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'>load-changed</a>"                                   : <code class="literal">Run Last</code>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'>load-failed</a>"                                    : <code class="literal">Run Last</code>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-ready-to-show" title='The "ready-to-show" signal'>ready-to-show</a>"                                  : <code class="literal">Run Last</code>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-script-alert" title='The "script-alert" signal'>script-alert</a>"                                   : <code class="literal">Run Last</code>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-script-confirm" title='The "script-confirm" signal'>script-confirm</a>"                                 : <code class="literal">Run Last</code>
@@ -137,10 +140,54 @@ WebKitWebView implements
 <div class="refsect1">
 <a name="WebKitWebView.details"></a><h2>Details</h2>
 <div class="refsect2">
-<a name="WebKitWebView-struct"></a><h3>WebKitWebView</h3>
-<pre class="programlisting">typedef struct _WebKitWebView WebKitWebView;</pre>
+<a name="WebKitWebView-struct"></a><h3>struct WebKitWebView</h3>
+<pre class="programlisting">struct WebKitWebView;</pre>
 <p>
 </p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitLoadEvent"></a><h3>enum WebKitLoadEvent</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_LOAD_STARTED,
+    WEBKIT_LOAD_REDIRECTED,
+    WEBKIT_LOAD_COMMITTED,
+    WEBKIT_LOAD_FINISHED
+} WebKitLoadEvent;
+</pre>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-LOAD-STARTED:CAPS"></a><span class="term"><code class="literal">WEBKIT_LOAD_STARTED</code></span></p></td>
+<td>A new load request has been made.
+No data has been received yet, empty structures have
+been allocated to perform the load; the load may still
+fail due to transport issues such as not being able to
+resolve a name, or connect to a port.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-LOAD-REDIRECTED:CAPS"></a><span class="term"><code class="literal">WEBKIT_LOAD_REDIRECTED</code></span></p></td>
+<td>A provisional data source received
+a server redirect.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-LOAD-COMMITTED:CAPS"></a><span class="term"><code class="literal">WEBKIT_LOAD_COMMITTED</code></span></p></td>
+<td>The content started arriving for a page load.
+The necessary transport requirements are stabilished, and the
+load is being performed.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-LOAD-FINISHED:CAPS"></a><span class="term"><code class="literal">WEBKIT_LOAD_FINISHED</code></span></p></td>
+<td>Load completed. All resources are done loading
+or there was an error during the load operation.
+</td>
+</tr>
+</tbody>
+</table></div>
 </div>
 <hr>
 <div class="refsect2">
@@ -205,63 +252,13 @@ Gets the web context of <em class="parameter"><code>web_view</code></em>.
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-web-view-get-loader-client"></a><h3>webkit_web_view_get_loader_client ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="returnvalue">WebKitWebLoaderClient</span></a> * webkit_web_view_get_loader_client
-                                                        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
-<p>
-Returns the <a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. You can use it
-to monitor the status of load operations happening on <em class="parameter"><code>web_view</code></em>.
-</p>
-<div class="variablelist"><table border="0">
-<col align="left" valign="top">
-<tbody>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
-<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
-</td>
-</tr>
-<tr>
-<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
-</td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-web-view-set-loader-client"></a><h3>webkit_web_view_set_loader_client ()</h3>
-<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_set_loader_client   (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code><a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> *loader_client</code></em>);</pre>
-<p>
-Sets the <a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> that the view will use during
-load operations.
-</p>
-<div class="variablelist"><table border="0">
-<col align="left" valign="top">
-<tbody>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
-<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
-</td>
-</tr>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>loader_client</code></em> :</span></p></td>
-<td>a <a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a>
-</td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
 <a name="webkit-web-view-load-uri"></a><h3>webkit_web_view_load_uri ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_load_uri            (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code>const <span class="type">gchar</span> *uri</code></em>);</pre>
 <p>
 Requests loading of the specified URI string.
-You can monitor the status of the load operation using the
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+You can monitor the load operation by connecting to
+<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -285,12 +282,11 @@ You can monitor the status of the load operation using the
                                                          <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
                                                          <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);</pre>
 <p>
-Load the given <em class="parameter"><code>content</code></em> string with the specified <em class="parameter"><code>base_uri</code></em>. 
+Load the given <em class="parameter"><code>content</code></em> string with the specified <em class="parameter"><code>base_uri</code></em>.
 Relative URLs in the <em class="parameter"><code>content</code></em> will be resolved against <em class="parameter"><code>base_uri</code></em>.
-When <em class="parameter"><code>base_uri</code></em> is <code class="literal">NULL</code>, it defaults to "about:blank". The mime type 
-of the document will be "text/html". You can monitor the status of 
-the load operation using the <a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. 
-See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+When <em class="parameter"><code>base_uri</code></em> is <code class="literal">NULL</code>, it defaults to "about:blank". The mime type
+of the document will be "text/html". You can monitor the load operation
+by connecting to <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -319,9 +315,8 @@ See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" 
                                                          <em class="parameter"><code>const <span class="type">gchar</span> *plain_text</code></em>);</pre>
 <p>
 Load the specified <em class="parameter"><code>plain_text</code></em> string into <em class="parameter"><code>web_view</code></em>. The mime type of
-document will be "text/plain". You can monitor  the status of the load 
-operation using the <a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. 
-See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+document will be "text/plain". You can monitor the load
+operation by connecting to <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -340,54 +335,13 @@ See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" 
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-web-view-load-alternate-html"></a><h3>webkit_web_view_load_alternate_html ()</h3>
-<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_load_alternate_html (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>,
-                                                         <em class="parameter"><code>const <span class="type">gchar</span> *unreachable_uri</code></em>);</pre>
-<p>
-Request loading of an alternate content for a URI that is unreachable. This allows clients
-to display page-loading errors in the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> itself. This is typically called from
-<a class="link" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-failed" title='The "provisional-load-failed" signal'><span class="type">"provisional-load-failed"</span></a> or <a class="link" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a>
-signals.
-When called from those signals this method will preserve the back-forward list. The URI passed in
-<em class="parameter"><code>base_uri</code></em> has to be an absolute URI.
-You can monitor the status of the load operation using the
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
-</p>
-<div class="variablelist"><table border="0">
-<col align="left" valign="top">
-<tbody>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
-<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
-</td>
-</tr>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>content</code></em> :</span></p></td>
-<td>the alternate content to display as the main page of the <em class="parameter"><code>web_view</code></em>
-</td>
-</tr>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>base_uri</code></em> :</span></p></td>
-<td>the base URI for relative locations</td>
-</tr>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>unreachable_uri</code></em> :</span></p></td>
-<td>the URI for the alternate page content</td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
 <a name="webkit-web-view-load-request"></a><h3>webkit_web_view_load_request ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_load_request        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> *request</code></em>);</pre>
 <p>
 Requests loading of the specified <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a>.
-You can monitor the status of the load operation using the
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+You can monitor the load operation by connecting to
+<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -400,6 +354,46 @@ You can monitor the status of the load operation using the
 <tr>
 <td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> to load</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-replace-content"></a><h3>webkit_web_view_replace_content ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_replace_content     (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content</code></em>,
+                                                         <em class="parameter"><code>const <span class="type">gchar</span> *content_uri</code></em>,
+                                                         <em class="parameter"><code>const <span class="type">gchar</span> *base_uri</code></em>);</pre>
+<p>
+Replace the content of <em class="parameter"><code>web_view</code></em> with <em class="parameter"><code>content</code></em> using <em class="parameter"><code>content_uri</code></em> as page URI.
+This allows clients to display page-loading errors in the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> itself.
+This is typically called from <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> signal. The URI passed in
+<em class="parameter"><code>base_uri</code></em> has to be an absolute URI. The mime type of the document will be "text/html".
+Signals <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> and <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> are not emitted
+when replacing content of a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> using this method.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>content</code></em> :</span></p></td>
+<td>the new content to display as the main page of the <em class="parameter"><code>web_view</code></em>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>content_uri</code></em> :</span></p></td>
+<td>the URI for the page content</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>base_uri</code></em> :</span></p></td>
+<td>the base URI for relative locations or <code class="literal">NULL</code>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
+</td>
 </tr>
 </tbody>
 </table></div>
@@ -433,8 +427,8 @@ Determines whether <em class="parameter"><code>web_view</code></em> has a previo
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_go_back             (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Loads the previous history item.
-You can monitor the status of the load operation using the
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+You can monitor the load operation by connecting to
+<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -474,8 +468,8 @@ Determines whether <em class="parameter"><code>web_view</code></em> has a next h
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_go_forward          (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Loads the next history item.
-You can monitor the status of the load operation using the
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+You can monitor the load operation by connecting to
+<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -492,7 +486,7 @@ You can monitor the status of the load operation using the
 <pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_web_view_get_title           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Gets the value of the <a class="link" href="WebKitWebView.html#WebKitWebView--title" title='The "title" property'><span class="type">"title"</span></a> property.
-You can connect to notify::title signal of <em class="parameter"><code>web_view</code></em> to 
+You can connect to notify::title signal of <em class="parameter"><code>web_view</code></em> to
 be notified when the title has been received.
 </p>
 <div class="variablelist"><table border="0">
@@ -552,10 +546,8 @@ using any cached data.
 Stops any ongoing loading operation in <em class="parameter"><code>web_view</code></em>.
 This method does nothing if no content is being loaded.
 If there is a loading operation in progress, it will be cancelled and
-<a class="link" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-failed" title='The "provisional-load-failed" signal'><span class="type">"provisional-load-failed"</span></a> or
-<a class="link" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> will be emitted on the current
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> with <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-CANCELLED:CAPS"><code class="literal">WEBKIT_NETWORK_ERROR_CANCELLED</code></a> error.
-See also <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+<a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> signal will be emitted with
+<a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-CANCELLED:CAPS"><code class="literal">WEBKIT_NETWORK_ERROR_CANCELLED</code></a> error.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -676,8 +668,8 @@ Obtains the <a class="link" href="WebKitBackForwardList.html" title="WebKitBackF
                                                          <em class="parameter"><code><a class="link" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem"><span class="type">WebKitBackForwardListItem</span></a> *list_item</code></em>);</pre>
 <p>
 Loads the specific history item <em class="parameter"><code>list_item</code></em>.
-You can monitor the status of the load operation using the
-<a class="link" href="WebKitWebLoaderClient.html" title="WebKitWebLoaderClient"><span class="type">WebKitWebLoaderClient</span></a> of <em class="parameter"><code>web_view</code></em>. See <a class="link" href="WebKitWebView.html#webkit-web-view-get-loader-client" title="webkit_web_view_get_loader_client ()"><code class="function">webkit_web_view_get_loader_client()</code></a>.
+You can monitor the load operation by connecting to
+<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -719,7 +711,7 @@ a load operation:
     the requested URI is the given one.
   </p></li>
 <li class="listitem"><p>
-    If the load operation was started by <a class="link" href="WebKitWebView.html#webkit-web-view-load-alternate-html" title="webkit_web_view_load_alternate_html ()"><code class="function">webkit_web_view_load_alternate_html()</code></a>,
+    If the load operation was started by <a class="link" href="WebKitWebView.html#webkit-web-view-load-html" title="webkit_web_view_load_html ()"><code class="function">webkit_web_view_load_html()</code></a>,
     the requested URI is "about:blank".
   </p></li>
 <li class="listitem"><p>
@@ -739,14 +731,18 @@ a load operation:
 <li class="listitem"><p>
   If there is a server redirection during the load operation,
   the active URI is the redirected URI. When the signal
-  <a class="link" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-provisional-load-received-server-redirect" title='The "provisional-load-received-server-redirect" signal'><span class="type">"provisional-load-received-server-redirect"</span></a>
-  is emitted, the active URI is already updated to the redirected URI.
+  <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> is emitted with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-REDIRECTED:CAPS"><code class="literal">WEBKIT_LOAD_REDIRECTED</code></a>
+  event, the active URI is already updated to the redirected URI.
 </p></li>
 <li class="listitem"><p>
-  When the signal <a class="link" href="WebKitWebLoaderClient.html#WebKitWebLoaderClient-load-committed" title='The "load-committed" signal'><span class="type">"load-committed"</span></a> is emitted,
-  the active URI is the final one and it will not change unless
-  a new load operation is started or a navigation action within the
-  same page is performed.
+  When the signal <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> is emitted
+  with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"><code class="literal">WEBKIT_LOAD_COMMITTED</code></a> event, the active URI is the final
+  one and it will not change unless a new load operation is started
+  or a navigation action within the same page is performed.
+</p></li>
+<li class="listitem"><p>
+  When the page content is replaced using <a class="link" href="WebKitWebView.html#webkit-web-view-replace-content" title="webkit_web_view_replace_content ()"><code class="function">webkit_web_view_replace_content()</code></a>,
+  the active URI is the content_uri provided.
 </p></li>
 </ol></div>
 <p>
@@ -859,6 +855,54 @@ that the window containing <em class="parameter"><code>web_view</code></em> shou
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-set-zoom-level"></a><h3>webkit_web_view_set_zoom_level ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_set_zoom_level      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><span class="type">gdouble</span> zoom_level</code></em>);</pre>
+<p>
+Set the zoom level of <em class="parameter"><code>web_view</code></em>, i.e. the factor by which the
+view contents are scaled with respect to their original size.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>zoom_level</code></em> :</span></p></td>
+<td>the zoom level</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-get-zoom-level"></a><h3>webkit_web_view_get_zoom_level ()</h3>
+<pre class="programlisting"><span class="returnvalue">gdouble</span>             webkit_web_view_get_zoom_level      (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<p>
+Get the zoom level of <em class="parameter"><code>web_view</code></em>, i.e. the factor by which the
+view contents are scaled with respect to their original size.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the current zoom level of <em class="parameter"><code>web_view</code></em>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitWebView.property-details"></a><h2>Property Details</h2>
@@ -904,6 +948,17 @@ See <a class="link" href="WebKitWebView.html#webkit-web-view-get-uri" title="web
 <p>
 The <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> of the view.
 </p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView--zoom-level"></a><h3>The <code class="literal">"zoom-level"</code> property</h3>
+<pre class="programlisting">  "zoom-level"               <span class="type">gdouble</span>               : Read / Write</pre>
+<p>
+The zoom level of the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> content.
+See <a class="link" href="WebKitWebView.html#webkit-web-view-set-zoom-level" title="webkit_web_view_set_zoom_level ()"><code class="function">webkit_web_view_set_zoom_level()</code></a> for more details.
+</p>
+<p>Allowed values: &gt;= 0</p>
+<p>Default value: 1</p>
 </div>
 </div>
 <div class="refsect1">
@@ -962,6 +1017,161 @@ until the <a class="link" href="WebKitWebView.html#WebKitWebView-ready-to-show" 
 <td>a newly allocated <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> widget
 or <code class="literal">NULL</code> to propagate the event further. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
 </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView-load-changed"></a><h3>The <code class="literal">"load-changed"</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
+                                                        <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent"><span class="type">WebKitLoadEvent</span></a> load_event,
+                                                        <span class="type">gpointer</span>        user_data)       : <code class="literal">Run Last</code></pre>
+<p>
+Emitted when the a load operation in <em class="parameter"><code>web_view</code></em> changes.
+The signal is always emitted with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"><code class="literal">WEBKIT_LOAD_STARTED</code></a> when a
+new load request is made and <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-FINISHED:CAPS"><code class="literal">WEBKIT_LOAD_FINISHED</code></a> when the load
+finishes successfully or due to an error. When the ongoing load
+operation fails <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> signal is emitted
+before <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> is emitted with
+<a class="link" href="WebKitWebView.html#WEBKIT-LOAD-FINISHED:CAPS"><code class="literal">WEBKIT_LOAD_FINISHED</code></a>.
+If a redirection is received from the server, this signal is emitted
+with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-REDIRECTED:CAPS"><code class="literal">WEBKIT_LOAD_REDIRECTED</code></a> after the initial emission with
+<a class="link" href="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"><code class="literal">WEBKIT_LOAD_STARTED</code></a> and before <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"><code class="literal">WEBKIT_LOAD_COMMITTED</code></a>.
+When the page content starts arriving the signal is emitted with
+<a class="link" href="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"><code class="literal">WEBKIT_LOAD_COMMITTED</code></a> event.
+</p>
+<p>
+You can handle this signal and use a switch to track any ongoing
+load operation.
+</p>
+<p>
+</p>
+<div class="informalexample">
+  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
+    <tbody>
+      <tr>
+        <td class="listing_lines" align="right"><pre>1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre></td>
+        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span> web_view_load_changed (WebKitWebView  *web_view,
+                                   WebKitLoadEvent load_event,
+                                   gpointer        user_data)
+{
+    <span class="keyword">switch</span> (load_event) {
+    <span class="keyword">case</span> WEBKIT_LOAD_STARTED:
+        <span class="comment">/*</span><span class="comment"> New load, we have now a provisional URI </span><span class="comment">*/</span>
+        provisional_uri = webkit_web_view_get_uri (web_view);
+        <span class="comment">/*</span><span class="comment"> Here we could start a spinner or update the</span>
+<span class="comment">         * location bar with the provisional URI </span><span class="comment">*/</span>
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_LOAD_REDIRECTED:
+        redirected_uri = webkit_web_view_get_uri (web_view);
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_LOAD_COMMITTED:
+        <span class="comment">/*</span><span class="comment"> The load is being performed. Current URI is</span>
+<span class="comment">         * the final one and it won't change unless a new</span>
+<span class="comment">         * load is requested or a navigation within the</span>
+<span class="comment">         * same page is performed </span><span class="comment">*/</span>
+        uri = webkit_web_view_get_uri (web_view);
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_LOAD_FINISHED:
+        <span class="comment">/*</span><span class="comment"> Load finished, we can now stop the spinner </span><span class="comment">*/</span>
+        <span class="keyword">break</span>;
+    }
+}</pre></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>load_event</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent"><span class="type">WebKitLoadEvent</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView-load-failed"></a><h3>The <code class="literal">"load-failed"</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">gboolean</span>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
+                                                        <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent"><span class="type">WebKitLoadEvent</span></a> load_event,
+                                                        <span class="type">gchar</span>          *failing_uri,
+                                                        <span class="type">gpointer</span>        error,
+                                                        <span class="type">gpointer</span>        user_data)        : <code class="literal">Run Last</code></pre>
+<p>
+Emitted when an error occurs during a load operation.
+If the error happened when starting to load data for a page
+<em class="parameter"><code>load_event</code></em> will be <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"><code class="literal">WEBKIT_LOAD_STARTED</code></a>. If it happened while
+loading a committed data source <em class="parameter"><code>load_event</code></em> will be <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"><code class="literal">WEBKIT_LOAD_COMMITTED</code></a>.
+Since a load error causes the load operation to finish, the signal
+WebKitWebView::load-changed will always be emitted with
+<a class="link" href="WebKitWebView.html#WEBKIT-LOAD-FINISHED:CAPS"><code class="literal">WEBKIT_LOAD_FINISHED</code></a> event right after this one.
+</p>
+<p>
+By default, if the signal is not handled, a stock error page will be displayed.
+You need to handle the signal if you want to provide your own error page.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>load_event</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent"><span class="type">WebKitLoadEvent</span></a> of the load operation</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>failing_uri</code></em> :</span></p></td>
+<td>the URI that failed to load</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td>the <span class="type">GError</span> that was triggered</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
 </tr>
 </tbody>
 </table></div>

@@ -20,6 +20,7 @@
 #ifndef Navigator_h
 #define Navigator_h
 
+#include "DOMWindowProperty.h"
 #include "NavigatorBase.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
@@ -40,14 +41,12 @@ class PluginData;
 
 typedef int ExceptionCode;
 
-class Navigator : public NavigatorBase, public RefCounted<Navigator> {
+class Navigator : public NavigatorBase, public RefCounted<Navigator>, public DOMWindowProperty {
 public:
     static PassRefPtr<Navigator> create(Frame* frame) { return adoptRef(new Navigator(frame)); }
     virtual ~Navigator();
 
     void resetGeolocation();
-    void disconnectFrame();
-    Frame* frame() const { return m_frame; }
 
     String appVersion() const;
     String language() const;
@@ -76,16 +75,18 @@ public:
 #endif
 
 #if ENABLE(GAMEPAD)
-    GamepadList* webkitGamepads();
+    // FIXME: This method should be in WebCore/Modules/gamepad.
+    GamepadList* gamepads();
 #endif
 
 private:
-    Navigator(Frame*);
-    Frame* m_frame;
+    explicit Navigator(Frame*);
+
     mutable RefPtr<DOMPluginArray> m_plugins;
     mutable RefPtr<DOMMimeTypeArray> m_mimeTypes;
     mutable RefPtr<Geolocation> m_geolocation;
 #if ENABLE(GAMEPAD)
+    // FIXME: This state should be in WebCore/Modules/gamepad.
     mutable RefPtr<GamepadList> m_gamepads;
 #endif
 #if ENABLE(POINTER_LOCK)

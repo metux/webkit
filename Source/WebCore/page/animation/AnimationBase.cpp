@@ -377,8 +377,8 @@ template <typename T>
 class RefCountedPropertyWrapper : public PropertyWrapperGetter<T*> {
 public:
     RefCountedPropertyWrapper(int prop, T* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<T>))
-    : PropertyWrapperGetter<T*>(prop, getter)
-    , m_setter(setter)
+        : PropertyWrapperGetter<T*>(prop, getter)
+        , m_setter(setter)
     {
     }
 
@@ -629,6 +629,38 @@ public:
 private:
     const Color& (RenderStyle::*m_getter)() const;
     void (RenderStyle::*m_setter)(const Color&);
+};
+
+enum MaybeInvalidColorTag { MaybeInvalidColor };
+class PropertyWrapperVisitedAffectedColor : public PropertyWrapperBase {
+public:
+    PropertyWrapperVisitedAffectedColor(int prop, const Color& (RenderStyle::*getter)() const, void (RenderStyle::*setter)(const Color&), 
+                                        const Color& (RenderStyle::*visitedGetter)() const, void (RenderStyle::*visitedSetter)(const Color&))
+        : PropertyWrapperBase(prop)
+        , m_wrapper(adoptPtr(new PropertyWrapper<const Color&>(prop, getter, setter)))
+        , m_visitedWrapper(adoptPtr(new PropertyWrapper<const Color&>(prop, visitedGetter, visitedSetter)))
+    {
+    }
+    PropertyWrapperVisitedAffectedColor(int prop, MaybeInvalidColorTag, const Color& (RenderStyle::*getter)() const, void (RenderStyle::*setter)(const Color&), 
+                                        const Color& (RenderStyle::*visitedGetter)() const, void (RenderStyle::*visitedSetter)(const Color&))
+        : PropertyWrapperBase(prop)
+        , m_wrapper(adoptPtr(new PropertyWrapperMaybeInvalidColor(prop, getter, setter)))
+        , m_visitedWrapper(adoptPtr(new PropertyWrapperMaybeInvalidColor(prop, visitedGetter, visitedSetter)))
+    {
+    }
+    virtual bool equals(const RenderStyle* a, const RenderStyle* b) const
+    {
+        return m_wrapper->equals(a, b) && m_visitedWrapper->equals(a, b);
+    }
+    virtual void blend(const AnimationBase* anim, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress) const
+    {
+        m_wrapper->blend(anim, dst, a, b, progress);
+        m_visitedWrapper->blend(anim, dst, a, b, progress);
+    }
+    
+private:
+    OwnPtr<PropertyWrapperBase> m_wrapper;
+    OwnPtr<PropertyWrapperBase> m_visitedWrapper;
 };
 
 // Wrapper base class for an animatable property in a FillLayer
@@ -930,9 +962,9 @@ void AnimationBase::ensurePropertyMap()
         gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyPaddingRight, &RenderStyle::paddingRight, &RenderStyle::setPaddingRight));
         gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyPaddingTop, &RenderStyle::paddingTop, &RenderStyle::setPaddingTop));
         gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyPaddingBottom, &RenderStyle::paddingBottom, &RenderStyle::setPaddingBottom));
-        gPropertyWrappers->append(new PropertyWrapper<const Color&>(CSSPropertyColor, &RenderStyle::color, &RenderStyle::setColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyColor, &RenderStyle::color, &RenderStyle::setColor, &RenderStyle::visitedLinkColor, &RenderStyle::setVisitedLinkColor));
 
-        gPropertyWrappers->append(new PropertyWrapper<const Color&>(CSSPropertyBackgroundColor, &RenderStyle::backgroundColor, &RenderStyle::setBackgroundColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyBackgroundColor, &RenderStyle::backgroundColor, &RenderStyle::setBackgroundColor, &RenderStyle::visitedLinkBackgroundColor, &RenderStyle::setVisitedLinkBackgroundColor));
 
         gPropertyWrappers->append(new FillLayersPropertyWrapper(CSSPropertyBackgroundImage, &RenderStyle::backgroundLayers, &RenderStyle::accessBackgroundLayers));
         gPropertyWrappers->append(new StyleImagePropertyWrapper(CSSPropertyListStyleImage, &RenderStyle::listStyleImage, &RenderStyle::setListStyleImage));
@@ -995,14 +1027,14 @@ void AnimationBase::ensurePropertyMap()
         gPropertyWrappers->append(new PropertyWrapper<const FilterOperations&>(CSSPropertyWebkitFilter, &RenderStyle::filter, &RenderStyle::setFilter));
 #endif
 
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyWebkitColumnRuleColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor));
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyWebkitTextStrokeColor, &RenderStyle::textStrokeColor, &RenderStyle::setTextStrokeColor));
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyWebkitTextFillColor, &RenderStyle::textFillColor, &RenderStyle::setTextFillColor));
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyBorderLeftColor, &RenderStyle::borderLeftColor, &RenderStyle::setBorderLeftColor));
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyBorderRightColor, &RenderStyle::borderRightColor, &RenderStyle::setBorderRightColor));
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyBorderTopColor, &RenderStyle::borderTopColor, &RenderStyle::setBorderTopColor));
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyBorderBottomColor, &RenderStyle::borderBottomColor, &RenderStyle::setBorderBottomColor));
-        gPropertyWrappers->append(new PropertyWrapperMaybeInvalidColor(CSSPropertyOutlineColor, &RenderStyle::outlineColor, &RenderStyle::setOutlineColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitColumnRuleColor, MaybeInvalidColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor, &RenderStyle::visitedLinkColumnRuleColor, &RenderStyle::setVisitedLinkColumnRuleColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitTextStrokeColor, MaybeInvalidColor, &RenderStyle::textStrokeColor, &RenderStyle::setTextStrokeColor, &RenderStyle::visitedLinkTextStrokeColor, &RenderStyle::setVisitedLinkTextStrokeColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitTextFillColor, MaybeInvalidColor, &RenderStyle::textFillColor, &RenderStyle::setTextFillColor, &RenderStyle::visitedLinkTextFillColor, &RenderStyle::setVisitedLinkTextFillColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyBorderLeftColor, MaybeInvalidColor, &RenderStyle::borderLeftColor, &RenderStyle::setBorderLeftColor, &RenderStyle::visitedLinkBorderLeftColor, &RenderStyle::setVisitedLinkBorderLeftColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyBorderRightColor, MaybeInvalidColor, &RenderStyle::borderRightColor, &RenderStyle::setBorderRightColor, &RenderStyle::visitedLinkBorderRightColor, &RenderStyle::setVisitedLinkBorderRightColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyBorderTopColor, MaybeInvalidColor, &RenderStyle::borderTopColor, &RenderStyle::setBorderTopColor, &RenderStyle::visitedLinkBorderTopColor, &RenderStyle::setVisitedLinkBorderTopColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyBorderBottomColor, MaybeInvalidColor, &RenderStyle::borderBottomColor, &RenderStyle::setBorderBottomColor, &RenderStyle::visitedLinkBorderBottomColor, &RenderStyle::setVisitedLinkBorderBottomColor));
+        gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyOutlineColor, MaybeInvalidColor, &RenderStyle::outlineColor, &RenderStyle::setOutlineColor, &RenderStyle::visitedLinkOutlineColor, &RenderStyle::setVisitedLinkOutlineColor));
 
         gPropertyWrappers->append(new PropertyWrapperShadow(CSSPropertyBoxShadow, &RenderStyle::boxShadow, &RenderStyle::setBoxShadow));
         gPropertyWrappers->append(new PropertyWrapperShadow(CSSPropertyWebkitBoxShadow, &RenderStyle::boxShadow, &RenderStyle::setBoxShadow));
@@ -1613,6 +1645,35 @@ double AnimationBase::timeToNextService()
     return 0;
 }
 
+// Compute the fractional time, taking into account direction.
+// There is no need to worry about iterations, we assume that we would have
+// short circuited above if we were done.
+
+double AnimationBase::fractionalTime(double scale, double elapsedTime, double offset) const
+{
+    double fractionalTime = m_animation->duration() ? (elapsedTime / m_animation->duration()) : 1;
+    // FIXME: startTime can be before the current animation "frame" time. This is to sync with the frame time
+    // concept in AnimationTimeController. So we need to somehow sync the two. Until then, the possible
+    // error is small and will probably not be noticeable. Until we fix this, remove the assert.
+    // https://bugs.webkit.org/show_bug.cgi?id=52037
+    // ASSERT(fractionalTime >= 0);
+    if (fractionalTime < 0)
+        fractionalTime = 0;
+
+    int integralTime = static_cast<int>(fractionalTime);
+    if (m_animation->iterationCount() != Animation::IterationCountInfinite)
+        integralTime = min(integralTime, m_animation->iterationCount() - 1);
+    fractionalTime -= integralTime;
+
+    if ((m_animation->direction() == Animation::AnimationDirectionAlternate) && (integralTime & 1))
+        fractionalTime = 1 - fractionalTime;
+
+    if (scale != 1 || offset)
+        fractionalTime = (fractionalTime - offset) * scale;
+
+    return fractionalTime;
+}
+
 double AnimationBase::progress(double scale, double offset, const TimingFunction* tf) const
 {
     if (preActive())
@@ -1629,19 +1690,8 @@ double AnimationBase::progress(double scale, double offset, const TimingFunction
     if (m_animation->iterationCount() > 0 && elapsedTime >= dur)
         return (m_animation->iterationCount() % 2) ? 1.0 : 0.0;
 
-    // Compute the fractional time, taking into account direction.
-    // There is no need to worry about iterations, we assume that we would have
-    // short circuited above if we were done.
-    double fractionalTime = elapsedTime / m_animation->duration();
-    int integralTime = static_cast<int>(fractionalTime);
-    fractionalTime -= integralTime;
+    const double fractionalTime = this->fractionalTime(scale, elapsedTime, offset);
 
-    if ((m_animation->direction() == Animation::AnimationDirectionAlternate) && (integralTime & 1))
-        fractionalTime = 1 - fractionalTime;
-
-    if (scale != 1 || offset)
-        fractionalTime = (fractionalTime - offset) * scale;
-        
     if (!tf)
         tf = m_animation->timingFunction().get();
 

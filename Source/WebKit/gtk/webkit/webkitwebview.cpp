@@ -7,7 +7,7 @@
  *  Copyright (C) 2008 Gustavo Noronha Silva <gns@gnome.org>
  *  Copyright (C) 2008 Nuanti Ltd.
  *  Copyright (C) 2008, 2009, 2010 Collabora Ltd.
- *  Copyright (C) 2009, 2010 Igalia S.L.
+ *  Copyright (C) 2009, 2010, 2012 Igalia S.L.
  *  Copyright (C) 2009 Movial Creative Technologies Inc.
  *  Copyright (C) 2009 Bobby Powers
  *  Copyright (C) 2010 Joone Hur <joone@kldp.org>
@@ -326,7 +326,7 @@ static gboolean webkit_web_view_forward_context_menu_event(WebKitWebView* webVie
     mainFrame->view()->setCursor(pointerCursor());
     if (page->frameCount()) {
         HitTestRequest request(HitTestRequest::Active);
-        IntPoint point = mainFrame->view()->windowToContents(event.pos());
+        IntPoint point = mainFrame->view()->windowToContents(event.position());
         MouseEventWithHitTestResults mev = mainFrame->document()->prepareMouseEvent(request, point, event);
 
         Frame* targetFrame = EventHandler::subframeForHitTestResult(mev);
@@ -384,8 +384,8 @@ static gboolean webkit_web_view_forward_context_menu_event(WebKitWebView* webVie
 
     WebKitWebViewPrivate* priv = webView->priv;
     priv->currentMenu = menu;
-    priv->lastPopupXPosition = event.globalX();
-    priv->lastPopupYPosition = event.globalY();
+    priv->lastPopupXPosition = event.globalPosition().x();
+    priv->lastPopupYPosition = event.globalPosition().y();
 
     gtk_menu_popup(menu, 0, 0, &PopupMenuPositionFunc, webView, event.button() + 1, gtk_get_current_event_time());
     return TRUE;
@@ -427,7 +427,7 @@ static gboolean webkit_web_view_popup_menu_handler(GtkWidget* widget)
     location.shrunkTo(IntPoint(view->width() - gContextMenuMargin, view->height() - gContextMenuMargin));
 
     IntPoint globalPoint(convertWidgetPointToScreenPoint(widget, location));
-    PlatformMouseEvent event(location, globalPoint, RightButton, MouseEventPressed, 0, false, false, false, false, gtk_get_current_event_time());
+    PlatformMouseEvent event(location, globalPoint, RightButton, PlatformEvent::MousePressed, 0, false, false, false, false, gtk_get_current_event_time());
     return webkit_web_view_forward_context_menu_event(WEBKIT_WEB_VIEW(widget), event);
 }
 
@@ -872,12 +872,8 @@ static void webkit_web_view_size_allocate(GtkWidget* widget, GtkAllocation* allo
     chromeClient->widgetSizeChanged(oldSize, IntSize(allocation->width, allocation->height));
     chromeClient->adjustmentWatcher()->updateAdjustmentsFromScrollbars();
 
-#if USE(ACCELERATED_COMPOSITING) && USE(CLUTTER)
-    if (webView->priv->rootLayerEmbedder) {
-        allocation->x = 0;
-        allocation->y = 0;
-        gtk_widget_size_allocate(GTK_WIDGET(webView->priv->rootLayerEmbedder), allocation);
-    }
+#if USE(ACCELERATED_COMPOSITING)
+    WEBKIT_WEB_VIEW(widget)->priv->acceleratedCompositingContext->resizeRootLayer(IntSize(allocation->width, allocation->height));
 #endif
 }
 
@@ -3122,6 +3118,10 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     coreSettings->setWebAudioEnabled(settingsPrivate->enableWebAudio);
 #endif
 
+#if ENABLE(WEB_SOCKETS)
+    coreSettings->setUseHixie76WebSocketProtocol(false);
+#endif
+
     if (Page* page = core(webView))
         page->setTabKeyCyclesThroughElements(settingsPrivate->tabKeyCyclesThroughElements);
 
@@ -3333,6 +3333,10 @@ static void webkit_web_view_init(WebKitWebView* webView)
     gtk_drag_dest_set_target_list(GTK_WIDGET(webView), PasteboardHelper::defaultPasteboardHelper()->targetList());
 
     priv->selfScrolling = false;
+
+#if USE(ACCELERATED_COMPOSITING)
+    priv->acceleratedCompositingContext = AcceleratedCompositingContext::create(webView);
+#endif
 }
 
 GtkWidget* webkit_web_view_new(void)
@@ -4785,7 +4789,7 @@ WebKitHitTestResult* webkit_web_view_get_hit_test_result(WebKitWebView* webView,
     PlatformMouseEvent mouseEvent = PlatformMouseEvent(event);
     Frame* frame = core(webView)->focusController()->focusedOrMainFrame();
     HitTestRequest request(HitTestRequest::Active);
-    IntPoint documentPoint = documentPointForWindowPoint(frame, mouseEvent.pos());
+    IntPoint documentPoint = documentPointForWindowPoint(frame, mouseEvent.position());
     MouseEventWithHitTestResults mev = frame->document()->prepareMouseEvent(request, documentPoint, mouseEvent);
 
     return kit(mev.hitTestResult());
@@ -4904,68 +4908,6 @@ void webViewExitFullscreen(WebKitWebView* webView)
         priv->fullscreenVideoController->exitFullscreen();
 #endif
 }
-
-#if USE(ACCELERATED_COMPOSITING)
-void webViewSetRootGraphicsLayer(WebKitWebView* webView, GraphicsLayer* graphicsLayer)
-{
-#if USE(CLUTTER)
-    WebKitWebViewPrivate* priv = webView->priv;
-
-    // Create an instance of GtkClutterEmbed to host actors as web layers.
-    if (!priv->rootLayerEmbedder) {
-        priv->rootLayerEmbedder = gtk_clutter_embed_new();
-        gtk_container_add(GTK_CONTAINER(webView), priv->rootLayerEmbedder);
-        gtk_widget_show(priv->rootLayerEmbedder);
-    }
-
-    // Add a root layer to the stage.
-    if (graphicsLayer) {
-        priv->rootGraphicsLayer = graphicsLayer;
-        // set white background
-        ClutterColor stageColor = { 0xFF, 0xFF, 0xFF, 0xFF };
-        ClutterActor* stage = gtk_clutter_embed_get_stage(GTK_CLUTTER_EMBED(priv->rootLayerEmbedder));
-        clutter_stage_set_color(CLUTTER_STAGE (stage), &stageColor);
-        clutter_container_add_actor(CLUTTER_CONTAINER(stage), priv->rootGraphicsLayer->platformLayer());
-        clutter_actor_show_all(stage);
-    }
-#else
-    notImplemented();
-#endif
-}
-
-void webViewDetachRootGraphicsLayer(WebKitWebView* webView)
-{
-#if USE(CLUTTER)
-    WebKitWebViewPrivate* priv = webView->priv;
-    // Detach the root layer from the hosting view.
-    gtk_container_remove(GTK_CONTAINER(webView), priv->rootLayerEmbedder);
-    priv->rootLayerEmbedder = 0;
-    priv->rootGraphicsLayer = 0;
-#else
-    notImplemented();
-#endif
-}
-
-#if USE(CLUTTER)
-static gboolean webViewSyncLayers(gpointer data)
-{
-    WebKitWebView* webView = WEBKIT_WEB_VIEW(data);
-    core(webView)->mainFrame()->view()->syncCompositingStateIncludingSubframes();
-
-    return FALSE;
-}
-#endif
-
-void webViewMarkForSync(WebKitWebView* webView, gboolean scheduleSync)
-{
-#if USE(CLUTTER)
-    g_timeout_add(0, webViewSyncLayers, webView);
-#else
-    notImplemented();
-#endif
-}
-
-#endif
 
 namespace WebKit {
 

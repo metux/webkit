@@ -128,7 +128,7 @@ void AudioBufferSourceNode::process(size_t framesToProcess)
         renderFromBuffer(outputBus, quantumFrameOffset, bufferFramesToProcess);
 
         // Apply the gain (in-place) to the output bus.
-        double totalGain = gain()->value() * m_buffer->gain();
+        float totalGain = gain()->value() * m_buffer->gain();
         outputBus->copyWithGainFrom(*outputBus, &m_lastGain, totalGain);
 
         // If the end time is somewhere in the middle of this time quantum, then simply zero out the
@@ -155,6 +155,28 @@ void AudioBufferSourceNode::process(size_t framesToProcess)
         // Too bad - the tryLock() failed.  We must be in the middle of changing buffers and were already outputting silence anyway.
         outputBus->zero();
     }
+}
+
+// Returns true if we're finished.
+bool AudioBufferSourceNode::renderSilenceAndFinishIfNotLooping(float* destinationL, float* destinationR, size_t framesToProcess)
+{
+    if (!loop()) {
+        // If we're not looping, then stop playing when we get to the end.
+        m_isPlaying = false;
+
+        if (framesToProcess > 0) {
+            // We're not looping and we've reached the end of the sample data, but we still need to provide more output,
+            // so generate silence for the remaining.
+            memset(destinationL, 0, sizeof(float) * framesToProcess);
+
+            if (destinationR)
+                memset(destinationR, 0, sizeof(float) * framesToProcess);
+        }
+
+        finish();
+        return true;
+    }
+    return false;
 }
 
 void AudioBufferSourceNode::renderFromBuffer(AudioBus* bus, unsigned destinationFrameOffset, size_t numberOfFrames)
@@ -247,68 +269,82 @@ void AudioBufferSourceNode::renderFromBuffer(AudioBus* bus, unsigned destination
     double virtualReadIndex = m_virtualReadIndex;
 
     // Render loop - reading from the source buffer to the destination using linear interpolation.
-    // FIXME: optimize for the very common case of playing back with pitchRate == 1.
-    // We can avoid the linear interpolation.
     int framesToProcess = numberOfFrames;
-    while (framesToProcess--) {
+
+    // Optimize for the very common case of playing back with pitchRate == 1.
+    // We can avoid the linear interpolation.
+    if (pitchRate == 1 && virtualReadIndex == floor(virtualReadIndex)) {
         unsigned readIndex = static_cast<unsigned>(virtualReadIndex);
-        double interpolationFactor = virtualReadIndex - readIndex;
-        
-        // For linear interpolation we need the next sample-frame too.
-        unsigned readIndex2 = readIndex + 1;
-        if (readIndex2 >= endFrame) {
-            if (loop()) {
-                // Make sure to wrap around at the end of the buffer.
-                readIndex2 -= deltaFrames;
-            } else
-                readIndex2 = readIndex;
-        }
+        while (framesToProcess > 0) {
+            int framesToEnd = endFrame - readIndex;
+            int framesThisTime = min(framesToProcess, framesToEnd);
+            framesThisTime = max(0, framesThisTime);
 
-        // Final sanity check on buffer access.
-        // FIXME: as an optimization, try to get rid of this inner-loop check and put assertions and guards before the loop.
-        if (readIndex >= bufferLength || readIndex2 >= bufferLength)
-            break;
+            memcpy(destinationL, sourceL + readIndex, sizeof(*sourceL) * framesThisTime);
+            destinationL += framesThisTime;
+            if (isStereo) {
+                memcpy(destinationR, sourceR + readIndex, sizeof(*sourceR) * framesThisTime);
+                destinationR += framesThisTime;
+            }
 
-        // Linear interpolation.
-        double sampleL1 = sourceL[readIndex];
-        double sampleL2 = sourceL[readIndex2];
-        double sampleL = (1.0 - interpolationFactor) * sampleL1 + interpolationFactor * sampleL2;
-        *destinationL++ = narrowPrecisionToFloat(sampleL);
+            readIndex += framesThisTime;
+            framesToProcess -= framesThisTime;
 
-        if (isStereo) {
-            double sampleR1 = sourceR[readIndex];
-            double sampleR2 = sourceR[readIndex2];
-            double sampleR = (1.0 - interpolationFactor) * sampleR1 + interpolationFactor * sampleR2;
-            *destinationR++ = narrowPrecisionToFloat(sampleR);
-        }
-
-        virtualReadIndex += pitchRate;
-
-        // Wrap-around, retaining sub-sample position since virtualReadIndex is floating-point.
-        if (virtualReadIndex >= endFrame) {
-            virtualReadIndex -= deltaFrames;
-
-            if (!loop()) {
-                // If we're not looping, then stop playing when we get to the end.
-                m_isPlaying = false;
-
-                if (framesToProcess > 0) {
-                    // We're not looping and we've reached the end of the sample data, but we still need to provide more output,
-                    // so generate silence for the remaining.
-                    memset(destinationL, 0, sizeof(float) * framesToProcess);
-
-                    if (isStereo)
-                        memset(destinationR, 0, sizeof(float) * framesToProcess);
-                }
-
-                finish();
-                break;
+            // Wrap-around.
+            if (readIndex >= endFrame) {
+                readIndex -= deltaFrames;
+                if (renderSilenceAndFinishIfNotLooping(destinationL, destinationR, framesToProcess))
+                    break;
             }
         }
-    }
-    
+        virtualReadIndex = readIndex;
+    } else {
+        while (framesToProcess--) {
+            unsigned readIndex = static_cast<unsigned>(virtualReadIndex);
+            double interpolationFactor = virtualReadIndex - readIndex;
+
+            // For linear interpolation we need the next sample-frame too.
+            unsigned readIndex2 = readIndex + 1;
+            if (readIndex2 >= endFrame) {
+                if (loop()) {
+                    // Make sure to wrap around at the end of the buffer.
+                    readIndex2 -= deltaFrames;
+                } else
+                    readIndex2 = readIndex;
+            }
+
+            // Final sanity check on buffer access.
+            // FIXME: as an optimization, try to get rid of this inner-loop check and put assertions and guards before the loop.
+            if (readIndex >= bufferLength || readIndex2 >= bufferLength)
+                break;
+
+            // Linear interpolation.
+            double sampleL1 = sourceL[readIndex];
+            double sampleL2 = sourceL[readIndex2];
+            double sampleL = (1.0 - interpolationFactor) * sampleL1 + interpolationFactor * sampleL2;
+            *destinationL++ = narrowPrecisionToFloat(sampleL);
+
+            if (isStereo) {
+                double sampleR1 = sourceR[readIndex];
+                double sampleR2 = sourceR[readIndex2];
+                double sampleR = (1.0 - interpolationFactor) * sampleR1 + interpolationFactor * sampleR2;
+                *destinationR++ = narrowPrecisionToFloat(sampleR);
+            }
+
+            virtualReadIndex += pitchRate;
+
+            // Wrap-around, retaining sub-sample position since virtualReadIndex is floating-point.
+            if (virtualReadIndex >= endFrame) {
+                virtualReadIndex -= deltaFrames;
+
+                if (renderSilenceAndFinishIfNotLooping(destinationL, destinationR, framesToProcess))
+                    break;
+            }
+        }
+    } 
     m_virtualReadIndex = virtualReadIndex;
 }
+
 
 void AudioBufferSourceNode::reset()
 {
