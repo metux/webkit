@@ -27,6 +27,7 @@
 #include "EventTarget.h"
 #include "FormData.h"
 #include "ResourceResponse.h"
+#include "SecurityOrigin.h"
 #include "ThreadableLoaderClient.h"
 #include "XMLHttpRequestProgressEventThrottle.h"
 #include <wtf/OwnPtr.h>
@@ -68,14 +69,13 @@ public:
         ResponseTypeArrayBuffer
     };
 
-    virtual XMLHttpRequest* toXMLHttpRequest() { return this; }
-
     virtual void contextDestroyed();
     virtual bool canSuspend() const;
     virtual void suspend(ReasonForSuspension);
     virtual void resume();
     virtual void stop();
 
+    virtual const AtomicString& interfaceName() const;
     virtual ScriptExecutionContext* scriptExecutionContext() const;
 
     const KURL& url() const { return m_url; }

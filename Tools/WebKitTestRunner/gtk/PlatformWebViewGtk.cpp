@@ -35,6 +35,7 @@ namespace WTR {
 PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup)
     : m_view(WKViewCreate(context, pageGroup))
     , m_window(gtk_window_new(GTK_WINDOW_POPUP))
+    , m_windowIsKey(true)
 {
     gtk_container_add(GTK_CONTAINER(m_window), GTK_WIDGET(m_view));
 
@@ -95,6 +96,25 @@ void PlatformWebView::setWindowFrame(WKRect frame)
 {
     gtk_window_move(GTK_WINDOW(m_window), frame.origin.x, frame.origin.y);
     resizeTo(frame.size.width, frame.size.height);
+}
+
+void PlatformWebView::addChromeInputField()
+{
+}
+
+void PlatformWebView::removeChromeInputField()
+{
+}
+
+void PlatformWebView::makeWebViewFirstResponder()
+{
+}
+
+WKRetainPtr<WKImageRef> PlatformWebView::windowSnapshotImage()
+{
+    // FIXME: implement to capture pixels in the UI process,
+    // which may be necessary to capture things like 3D transforms.
+    return 0;
 }
 
 } // namespace WTR

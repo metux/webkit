@@ -30,8 +30,9 @@
 
 /**
  * @constructor
+ * @extends {WebInspector.Object}
  */
-WebInspector.ConsoleModel = function(drawer)
+WebInspector.ConsoleModel = function()
 {
     this.messages = [];
     this.warnings = 0;
@@ -52,19 +53,12 @@ WebInspector.ConsoleModel.prototype = {
         if (WebInspector.settings.monitoringXHREnabled.get())
             ConsoleAgent.setMonitoringXHREnabled(true);
 
-        // There is no console agent for workers yet.
-        if (!WebInspector.WorkerManager.isWorkerFrontend())
-            ConsoleAgent.enable(this._setConsoleMessageExpiredCount.bind(this));
+        ConsoleAgent.enable();
     },
 
-    _setConsoleMessageExpiredCount: function(count)
-    {
-        if (count) {
-            var message = String.sprintf(WebInspector.UIString("%d console messages are not shown."), count);
-            this.addMessage(WebInspector.ConsoleMessage.createTextMessage(message, WebInspector.ConsoleMessage.MessageLevel.Warning));
-        }
-    },
-
+    /**
+     * @param {WebInspector.ConsoleMessage} msg
+     */
     addMessage: function(msg)
     {
         this.messages.push(msg);
@@ -74,6 +68,9 @@ WebInspector.ConsoleModel.prototype = {
         this._interruptRepeatCount = false;
     },
 
+    /**
+     * @param {WebInspector.ConsoleMessage} msg
+     */
     _incrementErrorWarningCount: function(msg)
     {
         switch (msg.level) {
@@ -119,20 +116,98 @@ WebInspector.ConsoleModel.prototype = {
             msg.repeatDelta = count - prevRepeatCount;
             msg.repeatCount = msg.repeatCount + msg.repeatDelta;
             msg.totalRepeatCount = count;
-            msg._updateRepeatCount();
+            msg.updateRepeatCount();
 
             this._incrementErrorWarningCount(msg);
             this.dispatchEventToListeners(WebInspector.ConsoleModel.Events.RepeatCountUpdated, msg);
         } else {
-            var msgCopy = new WebInspector.ConsoleMessage(msg.source, msg.type, msg.level, msg.line, msg.url, count - prevRepeatCount, msg._messageText, msg._parameters, msg._stackTrace, msg._request);
+            var msgCopy = WebInspector.ConsoleMessage.create(msg.source, msg.level, msg._messageText, msg.type, msg.url, msg.line, count - prevRepeatCount, msg._parameters, msg._stackTrace, msg._request);
             msgCopy.totalRepeatCount = count;
-            msgCopy._formatMessage();
             this.addMessage(msgCopy);
         }
     }
 }
 
 WebInspector.ConsoleModel.prototype.__proto__ = WebInspector.Object.prototype;
+
+/**
+ * @constructor
+ */
+WebInspector.ConsoleMessage = function()
+{
+    this.repeatDelta = 0;
+    this.repeatCount = 0;
+    this._totalRepeatCount = 0;
+}
+
+WebInspector.ConsoleMessage.prototype = {
+    /**
+     * @return {number}
+     */
+    get totalRepeatCount()
+    {
+        return this._totalRepeatCount;
+    },
+
+    set totalRepeatCount(totalRepeatCount)
+    {
+        this._totalRepeatCount = totalRepeatCount;
+    },
+
+    updateRepeatCount: function()
+    {
+        // Implemented by concrete instances
+    }
+}
+
+/**
+ * @param {string} source
+ * @param {string} level
+ * @param {string} message
+ * @param {string=} type
+ * @param {string=} url
+ * @param {number=} line
+ * @param {number=} repeatCount
+ * @param {Array.<RuntimeAgent.RemoteObject>=} parameters
+ * @param {ConsoleAgent.StackTrace=} stackTrace
+ * @param {WebInspector.Resource=} request
+ *
+ * @return {WebInspector.ConsoleMessage}
+ */
+WebInspector.ConsoleMessage.create = function(source, level, message, type, url, line, repeatCount, parameters, stackTrace, request)
+{
+}
+
+// Note: Keep these constants in sync with the ones in Console.h
+WebInspector.ConsoleMessage.MessageSource = {
+    HTML: "html",
+    XML: "xml",
+    JS: "javascript",
+    Network: "network",
+    ConsoleAPI: "console-api",
+    Other: "other"
+}
+
+WebInspector.ConsoleMessage.MessageType = {
+    Log: "log",
+    Dir: "dir",
+    DirXML: "dirxml",
+    Trace: "trace",
+    StartGroup: "startGroup",
+    StartGroupCollapsed: "startGroupCollapsed",
+    EndGroup: "endGroup",
+    Assert: "assert",
+    Result: "result"
+}
+
+WebInspector.ConsoleMessage.MessageLevel = {
+    Tip: "tip",
+    Log: "log",
+    Warning: "warning",
+    Error: "error",
+    Debug: "debug"
+}
+
 
 /**
  * @constructor
@@ -145,22 +220,28 @@ WebInspector.ConsoleDispatcher = function(console)
 }
 
 WebInspector.ConsoleDispatcher.prototype = {
+    /**
+     * @param {ConsoleAgent.ConsoleMessage} payload
+     */
     messageAdded: function(payload)
     {
-        var consoleMessage = new WebInspector.ConsoleMessage(
+        var consoleMessage = WebInspector.ConsoleMessage.create(
             payload.source,
-            payload.type,
             payload.level,
-            payload.line,
-            payload.url,
-            payload.repeatCount,
             payload.text,
+            payload.type,
+            payload.url,
+            payload.line,
+            payload.repeatCount,
             payload.parameters,
             payload.stackTrace,
             payload.networkRequestId ? WebInspector.networkResourceById(payload.networkRequestId) : undefined);
         this._console.addMessage(consoleMessage);
     },
 
+    /**
+     * @param {number} count
+     */
     messageRepeatCountUpdated: function(count)
     {
         this._console._messageRepeatCountUpdated(count);

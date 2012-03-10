@@ -106,6 +106,11 @@ void ContextMenuController::handleContextMenuEvent(Event* event)
     showContextMenu(event);
 }
 
+static PassOwnPtr<ContextMenuItem> separatorItem()
+{
+    return adoptPtr(new ContextMenuItem(SeparatorType, ContextMenuItemTagNoAction, String()));
+}
+
 void ContextMenuController::showContextMenu(Event* event, PassRefPtr<ContextMenuProvider> menuProvider)
 {
     m_menuProvider = menuProvider;
@@ -117,6 +122,10 @@ void ContextMenuController::showContextMenu(Event* event, PassRefPtr<ContextMenu
     }
 
     m_menuProvider->populateContextMenu(m_contextMenu.get());
+    if (m_hitTestResult.isSelected()) {
+        appendItem(*separatorItem(), m_contextMenu.get());
+        populate();
+    }
     showContextMenu(event);
 }
 
@@ -159,7 +168,7 @@ static void openNewWindow(const KURL& urlToLoad, Frame* frame)
 {
     if (Page* oldPage = frame->page()) {
         FrameLoadRequest request(frame->document()->securityOrigin(), ResourceRequest(urlToLoad, frame->loader()->outgoingReferrer()));
-        if (Page* newPage = oldPage->chrome()->createWindow(frame, request, WindowFeatures(), NavigationAction())) {
+        if (Page* newPage = oldPage->chrome()->createWindow(frame, request, WindowFeatures(), NavigationAction(request.resourceRequest()))) {
             newPage->mainFrame()->loader()->loadFrameRequest(request, false, false, 0, 0, SendReferrer);   
             newPage->chrome()->show();
         }
@@ -427,11 +436,6 @@ void ContextMenuController::appendItem(ContextMenuItem& menuItem, ContextMenu* p
     checkOrEnableIfNeeded(menuItem);
     if (parentMenu)
         parentMenu->appendItem(menuItem);
-}
-
-static PassOwnPtr<ContextMenuItem> separatorItem()
-{
-    return adoptPtr(new ContextMenuItem(SeparatorType, ContextMenuItemTagNoAction, String()));
 }
 
 void ContextMenuController::createAndAppendFontSubMenu(ContextMenuItem& fontMenuItem)

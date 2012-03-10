@@ -42,7 +42,7 @@ static JSValue numberConstructorMinValue(ExecState*, JSValue, const Identifier&)
 
 namespace JSC {
 
-const ClassInfo NumberConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::numberConstructorTable };
+const ClassInfo NumberConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::numberConstructorTable, CREATE_METHOD_TABLE(NumberConstructor) };
 
 /* Source for NumberConstructor.lut.h
 @begin numberConstructorTable
@@ -71,9 +71,14 @@ void NumberConstructor::finishCreation(ExecState* exec, NumberPrototype* numberP
     putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool NumberConstructor::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+bool NumberConstructor::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    return getStaticValueSlot<NumberConstructor, InternalFunction>(exec, ExecState::numberConstructorTable(exec), this, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
+}
+
+bool NumberConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+{
+    return getStaticValueSlot<NumberConstructor, InternalFunction>(exec, ExecState::numberConstructorTable(exec), static_cast<NumberConstructor*>(cell), propertyName, slot);
 }
 
 bool NumberConstructor::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
@@ -115,7 +120,7 @@ static EncodedJSValue JSC_HOST_CALL constructWithNumberConstructor(ExecState* ex
     return JSValue::encode(object);
 }
 
-ConstructType NumberConstructor::getConstructData(ConstructData& constructData)
+ConstructType NumberConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructWithNumberConstructor;
     return ConstructTypeHost;
@@ -127,7 +132,7 @@ static EncodedJSValue JSC_HOST_CALL callNumberConstructor(ExecState* exec)
     return JSValue::encode(jsNumber(!exec->argumentCount() ? 0 : exec->argument(0).toNumber(exec)));
 }
 
-CallType NumberConstructor::getCallData(CallData& callData)
+CallType NumberConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callNumberConstructor;
     return CallTypeHost;

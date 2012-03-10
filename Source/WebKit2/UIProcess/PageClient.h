@@ -97,19 +97,21 @@ public:
 
     virtual void toolTipChanged(const String&, const String&) = 0;
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     virtual void pageDidRequestScroll(const WebCore::IntPoint&) = 0;
 #endif
 #if PLATFORM(QT)
     virtual void didChangeContentsSize(const WebCore::IntSize&) = 0;
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
+#endif
 
+#if PLATFORM(QT) || PLATFORM(GTK)
     virtual void startDrag(const WebCore::DragData&, PassRefPtr<ShareableBitmap> dragImage) = 0;
 #endif
 
     virtual void setCursor(const WebCore::Cursor&) = 0;
     virtual void setCursorHiddenUntilMouseMoves(bool) = 0;
-    virtual void setViewportArguments(const WebCore::ViewportArguments&) = 0;
+    virtual void didChangeViewportProperties(const WebCore::ViewportArguments&) = 0;
 
     virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo) = 0;
     virtual void clearAllEditCommands() = 0;

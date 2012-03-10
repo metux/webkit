@@ -71,27 +71,33 @@ void HashTable::deleteTable() const
     }
 }
 
-void setUpStaticFunctionSlot(ExecState* exec, const HashEntry* entry, JSObject* thisObj, const Identifier& propertyName, PropertySlot& slot)
+bool setUpStaticFunctionSlot(ExecState* exec, const HashEntry* entry, JSObject* thisObj, const Identifier& propertyName, PropertySlot& slot)
 {
     ASSERT(thisObj->globalObject());
     ASSERT(entry->attributes() & Function);
     WriteBarrierBase<Unknown>* location = thisObj->getDirectLocation(exec->globalData(), propertyName);
 
     if (!location) {
+        // If a property is ever deleted from an object with a static table, then we reify
+        // all static functions at that time - after this we shouldn't be re-adding anything.
+        if (thisObj->staticFunctionsReified())
+            return false;
+    
         JSFunction* function;
         JSGlobalObject* globalObject = thisObj->globalObject();
 #if ENABLE(JIT)
         if (entry->generator() || entry->intrinsic() != DFG::NoIntrinsic)
-            function = JSFunction::create(exec, globalObject, globalObject->functionStructure(), entry->functionLength(), propertyName, exec->globalData().getHostFunction(entry->function(), entry->generator(), entry->intrinsic()));
+            function = JSFunction::create(exec, globalObject, entry->functionLength(), propertyName, exec->globalData().getHostFunction(entry->function(), entry->generator(), entry->intrinsic()));
         else
 #endif
-            function = JSFunction::create(exec, globalObject, globalObject->functionStructure(), entry->functionLength(), propertyName, entry->function());
+            function = JSFunction::create(exec, globalObject, entry->functionLength(), propertyName, entry->function());
 
         thisObj->putDirect(exec->globalData(), propertyName, function, entry->attributes());
         location = thisObj->getDirectLocation(exec->globalData(), propertyName);
     }
 
     slot.setValue(thisObj, location->get(), thisObj->offsetForLocation(location));
+    return true;
 }
 
 } // namespace JSC

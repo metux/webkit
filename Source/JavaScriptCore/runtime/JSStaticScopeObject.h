@@ -41,15 +41,18 @@ namespace JSC{
             return scopeObject;
         }
 
-        virtual void visitChildren(SlotVisitor&);
+        static void visitChildren(JSCell*, SlotVisitor&);
         bool isDynamicScope(bool& requiresDynamicChecks) const;
         virtual JSObject* toThisObject(ExecState*) const;
-        virtual JSValue toStrictThisObject(ExecState*) const;
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier&, PropertySlot&);
-        virtual void put(ExecState*, const Identifier&, JSValue, PutPropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+        static void put(JSCell*, ExecState*, const Identifier&, JSValue, PutPropertySlot&);
+
         void putWithAttributes(ExecState*, const Identifier&, JSValue, unsigned attributes);
 
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue proto) { return Structure::create(globalData, globalObject, proto, TypeInfo(ObjectType, StructureFlags), &s_info); }
+
+        static const ClassInfo s_info;
 
     protected:
         void finishCreation(ExecState* exec, const Identifier& identifier, JSValue value, unsigned attributes)

@@ -43,10 +43,6 @@
 #include <sys/mman.h>
 #endif
 
-#if OS(SYMBIAN)
-#include <e32std.h>
-#endif
-
 #if CPU(MIPS) && OS(LINUX)
 #include <sys/cachectl.h>
 #endif
@@ -62,12 +58,6 @@
 // From pkfuncs.h (private header file from the Platform Builder)
 #define CACHE_SYNC_ALL 0x07F
 extern "C" __declspec(dllimport) void CacheRangeFlush(LPVOID pAddr, DWORD dwLength, DWORD dwFlags);
-#endif
-
-#if PLATFORM(BREWMP)
-#include <AEEIMemCache1.h>
-#include <AEEMemCache1.bid>
-#include <wtf/brew/RefPtrBrew.h>
 #endif
 
 #define JIT_ALLOCATOR_LARGE_ALLOC_SIZE (pageSize() * 4)
@@ -192,11 +182,6 @@ public:
             : "r" (code), "r" (reinterpret_cast<char*>(code) + size)
             : "r0", "r1", "r2");
     }
-#elif OS(SYMBIAN)
-    static void cacheFlush(void* code, size_t size)
-    {
-        User::IMB_Range(code, static_cast<char*>(code) + size);
-    }
 #elif CPU(ARM_TRADITIONAL) && OS(LINUX) && COMPILER(RVCT)
     static __asm void cacheFlush(void* code, size_t size);
 #elif CPU(ARM_TRADITIONAL) && OS(LINUX) && COMPILER(GCC)
@@ -219,13 +204,6 @@ public:
     static void cacheFlush(void* code, size_t size)
     {
         CacheRangeFlush(code, size, CACHE_SYNC_ALL);
-    }
-#elif PLATFORM(BREWMP)
-    static void cacheFlush(void* code, size_t size)
-    {
-        RefPtr<IMemCache1> memCache = createRefPtrInstance<IMemCache1>(AEECLSID_MemCache1);
-        IMemCache1_ClearCache(memCache.get(), reinterpret_cast<uint32>(code), size, MEMSPACE_CACHE_FLUSH, MEMSPACE_DATACACHE);
-        IMemCache1_ClearCache(memCache.get(), reinterpret_cast<uint32>(code), size, MEMSPACE_CACHE_INVALIDATE, MEMSPACE_INSTCACHE);
     }
 #elif CPU(SH4) && OS(LINUX)
     static void cacheFlush(void* code, size_t size)

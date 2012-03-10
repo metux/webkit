@@ -8,13 +8,13 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -81,9 +81,6 @@ template<> inline CSSPrimitiveValue::operator unsigned short() const
     return 0;
 }
 
-// FIXME: Temp build fix for Symbian. 
-//Symbian treats unsigned short as int and below specilization contructor becomes duplicate incase of symbian.
-#if !OS(SYMBIAN)
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(int i)
     : m_type(CSS_NUMBER)
     , m_hasCachedCSSText(false)
@@ -99,7 +96,6 @@ template<> inline CSSPrimitiveValue::operator int() const
     ASSERT_NOT_REACHED();
     return 0;
 }
-#endif
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(unsigned i)
     : m_type(CSS_NUMBER)
@@ -1004,11 +1000,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
         case TABLE_CAPTION:
             m_value.ident = CSSValueTableCaption;
             break;
-#if ENABLE(WCSS)
-        case WAP_MARQUEE:
-            m_value.ident = CSSValueWapMarquee;
-            break;
-#endif
         case BOX:
             m_value.ident = CSSValueWebkitBox;
             break;
@@ -1159,30 +1150,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexFlow e)
     case FlowColumnReverse:
         m_value.ident = CSSValueColumnReverse;
         break;
-    case FlowHorizontal:
-        m_value.ident = CSSValueHorizontal;
-        break;
-    case FlowHorizontalReverse:
-        m_value.ident = CSSValueHorizontalReverse;
-        break;
-    case FlowHorizontalLeftToRight:
-        m_value.ident = CSSValueHorizontalLtr;
-        break;
-    case FlowHorizontalRightToLeft:
-        m_value.ident = CSSValueHorizontalRtl;
-        break;
-    case FlowVertical:
-        m_value.ident = CSSValueVertical;
-        break;
-    case FlowVerticalReverse:
-        m_value.ident = CSSValueVerticalReverse;
-        break;
-    case FlowVerticalTopToBottom:
-        m_value.ident = CSSValueVerticalTtb;
-        break;
-    case FlowVerticalBottomToTop:
-        m_value.ident = CSSValueVerticalBtt;
-        break;
     }
 }
 
@@ -1197,22 +1164,6 @@ template<> inline CSSPrimitiveValue::operator EFlexFlow() const
         return FlowColumn;
     case CSSValueColumnReverse:
         return FlowColumnReverse;
-    case CSSValueHorizontal:
-        return FlowHorizontal;
-    case CSSValueHorizontalReverse:
-        return FlowHorizontalReverse;
-    case CSSValueHorizontalLtr:
-        return FlowHorizontalLeftToRight;
-    case CSSValueHorizontalRtl:
-        return FlowHorizontalRightToLeft;
-    case CSSValueVertical:
-        return FlowVertical;
-    case CSSValueVerticalReverse:
-        return FlowVerticalReverse;
-    case CSSValueVerticalTtb:
-        return FlowVerticalTopToBottom;
-    case CSSValueVerticalBtt:
-        return FlowVerticalBottomToTop;
     default:
         ASSERT_NOT_REACHED();
         return FlowRow;
@@ -1642,7 +1593,7 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(RegionOverflow e)
         m_value.ident = CSSValueAuto;
         break;
     case BreakRegionOverflow:
-        m_value.ident = CSSValueWebkitBreak;
+        m_value.ident = CSSValueBreak;
         break;
     }
 }
@@ -1652,7 +1603,7 @@ template<> inline CSSPrimitiveValue::operator RegionOverflow() const
     switch (m_value.ident) {
     case CSSValueAuto:
         return AutoRegionOverflow;
-    case CSSValueWebkitBreak:
+    case CSSValueBreak:
         return BreakRegionOverflow;
     default:
         ASSERT_NOT_REACHED();
@@ -2000,6 +1951,25 @@ template<> inline CSSPrimitiveValue::operator ETextAlign() const
             return TAEND;
         default:
             return static_cast<ETextAlign>(m_value.ident - CSSValueWebkitAuto);
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ETextDecoration() const
+{
+    switch (m_value.ident) {
+    case CSSValueNone:
+        return TDNONE;
+    case CSSValueUnderline:
+        return UNDERLINE;
+    case CSSValueOverline:
+        return OVERLINE;
+    case CSSValueLineThrough:
+        return LINE_THROUGH;
+    case CSSValueBlink:
+        return BLINK;
+    default:
+        ASSERT_NOT_REACHED();
+        return TDNONE;
     }
 }
 
@@ -2738,7 +2708,7 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontSmoothingMode smoothi
         m_value.ident = CSSValueSubpixelAntialiased;
         return;
     }
-    
+
     ASSERT_NOT_REACHED();
     m_value.ident = CSSValueAuto;
 }
@@ -2755,7 +2725,7 @@ template<> inline CSSPrimitiveValue::operator FontSmoothingMode() const
     case CSSValueSubpixelAntialiased:
         return SubpixelAntialiased;
     }
-    
+
     ASSERT_NOT_REACHED();
     return AutoSmoothing;
 }
@@ -3015,7 +2985,7 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ESpeak e)
         break;
     }
 }
-    
+
 template<> inline CSSPrimitiveValue::operator Order() const
 {
     switch (m_value.ident) {
@@ -3640,7 +3610,7 @@ template<> inline CSSPrimitiveValue::operator EVectorEffect() const
         return VE_NONE;
     }
 }
-    
+
 #endif
 
 }

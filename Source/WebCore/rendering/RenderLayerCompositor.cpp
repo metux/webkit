@@ -95,6 +95,7 @@ RenderLayerCompositor::RenderLayerCompositor(RenderView* renderView)
     , m_updateCompositingLayersTimer(this, &RenderLayerCompositor::updateCompositingLayersTimerFired)
     , m_hasAcceleratedCompositing(true)
     , m_compositingTriggers(static_cast<ChromeClient::CompositingTriggerFlags>(ChromeClient::AllTriggers))
+    , m_compositedLayerCount(0)
     , m_showDebugBorders(false)
     , m_showRepaintCounter(false)
     , m_compositingConsultsOverlap(true)
@@ -241,9 +242,18 @@ void RenderLayerCompositor::updateCompositingLayersTimerFired(Timer<RenderLayerC
     updateCompositingLayers();
 }
 
+bool RenderLayerCompositor::hasAnyAdditionalCompositedLayers(const RenderLayer* rootLayer) const
+{
+    return m_compositedLayerCount > (rootLayer->isComposited() ? 1 : 0);
+}
+
 void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType updateType, RenderLayer* updateRoot)
 {
     m_updateCompositingLayersTimer.stop();
+    
+    // Compositing layers will be updated in Document::implicitClose() if suppressed here.
+    if (!m_renderView->document()->visualUpdatesAllowed())
+        return;
 
     if (m_forceCompositingMode && !m_compositing)
         enableCompositingMode(true);
@@ -256,7 +266,7 @@ void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 
     switch (updateType) {
     case CompositingUpdateAfterLayoutOrStyleChange:
-    case CompositingUpdateOnPaitingOrHitTest:
+    case CompositingUpdateOnHitTest:
         checkForHierarchyUpdate = true;
         break;
     case CompositingUpdateOnScroll:
@@ -305,7 +315,9 @@ void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 
         // Host the document layer in the RenderView's root layer.
         if (updateRoot == rootRenderLayer()) {
-            if (childList.isEmpty())
+            // Even when childList is empty, don't drop out of compositing mode if there are
+            // composited layers that we didn't hit in our traversal (e.g. because of visibility:hidden).
+            if (childList.isEmpty() && !hasAnyAdditionalCompositedLayers(updateRoot))
                 destroyRootLayer();
             else
                 m_rootContentLayer->setChildren(childList);
@@ -573,7 +585,7 @@ void RenderLayerCompositor::addToOverlapMap(OverlapMap& overlapMap, RenderLayer*
         boundsComputed = true;
     }
 
-    LayoutRect clipRect = layer->backgroundClipRect(rootRenderLayer(), true).rect();
+    LayoutRect clipRect = layer->backgroundClipRect(rootRenderLayer(), 0, true).rect(); // FIXME: Incorrect for CSS regions.
     clipRect.intersect(layerBounds);
     overlapMap.add(layer, clipRect);
 }
@@ -770,8 +782,9 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* layer, O
     }
 
     // If we're back at the root, and no other layers need to be composited, and the root layer itself doesn't need
-    // to be composited, then we can drop out of compositing mode altogether.
-    if (layer->isRootLayer() && !childState.m_subtreeIsCompositing && !requiresCompositingLayer(layer) && !m_forceCompositingMode) {
+    // to be composited, then we can drop out of compositing mode altogether. However, don't drop out of compositing mode
+    // if there are composited layers that we didn't hit in our traversal (e.g. because of visibility:hidden).
+    if (layer->isRootLayer() && !childState.m_subtreeIsCompositing && !requiresCompositingLayer(layer) && !m_forceCompositingMode && !hasAnyAdditionalCompositedLayers(layer)) {
         enableCompositingMode(false);
         willBeComposited = false;
     }
@@ -1345,7 +1358,7 @@ bool RenderLayerCompositor::clippedByAncestor(RenderLayer* layer) const
     if (!computeClipRoot || computeClipRoot == layer)
         return false;
 
-    return layer->backgroundClipRect(computeClipRoot, true).rect() != PaintInfo::infiniteRect();
+    return layer->backgroundClipRect(computeClipRoot, 0, true).rect() != PaintInfo::infiniteRect(); // FIXME: Incorrect for CSS regions.
 }
 
 // Return true if the given layer is a stacking context and has compositing child
@@ -1786,7 +1799,7 @@ void RenderLayerCompositor::destroyRootLayer()
 
     if (m_layerForScrollCorner) {
         m_layerForScrollCorner = nullptr;
-        m_renderView->frameView()->invalidateScrollCorner();
+        m_renderView->frameView()->invalidateScrollCorner(m_renderView->frameView()->scrollCornerRect());
     }
 
     if (m_overflowControlsHostLayer) {

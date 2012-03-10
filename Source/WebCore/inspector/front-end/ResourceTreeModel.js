@@ -42,6 +42,8 @@ WebInspector.ResourceTreeModel = function(networkManager)
     WebInspector.console.addEventListener(WebInspector.ConsoleModel.Events.RepeatCountUpdated, this._consoleMessageAdded, this);
     WebInspector.console.addEventListener(WebInspector.ConsoleModel.Events.ConsoleCleared, this._consoleCleared, this);
 
+    PageAgent.enable();
+
     this.frontendReused();
     InspectorBackend.registerPageDispatcher(new WebInspector.PageDispatcher(this));
 
@@ -385,10 +387,13 @@ WebInspector.ResourceTreeModel.prototype = {
         }
     },
 
+    /**
+     * @param {PageAgent.Frame} frame
+     * @param {string} url
+     */
     _createResource: function(frame, url)
     {
-        var resource = new WebInspector.Resource(null, url, frame.loaderId);
-        resource.frameId = frame.id;
+        var resource = new WebInspector.Resource(null, url, frame.id, frame.loaderId);
         resource.documentURL = frame.url;
         resource.mimeType = frame.mimeType;
         return resource;
@@ -433,3 +438,8 @@ WebInspector.PageDispatcher.prototype = {
         this._resourceTreeModel._frameDetached(frameId);
     }
 }
+
+/**
+ * @type {WebInspector.ResourceTreeModel}
+ */
+WebInspector.resourceTreeModel = null;

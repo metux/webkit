@@ -26,10 +26,13 @@
 #if ENABLE(SVG)
 #include "RenderSVGRoot.h"
 
+#include "Chrome.h"
+#include "ChromeClient.h"
 #include "Frame.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "LayoutRepainter.h"
+#include "Page.h"
 #include "RenderPart.h"
 #include "RenderSVGContainer.h"
 #include "RenderSVGResource.h"
@@ -114,34 +117,51 @@ void RenderSVGRoot::computePreferredLogicalWidths()
     setPreferredLogicalWidthsDirty(false);
 }
 
-LayoutUnit RenderSVGRoot::computeIntrinsicWidth(LayoutUnit replacedWidth) const
+bool RenderSVGRoot::isEmbeddedThroughImageElement() const
 {
-    if (!style()->width().isPercent())
-        return replacedWidth;
-    // FIXME: Remove unnecessary rounding when layout is off ints: webkit.org/b/63656
-    return static_cast<int>(ceilf(replacedWidth * style()->effectiveZoom()));
+    if (!node())
+        return false;
+
+    Frame* frame = node()->document()->frame();
+    if (!frame)
+        return false;
+
+    // Test whether we're embedded through an img.
+    if (!frame->page() || !frame->page()->chrome())
+        return false;
+
+    ChromeClient* chromeClient = frame->page()->chrome()->client();
+    if (!chromeClient || !chromeClient->isSVGImageChromeClient())
+        return false;
+
+    return true;
 }
 
-LayoutUnit RenderSVGRoot::computeIntrinsicHeight(LayoutUnit replacedHeight) const
+static inline bool isEmbeddedThroughFrameContainingSVGDocument(const Frame* frame)
 {
-    if (!style()->height().isPercent())
-        return replacedHeight;
-    // FIXME: Remove unnecessary rounding when layout is off ints: webkit.org/b/63656
-    return static_cast<int>(ceilf(replacedHeight * style()->effectiveZoom()));
+    ASSERT(frame);
+    ASSERT(frame->document());
+    // If our frame has an owner renderer, we're embedded through eg. object/embed/iframe,
+    // but we only negotiate if we're in an SVG document.
+    return !frame->ownerRenderer() || !frame->document()->isSVGDocument();
 }
 
 LayoutUnit RenderSVGRoot::computeReplacedLogicalWidth(bool includeMaxWidth) const
 {
-    LayoutUnit replacedWidth = RenderBox::computeReplacedLogicalWidth(includeMaxWidth);
+    // When we're embedded through SVGImage (border-image/background-image/<html:img>/...) we're forced to resize to a specific size.
+    LayoutUnit replacedWidth = m_containerSize.width();
+    if (replacedWidth > 0)
+        return replacedWidth;
+
+    replacedWidth = RenderBox::computeReplacedLogicalWidth(includeMaxWidth);
     Frame* frame = node() && node()->document() ? node()->document()->frame() : 0;
     if (!frame)
-        return computeIntrinsicWidth(replacedWidth);
+        return replacedWidth;
 
-    // If our frame has an owner renderer, we're embedded through eg. object/embed.
+    if (isEmbeddedThroughFrameContainingSVGDocument(frame))
+        return replacedWidth;
+
     RenderPart* ownerRenderer = frame->ownerRenderer();
-    if (!ownerRenderer)
-        return computeIntrinsicWidth(replacedWidth);
-
     RenderStyle* ownerRendererStyle = ownerRenderer->style();
     ASSERT(ownerRendererStyle);
     ASSERT(frame->contentRenderer());
@@ -173,17 +193,20 @@ LayoutUnit RenderSVGRoot::computeReplacedLogicalWidth(bool includeMaxWidth) cons
 
 LayoutUnit RenderSVGRoot::computeReplacedLogicalHeight() const
 {
-    LayoutUnit replacedHeight = RenderBox::computeReplacedLogicalHeight();
+    // When we're embedded through SVGImage (border-image/background-image/<html:img>/...) we're forced to resize to a specific size.
+    LayoutUnit replacedHeight = m_containerSize.height();
+    if (replacedHeight > 0)
+        return replacedHeight;
 
+    replacedHeight = RenderBox::computeReplacedLogicalHeight();
     Frame* frame = node() && node()->document() ? node()->document()->frame() : 0;
     if (!frame)
-        return computeIntrinsicHeight(replacedHeight);
+        return replacedHeight;
 
-    // If our frame has an owner renderer, we're embedded through eg. object/embed.
+    if (isEmbeddedThroughFrameContainingSVGDocument(frame))
+        return replacedHeight;
+
     RenderPart* ownerRenderer = frame->ownerRenderer();
-    if (!ownerRenderer)
-        return computeIntrinsicHeight(replacedHeight);
-
     RenderStyle* ownerRendererStyle = ownerRenderer->style();
     ASSERT(ownerRendererStyle);
     ASSERT(frame->contentRenderer());
@@ -213,11 +236,10 @@ void RenderSVGRoot::layout()
     LayoutSize oldSize(width(), height());
     computeLogicalWidth();
     computeLogicalHeight();
-    calcViewport();
 
     SVGSVGElement* svg = static_cast<SVGSVGElement*>(node());
-    m_isLayoutSizeChanged = svg->hasRelativeLengths() && oldSize != size();
- 
+    m_isLayoutSizeChanged = needsLayout || (svg->hasRelativeLengths() && oldSize != size());
+
     if (view() && view()->frameView() && view()->frameView()->embeddedContentBox()) {
         if (!m_needsSizeNegotiationWithHostDocument)
             m_needsSizeNegotiationWithHostDocument = !m_everHadLayout || oldSize != size();
@@ -263,8 +285,8 @@ void RenderSVGRoot::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     if (paintInfo.phase == PaintPhaseBlockBackground)
         return;
 
-    // An empty viewport disables rendering.  FIXME: Should we still render filters?
-    if (m_viewportSize.isEmpty())
+    // An empty viewport disables rendering.
+    if (borderBoxRect().isEmpty())
         return;
 
     // Don't paint if we don't have kids, except if we have filters we should paint those.
@@ -276,7 +298,7 @@ void RenderSVGRoot::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     childPaintInfo.context->save();
 
     // Apply initial viewport clip - not affected by overflow handling
-    childPaintInfo.context->clip(overflowClipRect(borderBoxOriginInContainer));
+    childPaintInfo.context->clip(overflowClipRect(borderBoxOriginInContainer, paintInfo.renderRegion));
 
     // Convert from container offsets (html renderers) to a relative transform (svg renderers).
     // Transform from our paint container's coordinate system to our local coords.
@@ -321,26 +343,6 @@ void RenderSVGRoot::updateFromElement()
 {
     RenderBox::updateFromElement();
     SVGResourcesCache::clientUpdatedFromElement(this, style());
-}
-
-void RenderSVGRoot::calcViewport()
-{
-    SVGSVGElement* svg = static_cast<SVGSVGElement*>(node());
-
-    if (!svg->hasSetContainerSize()) {
-        // In the normal case of <svg> being stand-alone or in a CSSBoxModel object we use
-        // RenderBox::width()/height() (which pulls data from RenderStyle)
-        m_viewportSize = FloatSize(width(), height());
-        return;
-    }
-
-    // In the SVGImage case grab the SVGLength values off of SVGSVGElement and use
-    // the special relativeWidthValue accessors which respect the specified containerSize
-    // FIXME: Check how SVGImage + zooming is supposed to be handled?
-    SVGLength width = svg->width();
-    SVGLength height = svg->height();
-    m_viewportSize = FloatSize(width.unitType() == LengthTypePercentage ? svg->relativeWidthValue() : width.value(svg),
-                               height.unitType() == LengthTypePercentage ? svg->relativeHeightValue() : height.value(svg));
 }
 
 // RenderBox methods will expect coordinates w/o any transforms in coordinates
@@ -391,7 +393,7 @@ void RenderSVGRoot::computeRectForRepaint(RenderBoxModelObject* repaintContainer
     repaintRect = localToBorderBoxTransform().mapRect(repaintRect);
 
     // Apply initial viewport clip - not affected by overflow settings    
-    repaintRect.intersect(enclosingLayoutRect(FloatRect(FloatPoint(), m_viewportSize)));
+    repaintRect.intersect(borderBoxRect());
 
     const SVGRenderStyle* svgStyle = style()->svgStyle();
     if (const ShadowData* shadow = svgStyle->shadow())

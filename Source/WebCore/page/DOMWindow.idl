@@ -164,19 +164,17 @@ module window {
         WebKitPoint webkitConvertPointFromNodeToPage(in [Optional=CallWithDefaultValue] Node node, 
                                                      in [Optional=CallWithDefaultValue] WebKitPoint p);
 
-#if defined(ENABLE_OFFLINE_WEB_APPLICATIONS) && ENABLE_OFFLINE_WEB_APPLICATIONS
         readonly attribute [EnabledAtRuntime] DOMApplicationCache applicationCache;
-#endif    
 #if defined(ENABLE_SQL_DATABASE) && ENABLE_SQL_DATABASE
         [EnabledAtRuntime] Database openDatabase(in DOMString name, in DOMString version, in DOMString displayName, in unsigned long estimatedSize, in [Callback, Optional] DatabaseCallback creationCallback)
             raises(DOMException);
 #endif
-#if defined(ENABLE_DOM_STORAGE) && ENABLE_DOM_STORAGE
+
         readonly attribute [EnabledAtRuntime] Storage sessionStorage
             getter raises(DOMException);
         readonly attribute [EnabledAtRuntime] Storage localStorage
             getter raises(DOMException);
-#endif
+
 #if defined(ENABLE_NOTIFICATIONS) && ENABLE_NOTIFICATIONS
         readonly attribute [EnabledAtRuntime] NotificationCenter webkitNotifications;
 #endif
@@ -365,6 +363,10 @@ module window {
         attribute CSSValueListConstructor CSSValueList;
         attribute WebKitCSSTransformValueConstructor WebKitCSSTransformValue;
 
+#if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
+        attribute WebKitCSSFilterValueConstructor WebKitCSSFilterValue;
+#endif
+
         attribute CSSRuleConstructor CSSRule;
         attribute CSSCharsetRuleConstructor CSSCharsetRule;
         attribute CSSFontFaceRuleConstructor CSSFontFaceRule;
@@ -545,7 +547,7 @@ module window {
         attribute [Conditional=DEVICE_ORIENTATION, EnabledAtRuntime] DeviceOrientationEventConstructor DeviceOrientationEvent;
         attribute [Conditional=TOUCH_EVENTS] TouchEventConstructor TouchEvent;
         attribute [Conditional=WEB_SOCKETS] CloseEventConstructor CloseEvent;
-        attribute [Conditional=DOM_STORAGE] StorageEventConstructor StorageEvent;
+        attribute StorageEventConstructor StorageEvent;
         attribute [Conditional=WEB_AUDIO] AudioProcessingEventConstructor AudioProcessingEvent;
         attribute [Conditional=WEB_AUDIO] OfflineAudioCompletionEventConstructor OfflineAudioCompletionEvent;
         attribute [Conditional=INPUT_SPEECH] SpeechInputEventConstructor SpeechInputEvent;
@@ -603,6 +605,10 @@ module window {
         attribute [JSCCustomGetter,EnabledAtRuntime] WebSocketConstructor WebSocket; // Usable with the new operator
 #endif
 
+#if defined(ENABLE_VIDEO_TRACK) && ENABLE_VIDEO_TRACK
+        attribute [EnabledAtRuntime=webkitVideoTrack] TextTrackCueConstructor TextTrackCue; // Usable with the new operator
+#endif
+
         attribute DOMPluginConstructor Plugin;
         attribute DOMPluginArrayConstructor PluginArray;
 
@@ -612,9 +618,7 @@ module window {
         attribute ClientRectConstructor ClientRect;
         attribute ClientRectListConstructor ClientRectList;
 
-#if defined(ENABLE_DOM_STORAGE) && ENABLE_DOM_STORAGE
         attribute StorageConstructor Storage;
-#endif
 
         attribute [CustomGetter, Conditional=VIDEO, EnabledAtRuntime] HTMLAudioElementConstructor Audio; // Usable with the new operator
         attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLAudioElementConstructor HTMLAudioElement;
@@ -629,11 +633,9 @@ module window {
         attribute WebKitAnimationListConstructor WebKitAnimationList;
 #endif
 
-#if defined(ENABLE_XPATH) && ENABLE_XPATH
         attribute XPathEvaluatorConstructor XPathEvaluator;
         attribute XPathResultConstructor XPathResult;
         attribute XPathExceptionConstructor XPathException;
-#endif
 
 #if defined(ENABLE_SVG) && ENABLE_SVG
         // Expose all implemented SVG 1.1 interfaces, excluding the SVG MI interfaces:
@@ -806,6 +808,8 @@ module window {
 #if defined(ENABLE_QUOTA) && ENABLE_QUOTA
         readonly attribute [EnabledAtRuntime=Quota] StorageInfo webkitStorageInfo;
 #endif
+
+        attribute [Conditional=MUTATION_OBSERVERS] WebKitMutationObserverConstructor WebKitMutationObserver;
 
 #endif // defined(LANGUAGE_JAVASCRIPT)
 

@@ -26,7 +26,7 @@
 #ifndef TiledDrawingAreaProxy_h
 #define TiledDrawingAreaProxy_h
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
 
 #include "DrawingAreaProxy.h"
 #include <WebCore/GraphicsContext.h>
@@ -60,8 +60,8 @@ typedef WKView PlatformWebView;
 class WebView;
 typedef WebView PlatformWebView;
 #elif PLATFORM(QT)
-class TouchViewInterface;
-typedef TouchViewInterface PlatformWebView;
+class QtTouchViewInterface;
+typedef QtTouchViewInterface PlatformWebView;
 #endif
 
 class TiledDrawingAreaProxy : public DrawingAreaProxy {
@@ -85,10 +85,8 @@ private:
     void updateWebView(const Vector<WebCore::IntRect>& paintedArea);
 
     // DrawingAreaProxy
-    virtual bool paint(const WebCore::IntRect&, PlatformDrawingContext);
     virtual void sizeDidChange();
     virtual void deviceScaleFactorDidChange();
-    virtual void setPageIsVisible(bool isVisible);
 
     virtual void createTile(int tileID, const UpdateInfo&);
     virtual void updateTile(int tileID, const UpdateInfo&);
@@ -98,7 +96,6 @@ private:
 
 private:
     bool m_isWaitingForDidSetFrameNotification;
-    bool m_isVisible;
 
     PlatformWebView* m_webView;
 #if PLATFORM(QT)
@@ -109,6 +106,6 @@ private:
 
 } // namespace WebKit
 
-#endif // TILED_BACKING_STORE
+#endif // USE(TILED_BACKING_STORE)
 
 #endif // TiledDrawingAreaProxy_h

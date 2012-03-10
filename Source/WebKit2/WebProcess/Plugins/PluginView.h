@@ -47,7 +47,7 @@ namespace WebCore {
 
 namespace WebKit {
 
-class PluginView : public WebCore::PluginViewBase, WebCore::MediaCanStartListener, PluginController, WebFrame::LoadListener {
+class PluginView : public WebCore::PluginViewBase, public PluginController, private WebCore::MediaCanStartListener, private WebFrame::LoadListener {
 public:
     static PassRefPtr<PluginView> create(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters&);
 
@@ -63,9 +63,13 @@ public:
 #if PLATFORM(MAC)
     void setWindowIsVisible(bool);
     void setWindowIsFocused(bool);
+    void setDeviceScaleFactor(float);
     void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     bool sendComplexTextInput(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
 #endif
+
+    // FIXME: Remove this; nobody should have to know about the plug-in view's renderer except the plug-in view itself.
+    WebCore::RenderBoxModelObject* renderer() const;
 
 private:
     PluginView(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters& parameters);
@@ -103,10 +107,12 @@ private:
     virtual JSC::JSObject* scriptObject(JSC::JSGlobalObject*);
     virtual void privateBrowsingStateChanged(bool);
     virtual bool getFormValue(String&);
+    virtual bool scroll(WebCore::ScrollDirection, WebCore::ScrollGranularity);
+    virtual WebCore::Scrollbar* horizontalScrollbar();
+    virtual WebCore::Scrollbar* verticalScrollbar();
 
     // WebCore::Widget
     virtual void setFrameRect(const WebCore::IntRect&);
-    virtual void setBoundsSize(const WebCore::IntSize&);
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect&);
     virtual void invalidateRect(const WebCore::IntRect&);
     virtual void setFocus(bool);
@@ -116,6 +122,7 @@ private:
     virtual void notifyWidget(WebCore::WidgetNotification);
     virtual void show();
     virtual void hide();
+    virtual bool transformsAffectFrameRect();
 
     // WebCore::MediaCanStartListener
     virtual void mediaCanStart();
@@ -144,6 +151,7 @@ private:
     virtual void pluginFocusOrWindowFocusChanged(bool pluginHasFocusAndWindowHasFocus);
     virtual void setComplexTextInputState(PluginComplexTextInputState);
     virtual mach_port_t compositingRenderServerPort();
+    virtual float contentsScaleFactor();
 #endif
     virtual String proxiesForURL(const String&);
     virtual String cookiesForURL(const String&);
@@ -195,7 +203,6 @@ private:
     RefPtr<WebCore::SharedBuffer> m_manualStreamData;
     
     RefPtr<ShareableBitmap> m_snapshot;
-    WebCore::IntSize m_boundsSize;
 };
 
 } // namespace WebKit

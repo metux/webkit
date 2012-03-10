@@ -822,6 +822,12 @@ bool NetscapePlugin::handleMouseLeaveEvent(const WebMouseEvent& mouseEvent)
     return platformHandleMouseLeaveEvent(mouseEvent);
 }
 
+bool NetscapePlugin::handleContextMenuEvent(const WebMouseEvent&)
+{
+    // We don't know if the plug-in has handled mousedown event by displaying a context menu, so we never want WebKit to show a default one.
+    return true;
+}
+
 bool NetscapePlugin::handleKeyboardEvent(const WebKeyboardEvent& keyboardEvent)
 {
     ASSERT(m_isStarted);
@@ -878,6 +884,26 @@ bool NetscapePlugin::getFormValue(String& formValue)
     // The plug-in allocates the form value string with NPN_MemAlloc so it needs to be freed with NPN_MemFree.
     npnMemFree(formValueString);
     return true;
+}
+
+bool NetscapePlugin::handleScroll(ScrollDirection, ScrollGranularity)
+{
+    return false;
+}
+
+bool NetscapePlugin::wantsWindowRelativeCoordinates()
+{
+    return true;
+}
+
+Scrollbar* NetscapePlugin::horizontalScrollbar()
+{
+    return 0;
+}
+
+Scrollbar* NetscapePlugin::verticalScrollbar()
+{
+    return 0;
 }
 
 bool NetscapePlugin::supportsSnapshotting() const

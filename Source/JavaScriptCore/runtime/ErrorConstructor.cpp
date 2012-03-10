@@ -29,6 +29,8 @@ namespace JSC {
 
 ASSERT_CLASS_FITS_IN_CELL(ErrorConstructor);
 
+const ClassInfo ErrorConstructor::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(ErrorConstructor) };
+
 ErrorConstructor::ErrorConstructor(JSGlobalObject* globalObject, Structure* structure)
     : InternalFunction(globalObject, structure)
 {
@@ -51,7 +53,7 @@ static EncodedJSValue JSC_HOST_CALL constructWithErrorConstructor(ExecState* exe
     return JSValue::encode(ErrorInstance::create(exec, errorStructure, message));
 }
 
-ConstructType ErrorConstructor::getConstructData(ConstructData& constructData)
+ConstructType ErrorConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructWithErrorConstructor;
     return ConstructTypeHost;
@@ -64,7 +66,7 @@ static EncodedJSValue JSC_HOST_CALL callErrorConstructor(ExecState* exec)
     return JSValue::encode(ErrorInstance::create(exec, errorStructure, message));
 }
 
-CallType ErrorConstructor::getCallData(CallData& callData)
+CallType ErrorConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callErrorConstructor;
     return CallTypeHost;

@@ -66,7 +66,7 @@ public:
     const String& filename() const { return m_fileName; }
     unsigned lineno() const { return m_lineNumber; }
 
-    virtual bool isErrorEvent() const;
+    virtual const AtomicString& interfaceName() const;
 
 private:
     ErrorEvent();

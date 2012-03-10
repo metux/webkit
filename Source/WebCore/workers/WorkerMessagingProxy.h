@@ -53,7 +53,7 @@ namespace WebCore {
 
         // Implementations of WorkerContextProxy.
         // (Only use these methods in the worker object thread.)
-        virtual void startWorkerContext(const KURL& scriptURL, const String& userAgent, const String& sourceCode);
+        virtual void startWorkerContext(const KURL& scriptURL, const String& userAgent, const String& sourceCode, WorkerThreadStartMode);
         virtual void terminateWorkerContext();
         virtual void postMessageToWorkerContext(PassRefPtr<SerializedScriptValue>, PassOwnPtr<MessagePortChannelArray>);
         virtual bool hasPendingActivity() const;
@@ -71,6 +71,7 @@ namespace WebCore {
         virtual void postConsoleMessageToWorkerObject(MessageSource, MessageType, MessageLevel, const String& message, int lineNumber, const String& sourceURL);
 #if ENABLE(INSPECTOR)
         virtual void postMessageToPageInspector(const String&);
+        virtual void updateInspectorStateCookie(const String&);
 #endif
         virtual void confirmMessageFromWorkerObject(bool hasPendingActivity);
         virtual void reportPendingActivity(bool hasPendingActivity);

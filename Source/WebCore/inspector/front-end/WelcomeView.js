@@ -27,9 +27,14 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @extends {WebInspector.View}
+ * @constructor
+ */
 WebInspector.WelcomeView = function(identifier, headingText, instructionsText)
 {
     WebInspector.View.call(this);
+    this.registerRequiredCSS("panelEnablerView.css");
 
     this.element.addStyleClass("panel-enabler-view");
     this.element.addStyleClass(identifier);

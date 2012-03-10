@@ -26,23 +26,23 @@
 #ifndef PlatformWebView_h
 #define PlatformWebView_h
 
+#include <WebKit2/WKRetainPtr.h>
+
 #if defined(BUILDING_QT__)
-namespace WTR {
-class WebView;
-}
-typedef WTR::WebView* PlatformWKView;
-class QMainWindow;
-typedef QMainWindow* PlatformWindow;
+class QDesktopWebView;
+typedef QDesktopWebView* PlatformWKView;
+class QSGView;
+typedef QSGView* PlatformWindow;
 #elif defined(__APPLE__) && __APPLE__
 #if __OBJC__
 @class WKView;
-@class NSWindow;
+@class WebKitTestRunnerWindow;
 #else
 class WKView;
-class NSWindow;
+class WebKitTestRunnerWindow;
 #endif
 typedef WKView* PlatformWKView;
-typedef NSWindow* PlatformWindow;
+typedef WebKitTestRunnerWindow* PlatformWindow;
 #elif defined(WIN32) || defined(_WIN32)
 typedef WKViewRef PlatformWKView;
 typedef HWND PlatformWindow;
@@ -65,12 +65,26 @@ public:
     void resizeTo(unsigned width, unsigned height);
     void focus();
 
+#if PLATFORM(QT)
+    bool sendEvent(QEvent*);
+    void postEvent(QEvent*);
+#endif
+
     WKRect windowFrame();
     void setWindowFrame(WKRect);
+    
+    void addChromeInputField();
+    void removeChromeInputField();
+    void makeWebViewFirstResponder();
+    void setWindowIsKey(bool isKey) { m_windowIsKey = isKey; }
+    bool windowIsKey() const { return m_windowIsKey; }
+    
+    WKRetainPtr<WKImageRef> windowSnapshotImage();
 
 private:
     PlatformWKView m_view;
     PlatformWindow m_window;
+    bool m_windowIsKey;
 };
 
 } // namespace WTR

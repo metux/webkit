@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ * @extends {WebInspector.View}
+ */
 WebInspector.DatabaseQueryView = function(database)
 {
     WebInspector.View.call(this);
@@ -45,11 +49,13 @@ WebInspector.DatabaseQueryView = function(database)
     this.prompt = new WebInspector.TextPrompt(this.promptElement, this.completions.bind(this), " ");
 }
 
-WebInspector.DatabaseQueryView.prototype = {
-    show: function(parentElement)
-    {
-        WebInspector.View.prototype.show.call(this, parentElement);
+WebInspector.DatabaseQueryView.Events = {
+    SchemaUpdated: "SchemaUpdated"
+}
 
+WebInspector.DatabaseQueryView.prototype = {
+    wasShown: function()
+    {
         function moveBackIfOutside()
         {
             if (!this.prompt.isCaretInsidePrompt() && window.getSelection().isCollapsed)
@@ -139,17 +145,17 @@ WebInspector.DatabaseQueryView.prototype = {
 
     _queryFinished: function(query, columnNames, values)
     {
-        var dataGrid = WebInspector.panels.resources.dataGridForResult(columnNames, values);
+        var dataGrid = WebInspector.DataGrid.createSortableDataGrid(columnNames, values);
         var trimmedQuery = query.trim();
 
         if (dataGrid) {
             dataGrid.element.addStyleClass("inline");
-            this._appendQueryResult(trimmedQuery, dataGrid.element);
+            this._appendViewQueryResult(trimmedQuery, dataGrid);
             dataGrid.autoSizeColumns(5);
         }
 
         if (trimmedQuery.match(/^create /i) || trimmedQuery.match(/^drop table /i))
-            WebInspector.panels.resources.updateDatabaseTables(this.database);
+            this.dispatchEventToListeners(WebInspector.DatabaseQueryView.Events.SchemaUpdated, this.database);
     },
 
     _queryError: function(query, error)
@@ -161,13 +167,39 @@ WebInspector.DatabaseQueryView.prototype = {
         else
             var message = WebInspector.UIString("An unexpected error %s occurred.", error.code);
 
-        this._appendQueryResult(query, message, "error");
+        this._appendErrorQueryResult(query, message);
     },
 
-    _appendQueryResult: function(query, result, resultClassName)
+    /**
+     * @param {string} query
+     * @param {WebInspector.View} view
+     */
+    _appendViewQueryResult: function(query, view)
+    {
+        var resultElement = this._appendQueryResult(query);
+        view.show(resultElement);
+
+        this.promptElement.scrollIntoView(false);
+    },
+
+    /**
+     * @param {string} query
+     * @param {string} errorText
+     */
+    _appendErrorQueryResult: function(query, errorText)
+    {
+        var resultElement = this._appendQueryResult(query);
+        resultElement.addStyleClass("error")
+        resultElement.textContent = errorText;
+
+        this.promptElement.scrollIntoView(false);
+    },
+
+    _appendQueryResult: function(query)
     {
         var element = document.createElement("div");
         element.className = "database-user-query";
+        this.element.insertBefore(element, this.promptElement);
 
         var commandTextElement = document.createElement("span");
         commandTextElement.className = "database-query-text";
@@ -176,20 +208,8 @@ WebInspector.DatabaseQueryView.prototype = {
 
         var resultElement = document.createElement("div");
         resultElement.className = "database-query-result";
-
-        if (resultClassName)
-            resultElement.addStyleClass(resultClassName);
-
-        if (typeof result === "string" || result instanceof String)
-            resultElement.textContent = result;
-        else if (result && result.nodeName)
-            resultElement.appendChild(result);
-
-        if (resultElement.childNodes.length)
-            element.appendChild(resultElement);
-
-        this.element.insertBefore(element, this.promptElement);
-        this.promptElement.scrollIntoView(false);
+        element.appendChild(resultElement);
+        return resultElement;
     }
 }
 

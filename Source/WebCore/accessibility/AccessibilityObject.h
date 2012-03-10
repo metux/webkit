@@ -30,6 +30,7 @@
 #ifndef AccessibilityObject_h
 #define AccessibilityObject_h
 
+#include "FloatQuad.h"
 #include "LayoutTypes.h"
 #include "VisiblePosition.h"
 #include "VisibleSelection.h"
@@ -178,6 +179,8 @@ enum AccessibilityRole {
     SheetRole,
     SliderRole,
     SliderThumbRole,
+    SpinButtonRole,
+    SpinButtonPartRole,
     SplitGroupRole,
     SplitterRole,
     StaticTextRole,
@@ -369,7 +372,11 @@ public:
     virtual bool isMenuList() const { return false; }
     virtual bool isMenuListPopup() const { return false; }
     virtual bool isMenuListOption() const { return false; }
+    virtual bool isSpinButton() const { return false; }
+    virtual bool isSpinButtonPart() const { return false; }
+    virtual bool isMockObject() const { return false; }
     bool isTextControl() const { return roleValue() == TextAreaRole || roleValue() == TextFieldRole; }
+    bool isARIATextControl() const;
     bool isTabList() const { return roleValue() == TabListRole; }
     bool isTabItem() const { return roleValue() == TabRole; }
     bool isRadioGroup() const { return roleValue() == RadioGroupRole; }
@@ -506,8 +513,9 @@ public:
     virtual LayoutRect boundingBoxRect() const { return LayoutRect(); }
     virtual LayoutRect elementRect() const = 0;
     virtual LayoutSize size() const { return elementRect().size(); }
-    virtual LayoutPoint clickPoint() const;
-
+    virtual LayoutPoint clickPoint();
+    static LayoutRect boundingBoxForQuads(RenderObject*, const Vector<FloatQuad>&);
+    
     virtual PlainTextRange selectedTextRange() const { return PlainTextRange(); }
     unsigned selectionStart() const { return selectedTextRange().start; }
     unsigned selectionEnd() const { return selectedTextRange().length; }
@@ -551,12 +559,13 @@ public:
 
     virtual void childrenChanged() { }
     virtual void contentChanged() { }
-    virtual const AccessibilityChildrenVector& children() { return m_children; }
+    const AccessibilityChildrenVector& children();
     virtual void addChildren() { }
     virtual bool canHaveChildren() const { return true; }
     virtual bool hasChildren() const { return m_haveChildren; }
     virtual void updateChildrenIfNecessary();
     virtual void clearChildren();
+    virtual void detachFromParent() { }
 
     virtual void selectedChildren(AccessibilityChildrenVector&) { }
     virtual void visibleChildren(AccessibilityChildrenVector&) { }

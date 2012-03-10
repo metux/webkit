@@ -201,8 +201,8 @@ static JSCell* formatLocaleDate(ExecState* exec, const GregorianDateTime& gdt, L
 {
 #if HAVE(LANGINFO_H)
     static const nl_item formats[] = { D_T_FMT, D_FMT, T_FMT };
-#elif (OS(WINCE) && !PLATFORM(QT)) || OS(SYMBIAN)
-     // strftime() does not support '#' on WinCE or Symbian
+#elif (OS(WINCE) && !PLATFORM(QT))
+     // strftime() does not support '#' on WinCE
     static const char* const formatStrings[] = { "%c", "%x", "%X" };
 #else
     static const char* const formatStrings[] = { "%#c", "%#x", "%X" };
@@ -375,7 +375,7 @@ static bool fillStructuresUsingDateArgs(ExecState *exec, int maxArgs, double *ms
     return ok;
 }
 
-const ClassInfo DatePrototype::s_info = {"Date", &DateInstance::s_info, 0, ExecState::dateTable};
+const ClassInfo DatePrototype::s_info = {"Date", &DateInstance::s_info, 0, ExecState::dateTable, CREATE_METHOD_TABLE(DatePrototype)};
 
 /* Source for DatePrototype.lut.h
 @begin dateTable
@@ -443,11 +443,15 @@ void DatePrototype::finishCreation(ExecState* exec, JSGlobalObject*)
     // The constructor will be added later, after DateConstructor has been built.
 }
 
-bool DatePrototype::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+bool DatePrototype::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::dateTable(exec), this, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
 }
 
+bool DatePrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+{
+    return getStaticFunctionSlot<JSObject>(exec, ExecState::dateTable(exec), static_cast<DatePrototype*>(cell), propertyName, slot);
+}
 
 bool DatePrototype::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
@@ -499,7 +503,9 @@ EncodedJSValue JSC_HOST_CALL dateProtoFuncToISOString(ExecState* exec)
         return throwVMTypeError(exec);
     
     DateInstance* thisDateObj = asDateInstance(thisValue); 
-    
+    if (!isfinite(thisDateObj->internalNumber()))
+        return throwVMError(exec, createRangeError(exec, "Invalid Date"));
+
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
         return JSValue::encode(jsNontrivialString(exec, "Invalid Date"));

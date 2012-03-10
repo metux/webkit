@@ -56,6 +56,7 @@
 #include "RegExpCache.h"
 #include "RegExpObject.h"
 #include "StrictEvalActivation.h"
+#include "StrongInlines.h"
 #include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
 #if PLATFORM(MAC)
@@ -186,7 +187,7 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , interpreter(0)
     , heap(this, heapSize)
 #if ENABLE(DFG_JIT)
-    , sizeOfLastOSRScratchBuffer(0)
+    , sizeOfLastScratchBuffer(0)
 #endif
     , dynamicGlobalObject(0)
     , cachedUTCOffset(std::numeric_limits<double>::quiet_NaN())
@@ -197,6 +198,9 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
 #endif
 #ifndef NDEBUG
     , exclusiveThread(0)
+#endif
+#if CPU(X86) && ENABLE(JIT)
+    , m_timeoutCount(512)
 #endif
 #if ENABLE(GC_VALIDATION)
     , m_isInitializingObject(false)
@@ -352,8 +356,8 @@ JSGlobalData::~JSGlobalData()
 #endif
 
 #if ENABLE(DFG_JIT)
-    for (unsigned i = 0; i < osrScratchBuffers.size(); ++i)
-        fastFree(osrScratchBuffers[i]);
+    for (unsigned i = 0; i < scratchBuffers.size(); ++i)
+        fastFree(scratchBuffers[i]);
 #endif
 }
 
@@ -395,18 +399,18 @@ JSGlobalData*& JSGlobalData::sharedInstanceInternal()
 }
 
 #if ENABLE(JIT)
-NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function)
+NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)
 {
-    return jitStubs->hostFunctionStub(this, function);
+    return jitStubs->hostFunctionStub(this, function, constructor);
 }
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, ThunkGenerator generator, DFG::Intrinsic intrinsic)
 {
     return jitStubs->hostFunctionStub(this, function, generator, intrinsic);
 }
 #else
-NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function)
+NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)
 {
-    return NativeExecutable::create(*this, function, callHostFunctionAsConstructor);
+    return NativeExecutable::create(*this, function, constructor);
 }
 #endif
 
@@ -447,7 +451,7 @@ void JSGlobalData::recompileAllJSFunctions()
     // up throwing away code that is live on the stack.
     ASSERT(!dynamicGlobalObject);
     
-    heap.forEachCell<Recompiler>();
+    heap.objectSpace().forEachCell<Recompiler>();
 }
 
 struct StackPreservingRecompiler : public MarkedBlock::VoidFunctor {
@@ -488,7 +492,7 @@ void JSGlobalData::releaseExecutableMemory()
                 recompiler.currentlyExecutingFunctions.add(static_cast<FunctionExecutable*>(executable));
                 
         }
-        heap.forEachCell<StackPreservingRecompiler>(recompiler);
+        heap.objectSpace().forEachCell<StackPreservingRecompiler>(recompiler);
     }
     m_regExpCache->invalidateCode();
     heap.collectAllGarbage();

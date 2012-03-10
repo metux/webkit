@@ -23,7 +23,7 @@
 
 #include "KURLHash.h"
 #include "PlatformString.h"
-#include "StyleList.h"
+#include "StyleBase.h"
 #include <wtf/ListHashSet.h>
 
 namespace WebCore {
@@ -32,7 +32,7 @@ class CachedCSSStyleSheet;
 class MediaList;
 class Node;
 
-class StyleSheet : public StyleList {
+class StyleSheet : public StyleBase {
 public:
     virtual ~StyleSheet();
 
@@ -61,13 +61,10 @@ public:
     virtual void styleSheetChanged() { }
 
     virtual KURL completeURL(const String& url) const;
-    virtual void addSubresourceStyleURLs(ListHashSet<KURL>&) { }
-
     virtual bool parseString(const String&, bool strict = true) = 0;
 
 protected:
     StyleSheet(Node* ownerNode, const String& href, const KURL& finalURL);
-    StyleSheet(StyleSheet* parentSheet, const String& href, const KURL& finalURL);
     StyleSheet(StyleBase* owner, const String& href, const KURL& finalURL);
 
 private:

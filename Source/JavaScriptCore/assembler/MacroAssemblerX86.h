@@ -44,13 +44,16 @@ public:
     using MacroAssemblerX86Common::add32;
     using MacroAssemblerX86Common::and32;
     using MacroAssemblerX86Common::branchAdd32;
+    using MacroAssemblerX86Common::branchSub32;
     using MacroAssemblerX86Common::sub32;
     using MacroAssemblerX86Common::or32;
     using MacroAssemblerX86Common::load32;
     using MacroAssemblerX86Common::store32;
     using MacroAssemblerX86Common::branch32;
     using MacroAssemblerX86Common::call;
+    using MacroAssemblerX86Common::addDouble;
     using MacroAssemblerX86Common::loadDouble;
+    using MacroAssemblerX86Common::storeDouble;
     using MacroAssemblerX86Common::convertInt32ToDouble;
 
     void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
@@ -83,15 +86,26 @@ public:
         m_assembler.subl_im(imm.m_value, address.m_ptr);
     }
 
-    void load32(void* address, RegisterID dest)
+    void load32(const void* address, RegisterID dest)
     {
         m_assembler.movl_mr(address, dest);
+    }
+
+    void addDouble(AbsoluteAddress address, FPRegisterID dest)
+    {
+        m_assembler.addsd_mr(address.m_ptr, dest);
     }
 
     void loadDouble(const void* address, FPRegisterID dest)
     {
         ASSERT(isSSE2Present());
         m_assembler.movsd_mr(address, dest);
+    }
+
+    void storeDouble(FPRegisterID src, const void* address)
+    {
+        ASSERT(isSSE2Present());
+        m_assembler.movsd_rm(src, address);
     }
 
     void convertInt32ToDouble(AbsoluteAddress src, FPRegisterID dest)
@@ -109,9 +123,15 @@ public:
         m_assembler.movl_rm(src, address);
     }
 
-    Jump branchAdd32(ResultCondition cond, TrustedImm32 src, AbsoluteAddress dest)
+    Jump branchAdd32(ResultCondition cond, TrustedImm32 imm, AbsoluteAddress dest)
     {
-        m_assembler.addl_im(src.m_value, dest.m_ptr);
+        m_assembler.addl_im(imm.m_value, dest.m_ptr);
+        return Jump(m_assembler.jCC(x86Condition(cond)));
+    }
+
+    Jump branchSub32(ResultCondition cond, TrustedImm32 imm, AbsoluteAddress dest)
+    {
+        m_assembler.subl_im(imm.m_value, dest.m_ptr);
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 

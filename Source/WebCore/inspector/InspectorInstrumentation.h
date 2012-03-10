@@ -60,6 +60,7 @@ class ScriptCallStack;
 class ScriptExecutionContext;
 class ScriptProfile;
 class StorageArea;
+class WorkerContext;
 class WorkerContextProxy;
 class XMLHttpRequest;
 
@@ -81,7 +82,8 @@ public:
     static void didInsertDOMNode(Document*, Node*);
     static void willRemoveDOMNode(Document*, Node*);
     static void willModifyDOMAttr(Document*, Element*);
-    static void didModifyDOMAttr(Document*, Element*);
+    static void didModifyDOMAttr(Document*, Element*, const AtomicString& name, const AtomicString& value);
+    static void didRemoveDOMAttr(Document*, Element*, const AtomicString& name);
     static void characterDataModified(Document*, CharacterData*);
     static void didInvalidateStyleAttr(Document*, Node*);
     static void frameWindowDiscarded(Frame*, DOMWindow*);
@@ -138,8 +140,8 @@ public:
     static void didLoadXHRSynchronously(ScriptExecutionContext*);
     static void scriptImported(ScriptExecutionContext*, unsigned long identifier, const String& sourceString);
     static void didReceiveScriptResponse(ScriptExecutionContext*, unsigned long identifier);
-    static void domContentLoadedEventFired(Frame*, const KURL&);
-    static void loadEventFired(Frame*, const KURL&);
+    static void domContentLoadedEventFired(Frame*);
+    static void loadEventFired(Frame*);
     static void frameDetachedFromParent(Frame*);
     static void didCommitLoad(Frame*, DocumentLoader*);
     static void loaderDetachedFromFrame(Frame*, DocumentLoader*);
@@ -170,15 +172,15 @@ public:
     static void didOpenDatabase(ScriptExecutionContext*, PassRefPtr<Database>, const String& domain, const String& name, const String& version);
 #endif
 
-#if ENABLE(DOM_STORAGE)
     static void didUseDOMStorage(Page*, StorageArea*, bool isLocalStorage, Frame*);
-#endif
 
 #if ENABLE(WORKERS)
+    static bool shouldPauseDedicatedWorkerOnStart(ScriptExecutionContext*);
     static void didStartWorkerContext(ScriptExecutionContext*, WorkerContextProxy*, const KURL&);
     static void didCreateWorker(ScriptExecutionContext*, intptr_t id, const String& url, bool isSharedWorker);
     static void didDestroyWorker(ScriptExecutionContext*, intptr_t id);
     static void workerContextTerminated(ScriptExecutionContext*, WorkerContextProxy*);
+    static void willEvaluateWorkerScript(WorkerContext*, int workerThreadStartMode);
 #endif
 
 #if ENABLE(WEB_SOCKETS)
@@ -189,10 +191,7 @@ public:
 #endif
 
     static void networkStateChanged(Page*);
-
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
     static void updateApplicationCacheStatus(Frame*);
-#endif
 
 #if ENABLE(INSPECTOR)
     static void frontendCreated() { s_frontendCounter += 1; }
@@ -214,7 +213,8 @@ private:
     static void willRemoveDOMNodeImpl(InstrumentingAgents*, Node*);
     static void didRemoveDOMNodeImpl(InstrumentingAgents*, Node*);
     static void willModifyDOMAttrImpl(InstrumentingAgents*, Element*);
-    static void didModifyDOMAttrImpl(InstrumentingAgents*, Element*);
+    static void didModifyDOMAttrImpl(InstrumentingAgents*, Element*, const AtomicString& name, const AtomicString& value);
+    static void didRemoveDOMAttrImpl(InstrumentingAgents*, Element*, const AtomicString& name);
     static void characterDataModifiedImpl(InstrumentingAgents*, CharacterData*);
     static void didInvalidateStyleAttrImpl(InstrumentingAgents*, Node*);
     static void frameWindowDiscardedImpl(InstrumentingAgents*, DOMWindow*);
@@ -272,8 +272,8 @@ private:
     static void didLoadXHRSynchronouslyImpl(InstrumentingAgents*);
     static void scriptImportedImpl(InstrumentingAgents*, unsigned long identifier, const String& sourceString);
     static void didReceiveScriptResponseImpl(InstrumentingAgents*, unsigned long identifier);
-    static void domContentLoadedEventFiredImpl(InstrumentingAgents*, Frame*, const KURL&);
-    static void loadEventFiredImpl(InstrumentingAgents*, Frame*, const KURL&);
+    static void domContentLoadedEventFiredImpl(InstrumentingAgents*, Frame*);
+    static void loadEventFiredImpl(InstrumentingAgents*, Frame*);
     static void frameDetachedFromParentImpl(InstrumentingAgents*, Frame*);
     static void didCommitLoadImpl(InstrumentingAgents*, Page*, DocumentLoader*);
     static void loaderDetachedFromFrameImpl(InstrumentingAgents*, DocumentLoader*);
@@ -304,11 +304,10 @@ private:
     static void didOpenDatabaseImpl(InstrumentingAgents*, PassRefPtr<Database>, const String& domain, const String& name, const String& version);
 #endif
 
-#if ENABLE(DOM_STORAGE)
     static void didUseDOMStorageImpl(InstrumentingAgents*, StorageArea*, bool isLocalStorage, Frame*);
-#endif
 
 #if ENABLE(WORKERS)
+    static bool shouldPauseDedicatedWorkerOnStartImpl(InstrumentingAgents*);
     static void didStartWorkerContextImpl(InstrumentingAgents*, WorkerContextProxy*, const KURL&);
     static void didCreateWorkerImpl(InstrumentingAgents*, intptr_t id, const String& url, bool isSharedWorker);
     static void didDestroyWorkerImpl(InstrumentingAgents*, intptr_t id);
@@ -322,10 +321,8 @@ private:
     static void didCloseWebSocketImpl(InstrumentingAgents*, unsigned long identifier);
 #endif
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
     static void networkStateChangedImpl(InstrumentingAgents*);
     static void updateApplicationCacheStatusImpl(InstrumentingAgents*, Frame*);
-#endif
 
     static InstrumentingAgents* instrumentingAgentsForPage(Page*);
     static InstrumentingAgents* instrumentingAgentsForFrame(Frame*);
@@ -395,12 +392,21 @@ inline void InspectorInstrumentation::willModifyDOMAttr(Document* document, Elem
 #endif
 }
 
-inline void InspectorInstrumentation::didModifyDOMAttr(Document* document, Element* element)
+inline void InspectorInstrumentation::didModifyDOMAttr(Document* document, Element* element, const AtomicString& name, const AtomicString& value)
 {
 #if ENABLE(INSPECTOR)
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        didModifyDOMAttrImpl(instrumentingAgents, element);
+        didModifyDOMAttrImpl(instrumentingAgents, element, name, value);
+#endif
+}
+
+inline void InspectorInstrumentation::didRemoveDOMAttr(Document* document, Element* element, const AtomicString& name)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
+        didRemoveDOMAttrImpl(instrumentingAgents, element, name);
 #endif
 }
 
@@ -867,19 +873,19 @@ inline void InspectorInstrumentation::didReceiveScriptResponse(ScriptExecutionCo
 #endif
 }
 
-inline void InspectorInstrumentation::domContentLoadedEventFired(Frame* frame, const KURL& url)
+inline void InspectorInstrumentation::domContentLoadedEventFired(Frame* frame)
 {
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
-        domContentLoadedEventFiredImpl(instrumentingAgents, frame, url);
+        domContentLoadedEventFiredImpl(instrumentingAgents, frame);
 #endif
 }
 
-inline void InspectorInstrumentation::loadEventFired(Frame* frame, const KURL& url)
+inline void InspectorInstrumentation::loadEventFired(Frame* frame)
 {
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
-        loadEventFiredImpl(instrumentingAgents, frame, url);
+        loadEventFiredImpl(instrumentingAgents, frame);
 #endif
 }
 
@@ -931,7 +937,6 @@ inline void InspectorInstrumentation::didWriteHTML(const InspectorInstrumentatio
 #endif
 }
 
-#if ENABLE(DOM_STORAGE)
 inline void InspectorInstrumentation::didUseDOMStorage(Page* page, StorageArea* storageArea, bool isLocalStorage, Frame* frame)
 {
 #if ENABLE(INSPECTOR)
@@ -939,9 +944,18 @@ inline void InspectorInstrumentation::didUseDOMStorage(Page* page, StorageArea* 
         didUseDOMStorageImpl(instrumentingAgents, storageArea, isLocalStorage, frame);
 #endif
 }
-#endif
 
 #if ENABLE(WORKERS)
+inline bool InspectorInstrumentation::shouldPauseDedicatedWorkerOnStart(ScriptExecutionContext* context)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(false);
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForContext(context))
+        return shouldPauseDedicatedWorkerOnStartImpl(instrumentingAgents);
+#endif
+    return false;
+}
+
 inline void InspectorInstrumentation::didStartWorkerContext(ScriptExecutionContext* context, WorkerContextProxy* proxy, const KURL& url)
 {
 #if ENABLE(INSPECTOR)
@@ -1016,14 +1030,13 @@ inline void InspectorInstrumentation::didCloseWebSocket(ScriptExecutionContext* 
 
 inline void InspectorInstrumentation::networkStateChanged(Page* page)
 {
-#if ENABLE(INSPECTOR) && ENABLE(OFFLINE_WEB_APPLICATIONS)
+#if ENABLE(INSPECTOR)
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         networkStateChangedImpl(instrumentingAgents);
 #endif
 }
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
 inline void InspectorInstrumentation::updateApplicationCacheStatus(Frame* frame)
 {
 #if ENABLE(INSPECTOR)
@@ -1032,7 +1045,6 @@ inline void InspectorInstrumentation::updateApplicationCacheStatus(Frame* frame)
         updateApplicationCacheStatusImpl(instrumentingAgents, frame);
 #endif
 }
-#endif
 
 inline void InspectorInstrumentation::didRegisterAnimationFrameCallback(Document* document, int callbackId)
 {

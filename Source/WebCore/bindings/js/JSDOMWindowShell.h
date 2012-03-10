@@ -30,14 +30,15 @@
 #define JSDOMWindowShell_h
 
 #include "JSDOMWindow.h"
+#include <runtime/JSGlobalThis.h>
 
 namespace WebCore {
 
     class DOMWindow;
     class Frame;
 
-    class JSDOMWindowShell : public JSC::JSNonFinalObject {
-        typedef JSC::JSNonFinalObject Base;
+    class JSDOMWindowShell : public JSC::JSGlobalThis {
+        typedef JSC::JSGlobalThis Base;
     public:
         JSDOMWindowShell(PassRefPtr<DOMWindow>, JSC::Structure*, DOMWrapperWorld*);
         virtual ~JSDOMWindowShell();
@@ -77,13 +78,14 @@ namespace WebCore {
         void* operator new(size_t);
         static const unsigned StructureFlags = JSC::OverridesGetOwnPropertySlot | JSC::OverridesVisitChildren | JSC::OverridesGetPropertyNames | Base::StructureFlags;
 
-        virtual void visitChildren(JSC::SlotVisitor&);
+        static void visitChildren(JSC::JSCell*, JSC::SlotVisitor&);
         virtual JSC::UString className() const;
-        virtual bool getOwnPropertySlot(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
+        static bool getOwnPropertySlot(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
         virtual bool getOwnPropertyDescriptor(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertyDescriptor&);
-        virtual void put(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSValue, JSC::PutPropertySlot&);
+        static void put(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSValue, JSC::PutPropertySlot&);
         virtual void putWithAttributes(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSValue, unsigned attributes);
-        virtual bool deleteProperty(JSC::ExecState*, const JSC::Identifier& propertyName);
+        static bool deleteProperty(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName);
         virtual void getPropertyNames(JSC::ExecState*, JSC::PropertyNameArray&, JSC::EnumerationMode mode = JSC::ExcludeDontEnumProperties);
         virtual void getOwnPropertyNames(JSC::ExecState*, JSC::PropertyNameArray&, JSC::EnumerationMode mode = JSC::ExcludeDontEnumProperties);
         virtual void defineGetter(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSObject* getterFunction, unsigned attributes);

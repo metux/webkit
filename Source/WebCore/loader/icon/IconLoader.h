@@ -26,43 +26,32 @@
 #ifndef IconLoader_h
 #define IconLoader_h
 
-#include "SubresourceLoaderClient.h"
+#include "CachedRawResource.h"
+#include "CachedResourceHandle.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
+class CachedRawResource;
 class Frame;
-class KURL;
-class SharedBuffer;
 
-class IconLoader : private SubresourceLoaderClient {
+class IconLoader : private CachedRawResourceClient {
     WTF_MAKE_NONCOPYABLE(IconLoader); WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<IconLoader> create(Frame*);
-    ~IconLoader();
+    virtual ~IconLoader();
 
     void startLoading();
     void stopLoading();
 
 private:
     explicit IconLoader(Frame*);
-
-    virtual void didReceiveResponse(SubresourceLoader*, const ResourceResponse&);
-    virtual void didReceiveData(SubresourceLoader*, const char*, int);
-    virtual void didFinishLoading(SubresourceLoader*, double);
-    virtual void didFail(SubresourceLoader*, const ResourceError&);
-
-    virtual void didReceiveAuthenticationChallenge(SubresourceLoader*, const AuthenticationChallenge&);
-
-    void finishLoading(const KURL&, PassRefPtr<SharedBuffer> data);
-    void clearLoadingState();
+    virtual void notifyFinished(CachedResource*);
 
     Frame* m_frame;
-
-    RefPtr<SubresourceLoader> m_resourceLoader;
-    bool m_loadIsInProgress;
+    CachedResourceHandle<CachedRawResource> m_resource;
 };
 
 } // namespace WebCore

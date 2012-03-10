@@ -277,7 +277,7 @@ void JSObjectSetProperty(JSContextRef ctx, JSObjectRef object, JSStringRef prope
         jsObject->putWithAttributes(exec, name, jsValue, attributes);
     else {
         PutPropertySlot slot;
-        jsObject->put(exec, name, jsValue, slot);
+        jsObject->methodTable()->put(jsObject, exec, name, jsValue, slot);
     }
 
     if (exec->hadException()) {
@@ -312,7 +312,7 @@ void JSObjectSetPropertyAtIndex(JSContextRef ctx, JSObjectRef object, unsigned p
     JSObject* jsObject = toJS(object);
     JSValue jsValue = toJS(exec, value);
     
-    jsObject->put(exec, propertyIndex, jsValue);
+    jsObject->methodTable()->putByIndex(jsObject, exec, propertyIndex, jsValue);
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -327,7 +327,7 @@ bool JSObjectDeleteProperty(JSContextRef ctx, JSObjectRef object, JSStringRef pr
 
     JSObject* jsObject = toJS(object);
 
-    bool result = jsObject->deleteProperty(exec, propertyName->identifier(&exec->globalData()));
+    bool result = jsObject->methodTable()->deleteProperty(jsObject, exec, propertyName->identifier(&exec->globalData()));
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -416,7 +416,8 @@ bool JSObjectDeletePrivateProperty(JSContextRef ctx, JSObjectRef object, JSStrin
 bool JSObjectIsFunction(JSContextRef, JSObjectRef object)
 {
     CallData callData;
-    return toJS(object)->getCallData(callData) != CallTypeNone;
+    JSCell* cell = toJS(object);
+    return cell->methodTable()->getCallData(cell, callData) != CallTypeNone;
 }
 
 JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -435,7 +436,7 @@ JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObject
         argList.append(toJS(exec, arguments[i]));
 
     CallData callData;
-    CallType callType = jsObject->getCallData(callData);
+    CallType callType = jsObject->methodTable()->getCallData(jsObject, callData);
     if (callType == CallTypeNone)
         return 0;
 
@@ -453,7 +454,7 @@ bool JSObjectIsConstructor(JSContextRef, JSObjectRef object)
 {
     JSObject* jsObject = toJS(object);
     ConstructData constructData;
-    return jsObject->getConstructData(constructData) != ConstructTypeNone;
+    return jsObject->methodTable()->getConstructData(jsObject, constructData) != ConstructTypeNone;
 }
 
 JSObjectRef JSObjectCallAsConstructor(JSContextRef ctx, JSObjectRef object, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -464,7 +465,7 @@ JSObjectRef JSObjectCallAsConstructor(JSContextRef ctx, JSObjectRef object, size
     JSObject* jsObject = toJS(object);
 
     ConstructData constructData;
-    ConstructType constructType = jsObject->getConstructData(constructData);
+    ConstructType constructType = jsObject->methodTable()->getConstructData(jsObject, constructData);
     if (constructType == ConstructTypeNone)
         return 0;
 

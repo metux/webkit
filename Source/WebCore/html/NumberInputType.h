@@ -64,11 +64,11 @@ private:
     virtual double parseToDoubleWithDecimalPlaces(const String&, double, unsigned*) const;
     virtual String serialize(double) const;
     virtual double acceptableError(double) const;
-    virtual void willBlur();
+    virtual void handleBlurEvent();
     virtual String visibleValue() const;
     virtual String convertFromVisibleValue(const String&) const;
     virtual bool isAcceptableValue(const String&);
-    virtual String sanitizeValue(const String&);
+    virtual String sanitizeValue(const String&) const;
     virtual bool hasUnacceptableValue();
     virtual bool shouldRespectSpeechAttribute();
     virtual bool supportsPlaceholder() const;

@@ -69,7 +69,7 @@ private:
     virtual void toolTipChanged(const WTF::String&, const WTF::String&);
     virtual void setCursor(const WebCore::Cursor&);
     virtual void setCursorHiddenUntilMouseMoves(bool);
-    virtual void setViewportArguments(const WebCore::ViewportArguments&);
+    virtual void didChangeViewportProperties(const WebCore::ViewportArguments&);
     virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo);
     virtual void clearAllEditCommands();
     virtual bool canUndoRedo(WebPageProxy::UndoOrRedo);
@@ -87,6 +87,7 @@ private:
     virtual void getEditorCommandsForKeyEvent(const NativeWebKeyboardEvent&, const AtomicString&, Vector<WTF::String>&);
     virtual void findStringInCustomRepresentation(const String&, FindOptions, unsigned);
     virtual void countStringMatchesInCustomRepresentation(const String&, FindOptions, unsigned);
+    virtual void startDrag(const WebCore::DragData&, PassRefPtr<ShareableBitmap> dragImage);
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void pageDidEnterAcceleratedCompositing();

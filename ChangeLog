@@ -1,44 +1,34 @@
-2012-02-01  Martin Robinson  <mrobinson@igalia.com>
+2011-10-26  Alejandro G. Castro  <alex@igalia.com>
 
-        Update the version number in preparation for the 1.6.3 release.
-
-        Reviewed by Xan Lopez.
-
-        * configure.ac: Update the library version.
-
-2012-02-01  Martin Robinson  <mrobinson@igalia.com>
-
-        Manually pull in the gthread library, as it seems that
-        with gold it doesn't happen automatically.
-
-        Reviewed by Xan Lopez.
-
-        * Source/autotools/webkit.m4:
-
-2012-02-01  Martin Robinson  <mrobinson@igalia.com>
-
-        Restore Source/WebKit/gtk/webkit/webkitversion.h to the list of files
-        processed by autoconfig.
-
-        * configure.ac: Re-add the file.
-
-2012-01-30  Martin Robinson  <mrobinson@igalia.com>
-
-        Small build fixes.
-
-        * configure.ac: Correct the version number to be 1.6.2 and fix
-        a bad merge of gtkdoc patches.
-
-2012-01-30  Priit Laes  <plaes@plaes.org>
-
-        [GTK] Create .xz tarballs during distcheck
-        https://bugs.webkit.org/show_bug.cgi?id=71001
+        [GTK] Update NEWS and configure.ac for 1.7.1 release
+        https://bugs.webkit.org/show_bug.cgi?id=70932
 
         Reviewed by Martin Robinson.
 
-        * configure.ac: Switched tarballs to use .xz compression.
+        * configure.ac: Bumped version number.
 
-2012-01-30  Gustavo Noronha Silva  <gns@gnome.org>
+2011-10-26  Alejandro G. Castro  <alex@igalia.com>
+
+        [GTK] [WK2] Add WebKit2 distcheck support
+        https://bugs.webkit.org/show_bug.cgi?id=70933
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Added WebKit2 compilation to the distcheck.
+        * configure.ac: Removed WebKit2 doc generation for the moment.
+
+2011-10-21  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        Remove QtScript source code from WebKit.
+        https://bugs.webkit.org/show_bug.cgi?id=64088
+
+        Reviewed by Tor Arne Vestbø.
+
+        Removed dead code that isn't developed anymore.
+
+        * Source/WebKit.pro:
+
+2011-10-19  Gustavo Noronha Silva  <gns@gnome.org>
 
         [GTK] Streamline wk1 documentation build
         https://bugs.webkit.org/show_bug.cgi?id=70447
@@ -51,7 +41,153 @@
         * configure.ac: no longer generate a separate GNUmakefile for
           the documentation build.
 
-2012-01-30  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+2011-10-18  Adam Barth  <abarth@webkit.org>
+
+        Always enable ENABLE(XPATH)
+        https://bugs.webkit.org/show_bug.cgi?id=70217
+
+        Reviewed by Eric Seidel.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWinCE.cmake:
+        * Source/cmakeconfig.h.cmake:
+        * configure.ac:
+
+2011-10-18  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Merge QML plugin for WebKit2 with the original WebKit1 plugin
+
+        We don't need a sepearate plugin, as we no longer expose the WK2
+        APIs under QtWebKit.experimental, but now use QtWebKit. The version
+        was also changed to 3.0 instead of 5.0, as the original plugin was
+        versioned 1.0, and bumping to 3.0 fits the scheme used by QtWebKit releases.
+
+        Reviewed by Andreas Kling.
+
+        * Source/WebKit.pro:
+
+2011-10-18  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Support for client-based geolocation
+        https://bugs.webkit.org/show_bug.cgi?id=64970
+
+        Reviewed by Martin Robinson.
+
+        Remove flag for enabling client-based geolocation since
+        it is used by default on Gtk port and hence not configurable.
+
+        * configure.ac:
+
+2011-10-17  Leandro Pereira  <leandro@profusion.mobi>
+
+        Unreviewed; actually enable/disable microdata support in CMake.
+
+        Follow-up to r97471, which did not plug the option to enable/disable
+        microdata into the buildsystem.
+
+        * Source/cmake/OptionsEfl.cmake: Add ENABLE_MICRODATA feature, turned off by default.
+        * Source/cmake/OptionsWinCE.cmake: Ditto.
+        * Source/cmakeconfig.h.cmake: Add ENABLE_MICRODATA #cmakedefine.
+
+2011-10-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        GTK build fix patch by Gustavo Noronha Silva.
+
+        * Source/autotools/symbols.filter:
+
+2011-10-17  Vamshikrishna Yellenki  <vamshi@motorola.com>
+
+        [webkit]Debug Build Bot failure
+        https://bugs.webkit.org/show_bug.cgi?id=70222
+
+        Reviewed by Xan Lopez.
+
+        * Source/autotools/symbols.filter: Corrected the filter name for getLocationAndLengthFronRange
+
+2011-10-16  Adam Barth  <abarth@webkit.org>
+
+        Always enable ENABLE(DOM_STORAGE)
+        https://bugs.webkit.org/show_bug.cgi?id=70189
+
+        Reviewed by Eric Seidel.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWinCE.cmake:
+        * Source/cmakeconfig.h.cmake:
+        * configure.ac:
+
+2011-10-15  Laszlo Gombos  <laszlo.1.gombos@nokia.com>
+
+        [Qt] [Symbian] Remove support for the Symbian platform for the QtWebKit port
+        https://bugs.webkit.org/show_bug.cgi?id=69920
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Source/WebKit.pri:
+        * Source/WebKit.pro:
+
+2011-10-14  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Rename virtual put to putVirtual
+        https://bugs.webkit.org/show_bug.cgi?id=69851
+
+        Reviewed by Darin Adler.
+
+        Renamed virtual versions of put to putVirtual in prepration for 
+        adding the static put to the MethodTable in ClassInfo since the 
+        compiler gets mad if the virtual and static versions have the same 
+        name.
+
+        * Source/autotools/symbols.filter:
+
+2011-10-14  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Rename virtual put to putVirtual
+        https://bugs.webkit.org/show_bug.cgi?id=69851
+
+        Reviewed by Darin Adler.
+
+        Renamed virtual versions of put to putVirtual in prepration for 
+        adding the static put to the MethodTable in ClassInfo since the 
+        compiler gets mad if the virtual and static versions have the same 
+        name.
+
+        * Source/autotools/symbols.filter:
+
+2011-10-13  Arko Saha  <arko@motorola.com>
+
+        Microdata: Basic implementation of document.getItems() method.
+        https://bugs.webkit.org/show_bug.cgi?id=68610
+
+        Reviewed by Ryosuke Niwa.
+
+        Added ENABLE(MICRODATA) feature flag.
+
+        * configure.ac:
+
+2011-10-14  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [EFL] Add DumpRenderTreeSupportEfl
+        https://bugs.webkit.org/show_bug.cgi?id=68458
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Source/cmake/eflsymbols.filter: Export DumpRenderTreeSupportEfl
+        symbols so that DumpRenderTree can link to them.
+
+2011-10-12  Adam Barth  <abarth@webkit.org>
+
+        Remove ENABLE(XHTMLMP) and associated code
+        https://bugs.webkit.org/show_bug.cgi?id=69729
+
+        Reviewed by David Levin.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWinCE.cmake:
+        * Source/cmakeconfig.h.cmake:
+        * configure.ac:
+
+2011-10-12  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
 
         Fix build with GLib 2.31
         https://bugs.webkit.org/show_bug.cgi?id=69840
@@ -59,6 +195,248 @@
         Reviewed by Martin Robinson.
 
         * configure.ac: add check for pthread rwlock support.
+
+2011-10-10  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [WebKit2] Make adding another unit test easier
+        https://bugs.webkit.org/show_bug.cgi?id=69409
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Include the new testing makefile.
+
+2011-10-11  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Remove all references to QTDIR_build and standalone_package
+
+        Qt is now modularized, which means we no longer import WebKit into
+        the Qt source tree. Instead we use git submodules, and building
+        QtWebKit as "part of Qt" is really building QtWebKit as from trunk.
+
+        To decrease the number of buildsystem configurations we also remove
+        the standalone_package code-path used when we were providing tarballs
+        with the derived sources pre-generated.
+
+        Reviewed by Simon Hausmann.
+
+        * Source/WebKit.pri:
+        * Source/WebKit.pro:
+
+2011-10-06  Fady Samuel  <fsamuel@chromium.org>
+
+        Code clean-up: Make RenderObject::absoluteBoundingBoxRect and associated methods const and make its parameter useTransforms no longer default to false
+        https://bugs.webkit.org/show_bug.cgi?id=69009
+
+        Reviewed by Simon Fraser.
+
+        * Source/autotools/symbols.filter:
+
+2011-10-06  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt][Wk2] Fix build with Qt 5 when QtScript is built as standalone module
+        https://bugs.webkit.org/show_bug.cgi?id=69520
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Source/WebKit.pri: Introduce convenience qt5 scope.
+        * Source/WebKit.pro: Replace QT_MAJOR_VERSION stuff with qt5 scope.
+
+2011-10-06  Nayan Kumar K  <nayankk@motorola.com>
+
+        Provide configure option to switch between JSC and V8.
+        https://bugs.webkit.org/show_bug.cgi?id=69469
+
+        Reviewed by Philippe Normand.
+
+        This is first of the patches to support building of V8 with
+        WebKit GTK. With this patch, new command line switch named
+        '--with-jsengine' is introduced, using which we can choose to
+        build either jsc or v8.
+
+        * GNUmakefile.am:
+        * configure.ac:
+
+2011-10-04  Scott Graham  <scottmg@chromium.org>
+
+        Add GAMEPAD feature flag
+        https://bugs.webkit.org/show_bug.cgi?id=66859
+
+        Reviewed by Darin Fisher.
+
+        * configure.ac:
+
+2011-10-04  Varun Jain  <varunjain@chromium.org>
+
+        Fix position check for double tap gesture detection. A double tap
+        should not be detected if the two taps are far from each other.
+        https://bugs.webkit.org/show_bug.cgi?id=69270
+
+        Reviewed by Darin Fisher.
+
+        Test: Source/WebKit/chromium/tests/InnerGestureRecognizerTest.cpp
+
+        * platform/chromium/GestureRecognizerChromium.cpp:
+        (WebCore::GestureRecognizerChromium::isSecondClickInsideManhattanSquare):
+        (WebCore::GestureRecognizerChromium::updateValues):
+        (WebCore::GestureRecognizerChromium::click):
+        * platform/chromium/GestureRecognizerChromium.h:
+
+2011-10-04  Nayan Kumar K  <nayankk@motorola.com>
+
+        [WebKit2][gtk] Generate gtk-doc for WebKit2-GTK.
+        https://bugs.webkit.org/show_bug.cgi?id=69325
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Documentation generation for WebKit2-GTK+ APIs
+        using gtk-doc.
+
+        * configure.ac:
+
+2011-10-04  Vsevolod Vlasov  <vsevik@chromium.org>
+
+        Web Inspector: Remove http/tests/inspector/network/disabled-cache-crash.html.
+        https://bugs.webkit.org/show_bug.cgi?id=69332
+
+        Reviewed by Pavel Feldman.
+
+        * Source/autotools/symbols.filter:
+
+2011-09-23  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Fix build against Qt5 after refactor of widgets out of QtGUi
+
+        QWidget and friends now live in the QtWidgets library. We update
+        includes in implementation files and private headers to us the
+        non-module-prefixed path, and leave the lookup for the include
+        path. For public headers we have to ifdef the includes as the
+        user might now have the modules we need in his QT config.
+
+        Finally, QSGCanvas is no longer a QWidget but a QWindow, so we
+        have to update our code and use windowHandle() for setting the
+        parent relationships.
+
+        https://bugs.webkit.org/show_bug.cgi?id=68687
+
+        Reviewed by Andreas Kling.
+
+        * Source/WebKit.pro:
+
+2011-09-29  Sergio Villar Senin  <svillar@igalia.com>
+
+        [GTK] Bump version to 1.7.0
+        https://bugs.webkit.org/show_bug.cgi?id=69082
+
+        Reviewed by Martin Robinson.
+
+        Apart from bumping the library version to 1.7.0 this patch also
+        sets the libtool version to the same one we have for the stable
+        branch.
+
+        * configure.ac:
+
+2011-09-28  Martin Robinson  <mrobinson@igalia.com>
+
+        Fix the WebKit2 WebGL build.
+
+        * configure.ac: Add -ldl to the OPENGL_LIBS.
+
+2011-09-28  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Bump minimum requirement for eina.
+        https://bugs.webkit.org/show_bug.cgi?id=68994
+
+        Reviewed by Ryosuke Niwa.
+
+        * Source/cmake/FindEFL.cmake:
+
+2011-09-27  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Unreviewed. Fix a build error in WebKit EFL.
+
+        When web socket is disabled, there is a build break in WebKit EFL port.
+        Currently, web socket is enabled by default in build-webkit script.
+        Thus, the web socket is also enabled in EFL script of cmake build system for now.
+        Because, WebKit EFL developers can't work on latest WebKit trunk.
+
+        However, IMO, we should fix build errors when web socket is disabled.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2011-09-27  Ulan Degenbaev  <ulan@chromium.org>
+
+        [v8] Code calling the typed array optimization script is fragile, depends on typed array hierarchy.
+
+        Install the flag, which indicates whether or not the optimization
+        script was executed, on the global object.
+
+        https://bugs.webkit.org/show_bug.cgi?id=68890
+
+        Reviewed by Kenneth Russell.
+
+        * Source/WebCore/bindings/v8/custom/V8ArrayBufferViewCustom.cpp:
+
+2011-09-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r96108, r96111, r96113, and r96116.
+        http://trac.webkit.org/changeset/96108
+        http://trac.webkit.org/changeset/96111
+        http://trac.webkit.org/changeset/96113
+        http://trac.webkit.org/changeset/96116
+        https://bugs.webkit.org/show_bug.cgi?id=68913
+
+        Wait for working Qt5 (Requested by ossy on #webkit).
+
+        * Source/WebKit.pro:
+
+2011-09-23  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Fix build against Qt5 after refactor of widgets out of QtGUi
+
+        QWidget and friends now live in the QtWidgets library. We update
+        includes in implementation files and private headers to us the
+        non-module-prefixed path, and leave the lookup for the include
+        path. For public headers we have to ifdef the includes as the
+        user might now have the modules we need in his QT config.
+
+        Finally, QSGCanvas is no longer a QWidget but a QWindow, so we
+        have to update our code and use windowHandle() for setting the
+        parent relationships.
+
+        https://bugs.webkit.org/show_bug.cgi?id=68687
+
+        Reviewed by Andreas Kling.
+
+        * Source/WebKit.pro:
+
+2011-09-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Reorganize header files
+        https://bugs.webkit.org/show_bug.cgi?id=65616
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Initialize $libwebkitgtkincludedir to
+        $(prefix)/include/webkitgtk-<api-version>
+
+2011-09-26  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Remove FindFreetype.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=68778
+
+        Reviewed by Adam Barth.
+
+        CMake has provided its own FindFreetype.cmake forever, so there is no
+        need to have another implementation in WebKit.
+
+        * Source/cmake/FindCairo.cmake: Use FREETYPE_{LIBRARIES,INCLUDE_DIRS}
+        instead of Freetype_{LIBRARIES,INCLUDE_DIRS}.
+        * Source/cmake/FindFreetype.cmake: Removed.
+        * Source/cmake/FindPango.cmake: Use FREETYPE_{LIBRARIES,INCLUDE_DIRS}
+        instead of Freetype_{LIBRARIES,INCLUDE_DIRS}.
+        * Source/cmake/OptionsEfl.cmake: Remove minimum required version
+        check, it has never been checked and Freetype 2.1.10 from 2005 is
+        already > 9.0.
 
 2011-09-26  Alejandro G. Castro  <alex@igalia.com>
 
@@ -71,6 +449,191 @@
         Reviewed by Martin Robinson.
 
         * GNUmakefile.am:
+
+2011-09-26  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Detect the operating system in a more generic way.
+        https://bugs.webkit.org/show_bug.cgi?id=67482
+
+        Reviewed by Adam Barth.
+
+        So far the buildsystem only considered Windows, Linux and Mac OS X as
+        valid operating systems, but any Unix (or at least the BSDs) should also
+        work fine.
+
+        By using the OS values CMake itself defines we can check for Unix
+        systems in a more generic fashion.
+
+        * Source/CMakeLists.txt:
+
+2011-09-26  Jay Soffian  <jaysoffian@gmail.com>
+
+        chrome.dll!WebCore::ApplyStyleCommand::applyBlockStyle ReadAV@NULL (64db547804532a84be2e53721e499e9e)
+        https://bugs.webkit.org/show_bug.cgi?id=51639
+
+        Reviewed by Ryosuke Niwa.
+
+        Add missing window.layoutTestController.dumpAsText so that test output matches expectation.
+
+        * LayoutTests/editing/style/justify-without-enclosing-block.xhtml:
+
+2011-09-25  Adam Barth  <abarth@webkit.org>
+
+        Finish removing PLATFORM(BREWMP) by removing associated code
+        https://bugs.webkit.org/show_bug.cgi?id=68779
+
+        Reviewed by Sam Weinig.
+
+        * Source/cmake/WebKitPackaging.cmake:
+        * wscript:
+
+2011-09-25  Adam Barth  <abarth@webkit.org>
+
+        Remove PLATFORM(HAIKU) and associated code
+        https://bugs.webkit.org/show_bug.cgi?id=68774
+
+        Reviewed by Sam Weinig.
+
+        * Source/cmake/WebKitPackaging.cmake:
+        * wscript:
+
+2011-09-25  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Remove FindLibXlst.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=68770
+
+        Reviewed by Adam Barth.
+
+        This file should have never been committed -- the library it looks for
+        is called libxslt, not libxlst, so it has never really been used. When
+        the buildsystem looked for libxslt, it used CMake's own LibXslt.cmake
+        instead.
+
+        * Source/cmake/FindLibXlst.cmake: Removed.
+
+2011-09-24  Adam Barth  <abarth@webkit.org>
+
+        Always enable ENABLE(OFFLINE_WEB_APPLICATIONS)
+        https://bugs.webkit.org/show_bug.cgi?id=68767
+
+        Reviewed by Eric Seidel.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWinCE.cmake:
+        * Source/cmakeconfig.h.cmake:
+        * configure.ac:
+
+2011-09-24  Adam Barth  <abarth@webkit.org>
+
+        Remove ENABLE(WCSS) and associated code
+        https://bugs.webkit.org/show_bug.cgi?id=68759
+
+        Reviewed by Darin Adler.
+
+        * configure.ac:
+
+2011-09-23  Yuqiang Xian  <yuqiang.xian@intel.com>
+
+        Add JSVALUE32_64 support to DFG JIT
+        https://bugs.webkit.org/show_bug.cgi?id=67460
+
+        Reviewed by Gavin Barraclough.
+
+        Add cmake options to enable DFG JIT compilation for EFL port
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2011-09-23  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Detect amd64 as a valid 64-bit architecture.
+        https://bugs.webkit.org/show_bug.cgi?id=67481
+
+        Reviewed by Oliver Hunt.
+
+        Some operating systems (generally the BSDs) use amd64 instead of x86_64
+        to report they're running on 64 bits, so consider it a valid value.
+
+        * Source/CMakeLists.txt:
+
+2011-09-23  Adam Klein  <adamk@chromium.org>
+
+        Add ENABLE_MUTATION_OBSERVERS feature flag
+        https://bugs.webkit.org/show_bug.cgi?id=68732
+
+        Reviewed by Ojan Vafai.
+
+        This flag will guard an implementation of the "Mutation Observers" proposed in
+        http://lists.w3.org/Archives/Public/public-webapps/2011JulSep/1622.html
+
+        * configure.ac:
+
+2011-09-23  Varun Jain  <varunjain@google.com>
+
+        Refactor WebViewImpl::scrollFocusedNodeIntoRect to a better place and add tests
+        https://bugs.webkit.org/show_bug.cgi?id=68198
+
+        Reviewed by Dimitri Glazkov.
+
+        * Source/autotools/symbols.filter:
+
+2011-09-23  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Add static version of JSCell::visitChildren
+        https://bugs.webkit.org/show_bug.cgi?id=68404
+
+        Reviewed by Darin Adler.
+
+        In this patch we just extract the bodies of the virtual visitChildren methods
+        throughout the JSCell inheritance hierarchy out into static methods, which are 
+        now called from the virtual methods.  This is an intermediate step in trying to 
+        move the virtual-ness of visitChildren into our own custom vtable stored in 
+        ClassInfo.  We need to convert the methods to static methods in order to be 
+        able to more easily store and refer to them in our custom vtable since normal 
+        member methods store some implicit information in their types, making it 
+        impossible to store them generically in ClassInfo.
+
+        * Source/autotools/symbols.filter:
+
+2011-09-21  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        Crash in RenderBox::paintMaskImages when GraphicsContext's painting is disabled
+        https://bugs.webkit.org/show_bug.cgi?id=68133
+
+        Reviewed by Darin Adler.
+
+        * Source/autotools/symbols.filter: Added the mangled symbols needed for window.internals
+
+2011-09-21  Joshua Bell  <jsbell@chromium.org>
+
+        IndexedDB: compare strings without decoding
+        https://bugs.webkit.org/show_bug.cgi?id=68554
+
+        Reviewed by Tony Chang.
+
+        Resolves a FIXME in IndexedDB that was also identified as a hotspot
+        during profiling. Yields a small performance improvement.
+
+        * Source/WebCore/storage/IDBLevelDBCoding.cpp:
+        * Source/WebCore/storage/IDBLevelDBCoding.h:
+        * Source/WebKit/chromium/tests/IDBLevelDBCodingTest.cpp:
+
+011-09-21  Leandro Pereira  <leandro@profusion.mobi>
+
+        Unreviewed. Remove unused ENABLE_AS_IMAGE flag after r95234 from
+        Options{Efl,WinCE}.cmake.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWinCE.cmake:
+
+2011-09-20  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK] requestAnimationFrame support for gtk port
+        https://bugs.webkit.org/show_bug.cgi?id=66280
+
+        Reviewed by Martin Robinson.
+
+        * configure.ac: Add an option to enable requestAnimationFrame for gtk port.
 
 2011-09-20  Carlos Garcia Campos  <cgarcia@igalia.com>
 

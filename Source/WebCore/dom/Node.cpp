@@ -28,6 +28,7 @@
 #include "AXObjectCache.h"
 #include "Attr.h"
 #include "Attribute.h"
+#include "ChildListMutationScope.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "CSSParser.h"
@@ -84,6 +85,7 @@
 #include "SelectorQuery.h"
 #include "ShadowRoot.h"
 #include "StaticNodeList.h"
+#include "StorageEvent.h"
 #include "TagNodeList.h"
 #include "Text.h"
 #include "TextEvent.h"
@@ -99,20 +101,13 @@
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/UnusedParam.h>
+#include <wtf/Vector.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
-
-#if ENABLE(DOM_STORAGE)
-#include "StorageEvent.h"
-#endif
 
 #if ENABLE(SVG)
 #include "SVGElementInstance.h"
 #include "SVGUseElement.h"
-#endif
-
-#if ENABLE(XHTMLMP)
-#include "HTMLNoScriptElement.h"
 #endif
 
 #if USE(JSC)
@@ -284,11 +279,11 @@ void Node::dumpStatistics()
 #endif
 }
 
-#ifndef NDEBUG
-static WTF::RefCountedLeakCounter nodeCounter("WebCoreNode");
+DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, nodeCounter, ("WebCoreNode"));
+DEFINE_DEBUG_ONLY_GLOBAL(HashSet<Node*>, ignoreSet, );
 
+#ifndef NDEBUG
 static bool shouldIgnoreLeaks = false;
-static HashSet<Node*> ignoreSet;
 #endif
 
 void Node::startIgnoringLeaks()
@@ -364,7 +359,7 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2)
 
     // When either the region thread or the region index has changed,
     // we need to prepare a separate render region object.
-    if ((s1 && s2) && ((s1->regionThread() != s2->regionThread() || (s1->regionIndex() != s2->regionIndex()))))
+    if ((s1 && s2) && (s1->regionThread() != s2->regionThread()))
         ch = Detach;
 
     return ch;
@@ -553,6 +548,14 @@ void Node::clearRareData()
     if (treeScope() && rareData()->nodeLists())
         treeScope()->removeNodeListCache();
 
+#if ENABLE(MUTATION_OBSERVERS)
+    Vector<MutationObserverEntry>* observerEntries = mutationObserverEntries();
+    if (observerEntries) {
+        for (size_t i = 0; i < observerEntries->size(); ++i)
+            observerEntries->at(i).observer->observedNodeDestructed(this);
+    }
+#endif
+
     NodeRareData::NodeRareDataMap& dataMap = NodeRareData::rareDataMap();
     NodeRareData::NodeRareDataMap::iterator it = dataMap.find(this);
     ASSERT(it != dataMap.end());
@@ -563,18 +566,18 @@ void Node::clearRareData()
 
 Element* Node::shadowHost() const
 {
-    return toElement(getFlag(IsShadowRootFlag) ? parent() : 0);
+    return toElement(isShadowRoot() ? parent() : 0);
 }
 
 void Node::setShadowHost(Element* host)
 {
-    ASSERT(!parentNode() && !isSVGShadowRoot());
-    if (host)
-        setFlag(IsShadowRootFlag);
-    else
-        clearFlag(IsShadowRootFlag);
-
+    ASSERT(!parentNode() && isShadowRoot());
     setParent(host);
+}
+
+Node* Node::toNode()
+{
+    return this;
 }
 
 HTMLInputElement* Node::toInputElement()
@@ -778,6 +781,12 @@ bool Node::isContentEditable()
     return rendererIsEditable(Editable);
 }
 
+bool Node::isContentRichlyEditable()
+{
+    document()->updateLayoutIgnorePendingStylesheets();
+    return rendererIsEditable(RichlyEditable);
+}
+
 bool Node::rendererIsEditable(EditableLevel editableLevel) const
 {
     if (document()->frame() && document()->frame()->page() && document()->frame()->page()->isEditable() && !shadowTreeRootNode())
@@ -823,7 +832,7 @@ RenderBoxModelObject* Node::renderBoxModelObject() const
 LayoutRect Node::getRect() const
 {
     if (renderer())
-        return renderer()->absoluteBoundingBoxRect(true);
+        return renderer()->absoluteBoundingBoxRect();
     return LayoutRect();
 }
     
@@ -835,7 +844,7 @@ LayoutRect Node::renderRect(bool* isReplaced)
     while (renderer && !renderer->isBody() && !renderer->isRoot()) {
         if (renderer->isRenderBlock() || renderer->isInlineBlockOrInlineTable() || renderer->isReplaced()) {
             *isReplaced = renderer->isReplaced();
-            return renderer->absoluteBoundingBoxRect(true);
+            return renderer->absoluteBoundingBoxRect();
         }
         renderer = renderer->parent();
     }
@@ -1191,6 +1200,20 @@ Node* Node::traversePreviousNode(const Node* stayWithin) const
         return n;
     }
     return parentNode();
+}
+
+Node* Node::traversePreviousSibling(const Node* stayWithin) const
+{
+    if (this == stayWithin)
+        return 0;
+    if (previousSibling())
+        return previousSibling();
+    const Node *n = this;
+    while (n && !n->previousSibling() && (!stayWithin || n->parentNode() != stayWithin))
+        n = n->parentNode();
+    if (n)
+        return n->previousSibling();
+    return 0;
 }
 
 Node* Node::traversePreviousNodePostOrder(const Node* stayWithin) const
@@ -1574,10 +1597,7 @@ ContainerNode* Node::nonShadowBoundaryParentNode() const
 
 bool Node::isInShadowTree()
 {
-    for (Node* n = this; n; n = n->parentNode())
-        if (n->isShadowRoot())
-            return true;
-    return false;
+    return treeScope() != document();
 }
 
 Element* Node::parentOrHostElement() const
@@ -2113,6 +2133,9 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
         case DOCUMENT_FRAGMENT_NODE:
         case SHADOW_ROOT_NODE: {
             ContainerNode* container = toContainerNode(this);
+#if ENABLE(MUTATION_OBSERVERS)
+            ChildListMutationScope mutation(this);
+#endif
             container->removeChildren();
             if (!text.isEmpty())
                 container->appendChild(document()->createTextNode(text), ec);
@@ -2270,6 +2293,23 @@ FloatPoint Node::convertFromPage(const FloatPoint& p) const
     return p;
 }
 
+#if ENABLE(MICRODATA)
+void Node::itemTypeAttributeChanged()
+{
+    Node * rootNode = document();
+
+    if (!rootNode->hasRareData())
+        return;
+
+    NodeRareData* data = rootNode->rareData();
+
+    if (!data->nodeLists())
+        return;
+
+    data->nodeLists()->invalidateMicrodataItemListCaches();
+}
+#endif
+
 #ifndef NDEBUG
 
 static void appendAttributeDesc(const Node* node, String& string, const QualifiedName& name, const char* attrDesc)
@@ -2419,7 +2459,20 @@ void NodeListsNodeData::invalidateCachesThatDependOnAttributes()
         it->second->invalidateCache();
     if (m_labelsNodeListCache)
         m_labelsNodeListCache->invalidateCache();
+
+#if ENABLE(MICRODATA)
+    invalidateMicrodataItemListCaches();
+#endif
 }
+
+#if ENABLE(MICRODATA)
+void NodeListsNodeData::invalidateMicrodataItemListCaches()
+{
+    MicroDataItemListCache::iterator itemListCacheEnd = m_microDataItemListCache.end();
+    for (MicroDataItemListCache::iterator it = m_microDataItemListCache.begin(); it != itemListCacheEnd; ++it)
+        it->second->invalidateCache();
+}
+#endif
 
 bool NodeListsNodeData::isEmpty() const
 {
@@ -2437,6 +2490,10 @@ bool NodeListsNodeData::isEmpty() const
         return false;
     if (!m_nameNodeListCache.isEmpty())
         return false;
+#if ENABLE(MICRODATA)
+    if (!m_microDataItemListCache.isEmpty())
+        return false;
+#endif
 
     if (m_labelsNodeListCache)
         return false;
@@ -2462,7 +2519,10 @@ Node* Node::enclosingLinkEventParentOrSelf()
     return 0;
 }
 
-// --------
+const AtomicString& Node::interfaceName() const
+{
+    return eventNames().interfaceForNode;
+}
 
 ScriptExecutionContext* Node::scriptExecutionContext() const
 {
@@ -2637,6 +2697,70 @@ EventTargetData* Node::ensureEventTargetData()
     return ensureRareData()->ensureEventTargetData();
 }
 
+#if ENABLE(MUTATION_OBSERVERS)
+Vector<MutationObserverEntry>* Node::mutationObserverEntries()
+{
+    return hasRareData() ? rareData()->mutationObserverEntries() : 0;
+}
+
+static void addMatchingObservers(HashSet<WebKitMutationObserver*>& observerSet, Vector<MutationObserverEntry>* observerEntries, MutationObserverOptions options)
+{
+    if (!observerEntries)
+        return;
+
+    const size_t size = observerEntries->size();
+    for (size_t i = 0; i < size; ++i) {
+        MutationObserverEntry& entry = observerEntries->at(i);
+        if (entry.hasAllOptions(options))
+            observerSet.add(entry.observer.get());
+    }
+}
+
+void Node::getRegisteredMutationObserversOfType(Vector<WebKitMutationObserver*>& observers, WebKitMutationObserver::MutationType type)
+{
+    HashSet<WebKitMutationObserver*> observerSet;
+    addMatchingObservers(observerSet, mutationObserverEntries(), type);
+    for (Node* node = parentNode(); node; node = node->parentNode())
+        addMatchingObservers(observerSet, node->mutationObserverEntries(), type | WebKitMutationObserver::Subtree);
+
+    // FIXME: this method should output a HashSet instead of a Vector.
+    if (!observerSet.isEmpty())
+        copyToVector(observerSet, observers);
+}
+
+Node::MutationRegistrationResult Node::registerMutationObserver(PassRefPtr<WebKitMutationObserver> observer, MutationObserverOptions options)
+{
+    Vector<MutationObserverEntry>* observerEntries = ensureRareData()->ensureMutationObserverEntries();
+    MutationObserverEntry entry(observer, options);
+
+    size_t index = observerEntries->find(entry);
+    if (index == notFound) {
+        observerEntries->append(entry);
+        return MutationObserverRegistered;
+    }
+
+    (*observerEntries)[index].options = entry.options;
+    return MutationRegistrationOptionsReset;
+}
+
+void Node::unregisterMutationObserver(PassRefPtr<WebKitMutationObserver> observer)
+{
+    Vector<MutationObserverEntry>* observerEntries = mutationObserverEntries();
+    ASSERT(observerEntries);
+    if (!observerEntries)
+        return;
+
+    MutationObserverEntry entry(observer, 0);
+    size_t index = observerEntries->find(entry);
+    ASSERT(index != notFound);
+    if (index == notFound)
+        return;
+
+    observerEntries->remove(index);
+}
+#endif // ENABLE(MUTATION_OBSERVERS)
+
+
 void Node::handleLocalEvents(Event* event)
 {
     if (!hasRareData() || !rareData()->eventTargetData())
@@ -2728,10 +2852,6 @@ void Node::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode)
     EventDispatcher::dispatchEvent(this, FocusEventDispatchMediator::create(oldFocusedNode));
 }
 
-void Node::willBlur()
-{
-}
-
 void Node::dispatchBlurEvent(PassRefPtr<Node> newFocusedNode)
 {
     if (document()->page())
@@ -2774,7 +2894,7 @@ void Node::defaultEventHandler(Event* event)
                 page->contextMenuController()->handleContextMenuEvent(event);
 #endif
     } else if (eventType == eventNames().textInputEvent) {
-        if (event->isTextEvent())
+        if (event->hasInterface(eventNames().interfaceForTextEvent))
             if (Frame* frame = document()->frame())
                 frame->eventHandler()->defaultTextInputEventHandler(static_cast<TextEvent*>(event));
 #if ENABLE(PAN_SCROLLING)
@@ -2794,7 +2914,7 @@ void Node::defaultEventHandler(Event* event)
             }
         }
 #endif
-    } else if (eventType == eventNames().mousewheelEvent && event->isWheelEvent()) {
+    } else if (eventType == eventNames().mousewheelEvent && event->hasInterface(eventNames().interfaceForWheelEvent)) {
         WheelEvent* wheelEvent = static_cast<WheelEvent*>(event);
         
         // If we don't have a renderer, send the wheel event to the first node we find with a renderer.

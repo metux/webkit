@@ -44,7 +44,7 @@
 #include "FrameWin.h"
 #endif
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
 #include "TiledBackingStoreClient.h"
 #endif
 
@@ -70,7 +70,7 @@ namespace WebCore {
     class RenderPart;
     class TiledBackingStore;
 
-#if !ENABLE(TILED_BACKING_STORE)
+#if !USE(TILED_BACKING_STORE)
     class TiledBackingStoreClient { };
 #endif
 
@@ -161,8 +161,8 @@ namespace WebCore {
         float textZoomFactor() const { return m_textZoomFactor; }
         void setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor);
 
-        // Convenience helper method that grabs the pageScaleFactor from Page.
-        float pageScaleFactor() const;
+        // Scale factor of this frame with respect to the container.
+        float frameScaleFactor() const;
 
 #if USE(ACCELERATED_COMPOSITING)
         void deviceOrPageScaleFactorChanged();
@@ -195,9 +195,6 @@ namespace WebCore {
         String matchLabelsAgainstElement(const Vector<String>& labels, Element*);
         
 #if PLATFORM(MAC)
-        NSString* searchForLabelsBeforeElement(NSArray* labels, Element*, size_t* resultDistance, bool* resultIsInCellAbove);
-        NSString* matchLabelsAgainstElement(NSArray* labels, Element*);
-
         NSImage* selectionImage(bool forceBlackText = false) const;
         NSImage* snapshotDragImage(Node*, NSRect* imageRect, NSRect* elementRect) const;
         NSImage* imageFromRect(NSRect) const;
@@ -249,7 +246,7 @@ namespace WebCore {
         bool m_isDisconnected;
         bool m_excludeFromTextSearch;
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     // FIXME: The tiled backing store belongs in FrameView, not Frame.
 
     public:

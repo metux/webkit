@@ -40,11 +40,12 @@
 #include "ExceptionCode.h"
 #include "InspectorInstrumentation.h"
 #include "MessageEvent.h"
+#include "NotImplemented.h"
 #include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
 #include "Worker.h"
+#include "WorkerDebuggerAgent.h"
 #include "WorkerInspectorController.h"
-#include "WorkerScriptDebugServer.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -117,9 +118,9 @@ public:
 
 private:
     WorkerExceptionTask(const String& errorMessage, int lineNumber, const String& sourceURL, WorkerMessagingProxy* messagingProxy)
-        : m_errorMessage(errorMessage.crossThreadString())
+        : m_errorMessage(errorMessage.isolatedCopy())
         , m_lineNumber(lineNumber)
-        , m_sourceURL(sourceURL.crossThreadString())
+        , m_sourceURL(sourceURL.isolatedCopy())
         , m_messagingProxy(messagingProxy)
     {
     }
@@ -221,7 +222,7 @@ public:
 private:
     PostMessageToPageInspectorTask(WorkerMessagingProxy* messagingProxy, const String& message)
         : m_messagingProxy(messagingProxy)
-        , m_message(message.crossThreadString())
+        , m_message(message.isolatedCopy())
     {
     }
 
@@ -265,9 +266,9 @@ WorkerMessagingProxy::~WorkerMessagingProxy()
            || (m_scriptExecutionContext->isWorkerContext() && currentThread() == static_cast<WorkerContext*>(m_scriptExecutionContext.get())->thread()->threadID()));
 }
 
-void WorkerMessagingProxy::startWorkerContext(const KURL& scriptURL, const String& userAgent, const String& sourceCode)
+void WorkerMessagingProxy::startWorkerContext(const KURL& scriptURL, const String& userAgent, const String& sourceCode, WorkerThreadStartMode startMode)
 {
-    RefPtr<DedicatedWorkerThread> thread = DedicatedWorkerThread::create(scriptURL, userAgent, sourceCode, *this, *this);
+    RefPtr<DedicatedWorkerThread> thread = DedicatedWorkerThread::create(scriptURL, userAgent, sourceCode, *this, *this, startMode);
     workerThreadCreated(thread);
     thread->start();
 }
@@ -365,7 +366,7 @@ void WorkerMessagingProxy::connectToInspector(WorkerContextProxy::PageInspector*
         return;
     ASSERT(!m_pageInspector);
     m_pageInspector = pageInspector;
-    m_workerThread->runLoop().postTask(createCallbackTask(connectToWorkerContextInspectorTask, true));
+    m_workerThread->runLoop().postTaskForMode(createCallbackTask(connectToWorkerContextInspectorTask, true), WorkerDebuggerAgent::debuggerTaskMode);
 }
 
 static void disconnectFromWorkerContextInspectorTask(ScriptExecutionContext* context, bool)
@@ -379,7 +380,9 @@ void WorkerMessagingProxy::disconnectFromInspector()
     m_pageInspector = 0;
     if (m_askedToTerminate)
         return;
-    m_workerThread->runLoop().postTaskForMode(createCallbackTask(disconnectFromWorkerContextInspectorTask, true), WorkerScriptDebugServer::debuggerTaskMode);
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+    m_workerThread->runLoop().postTaskForMode(createCallbackTask(disconnectFromWorkerContextInspectorTask, true), WorkerDebuggerAgent::debuggerTaskMode);
+#endif
 }
 
 static void dispatchOnInspectorBackendTask(ScriptExecutionContext* context, const String& message)
@@ -392,7 +395,9 @@ void WorkerMessagingProxy::sendMessageToInspector(const String& message)
 {
     if (m_askedToTerminate)
         return;
-    m_workerThread->runLoop().postTaskForMode(createCallbackTask(dispatchOnInspectorBackendTask, String(message)), WorkerScriptDebugServer::debuggerTaskMode);
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+    m_workerThread->runLoop().postTaskForMode(createCallbackTask(dispatchOnInspectorBackendTask, String(message)), WorkerDebuggerAgent::debuggerTaskMode);
+#endif
 }
 #endif
 
@@ -437,6 +442,11 @@ void WorkerMessagingProxy::terminateWorkerContext()
 void WorkerMessagingProxy::postMessageToPageInspector(const String& message)
 {
     m_scriptExecutionContext->postTask(PostMessageToPageInspectorTask::create(this, message));
+}
+
+void WorkerMessagingProxy::updateInspectorStateCookie(const String&)
+{
+    notImplemented();
 }
 #endif
 

@@ -188,7 +188,18 @@ namespace JSC {
         SmallStrings smallStrings;
         NumericStrings numericStrings;
         DateInstanceCache dateInstanceCache;
-        
+        Vector<CodeBlock*> codeBlocksBeingCompiled;
+        void startedCompiling(CodeBlock* codeBlock)
+        {
+            codeBlocksBeingCompiled.append(codeBlock);
+        }
+
+        void finishedCompiling(CodeBlock* codeBlock)
+        {
+            ASSERT_UNUSED(codeBlock, codeBlock == codeBlocksBeingCompiled.last());
+            codeBlocksBeingCompiled.removeLast();
+        }
+
 #if ENABLE(ASSEMBLER)
         ExecutableAllocator executableAllocator;
 #endif
@@ -219,7 +230,7 @@ namespace JSC {
         }
         NativeExecutable* getHostFunction(NativeFunction, ThunkGenerator, DFG::Intrinsic);
 #endif
-        NativeExecutable* getHostFunction(NativeFunction);
+        NativeExecutable* getHostFunction(NativeFunction, NativeFunction constructor);
 
         TimeoutChecker timeoutChecker;
         Terminator terminator;
@@ -233,25 +244,25 @@ namespace JSC {
         int64_t debugDataBuffer[64];
 #endif
 #if ENABLE(DFG_JIT)
-        Vector<void*> osrScratchBuffers;
-        size_t sizeOfLastOSRScratchBuffer;
+        Vector<void*> scratchBuffers;
+        size_t sizeOfLastScratchBuffer;
         
-        void* osrScratchBufferForSize(size_t size)
+        void* scratchBufferForSize(size_t size)
         {
             if (!size)
                 return 0;
             
-            if (size > sizeOfLastOSRScratchBuffer) {
+            if (size > sizeOfLastScratchBuffer) {
                 // Protect against a N^2 memory usage pathology by ensuring
                 // that at worst, we get a geometric series, meaning that the
                 // total memory usage is somewhere around
                 // max(scratch buffer size) * 4.
-                sizeOfLastOSRScratchBuffer = size * 2;
+                sizeOfLastScratchBuffer = size * 2;
                 
-                osrScratchBuffers.append(fastMalloc(sizeOfLastOSRScratchBuffer));
+                scratchBuffers.append(fastMalloc(sizeOfLastScratchBuffer));
             }
             
-            return osrScratchBuffers.last();
+            return scratchBuffers.last();
         }
 #endif
 #endif
@@ -295,8 +306,6 @@ namespace JSC {
         void addRegExpToTrace(PassRefPtr<RegExp> regExp);
 #endif
         void dumpRegExpTrace();
-        HandleSlot allocateGlobalHandle() { return heap.allocateGlobalHandle(); }
-        HandleSlot allocateLocalHandle() { return heap.allocateLocalHandle(); }
         void clearBuiltinStructures();
 
         bool isCollectorBusy() { return heap.isBusy(); }
@@ -305,6 +314,10 @@ namespace JSC {
 #if ENABLE(GC_VALIDATION)
         bool isInitializingObject() const; 
         void setInitializingObject(bool);
+#endif
+
+#if CPU(X86) && ENABLE(JIT)
+        unsigned m_timeoutCount;
 #endif
 
     private:
@@ -319,11 +332,6 @@ namespace JSC {
         bool m_isInitializingObject;
 #endif
     };
-
-    inline HandleSlot allocateGlobalHandle(JSGlobalData& globalData)
-    {
-        return globalData.allocateGlobalHandle();
-    }
 
 #if ENABLE(GC_VALIDATION)
     inline bool JSGlobalData::isInitializingObject() const

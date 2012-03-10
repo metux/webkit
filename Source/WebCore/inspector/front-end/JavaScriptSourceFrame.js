@@ -28,98 +28,110 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.JavaScriptSourceFrame = function(model, uiSourceCode)
+/**
+ * @constructor
+ * @extends {WebInspector.SourceFrame}
+ * @param {WebInspector.SourceFrameDelegate} delegate
+ * @param {WebInspector.DebuggerPresentationModel} model
+ * @param {WebInspector.UISourceCode} uiSourceCode
+ */
+WebInspector.JavaScriptSourceFrame = function(delegate, model, uiSourceCode)
 {
     // FIXME: move all SourceFrame methods related to JavaScript debugging here and
     // get rid of SourceFrame._delegate.
-    var delegate = new WebInspector.SourceFrameDelegateForScriptsPanel(model, uiSourceCode);
     WebInspector.SourceFrame.call(this, delegate, uiSourceCode.url);
-}
 
-WebInspector.JavaScriptSourceFrame.prototype.__proto__ = WebInspector.SourceFrame.prototype;
-
-WebInspector.SourceFrameDelegateForScriptsPanel = function(model, uiSourceCode)
-{
-    WebInspector.SourceFrameDelegate.call(this);
     this._model = model;
-    this._uiSourceCode = uiSourceCode;
     this._popoverObjectGroup = "popover";
+
+    uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.ContentChanged, this.contentChanged, this);
 }
 
-WebInspector.SourceFrameDelegateForScriptsPanel.prototype = {
-    requestContent: function(callback)
+WebInspector.JavaScriptSourceFrame.prototype = {
+    shouldShowPopover: function(element)
     {
-        this._uiSourceCode.requestContent(callback);
+        if (!this._model.paused)
+            return false;
+        if (!element.enclosingNodeOrSelfWithClass("webkit-line-content"))
+            return false;
+
+        // We are interested in identifiers and "this" keyword.
+        if (element.hasStyleClass("webkit-javascript-keyword"))
+            return element.textContent === "this";
+
+        return element.hasStyleClass("webkit-javascript-ident");
     },
 
-    debuggingSupported: function()
+    onShowPopover: function(element, showCallback)
     {
-        return true;
+        if (!this.readOnly) {
+            this.popoverHelper.hidePopover();
+            return;
+        }
+        this._highlightElement = this._highlightExpression(element);
+
+        function showObjectPopover(result, wasThrown)
+        {
+            if (!this._model.paused) {
+                this.popoverHelper.hidePopover();
+                return;
+            }
+            showCallback(WebInspector.RemoteObject.fromPayload(result), wasThrown);
+            // Popover may have been removed by showCallback().
+            if (this._highlightElement)
+                this._highlightElement.addStyleClass("source-frame-eval-expression");
+        }
+
+        var selectedCallFrame = this._model.selectedCallFrame;
+        selectedCallFrame.evaluate(this._highlightElement.textContent, this._popoverObjectGroup, false, false, showObjectPopover.bind(this));
     },
 
-    setBreakpoint: function(lineNumber, condition, enabled)
+    onHidePopover: function()
     {
-        this._model.setBreakpoint(this._uiSourceCode, lineNumber, condition, enabled);
-
-        if (!WebInspector.panels.scripts.breakpointsActivated)
-            WebInspector.panels.scripts.toggleBreakpointsClicked();
-    },
-
-    updateBreakpoint: function(lineNumber, condition, enabled)
-    {
-        this._model.updateBreakpoint(this._uiSourceCode, lineNumber, condition, enabled);
-    },
-
-    removeBreakpoint: function(lineNumber)
-    {
-        this._model.removeBreakpoint(this._uiSourceCode, lineNumber);
-    },
-
-    findBreakpoint: function(lineNumber)
-    {
-        return this._model.findBreakpoint(this._uiSourceCode, lineNumber);
-    },
-
-    continueToLine: function(lineNumber)
-    {
-        this._model.continueToLine(this._uiSourceCode, lineNumber);
-    },
-
-    canEditScriptSource: function()
-    {
-        return this._model.canEditScriptSource(this._uiSourceCode);
-    },
-
-    setScriptSource: function(text, callback)
-    {
-        this._model.setScriptSource(this._uiSourceCode, text, callback);
-    },
-
-    setScriptSourceIsBeingEdited: function(inEditMode)
-    {
-        WebInspector.panels.scripts.setScriptSourceIsBeingEdited(this._uiSourceCode, inEditMode);
-    },
-
-    debuggerPaused: function()
-    {
-        return WebInspector.panels.scripts.paused;
-    },
-
-    evaluateInSelectedCallFrame: function(string, callback)
-    {
-        WebInspector.panels.scripts.evaluateInSelectedCallFrame(string, this._popoverObjectGroup, false, false, callback);
-    },
-
-    releaseEvaluationResult: function()
-    {
+        // Replace higlight element with its contents inplace.
+        var highlightElement = this._highlightElement;
+        if (!highlightElement)
+            return;
+        var parentElement = highlightElement.parentElement;
+        var child = highlightElement.firstChild;
+        while (child) {
+            var nextSibling = child.nextSibling;
+            parentElement.insertBefore(child, highlightElement);
+            child = nextSibling;
+        }
+        parentElement.removeChild(highlightElement);
+        delete this._highlightElement;
         RuntimeAgent.releaseObjectGroup(this._popoverObjectGroup);
     },
 
-    suggestedFileName: function()
+    _highlightExpression: function(element)
     {
-        var names = WebInspector.panels.scripts._folderAndDisplayNameForScriptURL(this._uiSourceCode.url);
-        return names.displayName || "untitled.js";
+        // Collect tokens belonging to evaluated expression.
+        var tokens = [ element ];
+        var token = element.previousSibling;
+        while (token && (token.className === "webkit-javascript-ident" || token.className === "webkit-javascript-keyword" || token.textContent.trim() === ".")) {
+            tokens.push(token);
+            token = token.previousSibling;
+        }
+        tokens.reverse();
+
+        // Wrap them with highlight element.
+        var parentElement = element.parentElement;
+        var nextElement = element.nextSibling;
+        var container = document.createElement("span");
+        for (var i = 0; i < tokens.length; ++i)
+            container.appendChild(tokens[i]);
+        parentElement.insertBefore(container, nextElement);
+        return container;
+    },
+
+    populateTextAreaContextMenu: function(contextMenu)
+    {
+        var selection = window.getSelection();
+        if (selection.type !== "Range" || selection.isCollapsed)
+            return;
+        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Add to watch" : "Add to Watch"), this._delegate.addToWatch.bind(this._delegate, selection.toString()));
     }
 }
 
-WebInspector.SourceFrameDelegateForScriptsPanel.prototype.__proto__ = WebInspector.SourceFrameDelegate.prototype;
+WebInspector.JavaScriptSourceFrame.prototype.__proto__ = WebInspector.SourceFrame.prototype;

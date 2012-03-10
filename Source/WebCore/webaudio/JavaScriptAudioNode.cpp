@@ -42,12 +42,12 @@ namespace WebCore {
 
 const size_t DefaultBufferSize = 4096;
 
-PassRefPtr<JavaScriptAudioNode> JavaScriptAudioNode::create(AudioContext* context, double sampleRate, size_t bufferSize, unsigned numberOfInputs, unsigned numberOfOutputs)
+PassRefPtr<JavaScriptAudioNode> JavaScriptAudioNode::create(AudioContext* context, float sampleRate, size_t bufferSize, unsigned numberOfInputs, unsigned numberOfOutputs)
 {
     return adoptRef(new JavaScriptAudioNode(context, sampleRate, bufferSize, numberOfInputs, numberOfOutputs));
 }
 
-JavaScriptAudioNode::JavaScriptAudioNode(AudioContext* context, double sampleRate, size_t bufferSize, unsigned numberOfInputs, unsigned numberOfOutputs)
+JavaScriptAudioNode::JavaScriptAudioNode(AudioContext* context, float sampleRate, size_t bufferSize, unsigned numberOfInputs, unsigned numberOfOutputs)
     : AudioNode(context, sampleRate)
     , m_doubleBufferIndex(0)
     , m_doubleBufferIndexForEvent(0)
@@ -81,7 +81,7 @@ JavaScriptAudioNode::JavaScriptAudioNode(AudioContext* context, double sampleRat
     addInput(adoptPtr(new AudioNodeInput(this)));
     addOutput(adoptPtr(new AudioNodeOutput(this, 2)));
 
-    setType(NodeTypeJavaScript);
+    setNodeType(NodeTypeJavaScript);
 
     initialize();
 }
@@ -96,7 +96,7 @@ void JavaScriptAudioNode::initialize()
     if (isInitialized())
         return;
 
-    double sampleRate = context()->sampleRate();
+    float sampleRate = context()->sampleRate();
 
     // Create double buffers on both the input and output sides.
     // These AudioBuffers will be directly accessed in the main thread by JavaScript.
@@ -117,11 +117,6 @@ void JavaScriptAudioNode::uninitialize()
     m_outputBuffers.clear();
 
     AudioNode::uninitialize();
-}
-
-JavaScriptAudioNode* JavaScriptAudioNode::toJavaScriptAudioNode()
-{
-    return this;
 }
 
 void JavaScriptAudioNode::process(size_t framesToProcess)
@@ -260,6 +255,11 @@ void JavaScriptAudioNode::reset()
         m_inputBuffers[i]->zero();
         m_outputBuffers[i]->zero();
     }
+}
+
+const AtomicString& JavaScriptAudioNode::interfaceName() const
+{
+    return eventNames().interfaceForJavaScriptAudioNode;
 }
 
 ScriptExecutionContext* JavaScriptAudioNode::scriptExecutionContext() const

@@ -200,15 +200,11 @@ void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parame
     m_iconDatabaseProxy.setEnabled(parameters.iconDatabaseEnabled);
 #endif
 
-#if ENABLE(DOM_STORAGE)
     StorageTracker::initializeTracker(parameters.localStorageDirectory, 0);
     m_localStorageDirectory = parameters.localStorageDirectory;
-#endif
-    
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
+
     if (!parameters.applicationCacheDirectory.isEmpty())
         cacheStorage().setCacheDirectory(parameters.applicationCacheDirectory);
-#endif
 
     setShouldTrackVisitedLinks(parameters.shouldTrackVisitedLinks);
     setCacheModel(static_cast<uint32_t>(parameters.cacheModel));
@@ -238,6 +234,9 @@ void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parame
 
     if (parameters.shouldAlwaysUseComplexTextCodePath)
         setAlwaysUsesComplexTextCodePath(true);
+
+    if (parameters.shouldUseFontSmoothing)
+        setShouldUseFontSmoothing(true);
 
 #if USE(CFURLSTORAGESESSIONS)
     WebCore::ResourceHandle::setPrivateBrowsingStorageSessionIdentifierBase(parameters.uiProcessBundleIdentifier);
@@ -276,6 +275,11 @@ void WebProcess::setDefaultRequestTimeoutInterval(double timeoutInterval)
 void WebProcess::setAlwaysUsesComplexTextCodePath(bool alwaysUseComplexText)
 {
     WebCore::Font::setCodePath(alwaysUseComplexText ? WebCore::Font::Complex : WebCore::Font::Auto);
+}
+
+void WebProcess::setShouldUseFontSmoothing(bool useFontSmoothing)
+{
+    WebCore::Font::setShouldUseSmoothing(useFontSmoothing);
 }
 
 void WebProcess::languageChanged(const String& language) const
@@ -771,10 +775,8 @@ void WebProcess::clearResourceCaches(ResourceCachesToClear resourceCachesToClear
 
 void WebProcess::clearApplicationCache()
 {
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
     // Empty the application cache.
     cacheStorage().empty();
-#endif
 }
 
 #if !ENABLE(PLUGIN_PROCESS)

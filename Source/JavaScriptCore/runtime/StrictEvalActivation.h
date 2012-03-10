@@ -41,15 +41,16 @@ public:
         return activation;
     }
 
-    virtual bool deleteProperty(ExecState*, const Identifier&);
+    static bool deleteProperty(JSCell*, ExecState*, const Identifier&);
     virtual JSObject* toThisObject(ExecState*) const;
-    virtual JSValue toStrictThisObject(ExecState*) const;
 
     static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
     {
         return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
     }
     
+    static const ClassInfo s_info;
+
 protected:
     static const unsigned StructureFlags = IsEnvironmentRecord | JSNonFinalObject::StructureFlags;
 

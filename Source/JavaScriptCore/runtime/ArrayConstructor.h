@@ -51,11 +51,13 @@ namespace JSC {
 
     private:
         ArrayConstructor(JSGlobalObject*, Structure*);
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier&, PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+
         virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
 
-        virtual ConstructType getConstructData(ConstructData&);
-        virtual CallType getCallData(CallData&);
+        static ConstructType getConstructData(JSCell*, ConstructData&);
+        static CallType getCallData(JSCell*, CallData&);
     };
 
 } // namespace JSC

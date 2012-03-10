@@ -92,7 +92,7 @@ bool SVGAnimateMotionElement::isSupportedAttribute(const QualifiedName& attrName
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty())
         supportedAttributes.add(SVGNames::pathAttr);
-    return supportedAttributes.contains(attrName);
+    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGAnimateMotionElement::parseMappedAttribute(Attribute* attr)
@@ -116,7 +116,7 @@ SVGAnimateMotionElement::RotateMode SVGAnimateMotionElement::rotateMode() const
 {
     DEFINE_STATIC_LOCAL(const AtomicString, autoVal, ("auto"));
     DEFINE_STATIC_LOCAL(const AtomicString, autoReverse, ("auto-reverse"));
-    String rotate = fastGetAttribute(SVGNames::rotateAttr);
+    const AtomicString& rotate = getAttribute(SVGNames::rotateAttr);
     if (rotate == autoVal)
         return RotateAuto;
     if (rotate == autoReverse)

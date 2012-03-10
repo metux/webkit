@@ -33,7 +33,11 @@ enum Intrinsic {
     AbsIntrinsic,
     MinIntrinsic,
     MaxIntrinsic,
-    SqrtIntrinsic
+    SqrtIntrinsic,
+    ArrayPushIntrinsic,
+    ArrayPopIntrinsic,
+    CharCodeAtIntrinsic,
+    CharAtIntrinsic
 };
 
 } } // namespace JSC::DFG

@@ -45,6 +45,7 @@ class CSSProperty;
 class CSSFontFace;
 class CSSFontFaceRule;
 class CSSImageValue;
+class CSSRegionStyleRule;
 class CSSRuleList;
 class CSSSelector;
 class CSSStyleApplyProperty;
@@ -92,16 +93,16 @@ public:
                      CSSStyleSheet* pageUserSheet, const Vector<RefPtr<CSSStyleSheet> >* pageGroupUserSheets, const Vector<RefPtr<CSSStyleSheet> >* documentUserSheets,
                      bool strictParsing, bool matchAuthorAndUserStyles);
     ~CSSStyleSelector();
-    
+
     // Using these during tree walk will allow style selector to optimize child and descendant selector lookups.
     void pushParent(Element* parent) { m_checker.pushParent(parent); }
     void popParent(Element* parent) { m_checker.popParent(parent); }
 
-    PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false, bool matchVisitedPseudoClass = false);
-    
+    PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false);
+
     void keyframeStylesForAnimation(Element*, const RenderStyle*, KeyframeList&);
 
-    PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle = 0, bool matchVisitedPseudoClass = false);
+    PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle = 0);
 
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
@@ -122,7 +123,7 @@ private:
     void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);
     void initElement(Element*);
     RenderStyle* locateSharedStyle();
-    bool matchesSiblingRules();
+    bool matchesRuleSet(RuleSet*);
     Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
     Node* findSiblingForStyleSharing(Node*, unsigned& count) const;
     bool canShareStyleWithElement(Node*) const;
@@ -162,7 +163,7 @@ public:
     void setStyle(PassRefPtr<RenderStyle> s) { m_style = s; } // Used by the document when setting up its root style.
 
     void applyPropertyToStyle(int id, CSSValue*, RenderStyle*);
-    
+
     static float getComputedSizeFromSpecifiedSize(Document*, float zoomFactor, bool isAbsoluteSize, float specifiedSize, ESmartMinimumForFontSize = UseSmartMinimumForFontFize);
 
 private:
@@ -173,7 +174,7 @@ private:
 public:
     bool useSVGZoomRules();
 
-    Color getColorFromPrimitiveValue(CSSPrimitiveValue*) const;
+    Color getColorFromPrimitiveValue(CSSPrimitiveValue*, bool forVisitedLink = false) const;
 
     bool hasSelectorForAttribute(const AtomicString&) const;
 
@@ -188,6 +189,7 @@ public:
 
     void addKeyframeStyle(PassRefPtr<WebKitCSSKeyframesRule>);
     void addPageStyle(PassRefPtr<CSSPageRule>);
+    void addRegionStyleRule(PassRefPtr<CSSRegionStyleRule>);
 
     bool usesSiblingRules() const { return m_features.siblingRules; }
     bool usesFirstLineRules() const { return m_features.usesFirstLineRules; }
@@ -196,12 +198,17 @@ public:
 
     static bool createTransformOperations(CSSValue* inValue, RenderStyle* inStyle, RenderStyle* rootStyle, TransformOperations& outOperations);
 
+#if ENABLE(CSS_FILTERS)
+    bool createFilterOperations(CSSValue* inValue, RenderStyle* inStyle, RenderStyle* rootStyle, FilterOperations& outOperations);
+#endif
+
     struct Features {
         Features();
         ~Features();
         HashSet<AtomicStringImpl*> idsInRules;
         HashSet<AtomicStringImpl*> attrsInRules;
         OwnPtr<RuleSet> siblingRules;
+        OwnPtr<RuleSet> uncommonAttributeRules;
         bool usesFirstLineRules;
         bool usesBeforeAfterRules;
         bool usesLinkRules;
@@ -216,17 +223,31 @@ private:
     void adjustRenderStyle(RenderStyle* styleToAdjust, RenderStyle* parentStyle, Element*);
 
     void addMatchedRule(const RuleData* rule) { m_matchedRules.append(rule); }
-    void addMatchedDeclaration(CSSMutableStyleDeclaration*);
+    void addMatchedDeclaration(CSSMutableStyleDeclaration*, unsigned linkMatchType = SelectorChecker::MatchAll);
 
+    struct MatchResult {
+        MatchResult() : firstUARule(-1), lastUARule(-1), firstAuthorRule(-1), lastAuthorRule(-1), firstUserRule(-1), lastUserRule(-1) { }
+        int firstUARule;
+        int lastUARule;
+        int firstAuthorRule;
+        int lastAuthorRule;
+        int firstUserRule;
+        int lastUserRule;
+    };
+    void matchAllRules(MatchResult&);
+    void matchUARules(MatchResult&);
     void matchRules(RuleSet*, int& firstRuleIndex, int& lastRuleIndex, bool includeEmptyRules);
     void matchRulesForList(const Vector<RuleData>*, int& firstRuleIndex, int& lastRuleIndex, bool includeEmptyRules);
     bool fastRejectSelector(const RuleData&) const;
     void sortMatchedRules();
-    
+
     bool checkSelector(const RuleData&);
 
+    void applyMatchedDeclarations(const MatchResult&);
     template <bool firstPass>
     void applyDeclarations(bool important, int startIndex, int endIndex);
+    template <bool firstPass>
+    void applyDeclaration(CSSMutableStyleDeclaration*, bool isImportant);
 
     void matchPageRules(RuleSet*, bool isLeftPage, bool isFirstPage, const String& pageName);
     void matchPageRulesForList(const Vector<RuleData>*, bool isLeftPage, bool isFirstPage, const String& pageName);
@@ -234,7 +255,7 @@ private:
     bool isRightPage(int pageIndex) const { return !isLeftPage(pageIndex); }
     bool isFirstPage(int pageIndex) const;
     String pageName(int pageIndex) const;
-    
+
     OwnPtr<RuleSet> m_authorStyle;
     OwnPtr<RuleSet> m_userStyle;
 
@@ -248,16 +269,20 @@ private:
     typedef HashMap<AtomicStringImpl*, RefPtr<WebKitCSSKeyframesRule> > KeyframesRuleMap;
     KeyframesRuleMap m_keyframesRuleMap;
 
+    typedef Vector<RefPtr<CSSRegionStyleRule> > RegionStyleRules;
+    RegionStyleRules m_regionStyleRules;
 public:
     static RenderStyle* styleNotYetAvailable() { return s_styleNotYetAvailable; }
 
     StyleImage* styleImage(CSSPropertyID, CSSValue*);
     StyleImage* cachedOrPendingFromValue(CSSPropertyID, CSSImageValue*);
 
+    bool applyPropertyToRegularStyle() const { return m_applyPropertyToRegularStyle; }
+    bool applyPropertyToVisitedLinkStyle() const { return m_applyPropertyToVisitedLinkStyle; }
+
 private:
     static RenderStyle* s_styleNotYetAvailable;
 
-    void matchUARules(int& firstUARule, int& lastUARule);
     void updateFont();
     void cacheBorderAndBackground();
 
@@ -304,14 +329,19 @@ private:
     // set of matched decls four times, once for those properties that others depend on (like font-size),
     // and then a second time for all the remaining properties. We then do the same two passes
     // for any !important rules.
-    Vector<CSSMutableStyleDeclaration*, 64> m_matchedDecls;
+    struct MatchedStyleDeclaration {
+        MatchedStyleDeclaration(CSSMutableStyleDeclaration* decl, unsigned type) : styleDeclaration(decl), linkMatchType(type) { }
+        CSSMutableStyleDeclaration* styleDeclaration;
+        unsigned linkMatchType;
+    };
+    Vector<MatchedStyleDeclaration, 64> m_matchedDecls;
 
     // A buffer used to hold the set of matched rules for an element, and a temporary buffer used for
     // merge sorting.
     Vector<const RuleData*, 32> m_matchedRules;
 
     RefPtr<CSSRuleList> m_ruleList;
-    
+
     HashSet<int> m_pendingImageProperties; // Hash of CSSPropertyIDs
 
     OwnPtr<MediaQueryEvaluator> m_medium;
@@ -332,13 +362,15 @@ private:
     bool m_fontDirty;
     bool m_matchAuthorAndUserStyles;
     bool m_sameOriginOnly;
-    
+
     RefPtr<CSSFontSelector> m_fontSelector;
     Vector<CSSMutableStyleDeclaration*> m_additionalAttributeStyleDecls;
     Vector<MediaQueryResult*> m_viewportDependentMediaQueryResults;
 
+    bool m_applyPropertyToRegularStyle;
+    bool m_applyPropertyToVisitedLinkStyle;
     const CSSStyleApplyProperty& m_applyProperty;
-    
+
     friend class CSSStyleApplyProperty;
 };
 

@@ -478,6 +478,8 @@ static void resetDefaultsToConsistentValues()
         axController->resetToConsistentState();
 
     DumpRenderTreeSupportGtk::clearOpener(mainFrame);
+
+    DumpRenderTreeSupportGtk::resetGeolocationClientMock(webView);
 }
 
 static bool useLongRunningServerMode(int argc, char *argv[])
@@ -1096,9 +1098,11 @@ static void willSendRequestCallback(WebKitWebView* webView, WebKitWebFrame*, Web
 
 static WebKitWebView* createWebView()
 {
-    WebKitWebView* view = WEBKIT_WEB_VIEW(self_scrolling_webkit_web_view_new());
-
+    // It is important to declare DRT is running early so when creating
+    // web view mock clients are used instead of proper ones.
     DumpRenderTreeSupportGtk::setDumpRenderTreeModeEnabled(true);
+
+    WebKitWebView* view = WEBKIT_WEB_VIEW(self_scrolling_webkit_web_view_new());
 
     g_object_connect(G_OBJECT(view),
                      "signal::load-started", webViewLoadStarted, 0,
@@ -1168,7 +1172,6 @@ static void logHandler(const gchar* domain, GLogLevelFlags level, const gchar* m
 
 int main(int argc, char* argv[])
 {
-    g_thread_init(NULL);
     gtk_init(&argc, &argv);
 
     // Some plugins might try to use the GLib logger for printing debug

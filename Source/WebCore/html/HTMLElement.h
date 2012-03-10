@@ -25,12 +25,20 @@
 
 #include "StyledElement.h"
 
+#if ENABLE(MICRODATA)
+#include "DOMSettableTokenList.h"
+#endif
+
 namespace WebCore {
 
 class DocumentFragment;
 class HTMLCollection;
 class HTMLFormElement;
-                       
+
+#if ENABLE(MICRODATA)
+class MicroDataItemValue;
+#endif
+
 class HTMLElement : public StyledElement {
 public:
     static PassRefPtr<HTMLElement> create(const QualifiedName& tagName, Document*);
@@ -81,6 +89,15 @@ public:
 
     TextDirection directionalityIfhasDirAutoAttribute(bool& isAuto) const;
 
+#if ENABLE(MICRODATA)
+    PassRefPtr<DOMSettableTokenList> itemRef() const;
+    PassRefPtr<DOMSettableTokenList> itemProp() const;
+    PassRefPtr<DOMSettableTokenList> itemType() const;
+
+    void setItemValue(const String&, ExceptionCode&);
+    PassRefPtr<MicroDataItemValue> itemValue() const;
+#endif
+
 protected:
     HTMLElement(const QualifiedName& tagName, Document*);
 
@@ -107,6 +124,19 @@ private:
     void adjustDirectionalityIfNeededAfterChildAttributeChanged(Element* child);
     void adjustDirectionalityIfNeededAfterChildrenChanged(Node* beforeChange, int childCountDelta);
     TextDirection directionality(Node** strongDirectionalityTextNode= 0) const;
+
+#if ENABLE(MICRODATA)
+    void setItemProp(const String&);
+    void setItemRef(const String&);
+    void setItemType(const String&);
+
+    virtual String itemValueText() const;
+    virtual void setItemValueText(const String&, ExceptionCode&);
+
+    mutable RefPtr<DOMSettableTokenList> m_itemProp;
+    mutable RefPtr<DOMSettableTokenList> m_itemRef;
+    mutable RefPtr<DOMSettableTokenList> m_itemType;
+#endif
 };
 
 inline HTMLElement* toHTMLElement(Node* node)
@@ -120,6 +150,9 @@ inline const HTMLElement* toHTMLElement(const Node* node)
     ASSERT(!node || node->isHTMLElement());
     return static_cast<const HTMLElement*>(node);
 }
+
+// This will catch anyone doing an unnecessary cast.
+void toHTMLElement(const HTMLElement*);
 
 inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document* document)
     : StyledElement(tagName, document, CreateHTMLElement)

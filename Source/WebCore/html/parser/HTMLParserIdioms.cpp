@@ -68,11 +68,11 @@ String serializeForNumberType(double number)
 
 bool parseToDoubleForNumberType(const String& string, double* result)
 {
-    // See HTML5 2.4.4.3 `Real numbers.'
+    // See HTML5 2.5.4.3 `Real numbers.'
 
     // String::toDouble() accepts leading + and whitespace characters, which are not valid here.
     UChar firstCharacter = string[0];
-    if (firstCharacter != '-' && !isASCIIDigit(firstCharacter))
+    if (firstCharacter != '-' && firstCharacter != '.' && !isASCIIDigit(firstCharacter))
         return false;
 
     bool valid = false;
@@ -85,7 +85,7 @@ bool parseToDoubleForNumberType(const String& string, double* result)
         return false;
 
     // Numbers are considered finite IEEE 754 single-precision floating point values.
-    // See HTML5 2.4.4.3 `Real numbers.'
+    // See HTML5 2.5.4.3 `Real numbers.'
     if (-std::numeric_limits<float>::max() > value || value > std::numeric_limits<float>::max())
         return false;
 
@@ -215,8 +215,9 @@ bool parseHTMLInteger(const String& input, int& value)
     }
 
     // Step 9
-    value = sign * charactersToIntStrict(digits.characters(), digits.length());
-    return true;
+    bool ok;
+    value = sign * charactersToIntStrict(digits.characters(), digits.length(), &ok);
+    return ok;
 }
 
 // http://www.whatwg.org/specs/web-apps/current-work/#rules-for-parsing-non-negative-integers
@@ -261,8 +262,9 @@ bool parseHTMLNonNegativeInteger(const String& input, unsigned int& value)
     }
 
     // Step 9
-    value = charactersToUIntStrict(digits.characters(), digits.length());
-    return true;
+    bool ok;
+    value = charactersToUIntStrict(digits.characters(), digits.length(), &ok);
+    return ok;
 }
 
 }

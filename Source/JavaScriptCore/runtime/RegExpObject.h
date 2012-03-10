@@ -65,9 +65,10 @@ namespace JSC {
         JSValue test(ExecState*);
         JSValue exec(ExecState*);
 
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier& propertyName, PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier& propertyName, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
-        virtual void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+        static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
 
         static JS_EXPORTDATA const ClassInfo s_info;
 
@@ -81,9 +82,9 @@ namespace JSC {
         void finishCreation(JSGlobalObject*);
         static const unsigned StructureFlags = OverridesVisitChildren | OverridesGetOwnPropertySlot | Base::StructureFlags;
 
-    private:
-        virtual void visitChildren(SlotVisitor&);
+        static void visitChildren(JSCell*, SlotVisitor&);
 
+    private:
         bool match(ExecState*);
 
         struct RegExpObjectData {

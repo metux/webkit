@@ -242,7 +242,7 @@ sub GetGValueTypeName {
                  "unsigned int", "uint",
                  "unsigned long long", "uint64", 
                  "unsigned long", "ulong",
-                 "unsigned short", "ushort");
+                 "unsigned short", "uint");
 
     return $types{$type} ? $types{$type} : "object";
 }
@@ -1062,7 +1062,7 @@ sub GenerateFunctions {
         $param->name("value");
         $param->type($attribute->signature->type);
         my %attributes = ();
-        $param->extendedAttributes(attributes);
+        $param->extendedAttributes("attributes");
         my $arrayRef = $function->parameters;
         push(@$arrayRef, $param);
         

@@ -3,12 +3,12 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>Global functions</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Global functions">
 <link rel="prev" href="ch01.html" title="Global functions">
 <link rel="next" href="ch02.html" title="Class Overview">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -38,17 +38,17 @@
 <div class="refsynopsisdiv">
 <a name="webkitgtk-Global-functions.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis"><span class="returnvalue">SoupSession</span> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
-<a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-web-database-quota" title="webkit_get_default_web_database_quota ()">webkit_get_default_web_database_quota</a>
+<span class="returnvalue">guint64</span>             <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-web-database-quota" title="webkit_get_default_web_database_quota ()">webkit_get_default_web_database_quota</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
-const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path" title="webkit_get_web_database_directory_path ()">webkit_get_web_database_directory_path</a>
+const <span class="returnvalue">gchar</span> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path" title="webkit_get_web_database_directory_path ()">webkit_get_web_database_directory_path</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="returnvalue">WebKitWebPluginDatabase</span></a> * <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-plugin-database" title="webkit_get_web_plugin_database ()">webkit_get_web_plugin_database</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-remove-all-web-databases" title="webkit_remove_all_web_databases ()">webkit_remove_all_web_databases</a>     (<em class="parameter"><code><span class="type">void</span></code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-default-web-database-quota" title="webkit_set_default_web_database_quota ()">webkit_set_default_web_database_quota</a>
-                                                        (<em class="parameter"><code><a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a> defaultQuota</code></em>);
+                                                        (<em class="parameter"><code><span class="type">guint64</span> defaultQuota</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-web-database-directory-path" title="webkit_set_web_database_directory_path ()">webkit_set_web_database_directory_path</a>
-                                                        (<em class="parameter"><code>const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);
+                                                        (<em class="parameter"><code>const <span class="type">gchar</span> *path</code></em>);
 
 enum                <a class="link" href="webkitgtk-Global-functions.html#WebKitCacheModel" title="enum WebKitCacheModel">WebKitCacheModel</a>;
 <a class="link" href="webkitgtk-Global-functions.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="returnvalue">WebKitCacheModel</span></a>    <a class="link" href="webkitgtk-Global-functions.html#webkit-get-cache-model" title="webkit_get_cache_model ()">webkit_get_cache_model</a>              (<em class="parameter"><code><span class="type">void</span></code></em>);
@@ -87,7 +87,7 @@ traffic occurs, WebKit will use it instead of the default.
 <hr>
 <div class="refsect2">
 <a name="webkit-get-default-web-database-quota"></a><h3>webkit_get_default_web_database_quota ()</h3>
-<pre class="programlisting"><a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             webkit_get_default_web_database_quota
+<pre class="programlisting"><span class="returnvalue">guint64</span>             webkit_get_default_web_database_quota
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 Returns the default quota for Web Database databases. By default
@@ -105,7 +105,7 @@ this value is 5MB.
 <hr>
 <div class="refsect2">
 <a name="webkit-get-web-database-directory-path"></a><h3>webkit_get_web_database_directory_path ()</h3>
-<pre class="programlisting">const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_get_web_database_directory_path
+<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_get_web_database_directory_path
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 Returns the current path to the directory WebKit will write Web 
@@ -153,7 +153,7 @@ Removes all web databases from the current database directory path.
 <div class="refsect2">
 <a name="webkit-set-default-web-database-quota"></a><h3>webkit_set_default_web_database_quota ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_default_web_database_quota
-                                                        (<em class="parameter"><code><a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a> defaultQuota</code></em>);</pre>
+                                                        (<em class="parameter"><code><span class="type">guint64</span> defaultQuota</code></em>);</pre>
 <p>
 Sets the current path to the directory WebKit will write Web 
 Database databases.
@@ -171,7 +171,7 @@ Database databases.
 <div class="refsect2">
 <a name="webkit-set-web-database-directory-path"></a><h3>webkit_set_web_database_directory_path ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_web_database_directory_path
-                                                        (<em class="parameter"><code>const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);</pre>
+                                                        (<em class="parameter"><code>const <span class="type">gchar</span> *path</code></em>);</pre>
 <p>
 Sets the current path to the directory WebKit will write Web 
 Database databases.
@@ -257,6 +257,6 @@ WEBKIT_CACHE_MODEL_WEB_BROWSER.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

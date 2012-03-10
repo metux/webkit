@@ -59,7 +59,7 @@ public:
     InspectorConsoleAgent(InstrumentingAgents*, InspectorAgent*, InspectorState*, InjectedScriptManager*, InspectorDOMAgent*);
     ~InspectorConsoleAgent();
 
-    void enable(ErrorString*, int* consoleMessageExpireCount);
+    void enable(ErrorString*);
     void disable(ErrorString*);
     void clearMessages(ErrorString*);
     void reset();
@@ -76,7 +76,7 @@ public:
 
     void frameWindowDiscarded(DOMWindow*);
 
-    void resourceRetrievedByXMLHttpRequest(const String& url, const String& sendURL, unsigned sendLineNumber);
+    void resourceRetrievedByXMLHttpRequest(unsigned long identifier, const String& url, const String& sendURL, unsigned sendLineNumber);
     void didReceiveResponse(unsigned long identifier, const ResourceResponse&);
     void didFailLoading(unsigned long identifier, const ResourceError&);
 #if ENABLE(JAVASCRIPT_DEBUGGER)

@@ -273,7 +273,7 @@ double NumberInputType::acceptableError(double step) const
     return step / pow(2.0, FLT_MANT_DIG);
 }
 
-void NumberInputType::willBlur()
+void NumberInputType::handleBlurEvent()
 {
     // Reset the renderer value, which might be unmatched with the element value.
     element()->setFormControlValueMatchesRenderer(false);
@@ -308,7 +308,7 @@ bool NumberInputType::isAcceptableValue(const String& proposedValue)
     return proposedValue.isEmpty() || isfinite(parseLocalizedNumber(proposedValue)) || parseToDoubleForNumberType(proposedValue, 0);
 }
 
-String NumberInputType::sanitizeValue(const String& proposedValue)
+String NumberInputType::sanitizeValue(const String& proposedValue) const
 {
     if (proposedValue.isEmpty())
         return proposedValue;

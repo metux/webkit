@@ -26,6 +26,9 @@
 #ifndef DFGOSREntry_h
 #define DFGOSREntry_h
 
+#include "DFGAbstractValue.h"
+#include "DFGOperands.h"
+
 namespace JSC {
 
 class ExecState;
@@ -34,6 +37,17 @@ class CodeBlock;
 namespace DFG {
 
 #if ENABLE(DFG_JIT)
+struct OSREntryData {
+    unsigned m_bytecodeIndex;
+    unsigned m_machineCodeOffset;
+    Operands<AbstractValue> m_expectedValues;
+};
+
+inline unsigned getOSREntryDataBytecodeIndex(OSREntryData* osrEntryData)
+{
+    return osrEntryData->m_bytecodeIndex;
+}
+
 void* prepareOSREntry(ExecState*, CodeBlock*, unsigned bytecodeIndex);
 #else
 inline void* prepareOSREntry(ExecState*, CodeBlock*, unsigned) { return 0; }

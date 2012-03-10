@@ -128,14 +128,14 @@ void SVGResourcesCache::clientStyleChanged(RenderObject* renderer, StyleDifferen
     if (diff == StyleDifferenceEqual)
         return;
 
-    // In this case the proper SVGFE*Element will imply whether the modifided CSS properties implies a relayout or repaint.
+    // In this case the proper SVGFE*Element will decide whether the modified CSS properties require a relayout or repaint.
     if (renderer->isSVGResourceFilterPrimitive() && diff == StyleDifferenceRepaint)
         return;
 
     clientUpdatedFromElement(renderer, newStyle);
     RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer, false);
 }
- 
+
 void SVGResourcesCache::clientUpdatedFromElement(RenderObject* renderer, const RenderStyle* newStyle)
 {
     ASSERT(renderer);
@@ -144,6 +144,12 @@ void SVGResourcesCache::clientUpdatedFromElement(RenderObject* renderer, const R
     SVGResourcesCache* cache = resourcesCacheFromRenderObject(renderer);
     cache->removeResourcesFromRenderObject(renderer);
     cache->addResourcesFromRenderObject(renderer, newStyle);
+
+#if ENABLE(FILTERS)
+    SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(renderer);
+    if (resources && resources->filter())
+        resources->removeClientFromCache(renderer);
+#endif
 }
 
 void SVGResourcesCache::clientDestroyed(RenderObject* renderer)

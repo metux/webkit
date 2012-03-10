@@ -50,14 +50,16 @@ public:
     virtual ~RuntimeArray();
 
     virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
-    virtual bool getOwnPropertySlot(ExecState*, const Identifier&, PropertySlot&);
-    virtual bool getOwnPropertySlot(ExecState*, unsigned, PropertySlot&);
+    virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
+    static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+    virtual bool getOwnPropertySlotVirtual(ExecState*, unsigned, PropertySlot&);
+    static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned, PropertySlot&);
     virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
-    virtual void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
-    virtual void put(ExecState*, unsigned propertyName, JSValue);
+    static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+    static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
     
-    virtual bool deleteProperty(ExecState* exec, const Identifier &propertyName);
-    virtual bool deleteProperty(ExecState* exec, unsigned propertyName);
+    static bool deleteProperty(JSCell*, ExecState*, const Identifier &propertyName);
+    static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
     
     unsigned getLength() const { return getConcreteArray()->getLength(); }
     

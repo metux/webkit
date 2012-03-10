@@ -63,6 +63,7 @@ public:
     bool hasHandledAKeyDownEvent() const { return m_hasHandledAKeyDownEvent; }
 
     mach_port_t compositingRenderServerPort();
+    double contentsScaleFactor();
 
 #ifndef NP_NO_CARBON
     WindowRef windowRef() const;
@@ -187,6 +188,7 @@ private:
     virtual bool handleWheelEvent(const WebWheelEvent&);
     virtual bool handleMouseEnterEvent(const WebMouseEvent&);
     virtual bool handleMouseLeaveEvent(const WebMouseEvent&);
+    virtual bool handleContextMenuEvent(const WebMouseEvent&);
     virtual bool handleKeyboardEvent(const WebKeyboardEvent&);
     virtual void setFocus(bool);
     virtual NPObject* pluginScriptableNPObject();
@@ -195,6 +197,7 @@ private:
     virtual void windowFocusChanged(bool);
     virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     virtual void windowVisibilityChanged(bool);
+    virtual void contentsScaleFactorChanged(float);
 
     virtual uint64_t pluginComplexTextInputIdentifier() const;
     virtual void sendComplexTextInput(const String& textInput);
@@ -205,6 +208,10 @@ private:
 
     virtual void privateBrowsingStateChanged(bool);
     virtual bool getFormValue(String& formValue);
+    virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity);
+    virtual bool wantsWindowRelativeCoordinates();
+    virtual WebCore::Scrollbar* horizontalScrollbar();
+    virtual WebCore::Scrollbar* verticalScrollbar();
 
     bool supportsSnapshotting() const;
 

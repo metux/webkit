@@ -114,7 +114,7 @@ static void makeCapitalized(String* string, UChar previous)
     int32_t endOfWord;
     int32_t startOfWord = textBreakFirst(boundary);
     for (endOfWord = textBreakNext(boundary); endOfWord != TextBreakDone; startOfWord = endOfWord, endOfWord = textBreakNext(boundary)) {
-        if (startOfWord != 0) // Ignore first char of previous string
+        if (startOfWord) // Ignore first char of previous string
             data[startOfWord - 1] = characters[startOfWord - 1] == noBreakSpace ? noBreakSpace : toTitleCase(stringWithPrevious[startOfWord]);
         for (int i = startOfWord + 1; i < endOfWord; i++)
             data[i - 1] = characters[i - 1];
@@ -301,7 +301,7 @@ PassRefPtr<StringImpl> RenderText::originalText() const
     return (e && e->isTextNode()) ? static_cast<Text*>(e)->dataImpl() : 0;
 }
 
-void RenderText::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset)
+void RenderText::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
     for (InlineTextBox* box = firstTextBox(); box; box = box->nextTextBox())
         rects.append(enclosingLayoutRect(FloatRect(accumulatedOffset + box->topLeft(), box->size())));
@@ -388,7 +388,7 @@ static IntRect ellipsisRectForBox(InlineTextBox* box, unsigned startPos, unsigne
     return IntRect();
 }
     
-void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed, ClippingOption option)
+void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed, ClippingOption option) const
 {
     for (InlineTextBox* box = firstTextBox(); box; box = box->nextTextBox()) {
         IntRect boundaries = box->calculateBoundaries();
@@ -405,7 +405,7 @@ void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed, Clippin
     }
 }
     
-void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed)
+void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 {
     absoluteQuads(quads, wasFixed, NoClipping);
 }
@@ -1265,14 +1265,16 @@ UChar RenderText::previousCharacter() const
     return prev;
 }
 
-void RenderText::transformText(String& text) const
+void applyTextTransform(const RenderStyle* style, String& text, UChar previousCharacter)
 {
-    ASSERT(style());
-    switch (style()->textTransform()) {
+    if (!style)
+        return;
+
+    switch (style->textTransform()) {
     case TTNONE:
         break;
     case CAPITALIZE:
-        makeCapitalized(&text, previousCharacter());
+        makeCapitalized(&text, previousCharacter);
         break;
     case UPPERCASE:
         text.makeUpper();
@@ -1294,7 +1296,7 @@ void RenderText::setTextInternal(PassRefPtr<StringImpl> text)
     ASSERT(m_text);
 
     if (style()) {
-        transformText(m_text);
+        applyTextTransform(style(), m_text, previousCharacter());
 
         // We use the same characters here as for list markers.
         // See the listMarkerText function in RenderListMarker.cpp.
@@ -1365,8 +1367,7 @@ String RenderText::textWithoutTranscoding() const
     // Otherwise, we should use original text. If text-transform is
     // specified, we should transform the text on the fly.
     String text = originalText();
-    if (style())
-        transformText(text);
+    applyTextTransform(style(), text, previousCharacter());
     return text;
 }
 
@@ -1595,15 +1596,16 @@ int RenderText::caretMinOffset() const
 int RenderText::caretMaxOffset() const
 {
     InlineTextBox* box = lastTextBox();
-    if (!box)
+    if (!lastTextBox())
         return textLength();
+
     int maxOffset = box->start() + box->len();
     for (box = box->prevTextBox(); box; box = box->prevTextBox())
         maxOffset = max<int>(maxOffset, box->start() + box->len());
     return maxOffset;
 }
 
-unsigned RenderText::caretMaxRenderedOffset() const
+unsigned RenderText::renderedTextLength() const
 {
     int l = 0;
     for (InlineTextBox* box = firstTextBox(); box; box = box->nextTextBox())

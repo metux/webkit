@@ -122,7 +122,10 @@ JSClassRef LayoutTestController::wrapperClass()
 
 void LayoutTestController::display()
 {
-    // FIXME: actually implement, once we want pixel tests
+    WKBundlePageRef page = InjectedBundle::shared().page()->page();
+    WKBundlePageForceRepaint(page);
+    WKBundlePageSetTracksRepaints(page, true);
+    WKBundlePageResetTrackedRepaints(page);
 }
 
 void LayoutTestController::dumpAsText(bool dumpPixels)
@@ -324,6 +327,16 @@ void LayoutTestController::setDatabaseQuota(uint64_t quota)
     return WKBundleSetDatabaseQuota(InjectedBundle::shared().bundle(), quota);
 }
 
+void LayoutTestController::clearAllApplicationCaches()
+{
+    WKBundleClearApplicationCache(InjectedBundle::shared().bundle());
+}
+
+void LayoutTestController::setAppCacheMaximumSize(uint64_t size)
+{
+    WKBundleSetAppCacheMaximumSize(InjectedBundle::shared().bundle(), size);
+}
+
 bool LayoutTestController::isCommandEnabled(JSStringRef name)
 {
     return WKBundlePageIsEditingCommandEnabled(InjectedBundle::shared().page()->page(), toWK(name).get());
@@ -498,6 +511,96 @@ void LayoutTestController::setTextDirection(JSStringRef direction)
 void LayoutTestController::setShouldStayOnPageAfterHandlingBeforeUnload(bool shouldStayOnPage)
 {
     InjectedBundle::shared().postNewBeforeUnloadReturnValue(!shouldStayOnPage);
+}
+
+void LayoutTestController::dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
+{
+    InjectedBundle::shared().os() << toSTD(adoptWK(WKBundlePageViewportConfigurationAsText(InjectedBundle::shared().page()->page(), deviceDPI, deviceWidth, deviceHeight, availableWidth, availableHeight)));
+}
+
+typedef WTF::HashMap<unsigned, JSValueRef> CallbackMap;
+static CallbackMap& callbackMap()
+{
+    static CallbackMap& map = *new CallbackMap;
+    return map;
+}
+
+enum {
+    AddChromeInputFieldCallbackID,
+    RemoveChromeInputFieldCallbackID,
+    FocusWebViewCallbackID,
+    SetBackingScaleFactorCallbackID
+};
+
+static void cacheLayoutTestControllerCallback(unsigned index, JSValueRef callback)
+{
+    if (!callback)
+        return;
+
+    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(InjectedBundle::shared().page()->page());
+    JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
+    JSValueProtect(context, callback);
+    callbackMap().add(index, callback);
+}
+
+static void callLayoutTestControllerCallback(unsigned index)
+{
+    if (!callbackMap().contains(index))
+        return;
+    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(InjectedBundle::shared().page()->page());
+    JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
+    JSObjectRef callback = JSValueToObject(context, callbackMap().take(index), 0);
+    JSObjectCallAsFunction(context, callback, JSContextGetGlobalObject(context), 0, 0, 0);
+    JSValueUnprotect(context, callback);
+}
+
+void LayoutTestController::addChromeInputField(JSValueRef callback)
+{
+    cacheLayoutTestControllerCallback(AddChromeInputFieldCallbackID, callback);
+    InjectedBundle::shared().postAddChromeInputField();
+}
+
+void LayoutTestController::removeChromeInputField(JSValueRef callback)
+{
+    cacheLayoutTestControllerCallback(RemoveChromeInputFieldCallbackID, callback);
+    InjectedBundle::shared().postRemoveChromeInputField();
+}
+
+void LayoutTestController::focusWebView(JSValueRef callback)
+{
+    cacheLayoutTestControllerCallback(FocusWebViewCallbackID, callback);
+    InjectedBundle::shared().postFocusWebView();
+}
+
+void LayoutTestController::setBackingScaleFactor(double backingScaleFactor, JSValueRef callback)
+{
+    cacheLayoutTestControllerCallback(SetBackingScaleFactorCallbackID, callback);
+    InjectedBundle::shared().postSetBackingScaleFactor(backingScaleFactor);
+}
+
+void LayoutTestController::setWindowIsKey(bool isKey)
+{
+    InjectedBundle::shared().postSetWindowIsKey(isKey);
+}
+
+void LayoutTestController::callAddChromeInputFieldCallback()
+{
+    callLayoutTestControllerCallback(AddChromeInputFieldCallbackID);
+}
+
+void LayoutTestController::callRemoveChromeInputFieldCallback()
+{
+    callLayoutTestControllerCallback(RemoveChromeInputFieldCallbackID);
+}
+
+void LayoutTestController::callFocusWebViewCallback()
+{
+    callLayoutTestControllerCallback(FocusWebViewCallbackID);
+}
+
+void LayoutTestController::callSetBackingScaleFactorCallback()
+{
+    callLayoutTestControllerCallback(SetBackingScaleFactorCallbackID);
 }
 
 } // namespace WTR

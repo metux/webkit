@@ -33,6 +33,7 @@
 #include "JSDOMWindow.h"
 #include "DOMWindow.h"
 #include "ScriptController.h"
+#include <heap/StrongInlines.h>
 #include <runtime/JSObject.h>
 
 using namespace JSC;
@@ -41,7 +42,7 @@ namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSDOMWindowShell);
 
-const ClassInfo JSDOMWindowShell::s_info = { "JSDOMWindowShell", &Base::s_info, 0, 0 };
+const ClassInfo JSDOMWindowShell::s_info = { "JSDOMWindowShell", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSDOMWindowShell) };
 
 JSDOMWindowShell::JSDOMWindowShell(Structure* structure, DOMWrapperWorld* world)
     : Base(*world->globalData(), structure)
@@ -83,14 +84,15 @@ void JSDOMWindowShell::setWindow(PassRefPtr<DOMWindow> domWindow)
 // JSObject methods
 // ----
 
-void JSDOMWindowShell::visitChildren(SlotVisitor& visitor)
+void JSDOMWindowShell::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    JSDOMWindowShell* thisObject = static_cast<JSDOMWindowShell*>(cell);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(structure()->typeInfo().overridesVisitChildren());
-    Base::visitChildren(visitor);
-    if (m_window)
-        visitor.append(&m_window);
+    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    Base::visitChildren(thisObject, visitor);
+    if (thisObject->m_window)
+        visitor.append(&thisObject->m_window);
 }
 
 UString JSDOMWindowShell::className() const
@@ -98,9 +100,14 @@ UString JSDOMWindowShell::className() const
     return m_window->className();
 }
 
-bool JSDOMWindowShell::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+bool JSDOMWindowShell::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    return m_window->getOwnPropertySlot(exec, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
+}
+
+bool JSDOMWindowShell::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+{
+    return static_cast<JSDOMWindowShell*>(cell)->m_window->getOwnPropertySlotVirtual(exec, propertyName, slot);
 }
 
 bool JSDOMWindowShell::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
@@ -108,9 +115,10 @@ bool JSDOMWindowShell::getOwnPropertyDescriptor(ExecState* exec, const Identifie
     return m_window->getOwnPropertyDescriptor(exec, propertyName, descriptor);
 }
 
-void JSDOMWindowShell::put(ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot& slot)
+void JSDOMWindowShell::put(JSCell* cell, ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot& slot)
 {
-    m_window->put(exec, propertyName, value, slot);
+    JSDOMWindowShell* thisObject = static_cast<JSDOMWindowShell*>(cell);
+    thisObject->m_window->methodTable()->put(thisObject->m_window.get(), exec, propertyName, value, slot);
 }
 
 void JSDOMWindowShell::putWithAttributes(ExecState* exec, const Identifier& propertyName, JSValue value, unsigned attributes)
@@ -123,9 +131,10 @@ bool JSDOMWindowShell::defineOwnProperty(JSC::ExecState* exec, const JSC::Identi
     return m_window->defineOwnProperty(exec, propertyName, descriptor, shouldThrow);
 }
 
-bool JSDOMWindowShell::deleteProperty(ExecState* exec, const Identifier& propertyName)
+bool JSDOMWindowShell::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName)
 {
-    return m_window->deleteProperty(exec, propertyName);
+    JSDOMWindowShell* thisObject = static_cast<JSDOMWindowShell*>(cell);
+    return thisObject->m_window->methodTable()->deleteProperty(thisObject->m_window.get(), exec, propertyName);
 }
 
 void JSDOMWindowShell::getPropertyNames(ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)

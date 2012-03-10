@@ -38,81 +38,51 @@
 
 namespace JSC { namespace DFG {
 
-// This method used to fill a numeric value to a FPR when linking speculative -> non-speculative.
-void JITCompiler::fillNumericToDouble(NodeIndex nodeIndex, FPRReg fpr, GPRReg temporary)
+Vector<BytecodeAndMachineOffset>& JITCompiler::decodedCodeMapFor(CodeBlock* codeBlock)
 {
-    Node& node = graph()[nodeIndex];
+    ASSERT(codeBlock == codeBlock->baselineVersion());
+    ASSERT(codeBlock->getJITType() == JITCode::BaselineJIT);
+    ASSERT(codeBlock->jitCodeMap());
+    
+    std::pair<HashMap<CodeBlock*, Vector<BytecodeAndMachineOffset> >::iterator, bool> result = m_decodedCodeMaps.add(codeBlock, Vector<BytecodeAndMachineOffset>());
+    
+    if (result.second)
+        codeBlock->jitCodeMap()->decode(result.first->second);
+    
+    return result.first->second;
+}
 
-    if (node.hasConstant()) {
-        ASSERT(isNumberConstant(nodeIndex));
-        move(MacroAssembler::ImmPtr(reinterpret_cast<void*>(reinterpretDoubleToIntptr(valueOfNumberConstant(nodeIndex)))), temporary);
-        movePtrToDouble(temporary, fpr);
-    } else {
-        loadPtr(addressFor(node.virtualRegister()), temporary);
-        Jump isInteger = branchPtr(MacroAssembler::AboveOrEqual, temporary, GPRInfo::tagTypeNumberRegister);
-        unboxDouble(temporary, fpr);
-        Jump hasUnboxedDouble = jump();
-        isInteger.link(this);
-        convertInt32ToDouble(temporary, fpr);
-        hasUnboxedDouble.link(this);
+void JITCompiler::linkOSRExits(SpeculativeJIT& speculative)
+{
+    OSRExitVector::Iterator exitsIter = speculative.osrExits().begin();
+    OSRExitVector::Iterator exitsEnd = speculative.osrExits().end();
+    
+    while (exitsIter != exitsEnd) {
+        const OSRExit& exit = *exitsIter;
+        exitSpeculativeWithOSR(exit, speculative.speculationRecovery(exit.m_recoveryIndex));
+        ++exitsIter;
     }
 }
 
-// This method used to fill an integer value to a GPR when linking speculative -> non-speculative.
-void JITCompiler::fillInt32ToInteger(NodeIndex nodeIndex, GPRReg gpr)
-{
-    Node& node = graph()[nodeIndex];
+#if USE(JSVALUE64)
 
-    if (node.hasConstant()) {
-        ASSERT(isInt32Constant(nodeIndex));
-        move(MacroAssembler::Imm32(valueOfInt32Constant(nodeIndex)), gpr);
-    } else {
-#if ENABLE(DFG_JIT_ASSERT)
-        // Redundant load, just so we can check the tag!
-        loadPtr(addressFor(node.virtualRegister()), gpr);
-        jitAssertIsJSInt32(gpr);
-#endif
-        load32(addressFor(node.virtualRegister()), gpr);
-    }
-}
-
-// This method used to fill a JSValue to a GPR when linking speculative -> non-speculative.
-void JITCompiler::fillToJS(NodeIndex nodeIndex, GPRReg gpr)
-{
-    Node& node = graph()[nodeIndex];
-
-    if (node.hasConstant()) {
-        if (isInt32Constant(nodeIndex)) {
-            JSValue jsValue = jsNumber(valueOfInt32Constant(nodeIndex));
-            move(MacroAssembler::ImmPtr(JSValue::encode(jsValue)), gpr);
-        } else if (isNumberConstant(nodeIndex)) {
-            JSValue jsValue(JSValue::EncodeAsDouble, valueOfNumberConstant(nodeIndex));
-            move(MacroAssembler::ImmPtr(JSValue::encode(jsValue)), gpr);
-        } else {
-            ASSERT(isJSConstant(nodeIndex));
-            JSValue jsValue = valueOfJSConstant(nodeIndex);
-            move(MacroAssembler::ImmPtr(JSValue::encode(jsValue)), gpr);
-        }
-        return;
-    }
-
-    loadPtr(addressFor(node.virtualRegister()), gpr);
-}
-
-void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecovery* recovery, Vector<BytecodeAndMachineOffset>& decodedCodeMap)
+void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecovery* recovery)
 {
     // 1) Pro-forma stuff.
     exit.m_check.link(this);
 
-#if ENABLE(DFG_DEBUG_VERBOSE)
-    fprintf(stderr, "OSR exit for Node @%d (bc#%u) at JIT offset 0x%x   ", (int)exit.m_nodeIndex, exit.m_bytecodeIndex, debugOffset());
+#if DFG_ENABLE(DEBUG_VERBOSE)
+    fprintf(stderr, "OSR exit for Node @%d (", (int)exit.m_nodeIndex);
+    for (CodeOrigin codeOrigin = exit.m_codeOrigin; ; codeOrigin = codeOrigin.inlineCallFrame->caller) {
+        fprintf(stderr, "bc#%u", codeOrigin.bytecodeIndex);
+        if (!codeOrigin.inlineCallFrame)
+            break;
+        fprintf(stderr, " -> %p ", codeOrigin.inlineCallFrame->executable.get());
+    }
+    fprintf(stderr, ") at JIT offset 0x%x  ", debugOffset());
     exit.dump(stderr);
 #endif
-#if ENABLE(DFG_JIT_BREAK_ON_SPECULATION_FAILURE)
-    breakpoint();
-#endif
-    
-#if ENABLE(DFG_VERBOSE_SPECULATION_FAILURE)
+#if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
     SpeculationFailureDebugInfo* debugInfo = new SpeculationFailureDebugInfo;
     debugInfo->codeBlock = m_codeBlock;
     debugInfo->debugOffset = debugOffset();
@@ -120,7 +90,11 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
     debugCall(debugOperationPrintSpeculationFailure, debugInfo);
 #endif
     
-#if ENABLE(DFG_SUCCESS_STATS)
+#if DFG_ENABLE(JIT_BREAK_ON_SPECULATION_FAILURE)
+    breakpoint();
+#endif
+    
+#if DFG_ENABLE(SUCCESS_STATS)
     static SamplingCounter counter("SpeculationFailure");
     emitCount(counter);
 #endif
@@ -172,6 +146,8 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
     for (int index = 0; index < exit.numberOfRecoveries(); ++index) {
         const ValueRecovery& recovery = exit.valueRecovery(index);
         switch (recovery.technique()) {
+        case Int32DisplacedInRegisterFile:
+        case DoubleDisplacedInRegisterFile:
         case DisplacedInRegisterFile:
             numberOfDisplacedVirtualRegisters++;
             ASSERT((int)recovery.virtualRegister() >= 0);
@@ -200,6 +176,7 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
             break;
             
         case UnboxedInt32InGPR:
+        case AlreadyInRegisterFileAsUnboxedInt32:
             haveUnboxedInt32s = true;
             break;
             
@@ -218,7 +195,24 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
         }
     }
     
-    EncodedJSValue* scratchBuffer = static_cast<EncodedJSValue*>(globalData()->osrScratchBufferForSize(sizeof(EncodedJSValue) * (numberOfPoisonedVirtualRegisters + (numberOfDisplacedVirtualRegisters <= GPRInfo::numberOfRegisters ? 0 : numberOfDisplacedVirtualRegisters))));
+#if DFG_ENABLE(DEBUG_VERBOSE)
+    fprintf(stderr, "  ");
+    if (numberOfPoisonedVirtualRegisters)
+        fprintf(stderr, "Poisoned=%u ", numberOfPoisonedVirtualRegisters);
+    if (numberOfDisplacedVirtualRegisters)
+        fprintf(stderr, "Displaced=%u ", numberOfDisplacedVirtualRegisters);
+    if (haveUnboxedInt32s)
+        fprintf(stderr, "UnboxedInt32 ");
+    if (haveFPRs)
+        fprintf(stderr, "FPR ");
+    if (haveConstants)
+        fprintf(stderr, "Constants ");
+    if (haveUndefined)
+        fprintf(stderr, "Undefined ");
+    fprintf(stderr, " ");
+#endif
+    
+    EncodedJSValue* scratchBuffer = static_cast<EncodedJSValue*>(globalData()->scratchBufferForSize(sizeof(EncodedJSValue) * (numberOfPoisonedVirtualRegisters + (numberOfDisplacedVirtualRegisters <= GPRInfo::numberOfRegisters ? 0 : numberOfDisplacedVirtualRegisters))));
 
     // From here on, the code assumes that it is profitable to maximize the distance
     // between when something is computed and when it is stored.
@@ -228,8 +222,19 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
     if (haveUnboxedInt32s) {
         for (int index = 0; index < exit.numberOfRecoveries(); ++index) {
             const ValueRecovery& recovery = exit.valueRecovery(index);
-            if (recovery.technique() == UnboxedInt32InGPR && recovery.gpr() != alreadyBoxed)
-                orPtr(GPRInfo::tagTypeNumberRegister, recovery.gpr());
+            switch (recovery.technique()) {
+            case UnboxedInt32InGPR:
+                if (recovery.gpr() != alreadyBoxed)
+                    orPtr(GPRInfo::tagTypeNumberRegister, recovery.gpr());
+                break;
+                
+            case AlreadyInRegisterFileAsUnboxedInt32:
+                store32(Imm32(static_cast<uint32_t>(TagTypeNumber >> 32)), tagFor(static_cast<VirtualRegister>(exit.operandForIndex(index))));
+                break;
+                
+            default:
+                break;
+            }
         }
     }
     
@@ -297,17 +302,43 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
             unsigned displacementIndex = 0;
             for (int index = 0; index < exit.numberOfRecoveries(); ++index) {
                 const ValueRecovery& recovery = exit.valueRecovery(index);
-                if (recovery.technique() != DisplacedInRegisterFile)
-                    continue;
-                loadPtr(addressFor(recovery.virtualRegister()), GPRInfo::toRegister(displacementIndex++));
+                switch (recovery.technique()) {
+                case DisplacedInRegisterFile:
+                    loadPtr(addressFor(recovery.virtualRegister()), GPRInfo::toRegister(displacementIndex++));
+                    break;
+                    
+                case Int32DisplacedInRegisterFile: {
+                    GPRReg gpr = GPRInfo::toRegister(displacementIndex++);
+                    load32(addressFor(recovery.virtualRegister()), gpr);
+                    orPtr(GPRInfo::tagTypeNumberRegister, gpr);
+                    break;
+                }
+                    
+                case DoubleDisplacedInRegisterFile: {
+                    GPRReg gpr = GPRInfo::toRegister(displacementIndex++);
+                    loadPtr(addressFor(recovery.virtualRegister()), gpr);
+                    subPtr(GPRInfo::tagTypeNumberRegister, gpr);
+                    break;
+                }
+                    
+                default:
+                    break;
+                }
             }
         
             displacementIndex = 0;
             for (int index = 0; index < exit.numberOfRecoveries(); ++index) {
                 const ValueRecovery& recovery = exit.valueRecovery(index);
-                if (recovery.technique() != DisplacedInRegisterFile)
-                    continue;
-                storePtr(GPRInfo::toRegister(displacementIndex++), addressFor((VirtualRegister)exit.operandForIndex(index)));
+                switch (recovery.technique()) {
+                case DisplacedInRegisterFile:
+                case Int32DisplacedInRegisterFile:
+                case DoubleDisplacedInRegisterFile:
+                    storePtr(GPRInfo::toRegister(displacementIndex++), addressFor((VirtualRegister)exit.operandForIndex(index)));
+                    break;
+                    
+                default:
+                    break;
+                }
             }
         } else {
             // FIXME: This should use the shuffling algorithm that we use
@@ -329,19 +360,46 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
         
             for (int index = 0; index < exit.numberOfRecoveries(); ++index) {
                 const ValueRecovery& recovery = exit.valueRecovery(index);
-                if (recovery.technique() != DisplacedInRegisterFile)
-                    continue;
-                loadPtr(addressFor(recovery.virtualRegister()), GPRInfo::regT0);
-                storePtr(GPRInfo::regT0, scratchBuffer + scratchIndex++);
+                
+                switch (recovery.technique()) {
+                case DisplacedInRegisterFile:
+                    loadPtr(addressFor(recovery.virtualRegister()), GPRInfo::regT0);
+                    storePtr(GPRInfo::regT0, scratchBuffer + scratchIndex++);
+                    break;
+                    
+                case Int32DisplacedInRegisterFile: {
+                    load32(addressFor(recovery.virtualRegister()), GPRInfo::regT0);
+                    orPtr(GPRInfo::tagTypeNumberRegister, GPRInfo::regT0);
+                    storePtr(GPRInfo::regT0, scratchBuffer + scratchIndex++);
+                    break;
+                }
+                    
+                case DoubleDisplacedInRegisterFile: {
+                    loadPtr(addressFor(recovery.virtualRegister()), GPRInfo::regT0);
+                    subPtr(GPRInfo::tagTypeNumberRegister, GPRInfo::regT0);
+                    storePtr(GPRInfo::regT0, scratchBuffer + scratchIndex++);
+                    break;
+                }
+                    
+                default:
+                    break;
+                }
             }
         
             scratchIndex = numberOfPoisonedVirtualRegisters;
             for (int index = 0; index < exit.numberOfRecoveries(); ++index) {
                 const ValueRecovery& recovery = exit.valueRecovery(index);
-                if (recovery.technique() != DisplacedInRegisterFile)
-                    continue;
-                loadPtr(scratchBuffer + scratchIndex++, GPRInfo::regT0);
-                storePtr(GPRInfo::regT0, addressFor((VirtualRegister)exit.operandForIndex(index)));
+                switch (recovery.technique()) {
+                case DisplacedInRegisterFile:
+                case Int32DisplacedInRegisterFile:
+                case DoubleDisplacedInRegisterFile:
+                    loadPtr(scratchBuffer + scratchIndex++, GPRInfo::regT0);
+                    storePtr(GPRInfo::regT0, addressFor((VirtualRegister)exit.operandForIndex(index)));
+                    break;
+                    
+                default:
+                    break;
+                }
             }
         
             ASSERT(scratchIndex == numberOfPoisonedVirtualRegisters + numberOfDisplacedVirtualRegisters);
@@ -408,6 +466,9 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
     //         entry, since both forms of OSR are expensive. OSR entry is
     //         particularly expensive.
     //
+    //     (d) Frequent OSR failures, even those that do not result in the code
+    //         running in a hot loop, result in recompilation getting triggered.
+    //
     //     To ensure (c), we'd like to set the execute counter to
     //     counterValueForOptimizeAfterWarmUp(). This seems like it would endanger
     //     (a) and (b), since then every OSR exit would delay the opportunity for
@@ -415,57 +476,104 @@ void JITCompiler::exitSpeculativeWithOSR(const OSRExit& exit, SpeculationRecover
     //     frequently and the function has few loops, then the counter will never
     //     become non-negative and OSR entry will never be triggered. OSR entry
     //     will only happen if a loop gets hot in the old JIT, which does a pretty
-    //     good job of ensuring (a) and (b). This heuristic may need to be
-    //     rethought in the future, particularly if we support reoptimizing code
-    //     with new value profiles gathered from code that did OSR exit.
+    //     good job of ensuring (a) and (b). But that doesn't take care of (d),
+    //     since each speculation failure would reset the execute counter.
+    //     So we check here if the number of speculation failures is significantly
+    //     larger than the number of successes (we want 90% success rate), and if
+    //     there have been a large enough number of failures. If so, we set the
+    //     counter to 0; otherwise we set the counter to
+    //     counterValueForOptimizeAfterWarmUp().
     
-    store32(Imm32(codeBlock()->alternative()->counterValueForOptimizeAfterWarmUp()), codeBlock()->alternative()->addressOfExecuteCounter());
+    move(TrustedImmPtr(codeBlock()), GPRInfo::regT0);
+    
+    load32(Address(GPRInfo::regT0, CodeBlock::offsetOfSpeculativeFailCounter()), GPRInfo::regT2);
+    load32(Address(GPRInfo::regT0, CodeBlock::offsetOfSpeculativeSuccessCounter()), GPRInfo::regT1);
+    add32(Imm32(1), GPRInfo::regT2);
+    add32(Imm32(-1), GPRInfo::regT1);
+    store32(GPRInfo::regT2, Address(GPRInfo::regT0, CodeBlock::offsetOfSpeculativeFailCounter()));
+    store32(GPRInfo::regT1, Address(GPRInfo::regT0, CodeBlock::offsetOfSpeculativeSuccessCounter()));
+    
+    move(TrustedImmPtr(codeBlock()->alternative()), GPRInfo::regT0);
+    
+    Jump fewFails = branch32(BelowOrEqual, GPRInfo::regT2, Imm32(codeBlock()->largeFailCountThreshold()));
+    mul32(Imm32(Heuristics::desiredSpeculativeSuccessFailRatio), GPRInfo::regT2, GPRInfo::regT2);
+    
+    Jump lowFailRate = branch32(BelowOrEqual, GPRInfo::regT2, GPRInfo::regT1);
+    
+    // Reoptimize as soon as possible.
+    store32(Imm32(Heuristics::executionCounterValueForOptimizeNextInvocation), Address(GPRInfo::regT0, CodeBlock::offsetOfExecuteCounter()));
+    Jump doneAdjusting = jump();
+    
+    fewFails.link(this);
+    lowFailRate.link(this);
+    
+    store32(Imm32(codeBlock()->alternative()->counterValueForOptimizeAfterLongWarmUp()), Address(GPRInfo::regT0, CodeBlock::offsetOfExecuteCounter()));
+    
+    doneAdjusting.link(this);
     
     // 12) Load the result of the last bytecode operation into regT0.
     
     if (exit.m_lastSetOperand != std::numeric_limits<int>::max())
         loadPtr(addressFor((VirtualRegister)exit.m_lastSetOperand), GPRInfo::cachedResultRegister);
     
-    // 13) Fix call frame.
+    // 13) Fix call frame(s).
     
     ASSERT(codeBlock()->alternative()->getJITType() == JITCode::BaselineJIT);
     storePtr(TrustedImmPtr(codeBlock()->alternative()), addressFor((VirtualRegister)RegisterFile::CodeBlock));
     
+    for (CodeOrigin codeOrigin = exit.m_codeOrigin; codeOrigin.inlineCallFrame; codeOrigin = codeOrigin.inlineCallFrame->caller) {
+        InlineCallFrame* inlineCallFrame = codeOrigin.inlineCallFrame;
+        CodeBlock* baselineCodeBlock = baselineCodeBlockFor(codeOrigin);
+        CodeBlock* baselineCodeBlockForCaller = baselineCodeBlockFor(inlineCallFrame->caller);
+        Vector<BytecodeAndMachineOffset>& decodedCodeMap = decodedCodeMapFor(baselineCodeBlockForCaller);
+        unsigned returnBytecodeIndex = inlineCallFrame->caller.bytecodeIndex + OPCODE_LENGTH(op_call);
+        BytecodeAndMachineOffset* mapping = binarySearch<BytecodeAndMachineOffset, unsigned, BytecodeAndMachineOffset::getBytecodeIndex>(decodedCodeMap.begin(), decodedCodeMap.size(), returnBytecodeIndex);
+        
+        ASSERT(mapping);
+        ASSERT(mapping->m_bytecodeIndex == returnBytecodeIndex);
+        
+        void* jumpTarget = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(baselineCodeBlockForCaller->getJITCode().start()) + mapping->m_machineCodeOffset);
+
+        loadPtr(addressFor((VirtualRegister)inlineCallFrame->calleeVR), GPRInfo::regT1);
+        loadPtr(MacroAssembler::Address(GPRInfo::regT1, OBJECT_OFFSETOF(JSFunction, m_scopeChain)), GPRInfo::regT2);
+        GPRReg callerFrameGPR;
+        if (inlineCallFrame->caller.inlineCallFrame) {
+            addPtr(Imm32(inlineCallFrame->caller.inlineCallFrame->stackOffset * sizeof(EncodedJSValue)), GPRInfo::callFrameRegister, GPRInfo::regT3);
+            callerFrameGPR = GPRInfo::regT3;
+        } else
+            callerFrameGPR = GPRInfo::callFrameRegister;
+        
+        storePtr(TrustedImmPtr(baselineCodeBlock), addressFor((VirtualRegister)(inlineCallFrame->stackOffset + RegisterFile::CodeBlock)));
+        storePtr(GPRInfo::regT2, addressFor((VirtualRegister)(inlineCallFrame->stackOffset + RegisterFile::ScopeChain)));
+        storePtr(callerFrameGPR, addressFor((VirtualRegister)(inlineCallFrame->stackOffset + RegisterFile::CallerFrame)));
+        storePtr(TrustedImmPtr(jumpTarget), addressFor((VirtualRegister)(inlineCallFrame->stackOffset + RegisterFile::ReturnPC)));
+        storePtr(TrustedImmPtr(JSValue::encode(jsNumber(inlineCallFrame->numArgumentsIncludingThis))), addressFor((VirtualRegister)(inlineCallFrame->stackOffset + RegisterFile::ArgumentCount)));
+        storePtr(GPRInfo::regT1, addressFor((VirtualRegister)(inlineCallFrame->stackOffset + RegisterFile::Callee)));
+    }
+    
+    if (exit.m_codeOrigin.inlineCallFrame)
+        addPtr(Imm32(exit.m_codeOrigin.inlineCallFrame->stackOffset * sizeof(EncodedJSValue)), GPRInfo::callFrameRegister);
+    
     // 14) Jump into the corresponding baseline JIT code.
     
-    BytecodeAndMachineOffset* mapping = binarySearch<BytecodeAndMachineOffset, unsigned, BytecodeAndMachineOffset::getBytecodeIndex>(decodedCodeMap.begin(), decodedCodeMap.size(), exit.m_bytecodeIndex);
+    CodeBlock* baselineCodeBlock = baselineCodeBlockFor(exit.m_codeOrigin);
+    Vector<BytecodeAndMachineOffset>& decodedCodeMap = decodedCodeMapFor(baselineCodeBlock);
+    
+    BytecodeAndMachineOffset* mapping = binarySearch<BytecodeAndMachineOffset, unsigned, BytecodeAndMachineOffset::getBytecodeIndex>(decodedCodeMap.begin(), decodedCodeMap.size(), exit.m_codeOrigin.bytecodeIndex);
     
     ASSERT(mapping);
-    ASSERT(mapping->m_bytecodeIndex == exit.m_bytecodeIndex);
+    ASSERT(mapping->m_bytecodeIndex == exit.m_codeOrigin.bytecodeIndex);
     
-    void* jumpTarget = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(codeBlock()->alternative()->getJITCode().start()) + mapping->m_machineCodeOffset);
+    void* jumpTarget = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(baselineCodeBlock->getJITCode().start()) + mapping->m_machineCodeOffset);
     
     ASSERT(GPRInfo::regT1 != GPRInfo::cachedResultRegister);
     
     move(TrustedImmPtr(jumpTarget), GPRInfo::regT1);
     jump(GPRInfo::regT1);
 
-#if ENABLE(DFG_DEBUG_VERBOSE)
-    fprintf(stderr, "   -> %p\n", jumpTarget);
+#if DFG_ENABLE(DEBUG_VERBOSE)
+    fprintf(stderr, "-> %p\n", jumpTarget);
 #endif
-}
-
-void JITCompiler::linkOSRExits(SpeculativeJIT& speculative)
-{
-    Vector<BytecodeAndMachineOffset> decodedCodeMap;
-    ASSERT(codeBlock()->alternative());
-    ASSERT(codeBlock()->alternative()->getJITType() == JITCode::BaselineJIT);
-    ASSERT(codeBlock()->alternative()->jitCodeMap());
-    codeBlock()->alternative()->jitCodeMap()->decode(decodedCodeMap);
-    
-    OSRExitVector::Iterator exitsIter = speculative.osrExits().begin();
-    OSRExitVector::Iterator exitsEnd = speculative.osrExits().end();
-    
-    while (exitsIter != exitsEnd) {
-        const OSRExit& exit = *exitsIter;
-        exitSpeculativeWithOSR(exit, speculative.speculationRecovery(exit.m_recoveryIndex), decodedCodeMap);
-        ++exitsIter;
-    }
 }
 
 void JITCompiler::compileEntry()
@@ -488,33 +596,32 @@ void JITCompiler::compileBody()
     // We generate the speculative code path, followed by OSR exit code to return
     // to the old JIT code if speculations fail.
 
-#if ENABLE(DFG_JIT_BREAK_ON_EVERY_FUNCTION)
+#if DFG_ENABLE(JIT_BREAK_ON_EVERY_FUNCTION)
     // Handy debug tool!
     breakpoint();
 #endif
+    
+    addPtr(Imm32(1), AbsoluteAddress(codeBlock()->addressOfSpeculativeSuccessCounter()));
 
     Label speculativePathBegin = label();
     SpeculativeJIT speculative(*this);
     bool compiledSpeculative = speculative.compile();
     ASSERT_UNUSED(compiledSpeculative, compiledSpeculative);
 
-#if ENABLE(DFG_OSR_ENTRY)
-    m_codeBlock->setJITCodeMap(m_jitCodeMapEncoder.finish());
-#endif
-    
     linkOSRExits(speculative);
 
-    // Iterate over the m_calls vector, checking for exception checks,
-    // and linking them to here.
-    for (unsigned i = 0; i < m_calls.size(); ++i) {
-        Jump& exceptionCheck = m_calls[i].m_exceptionCheck;
+    // Iterate over the m_calls vector, checking for jumps to link.
+    bool didLinkExceptionCheck = false;
+    for (unsigned i = 0; i < m_exceptionChecks.size(); ++i) {
+        Jump& exceptionCheck = m_exceptionChecks[i].m_exceptionCheck;
         if (exceptionCheck.isSet()) {
             exceptionCheck.link(this);
-            ++m_exceptionCheckCount;
+            didLinkExceptionCheck = true;
         }
     }
+
     // If any exception checks were linked, generate code to lookup a handler.
-    if (m_exceptionCheckCount) {
+    if (didLinkExceptionCheck) {
         // lookupExceptionHandler is passed two arguments, exec (the CallFrame*), and
         // an identifier for the operation that threw the exception, which we can use
         // to look up handler information. The identifier we use is the return address
@@ -522,7 +629,7 @@ void JITCompiler::compileBody()
         // available on the stack, just below the stack pointer!
         move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
         peek(GPRInfo::argumentGPR1, -1);
-        m_calls.append(CallRecord(call(), lookupExceptionHandler));
+        m_calls.append(CallLinkRecord(call(), lookupExceptionHandler));
         // lookupExceptionHandler leaves the handler CallFrame* in the returnValueGPR,
         // and the address of the handler in returnValueGPR2.
         jump(GPRInfo::returnValueGPR2);
@@ -532,24 +639,20 @@ void JITCompiler::compileBody()
 void JITCompiler::link(LinkBuffer& linkBuffer)
 {
     // Link the code, populate data in CodeBlock data structures.
-#if ENABLE(DFG_DEBUG_VERBOSE)
-    fprintf(stderr, "JIT code for %p start at [%p, %p)\n", m_codeBlock, linkBuffer.debugAddress(), static_cast<char*>(linkBuffer.debugAddress()) + linkBuffer.debugSize());
+#if DFG_ENABLE(DEBUG_VERBOSE)
+    fprintf(stderr, "JIT code for %p start at [%p, %p). Size = %lu.\n", m_codeBlock, linkBuffer.debugAddress(), static_cast<char*>(linkBuffer.debugAddress()) + linkBuffer.debugSize(), linkBuffer.debugSize());
 #endif
 
     // Link all calls out from the JIT code to their respective functions.
-    for (unsigned i = 0; i < m_calls.size(); ++i) {
-        if (m_calls[i].m_function.value())
-            linkBuffer.link(m_calls[i].m_call, m_calls[i].m_function);
-    }
+    for (unsigned i = 0; i < m_calls.size(); ++i)
+        linkBuffer.link(m_calls[i].m_call, m_calls[i].m_function);
 
     if (m_codeBlock->needsCallReturnIndices()) {
-        m_codeBlock->callReturnIndexVector().reserveCapacity(m_exceptionCheckCount);
-        for (unsigned i = 0; i < m_calls.size(); ++i) {
-            if (m_calls[i].m_handlesExceptions) {
-                unsigned returnAddressOffset = linkBuffer.returnAddressOffset(m_calls[i].m_call);
-                unsigned exceptionInfo = m_calls[i].m_codeOrigin.bytecodeIndex();
-                m_codeBlock->callReturnIndexVector().append(CallReturnOffsetToBytecodeOffset(returnAddressOffset, exceptionInfo));
-            }
+        m_codeBlock->callReturnIndexVector().reserveCapacity(m_exceptionChecks.size());
+        for (unsigned i = 0; i < m_exceptionChecks.size(); ++i) {
+            unsigned returnAddressOffset = linkBuffer.returnAddressOffset(m_exceptionChecks[i].m_call);
+            unsigned exceptionInfo = m_exceptionChecks[i].m_codeOrigin.bytecodeIndex;
+            m_codeBlock->callReturnIndexVector().append(CallReturnOffsetToBytecodeOffset(returnAddressOffset, exceptionInfo));
         }
     }
 
@@ -664,7 +767,7 @@ void JITCompiler::compileFunction(JITCode& entry, MacroAssemblerCodePtr& entryWi
     entry = JITCode(linkBuffer.finalizeCode(), JITCode::DFGJIT);
 }
 
-#if ENABLE(DFG_JIT_ASSERT)
+#if DFG_ENABLE(JIT_ASSERT)
 void JITCompiler::jitAssertIsInt32(GPRReg gpr)
 {
 #if CPU(X86_64)
@@ -739,6 +842,8 @@ void JITCompiler::clearSamplingFlag(int32_t flag)
 }
 #endif
 
+#endif // USE(JSVALUE64)
+
 } } // namespace JSC::DFG
 
-#endif
+#endif // ENABLE(DFG_JIT)

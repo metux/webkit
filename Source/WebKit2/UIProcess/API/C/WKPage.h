@@ -191,7 +191,6 @@ typedef float (*WKPageFooterHeightCallback)(WKPageRef page, WKFrameRef frame, co
 typedef void (*WKPageDrawHeaderCallback)(WKPageRef page, WKFrameRef frame, WKRect rect, const void* clientInfo);
 typedef void (*WKPageDrawFooterCallback)(WKPageRef page, WKFrameRef frame, WKRect rect, const void* clientInfo);
 typedef void (*WKPagePrintFrameCallback)(WKPageRef page, WKFrameRef frame, const void* clientInfo);
-typedef void (*WKPageDidCompleteRubberBandForMainFrameCallback)(WKPageRef page, WKSize initialOverhang, const void* clientInfo);
 typedef void (*WKPageSaveDataToFileInDownloadsFolderCallback)(WKPageRef page, WKStringRef suggestedFilename, WKStringRef mimeType, WKURLRef originatingURL, WKDataRef data, const void* clientInfo);
 typedef bool (*WKPageShouldInterruptJavaScriptCallback)(WKPageRef page, const void *clientInfo);
 
@@ -240,7 +239,7 @@ struct WKPageUIClient {
     WKPageDrawFooterCallback                                            drawFooter;
     WKPagePrintFrameCallback                                            printFrame;
     WKPageCallback                                                      runModal;
-    WKPageDidCompleteRubberBandForMainFrameCallback                     didCompleteRubberBandForMainFrame;
+    void*                                                               unused1; // Used to be didCompleteRubberBandForMainFrame
     WKPageSaveDataToFileInDownloadsFolderCallback                       saveDataToFileInDownloadsFolder;
     WKPageShouldInterruptJavaScriptCallback                             shouldInterruptJavaScript;    
 
@@ -275,16 +274,22 @@ enum {
 // ContextMenu client
 typedef void (*WKPageGetContextMenuFromProposedContextMenuCallback)(WKPageRef page, WKArrayRef proposedMenu, WKArrayRef* newMenu, WKTypeRef userData, const void* clientInfo);
 typedef void (*WKPageCustomContextMenuItemSelectedCallback)(WKPageRef page, WKContextMenuItemRef contextMenuItem, const void* clientInfo);
+typedef void (*WKPageContextMenuDismissedCallback)(WKPageRef page, const void* clientInfo);
 
 struct WKPageContextMenuClient {
     int                                                                 version;
     const void *                                                        clientInfo;
+    
+    // Version 0
     WKPageGetContextMenuFromProposedContextMenuCallback                 getContextMenuFromProposedMenu;
     WKPageCustomContextMenuItemSelectedCallback                         customContextMenuItemSelected;
+    
+    // Version 1
+    WKPageContextMenuDismissedCallback                                  contextMenuDismissed;
 };
 typedef struct WKPageContextMenuClient WKPageContextMenuClient;
 
-enum { kWKPageContextMenuClientCurrentVersion = 0 };
+enum { kWKPageContextMenuClientCurrentVersion = 1 };
 
 WK_EXPORT WKTypeID WKPageGetTypeID();
 
@@ -317,6 +322,10 @@ WK_EXPORT bool WKPageWillHandleHorizontalScrollEvents(WKPageRef page);
 WK_EXPORT WKStringRef WKPageCopyTitle(WKPageRef page);
 
 WK_EXPORT WKURLRef WKPageCopyPendingAPIRequestURL(WKPageRef page);
+
+WK_EXPORT WKURLRef WKPageCopyActiveURL(WKPageRef page);
+WK_EXPORT WKURLRef WKPageCopyProvisionalURL(WKPageRef page);
+WK_EXPORT WKURLRef WKPageCopyCommittedURL(WKPageRef page);
 
 WK_EXPORT WKFrameRef WKPageGetMainFrame(WKPageRef page);
 WK_EXPORT WKFrameRef WKPageGetFocusedFrame(WKPageRef page); // The focused frame may be inactive.

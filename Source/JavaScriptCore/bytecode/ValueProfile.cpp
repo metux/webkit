@@ -60,19 +60,12 @@ void ValueProfile::computeStatistics(const ClassInfo* classInfo, Statistics& sta
 void ValueProfile::computeStatistics(Statistics& statistics) const
 {
     for (unsigned i = 0; i < numberOfBuckets; ++i) {
-        if (!m_buckets[i]) {
-            WeakBucket weakBucket = m_weakBuckets[i];
-            if (!!weakBucket) {
-                statistics.samples++;
-                computeStatistics(weakBucket.getClassInfo(), statistics);
-            }
-            
+        JSValue value = JSValue::decode(m_buckets[i]);
+        if (!value)
             continue;
-        }
         
         statistics.samples++;
         
-        JSValue value = JSValue::decode(m_buckets[i]);
         if (value.isInt32())
             statistics.int32s++;
         else if (value.isDouble())
@@ -86,40 +79,17 @@ void ValueProfile::computeStatistics(Statistics& statistics) const
 
 PredictedType ValueProfile::computeUpdatedPrediction()
 {
-    ValueProfile::Statistics statistics;
-    computeStatistics(statistics);
-    
-    PredictedType prediction;
-    
-    if (!statistics.samples)
-        prediction = PredictNone;
-    else if (statistics.int32s == statistics.samples)
-        prediction = StrongPredictionTag | PredictInt32;
-    else if (statistics.doubles == statistics.samples)
-        prediction = StrongPredictionTag | PredictDouble;
-    else if (statistics.int32s + statistics.doubles == statistics.samples)
-        prediction = StrongPredictionTag | PredictNumber;
-    else if (statistics.arrays == statistics.samples)
-        prediction = StrongPredictionTag | PredictArray;
-    else if (statistics.finalObjects == statistics.samples)
-        prediction = StrongPredictionTag | PredictFinalObject;
-    else if (statistics.strings == statistics.samples)
-        prediction = StrongPredictionTag | PredictString;
-    else if (statistics.objects == statistics.samples)
-        prediction = StrongPredictionTag | PredictObjectOther;
-    else if (statistics.cells == statistics.samples)
-        prediction = StrongPredictionTag | PredictCellOther;
-    else if (statistics.booleans == statistics.samples)
-        prediction = StrongPredictionTag | PredictBoolean;
-    else
-        prediction = StrongPredictionTag | PredictOther;
-
-    m_numberOfSamplesInPrediction += statistics.samples;
-    mergePrediction(m_prediction, prediction);
     for (unsigned i = 0; i < numberOfBuckets; ++i) {
+        JSValue value = JSValue::decode(m_buckets[i]);
+        if (!value)
+            continue;
+        
+        m_numberOfSamplesInPrediction++;
+        mergePrediction(m_prediction, predictionFromValue(value));
+        
         m_buckets[i] = JSValue::encode(JSValue());
-        m_weakBuckets[i] = WeakBucket();
     }
+    
     return m_prediction;
 }
 #endif // ENABLE(VALUE_PROFILER)

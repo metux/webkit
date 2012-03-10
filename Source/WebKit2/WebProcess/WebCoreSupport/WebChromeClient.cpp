@@ -75,7 +75,7 @@ static WebFrame* findLargestFrameInFrameSet(WebPage* page)
 {
     // Approximate what a user could consider a default target frame for application menu operations.
 
-    WebFrame* mainFrame = page->mainFrame();
+    WebFrame* mainFrame = page->mainWebFrame();
     if (!mainFrame->isFrameSet())
         return 0;
 
@@ -294,7 +294,7 @@ void WebChromeClient::closeWindowSoon()
 
     m_page->corePage()->setGroupName(String());
 
-    if (WebFrame* frame = m_page->mainFrame()) {
+    if (WebFrame* frame = m_page->mainWebFrame()) {
         if (Frame* coreFrame = frame->coreFrame())
             coreFrame->loader()->stopForUserCancel();
     }
@@ -401,7 +401,7 @@ void WebChromeClient::scroll(const IntSize& scrollOffset, const IntRect& scrollR
     m_page->drawingArea()->scroll(intersection(scrollRect, clipRect), scrollOffset);
 }
 
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
 void WebChromeClient::delegatedScrollRequested(const IntPoint& scrollOffset)
 {
     m_page->pageDidRequestScroll(scrollOffset);
@@ -427,14 +427,14 @@ PlatformPageClient WebChromeClient::platformPageClient() const
 void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) const
 {
 #if PLATFORM(QT)
-#if ENABLE(TILED_BACKING_STORE)
+#if USE(TILED_BACKING_STORE)
     if (frame->page()->mainFrame() == frame)
         m_page->resizeToContentsIfNeeded();
 #endif
 
     WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
 
-    if (!m_page->mainFrame() || m_page->mainFrame() != webFrame)
+    if (!m_page->mainWebFrame() || m_page->mainWebFrame() != webFrame)
         return;
 
     m_page->send(Messages::WebPageProxy::DidChangeContentsSize(size));
@@ -498,6 +498,7 @@ void WebChromeClient::mouseDidMoveOverElement(const HitTestResult& hitTestResult
 
     WebHitTestResult::Data webHitTestResultData;
     webHitTestResultData.absoluteImageURL = hitTestResult.absoluteImageURL().string();
+    webHitTestResultData.absolutePDFURL = hitTestResult.absolutePDFURL().string();
     webHitTestResultData.absoluteLinkURL = hitTestResult.absoluteLinkURL().string();
     webHitTestResultData.absoluteMediaURL = hitTestResult.absoluteMediaURL().string();
     webHitTestResultData.linkLabel = hitTestResult.textContent();
@@ -543,7 +544,6 @@ void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& database
 #endif
 
 
-#if ENABLE(OFFLINE_WEB_APPLICATIONS)
 void WebChromeClient::reachedMaxAppCacheSize(int64_t)
 {
     notImplemented();
@@ -553,7 +553,6 @@ void WebChromeClient::reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_
 {
     notImplemented();
 }
-#endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
 void WebChromeClient::dashboardRegionsChanged()
@@ -589,20 +588,6 @@ String WebChromeClient::generateReplacementFile(const String& path)
     return m_page->injectedBundleUIClient().generateFileForUpload(m_page, path);
 }
 
-bool WebChromeClient::paintCustomScrollbar(GraphicsContext*, const FloatRect&, ScrollbarControlSize, 
-                                           ScrollbarControlState, ScrollbarPart pressedPart, bool vertical,
-                                           float value, float proportion, ScrollbarControlPartMask)
-{
-    notImplemented();
-    return false;
-}
-
-bool WebChromeClient::paintCustomScrollCorner(GraphicsContext*, const FloatRect&)
-{
-    notImplemented();
-    return false;
-}
-
 bool WebChromeClient::paintCustomOverhangArea(GraphicsContext* context, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect)
 {
     if (!m_page->injectedBundleUIClient().shouldPaintCustomOverhangArea())
@@ -630,18 +615,7 @@ void WebChromeClient::runOpenPanel(Frame* frame, PassRefPtr<FileChooser> prpFile
     RefPtr<FileChooser> fileChooser = prpFileChooser;
 
     m_page->setActiveOpenPanelResultListener(WebOpenPanelResultListener::create(m_page, fileChooser.get()));
-    
-    WebOpenPanelParameters::Data parameters;
-    parameters.allowMultipleFiles = fileChooser->settings().allowsMultipleFiles;
-#if ENABLE(DIRECTORY_UPLOAD)
-    parameters.allowsDirectoryUpload = fileChooser->settings().allowsDirectoryUpload;
-#else
-    parameters.allowsDirectoryUpload = false;
-#endif
-    parameters.acceptTypes = fileChooser->settings().acceptTypes;
-    parameters.filenames = fileChooser->settings().selectedFiles;
-
-    m_page->send(Messages::WebPageProxy::RunOpenPanel(static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame()->frameID(), parameters));
+    m_page->send(Messages::WebPageProxy::RunOpenPanel(static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame()->frameID(), fileChooser->settings()));
 }
 
 void WebChromeClient::loadIconForFiles(const Vector<String>& filenames, FileIconLoader* loader)
@@ -662,16 +636,6 @@ void WebChromeClient::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
 }
 
 void WebChromeClient::formStateDidChange(const Node*)
-{
-    notImplemented();
-}
-
-void WebChromeClient::formDidFocus(const Node*)
-{ 
-    notImplemented();
-}
-
-void WebChromeClient::formDidBlur(const Node*)
 {
     notImplemented();
 }
@@ -776,9 +740,9 @@ void WebChromeClient::setRootFullScreenLayer(GraphicsLayer* layer)
 
 #endif
 
-void WebChromeClient::dispatchViewportDataDidChange(const ViewportArguments& args) const
+void WebChromeClient::dispatchViewportPropertiesDidChange(const ViewportArguments& args) const
 {
-    m_page->send(Messages::WebPageProxy::DidChangeViewportData(args));
+    m_page->send(Messages::WebPageProxy::DidChangeViewportProperties(args));
 }
 
 void WebChromeClient::didStartRubberBandForFrame(Frame*, const IntSize&) const
@@ -789,10 +753,6 @@ void WebChromeClient::didStartRubberBandForFrame(Frame*, const IntSize&) const
 void WebChromeClient::didCompleteRubberBandForFrame(Frame* frame, const IntSize& initialOverhang) const
 {
     m_page->drawingArea()->enableDisplayThrottling();
-
-    if (frame != frame->page()->mainFrame())
-        return;
-    m_page->send(Messages::WebPageProxy::DidCompleteRubberBandForMainFrame(initialOverhang));
 }
 
 void WebChromeClient::didStartAnimatedScroll() const

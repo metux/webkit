@@ -178,31 +178,30 @@ protected:
 private:
     virtual UString className() const;
 
-    virtual bool getOwnPropertySlot(ExecState*, const Identifier&, PropertySlot&);
+    virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
+    static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
     virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
     
-    virtual void put(ExecState*, const Identifier&, JSValue, PutPropertySlot&);
+    static void put(JSCell*, ExecState*, const Identifier&, JSValue, PutPropertySlot&);
 
-    virtual bool deleteProperty(ExecState*, const Identifier&);
-    virtual bool deleteProperty(ExecState*, unsigned);
+    static bool deleteProperty(JSCell*, ExecState*, const Identifier&);
+    static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned);
 
     virtual bool hasInstance(ExecState* exec, JSValue value, JSValue proto);
 
     virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
-    virtual double toNumber(ExecState*) const;
-    virtual UString toString(ExecState*) const;
+    static ConstructType getConstructData(JSCell*, ConstructData&);
+    static CallType getCallData(JSCell*, CallData&);
 
-    virtual ConstructType getConstructData(ConstructData&);
-    virtual CallType getCallData(CallData&);
-
-    virtual void visitChildren(SlotVisitor& visitor)
+    static void visitChildren(JSCell* cell, SlotVisitor& visitor)
     {
-        ASSERT_GC_OBJECT_INHERITS((static_cast<Parent*>(this)), &JSCallbackObject<Parent>::s_info);
+        JSCallbackObject* thisObject = static_cast<JSCallbackObject*>(cell);
+        ASSERT_GC_OBJECT_INHERITS((static_cast<Parent*>(thisObject)), &JSCallbackObject<Parent>::s_info);
         COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-        ASSERT(Parent::structure()->typeInfo().overridesVisitChildren());
-        Parent::visitChildren(visitor);
-        m_callbackObjectData->visitChildren(visitor);
+        ASSERT(thisObject->Parent::structure()->typeInfo().overridesVisitChildren());
+        Parent::visitChildren(thisObject, visitor);
+        thisObject->m_callbackObjectData->visitChildren(visitor);
     }
 
     void init(ExecState*);

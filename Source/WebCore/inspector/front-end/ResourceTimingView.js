@@ -28,6 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @extends {WebInspector.View}
+ * @constructor
+ */
 WebInspector.ResourceTimingView = function(resource)
 {
     WebInspector.View.call(this);
@@ -39,26 +43,23 @@ WebInspector.ResourceTimingView = function(resource)
 }
 
 WebInspector.ResourceTimingView.prototype = {
-    show: function(parentElement)
+    wasShown: function()
     {
         if (!this._resource.timing) {
             if (!this._emptyView) {
                 this._emptyView = new WebInspector.EmptyView(WebInspector.UIString("This request has no detailed timing info."));
-                this.addChildView(this._emptyView);
-                this._emptyView.show();
+                this._emptyView.show(this.element);
                 this.innerView = this._emptyView;
             }
-            WebInspector.View.prototype.show.call(this, parentElement);
             return;
         }
 
         if (this._emptyView) {
-            this.removeChildView(this._emptyView);
+            this._emptyView.detach();
             delete this._emptyView;
         }
 
         this._refresh();
-        WebInspector.View.prototype.show.call(this, parentElement);
     },
 
     _refresh: function()
@@ -76,7 +77,7 @@ WebInspector.ResourceTimingView.createTimingTable = function(resource)
     var tableElement = document.createElement("table");
     var rows = [];
 
-    function addRow(title, className, start, end, color)
+    function addRow(title, className, start, end)
     {
         var row = {};
         row.title = title;

@@ -32,7 +32,7 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
-#define ASSERT_CLASS_FITS_IN_CELL(class) COMPILE_ASSERT(sizeof(class) < MarkedSpace::maxCellSize, class_fits_in_cell)
+#define ASSERT_CLASS_FITS_IN_CELL(class) COMPILE_ASSERT(sizeof(class) <= MarkedSpace::maxCellSize, class_fits_in_cell)
 
 namespace JSC {
 
@@ -45,16 +45,15 @@ class SlotVisitor;
 class MarkedSpace {
     WTF_MAKE_NONCOPYABLE(MarkedSpace);
 public:
-    static const size_t maxCellSize = 1024;
+    static const size_t maxCellSize = 2048;
 
     struct SizeClass {
         SizeClass();
         void resetAllocator();
-        void canonicalizeBlock();
+        void zapFreeList();
 
         MarkedBlock::FreeCell* firstFreeCell;
         MarkedBlock* currentBlock;
-        MarkedBlock* nextBlock;
         DoublyLinkedList<MarkedBlock> blockList;
         size_t cellSize;
     };
@@ -69,30 +68,31 @@ public:
     void addBlock(SizeClass&, MarkedBlock*);
     void removeBlock(MarkedBlock*);
     
-    void canonicalizeBlocks();
+    void canonicalizeCellLivenessData();
 
     size_t waterMark();
     size_t highWaterMark();
+    size_t nurseryWaterMark();
     void setHighWaterMark(size_t);
 
     template<typename Functor> typename Functor::ReturnType forEachBlock(Functor&); // Safe to remove the current item while iterating.
     template<typename Functor> typename Functor::ReturnType forEachBlock();
 
 private:
-    // [ 8, 16... 128 )
+    // [ 32... 256 ]
     static const size_t preciseStep = MarkedBlock::atomSize;
-    static const size_t preciseCutoff = 128;
-    static const size_t maximumPreciseAllocationSize = preciseCutoff - preciseStep;
-    static const size_t preciseCount = preciseCutoff / preciseStep - 1;
+    static const size_t preciseCutoff = 256;
+    static const size_t preciseCount = preciseCutoff / preciseStep;
 
-    // [ 128, 256... 1024 )
+    // [ 512... 2048 ]
     static const size_t impreciseStep = preciseCutoff;
     static const size_t impreciseCutoff = maxCellSize;
-    static const size_t impreciseCount = impreciseCutoff / impreciseStep - 1;
+    static const size_t impreciseCount = impreciseCutoff / impreciseStep;
 
-    SizeClass m_preciseSizeClasses[preciseCount];
-    SizeClass m_impreciseSizeClasses[impreciseCount];
+    FixedArray<SizeClass, preciseCount> m_preciseSizeClasses;
+    FixedArray<SizeClass, impreciseCount> m_impreciseSizeClasses;
     size_t m_waterMark;
+    size_t m_nurseryWaterMark;
     size_t m_highWaterMark;
     Heap* m_heap;
 };
@@ -107,6 +107,11 @@ inline size_t MarkedSpace::highWaterMark()
     return m_highWaterMark;
 }
 
+inline size_t MarkedSpace::nurseryWaterMark()
+{
+    return m_nurseryWaterMark;
+}
+
 inline void MarkedSpace::setHighWaterMark(size_t highWaterMark)
 {
     m_highWaterMark = highWaterMark;
@@ -114,8 +119,8 @@ inline void MarkedSpace::setHighWaterMark(size_t highWaterMark)
 
 inline MarkedSpace::SizeClass& MarkedSpace::sizeClassFor(size_t bytes)
 {
-    ASSERT(bytes && bytes < maxCellSize);
-    if (bytes <= maximumPreciseAllocationSize)
+    ASSERT(bytes && bytes <= maxCellSize);
+    if (bytes <= preciseCutoff)
         return m_preciseSizeClasses[(bytes - 1) / preciseStep];
     return m_impreciseSizeClasses[(bytes - 1) / impreciseStep];
 }
@@ -124,39 +129,21 @@ inline void* MarkedSpace::allocate(SizeClass& sizeClass)
 {
     MarkedBlock::FreeCell* firstFreeCell = sizeClass.firstFreeCell;
     if (!firstFreeCell) {
-        // There are two possibilities for why we got here:
-        // 1) We've exhausted the allocation cache for currentBlock, in which case
-        //    currentBlock == nextBlock, and we know that there is no reason to
-        //    repeat a lazy sweep of nextBlock because we won't find anything.
-        // 2) Allocation caches have been cleared, in which case nextBlock may
-        //    have (and most likely does have) free cells, so we almost certainly
-        //    should do a lazySweep for nextBlock. This also implies that
-        //    currentBlock == 0.
-        
-        if (sizeClass.currentBlock) {
-            ASSERT(sizeClass.currentBlock == sizeClass.nextBlock);
-            m_waterMark += sizeClass.nextBlock->capacity();
-            sizeClass.nextBlock = sizeClass.nextBlock->next();
-            sizeClass.currentBlock = 0;
-        }
-        
-        for (MarkedBlock*& block = sizeClass.nextBlock ; block; block = block->next()) {
-            firstFreeCell = block->lazySweep();
-            if (firstFreeCell) {
-                sizeClass.firstFreeCell = firstFreeCell;
-                sizeClass.currentBlock = block;
+        for (MarkedBlock*& block = sizeClass.currentBlock; block; block = block->next()) {
+            firstFreeCell = block->sweep(MarkedBlock::SweepToFreeList);
+            if (firstFreeCell)
                 break;
-            }
-            
+            m_nurseryWaterMark += block->capacity() - block->size();
             m_waterMark += block->capacity();
+            block->didConsumeFreeList();
         }
-        
+
         if (!firstFreeCell)
             return 0;
     }
-    
+
     ASSERT(firstFreeCell);
-    
+
     sizeClass.firstFreeCell = firstFreeCell->next;
     return firstFreeCell;
 }
@@ -193,26 +180,23 @@ template <typename Functor> inline typename Functor::ReturnType MarkedSpace::for
 inline MarkedSpace::SizeClass::SizeClass()
     : firstFreeCell(0)
     , currentBlock(0)
-    , nextBlock(0)
     , cellSize(0)
 {
 }
 
 inline void MarkedSpace::SizeClass::resetAllocator()
 {
-    nextBlock = blockList.head();
+    currentBlock = blockList.head();
 }
 
-inline void MarkedSpace::SizeClass::canonicalizeBlock()
+inline void MarkedSpace::SizeClass::zapFreeList()
 {
-    if (currentBlock) {
-        currentBlock->canonicalizeBlock(firstFreeCell);
-        firstFreeCell = 0;
+    if (!currentBlock) {
+        ASSERT(!firstFreeCell);
+        return;
     }
-    
-    ASSERT(!firstFreeCell);
-    
-    currentBlock = 0;
+
+    currentBlock->zapFreeList(firstFreeCell);
     firstFreeCell = 0;
 }
 

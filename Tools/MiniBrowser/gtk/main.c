@@ -61,8 +61,10 @@ static void loadURI(const gchar *uri, WKContextRef processContext)
     WKViewRef webView = WKViewCreate(processContext, 0);
     GtkWidget *mainWindow = browser_window_new(webView);
     gchar *url = argumentToURL(uri);
-    WKPageLoadURL(WKViewGetPage(webView), WKURLCreateWithUTF8CString(url));
+    WKURLRef wkURL = WKURLCreateWithUTF8CString(url);
     g_free(url);
+    WKPageLoadURL(WKViewGetPage(webView), wkURL);
+    WKRelease(wkURL);
 
     gtk_widget_grab_focus(GTK_WIDGET(webView));
     gtk_widget_show(mainWindow);
@@ -76,8 +78,7 @@ static const GOptionEntry commandLineOptions[] =
 
 int main(int argc, char *argv[])
 {
-    if (!g_thread_supported())
-        g_thread_init(NULL);
+    gtk_init(&argc, &argv);
 
     GOptionContext *context = g_option_context_new(NULL);
     g_option_context_add_main_entries(context, commandLineOptions, 0);

@@ -22,11 +22,14 @@
 #ifndef JSDOMBinding_h
 #define JSDOMBinding_h
 
+#include "CSSRule.h"
+#include "CSSStyleSheet.h"
 #include "JSDOMGlobalObject.h"
 #include "JSDOMWrapper.h"
 #include "DOMWrapperWorld.h"
 #include "Document.h"
 #include "Element.h"
+#include "MediaList.h"
 #include "StyleBase.h"
 #include <heap/Weak.h>
 #include <runtime/FunctionPrototype.h>
@@ -182,6 +185,33 @@ namespace WebCore {
         if (Node* node = styleBase->node())
             return root(node);
         return styleBase;
+    }
+
+    inline void* root(CSSStyleDeclaration* style)
+    {
+        if (CSSRule* parentRule = style->parentRule())
+            return root(parentRule);
+        if (CSSStyleSheet* styleSheet = style->parentStyleSheet())
+            return root(styleSheet);
+        return style;
+    }
+
+    inline void* root(CSSMutableStyleDeclaration* style)
+    {
+        if (CSSRule* parentRule = style->parentRule())
+            return root(parentRule);
+        if (CSSStyleSheet* styleSheet = style->parentStyleSheet())
+            return root(styleSheet);
+        if (Node* node = style->node())
+            return root(node);
+        return style;
+    }
+
+    inline void* root(MediaList* mediaList)
+    {
+        if (CSSStyleSheet* parentStyleSheet = mediaList->parentStyleSheet())
+            return root(parentStyleSheet);
+        return mediaList;
     }
 
     const JSC::HashTable* getHashTableForGlobalData(JSC::JSGlobalData&, const JSC::HashTable* staticTable);

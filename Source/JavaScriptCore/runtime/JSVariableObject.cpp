@@ -34,12 +34,13 @@
 
 namespace JSC {
 
-bool JSVariableObject::deleteProperty(ExecState* exec, const Identifier& propertyName)
+bool JSVariableObject::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName)
 {
-    if (symbolTable().contains(propertyName.impl()))
+    JSVariableObject* thisObject = static_cast<JSVariableObject*>(cell);
+    if (thisObject->symbolTable().contains(propertyName.impl()))
         return false;
 
-    return JSObject::deleteProperty(exec, propertyName);
+    return JSObject::deleteProperty(thisObject, exec, propertyName);
 }
 
 void JSVariableObject::getOwnPropertyNames(ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)

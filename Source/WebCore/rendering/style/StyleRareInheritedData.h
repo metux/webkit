@@ -57,6 +57,10 @@ public:
     float textStrokeWidth;
     Color textFillColor;
     Color textEmphasisColor;
+    
+    Color visitedLinkTextStrokeColor;
+    Color visitedLinkTextFillColor;
+    Color visitedLinkTextEmphasisColor;    
 
     OwnPtr<ShadowData> textShadow; // Our text shadow information for shadowed text drawing.
     AtomicString highlight; // Apple-specific extension for custom highlight rendering.
@@ -98,6 +102,9 @@ public:
 
     AtomicString textEmphasisCustomMark;
     RefPtr<QuotesData> quotes;
+#if ENABLE(TOUCH_EVENTS)
+    Color tapHighlightColor;
+#endif
 
 private:
     StyleRareInheritedData();

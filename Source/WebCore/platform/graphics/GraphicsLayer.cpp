@@ -61,6 +61,10 @@ void KeyframeValueList::insert(const AnimationValue* value)
     m_values.append(value);
 }
 
+#ifndef NDEBUG
+static bool s_inPaintContents = false;
+#endif
+
 GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     : m_client(client)
     , m_anchorPoint(0.5f, 0.5f, 0)
@@ -84,10 +88,12 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_replicatedLayer(0)
     , m_repaintCount(0)
 {
+    ASSERT(!s_inPaintContents);
 }
 
 GraphicsLayer::~GraphicsLayer()
 {
+    ASSERT(!s_inPaintContents);
     removeAllChildren();
     removeFromParent();
 }
@@ -268,8 +274,14 @@ void GraphicsLayer::clearBackgroundColor()
 
 void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const IntRect& clip)
 {
+#ifndef NDEBUG
+    s_inPaintContents = true;
+#endif
     if (m_client)
         m_client->paintContents(this, context, m_paintingPhase, clip);
+#ifndef NDEBUG
+    s_inPaintContents = false;
+#endif
 }
 
 String GraphicsLayer::animationNameForTransition(AnimatedPropertyID property)
@@ -294,15 +306,13 @@ void GraphicsLayer::updateDebugIndicators()
     if (GraphicsLayer::showDebugBorders()) {
         if (drawsContent()) {
             if (m_usingTiledLayer)
-                setDebugBorder(Color(0, 255, 0, 204), 2.0f);    // tiled layer: green
+                setDebugBorder(Color(255, 128, 0, 128), 2); // tiled layer: orange
             else
-                setDebugBorder(Color(255, 0, 0, 204), 2.0f);    // normal layer: red
+                setDebugBorder(Color(0, 128, 32, 128), 2); // normal layer: green
         } else if (masksToBounds()) {
-            setDebugBorder(Color(128, 255, 255, 178), 2.0f);    // masking layer: pale blue
-            if (GraphicsLayer::showDebugBorders())
-                setDebugBackgroundColor(Color(128, 255, 255, 52));
+            setDebugBorder(Color(128, 255, 255, 48), 20); // masking layer: pale blue
         } else
-            setDebugBorder(Color(255, 255, 0, 204), 2.0f);      // container: yellow
+            setDebugBorder(Color(255, 255, 0, 192), 2); // container: yellow
     }
 }
 

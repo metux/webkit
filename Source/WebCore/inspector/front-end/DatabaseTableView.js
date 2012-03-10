@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ * @extends {WebInspector.View}
+ */
 WebInspector.DatabaseTableView = function(database, tableName)
 {
     WebInspector.View.call(this);
@@ -34,13 +38,12 @@ WebInspector.DatabaseTableView = function(database, tableName)
     this.element.addStyleClass("table");
 
     this.refreshButton = new WebInspector.StatusBarButton(WebInspector.UIString("Refresh"), "refresh-storage-status-bar-item");
-    this.refreshButton.addEventListener("click", this._refreshButtonClicked.bind(this), false);
+    this.refreshButton.addEventListener("click", this._refreshButtonClicked, this);
 }
 
 WebInspector.DatabaseTableView.prototype = {
-    show: function(parentElement)
+    wasShown: function()
     {
-        WebInspector.View.prototype.show.call(this, parentElement);
         this.update();
     },
 
@@ -56,16 +59,15 @@ WebInspector.DatabaseTableView.prototype = {
 
     _queryFinished: function(columnNames, values)
     {
-        this.element.removeChildren();
+        this.detachChildViews();
 
-        var dataGrid = WebInspector.panels.resources.dataGridForResult(columnNames, values);
+        var dataGrid = WebInspector.DataGrid.createSortableDataGrid(columnNames, values);
         if (!dataGrid) {
             this._emptyView = new WebInspector.EmptyView(WebInspector.UIString("The “%s”\ntable is empty.", this.tableName));
             this._emptyView.show(this.element);
             return;
         }
-
-        this.element.appendChild(dataGrid.element);
+        dataGrid.show(this.element);
         dataGrid.autoSizeColumns(5);
     },
 

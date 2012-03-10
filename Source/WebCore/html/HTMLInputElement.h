@@ -190,6 +190,7 @@ public:
 
     void setDefaultName(const AtomicString&);
 
+    Vector<String> acceptMIMETypes();
     String accept() const;
     String alt() const;
 
@@ -218,18 +219,11 @@ public:
     HTMLOptionElement* selectedOption() const;
 #endif
 
-#if ENABLE(WCSS)
-    void setWapInputFormat(String& mask);
-#endif
-
     // These functions are public so they can be used in InputType classes.
     // Otherwise, they would be private.
     CheckedRadioButtons& checkedRadioButtons() const;
     void updateCheckedRadioButtons();
     void setValueInternal(const String&, bool sendChangeEvent);
-#if ENABLE(WCSS)
-    bool isConformToInputMask(const String&) const;
-#endif
 
     void cacheSelectionInResponseToSetValue(int caretOffset) { cacheSelection(caretOffset, caretOffset, SelectionHasNoDirection); }
 
@@ -237,6 +231,8 @@ public:
     // For test purposes.
     bool connectToColorChooser();
 #endif
+
+    String defaultToolTip() const;
 
     static const int maximumLength;
 
@@ -314,7 +310,6 @@ private:
     virtual bool isEmptyValue() const { return value().isEmpty(); }
     virtual bool isEmptySuggestedValue() const { return suggestedValue().isEmpty(); }
     virtual void handleFocusEvent();
-    virtual void willBlur();
     virtual void handleBlurEvent();
 
     virtual bool isOptionalFormControl() const { return !isRequiredFormControl(); }
@@ -336,20 +331,12 @@ private:
 #endif
     void parseMaxLengthAttribute(Attribute*);
     void updateValueIfNeeded();
-#if ENABLE(WCSS)
-    bool isConformToInputMask(UChar, unsigned) const;
-    String validateInputMask(String&);
-#endif
 
     AtomicString m_name;
     String m_valueIfDirty;
     String m_suggestedValue;
     int m_size;
     int m_maxLength;
-#if ENABLE(WCSS)
-    String m_inputFormatMask;
-    unsigned m_maxInputCharsAllowed;
-#endif
     short m_maxResults;
     bool m_isChecked : 1;
     bool m_reflectsCheckedAttribute : 1;

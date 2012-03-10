@@ -258,11 +258,6 @@ bool WebFrameLoaderClient::dispatchDidLoadResourceFromMemoryCache(DocumentLoader
     return false;
 }
 
-void WebFrameLoaderClient::dispatchDidLoadResourceByXMLHttpRequest(unsigned long identifier, const String&)
-{
-    notImplemented();
-}
-
 void WebFrameLoaderClient::dispatchDidHandleOnloadEvents()
 {
     WebPage* webPage = m_frame->page();
@@ -537,7 +532,7 @@ void WebFrameLoaderClient::dispatchDidFirstLayout()
     // Notify the UIProcess.
     webPage->send(Messages::WebPageProxy::DidFirstLayoutForFrame(m_frame->frameID(), InjectedBundleUserMessageEncoder(userData.get())));
 
-    if (m_frame == m_frame->page()->mainFrame())
+    if (m_frame == m_frame->page()->mainWebFrame())
         webPage->drawingArea()->setLayerTreeStateIsFrozen(false);
 }
 
@@ -569,7 +564,7 @@ void WebFrameLoaderClient::dispatchDidLayout()
     // the UIProcess for every call.
 
     // FIXME: Remove at the soonest possible time.
-    if (m_frame == m_frame->page()->mainFrame())
+    if (m_frame == m_frame->page()->mainWebFrame())
         webPage->send(Messages::WebPageProxy::SetRenderTreeSize(webPage->renderTreeSize()));
 }
 
@@ -995,6 +990,13 @@ bool WebFrameLoaderClient::shouldFallBack(const ResourceError& error)
     if (error.errorCode() == pluginWillHandleLoadError.errorCode() && error.domain() == pluginWillHandleLoadError.domain())
         return false;
 
+#if PLATFORM(QT)
+    DEFINE_STATIC_LOCAL(const ResourceError, errorInterruptedForPolicyChange, (this->interruptedForPolicyChangeError(ResourceRequest())));
+
+    if (error.errorCode() == errorInterruptedForPolicyChange.errorCode() && error.domain() == errorInterruptedForPolicyChange.domain())
+        return false;
+#endif
+
     return true;
 }
 
@@ -1033,7 +1035,7 @@ void WebFrameLoaderClient::frameLoadCompleted()
     if (!webPage)
         return;
 
-    if (m_frame == m_frame->page()->mainFrame())
+    if (m_frame == m_frame->page()->mainWebFrame())
         webPage->drawingArea()->setLayerTreeStateIsFrozen(false);
 }
 
@@ -1050,7 +1052,7 @@ void WebFrameLoaderClient::restoreViewState()
 
     // FIXME: This should not be necessary. WebCore should be correctly invalidating
     // the view on restores from the back/forward cache.
-    if (m_frame == m_frame->page()->mainFrame())
+    if (m_frame == m_frame->page()->mainWebFrame())
         m_frame->page()->drawingArea()->setNeedsDisplay(m_frame->page()->bounds());
 }
 
@@ -1060,7 +1062,7 @@ void WebFrameLoaderClient::provisionalLoadStarted()
     if (!webPage)
         return;
 
-    if (m_frame == m_frame->page()->mainFrame())
+    if (m_frame == m_frame->page()->mainWebFrame())
         webPage->drawingArea()->setLayerTreeStateIsFrozen(true);
 }
 
@@ -1108,7 +1110,7 @@ void WebFrameLoaderClient::savePlatformDataToCachedFrame(CachedFrame*)
 void WebFrameLoaderClient::transitionToCommittedFromCachedFrame(CachedFrame*)
 {
     WebPage* webPage = m_frame->page();
-    bool isMainFrame = webPage->mainFrame() == m_frame;
+    bool isMainFrame = webPage->mainWebFrame() == m_frame;
     
     const ResourceResponse& response = m_frame->coreFrame()->loader()->documentLoader()->response();
     m_frameHasCustomRepresentation = isMainFrame && WebProcess::shared().shouldUseCustomRepresentationForResponse(response);
@@ -1119,13 +1121,20 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     WebPage* webPage = m_frame->page();
     Color backgroundColor = webPage->drawsTransparentBackground() ? Color::transparent : Color::white;
 
-    bool isMainFrame = webPage->mainFrame() == m_frame;
+    bool isMainFrame = webPage->mainWebFrame() == m_frame;
 
-#if ENABLE(TILED_BACKING_STORE)
-    IntSize currentVisibleContentSize = m_frame->coreFrame()->view() ? m_frame->coreFrame()->view()->visibleContentRect().size() : IntSize();
-    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, false, webPage->resizesToContentsLayoutSize(), isMainFrame && webPage->resizesToContentsEnabled());
+#if USE(TILED_BACKING_STORE)
+    IntSize currentVisibleContentSize;
+    IntSize fixedLayoutSize;
 
-    if (isMainFrame && webPage->resizesToContentsEnabled()) {
+    if (FrameView* view = m_frame->coreFrame()->view()) {
+        currentVisibleContentSize = view->visibleContentRect().size();
+        fixedLayoutSize = view->fixedLayoutSize();
+    }
+
+    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, false, fixedLayoutSize, !fixedLayoutSize.isEmpty());
+
+    if (isMainFrame && !fixedLayoutSize.isEmpty()) {
         m_frame->coreFrame()->view()->setDelegatesScrolling(true);
         m_frame->coreFrame()->view()->setPaintsEntireContents(true);
         // The HistoryController will update the scroll position later if needed.
@@ -1237,7 +1246,7 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
     parameters.loadManually = loadManually;
     parameters.documentURL = m_frame->coreFrame()->document()->url().string();
 
-    Frame* mainFrame = webPage->mainFrame()->coreFrame();
+    Frame* mainFrame = webPage->mainWebFrame()->coreFrame();
     if (m_frame->coreFrame() == mainFrame)
         parameters.toplevelDocumentURL = parameters.documentURL;
     else if (m_frame->coreFrame()->document()->securityOrigin()->canAccess(mainFrame->document()->securityOrigin())) {

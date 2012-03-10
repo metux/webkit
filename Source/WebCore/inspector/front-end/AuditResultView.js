@@ -28,6 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ * @extends {WebInspector.View}
+ */
 WebInspector.AuditResultView = function(categoryResults)
 {
     WebInspector.View.call(this);
@@ -39,11 +43,25 @@ WebInspector.AuditResultView = function(categoryResults)
     categoryResults.sort(categorySorter);
     for (var i = 0; i < categoryResults.length; ++i)
         this.element.appendChild(new WebInspector.AuditCategoryResultPane(categoryResults[i]).element);
+
+    this.element.addEventListener("contextmenu", this._contextMenuEventFired.bind(this), true);
+}
+
+WebInspector.AuditResultView.prototype = {
+    _contextMenuEventFired: function(event)
+    {
+        var contextMenu = new WebInspector.ContextMenu();
+        if (WebInspector.populateHrefContextMenu(contextMenu, null, event))
+            contextMenu.show(event);
+    }
 }
 
 WebInspector.AuditResultView.prototype.__proto__ = WebInspector.View.prototype;
 
-
+/**
+ * @constructor
+ * @extends {WebInspector.SidebarPane}
+ */
 WebInspector.AuditCategoryResultPane = function(categoryResult)
 {
     WebInspector.SidebarPane.call(this, categoryResult.title);

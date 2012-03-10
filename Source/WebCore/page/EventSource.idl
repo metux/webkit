@@ -34,10 +34,9 @@ module window {
     interface [
         ActiveDOMObject,
         CanBeConstructed,
-        CustomConstructFunction,
         ConstructorParameters=1,
         Constructor(in DOMString scriptUrl),
-        ConstructorWith=ScriptExecutionContext,
+        CallWith=ScriptExecutionContext,
         ConstructorRaisesException,
         V8ConstructorSetsActiveDOMWrapper,
         EventTarget,

@@ -23,6 +23,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ * @extends {WebInspector.View}
+ */
 WebInspector.ApplicationCacheItemsView = function(treeElement, appcacheDomain)
 {
     WebInspector.View.call(this);
@@ -33,11 +37,11 @@ WebInspector.ApplicationCacheItemsView = function(treeElement, appcacheDomain)
     // FIXME: Needs better tooltip. (Localized)
     this.deleteButton = new WebInspector.StatusBarButton(WebInspector.UIString("Delete"), "delete-storage-status-bar-item");
     this.deleteButton.visible = false;
-    this.deleteButton.addEventListener("click", this._deleteButtonClicked.bind(this), false);
+    this.deleteButton.addEventListener("click", this._deleteButtonClicked, this);
 
     // FIXME: Needs better tooltip. (Localized)
     this.refreshButton = new WebInspector.StatusBarButton(WebInspector.UIString("Refresh"), "refresh-storage-status-bar-item");
-    this.refreshButton.addEventListener("click", this._refreshButtonClicked.bind(this), false);
+    this.refreshButton.addEventListener("click", this._refreshButtonClicked, this);
 
     if (Preferences.onlineDetectionEnabled) {
         this.connectivityIcon = document.createElement("img");
@@ -99,16 +103,14 @@ WebInspector.ApplicationCacheItemsView.prototype = {
         }
     },
 
-    show: function(parentElement)
+    wasShown: function()
     {
-        WebInspector.View.prototype.show.call(this, parentElement);
         this.updateNetworkState(navigator.onLine);
         this._update();
     },
 
-    hide: function()
+    willHide: function()
     {
-        WebInspector.View.prototype.hide.call(this);
         this.deleteButton.visible = false;
     },
 
@@ -175,7 +177,7 @@ WebInspector.ApplicationCacheItemsView.prototype = {
         this._populateDataGrid();
         this._dataGrid.autoSizeColumns(20, 80);
         this._dataGrid.element.removeStyleClass("hidden");
-        this._emptyView.hide();
+        this._emptyView.detach();
         this.deleteButton.visible = true;
 
         var totalSizeString = Number.bytesToString(this._size);
@@ -198,9 +200,8 @@ WebInspector.ApplicationCacheItemsView.prototype = {
         columns[2].aligned = "right";
         columns[2].sortable = true;
         this._dataGrid = new WebInspector.DataGrid(columns);
-        this.element.appendChild(this._dataGrid.element);
+        this._dataGrid.show(this.element);
         this._dataGrid.addEventListener("sorting changed", this._populateDataGrid, this);
-        this._dataGrid.updateWidths();
     },
 
     _populateDataGrid: function()
@@ -218,7 +219,7 @@ WebInspector.ApplicationCacheItemsView.prototype = {
         }
 
         var comparator;
-        switch (parseInt(this._dataGrid.sortColumnIdentifier)) {
+        switch (parseInt(this._dataGrid.sortColumnIdentifier, 10)) {
             case 0: comparator = localeCompare.bind(this, "name"); break;
             case 1: comparator = localeCompare.bind(this, "type"); break;
             case 2: comparator = numberCompare.bind(this, "size"); break;
@@ -249,12 +250,6 @@ WebInspector.ApplicationCacheItemsView.prototype = {
             this._dataGrid.children[0].selected = true;
     },
 
-    onResize: function()
-    {
-        if (this._dataGrid)
-            this._dataGrid.updateWidths();
-    },
-
     _deleteButtonClicked: function(event)
     {
         if (!this._dataGrid || !this._dataGrid.selectedNode)
@@ -280,6 +275,10 @@ WebInspector.ApplicationCacheItemsView.prototype = {
 
 WebInspector.ApplicationCacheItemsView.prototype.__proto__ = WebInspector.View.prototype;
 
+/**
+ * @constructor
+ * @implements {ApplicationCacheAgent.Dispatcher}
+ */
 WebInspector.ApplicationCacheDispatcher = function()
 {
 }

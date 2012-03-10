@@ -37,6 +37,10 @@
 #include "MediaPlayerProxy.h"
 #endif
 
+#if ENABLE(VIDEO_TRACK)
+#include "TextTrack.h"
+#endif
+
 namespace WebCore {
 
 #if ENABLE(WEB_AUDIO)
@@ -58,7 +62,11 @@ class Widget;
 // But it can't be until the Chromium WebMediaPlayerClientImpl class is fixed so it
 // no longer depends on typecasting a MediaPlayerClient to an HTMLMediaElement.
 
-class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, private MediaCanStartListener, private ActiveDOMObject {
+class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, private MediaCanStartListener, public ActiveDOMObject
+#if ENABLE(VIDEO_TRACK)
+    , private TextTrackClient
+#endif
+{
 public:
     MediaPlayer* player() const { return m_player.get(); }
     
@@ -73,6 +81,7 @@ public:
     virtual bool supportsFullscreen() const { return false; };
 
     virtual bool supportsSave() const;
+    virtual bool supportsScanning() const;
     
     PlatformMedia platformMedia() const;
 #if USE(ACCELERATED_COMPOSITING)
@@ -169,6 +178,10 @@ public:
 
     float percentLoaded() const;
 
+#if ENABLE(VIDEO_TRACK)
+    PassRefPtr<TextTrack> addTrack(const String& kind, const String& label = "", const String& language = "");
+#endif
+
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     void allocateMediaPlayerIfNecessary();
     void setNeedWidgetUpdate(bool needWidgetUpdate) { m_needWidgetUpdate = needWidgetUpdate; }
@@ -203,6 +216,8 @@ public:
     static void clearMediaCacheForSite(const String&);
 
     bool isPlaying() const { return m_playing; }
+
+    virtual bool hasPendingActivity() const;
 
 #if ENABLE(WEB_AUDIO)
     MediaElementAudioSourceNode* audioSourceNode() { return m_audioSourceNode; }
@@ -267,7 +282,6 @@ private:
     virtual void suspend(ReasonForSuspension);
     virtual void resume();
     virtual void stop();
-    virtual bool hasPendingActivity() const;
     
     virtual void mediaVolumeDidChange();
 
@@ -338,6 +352,15 @@ private:
 
 #if ENABLE(VIDEO_TRACK)
     void loadTextTracks();
+
+    // TextTrackClient
+    virtual void textTrackReadyStateChanged(TextTrack*);
+    virtual void textTrackModeChanged(TextTrack*);
+    virtual void textTrackCreated(TextTrack*);
+    virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*);
+    virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*);
+    virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>);
+    virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
 #endif
 
     // These "internal" functions do not check user gesture restrictions.
@@ -378,6 +401,11 @@ private:
     void configureMediaControls();
 
     virtual void* preDispatchEventHandler(Event*);
+
+#if ENABLE(MICRODATA)
+    virtual String itemValueText() const;
+    virtual void setItemValueText(const String&, ExceptionCode&);
+#endif
 
     Timer<HTMLMediaElement> m_loadTimer;
     Timer<HTMLMediaElement> m_asyncEventTimer;

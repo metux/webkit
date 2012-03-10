@@ -55,7 +55,7 @@ static EncodedJSValue JSC_HOST_CALL objectConstructorIsExtensible(ExecState*);
 
 namespace JSC {
 
-const ClassInfo ObjectConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::objectConstructorTable };
+const ClassInfo ObjectConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::objectConstructorTable, CREATE_METHOD_TABLE(ObjectConstructor) };
 
 /* Source for ObjectConstructor.lut.h
 @begin objectConstructorTable
@@ -89,9 +89,14 @@ void ObjectConstructor::finishCreation(ExecState* exec, ObjectPrototype* objectP
     putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool ObjectConstructor::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+bool ObjectConstructor::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::objectConstructorTable(exec), this, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
+}
+
+bool ObjectConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<JSObject>(exec, ExecState::objectConstructorTable(exec), static_cast<ObjectConstructor*>(cell), propertyName, slot);
 }
 
 bool ObjectConstructor::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
@@ -114,7 +119,7 @@ static EncodedJSValue JSC_HOST_CALL constructWithObjectConstructor(ExecState* ex
     return JSValue::encode(constructObject(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
-ConstructType ObjectConstructor::getConstructData(ConstructData& constructData)
+ConstructType ObjectConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructWithObjectConstructor;
     return ConstructTypeHost;
@@ -126,7 +131,7 @@ static EncodedJSValue JSC_HOST_CALL callObjectConstructor(ExecState* exec)
     return JSValue::encode(constructObject(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
-CallType ObjectConstructor::getCallData(CallData& callData)
+CallType ObjectConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callObjectConstructor;
     return CallTypeHost;

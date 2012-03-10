@@ -51,7 +51,7 @@
 #define IS_ICON_SYNC_THREAD() (m_syncThread == currentThread())
 #define ASSERT_ICON_SYNC_THREAD() ASSERT(IS_ICON_SYNC_THREAD())
 
-#if PLATFORM(QT) || PLATFORM(GTK)
+#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(WIN_CAIRO)
 #define CAN_THEME_URL_ICON
 #endif
 
@@ -128,7 +128,7 @@ bool IconDatabase::open(const String& directory, const String& filename)
         return false;
     }
 
-    m_databaseDirectory = directory.crossThreadString();
+    m_databaseDirectory = directory.isolatedCopy();
 
     // Formulate the full path for the database file
     m_completeDatabasePath = pathByAppendingComponent(m_databaseDirectory, filename);
@@ -227,7 +227,7 @@ Image* IconDatabase::synchronousIconForPageURL(const String& pageURLOriginal, co
     
     PageURLRecord* pageRecord = m_pageURLToRecordMap.get(pageURLOriginal);
     if (!pageRecord) {
-        pageURLCopy = pageURLOriginal.crossThreadString();
+        pageURLCopy = pageURLOriginal.isolatedCopy();
         pageRecord = getOrCreatePageURLRecord(pageURLCopy);
     }
     
@@ -263,7 +263,7 @@ Image* IconDatabase::synchronousIconForPageURL(const String& pageURLOriginal, co
     // mark it to be read by the background thread
     if (iconRecord->imageDataStatus() == ImageDataStatusUnknown) {
         if (pageURLCopy.isNull())
-            pageURLCopy = pageURLOriginal.crossThreadString();
+            pageURLCopy = pageURLOriginal.isolatedCopy();
     
         MutexLocker locker(m_pendingReadingLock);
         m_pageURLsInterestedInIcons.add(pageURLCopy);
@@ -312,7 +312,7 @@ String IconDatabase::synchronousIconURLForPageURL(const String& pageURLOriginal)
     
     PageURLRecord* pageRecord = m_pageURLToRecordMap.get(pageURLOriginal);
     if (!pageRecord)
-        pageRecord = getOrCreatePageURLRecord(pageURLOriginal.crossThreadString());
+        pageRecord = getOrCreatePageURLRecord(pageURLOriginal.isolatedCopy());
     
     // If pageRecord is NULL, one of two things is true -
     // 1 - The initial url import is incomplete and this pageURL has already been marked to be notified once it is complete if an iconURL exists
@@ -321,7 +321,7 @@ String IconDatabase::synchronousIconURLForPageURL(const String& pageURLOriginal)
         return String();
     
     // Possible the pageRecord is around because it's a retained pageURL with no iconURL, so we have to check
-    return pageRecord->iconRecord() ? pageRecord->iconRecord()->iconURL().threadsafeCopy() : String();
+    return pageRecord->iconRecord() ? pageRecord->iconRecord()->iconURL().isolatedCopy() : String();
 }
 
 #ifdef CAN_THEME_URL_ICON
@@ -406,7 +406,7 @@ void IconDatabase::retainIconForPageURL(const String& pageURLOriginal)
     String pageURL;
     
     if (!record) {
-        pageURL = pageURLOriginal.crossThreadString();
+        pageURL = pageURLOriginal.isolatedCopy();
 
         record = new PageURLRecord(pageURL);
         m_pageURLToRecordMap.set(pageURL, record);
@@ -414,7 +414,7 @@ void IconDatabase::retainIconForPageURL(const String& pageURLOriginal)
     
     if (!record->retain()) {
         if (pageURL.isNull())
-            pageURL = pageURLOriginal.crossThreadString();
+            pageURL = pageURLOriginal.isolatedCopy();
 
         // This page just had its retain count bumped from 0 to 1 - Record that fact
         m_retainedPageURLs.add(pageURL);
@@ -489,7 +489,7 @@ void IconDatabase::releaseIconForPageURL(const String& pageURLOriginal)
     // Mark stuff for deletion from the database only if we're not in private browsing
     if (!m_privateBrowsingEnabled) {
         MutexLocker locker(m_pendingSyncLock);
-        m_pageURLsPendingSync.set(pageURLOriginal.crossThreadString(), pageRecord->snapshot(true));
+        m_pageURLsPendingSync.set(pageURLOriginal.isolatedCopy(), pageRecord->snapshot(true));
     
         // If this page is the last page to refer to a particular IconRecord, that IconRecord needs to
         // be marked for deletion
@@ -515,7 +515,7 @@ void IconDatabase::setIconDataForIconURL(PassRefPtr<SharedBuffer> dataOriginal, 
     RefPtr<SharedBuffer> data = dataOriginal ? dataOriginal->copy() : PassRefPtr<SharedBuffer>(0);
     if (data)
         data->setMutexForVerifier(m_urlAndIconLock);
-    String iconURL = iconURLOriginal.crossThreadString();
+    String iconURL = iconURLOriginal.isolatedCopy();
     
     Vector<String> pageURLs;
     {
@@ -592,8 +592,8 @@ void IconDatabase::setIconURLForPageURL(const String& iconURLOriginal, const Str
         if (pageRecord && pageRecord->iconRecord() && pageRecord->iconRecord()->iconURL() == iconURLOriginal)
             return;
             
-        pageURL = pageURLOriginal.crossThreadString();
-        iconURL = iconURLOriginal.crossThreadString();
+        pageURL = pageURLOriginal.isolatedCopy();
+        iconURL = iconURLOriginal.isolatedCopy();
 
         if (!pageRecord) {
             pageRecord = new PageURLRecord(pageURL);
@@ -767,6 +767,7 @@ IconDatabase::IconDatabase()
     , m_threadTerminationRequested(false)
     , m_removeIconsRequested(false)
     , m_iconURLImportComplete(false)
+    , m_syncThreadHasWorkToDo(false)
     , m_disabledSuddenTerminationForSyncThread(false)
     , m_initialPruningComplete(false)
     , m_client(defaultClient())
@@ -818,6 +819,7 @@ void IconDatabase::wakeSyncThread()
         disableSuddenTermination();
     }
 
+    m_syncThreadHasWorkToDo = true;
     m_syncCondition.signal();
 }
 
@@ -857,13 +859,13 @@ bool IconDatabase::isOpen() const
 String IconDatabase::databasePath() const
 {
     MutexLocker locker(m_syncLock);
-    return m_completeDatabasePath.threadsafeCopy();
+    return m_completeDatabasePath.isolatedCopy();
 }
 
 String IconDatabase::defaultDatabaseFilename()
 {
     DEFINE_STATIC_LOCAL(String, defaultDatabaseFilename, ("WebpageIcons.db"));
-    return defaultDatabaseFilename.threadsafeCopy();
+    return defaultDatabaseFilename.isolatedCopy();
 }
 
 // Unlike getOrCreatePageURLRecord(), getOrCreateIconRecord() does not mark the icon as "interested in import"
@@ -1350,9 +1352,14 @@ void* IconDatabase::syncThreadMainLoop()
 {
     ASSERT_ICON_SYNC_THREAD();
 
-    bool shouldReenableSuddenTermination = false;
-
     m_syncLock.lock();
+
+    bool shouldReenableSuddenTermination = m_disabledSuddenTerminationForSyncThread;
+    m_disabledSuddenTerminationForSyncThread = false;
+
+    // We'll either do any pending work on our first pass through the loop, or we'll terminate
+    // without doing any work. Either way we're dealing with any currently-pending work.
+    m_syncThreadHasWorkToDo = false;
 
     // It's possible thread termination is requested before the main loop even starts - in that case, just skip straight to cleanup
     while (!m_threadTerminationRequested) {
@@ -1427,14 +1434,17 @@ void* IconDatabase::syncThreadMainLoop()
             // The following is balanced by the call to disableSuddenTermination in the
             // wakeSyncThread function. Any time we wait on the condition, we also have
             // to enableSuddenTermation, after doing the next batch of work.
-            ASSERT(m_disabledSuddenTerminationForSyncThread);
             enableSuddenTermination();
-            m_disabledSuddenTerminationForSyncThread = false;
         }
 
-        m_syncCondition.wait(m_syncLock);
+        while (!m_syncThreadHasWorkToDo)
+            m_syncCondition.wait(m_syncLock);
 
+        m_syncThreadHasWorkToDo = false;
+
+        ASSERT(m_disabledSuddenTerminationForSyncThread);
         shouldReenableSuddenTermination = true;
+        m_disabledSuddenTerminationForSyncThread = false;
     }
 
     m_syncLock.unlock();
@@ -1446,8 +1456,9 @@ void* IconDatabase::syncThreadMainLoop()
         // The following is balanced by the call to disableSuddenTermination in the
         // wakeSyncThread function. Any time we wait on the condition, we also have
         // to enableSuddenTermation, after doing the next batch of work.
-        ASSERT(m_disabledSuddenTerminationForSyncThread);
         enableSuddenTermination();
+
+        MutexLocker locker(m_syncLock);
         m_disabledSuddenTerminationForSyncThread = false;
     }
 
@@ -2135,7 +2146,7 @@ class ImportedIconURLForPageURLWorkItem : public ClientWorkItem {
 public:
     ImportedIconURLForPageURLWorkItem(IconDatabaseClient* client, const String& pageURL)
         : ClientWorkItem(client)
-        , m_pageURL(new String(pageURL.threadsafeCopy()))
+        , m_pageURL(new String(pageURL.isolatedCopy()))
     { }
     
     virtual ~ImportedIconURLForPageURLWorkItem()
@@ -2158,7 +2169,7 @@ class ImportedIconDataForPageURLWorkItem : public ClientWorkItem {
 public:
     ImportedIconDataForPageURLWorkItem(IconDatabaseClient* client, const String& pageURL)
         : ClientWorkItem(client)
-        , m_pageURL(new String(pageURL.threadsafeCopy()))
+        , m_pageURL(new String(pageURL.isolatedCopy()))
     { }
     
     virtual ~ImportedIconDataForPageURLWorkItem()

@@ -32,6 +32,7 @@
 #if ENABLE(INDEXED_DATABASE)
 
 #include "ActiveDOMObject.h"
+#include "DOMStringList.h"
 #include "Event.h"
 #include "EventListener.h"
 #include "EventNames.h"
@@ -74,6 +75,7 @@ public:
 
     // IDBCallbacks
     virtual void onError(PassRefPtr<IDBDatabaseError>);
+    virtual void onSuccess(PassRefPtr<DOMStringList>);
     virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>);
     virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>);
     virtual void onSuccess(PassRefPtr<IDBKey>);
@@ -85,7 +87,7 @@ public:
     virtual bool hasPendingActivity() const;
 
     // EventTarget
-    virtual IDBRequest* toIDBRequest() { return this; }
+    virtual const AtomicString& interfaceName() const;
     virtual ScriptExecutionContext* scriptExecutionContext() const;
     virtual bool dispatchEvent(PassRefPtr<Event>);
     bool dispatchEvent(PassRefPtr<Event> event, ExceptionCode& ec) { return EventTarget::dispatchEvent(event, ec); }

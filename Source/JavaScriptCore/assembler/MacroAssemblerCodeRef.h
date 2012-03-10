@@ -52,6 +52,19 @@
 #define ASSERT_VALID_CODE_OFFSET(offset) // Anything goes!
 #endif
 
+#if CPU(X86) && OS(WIN)
+#define CALLING_CONVENTION_IS_STDCALL 1
+#ifndef CDECL
+#if COMPILER(MSVC)
+#define CDECL __cdecl
+#else
+#define CDECL __attribute__ ((__cdecl))
+#endif // COMPILER(MSVC)
+#endif // CDECL
+#else
+#define CALLING_CONVENTION_IS_STDCALL 0
+#endif
+
 namespace JSC {
 
 // FunctionPtr:
@@ -99,6 +112,44 @@ public:
     {
         ASSERT_VALID_CODE_POINTER(m_value);
     }
+
+#if CALLING_CONVENTION_IS_STDCALL
+
+    template<typename returnType>
+    FunctionPtr(returnType (CDECL *value)())
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1>
+    FunctionPtr(returnType (CDECL *value)(argType1))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1, typename argType2>
+    FunctionPtr(returnType (CDECL *value)(argType1, argType2))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1, typename argType2, typename argType3>
+    FunctionPtr(returnType (CDECL *value)(argType1, argType2, argType3))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1, typename argType2, typename argType3, typename argType4>
+    FunctionPtr(returnType (CDECL *value)(argType1, argType2, argType3, argType4))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+#endif
 
     template<typename FunctionType>
     explicit FunctionPtr(FunctionType* value)

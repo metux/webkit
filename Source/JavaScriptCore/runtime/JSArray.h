@@ -94,10 +94,12 @@ namespace JSC {
             return array;
         }
 
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier& propertyName, PropertySlot&);
-        virtual bool getOwnPropertySlot(ExecState*, unsigned propertyName, PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier& propertyName, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, unsigned propertyName, PropertySlot&);
+        static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
-        virtual void put(ExecState*, unsigned propertyName, JSValue); // FIXME: Make protected and add setItem.
+        static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
 
         static JS_EXPORTDATA const ClassInfo s_info;
         
@@ -154,8 +156,6 @@ namespace JSC {
             return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
         }
         
-        inline void visitChildrenDirect(SlotVisitor&);
-
         static ptrdiff_t storageOffset()
         {
             return OBJECT_OFFSETOF(JSArray, m_storage);
@@ -166,13 +166,15 @@ namespace JSC {
             return OBJECT_OFFSETOF(JSArray, m_vectorLength);
         }
 
+        static void visitChildren(JSCell*, SlotVisitor&);
+
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
-        virtual void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
-        virtual bool deleteProperty(ExecState*, const Identifier& propertyName);
-        virtual bool deleteProperty(ExecState*, unsigned propertyName);
+        static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+
+        static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
+        static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
         virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
-        virtual void visitChildren(SlotVisitor&);
 
         void* subclassData() const;
         void setSubclassData(void*);
@@ -210,22 +212,6 @@ namespace JSC {
 
     inline bool isJSArray(JSGlobalData* globalData, JSCell* cell) { return cell->vptr() == globalData->jsArrayVPtr; }
     inline bool isJSArray(JSGlobalData* globalData, JSValue v) { return v.isCell() && isJSArray(globalData, v.asCell()); }
-
-    inline void JSArray::visitChildrenDirect(SlotVisitor& visitor)
-    {
-        JSObject::visitChildrenDirect(visitor);
-        
-        ArrayStorage* storage = m_storage;
-
-        unsigned usedVectorLength = std::min(storage->m_length, m_vectorLength);
-        visitor.appendValues(storage->m_vector, usedVectorLength);
-
-        if (SparseArrayValueMap* map = storage->m_sparseValueMap) {
-            SparseArrayValueMap::iterator end = map->end();
-            for (SparseArrayValueMap::iterator it = map->begin(); it != end; ++it)
-                visitor.append(&it->second);
-        }
-    }
 
     // Rule from ECMA 15.2 about what an array index is.
     // Must exactly match string form of an unsigned integer, and be less than 2^32 - 1.

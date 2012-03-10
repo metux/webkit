@@ -3,7 +3,7 @@
     Copyright (C) 2001 Dirk Mueller (mueller@kde.org)
     Copyright (C) 2002 Waldo Bastian (bastian@kde.org)
     Copyright (C) 2006 Samuel Weinig (sam.weinig@gmail.com)
-    Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+    Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -59,6 +59,7 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
             return ResourceLoadPriorityHigh;
         case CachedResource::Script:
         case CachedResource::FontResource:
+        case CachedResource::RawResource:
             return ResourceLoadPriorityMedium;
         case CachedResource::ImageResource:
             return ResourceLoadPriorityLow;
@@ -70,20 +71,23 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
         case CachedResource::LinkSubresource:
             return ResourceLoadPriorityVeryLow;
 #endif
+#if ENABLE(VIDEO_TRACK)
+        case CachedResource::CueResource:
+            return ResourceLoadPriorityLow;
+#endif
     }
     ASSERT_NOT_REACHED();
     return ResourceLoadPriorityLow;
 }
 
-#ifndef NDEBUG
-static RefCountedLeakCounter cachedResourceLeakCounter("CachedResource");
-#endif
+DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("CachedResource"));
 
 CachedResource::CachedResource(const ResourceRequest& request, Type type)
     : m_resourceRequest(request)
     , m_loadPriority(defaultPriorityForResourceType(type))
     , m_responseTimestamp(currentTime())
     , m_lastDecodedAccessTime(0)
+    , m_loadFinishTime(0)
     , m_encodedSize(0)
     , m_decodedSize(0)
     , m_accessCount(0)
@@ -96,7 +100,6 @@ CachedResource::CachedResource(const ResourceRequest& request, Type type)
     , m_loading(false)
     , m_type(type)
     , m_status(Pending)
-    , m_options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials)
 #ifndef NDEBUG
     , m_deleted(false)
     , m_lruIndex(0)
@@ -131,10 +134,11 @@ CachedResource::~CachedResource()
         m_owningCachedResourceLoader->removeCachedResource(this);
 }
 
-void CachedResource::load(CachedResourceLoader* cachedResourceLoader, bool incremental, SecurityCheckPolicy securityCheck)
+void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const ResourceLoaderOptions& options)
 {
+    m_options = options;
     m_loading = true;
-    m_request = CachedResourceRequest::load(cachedResourceLoader, this, incremental, securityCheck, m_options);
+    m_request = CachedResourceRequest::load(cachedResourceLoader, this, options);
     if (m_request) {
         m_status = Pending;
         cachedResourceLoader->incrementRequestCount(this);
@@ -146,7 +150,7 @@ void CachedResource::checkNotify()
     if (isLoading())
         return;
 
-    CachedResourceClientWalker w(m_clients);
+    CachedResourceClientWalker<CachedResourceClient> w(m_clients);
     while (CachedResourceClient* c = w.next())
         c->notifyFinished(this);
 }

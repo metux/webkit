@@ -3,12 +3,12 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebDataSource</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebDatabase.html" title="WebKitWebDatabase">
 <link rel="next" href="WebKitWebResource.html" title="WebKitWebResource">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -40,28 +40,28 @@
 <div class="refsynopsisdiv">
 <a name="WebKitWebDataSource.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">                    <a class="link" href="WebKitWebDataSource.html#WebKitWebDataSource-struct" title="WebKitWebDataSource">WebKitWebDataSource</a>;
-<a href="http://library.gnome.org/devel/glib/unstable/glib-Strings.html#GString"><span class="returnvalue">GString</span></a> *           <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-data" title="webkit_web_data_source_get_data ()">webkit_web_data_source_get_data</a>     (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
-const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-encoding" title="webkit_web_data_source_get_encoding ()">webkit_web_data_source_get_encoding</a> (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
+<span class="returnvalue">GString</span> *           <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-data" title="webkit_web_data_source_get_data ()">webkit_web_data_source_get_data</a>     (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
+const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-encoding" title="webkit_web_data_source_get_encoding ()">webkit_web_data_source_get_encoding</a> (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
 <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="returnvalue">WebKitNetworkRequest</span></a> * <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-initial-request" title="webkit_web_data_source_get_initial_request ()">webkit_web_data_source_get_initial_request</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
 <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="returnvalue">WebKitWebResource</span></a> * <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-main-resource" title="webkit_web_data_source_get_main_resource ()">webkit_web_data_source_get_main_resource</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
 <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="returnvalue">WebKitNetworkRequest</span></a> * <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-request" title="webkit_web_data_source_get_request ()">webkit_web_data_source_get_request</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
-<a href="http://library.gnome.org/devel/glib/unstable/glib-Doubly-Linked-Lists.html#GList"><span class="returnvalue">GList</span></a> *             <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-subresources" title="webkit_web_data_source_get_subresources ()">webkit_web_data_source_get_subresources</a>
+<span class="returnvalue">GList</span> *             <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-subresources" title="webkit_web_data_source_get_subresources ()">webkit_web_data_source_get_subresources</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
-const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-unreachable-uri" title="webkit_web_data_source_get_unreachable_uri ()">webkit_web_data_source_get_unreachable_uri</a>
+const <span class="returnvalue">gchar</span> *       <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-unreachable-uri" title="webkit_web_data_source_get_unreachable_uri ()">webkit_web_data_source_get_unreachable_uri</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
 <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="returnvalue">WebKitWebFrame</span></a> *    <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-get-web-frame" title="webkit_web_data_source_get_web_frame ()">webkit_web_data_source_get_web_frame</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
-<a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-is-loading" title="webkit_web_data_source_is_loading ()">webkit_web_data_source_is_loading</a>   (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
+<span class="returnvalue">gboolean</span>            <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-is-loading" title="webkit_web_data_source_is_loading ()">webkit_web_data_source_is_loading</a>   (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);
 <a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="returnvalue">WebKitWebDataSource</span></a> * <a class="link" href="WebKitWebDataSource.html#webkit-web-data-source-new" title="webkit_web_data_source_new ()">webkit_web_data_source_new</a>        (<em class="parameter"><code><span class="type">void</span></code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitWebDataSource.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="synopsis">
-  <a href="http://library.gnome.org/devel/gobject/unstable/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+  GObject
    +----WebKitWebDataSource
 </pre>
 </div>
@@ -94,10 +94,10 @@ can do this via webkit_web_data_source_is_loading.
 <hr>
 <div class="refsect2">
 <a name="webkit-web-data-source-get-data"></a><h3>webkit_web_data_source_get_data ()</h3>
-<pre class="programlisting"><a href="http://library.gnome.org/devel/glib/unstable/glib-Strings.html#GString"><span class="returnvalue">GString</span></a> *           webkit_web_data_source_get_data     (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
+<pre class="programlisting"><span class="returnvalue">GString</span> *           webkit_web_data_source_get_data     (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
 <p>
 Returns the raw data that represents the the frame's content.The data will
-be incomplete until the data has finished loading. Returns <a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the web
+be incomplete until the data has finished loading. Returns <code class="literal">NULL</code> if the web
 frame hasn't loaded any data. Use webkit_web_data_source_is_loading to test
 if data source is in the process of loading.
 </p>
@@ -111,8 +111,8 @@ if data source is in the process of loading.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a <a href="http://library.gnome.org/devel/glib/unstable/glib-Strings.html#GString"><span class="type">GString</span></a> which contains the raw
-data that represents the <em class="parameter"><code>data_source</code></em> or <a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the <em class="parameter"><code>data_source</code></em>
+<td>a <span class="type">GString</span> which contains the raw
+data that represents the <em class="parameter"><code>data_source</code></em> or <code class="literal">NULL</code> if the <em class="parameter"><code>data_source</code></em>
 hasn't loaded any data. <span class="annotation">[<a href="http://foldoc.org/transfer%20none"><span class="acronym">transfer none</span></a>]</span>
 </td>
 </tr>
@@ -123,7 +123,7 @@ hasn't loaded any data. <span class="annotation">[<a href="http://foldoc.org/tra
 <hr>
 <div class="refsect2">
 <a name="webkit-web-data-source-get-encoding"></a><h3>webkit_web_data_source_get_encoding ()</h3>
-<pre class="programlisting">const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_data_source_get_encoding (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
+<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_web_data_source_get_encoding (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
 <p>
 Returns the text encoding name as set in the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>, or if not, the
 text encoding of the response.
@@ -220,7 +220,7 @@ get from the webkit_web_data_source_get_initial_request method.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> that
-created the <em class="parameter"><code>data_source</code></em> or <a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the <em class="parameter"><code>data_source</code></em> is not
+created the <em class="parameter"><code>data_source</code></em> or <code class="literal">NULL</code> if the <em class="parameter"><code>data_source</code></em> is not
 attached to the frame or the frame hasn't been loaded. <span class="annotation">[<a href="http://foldoc.org/transfer%20none"><span class="acronym">transfer none</span></a>]</span>
 </td>
 </tr>
@@ -231,10 +231,10 @@ attached to the frame or the frame hasn't been loaded. <span class="annotation">
 <hr>
 <div class="refsect2">
 <a name="webkit-web-data-source-get-subresources"></a><h3>webkit_web_data_source_get_subresources ()</h3>
-<pre class="programlisting"><a href="http://library.gnome.org/devel/glib/unstable/glib-Doubly-Linked-Lists.html#GList"><span class="returnvalue">GList</span></a> *             webkit_web_data_source_get_subresources
+<pre class="programlisting"><span class="returnvalue">GList</span> *             webkit_web_data_source_get_subresources
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
 <p>
-Gives you a <a href="http://library.gnome.org/devel/glib/unstable/glib-Doubly-Linked-Lists.html#GList"><span class="type">GList</span></a> of <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> objects that compose the
+Gives you a <span class="type">GList</span> of <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> objects that compose the
 <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> to which this <a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> is attached.
 </p>
 <div class="variablelist"><table border="0">
@@ -247,7 +247,7 @@ Gives you a <a href="http://library.gnome.org/devel/glib/unstable/glib-Doubly-Li
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a <a href="http://library.gnome.org/devel/glib/unstable/glib-Doubly-Linked-Lists.html#GList"><span class="type">GList</span></a> of <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> objects; the objects are owned by
+<td>a <span class="type">GList</span> of <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> objects; the objects are owned by
 WebKit, but the GList must be freed. <span class="annotation">[<a href="http://foldoc.org/element-type"><span class="acronym">element-type</span></a> WebKitWebResource][<a href="http://foldoc.org/transfer%20container"><span class="acronym">transfer container</span></a>]</span>
 </td>
 </tr>
@@ -258,7 +258,7 @@ WebKit, but the GList must be freed. <span class="annotation">[<a href="http://f
 <hr>
 <div class="refsect2">
 <a name="webkit-web-data-source-get-unreachable-uri"></a><h3>webkit_web_data_source_get_unreachable_uri ()</h3>
-<pre class="programlisting">const <a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_data_source_get_unreachable_uri
+<pre class="programlisting">const <span class="returnvalue">gchar</span> *       webkit_web_data_source_get_unreachable_uri
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
 <p>
 Return the unreachable URI of <em class="parameter"><code>data_source</code></em>. The <em class="parameter"><code>data_source</code></em> will have an
@@ -275,7 +275,7 @@ webkit_web_frame_load_alternate_html_string method.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the unreachable URL of <em class="parameter"><code>data_source</code></em> or <a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if there is no unreachable URL.</td>
+<td>the unreachable URL of <em class="parameter"><code>data_source</code></em> or <code class="literal">NULL</code> if there is no unreachable URL.</td>
 </tr>
 </tbody>
 </table></div>
@@ -301,7 +301,7 @@ Returns the <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><s
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> that represents
 the <em class="parameter"><code>data_source</code></em>. The <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> is owned by WebKit and should
-not be freed or destroyed.  This will return <a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the
+not be freed or destroyed.  This will return <code class="literal">NULL</code> if the
 <em class="parameter"><code>data_source</code></em> is not attached to a frame. <span class="annotation">[<a href="http://foldoc.org/transfer%20none"><span class="acronym">transfer none</span></a>]</span>
 </td>
 </tr>
@@ -312,7 +312,7 @@ not be freed or destroyed.  This will return <a href="http://library.gnome.org/d
 <hr>
 <div class="refsect2">
 <a name="webkit-web-data-source-is-loading"></a><h3>webkit_web_data_source_is_loading ()</h3>
-<pre class="programlisting"><a href="http://library.gnome.org/devel/glib/unstable/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_web_data_source_is_loading   (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
+<pre class="programlisting"><span class="returnvalue">gboolean</span>            webkit_web_data_source_is_loading   (<em class="parameter"><code><a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> *data_source</code></em>);</pre>
 <p>
 Determines whether the data source is in the process of loading its content.
 </p>
@@ -327,7 +327,7 @@ Determines whether the data source is in the process of loading its content.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>
-<a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the <em class="parameter"><code>data_source</code></em> is still loading, <a href="http://library.gnome.org/devel/glib/unstable/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise</td>
+<code class="literal">TRUE</code> if the <em class="parameter"><code>data_source</code></em> is still loading, <code class="literal">FALSE</code> otherwise</td>
 </tr>
 </tbody>
 </table></div>
@@ -354,6 +354,6 @@ Return: a new <a class="link" href="WebKitWebDataSource.html" title="WebKitWebDa
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

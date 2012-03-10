@@ -41,7 +41,7 @@ static EncodedJSValue JSC_HOST_CALL arrayConstructorIsArray(ExecState*);
 
 namespace JSC {
 
-const ClassInfo ArrayConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::arrayConstructorTable };
+const ClassInfo ArrayConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::arrayConstructorTable, CREATE_METHOD_TABLE(ArrayConstructor) };
 
 /* Source for ArrayConstructor.lut.h
 @begin arrayConstructorTable
@@ -63,9 +63,14 @@ void ArrayConstructor::finishCreation(ExecState* exec, ArrayPrototype* arrayProt
     putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool ArrayConstructor::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+bool ArrayConstructor::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::arrayConstructorTable(exec), this, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
+}
+
+bool ArrayConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::arrayConstructorTable(exec), static_cast<ArrayConstructor*>(cell), propertyName, slot);
 }
 
 bool ArrayConstructor::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
@@ -97,7 +102,7 @@ static EncodedJSValue JSC_HOST_CALL constructWithArrayConstructor(ExecState* exe
     return JSValue::encode(constructArrayWithSizeQuirk(exec, args));
 }
 
-ConstructType ArrayConstructor::getConstructData(ConstructData& constructData)
+ConstructType ArrayConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructWithArrayConstructor;
     return ConstructTypeHost;
@@ -109,7 +114,7 @@ static EncodedJSValue JSC_HOST_CALL callArrayConstructor(ExecState* exec)
     return JSValue::encode(constructArrayWithSizeQuirk(exec, args));
 }
 
-CallType ArrayConstructor::getCallData(CallData& callData)
+CallType ArrayConstructor::getCallData(JSCell*, CallData& callData)
 {
     // equivalent to 'new Array(....)'
     callData.native.function = callArrayConstructor;

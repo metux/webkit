@@ -86,17 +86,19 @@ namespace JSC {
             return array;
         }
 
-        static Structure* createStructure(JSGlobalData&, JSGlobalObject*, JSValue prototype, const JSC::ClassInfo* = &s_defaultInfo);
+        static Structure* createStructure(JSGlobalData&, JSGlobalObject*, JSValue prototype, const JSC::ClassInfo* = &s_info);
 
-        virtual bool getOwnPropertySlot(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
-        virtual bool getOwnPropertySlot(JSC::ExecState*, unsigned propertyName, JSC::PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
+        static bool getOwnPropertySlot(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(JSC::ExecState*, unsigned propertyName, JSC::PropertySlot&);
+        static bool getOwnPropertySlotByIndex(JSC::JSCell*, JSC::ExecState*, unsigned propertyName, JSC::PropertySlot&);
         virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
-        virtual void put(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSValue, JSC::PutPropertySlot&);
-        virtual void put(JSC::ExecState*, unsigned propertyName, JSC::JSValue);
+        static void put(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSValue, JSC::PutPropertySlot&);
+        static void putByIndex(JSC::JSCell*, JSC::ExecState*, unsigned propertyName, JSC::JSValue);
 
         virtual void getOwnPropertyNames(JSC::ExecState*, JSC::PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
-        static const ClassInfo s_defaultInfo;
+        static JS_EXPORTDATA const ClassInfo s_info;
         
         size_t length() const { return m_storage->length(); }
 
@@ -105,6 +107,8 @@ namespace JSC {
 #if !ASSERT_DISABLED
         virtual ~JSByteArray();
 #endif
+
+        static size_t offsetOfStorage() { return OBJECT_OFFSETOF(JSByteArray, m_storage); }
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | JSObject::StructureFlags;

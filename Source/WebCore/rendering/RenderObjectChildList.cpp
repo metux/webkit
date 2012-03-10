@@ -114,6 +114,9 @@ RenderObject* RenderObjectChildList::removeChildNode(RenderObject* owner, Render
         if (oldChild->isRenderRegion())
             toRenderRegion(oldChild)->detachRegion();
 
+        if (oldChild->inRenderFlowThread() && oldChild->isBox())
+            oldChild->enclosingRenderFlowThread()->removeRenderBoxRegionInfo(toRenderBox(oldChild));
+
         if (RenderFlowThread* containerFlowThread = renderFlowThreadContainer(owner))
             containerFlowThread->removeFlowChild(oldChild);
 
@@ -283,9 +286,13 @@ static RenderObject* findBeforeAfterParent(RenderObject* object)
     if (!(object->isTable() || object->isTableSection() || object->isTableRow()))
         return object;
 
+    // If there is a :first-letter style applied on the :before or :after content,
+    // then we want the parent of the first-letter block
     RenderObject* beforeAfterParent = object;
-    while (beforeAfterParent && !(beforeAfterParent->isText() || beforeAfterParent->isImage()))
+    while (beforeAfterParent && !(beforeAfterParent->isText() || beforeAfterParent->isImage())
+        && (beforeAfterParent->style()->styleType() != FIRST_LETTER))
         beforeAfterParent = beforeAfterParent->firstChild();
+
     return beforeAfterParent ? beforeAfterParent->parent() : 0;
 }
 
@@ -297,15 +304,10 @@ RenderObject* RenderObjectChildList::beforePseudoElementRenderer(const RenderObj
     // generated inline run-in in the next level of children.
     RenderObject* first = const_cast<RenderObject*>(owner);
     do {
-        // Skip list markers and generated run-ins
         first = first->firstChild();
-        while (first && first->isListMarker()) {
-            if (first->parent() != owner && first->parent()->isAnonymousBlock())
-                first = first->parent();
-            first = first->nextSibling();
-        }
-        while (first && first->isRenderInline() && first->isRunIn())
-            first = first->nextSibling();
+        // Skip list markers and generated run-ins.
+        while (first && (first->isListMarker() || (first->isRenderInline() && first->isRunIn())))
+            first = first->nextInPreOrderAfterChildren(owner);
     } while (first && first->isAnonymous() && first->style()->styleType() == NOPSEUDO);
 
     if (!first)
@@ -315,20 +317,17 @@ RenderObject* RenderObjectChildList::beforePseudoElementRenderer(const RenderObj
         return first;
 
     // Check for a possible generated run-in, using run-in positioning rules.
-    // Skip inlines and floating / positioned blocks, and place as the first child.
     first = owner->firstChild();
     if (!first->isRenderBlock())
         return 0;
-    while (first && first->isFloatingOrPositioned())
+    
+    first = first->firstChild();
+    // We still need to skip any list markers that could exist before the run-in.
+    while (first && first->isListMarker())
         first = first->nextSibling();
-    if (first) {
-        first = first->firstChild();
-        // We still need to skip any list markers that could exist before the run-in.
-        while (first && first->isListMarker())
-            first = first->nextSibling();
-        if (first && first->style()->styleType() == BEFORE && first->isRenderInline() && first->isRunIn())
-            return first;
-    }
+    if (first && first->style()->styleType() == BEFORE && first->isRenderInline() && first->isRunIn())
+        return first;
+    
     return 0;
 }
 
@@ -431,6 +430,7 @@ void RenderObjectChildList::updateBeforeAfterContent(RenderObject* owner, Pseudo
                     RefPtr<RenderStyle> newStyle = RenderStyle::create();
                     newStyle->inheritFrom(pseudoElementStyle);
                     newStyle->setDisplay(curr->style()->display());
+                    newStyle->setStyleType(curr->style()->styleType());
                     curr->setStyle(newStyle);
                     curr = curr->parent();
                 }

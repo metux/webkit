@@ -28,6 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @constructor
+ */
 WebInspector.TextRange = function(startLine, startColumn, endLine, endColumn)
 {
     this.startLine = startLine;
@@ -53,6 +56,9 @@ WebInspector.TextRange.prototype = {
     }
 }
 
+/**
+ * @constructor
+ */
 WebInspector.TextEditorModel = function()
 {
     this._lines = [""];
@@ -60,6 +66,13 @@ WebInspector.TextEditorModel = function()
     this._undoStack = [];
     this._noPunctuationRegex = /[^ !%&()*+,-.:;<=>?\[\]\^{|}~]+/;
     this._lineBreak = "\n";
+}
+
+WebInspector.TextEditorModel.Indent = {
+    TwoSpaces: "  ",
+    FourSpaces: "    ",
+    EightSpaces: "        ",
+    TabCharacter: "\t"
 }
 
 WebInspector.TextEditorModel.prototype = {
@@ -298,3 +311,5 @@ WebInspector.TextEditorModel.prototype = {
         this._undoStack = [];
     }
 }
+
+WebInspector.settings.textEditorIndent = WebInspector.settings.createSetting("textEditorIndent", WebInspector.TextEditorModel.Indent.FourSpaces);

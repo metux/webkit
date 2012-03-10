@@ -119,11 +119,6 @@ void HTMLLinkElement::setDisabledState(bool disabled)
     }
 }
 
-StyleSheet* HTMLLinkElement::sheet() const
-{
-    return m_sheet.get();
-}
-
 void HTMLLinkElement::parseMappedAttribute(Attribute* attr)
 {
     if (attr->name() == relAttr) {
@@ -179,7 +174,7 @@ void HTMLLinkElement::process()
 
     String type = m_type.lower();
 
-    if (!m_linkLoader.loadLink(m_relAttribute, type, m_url, document()))
+    if (!m_linkLoader.loadLink(m_relAttribute, type, m_sizes->toString(), m_url, document()))
         return;
 
     bool acceptIfTypeContainsTextCSS = document()->page() && document()->page()->settings() && document()->page()->settings()->treatsAnyTextCSSLinkAsStylesheet();
@@ -344,7 +339,7 @@ bool HTMLLinkElement::isLoading() const
         return true;
     if (!m_sheet)
         return false;
-    return static_cast<CSSStyleSheet *>(m_sheet.get())->isLoading();
+    return m_sheet->isLoading();
 }
 
 void HTMLLinkElement::linkLoaded()
@@ -413,7 +408,7 @@ void HTMLLinkElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
     addSubresourceURL(urls, href());
     
     // Walk the URLs linked by the linked-to stylesheet.
-    if (StyleSheet* styleSheet = const_cast<HTMLLinkElement*>(this)->sheet())
+    if (CSSStyleSheet* styleSheet = const_cast<HTMLLinkElement*>(this)->sheet())
         styleSheet->addSubresourceStyleURLs(urls);
 }
 
@@ -452,5 +447,17 @@ void HTMLLinkElement::setSizes(const String& value)
 {
     m_sizes->setValue(value);
 }
+
+#if ENABLE(MICRODATA)
+String HTMLLinkElement::itemValueText() const
+{
+    return getURLAttribute(hrefAttr);
+}
+
+void HTMLLinkElement::setItemValueText(const String& value, ExceptionCode& ec)
+{
+    setAttribute(hrefAttr, value, ec);
+}
+#endif
 
 } // namespace WebCore

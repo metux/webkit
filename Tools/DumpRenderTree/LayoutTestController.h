@@ -314,6 +314,12 @@ public:
     bool shouldStayOnPageAfterHandlingBeforeUnload() const { return m_shouldStayOnPageAfterHandlingBeforeUnload; }
     void setShouldStayOnPageAfterHandlingBeforeUnload(bool shouldStayOnPageAfterHandlingBeforeUnload) { m_shouldStayOnPageAfterHandlingBeforeUnload = shouldStayOnPageAfterHandlingBeforeUnload; }
 
+    void addChromeInputField();
+    void removeChromeInputField();
+    void focusWebView();
+
+    void setBackingScaleFactor(double);
+
     void setPOSIXLocale(JSStringRef locale);
 
     void setWebViewEditable(bool);

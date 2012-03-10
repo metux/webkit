@@ -59,7 +59,7 @@ static EncodedJSValue JSC_HOST_CALL mathProtoFuncTan(ExecState*);
 
 namespace JSC {
 
-const ClassInfo MathObject::s_info = { "Math", &JSNonFinalObject::s_info, 0, ExecState::mathTable };
+const ClassInfo MathObject::s_info = { "Math", &JSNonFinalObject::s_info, 0, ExecState::mathTable, CREATE_METHOD_TABLE(MathObject) };
 
 /* Source for MathObject.lut.h
 @begin mathTable
@@ -104,9 +104,14 @@ void MathObject::finishCreation(ExecState* exec, JSGlobalObject* globalObject)
     putDirectWithoutTransition(exec->globalData(), Identifier(exec, "SQRT2"), jsNumber(sqrt(2.0)), DontDelete | DontEnum | ReadOnly);
 }
 
-bool MathObject::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+bool MathObject::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::mathTable(exec), this, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
+}
+
+bool MathObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<JSObject>(exec, ExecState::mathTable(exec), static_cast<MathObject*>(cell), propertyName, slot);
 }
 
 bool MathObject::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)

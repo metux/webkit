@@ -41,7 +41,7 @@ using namespace JSC;
 
 namespace WebCore {
 
-const ClassInfo JSDOMWindowBase::s_info = { "Window", &JSDOMGlobalObject::s_info, 0, 0 };
+const ClassInfo JSDOMWindowBase::s_info = { "Window", &JSDOMGlobalObject::s_info, 0, 0, CREATE_METHOD_TABLE(JSDOMWindowBase) };
 
 JSDOMWindowBase::JSDOMWindowBase(JSGlobalData& globalData, Structure* structure, PassRefPtr<DOMWindow> window, JSDOMWindowShell* shell)
     : JSDOMGlobalObject(globalData, structure, shell->world())
@@ -150,11 +150,6 @@ JSObject* JSDOMWindowBase::toThisObject(ExecState*) const
     return shell();
 }
 
-JSValue JSDOMWindowBase::toStrictThisObject(ExecState*) const
-{
-    return shell();
-}
-
 JSDOMWindowShell* JSDOMWindowBase::shell() const
 {
     return m_shell;
@@ -166,7 +161,7 @@ JSGlobalData* JSDOMWindowBase::commonJSGlobalData()
 
     static JSGlobalData* globalData = 0;
     if (!globalData) {
-        globalData = JSGlobalData::createLeaked(ThreadStackTypeLarge, LargeHeap).releaseRef();
+        globalData = JSGlobalData::createLeaked(ThreadStackTypeLarge, LargeHeap).leakRef();
         globalData->timeoutChecker.setTimeoutInterval(10000); // 10 seconds
 #ifndef NDEBUG
         globalData->exclusiveThread = currentThread();

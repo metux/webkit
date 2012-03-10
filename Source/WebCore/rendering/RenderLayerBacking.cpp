@@ -210,7 +210,7 @@ void RenderLayerBacking::updateCompositedBounds()
         LayoutRect clippingBounds = view->layoutOverflowRect();
 
         if (m_owningLayer != rootLayer)
-            clippingBounds.intersect(m_owningLayer->backgroundClipRect(rootLayer, true).rect());
+            clippingBounds.intersect(m_owningLayer->backgroundClipRect(rootLayer, 0, true).rect()); // FIXME: Incorrect for CSS regions.
 
         LayoutPoint delta;
         m_owningLayer->convertToLayerCoords(rootLayer, delta);
@@ -337,10 +337,10 @@ static LayoutRect clipBox(RenderBox* renderer)
 {
     LayoutRect result = PaintInfo::infiniteRect();
     if (renderer->hasOverflowClip())
-        result = renderer->overflowClipRect(LayoutPoint());
+        result = renderer->overflowClipRect(LayoutPoint(), 0); // FIXME: Incorrect for CSS regions.
 
     if (renderer->hasClip())
-        result.intersect(renderer->clipRect(LayoutPoint()));
+        result.intersect(renderer->clipRect(LayoutPoint(), 0)); // FIXME: Incorrect for CSS regions.
 
     return result;
 }
@@ -395,7 +395,7 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
         // Call calculateRects to get the backgroundRect which is what is used to clip the contents of this
         // layer. Note that we call it with temporaryClipRects = true because normally when computing clip rects
         // for a compositing layer, rootLayer is the layer itself.
-        LayoutRect parentClipRect = m_owningLayer->backgroundClipRect(compAncestor, true).rect();
+        LayoutRect parentClipRect = m_owningLayer->backgroundClipRect(compAncestor, 0, true).rect(); // FIXME: Incorrect for CSS regions.
         ASSERT(parentClipRect != PaintInfo::infiniteRect());
         m_ancestorClippingLayer->setPosition(FloatPoint() + (parentClipRect.location() - graphicsLayerParentLocation));
         m_ancestorClippingLayer->setSize(parentClipRect.size());
@@ -757,7 +757,7 @@ bool RenderLayerBacking::rendererHasBackground() const
     return renderer()->hasBackground();
 }
 
-const Color RenderLayerBacking::rendererBackgroundColor() const
+Color RenderLayerBacking::rendererBackgroundColor() const
 {
     // FIXME: share more code here
     if (renderer()->node() && renderer()->node()->isDocumentNode()) {
@@ -910,10 +910,6 @@ bool RenderLayerBacking::containsPaintedContent() const
     if (isAcceleratedCanvas(renderer()))
         return hasBoxDecorationsOrBackground(renderer());
 #endif
-#if ENABLE(FULLSCREEN_API)
-    if (renderer()->isRenderFullScreen())
-        return false;
-#endif
 
     return true;
 }
@@ -930,7 +926,7 @@ bool RenderLayerBacking::isDirectlyCompositedImage() const
     RenderImage* imageRenderer = toRenderImage(renderObject);
     if (CachedImage* cachedImage = imageRenderer->cachedImage()) {
         if (cachedImage->hasImage())
-            return cachedImage->image()->isBitmapImage();
+            return cachedImage->imageForRenderer(imageRenderer)->isBitmapImage();
     }
 
     return false;
@@ -967,7 +963,7 @@ void RenderLayerBacking::updateImageContents()
     if (!cachedImage)
         return;
 
-    Image* image = cachedImage->image();
+    Image* image = cachedImage->imageForRenderer(imageRenderer);
     if (!image)
         return;
 
@@ -1094,7 +1090,7 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
     // Calculate the clip rects we should use.
     LayoutRect layerBounds;
     ClipRect damageRect, clipRectToApply, outlineRect;
-    m_owningLayer->calculateRects(rootLayer, paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect);
+    m_owningLayer->calculateRects(rootLayer, 0, paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect); // FIXME: Incorrect for CSS regions.
 
     LayoutPoint paintOffset = toPoint(layerBounds.location() - m_owningLayer->renderBoxLocation());
 
@@ -1113,19 +1109,14 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
         // Establish the clip used to paint our background.
         m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, damageRect, DoNotIncludeSelfForBorderRadius);
         
-        PaintInfo info(context, damageRect.rect(), PaintPhaseBlockBackground, false, paintingRootForRenderer, 0);
+        PaintInfo info(context, damageRect.rect(), PaintPhaseBlockBackground, false, paintingRootForRenderer, 0, 0);
         renderer()->paint(info, paintOffset);
 
-        // Our scrollbar widgets paint exactly when we tell them to, so that they work properly with
-        // z-index.  We paint after we painted the background/border, so that the scrollbars will
-        // sit above the background/border.
-        m_owningLayer->paintOverflowControls(context, layerBounds.location(), damageRect.rect());
-        
         // Restore the clip.
         m_owningLayer->restoreClip(context, paintDirtyRect, damageRect);
 
         // Now walk the sorted list of children with negative z-indices. Only RenderLayers without compositing layers will paint.
-        m_owningLayer->paintList(m_owningLayer->negZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0);
+        m_owningLayer->paintList(m_owningLayer->negZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, 0);
     }
                 
     bool forceBlackText = paintBehavior & PaintBehaviorForceBlackText;
@@ -1136,7 +1127,7 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
         m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, clipRectToApply);
         PaintInfo paintInfo(context, clipRectToApply.rect(), 
                             selectionOnly ? PaintPhaseSelection : PaintPhaseChildBlockBackgrounds,
-                            forceBlackText, paintingRootForRenderer, 0);
+                            forceBlackText, paintingRootForRenderer, 0, 0);
         renderer()->paint(paintInfo, paintOffset);
 
         if (!selectionOnly) {
@@ -1155,17 +1146,17 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
 
         if (!outlineRect.isEmpty()) {
             // Paint our own outline
-            PaintInfo paintInfo(context, outlineRect.rect(), PaintPhaseSelfOutline, false, paintingRootForRenderer, 0);
+            PaintInfo paintInfo(context, outlineRect.rect(), PaintPhaseSelfOutline, false, paintingRootForRenderer, 0, 0);
             m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, outlineRect, DoNotIncludeSelfForBorderRadius);
             renderer()->paint(paintInfo, paintOffset);
             m_owningLayer->restoreClip(context, paintDirtyRect, outlineRect);
         }
 
         // Paint any child layers that have overflow.
-        m_owningLayer->paintList(m_owningLayer->normalFlowList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0);
+        m_owningLayer->paintList(m_owningLayer->normalFlowList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, 0);
 
         // Now walk the sorted list of children with positive z-indices.
-        m_owningLayer->paintList(m_owningLayer->posZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0);
+        m_owningLayer->paintList(m_owningLayer->posZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, 0);
     }
     
     if (shouldPaint && (paintingPhase & GraphicsLayerPaintMask)) {
@@ -1173,7 +1164,7 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
             m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, damageRect, DoNotIncludeSelfForBorderRadius);
 
             // Paint the mask.
-            PaintInfo paintInfo(context, damageRect.rect(), PaintPhaseMask, false, paintingRootForRenderer, 0);
+            PaintInfo paintInfo(context, damageRect.rect(), PaintPhaseMask, false, paintingRootForRenderer, 0, 0);
             renderer()->paint(paintInfo, paintOffset);
             
             // Restore the clip.

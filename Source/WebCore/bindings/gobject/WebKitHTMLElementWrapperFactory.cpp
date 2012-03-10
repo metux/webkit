@@ -158,6 +158,12 @@
 #include "webkit/WebKitDOMHTMLVideoElementPrivate.h"
 #endif
 
+#if ENABLE(VIDEO_TRACK)
+#include "webkit/WebKitDOMTextTrackCueListPrivate.h"
+#include "webkit/WebKitDOMTextTrackCuePrivate.h"
+#include "webkit/WebKitDOMTextTrackPrivate.h"
+#endif
+ 
 #include <wtf/text/CString.h>
 
 namespace WebKit {

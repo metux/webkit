@@ -31,6 +31,7 @@
 #include "RenderStyleConstants.h"
 #include "ScriptWrappable.h"
 #include "TreeShared.h"
+#include "WebKitMutationObserver.h"
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
 
@@ -80,6 +81,8 @@ class SVGUseElement;
 class TagNodeList;
 class TreeScope;
 
+struct MutationObserverEntry;
+
 typedef int ExceptionCode;
 
 const int nodeStyleChangeShift = 25;
@@ -94,7 +97,7 @@ enum StyleChangeType {
     SyntheticStyleChange = 3 << nodeStyleChangeShift
 };
 
-class Node : public EventTarget, public TreeShared<ContainerNode>, public ScriptWrappable {
+class Node : public EventTarget, public ScriptWrappable, public TreeShared<ContainerNode> {
     friend class Document;
     friend class TreeScope;
 
@@ -198,7 +201,7 @@ public:
     bool isHTMLElement() const { return getFlag(IsHTMLFlag); }
 
     bool isSVGElement() const { return getFlag(IsSVGFlag); }
-    virtual bool isSVGShadowRoot() const { return false; }
+    bool isSVGShadowRoot() const { return getFlag(IsShadowRootOrSVGShadowRootFlag) && isSVGElement(); }
 #if ENABLE(SVG)
     SVGUseElement* svgShadowHost() const;
 #endif
@@ -211,7 +214,7 @@ public:
     bool isCommentNode() const { return getFlag(IsCommentFlag); }
     virtual bool isCharacterDataNode() const { return false; }
     bool isDocumentNode() const;
-    bool isShadowRoot() const { return getFlag(IsShadowRootFlag); }
+    bool isShadowRoot() const { return getFlag(IsShadowRootOrSVGShadowRootFlag) && !isSVGElement(); }
     virtual bool isContentElement() const { return false; }
     virtual bool canHaveLightChildRendererWithShadow() const { return false; }
 
@@ -340,6 +343,7 @@ public:
     virtual Node* focusDelegate();
 
     bool isContentEditable();
+    bool isContentRichlyEditable();
 
     bool rendererIsEditable() const { return rendererIsEditable(Editable); }
     bool rendererIsRichlyEditable() const { return rendererIsEditable(RichlyEditable); }
@@ -398,6 +402,9 @@ public:
 
     // Does a reverse pre-order traversal to find the node that comes before the current one in document order
     Node* traversePreviousNode(const Node* stayWithin = 0) const;
+
+    // Like traversePreviousNode, but skips children and starts with the next sibling.
+    Node* traversePreviousSibling(const Node* stayWithin = 0) const;
 
     // Like traverseNextNode, but visits parents after their children.
     Node* traverseNextNodePostOrder() const;
@@ -513,6 +520,7 @@ public:
     void notifyLocalNodeListsAttributeChanged();
     void notifyLocalNodeListsLabelChanged();
     void removeCachedClassNodeList(ClassNodeList*, const String&);
+
     void removeCachedNameNodeList(NameNodeList*, const String&);
     void removeCachedTagNodeList(TagNodeList*, const AtomicString&);
     void removeCachedTagNodeList(TagNodeList*, const QualifiedName&);
@@ -528,10 +536,10 @@ public:
 
     unsigned short compareDocumentPosition(Node*);
 
-    virtual Node* toNode() { return this; }
-
+    virtual Node* toNode();
     virtual HTMLInputElement* toInputElement();
 
+    virtual const AtomicString& interfaceName() const;
     virtual ScriptExecutionContext* scriptExecutionContext() const;
 
     virtual bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture);
@@ -560,7 +568,6 @@ public:
     void dispatchSimulatedClick(PassRefPtr<Event> underlyingEvent, bool sendMouseEvents = false, bool showPressedLook = true);
 
     virtual void dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode);
-    virtual void willBlur();
     virtual void dispatchBlurEvent(PassRefPtr<Node> newFocusedNode);
     virtual void dispatchChangeEvent();
     virtual void dispatchInputEvent();
@@ -577,6 +584,22 @@ public:
 
     virtual EventTargetData* eventTargetData();
     virtual EventTargetData* ensureEventTargetData();
+
+#if ENABLE(MICRODATA)
+    void itemTypeAttributeChanged();
+#endif
+
+#if ENABLE(MUTATION_OBSERVERS)
+    void getRegisteredMutationObserversOfType(Vector<WebKitMutationObserver*>&, WebKitMutationObserver::MutationType);
+
+    enum MutationRegistrationResult {
+        MutationObserverRegistered,
+        MutationRegistrationOptionsReset
+    };
+    MutationRegistrationResult registerMutationObserver(PassRefPtr<WebKitMutationObserver>, MutationObserverOptions);
+
+    void unregisterMutationObserver(PassRefPtr<WebKitMutationObserver>);
+#endif // ENABLE(MUTATION_OBSERVERS)
 
 private:
     enum NodeFlags {
@@ -598,7 +621,7 @@ private:
         InActiveChainFlag = 1 << 15,
         InDetachFlag = 1 << 16,
         HasRareDataFlag = 1 << 17,
-        IsShadowRootFlag = 1 << 18,
+        IsShadowRootOrSVGShadowRootFlag = 1 << 18,
 
         // These bits are used by derived classes, pulled up here so they can
         // be stored in the same memory word as the Node bits above.
@@ -638,9 +661,11 @@ protected:
         CreateComment = DefaultNodeFlags | IsCommentFlag,
         CreateContainer = DefaultNodeFlags | IsContainerFlag, 
         CreateElement = CreateContainer | IsElementFlag, 
+        CreateShadowRoot = CreateContainer | IsShadowRootOrSVGShadowRootFlag,
         CreateStyledElement = CreateElement | IsStyledElementFlag, 
         CreateHTMLElement = CreateStyledElement | IsHTMLFlag, 
-        CreateSVGElement = CreateStyledElement | IsSVGFlag, 
+        CreateSVGElement = CreateStyledElement | IsSVGFlag,
+        CreateSVGShadowRoot = CreateSVGElement | IsShadowRootOrSVGShadowRootFlag,
     };
     Node(Document*, ConstructionType);
 
@@ -699,11 +724,15 @@ private:
 
     void trackForDebugging();
 
+#if ENABLE(MUTATION_OBSERVERS)
+    Vector<MutationObserverEntry>* mutationObserverEntries();
+#endif
+
+    mutable uint32_t m_nodeFlags;
     Document* m_document;
     Node* m_previous;
     Node* m_next;
     RenderObject* m_renderer;
-    mutable uint32_t m_nodeFlags;
 
 protected:
     bool isParsingChildrenFinished() const { return getFlag(IsParsingChildrenFinishedFlag); }
@@ -740,7 +769,7 @@ inline void addSubresourceURL(ListHashSet<KURL>& urls, const KURL& url)
 
 inline ContainerNode* Node::parentNode() const
 {
-    return getFlag(IsShadowRootFlag) || isSVGShadowRoot() ? 0 : parent();
+    return getFlag(IsShadowRootOrSVGShadowRootFlag) ? 0 : parent();
 }
 
 inline ContainerNode* Node::parentOrHostNode() const
@@ -750,7 +779,7 @@ inline ContainerNode* Node::parentOrHostNode() const
 
 inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
 {
-    ASSERT(!getFlag(IsShadowRootFlag) && !isSVGShadowRoot());
+    ASSERT(!getFlag(IsShadowRootOrSVGShadowRootFlag));
     return parentOrHostNode();
 }
 

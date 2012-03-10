@@ -29,7 +29,11 @@
 #include <gtk/gtk.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef WEBKIT2
+#include <webkit2/webkit2.h>
+#else
 #include <webkit/webkit.h>
+#endif
 
 static gint windowCount = 0;
 
@@ -388,8 +392,6 @@ int main(int argc, char* argv[])
     };
 
     gtk_init(&argc, &argv);
-    if (!g_thread_supported())
-        g_thread_init(NULL);
 
     GOptionContext *context = g_option_context_new(0);
     g_option_context_add_main_entries(context, commandLineOptions, 0);

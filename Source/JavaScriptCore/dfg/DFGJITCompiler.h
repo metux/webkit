@@ -30,12 +30,11 @@
 
 #include <assembler/MacroAssembler.h>
 #include <bytecode/CodeBlock.h>
+#include <dfg/DFGFPRInfo.h>
+#include <dfg/DFGGPRInfo.h>
 #include <dfg/DFGGraph.h>
 #include <dfg/DFGRegisterBank.h>
 #include <jit/JITCode.h>
-
-#include <dfg/DFGFPRInfo.h>
-#include <dfg/DFGGPRInfo.h>
 
 namespace JSC {
 
@@ -57,54 +56,51 @@ struct OSRExit;
 typedef void (*V_DFGDebugOperation_EP)(ExecState*, void*);
 #endif
 
-#if ENABLE(DFG_VERBOSE_SPECULATION_FAILURE)
+#if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
 struct SpeculationFailureDebugInfo {
     CodeBlock* codeBlock;
     unsigned debugOffset;
 };
 #endif
 
-// === CallRecord ===
+// === CallLinkRecord ===
 //
-// A record of a call out from JIT code to a helper function.
-// Every CallRecord contains a reference to the call instruction & the function
-// that it needs to be linked to. Calls that might throw an exception also record
-// the Jump taken on exception (unset if not present), and ExceptionInfo (presently
-// an unsigned, bytecode index) used to recover handler/source info.
-struct CallRecord {
-    // Constructor for a call with no exception handler.
-    CallRecord(MacroAssembler::Call call, FunctionPtr function)
+// A record of a call out from JIT code that needs linking to a helper function.
+// Every CallLinkRecord contains a reference to the call instruction & the function
+// that it needs to be linked to.
+struct CallLinkRecord {
+    CallLinkRecord(MacroAssembler::Call call, FunctionPtr function)
         : m_call(call)
         , m_function(function)
-        , m_handlesExceptions(false)
-    {
-    }
-
-    // Constructor for a call with an exception handler.
-    CallRecord(MacroAssembler::Call call, FunctionPtr function, MacroAssembler::Jump exceptionCheck, CodeOrigin codeOrigin)
-        : m_call(call)
-        , m_function(function)
-        , m_exceptionCheck(exceptionCheck)
-        , m_codeOrigin(codeOrigin)
-        , m_handlesExceptions(true)
-    {
-    }
-
-    // Constructor for a call that may cause exceptions, but which are handled
-    // through some mechanism other than the in-line exception handler.
-    CallRecord(MacroAssembler::Call call, FunctionPtr function, CodeOrigin codeOrigin)
-        : m_call(call)
-        , m_function(function)
-        , m_codeOrigin(codeOrigin)
-        , m_handlesExceptions(true)
     {
     }
 
     MacroAssembler::Call m_call;
     FunctionPtr m_function;
+};
+
+// === CallExceptionRecord ===
+//
+// A record of a call out from JIT code that might throw an exception.
+// Calls that might throw an exception also record the Jump taken on exception
+// (unset if not present) and code origin used to recover handler/source info.
+struct CallExceptionRecord {
+    CallExceptionRecord(MacroAssembler::Call call, CodeOrigin codeOrigin)
+        : m_call(call)
+        , m_codeOrigin(codeOrigin)
+    {
+    }
+
+    CallExceptionRecord(MacroAssembler::Call call, MacroAssembler::Jump exceptionCheck, CodeOrigin codeOrigin)
+        : m_call(call)
+        , m_exceptionCheck(exceptionCheck)
+        , m_codeOrigin(codeOrigin)
+    {
+    }
+
+    MacroAssembler::Call m_call;
     MacroAssembler::Jump m_exceptionCheck;
     CodeOrigin m_codeOrigin;
-    bool m_handlesExceptions;
 };
 
 // === JITCompiler ===
@@ -121,7 +117,6 @@ public:
         : m_globalData(globalData)
         , m_graph(dfg)
         , m_codeBlock(codeBlock)
-        , m_exceptionCheckCount(0)
     {
     }
 
@@ -134,7 +129,7 @@ public:
     JSGlobalData* globalData() { return m_globalData; }
     AssemblerType_T& assembler() { return m_assembler; }
 
-#if CPU(X86_64)
+#if CPU(X86_64) || CPU(X86)
     void preserveReturnAddressAfterCall(GPRReg reg)
     {
         pop(reg);
@@ -165,9 +160,28 @@ public:
     }
 #endif
 
+    Jump branchIfNotCell(GPRReg reg)
+    {
+#if USE(JSVALUE64)
+        return branchTestPtr(MacroAssembler::NonZero, reg, GPRInfo::tagMaskRegister);
+#else
+        return branch32(MacroAssembler::NotEqual, reg, TrustedImm32(JSValue::CellTag));
+#endif
+    }
+    
     static Address addressForGlobalVar(GPRReg global, int32_t varNumber)
     {
         return Address(global, varNumber * sizeof(Register));
+    }
+
+    static Address tagForGlobalVar(GPRReg global, int32_t varNumber)
+    {
+        return Address(global, varNumber * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag));
+    }
+
+    static Address payloadForGlobalVar(GPRReg global, int32_t varNumber)
+    {
+        return Address(global, varNumber * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
     }
 
     static Address addressFor(VirtualRegister virtualRegister)
@@ -191,33 +205,36 @@ public:
     }
 
     // Notify the JIT of a call that does not require linking.
-    void notifyCall(Call call, CodeOrigin codeOrigin)
+    void notifyCall(Call functionCall, CodeOrigin codeOrigin)
     {
-        m_calls.append(CallRecord(call, FunctionPtr(), codeOrigin));
+        m_exceptionChecks.append(CallExceptionRecord(functionCall, codeOrigin));
     }
 
     // Add a call out from JIT code, without an exception check.
-    void appendCall(const FunctionPtr& function)
+    Call appendCall(const FunctionPtr& function)
     {
-        m_calls.append(CallRecord(call(), function));
-        // FIXME: should be able to JIT_ASSERT here that globalData->exception is null on return back to JIT code.
+        Call functionCall = call();
+        m_calls.append(CallLinkRecord(functionCall, function));
+        return functionCall;
     }
 
     // Add a call out from JIT code, with an exception check.
-    Call appendCallWithExceptionCheck(const FunctionPtr& function, CodeOrigin codeOrigin)
+    Call addExceptionCheck(Call functionCall, CodeOrigin codeOrigin)
     {
-        Call functionCall = call();
+#if USE(JSVALUE64)
         Jump exceptionCheck = branchTestPtr(NonZero, AbsoluteAddress(&globalData()->exception));
-        m_calls.append(CallRecord(functionCall, function, exceptionCheck, codeOrigin));
+#elif USE(JSVALUE32_64)
+        Jump exceptionCheck = branch32(NotEqual, AbsoluteAddress(reinterpret_cast<char*>(&globalData()->exception) + OBJECT_OFFSETOF(JSValue, u.asBits.tag)), TrustedImm32(JSValue::EmptyValueTag));
+#endif
+        m_exceptionChecks.append(CallExceptionRecord(functionCall, exceptionCheck, codeOrigin));
         return functionCall;
     }
     
     // Add a call out from JIT code, with a fast exception check that tests if the return value is zero.
-    Call appendCallWithFastExceptionCheck(const FunctionPtr& function, CodeOrigin codeOrigin)
+    Call addFastExceptionCheck(Call functionCall, CodeOrigin codeOrigin)
     {
-        Call functionCall = call();
         Jump exceptionCheck = branchTestPtr(Zero, GPRInfo::returnValueGPR);
-        m_calls.append(CallRecord(functionCall, function, exceptionCheck, codeOrigin));
+        m_exceptionChecks.append(CallExceptionRecord(functionCall, exceptionCheck, codeOrigin));
         return functionCall;
     }
     
@@ -231,8 +248,15 @@ public:
             move(TrustedImmPtr(m_globalData->debugDataBuffer + GPRInfo::numberOfRegisters + i), GPRInfo::regT0);
             storeDouble(FPRInfo::toRegister(i), GPRInfo::regT0);
         }
+#if CPU(X86_64)
         move(TrustedImmPtr(argument), GPRInfo::argumentGPR1);
         move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
+#elif CPU(X86)
+        poke(GPRInfo::callFrameRegister, 0);
+        poke(TrustedImmPtr(argument), 1);
+#else
+#error "DFG JIT not supported on this platform."
+#endif
         move(TrustedImmPtr(reinterpret_cast<void*>(function)), GPRInfo::regT0);
         call(GPRInfo::regT0);
         for (unsigned i = 0; i < FPRInfo::numberOfRegisters; ++i) {
@@ -251,16 +275,47 @@ public:
     bool isDoubleConstant(NodeIndex nodeIndex) { return graph().isDoubleConstant(codeBlock(), nodeIndex); }
     bool isNumberConstant(NodeIndex nodeIndex) { return graph().isNumberConstant(codeBlock(), nodeIndex); }
     bool isBooleanConstant(NodeIndex nodeIndex) { return graph().isBooleanConstant(codeBlock(), nodeIndex); }
-    bool isFunctionConstant(NodeIndex nodeIndex) { return graph().isFunctionConstant(codeBlock(), *globalData(), nodeIndex); }
+    bool isFunctionConstant(NodeIndex nodeIndex) { return graph().isFunctionConstant(codeBlock(), nodeIndex); }
     // Helper methods get constant values from nodes.
     JSValue valueOfJSConstant(NodeIndex nodeIndex) { return graph().valueOfJSConstant(codeBlock(), nodeIndex); }
     int32_t valueOfInt32Constant(NodeIndex nodeIndex) { return graph().valueOfInt32Constant(codeBlock(), nodeIndex); }
     double valueOfNumberConstant(NodeIndex nodeIndex) { return graph().valueOfNumberConstant(codeBlock(), nodeIndex); }
     bool valueOfBooleanConstant(NodeIndex nodeIndex) { return graph().valueOfBooleanConstant(codeBlock(), nodeIndex); }
-    JSFunction* valueOfFunctionConstant(NodeIndex nodeIndex) { return graph().valueOfFunctionConstant(codeBlock(), *globalData(), nodeIndex); }
+    JSFunction* valueOfFunctionConstant(NodeIndex nodeIndex) { return graph().valueOfFunctionConstant(codeBlock(), nodeIndex); }
+    
+    // Helper methods to get predictions
+    PredictedType getPrediction(Node& node) { return node.prediction(); }
+    PredictedType getPrediction(NodeIndex nodeIndex) { return getPrediction(graph()[nodeIndex]); }
+
+#if USE(JSVALUE32_64)
+    void* addressOfDoubleConstant(NodeIndex nodeIndex)
+    {
+        ASSERT(isNumberConstant(nodeIndex));
+        unsigned constantIndex = graph()[nodeIndex].constantNumber();
+        return &(codeBlock()->constantRegister(FirstConstantRegisterIndex + constantIndex));
+    }
+
+    void emitLoadTag(NodeIndex, GPRReg tag);
+    void emitLoadPayload(NodeIndex, GPRReg payload);
+
+    void emitLoad(const JSValue&, GPRReg tag, GPRReg payload);
+    void emitLoad(NodeIndex, GPRReg tag, GPRReg payload);
+    void emitLoad2(NodeIndex index1, GPRReg tag1, GPRReg payload1, NodeIndex index2, GPRReg tag2, GPRReg payload2);
+
+    void emitLoadDouble(NodeIndex, FPRReg value);
+    void emitLoadInt32ToDouble(NodeIndex, FPRReg value);
+
+    void emitStore(NodeIndex, GPRReg tag, GPRReg payload);
+    void emitStore(NodeIndex, const JSValue constant);
+    void emitStoreInt32(NodeIndex, GPRReg payload, bool indexIsInt32 = false);
+    void emitStoreInt32(NodeIndex, TrustedImm32 payload, bool indexIsInt32 = false);
+    void emitStoreCell(NodeIndex, GPRReg payload, bool indexIsCell = false);
+    void emitStoreBool(NodeIndex, GPRReg payload, bool indexIsBool = false);
+    void emitStoreDouble(NodeIndex, FPRReg value);
+#endif
 
     // These methods JIT generate dynamic, debug-only checks - akin to ASSERTs.
-#if ENABLE(DFG_JIT_ASSERT)
+#if DFG_ENABLE(JIT_ASSERT)
     void jitAssertIsInt32(GPRReg);
     void jitAssertIsJSInt32(GPRReg);
     void jitAssertIsJSNumber(GPRReg);
@@ -275,6 +330,7 @@ public:
 #endif
 
     // These methods convert between doubles, and doubles boxed and JSValues.
+#if USE(JSVALUE64)
     GPRReg boxDouble(FPRReg fpr, GPRReg gpr)
     {
         moveDoubleToPtr(fpr, gpr);
@@ -288,6 +344,26 @@ public:
         movePtrToDouble(gpr, fpr);
         return fpr;
     }
+#elif USE(JSVALUE32_64)
+    void boxDouble(FPRReg fpr, GPRReg tagGPR, GPRReg payloadGPR)
+    {
+#if CPU(X86)
+        movePackedToInt32(fpr, payloadGPR);
+        rshiftPacked(TrustedImm32(32), fpr);
+        movePackedToInt32(fpr, tagGPR);
+#endif
+    }
+    void unboxDouble(GPRReg tagGPR, GPRReg payloadGPR, FPRReg fpr, FPRReg scratchFPR)
+    {
+        jitAssertIsJSDouble(tagGPR);
+#if CPU(X86)
+        moveInt32ToPacked(payloadGPR, fpr);
+        moveInt32ToPacked(tagGPR, scratchFPR);
+        lshiftPacked(TrustedImm32(32), scratchFPR);
+        orPacked(scratchFPR, fpr);
+#endif
+    }
+#endif
 
 #if ENABLE(SAMPLING_COUNTERS)
     // Debug profiling tool.
@@ -303,11 +379,18 @@ public:
     void clearSamplingFlag(int32_t flag);
 #endif
 
+#if USE(JSVALUE64)
     void addPropertyAccess(JITCompiler::Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR)
     {
         m_propertyAccesses.append(PropertyAccessRecord(functionCall, deltaCheckImmToCall, deltaCallToStructCheck, deltaCallToLoadOrStore, deltaCallToSlowCase, deltaCallToDone,  baseGPR, valueGPR, scratchGPR));
     }
-    
+#elif USE(JSVALUE32_64)
+    void addPropertyAccess(JITCompiler::Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToTagLoadOrStore, int16_t deltaCallToPayloadLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR)
+    {
+        m_propertyAccesses.append(PropertyAccessRecord(functionCall, deltaCheckImmToCall, deltaCallToStructCheck, deltaCallToTagLoadOrStore, deltaCallToPayloadLoadOrStore, deltaCallToSlowCase, deltaCallToDone,  baseGPR, valueTagGPR, valueGPR, scratchGPR));
+    }
+#endif
+
     void addMethodGet(Call slowCall, DataLabelPtr structToCompare, DataLabelPtr protoObj, DataLabelPtr protoStructToCompare, DataLabelPtr putFunction)
     {
         m_methodGets.append(MethodGetRecord(slowCall, structToCompare, protoObj, protoStructToCompare, putFunction));
@@ -320,7 +403,25 @@ public:
     
     void noticeOSREntry(BasicBlock& basicBlock)
     {
-        m_jitCodeMapEncoder.append(basicBlock.bytecodeBegin, differenceBetween(m_startOfCode, label()));
+#if DFG_ENABLE(OSR_ENTRY)
+        OSREntryData* entry = codeBlock()->appendDFGOSREntryData(basicBlock.bytecodeBegin, differenceBetween(m_startOfCode, label()));
+        
+        entry->m_expectedValues = basicBlock.valuesAtHead;
+        
+        // Fix the expected values: in our protocol, a dead variable will have an expected
+        // value of (None, []). But the old JIT may stash some values there. So we really
+        // need (Top, TOP).
+        for (size_t argument = 0; argument < basicBlock.variablesAtHead.numberOfArguments(); ++argument) {
+            if (basicBlock.variablesAtHead.argument(argument) == NoNode)
+                entry->m_expectedValues.argument(argument).makeTop();
+        }
+        for (size_t local = 0; local < basicBlock.variablesAtHead.numberOfLocals(); ++local) {
+            if (basicBlock.variablesAtHead.local(local) == NoNode)
+                entry->m_expectedValues.local(local).makeTop();
+        }
+#else
+        UNUSED_PARAM(basicBlock);
+#endif
     }
 
 private:
@@ -329,13 +430,21 @@ private:
     void compileBody();
     void link(LinkBuffer&);
 
-    // These methods used in linking the speculative & non-speculative paths together.
-    void fillNumericToDouble(NodeIndex, FPRReg, GPRReg temporary);
-    void fillInt32ToInteger(NodeIndex, GPRReg);
-    void fillToJS(NodeIndex, GPRReg);
-    
-    void exitSpeculativeWithOSR(const OSRExit&, SpeculationRecovery*, Vector<BytecodeAndMachineOffset>& decodedCodeMap);
+    void exitSpeculativeWithOSR(const OSRExit&, SpeculationRecovery*);
     void linkOSRExits(SpeculativeJIT&);
+    
+    CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
+    {
+        if (codeOrigin.inlineCallFrame) {
+            ExecutableBase* executable = codeOrigin.inlineCallFrame->executable.get();
+            ASSERT(executable->structure()->classInfo() == &FunctionExecutable::s_info);
+            return static_cast<FunctionExecutable*>(executable)->baselineCodeBlockFor(codeOrigin.inlineCallFrame->isCall ? CodeForCall : CodeForConstruct);
+        }
+        ASSERT(codeBlock()->alternative() == codeBlock()->baselineVersion());
+        return codeBlock()->alternative();
+    }
+    
+    Vector<BytecodeAndMachineOffset>& decodedCodeMapFor(CodeBlock*);
 
     // The globalData, used to access constants such as the vPtrs.
     JSGlobalData* m_globalData;
@@ -345,25 +454,38 @@ private:
 
     // The codeBlock currently being generated, used to access information such as constant values, immediates.
     CodeBlock* m_codeBlock;
-
+    
+    HashMap<CodeBlock*, Vector<BytecodeAndMachineOffset> > m_decodedCodeMaps;
+    
     // Vector of calls out from JIT code, including exception handler information.
     // Count of the number of CallRecords with exception handlers.
-    Vector<CallRecord> m_calls;
-    unsigned m_exceptionCheckCount;
+    Vector<CallLinkRecord> m_calls;
+    Vector<CallExceptionRecord> m_exceptionChecks;
     
     // JIT code map for OSR entrypoints.
     Label m_startOfCode;
-    CompactJITCodeMap::Encoder m_jitCodeMapEncoder;
 
     struct PropertyAccessRecord {
+#if USE(JSVALUE64)
         PropertyAccessRecord(Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR)
+#elif USE(JSVALUE32_64)
+        PropertyAccessRecord(Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToTagLoadOrStore, int16_t deltaCallToPayloadLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR)
+#endif
             : m_functionCall(functionCall)
             , m_deltaCheckImmToCall(deltaCheckImmToCall)
             , m_deltaCallToStructCheck(deltaCallToStructCheck)
+#if USE(JSVALUE64)
             , m_deltaCallToLoadOrStore(deltaCallToLoadOrStore)
+#elif USE(JSVALUE32_64)
+            , m_deltaCallToTagLoadOrStore(deltaCallToTagLoadOrStore)
+            , m_deltaCallToPayloadLoadOrStore(deltaCallToPayloadLoadOrStore)
+#endif
             , m_deltaCallToSlowCase(deltaCallToSlowCase)
             , m_deltaCallToDone(deltaCallToDone)
             , m_baseGPR(baseGPR)
+#if USE(JSVALUE32_64)
+            , m_valueTagGPR(valueTagGPR)
+#endif
             , m_valueGPR(valueGPR)
             , m_scratchGPR(scratchGPR)
         {
@@ -372,10 +494,18 @@ private:
         JITCompiler::Call m_functionCall;
         int16_t m_deltaCheckImmToCall;
         int16_t m_deltaCallToStructCheck;
+#if USE(JSVALUE64)
         int16_t m_deltaCallToLoadOrStore;
+#elif USE(JSVALUE32_64)
+        int16_t m_deltaCallToTagLoadOrStore;
+        int16_t m_deltaCallToPayloadLoadOrStore;
+#endif
         int16_t m_deltaCallToSlowCase;
         int16_t m_deltaCallToDone;
         int8_t m_baseGPR;
+#if USE(JSVALUE32_64)
+        int8_t m_valueTagGPR;
+#endif
         int8_t m_valueGPR;
         int8_t m_scratchGPR;
     };

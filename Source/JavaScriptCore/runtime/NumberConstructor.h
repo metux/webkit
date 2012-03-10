@@ -38,7 +38,8 @@ namespace JSC {
             return constructor;
         }
 
-        virtual bool getOwnPropertySlot(ExecState*, const Identifier&, PropertySlot&);
+        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
         JSValue getValueProperty(ExecState*, int token) const;
 
@@ -57,8 +58,8 @@ namespace JSC {
 
     private:
         NumberConstructor(JSGlobalObject*, Structure*);
-        virtual ConstructType getConstructData(ConstructData&);
-        virtual CallType getCallData(CallData&);
+        static ConstructType getConstructData(JSCell*, ConstructData&);
+        static CallType getCallData(JSCell*, CallData&);
     };
 
 } // namespace JSC

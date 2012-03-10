@@ -37,6 +37,7 @@
 #include "Blob.h"
 #include "BlobData.h"
 #include "CloseEvent.h"
+#include "ContentSecurityPolicy.h"
 #include "DOMWindow.h"
 #include "Event.h"
 #include "EventException.h"
@@ -193,6 +194,14 @@ void WebSocket::connect(const String& url, const Vector<String>& protocols, Exce
     if (!portAllowed(m_url)) {
         scriptExecutionContext()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "WebSocket port " + String::number(m_url.port()) + " blocked", 0, scriptExecutionContext()->securityOrigin()->toString(), 0);
         m_state = CLOSED;
+        ec = SECURITY_ERR;
+        return;
+    }
+
+    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectFromSource(m_url)) {
+        m_state = CLOSED;
+
+        // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return;
     }
@@ -360,6 +369,14 @@ String WebSocket::protocol() const
     return m_subprotocol;
 }
 
+String WebSocket::extensions() const
+{
+    if (m_useHixie76Protocol)
+        return String();
+    // WebSocket protocol extension is not supported yet.
+    return "";
+}
+
 String WebSocket::binaryType() const
 {
     if (m_useHixie76Protocol)
@@ -388,6 +405,11 @@ void WebSocket::setBinaryType(const String& binaryType, ExceptionCode& ec)
     }
     ec = SYNTAX_ERR;
     return;
+}
+
+const AtomicString& WebSocket::interfaceName() const
+{
+    return eventNames().interfaceForWebSocket;
 }
 
 ScriptExecutionContext* WebSocket::scriptExecutionContext() const

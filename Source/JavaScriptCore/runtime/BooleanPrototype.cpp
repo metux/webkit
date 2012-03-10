@@ -38,7 +38,7 @@ static EncodedJSValue JSC_HOST_CALL booleanProtoFuncValueOf(ExecState*);
 
 namespace JSC {
 
-const ClassInfo BooleanPrototype::s_info = { "Boolean", &BooleanObject::s_info, 0, ExecState::booleanPrototypeTable };
+const ClassInfo BooleanPrototype::s_info = { "Boolean", &BooleanObject::s_info, 0, ExecState::booleanPrototypeTable, CREATE_METHOD_TABLE(BooleanPrototype) };
 
 /* Source for BooleanPrototype.lut.h
 @begin booleanPrototypeTable
@@ -62,9 +62,14 @@ void BooleanPrototype::finishCreation(ExecState* exec, JSGlobalObject*)
     ASSERT(inherits(&s_info));
 }
 
-bool BooleanPrototype::getOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+bool BooleanPrototype::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<BooleanObject>(exec, ExecState::booleanPrototypeTable(exec), this, propertyName, slot);
+    return getOwnPropertySlot(this, exec, propertyName, slot);
+}
+
+bool BooleanPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<BooleanObject>(exec, ExecState::booleanPrototypeTable(exec), static_cast<BooleanPrototype*>(cell), propertyName, slot);
 }
 
 bool BooleanPrototype::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
