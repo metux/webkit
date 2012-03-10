@@ -44,6 +44,7 @@
 #include "BackForwardList.h"
 #include "Cache.h"
 #include "ChromeClientGtk.h"
+#include "ClipboardUtilitiesGtk.h"
 #include "ContextMenuClientGtk.h"
 #include "ContextMenuController.h"
 #include "ContextMenu.h"
@@ -63,6 +64,7 @@
 #include "FrameView.h"
 #include <glib/gi18n-lib.h>
 #include <GOwnPtr.h>
+#include <GOwnPtrGtk.h>
 #include "GraphicsContext.h"
 #include "GtkVersioning.h"
 #include "HitTestRequest.h"
@@ -585,10 +587,51 @@ static gboolean webkit_web_view_key_release_event(GtkWidget* widget, GdkEventKey
 
 static gboolean webkit_web_view_button_press_event(GtkWidget* widget, GdkEventButton* event)
 {
+    // Eventually it may make sense for these to be per-view and per-device,
+    // but at this time the implementation matches the Windows port.
+    static int currentClickCount = 1;
+    static IntPoint previousPoint;
+    static guint previousButton;
+    static guint32 previousTime;
+
     WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
 
     // FIXME: need to keep track of subframe focus for key events
     gtk_widget_grab_focus(widget);
+
+    // For double and triple clicks GDK sends both a normal button press event
+    // and a specific type (like GDK_2BUTTON_PRESS). If we detect a special press
+    // coming up, ignore this event as it certainly generated the double or triple
+    // click. The consequence of not eating this event is two DOM button press events
+    // are generated.
+    GOwnPtr<GdkEvent> nextEvent(gdk_event_peek());
+    if (nextEvent && (nextEvent->any.type == GDK_2BUTTON_PRESS || nextEvent->any.type == GDK_3BUTTON_PRESS))
+        return TRUE;
+
+    gint doubleClickDistance = 250;
+    gint doubleClickTime = 5;
+    GtkSettings* settings = gtk_settings_get_for_screen(gdk_drawable_get_screen(widget->window));
+    g_object_get(settings, 
+        "gtk-double-click-distance", &doubleClickDistance,
+        "gtk-double-click-time", &doubleClickTime, NULL);
+
+    // GTK+ only counts up to triple clicks, but WebCore wants to know about
+    // quadruple clicks, quintuple clicks, ad infinitum. Here, we replicate the
+    // GDK logic for counting clicks.
+    if ((event->type == GDK_2BUTTON_PRESS || event->type == GDK_3BUTTON_PRESS)
+        || ((abs(event->x - previousPoint.x()) < doubleClickDistance)
+            && (abs(event->y - previousPoint.y()) < doubleClickDistance)
+            && (event->time - previousTime < static_cast<guint>(doubleClickTime))
+            && (event->button == previousButton)))
+        currentClickCount++;
+    else
+        currentClickCount = 1;
+
+    PlatformMouseEvent platformEvent(event);
+    platformEvent.setClickCount(currentClickCount);
+    previousPoint = platformEvent.pos();
+    previousButton = event->button;
+    previousTime = event->time;
 
     if (event->button == 3)
         return webkit_web_view_forward_context_menu_event(webView, PlatformMouseEvent(event));
@@ -597,7 +640,8 @@ static gboolean webkit_web_view_button_press_event(GtkWidget* widget, GdkEventBu
     if (!frame->view())
         return FALSE;
 
-    gboolean result = frame->eventHandler()->handleMousePressEvent(PlatformMouseEvent(event));
+
+    gboolean result = frame->eventHandler()->handleMousePressEvent(platformEvent);
 
 #if PLATFORM(X11)
     /* Copy selection to the X11 selection clipboard */
@@ -1122,6 +1166,8 @@ static void webkit_web_view_dispose(GObject* object)
         priv->subResources = NULL;
     }
 
+    priv->draggingDataObjects.clear();
+
     G_OBJECT_CLASS(webkit_web_view_parent_class)->dispose(object);
 }
 
@@ -1232,126 +1278,49 @@ static void webkit_web_view_screen_changed(GtkWidget* widget, GdkScreen* previou
 
 static void webkit_web_view_drag_end(GtkWidget* widget, GdkDragContext* context)
 {
-    g_object_unref(context);
-}
+    WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
+    WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW_GET_PRIVATE(webView);
 
-struct DNDContentsRequest
-{
-    gint info;
-    GtkSelectionData* dnd_selection_data;
-
-    gboolean is_url_label_request;
-    gchar* url;
-};
-
-void clipboard_contents_received(GtkClipboard* clipboard, GtkSelectionData* selection_data, gpointer data)
-{
-    DNDContentsRequest* contents_request = reinterpret_cast<DNDContentsRequest*>(data);
-
-    if (contents_request->is_url_label_request) {
-        // We have received contents of the label clipboard. Use them to form
-        // required structures. When formed, enhance the dnd's selection data
-        // with them and return.
-
-        // If the label is empty, use the url itself.
-        gchar* url_label = reinterpret_cast<gchar*>(gtk_selection_data_get_text(selection_data));
-        if (!url_label)
-            url_label = g_strdup(contents_request->url);
-
-        gchar* data = 0;
-        switch (contents_request->info) {
-        case WEBKIT_WEB_VIEW_TARGET_INFO_URI_LIST:
-            data = g_strdup_printf("%s\r\n%s\r\n", contents_request->url, url_label);
-            break;
-        case WEBKIT_WEB_VIEW_TARGET_INFO_NETSCAPE_URL:
-            data = g_strdup_printf("%s\n%s", contents_request->url, url_label);
-            break;
-        }
-
-        if (data) {
-            gtk_selection_data_set(contents_request->dnd_selection_data,
-                                   contents_request->dnd_selection_data->target, 8,
-                                   reinterpret_cast<const guchar*>(data), strlen(data));
-            g_free(data);
-        }
-
-        g_free(url_label);
-        g_free(contents_request->url);
-        g_free(contents_request);
-
+    // This might happen if a drag is still in progress after a WebKitWebView
+    // is disposed and before it is finalized.
+    if (!priv->draggingDataObjects.contains(context))
         return;
-    }
 
-    switch (contents_request->info) {
-    case WEBKIT_WEB_VIEW_TARGET_INFO_HTML:
-    case WEBKIT_WEB_VIEW_TARGET_INFO_TEXT:
-        {
-        gchar* data = reinterpret_cast<gchar*>(gtk_selection_data_get_text(selection_data));
-        if (data) {
-            gtk_selection_data_set(contents_request->dnd_selection_data,
-                                   contents_request->dnd_selection_data->target, 8,
-                                   reinterpret_cast<const guchar*>(data),
-                                   strlen(data));
-            g_free(data);
-        }
-        break;
-        }
-    case WEBKIT_WEB_VIEW_TARGET_INFO_IMAGE:
-        {
-        GdkPixbuf* pixbuf = gtk_selection_data_get_pixbuf(selection_data);
-        if (pixbuf) {
-            gtk_selection_data_set_pixbuf(contents_request->dnd_selection_data, pixbuf);
-            g_object_unref(pixbuf);
-        }
-        break;
-        }
-    case WEBKIT_WEB_VIEW_TARGET_INFO_URI_LIST:
-    case WEBKIT_WEB_VIEW_TARGET_INFO_NETSCAPE_URL:
-        // URL's label is stored in another clipboard, so we store URL into
-        // contents request, mark the latter as an url label request
-        // and request for contents of the label clipboard.
-        contents_request->is_url_label_request = TRUE;
-        contents_request->url = reinterpret_cast<gchar*>(gtk_selection_data_get_text(selection_data));
+    priv->draggingDataObjects.remove(context);
 
-        gtk_clipboard_request_contents(gtk_clipboard_get(gdk_atom_intern_static_string("WebKitClipboardUrlLabel")),
-                                       selection_data->target, clipboard_contents_received, contents_request);
-        break;
-    }
+    Frame* frame = core(webView)->focusController()->focusedOrMainFrame();
+    if (!frame)
+        return;
+
+    GdkEvent* event = gdk_event_new(GDK_BUTTON_RELEASE);
+    int x, y, xRoot, yRoot;
+    GdkModifierType modifiers;
+    GdkDisplay* display = gdk_display_get_default();
+    gdk_display_get_pointer(display, 0, &xRoot, &yRoot, &modifiers);
+
+    event->button.window = static_cast<GdkWindow*>(g_object_ref(gdk_display_get_window_at_pointer(display, &x, &y)));
+    event->button.x = x;
+    event->button.y = y;
+    event->button.x_root = xRoot;
+    event->button.y_root = yRoot;
+    event->button.state = modifiers;
+
+    PlatformMouseEvent platformEvent(&event->button);
+    frame->eventHandler()->dragSourceEndedAt(platformEvent, gdkDragActionToDragOperation(context->action));
+
+    gdk_event_free(event);
 }
 
-static void webkit_web_view_drag_data_get(GtkWidget* widget, GdkDragContext* context, GtkSelectionData* selection_data, guint info, guint time_)
+static void webkit_web_view_drag_data_get(GtkWidget* widget, GdkDragContext* context, GtkSelectionData* selectionData, guint info, guint)
 {
-    GdkAtom selection_atom = GDK_NONE;
-    GdkAtom target_atom = selection_data->target;
+    WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW_GET_PRIVATE(WEBKIT_WEB_VIEW(widget));
 
-    switch (info) {
-        case WEBKIT_WEB_VIEW_TARGET_INFO_HTML:
-            selection_atom = gdk_atom_intern_static_string("WebKitClipboardHtml");
-            // HTML markup data is set as text, therefor, we need a text-like target atom
-            target_atom = gdk_atom_intern_static_string("UTF8_STRING");
-            break;
-        case WEBKIT_WEB_VIEW_TARGET_INFO_TEXT:
-            selection_atom = gdk_atom_intern_static_string("WebKitClipboardText");
-            break;
-        case WEBKIT_WEB_VIEW_TARGET_INFO_IMAGE:
-            selection_atom = gdk_atom_intern_static_string("WebKitClipboardImage");
-            break;
-        case WEBKIT_WEB_VIEW_TARGET_INFO_URI_LIST:
-        case WEBKIT_WEB_VIEW_TARGET_INFO_NETSCAPE_URL:
-            selection_atom = gdk_atom_intern_static_string("WebKitClipboardUrl");
-            // We require URL and label, which are both stored in text format
-            // and are needed to be retrieved as such.
-            target_atom = gdk_atom_intern_static_string("UTF8_STRING");
-            break;
-    }
+    // This might happen if a drag is still in progress after a WebKitWebView
+    // is diposed and before it is finalized.
+    if (!priv->draggingDataObjects.contains(context))
+        return;
 
-    DNDContentsRequest* contents_request = g_new(DNDContentsRequest, 1);
-    contents_request->info = info;
-    contents_request->is_url_label_request = FALSE;
-    contents_request->dnd_selection_data = selection_data;
-
-    gtk_clipboard_request_contents(gtk_clipboard_get(selection_atom), target_atom,
-                                   clipboard_contents_received, contents_request);
+    pasteboardHelperInstance()->fillSelectionData(selectionData, info, priv->draggingDataObjects.get(context).get());
 }
 
 #if GTK_CHECK_VERSION(2, 12, 0)

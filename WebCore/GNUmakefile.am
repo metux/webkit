@@ -2038,6 +2038,8 @@ webcoregtk_sources += \
 	WebCore/platform/graphics/gtk/IntRectGtk.cpp \
 	WebCore/platform/gtk/ClipboardGtk.cpp \
 	WebCore/platform/gtk/ClipboardGtk.h \
+	WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp \
+	WebCore/platform/gtk/ClipboardUtilitiesGtk.h \
 	WebCore/platform/gtk/ContextMenuGtk.cpp \
 	WebCore/platform/gtk/ContextMenuItemGtk.cpp \
 	WebCore/platform/gtk/CursorGtk.cpp \
@@ -2049,6 +2051,8 @@ webcoregtk_sources += \
 	WebCore/platform/gtk/EventLoopGtk.cpp \
 	WebCore/platform/gtk/FileChooserGtk.cpp \
 	WebCore/platform/gtk/FileSystemGtk.cpp \
+	WebCore/platform/gtk/GOwnPtrGtk.cpp \
+	WebCore/platform/gtk/GOwnPtrGtk.h \
 	WebCore/platform/gtk/GRefPtrGtk.cpp \
 	WebCore/platform/gtk/GRefPtrGtk.h \
 	WebCore/platform/gtk/GtkPluginWidget.cpp \
@@ -3768,7 +3772,9 @@ webcore_dist += \
 webinspectordir = ${datadir}/webkit-1.0/webinspector
 dist_webinspector_DATA = \
 	$(WebCore)/English.lproj/localizedStrings.js \
-	$(shell ls $(WebCore)/inspector/front-end/*.{js,html,css})
+	$(shell ls $(WebCore)/inspector/front-end/*.js) \
+	$(shell ls $(WebCore)/inspector/front-end/*.html) \
+	$(shell ls $(WebCore)/inspector/front-end/*.css)
 
 webinspectorimagesdir = ${datadir}/webkit-1.0/webinspector/Images
 dist_webinspectorimages_DATA = \
