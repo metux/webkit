@@ -103,7 +103,12 @@ void ChromeClient::setWindowRect(const FloatRect& rect)
 
 FloatRect ChromeClient::pageRect()
 {
+    GtkAllocation allocation;
+#if GTK_CHECK_VERSION(2, 18, 0)
+    gtk_widget_get_allocation(GTK_WIDGET(m_webView), &allocation);
+#else
     GtkAllocation allocation = GTK_WIDGET(m_webView)->allocation;
+#endif
     return IntRect(allocation.x, allocation.y, allocation.width, allocation.height);
 }
 
@@ -335,7 +340,7 @@ void ChromeClient::invalidateWindow(const IntRect&, bool)
 void ChromeClient::invalidateContentsAndWindow(const IntRect& updateRect, bool immediate)
 {
     GdkRectangle rect = updateRect;
-    GdkWindow* window = GTK_WIDGET(m_webView)->window;
+    GdkWindow* window = gtk_widget_get_window(GTK_WIDGET(m_webView));
 
     if (window) {
         gdk_window_invalidate_rect(window, &rect, FALSE);
@@ -352,7 +357,7 @@ void ChromeClient::invalidateContentsForSlowScroll(const IntRect& updateRect, bo
 
 void ChromeClient::scroll(const IntSize& delta, const IntRect& rectToScroll, const IntRect& clipRect)
 {
-    GdkWindow* window = GTK_WIDGET(m_webView)->window;
+    GdkWindow* window = gtk_widget_get_window(GTK_WIDGET(m_webView));
     if (!window)
         return;
 
@@ -390,7 +395,7 @@ static IntPoint widgetScreenPosition(GtkWidget* widget)
 
     IntPoint result(widgetX, widgetY);
     int originX, originY;
-    gdk_window_get_origin(window->window, &originX, &originY);
+    gdk_window_get_origin(gtk_widget_get_window(window), &originX, &originY);
     result.move(originX, originY);
 
     return result;
@@ -424,9 +429,15 @@ void ChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) const
     // We need to queue a resize request only if the size changed,
     // otherwise we get into an infinite loop!
     GtkWidget* widget = GTK_WIDGET(m_webView);
+    GtkRequisition requisition;
+#if GTK_CHECK_VERSION(2, 20, 0)
+    gtk_widget_get_requisition(widget, &requisition);
+#else
+    requisition = widget->requisition;
+#endif
     if (gtk_widget_get_realized(widget)
-        && (widget->requisition.height != size.height())
-        || (widget->requisition.width != size.width()))
+        && (requisition.height != size.height())
+        || (requisition.width != size.width()))
         gtk_widget_queue_resize_no_redraw(widget);
 }
 
