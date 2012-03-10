@@ -39,7 +39,8 @@ private:
     virtual void calcPrefWidths();
     virtual void layout();
     virtual void updateFromElement();
-};
+
+    virtual bool requiresForcedStyleRecalcPropagation() const { return true; }
 
 inline RenderProgress* toRenderProgress(RenderObject* object)
 {

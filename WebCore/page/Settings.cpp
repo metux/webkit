@@ -72,6 +72,7 @@ Settings::Settings(Page* page)
     , m_privateBrowsingEnabled(false)
     , m_caretBrowsingEnabled(false)
     , m_areImagesEnabled(true)
+    , m_isMediaEnabled(true)
     , m_arePluginsEnabled(false)
     , m_localStorageEnabled(false)
     , m_isJavaScriptEnabled(false)
@@ -79,6 +80,7 @@ Settings::Settings(Page* page)
     , m_allowUniversalAccessFromFileURLs(true)
     , m_allowFileAccessFromFileURLs(true)
     , m_javaScriptCanOpenWindowsAutomatically(false)
+    , m_javaScriptCanAccessClipboard(false)
     , m_shouldPrintBackgrounds(false)
     , m_textAreasAreResizable(false)
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -262,6 +264,11 @@ void Settings::setImagesEnabled(bool areImagesEnabled)
     m_areImagesEnabled = areImagesEnabled;
 }
 
+void Settings::setMediaEnabled(bool isMediaEnabled)
+{
+    m_isMediaEnabled = isMediaEnabled;
+}
+
 void Settings::setPluginsEnabled(bool arePluginsEnabled)
 {
     m_arePluginsEnabled = arePluginsEnabled;
@@ -289,6 +296,11 @@ void Settings::setPrivateBrowsingEnabled(bool privateBrowsingEnabled)
 void Settings::setJavaScriptCanOpenWindowsAutomatically(bool javaScriptCanOpenWindowsAutomatically)
 {
     m_javaScriptCanOpenWindowsAutomatically = javaScriptCanOpenWindowsAutomatically;
+}
+
+void Settings::setJavaScriptCanAccessClipboard(bool javaScriptCanAccessClipboard)
+{
+    m_javaScriptCanAccessClipboard = javaScriptCanAccessClipboard;
 }
 
 void Settings::setDefaultTextEncodingName(const String& defaultTextEncodingName)
