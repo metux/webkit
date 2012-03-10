@@ -49,18 +49,14 @@ public:
         return adoptRef(new CSSRegionStyleRule(parent, selectors, rules));
     }
 
-    virtual ~CSSRegionStyleRule();
+    ~CSSRegionStyleRule();
 
-    virtual String cssText() const;
+    String cssText() const;
     const CSSSelectorList& selectorList() const { return m_selectorList; }
     CSSRuleList* cssRules() const { return m_ruleList.get(); }
 
 private:
     CSSRegionStyleRule(CSSStyleSheet* parent, Vector<OwnPtr<CSSParserSelector> >* selectors, PassRefPtr<CSSRuleList> rules);
-
-    virtual bool isRegionStyleRule() const { return true; }
-
-    virtual CSSRuleType type() const { return WEBKIT_REGION_STYLE_RULE; }
 
     CSSSelectorList m_selectorList;
     RefPtr<CSSRuleList> m_ruleList;

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2004 Zack Rusin <zack@kde.org>
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alexey Proskuryakov <ap@webkit.org>
  * Copyright (C) 2007 Nicholas Shanks <webkit@nickshanks.com>
  * Copyright (C) 2011 Sencha, Inc. All rights reserved.
@@ -40,6 +40,9 @@
 #include "CSSSelector.h"
 #include "CSSTimingFunctionValue.h"
 #include "CSSValueList.h"
+#if ENABLE(CSS_SHADERS)
+#include "CustomFilterOperation.h"
+#endif
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "FontFeatureSettings.h"
@@ -199,6 +202,7 @@ static const int computedProperties[] = {
     CSSPropertyWebkitColumnBreakAfter,
     CSSPropertyWebkitColumnBreakBefore,
     CSSPropertyWebkitColumnBreakInside,
+    CSSPropertyWebkitColumnAxis,
     CSSPropertyWebkitColumnCount,
     CSSPropertyWebkitColumnGap,
     CSSPropertyWebkitColumnRuleColor,
@@ -209,12 +213,10 @@ static const int computedProperties[] = {
 #if ENABLE(DASHBOARD_SUPPORT)
     CSSPropertyWebkitDashboardRegion,
 #endif
-#if ENABLE(CSS3_FLEXBOX)
     CSSPropertyWebkitFlexOrder,
     CSSPropertyWebkitFlexPack,
     CSSPropertyWebkitFlexAlign,
     CSSPropertyWebkitFlexFlow,
-#endif
     CSSPropertyWebkitFontSmoothing,
     CSSPropertyWebkitHighlight,
     CSSPropertyWebkitHyphenateCharacter,
@@ -225,6 +227,8 @@ static const int computedProperties[] = {
     CSSPropertyWebkitLineBoxContain,
     CSSPropertyWebkitLineBreak,
     CSSPropertyWebkitLineClamp,
+    CSSPropertyWebkitLineGrid,
+    CSSPropertyWebkitLineGridSnap,
     CSSPropertyWebkitLocale,
     CSSPropertyWebkitMarginBeforeCollapse,
     CSSPropertyWebkitMarginAfterCollapse,
@@ -249,6 +253,7 @@ static const int computedProperties[] = {
     CSSPropertyWebkitNbspMode,
     CSSPropertyWebkitPerspective,
     CSSPropertyWebkitPerspectiveOrigin,
+    CSSPropertyWebkitPrintColorAdjust,
     CSSPropertyWebkitRtlOrdering,
 #if ENABLE(TOUCH_EVENTS)
     CSSPropertyWebkitTapHighlightColor,
@@ -279,7 +284,11 @@ static const int computedProperties[] = {
     CSSPropertyWebkitRegionOverflow,
     CSSPropertyWebkitRegionBreakAfter,
     CSSPropertyWebkitRegionBreakBefore,
-    CSSPropertyWebkitRegionBreakInside
+    CSSPropertyWebkitRegionBreakInside,
+    CSSPropertyWebkitWrapFlow,
+    CSSPropertyWebkitWrapMargin,
+    CSSPropertyWebkitWrapPadding,
+    CSSPropertyWebkitWrapThrough
 #if ENABLE(SVG)
     ,
     CSSPropertyClipPath,
@@ -646,9 +655,11 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
 }
 
 #if ENABLE(CSS_FILTERS)
-static PassRefPtr<CSSValue> computedFilter(RenderObject* renderer, const RenderStyle* style, CSSPrimitiveValueCache* primitiveValueCache)
+PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(RenderStyle* style) const
 {
-    if (!renderer || style->filter().operations().isEmpty())
+    CSSPrimitiveValueCache* primitiveValueCache = m_node->document()->cssPrimitiveValueCache().get();
+
+    if (style->filter().operations().isEmpty())
         return primitiveValueCache->createIdentifierValue(CSSValueNone);
 
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
@@ -724,6 +735,47 @@ static PassRefPtr<CSSValue> computedFilter(RenderObject* renderer, const RenderS
             filterValue->append(primitiveValueCache->createValue(sharpenOperation->threshold(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
+        case FilterOperation::DROP_SHADOW: {
+            DropShadowFilterOperation* dropShadowOperation = static_cast<DropShadowFilterOperation*>(filterOperation);
+            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::DropShadowFilterOperation);
+            // We want our computed style to look like that of a text shadow (has neither spread nor inset style).
+            ShadowData shadowData = ShadowData(dropShadowOperation->x(), dropShadowOperation->y(), dropShadowOperation->stdDeviation(), 0, Normal, false, dropShadowOperation->color());
+            filterValue->append(valueForShadow(&shadowData, CSSPropertyTextShadow, style));
+            break;
+        }
+#if ENABLE(CSS_SHADERS)
+        case FilterOperation::CUSTOM: {
+            CustomFilterOperation* customOperation = static_cast<CustomFilterOperation*>(filterOperation);
+            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::CustomFilterOperation);
+            
+            // The output should be verbose, even if the values are the default ones.
+            
+            RefPtr<CSSValueList> shadersList = CSSValueList::createSpaceSeparated();
+            if (customOperation->vertexShader())
+                shadersList->append(customOperation->vertexShader()->cssValue());
+            else
+                shadersList->append(primitiveValueCache->createIdentifierValue(CSSValueNone));
+            if (customOperation->fragmentShader())
+                shadersList->append(customOperation->fragmentShader()->cssValue());
+            else
+                shadersList->append(primitiveValueCache->createIdentifierValue(CSSValueNone));
+            filterValue->append(shadersList.release());
+            
+            RefPtr<CSSValueList> meshParameters = CSSValueList::createSpaceSeparated();
+            meshParameters->append(primitiveValueCache->createValue(customOperation->meshRows(), CSSPrimitiveValue::CSS_NUMBER));
+            meshParameters->append(primitiveValueCache->createValue(customOperation->meshColumns(), CSSPrimitiveValue::CSS_NUMBER));
+            meshParameters->append(primitiveValueCache->createValue(customOperation->meshBoxType()));
+            
+            // FIXME: The specification doesn't have any "attached" identifier. Should we add one?
+            // https://bugs.webkit.org/show_bug.cgi?id=72700
+            if (customOperation->meshType() == CustomFilterOperation::DETACHED)
+                meshParameters->append(primitiveValueCache->createIdentifierValue(CSSValueDetached));
+            
+            filterValue->append(meshParameters.release());
+            
+            break;
+        }
+#endif
         default:
             filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::UnknownFilterOperation);
             break;
@@ -1334,6 +1386,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return primitiveValueCache->createValue(style->clear());
         case CSSPropertyColor:
             return primitiveValueCache->createColorValue(m_allowVisitedStyle ? style->visitedDependentColor(CSSPropertyColor).rgb() : style->color().rgb());
+        case CSSPropertyWebkitPrintColorAdjust:
+            return primitiveValueCache->createValue(style->printColorAdjust());
+        case CSSPropertyWebkitColumnAxis:
+            return primitiveValueCache->createValue(style->columnAxis());
         case CSSPropertyWebkitColumnCount:
             if (style->hasAutoColumnCount())
                 return primitiveValueCache->createIdentifierValue(CSSValueAuto);
@@ -1390,7 +1446,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return primitiveValueCache->createValue(style->display());
         case CSSPropertyEmptyCells:
             return primitiveValueCache->createValue(style->emptyCells());
-#if ENABLE(CSS3_FLEXBOX)
         case CSSPropertyWebkitFlexOrder:
             return primitiveValueCache->createValue(style->flexOrder(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyWebkitFlexPack:
@@ -1399,7 +1454,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return primitiveValueCache->createValue(style->flexAlign());
         case CSSPropertyWebkitFlexFlow:
             return primitiveValueCache->createValue(style->flexFlow());
-#endif
         case CSSPropertyFloat:
             return primitiveValueCache->createValue(style->floating());
         case CSSPropertyFont: {
@@ -1838,6 +1892,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return getTimingFunctionValue(style->animations());
         case CSSPropertyWebkitAppearance:
             return primitiveValueCache->createValue(style->appearance());
+        case CSSPropertyWebkitAspectRatio:
+            if (!style->hasAspectRatio())
+                return primitiveValueCache->createIdentifierValue(CSSValueNone);
+            return primitiveValueCache->createValue(style->aspectRatio(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyWebkitBackfaceVisibility:
             return primitiveValueCache->createIdentifierValue((style->backfaceVisibility() == BackfaceVisibilityHidden) ? CSSValueHidden : CSSValueVisible);
         case CSSPropertyWebkitBorderImage:
@@ -1970,6 +2028,12 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return primitiveValueCache->createValue(style->pointerEvents());
         case CSSPropertyWebkitColorCorrection:
             return primitiveValueCache->createValue(style->colorSpace());
+        case CSSPropertyWebkitLineGrid:
+            if (style->lineGrid().isNull())
+                return primitiveValueCache->createIdentifierValue(CSSValueNone);
+            return primitiveValueCache->createValue(style->lineGrid(), CSSPrimitiveValue::CSS_STRING);
+        case CSSPropertyWebkitLineGridSnap:
+            return CSSPrimitiveValue::create(style->lineGridSnap());
         case CSSPropertyWebkitWritingMode:
             return primitiveValueCache->createValue(style->writingMode());
         case CSSPropertyWebkitTextCombine:
@@ -1994,9 +2058,13 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return primitiveValueCache->createValue(style->regionThread(), CSSPrimitiveValue::CSS_STRING);
         case CSSPropertyWebkitRegionOverflow:
             return primitiveValueCache->createValue(style->regionOverflow());
+        case CSSPropertyWebkitWrapMargin:
+            return primitiveValueCache->createValue(style->wrapMargin());
+        case CSSPropertyWebkitWrapPadding:
+            return primitiveValueCache->createValue(style->wrapPadding());
 #if ENABLE(CSS_FILTERS)
         case CSSPropertyWebkitFilter:
-            return computedFilter(renderer, style.get(), primitiveValueCache);
+            return valueForFilter(style.get());
 #endif
         /* Shorthand properties, currently not supported see bug 13658*/
         case CSSPropertyBackground:
@@ -2112,6 +2180,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
 
             return primitiveValueCache->createValue(style->wrapShape());
 
+        case CSSPropertyWebkitWrapFlow:
+            return primitiveValueCache->createValue(style->wrapFlow());
+        case CSSPropertyWebkitWrapThrough:
+            return primitiveValueCache->createValue(style->wrapThrough());
 #if ENABLE(SVG)
         case CSSPropertyClipPath:
         case CSSPropertyClipRule:

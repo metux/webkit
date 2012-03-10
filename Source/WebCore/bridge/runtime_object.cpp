@@ -116,14 +116,9 @@ JSValue RuntimeObject::methodGetter(ExecState* exec, JSValue slotBase, const Ide
     return method;
 }
 
-bool RuntimeObject::getOwnPropertySlotVirtual(ExecState *exec, const Identifier& propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlot(this, exec, propertyName, slot);
-}
-
 bool RuntimeObject::getOwnPropertySlot(JSCell* cell, ExecState *exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    RuntimeObject* thisObject = static_cast<RuntimeObject*>(cell);
+    RuntimeObject* thisObject = jsCast<RuntimeObject*>(cell);
     if (!thisObject->m_instance) {
         throwInvalidAccessError(exec);
         return false;
@@ -167,14 +162,15 @@ bool RuntimeObject::getOwnPropertySlot(JSCell* cell, ExecState *exec, const Iden
     return instance->getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
 
-bool RuntimeObject::getOwnPropertyDescriptor(ExecState *exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool RuntimeObject::getOwnPropertyDescriptor(JSObject* object, ExecState *exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    if (!m_instance) {
+    RuntimeObject* thisObject = jsCast<RuntimeObject*>(object);
+    if (!thisObject->m_instance) {
         throwInvalidAccessError(exec);
         return false;
     }
     
-    RefPtr<Instance> instance = m_instance;
+    RefPtr<Instance> instance = thisObject->m_instance;
     instance->begin();
     
     Class *aClass = instance->getClass();
@@ -184,7 +180,7 @@ bool RuntimeObject::getOwnPropertyDescriptor(ExecState *exec, const Identifier& 
         Field *aField = aClass->fieldNamed(propertyName, instance.get());
         if (aField) {
             PropertySlot slot;
-            slot.setCustom(this, fieldGetter);
+            slot.setCustom(thisObject, fieldGetter);
             instance->end();
             descriptor.setDescriptor(slot.getValue(exec, propertyName), DontDelete);
             return true;
@@ -194,7 +190,7 @@ bool RuntimeObject::getOwnPropertyDescriptor(ExecState *exec, const Identifier& 
             MethodList methodList = aClass->methodsNamed(propertyName, instance.get());
             if (methodList.size() > 0) {
                 PropertySlot slot;
-                slot.setCustom(this, methodGetter);
+                slot.setCustom(thisObject, methodGetter);
                 instance->end();
                 descriptor.setDescriptor(slot.getValue(exec, propertyName), DontDelete | ReadOnly);
                 return true;
@@ -204,7 +200,7 @@ bool RuntimeObject::getOwnPropertyDescriptor(ExecState *exec, const Identifier& 
         // Try a fallback object.
         if (!aClass->fallbackObject(exec, instance.get(), propertyName).isUndefined()) {
             PropertySlot slot;
-            slot.setCustom(this, fallbackObjectGetter);
+            slot.setCustom(thisObject, fallbackObjectGetter);
             instance->end();
             descriptor.setDescriptor(slot.getValue(exec, propertyName), DontDelete | ReadOnly | DontEnum);
             return true;
@@ -213,12 +209,12 @@ bool RuntimeObject::getOwnPropertyDescriptor(ExecState *exec, const Identifier& 
     
     instance->end();
     
-    return instance->getOwnPropertyDescriptor(this, exec, propertyName, descriptor);
+    return instance->getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
 void RuntimeObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot& slot)
 {
-    RuntimeObject* thisObject = static_cast<RuntimeObject*>(cell);
+    RuntimeObject* thisObject = jsCast<RuntimeObject*>(cell);
     if (!thisObject->m_instance) {
         throwInvalidAccessError(exec);
         return;
@@ -243,12 +239,13 @@ bool RuntimeObject::deleteProperty(JSCell*, ExecState*, const Identifier&)
     return false;
 }
 
-JSValue RuntimeObject::defaultValue(ExecState* exec, PreferredPrimitiveType hint) const
+JSValue RuntimeObject::defaultValue(const JSObject* object, ExecState* exec, PreferredPrimitiveType hint)
 {
-    if (!m_instance)
+    const RuntimeObject* thisObject = jsCast<const RuntimeObject*>(object);
+    if (!thisObject->m_instance)
         return throwInvalidAccessError(exec);
     
-    RefPtr<Instance> instance = m_instance;
+    RefPtr<Instance> instance = thisObject->m_instance;
 
     instance->begin();
     JSValue result = instance->defaultValue(exec, hint);
@@ -268,7 +265,7 @@ static EncodedJSValue JSC_HOST_CALL callRuntimeObject(ExecState* exec)
 
 CallType RuntimeObject::getCallData(JSCell* cell, CallData& callData)
 {
-    RuntimeObject* thisObject = static_cast<RuntimeObject*>(cell);
+    RuntimeObject* thisObject = jsCast<RuntimeObject*>(cell);
     if (!thisObject->m_instance)
         return CallTypeNone;
     
@@ -296,7 +293,7 @@ static EncodedJSValue JSC_HOST_CALL callRuntimeConstructor(ExecState* exec)
 
 ConstructType RuntimeObject::getConstructData(JSCell* cell, ConstructData& constructData)
 {
-    RuntimeObject* thisObject = static_cast<RuntimeObject*>(cell);
+    RuntimeObject* thisObject = jsCast<RuntimeObject*>(cell);
     if (!thisObject->m_instance)
         return ConstructTypeNone;
     
@@ -308,14 +305,15 @@ ConstructType RuntimeObject::getConstructData(JSCell* cell, ConstructData& const
     return ConstructTypeHost;
 }
 
-void RuntimeObject::getOwnPropertyNames(ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode)
+void RuntimeObject::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode)
 {
-    if (!m_instance) {
+    RuntimeObject* thisObject = jsCast<RuntimeObject*>(object);
+    if (!thisObject->m_instance) {
         throwInvalidAccessError(exec);
         return;
     }
 
-    RefPtr<Instance> instance = m_instance;
+    RefPtr<Instance> instance = thisObject->m_instance;
     
     instance->begin();
     instance->getPropertyNames(exec, propertyNames);

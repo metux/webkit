@@ -44,6 +44,7 @@ class CSSPrimitiveValue;
 class CSSProperty;
 class CSSFontFace;
 class CSSFontFaceRule;
+class CSSImageGeneratorValue;
 class CSSImageValue;
 class CSSRegionStyleRule;
 class CSSRuleList;
@@ -53,6 +54,7 @@ class CSSStyleRule;
 class CSSStyleSheet;
 class CSSValue;
 class ContainerNode;
+class CustomFilterOperation;
 class Document;
 class Element;
 class Frame;
@@ -66,11 +68,15 @@ class RuleData;
 class RuleSet;
 class Settings;
 class StyleImage;
+class StylePendingImage;
+class StyleShader;
 class StyleSheet;
 class StyleSheetList;
 class StyledElement;
 class WebKitCSSKeyframeRule;
 class WebKitCSSKeyframesRule;
+class WebKitCSSFilterValue;
+class WebKitCSSShaderValue;
 
 class MediaQueryResult {
     WTF_MAKE_NONCOPYABLE(MediaQueryResult); WTF_MAKE_FAST_ALLOCATED;
@@ -164,6 +170,10 @@ public:
 
     void applyPropertyToStyle(int id, CSSValue*, RenderStyle*);
 
+    void applyPropertyToCurrentStyle(int id, CSSValue*);
+
+    void updateFont();
+
     static float getComputedSizeFromSpecifiedSize(Document*, float zoomFactor, bool isAbsoluteSize, float specifiedSize, ESmartMinimumForFontSize = UseSmartMinimumForFontFize);
 
 private:
@@ -191,6 +201,8 @@ public:
     void addPageStyle(PassRefPtr<CSSPageRule>);
     void addRegionStyleRule(PassRefPtr<CSSRegionStyleRule>);
 
+    bool checkRegionStyle(Element*);
+
     bool usesSiblingRules() const { return m_features.siblingRules; }
     bool usesFirstLineRules() const { return m_features.usesFirstLineRules; }
     bool usesBeforeAfterRules() const { return m_features.usesBeforeAfterRules; }
@@ -200,7 +212,13 @@ public:
 
 #if ENABLE(CSS_FILTERS)
     bool createFilterOperations(CSSValue* inValue, RenderStyle* inStyle, RenderStyle* rootStyle, FilterOperations& outOperations);
+#if ENABLE(CSS_SHADERS)
+    StyleShader* styleShader(CSSValue*);
+    StyleShader* cachedOrPendingStyleShaderFromValue(WebKitCSSShaderValue*);
+    PassRefPtr<CustomFilterOperation> createCustomFilterOperation(WebKitCSSFilterValue*);
+    void loadPendingShaders();
 #endif
+#endif // ENABLE(CSS_FILTERS)
 
     struct Features {
         Features();
@@ -226,13 +244,14 @@ private:
     void addMatchedDeclaration(CSSMutableStyleDeclaration*, unsigned linkMatchType = SelectorChecker::MatchAll);
 
     struct MatchResult {
-        MatchResult() : firstUARule(-1), lastUARule(-1), firstAuthorRule(-1), lastAuthorRule(-1), firstUserRule(-1), lastUserRule(-1) { }
+        MatchResult() : firstUARule(-1), lastUARule(-1), firstAuthorRule(-1), lastAuthorRule(-1), firstUserRule(-1), lastUserRule(-1), isCacheable(true) { }
         int firstUARule;
         int lastUARule;
         int firstAuthorRule;
         int lastAuthorRule;
         int firstUserRule;
         int lastUserRule;
+        bool isCacheable;
     };
     void matchAllRules(MatchResult&);
     void matchUARules(MatchResult&);
@@ -245,9 +264,9 @@ private:
 
     void applyMatchedDeclarations(const MatchResult&);
     template <bool firstPass>
-    void applyDeclarations(bool important, int startIndex, int endIndex);
+    void applyDeclarations(bool important, int startIndex, int endIndex, bool& inheritedOnly);
     template <bool firstPass>
-    void applyDeclaration(CSSMutableStyleDeclaration*, bool isImportant);
+    void applyDeclaration(CSSMutableStyleDeclaration*, bool isImportant, bool& inheritedOnly);
 
     void matchPageRules(RuleSet*, bool isLeftPage, bool isFirstPage, const String& pageName);
     void matchPageRulesForList(const Vector<RuleData>*, bool isLeftPage, bool isFirstPage, const String& pageName);
@@ -271,11 +290,13 @@ private:
 
     typedef Vector<RefPtr<CSSRegionStyleRule> > RegionStyleRules;
     RegionStyleRules m_regionStyleRules;
+
 public:
     static RenderStyle* styleNotYetAvailable() { return s_styleNotYetAvailable; }
 
     StyleImage* styleImage(CSSPropertyID, CSSValue*);
     StyleImage* cachedOrPendingFromValue(CSSPropertyID, CSSImageValue*);
+    StyleImage* generatedOrPendingFromValue(CSSPropertyID, CSSImageGeneratorValue*);
 
     bool applyPropertyToRegularStyle() const { return m_applyPropertyToRegularStyle; }
     bool applyPropertyToVisitedLinkStyle() const { return m_applyPropertyToVisitedLinkStyle; }
@@ -283,7 +304,6 @@ public:
 private:
     static RenderStyle* s_styleNotYetAvailable;
 
-    void updateFont();
     void cacheBorderAndBackground();
 
     void mapFillAttachment(CSSPropertyID, FillLayer*, CSSValue*);
@@ -323,18 +343,31 @@ private:
     void applySVGProperty(int id, CSSValue*);
 #endif
 
+    StyleImage* loadPendingImage(StylePendingImage*);
     void loadPendingImages();
+
+    struct MatchedStyleDeclaration {
+        MatchedStyleDeclaration();
+        CSSMutableStyleDeclaration* styleDeclaration;
+        unsigned linkMatchType;
+    };
+    static unsigned computeDeclarationHash(MatchedStyleDeclaration*, unsigned size);
+    const RenderStyle* findFromMatchedDeclarationCache(unsigned hash, const MatchResult&);   
+    void addToMatchedDeclarationCache(const RenderStyle*, unsigned hash, const MatchResult&);
 
     // We collect the set of decls that match in |m_matchedDecls|. We then walk the
     // set of matched decls four times, once for those properties that others depend on (like font-size),
     // and then a second time for all the remaining properties. We then do the same two passes
     // for any !important rules.
-    struct MatchedStyleDeclaration {
-        MatchedStyleDeclaration(CSSMutableStyleDeclaration* decl, unsigned type) : styleDeclaration(decl), linkMatchType(type) { }
-        CSSMutableStyleDeclaration* styleDeclaration;
-        unsigned linkMatchType;
-    };
     Vector<MatchedStyleDeclaration, 64> m_matchedDecls;
+    
+    struct MatchedStyleDeclarationCacheItem {
+        Vector<MatchedStyleDeclaration> matchedStyleDeclarations;
+        MatchResult matchResult;
+        RefPtr<RenderStyle> renderStyle;
+    };
+    typedef HashMap<unsigned, MatchedStyleDeclarationCacheItem> MatchedStyleDeclarationCache;
+    MatchedStyleDeclarationCache m_matchStyleDeclarationCache;
 
     // A buffer used to hold the set of matched rules for an element, and a temporary buffer used for
     // merge sorting.
@@ -370,8 +403,16 @@ private:
     bool m_applyPropertyToRegularStyle;
     bool m_applyPropertyToVisitedLinkStyle;
     const CSSStyleApplyProperty& m_applyProperty;
+    
+#if ENABLE(CSS_SHADERS)
+    bool m_hasPendingShaders;
+#endif
 
     friend class CSSStyleApplyProperty;
+    friend bool operator==(const MatchedStyleDeclaration&, const MatchedStyleDeclaration&);
+    friend bool operator!=(const MatchedStyleDeclaration&, const MatchedStyleDeclaration&);
+    friend bool operator==(const MatchResult&, const MatchResult&);
+    friend bool operator!=(const MatchResult&, const MatchResult&);
 };
 
 } // namespace WebCore

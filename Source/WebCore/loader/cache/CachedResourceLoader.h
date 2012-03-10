@@ -44,6 +44,7 @@ class CachedFont;
 class CachedImage;
 class CachedRawResource;
 class CachedScript;
+class CachedShader;
 class CachedTextTrack;
 class CachedXSLStyleSheet;
 class Document;
@@ -75,7 +76,10 @@ public:
     CachedResource* requestLinkResource(CachedResource::Type, ResourceRequest&, ResourceLoadPriority = ResourceLoadPriorityUnresolved);
 #endif
 #if ENABLE(VIDEO_TRACK)
-    CachedTextTrack* requestCues(ResourceRequest&);
+    CachedTextTrack* requestTextTrack(ResourceRequest&);
+#endif
+#if ENABLE(CSS_SHADERS)
+    CachedShader* requestShader(ResourceRequest&);
 #endif
 
     // Logs an access denied message to the console for the specified URL.

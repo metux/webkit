@@ -89,7 +89,7 @@ static inline void insertSemicolonIfNeeded(UString& functionBody)
 
     for (size_t i = functionBody.length() - 2; i > 0; --i) {
         UChar ch = functionBody[i];
-        if (!Lexer::isWhiteSpace(ch) && !Lexer::isLineTerminator(ch)) {
+        if (!Lexer<UChar>::isWhiteSpace(ch) && !Lexer<UChar>::isLineTerminator(ch)) {
             if (ch != ';' && ch != '}')
                 functionBody = makeUString(functionBody.substringSharingImpl(0, i + 1), ";", functionBody.substringSharingImpl(i + 1, functionBody.length() - (i + 1)));
             return;
@@ -132,17 +132,24 @@ EncodedJSValue JSC_HOST_CALL functionProtoFuncApply(ExecState* exec)
     if (!array.isUndefinedOrNull()) {
         if (!array.isObject())
             return throwVMTypeError(exec);
-        if (asObject(array)->classInfo() == &Arguments::s_info)
+        if (asObject(array)->classInfo() == &Arguments::s_info) {
+            if (asArguments(array)->length(exec) > Arguments::MaxArguments)
+                return JSValue::encode(throwStackOverflowError(exec));
             asArguments(array)->fillArgList(exec, applyArgs);
-        else if (isJSArray(&exec->globalData(), array))
+        } else if (isJSArray(&exec->globalData(), array)) {
+            if (asArray(array)->length() > Arguments::MaxArguments)
+                return JSValue::encode(throwStackOverflowError(exec));
             asArray(array)->fillArgList(exec, applyArgs);
-        else {
+        } else {
             unsigned length = asObject(array)->get(exec, exec->propertyNames().length).toUInt32(exec);
+            if (length > Arguments::MaxArguments)
+                return JSValue::encode(throwStackOverflowError(exec));
+
             for (unsigned i = 0; i < length; ++i)
-                applyArgs.append(asArray(array)->get(exec, i));
+                applyArgs.append(asObject(array)->get(exec, i));
         }
     }
-
+    
     return JSValue::encode(call(exec, thisValue, callType, callData, exec->argument(0), applyArgs));
 }
 

@@ -140,6 +140,8 @@ bool BytecodeGenerator::dumpsGeneratedCode()
 
 JSObject* BytecodeGenerator::generate()
 {
+    SamplingRegion samplingRegion("Bytecode Generation");
+    
     m_codeBlock->setThisRegister(m_thisRegister.index());
 
     m_scopeNode->emitBytecode(*this);
@@ -194,8 +196,8 @@ void BytecodeGenerator::preserveLastVar()
 
 BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, ScopeChainNode* scopeChain, SymbolTable* symbolTable, ProgramCodeBlock* codeBlock, CompilationKind compilationKind)
     : m_shouldEmitDebugHooks(scopeChain->globalObject->debugger())
-    , m_shouldEmitProfileHooks(scopeChain->globalObject->supportsProfiling())
-    , m_shouldEmitRichSourceInfo(scopeChain->globalObject->supportsRichSourceInfo())
+    , m_shouldEmitProfileHooks(scopeChain->globalObject->globalObjectMethodTable()->supportsProfiling(scopeChain->globalObject.get()))
+    , m_shouldEmitRichSourceInfo(scopeChain->globalObject->globalObjectMethodTable()->supportsRichSourceInfo(scopeChain->globalObject.get()))
     , m_scopeChain(*scopeChain->globalData, scopeChain)
     , m_symbolTable(symbolTable)
     , m_scopeNode(programNode)
@@ -265,8 +267,8 @@ BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, ScopeChainNode* s
 
 BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainNode* scopeChain, SymbolTable* symbolTable, CodeBlock* codeBlock, CompilationKind)
     : m_shouldEmitDebugHooks(scopeChain->globalObject->debugger())
-    , m_shouldEmitProfileHooks(scopeChain->globalObject->supportsProfiling())
-    , m_shouldEmitRichSourceInfo(scopeChain->globalObject->supportsRichSourceInfo())
+    , m_shouldEmitProfileHooks(scopeChain->globalObject->globalObjectMethodTable()->supportsProfiling(scopeChain->globalObject.get()))
+    , m_shouldEmitRichSourceInfo(scopeChain->globalObject->globalObjectMethodTable()->supportsRichSourceInfo(scopeChain->globalObject.get()))
     , m_scopeChain(*scopeChain->globalData, scopeChain)
     , m_symbolTable(symbolTable)
     , m_scopeNode(functionBody)
@@ -427,8 +429,8 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
 
 BytecodeGenerator::BytecodeGenerator(EvalNode* evalNode, ScopeChainNode* scopeChain, SymbolTable* symbolTable, EvalCodeBlock* codeBlock, CompilationKind)
     : m_shouldEmitDebugHooks(scopeChain->globalObject->debugger())
-    , m_shouldEmitProfileHooks(scopeChain->globalObject->supportsProfiling())
-    , m_shouldEmitRichSourceInfo(scopeChain->globalObject->supportsRichSourceInfo())
+    , m_shouldEmitProfileHooks(scopeChain->globalObject->globalObjectMethodTable()->supportsProfiling(scopeChain->globalObject.get()))
+    , m_shouldEmitRichSourceInfo(scopeChain->globalObject->globalObjectMethodTable()->supportsRichSourceInfo(scopeChain->globalObject.get()))
     , m_scopeChain(*scopeChain->globalData, scopeChain)
     , m_symbolTable(symbolTable)
     , m_scopeNode(evalNode)
@@ -1819,7 +1821,7 @@ RegisterID* BytecodeGenerator::emitCall(OpcodeID opcodeID, RegisterID* dst, Regi
     emitOpcode(opcodeID);
     instructions().append(func->index()); // func
     instructions().append(callArguments.count()); // argCount
-    instructions().append(callArguments.callFrame()); // registerOffset
+    instructions().append(callArguments.registerOffset()); // registerOffset
     if (dst != ignoredResult()) {
         emitOpcode(op_call_put_result);
         instructions().append(dst->index()); // dst
@@ -1833,40 +1835,29 @@ RegisterID* BytecodeGenerator::emitCall(OpcodeID opcodeID, RegisterID* dst, Regi
     return dst;
 }
 
-RegisterID* BytecodeGenerator::emitLoadVarargs(RegisterID* argCountDst, RegisterID* thisRegister, RegisterID* arguments)
+RegisterID* BytecodeGenerator::emitCallVarargs(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, RegisterID* profileHookRegister, unsigned divot, unsigned startOffset, unsigned endOffset)
 {
-    ASSERT(argCountDst->index() < arguments->index());
-    emitOpcode(op_load_varargs);
-    instructions().append(argCountDst->index());
-    instructions().append(arguments->index());
-    instructions().append(thisRegister->index() + RegisterFile::CallFrameHeaderSize); // initial registerOffset
-    return argCountDst;
-}
-
-RegisterID* BytecodeGenerator::emitCallVarargs(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* argCountRegister, unsigned divot, unsigned startOffset, unsigned endOffset)
-{
-    ASSERT(func->refCount());
-    ASSERT(thisRegister->refCount());
-    ASSERT(dst != func);
     if (m_shouldEmitProfileHooks) {
+        emitMove(profileHookRegister, func);
         emitOpcode(op_profile_will_call);
-        instructions().append(func->index());
+        instructions().append(profileHookRegister->index());
     }
     
     emitExpressionInfo(divot, startOffset, endOffset);
-    
+
     // Emit call.
     emitOpcode(op_call_varargs);
-    instructions().append(func->index()); // func
-    instructions().append(argCountRegister->index()); // arg count
-    instructions().append(thisRegister->index() + RegisterFile::CallFrameHeaderSize); // initial registerOffset
+    instructions().append(func->index());
+    instructions().append(thisRegister->index());
+    instructions().append(arguments->index());
+    instructions().append(firstFreeRegister->index());
     if (dst != ignoredResult()) {
         emitOpcode(op_call_put_result);
-        instructions().append(dst->index()); // dst
+        instructions().append(dst->index());
     }
     if (m_shouldEmitProfileHooks) {
         emitOpcode(op_profile_did_call);
-        instructions().append(func->index());
+        instructions().append(profileHookRegister->index());
     }
     return dst;
 }
@@ -1877,8 +1868,7 @@ RegisterID* BytecodeGenerator::emitReturn(RegisterID* src)
         emitOpcode(op_tear_off_activation);
         instructions().append(m_activationRegister->index());
         instructions().append(m_codeBlock->argumentsRegister());
-    } else if (m_codeBlock->usesArguments() && m_codeBlock->m_numParameters > 1
-               && !m_codeBlock->isStrictMode()) { // If there are no named parameters, there's nothing to tear off, since extra / unnamed parameters get copied to the arguments object at construct time.
+    } else if (m_codeBlock->usesArguments() && m_codeBlock->m_numParameters != 1 && !m_codeBlock->isStrictMode()) {
         emitOpcode(op_tear_off_arguments);
         instructions().append(m_codeBlock->argumentsRegister());
     }
@@ -1931,7 +1921,7 @@ RegisterID* BytecodeGenerator::emitConstruct(RegisterID* dst, RegisterID* func, 
     emitOpcode(op_construct);
     instructions().append(func->index()); // func
     instructions().append(callArguments.count()); // argCount
-    instructions().append(callArguments.callFrame()); // registerOffset
+    instructions().append(callArguments.registerOffset()); // registerOffset
     if (dst != ignoredResult()) {
         emitOpcode(op_call_put_result);
         instructions().append(dst->index()); // dst
@@ -2367,14 +2357,12 @@ void BytecodeGenerator::setIsNumericCompareFunction(bool isNumericCompareFunctio
     m_codeBlock->setIsNumericCompareFunction(isNumericCompareFunction);
 }
 
-int BytecodeGenerator::argumentNumberFor(const Identifier& ident)
+bool BytecodeGenerator::isArgumentNumber(const Identifier& ident, int argumentNumber)
 {
-    int parameterCount = m_parameters.size(); // includes 'this'
     RegisterID* registerID = registerFor(ident);
-    if (!registerID)
-        return 0;
-    int index = registerID->index() + RegisterFile::CallFrameHeaderSize + parameterCount;
-    return (index > 0 && index < parameterCount) ? index : 0;
+    if (!registerID || registerID->index() >= 0)
+         return 0;
+    return registerID->index() - m_thisRegister.index() - 1 == argumentNumber;
 }
 
 } // namespace JSC

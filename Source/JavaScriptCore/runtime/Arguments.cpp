@@ -45,7 +45,7 @@ Arguments::~Arguments()
 
 void Arguments::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    Arguments* thisObject = static_cast<Arguments*>(cell);
+    Arguments* thisObject = jsCast<Arguments*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
@@ -145,14 +145,9 @@ void Arguments::fillArgList(ExecState* exec, MarkedArgumentBuffer& args)
     }
 }
 
-bool Arguments::getOwnPropertySlotVirtual(ExecState* exec, unsigned i, PropertySlot& slot)
-{
-    return getOwnPropertySlotByIndex(this, exec, i, slot);
-}
-
 bool Arguments::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned i, PropertySlot& slot)
 {
-    Arguments* thisObject = static_cast<Arguments*>(cell);
+    Arguments* thisObject = jsCast<Arguments*>(cell);
     if (i < thisObject->d->numArguments && (!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i])) {
         if (i < thisObject->d->numParameters) {
             slot.setValue(thisObject->d->registers[thisObject->d->firstParameterIndex + i].get());
@@ -173,7 +168,7 @@ void Arguments::createStrictModeCallerIfNecessary(ExecState* exec)
     PropertyDescriptor descriptor;
     JSValue thrower = createTypeErrorFunction(exec, "Unable to access caller of strict mode function");
     descriptor.setAccessorDescriptor(thrower, thrower, DontEnum | DontDelete | Getter | Setter);
-    defineOwnProperty(exec, exec->propertyNames().caller, descriptor, false);
+    methodTable()->defineOwnProperty(this, exec, exec->propertyNames().caller, descriptor, false);
 }
 
 void Arguments::createStrictModeCalleeIfNecessary(ExecState* exec)
@@ -185,17 +180,12 @@ void Arguments::createStrictModeCalleeIfNecessary(ExecState* exec)
     PropertyDescriptor descriptor;
     JSValue thrower = createTypeErrorFunction(exec, "Unable to access callee of strict mode function");
     descriptor.setAccessorDescriptor(thrower, thrower, DontEnum | DontDelete | Getter | Setter);
-    defineOwnProperty(exec, exec->propertyNames().callee, descriptor, false);
-}
-
-bool Arguments::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlot(this, exec, propertyName, slot);
+    methodTable()->defineOwnProperty(this, exec, exec->propertyNames().callee, descriptor, false);
 }
 
 bool Arguments::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    Arguments* thisObject = static_cast<Arguments*>(cell);
+    Arguments* thisObject = jsCast<Arguments*>(cell);
     bool isArrayIndex;
     unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < thisObject->d->numArguments && (!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i])) {
@@ -225,53 +215,55 @@ bool Arguments::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifi
     return JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
 
-bool Arguments::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool Arguments::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
+    Arguments* thisObject = jsCast<Arguments*>(object);
     bool isArrayIndex;
     unsigned i = propertyName.toArrayIndex(isArrayIndex);
-    if (isArrayIndex && i < d->numArguments && (!d->deletedArguments || !d->deletedArguments[i])) {
-        if (i < d->numParameters) {
-            descriptor.setDescriptor(d->registers[d->firstParameterIndex + i].get(), None);
+    if (isArrayIndex && i < thisObject->d->numArguments && (!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i])) {
+        if (i < thisObject->d->numParameters) {
+            descriptor.setDescriptor(thisObject->d->registers[thisObject->d->firstParameterIndex + i].get(), None);
         } else
-            descriptor.setDescriptor(d->extraArguments[i - d->numParameters].get(), None);
+            descriptor.setDescriptor(thisObject->d->extraArguments[i - thisObject->d->numParameters].get(), None);
         return true;
     }
     
-    if (propertyName == exec->propertyNames().length && LIKELY(!d->overrodeLength)) {
-        descriptor.setDescriptor(jsNumber(d->numArguments), DontEnum);
+    if (propertyName == exec->propertyNames().length && LIKELY(!thisObject->d->overrodeLength)) {
+        descriptor.setDescriptor(jsNumber(thisObject->d->numArguments), DontEnum);
         return true;
     }
     
-    if (propertyName == exec->propertyNames().callee && LIKELY(!d->overrodeCallee)) {
-        if (!d->isStrictMode) {
-            descriptor.setDescriptor(d->callee.get(), DontEnum);
+    if (propertyName == exec->propertyNames().callee && LIKELY(!thisObject->d->overrodeCallee)) {
+        if (!thisObject->d->isStrictMode) {
+            descriptor.setDescriptor(thisObject->d->callee.get(), DontEnum);
             return true;
         }
-        createStrictModeCalleeIfNecessary(exec);
+        thisObject->createStrictModeCalleeIfNecessary(exec);
     }
 
-    if (propertyName == exec->propertyNames().caller && d->isStrictMode)
-        createStrictModeCallerIfNecessary(exec);
+    if (propertyName == exec->propertyNames().caller && thisObject->d->isStrictMode)
+        thisObject->createStrictModeCallerIfNecessary(exec);
     
-    return JSObject::getOwnPropertyDescriptor(exec, propertyName, descriptor);
+    return JSObject::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
-void Arguments::getOwnPropertyNames(ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
+void Arguments::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    for (unsigned i = 0; i < d->numArguments; ++i) {
-        if (!d->deletedArguments || !d->deletedArguments[i])
+    Arguments* thisObject = jsCast<Arguments*>(object);
+    for (unsigned i = 0; i < thisObject->d->numArguments; ++i) {
+        if (!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i])
             propertyNames.add(Identifier(exec, UString::number(i)));
     }
     if (mode == IncludeDontEnumProperties) {
         propertyNames.add(exec->propertyNames().callee);
         propertyNames.add(exec->propertyNames().length);
     }
-    JSObject::getOwnPropertyNames(exec, propertyNames, mode);
+    JSObject::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
 void Arguments::putByIndex(JSCell* cell, ExecState* exec, unsigned i, JSValue value)
 {
-    Arguments* thisObject = static_cast<Arguments*>(cell);
+    Arguments* thisObject = jsCast<Arguments*>(cell);
     if (i < thisObject->d->numArguments && (!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i])) {
         if (i < thisObject->d->numParameters)
             thisObject->d->registers[thisObject->d->firstParameterIndex + i].set(exec->globalData(), thisObject->d->activation ? static_cast<JSCell*>(thisObject->d->activation.get()) : cell, value);
@@ -286,7 +278,7 @@ void Arguments::putByIndex(JSCell* cell, ExecState* exec, unsigned i, JSValue va
 
 void Arguments::put(JSCell* cell, ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot& slot)
 {
-    Arguments* thisObject = static_cast<Arguments*>(cell);
+    Arguments* thisObject = jsCast<Arguments*>(cell);
     bool isArrayIndex;
     unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < thisObject->d->numArguments && (!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i])) {
@@ -320,7 +312,7 @@ void Arguments::put(JSCell* cell, ExecState* exec, const Identifier& propertyNam
 
 bool Arguments::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsigned i) 
 {
-    Arguments* thisObject = static_cast<Arguments*>(cell);
+    Arguments* thisObject = jsCast<Arguments*>(cell);
     if (i < thisObject->d->numArguments) {
         if (!thisObject->d->deletedArguments) {
             thisObject->d->deletedArguments = adoptArrayPtr(new bool[thisObject->d->numArguments]);
@@ -337,7 +329,7 @@ bool Arguments::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsigned i)
 
 bool Arguments::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName) 
 {
-    Arguments* thisObject = static_cast<Arguments*>(cell);
+    Arguments* thisObject = jsCast<Arguments*>(cell);
     bool isArrayIndex;
     unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < thisObject->d->numArguments) {

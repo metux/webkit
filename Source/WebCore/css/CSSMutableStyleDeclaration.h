@@ -87,8 +87,6 @@ public:
 
     Node* node() const { return m_node; }
 
-    virtual bool isMutableStyleDeclaration() const { return true; }
-
     virtual String cssText() const;
     virtual void setCssText(const String&, ExceptionCode&);
 
@@ -160,6 +158,8 @@ private:
     String getLayeredShorthandValue(const int* properties, size_t) const;
     String get4Values(const int* properties) const;
     String borderSpacingValue(const int properties[2]) const;
+    String fontValue() const;
+    bool appendFontLonghandValueIfExplicit(int propertyID, StringBuilder& result) const;
 
     template<size_t size> String getShorthandValue(const int (&properties)[size]) const { return getShorthandValue(properties, size); }
     template<size_t size> String getCommonValue(const int (&properties)[size]) const { return getCommonValue(properties, size); }
@@ -174,10 +174,6 @@ private:
     Vector<CSSProperty, 4> m_properties;
 
     Node* m_node;
-    bool m_strictParsing : 1;
-#ifndef NDEBUG
-    unsigned m_iteratorCount : 4;
-#endif
 
     friend class CSSMutableStyleDeclarationConstIterator;
 };

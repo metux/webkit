@@ -28,7 +28,6 @@
 #ifndef IDBFactoryBackendInterface_h
 #define IDBFactoryBackendInterface_h
 
-#include "ExceptionCode.h"
 #include "IDBCallbacks.h"
 #include "PlatformString.h"
 #include <wtf/Threading.h>
@@ -42,6 +41,8 @@ class Frame;
 class IDBDatabase;
 class SecurityOrigin;
 
+typedef int ExceptionCode;
+
 // This class is shared by IDBFactory (async) and IDBFactorySync (sync).
 // This is implemented by IDBFactoryBackendImpl and optionally others (in order to proxy
 // calls across process barriers). All calls to these classes should be non-blocking and
@@ -53,6 +54,7 @@ public:
 
     virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, Frame*, const String& dataDir) = 0;
     virtual void open(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, Frame*, const String& dataDir) = 0;
+    virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, Frame*, const String& dataDir) = 0;
 };
 
 } // namespace WebCore

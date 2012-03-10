@@ -34,6 +34,7 @@
 #include "WebKitMutationObserver.h"
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
+#include <wtf/text/AtomicString.h>
 
 #if USE(JSC)
 namespace JSC {
@@ -80,8 +81,6 @@ class SVGUseElement;
 #endif
 class TagNodeList;
 class TreeScope;
-
-struct MutationObserverEntry;
 
 typedef int ExceptionCode;
 
@@ -191,6 +190,8 @@ public:
     
     Node* lastDescendant() const;
     Node* firstDescendant() const;
+
+    virtual bool isActiveNode() const { return false; }
     
     // Other methods (not part of DOM)
 
@@ -590,15 +591,12 @@ public:
 #endif
 
 #if ENABLE(MUTATION_OBSERVERS)
-    void getRegisteredMutationObserversOfType(Vector<WebKitMutationObserver*>&, WebKitMutationObserver::MutationType);
-
-    enum MutationRegistrationResult {
-        MutationObserverRegistered,
-        MutationRegistrationOptionsReset
-    };
-    MutationRegistrationResult registerMutationObserver(PassRefPtr<WebKitMutationObserver>, MutationObserverOptions);
-
-    void unregisterMutationObserver(PassRefPtr<WebKitMutationObserver>);
+    void getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>&, WebKitMutationObserver::MutationType, const AtomicString& attributeName = nullAtom);
+    MutationObserverRegistration* registerMutationObserver(PassRefPtr<WebKitMutationObserver>);
+    void unregisterMutationObserver(MutationObserverRegistration*);
+    void registerTransientMutationObserver(MutationObserverRegistration*);
+    void unregisterTransientMutationObserver(MutationObserverRegistration*);
+    void notifyMutationObserversNodeWillDetach();
 #endif // ENABLE(MUTATION_OBSERVERS)
 
 private:
@@ -725,7 +723,9 @@ private:
     void trackForDebugging();
 
 #if ENABLE(MUTATION_OBSERVERS)
-    Vector<MutationObserverEntry>* mutationObserverEntries();
+    Vector<OwnPtr<MutationObserverRegistration> >* mutationObserverRegistry();
+    HashSet<MutationObserverRegistration*>* transientMutationObserverRegistry();
+    void collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>&, Node* fromNode, WebKitMutationObserver::MutationType, const AtomicString& attributeName);
 #endif
 
     mutable uint32_t m_nodeFlags;

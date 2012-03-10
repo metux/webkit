@@ -39,6 +39,7 @@ namespace WebCore {
     
 AccessibilityScrollView::AccessibilityScrollView(ScrollView* view)
     : m_scrollView(view)
+    , m_childrenDirty(false)
 {
 }
 
@@ -47,8 +48,10 @@ PassRefPtr<AccessibilityScrollView> AccessibilityScrollView::create(ScrollView* 
     return adoptRef(new AccessibilityScrollView(view));
 }
     
-AccessibilityObject* AccessibilityScrollView::scrollBar(AccessibilityOrientation orientation) const
+AccessibilityObject* AccessibilityScrollView::scrollBar(AccessibilityOrientation orientation)
 {
+    updateScrollbars();
+    
     switch (orientation) {
     case AccessibilityOrientationVertical:
         return m_verticalScrollbar ? m_verticalScrollbar.get() : 0;
@@ -74,6 +77,9 @@ Widget* AccessibilityScrollView::widgetForAttachmentView() const
     
 void AccessibilityScrollView::updateChildrenIfNecessary()
 {
+    if (m_childrenDirty)
+        clearChildren();
+
     if (!m_haveChildren)
         addChildren();
     
@@ -117,6 +123,13 @@ AccessibilityScrollbar* AccessibilityScrollView::addChildScrollbar(Scrollbar* sc
     return scrollBarObject;
 }
         
+void AccessibilityScrollView::clearChildren()
+{
+    AccessibilityObject::clearChildren();
+    m_verticalScrollbar = 0;
+    m_horizontalScrollbar = 0;
+}
+    
 void AccessibilityScrollView::addChildren()
 {
     ASSERT(!m_haveChildren);
@@ -174,10 +187,22 @@ AccessibilityObject* AccessibilityScrollView::parentObject() const
         return 0;
     
     HTMLFrameOwnerElement* owner = static_cast<FrameView*>(m_scrollView.get())->frame()->ownerElement();
-    if (owner && owner->renderPart())
-        return axObjectCache()->getOrCreate(owner->renderPart()->parent());
-    
+    if (owner && owner->renderer())
+        return axObjectCache()->getOrCreate(owner->renderer());
+
     return 0;
 }
     
+AccessibilityObject* AccessibilityScrollView::parentObjectIfExists() const
+{
+    if (!m_scrollView->isFrameView())
+        return 0;
+    
+    HTMLFrameOwnerElement* owner = static_cast<FrameView*>(m_scrollView.get())->frame()->ownerElement();
+    if (owner && owner->renderer())
+        return axObjectCache()->get(owner->renderer());
+    
+    return 0;
+}
+
 } // namespace WebCore    

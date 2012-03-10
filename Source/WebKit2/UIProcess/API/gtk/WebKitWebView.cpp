@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Igalia S.L.
+ * Portions Copyright (c) 2011 Motorola Mobility, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,6 +22,7 @@
 #include "WebKitWebView.h"
 
 #include "WebKitBackForwardListPrivate.h"
+#include "WebKitSettingsPrivate.h"
 #include "WebKitWebContextPrivate.h"
 #include "WebKitWebLoaderClient.h"
 #include "WebKitWebLoaderClientPrivate.h"
@@ -42,16 +44,21 @@ enum {
     PROP_0,
 
     PROP_WEB_CONTEXT,
-    PROP_ESTIMATED_LOAD_PROGRESS
+    PROP_TITLE,
+    PROP_ESTIMATED_LOAD_PROGRESS,
+    PROP_URI
 };
 
 struct _WebKitWebViewPrivate {
     WebKitWebContext* context;
+    CString title;
     CString customTextEncoding;
     double estimatedLoadProgress;
+    CString activeURI;
 
     GRefPtr<WebKitWebLoaderClient> loaderClient;
     GRefPtr<WebKitBackForwardList> backForwardList;
+    GRefPtr<WebKitSettings> settings;
 };
 
 G_DEFINE_TYPE(WebKitWebView, webkit_web_view, WEBKIT_TYPE_WEB_VIEW_BASE)
@@ -79,6 +86,8 @@ static void webkitWebViewConstructed(GObject* object)
     webkitWebViewSetLoaderClient(webView, defaultLoaderClient.get(), toAPI(page));
 
     priv->backForwardList = adoptGRef(webkitBackForwardListCreate(WKPageGetBackForwardList(toAPI(page))));
+    priv->settings = adoptGRef(webkit_settings_new());
+    webkitSettingsAttachSettingsToPage(priv->settings.get(), toAPI(page));
 }
 
 static void webkitWebViewSetProperty(GObject* object, guint propId, const GValue* value, GParamSpec* paramSpec)
@@ -102,8 +111,14 @@ static void webkitWebViewGetProperty(GObject* object, guint propId, GValue* valu
     case PROP_WEB_CONTEXT:
         g_value_take_object(value, webView->priv->context);
         break;
+    case PROP_TITLE:
+        g_value_set_string(value, webView->priv->title.data());
+        break;
     case PROP_ESTIMATED_LOAD_PROGRESS:
         g_value_set_double(value, webkit_web_view_get_estimated_load_progress(webView));
+        break;
+    case PROP_URI:
+        g_value_set_string(value, webkit_web_view_get_uri(webView));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
@@ -146,6 +161,21 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
                                                         "The web context for the view",
                                                         WEBKIT_TYPE_WEB_CONTEXT,
                                                         static_cast<GParamFlags>(WEBKIT_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+
+    /**
+     * WebKitWebView:title:
+     * 
+     * The main frame document title of this #WebKitWebView. If 
+     * the title has not been received yet, it will be %NULL.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_TITLE,
+                                    g_param_spec_string("title",
+                                                        "Title",
+                                                        "Main frame document title",
+                                                        0,
+                                                        WEBKIT_PARAM_READABLE));
+    
     /**
      * WebKitWebView:estimated-load-progress:
      *
@@ -164,6 +194,29 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
                                                         "An estimate of the percent completion for a document load",
                                                         0.0, 1.0, 0.0,
                                                         WEBKIT_PARAM_READABLE));
+    /**
+     * WebKitWebView:uri:
+     *
+     * The current active URI of the #WebKitWebView.
+     * See webkit_web_view_get_uri() for more details.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_URI,
+                                    g_param_spec_string("uri",
+                                                        "URI",
+                                                        "The current active URI of the view",
+                                                        0,
+                                                        WEBKIT_PARAM_READABLE));
+}
+
+void webkitWebViewSetTitle(WebKitWebView* webView, const CString& title)
+{
+    WebKitWebViewPrivate* priv = webView->priv;
+    if (priv->title == title)
+        return;
+    
+    priv->title = title;
+    g_object_notify(G_OBJECT(webView), "title");
 }
 
 void webkitWebViewSetEstimatedLoadProgress(WebKitWebView* webView, double estimatedLoadProgress)
@@ -172,6 +225,21 @@ void webkitWebViewSetEstimatedLoadProgress(WebKitWebView* webView, double estima
         return;
     webView->priv->estimatedLoadProgress = estimatedLoadProgress;
     g_object_notify(G_OBJECT(webView), "estimated-load-progress");
+}
+
+void webkitWebViewUpdateURI(WebKitWebView* webView)
+{
+    WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
+    WKRetainPtr<WKURLRef> wkURL(AdoptWK, WKPageCopyActiveURL(toAPI(page)));
+    CString activeURI;
+    if (wkURL)
+        activeURI = toImpl(wkURL.get())->string().utf8();
+
+    if (webView->priv->activeURI == activeURI)
+        return;
+
+    webView->priv->activeURI = activeURI;
+    g_object_notify(G_OBJECT(webView), "uri");
 }
 
 /**
@@ -271,6 +339,51 @@ void webkit_web_view_load_uri(WebKitWebView* webView, const gchar* uri)
     WKRetainPtr<WKURLRef> url(AdoptWK, WKURLCreateWithUTF8CString(uri));
     WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
     WKPageLoadURL(toAPI(page), url.get());
+    webkitWebViewUpdateURI(webView);
+}
+
+/**
+ * webkit_web_view_load_html:
+ * @web_view: a #WebKitWebView
+ * @content: The HTML string to load
+ * @base_uri: (allow-none): The base URI for relative locations or %NULL
+ *
+ * Load the given @content string with the specified @base_uri. 
+ * Relative URLs in the @content will be resolved against @base_uri.
+ * When @base_uri is %NULL, it defaults to "about:blank". The mime type 
+ * of the document will be "text/html". You can monitor the status of 
+ * the load operation using the #WebKitWebLoaderClient of @web_view. 
+ * See webkit_web_view_get_loader_client().
+ */
+void webkit_web_view_load_html(WebKitWebView* webView, const gchar* content, const gchar* baseURI)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+    g_return_if_fail(content);
+
+    WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
+    WKRetainPtr<WKStringRef> contentRef(AdoptWK,  WKStringCreateWithUTF8CString(content));
+    WKRetainPtr<WKURLRef> baseURIRef = baseURI ? adoptWK(WKURLCreateWithUTF8CString(baseURI)) : 0;
+    WKPageLoadHTMLString(toAPI(page), contentRef.get(), baseURIRef.get());
+}
+
+/**
+ * webkit_web_view_load_plain_text:
+ * @web_view: a #WebKitWebView
+ * @plain_text: The plain text to load
+ *
+ * Load the specified @plain_text string into @web_view. The mime type of
+ * document will be "text/plain". You can monitor  the status of the load 
+ * operation using the #WebKitWebLoaderClient of @web_view. 
+ * See webkit_web_view_get_loader_client().
+ */
+void webkit_web_view_load_plain_text(WebKitWebView* webView, const gchar* plainText)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+    g_return_if_fail(plainText);
+
+    WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
+    WKRetainPtr<WKStringRef> plainTextRef(AdoptWK, WKStringCreateWithUTF8CString(plainText));
+    WKPageLoadPlainTextString(toAPI(page), plainTextRef.get());
 }
 
 /**
@@ -299,6 +412,45 @@ void webkit_web_view_load_alternate_html(WebKitWebView* webView, const gchar* co
     WKRetainPtr<WKURLRef> unreachableURL = unreachableURI ? adoptWK(WKURLCreateWithUTF8CString(unreachableURI)) : 0;
     WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
     WKPageLoadAlternateHTMLString(toAPI(page), htmlString.get(), baseURL.get(), unreachableURL.get());
+    webkitWebViewUpdateURI(webView);
+}
+
+/**
+ * webkit_web_view_load_request:
+ * @web_view: a #WebKitWebView
+ * @request: a #WebKitNetworkRequest to load
+ *
+ * Requests loading of the specified #WebKitNetworkRequest.
+ * You can monitor the status of the load operation using the
+ * #WebKitWebLoaderClient of @web_view. See webkit_web_view_get_loader_client().
+ */
+void webkit_web_view_load_request(WebKitWebView* webView, WebKitNetworkRequest* request)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+    g_return_if_fail(WEBKIT_IS_NETWORK_REQUEST(request));
+
+    WKRetainPtr<WKURLRef> wkURL(AdoptWK, WKURLCreateWithUTF8CString(webkit_network_request_get_uri(request)));
+    WKRetainPtr<WKURLRequestRef> wkRequest(AdoptWK, WKURLRequestCreateWithWKURL(wkURL.get()));
+    WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
+    WKPageLoadURLRequest(toAPI(page), wkRequest.get());
+    webkitWebViewUpdateURI(webView);
+}
+
+/**
+ * webkit_web_view_get_title:
+ * @web_view: a #WebKitWebView
+ * 
+ * Gets the value of the #WebKitWebView:title property.
+ * You can connect to notify::title signal of @web_view to 
+ * be notified when the title has been received.
+ *
+ * Returns: The main frame document title of @web_view.
+ */
+const gchar* webkit_web_view_get_title(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    return webView->priv->title.data();
 }
 
 /**
@@ -313,6 +465,7 @@ void webkit_web_view_reload(WebKitWebView* webView)
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
     WKPageReload(toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
+    webkitWebViewUpdateURI(webView);
 }
 
 /**
@@ -327,6 +480,7 @@ void webkit_web_view_reload_bypass_cache(WebKitWebView* webView)
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
     WKPageReloadFromOrigin(toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
+    webkitWebViewUpdateURI(webView);
 }
 
 /**
@@ -361,6 +515,7 @@ void webkit_web_view_go_back(WebKitWebView* webView)
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
     WKPageGoBack(toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
+    webkitWebViewUpdateURI(webView);
 }
 
 /**
@@ -391,6 +546,7 @@ void webkit_web_view_go_forward(WebKitWebView* webView)
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
     WKPageGoForward(toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
+    webkitWebViewUpdateURI(webView);
 }
 
 /**
@@ -406,6 +562,67 @@ gboolean webkit_web_view_can_go_forward(WebKitWebView* webView)
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), FALSE);
 
     return WKPageCanGoForward(toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
+}
+
+/**
+ * webkit_web_view_get_uri:
+ * @web_view: a #WebKitWebView
+ *
+ * Returns the current active URI of @web_view. The active URI might change during
+ * a load operation:
+ *
+ * <orderedlist>
+ * <listitem><para>
+ *   When nothing has been loaded yet on @web_view the active URI is %NULL.
+ * </para></listitem>
+ * <listitem><para>
+ *   When a new load operation starts the active URI is the requested URI:
+ *   <itemizedlist>
+ *   <listitem><para>
+ *     If the load operation was started by webkit_web_view_load_uri(),
+ *     the requested URI is the given one.
+ *   </para></listitem>
+ *   <listitem><para>
+ *     If the load operation was started by webkit_web_view_load_alternate_html(),
+ *     the requested URI is "about:blank".
+ *   </para></listitem>
+ *   <listitem><para>
+ *     If the load operation was started by webkit_web_view_go_back() or
+ *     webkit_web_view_go_forward(), the requested URI is the original URI
+ *     of the previous/next item in the #WebKitBackForwardList of @web_view.
+ *   </para></listitem>
+ *   <listitem><para>
+ *     If the load operation was started by
+ *     webkit_web_view_go_to_back_forward_list_item(), the requested URI
+ *     is the opriginal URI of the given #WebKitBackForwardListItem.
+ *   </para></listitem>
+ *   </itemizedlist>
+ * </para></listitem>
+ * <listitem><para>
+ *   If there is a server redirection during the load operation,
+ *   the active URI is the redirected URI. When the signal
+ *   #WebKitWebLoaderClient::provisional-load-received-server-redirect
+ *   is emitted, the active URI is already updated to the redirected URI.
+ * </para></listitem>
+ * <listitem><para>
+ *   When the signal #WebKitWebLoaderClient::load-committed is emitted,
+ *   the active URI is the final one and it will not change unless
+ *   a new load operation is started or a navigation action within the
+ *   same page is performed.
+ * </para></listitem>
+ * </orderedlist>
+ *
+ * You can monitor the active URI by connecting to the notify::uri
+ * signal of @web_view.
+ *
+ * Returns: the current active URI of @web_view or %NULL
+ *    if nothing has been loaded yet.
+ */
+const gchar* webkit_web_view_get_uri(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    return webView->priv->activeURI.data();
 }
 
 /**
@@ -454,9 +671,9 @@ void webkit_web_view_set_custom_charset(WebKitWebView* webView, const gchar* cha
  * webkit_web_view_get_estimated_load_progress:
  * @web_view: a #WebKitWebView
  *
- * Gets the value of #WebKitWebView:estimated-load-progress.
+ * Gets the value of the #WebKitWebView:estimated-load-progress property.
  * You can monitor the estimated progress of a load operation by
- * connecting to the ::notify signal of @web_view.
+ * connecting to the notify::estimated-load-progress signal of @web_view.
  *
  * Returns: an estimate of the of the percent complete for a document
  *     load as a range from 0.0 to 1.0.
@@ -499,4 +716,55 @@ void webkit_web_view_go_to_back_forward_list_item(WebKitWebView* webView, WebKit
 
     WKPageGoToBackForwardListItem(toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))),
                                   webkitBackForwardListItemGetWKItem(listItem));
+    webkitWebViewUpdateURI(webView);
+}
+
+/**
+ * webkit_web_view_set_settings:
+ * @web_view: a #WebKitWebView
+ * @settings: a #WebKitSettings
+ *
+ * Sets the #WebKitSettings to be applied to @web_view. The
+ * existing #WebKitSettings of @web_view will be replaced by
+ * @settings. New settings are applied immediately on @web_view.
+ * The same #WebKitSettings object can be shared
+ * by multiple #WebKitWebView<!-- -->s.
+ */
+void webkit_web_view_set_settings(WebKitWebView* webView, WebKitSettings* settings)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    if (webView->priv->settings == settings)
+        return;
+
+    webView->priv->settings = settings;
+    webkitSettingsAttachSettingsToPage(settings, toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView))));
+}
+
+/**
+ * webkit_web_view_get_settings:
+ * @web_view: a #WebKitWebView
+ *
+ * Gets the #WebKitSettings currently applied to @web_view.
+ * If no other #WebKitSettings have been explicitly applied to
+ * @web_view with webkit_web_view_set_settings(), the default
+ * #WebKitSettings will be returned. This method always returns
+ * a valid #WebKitSettings object.
+ * To modify any of the @web_view settings, you can either create
+ * a new #WebKitSettings object with webkit_settings_new(), setting
+ * the desired preferences, and then replace the existing @web_view
+ * settings with webkit_web_view_set_settings() or get the existing
+ * @web_view settings and update it directly. #WebKitSettings objects
+ * can be shared by multiple #WebKitWebView<!-- -->s, so modifying
+ * the settings of a #WebKitWebView would affect other
+ * #WebKitWebView<!-- -->s using the same #WebKitSettings.
+ *
+ * Returns: (transfer none): the #WebKitSettings attached to @web_view
+ */
+WebKitSettings* webkit_web_view_get_settings(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    return webView->priv->settings.get();
 }

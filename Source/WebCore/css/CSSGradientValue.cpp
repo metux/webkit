@@ -26,9 +26,9 @@
 #include "config.h"
 #include "CSSGradientValue.h"
 
-#include "CSSValueKeywords.h"
 #include "CSSStyleSelector.h"
-#include "GeneratedImage.h"
+#include "CSSValueKeywords.h"
+#include "GeneratorGeneratedImage.h"
 #include "Gradient.h"
 #include "Image.h"
 #include "IntSize.h"
@@ -58,7 +58,16 @@ PassRefPtr<Image> CSSGradientValue::image(RenderObject* renderer, const IntSize&
     }
 
     // We need to create an image.
-    RefPtr<Image> newImage = GeneratedImage::create(createGradient(renderer, size), size);
+    RefPtr<Gradient> gradient;
+
+    if (isLinearGradient())
+        gradient = static_cast<CSSLinearGradientValue*>(this)->createGradient(renderer, size);
+    else {
+        ASSERT(isRadialGradient());
+        gradient = static_cast<CSSRadialGradientValue*>(this)->createGradient(renderer, size);
+    }
+
+    RefPtr<Image> newImage = GeneratorGeneratedImage::create(gradient, size);
     if (cacheable)
         putImage(size, newImage);
 
@@ -428,7 +437,7 @@ bool CSSGradientValue::isCacheable() const
     return true;
 }
 
-String CSSLinearGradientValue::cssText() const
+String CSSLinearGradientValue::customCssText() const
 {
     String result;
     if (m_deprecatedType) {
@@ -570,7 +579,7 @@ PassRefPtr<Gradient> CSSLinearGradientValue::createGradient(RenderObject* render
     return gradient.release();
 }
 
-String CSSRadialGradientValue::cssText() const
+String CSSRadialGradientValue::customCssText() const
 {
     String result;
 

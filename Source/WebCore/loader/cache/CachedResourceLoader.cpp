@@ -31,7 +31,6 @@
 #include "CachedFont.h"
 #include "CachedImage.h"
 #include "CachedRawResource.h"
-#include "CachedResourceRequest.h"
 #include "CachedScript.h"
 #include "CachedXSLStyleSheet.h"
 #include "Console.h"
@@ -54,6 +53,10 @@
 
 #if ENABLE(VIDEO_TRACK)
 #include "CachedTextTrack.h"
+#endif
+
+#if ENABLE(CSS_SHADERS)
+#include "CachedShader.h"
 #endif
 
 #define PRELOAD_DEBUG 0
@@ -86,8 +89,12 @@ static CachedResource* createResource(CachedResource::Type type, ResourceRequest
         return new CachedResource(request, CachedResource::LinkSubresource);
 #endif
 #if ENABLE(VIDEO_TRACK)
-    case CachedResource::CueResource:
+    case CachedResource::TextTrackResource:
         return new CachedTextTrack(request);
+#endif
+#if ENABLE(CSS_SHADERS)
+    case CachedResource::ShaderResource:
+        return new CachedShader(request);
 #endif
     }
     ASSERT_NOT_REACHED();
@@ -162,9 +169,16 @@ CachedFont* CachedResourceLoader::requestFont(ResourceRequest& request)
 }
 
 #if ENABLE(VIDEO_TRACK)
-CachedTextTrack* CachedResourceLoader::requestCues(ResourceRequest& request)
+CachedTextTrack* CachedResourceLoader::requestTextTrack(ResourceRequest& request)
 {
-    return static_cast<CachedTextTrack*>(requestResource(CachedResource::CueResource, request, String(), defaultCachedResourceOptions()));
+    return static_cast<CachedTextTrack*>(requestResource(CachedResource::TextTrackResource, request, String(), defaultCachedResourceOptions()));
+}
+#endif
+
+#if ENABLE(CSS_SHADERS)
+CachedShader* CachedResourceLoader::requestShader(ResourceRequest& request)
+{
+    return static_cast<CachedShader*>(requestResource(CachedResource::ShaderResource, request, String(), defaultCachedResourceOptions()));
 }
 #endif
 
@@ -240,7 +254,10 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
                 return false;
         break;
 #if ENABLE(VIDEO_TRACK)
-    case CachedResource::CueResource:
+    case CachedResource::TextTrackResource:
+#endif
+#if ENABLE(CSS_SHADERS)
+    case CachedResource::ShaderResource:
 #endif
     case CachedResource::ImageResource:
     case CachedResource::FontResource: {
@@ -288,7 +305,10 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
     case CachedResource::LinkSubresource:
 #endif
 #if ENABLE(VIDEO_TRACK)
-    case CachedResource::CueResource:
+    case CachedResource::TextTrackResource:
+#endif
+#if ENABLE(CSS_SHADERS)
+    case CachedResource::ShaderResource:
 #endif
         // These types of resources can be loaded from any origin.
         // FIXME: Are we sure about CachedResource::FontResource?
@@ -303,13 +323,6 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
 #endif
     }
 
-    // Given that the load is allowed by the same-origin policy, we should
-    // check whether the load passes the mixed-content policy.
-    //
-    // FIXME: Should we consider forPreload here?
-    if (!checkInsecureContent(type, url))
-        return false;
-
     switch (type) {
 #if ENABLE(XSLT)
     case CachedResource::XSLStyleSheet:
@@ -317,7 +330,19 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
     case CachedResource::Script:
         if (!m_document->contentSecurityPolicy()->allowScriptFromSource(url))
             return false;
+
+        if (frame()) {
+            Settings* settings = frame()->settings();
+            if (!frame()->loader()->client()->allowScriptFromSource(!settings || settings->isScriptEnabled(), url)) {
+                frame()->loader()->client()->didNotAllowScript();
+                return false;
+            }
+        }
         break;
+#if ENABLE(CSS_SHADERS)
+    case CachedResource::ShaderResource:
+        // Since shaders are referenced from CSS Styles use the same rules here.
+#endif
     case CachedResource::CSSStyleSheet:
         if (!m_document->contentSecurityPolicy()->allowStyleFromSource(url))
             return false;
@@ -345,7 +370,7 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
 #endif
         break;
 #if ENABLE(VIDEO_TRACK)
-    case CachedResource::CueResource:
+    case CachedResource::TextTrackResource:
         // Cues aren't called out in the CPS spec yet, but they only work with a media element
         // so use the media policy.
         if (!m_document->contentSecurityPolicy()->allowMediaFromSource(url))
@@ -353,6 +378,14 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
         break;
 #endif
     }
+
+    // Last of all, check for insecure content. We do this last so that when
+    // folks block insecure content with a CSP policy, they don't get a warning.
+    // They'll still get a warning in the console about CSP blocking the load.
+
+    // FIXME: Should we consider forPreload here?
+    if (!checkInsecureContent(type, url))
+        return false;
 
     return true;
 }
@@ -620,6 +653,8 @@ void CachedResourceLoader::removeCachedResource(CachedResource* resource) const
 void CachedResourceLoader::loadDone()
 {
     m_loadFinishing = false;
+
+    RefPtr<Document> protect(m_document);
     if (frame())
         frame()->loader()->loadDone();
     performPostLoadActions();

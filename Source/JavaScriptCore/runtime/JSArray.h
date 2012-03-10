@@ -66,6 +66,7 @@ namespace JSC {
         void finishCreation(JSGlobalData&);
         void finishCreation(JSGlobalData&, unsigned initialLength, ArrayCreationMode);
         void finishCreation(JSGlobalData&, const ArgList&);
+        void finishCreation(JSGlobalData&, const JSValue*, size_t length);
     
     public:
         typedef JSNonFinalObject Base;
@@ -94,11 +95,16 @@ namespace JSC {
             return array;
         }
 
-        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier& propertyName, PropertySlot&);
+        static JSArray* create(JSGlobalData& globalData, Structure* structure, const JSValue* values, size_t length)
+        {
+            JSArray* array = new (allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure);
+            array->finishCreation(globalData, values, length);
+            return array;
+        }
+
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
-        virtual bool getOwnPropertySlotVirtual(ExecState*, unsigned propertyName, PropertySlot&);
         static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
-        virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
+        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
         static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
 
         static JS_EXPORTDATA const ClassInfo s_info;
@@ -174,7 +180,7 @@ namespace JSC {
 
         static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
         static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
-        virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
+        static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
 
         void* subclassData() const;
         void setSubclassData(void*);

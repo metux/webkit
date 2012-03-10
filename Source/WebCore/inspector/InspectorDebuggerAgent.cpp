@@ -100,6 +100,12 @@ bool InspectorDebuggerAgent::enabled()
     return m_inspectorState->getBoolean(DebuggerAgentState::debuggerEnabled);
 }
 
+void InspectorDebuggerAgent::getCapabilities(ErrorString*, RefPtr<InspectorArray>* capabilities)
+{
+    if (scriptDebugServer().canSetScriptSource())
+        (*capabilities)->pushString(InspectorFrontend::Debugger::capabilitySetScriptSource);
+}
+
 void InspectorDebuggerAgent::enable(ErrorString*)
 {
     if (enabled())
@@ -352,6 +358,16 @@ void InspectorDebuggerAgent::getScriptSource(ErrorString* error, const String& s
         *scriptSource = it->second.source;
     else
         *error = "No script for id: " + scriptId;
+}
+
+void InspectorDebuggerAgent::getFunctionLocation(ErrorString* errorString, const String& functionId, RefPtr<InspectorObject>* location)
+{
+    InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(functionId);
+    if (injectedScript.hasNoValue()) {
+        *errorString = "Inspected frame has gone";
+        return;
+    }
+    injectedScript.getFunctionLocation(errorString, functionId, location);
 }
 
 void InspectorDebuggerAgent::schedulePauseOnNextStatement(const String& breakReason, PassRefPtr<InspectorObject> data)

@@ -39,16 +39,15 @@ public:
         return adoptRef(new CSSUnicodeRangeValue(from, to));
     }
 
-    virtual ~CSSUnicodeRangeValue();
-
     UChar32 from() const { return m_from; }
     UChar32 to() const { return m_to; }
 
-    virtual String cssText() const;
+    String customCssText() const;
 
 private:
     CSSUnicodeRangeValue(UChar32 from, UChar32 to)
-        : m_from(from)
+        : CSSValue(UnicodeRangeClass)
+        , m_from(from)
         , m_to(to)
     {
     }

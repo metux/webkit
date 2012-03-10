@@ -29,7 +29,6 @@
 #define IDBFactory_h
 
 #include "DOMStringList.h"
-#include "ExceptionCode.h"
 #include "IDBFactoryBackendInterface.h"
 #include "IDBRequest.h"
 #include "PlatformString.h"
@@ -44,7 +43,10 @@ namespace WebCore {
 class IDBKey;
 class IDBKeyRange;
 class IDBFactoryBackendInterface;
+class IDBVersionChangeRequest;
 class ScriptExecutionContext;
+
+typedef int ExceptionCode;
 
 class IDBFactory : public RefCounted<IDBFactory> {
 public:
@@ -57,6 +59,7 @@ public:
     PassRefPtr<IDBRequest> getDatabaseNames(ScriptExecutionContext*);
 
     PassRefPtr<IDBRequest> open(ScriptExecutionContext*, const String& name, ExceptionCode&);
+    PassRefPtr<IDBVersionChangeRequest> deleteDatabase(ScriptExecutionContext*, const String& name, ExceptionCode&);
 
     short cmp(PassRefPtr<IDBKey> first, PassRefPtr<IDBKey> second, ExceptionCode&);
 
@@ -71,4 +74,3 @@ private:
 #endif
 
 #endif // IDBFactory_h
-

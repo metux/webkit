@@ -144,7 +144,7 @@ void drawHighlightForSVGRenderer(GraphicsContext& context, const Vector<FloatQua
 
 inline LayoutSize frameToMainFrameOffset(Frame* frame)
 {
-    LayoutPoint mainFramePoint = frame->page()->mainFrame()->view()->windowToContents(frame->view()->contentsToWindow(LayoutPoint()));
+    LayoutPoint mainFramePoint = frame->page()->mainFrame()->view()->rootViewToContents(frame->view()->contentsToRootView(LayoutPoint()));
     return toLayoutSize(mainFramePoint);
 }
 
@@ -462,26 +462,8 @@ void drawRectHighlight(GraphicsContext& context, Document* document, HighlightDa
     FloatRect overlayRect = view->visibleContentRect();
     context.translate(-overlayRect.x(), -overlayRect.y());
 
-    static const int outlineThickness = 2;
-
-    Path quadPath = quadToPath(FloatRect(*(highlightData->rect)));
-
-    // Clip out the quad, then draw with a 2px stroke to get a pixel
-    // of outline (because inflating a quad is hard)
-    {
-        context.save();
-        context.clipOut(quadPath);
-
-        context.setStrokeThickness(outlineThickness);
-        context.setStrokeColor(highlightData->contentOutline, ColorSpaceDeviceRGB);
-        context.strokePath(quadPath);
-
-        context.restore();
-    }
-
-    // Now do the fill
-    context.setFillColor(highlightData->content, ColorSpaceDeviceRGB);
-    context.fillPath(quadPath);
+    FloatRect highlightRect(*(highlightData->rect));
+    drawOutlinedQuad(context, highlightRect, highlightData->content, highlightData->contentOutline);
 }
 
 } // anonymous namespace

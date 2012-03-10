@@ -34,8 +34,8 @@
 #include "CSSFontSelector.h"
 #include "CSSStyleSelector.h"
 #include "Document.h"
+#include "DocumentEventQueue.h"
 #include "EventHandler.h"
-#include "EventQueue.h"
 #include "FocusController.h"
 #include "FontCache.h"
 #include "Frame.h"
@@ -70,8 +70,12 @@ const int rowSpacing = 1;
 
 const int optionsSpacingHorizontal = 2;
 
+// The minSize constant was originally defined to render scrollbars correctly.
+// This might vary for different platforms.
 const int minSize = 4;
-const int maxDefaultSize = 10;
+
+// Default size when the multiple attribute is present but size attribute is absent.
+const int defaultSize = 4;
 
 // FIXME: This hardcoded baselineAdjustment is what we used to do for the old
 // widget, but I'm not sure this is right for the new control.
@@ -216,7 +220,8 @@ int RenderListBox::size() const
     int specifiedSize = toHTMLSelectElement(node())->size();
     if (specifiedSize > 1)
         return max(minSize, specifiedSize);
-    return min(max(minSize, numItems()), maxDefaultSize);
+
+    return defaultSize;
 }
 
 int RenderListBox::numVisibleItems() const
@@ -415,8 +420,7 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
     }
 
     // Draw the item text
-    if (itemStyle->visibility() != HIDDEN)
-        paintInfo.context->drawBidiText(itemFont, textRun, r.location());
+    paintInfo.context->drawBidiText(itemFont, textRun, r.location());
 }
 
 void RenderListBox::paintItemBackground(PaintInfo& paintInfo, const LayoutPoint& paintOffset, int listIndex)
@@ -467,7 +471,7 @@ int RenderListBox::listIndexAtOffset(const LayoutSize& offset)
     if (offset.height() < borderTop() + paddingTop() || offset.height() > height() - paddingBottom() - borderBottom())
         return -1;
 
-    LayoutUnit scrollbarWidth = m_vBar ? m_vBar->width() : 0;
+    LayoutUnit scrollbarWidth = m_vBar ? m_vBar->width() : LayoutUnit(0);
     if (offset.width() < borderLeft() + paddingLeft() || offset.width() > width() - borderRight() - paddingRight() - scrollbarWidth)
         return -1;
 
@@ -492,10 +496,10 @@ void RenderListBox::panScroll(const IntPoint& panStartMousePosition)
     else
         previousMousePosition = currentMousePosition;
 
-    LayoutUnit yDelta = currentMousePosition.y() - panStartMousePosition.y();
+    int yDelta = currentMousePosition.y() - panStartMousePosition.y();
 
     // If the point is too far from the center we limit the speed
-    yDelta = max<LayoutUnit>(min<LayoutUnit>(yDelta, maxSpeed), -maxSpeed);
+    yDelta = max<int>(min<int>(yDelta, maxSpeed), -maxSpeed);
     
     if (abs(yDelta) < iconRadius) // at the center we let the space for the icon
         return;
@@ -509,9 +513,9 @@ void RenderListBox::panScroll(const IntPoint& panStartMousePosition)
     // Let's attenuate the speed
     yDelta /= speedReducer;
 
-    LayoutPoint scrollPoint(0, 0);
+    IntPoint scrollPoint(0, 0);
     scrollPoint.setY(absOffset.y() + yDelta);
-    LayoutUnit newOffset = scrollToward(scrollPoint);
+    int newOffset = scrollToward(scrollPoint);
     if (newOffset < 0) 
         return;
 
@@ -521,11 +525,11 @@ void RenderListBox::panScroll(const IntPoint& panStartMousePosition)
     m_inAutoscroll = false;
 }
 
-int RenderListBox::scrollToward(const LayoutPoint& destination)
+int RenderListBox::scrollToward(const IntPoint& destination)
 {
     // FIXME: This doesn't work correctly with transforms.
     FloatPoint absPos = localToAbsolute();
-    LayoutSize positionOffset = roundedLayoutSize(destination - absPos);
+    IntSize positionOffset = roundedIntSize(destination - absPos);
 
     int rows = numVisibleItems();
     int offset = m_indexOffset;
@@ -541,7 +545,7 @@ int RenderListBox::scrollToward(const LayoutPoint& destination)
 
 void RenderListBox::autoscroll()
 {
-    LayoutPoint pos = frame()->view()->windowToContents(frame()->eventHandler()->currentMousePosition());
+    IntPoint pos = frame()->view()->windowToContents(frame()->eventHandler()->currentMousePosition());
 
     int endIndex = scrollToward(pos);
     if (endIndex >= 0) {
@@ -600,17 +604,17 @@ void RenderListBox::valueChanged(unsigned listIndex)
     element->dispatchFormControlChangeEvent();
 }
 
-LayoutUnit RenderListBox::scrollSize(ScrollbarOrientation orientation) const
+int RenderListBox::scrollSize(ScrollbarOrientation orientation) const
 {
     return ((orientation == VerticalScrollbar) && m_vBar) ? (m_vBar->totalSize() - m_vBar->visibleSize()) : 0;
 }
 
-LayoutUnit RenderListBox::scrollPosition(Scrollbar*) const
+int RenderListBox::scrollPosition(Scrollbar*) const
 {
     return m_indexOffset;
 }
 
-void RenderListBox::setScrollOffset(const LayoutPoint& offset)
+void RenderListBox::setScrollOffset(const IntPoint& offset)
 {
     scrollTo(offset.y());
 }
@@ -622,7 +626,7 @@ void RenderListBox::scrollTo(int newOffset)
 
     m_indexOffset = newOffset;
     repaint();
-    node()->document()->eventQueue()->enqueueOrDispatchScrollEvent(node(), EventQueue::ScrollEventElementTarget);
+    node()->document()->eventQueue()->enqueueOrDispatchScrollEvent(node(), DocumentEventQueue::ScrollEventElementTarget);
 }
 
 LayoutUnit RenderListBox::itemHeight() const
@@ -632,7 +636,7 @@ LayoutUnit RenderListBox::itemHeight() const
 
 LayoutUnit RenderListBox::verticalScrollbarWidth() const
 {
-    return m_vBar && !m_vBar->isOverlayScrollbar() ? m_vBar->width() : 0;
+    return m_vBar && !m_vBar->isOverlayScrollbar() ? m_vBar->width() : LayoutUnit(0);
 }
 
 // FIXME: We ignore padding in the vertical direction as far as these values are concerned, since that's
@@ -708,91 +712,91 @@ bool RenderListBox::isActive() const
     return page && page->focusController()->isActive();
 }
 
-void RenderListBox::invalidateScrollbarRect(Scrollbar* scrollbar, const LayoutRect& rect)
+void RenderListBox::invalidateScrollbarRect(Scrollbar* scrollbar, const IntRect& rect)
 {
-    LayoutRect scrollRect = rect;
+    IntRect scrollRect = rect;
     scrollRect.move(width() - borderRight() - scrollbar->width(), borderTop());
     repaintRectangle(scrollRect);
 }
 
-LayoutRect RenderListBox::convertFromScrollbarToContainingView(const Scrollbar* scrollbar, const LayoutRect& scrollbarRect) const
+IntRect RenderListBox::convertFromScrollbarToContainingView(const Scrollbar* scrollbar, const IntRect& scrollbarRect) const
 {
     RenderView* view = this->view();
     if (!view)
         return scrollbarRect;
 
-    LayoutRect rect = scrollbarRect;
+    IntRect rect = scrollbarRect;
 
-    LayoutUnit scrollbarLeft = width() - borderRight() - scrollbar->width();
-    LayoutUnit scrollbarTop = borderTop();
+    int scrollbarLeft = width() - borderRight() - scrollbar->width();
+    int scrollbarTop = borderTop();
     rect.move(scrollbarLeft, scrollbarTop);
 
     return view->frameView()->convertFromRenderer(this, rect);
 }
 
-LayoutRect RenderListBox::convertFromContainingViewToScrollbar(const Scrollbar* scrollbar, const LayoutRect& parentRect) const
+IntRect RenderListBox::convertFromContainingViewToScrollbar(const Scrollbar* scrollbar, const IntRect& parentRect) const
 {
     RenderView* view = this->view();
     if (!view)
         return parentRect;
 
-    LayoutRect rect = view->frameView()->convertToRenderer(this, parentRect);
+    IntRect rect = view->frameView()->convertToRenderer(this, parentRect);
 
-    LayoutUnit scrollbarLeft = width() - borderRight() - scrollbar->width();
-    LayoutUnit scrollbarTop = borderTop();
+    int scrollbarLeft = width() - borderRight() - scrollbar->width();
+    int scrollbarTop = borderTop();
     rect.move(-scrollbarLeft, -scrollbarTop);
     return rect;
 }
 
-LayoutPoint RenderListBox::convertFromScrollbarToContainingView(const Scrollbar* scrollbar, const LayoutPoint& scrollbarPoint) const
+IntPoint RenderListBox::convertFromScrollbarToContainingView(const Scrollbar* scrollbar, const IntPoint& scrollbarPoint) const
 {
     RenderView* view = this->view();
     if (!view)
         return scrollbarPoint;
 
-    LayoutPoint point = scrollbarPoint;
+    IntPoint point = scrollbarPoint;
 
-    LayoutUnit scrollbarLeft = width() - borderRight() - scrollbar->width();
-    LayoutUnit scrollbarTop = borderTop();
+    int scrollbarLeft = width() - borderRight() - scrollbar->width();
+    int scrollbarTop = borderTop();
     point.move(scrollbarLeft, scrollbarTop);
 
     return view->frameView()->convertFromRenderer(this, point);
 }
 
-LayoutPoint RenderListBox::convertFromContainingViewToScrollbar(const Scrollbar* scrollbar, const LayoutPoint& parentPoint) const
+IntPoint RenderListBox::convertFromContainingViewToScrollbar(const Scrollbar* scrollbar, const IntPoint& parentPoint) const
 {
     RenderView* view = this->view();
     if (!view)
         return parentPoint;
 
-    LayoutPoint point = view->frameView()->convertToRenderer(this, parentPoint);
+    IntPoint point = view->frameView()->convertToRenderer(this, parentPoint);
 
-    LayoutUnit scrollbarLeft = width() - borderRight() - scrollbar->width();
-    LayoutUnit scrollbarTop = borderTop();
+    int scrollbarLeft = width() - borderRight() - scrollbar->width();
+    int scrollbarTop = borderTop();
     point.move(-scrollbarLeft, -scrollbarTop);
     return point;
 }
 
-LayoutSize RenderListBox::contentsSize() const
+IntSize RenderListBox::contentsSize() const
 {
-    return LayoutSize(scrollWidth(), scrollHeight());
+    return IntSize(scrollWidth(), scrollHeight());
 }
 
-LayoutUnit RenderListBox::visibleHeight() const
+int RenderListBox::visibleHeight() const
 {
     return height();
 }
 
-LayoutUnit RenderListBox::visibleWidth() const
+int RenderListBox::visibleWidth() const
 {
     return width();
 }
 
-LayoutPoint RenderListBox::currentMousePosition() const
+IntPoint RenderListBox::currentMousePosition() const
 {
     RenderView* view = this->view();
     if (!view)
-        return LayoutPoint();
+        return IntPoint();
     return view->frameView()->currentMousePosition();
 }
 

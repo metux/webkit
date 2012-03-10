@@ -26,6 +26,7 @@
 #ifndef CodeOrigin_h
 #define CodeOrigin_h
 
+#include "ValueRecovery.h"
 #include "WriteBarrier.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
@@ -34,6 +35,7 @@ namespace JSC {
 
 struct InlineCallFrame;
 class ExecutableBase;
+class JSFunction;
 
 struct CodeOrigin {
     uint32_t bytecodeIndex;
@@ -63,6 +65,10 @@ struct CodeOrigin {
     // 2 = inlined one deep, etc.
     unsigned inlineDepth() const;
     
+    // If the code origin corresponds to inlined code, gives you the heap object that
+    // would have owned the code if it had not been inlined. Otherwise returns 0.
+    ExecutableBase* codeOriginOwner() const;
+    
     static unsigned inlineDepthForCallFrame(InlineCallFrame*);
     
     bool operator==(const CodeOrigin& other) const;
@@ -74,11 +80,11 @@ struct CodeOrigin {
 };
 
 struct InlineCallFrame {
+    Vector<ValueRecovery> arguments;
     WriteBarrier<ExecutableBase> executable;
-    unsigned stackOffset;
-    unsigned calleeVR;
+    WriteBarrier<JSFunction> callee;
     CodeOrigin caller;
-    unsigned numArgumentsIncludingThis : 31;
+    unsigned stackOffset : 31;
     bool isCall : 1;
 };
 
@@ -122,6 +128,13 @@ inline Vector<CodeOrigin> CodeOrigin::inlineStack() const
 inline unsigned getCallReturnOffsetForCodeOrigin(CodeOriginAtCallReturnOffset* data)
 {
     return data->callReturnOffset;
+}
+
+inline ExecutableBase* CodeOrigin::codeOriginOwner() const
+{
+    if (!inlineCallFrame)
+        return 0;
+    return inlineCallFrame->executable.get();
 }
 
 } // namespace JSC

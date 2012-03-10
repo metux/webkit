@@ -29,7 +29,6 @@
 #include "CachedResourceClient.h"
 #include "CachedResourceClientWalker.h"
 #include "CachedResourceLoader.h"
-#include "CachedResourceRequest.h"
 #include "Frame.h"
 #include "FrameLoaderClient.h"
 #include "FrameLoaderTypes.h"
@@ -37,6 +36,7 @@
 #include "RenderObject.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
+#include "SubresourceLoader.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
@@ -90,6 +90,15 @@ void CachedImage::load(CachedResourceLoader* cachedResourceLoader, const Resourc
         setLoading(false);
 }
 
+void CachedImage::removeClientForRenderer(RenderObject* renderer)
+{
+#if ENABLE(SVG)
+    if (m_svgImageCache)
+        m_svgImageCache->removeRendererFromCache(renderer);
+#endif
+    removeClient(renderer);
+}
+
 void CachedImage::didAddClient(CachedResourceClient* c)
 {
     if (m_decodedDataDeletionTimer.isActive())
@@ -132,72 +141,21 @@ bool CachedImage::willPaintBrokenImage() const
 }
 
 #if ENABLE(SVG)
-inline Image* CachedImage::lookupImageForSize(const IntSize& size) const
+inline Image* CachedImage::lookupOrCreateImageForRenderer(const RenderObject* renderer)
 {
     if (!m_image)
         return 0;
     if (!m_image->isSVGImage())
         return m_image.get();
-    if (Image* image = m_svgImageCache.imageForSize(size))
-        return image;
-    return m_image.get();
-}
-
-inline Image* CachedImage::lookupImageForRenderer(const RenderObject* renderer) const
-{
-    if (!m_image)
-        return 0;
-    if (!m_image->isSVGImage())
+    Image* useImage = m_svgImageCache->lookupOrCreateBitmapImageForRenderer(renderer);
+    if (useImage == Image::nullImage())
         return m_image.get();
-    if (Image* image = m_svgImageCache.imageForRenderer(renderer))
-        return image;
-    return m_image.get();
-}
-
-inline PassRefPtr<Image> createSVGImage(CachedImage* image, const IntSize& size, SharedBuffer* data)
-{
-    if (size.isEmpty() || !data)
-        return SVGImage::create(image);
-
-    RefPtr<Image> newImage = SVGImage::create(image);
-    newImage->setData(data, true);
-    newImage->setContainerSize(size);
-    return newImage.release();
-}
-
-inline PassRefPtr<Image> CachedImage::lookupOrCreateImageForRenderer(const RenderObject* renderer)
-{
-    if (!m_image)
-        return 0;
-    if (!m_image->isSVGImage())
-        return m_image;
-
-    IntSize size;
-    if (Image* result = m_svgImageCache.imageForRenderer(renderer, &size))
-        return result;
-
-    if (size.isEmpty())
-        return m_image;
-
-    // Create and cache new image at desired size.
-    RefPtr<Image> newImage = createSVGImage(this, size, m_data.get());
-    m_svgImageCache.putImage(size, newImage);
-    return newImage.release();
+    return useImage;
 }
 #else
-inline Image* CachedImage::lookupImageForSize(const IntSize&) const
+inline Image* CachedImage::lookupOrCreateImageForRenderer(const RenderObject*)
 {
     return m_image.get();
-}
-
-inline Image* CachedImage::lookupImageForRenderer(const RenderObject*) const
-{
-    return m_image.get();
-}
-
-inline PassRefPtr<Image> CachedImage::lookupOrCreateImageForRenderer(const RenderObject*)
-{
-    return m_image;
 }
 #endif
 
@@ -230,27 +188,21 @@ Image* CachedImage::imageForRenderer(const RenderObject* renderer)
     }
 
     if (m_image)
-        return lookupOrCreateImageForRenderer(renderer).get();
+        return lookupOrCreateImageForRenderer(renderer);
 
     return Image::nullImage();
 }
 
 void CachedImage::setContainerSizeForRenderer(const RenderObject* renderer, const IntSize& containerSize, float containerZoom)
 {
-    if (!m_image)
+    if (!m_image || containerSize.isEmpty())
         return;
 #if ENABLE(SVG)
     if (!m_image->isSVGImage()) {
         m_image->setContainerSize(containerSize);
         return;
     }
-    m_svgImageCache.setClient(renderer, containerSize);
-
-    Image* image = lookupOrCreateImageForRenderer(renderer).get();
-    if (image && image != m_image) {
-        ASSERT(image->isSVGImage());
-        static_cast<SVGImage*>(image)->setContainerZoom(containerZoom);
-    }
+    m_svgImageCache->setRequestedSizeAndZoom(renderer, SVGImageCache::SizeAndZoom(containerSize, containerZoom));
 #else
     UNUSED_PARAM(renderer);
     m_image->setContainerSize(containerSize);
@@ -288,9 +240,21 @@ IntSize CachedImage::imageSizeForRenderer(const RenderObject* renderer, float mu
     if (!m_image)
         return IntSize();
 #if ENABLE(SVG)
-    // SVGImages already includes the zooming in its intrinsic size.
-    if (m_image->isSVGImage())
-        return lookupImageForRenderer(renderer)->size();
+    if (m_image->isSVGImage()) {
+        // SVGImages already includes the zooming in its intrinsic size.
+        SVGImageCache::SizeAndZoom sizeAndZoom = m_svgImageCache->requestedSizeAndZoom(renderer);
+        if (sizeAndZoom.size.isEmpty())
+            return m_image->size();
+        if (sizeAndZoom.zoom == 1)
+            return sizeAndZoom.size;
+        if (multiplier == 1) {
+            // Consumer wants unscaled coordinates.
+            sizeAndZoom.size.setWidth(sizeAndZoom.size.width() / sizeAndZoom.zoom);
+            sizeAndZoom.size.setHeight(sizeAndZoom.size.height() / sizeAndZoom.zoom);
+            return sizeAndZoom.size;
+        }
+        return sizeAndZoom.size;
+    }
 #endif
 
     if (multiplier == 1.0f)
@@ -314,24 +278,6 @@ void CachedImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& int
         m_image->computeIntrinsicDimensions(intrinsicWidth, intrinsicHeight, intrinsicRatio);
 }
 
-void CachedImage::addClientForRenderer(RenderObject* renderer)
-{
-    ASSERT(renderer);
-#if ENABLE(SVG)
-    m_svgImageCache.addClient(renderer, IntSize());
-#endif
-    addClient(renderer);
-}
-
-void CachedImage::removeClientForRenderer(RenderObject* renderer)
-{
-    ASSERT(renderer);
-#if ENABLE(SVG)
-    m_svgImageCache.removeClient(renderer);
-#endif
-    removeClient(renderer);
-}
-
 void CachedImage::notifyObservers(const IntRect* changeRect)
 {
     CachedResourceClientWalker<CachedImageClient> w(m_clients);
@@ -341,17 +287,18 @@ void CachedImage::notifyObservers(const IntRect* changeRect)
 
 void CachedImage::checkShouldPaintBrokenImage()
 {
-    Frame* frame = m_request ? m_request->cachedResourceLoader()->frame() : 0;
-    if (!frame)
+    if (!m_loader || m_loader->reachedTerminalState())
         return;
 
-    m_shouldPaintBrokenImage = frame->loader()->client()->shouldPaintBrokenImage(m_resourceRequest.url());
+    m_shouldPaintBrokenImage = m_loader->frameLoader()->client()->shouldPaintBrokenImage(m_resourceRequest.url());
 }
 
 void CachedImage::clear()
 {
     destroyDecodedData();
+#if ENABLE(SVG)
     m_svgImageCache.clear();
+#endif
     m_image = 0;
     setEncodedSize(0);
 }
@@ -369,7 +316,9 @@ inline void CachedImage::createImage()
 #endif
 #if ENABLE(SVG)
     if (m_response.mimeType() == "image/svg+xml") {
-        m_image = createSVGImage(this, IntSize(), 0);
+        RefPtr<SVGImage> svgImage = SVGImage::create(this);
+        m_svgImageCache = SVGImageCache::create(svgImage.get());
+        m_image = svgImage.release();
         return;
     }
 #endif
@@ -378,10 +327,9 @@ inline void CachedImage::createImage()
 
 size_t CachedImage::maximumDecodedImageSize()
 {
-    Frame* frame = m_request ? m_request->cachedResourceLoader()->frame() : 0;
-    if (!frame)
+    if (!m_loader || m_loader->reachedTerminalState())
         return 0;
-    Settings* settings = frame->settings();
+    Settings* settings = m_loader->frameLoader()->frame()->settings();
     return settings ? settings->maximumDecodedImageSize() : 0;
 }
 
@@ -449,16 +397,13 @@ void CachedImage::destroyDecodedData()
         setDecodedSize(0);
         if (!MemoryCache::shouldMakeResourcePurgeableOnEviction())
             makePurgeable(true);
-    } else if (m_image && !errorOccurred() && !m_image->isSVGImage())
+    } else if (m_image && !errorOccurred())
         m_image->destroyDecodedData();
 }
 
 void CachedImage::decodedSizeChanged(const Image* image, int delta)
 {
-    if (!image)
-        return;
-    Image* useImage = lookupImageForSize(image->size());
-    if (image != useImage)
+    if (!image || image != m_image)
         return;
     
     setDecodedSize(decodedSize() + delta);
@@ -466,10 +411,7 @@ void CachedImage::decodedSizeChanged(const Image* image, int delta)
 
 void CachedImage::didDraw(const Image* image)
 {
-    if (!image)
-        return;
-    Image* useImage = lookupImageForSize(image->size());
-    if (image != useImage)
+    if (!image || image != m_image)
         return;
     
     double timeStamp = FrameView::currentPaintTimeStamp();
@@ -481,10 +423,7 @@ void CachedImage::didDraw(const Image* image)
 
 bool CachedImage::shouldPauseAnimation(const Image* image)
 {
-    if (!image)
-        return false;
-    Image* useImage = lookupImageForSize(image->size());
-    if (image != useImage)
+    if (!image || image != m_image)
         return false;
     
     CachedResourceClientWalker<CachedImageClient> w(m_clients);
@@ -498,22 +437,23 @@ bool CachedImage::shouldPauseAnimation(const Image* image)
 
 void CachedImage::animationAdvanced(const Image* image)
 {
-    if (!image)
-        return;
-    Image* useImage = lookupImageForSize(image->size());
-    if (image != useImage)
+    if (!image || image != m_image)
         return;
     notifyObservers();
 }
 
 void CachedImage::changedInRect(const Image* image, const IntRect& rect)
 {
-    if (!image)
+    if (!image || image != m_image)
         return;
-    Image* useImage = lookupImageForSize(image->size());
-    if (image != useImage)
+#if ENABLE(SVG)
+    // We have to update the cached ImageBuffers if the underlying content changed.
+    if (image->isSVGImage()) {
+        m_svgImageCache->imageContentChanged();
         return;
+    }
+#endif
     notifyObservers(&rect);
 }
 
-} //namespace WebCore
+} // namespace WebCore

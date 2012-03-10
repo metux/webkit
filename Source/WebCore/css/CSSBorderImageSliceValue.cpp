@@ -32,16 +32,13 @@
 namespace WebCore {
 
 CSSBorderImageSliceValue::CSSBorderImageSliceValue(PassRefPtr<CSSPrimitiveValue> slices, bool fill)
-    : m_slices(slices)
+    : CSSValue(BorderImageSliceClass)
+    , m_slices(slices)
     , m_fill(fill)
 {
 }
 
-CSSBorderImageSliceValue::~CSSBorderImageSliceValue()
-{
-}
-
-String CSSBorderImageSliceValue::cssText() const
+String CSSBorderImageSliceValue::customCssText() const
 {
     // Dump the slices first.
     String text = m_slices->cssText();

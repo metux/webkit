@@ -80,9 +80,11 @@ namespace JSC {
     public:
         typedef JSCell Base;
 
+        virtual void vtableAnchor();
+
         static void visitChildren(JSCell*, SlotVisitor&);
 
-        virtual UString className() const;
+        static UString className(const JSObject*);
 
         static void finalize(JSCell*);
 
@@ -99,21 +101,15 @@ namespace JSC {
         bool getPropertySlot(ExecState*, unsigned propertyName, PropertySlot&);
         bool getPropertyDescriptor(ExecState*, const Identifier& propertyName, PropertyDescriptor&);
 
-        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier& propertyName, PropertySlot&);
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
-        virtual bool getOwnPropertySlotVirtual(ExecState*, unsigned propertyName, PropertySlot&);
         static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
-        virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
+        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
 
         static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
         static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
 
-        virtual void putWithAttributes(JSGlobalData*, const Identifier& propertyName, JSValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot);
-        virtual void putWithAttributes(JSGlobalData*, const Identifier& propertyName, JSValue value, unsigned attributes);
-        virtual void putWithAttributes(JSGlobalData*, unsigned propertyName, JSValue value, unsigned attributes);
-        virtual void putWithAttributes(ExecState*, const Identifier& propertyName, JSValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot);
-        virtual void putWithAttributes(ExecState*, const Identifier& propertyName, JSValue value, unsigned attributes);
-        virtual void putWithAttributes(ExecState*, unsigned propertyName, JSValue value, unsigned attributes);
+        static void putWithAttributes(JSObject*, ExecState*, const Identifier& propertyName, JSValue, unsigned attributes);
+        void putWithAttributes(JSGlobalData*, const Identifier& propertyName, JSValue, unsigned attributes);
 
         bool propertyIsEnumerable(ExecState*, const Identifier& propertyName) const;
 
@@ -124,12 +120,12 @@ namespace JSC {
         static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
         static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
 
-        virtual JSValue defaultValue(ExecState*, PreferredPrimitiveType) const;
+        static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
 
-        virtual bool hasInstance(ExecState*, JSValue, JSValue prototypeProperty);
+        static bool hasInstance(JSObject*, ExecState*, JSValue, JSValue prototypeProperty);
 
-        virtual void getPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
-        virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
+        static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        static void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
 
         JSValue toPrimitive(ExecState*, PreferredPrimitiveType = NoPreference) const;
         bool toBoolean(ExecState*) const;
@@ -137,8 +133,8 @@ namespace JSC {
         double toNumber(ExecState*) const;
         UString toString(ExecState*) const;
 
-        virtual JSObject* toThisObject(ExecState*) const;
-        virtual JSObject* unwrappedObject();
+        static JSObject* toThisObject(JSCell*, ExecState*);
+        JSObject* unwrappedObject();
 
         bool getPropertySpecificValue(ExecState* exec, const Identifier& propertyName, JSCell*& specificFunction) const;
 
@@ -187,16 +183,17 @@ namespace JSC {
         void fillGetterPropertySlot(PropertySlot&, WriteBarrierBase<Unknown>* location);
         void initializeGetterSetterProperty(ExecState*, const Identifier&, GetterSetter*, unsigned attributes);
 
-        virtual void defineGetter(ExecState*, const Identifier& propertyName, JSObject* getterFunction, unsigned attributes = 0);
-        virtual void defineSetter(ExecState*, const Identifier& propertyName, JSObject* setterFunction, unsigned attributes = 0);
-        virtual JSValue lookupGetter(ExecState*, const Identifier& propertyName);
-        virtual JSValue lookupSetter(ExecState*, const Identifier& propertyName);
-        virtual bool defineOwnProperty(ExecState*, const Identifier& propertyName, PropertyDescriptor&, bool shouldThrow);
+        static void defineGetter(JSObject*, ExecState*, const Identifier& propertyName, JSObject* getterFunction, unsigned attributes = 0);
+        static void defineSetter(JSObject*, ExecState*, const Identifier& propertyName, JSObject* setterFunction, unsigned attributes = 0);
+        JSValue lookupGetter(ExecState*, const Identifier& propertyName);
+        JSValue lookupSetter(ExecState*, const Identifier& propertyName);
+        static bool defineOwnProperty(JSObject*, ExecState*, const Identifier& propertyName, PropertyDescriptor&, bool shouldThrow);
 
-        virtual bool isGlobalObject() const { return false; }
-        virtual bool isVariableObject() const { return false; }
-        virtual bool isActivationObject() const { return false; }
-        virtual bool isErrorInstance() const { return false; }
+        bool isGlobalObject() const;
+        bool isVariableObject() const;
+        bool isActivationObject() const;
+        bool isErrorInstance() const;
+        bool isGlobalThis() const;
 
         void seal(JSGlobalData&);
         void freeze(JSGlobalData&);
@@ -406,6 +403,31 @@ inline size_t JSObject::offsetOfInheritorID()
     return OBJECT_OFFSETOF(JSObject, m_inheritorID);
 }
 
+inline bool JSObject::isGlobalObject() const
+{
+    return structure()->typeInfo().type() == GlobalObjectType;
+}
+
+inline bool JSObject::isVariableObject() const
+{
+    return structure()->typeInfo().type() >= VariableObjectType;
+}
+
+inline bool JSObject::isActivationObject() const
+{
+    return structure()->typeInfo().type() == ActivationObjectType;
+}
+
+inline bool JSObject::isErrorInstance() const
+{
+    return structure()->typeInfo().type() == ErrorInstanceType;
+}
+
+inline bool JSObject::isGlobalThis() const
+{
+    return structure()->typeInfo().type() == GlobalThisType;
+}
+
 inline JSObject* constructEmptyObject(ExecState* exec, Structure* structure)
 {
     return JSFinalObject::create(exec, structure);
@@ -501,6 +523,11 @@ inline bool JSValue::inherits(const ClassInfo* classInfo) const
     return isCell() && asCell()->inherits(classInfo);
 }
 
+inline JSObject* JSValue::toThisObject(ExecState* exec) const
+{
+    return isCell() ? asCell()->methodTable()->toThisObject(asCell(), exec) : toThisObjectSlowCase(exec);
+}
+
 ALWAYS_INLINE bool JSObject::inlineGetOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
     if (WriteBarrierBase<Unknown>* location = getDirectLocation(exec->globalData(), propertyName)) {
@@ -520,24 +547,19 @@ ALWAYS_INLINE bool JSObject::inlineGetOwnPropertySlot(ExecState* exec, const Ide
     return false;
 }
 
-ALWAYS_INLINE bool JSObject::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlot(this, exec, propertyName, slot);
-}
-
 // It may seem crazy to inline a function this large, especially a virtual function,
 // but it makes a big difference to property lookup that derived classes can inline their
 // base class call to this.
 ALWAYS_INLINE bool JSObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    return static_cast<JSObject*>(cell)->inlineGetOwnPropertySlot(exec, propertyName, slot);
+    return jsCast<JSObject*>(cell)->inlineGetOwnPropertySlot(exec, propertyName, slot);
 }
 
 ALWAYS_INLINE bool JSCell::fastGetOwnPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
     if (!structure()->typeInfo().overridesGetOwnPropertySlot())
         return asObject(this)->inlineGetOwnPropertySlot(exec, propertyName, slot);
-    return getOwnPropertySlotVirtual(exec, propertyName, slot);
+    return methodTable()->getOwnPropertySlot(this, exec, propertyName, slot);
 }
 
 // Fast call to get a property where we may not yet have converted the string to an
@@ -575,7 +597,7 @@ ALWAYS_INLINE bool JSObject::getPropertySlot(ExecState* exec, unsigned propertyN
 {
     JSObject* object = this;
     while (true) {
-        if (object->getOwnPropertySlotVirtual(exec, propertyName, slot))
+        if (object->methodTable()->getOwnPropertySlotByIndex(object, exec, propertyName, slot))
             return true;
         JSValue prototype = object->prototype();
         if (!prototype.isObject())
@@ -750,7 +772,7 @@ inline void JSObject::transitionTo(JSGlobalData& globalData, Structure* newStruc
 
 inline JSValue JSObject::toPrimitive(ExecState* exec, PreferredPrimitiveType preferredType) const
 {
-    return defaultValue(exec, preferredType);
+    return methodTable()->defaultValue(this, exec, preferredType);
 }
 
 inline JSValue JSValue::get(ExecState* exec, const Identifier& propertyName) const
@@ -796,7 +818,7 @@ inline JSValue JSValue::get(ExecState* exec, unsigned propertyName, PropertySlot
     }
     JSCell* cell = const_cast<JSCell*>(asCell());
     while (true) {
-        if (cell->getOwnPropertySlotVirtual(exec, propertyName, slot))
+        if (cell->methodTable()->getOwnPropertySlotByIndex(cell, exec, propertyName, slot))
             return slot.getValue(exec, propertyName);
         JSValue prototype = asObject(cell)->prototype();
         if (!prototype.isObject())

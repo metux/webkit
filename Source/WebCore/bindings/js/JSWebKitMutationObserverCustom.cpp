@@ -78,6 +78,7 @@ JSValue JSWebKitMutationObserver::observe(ExecState* exec)
 
     JSDictionary dictionary(exec, optionsObject);
     MutationObserverOptions options = 0;
+    // FIXME: Add support for parsing of the attributeFilter option.
     bool option;
     if (dictionary.tryGetProperty("childList", option) && option)
         options |= WebKitMutationObserver::ChildList;
@@ -93,7 +94,10 @@ JSValue JSWebKitMutationObserver::observe(ExecState* exec)
     if (exec->hadException())
         return jsUndefined();
 
-    impl()->observe(target, options);
+    ExceptionCode ec = 0;
+    impl()->observe(target, options, ec);
+    if (ec)
+        setDOMException(exec, ec);
     return jsUndefined();
 }
 

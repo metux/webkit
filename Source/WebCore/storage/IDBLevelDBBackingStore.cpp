@@ -186,7 +186,7 @@ void IDBLevelDBBackingStore::getDatabaseNames(Vector<String>& foundNames)
     }
 }
 
-bool IDBLevelDBBackingStore::extractIDBDatabaseMetaData(const String& name, String& foundVersion, int64_t& foundId)
+bool IDBLevelDBBackingStore::getIDBDatabaseMetaData(const String& name, String& foundVersion, int64_t& foundId)
 {
     const Vector<char> key = DatabaseNameKey::encode(m_identifier, name);
 
@@ -216,21 +216,67 @@ static int64_t getNewDatabaseId(LevelDBDatabase* db)
     return databaseId;
 }
 
-bool IDBLevelDBBackingStore::setIDBDatabaseMetaData(const String& name, const String& version, int64_t& rowId, bool invalidRowId)
+bool IDBLevelDBBackingStore::createIDBDatabaseMetaData(const String& name, const String& version, int64_t& rowId)
 {
-    if (invalidRowId) {
-        rowId = getNewDatabaseId(m_db.get());
-        if (rowId < 0)
-            return false;
+    rowId = getNewDatabaseId(m_db.get());
+    if (rowId < 0)
+        return false;
 
-        const Vector<char> key = DatabaseNameKey::encode(m_identifier, name);
-        if (!putInt(m_db.get(), key, rowId))
+    const Vector<char> key = DatabaseNameKey::encode(m_identifier, name);
+    if (!putInt(m_db.get(), key, rowId))
+        return false;
+    if (!putString(m_db.get(), DatabaseMetaDataKey::encode(rowId, DatabaseMetaDataKey::kUserVersion), version))
+        return false;
+    return true;
+}
+
+bool IDBLevelDBBackingStore::updateIDBDatabaseMetaData(int64_t rowId, const String& version)
+{
+    ASSERT(m_currentTransaction);
+    if (!putString(m_currentTransaction.get(), DatabaseMetaDataKey::encode(rowId, DatabaseMetaDataKey::kUserVersion), version))
+        return false;
+
+    return true;
+}
+
+static bool deleteRange(LevelDBTransaction* transaction, const Vector<char>& begin, const Vector<char>& end)
+{
+    OwnPtr<LevelDBIterator> it = transaction->createIterator();
+    for (it->seek(begin); it->isValid() && compareKeys(it->key(), end) < 0; it->next()) {
+        if (!transaction->remove(it->key()))
             return false;
     }
 
-    if (!putString(m_db.get(), DatabaseMetaDataKey::encode(rowId, DatabaseMetaDataKey::kUserVersion), version))
+    return true;
+}
+
+
+bool IDBLevelDBBackingStore::deleteDatabase(const String& name)
+{
+    if (m_currentTransaction)
         return false;
 
+    RefPtr<IDBLevelDBBackingStore::Transaction> transaction = IDBLevelDBBackingStore::Transaction::create(this);
+    transaction->begin();
+
+    int64_t databaseId;
+    String version;
+    if (!getIDBDatabaseMetaData(name, version, databaseId)) {
+        transaction->rollback();
+        return true;
+    }
+
+    const Vector<char> startKey = DatabaseMetaDataKey::encode(databaseId, DatabaseMetaDataKey::kOriginName);
+    const Vector<char> stopKey = DatabaseMetaDataKey::encode(databaseId + 1, DatabaseMetaDataKey::kOriginName);
+    if (!deleteRange(m_currentTransaction.get(), startKey, stopKey)) {
+        transaction->rollback();
+        return false;
+    }
+
+    const Vector<char> key = DatabaseNameKey::encode(m_identifier, name);
+    m_currentTransaction->remove(key);
+
+    transaction->commit();
     return true;
 }
 
@@ -409,17 +455,6 @@ bool IDBLevelDBBackingStore::createObjectStore(int64_t databaseId, const String&
     }
 
     assignedObjectStoreId = objectStoreId;
-
-    return true;
-}
-
-static bool deleteRange(LevelDBTransaction* transaction, const Vector<char>& begin, const Vector<char>& end)
-{
-    OwnPtr<LevelDBIterator> it = transaction->createIterator();
-    for (it->seek(begin); it->isValid() && compareKeys(it->key(), end) < 0; it->next()) {
-        if (!transaction->remove(it->key()))
-            return false;
-    }
 
     return true;
 }
@@ -1376,8 +1411,6 @@ bool IDBLevelDBBackingStore::backingStoreExists(SecurityOrigin* securityOrigin, 
     // FIXME: this is checking for presence of the domain, not the database itself
     return fileExists(path+"/CURRENT");
 }
-
-// FIXME: deleteDatabase should be part of IDBBackingStore.
 
 } // namespace WebCore
 

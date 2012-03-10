@@ -31,7 +31,6 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
-#include "Document.h"
 #include "EventException.h"
 #include "EventListener.h"
 #include "EventNames.h"
@@ -57,6 +56,7 @@ IDBRequest::IDBRequest(ScriptExecutionContext* context, PassRefPtr<IDBAny> sourc
     , m_readyState(LOADING)
     , m_finished(false)
     , m_cursorType(IDBCursorBackendInterface::InvalidCursorType)
+    , m_cursor(0)
 {
     if (m_transaction) {
         m_transaction->registerRequest(this);
@@ -149,12 +149,10 @@ void IDBRequest::abort()
         ASSERT(m_readyState == DONE);
         return;
     }
-    // FIXME: Remove isDocument check when
-    // https://bugs.webkit.org/show_bug.cgi?id=57789 is resolved.
-    if (!scriptExecutionContext() || !scriptExecutionContext()->isDocument())
+    if (!scriptExecutionContext())
         return;
 
-    EventQueue* eventQueue = static_cast<Document*>(scriptExecutionContext())->eventQueue();
+    EventQueue* eventQueue = scriptExecutionContext()->eventQueue();
     for (size_t i = 0; i < m_enqueuedEvents.size(); ++i) {
         bool removed = eventQueue->cancelEvent(m_enqueuedEvents[i].get());
         ASSERT_UNUSED(removed, removed);
@@ -173,11 +171,18 @@ void IDBRequest::setCursorType(IDBCursorBackendInterface::CursorType cursorType)
     m_cursorType = cursorType;
 }
 
+void IDBRequest::setCursor(PassRefPtr<IDBCursor> cursor)
+{
+    ASSERT(!m_cursor);
+    m_cursor = cursor;
+}
+
 void IDBRequest::onError(PassRefPtr<IDBDatabaseError> error)
 {
     ASSERT(!m_errorCode && m_errorMessage.isNull() && !m_result);
     m_errorCode = error->code();
     m_errorMessage = error->message();
+    m_cursor.clear();
     enqueueEvent(Event::create(eventNames().errorEvent, true, true));
 }
 
@@ -197,10 +202,15 @@ void IDBRequest::onSuccess(PassRefPtr<IDBCursorBackendInterface> backend)
 {
     ASSERT(!m_errorCode && m_errorMessage.isNull() && !m_result);
     ASSERT(m_cursorType != IDBCursorBackendInterface::InvalidCursorType);
+
+    RefPtr<IDBCursor> cursor;
     if (m_cursorType == IDBCursorBackendInterface::IndexKeyCursor)
-        m_result = IDBAny::create(IDBCursor::create(backend, this, m_source.get(), m_transaction.get()));
+        cursor = IDBCursor::create(backend, this, m_source.get(), m_transaction.get());
     else
-        m_result = IDBAny::create(IDBCursorWithValue::create(backend, this, m_source.get(), m_transaction.get()));
+        cursor = IDBCursorWithValue::create(backend, this, m_source.get(), m_transaction.get());
+
+    setResultCursor(cursor, m_cursorType);
+
     enqueueEvent(createSuccessEvent());
 }
 
@@ -233,7 +243,8 @@ void IDBRequest::onSuccess(PassRefPtr<IDBTransactionBackendInterface> prpBackend
     m_transaction = frontend;
 
     ASSERT(m_source->type() == IDBAny::IDBDatabaseType);
-    m_source->idbDatabase()->setSetVersionTransaction(frontend.get());
+    ASSERT(m_transaction->mode() == IDBTransaction::VERSION_CHANGE);
+    m_source->idbDatabase()->setVersionChangeTransaction(frontend.get());
 
     IDBPendingTransactionMonitor::removePendingTransaction(m_transaction->backend());
 
@@ -245,6 +256,17 @@ void IDBRequest::onSuccess(PassRefPtr<SerializedScriptValue> serializedScriptVal
 {
     ASSERT(!m_errorCode && m_errorMessage.isNull() && !m_result);
     m_result = IDBAny::create(serializedScriptValue);
+    m_cursor.clear();
+    enqueueEvent(createSuccessEvent());
+}
+
+void IDBRequest::onSuccessWithContinuation()
+{
+    ASSERT(!m_errorCode && m_errorMessage.isNull() && !m_result);
+    ASSERT(m_cursor);
+
+    setResultCursor(m_cursor, m_cursorType);
+    m_cursor.clear();
     enqueueEvent(createSuccessEvent());
 }
 
@@ -301,8 +323,8 @@ bool IDBRequest::dispatchEvent(PassRefPtr<Event> event)
     ASSERT(event->type() == eventNames().successEvent || event->type() == eventNames().errorEvent || event->type() == eventNames().blockedEvent);
     bool dontPreventDefault = IDBEventDispatcher::dispatch(event.get(), targets);
 
-    // If the result was of type IDBCursor, then we'll fire again.
-    if (m_result && m_result->type() != IDBAny::IDBCursorType && m_result->type() != IDBAny::IDBCursorWithValueType)
+    // If the result was of type IDBCursor, or a onBlocked event, then we'll fire again.
+    if (event->type() != eventNames().blockedEvent && m_result && m_result->type() != IDBAny::IDBCursorType && m_result->type() != IDBAny::IDBCursorWithValueType)
         m_finished = true;
 
     if (m_transaction) {
@@ -327,8 +349,7 @@ void IDBRequest::enqueueEvent(PassRefPtr<Event> event)
     if (!scriptExecutionContext())
         return;
 
-    ASSERT(scriptExecutionContext()->isDocument());
-    EventQueue* eventQueue = static_cast<Document*>(scriptExecutionContext())->eventQueue();
+    EventQueue* eventQueue = scriptExecutionContext()->eventQueue();
     event->setTarget(this);
     eventQueue->enqueueEvent(event.get());
     m_enqueuedEvents.append(event);
@@ -342,6 +363,16 @@ EventTargetData* IDBRequest::eventTargetData()
 EventTargetData* IDBRequest::ensureEventTargetData()
 {
     return &m_eventTargetData;
+}
+
+void IDBRequest::setResultCursor(PassRefPtr<IDBCursor> prpCursor, IDBCursorBackendInterface::CursorType type)
+{
+    if (type == IDBCursorBackendInterface::IndexKeyCursor) {
+        m_result = IDBAny::create(prpCursor);
+        return;
+    }
+
+    m_result = IDBAny::create(IDBCursorWithValue::fromCursor(prpCursor));
 }
 
 } // namespace WebCore

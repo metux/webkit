@@ -29,6 +29,7 @@
 #include "CachedResourceLoader.h"
 #include "ClientRect.h"
 #include "Document.h"
+#include "DocumentMarker.h"
 #include "DocumentMarkerController.h"
 #include "Element.h"
 #include "ExceptionCode.h"
@@ -62,6 +63,34 @@
 #endif
 
 namespace WebCore {
+
+static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerTypes& result)
+{
+    if (markerType.isEmpty() || equalIgnoringCase(markerType, "all"))
+        result = DocumentMarker::AllMarkers();
+    else if (equalIgnoringCase(markerType, "Spelling"))
+        result =  DocumentMarker::Spelling;
+    else if (equalIgnoringCase(markerType, "Grammar"))
+        result =  DocumentMarker::Grammar;
+    else if (equalIgnoringCase(markerType, "TextMatch"))
+        result =  DocumentMarker::TextMatch;
+    else if (equalIgnoringCase(markerType, "Replacement"))
+        result =  DocumentMarker::Replacement;
+    else if (equalIgnoringCase(markerType, "CorrectionIndicator"))
+        result =  DocumentMarker::CorrectionIndicator;
+    else if (equalIgnoringCase(markerType, "RejectedCorrection"))
+        result =  DocumentMarker::RejectedCorrection;
+    else if (equalIgnoringCase(markerType, "Autocorrected"))
+        result =  DocumentMarker::Autocorrected;
+    else if (equalIgnoringCase(markerType, "SpellCheckingExemption"))
+        result =  DocumentMarker::SpellCheckingExemption;
+    else if (equalIgnoringCase(markerType, "DeletedAutocorrection"))
+        result =  DocumentMarker::DeletedAutocorrection;
+    else
+        return false;
+
+    return true;
+}
 
 const char* Internals::internalsId = "internals";
 
@@ -174,19 +203,14 @@ String Internals::shadowPseudoId(Element* element, ExceptionCode& ec)
 }
 
 #if ENABLE(INPUT_COLOR)
-bool Internals::connectColorChooserClient(Element* element)
+void Internals::selectColorInColorChooser(Element* element, const String& colorValue)
 {
     if (!element->hasTagName(HTMLNames::inputTag))
-        return false;
+        return;
     HTMLInputElement* inputElement = element->toInputElement();
     if (!inputElement)
-        return false;
-    return inputElement->connectToColorChooser();
-}
-
-void Internals::selectColorInColorChooser(const String& colorValue)
-{
-    ColorChooser::chooser()->colorSelected(Color(colorValue));
+        return;
+    inputElement->selectColorInColorChooser(Color(colorValue));
 }
 #endif
 
@@ -215,24 +239,36 @@ PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionCode& e
     return ClientRect::create(renderer->absoluteBoundingBoxRectIgnoringTransforms());
 }
 
-unsigned Internals::markerCountForNode(Node* node, ExceptionCode& ec)
+unsigned Internals::markerCountForNode(Node* node, const String& markerType, ExceptionCode& ec)
 {
     if (!node) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
 
-    return node->document()->markers()->markersFor(node).size();
+    DocumentMarker::MarkerTypes markerTypes = 0;
+    if (!markerTypesFrom(markerType, markerTypes)) {
+        ec = SYNTAX_ERR;
+        return 0;
+    }
+
+    return node->document()->markers()->markersFor(node, markerTypes).size();
 }
 
-PassRefPtr<Range> Internals::markerRangeForNode(Node* node, unsigned index, ExceptionCode& ec)
+PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
     if (!node) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
-    
-    Vector<DocumentMarker*> markers = node->document()->markers()->markersFor(node);
+
+    DocumentMarker::MarkerTypes markerTypes = 0;
+    if (!markerTypesFrom(markerType, markerTypes)) {
+        ec = SYNTAX_ERR;
+        return 0;
+    }
+
+    Vector<DocumentMarker*> markers = node->document()->markers()->markersFor(node, markerTypes);
     if (markers.size() <= index)
         return 0;
     return Range::create(node->document(), node, markers[index]->startOffset(), node, markers[index]->endOffset());
@@ -246,6 +282,36 @@ void Internals::setForceCompositingMode(Document* document, bool enabled, Except
     }
 
     document->settings()->setForceCompositingMode(enabled);
+}
+
+void Internals::setEnableCompositingForFixedPosition(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->settings()->setAcceleratedCompositingForFixedPositionEnabled(enabled);
+}
+
+void Internals::setEnableCompositingForScrollableFrames(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->settings()->setAcceleratedCompositingForScrollableFramesEnabled(enabled);
+}
+
+void Internals::setAcceleratedDrawingEnabled(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->settings()->setAcceleratedDrawingEnabled(enabled);
 }
 
 void Internals::setEnableScrollAnimator(Document* document, bool enabled, ExceptionCode& ec)
@@ -305,6 +371,16 @@ void Internals::setZoomParameters(Document* document, float scale, float x, floa
 #endif
 }
 
+void Internals::setMockScrollbarsEnabled(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->settings()->setMockScrollbarsEnabled(enabled);
+}
+
 void Internals::setPasswordEchoEnabled(Document* document, bool enabled, ExceptionCode& ec)
 {
     if (!document || !document->settings()) {
@@ -351,6 +427,30 @@ void Internals::setScrollViewPosition(Document* document, long x, long y, Except
     frameView->setConstrainsScrollingToContentEdge(constrainsScrollingToContentEdgeOldValue);
 }
 
+void Internals::setPagination(Document* document, const String& mode, int gap, ExceptionCode& ec)
+{
+    if (!document || !document->page()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    Page::Pagination pagination;
+    if (mode == "Unpaginated")
+        pagination.mode = Page::Pagination::Unpaginated;
+    else if (mode == "HorizontallyPaginated")
+        pagination.mode = Page::Pagination::HorizontallyPaginated;
+    else if (mode == "VerticallyPaginated")
+        pagination.mode = Page::Pagination::VerticallyPaginated;
+    else {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
+    pagination.gap = gap;
+
+    document->page()->setPagination(pagination);
+}
+
 void Internals::reset(Document* document)
 {
     if (!document || !document->settings())
@@ -365,6 +465,9 @@ void Internals::reset(Document* document)
         document->settings()->setPasswordEchoEnabled(passwordEchoEnabledBackup);
         passwordEchoEnabledBackedUp = false;
     }
+
+    if (Page* page = document->page())
+        page->setPagination(Page::Pagination());
 }
 
 bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
@@ -472,6 +575,26 @@ unsigned Internals::lengthFromRange(Element* scope, const Range* range, Exceptio
     size_t length = 0;
     TextIterator::getLocationAndLengthFromRange(scope, range, unusedLocation, length);
     return length;
+}
+
+void Internals::setUnifiedTextCheckingEnabled(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->frame() || !document->frame()->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->frame()->settings()->setUnifiedTextCheckerEnabled(enabled);
+}
+
+bool Internals::unifiedTextCheckingEnabled(Document* document, ExceptionCode& ec)
+{
+    if (!document || !document->frame() || !document->frame()->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return false;
+    }
+
+    return document->frame()->settings()->unifiedTextCheckerEnabled();
 }
 
 }

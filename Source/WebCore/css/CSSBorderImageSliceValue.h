@@ -40,9 +40,8 @@ public:
     {
         return adoptRef(new CSSBorderImageSliceValue(slices, fill));
     }
-    virtual ~CSSBorderImageSliceValue();
 
-    virtual String cssText() const;
+    String customCssText() const;
 
     Quad* slices() { return m_slices ? m_slices->getQuadValue() : 0; }
 
@@ -53,7 +52,6 @@ public:
 
 private:
     CSSBorderImageSliceValue(PassRefPtr<CSSPrimitiveValue> slices, bool fill);
-    virtual bool isBorderImageSliceValue() const { return true; }
 };
 
 } // namespace WebCore

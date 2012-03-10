@@ -55,6 +55,17 @@ namespace JSC {
 
     typedef Vector<ExecState*, 16> ExecStateStack;
     
+    struct GlobalObjectMethodTable {
+        typedef bool (*SupportsProfilingFunctionPtr)(const JSGlobalObject*); 
+        SupportsProfilingFunctionPtr supportsProfiling;
+
+        typedef bool (*SupportsRichSourceInfoFunctionPtr)(const JSGlobalObject*);
+        SupportsRichSourceInfoFunctionPtr supportsRichSourceInfo;
+
+        typedef bool (*ShouldInterruptScriptFunctionPtr)(const JSGlobalObject*);
+        ShouldInterruptScriptFunctionPtr shouldInterruptScript;
+    };
+
     class JSGlobalObject : public JSVariableObject {
     private:
         typedef HashSet<RefPtr<OpaqueJSWeakObjectMap> > WeakMapSet;
@@ -133,6 +144,9 @@ namespace JSC {
 
         bool m_evalEnabled;
 
+        static JS_EXPORTDATA const GlobalObjectMethodTable s_globalObjectMethodTable;
+        const GlobalObjectMethodTable* m_globalObjectMethodTable;
+
         void createRareDataIfNeeded()
         {
             if (m_rareData)
@@ -154,12 +168,13 @@ namespace JSC {
         static JS_EXPORTDATA const ClassInfo s_info;
 
     protected:
-        explicit JSGlobalObject(JSGlobalData& globalData, Structure* structure)
+        explicit JSGlobalObject(JSGlobalData& globalData, Structure* structure, const GlobalObjectMethodTable* globalObjectMethodTable = 0)
             : JSVariableObject(globalData, structure, &m_symbolTable, 0)
             , m_registerArraySize(0)
             , m_globalScopeChain()
             , m_weakRandom(static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)))
             , m_evalEnabled(true)
+            , m_globalObjectMethodTable(globalObjectMethodTable ? globalObjectMethodTable : &s_globalObjectMethodTable)
         {
         }
 
@@ -182,16 +197,15 @@ namespace JSC {
 
         static void visitChildren(JSCell*, SlotVisitor&);
 
-        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
-        virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
-        virtual bool hasOwnPropertyForWrite(ExecState*, const Identifier&);
+        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
+        bool hasOwnPropertyForWrite(ExecState*, const Identifier&);
         static void put(JSCell*, ExecState*, const Identifier&, JSValue, PutPropertySlot&);
 
-        virtual void putWithAttributes(ExecState*, const Identifier& propertyName, JSValue value, unsigned attributes);
+        static void putWithAttributes(JSObject*, ExecState*, const Identifier& propertyName, JSValue, unsigned attributes);
 
-        virtual void defineGetter(ExecState*, const Identifier& propertyName, JSObject* getterFunc, unsigned attributes);
-        virtual void defineSetter(ExecState*, const Identifier& propertyName, JSObject* setterFunc, unsigned attributes);
+        static void defineGetter(JSObject*, ExecState*, const Identifier& propertyName, JSObject* getterFunc, unsigned attributes);
+        static void defineSetter(JSObject*, ExecState*, const Identifier& propertyName, JSObject* setterFunc, unsigned attributes);
 
         // We use this in the code generator as we perform symbol table
         // lookups prior to initializing the properties
@@ -263,20 +277,18 @@ namespace JSC {
         Debugger* debugger() const { return m_debugger; }
         void setDebugger(Debugger* debugger) { m_debugger = debugger; }
 
-        virtual bool supportsProfiling() const { return false; }
-        virtual bool supportsRichSourceInfo() const { return true; }
+        const GlobalObjectMethodTable* globalObjectMethodTable() const { return m_globalObjectMethodTable; }
+
+        static bool supportsProfiling(const JSGlobalObject*) { return false; }
+        static bool supportsRichSourceInfo(const JSGlobalObject*) { return true; }
 
         ScopeChainNode* globalScopeChain() { return m_globalScopeChain.get(); }
 
-        virtual bool isGlobalObject() const { return true; }
-
         ExecState* globalExec();
 
-        virtual bool shouldInterruptScript() const { return true; }
+        static bool shouldInterruptScript(const JSGlobalObject*) { return true; }
 
-        virtual bool allowsAccessFrom(const JSGlobalObject*) const { return true; }
-
-        virtual bool isDynamicScope(bool& requiresDynamicChecks) const;
+        bool isDynamicScope(bool& requiresDynamicChecks) const;
 
         void setEvalEnabled(bool enabled) { m_evalEnabled = enabled; }
         bool evalEnabled() { return m_evalEnabled; }
@@ -289,7 +301,7 @@ namespace JSC {
 
         static Structure* createStructure(JSGlobalData& globalData, JSValue prototype)
         {
-            return Structure::create(globalData, 0, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
+            return Structure::create(globalData, 0, prototype, TypeInfo(GlobalObjectType, StructureFlags), &s_info);
         }
 
         void registerWeakMap(OpaqueJSWeakObjectMap* map)
@@ -461,6 +473,11 @@ namespace JSC {
         return constructArray(exec, exec->lexicalGlobalObject(), values);
     }
 
+    inline JSArray* constructArray(ExecState* exec, const JSValue* values, size_t length)
+    {
+        return JSArray::create(exec->globalData(), exec->lexicalGlobalObject()->arrayStructure(), values, length);
+    }
+
     class DynamicGlobalObjectScope {
         WTF_MAKE_NONCOPYABLE(DynamicGlobalObjectScope);
     public:
@@ -475,6 +492,11 @@ namespace JSC {
         JSGlobalObject*& m_dynamicGlobalObjectSlot;
         JSGlobalObject* m_savedDynamicGlobalObject;
     };
+
+    inline bool JSGlobalObject::isDynamicScope(bool&) const
+    {
+        return true;
+    }
 
 } // namespace JSC
 

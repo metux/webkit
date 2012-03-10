@@ -22,7 +22,6 @@
 #define CSSStyleDeclaration_h
 
 #include "CSSRule.h"
-#include "StyleBase.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -103,15 +102,23 @@ public:
     void showStyle();
 #endif
 
-    virtual bool isMutableStyleDeclaration() const { return false; }
+    bool isMutableStyleDeclaration() const { return m_isMutableStyleDeclaration; }
 
 protected:
-    CSSStyleDeclaration(CSSRule* parentRule = 0);
+    CSSStyleDeclaration(CSSRule* parentRule = 0, bool isMutable = false);
 
     virtual bool cssPropertyMatches(const CSSProperty*) const;
 
+    // These bits are only used by CSSMutableStyleDeclaration but kept here
+    // to maximize struct packing.
+    bool m_strictParsing : 1;
+#ifndef NDEBUG
+    unsigned m_iteratorCount : 4;
+#endif
+
 private:
-    bool m_parentIsRule;
+    bool m_isMutableStyleDeclaration : 1;
+    bool m_parentIsRule : 1;
     union {
         CSSRule* m_parentRule;
         CSSStyleSheet* m_parentStyleSheet;

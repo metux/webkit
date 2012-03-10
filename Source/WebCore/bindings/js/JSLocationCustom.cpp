@@ -154,26 +154,27 @@ bool JSLocation::putDelegate(ExecState* exec, const Identifier& propertyName, JS
 
 bool JSLocation::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName)
 {
-    JSLocation* thisObject = static_cast<JSLocation*>(cell);
+    JSLocation* thisObject = jsCast<JSLocation*>(cell);
     // Only allow deleting by frames in the same origin.
     if (!allowsAccessFromFrame(exec, thisObject->impl()->frame()))
         return false;
     return Base::deleteProperty(thisObject, exec, propertyName);
 }
 
-void JSLocation::getOwnPropertyNames(ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
+void JSLocation::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
+    JSLocation* thisObject = jsCast<JSLocation*>(object);
     // Only allow the location object to enumerated by frames in the same origin.
-    if (!allowsAccessFromFrame(exec, impl()->frame()))
+    if (!allowsAccessFromFrame(exec, thisObject->impl()->frame()))
         return;
-    Base::getOwnPropertyNames(exec, propertyNames, mode);
+    Base::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
-void JSLocation::defineGetter(ExecState* exec, const Identifier& propertyName, JSObject* getterFunction, unsigned attributes)
+void JSLocation::defineGetter(JSObject* object, ExecState* exec, const Identifier& propertyName, JSObject* getterFunction, unsigned attributes)
 {
     if (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf)
         return;
-    Base::defineGetter(exec, propertyName, getterFunction, attributes);
+    Base::defineGetter(object, exec, propertyName, getterFunction, attributes);
 }
 
 void JSLocation::setHref(ExecState* exec, JSValue value)
@@ -280,11 +281,11 @@ bool JSLocationPrototype::putDelegate(ExecState* exec, const Identifier& propert
     return (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf);
 }
 
-void JSLocationPrototype::defineGetter(ExecState* exec, const Identifier& propertyName, JSObject* getterFunction, unsigned attributes)
+void JSLocationPrototype::defineGetter(JSObject* object, ExecState* exec, const Identifier& propertyName, JSObject* getterFunction, unsigned attributes)
 {
     if (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf)
         return;
-    Base::defineGetter(exec, propertyName, getterFunction, attributes);
+    Base::defineGetter(object, exec, propertyName, getterFunction, attributes);
 }
 
 } // namespace WebCore

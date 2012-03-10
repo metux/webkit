@@ -135,7 +135,7 @@ Settings::Settings(Page* page)
     , m_isMediaEnabled(true)
     , m_arePluginsEnabled(false)
     , m_localStorageEnabled(false)
-    , m_isJavaScriptEnabled(false)
+    , m_isScriptEnabled(false)
     , m_isWebSecurityEnabled(true)
     , m_allowUniversalAccessFromFileURLs(true)
     , m_allowFileAccessFromFileURLs(true)
@@ -180,6 +180,8 @@ Settings::Settings(Page* page)
     , m_acceleratedCompositingForPluginsEnabled(true)
     , m_acceleratedCompositingForCanvasEnabled(true)
     , m_acceleratedCompositingForAnimationEnabled(true)
+    , m_acceleratedCompositingForFixedPositionEnabled(false)
+    , m_acceleratedCompositingForScrollableFramesEnabled(false)
     , m_showDebugBorders(false)
     , m_showRepaintCounter(false)
     , m_experimentalNotificationsEnabled(false)
@@ -195,9 +197,6 @@ Settings::Settings(Page* page)
     , m_dnsPrefetchingEnabled(false)
 #if ENABLE(FULLSCREEN_API)
     , m_fullScreenAPIEnabled(false)
-#endif
-#if ENABLE(MOUSE_LOCK_API)
-    , m_mouseLockAPIEnabled(false)
 #endif
     , m_asynchronousSpellCheckingEnabled(false)
 #if USE(UNIFIED_TEXT_CHECKING)
@@ -228,6 +227,8 @@ Settings::Settings(Page* page)
     , m_passwordEchoEnabled(false)
 #endif
     , m_suppressIncrementalRendering(false)
+    , m_backspaceKeyNavigationEnabled(true)
+    , m_visualWordMovementEnabled(false)
     , m_loadsImagesAutomaticallyTimer(this, &Settings::loadsImagesAutomaticallyTimerFired)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString 
@@ -365,9 +366,9 @@ void Settings::setLoadsSiteIconsIgnoringImageLoadingSetting(bool loadsSiteIcons)
     m_loadsSiteIconsIgnoringImageLoadingSetting = loadsSiteIcons;
 }
 
-void Settings::setJavaScriptEnabled(bool isJavaScriptEnabled)
+void Settings::setScriptEnabled(bool isScriptEnabled)
 {
-    m_isJavaScriptEnabled = isJavaScriptEnabled;
+    m_isScriptEnabled = isScriptEnabled;
 }
 
 void Settings::setWebSecurityEnabled(bool isWebSecurityEnabled)
@@ -714,11 +715,6 @@ void Settings::setAcceleratedCompositingEnabled(bool enabled)
 void Settings::setCanvasUsesAcceleratedDrawing(bool enabled)
 {
     m_canvasUsesAcceleratedDrawing = enabled;
-}
-
-void Settings::setAcceleratedDrawingEnabled(bool enabled)
-{
-    m_acceleratedDrawingEnabled = enabled;
 }
 
 void Settings::setAcceleratedCompositingFor3DTransformsEnabled(bool enabled)

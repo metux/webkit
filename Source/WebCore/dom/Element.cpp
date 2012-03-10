@@ -470,7 +470,7 @@ int Element::scrollHeight()
     return 0;
 }
 
-LayoutRect Element::boundsInWindowSpace()
+LayoutRect Element::boundsInRootViewSpace()
 {
     document()->updateLayoutIgnorePendingStylesheets();
 
@@ -501,7 +501,7 @@ LayoutRect Element::boundsInWindowSpace()
     for (size_t i = 1; i < quads.size(); ++i)
         result.unite(quads[i].enclosingBoundingBox());
 
-    result = view->contentsToWindow(result);
+    result = view->contentsToRootView(result);
     return result;
 }
 
@@ -617,16 +617,44 @@ const AtomicString& Element::getAttributeNS(const String& namespaceURI, const St
 }
 
 #if ENABLE(MUTATION_OBSERVERS)
-static void enqueueAttributesMutationRecord(Element* element, const QualifiedName& name)
+static inline bool hasOldValue(MutationObserverOptions options)
 {
-    Vector<WebKitMutationObserver*> observers;
-    element->getRegisteredMutationObserversOfType(observers, WebKitMutationObserver::Attributes);
+    return options & WebKitMutationObserver::AttributeOldValue;
+}
+
+static inline bool isOldValueRequested(const HashMap<WebKitMutationObserver*, MutationObserverOptions>& observers)
+{
+    for (HashMap<WebKitMutationObserver*, MutationObserverOptions>::const_iterator iter = observers.begin(); iter != observers.end(); ++iter) {
+        if (hasOldValue(iter->second))
+            return true;
+    }
+    return false;
+}
+
+static void enqueueAttributesMutationRecord(Element* element, const QualifiedName& name, const AtomicString& oldValue)
+{
+    HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions> observers;
+    element->getRegisteredMutationObserversOfType(observers, WebKitMutationObserver::Attributes, name.localName());
     if (observers.isEmpty())
         return;
 
-    RefPtr<MutationRecord> mutation = MutationRecord::createAttributes(element, name);
-    for (size_t i = 0; i < observers.size(); ++i)
-        observers[i]->enqueueMutationRecord(mutation);
+    // FIXME: Factor this logic out to avoid duplication with characterDataOldValue.
+    RefPtr<MutationRecord> mutation = MutationRecord::createAttributes(element, name, isOldValueRequested(observers) ? oldValue : nullAtom);
+    RefPtr<MutationRecord> mutationWithNullOldValue;
+    for (HashMap<WebKitMutationObserver*, MutationObserverOptions>::iterator iter = observers.begin(); iter != observers.end(); ++iter) {
+        WebKitMutationObserver* observer = iter->first;
+        if (hasOldValue(iter->second)) {
+            observer->enqueueMutationRecord(mutation);
+            continue;
+        }
+        if (!mutationWithNullOldValue) {
+            if (mutation->oldValue().isNull())
+                mutationWithNullOldValue = mutation;
+            else
+                mutationWithNullOldValue = MutationRecord::createWithNullOldValue(mutation).get();
+        }
+        observer->enqueueMutationRecord(mutationWithNullOldValue);
+    }
 }
 #endif
 
@@ -652,7 +680,7 @@ void Element::setAttribute(const AtomicString& name, const AtomicString& value, 
 
 #if ENABLE(MUTATION_OBSERVERS)
     // The call to attributeChanged below may dispatch DOMSubtreeModified, so it's important to enqueue a MutationRecord now.
-    enqueueAttributesMutationRecord(this, attributeName);
+    enqueueAttributesMutationRecord(this, attributeName, old ? old->value() : nullAtom);
 #endif
 
     if (isIdAttributeName(old ? old->name() : attributeName))
@@ -690,7 +718,7 @@ void Element::setAttribute(const QualifiedName& name, const AtomicString& value,
 
 #if ENABLE(MUTATION_OBSERVERS)
     // The call to attributeChanged below may dispatch DOMSubtreeModified, so it's important to enqueue a MutationRecord now.
-    enqueueAttributesMutationRecord(this, name);
+    enqueueAttributesMutationRecord(this, name, old ? old->value() : nullAtom);
 #endif
 
     if (isIdAttributeName(name))

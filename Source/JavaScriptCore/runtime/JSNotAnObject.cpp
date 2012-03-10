@@ -39,15 +39,10 @@ ASSERT_CLASS_FITS_IN_CELL(JSNotAnObject);
 const ClassInfo JSNotAnObject::s_info = { "Object", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSNotAnObject) };
 
 // JSValue methods
-JSValue JSNotAnObject::defaultValue(ExecState* exec, PreferredPrimitiveType) const
+JSValue JSNotAnObject::defaultValue(const JSObject*, ExecState* exec, PreferredPrimitiveType)
 {
     ASSERT_UNUSED(exec, exec->hadException());
     return jsNumber(0);
-}
-
-bool JSNotAnObject::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& identifier, PropertySlot& slot)
-{
-    return getOwnPropertySlot(this, exec, identifier, slot);
 }
 
 // JSObject methods
@@ -57,18 +52,13 @@ bool JSNotAnObject::getOwnPropertySlot(JSCell*, ExecState* exec, const Identifie
     return false;
 }
 
-bool JSNotAnObject::getOwnPropertySlotVirtual(ExecState* exec, unsigned propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlotByIndex(this, exec, propertyName, slot);
-}
-
 bool JSNotAnObject::getOwnPropertySlotByIndex(JSCell*, ExecState* exec, unsigned, PropertySlot&)
 {
     ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
-bool JSNotAnObject::getOwnPropertyDescriptor(ExecState* exec, const Identifier&, PropertyDescriptor&)
+bool JSNotAnObject::getOwnPropertyDescriptor(JSObject*, ExecState* exec, const Identifier&, PropertyDescriptor&)
 {
     ASSERT_UNUSED(exec, exec->hadException());
     return false;
@@ -96,7 +86,7 @@ bool JSNotAnObject::deletePropertyByIndex(JSCell*, ExecState* exec, unsigned)
     return false;
 }
 
-void JSNotAnObject::getOwnPropertyNames(ExecState* exec, PropertyNameArray&, EnumerationMode)
+void JSNotAnObject::getOwnPropertyNames(JSObject*, ExecState* exec, PropertyNameArray&, EnumerationMode)
 {
     ASSERT_UNUSED(exec, exec->hadException());
 }

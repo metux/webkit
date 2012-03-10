@@ -34,7 +34,10 @@
 
 #include "WebKitMutationObserver.h"
 
+#include "Document.h"
+#include "ExceptionCode.h"
 #include "MutationCallback.h"
+#include "MutationObserverRegistration.h"
 #include "MutationRecord.h"
 #include "Node.h"
 #include <wtf/ListHashSet.h>
@@ -53,32 +56,54 @@ WebKitMutationObserver::WebKitMutationObserver(PassRefPtr<MutationCallback> call
 
 WebKitMutationObserver::~WebKitMutationObserver()
 {
+    ASSERT(m_registrations.isEmpty());
 }
 
-void WebKitMutationObserver::observe(Node* node, MutationObserverOptions options)
+bool WebKitMutationObserver::validateOptions(MutationObserverOptions options)
 {
-    // FIXME: More options composition work needs to be done here, e.g., validation.
+    return (options & (Attributes | CharacterData | ChildList))
+        && ((options & Attributes) || !(options & AttributeOldValue))
+        && ((options & Attributes) || !(options & AttributeFilter))
+        && ((options & CharacterData) || !(options & CharacterDataOldValue));
+}
 
-    if (node->registerMutationObserver(this, options) == Node::MutationObserverRegistered)
-        m_observedNodes.append(node);
+void WebKitMutationObserver::observe(Node* node, MutationObserverOptions options, const HashSet<AtomicString>& attributeFilter, ExceptionCode& ec)
+{
+    if (!node) {
+        ec = NOT_FOUND_ERR;
+        return;
+    }
+
+    if (!validateOptions(options)) {
+        // FIXME: Revisit this once the spec specifies the exception type; SYNTAX_ERR may not be appropriate.
+        ec = SYNTAX_ERR;
+        return;
+    }
+
+    MutationObserverRegistration* registration = node->registerMutationObserver(this);
+    registration->resetObservation(options, attributeFilter);
+
+    if (registration->isSubtree())
+        node->document()->addSubtreeMutationObserverTypes(registration->mutationTypes());
 }
 
 void WebKitMutationObserver::disconnect()
 {
-    for (size_t i = 0; i < m_observedNodes.size(); ++i)
-        m_observedNodes[i]->unregisterMutationObserver(this);
-
-    m_observedNodes.clear();
+    HashSet<MutationObserverRegistration*> registrations(m_registrations);
+    for (HashSet<MutationObserverRegistration*>::iterator iter = registrations.begin(); iter != registrations.end(); ++iter)
+        (*iter)->unregister();
 }
 
-void WebKitMutationObserver::observedNodeDestructed(Node* node)
+void WebKitMutationObserver::observationStarted(MutationObserverRegistration* registration)
 {
-    size_t index = m_observedNodes.find(node);
-    ASSERT(index != notFound);
-    if (index == notFound)
-        return;
+    ASSERT(!m_registrations.contains(registration));
+    m_registrations.add(registration);
+}
 
-    m_observedNodes.remove(index);
+void WebKitMutationObserver::observationEnded(MutationObserverRegistration* registration)
+{
+    ASSERT(m_registrations.contains(registration));
+    m_registrations.remove(registration);
 }
 
 typedef ListHashSet<RefPtr<WebKitMutationObserver> > MutationObserverSet;
@@ -99,6 +124,10 @@ void WebKitMutationObserver::deliver()
 {
     MutationRecordArray records;
     records.swap(m_records);
+
+    for (HashSet<MutationObserverRegistration*>::iterator iter = m_registrations.begin(); iter != m_registrations.end(); ++iter)
+        (*iter)->clearTransientRegistrations();
+
     m_callback->handleEvent(&records, this);
 }
 

@@ -3,6 +3,7 @@
  * Copyright (C) 2007, 2008 Alp Toker <alp@atoker.com>
  * Copyright (C) 2008 Collabora Ltd.
  * Copyright (C) 2011 Igalia S.L.
+ * Portions Copyright (c) 2011 Motorola Mobility, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -29,8 +30,10 @@
 
 #include <webkit2/WebKitBackForwardList.h>
 #include <webkit2/WebKitDefines.h>
+#include <webkit2/WebKitNetworkRequest.h>
 #include <webkit2/WebKitWebContext.h>
 #include <webkit2/WebKitWebLoaderClient.h>
+#include <webkit2/WebKitSettings.h>
 #include <webkit2/WebKitWebViewBase.h>
 
 G_BEGIN_DECLS
@@ -89,13 +92,28 @@ webkit_web_view_load_uri                     (WebKitWebView             *web_vie
                                               const gchar               *uri);
 
 WEBKIT_API void
+webkit_web_view_load_html                    (WebKitWebView         *web_view,
+                                              const gchar           *content,
+                                              const gchar           *base_uri);
+
+WEBKIT_API void
+webkit_web_view_load_plain_text              (WebKitWebView         *web_view,
+                                              const gchar           *plain_text);
+
+WEBKIT_API void
 webkit_web_view_load_alternate_html          (WebKitWebView             *web_view,
                                               const gchar               *content,
                                               const gchar               *base_uri,
                                               const gchar               *unreachable_uri);
+WEBKIT_API void
+webkit_web_view_load_request                 (WebKitWebView             *web_view,
+                                              WebKitNetworkRequest      *request);
 
 WEBKIT_API void
 webkit_web_view_stop_loading                 (WebKitWebView             *web_view);
+
+WEBKIT_API const gchar * 
+webkit_web_view_get_title                    (WebKitWebView             *web_view);
 
 WEBKIT_API void
 webkit_web_view_reload                       (WebKitWebView             *web_view);
@@ -124,6 +142,8 @@ webkit_web_view_get_back_forward_list        (WebKitWebView             *web_vie
 WEBKIT_API void
 webkit_web_view_go_to_back_forward_list_item (WebKitWebView             *web_view,
                                               WebKitBackForwardListItem *list_item);
+WEBKIT_API const gchar *
+webkit_web_view_get_uri                      (WebKitWebView             *web_view);
 
 WEBKIT_API const gchar *
 webkit_web_view_get_custom_charset           (WebKitWebView             *web_view);
@@ -131,6 +151,13 @@ webkit_web_view_get_custom_charset           (WebKitWebView             *web_vie
 WEBKIT_API void
 webkit_web_view_set_custom_charset           (WebKitWebView             *web_view,
                                               const gchar               *charset);
+
+WEBKIT_API void
+webkit_web_view_set_settings                 (WebKitWebView             *web_view,
+                                              WebKitSettings            *settings);
+
+WEBKIT_API WebKitSettings *
+webkit_web_view_get_settings                 (WebKitWebView             *web_view);
 
 G_END_DECLS
 

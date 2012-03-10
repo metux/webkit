@@ -458,16 +458,17 @@ void CSPSourceList::addSourceUnsafeEval()
 
 class CSPDirective {
 public:
-    CSPDirective(const String& name, const String& value, SecurityOrigin* origin)
-        : m_sourceList(origin)
+    CSPDirective(const String& name, const String& value, ScriptExecutionContext* context)
+        : m_sourceList(context->securityOrigin())
         , m_text(name + ' ' + value)
+        , m_selfURL(context->url())
     {
         m_sourceList.parse(value);
     }
 
     bool allows(const KURL& url)
     {
-        return m_sourceList.matches(url);
+        return m_sourceList.matches(url.isEmpty() ? m_selfURL : url);
     }
 
     bool allowInline() const { return m_sourceList.allowInline(); }
@@ -478,12 +479,14 @@ public:
 private:
     CSPSourceList m_sourceList;
     String m_text;
+    KURL m_selfURL;
 };
 
 ContentSecurityPolicy::ContentSecurityPolicy(ScriptExecutionContext* scriptExecutionContext)
     : m_havePolicy(false)
     , m_scriptExecutionContext(scriptExecutionContext)
     , m_reportOnly(false)
+    , m_haveSandboxPolicy(false)
 {
 }
 
@@ -515,7 +518,7 @@ void ContentSecurityPolicy::didReceiveHeader(const String& header, HeaderType ty
 void ContentSecurityPolicy::reportViolation(const String& directiveText, const String& consoleMessage) const
 {
     String message = m_reportOnly ? "[Report Only] " + consoleMessage : consoleMessage;
-    m_scriptExecutionContext->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 1, String(), 0);
+    m_scriptExecutionContext->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
 
     if (m_reportURLs.isEmpty())
         return;
@@ -553,7 +556,7 @@ void ContentSecurityPolicy::reportViolation(const String& directiveText, const S
 void ContentSecurityPolicy::logUnrecognizedDirective(const String& name) const
 {
     String message = makeString("Unrecognized Content-Security-Policy directive '", name, "'.\n");
-    m_scriptExecutionContext->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 1, String(), 0);
+    m_scriptExecutionContext->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
 }
 
 bool ContentSecurityPolicy::checkEval(CSPDirective* directive) const
@@ -759,7 +762,14 @@ void ContentSecurityPolicy::parseReportURI(const String& value)
 
 PassOwnPtr<CSPDirective> ContentSecurityPolicy::createCSPDirective(const String& name, const String& value)
 {
-    return adoptPtr(new CSPDirective(name, value, m_scriptExecutionContext->securityOrigin()));
+    return adoptPtr(new CSPDirective(name, value, m_scriptExecutionContext));
+}
+
+void ContentSecurityPolicy::applySandboxPolicy(const String& sandboxPolicy)
+{
+    ASSERT(!m_haveSandboxPolicy);
+    m_haveSandboxPolicy = true;
+    m_scriptExecutionContext->enforceSandboxFlags(SecurityContext::parseSandboxPolicy(sandboxPolicy));
 }
 
 void ContentSecurityPolicy::addDirective(const String& name, const String& value)
@@ -773,6 +783,7 @@ void ContentSecurityPolicy::addDirective(const String& name, const String& value
     DEFINE_STATIC_LOCAL(String, fontSrc, ("font-src"));
     DEFINE_STATIC_LOCAL(String, mediaSrc, ("media-src"));
     DEFINE_STATIC_LOCAL(String, connectSrc, ("connect-src"));
+    DEFINE_STATIC_LOCAL(String, sandbox, ("sandbox"));
     DEFINE_STATIC_LOCAL(String, reportURI, ("report-uri"));
 
     ASSERT(!name.isEmpty());
@@ -795,6 +806,8 @@ void ContentSecurityPolicy::addDirective(const String& name, const String& value
         m_mediaSrc = createCSPDirective(name, value);
     else if (!m_connectSrc && equalIgnoringCase(name, connectSrc))
         m_connectSrc = createCSPDirective(name, value);
+    else if (!m_haveSandboxPolicy && equalIgnoringCase(name, sandbox))
+        applySandboxPolicy(value);
     else if (m_reportURLs.isEmpty() && equalIgnoringCase(name, reportURI))
         parseReportURI(value);
     else

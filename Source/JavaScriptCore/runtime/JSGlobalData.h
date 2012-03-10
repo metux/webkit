@@ -64,9 +64,9 @@ namespace JSC {
     class Interpreter;
     class JSGlobalObject;
     class JSObject;
-    class Lexer;
+    class Keywords;
     class NativeExecutable;
-    class Parser;
+    class ParserArena;
     class RegExpCache;
     class Stringifier;
     class Structure;
@@ -219,8 +219,8 @@ namespace JSC {
                 : wtfThreadData().stack();
         }
 
-        Lexer* lexer;
-        Parser* parser;
+        OwnPtr<ParserArena> parserArena;
+        OwnPtr<Keywords> keywords;
         Interpreter* interpreter;
 #if ENABLE(JIT)
         OwnPtr<JITThunks> jitStubs;
@@ -240,10 +240,9 @@ namespace JSC {
 #if ENABLE(JIT)
         ReturnAddressPtr exceptionLocation;
         JSValue hostCallReturnValue;
-#ifndef NDEBUG
-        int64_t debugDataBuffer[64];
-#endif
 #if ENABLE(DFG_JIT)
+        uint32_t osrExitIndex;
+        void* osrExitJumpDestination;
         Vector<void*> scratchBuffers;
         size_t sizeOfLastScratchBuffer;
         

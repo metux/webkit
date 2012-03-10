@@ -71,14 +71,14 @@ Chrome::~Chrome()
     m_client->chromeDestroyed();
 }
 
-void Chrome::invalidateWindow(const IntRect& updateRect, bool immediate)
+void Chrome::invalidateRootView(const IntRect& updateRect, bool immediate)
 {
-    m_client->invalidateWindow(updateRect, immediate);
+    m_client->invalidateRootView(updateRect, immediate);
 }
 
-void Chrome::invalidateContentsAndWindow(const IntRect& updateRect, bool immediate)
+void Chrome::invalidateContentsAndRootView(const IntRect& updateRect, bool immediate)
 {
-    m_client->invalidateContentsAndWindow(updateRect, immediate);
+    m_client->invalidateContentsAndRootView(updateRect, immediate);
 }
 
 void Chrome::invalidateContentsForSlowScroll(const IntRect& updateRect, bool immediate)
@@ -98,14 +98,14 @@ void Chrome::delegatedScrollRequested(const IntPoint& scrollPoint)
 }
 #endif
 
-IntPoint Chrome::screenToWindow(const IntPoint& point) const
+IntPoint Chrome::screenToRootView(const IntPoint& point) const
 {
-    return m_client->screenToWindow(point);
+    return m_client->screenToRootView(point);
 }
 
-IntRect Chrome::windowToScreen(const IntRect& rect) const
+IntRect Chrome::rootViewToScreen(const IntRect& rect) const
 {
-    return m_client->windowToScreen(rect);
+    return m_client->rootViewToScreen(rect);
 }
 
 PlatformPageClient Chrome::platformPageClient() const
@@ -463,14 +463,14 @@ void Chrome::openColorChooser(ColorChooser* colorChooser, const Color& initialCo
     m_client->openColorChooser(colorChooser, initialColor);
 }
 
-void Chrome::cleanupColorChooser()
+void Chrome::cleanupColorChooser(ColorChooser* colorChooser)
 {
-    m_client->cleanupColorChooser();
+    m_client->cleanupColorChooser(colorChooser);
 }
 
-void Chrome::setSelectedColorInColorChooser(const Color& color)
+void Chrome::setSelectedColorInColorChooser(ColorChooser* colorChooser, const Color& color)
 {
-    m_client->setSelectedColorInColorChooser(color);
+    m_client->setSelectedColorInColorChooser(colorChooser, color);
 }
 #endif
 

@@ -29,18 +29,13 @@
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlock.h"
+#include "DFGOSRExit.h"
 #include "DFGRepatch.h"
+#include "InlineASM.h"
 #include "Interpreter.h"
 #include "JSByteArray.h"
 #include "JSGlobalData.h"
 #include "Operations.h"
-
-
-#if OS(DARWIN) || (OS(WINDOWS) && CPU(X86))
-#define SYMBOL_STRING(name) "_" #name
-#else
-#define SYMBOL_STRING(name) #name
-#endif
 
 #if CPU(X86_64)
 
@@ -49,7 +44,7 @@
     ".globl " SYMBOL_STRING(function) "\n" \
     SYMBOL_STRING(function) ":" "\n" \
         "mov (%rsp), %" STRINGIZE(register) "\n" \
-        "jmp " SYMBOL_STRING(function) "WithReturnAddress" "\n" \
+        "jmp " SYMBOL_STRING_RELOCATION(function##WithReturnAddress) "\n" \
     );
 #define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function)    FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, rsi)
 #define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function)  FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, rcx)
@@ -63,11 +58,52 @@
     SYMBOL_STRING(function) ":" "\n" \
         "mov (%esp), %eax\n" \
         "mov %eax, " STRINGIZE(offset) "(%esp)\n" \
-        "jmp " SYMBOL_STRING(function) "WithReturnAddress" "\n" \
+        "jmp " SYMBOL_STRING_RELOCATION(function##WithReturnAddress) "\n" \
     );
 #define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function)    FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, 8)
 #define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function)  FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, 16)
 #define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function) FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, 24)
+
+#elif COMPILER(GCC) && CPU(ARM_THUMB2)
+
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function) \
+    asm ( \
+    ".text" "\n" \
+    ".align 2" "\n" \
+    ".globl " SYMBOL_STRING(function) "\n" \
+    HIDE_SYMBOL(function) "\n" \
+    ".thumb" "\n" \
+    ".thumb_func " THUMB_FUNC_PARAM(function) "\n" \
+    SYMBOL_STRING(function) ":" "\n" \
+        "cpy a2, lr" "\n" \
+        "b " SYMBOL_STRING_RELOCATION(function) "WithReturnAddress" "\n" \
+    );
+
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function) \
+    asm ( \
+    ".text" "\n" \
+    ".align 2" "\n" \
+    ".globl " SYMBOL_STRING(function) "\n" \
+    HIDE_SYMBOL(function) "\n" \
+    ".thumb" "\n" \
+    ".thumb_func " THUMB_FUNC_PARAM(function) "\n" \
+    SYMBOL_STRING(function) ":" "\n" \
+        "cpy a4, lr" "\n" \
+        "b " SYMBOL_STRING_RELOCATION(function) "WithReturnAddress" "\n" \
+    );
+
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function) \
+    asm ( \
+    ".text" "\n" \
+    ".align 2" "\n" \
+    ".globl " SYMBOL_STRING(function) "\n" \
+    HIDE_SYMBOL(function) "\n" \
+    ".thumb" "\n" \
+    ".thumb_func " THUMB_FUNC_PARAM(function) "\n" \
+    SYMBOL_STRING(function) ":" "\n" \
+        "str lr, [sp, #4]" "\n" \
+        "b " SYMBOL_STRING_RELOCATION(function) "WithReturnAddress" "\n" \
+    );
 
 #endif
 
@@ -155,10 +191,8 @@ EncodedJSValue DFG_OPERATION operationConvertThis(ExecState* exec, EncodedJSValu
     return JSValue::encode(JSValue::decode(encodedOp).toThisObject(exec));
 }
 
-JSCell* DFG_OPERATION operationCreateThis(ExecState* exec, JSCell* prototype)
+inline JSCell* createThis(ExecState* exec, JSCell* prototype, JSFunction* constructor)
 {
-    JSFunction* constructor = asFunction(exec->callee());
-    
 #if !ASSERT_DISABLED
     ConstructData constructData;
     ASSERT(constructor->methodTable()->getConstructData(constructor, constructData) == ConstructTypeJS);
@@ -173,6 +207,16 @@ JSCell* DFG_OPERATION operationCreateThis(ExecState* exec, JSCell* prototype)
         structure = constructor->scope()->globalObject->emptyObjectStructure();
     
     return constructEmptyObject(exec, structure);
+}
+
+JSCell* DFG_OPERATION operationCreateThis(ExecState* exec, JSCell* prototype)
+{
+    return createThis(exec, prototype, asFunction(exec->callee()));
+}
+
+JSCell* DFG_OPERATION operationCreateThisInlined(ExecState* exec, JSCell* prototype, JSCell* constructor)
+{
+    return createThis(exec, prototype, static_cast<JSFunction*>(constructor));
 }
 
 JSCell* DFG_OPERATION operationNewObject(ExecState* exec)
@@ -281,8 +325,9 @@ EncodedJSValue DFG_OPERATION operationGetMethodOptimizeWithReturnAddress(ExecSta
     JSValue baseValue(base);
     PropertySlot slot(baseValue);
     JSValue result = baseValue.get(exec, *propertyName, slot);
-
-    MethodCallLinkInfo& methodInfo = exec->codeBlock()->getMethodCallLinkInfo(returnAddress);
+    
+    CodeBlock* codeBlock = exec->codeBlock();
+    MethodCallLinkInfo& methodInfo = codeBlock->getMethodCallLinkInfo(returnAddress);
     if (methodInfo.seenOnce())
         dfgRepatchGetMethod(exec, baseValue, *propertyName, slot, methodInfo);
     else
@@ -323,7 +368,7 @@ EncodedJSValue DFG_OPERATION operationGetByIdOptimizeWithReturnAddress(ExecState
     JSValue baseValue(base);
     PropertySlot slot(baseValue);
     JSValue result = baseValue.get(exec, *propertyName, slot);
-
+    
     StructureStubInfo& stubInfo = exec->codeBlock()->getStubInfo(returnAddress);
     if (stubInfo.seen)
         dfgRepatchGetByID(exec, baseValue, *propertyName, slot, stubInfo);
@@ -509,7 +554,7 @@ asm (
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
     "mov -40(%r13), %r13\n"
     "mov %r13, %rdi\n"
-    "jmp " SYMBOL_STRING(getHostCallReturnValueWithExecState) "\n"
+    "jmp " SYMBOL_STRING_RELOCATION(getHostCallReturnValueWithExecState) "\n"
 );
 #elif CPU(X86)
 asm (
@@ -517,7 +562,20 @@ asm (
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
     "mov -40(%edi), %edi\n"
     "mov %edi, 4(%esp)\n"
-    "jmp " SYMBOL_STRING(getHostCallReturnValueWithExecState) "\n"
+    "jmp " SYMBOL_STRING_RELOCATION(getHostCallReturnValueWithExecState) "\n"
+);
+#elif CPU(ARM_THUMB2)
+asm (
+".text" "\n"
+".align 2" "\n"
+".globl " SYMBOL_STRING(getHostCallReturnValue) "\n"
+HIDE_SYMBOL(getHostCallReturnValue) "\n"
+".thumb" "\n"
+".thumb_func " THUMB_FUNC_PARAM(getHostCallReturnValue) "\n"
+SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
+    "ldr r5, [r5, #-40]" "\n"
+    "cpy r0, r5" "\n"
+    "b " SYMBOL_STRING_RELOCATION(getHostCallReturnValueWithExecState) "\n"
 );
 #endif
 
@@ -530,6 +588,10 @@ static void* handleHostCall(ExecState* execCallee, JSValue callee, CodeSpecializ
 {
     ExecState* exec = execCallee->callerFrame();
     JSGlobalData* globalData = &exec->globalData();
+
+    execCallee->setScopeChain(exec->scopeChain());
+    execCallee->setCodeBlock(0);
+
     if (kind == CodeForCall) {
         CallData callData;
         CallType callType = getCallData(callee, callData);
@@ -537,17 +599,10 @@ static void* handleHostCall(ExecState* execCallee, JSValue callee, CodeSpecializ
         ASSERT(callType != CallTypeJS);
     
         if (callType == CallTypeHost) {
-            if (!globalData->interpreter->registerFile().grow(execCallee->registers())) {
-                globalData->exception = createStackOverflowError(exec);
-                return 0;
-            }
-        
-            execCallee->setScopeChain(exec->scopeChain());
-        
             globalData->hostCallReturnValue = JSValue::decode(callData.native.function(execCallee));
-        
             if (globalData->exception)
                 return 0;
+
             return reinterpret_cast<void*>(getHostCallReturnValue);
         }
     
@@ -564,17 +619,10 @@ static void* handleHostCall(ExecState* execCallee, JSValue callee, CodeSpecializ
     ASSERT(constructType != ConstructTypeJS);
     
     if (constructType == ConstructTypeHost) {
-        if (!globalData->interpreter->registerFile().grow(execCallee->registers())) {
-            globalData->exception = createStackOverflowError(exec);
-            return 0;
-        }
-        
-        execCallee->setScopeChain(exec->scopeChain());
-        
         globalData->hostCallReturnValue = JSValue::decode(constructData.native.function(execCallee));
-        
         if (globalData->exception)
             return 0;
+
         return reinterpret_cast<void*>(getHostCallReturnValue);
     }
     
@@ -591,15 +639,16 @@ inline void* linkFor(ExecState* execCallee, ReturnAddressPtr returnAddress, Code
     JSCell* calleeAsFunctionCell = getJSFunction(calleeAsValue);
     if (!calleeAsFunctionCell)
         return handleHostCall(execCallee, calleeAsValue, kind);
+
     JSFunction* callee = asFunction(calleeAsFunctionCell);
+    execCallee->setScopeChain(callee->scopeUnchecked());
     ExecutableBase* executable = callee->executable();
-    
+
     MacroAssemblerCodePtr codePtr;
     CodeBlock* codeBlock = 0;
     if (executable->isHostFunction())
         codePtr = executable->generatedJITCodeFor(kind).addressForCall();
     else {
-        execCallee->setScopeChain(callee->scope());
         FunctionExecutable* functionExecutable = static_cast<FunctionExecutable*>(executable);
         JSObject* error = functionExecutable->compileFor(execCallee, callee->scope(), kind);
         if (error) {
@@ -725,14 +774,12 @@ EncodedJSValue DFG_OPERATION operationStrCat(ExecState* exec, void* start, size_
 
 EncodedJSValue DFG_OPERATION operationNewArray(ExecState* exec, void* start, size_t size)
 {
-    ArgList argList(static_cast<Register*>(start), size);
-    return JSValue::encode(constructArray(exec, argList));
+    return JSValue::encode(constructArray(exec, static_cast<JSValue*>(start), size));
 }
 
 EncodedJSValue DFG_OPERATION operationNewArrayBuffer(ExecState* exec, size_t start, size_t size)
 {
-    ArgList argList(exec->codeBlock()->constantBuffer(start), size);
-    return JSValue::encode(constructArray(exec, argList));
+    return JSValue::encode(constructArray(exec, exec->codeBlock()->constantBuffer(start), size));
 }
 
 EncodedJSValue DFG_OPERATION operationNewRegexp(ExecState* exec, void* regexpPtr)
@@ -781,7 +828,7 @@ void DFG_OPERATION debugOperationPrintSpeculationFailure(ExecState*, void* debug
     SpeculationFailureDebugInfo* debugInfo = static_cast<SpeculationFailureDebugInfo*>(debugInfoRaw);
     CodeBlock* codeBlock = debugInfo->codeBlock;
     CodeBlock* alternative = codeBlock->alternative();
-    printf("Speculation failure in %p at 0x%x with executeCounter = %d, reoptimizationRetryCounter = %u, optimizationDelayCounter = %u, success/fail %u/%u\n", codeBlock, debugInfo->debugOffset, alternative ? alternative->executeCounter() : 0, alternative ? alternative->reoptimizationRetryCounter() : 0, alternative ? alternative->optimizationDelayCounter() : 0, codeBlock->speculativeSuccessCounter(), codeBlock->speculativeFailCounter());
+    printf("Speculation failure in %p at @%u with executeCounter = %d, reoptimizationRetryCounter = %u, optimizationDelayCounter = %u, success/fail %u/%u\n", codeBlock, debugInfo->nodeIndex, alternative ? alternative->executeCounter() : 0, alternative ? alternative->reoptimizationRetryCounter() : 0, alternative ? alternative->optimizationDelayCounter() : 0, codeBlock->speculativeSuccessCounter(), codeBlock->speculativeFailCounter());
 }
 #endif
 

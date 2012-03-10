@@ -26,7 +26,6 @@
 #ifndef ScrollableArea_h
 #define ScrollableArea_h
 
-#include "LayoutTypes.h"
 #include "Scrollbar.h"
 #include <wtf/Vector.h>
 
@@ -86,6 +85,7 @@ public:
 
     ScrollAnimator* scrollAnimator() const;
     const IntPoint& scrollOrigin() const { return m_scrollOrigin; }
+    bool scrollOriginChanged() const { return m_scrollOriginChanged; }
 
     virtual bool isActive() const = 0;
     virtual int scrollSize(ScrollbarOrientation) const = 0;
@@ -127,8 +127,8 @@ public:
     virtual IntPoint minimumScrollPosition() const { ASSERT_NOT_REACHED(); return IntPoint(); }
     virtual IntPoint maximumScrollPosition() const { ASSERT_NOT_REACHED(); return IntPoint(); }
     virtual IntRect visibleContentRect(bool /*includeScrollbars*/ = false) const { ASSERT_NOT_REACHED(); return IntRect(); }
-    virtual LayoutUnit visibleHeight() const { ASSERT_NOT_REACHED(); return 0; }
-    virtual LayoutUnit visibleWidth() const { ASSERT_NOT_REACHED(); return 0; }
+    virtual int visibleHeight() const { ASSERT_NOT_REACHED(); return 0; }
+    virtual int visibleWidth() const { ASSERT_NOT_REACHED(); return 0; }
     virtual IntSize contentsSize() const { ASSERT_NOT_REACHED(); return IntSize(); }
     virtual IntSize overhangAmount() const { ASSERT_NOT_REACHED(); return IntSize(); }
     virtual IntPoint currentMousePosition() const { return IntPoint(); }
@@ -166,6 +166,11 @@ public:
     void setScrollOffsetFromInternals(const IntPoint&);
 
 protected:
+    void setScrollOrigin(const IntPoint&);
+    void setScrollOriginX(int);
+    void setScrollOriginY(int);
+    void resetScrollOriginChanged() { m_scrollOriginChanged = false; }
+
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) = 0;
     virtual void invalidateScrollCornerRect(const IntRect&) = 0;
 
@@ -181,19 +186,6 @@ protected:
     bool hasLayerForVerticalScrollbar() const;
     bool hasLayerForScrollCorner() const;
 
-    // There are 8 possible combinations of writing mode and direction. Scroll origin will be non-zero in the x or y axis
-    // if there is any reversed direction or writing-mode. The combinations are:
-    // writing-mode / direction     scrollOrigin.x() set    scrollOrigin.y() set
-    // horizontal-tb / ltr          NO                      NO
-    // horizontal-tb / rtl          YES                     NO
-    // horizontal-bt / ltr          NO                      YES
-    // horizontal-bt / rtl          YES                     YES
-    // vertical-lr / ltr            NO                      NO
-    // vertical-lr / rtl            NO                      YES
-    // vertical-rl / ltr            YES                     NO
-    // vertical-rl / rtl            YES                     YES
-    IntPoint m_scrollOrigin;
-
 private:
     // NOTE: Only called from the ScrollAnimator.
     friend class ScrollAnimator;
@@ -208,6 +200,21 @@ private:
     unsigned m_horizontalScrollElasticity : 2; // ScrollElasticity
 
     unsigned m_scrollbarOverlayStyle : 2; // ScrollbarOverlayStyle
+
+    // There are 8 possible combinations of writing mode and direction. Scroll origin will be non-zero in the x or y axis
+    // if there is any reversed direction or writing-mode. The combinations are:
+    // writing-mode / direction     scrollOrigin.x() set    scrollOrigin.y() set
+    // horizontal-tb / ltr          NO                      NO
+    // horizontal-tb / rtl          YES                     NO
+    // horizontal-bt / ltr          NO                      YES
+    // horizontal-bt / rtl          YES                     YES
+    // vertical-lr / ltr            NO                      NO
+    // vertical-lr / rtl            NO                      YES
+    // vertical-rl / ltr            YES                     NO
+    // vertical-rl / rtl            YES                     YES
+    IntPoint m_scrollOrigin;
+
+    bool m_scrollOriginChanged;
 };
 
 } // namespace WebCore

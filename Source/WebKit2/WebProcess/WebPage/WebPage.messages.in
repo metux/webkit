@@ -43,6 +43,7 @@ messages -> WebPage {
 #endif
 #if ENABLE(TOUCH_EVENTS)
     TouchEvent(WebKit::WebTouchEvent event)
+    TouchEventSyncForTesting(WebKit::WebTouchEvent event) -> (bool handled)
 #endif
 
     ContextMenuHidden()
@@ -97,7 +98,7 @@ messages -> WebPage {
 
 #if USE(TILED_BACKING_STORE)
     SetFixedVisibleContentRect(WebCore::IntRect rect)
-    SetResizesToContentsUsingLayoutSize(WebCore::IntSize size)
+    SetViewportSize(WebCore::IntSize size)
 #endif
 
     Close()
@@ -119,6 +120,9 @@ messages -> WebPage {
 
     SetUseFixedLayout(bool fixed)
     SetFixedLayoutSize(WebCore::IntSize size)
+
+    SetPaginationMode(uint32_t mode);
+    SetGapBetweenPages(double gap);
 
     # Find.
     FindString(WTF::String string, uint32_t findOptions, unsigned maxMatchCount)

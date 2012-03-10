@@ -63,7 +63,7 @@ WebInspector.Panel.prototype = {
 
     show: function()
     {
-        WebInspector.View.prototype.show.call(this, WebInspector.mainPanelsView.element);
+        WebInspector.View.prototype.show.call(this, WebInspector.inspectorView.element);
     },
 
     wasShown: function()
@@ -79,10 +79,9 @@ WebInspector.Panel.prototype = {
         if ("_toolbarItem" in this)
             this._toolbarItem.addStyleClass("toggled-on");
 
-        WebInspector.currentFocusElement = this.defaultFocusedElement;
+        WebInspector.setCurrentFocusElement(this.defaultFocusedElement);
 
         this.restoreSidebarWidth();
-        WebInspector.extensionServer.notifyPanelShown(this.name);
     },
 
     willHide: function()
@@ -92,7 +91,6 @@ WebInspector.Panel.prototype = {
         delete this._statusBarItemContainer;
         if ("_toolbarItem" in this)
             this._toolbarItem.removeStyleClass("toggled-on");
-        WebInspector.extensionServer.notifyPanelHidden(this.name);
     },
 
     reset: function()

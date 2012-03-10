@@ -209,6 +209,10 @@ public:
     FileList* files();
     void receiveDroppedFiles(const Vector<String>&);
     Icon* icon() const;
+    // These functions are used for rendering the input active during a
+    // drag-and-drop operation.
+    bool canReceiveDroppedFiles() const;
+    void setCanReceiveDroppedFiles(bool);
 
     void addSearchResult();
     void onSearch();
@@ -229,7 +233,7 @@ public:
 
 #if ENABLE(INPUT_COLOR)
     // For test purposes.
-    bool connectToColorChooser();
+    void selectColorInColorChooser(const Color&);
 #endif
 
     String defaultToolTip() const;
@@ -268,7 +272,7 @@ private:
 
     virtual bool canStartSelection() const;
 
-    virtual void accessKeyAction(bool sendToAnyElement);
+    virtual void accessKeyAction(bool sendMouseEvents);
 
     virtual bool mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const;
     virtual void parseMappedAttribute(Attribute*);
@@ -351,6 +355,7 @@ private:
     bool m_stateRestored : 1;
     bool m_parsingInProgress : 1;
     bool m_wasModifiedByUser : 1;
+    bool m_canReceiveDroppedFiles : 1;
     OwnPtr<InputType> m_inputType;
 };
 

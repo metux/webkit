@@ -40,6 +40,7 @@
 #include "SVGLength.h"
 #include "SVGRenderSupport.h"
 #include "SVGResources.h"
+#include "SVGResourcesCache.h"
 #include "SVGSVGElement.h"
 #include "SVGStyledElement.h"
 #include "SVGViewSpec.h"
@@ -117,7 +118,7 @@ void RenderSVGRoot::computePreferredLogicalWidths()
     setPreferredLogicalWidthsDirty(false);
 }
 
-bool RenderSVGRoot::isEmbeddedThroughImageElement() const
+bool RenderSVGRoot::isEmbeddedThroughSVGImage() const
 {
     if (!node())
         return false;
@@ -137,13 +138,20 @@ bool RenderSVGRoot::isEmbeddedThroughImageElement() const
     return true;
 }
 
-static inline bool isEmbeddedThroughFrameContainingSVGDocument(const Frame* frame)
+bool RenderSVGRoot::isEmbeddedThroughFrameContainingSVGDocument() const
 {
-    ASSERT(frame);
-    ASSERT(frame->document());
+    if (!node())
+        return false;
+
+    Frame* frame = node()->document()->frame();
+    if (!frame)
+        return false;
+
     // If our frame has an owner renderer, we're embedded through eg. object/embed/iframe,
     // but we only negotiate if we're in an SVG document.
-    return !frame->ownerRenderer() || !frame->document()->isSVGDocument();
+    if (!frame->ownerRenderer())
+        return false;
+    return frame->document()->isSVGDocument();
 }
 
 LayoutUnit RenderSVGRoot::computeReplacedLogicalWidth(bool includeMaxWidth) const
@@ -158,7 +166,7 @@ LayoutUnit RenderSVGRoot::computeReplacedLogicalWidth(bool includeMaxWidth) cons
     if (!frame)
         return replacedWidth;
 
-    if (isEmbeddedThroughFrameContainingSVGDocument(frame))
+    if (!isEmbeddedThroughFrameContainingSVGDocument())
         return replacedWidth;
 
     RenderPart* ownerRenderer = frame->ownerRenderer();
@@ -203,13 +211,14 @@ LayoutUnit RenderSVGRoot::computeReplacedLogicalHeight() const
     if (!frame)
         return replacedHeight;
 
-    if (isEmbeddedThroughFrameContainingSVGDocument(frame))
+    if (!isEmbeddedThroughFrameContainingSVGDocument())
         return replacedHeight;
 
     RenderPart* ownerRenderer = frame->ownerRenderer();
+    ASSERT(ownerRenderer);
+
     RenderStyle* ownerRendererStyle = ownerRenderer->style();
     ASSERT(ownerRendererStyle);
-    ASSERT(frame->contentRenderer());
 
     Length ownerHeight = ownerRendererStyle->height();
     if (ownerHeight.isAuto())
@@ -246,7 +255,7 @@ void RenderSVGRoot::layout()
     } else
         ASSERT(!m_needsSizeNegotiationWithHostDocument);
 
-    SVGRenderSupport::layoutChildren(this, needsLayout);
+    SVGRenderSupport::layoutChildren(this, needsLayout || SVGRenderSupport::filtersForceContainerLayout(this));
     m_isLayoutSizeChanged = false;
 
     // At this point LayoutRepainter already grabbed the old bounds,
@@ -263,12 +272,8 @@ void RenderSVGRoot::layout()
 
 bool RenderSVGRoot::selfWillPaint()
 {
-#if ENABLE(FILTERS)
     SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(this);
     return resources && resources->filter();
-#else
-    return false;
-#endif
 }
 
 void RenderSVGRoot::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -429,8 +434,7 @@ bool RenderSVGRoot::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
     LayoutPoint pointInBorderBox = pointInParent - parentOriginToBorderBox();
 
     // Note: For now, we're ignoring hits to border and padding for <svg>
-    LayoutPoint pointInContentBox = pointInBorderBox - borderOriginToContentBox();
-    if (!contentBoxRect().contains(pointInContentBox))
+    if (!contentBoxRect().contains(pointInBorderBox))
         return false;
 
     LayoutPoint localPoint = localToParentTransform().inverse().mapPoint(pointInParent);

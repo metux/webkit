@@ -115,6 +115,7 @@ WorkerContext::WorkerContext(const KURL& url, const String& userAgent, WorkerThr
     , m_workerInspectorController(adoptPtr(new WorkerInspectorController(this)))
 #endif
     , m_closing(false)
+    , m_eventQueue(WorkerEventQueue::create(this))
 {
     setSecurityOrigin(SecurityOrigin::create(url));
     
@@ -299,6 +300,10 @@ void WorkerContext::logExceptionToConsole(const String& errorMessage, int lineNu
 
 void WorkerContext::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>)
 {
+    if (!isContextThread()) {
+        postTask(AddConsoleMessageTask::create(source, type, level, message));
+        return;
+    }
     thread()->workerReportingProxy().postConsoleMessageToWorkerObject(source, type, level, message, lineNumber, sourceURL);
 }
 
@@ -504,6 +509,11 @@ void WorkerContext::notifyObserversOfStop()
         observer->notifyStop();
         iter = m_workerObservers.begin();
     }
+}
+
+WorkerEventQueue* WorkerContext::eventQueue() const
+{
+    return m_eventQueue.get();
 }
 
 } // namespace WebCore

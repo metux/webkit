@@ -63,6 +63,7 @@ messages -> WebPageProxy {
     NotifyScrollerThumbIsVisibleInRect(WebCore::IntRect scrollerThumb)
     DidChangeScrollbarsForMainFrame(bool hasHorizontalScrollbar, bool hasVerticalScrollbar)
     DidChangeScrollOffsetPinningForMainFrame(bool hasHorizontalScrollbar, bool hasVerticalScrollbar)
+    DidChangePageCount(unsigned pageCount);
     DidFailToInitializePlugin(WTF::String mimeType)
     NumWheelEventHandlersChanged(unsigned count)
 
@@ -108,6 +109,7 @@ messages -> WebPageProxy {
     DidReceiveTitleForFrame(uint64_t frameID, WTF::String title, WebKit::InjectedBundleUserMessageEncoder userData)
     DidDisplayInsecureContentForFrame(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData)
     DidRunInsecureContentForFrame(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData)
+    DidDetectXSSForFrame(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData)
     DidSameDocumentNavigationForFrame(uint64_t frameID, uint32_t type, WTF::String url, WebKit::InjectedBundleUserMessageEncoder userData)
 
     FrameDidBecomeFrameSet(uint64_t frameID, bool value)
@@ -164,7 +166,7 @@ messages -> WebPageProxy {
 
     # Find messages
     DidCountStringMatches(WTF::String string, uint32_t matchCount)
-    SetFindIndicator(WebCore::FloatRect selectionRect, Vector<WebCore::FloatRect> textRects, float contentImageScaleFactor, WebKit::ShareableBitmap::Handle contentImageHandle, bool fadeOut)
+    SetFindIndicator(WebCore::FloatRect selectionRect, Vector<WebCore::FloatRect> textRects, float contentImageScaleFactor, WebKit::ShareableBitmap::Handle contentImageHandle, bool fadeOut, bool animate)
     DidFindString(WTF::String string, uint32_t matchCount)
     DidFailToFindString(WTF::String string)
 #if PLATFORM(WIN)
@@ -205,7 +207,7 @@ messages -> WebPageProxy {
     IgnoreWord(WTF::String word);
 
     # Drag and drop messages
-    DidPerformDragControllerAction(uint64_t resultOperation)
+    DidPerformDragControllerAction(WebCore::DragSession dragSession)
 #if PLATFORM(MAC)
     SetDragImage(WebCore::IntPoint clientPosition, WebKit::ShareableBitmap::Handle dragImage, bool linkDrag)
 #endif

@@ -60,9 +60,18 @@ extern unsigned largeFailCountThresholdBaseForLoop;
 extern unsigned reoptimizationRetryCounterMax;
 extern unsigned reoptimizationRetryCounterStep;
 
+extern unsigned minimumOptimizationDelay;
 extern unsigned maximumOptimizationDelay;
 extern double desiredProfileLivenessRate;
 extern double desiredProfileFullnessRate;
+
+extern unsigned minimumNumberOfScansBetweenRebalance;
+extern unsigned gcMarkStackSegmentSize;
+extern unsigned minimumNumberOfCellsToKeep;
+extern unsigned maximumNumberOfSharedSegments;
+extern unsigned sharedStackWakeupThreshold;
+extern unsigned numberOfGCMarkers;
+extern unsigned opaqueRootMergeThreshold;
 
 void initializeHeuristics();
 

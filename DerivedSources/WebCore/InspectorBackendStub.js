@@ -1,4 +1,4 @@
-// Copyright (c) 2010 The Chromium Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -10,127 +10,134 @@ InspectorBackendStub = function()
     this._callbacks = {};
     this._domainDispatchers = {};
     this._eventArgs = {};
-        this._registerDelegate('{"method": "Page.enable", "id": 0}');
-        this._registerDelegate('{"method": "Page.disable", "id": 0}');
-        this._registerDelegate('{"method": "Page.addScriptToEvaluateOnLoad", "params": {"scriptSource": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Page.removeScriptToEvaluateOnLoad", "params": {"identifier": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Page.reload", "params": {"ignoreCache": {"optional": true, "type": "boolean"}, "scriptToEvaluateOnLoad": {"optional": true, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Page.open", "params": {"url": {"optional": false, "type": "string"}, "newWindow": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Page.getCookies", "id": 0}');
-        this._registerDelegate('{"method": "Page.deleteCookie", "params": {"cookieName": {"optional": false, "type": "string"}, "domain": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Page.getResourceTree", "id": 0}');
-        this._registerDelegate('{"method": "Page.getResourceContent", "params": {"frameId": {"optional": false, "type": "string"}, "url": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Page.searchInResource", "params": {"frameId": {"optional": false, "type": "string"}, "url": {"optional": false, "type": "string"}, "query": {"optional": false, "type": "string"}, "caseSensitive": {"optional": true, "type": "boolean"}, "isRegex": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Page.searchInResources", "params": {"text": {"optional": false, "type": "string"}, "caseSensitive": {"optional": true, "type": "boolean"}, "isRegex": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Runtime.evaluate", "params": {"expression": {"optional": false, "type": "string"}, "objectGroup": {"optional": true, "type": "string"}, "includeCommandLineAPI": {"optional": true, "type": "boolean"}, "doNotPauseOnExceptions": {"optional": true, "type": "boolean"}, "frameId": {"optional": true, "type": "string"}, "returnByValue": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Runtime.callFunctionOn", "params": {"objectId": {"optional": false, "type": "string"}, "functionDeclaration": {"optional": false, "type": "string"}, "arguments": {"optional": true, "type": "object"}, "returnByValue": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Runtime.getProperties", "params": {"objectId": {"optional": false, "type": "string"}, "ownProperties": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Runtime.releaseObject", "params": {"objectId": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Runtime.releaseObjectGroup", "params": {"objectGroup": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Runtime.run", "id": 0}');
-        this._registerDelegate('{"method": "Console.enable", "id": 0}');
-        this._registerDelegate('{"method": "Console.disable", "id": 0}');
-        this._registerDelegate('{"method": "Console.clearMessages", "id": 0}');
-        this._registerDelegate('{"method": "Console.setMonitoringXHREnabled", "params": {"enabled": {"optional": false, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Console.addInspectedNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Network.enable", "id": 0}');
-        this._registerDelegate('{"method": "Network.disable", "id": 0}');
-        this._registerDelegate('{"method": "Network.setUserAgentOverride", "params": {"userAgent": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Network.setExtraHTTPHeaders", "params": {"headers": {"optional": false, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "Network.getResponseBody", "params": {"requestId": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Network.clearBrowserCache", "id": 0}');
-        this._registerDelegate('{"method": "Network.clearBrowserCookies", "id": 0}');
-        this._registerDelegate('{"method": "Network.setCacheDisabled", "params": {"cacheDisabled": {"optional": false, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Database.enable", "id": 0}');
-        this._registerDelegate('{"method": "Database.disable", "id": 0}');
-        this._registerDelegate('{"method": "Database.getDatabaseTableNames", "params": {"databaseId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Database.executeSQL", "params": {"databaseId": {"optional": false, "type": "number"}, "query": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMStorage.enable", "id": 0}');
-        this._registerDelegate('{"method": "DOMStorage.disable", "id": 0}');
-        this._registerDelegate('{"method": "DOMStorage.getDOMStorageEntries", "params": {"storageId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMStorage.setDOMStorageItem", "params": {"storageId": {"optional": false, "type": "number"}, "key": {"optional": false, "type": "string"}, "value": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMStorage.removeDOMStorageItem", "params": {"storageId": {"optional": false, "type": "number"}, "key": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "ApplicationCache.getApplicationCaches", "id": 0}');
-        this._registerDelegate('{"method": "DOM.getDocument", "id": 0}');
-        this._registerDelegate('{"method": "DOM.requestChildNodes", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.querySelector", "params": {"nodeId": {"optional": false, "type": "number"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.querySelectorAll", "params": {"nodeId": {"optional": false, "type": "number"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.setNodeName", "params": {"nodeId": {"optional": false, "type": "number"}, "name": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.setNodeValue", "params": {"nodeId": {"optional": false, "type": "number"}, "value": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.removeNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.setAttributeValue", "params": {"nodeId": {"optional": false, "type": "number"}, "name": {"optional": false, "type": "string"}, "value": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.setAttributesAsText", "params": {"nodeId": {"optional": false, "type": "number"}, "text": {"optional": false, "type": "string"}, "name": {"optional": true, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.removeAttribute", "params": {"nodeId": {"optional": false, "type": "number"}, "name": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.getEventListenersForNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.copyNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.getOuterHTML", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.setOuterHTML", "params": {"nodeId": {"optional": false, "type": "number"}, "outerHTML": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.performSearch", "params": {"query": {"optional": false, "type": "string"}, "runSynchronously": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.cancelSearch", "id": 0}');
-        this._registerDelegate('{"method": "DOM.requestNode", "params": {"objectId": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.setInspectModeEnabled", "params": {"enabled": {"optional": false, "type": "boolean"}, "highlightConfig": {"optional": true, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.highlightRect", "params": {"x": {"optional": false, "type": "number"}, "y": {"optional": false, "type": "number"}, "width": {"optional": false, "type": "number"}, "height": {"optional": false, "type": "number"}, "color": {"optional": true, "type": "object"}, "outlineColor": {"optional": true, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.highlightNode", "params": {"nodeId": {"optional": false, "type": "number"}, "highlightConfig": {"optional": false, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.hideHighlight", "id": 0}');
-        this._registerDelegate('{"method": "DOM.highlightFrame", "params": {"frameId": {"optional": false, "type": "string"}, "contentColor": {"optional": true, "type": "object"}, "contentOutlineColor": {"optional": true, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.pushNodeByPathToFrontend", "params": {"path": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.resolveNode", "params": {"nodeId": {"optional": false, "type": "number"}, "objectGroup": {"optional": true, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.getAttributes", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOM.moveTo", "params": {"nodeId": {"optional": false, "type": "number"}, "targetNodeId": {"optional": false, "type": "number"}, "insertBeforeNodeId": {"optional": true, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.getStylesForNode", "params": {"nodeId": {"optional": false, "type": "number"}, "forcedPseudoClasses": {"optional": true, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.getComputedStyleForNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.getInlineStyleForNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.getAllStyleSheets", "id": 0}');
-        this._registerDelegate('{"method": "CSS.getStyleSheet", "params": {"styleSheetId": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.getStyleSheetText", "params": {"styleSheetId": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.setStyleSheetText", "params": {"styleSheetId": {"optional": false, "type": "string"}, "text": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.setPropertyText", "params": {"styleId": {"optional": false, "type": "object"}, "propertyIndex": {"optional": false, "type": "number"}, "text": {"optional": false, "type": "string"}, "overwrite": {"optional": false, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.toggleProperty", "params": {"styleId": {"optional": false, "type": "object"}, "propertyIndex": {"optional": false, "type": "number"}, "disable": {"optional": false, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.setRuleSelector", "params": {"ruleId": {"optional": false, "type": "object"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.addRule", "params": {"contextNodeId": {"optional": false, "type": "number"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "CSS.getSupportedCSSProperties", "id": 0}');
-        this._registerDelegate('{"method": "Timeline.start", "params": {"maxCallStackDepth": {"optional": true, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Timeline.stop", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.enable", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.disable", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.setBreakpointsActive", "params": {"active": {"optional": false, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.setBreakpointByUrl", "params": {"lineNumber": {"optional": false, "type": "number"}, "url": {"optional": true, "type": "string"}, "urlRegex": {"optional": true, "type": "string"}, "columnNumber": {"optional": true, "type": "number"}, "condition": {"optional": true, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.setBreakpoint", "params": {"location": {"optional": false, "type": "object"}, "condition": {"optional": true, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.removeBreakpoint", "params": {"breakpointId": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.continueToLocation", "params": {"location": {"optional": false, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.stepOver", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.stepInto", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.stepOut", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.pause", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.resume", "id": 0}');
-        this._registerDelegate('{"method": "Debugger.searchInContent", "params": {"scriptId": {"optional": false, "type": "string"}, "query": {"optional": false, "type": "string"}, "caseSensitive": {"optional": true, "type": "boolean"}, "isRegex": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.setScriptSource", "params": {"scriptId": {"optional": false, "type": "string"}, "scriptSource": {"optional": false, "type": "string"}, "preview": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.getScriptSource", "params": {"scriptId": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.setPauseOnExceptions", "params": {"state": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Debugger.evaluateOnCallFrame", "params": {"callFrameId": {"optional": false, "type": "string"}, "expression": {"optional": false, "type": "string"}, "objectGroup": {"optional": true, "type": "string"}, "includeCommandLineAPI": {"optional": true, "type": "boolean"}, "returnByValue": {"optional": true, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMDebugger.setDOMBreakpoint", "params": {"nodeId": {"optional": false, "type": "number"}, "type": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMDebugger.removeDOMBreakpoint", "params": {"nodeId": {"optional": false, "type": "number"}, "type": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMDebugger.setEventListenerBreakpoint", "params": {"eventName": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMDebugger.removeEventListenerBreakpoint", "params": {"eventName": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMDebugger.setXHRBreakpoint", "params": {"url": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "DOMDebugger.removeXHRBreakpoint", "params": {"url": {"optional": false, "type": "string"}}, "id": 0}');
-        this._registerDelegate('{"method": "Profiler.enable", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.disable", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.isEnabled", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.start", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.stop", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.getProfileHeaders", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.getProfile", "params": {"type": {"optional": false, "type": "string"}, "uid": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Profiler.removeProfile", "params": {"type": {"optional": false, "type": "string"}, "uid": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Profiler.clearProfiles", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.takeHeapSnapshot", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.collectGarbage", "id": 0}');
-        this._registerDelegate('{"method": "Profiler.getObjectByHeapObjectId", "params": {"objectId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Worker.setWorkerInspectionEnabled", "params": {"value": {"optional": false, "type": "boolean"}}, "id": 0}');
-        this._registerDelegate('{"method": "Worker.sendMessageToWorker", "params": {"workerId": {"optional": false, "type": "number"}, "message": {"optional": false, "type": "object"}}, "id": 0}');
-        this._registerDelegate('{"method": "Worker.connectToWorker", "params": {"workerId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Worker.disconnectFromWorker", "params": {"workerId": {"optional": false, "type": "number"}}, "id": 0}');
-        this._registerDelegate('{"method": "Worker.setAutoconnectToWorkers", "params": {"value": {"optional": false, "type": "boolean"}}, "id": 0}');
+    this._replyArgs = {};
+    this._registerDelegate('{"method": "Page.enable", "id": 0}');
+    this._registerDelegate('{"method": "Page.disable", "id": 0}');
+    this._registerDelegate('{"method": "Page.addScriptToEvaluateOnLoad", "params": {"scriptSource": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Page.removeScriptToEvaluateOnLoad", "params": {"identifier": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Page.reload", "params": {"ignoreCache": {"optional": true, "type": "boolean"}, "scriptToEvaluateOnLoad": {"optional": true, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Page.open", "params": {"url": {"optional": false, "type": "string"}, "newWindow": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Page.getCookies", "id": 0}');
+    this._registerDelegate('{"method": "Page.deleteCookie", "params": {"cookieName": {"optional": false, "type": "string"}, "domain": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Page.getResourceTree", "id": 0}');
+    this._registerDelegate('{"method": "Page.getResourceContent", "params": {"frameId": {"optional": false, "type": "string"}, "url": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Page.searchInResource", "params": {"frameId": {"optional": false, "type": "string"}, "url": {"optional": false, "type": "string"}, "query": {"optional": false, "type": "string"}, "caseSensitive": {"optional": true, "type": "boolean"}, "isRegex": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Page.searchInResources", "params": {"text": {"optional": false, "type": "string"}, "caseSensitive": {"optional": true, "type": "boolean"}, "isRegex": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Runtime.evaluate", "params": {"expression": {"optional": false, "type": "string"}, "objectGroup": {"optional": true, "type": "string"}, "includeCommandLineAPI": {"optional": true, "type": "boolean"}, "doNotPauseOnExceptions": {"optional": true, "type": "boolean"}, "frameId": {"optional": true, "type": "string"}, "returnByValue": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Runtime.callFunctionOn", "params": {"objectId": {"optional": false, "type": "string"}, "functionDeclaration": {"optional": false, "type": "string"}, "arguments": {"optional": true, "type": "object"}, "returnByValue": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Runtime.getProperties", "params": {"objectId": {"optional": false, "type": "string"}, "ownProperties": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Runtime.releaseObject", "params": {"objectId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Runtime.releaseObjectGroup", "params": {"objectGroup": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Runtime.run", "id": 0}');
+    this._registerDelegate('{"method": "Console.enable", "id": 0}');
+    this._registerDelegate('{"method": "Console.disable", "id": 0}');
+    this._registerDelegate('{"method": "Console.clearMessages", "id": 0}');
+    this._registerDelegate('{"method": "Console.setMonitoringXHREnabled", "params": {"enabled": {"optional": false, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Console.addInspectedNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Network.enable", "id": 0}');
+    this._registerDelegate('{"method": "Network.disable", "id": 0}');
+    this._registerDelegate('{"method": "Network.setUserAgentOverride", "params": {"userAgent": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Network.setExtraHTTPHeaders", "params": {"headers": {"optional": false, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "Network.getResponseBody", "params": {"requestId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Network.clearBrowserCache", "id": 0}');
+    this._registerDelegate('{"method": "Network.clearBrowserCookies", "id": 0}');
+    this._registerDelegate('{"method": "Network.setCacheDisabled", "params": {"cacheDisabled": {"optional": false, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Database.enable", "id": 0}');
+    this._registerDelegate('{"method": "Database.disable", "id": 0}');
+    this._registerDelegate('{"method": "Database.getDatabaseTableNames", "params": {"databaseId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Database.executeSQL", "params": {"databaseId": {"optional": false, "type": "number"}, "query": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMStorage.enable", "id": 0}');
+    this._registerDelegate('{"method": "DOMStorage.disable", "id": 0}');
+    this._registerDelegate('{"method": "DOMStorage.getDOMStorageEntries", "params": {"storageId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMStorage.setDOMStorageItem", "params": {"storageId": {"optional": false, "type": "number"}, "key": {"optional": false, "type": "string"}, "value": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMStorage.removeDOMStorageItem", "params": {"storageId": {"optional": false, "type": "number"}, "key": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "ApplicationCache.getFramesWithManifests", "id": 0}');
+    this._registerDelegate('{"method": "ApplicationCache.enable", "id": 0}');
+    this._registerDelegate('{"method": "ApplicationCache.getManifestForFrame", "params": {"frameId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "ApplicationCache.getApplicationCacheForFrame", "params": {"frameId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.getDocument", "id": 0}');
+    this._registerDelegate('{"method": "DOM.requestChildNodes", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.querySelector", "params": {"nodeId": {"optional": false, "type": "number"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.querySelectorAll", "params": {"nodeId": {"optional": false, "type": "number"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.setNodeName", "params": {"nodeId": {"optional": false, "type": "number"}, "name": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.setNodeValue", "params": {"nodeId": {"optional": false, "type": "number"}, "value": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.removeNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.setAttributeValue", "params": {"nodeId": {"optional": false, "type": "number"}, "name": {"optional": false, "type": "string"}, "value": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.setAttributesAsText", "params": {"nodeId": {"optional": false, "type": "number"}, "text": {"optional": false, "type": "string"}, "name": {"optional": true, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.removeAttribute", "params": {"nodeId": {"optional": false, "type": "number"}, "name": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.getEventListenersForNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.copyNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.getOuterHTML", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.setOuterHTML", "params": {"nodeId": {"optional": false, "type": "number"}, "outerHTML": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.performSearch", "params": {"query": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.getSearchResults", "params": {"searchId": {"optional": false, "type": "string"}, "fromIndex": {"optional": false, "type": "number"}, "toIndex": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.discardSearchResults", "params": {"searchId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.requestNode", "params": {"objectId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.setInspectModeEnabled", "params": {"enabled": {"optional": false, "type": "boolean"}, "highlightConfig": {"optional": true, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.highlightRect", "params": {"x": {"optional": false, "type": "number"}, "y": {"optional": false, "type": "number"}, "width": {"optional": false, "type": "number"}, "height": {"optional": false, "type": "number"}, "color": {"optional": true, "type": "object"}, "outlineColor": {"optional": true, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.highlightNode", "params": {"nodeId": {"optional": false, "type": "number"}, "highlightConfig": {"optional": false, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.hideHighlight", "id": 0}');
+    this._registerDelegate('{"method": "DOM.highlightFrame", "params": {"frameId": {"optional": false, "type": "string"}, "contentColor": {"optional": true, "type": "object"}, "contentOutlineColor": {"optional": true, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.pushNodeByPathToFrontend", "params": {"path": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.resolveNode", "params": {"nodeId": {"optional": false, "type": "number"}, "objectGroup": {"optional": true, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.getAttributes", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOM.moveTo", "params": {"nodeId": {"optional": false, "type": "number"}, "targetNodeId": {"optional": false, "type": "number"}, "insertBeforeNodeId": {"optional": true, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.getStylesForNode", "params": {"nodeId": {"optional": false, "type": "number"}, "forcedPseudoClasses": {"optional": true, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.getComputedStyleForNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.getInlineStyleForNode", "params": {"nodeId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.getAllStyleSheets", "id": 0}');
+    this._registerDelegate('{"method": "CSS.getStyleSheet", "params": {"styleSheetId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.getStyleSheetText", "params": {"styleSheetId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.setStyleSheetText", "params": {"styleSheetId": {"optional": false, "type": "string"}, "text": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.setPropertyText", "params": {"styleId": {"optional": false, "type": "object"}, "propertyIndex": {"optional": false, "type": "number"}, "text": {"optional": false, "type": "string"}, "overwrite": {"optional": false, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.toggleProperty", "params": {"styleId": {"optional": false, "type": "object"}, "propertyIndex": {"optional": false, "type": "number"}, "disable": {"optional": false, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.setRuleSelector", "params": {"ruleId": {"optional": false, "type": "object"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.addRule", "params": {"contextNodeId": {"optional": false, "type": "number"}, "selector": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "CSS.getSupportedCSSProperties", "id": 0}');
+    this._registerDelegate('{"method": "Timeline.start", "params": {"maxCallStackDepth": {"optional": true, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Timeline.stop", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.getCapabilities", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.enable", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.disable", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.setBreakpointsActive", "params": {"active": {"optional": false, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.setBreakpointByUrl", "params": {"lineNumber": {"optional": false, "type": "number"}, "url": {"optional": true, "type": "string"}, "urlRegex": {"optional": true, "type": "string"}, "columnNumber": {"optional": true, "type": "number"}, "condition": {"optional": true, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.setBreakpoint", "params": {"location": {"optional": false, "type": "object"}, "condition": {"optional": true, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.removeBreakpoint", "params": {"breakpointId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.continueToLocation", "params": {"location": {"optional": false, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.stepOver", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.stepInto", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.stepOut", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.pause", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.resume", "id": 0}');
+    this._registerDelegate('{"method": "Debugger.searchInContent", "params": {"scriptId": {"optional": false, "type": "string"}, "query": {"optional": false, "type": "string"}, "caseSensitive": {"optional": true, "type": "boolean"}, "isRegex": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.setScriptSource", "params": {"scriptId": {"optional": false, "type": "string"}, "scriptSource": {"optional": false, "type": "string"}, "preview": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.getScriptSource", "params": {"scriptId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.getFunctionLocation", "params": {"functionId": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.setPauseOnExceptions", "params": {"state": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Debugger.evaluateOnCallFrame", "params": {"callFrameId": {"optional": false, "type": "string"}, "expression": {"optional": false, "type": "string"}, "objectGroup": {"optional": true, "type": "string"}, "includeCommandLineAPI": {"optional": true, "type": "boolean"}, "returnByValue": {"optional": true, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMDebugger.setDOMBreakpoint", "params": {"nodeId": {"optional": false, "type": "number"}, "type": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMDebugger.removeDOMBreakpoint", "params": {"nodeId": {"optional": false, "type": "number"}, "type": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMDebugger.setEventListenerBreakpoint", "params": {"eventName": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMDebugger.removeEventListenerBreakpoint", "params": {"eventName": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMDebugger.setXHRBreakpoint", "params": {"url": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "DOMDebugger.removeXHRBreakpoint", "params": {"url": {"optional": false, "type": "string"}}, "id": 0}');
+    this._registerDelegate('{"method": "Profiler.enable", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.disable", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.isEnabled", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.start", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.stop", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.getProfileHeaders", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.getProfile", "params": {"type": {"optional": false, "type": "string"}, "uid": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Profiler.removeProfile", "params": {"type": {"optional": false, "type": "string"}, "uid": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Profiler.clearProfiles", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.takeHeapSnapshot", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.collectGarbage", "id": 0}');
+    this._registerDelegate('{"method": "Profiler.getObjectByHeapObjectId", "params": {"objectId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Worker.setWorkerInspectionEnabled", "params": {"value": {"optional": false, "type": "boolean"}}, "id": 0}');
+    this._registerDelegate('{"method": "Worker.sendMessageToWorker", "params": {"workerId": {"optional": false, "type": "number"}, "message": {"optional": false, "type": "object"}}, "id": 0}');
+    this._registerDelegate('{"method": "Worker.connectToWorker", "params": {"workerId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Worker.disconnectFromWorker", "params": {"workerId": {"optional": false, "type": "number"}}, "id": 0}');
+    this._registerDelegate('{"method": "Worker.setAutoconnectToWorkers", "params": {"value": {"optional": false, "type": "boolean"}}, "id": 0}');
     this._eventArgs["Inspector.frontendReused"] = [];
     this._eventArgs["Inspector.bringToFront"] = [];
     this._eventArgs["Inspector.disconnectFromBackend"] = [];
@@ -164,8 +171,8 @@ InspectorBackendStub = function()
     this._eventArgs["Database.sqlTransactionFailed"] = ["transactionId", "sqlError"];
     this._eventArgs["DOMStorage.addDOMStorage"] = ["storage"];
     this._eventArgs["DOMStorage.updateDOMStorage"] = ["storageId"];
-    this._eventArgs["ApplicationCache.updateApplicationCacheStatus"] = ["status"];
-    this._eventArgs["ApplicationCache.updateNetworkState"] = ["isNowOnline"];
+    this._eventArgs["ApplicationCache.applicationCacheStatusUpdated"] = ["frameId", "manifestURL", "status"];
+    this._eventArgs["ApplicationCache.networkStateUpdated"] = ["isNowOnline"];
     this._eventArgs["DOM.documentUpdated"] = [];
     this._eventArgs["DOM.setChildNodes"] = ["parentId", "nodes"];
     this._eventArgs["DOM.attributeModified"] = ["nodeId", "name", "value"];
@@ -175,7 +182,6 @@ InspectorBackendStub = function()
     this._eventArgs["DOM.childNodeCountUpdated"] = ["nodeId", "childNodeCount"];
     this._eventArgs["DOM.childNodeInserted"] = ["parentNodeId", "previousNodeId", "node"];
     this._eventArgs["DOM.childNodeRemoved"] = ["parentNodeId", "nodeId"];
-    this._eventArgs["DOM.searchResults"] = ["nodeIds"];
     this._eventArgs["Timeline.started"] = [];
     this._eventArgs["Timeline.stopped"] = [];
     this._eventArgs["Timeline.eventRecorded"] = ["record"];
@@ -197,6 +203,61 @@ InspectorBackendStub = function()
     this._eventArgs["Worker.workerCreated"] = ["workerId", "url", "inspectorConnected"];
     this._eventArgs["Worker.workerTerminated"] = ["workerId"];
     this._eventArgs["Worker.dispatchMessageFromWorker"] = ["workerId", "message"];
+    this._replyArgs["Page.addScriptToEvaluateOnLoad"] = ["identifier"];
+    this._replyArgs["Page.getCookies"] = ["cookies", "cookiesString"];
+    this._replyArgs["Page.getResourceTree"] = ["frameTree"];
+    this._replyArgs["Page.getResourceContent"] = ["content", "base64Encoded"];
+    this._replyArgs["Page.searchInResource"] = ["result"];
+    this._replyArgs["Page.searchInResources"] = ["result"];
+    this._replyArgs["Runtime.evaluate"] = ["result", "wasThrown"];
+    this._replyArgs["Runtime.callFunctionOn"] = ["result", "wasThrown"];
+    this._replyArgs["Runtime.getProperties"] = ["result"];
+    this._replyArgs["Network.getResponseBody"] = ["body", "base64Encoded"];
+    this._replyArgs["Database.getDatabaseTableNames"] = ["tableNames"];
+    this._replyArgs["Database.executeSQL"] = ["success", "transactionId"];
+    this._replyArgs["DOMStorage.getDOMStorageEntries"] = ["entries"];
+    this._replyArgs["DOMStorage.setDOMStorageItem"] = ["success"];
+    this._replyArgs["DOMStorage.removeDOMStorageItem"] = ["success"];
+    this._replyArgs["ApplicationCache.getFramesWithManifests"] = ["frameIds"];
+    this._replyArgs["ApplicationCache.getManifestForFrame"] = ["manifestURL"];
+    this._replyArgs["ApplicationCache.getApplicationCacheForFrame"] = ["applicationCache"];
+    this._replyArgs["DOM.getDocument"] = ["root"];
+    this._replyArgs["DOM.querySelector"] = ["nodeId"];
+    this._replyArgs["DOM.querySelectorAll"] = ["nodeIds"];
+    this._replyArgs["DOM.setNodeName"] = ["nodeId"];
+    this._replyArgs["DOM.getEventListenersForNode"] = ["listeners"];
+    this._replyArgs["DOM.getOuterHTML"] = ["outerHTML"];
+    this._replyArgs["DOM.setOuterHTML"] = ["nodeId"];
+    this._replyArgs["DOM.performSearch"] = ["searchId", "resultCount"];
+    this._replyArgs["DOM.getSearchResults"] = ["nodeIds"];
+    this._replyArgs["DOM.requestNode"] = ["nodeId"];
+    this._replyArgs["DOM.pushNodeByPathToFrontend"] = ["nodeId"];
+    this._replyArgs["DOM.resolveNode"] = ["object"];
+    this._replyArgs["DOM.getAttributes"] = ["attributes"];
+    this._replyArgs["DOM.moveTo"] = ["nodeId"];
+    this._replyArgs["CSS.getStylesForNode"] = ["styles"];
+    this._replyArgs["CSS.getComputedStyleForNode"] = ["style"];
+    this._replyArgs["CSS.getInlineStyleForNode"] = ["style"];
+    this._replyArgs["CSS.getAllStyleSheets"] = ["headers"];
+    this._replyArgs["CSS.getStyleSheet"] = ["styleSheet"];
+    this._replyArgs["CSS.getStyleSheetText"] = ["text"];
+    this._replyArgs["CSS.setPropertyText"] = ["style"];
+    this._replyArgs["CSS.toggleProperty"] = ["style"];
+    this._replyArgs["CSS.setRuleSelector"] = ["rule"];
+    this._replyArgs["CSS.addRule"] = ["rule"];
+    this._replyArgs["CSS.getSupportedCSSProperties"] = ["cssProperties"];
+    this._replyArgs["Debugger.getCapabilities"] = ["capabilities"];
+    this._replyArgs["Debugger.setBreakpointByUrl"] = ["breakpointId", "locations"];
+    this._replyArgs["Debugger.setBreakpoint"] = ["breakpointId", "actualLocation"];
+    this._replyArgs["Debugger.searchInContent"] = ["result"];
+    this._replyArgs["Debugger.setScriptSource"] = ["callFrames", "result"];
+    this._replyArgs["Debugger.getScriptSource"] = ["scriptSource"];
+    this._replyArgs["Debugger.getFunctionLocation"] = ["location"];
+    this._replyArgs["Debugger.evaluateOnCallFrame"] = ["result", "wasThrown"];
+    this._replyArgs["Profiler.isEnabled"] = ["state"];
+    this._replyArgs["Profiler.getProfileHeaders"] = ["headers"];
+    this._replyArgs["Profiler.getProfile"] = ["profile"];
+    this._replyArgs["Profiler.getObjectByHeapObjectId"] = ["result"];
     this.registerInspectorDispatcher = this._registerDomainDispatcher.bind(this, "Inspector");
     this.registerPageDispatcher = this._registerDomainDispatcher.bind(this, "Page");
     this.registerConsoleDispatcher = this._registerDomainDispatcher.bind(this, "Console");
@@ -209,7 +270,8 @@ InspectorBackendStub = function()
     this.registerDebuggerDispatcher = this._registerDomainDispatcher.bind(this, "Debugger");
     this.registerProfilerDispatcher = this._registerDomainDispatcher.bind(this, "Profiler");
     this.registerWorkerDispatcher = this._registerDomainDispatcher.bind(this, "Worker");
-    }
+    DebuggerAgent.capabilitySetScriptSource = "set-script-source";
+}
 
 InspectorBackendStub.prototype = {
     dumpInspectorTimeStats: 0,
@@ -290,11 +352,11 @@ InspectorBackendStub.prototype = {
     {
         messageObject.id = this._wrap(callback);
 
-        if (this.dumpInspectorTimeStats) {
-            var wrappedCallback = this._callbacks[messageObject.id];
-            wrappedCallback.methodName = messageObject.method;
+        var wrappedCallback = this._callbacks[messageObject.id];
+        wrappedCallback.methodName = messageObject.method;
+
+        if (this.dumpInspectorTimeStats)
             wrappedCallback.sendRequestTime = Date.now();
-        }
 
         if (this.dumpInspectorProtocolMessages)
             console.log("frontend: " + JSON.stringify(messageObject));
@@ -353,20 +415,23 @@ InspectorBackendStub.prototype = {
                     this.reportProtocolError(messageObject);
             }
 
-            var arguments = [];
-            if (messageObject.result) {
-                for (var key in messageObject.result)
-                    arguments.push(messageObject.result[key]);
-            }
-
             var callback = this._callbacks[messageObject.id];
             if (callback) {
+                var argumentsArray = [];
+                if (messageObject.result) {
+                    var paramNames = this._replyArgs[callback.methodName];
+                    if (paramNames) {
+                        for (var i = 0; i < paramNames.length; ++i)
+                            argumentsArray.push(messageObject.result[paramNames[i]]);
+                    }
+                }
+
                 var processingStartTime;
                 if (this.dumpInspectorTimeStats && callback.methodName)
                     processingStartTime = Date.now();
 
-                arguments.unshift(messageObject.error);
-                callback.apply(null, arguments);
+                argumentsArray.unshift(messageObject.error);
+                callback.apply(null, argumentsArray);
                 --this._pendingResponsesCount;
                 delete this._callbacks[messageObject.id];
 

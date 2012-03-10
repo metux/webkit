@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Igalia S.L.
+ * Portions Copyright (c) 2011 Motorola Mobility, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -57,6 +58,7 @@ static void didStartProvisionalLoadForFrame(WKPageRef page, WKFrameRef frame, WK
 
     gboolean returnValue;
     WebKitWebView* webView = WEBKIT_WEB_VIEW(toImpl(page)->viewWidget());
+    webkitWebViewUpdateURI(webView);
     g_signal_emit(WEBKIT_WEB_LOADER_CLIENT(clientInfo), signals[PROVISIONAL_LOAD_STARTED], 0, webView, &returnValue);
 }
 
@@ -67,6 +69,7 @@ static void didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef page, W
 
     gboolean returnValue;
     WebKitWebView* webView = WEBKIT_WEB_VIEW(toImpl(page)->viewWidget());
+    webkitWebViewUpdateURI(webView);
     g_signal_emit(WEBKIT_WEB_LOADER_CLIENT(clientInfo), signals[PROVISIONAL_LOAD_RECEIVED_SERVER_REDIRECT], 0, webView, &returnValue);
 }
 
@@ -92,6 +95,7 @@ static void didCommitLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef us
 
     gboolean returnValue;
     WebKitWebView* webView = WEBKIT_WEB_VIEW(toImpl(page)->viewWidget());
+    webkitWebViewUpdateURI(webView);
     g_signal_emit(WEBKIT_WEB_LOADER_CLIENT(clientInfo), signals[LOAD_COMMITTED], 0, webView,  &returnValue);
 }
 
@@ -120,6 +124,22 @@ static void didFailLoadWithErrorForFrame(WKPageRef page, WKFrameRef frame, WKErr
                   resourceError.failingURL().utf8().data(), webError.get(), &returnValue);
 }
 
+static void didSameDocumentNavigationForFrame(WKPageRef page, WKFrameRef frame, WKSameDocumentNavigationType, WKTypeRef, const void*)
+{
+    if (!WKFrameIsMainFrame(frame))
+        return;
+
+    webkitWebViewUpdateURI(WEBKIT_WEB_VIEW(toImpl(page)->viewWidget()));
+}
+
+static void didReceiveTitleForFrame(WKPageRef page, WKStringRef titleRef, WKFrameRef frameRef, WKTypeRef, const void*)
+{
+    if (!WKFrameIsMainFrame(frameRef))
+        return;
+
+    webkitWebViewSetTitle(WEBKIT_WEB_VIEW(toImpl(page)->viewWidget()), toImpl(titleRef)->string().utf8());
+}
+
 static void didChangeProgress(WKPageRef page, const void* clientInfo)
 {
     WebKitWebView* webView = WEBKIT_WEB_VIEW(toImpl(page)->viewWidget());
@@ -144,8 +164,8 @@ void webkitWebLoaderClientAttachLoaderClientToPage(WebKitWebLoaderClient* loader
         0, // didFinishDocumentLoadForFrame
         didFinishLoadForFrame,
         didFailLoadWithErrorForFrame,
-        0, // didSameDocumentNavigationForFrame
-        0, // didReceiveTitleForFrame
+        didSameDocumentNavigationForFrame,
+        didReceiveTitleForFrame,
         0, // didFirstLayoutForFrame
         0, // didFirstVisuallyNonEmptyLayoutForFrame
         0, // didRemoveFrameFromHierarchy
@@ -161,7 +181,8 @@ void webkitWebLoaderClientAttachLoaderClientToPage(WebKitWebLoaderClient* loader
         0, // processDidCrash
         didChangeBackForwardList,
         0, // shouldGoToBackForwardListItem
-        0 // didFailToInitializePlugin
+        0, // didFailToInitializePlugin
+        0 // didDetectXSSForFrame
     };
     WKPageSetPageLoaderClient(wkPage, &wkLoaderClient);
 }

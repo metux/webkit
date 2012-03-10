@@ -34,6 +34,10 @@ StringObject::StringObject(JSGlobalData& globalData, Structure* structure)
 {
 }
 
+void StringObject::vtableAnchor()
+{
+}
+
 void StringObject::finishCreation(JSGlobalData& globalData, JSString* string)
 {
     Base::finishCreation(globalData);
@@ -41,37 +45,28 @@ void StringObject::finishCreation(JSGlobalData& globalData, JSString* string)
     setInternalValue(globalData, string);
 }
 
-bool StringObject::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlot(this, exec, propertyName, slot);
-}
-
 bool StringObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    StringObject* thisObject = static_cast<StringObject*>(cell);
+    StringObject* thisObject = jsCast<StringObject*>(cell);
     if (thisObject->internalValue()->getStringPropertySlot(exec, propertyName, slot))
         return true;
     return JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
     
-bool StringObject::getOwnPropertySlotVirtual(ExecState* exec, unsigned propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlotByIndex(this, exec, propertyName, slot);
-}
-
 bool StringObject::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, PropertySlot& slot)
 {
-    StringObject* thisObject = static_cast<StringObject*>(cell);
+    StringObject* thisObject = jsCast<StringObject*>(cell);
     if (thisObject->internalValue()->getStringPropertySlot(exec, propertyName, slot))
         return true;    
     return JSObject::getOwnPropertySlot(thisObject, exec, Identifier::from(exec, propertyName), slot);
 }
 
-bool StringObject::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool StringObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    if (internalValue()->getStringPropertyDescriptor(exec, propertyName, descriptor))
+    StringObject* thisObject = jsCast<StringObject*>(object);
+    if (thisObject->internalValue()->getStringPropertyDescriptor(exec, propertyName, descriptor))
         return true;    
-    return JSObject::getOwnPropertyDescriptor(exec, propertyName, descriptor);
+    return JSObject::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
 void StringObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot& slot)
@@ -83,7 +78,7 @@ void StringObject::put(JSCell* cell, ExecState* exec, const Identifier& property
 
 bool StringObject::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName)
 {
-    StringObject* thisObject = static_cast<StringObject*>(cell);
+    StringObject* thisObject = jsCast<StringObject*>(cell);
     if (propertyName == exec->propertyNames().length)
         return false;
     bool isStrictUInt32;
@@ -93,14 +88,15 @@ bool StringObject::deleteProperty(JSCell* cell, ExecState* exec, const Identifie
     return JSObject::deleteProperty(thisObject, exec, propertyName);
 }
 
-void StringObject::getOwnPropertyNames(ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
+void StringObject::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    int size = internalValue()->length();
+    StringObject* thisObject = jsCast<StringObject*>(object);
+    int size = thisObject->internalValue()->length();
     for (int i = 0; i < size; ++i)
         propertyNames.add(Identifier(exec, UString::number(i)));
     if (mode == IncludeDontEnumProperties)
         propertyNames.add(exec->propertyNames().length);
-    return JSObject::getOwnPropertyNames(exec, propertyNames, mode);
+    return JSObject::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
 } // namespace JSC

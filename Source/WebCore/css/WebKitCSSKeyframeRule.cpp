@@ -31,7 +31,7 @@
 namespace WebCore {
 
 WebKitCSSKeyframeRule::WebKitCSSKeyframeRule(CSSStyleSheet* parent)
-    : CSSRule(parent)
+    : CSSRule(parent, CSSRule::WEBKIT_KEYFRAME_RULE)
 {
 }
 
@@ -50,12 +50,6 @@ String WebKitCSSKeyframeRule::cssText() const
     result += "}";
 
     return result;
-}
-
-bool WebKitCSSKeyframeRule::parseString(const String& /*string*/, bool /*strict*/)
-{
-    // FIXME
-    return false;
 }
 
 void WebKitCSSKeyframeRule::setDeclaration(PassRefPtr<CSSMutableStyleDeclaration> style)

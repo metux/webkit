@@ -62,7 +62,7 @@ protected:
 
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0);
 
-    virtual void paintIntoRect(GraphicsContext*, const IntRect&);
+    virtual void paintIntoRect(GraphicsContext*, const LayoutRect&);
     virtual void paint(PaintInfo&, const LayoutPoint&);
 
     virtual void intrinsicSizeChanged()
@@ -77,7 +77,7 @@ private:
     virtual bool isImage() const { return true; }
     virtual bool isRenderImage() const { return true; }
 
-    virtual void paintReplaced(PaintInfo&, const IntPoint&);
+    virtual void paintReplaced(PaintInfo&, const LayoutPoint&);
 
     virtual bool backgroundIsObscured() const;
 
@@ -90,7 +90,7 @@ private:
 
     IntSize imageSizeForError(CachedImage*) const;
     void imageDimensionsChanged(bool imageSizeChanged, const IntRect* = 0);
-    bool updateIntrinsicSizeIfNeeded(bool imageSizeChanged);
+    bool updateIntrinsicSizeIfNeeded(const LayoutSize&, bool imageSizeChanged);
 
     void paintAreaElementFocusRing(PaintInfo&);
 

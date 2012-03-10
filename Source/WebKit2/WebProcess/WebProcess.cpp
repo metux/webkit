@@ -134,6 +134,7 @@ WebProcess::WebProcess()
 #if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
     , m_compositingRenderServerPort(MACH_PORT_NULL)
 #endif
+    , m_fullKeyboardAccessEnabled(false)
 #if PLATFORM(QT)
     , m_networkAccessManager(0)
 #endif
@@ -264,7 +265,7 @@ void WebProcess::registerURLSchemeAsSecure(const String& urlScheme) const
 
 void WebProcess::setDomainRelaxationForbiddenForURLScheme(const String& urlScheme) const
 {
-    SecurityOrigin::setDomainRelaxationForbiddenForURLScheme(true, urlScheme);
+    SchemeRegistry::setDomainRelaxationForbiddenForURLScheme(true, urlScheme);
 }
 
 void WebProcess::setDefaultRequestTimeoutInterval(double timeoutInterval)
@@ -285,6 +286,11 @@ void WebProcess::setShouldUseFontSmoothing(bool useFontSmoothing)
 void WebProcess::languageChanged(const String& language) const
 {
     overrideDefaultLanguage(language);
+}
+
+void WebProcess::fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled)
+{
+    m_fullKeyboardAccessEnabled = fullKeyboardAccessEnabled;
 }
 
 void WebProcess::setVisitedLinkTable(const SharedMemory::Handle& handle)
@@ -331,13 +337,6 @@ void WebProcess::addVisitedLink(WebCore::LinkHash linkHash)
         return;
     m_connection->send(Messages::WebContext::AddVisitedLinkHash(linkHash), 0);
 }
-
-#if !PLATFORM(MAC)
-bool WebProcess::fullKeyboardAccessEnabled()
-{
-    return false;
-}
-#endif
 
 void WebProcess::setCacheModel(uint32_t cm)
 {
@@ -956,6 +955,13 @@ void WebProcess::cancelDownload(uint64_t downloadID)
 {
     DownloadManager::shared().cancelDownload(downloadID);
 }
+
+#if PLATFORM(QT)
+void WebProcess::startTransfer(uint64_t downloadID, const String& destination)
+{
+    DownloadManager::shared().startTransfer(downloadID, destination);
+}
+#endif
 
 void WebProcess::setEnhancedAccessibility(bool flag)
 {

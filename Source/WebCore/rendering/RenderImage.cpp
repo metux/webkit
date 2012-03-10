@@ -174,20 +174,20 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
     imageDimensionsChanged(imageSizeChanged, rect);
 }
 
-bool RenderImage::updateIntrinsicSizeIfNeeded(bool imageSizeChanged)
+bool RenderImage::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize, bool imageSizeChanged)
 {
-    if (m_imageResource->imageSize(style()->effectiveZoom()) == intrinsicSize() && !imageSizeChanged)
+    if (newSize == intrinsicSize() && !imageSizeChanged)
         return false;
     if (m_imageResource->errorOccurred())
         return imageSizeChanged;
-    setIntrinsicSize(m_imageResource->imageSize(style()->effectiveZoom()));
+    setIntrinsicSize(newSize);
     return true;
 }
 
 void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* rect)
 {
     bool shouldRepaint = true;
-    if (updateIntrinsicSizeIfNeeded(imageSizeChanged)) {
+    if (updateIntrinsicSizeIfNeeded(m_imageResource->imageSize(style()->effectiveZoom()), imageSizeChanged)) {
         // In the case of generated image content using :before/:after, we might not be in the
         // render tree yet.  In that case, we don't need to worry about check for layout, since we'll get a
         // layout when we get added in to the render tree hierarchy later.
@@ -212,7 +212,7 @@ void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* r
     }
 
     if (shouldRepaint) {
-        IntRect repaintRect;
+        LayoutRect repaintRect;
         if (rect) {
             // The image changed rect is in source image coordinates (pre-zooming),
             // so map from the bounds of the image to the contentsBox.
@@ -394,7 +394,7 @@ void RenderImage::areaElementFocusChanged(HTMLAreaElement* element)
     repaint();
 }
 
-void RenderImage::paintIntoRect(GraphicsContext* context, const IntRect& rect)
+void RenderImage::paintIntoRect(GraphicsContext* context, const LayoutRect& rect)
 {
     if (!m_imageResource->hasImage() || m_imageResource->errorOccurred() || rect.width() <= 0 || rect.height() <= 0)
         return;
@@ -454,7 +454,7 @@ bool RenderImage::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
 
     if (tempResult.innerNode() && node()) {
         if (HTMLMapElement* map = imageMap()) {
-            IntRect contentBox = contentBoxRect();
+            LayoutRect contentBox = contentBoxRect();
             float scaleFactor = 1 / style()->effectiveZoom();
             LayoutPoint mapLocation(pointInContainer.x() - accumulatedOffset.x() - this->x() - contentBox.x(), pointInContainer.y() - accumulatedOffset.y() - this->y() - contentBox.y());
             mapLocation.scale(scaleFactor, scaleFactor);
@@ -491,18 +491,32 @@ LayoutUnit RenderImage::computeReplacedLogicalWidth(bool includeMaxWidth) const
         return width;
     }
 
-    // Propagate the containing block size to the image resource, otherwhise we can't compute our own intrinsic size, if it's relative.
     RenderBox* contentRenderer = embeddedContentBox();
     bool hasRelativeWidth = contentRenderer ? contentRenderer->style()->width().isPercent() : m_imageResource->imageHasRelativeWidth();
     bool hasRelativeHeight = contentRenderer ? contentRenderer->style()->height().isPercent() : m_imageResource->imageHasRelativeHeight();
 
+    IntSize containerSize;
     if (hasRelativeWidth || hasRelativeHeight) {
+        // Propagate the containing block size to the image resource, otherwhise we can't compute our own intrinsic size, if it's relative.
         RenderObject* containingBlock = isPositioned() ? container() : this->containingBlock();
         if (containingBlock->isBox()) {
             RenderBox* box = toRenderBox(containingBlock);
-            m_imageResource->setContainerSizeForRenderer(IntSize(box->availableWidth(), box->availableHeight())); // Already contains zooming information.
-            const_cast<RenderImage*>(this)->updateIntrinsicSizeIfNeeded(false);
+            containerSize = IntSize(box->availableWidth(), box->availableHeight()); // Already contains zooming information.
         }
+    } else {
+        // Propagate the current zoomed image size to the image resource, otherwhise the image size will remain the same on-screen.
+        CachedImage* cachedImage = m_imageResource->cachedImage();
+        if (cachedImage && cachedImage->image()) {
+            containerSize = cachedImage->image()->size();
+            // FIXME: Remove unnecessary rounding when layout is off ints: webkit.org/b/63656
+            containerSize.setWidth(static_cast<LayoutUnit>(containerSize.width() * style()->effectiveZoom()));
+            containerSize.setHeight(static_cast<LayoutUnit>(containerSize.height() * style()->effectiveZoom()));
+        }
+    }
+
+    if (!containerSize.isEmpty()) {
+        m_imageResource->setContainerSizeForRenderer(containerSize);
+        const_cast<RenderImage*>(this)->updateIntrinsicSizeIfNeeded(containerSize, false);
     }
 
     return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
@@ -513,8 +527,9 @@ void RenderImage::computeIntrinsicRatioInformation(FloatSize& intrinsicRatio, bo
     // Assure this method is never used for SVGImages.
     ASSERT(!embeddedContentBox());
     isPercentageIntrinsicSize = false;
-    if (m_imageResource && m_imageResource->image())
-        intrinsicRatio = m_imageResource->image()->size();
+    CachedImage* cachedImage = m_imageResource ? m_imageResource->cachedImage() : 0;
+    if (cachedImage && cachedImage->image())
+        intrinsicRatio = cachedImage->image()->size();
 }
 
 bool RenderImage::needsPreferredWidthsRecalculation() const
@@ -529,9 +544,11 @@ RenderBox* RenderImage::embeddedContentBox() const
     if (!m_imageResource)
         return 0;
 
-    RefPtr<Image> image = m_imageResource->image();
-    if (image && image->isSVGImage())
-        return static_pointer_cast<SVGImage>(image)->embeddedContentBox();
+#if ENABLE(SVG)
+    CachedImage* cachedImage = m_imageResource->cachedImage();
+    if (cachedImage && cachedImage->image() && cachedImage->image()->isSVGImage())
+        return static_cast<SVGImage*>(cachedImage->image())->embeddedContentBox();
+#endif
 
     return 0;
 }

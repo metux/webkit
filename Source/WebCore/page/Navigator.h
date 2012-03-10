@@ -31,7 +31,9 @@ namespace WebCore {
 class DOMMimeTypeArray;
 class DOMPluginArray;
 class Frame;
+class GamepadList;
 class Geolocation;
+class PointerLock;
 class NavigatorUserMediaErrorCallback;
 class NavigatorUserMediaSuccessCallback;
 class PluginData;
@@ -58,6 +60,10 @@ public:
 
     Geolocation* geolocation() const;
 
+#if ENABLE(POINTER_LOCK)
+    PointerLock* webkitPointer() const;
+#endif
+
     // Relinquishes the storage lock, if one exists.
     void getStorageUpdates();
 
@@ -69,12 +75,19 @@ public:
     virtual void webkitGetUserMedia(const String& options, PassRefPtr<NavigatorUserMediaSuccessCallback>, PassRefPtr<NavigatorUserMediaErrorCallback>, ExceptionCode&);
 #endif
 
+#if ENABLE(GAMEPAD)
+    GamepadList* webkitGamepads();
+#endif
+
 private:
     Navigator(Frame*);
     Frame* m_frame;
     mutable RefPtr<DOMPluginArray> m_plugins;
     mutable RefPtr<DOMMimeTypeArray> m_mimeTypes;
     mutable RefPtr<Geolocation> m_geolocation;
+#if ENABLE(POINTER_LOCK)
+    mutable RefPtr<PointerLock> m_pointer;
+#endif
 };
 
 }

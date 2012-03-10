@@ -37,6 +37,7 @@ module html {
                  attribute boolean           draggable;
                  attribute [Reflect] DOMString webkitdropzone;
                  attribute [Reflect] boolean hidden;
+                 attribute [Reflect] DOMString accessKey;
 
         // Extensions
                  attribute [ConvertNullToNullString] DOMString innerHTML
@@ -68,7 +69,7 @@ module html {
 
                  attribute [Conditional=MICRODATA, Reflect] boolean itemScope;
         readonly attribute [Conditional=MICRODATA] DOMSettableTokenList itemType;
-                 attribute [Conditional=MICRODATA, Reflect] DOMString itemId;
+                 attribute [Conditional=MICRODATA, Reflect, URL] DOMString itemId;
 
         readonly attribute [Conditional=MICRODATA] DOMSettableTokenList itemRef;
         readonly attribute [Conditional=MICRODATA] DOMSettableTokenList itemProp;

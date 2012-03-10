@@ -44,6 +44,10 @@ namespace WebCore {
     struct ViewportArguments;
 }
 
+#if PLATFORM(QT)
+class QtWebPageProxy;
+#endif
+
 namespace WebKit {
 
 class DrawingAreaProxy;
@@ -103,6 +107,8 @@ public:
 #if PLATFORM(QT)
     virtual void didChangeContentsSize(const WebCore::IntSize&) = 0;
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
+    virtual void didReceiveMessageFromNavigatorQtObject(const String&) = 0;
+    virtual void handleDownloadRequest(DownloadProxy*) = 0;
 #endif
 
 #if PLATFORM(QT) || PLATFORM(GTK)
@@ -145,7 +151,7 @@ public:
     virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) = 0;
     virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) = 0;
 
-    virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut) = 0;
+    virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut, bool animate) = 0;
 #if PLATFORM(WIN)
     virtual void didInstallOrUninstallPageOverlay(bool) = 0;
 #endif

@@ -33,32 +33,43 @@
 
 #if ENABLE(MUTATION_OBSERVERS)
 
-#include <wtf/PassOwnPtr.h>
+#include <wtf/HashSet.h>
+#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#include <wtf/text/AtomicString.h>
+#include <wtf/text/AtomicStringHash.h>
 
 namespace WebCore {
 
 class MutationCallback;
+class MutationObserverRegistration;
 class MutationRecord;
 class Node;
 
+typedef int ExceptionCode;
+
 typedef unsigned char MutationObserverOptions;
+typedef unsigned char MutationRecordDeliveryOptions;
 
 class WebKitMutationObserver : public RefCounted<WebKitMutationObserver> {
 public:
     enum MutationType {
         ChildList = 1 << 0,
         Attributes = 1 << 1,
-        CharacterData = 1 << 2
+        CharacterData = 1 << 2,
+
+        AllMutationTypes = ChildList | Attributes | CharacterData
     };
 
-    enum OptionFlags {
+    enum ObservationFlags  {
         Subtree = 1 << 3,
-        AttributeOldValue = 1 << 4,
-        CharacterDataOldValue = 1 << 5,
-        AttributeFilter = 1 << 6
+        AttributeFilter = 1 << 4
+    };
+
+    enum DeliveryFlags {
+        AttributeOldValue = 1 << 5,
+        CharacterDataOldValue = 1 << 6,
     };
 
     static PassRefPtr<WebKitMutationObserver> create(PassRefPtr<MutationCallback>);
@@ -66,19 +77,21 @@ public:
 
     ~WebKitMutationObserver();
 
-    void observe(Node*, MutationObserverOptions);
+    void observe(Node*, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter, ExceptionCode&);
     void disconnect();
-    void observedNodeDestructed(Node*);
+    void observationStarted(MutationObserverRegistration*);
+    void observationEnded(MutationObserverRegistration*);
     void enqueueMutationRecord(PassRefPtr<MutationRecord>);
 
 private:
     WebKitMutationObserver(PassRefPtr<MutationCallback>);
-
     void deliver();
+
+    static bool validateOptions(MutationObserverOptions);
 
     RefPtr<MutationCallback> m_callback;
     Vector<RefPtr<MutationRecord> > m_records;
-    Vector<Node*> m_observedNodes; // NodeRareData has a RefPtr to this, so use a weak pointer to avoid a cycle.
+    HashSet<MutationObserverRegistration*> m_registrations;
 };
 
 }

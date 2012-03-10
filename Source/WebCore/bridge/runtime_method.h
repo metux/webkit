@@ -37,6 +37,8 @@ class RuntimeMethod : public InternalFunction {
 public:
     typedef InternalFunction Base;
 
+    virtual void vtableAnchor();
+
     static RuntimeMethod* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, const Identifier& name, Bindings::MethodList& methodList)
     {
         RuntimeMethod* method = new (allocateCell<RuntimeMethod>(*exec->heap())) RuntimeMethod(globalObject, structure, methodList);
@@ -64,12 +66,11 @@ protected:
     static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
     static CallType getCallData(JSCell*, CallData&);
 
-    virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
     static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+    static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
 
 private:
     static JSValue lengthGetter(ExecState*, JSValue, const Identifier&);
-    virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
 
     OwnPtr<Bindings::MethodList> _methodList;
 };

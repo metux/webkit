@@ -94,6 +94,7 @@ HTMLInputElement::HTMLInputElement(const QualifiedName& tagName, Document* docum
     , m_stateRestored(false)
     , m_parsingInProgress(createdByParser)
     , m_wasModifiedByUser(false)
+    , m_canReceiveDroppedFiles(false)
     , m_inputType(InputType::createText(this))
 {
     ASSERT(hasTagName(inputTag) || hasTagName(isindexTag));
@@ -698,9 +699,9 @@ bool HTMLInputElement::canHaveSelection() const
     return isTextField();
 }
 
-void HTMLInputElement::accessKeyAction(bool sendToAnyElement)
+void HTMLInputElement::accessKeyAction(bool sendMouseEvents)
 {
-    m_inputType->accessKeyAction(sendToAnyElement);
+    m_inputType->accessKeyAction(sendMouseEvents);
 }
 
 bool HTMLInputElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const
@@ -1291,7 +1292,7 @@ void HTMLInputElement::defaultEventHandler(Event* evt)
 
 bool HTMLInputElement::isURLAttribute(Attribute *attr) const
 {
-    return (attr->name() == srcAttr || attr->name() == formactionAttr);
+    return attr->name() == srcAttr || attr->name() == formactionAttr || HTMLTextFormControlElement::isURLAttribute(attr);
 }
 
 String HTMLInputElement::defaultValue() const
@@ -1410,6 +1411,19 @@ Icon* HTMLInputElement::icon() const
     return m_inputType->icon();
 }
 
+bool HTMLInputElement::canReceiveDroppedFiles() const
+{
+    return m_canReceiveDroppedFiles;
+}
+
+void HTMLInputElement::setCanReceiveDroppedFiles(bool canReceiveDroppedFiles)
+{
+    if (m_canReceiveDroppedFiles == canReceiveDroppedFiles)
+        return;
+    m_canReceiveDroppedFiles = canReceiveDroppedFiles;
+    renderer()->updateFromElement();
+}
+
 String HTMLInputElement::visibleValue() const
 {
     return m_inputType->visibleValue();
@@ -1523,12 +1537,14 @@ bool HTMLInputElement::recalcWillValidate() const
 }
 
 #if ENABLE(INPUT_COLOR)
-bool HTMLInputElement::connectToColorChooser()
+void HTMLInputElement::selectColorInColorChooser(const Color& color)
 {
     if (!m_inputType->isColorControl())
-        return false;
-    ColorChooser::chooser()->connectClient(static_cast<ColorInputType*>(m_inputType.get()));
-    return true;
+        return;
+    RefPtr<ColorChooser> chooser = static_cast<ColorInputType*>(m_inputType.get())->chooser();
+    if (!chooser)
+        return;
+    chooser->didChooseColor(color);
 }
 #endif
     

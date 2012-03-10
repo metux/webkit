@@ -85,6 +85,7 @@ ALWAYS_INLINE RenderStyle::RenderStyle()
     , m_childrenAffectedByBackwardPositionalRules(false)
     , m_firstChildState(false)
     , m_lastChildState(false)
+    , m_explicitInheritance(false)
     , m_childIndex(0)
     , m_box(defaultStyle()->m_box)
     , visual(defaultStyle()->visual)
@@ -114,6 +115,7 @@ ALWAYS_INLINE RenderStyle::RenderStyle(bool)
     , m_childrenAffectedByBackwardPositionalRules(false)
     , m_firstChildState(false)
     , m_lastChildState(false)
+    , m_explicitInheritance(false)
     , m_childIndex(0)
 {
     setBitDefaults();
@@ -124,9 +126,7 @@ ALWAYS_INLINE RenderStyle::RenderStyle(bool)
     surround.init();
     rareNonInheritedData.init();
     rareNonInheritedData.access()->m_deprecatedFlexibleBox.init();
-#if ENABLE(CSS3_FLEXBOX)
     rareNonInheritedData.access()->m_flexibleBox.init();
-#endif
     rareNonInheritedData.access()->m_marquee.init();
     rareNonInheritedData.access()->m_multiCol.init();
     rareNonInheritedData.access()->m_transform.init();
@@ -154,6 +154,7 @@ ALWAYS_INLINE RenderStyle::RenderStyle(const RenderStyle& o)
     , m_childrenAffectedByBackwardPositionalRules(false)
     , m_firstChildState(false)
     , m_lastChildState(false)
+    , m_explicitInheritance(false)
     , m_childIndex(0)
     , m_box(o.m_box)
     , visual(o.visual)
@@ -179,6 +180,34 @@ void RenderStyle::inheritFrom(const RenderStyle* inheritParent)
     if (m_svgStyle != inheritParent->m_svgStyle)
         m_svgStyle.access()->inheritFrom(inheritParent->m_svgStyle.get());
 #endif
+}
+
+void RenderStyle::copyNonInheritedFrom(const RenderStyle* other)
+{
+    m_box = other->m_box;
+    visual = other->visual;
+    m_background = other->m_background;
+    surround = other->surround;
+    rareNonInheritedData = other->rareNonInheritedData;
+    // The flags are copied one-by-one because noninherited_flags contains a bunch of stuff other than real style data.
+    noninherited_flags._effectiveDisplay = other->noninherited_flags._effectiveDisplay;
+    noninherited_flags._originalDisplay = other->noninherited_flags._originalDisplay;
+    noninherited_flags._overflowX = other->noninherited_flags._overflowX;
+    noninherited_flags._overflowY = other->noninherited_flags._overflowY;
+    noninherited_flags._vertical_align = other->noninherited_flags._vertical_align;
+    noninherited_flags._clear = other->noninherited_flags._clear;
+    noninherited_flags._position = other->noninherited_flags._position;
+    noninherited_flags._floating = other->noninherited_flags._floating;
+    noninherited_flags._table_layout = other->noninherited_flags._table_layout;
+    noninherited_flags._page_break_before = other->noninherited_flags._page_break_before;
+    noninherited_flags._page_break_after = other->noninherited_flags._page_break_after;
+    noninherited_flags._page_break_inside = other->noninherited_flags._page_break_inside;
+    noninherited_flags._unicodeBidi = other->noninherited_flags._unicodeBidi;
+#if ENABLE(SVG)
+    if (m_svgStyle != other->m_svgStyle)
+        m_svgStyle.access()->copyNonInheritedFrom(other->m_svgStyle.get());
+#endif
+    ASSERT(zoom() == initialZoom());
 }
 
 RenderStyle::~RenderStyle()
@@ -356,15 +385,19 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         if (rareNonInheritedData->m_regionOverflow != other->rareNonInheritedData->m_regionOverflow)
             return StyleDifferenceLayout;
 
+        if (rareNonInheritedData->m_wrapFlow != other->rareNonInheritedData->m_wrapFlow
+            || rareNonInheritedData->m_wrapThrough != other->rareNonInheritedData->m_wrapThrough
+            || rareNonInheritedData->m_wrapMargin != other->rareNonInheritedData->m_wrapMargin
+            || rareNonInheritedData->m_wrapPadding != other->rareNonInheritedData->m_wrapPadding)
+            return StyleDifferenceLayout;
+
         if (rareNonInheritedData->m_deprecatedFlexibleBox.get() != other->rareNonInheritedData->m_deprecatedFlexibleBox.get()
             && *rareNonInheritedData->m_deprecatedFlexibleBox.get() != *other->rareNonInheritedData->m_deprecatedFlexibleBox.get())
             return StyleDifferenceLayout;
 
-#if ENABLE(CSS3_FLEXBOX)
         if (rareNonInheritedData->m_flexibleBox.get() != other->rareNonInheritedData->m_flexibleBox.get()
             && *rareNonInheritedData->m_flexibleBox.get() != *other->rareNonInheritedData->m_flexibleBox.get())
             return StyleDifferenceLayout;
-#endif
 
         // FIXME: We should add an optimized form of layout that just recomputes visual overflow.
         if (!rareNonInheritedData->shadowDataEquivalent(*other->rareNonInheritedData.get()))
@@ -386,6 +419,13 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             return StyleDifferenceLayout;
 #endif
         }
+
+#if ENABLE(CSS_FILTERS)
+        if (rareNonInheritedData->m_filter.get() != other->rareNonInheritedData->m_filter.get()
+            && *rareNonInheritedData->m_filter.get() != *other->rareNonInheritedData->m_filter.get()) {
+            return StyleDifferenceLayout;
+        }
+#endif
 
 #if !USE(ACCELERATED_COMPOSITING)
         if (rareNonInheritedData.get() != other->rareNonInheritedData.get()) {
@@ -423,7 +463,9 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             || rareInheritedData->textEmphasisMark != other->rareInheritedData->textEmphasisMark
             || rareInheritedData->textEmphasisPosition != other->rareInheritedData->textEmphasisPosition
             || rareInheritedData->textEmphasisCustomMark != other->rareInheritedData->textEmphasisCustomMark
-            || rareInheritedData->m_lineBoxContain != other->rareInheritedData->m_lineBoxContain)
+            || rareInheritedData->m_lineBoxContain != other->rareInheritedData->m_lineBoxContain
+            || rareInheritedData->m_lineGrid != other->rareInheritedData->m_lineGrid
+            || rareInheritedData->m_lineGridSnap != other->rareInheritedData->m_lineGridSnap)
             return StyleDifferenceLayout;
 
         if (!rareInheritedData->shadowDataEquivalent(*other->rareInheritedData.get()))
@@ -566,7 +608,7 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
     if (inherited->color != other->inherited->color
         || inherited_flags._visibility != other->inherited_flags._visibility
         || inherited_flags._text_decorations != other->inherited_flags._text_decorations
-        || inherited_flags._force_backgrounds_to_white != other->inherited_flags._force_backgrounds_to_white
+        || inherited_flags.m_printColorAdjust != other->inherited_flags.m_printColorAdjust
         || inherited_flags._insideLink != other->inherited_flags._insideLink
         || surround->border != other->surround->border
         || *m_background.get() != *other->m_background.get()

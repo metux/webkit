@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Igalia S.L.
+ * Portions Copyright (c) 2011 Motorola Mobility, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,6 +23,7 @@
 
 #include "TestMain.h"
 #include <webkit2/webkit2.h>
+#include <wtf/text/CString.h>
 
 class WebViewTest: public Test {
 public:
@@ -29,10 +31,20 @@ public:
     WebViewTest();
     virtual ~WebViewTest();
 
+    void loadURI(const char* uri);
+    void loadHtml(const char* html, const char* baseURI);
+    void loadPlainText(const char* plainText);
+    void loadAlternateHTML(const char* html, const char* baseURI, const char* unreachableURI);
+    void loadRequest(WebKitNetworkRequest*);
+    void goBack();
+    void goForward();
+    void goToBackForwardListItem(WebKitBackForwardListItem*);
+
     void wait(double seconds);
 
     WebKitWebView* m_webView;
     GMainLoop* m_mainLoop;
+    CString m_activeURI;
 };
 
 #endif // WebViewTest_h

@@ -302,9 +302,6 @@ void Node::stopIgnoringLeaks()
 
 Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2)
 {
-    // FIXME: The behavior of this function is just totally wrong.  It doesn't handle
-    // explicit inheritance of non-inherited properties and so you end up not re-resolving
-    // style in cases where you need to.
     StyleChange ch = NoInherit;
     EDisplay display1 = s1 ? s1->display() : NONE;
     bool fl1 = s1 && s1->hasPseudoStyle(FIRST_LETTER);
@@ -324,7 +321,9 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2)
         ch = NoChange;
     else if (s1->inheritedNotEqual(s2))
         ch = Inherit;
-    
+    else if (s1->hasExplicitlyInheritedProperties() || s2->hasExplicitlyInheritedProperties())
+        ch = Inherit;
+
     // For nth-child and other positional rules, treat styles as different if they have
     // changed positionally in the DOM. This way subsequent sibling resolutions won't be confused
     // by the wrong child index and evaluate to incorrect results.
@@ -549,11 +548,7 @@ void Node::clearRareData()
         treeScope()->removeNodeListCache();
 
 #if ENABLE(MUTATION_OBSERVERS)
-    Vector<MutationObserverEntry>* observerEntries = mutationObserverEntries();
-    if (observerEntries) {
-        for (size_t i = 0; i < observerEntries->size(); ++i)
-            observerEntries->at(i).observer->observedNodeDestructed(this);
-    }
+    ASSERT(!transientMutationObserverRegistry() || transientMutationObserverRegistry()->isEmpty());
 #endif
 
     NodeRareData::NodeRareDataMap& dataMap = NodeRareData::rareDataMap();
@@ -2549,6 +2544,24 @@ void Node::didMoveToNewOwnerDocument()
 {
     ASSERT(!didMoveToNewOwnerDocumentWasCalled);
     setDidMoveToNewOwnerDocumentWasCalled(true);
+
+    // FIXME: Event listener types for this node should be set on the new owner document here.
+
+#if ENABLE(MUTATION_OBSERVERS)
+    if (Vector<OwnPtr<MutationObserverRegistration> >* registry = mutationObserverRegistry()) {
+        for (size_t i = 0; i < registry->size(); ++i) {
+            if (registry->at(i)->isSubtree())
+                document()->addSubtreeMutationObserverTypes(registry->at(i)->mutationTypes());
+        }
+    }
+
+    if (HashSet<MutationObserverRegistration*>* transientRegistry = transientMutationObserverRegistry()) {
+        for (HashSet<MutationObserverRegistration*>::iterator iter = transientRegistry->begin(); iter != transientRegistry->end(); ++iter) {
+            if ((*iter)->isSubtree())
+                document()->addSubtreeMutationObserverTypes((*iter)->mutationTypes());
+        }
+    }
+#endif
 }
 
 #if ENABLE(SVG)
@@ -2698,65 +2711,118 @@ EventTargetData* Node::ensureEventTargetData()
 }
 
 #if ENABLE(MUTATION_OBSERVERS)
-Vector<MutationObserverEntry>* Node::mutationObserverEntries()
+Vector<OwnPtr<MutationObserverRegistration> >* Node::mutationObserverRegistry()
 {
-    return hasRareData() ? rareData()->mutationObserverEntries() : 0;
+    return hasRareData() ? rareData()->mutationObserverRegistry() : 0;
 }
 
-static void addMatchingObservers(HashSet<WebKitMutationObserver*>& observerSet, Vector<MutationObserverEntry>* observerEntries, MutationObserverOptions options)
+HashSet<MutationObserverRegistration*>* Node::transientMutationObserverRegistry()
 {
-    if (!observerEntries)
-        return;
+    return hasRareData() ? rareData()->transientMutationObserverRegistry() : 0;
+}
 
-    const size_t size = observerEntries->size();
-    for (size_t i = 0; i < size; ++i) {
-        MutationObserverEntry& entry = observerEntries->at(i);
-        if (entry.hasAllOptions(options))
-            observerSet.add(entry.observer.get());
+void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, Node* fromNode, WebKitMutationObserver::MutationType type, const AtomicString& attributeName)
+{
+    if (Vector<OwnPtr<MutationObserverRegistration> >* registry = fromNode->mutationObserverRegistry()) {
+        const size_t size = registry->size();
+        for (size_t i = 0; i < size; ++i) {
+            MutationObserverRegistration* registration = registry->at(i).get();
+            if (registration->shouldReceiveMutationFrom(this, type, attributeName)) {
+                MutationRecordDeliveryOptions deliveryOptions = registration->deliveryOptions();
+                pair<HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::iterator, bool> result = observers.add(registration->observer(), deliveryOptions);
+                if (!result.second)
+                    result.first->second |= deliveryOptions;
+
+            }
+        }
+    }
+
+    if (HashSet<MutationObserverRegistration*>* transientRegistry = fromNode->transientMutationObserverRegistry()) {
+        for (HashSet<MutationObserverRegistration*>::iterator iter = transientRegistry->begin(); iter != transientRegistry->end(); ++iter) {
+            MutationObserverRegistration* registration = *iter;
+            if (registration->shouldReceiveMutationFrom(this, type, attributeName)) {
+                MutationRecordDeliveryOptions deliveryOptions = registration->deliveryOptions();
+                pair<HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::iterator, bool> result = observers.add(registration->observer(), deliveryOptions);
+                if (!result.second)
+                    result.first->second |= deliveryOptions;
+            }
+        }
     }
 }
 
-void Node::getRegisteredMutationObserversOfType(Vector<WebKitMutationObserver*>& observers, WebKitMutationObserver::MutationType type)
+void Node::getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, WebKitMutationObserver::MutationType type, const AtomicString& attributeName)
 {
-    HashSet<WebKitMutationObserver*> observerSet;
-    addMatchingObservers(observerSet, mutationObserverEntries(), type);
+    collectMatchingObserversForMutation(observers, this, type, attributeName);
+
+    if (!document()->hasSubtreeMutationObserverOfType(type))
+        return;
+
     for (Node* node = parentNode(); node; node = node->parentNode())
-        addMatchingObservers(observerSet, node->mutationObserverEntries(), type | WebKitMutationObserver::Subtree);
-
-    // FIXME: this method should output a HashSet instead of a Vector.
-    if (!observerSet.isEmpty())
-        copyToVector(observerSet, observers);
+        collectMatchingObserversForMutation(observers, node, type, attributeName);
 }
 
-Node::MutationRegistrationResult Node::registerMutationObserver(PassRefPtr<WebKitMutationObserver> observer, MutationObserverOptions options)
+MutationObserverRegistration* Node::registerMutationObserver(PassRefPtr<WebKitMutationObserver> observer)
 {
-    Vector<MutationObserverEntry>* observerEntries = ensureRareData()->ensureMutationObserverEntries();
-    MutationObserverEntry entry(observer, options);
-
-    size_t index = observerEntries->find(entry);
-    if (index == notFound) {
-        observerEntries->append(entry);
-        return MutationObserverRegistered;
+    Vector<OwnPtr<MutationObserverRegistration> >* registry = ensureRareData()->ensureMutationObserverRegistry();
+    for (size_t i = 0; i < registry->size(); ++i) {
+        if (registry->at(i)->observer() == observer)
+            return registry->at(i).get();
     }
 
-    (*observerEntries)[index].options = entry.options;
-    return MutationRegistrationOptionsReset;
+    OwnPtr<MutationObserverRegistration> registration = MutationObserverRegistration::create(observer, this);
+    MutationObserverRegistration* registrationPtr = registration.get();
+    registry->append(registration.release());
+    return registrationPtr;
 }
 
-void Node::unregisterMutationObserver(PassRefPtr<WebKitMutationObserver> observer)
+void Node::unregisterMutationObserver(MutationObserverRegistration* registration)
 {
-    Vector<MutationObserverEntry>* observerEntries = mutationObserverEntries();
-    ASSERT(observerEntries);
-    if (!observerEntries)
+    Vector<OwnPtr<MutationObserverRegistration> >* registry = mutationObserverRegistry();
+    ASSERT(registry);
+    if (!registry)
         return;
 
-    MutationObserverEntry entry(observer, 0);
-    size_t index = observerEntries->find(entry);
+    size_t index = registry->find(registration);
     ASSERT(index != notFound);
     if (index == notFound)
         return;
 
-    observerEntries->remove(index);
+    registry->remove(index);
+}
+
+void Node::registerTransientMutationObserver(MutationObserverRegistration* registration)
+{
+    ensureRareData()->ensureTransientMutationObserverRegistry()->add(registration);
+}
+
+void Node::unregisterTransientMutationObserver(MutationObserverRegistration* registration)
+{
+    HashSet<MutationObserverRegistration*>* transientRegistry = transientMutationObserverRegistry();
+    ASSERT(transientRegistry);
+    if (!transientRegistry)
+        return;
+
+    ASSERT(transientRegistry->contains(registration));
+    transientRegistry->remove(registration);
+}
+
+void Node::notifyMutationObserversNodeWillDetach()
+{
+    if (!document()->hasSubtreeMutationObserver())
+        return;
+
+    for (Node* node = parentNode(); node; node = node->parentNode()) {
+        if (Vector<OwnPtr<MutationObserverRegistration> >* registry = node->mutationObserverRegistry()) {
+            const size_t size = registry->size();
+            for (size_t i = 0; i < size; ++i)
+                registry->at(i)->observedSubtreeNodeWillDetach(this);
+        }
+
+        if (HashSet<MutationObserverRegistration*>* transientRegistry = node->transientMutationObserverRegistry()) {
+            for (HashSet<MutationObserverRegistration*>::iterator iter = transientRegistry->begin(); iter != transientRegistry->end(); ++iter)
+                (*iter)->observedSubtreeNodeWillDetach(this);
+        }
+    }
 }
 #endif // ENABLE(MUTATION_OBSERVERS)
 

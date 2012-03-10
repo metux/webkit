@@ -81,7 +81,7 @@ void StyleCachedImage::setContainerSizeForRenderer(const RenderObject* renderer,
 
 void StyleCachedImage::addClient(RenderObject* renderer)
 {
-    m_image->addClientForRenderer(renderer);
+    m_image->addClient(renderer);
 }
 
 void StyleCachedImage::removeClient(RenderObject* renderer)

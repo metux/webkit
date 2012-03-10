@@ -135,6 +135,7 @@ public:
 
     RenderLayer* rootRenderLayer() const;
     GraphicsLayer* rootGraphicsLayer() const;
+    GraphicsLayer* scrollLayer() const;
 
     enum RootLayerAttachment {
         RootLayerUnattached,
@@ -282,6 +283,7 @@ private:
     bool requiresCompositingWhenDescendantsAreCompositing(RenderObject*) const;
     bool requiresCompositingForFullScreen(RenderObject*) const;
     bool requiresCompositingForScrollableFrame() const;
+    bool requiresCompositingForPosition(RenderObject*, const RenderLayer*) const;
 
     bool requiresScrollLayer(RootLayerAttachment) const;
     bool requiresHorizontalScrollbarLayer() const;
@@ -309,10 +311,13 @@ private:
     // FIXME: once set, this is never cleared.
     mutable bool m_compositingDependsOnGeometry;
 
+    mutable bool m_compositingNeedsUpdate;
+
     bool m_compositing;
     bool m_compositingLayersNeedRebuild;
     bool m_flushingLayers;
     bool m_forceCompositingMode;
+    bool m_compositeForFixedPosition;
 
     RootLayerAttachment m_rootLayerAttachment;
 
