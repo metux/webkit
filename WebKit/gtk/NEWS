@@ -1,4 +1,20 @@
 ================
+WebKitGTK+ 1.2.2
+================
+
+What's new in WebKitGTK+ 1.2.2?
+
+  - New stable release, API and ABI compatible with previous 1.2.x
+    versions;
+  - A number of crashes discovered since the 1.2.1 release have been
+    fixed;
+  - A new function has been added toc clear the back/forward
+    list:
+      webkit_web_back_forward_list_clear;
+  - The infamous "cursor hangs when dragging" bug has been squashed;
+  - Scrollbars no longer working after going back has also been fixed.
+
+================
 WebKitGTK+ 1.2.0
 ================
 

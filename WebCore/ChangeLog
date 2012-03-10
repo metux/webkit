@@ -1,3 +1,354 @@
+2010-07-09  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Reviewed by NOBODY (OOPS!).
+
+        [GTK] Crashes when going back with page cache in unknown circunstances
+        https://bugs.webkit.org/show_bug.cgi?id=41710
+
+        Could not yet find a way to reproduce this in a layout test. The
+        issue is document being NULL, so this NULL-check should be enough
+        to get rid of the crash.
+
+        * page/EventHandler.cpp:
+        (WebCore::EventHandler::sendScrollEvent):
+
+2010-07-07  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Scrollbars sometimes go dead and stop scrolling the view
+        https://bugs.webkit.org/show_bug.cgi?id=41711
+
+        Rework the setGtkAdjustment function slightly, make it have an
+        early return, and be more readable.
+
+        * platform/gtk/ScrollViewGtk.cpp:
+        (WebCore::ScrollView::setGtkAdjustments):
+
+2010-07-06  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Unreviewed.
+
+        Fixes regression on API test by disabling the scrollbars before
+        configuring the adjustments.
+
+        * platform/gtk/ScrollViewGtk.cpp:
+        (WebCore::ScrollView::setGtkAdjustments):
+
+2010-07-06  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Scrollbars sometimes go dead and stop scrolling the view
+        https://bugs.webkit.org/show_bug.cgi?id=41711
+
+        Fixes GtkScrolledWindow scrollbars not actually scrolling the page
+        in certain conditions. No tests because it is hard to reproduce,
+        and depends on interaction with a widget that is outside of the
+        WebView, which is tricky.
+
+        * platform/gtk/ScrollViewGtk.cpp:
+        (WebCore::ScrollView::setGtkAdjustments):
+
+2010-07-06  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Rubber-stamped by Xan Lopez.
+
+        Crash when hitting back on some pages
+        http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=575236
+
+        Also NULL-check document, in hopes of fixing this hard to
+        reproduce crash that we are getting reported quite a bit.
+
+        * page/FrameView.cpp:
+        (WebCore::FrameView::windowClipRect):
+
+2010-06-01  Martin Robinson  <mrobinson@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] Double clicks cause three button press events
+        https://bugs.webkit.org/show_bug.cgi?id=38853
+
+        Add GOwnPtr wrapper for GdkEvent and expose a setter for
+        PlatformMouseEvent::m_clickCount.
+
+        * GNUmakefile.am: Add GOwnPtrGtk.{cpp,h} to the sources list.
+        * platform/PlatformMouseEvent.h: 
+        (WebCore::PlatformMouseEvent::setClickCount): Added.
+        * platform/gtk/GOwnPtrGtk.cpp: Added.
+        (WTF::GdkEvent):
+        * platform/gtk/GOwnPtrGtk.h: Added.
+
+2010-05-22  Yong Li  <yoli@rim.com>
+
+        Reviewed by Darin Adler.
+
+        Fix a crash when XHTMLMP is enabled. The frame pointer in Document
+        ctor can be null.
+        https://bugs.webkit.org/show_bug.cgi?id=39448
+
+        No new tests because it is obvious and it must be reproduced with
+        XHTMLMP enabled.
+
+        * dom/Document.cpp:
+        (WebCore::Document::Document):
+
+2010-05-22  Martin Robinson  <mrobinson@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] webkit_web_view_drag_end should call EventHandler::dragSourceEndedAt
+        https://bugs.webkit.org/show_bug.cgi?id=39465
+
+        Added a helper function for converting a GDK action bitmask into a DragOperation bitmask.
+
+        No new tests as behavior has not changed.
+
+        * platform/gtk/ClipboardUtilitiesGtk.cpp:
+        (WebCore::gdkDragActionToDragOperation): Added.
+        * platform/gtk/ClipboardUtilitiesGtk.h:
+
+2010-05-22  Martin Robinson  <mrobinson@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        [GTK] WebKit/gtk/WebCoreSupport/DragClientGtk::startDrag should use the Clipboard::sourceOperation
+        https://bugs.webkit.org/show_bug.cgi?id=39459
+
+        Add ClipboardUtilitiesGtk, a container for GTK+/WebCore clipboard utility functions.
+        Initially add a function which converts a WebCore::DragOperation to a bitmask of
+        GdkDragActions.
+
+        No new tests, because behavior has not changed.
+
+        * GNUmakefile.am:
+        * platform/gtk/ClipboardUtilitiesGtk.cpp: Added.
+        (WebCore::dragOperationToGdkDragActions): Added.
+        * platform/gtk/ClipboardUtilitiesGtk.h: Added.
+
+2010-05-18  Tony Chang  <tony@chromium.org>
+
+        Reviewed by Ojan Vafai.
+
+        REGRESSION: crash in WebCore::CompositeEditCommand::splitTreeToNode when indenting in an empty li
+        https://bugs.webkit.org/show_bug.cgi?id=38232
+
+        Test: editing/execCommand/crash-indenting-list-item.html
+
+        * editing/IndentOutdentCommand.cpp:
+        (WebCore::IndentOutdentCommand::tryIndentingAsListItem):
+        (WebCore::IndentOutdentCommand::indentIntoBlockquote):
+
+2010-05-17  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Rubber-stamped by Xan Lopez.
+
+        Build fix. Remove bashism from build system.
+
+        * GNUmakefile.am:
+
+2010-05-13  Tony Chang  <tony@chromium.org>
+
+        Reviewed by Darin Adler.
+
+        REGRESSION: Crash by pasting to a textarea with white-space:nowrap
+        https://bugs.webkit.org/show_bug.cgi?id=38992
+
+        Test: editing/pasteboard/paste-plaintext-nowrap.html
+
+        * editing/InsertParagraphSeparatorCommand.cpp:
+        (WebCore::highestVisuallyEquivalentDivBelowRoot):
+        (WebCore::InsertParagraphSeparatorCommand::doApply):
+
+2010-05-15  Andrei Bucur  <abucur@adobe.com>
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Functions using the cairo_pattern_t object returned by
+        Pattern::createPlatformPattern sould destroy it after the painting
+        operation. Failing to do so causes memory leaks.
+
+        Test: No test was added because the patch adds no new functionality.
+        It just completes the normal life cycle of a cairo_pattern_t object.
+
+        * platform/graphics/cairo/FontCairo.cpp:
+        (WebCore::Font::drawGlyphs):
+        * platform/graphics/cairo/GraphicsContextCairo.cpp:
+        (WebCore::setPlatformFill):
+        (WebCore::setPlatformStroke):
+
+2010-05-15  Joanmarie Diggs  <joanmarie.diggs@gmail.com>
+
+        Reviewed by Xan Lopez.
+
+        https://bugs.webkit.org/show_bug.cgi?id=30500
+        [Gtk] Find a way for WebKit to "announce" itself so that ATs can readily distinguish it from true Gtk/Gail
+
+        The "announcement" is now made in the form of an object attribute
+        associated with the AtkObject.
+
+        * accessibility/gtk/AccessibilityObjectWrapperAtk.cpp:
+        (webkit_accessible_get_attributes):
+
+2010-05-14  Adele Peterson  <adele@apple.com>
+
+        Reviewed by Dave Hyatt.
+
+        Fix for https://bugs.webkit.org/show_bug.cgi?id=39095 
+        <rdar://problem/7984158> REGRESSION (r53085): Infinite recursion in Position::getInlineBoxAndOffset when changing writing direction to right-to-left
+
+        Test: editing/selection/applystyle-to-inline-inside-block.html
+
+        * dom/Position.cpp: (WebCore::Position::getInlineBoxAndOffset): Now that this function correctly goes in and out of editable areas by calling
+        downstreamIgnoringEditingBoundaries and upstreamIgnoringEditingBoundaries for blocks (added in r58665), we no longer need a special case to 
+        jump out to the parent when we hit an inline (which was added in r53085 when this issue was introduced).
+
+2010-05-13  Alejandro G. Castro  <alex@igalia.com>
+
+        Reviewed by Xan Lopez.
+
+        In case there is no expose event we render the theme in a pixmap
+        and copy it to the cairo context. This is slow but it is used just
+        in case we are printing nowadays.
+
+        [GTK] Theme does not render when printing
+        https://bugs.webkit.org/show_bug.cgi?id=38896
+
+        * platform/gtk/RenderThemeGtk.cpp:
+        (WebCore::paintMozillaGtkWidget):
+
+2010-05-10  Philippe Normand  <pnormand@igalia.com>
+
+        Reviewed by David Levin.
+
+        [GStreamer] incoherent #ifdef in GOwnPtrGStreamer.h
+        https://bugs.webkit.org/show_bug.cgi?id=38839
+
+        Fixed #ifdef/curly braces coherence.
+
+        * platform/graphics/gstreamer/GOwnPtrGStreamer.cpp:
+        (WTF::GstElement):
+
+2010-05-10  Philippe Normand  <pnormand@igalia.com>
+
+        Reviewed by Dirk Schulze.
+
+        [GStreamer] un-needed cairo.h include
+        https://bugs.webkit.org/show_bug.cgi?id=38837
+
+        Cairo not used in the sink anymore. So it's not needed to include
+        the header.
+
+        * platform/graphics/gstreamer/VideoSinkGStreamer.h:
+
+2010-05-11  Xan Lopez  <xlopez@igalia.com>
+
+        Reviewed by Gustavo Noronha.
+
+        [gtk] critical warning in soup_message_set_first_party() when cancelling a navigation
+        https://bugs.webkit.org/show_bug.cgi?id=38653
+
+        Check if willSendRequest cancelled the request before setting the
+        first party for the cookies in the message, otherwise we'll get a
+        critical warning.
+
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::restartedCallback):
+
+2010-05-07  Zoltan Herczeg  <zherczeg@webkit.org>
+
+        Reviewed by Dirk Schulze
+
+        Fixed the inverse function of f(x) = ((x + 0.055) / 1.055) ^ 2.4
+        https://bugs.webkit.org/show_bug.cgi?id=38735
+
+        It is ((x ^ (1 / 2.4)) * 1.055) - 0.055
+
+        Chromium pixel tests cover the issue.
+
+        * platform/graphics/ImageBuffer.cpp:
+        (WebCore::ImageBuffer::transformColorSpace):
+
+2010-05-07  Martin Robinson  <mrobinson@igalia.com>
+
+        Reviewed by Gustavo Noronha Silva.
+
+        https://bugs.webkit.org/show_bug.cgi?id=38769
+        ClipboardGtk should write the URL label in the text portion of the DataObject
+
+        No tests as this code path is currently unused in the GTK+ port.
+
+        * platform/gtk/ClipboardGtk.cpp:
+        (WebCore::ClipboardGtk::writeURL): Write the label to the text portion of the DataObject, instead of the URL.
+
+2010-05-07  Ben Murdoch  <benm@google.com>
+
+        Reviewed by Darin Adler.
+
+        Potential crash in EventHandler::handleTouchEvent
+        https://bugs.webkit.org/show_bug.cgi?id=38646
+
+        Fix a ref counting bug that can cause a crash if the m_originatingouchPointTargets
+        hashmap holds the last ref to an EventTarget when the user lifts their finger.
+
+        This is very hard to reproduce in a consistent way and clearly a
+        simple logic error in the code, therefore no new tests.
+
+        * page/EventHandler.cpp:
+        (WebCore::EventHandler::handleTouchEvent): Don't let the RefPtr we get back from
+            the hasmap go out of scope so soon as it could delete the wrapped ptr if the
+            hashmap held the last ref (and we use the raw ptr that the RefPtr
+            wraps later in the WebCore::Touch constructor).
+
+2010-05-07  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Rubber-stamped by Kenneth Rohde Christiansen.
+
+        [GTK] Fails to build on GTK+ < 2.14
+        https://bugs.webkit.org/show_bug.cgi?id=38746
+
+        Build fix only. Do basically the same as gtk_adjustment_configure
+        would do if we are bellow GTK+ 2.14.
+
+        * platform/gtk/ScrollViewGtk.cpp:
+        (WebCore::AdjustmentConfigure):
+
+2010-05-07  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
+
+        Rubber-stamped by Xan Lopez.
+
+        Crash with MgOpenModerna font, with non-UTF-8 character
+        https://bugs.webkit.org/show_bug.cgi?id=37795
+
+        NULL-check the font platform data, for now, to avoid the crash.
+
+        Could not yet figure out a way to get a test written that does not
+        involve adding the font to the tree, but there are doubts about
+        licensing.
+
+        * platform/graphics/cairo/FontCacheCairo.cpp:
+        (WebCore::FontCache::getFontDataForCharacters):
+
+2010-05-06  Martin Robinson  <mrobinson@webkit.org>
+
+        Reviewed by Gustavo Noronha Silva.
+
+        [GTK] Enable DOM clipboard and drag-and-drop access
+        https://bugs.webkit.org/show_bug.cgi?id=30623
+
+        Convert dragging portion of drag-and-drop to use DataObjectGtk.
+
+        No new tests, because functionality has not changed.
+
+        * page/gtk/EventHandlerGtk.cpp:
+        (WebCore::EventHandler::createDraggingClipboard): Pass the DataObjectGtk as a parameter here.
+        * platform/gtk/ClipboardGtk.h:
+        (WebCore::ClipboardGtk::create): Take the DataObject as a parameter instead of creating it here.
+        (WebCore::ClipboardGtk::helper): Added.
+        (WebCore::ClipboardGtk::dataObject): Added.
+        * platform/gtk/PasteboardHelper.h: Make targetListForDataObject a public method.
+
 2010-05-07  Gustavo Noronha Silva  <gustavo.noronha@collabora.co.uk>
 
         Rubber-stamped by Kenneth Rohde Christiansen.

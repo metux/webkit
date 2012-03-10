@@ -117,7 +117,7 @@ noinst_PROGRAMS = Programs/minidom$(EXEEXT) \
 
 @ENABLE_INTROSPECTION_TRUE@am__append_9 = JSCore-1.0.gir
 @ENABLE_INTROSPECTION_TRUE@am__append_10 = WebKit-1.0.gir
-@ENABLE_INTROSPECTION_TRUE@am__append_11 = $(GIRTYPELIBDIR)
+@ENABLE_INTROSPECTION_TRUE@am__append_11 = $(libdir)/girepository-1.0
 @ENABLE_INTROSPECTION_TRUE@am__append_12 = $(JSCORE_GIRSOURCES:.gir=.typelib) $(WEBKIT_GIRSOURCES:.gir=.typelib)
 @ENABLE_INTROSPECTION_TRUE@am__append_13 = $(JSCORE_GIRSOURCES) $(WEBKIT_GIRSOURCES) $(typelibs_DATA)
 DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
@@ -4214,6 +4214,8 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 	WebCore/platform/graphics/gtk/IntRectGtk.cpp \
 	WebCore/platform/gtk/ClipboardGtk.cpp \
 	WebCore/platform/gtk/ClipboardGtk.h \
+	WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp \
+	WebCore/platform/gtk/ClipboardUtilitiesGtk.h \
 	WebCore/platform/gtk/ContextMenuGtk.cpp \
 	WebCore/platform/gtk/ContextMenuItemGtk.cpp \
 	WebCore/platform/gtk/CursorGtk.cpp \
@@ -4225,6 +4227,8 @@ am__libwebkit_1_0_la_SOURCES_DIST = WebCore/WebCorePrefix.h \
 	WebCore/platform/gtk/EventLoopGtk.cpp \
 	WebCore/platform/gtk/FileChooserGtk.cpp \
 	WebCore/platform/gtk/FileSystemGtk.cpp \
+	WebCore/platform/gtk/GOwnPtrGtk.cpp \
+	WebCore/platform/gtk/GOwnPtrGtk.h \
 	WebCore/platform/gtk/GRefPtrGtk.cpp \
 	WebCore/platform/gtk/GRefPtrGtk.h \
 	WebCore/platform/gtk/GtkPluginWidget.cpp \
@@ -5541,6 +5545,7 @@ am__objects_35 =  \
 	WebCore/platform/graphics/gtk/libwebkit_1_0_la-IntPointGtk.lo \
 	WebCore/platform/graphics/gtk/libwebkit_1_0_la-IntRectGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-ClipboardGtk.lo \
+	WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuItemGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-CursorGtk.lo \
@@ -5550,6 +5555,7 @@ am__objects_35 =  \
 	WebCore/platform/gtk/libwebkit_1_0_la-EventLoopGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-FileChooserGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-FileSystemGtk.lo \
+	WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-GRefPtrGtk.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-GtkPluginWidget.lo \
 	WebCore/platform/gtk/libwebkit_1_0_la-KURLGtk.lo \
@@ -6325,8 +6331,6 @@ GAIL_LIBS = @GAIL_LIBS@
 GEOCLUE_CFLAGS = @GEOCLUE_CFLAGS@
 GEOCLUE_LIBS = @GEOCLUE_LIBS@
 GETTEXT_PACKAGE = @GETTEXT_PACKAGE@
-GIRDIR = @GIRDIR@
-GIRTYPELIBDIR = @GIRTYPELIBDIR@
 GLIB_CFLAGS = @GLIB_CFLAGS@
 GLIB_GENMARSHAL = @GLIB_GENMARSHAL@
 GLIB_LIBS = @GLIB_LIBS@
@@ -6395,6 +6399,8 @@ PANGO_LIBS = @PANGO_LIBS@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PERL = @PERL@
 PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PNG_LIBS = @PNG_LIBS@
 RANLIB = @RANLIB@
 SED = @SED@
@@ -8699,6 +8705,8 @@ webcoregtk_sources := WebCore/bindings/js/ScriptControllerGtk.cpp \
 	WebCore/platform/graphics/gtk/IntRectGtk.cpp \
 	WebCore/platform/gtk/ClipboardGtk.cpp \
 	WebCore/platform/gtk/ClipboardGtk.h \
+	WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp \
+	WebCore/platform/gtk/ClipboardUtilitiesGtk.h \
 	WebCore/platform/gtk/ContextMenuGtk.cpp \
 	WebCore/platform/gtk/ContextMenuItemGtk.cpp \
 	WebCore/platform/gtk/CursorGtk.cpp \
@@ -8710,6 +8718,8 @@ webcoregtk_sources := WebCore/bindings/js/ScriptControllerGtk.cpp \
 	WebCore/platform/gtk/EventLoopGtk.cpp \
 	WebCore/platform/gtk/FileChooserGtk.cpp \
 	WebCore/platform/gtk/FileSystemGtk.cpp \
+	WebCore/platform/gtk/GOwnPtrGtk.cpp \
+	WebCore/platform/gtk/GOwnPtrGtk.h \
 	WebCore/platform/gtk/GRefPtrGtk.cpp \
 	WebCore/platform/gtk/GRefPtrGtk.h \
 	WebCore/platform/gtk/GtkPluginWidget.cpp \
@@ -9058,7 +9068,7 @@ libwebkit_1_0_la_LIBADD = \
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = WebKit/gtk/webkit-1.0.pc
-@ENABLE_INTROSPECTION_TRUE@girdir = $(GIRDIR)
+@ENABLE_INTROSPECTION_TRUE@girdir = $(datadir)/gir-1.0
 @ENABLE_INTROSPECTION_TRUE@gir_DATA = $(WEBKIT_GIRSOURCES) $(JSCORE_GIRSOURCES)
 WEBKIT_MARSHAL = $(GENSOURCES)/webkitmarshal
 WEBKIT_MARSHAL_LIST = $(top_srcdir)/WebKit/gtk/webkitmarshal.list
@@ -13925,6 +13935,9 @@ WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp):
 WebCore/platform/gtk/libwebkit_1_0_la-ClipboardGtk.lo:  \
 	WebCore/platform/gtk/$(am__dirstamp) \
 	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
+WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo:  \
+	WebCore/platform/gtk/$(am__dirstamp) \
+	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
 WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuGtk.lo:  \
 	WebCore/platform/gtk/$(am__dirstamp) \
 	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
@@ -13950,6 +13963,9 @@ WebCore/platform/gtk/libwebkit_1_0_la-FileChooserGtk.lo:  \
 	WebCore/platform/gtk/$(am__dirstamp) \
 	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
 WebCore/platform/gtk/libwebkit_1_0_la-FileSystemGtk.lo:  \
+	WebCore/platform/gtk/$(am__dirstamp) \
+	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
+WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo:  \
 	WebCore/platform/gtk/$(am__dirstamp) \
 	WebCore/platform/gtk/$(DEPDIR)/$(am__dirstamp)
 WebCore/platform/gtk/libwebkit_1_0_la-GRefPtrGtk.lo:  \
@@ -16400,6 +16416,8 @@ mostlyclean-compile:
 	-rm -f WebCore/platform/graphics/transforms/libwebkit_1_0_la-TranslateTransformOperation.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-ClipboardGtk.$(OBJEXT)
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-ClipboardGtk.lo
+	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.$(OBJEXT)
+	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuGtk.$(OBJEXT)
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuGtk.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuItemGtk.$(OBJEXT)
@@ -16418,6 +16436,8 @@ mostlyclean-compile:
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-FileChooserGtk.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-FileSystemGtk.$(OBJEXT)
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-FileSystemGtk.lo
+	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.$(OBJEXT)
+	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-GRefPtrGtk.$(OBJEXT)
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-GRefPtrGtk.lo
 	-rm -f WebCore/platform/gtk/libwebkit_1_0_la-GeolocationServiceGtk.$(OBJEXT)
@@ -18464,6 +18484,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/graphics/transforms/$(DEPDIR)/libwebkit_1_0_la-TransformationMatrix.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/graphics/transforms/$(DEPDIR)/libwebkit_1_0_la-TranslateTransformOperation.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ClipboardGtk.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ClipboardUtilitiesGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ContextMenuGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ContextMenuItemGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-CursorGtk.Plo@am__quote@
@@ -18473,6 +18494,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-EventLoopGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-FileChooserGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-FileSystemGtk.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GOwnPtrGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GRefPtrGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GeolocationServiceGtk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GtkPluginWidget.Plo@am__quote@
@@ -30045,6 +30067,14 @@ WebCore/platform/gtk/libwebkit_1_0_la-ClipboardGtk.lo: WebCore/platform/gtk/Clip
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/platform/gtk/libwebkit_1_0_la-ClipboardGtk.lo `test -f 'WebCore/platform/gtk/ClipboardGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/ClipboardGtk.cpp
 
+WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo: WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo -MD -MP -MF WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ClipboardUtilitiesGtk.Tpo -c -o WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo `test -f 'WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ClipboardUtilitiesGtk.Tpo WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ClipboardUtilitiesGtk.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp' object='WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/platform/gtk/libwebkit_1_0_la-ClipboardUtilitiesGtk.lo `test -f 'WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/ClipboardUtilitiesGtk.cpp
+
 WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuGtk.lo: WebCore/platform/gtk/ContextMenuGtk.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuGtk.lo -MD -MP -MF WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ContextMenuGtk.Tpo -c -o WebCore/platform/gtk/libwebkit_1_0_la-ContextMenuGtk.lo `test -f 'WebCore/platform/gtk/ContextMenuGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/ContextMenuGtk.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ContextMenuGtk.Tpo WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-ContextMenuGtk.Plo
@@ -30116,6 +30146,14 @@ WebCore/platform/gtk/libwebkit_1_0_la-FileSystemGtk.lo: WebCore/platform/gtk/Fil
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='WebCore/platform/gtk/FileSystemGtk.cpp' object='WebCore/platform/gtk/libwebkit_1_0_la-FileSystemGtk.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/platform/gtk/libwebkit_1_0_la-FileSystemGtk.lo `test -f 'WebCore/platform/gtk/FileSystemGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/FileSystemGtk.cpp
+
+WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo: WebCore/platform/gtk/GOwnPtrGtk.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo -MD -MP -MF WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GOwnPtrGtk.Tpo -c -o WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo `test -f 'WebCore/platform/gtk/GOwnPtrGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/GOwnPtrGtk.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GOwnPtrGtk.Tpo WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GOwnPtrGtk.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='WebCore/platform/gtk/GOwnPtrGtk.cpp' object='WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -c -o WebCore/platform/gtk/libwebkit_1_0_la-GOwnPtrGtk.lo `test -f 'WebCore/platform/gtk/GOwnPtrGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/GOwnPtrGtk.cpp
 
 WebCore/platform/gtk/libwebkit_1_0_la-GRefPtrGtk.lo: WebCore/platform/gtk/GRefPtrGtk.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libwebkit_1_0_la_CPPFLAGS) $(CPPFLAGS) $(libwebkit_1_0_la_CXXFLAGS) $(CXXFLAGS) -MT WebCore/platform/gtk/libwebkit_1_0_la-GRefPtrGtk.lo -MD -MP -MF WebCore/platform/gtk/$(DEPDIR)/libwebkit_1_0_la-GRefPtrGtk.Tpo -c -o WebCore/platform/gtk/libwebkit_1_0_la-GRefPtrGtk.lo `test -f 'WebCore/platform/gtk/GRefPtrGtk.cpp' || echo '$(srcdir)/'`WebCore/platform/gtk/GRefPtrGtk.cpp
