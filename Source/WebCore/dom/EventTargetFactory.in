@@ -13,6 +13,7 @@ IDBTransaction conditional=INDEXED_DATABASE
 IDBVersionChangeRequest conditional=INDEXED_DATABASE
 JavaScriptAudioNode conditional=WEB_AUDIO
 LocalMediaStream conditional=MEDIA_STREAM
+MediaController conditional=VIDEO
 MediaStream conditional=MEDIA_STREAM
 MessagePort
 Node
@@ -21,6 +22,9 @@ PeerConnection conditional=MEDIA_STREAM
 SharedWorker conditional=SHARED_WORKERS
 SharedWorkerContext conditional=SHARED_WORKERS
 SVGElementInstance conditional=SVG
+TextTrack conditional=VIDEO_TRACK
+TextTrackCue conditional=VIDEO_TRACK
+TextTrackList conditional=VIDEO_TRACK
 WebSocket conditional=WEB_SOCKETS
 Worker conditional=WORKERS
 XMLHttpRequest

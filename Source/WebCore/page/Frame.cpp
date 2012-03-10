@@ -111,10 +111,6 @@
 #include "SVGDocumentExtensions.h"
 #endif
 
-#if ENABLE(MEDIA_STREAM)
-#include "MediaStreamFrameController.h"
-#endif
-
 #if USE(TILED_BACKING_STORE)
 #include "TiledBackingStore.h"
 #endif
@@ -169,9 +165,6 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_inViewSourceMode(false)
     , m_isDisconnected(false)
     , m_excludeFromTextSearch(false)
-#if ENABLE(MEDIA_STREAM)
-    , m_mediaStreamFrameController(RuntimeEnabledFeatures::mediaStreamEnabled() ? adoptPtr(new MediaStreamFrameController(this)) : PassOwnPtr<MediaStreamFrameController>())
-#endif
 {
     ASSERT(page);
     AtomicString::init();
@@ -227,11 +220,6 @@ Frame::~Frame()
 
     if (m_domWindow)
         m_domWindow->disconnectFrame();
-
-#if ENABLE(MEDIA_STREAM)
-    if (m_mediaStreamFrameController)
-        m_mediaStreamFrameController->disconnectFrame();
-#endif
 
     HashSet<DOMWindow*>::iterator end = m_liveFormerWindows.end();
     for (HashSet<DOMWindow*>::iterator it = m_liveFormerWindows.begin(); it != end; ++it)
@@ -698,11 +686,6 @@ void Frame::pageDestroyed()
         m_domWindow->pageDestroyed();
     }
 
-#if ENABLE(MEDIA_STREAM)
-    if (m_mediaStreamFrameController)
-        m_mediaStreamFrameController->disconnectPage();
-#endif
-
     // FIXME: It's unclear as to why this is called more than once, but it is,
     // so page() could be NULL.
     if (page() && page()->focusController()->focusedFrame() == this)
@@ -756,10 +739,6 @@ void Frame::transferChildFrameToNewDocument()
 #endif
         }
 
-#if ENABLE(MEDIA_STREAM)
-        if (m_mediaStreamFrameController)
-            m_mediaStreamFrameController->transferToNewPage(newPage);
-#endif
         m_page = newPage;
 
         if (newPage)
@@ -815,7 +794,7 @@ VisiblePosition Frame::visiblePositionForPoint(const LayoutPoint& framePoint)
     return visiblePos;
 }
 
-Document* Frame::documentAtPoint(const LayoutPoint& point)
+Document* Frame::documentAtPoint(const IntPoint& point)
 {
     if (!view())
         return 0;
@@ -929,7 +908,7 @@ void Frame::tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea)
     unsigned size = paintedArea.size();
     // Request repaint from the system
     for (int n = 0; n < size; ++n)
-        m_page->chrome()->invalidateContentsAndWindow(m_view->contentsToWindow(paintedArea[n]), false);
+        m_page->chrome()->invalidateContentsAndRootView(m_view->contentsToRootView(paintedArea[n]), false);
 }
 
 IntRect Frame::tiledBackingStoreContentsRect()
@@ -999,8 +978,6 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     if (document->isSVGDocument()) {
         if (!static_cast<SVGDocument*>(document)->zoomAndPanEnabled())
             return;
-        if (document->renderer())
-            document->renderer()->setNeedsLayout(true);
     }
 #endif
 
@@ -1065,7 +1042,7 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
     m_page->chrome()->client()->numWheelEventHandlersChanged(count);
 }
 
-#if !PLATFORM(MAC) && !PLATFORM(WIN) && !PLATFORM(WX)
+#if !PLATFORM(MAC) && !PLATFORM(WIN)
 struct ScopedFramePaintingState {
     ScopedFramePaintingState(Frame* theFrame, RenderObject* theRenderer)
         : frame(theFrame)

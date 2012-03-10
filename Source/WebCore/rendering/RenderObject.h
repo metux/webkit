@@ -109,8 +109,8 @@ struct DashboardRegionValue {
     }
 
     String label;
-    IntRect bounds;
-    IntRect clip;
+    LayoutRect bounds;
+    LayoutRect clip;
     int type;
 };
 #endif
@@ -244,7 +244,7 @@ protected:
     }
     //////////////////////////////////////////
 private:
-    void addAbsoluteRectForLayer(IntRect& result);
+    void addAbsoluteRectForLayer(LayoutRect& result);
     void setLayerNeedsFullRepaint();
 
 public:
@@ -356,18 +356,6 @@ public:
     static inline bool isAfterContent(const RenderObject* obj) { return obj && obj->isAfterContent(); }
     static inline bool isBeforeOrAfterContent(const RenderObject* obj) { return obj && obj->isBeforeOrAfterContent(); }
 
-    inline RenderObject* findBeforeContentRenderer() const
-    {
-        RenderObject* renderer = beforePseudoElementRenderer();
-        return isBeforeContent(renderer) ? renderer : 0;
-    }
-
-    inline RenderObject* findAfterContentRenderer() const
-    {
-        RenderObject* renderer = afterPseudoElementRenderer();
-        return isAfterContent(renderer) ? renderer : 0;
-    }
-
     inline RenderObject* anonymousContainer(RenderObject* child)
     {
          RenderObject* container = child;
@@ -421,7 +409,7 @@ public:
     virtual void setNeedsBoundariesUpdate();
 
     // Per SVG 1.1 objectBoundingBox ignores clipping, masking, filter effects, opacity and stroke-width.
-    // This is used for all computation of objectBoundingBox relative units and by SVGLocateable::getBBox().
+    // This is used for all computation of objectBoundingBox relative units and by SVGLocatable::getBBox().
     // NOTE: Markers are not specifically ignored here by SVG 1.1 spec, but we ignore them
     // since stroke-width is ignored (and marker size can depend on stroke-width).
     // objectBoundingBox is returned local coordinates.
@@ -503,6 +491,12 @@ public:
 
     bool hasTransform() const { return m_hasTransform; }
     bool hasMask() const { return style() && style()->hasMask(); }
+
+#if ENABLE(CSS_FILTERS)
+    bool hasFilter() const { return style() && style()->hasFilter(); }
+#else
+    bool hasFilter() const { return false; }
+#endif
 
     inline bool preservesNewline() const;
 
@@ -646,8 +640,8 @@ public:
     virtual void absoluteRects(Vector<LayoutRect>&, const LayoutPoint&) const { }
 
     // FIXME: useTransforms should go away eventually
-    IntRect absoluteBoundingBoxRect(bool useTransform = true) const;
-    IntRect absoluteBoundingBoxRectIgnoringTransforms() const { return absoluteBoundingBoxRect(false); }
+    LayoutRect absoluteBoundingBoxRect(bool useTransform = true) const;
+    LayoutRect absoluteBoundingBoxRectIgnoringTransforms() const { return absoluteBoundingBoxRect(false); }
 
     // Build an array of quads in absolute coords for line boxes
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* /*wasFixed*/ = 0) const { }
@@ -704,22 +698,22 @@ public:
 
     // Returns the rect that should be repainted whenever this object changes.  The rect is in the view's
     // coordinate space.  This method deals with outlines and overflow.
-    IntRect absoluteClippedOverflowRect() const
+    LayoutRect absoluteClippedOverflowRect() const
     {
         return clippedOverflowRectForRepaint(0);
     }
-    virtual IntRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
-    virtual IntRect rectWithOutlineForRepaint(RenderBoxModelObject* repaintContainer, int outlineWidth) const;
+    virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
+    virtual LayoutRect rectWithOutlineForRepaint(RenderBoxModelObject* repaintContainer, LayoutUnit outlineWidth) const;
 
     // Given a rect in the object's coordinate space, compute a rect suitable for repainting
     // that rect in view coordinates.
-    void computeAbsoluteRepaintRect(IntRect& r, bool fixed = false) const
+    void computeAbsoluteRepaintRect(LayoutRect& r, bool fixed = false) const
     {
         return computeRectForRepaint(0, r, fixed);
     }
     // Given a rect in the object's coordinate space, compute a rect suitable for repainting
     // that rect in the coordinate space of repaintContainer.
-    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, IntRect&, bool fixed = false) const;
+    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
 
     // If multiple-column layout results in applying an offset to the given point, add the same
     // offset to the given size.
@@ -735,7 +729,7 @@ public:
     bool hasReflection() const { return m_hasReflection; }
 
     // Applied as a "slop" to dirty rect checks during the outline painting phase's dirty-rect checks.
-    int maximalOutlineSize(PaintPhase) const;
+    LayoutUnit maximalOutlineSize(PaintPhase) const;
 
     void setHasMarkupTruncation(bool b = true) { m_hasMarkupTruncation = b; }
     bool hasMarkupTruncation() const { return m_hasMarkupTruncation; }
@@ -780,7 +774,7 @@ public:
      * @param extraWidthToEndOfLine optional out arg to give extra width to end of line -
      * useful for character range rect computations
      */
-    virtual IntRect localCaretRect(InlineBox*, int caretOffset, int* extraWidthToEndOfLine = 0);
+    virtual LayoutRect localCaretRect(InlineBox*, int caretOffset, LayoutUnit* extraWidthToEndOfLine = 0);
 
     bool isMarginBeforeQuirk() const { return m_marginBeforeQuirk; }
     bool isMarginAfterQuirk() const { return m_marginAfterQuirk; }
@@ -798,18 +792,12 @@ public:
     virtual bool isFlexingChildren() const { return false; }
     virtual bool isStretchingChildren() const { return false; }
 
-#if ENABLE(CSS3_FLEXBOX)
     // Virtual function helper for the new FlexibleBox Layout (display: -webkit-flexbox).
     virtual bool isFlexibleBox() const { return false; }
-#endif
 
     bool isFlexibleBoxIncludingDeprecated() const
     {
-#if ENABLE(CSS3_FLEXBOX)
         return isFlexibleBox() || isDeprecatedFlexibleBox();
-#else
-        return isDeprecatedFlexibleBox();
-#endif
     }
 
     virtual bool isCombineText() const { return false; }
@@ -843,7 +831,7 @@ public:
     
     virtual void addFocusRingRects(Vector<LayoutRect>&, const LayoutPoint&) { };
 
-    IntRect absoluteOutlineBounds() const
+    LayoutRect absoluteOutlineBounds() const
     {
         return outlineBoundsForRepaint(0);
     }
@@ -855,21 +843,21 @@ protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
     void propagateStyleToAnonymousChildren(bool blockChildrenOnly = false);
 
-    void drawLineForBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2, BoxSide,
+    void drawLineForBoxSide(GraphicsContext*, LayoutUnit x1, LayoutUnit y1, LayoutUnit x2, LayoutUnit y2, BoxSide,
                             Color, EBorderStyle, int adjbw1, int adjbw2, bool antialias = false);
 
     void paintFocusRing(GraphicsContext*, const LayoutPoint&, RenderStyle*);
     void paintOutline(GraphicsContext*, const LayoutRect&);
-    void addPDFURLRect(GraphicsContext*, const IntRect&);
+    void addPDFURLRect(GraphicsContext*, const LayoutRect&);
 
-    virtual IntRect viewRect() const;
+    virtual LayoutRect viewRect() const;
 
-    void adjustRectForOutlineAndShadow(IntRect&) const;
+    void adjustRectForOutlineAndShadow(LayoutRect&) const;
 
     virtual void willBeDestroyed();
     void arenaDelete(RenderArena*, void* objectBase);
 
-    virtual IntRect outlineBoundsForRepaint(RenderBoxModelObject* /*repaintContainer*/, IntPoint* /*cachedOffsetToRepaintContainer*/ = 0) const { return IntRect(); }
+    virtual LayoutRect outlineBoundsForRepaint(RenderBoxModelObject* /*repaintContainer*/, LayoutPoint* /*cachedOffsetToRepaintContainer*/ = 0) const { return LayoutRect(); }
 
 private:
     RenderStyle* firstLineStyleSlowCase() const;

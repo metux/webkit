@@ -274,20 +274,25 @@ Panels.prototype = {
 /**
  * @constructor
  */
-function PanelImpl(id)
+function ExtensionViewImpl(id)
 {
     this._id = id;
-    this.onShown = new EventSink("panel-shown-" + id);
-    this.onHidden = new EventSink("panel-hidden-" + id);
+
+    function dispatchShowEvent(message)
+    {
+        var frameIndex = message.arguments[0];
+        this._fire(window.top.frames[frameIndex]);
+    }
+    this.onShown = new EventSink("view-shown-" + id, dispatchShowEvent);
+    this.onHidden = new EventSink("view-hidden-" + id);
 }
 
 /**
  * @constructor
- * @extends {PanelImpl}
  */
 function PanelWithSidebarImpl(id)
 {
-    PanelImpl.call(this, id);
+    this._id = id;
 }
 
 PanelWithSidebarImpl.prototype = {
@@ -308,7 +313,7 @@ PanelWithSidebarImpl.prototype = {
     }
 }
 
-PanelWithSidebarImpl.prototype.__proto__ = PanelImpl.prototype;
+PanelWithSidebarImpl.prototype.__proto__ = ExtensionViewImpl.prototype;
 
 /**
  * @constructor
@@ -323,21 +328,40 @@ function ElementsPanel()
 
 /**
  * @constructor
- * @extends {Panel}
+ * @extends {ExtensionViewImpl}
  */
-function ExtensionPanel(id)
+function ExtensionPanelImpl(id)
 {
-    Panel.call(this, id);
+    ExtensionViewImpl.call(this, id);
     this.onSearch = new EventSink("panel-search-" + id);
 }
 
+ExtensionPanelImpl.prototype = {
+    createStatusBarButton: function(iconPath, tooltipText, disabled)
+    {
+        var id = "button-" + extensionServer.nextObjectId();
+        var request = {
+            command: "createStatusBarButton",
+            panel: this._id,
+            id: id,
+            icon: iconPath,
+            tooltip: tooltipText,
+            disabled: !!disabled
+        };
+        extensionServer.sendRequest(request);
+        return new Button(id);
+    }
+};
+
+ExtensionPanelImpl.prototype.__proto__ = ExtensionViewImpl.prototype;
+
 /**
  * @constructor
+ * @extends {ExtensionViewImpl}
  */
 function ExtensionSidebarPaneImpl(id)
 {
-    this._id = id;
-    this.onUpdated = new EventSink("sidebar-updated-" + id);
+    ExtensionViewImpl.call(this, id);
 }
 
 ExtensionSidebarPaneImpl.prototype = {
@@ -346,14 +370,14 @@ ExtensionSidebarPaneImpl.prototype = {
         extensionServer.sendRequest({ command: "setSidebarHeight", id: this._id, height: height });
     },
 
-    setExpression: function(expression, rootTitle)
+    setExpression: function(expression, rootTitle, callback)
     {
-        extensionServer.sendRequest({ command: "setSidebarContent", id: this._id, expression: expression, rootTitle: rootTitle, evaluateOnPage: true });
+        extensionServer.sendRequest({ command: "setSidebarContent", id: this._id, expression: expression, rootTitle: rootTitle, evaluateOnPage: true }, callback);
     },
 
-    setObject: function(jsonObject, rootTitle)
+    setObject: function(jsonObject, rootTitle, callback)
     {
-        extensionServer.sendRequest({ command: "setSidebarContent", id: this._id, expression: jsonObject, rootTitle: rootTitle });
+        extensionServer.sendRequest({ command: "setSidebarContent", id: this._id, expression: jsonObject, rootTitle: rootTitle }, callback);
     },
 
     setPage: function(page)
@@ -361,6 +385,29 @@ ExtensionSidebarPaneImpl.prototype = {
         extensionServer.sendRequest({ command: "setSidebarPage", id: this._id, page: page });
     }
 }
+
+/**
+ * @constructor
+ */
+function ButtonImpl(id)
+{
+    this._id = id;
+    this.onClicked = new EventSink("button-clicked-" + id);
+}
+
+ButtonImpl.prototype = {
+    update: function(iconPath, tooltipText, disabled)
+    {
+        var request = {
+            command: "updateButton",
+            id: this._id,
+            icon: iconPath,
+            tooltip: tooltipText,
+            disabled: !!disabled
+        };
+        extensionServer.sendRequest(request);
+    }
+};
 
 /**
  * @constructor
@@ -506,10 +553,7 @@ InspectedWindow.prototype = {
     {
         function callbackWrapper(result)
         {
-            var value = result.value;
-            if (!result.isException)
-                value = value === "undefined" ? undefined : JSON.parse(value);
-            callback(value, result.isException);
+            callback(result.value, result.isException);
         }
         return extensionServer.sendRequest({ command: "evaluateOnInspectedPage", expression: expression }, callback && callbackWrapper);
     },
@@ -700,9 +744,10 @@ function defineDeprecatedProperty(object, className, oldName, newName)
 
 var AuditCategory = declareInterfaceClass(AuditCategoryImpl);
 var AuditResult = declareInterfaceClass(AuditResultImpl);
+var Button = declareInterfaceClass(ButtonImpl);
 var EventSink = declareInterfaceClass(EventSinkImpl);
+var ExtensionPanel = declareInterfaceClass(ExtensionPanelImpl);
 var ExtensionSidebarPane = declareInterfaceClass(ExtensionSidebarPaneImpl);
-var Panel = declareInterfaceClass(PanelImpl);
 var PanelWithSidebar = declareInterfaceClass(PanelWithSidebarImpl);
 var Request = declareInterfaceClass(RequestImpl);
 var Resource = declareInterfaceClass(ResourceImpl);
@@ -722,6 +767,7 @@ function buildExtensionAPIInjectedScript(platformAPI)
         defineCommonExtensionSymbols.toString() + ";" +
         injectedExtensionAPI.toString() + ";" +
         "injectedExtensionAPI(injectedScriptId);" +
-        (platformAPI || "") +
+        (platformAPI || "") + ";" +
+        "return {};" +
         "})";
 }

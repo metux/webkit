@@ -76,6 +76,9 @@
 
 using namespace WebCore;
 
+static GQuark gailTextUtilQuark = 0;
+static GQuark hyperlinkObjectQuark = 0;
+
 static AccessibilityObject* fallbackObject()
 {
     // FIXME: An AXObjectCache with a Document is meaningless.
@@ -292,6 +295,12 @@ static AtkObject* atkParentOfRootObject(AtkObject* object)
 
 static AtkObject* webkit_accessible_get_parent(AtkObject* object)
 {
+    // Check first if the parent has been already set.
+    AtkObject* accessibleParent = ATK_OBJECT_CLASS(webkit_accessible_parent_class)->get_parent(object);
+    if (accessibleParent)
+        return accessibleParent;
+
+    // Parent not set yet, so try to find it in the hierarchy.
     AccessibilityObject* coreObject = core(object);
     if (!coreObject)
         return 0;
@@ -830,6 +839,9 @@ static void webkit_accessible_class_init(AtkObjectClass* klass)
     klass->get_index_in_parent = webkit_accessible_get_index_in_parent;
     klass->get_attributes = webkit_accessible_get_attributes;
     klass->ref_relation_set = webkit_accessible_ref_relation_set;
+
+    gailTextUtilQuark = g_quark_from_static_string("webkit-accessible-gail-text-util");
+    hyperlinkObjectQuark = g_quark_from_static_string("webkit-accessible-hyperlink-object");
 }
 
 GType
@@ -1275,13 +1287,13 @@ static gchar* webkit_accessible_text_get_text(AtkText* text, gint startOffset, g
 
 static GailTextUtil* getGailTextUtilForAtk(AtkText* textObject)
 {
-    gpointer data = g_object_get_data(G_OBJECT(textObject), "webkit-accessible-gail-text-util");
+    gpointer data = g_object_get_qdata(G_OBJECT(textObject), gailTextUtilQuark);
     if (data)
         return static_cast<GailTextUtil*>(data);
 
     GailTextUtil* gailTextUtil = gail_text_util_new();
     gail_text_util_text_setup(gailTextUtil, webkit_accessible_text_get_text(textObject, 0, -1));
-    g_object_set_data_full(G_OBJECT(textObject), "webkit-accessible-gail-text-util", gailTextUtil, g_object_unref);
+    g_object_set_qdata_full(G_OBJECT(textObject), gailTextUtilQuark, gailTextUtil, g_object_unref);
     return gailTextUtil;
 }
 
@@ -1302,7 +1314,6 @@ static PangoLayout* getPangoLayoutForAtk(AtkText* textObject)
 
     // Create a string with the layout as it appears on the screen
     PangoLayout* layout = gtk_widget_create_pango_layout(static_cast<GtkWidget*>(webView), textForObject(coreObject));
-    g_object_set_data_full(G_OBJECT(textObject), "webkit-accessible-pango-layout", layout, g_object_unref);
     return layout;
 }
 
@@ -2360,10 +2371,10 @@ static void atkHypertextInterfaceInit(AtkHypertextIface* iface)
 
 static AtkHyperlink* webkitAccessibleHyperlinkImplGetHyperlink(AtkHyperlinkImpl* hyperlink)
 {
-    AtkHyperlink* hyperlinkObject = ATK_HYPERLINK(g_object_get_data(G_OBJECT(hyperlink), "hyperlink-object"));
+    AtkHyperlink* hyperlinkObject = ATK_HYPERLINK(g_object_get_qdata(G_OBJECT(hyperlink), hyperlinkObjectQuark));
     if (!hyperlinkObject) {
         hyperlinkObject = ATK_HYPERLINK(webkitAccessibleHyperlinkNew(hyperlink));
-        g_object_set_data(G_OBJECT(hyperlink), "hyperlink-object", hyperlinkObject);
+        g_object_set_qdata(G_OBJECT(hyperlink), hyperlinkObjectQuark, hyperlinkObject);
     }
     return hyperlinkObject;
 }

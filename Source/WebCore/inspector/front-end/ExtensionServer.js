@@ -50,6 +50,7 @@ WebInspector.ExtensionServer = function()
     this._registerHandler("addRequestHeaders", this._onAddRequestHeaders.bind(this));
     this._registerHandler("createPanel", this._onCreatePanel.bind(this));
     this._registerHandler("createSidebarPane", this._onCreateSidebarPane.bind(this));
+    this._registerHandler("createStatusBarButton", this._onCreateStatusBarButton.bind(this));
     this._registerHandler("evaluateOnInspectedPage", this._onEvaluateOnInspectedPage.bind(this));
     this._registerHandler("getHAR", this._onGetHAR.bind(this));
     this._registerHandler("getConsoleMessages", this._onGetConsoleMessages.bind(this));
@@ -66,6 +67,7 @@ WebInspector.ExtensionServer = function()
     this._registerHandler("stopAuditCategoryRun", this._onStopAuditCategoryRun.bind(this));
     this._registerHandler("subscribe", this._onSubscribe.bind(this));
     this._registerHandler("unsubscribe", this._onUnsubscribe.bind(this));
+    this._registerHandler("updateButton", this._onUpdateButton.bind(this));
 
     window.addEventListener("message", this._onWindowMessage.bind(this), false);
 }
@@ -81,14 +83,19 @@ WebInspector.ExtensionServer.prototype = {
         this._postNotification("panel-search-" + panelId, action, searchString);
     },
 
-    notifyPanelShown: function(panelId)
+    notifyViewShown: function(identifier, frameIndex)
     {
-        this._postNotification("panel-shown-" + panelId);
+        this._postNotification("view-shown-" + identifier, frameIndex);
     },
 
-    notifyPanelHidden: function(panelId)
+    notifyViewHidden: function(identifier)
     {
-        this._postNotification("panel-hidden-" + panelId);
+        this._postNotification("view-hidden-" + identifier);
+    },
+
+    notifyButtonClicked: function(identifier)
+    {
+        this._postNotification("button-clicked-" + identifier);
     },
 
     _inspectedURLChanged: function(event)
@@ -101,11 +108,6 @@ WebInspector.ExtensionServer.prototype = {
     notifyInspectorReset: function()
     {
         this._postNotification("reset");
-    },
-
-    notifyExtensionSidebarUpdated: function(id)
-    {
-        this._postNotification("sidebar-updated-" + id);
     },
 
     startAuditRun: function(category, auditRun)
@@ -196,16 +198,36 @@ WebInspector.ExtensionServer.prototype = {
         if (id in this._clientObjects || id in WebInspector.panels)
             return this._status.E_EXISTS(id);
 
-        var panel = new WebInspector.ExtensionPanel(id, message.title, this._expandResourcePath(port._extensionOrigin, message.icon));
+        var page = this._expandResourcePath(port._extensionOrigin, message.page);
+        var icon = this._expandResourcePath(port._extensionOrigin, message.icon)
+        var panel = new WebInspector.ExtensionPanel(id, message.title, page, icon);
         this._clientObjects[id] = panel;
         WebInspector.panels[id] = panel;
         WebInspector.addPanel(panel);
-
-        this.createClientIframe(panel.element, this._expandResourcePath(port._extensionOrigin, message.page), true);
         return this._status.OK();
     },
 
-    _onCreateSidebarPane: function(message, constructor)
+    _onCreateStatusBarButton: function(message, port)
+    {
+        var panel = this._clientObjects[message.panel];
+        if (!panel || !(panel instanceof WebInspector.ExtensionPanel))
+            return this._status.E_NOTFOUND(message.panel);
+        var button = new WebInspector.ExtensionButton(message.id, this._expandResourcePath(port._extensionOrigin, message.icon), message.tooltip, message.disabled);
+        this._clientObjects[message.id] = button;
+        panel.addStatusBarItem(button.element);
+        return this._status.OK();
+    },
+
+    _onUpdateButton: function(message, port)
+    {
+        var button = this._clientObjects[message.id];
+        if (!button || !(button instanceof WebInspector.ExtensionButton))
+            return this._status.E_NOTFOUND(message.id);
+        button.update(this._expandResourcePath(port._extensionOrigin, message.icon), message.tooltip, message.disabled);
+        return this._status.OK();
+    },
+
+    _onCreateSidebarPane: function(message)
     {
         var panel = WebInspector.panels[message.panel];
         if (!panel)
@@ -221,29 +243,29 @@ WebInspector.ExtensionServer.prototype = {
         return this._status.OK();
     },
 
-    createClientIframe: function(parent, url, isPanel)
-    {
-        var iframeView = new WebInspector.IFrameView(url, "extension" + (isPanel ? " panel" : ""));
-        iframeView.show(parent);
-    },
-
     _onSetSidebarHeight: function(message)
     {
         var sidebar = this._clientObjects[message.id];
         if (!sidebar)
             return this._status.E_NOTFOUND(message.id);
-        sidebar.bodyElement.firstChild.style.height = message.height;
+        sidebar.setHeight(message.height);
+        return this._status.OK();
     },
 
-    _onSetSidebarContent: function(message)
+    _onSetSidebarContent: function(message, port)
     {
         var sidebar = this._clientObjects[message.id];
         if (!sidebar)
             return this._status.E_NOTFOUND(message.id);
+        function callback(error)
+        {
+            var result = error ? this._status.E_FAILED(error) : this._status.OK();
+            this._dispatchCallback(message.requestId, port, result);
+        }
         if (message.evaluateOnPage)
-            sidebar.setExpression(message.expression, message.rootTitle);
+            sidebar.setExpression(message.expression, message.rootTitle, callback.bind(this));
         else
-            sidebar.setObject(message.expression, message.rootTitle);
+            sidebar.setObject(message.expression, message.rootTitle, callback.bind(this));
     },
 
     _onSetSidebarPage: function(message, port)
@@ -282,7 +304,7 @@ WebInspector.ExtensionServer.prototype = {
 
     _onReload: function(message)
     {
-        var options = message.options || {};
+        var options = /** @type ExtensionReloadOptions */ (message.options || {});
         NetworkAgent.setUserAgentOverride(typeof options.userAgent === "string" ? options.userAgent : "");
         var injectedScript;
         if (options.injectedScript) {
@@ -290,7 +312,7 @@ WebInspector.ExtensionServer.prototype = {
             // returns empty object for compatibility with InjectedScriptManager on the backend.
             injectedScript = "((function(){" + options.injectedScript + "})(),function(){return {}})";
         }
-        PageAgent.reload(false, injectedScript);
+        PageAgent.reload(!!options.ignoreCache, injectedScript);
         return this._status.OK();
     },
 
@@ -298,17 +320,19 @@ WebInspector.ExtensionServer.prototype = {
     {
         function callback(error, resultPayload, wasThrown)
         {
-            if (error)
-                return;
-            var resultObject = WebInspector.RemoteObject.fromPayload(resultPayload);
             var result = {};
+            if (error) {
+                result.isException = true;
+                result.value = error.message;
+            }  else
+                result.value = resultPayload.value;
+
             if (wasThrown)
                 result.isException = true;
-            result.value = resultObject.description;
+      
             this._dispatchCallback(message.requestId, port, result);
         }
-        var evalExpression = "JSON.stringify(eval(unescape('" + escape(message.expression) + "')));";
-        RuntimeAgent.evaluate(evalExpression, "", true, undefined, undefined, undefined, callback.bind(this));
+        RuntimeAgent.evaluate(message.expression, "", true, undefined, undefined, true, callback.bind(this));
     },
 
     _onGetConsoleMessages: function()
@@ -495,7 +519,8 @@ WebInspector.ExtensionServer.prototype = {
 
     _dispatchCallback: function(requestId, port, result)
     {
-        port.postMessage({ command: "callback", requestId: requestId, result: result });
+        if (requestId)
+            port.postMessage({ command: "callback", requestId: requestId, result: result });
     },
 
     initExtensions: function()

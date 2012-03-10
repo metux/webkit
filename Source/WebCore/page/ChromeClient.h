@@ -146,15 +146,15 @@ namespace WebCore {
         virtual IntRect windowResizerRect() const = 0;
 
         // Methods used by HostWindow.
-        virtual void invalidateWindow(const IntRect&, bool) = 0;
-        virtual void invalidateContentsAndWindow(const IntRect&, bool) = 0;
+        virtual void invalidateRootView(const IntRect&, bool) = 0;
+        virtual void invalidateContentsAndRootView(const IntRect&, bool) = 0;
         virtual void invalidateContentsForSlowScroll(const IntRect&, bool) = 0;
         virtual void scroll(const IntSize&, const IntRect&, const IntRect&) = 0;
 #if USE(TILED_BACKING_STORE)
         virtual void delegatedScrollRequested(const IntPoint&) = 0;
 #endif
-        virtual IntPoint screenToWindow(const IntPoint&) const = 0;
-        virtual IntRect windowToScreen(const IntRect&) const = 0;
+        virtual IntPoint screenToRootView(const IntPoint&) const = 0;
+        virtual IntRect rootViewToScreen(const IntRect&) const = 0;
         virtual PlatformPageClient platformPageClient() const = 0;
         virtual void scrollbarsModeDidChange() const = 0;
         virtual void setCursor(const Cursor&) = 0;
@@ -228,8 +228,8 @@ namespace WebCore {
 
 #if ENABLE(INPUT_COLOR)
         virtual void openColorChooser(ColorChooser*, const Color&) = 0;
-        virtual void cleanupColorChooser() = 0;
-        virtual void setSelectedColorInColorChooser(const Color&) = 0;
+        virtual void cleanupColorChooser(ColorChooser*) = 0;
+        virtual void setSelectedColorInColorChooser(ColorChooser*, const Color&) = 0;
 #endif
 
         virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>) = 0;

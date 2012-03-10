@@ -263,7 +263,11 @@ public:
     double pageScaleFactor() const;
 
     void setUseFixedLayout(bool);
+    bool useFixedLayout() const { return m_useFixedLayout; }
     void setFixedLayoutSize(const WebCore::IntSize&);
+
+    void setPaginationMode(uint32_t /* WebCore::Page::Pagination::Mode */);
+    void setGapBetweenPages(double);
 
     bool drawsBackground() const { return m_drawsBackground; }
     bool drawsTransparentBackground() const { return m_drawsTransparentBackground; }
@@ -308,8 +312,10 @@ public:
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
     void setFixedVisibleContentRect(const WebCore::IntRect&);
-    void setResizesToContentsUsingLayoutSize(const WebCore::IntSize& targetLayoutSize);
+    void setResizesToContentsUsingLayoutSize(const WebCore::IntSize&);
     void resizeToContentsIfNeeded();
+    void setViewportSize(const WebCore::IntSize&);
+    WebCore::IntSize viewportSize() const { return m_viewportSize; }
 #endif
 
     WebContextMenu* contextMenu();
@@ -420,6 +426,8 @@ public:
 
     void didChangeScrollOffsetForMainFrame();
 
+    void mainFrameDidLayout();
+
     bool canRunBeforeUnloadConfirmPanel() const { return m_canRunBeforeUnloadConfirmPanel; }
     void setCanRunBeforeUnloadConfirmPanel(bool canRunBeforeUnloadConfirmPanel) { m_canRunBeforeUnloadConfirmPanel = canRunBeforeUnloadConfirmPanel; }
 
@@ -429,6 +437,7 @@ public:
     void runModal();
 
     void setDeviceScaleFactor(float);
+    float deviceScaleFactor() const;
 
     void setMemoryCacheMessagesEnabled(bool);
 
@@ -506,6 +515,7 @@ private:
 #endif
 #if ENABLE(TOUCH_EVENTS)
     void touchEvent(const WebTouchEvent&);
+    void touchEventSyncForTesting(const WebTouchEvent&, bool& handled);
 #endif
     void contextMenuHidden() { m_isShowingContextMenu = false; }
 
@@ -600,6 +610,7 @@ private:
 
     WebCore::IntSize m_viewSize;
     OwnPtr<DrawingArea> m_drawingArea;
+    bool m_useFixedLayout;
 
     bool m_drawsBackground;
     bool m_drawsTransparentBackground;
@@ -658,6 +669,7 @@ private:
 
 #if USE(TILED_BACKING_STORE)
     WebCore::IntSize m_resizesToContentsLayoutSize;
+    WebCore::IntSize m_viewportSize;
 #endif
 
     FindController m_findController;
@@ -690,6 +702,8 @@ private:
 
     bool m_cachedMainFrameIsPinnedToLeftSide;
     bool m_cachedMainFrameIsPinnedToRightSide;
+
+    unsigned m_cachedPageCount;
 
     bool m_isShowingContextMenu;
 

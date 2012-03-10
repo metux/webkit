@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Igalia S.L.
+ * Portions Copyright (c) 2011 Motorola Mobility, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -37,6 +38,66 @@ static gboolean testLoadTimeoutFinishLoop(GMainLoop* loop)
 {
     g_main_loop_quit(loop);
     return FALSE;
+}
+
+void WebViewTest::loadURI(const char* uri)
+{
+    m_activeURI = uri;
+    webkit_web_view_load_uri(m_webView, uri);
+}
+
+void WebViewTest::loadHtml(const char* html, const char* baseURI)
+{
+    m_activeURI = "about:blank";
+    webkit_web_view_load_html(m_webView, html, baseURI);
+}
+
+void WebViewTest::loadPlainText(const char* plainText)
+{
+    m_activeURI = "about:blank";
+    webkit_web_view_load_plain_text(m_webView, plainText);
+}
+
+void WebViewTest::loadAlternateHTML(const char* html, const char* baseURI, const char* unreachableURI)
+{
+    m_activeURI = "about:blank";
+    webkit_web_view_load_alternate_html(m_webView, html, baseURI, unreachableURI);
+}
+
+void WebViewTest::loadRequest(WebKitNetworkRequest* request)
+{
+    m_activeURI = webkit_network_request_get_uri(request);
+    webkit_web_view_load_request(m_webView, request);
+}
+
+void WebViewTest::goBack()
+{
+    if (webkit_web_view_can_go_back(m_webView)) {
+        WebKitBackForwardList* list = webkit_web_view_get_back_forward_list(m_webView);
+        WebKitBackForwardListItem* item = webkit_back_forward_list_get_nth_item(list, -1);
+        m_activeURI = webkit_back_forward_list_item_get_original_uri(item);
+    }
+
+    // Call go_back even when can_go_back returns FALSE to check nothing happens.
+    webkit_web_view_go_back(m_webView);
+}
+
+void WebViewTest::goForward()
+{
+    if (webkit_web_view_can_go_forward(m_webView)) {
+        WebKitBackForwardList* list = webkit_web_view_get_back_forward_list(m_webView);
+        WebKitBackForwardListItem* item = webkit_back_forward_list_get_nth_item(list, 1);
+        m_activeURI = webkit_back_forward_list_item_get_original_uri(item);
+    }
+
+    // Call go_forward even when can_go_forward returns FALSE to check nothing happens.
+    webkit_web_view_go_forward(m_webView);
+}
+
+void WebViewTest::goToBackForwardListItem(WebKitBackForwardListItem* item)
+{
+    m_activeURI = webkit_back_forward_list_item_get_original_uri(item);
+    webkit_web_view_go_to_back_forward_list_item(m_webView, item);
 }
 
 void WebViewTest::wait(double seconds)

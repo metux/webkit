@@ -301,7 +301,8 @@ private:
         bool changed = false;
         
         switch (op) {
-        case JSConstant: {
+        case JSConstant:
+        case WeakJSConstant: {
             changed |= setPrediction(predictionFromValue(m_graph.valueOfJSConstant(m_codeBlock, m_compileIndex)));
             break;
         }
@@ -440,7 +441,21 @@ private:
             break;
         }
             
-        case GetById:
+        case GetById: {
+            if (node.getHeapPrediction())
+                changed |= mergePrediction(node.getHeapPrediction());
+            else if (m_codeBlock->identifier(node.identifierNumber()) == m_globalData.propertyNames->length) {
+                // If there is no prediction from value profiles, check if we might be
+                // able to infer the type ourselves.
+                bool isArray = isArrayPrediction(m_graph[node.child1()].prediction());
+                bool isString = isStringPrediction(m_graph[node.child1()].prediction());
+                bool isByteArray = m_graph[node.child1()].shouldSpeculateByteArray();
+                if (isArray || isString || isByteArray)
+                    changed |= mergePrediction(PredictInt32);
+            }
+            break;
+        }
+            
         case GetMethod:
         case GetByVal: {
             if (node.getHeapPrediction())
@@ -459,11 +474,6 @@ private:
             break;
         }
             
-        case CheckMethod: {
-            changed |= setPrediction(m_graph.getMethodCheckPrediction(node));
-            break;
-        }
-
         case Call:
         case Construct: {
             if (node.getHeapPrediction())
@@ -512,7 +522,7 @@ private:
         }
             
         case GetCallee: {
-            changed |= setPrediction(PredictObjectOther);
+            changed |= setPrediction(PredictFunction);
             break;
         }
             
@@ -593,8 +603,9 @@ private:
         case PutByOffset:
             break;
             
-        // This gets ignored because it doesn't do anything.
+        // These gets ignored because it doesn't do anything.
         case Phantom:
+        case InlineStart:
             break;
 #else
         default:
@@ -970,18 +981,18 @@ private:
         return NoNode;
     }
     
-    NodeIndex globalVarLoadElimination(unsigned varNumber)
+    NodeIndex globalVarLoadElimination(unsigned varNumber, JSGlobalObject* globalObject)
     {
         NodeIndex start = startIndexForChildren();
         for (NodeIndex index = m_compileIndex; index-- > start;) {
             Node& node = m_graph[index];
             switch (node.op) {
             case GetGlobalVar:
-                if (node.varNumber() == varNumber)
+                if (node.varNumber() == varNumber && m_codeBlock->globalObjectFor(node.codeOrigin) == globalObject)
                     return index;
                 break;
             case PutGlobalVar:
-                if (node.varNumber() == varNumber)
+                if (node.varNumber() == varNumber && m_codeBlock->globalObjectFor(node.codeOrigin) == globalObject)
                     return node.child1();
                 break;
             default:
@@ -1017,47 +1028,6 @@ private:
             case ArrayPush:
                 // A push cannot affect previously existing elements in the array.
                 break;
-            default:
-                if (clobbersWorld(index))
-                    return NoNode;
-                break;
-            }
-        }
-        return NoNode;
-    }
-
-    NodeIndex getMethodLoadElimination(const MethodCheckData& methodCheckData, unsigned identifierNumber, NodeIndex child1)
-    {
-        NodeIndex start = startIndexForChildren(child1);
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
-            Node& node = m_graph[index];
-            switch (node.op) {
-            case CheckMethod:
-                if (node.child1() == child1
-                    && node.identifierNumber() == identifierNumber
-                    && m_graph.m_methodCheckData[node.methodCheckDataIndex()] == methodCheckData)
-                    return index;
-                break;
-                
-            case PutByOffset:
-                // If a put was optimized to by-offset then it's not changing the structure
-                break;
-                
-            case PutByVal:
-            case PutByValAlias:
-                if (byValHasIntBase(node)) {
-                    // If PutByVal speculates that it's accessing an array with an
-                    // integer index, then it's impossible for it to cause a structure
-                    // change.
-                    break;
-                }
-                return NoNode;
-                
-            case ArrayPush:
-            case ArrayPop:
-                // Pushing and popping cannot despecify a function.
-                break;
-                
             default:
                 if (clobbersWorld(index))
                     return NoNode;
@@ -1364,7 +1334,7 @@ private:
         // Finally handle heap accesses. These are not quite pure, but we can still
         // optimize them provided that some subtle conditions are met.
         case GetGlobalVar:
-            setReplacement(globalVarLoadElimination(node.varNumber()));
+            setReplacement(globalVarLoadElimination(node.varNumber(), m_codeBlock->globalObjectFor(node.codeOrigin)));
             break;
             
         case GetByVal:
@@ -1375,10 +1345,6 @@ private:
         case PutByVal:
             if (byValHasIntBase(node) && getByValLoadElimination(node.child1(), node.child2()) != NoNode)
                 node.op = PutByValAlias;
-            break;
-            
-        case CheckMethod:
-            setReplacement(getMethodLoadElimination(m_graph.m_methodCheckData[node.methodCheckDataIndex()], node.identifierNumber(), node.child1()));
             break;
             
         case CheckStructure:

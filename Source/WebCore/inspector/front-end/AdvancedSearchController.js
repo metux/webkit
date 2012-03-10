@@ -41,7 +41,10 @@ WebInspector.AdvancedSearchController = function()
 
 WebInspector.AdvancedSearchController.createShortcut = function()
 {
-    return WebInspector.KeyboardShortcut.makeDescriptor("f", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta | WebInspector.KeyboardShortcut.Modifiers.Shift);
+    if (WebInspector.isMac())
+        return WebInspector.KeyboardShortcut.makeDescriptor("f", WebInspector.KeyboardShortcut.Modifiers.Meta | WebInspector.KeyboardShortcut.Modifiers.Alt);
+    else
+        return WebInspector.KeyboardShortcut.makeDescriptor("f", WebInspector.KeyboardShortcut.Modifiers.Ctrl | WebInspector.KeyboardShortcut.Modifiers.Shift);
 }
 
 WebInspector.AdvancedSearchController.prototype = {
@@ -156,6 +159,7 @@ WebInspector.AdvancedSearchController.prototype = {
 WebInspector.SearchView = function(controller)
 {
     WebInspector.View.call(this);
+    this.registerRequiredCSS("textViewer.css");
     
     this._controller = controller;
 
@@ -336,7 +340,7 @@ WebInspector.SearchView.prototype = {
 
     focus: function()
     {
-        WebInspector.currentFocusElement = this._search;
+        WebInspector.setCurrentFocusElement(this._search);
         this._search.select();
     },
 
@@ -670,3 +674,8 @@ WebInspector.FileBasedSearchResultsPane.SearchResult = function(file, searchMatc
     this.file = file;
     this.searchMatches = searchMatches;
 }
+
+/**
+ * @type {WebInspector.AdvancedSearchController}
+ */
+WebInspector.advancedSearchController = null;

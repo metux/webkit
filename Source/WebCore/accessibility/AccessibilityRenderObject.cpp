@@ -426,6 +426,8 @@ RenderObject* AccessibilityRenderObject::renderParentObject() const
             if (firstChild == parent->firstChild())
                 break;
             firstChild = parent->firstChild();
+            if (!firstChild->node())
+                break;
             nodeRenderFirstChild = firstChild->node()->renderer();
         }
     }
@@ -435,6 +437,10 @@ RenderObject* AccessibilityRenderObject::renderParentObject() const
     
 AccessibilityObject* AccessibilityRenderObject::parentObjectIfExists() const
 {
+    // WebArea's parent should be the scroll view containing it.
+    if (isWebArea())
+        return axObjectCache()->get(m_renderer->frame()->view());
+
     return axObjectCache()->get(renderParentObject());
 }
     
@@ -628,11 +634,13 @@ bool AccessibilityRenderObject::isNativeCheckboxOrRadio() const
 bool AccessibilityRenderObject::isChecked() const
 {
     ASSERT(m_renderer);
-    if (!m_renderer->node())
+    
+    Node* node = this->node();
+    if (!node)
         return false;
 
     // First test for native checkedness semantics
-    HTMLInputElement* inputElement = m_renderer->node()->toInputElement();
+    HTMLInputElement* inputElement = node->toInputElement();
     if (inputElement)
         return inputElement->shouldAppearChecked();
 
@@ -775,10 +783,12 @@ AccessibilityObject* AccessibilityRenderObject::selectedRadioButton()
     if (!isRadioGroup())
         return 0;
     
+    AccessibilityObject::AccessibilityChildrenVector children = this->children();
+
     // Find the child radio button that is selected (ie. the intValue == 1).
-    int count = m_children.size();
-    for (int i = 0; i < count; ++i) {
-        AccessibilityObject* object = m_children[i].get();
+    size_t size = children.size();
+    for (size_t i = 0; i < size; ++i) {
+        AccessibilityObject* object = children[i].get();
         if (object->roleValue() == RadioButtonRole && object->checkboxOrRadioValue() == ButtonStateOn)
             return object;
     }
@@ -794,9 +804,11 @@ AccessibilityObject* AccessibilityRenderObject::selectedTabItem()
     AccessibilityObject::AccessibilityChildrenVector tabs;
     tabChildren(tabs);
     
-    int count = tabs.size();
-    for (int i = 0; i < count; ++i) {
-        AccessibilityObject* object = m_children[i].get();
+    AccessibilityObject::AccessibilityChildrenVector children = this->children();
+    
+    size_t size = tabs.size();
+    for (size_t i = 0; i < size; ++i) {
+        AccessibilityObject* object = children[i].get();
         if (object->isTabItem() && object->isChecked())
             return object;
     }
@@ -1163,9 +1175,6 @@ String AccessibilityRenderObject::stringValue() const
     if (m_renderer->isListMarker())
         return toRenderListMarker(m_renderer)->text();
     
-    if (cssBox && cssBox->isRenderButton())
-        return toRenderButton(m_renderer)->text();
-
     if (isWebArea()) {
         // FIXME: Why would a renderer exist when the Document isn't attached to a frame?
         if (m_renderer->frame())
@@ -1300,7 +1309,7 @@ HTMLLabelElement* AccessibilityRenderObject::labelElementContainer() const
 
 String AccessibilityRenderObject::title() const
 {
-    AccessibilityRole ariaRole = ariaRoleAttribute();
+    AccessibilityRole role = roleValue();
     
     if (!m_renderer)
         return String();
@@ -1320,22 +1329,27 @@ String AccessibilityRenderObject::title() const
             return input->value();
     }
     
-    if (isInputTag || AccessibilityObject::isARIAInput(ariaRole) || isControl()) {
+    if (isInputTag || AccessibilityObject::isARIAInput(ariaRoleAttribute()) || isControl()) {
         HTMLLabelElement* label = labelForElement(static_cast<Element*>(node));
         if (label && !titleUIElement())
             return label->innerText();
     }
     
-    if (roleValue() == ButtonRole
-        || ariaRole == ListBoxOptionRole
-        || ariaRole == MenuItemRole
-        || ariaRole == MenuButtonRole
-        || ariaRole == RadioButtonRole
-        || ariaRole == CheckBoxRole
-        || ariaRole == TabRole
-        || ariaRole == PopUpButtonRole
-        || isHeading()
-        || isLink())
+    switch (role) {
+    case ButtonRole:
+    case ListBoxOptionRole:
+    case MenuItemRole:
+    case MenuButtonRole:
+    case RadioButtonRole:
+    case CheckBoxRole:
+    case TabRole:
+    case PopUpButtonRole:
+        return textUnderElement();
+    default:
+        break;
+    }
+    
+    if (isHeading() || isLink())
         return textUnderElement();
     
     return String();
@@ -3113,12 +3127,12 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (m_renderer->isListMarker())
         return ListMarkerRole;
     if (node && node->hasTagName(buttonTag))
-        return ButtonRole;
+        return ariaHasPopup() ? PopUpButtonRole : ButtonRole;
     if (m_renderer->isText())
         return StaticTextRole;
     if (cssBox && cssBox->isImage()) {
         if (node && node->hasTagName(inputTag))
-            return ButtonRole;
+            return ariaHasPopup() ? PopUpButtonRole : ButtonRole;
         return ImageRole;
     }
     if (node && node->hasTagName(canvasTag))
@@ -3140,11 +3154,8 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
         if (input->isRadioButton())
             return RadioButtonRole;
         if (input->isTextButton())
-            return ButtonRole;
+            return ariaHasPopup() ? PopUpButtonRole : ButtonRole;
     }
-
-    if (node && node->hasTagName(buttonTag))
-        return ButtonRole;
 
     if (isFileUploadButton())
         return ButtonRole;
@@ -3397,36 +3408,25 @@ void AccessibilityRenderObject::childrenChanged()
     if (!m_renderer)
         return;
 
-    bool sentChildrenChanged = false;
-    
+    axObjectCache()->postNotification(this, document(), AXObjectCache::AXChildrenChanged, true);
+
     // Go up the accessibility parent chain, but only if the element already exists. This method is
     // called during render layouts, minimal work should be done. 
     // If AX elements are created now, they could interrogate the render tree while it's in a funky state.
     // At the same time, process ARIA live region changes.
     for (AccessibilityObject* parent = this; parent; parent = parent->parentObjectIfExists()) {
-        if (!parent->isAccessibilityRenderObject())
-            continue;
-        
-        AccessibilityRenderObject* axParent = toAccessibilityRenderObject(parent);
-        
-        // Send the children changed notification on the first accessibility render object ancestor.
-        if (!sentChildrenChanged) {
-            axObjectCache()->postNotification(axParent->renderer(), AXObjectCache::AXChildrenChanged, true);
-            sentChildrenChanged = true;
-        }
-        
-        axParent->setNeedsToUpdateChildren();
-        
+        parent->setNeedsToUpdateChildren();
+
         // These notifications always need to be sent because screenreaders are reliant on them to perform. 
         // In other words, they need to be sent even when the screen reader has not accessed this live region since the last update.
 
         // If this element supports ARIA live regions, then notify the AT of changes.
-        if (axParent->supportsARIALiveRegion())
-            axObjectCache()->postNotification(axParent->renderer(), AXObjectCache::AXLiveRegionChanged, true);
+        if (parent->supportsARIALiveRegion())
+            axObjectCache()->postNotification(parent, parent->document(), AXObjectCache::AXLiveRegionChanged, true);
         
         // If this element is an ARIA text control, notify the AT of changes.
-        if (axParent->isARIATextControl() && !axParent->isNativeTextControl() && !axParent->node()->isContentEditable())
-            axObjectCache()->postNotification(axParent->renderer(), AXObjectCache::AXValueChanged, true);
+        if (parent->isARIATextControl() && !parent->isNativeTextControl() && !parent->node()->isContentEditable())
+            axObjectCache()->postNotification(parent, parent->document(), AXObjectCache::AXValueChanged, true);
     }
 }
     
@@ -3662,10 +3662,11 @@ void AccessibilityRenderObject::ariaListboxVisibleChildren(AccessibilityChildren
     if (!hasChildren())
         addChildren();
     
-    unsigned length = m_children.size();
-    for (unsigned i = 0; i < length; i++) {
-        if (!m_children[i]->isOffScreen())
-            result.append(m_children[i]);
+    AccessibilityObject::AccessibilityChildrenVector children = this->children();
+    size_t size = children.size();
+    for (size_t i = 0; i < size; i++) {
+        if (!children[i]->isOffScreen())
+            result.append(children[i]);
     }
 }
 
@@ -3685,10 +3686,11 @@ void AccessibilityRenderObject::tabChildren(AccessibilityChildrenVector& result)
 {
     ASSERT(roleValue() == TabListRole);
     
-    unsigned length = m_children.size();
-    for (unsigned i = 0; i < length; ++i) {
-        if (m_children[i]->isTabItem())
-            result.append(m_children[i]);
+    AccessibilityObject::AccessibilityChildrenVector children = this->children();
+    size_t size = children.size();
+    for (size_t i = 0; i < size; ++i) {
+        if (children[i]->isTabItem())
+            result.append(children[i]);
     }
 }
     

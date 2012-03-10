@@ -63,7 +63,14 @@ public:
 
     virtual ~CSSStyleSheet();
 
-    CSSRule* ownerRule() const;
+    CSSStyleSheet* parentStyleSheet() const
+    {
+        StyleSheet* parentSheet = StyleSheet::parentStyleSheet();
+        ASSERT(!parentSheet || parentSheet->isCSSStyleSheet());
+        return static_cast<CSSStyleSheet*>(parentSheet);
+    }
+
+    CSSRule* ownerRule() const { return parentRule(); }
     PassRefPtr<CSSRuleList> cssRules(bool omitCharsetRules = false);
     unsigned insertRule(const String& rule, unsigned index, ExceptionCode&);
     void deleteRule(unsigned index, ExceptionCode&);
@@ -77,7 +84,7 @@ public:
     void addNamespace(CSSParser*, const AtomicString& prefix, const AtomicString& uri);
     const AtomicString& determineNamespace(const AtomicString& prefix);
 
-    virtual void styleSheetChanged();
+    void styleSheetChanged();
 
     virtual bool parseString(const String&, bool strict = true);
 
@@ -88,7 +95,8 @@ public:
     virtual void checkLoaded();
     void startLoadingDynamicSheet();
 
-    Document* document();
+    Node* findStyleSheetOwnerNode() const;
+    Document* findDocument();
 
     const String& charset() const { return m_charset; }
 

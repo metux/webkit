@@ -47,20 +47,18 @@ public:
     CSSPrimitiveValue* offset() const { return m_offset.get(); }
     CSSValue* mask() const { return m_mask.get(); }
 
-    virtual String cssText() const;
+    String customCssText() const;
 
-    virtual void addSubresourceStyleURLs(ListHashSet<KURL>&, const CSSStyleSheet*);
+    void addSubresourceStyleURLs(ListHashSet<KURL>&, const CSSStyleSheet*);
 
 private:
-    CSSReflectValue(CSSReflectionDirection direction,
-            PassRefPtr<CSSPrimitiveValue> offset, PassRefPtr<CSSValue> mask)
-        : m_direction(direction)
+    CSSReflectValue(CSSReflectionDirection direction, PassRefPtr<CSSPrimitiveValue> offset, PassRefPtr<CSSValue> mask)
+        : CSSValue(ReflectClass)
+        , m_direction(direction)
         , m_offset(offset)
         , m_mask(mask)
     {
     }
-
-    virtual bool isReflectValue() const { return true; }
 
     CSSReflectionDirection m_direction;
     RefPtr<CSSPrimitiveValue> m_offset;

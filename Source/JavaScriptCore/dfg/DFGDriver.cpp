@@ -37,6 +37,12 @@ namespace JSC { namespace DFG {
 enum CompileMode { CompileFunction, CompileOther };
 inline bool compile(CompileMode compileMode, ExecState* exec, CodeBlock* codeBlock, JITCode& jitCode, MacroAssemblerCodePtr* jitCodeWithArityCheck)
 {
+    SamplingRegion samplingRegion("DFG Compilation (Driver)");
+    
+    ASSERT(codeBlock);
+    ASSERT(codeBlock->alternative());
+    ASSERT(codeBlock->alternative()->getJITType() == JITCode::BaselineJIT);
+    
     JSGlobalData* globalData = &exec->globalData();
     Graph dfg;
     if (!parse(dfg, globalData, codeBlock))

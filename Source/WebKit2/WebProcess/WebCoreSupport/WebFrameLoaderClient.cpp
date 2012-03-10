@@ -563,9 +563,11 @@ void WebFrameLoaderClient::dispatchDidLayout()
     // NOTE: Unlike the other layout notifications, this does not notify the
     // the UIProcess for every call.
 
-    // FIXME: Remove at the soonest possible time.
-    if (m_frame == m_frame->page()->mainWebFrame())
+    if (m_frame == m_frame->page()->mainWebFrame()) {
+        // FIXME: Remove at the soonest possible time.
         webPage->send(Messages::WebPageProxy::SetRenderTreeSize(webPage->renderTreeSize()));
+        webPage->mainFrameDidLayout();
+    }
 }
 
 Frame* WebFrameLoaderClient::dispatchCreatePage(const NavigationAction& navigationAction)
@@ -761,23 +763,28 @@ void WebFrameLoaderClient::didChangeEstimatedProgress()
 
 void WebFrameLoaderClient::postProgressStartedNotification()
 {
-    if (WebPage* webPage = m_frame->page())
-        webPage->send(Messages::WebPageProxy::DidStartProgress());
+    if (WebPage* webPage = m_frame->page()) {
+        if (m_frame->isMainFrame())
+            webPage->send(Messages::WebPageProxy::DidStartProgress());
+    }
 }
 
 void WebFrameLoaderClient::postProgressEstimateChangedNotification()
 {
     if (WebPage* webPage = m_frame->page()) {
-        double progress = webPage->corePage()->progress()->estimatedProgress();
-        webPage->send(Messages::WebPageProxy::DidChangeProgress(progress));
-
+        if (m_frame->isMainFrame()) {
+            double progress = webPage->corePage()->progress()->estimatedProgress();
+            webPage->send(Messages::WebPageProxy::DidChangeProgress(progress));
+        }
     }
 }
 
 void WebFrameLoaderClient::postProgressFinishedNotification()
 {
-    if (WebPage* webPage = m_frame->page())
-        webPage->send(Messages::WebPageProxy::DidFinishProgress());
+    if (WebPage* webPage = m_frame->page()) {
+        if (m_frame->isMainFrame())
+            webPage->send(Messages::WebPageProxy::DidFinishProgress());
+    }
 }
 
 void WebFrameLoaderClient::setMainFrameDocumentReady(bool)
@@ -942,6 +949,19 @@ void WebFrameLoaderClient::didRunInsecureContent(SecurityOrigin*, const KURL&)
     webPage->injectedBundleLoaderClient().didRunInsecureContentForFrame(webPage, m_frame, userData);
 
     webPage->send(Messages::WebPageProxy::DidRunInsecureContentForFrame(m_frame->frameID(), InjectedBundleUserMessageEncoder(userData.get())));
+}
+
+void WebFrameLoaderClient::didDetectXSS(const KURL&, bool)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+
+    RefPtr<APIObject> userData;
+
+    webPage->injectedBundleLoaderClient().didDetectXSSForFrame(webPage, m_frame, userData);
+
+    webPage->send(Messages::WebPageProxy::DidDetectXSSForFrame(m_frame->frameID(), InjectedBundleUserMessageEncoder(userData.get())));
 }
 
 ResourceError WebFrameLoaderClient::cancelledError(const ResourceRequest& request)
@@ -1119,35 +1139,17 @@ void WebFrameLoaderClient::transitionToCommittedFromCachedFrame(CachedFrame*)
 void WebFrameLoaderClient::transitionToCommittedForNewPage()
 {
     WebPage* webPage = m_frame->page();
+
     Color backgroundColor = webPage->drawsTransparentBackground() ? Color::transparent : Color::white;
-
     bool isMainFrame = webPage->mainWebFrame() == m_frame;
+    bool shouldUseFixedLayout = isMainFrame && webPage->useFixedLayout();
 
-#if USE(TILED_BACKING_STORE)
-    IntSize currentVisibleContentSize;
-    IntSize fixedLayoutSize;
-
-    if (FrameView* view = m_frame->coreFrame()->view()) {
-        currentVisibleContentSize = view->visibleContentRect().size();
-        fixedLayoutSize = view->fixedLayoutSize();
-    }
-
-    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, false, fixedLayoutSize, !fixedLayoutSize.isEmpty());
-
-    if (isMainFrame && !fixedLayoutSize.isEmpty()) {
-        m_frame->coreFrame()->view()->setDelegatesScrolling(true);
-        m_frame->coreFrame()->view()->setPaintsEntireContents(true);
-        // The HistoryController will update the scroll position later if needed.
-        m_frame->coreFrame()->view()->setFixedVisibleContentRect(IntRect(IntPoint::zero(), currentVisibleContentSize));
-    }
-
-#else
+#if !USE(TILED_BACKING_STORE)
     const ResourceResponse& response = m_frame->coreFrame()->loader()->documentLoader()->response();
     m_frameHasCustomRepresentation = isMainFrame && WebProcess::shared().shouldUseCustomRepresentationForResponse(response);
-
-    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, false, IntSize(), false);
 #endif
 
+    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, /* transparent */ false, IntSize(), shouldUseFixedLayout);
     m_frame->coreFrame()->view()->setTransparent(!webPage->drawsBackground());
 }
 

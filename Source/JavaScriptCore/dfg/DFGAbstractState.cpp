@@ -168,7 +168,8 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         return true;
         
     switch (node.op) {
-    case JSConstant: {
+    case JSConstant:
+    case WeakJSConstant: {
         JSValue value = m_graph.valueOfJSConstant(m_codeBlock, nodeIndex);
         if (value.isCell())
             m_haveStructures = true;
@@ -498,7 +499,7 @@ bool AbstractState::execute(NodeIndex nodeIndex)
             destination = source;
             break;
         }
-            
+        
         if (isOtherPrediction(child.prediction())) {
             source.filter(PredictOther);
             destination.set(PredictObjectOther);
@@ -534,7 +535,7 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         break;
             
     case GetCallee:
-        forNode(nodeIndex).set(PredictObjectOther);
+        forNode(nodeIndex).set(PredictFunction);
         break;
             
     case GetScopeChain:
@@ -551,6 +552,10 @@ bool AbstractState::execute(NodeIndex nodeIndex)
             
     case GetById:
     case GetMethod:
+        if (!node.prediction()) {
+            m_isValid = false;
+            break;
+        }
         forNode(node.child1()).filter(PredictCell);
         clobberStructures(nodeIndex);
         forNode(nodeIndex).makeTop();
@@ -597,15 +602,8 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         forNode(node.child1()).filter(PredictCell);
         break;
             
-    case CheckMethod:
-        // FIXME: We should be able to propagate the structure sets of constants (i.e. prototypes).
-        forNode(node.child1()).filter(m_graph.m_methodCheckData[node.methodCheckDataIndex()].structure);
-        forNode(nodeIndex).set(PredictObjectOther);
-        m_haveStructures = true;
-        break;
-        
     case CheckFunction:
-        forNode(node.child1()).filter(PredictObjectOther);
+        forNode(node.child1()).filter(PredictFunction);
         // FIXME: Should be able to propagate the fact that we know what the function is.
         break;
             
@@ -629,8 +627,10 @@ bool AbstractState::execute(NodeIndex nodeIndex)
             
     case InstanceOf:
         // Again, sadly, we don't propagate the fact that we've done InstanceOf
-        forNode(node.child1()).filter(PredictCell);
-        forNode(node.child2()).filter(PredictCell);
+        if (!(m_graph[node.child1()].prediction() & ~PredictCell) && !(forNode(node.child1()).m_type & ~PredictCell))
+            forNode(node.child1()).filter(PredictCell);
+        forNode(node.child3()).filter(PredictCell);
+        forNode(nodeIndex).set(PredictBoolean);
         break;
             
     case Phi:
@@ -655,6 +655,7 @@ bool AbstractState::execute(NodeIndex nodeIndex)
         break;
             
     case Phantom:
+    case InlineStart:
         break;
     }
     
@@ -795,7 +796,7 @@ void AbstractState::dump(FILE* out)
             first = false;
         else
             fprintf(out, " ");
-        fprintf(out, "@%lu:", i + m_block->begin);
+        fprintf(out, "@%lu:", static_cast<unsigned long>(i + m_block->begin));
         m_nodes[i].dump(out);
     }
 }

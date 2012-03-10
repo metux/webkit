@@ -27,14 +27,9 @@
 module events {
 
     interface [
-        CanBeConstructed,
-        CustomConstructor
+        ConstructorTemplate=Event
     ] BeforeLoadEvent : Event {
-        void initBeforeLoadEvent(in [Optional=CallWithDefaultValue] DOMString type,
-                                 in [Optional=CallWithDefaultValue] boolean canBubble, 
-                                 in [Optional=CallWithDefaultValue] boolean cancelable,
-                                 in [Optional=CallWithDefaultValue] DOMString url);
-        readonly attribute DOMString url;
+        readonly attribute [InitializedByConstructor] DOMString url;
     };
 
 }

@@ -28,8 +28,10 @@
 
 #if ENABLE(DFG_JIT)
 
+#include <assembler/LinkBuffer.h>
 #include <assembler/MacroAssembler.h>
 #include <bytecode/CodeBlock.h>
+#include <dfg/DFGAssemblyHelpers.h>
 #include <dfg/DFGFPRInfo.h>
 #include <dfg/DFGGPRInfo.h>
 #include <dfg/DFGGraph.h>
@@ -51,17 +53,6 @@ class SpeculationRecovery;
 
 struct EntryLocation;
 struct OSRExit;
-
-#ifndef NDEBUG
-typedef void (*V_DFGDebugOperation_EP)(ExecState*, void*);
-#endif
-
-#if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
-struct SpeculationFailureDebugInfo {
-    CodeBlock* codeBlock;
-    unsigned debugOffset;
-};
-#endif
 
 // === CallLinkRecord ===
 //
@@ -103,6 +94,51 @@ struct CallExceptionRecord {
     CodeOrigin m_codeOrigin;
 };
 
+struct PropertyAccessRecord {
+#if USE(JSVALUE64)
+    PropertyAccessRecord(MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR)
+#elif USE(JSVALUE32_64)
+    PropertyAccessRecord(MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToTagLoadOrStore, MacroAssembler::DataLabelCompact deltaCallToPayloadLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR)
+#endif
+        : m_deltaCheckImmToCall(deltaCheckImmToCall)
+        , m_functionCall(functionCall)
+        , m_deltaCallToStructCheck(deltaCallToStructCheck)
+#if USE(JSVALUE64)
+        , m_deltaCallToLoadOrStore(deltaCallToLoadOrStore)
+#elif USE(JSVALUE32_64)
+        , m_deltaCallToTagLoadOrStore(deltaCallToTagLoadOrStore)
+        , m_deltaCallToPayloadLoadOrStore(deltaCallToPayloadLoadOrStore)
+#endif
+        , m_deltaCallToSlowCase(deltaCallToSlowCase)
+        , m_deltaCallToDone(deltaCallToDone)
+        , m_baseGPR(baseGPR)
+#if USE(JSVALUE32_64)
+        , m_valueTagGPR(valueTagGPR)
+#endif
+        , m_valueGPR(valueGPR)
+        , m_scratchGPR(scratchGPR)
+    {
+    }
+
+    MacroAssembler::DataLabelPtr m_deltaCheckImmToCall;
+    MacroAssembler::Call m_functionCall;
+    MacroAssembler::Jump m_deltaCallToStructCheck;
+#if USE(JSVALUE64)
+    MacroAssembler::DataLabelCompact m_deltaCallToLoadOrStore;
+#elif USE(JSVALUE32_64)
+    MacroAssembler::DataLabelCompact m_deltaCallToTagLoadOrStore;
+    MacroAssembler::DataLabelCompact m_deltaCallToPayloadLoadOrStore;
+#endif
+    MacroAssembler::Label m_deltaCallToSlowCase;
+    MacroAssembler::Label m_deltaCallToDone;
+    int8_t m_baseGPR;
+#if USE(JSVALUE32_64)
+    int8_t m_valueTagGPR;
+#endif
+    int8_t m_valueGPR;
+    int8_t m_scratchGPR;
+};
+
 // === JITCompiler ===
 //
 // DFG::JITCompiler is responsible for generating JIT code from the dataflow graph.
@@ -111,12 +147,11 @@ struct CallExceptionRecord {
 // relationship). The JITCompiler holds references to information required during
 // compilation, and also records information used in linking (e.g. a list of all
 // call to be linked).
-class JITCompiler : public MacroAssembler {
+class JITCompiler : public AssemblyHelpers {
 public:
     JITCompiler(JSGlobalData* globalData, Graph& dfg, CodeBlock* codeBlock)
-        : m_globalData(globalData)
+        : AssemblyHelpers(globalData, codeBlock)
         , m_graph(dfg)
-        , m_codeBlock(codeBlock)
     {
     }
 
@@ -125,84 +160,6 @@ public:
 
     // Accessors for properties.
     Graph& graph() { return m_graph; }
-    CodeBlock* codeBlock() { return m_codeBlock; }
-    JSGlobalData* globalData() { return m_globalData; }
-    AssemblerType_T& assembler() { return m_assembler; }
-
-#if CPU(X86_64) || CPU(X86)
-    void preserveReturnAddressAfterCall(GPRReg reg)
-    {
-        pop(reg);
-    }
-
-    void restoreReturnAddressBeforeReturn(GPRReg reg)
-    {
-        push(reg);
-    }
-
-    void restoreReturnAddressBeforeReturn(Address address)
-    {
-        push(address);
-    }
-
-    void emitGetFromCallFrameHeaderPtr(RegisterFile::CallFrameHeaderEntry entry, GPRReg to)
-    {
-        loadPtr(Address(GPRInfo::callFrameRegister, entry * sizeof(Register)), to);
-    }
-    void emitPutToCallFrameHeader(GPRReg from, RegisterFile::CallFrameHeaderEntry entry)
-    {
-        storePtr(from, Address(GPRInfo::callFrameRegister, entry * sizeof(Register)));
-    }
-
-    void emitPutImmediateToCallFrameHeader(void* value, RegisterFile::CallFrameHeaderEntry entry)
-    {
-        storePtr(TrustedImmPtr(value), Address(GPRInfo::callFrameRegister, entry * sizeof(Register)));
-    }
-#endif
-
-    Jump branchIfNotCell(GPRReg reg)
-    {
-#if USE(JSVALUE64)
-        return branchTestPtr(MacroAssembler::NonZero, reg, GPRInfo::tagMaskRegister);
-#else
-        return branch32(MacroAssembler::NotEqual, reg, TrustedImm32(JSValue::CellTag));
-#endif
-    }
-    
-    static Address addressForGlobalVar(GPRReg global, int32_t varNumber)
-    {
-        return Address(global, varNumber * sizeof(Register));
-    }
-
-    static Address tagForGlobalVar(GPRReg global, int32_t varNumber)
-    {
-        return Address(global, varNumber * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag));
-    }
-
-    static Address payloadForGlobalVar(GPRReg global, int32_t varNumber)
-    {
-        return Address(global, varNumber * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
-    }
-
-    static Address addressFor(VirtualRegister virtualRegister)
-    {
-        return Address(GPRInfo::callFrameRegister, virtualRegister * sizeof(Register));
-    }
-
-    static Address tagFor(VirtualRegister virtualRegister)
-    {
-        return Address(GPRInfo::callFrameRegister, virtualRegister * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag));
-    }
-
-    static Address payloadFor(VirtualRegister virtualRegister)
-    {
-        return Address(GPRInfo::callFrameRegister, virtualRegister * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
-    }
-
-    Jump branchIfNotObject(GPRReg structureReg)
-    {
-        return branch8(Below, Address(structureReg, Structure::typeInfoTypeOffset()), TrustedImm32(ObjectType));
-    }
 
     // Notify the JIT of a call that does not require linking.
     void notifyCall(Call functionCall, CodeOrigin codeOrigin)
@@ -238,36 +195,6 @@ public:
         return functionCall;
     }
     
-#ifndef NDEBUG
-    // Add a debug call. This call has no effect on JIT code execution state.
-    void debugCall(V_DFGDebugOperation_EP function, void* argument)
-    {
-        for (unsigned i = 0; i < GPRInfo::numberOfRegisters; ++i)
-            storePtr(GPRInfo::toRegister(i), m_globalData->debugDataBuffer + i);
-        for (unsigned i = 0; i < FPRInfo::numberOfRegisters; ++i) {
-            move(TrustedImmPtr(m_globalData->debugDataBuffer + GPRInfo::numberOfRegisters + i), GPRInfo::regT0);
-            storeDouble(FPRInfo::toRegister(i), GPRInfo::regT0);
-        }
-#if CPU(X86_64)
-        move(TrustedImmPtr(argument), GPRInfo::argumentGPR1);
-        move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
-#elif CPU(X86)
-        poke(GPRInfo::callFrameRegister, 0);
-        poke(TrustedImmPtr(argument), 1);
-#else
-#error "DFG JIT not supported on this platform."
-#endif
-        move(TrustedImmPtr(reinterpret_cast<void*>(function)), GPRInfo::regT0);
-        call(GPRInfo::regT0);
-        for (unsigned i = 0; i < FPRInfo::numberOfRegisters; ++i) {
-            move(TrustedImmPtr(m_globalData->debugDataBuffer + GPRInfo::numberOfRegisters + i), GPRInfo::regT0);
-            loadDouble(GPRInfo::regT0, FPRInfo::toRegister(i));
-        }
-        for (unsigned i = 0; i < GPRInfo::numberOfRegisters; ++i)
-            loadPtr(m_globalData->debugDataBuffer + i, GPRInfo::toRegister(i));
-    }
-#endif
-
     // Helper methods to check nodes for constants.
     bool isConstant(NodeIndex nodeIndex) { return graph().isConstant(nodeIndex); }
     bool isJSConstant(NodeIndex nodeIndex) { return graph().isJSConstant(nodeIndex); }
@@ -294,117 +221,45 @@ public:
         unsigned constantIndex = graph()[nodeIndex].constantNumber();
         return &(codeBlock()->constantRegister(FirstConstantRegisterIndex + constantIndex));
     }
-
-    void emitLoadTag(NodeIndex, GPRReg tag);
-    void emitLoadPayload(NodeIndex, GPRReg payload);
-
-    void emitLoad(const JSValue&, GPRReg tag, GPRReg payload);
-    void emitLoad(NodeIndex, GPRReg tag, GPRReg payload);
-    void emitLoad2(NodeIndex index1, GPRReg tag1, GPRReg payload1, NodeIndex index2, GPRReg tag2, GPRReg payload2);
-
-    void emitLoadDouble(NodeIndex, FPRReg value);
-    void emitLoadInt32ToDouble(NodeIndex, FPRReg value);
-
-    void emitStore(NodeIndex, GPRReg tag, GPRReg payload);
-    void emitStore(NodeIndex, const JSValue constant);
-    void emitStoreInt32(NodeIndex, GPRReg payload, bool indexIsInt32 = false);
-    void emitStoreInt32(NodeIndex, TrustedImm32 payload, bool indexIsInt32 = false);
-    void emitStoreCell(NodeIndex, GPRReg payload, bool indexIsCell = false);
-    void emitStoreBool(NodeIndex, GPRReg payload, bool indexIsBool = false);
-    void emitStoreDouble(NodeIndex, FPRReg value);
 #endif
 
-    // These methods JIT generate dynamic, debug-only checks - akin to ASSERTs.
-#if DFG_ENABLE(JIT_ASSERT)
-    void jitAssertIsInt32(GPRReg);
-    void jitAssertIsJSInt32(GPRReg);
-    void jitAssertIsJSNumber(GPRReg);
-    void jitAssertIsJSDouble(GPRReg);
-    void jitAssertIsCell(GPRReg);
-#else
-    void jitAssertIsInt32(GPRReg) {}
-    void jitAssertIsJSInt32(GPRReg) {}
-    void jitAssertIsJSNumber(GPRReg) {}
-    void jitAssertIsJSDouble(GPRReg) {}
-    void jitAssertIsCell(GPRReg) {}
-#endif
-
-    // These methods convert between doubles, and doubles boxed and JSValues.
-#if USE(JSVALUE64)
-    GPRReg boxDouble(FPRReg fpr, GPRReg gpr)
+    void addPropertyAccess(const PropertyAccessRecord& record)
     {
-        moveDoubleToPtr(fpr, gpr);
-        subPtr(GPRInfo::tagTypeNumberRegister, gpr);
-        return gpr;
+        m_propertyAccesses.append(record);
     }
-    FPRReg unboxDouble(GPRReg gpr, FPRReg fpr)
-    {
-        jitAssertIsJSDouble(gpr);
-        addPtr(GPRInfo::tagTypeNumberRegister, gpr);
-        movePtrToDouble(gpr, fpr);
-        return fpr;
-    }
-#elif USE(JSVALUE32_64)
-    void boxDouble(FPRReg fpr, GPRReg tagGPR, GPRReg payloadGPR)
-    {
-#if CPU(X86)
-        movePackedToInt32(fpr, payloadGPR);
-        rshiftPacked(TrustedImm32(32), fpr);
-        movePackedToInt32(fpr, tagGPR);
-#endif
-    }
-    void unboxDouble(GPRReg tagGPR, GPRReg payloadGPR, FPRReg fpr, FPRReg scratchFPR)
-    {
-        jitAssertIsJSDouble(tagGPR);
-#if CPU(X86)
-        moveInt32ToPacked(payloadGPR, fpr);
-        moveInt32ToPacked(tagGPR, scratchFPR);
-        lshiftPacked(TrustedImm32(32), scratchFPR);
-        orPacked(scratchFPR, fpr);
-#endif
-    }
-#endif
-
-#if ENABLE(SAMPLING_COUNTERS)
-    // Debug profiling tool.
-    static void emitCount(MacroAssembler&, AbstractSamplingCounter&, uint32_t increment = 1);
-    void emitCount(AbstractSamplingCounter& counter, uint32_t increment = 1)
-    {
-        emitCount(*this, counter, increment);
-    }
-#endif
-
-#if ENABLE(SAMPLING_FLAGS)
-    void setSamplingFlag(int32_t flag);
-    void clearSamplingFlag(int32_t flag);
-#endif
-
-#if USE(JSVALUE64)
-    void addPropertyAccess(JITCompiler::Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR)
-    {
-        m_propertyAccesses.append(PropertyAccessRecord(functionCall, deltaCheckImmToCall, deltaCallToStructCheck, deltaCallToLoadOrStore, deltaCallToSlowCase, deltaCallToDone,  baseGPR, valueGPR, scratchGPR));
-    }
-#elif USE(JSVALUE32_64)
-    void addPropertyAccess(JITCompiler::Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToTagLoadOrStore, int16_t deltaCallToPayloadLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR)
-    {
-        m_propertyAccesses.append(PropertyAccessRecord(functionCall, deltaCheckImmToCall, deltaCallToStructCheck, deltaCallToTagLoadOrStore, deltaCallToPayloadLoadOrStore, deltaCallToSlowCase, deltaCallToDone,  baseGPR, valueTagGPR, valueGPR, scratchGPR));
-    }
-#endif
 
     void addMethodGet(Call slowCall, DataLabelPtr structToCompare, DataLabelPtr protoObj, DataLabelPtr protoStructToCompare, DataLabelPtr putFunction)
     {
         m_methodGets.append(MethodGetRecord(slowCall, structToCompare, protoObj, protoStructToCompare, putFunction));
     }
     
-    void addJSCall(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, bool isCall, CodeOrigin codeOrigin)
+    void addJSCall(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, CallLinkInfo::CallType callType, CodeOrigin codeOrigin)
     {
-        m_jsCalls.append(JSCallRecord(fastCall, slowCall, targetToCheck, isCall, codeOrigin));
+        m_jsCalls.append(JSCallRecord(fastCall, slowCall, targetToCheck, callType, codeOrigin));
     }
     
-    void noticeOSREntry(BasicBlock& basicBlock)
+    void addWeakReference(JSCell* target)
+    {
+        m_codeBlock->appendWeakReference(target);
+    }
+    
+    void addWeakReferenceTransition(JSCell* codeOrigin, JSCell* from, JSCell* to)
+    {
+        m_codeBlock->appendWeakReferenceTransition(codeOrigin, from, to);
+    }
+    
+    template<typename T>
+    Jump branchWeakPtr(RelationalCondition cond, T left, JSCell* weakPtr)
+    {
+        Jump result = branchPtr(cond, left, TrustedImmPtr(weakPtr));
+        addWeakReference(weakPtr);
+        return result;
+    }
+    
+    void noticeOSREntry(BasicBlock& basicBlock, JITCompiler::Label blockHead, LinkBuffer& linkBuffer)
     {
 #if DFG_ENABLE(OSR_ENTRY)
-        OSREntryData* entry = codeBlock()->appendDFGOSREntryData(basicBlock.bytecodeBegin, differenceBetween(m_startOfCode, label()));
+        OSREntryData* entry = codeBlock()->appendDFGOSREntryData(basicBlock.bytecodeBegin, linkBuffer.offsetOf(blockHead));
         
         entry->m_expectedValues = basicBlock.valuesAtHead;
         
@@ -421,94 +276,35 @@ public:
         }
 #else
         UNUSED_PARAM(basicBlock);
+        UNUSED_PARAM(blockHead);
+        UNUSED_PARAM(linkBuffer);
 #endif
     }
 
+    ValueProfile* valueProfileFor(NodeIndex nodeIndex)
+    {
+        if (nodeIndex == NoNode)
+            return 0;
+        
+        return m_graph.valueProfileFor(nodeIndex, baselineCodeBlockFor(m_graph[nodeIndex].codeOrigin));
+    }
+    
 private:
     // Internal implementation to compile.
     void compileEntry();
-    void compileBody();
+    void compileBody(SpeculativeJIT&);
     void link(LinkBuffer&);
 
     void exitSpeculativeWithOSR(const OSRExit&, SpeculationRecovery*);
-    void linkOSRExits(SpeculativeJIT&);
+    void linkOSRExits();
     
-    CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
-    {
-        if (codeOrigin.inlineCallFrame) {
-            ExecutableBase* executable = codeOrigin.inlineCallFrame->executable.get();
-            ASSERT(executable->structure()->classInfo() == &FunctionExecutable::s_info);
-            return static_cast<FunctionExecutable*>(executable)->baselineCodeBlockFor(codeOrigin.inlineCallFrame->isCall ? CodeForCall : CodeForConstruct);
-        }
-        ASSERT(codeBlock()->alternative() == codeBlock()->baselineVersion());
-        return codeBlock()->alternative();
-    }
-    
-    Vector<BytecodeAndMachineOffset>& decodedCodeMapFor(CodeBlock*);
-
-    // The globalData, used to access constants such as the vPtrs.
-    JSGlobalData* m_globalData;
-
     // The dataflow graph currently being generated.
     Graph& m_graph;
 
-    // The codeBlock currently being generated, used to access information such as constant values, immediates.
-    CodeBlock* m_codeBlock;
-    
-    HashMap<CodeBlock*, Vector<BytecodeAndMachineOffset> > m_decodedCodeMaps;
-    
     // Vector of calls out from JIT code, including exception handler information.
     // Count of the number of CallRecords with exception handlers.
     Vector<CallLinkRecord> m_calls;
     Vector<CallExceptionRecord> m_exceptionChecks;
-    
-    // JIT code map for OSR entrypoints.
-    Label m_startOfCode;
-
-    struct PropertyAccessRecord {
-#if USE(JSVALUE64)
-        PropertyAccessRecord(Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR)
-#elif USE(JSVALUE32_64)
-        PropertyAccessRecord(Call functionCall, int16_t deltaCheckImmToCall, int16_t deltaCallToStructCheck, int16_t deltaCallToTagLoadOrStore, int16_t deltaCallToPayloadLoadOrStore, int16_t deltaCallToSlowCase, int16_t deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR)
-#endif
-            : m_functionCall(functionCall)
-            , m_deltaCheckImmToCall(deltaCheckImmToCall)
-            , m_deltaCallToStructCheck(deltaCallToStructCheck)
-#if USE(JSVALUE64)
-            , m_deltaCallToLoadOrStore(deltaCallToLoadOrStore)
-#elif USE(JSVALUE32_64)
-            , m_deltaCallToTagLoadOrStore(deltaCallToTagLoadOrStore)
-            , m_deltaCallToPayloadLoadOrStore(deltaCallToPayloadLoadOrStore)
-#endif
-            , m_deltaCallToSlowCase(deltaCallToSlowCase)
-            , m_deltaCallToDone(deltaCallToDone)
-            , m_baseGPR(baseGPR)
-#if USE(JSVALUE32_64)
-            , m_valueTagGPR(valueTagGPR)
-#endif
-            , m_valueGPR(valueGPR)
-            , m_scratchGPR(scratchGPR)
-        {
-        }
-
-        JITCompiler::Call m_functionCall;
-        int16_t m_deltaCheckImmToCall;
-        int16_t m_deltaCallToStructCheck;
-#if USE(JSVALUE64)
-        int16_t m_deltaCallToLoadOrStore;
-#elif USE(JSVALUE32_64)
-        int16_t m_deltaCallToTagLoadOrStore;
-        int16_t m_deltaCallToPayloadLoadOrStore;
-#endif
-        int16_t m_deltaCallToSlowCase;
-        int16_t m_deltaCallToDone;
-        int8_t m_baseGPR;
-#if USE(JSVALUE32_64)
-        int8_t m_valueTagGPR;
-#endif
-        int8_t m_valueGPR;
-        int8_t m_scratchGPR;
-    };
     
     struct MethodGetRecord {
         MethodGetRecord(Call slowCall, DataLabelPtr structToCompare, DataLabelPtr protoObj, DataLabelPtr protoStructToCompare, DataLabelPtr putFunction)
@@ -528,11 +324,11 @@ private:
     };
     
     struct JSCallRecord {
-        JSCallRecord(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, bool isCall, CodeOrigin codeOrigin)
+        JSCallRecord(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, CallLinkInfo::CallType callType, CodeOrigin codeOrigin)
             : m_fastCall(fastCall)
             , m_slowCall(slowCall)
             , m_targetToCheck(targetToCheck)
-            , m_isCall(isCall)
+            , m_callType(callType)
             , m_codeOrigin(codeOrigin)
         {
         }
@@ -540,10 +336,10 @@ private:
         Call m_fastCall;
         Call m_slowCall;
         DataLabelPtr m_targetToCheck;
-        bool m_isCall;
+        CallLinkInfo::CallType m_callType;
         CodeOrigin m_codeOrigin;
     };
-
+    
     Vector<PropertyAccessRecord, 4> m_propertyAccesses;
     Vector<MethodGetRecord, 4> m_methodGets;
     Vector<JSCallRecord, 4> m_jsCalls;

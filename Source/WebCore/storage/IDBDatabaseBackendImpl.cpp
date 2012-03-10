@@ -55,6 +55,22 @@ private:
     RefPtr<IDBCallbacks> m_callbacks;
 };
 
+class IDBDatabaseBackendImpl::PendingDeleteCall : public RefCounted<PendingDeleteCall> {
+public:
+    static PassRefPtr<PendingDeleteCall> create(PassRefPtr<IDBCallbacks> callbacks)
+    {
+        return adoptRef(new PendingDeleteCall(callbacks));
+    }
+    PassRefPtr<IDBCallbacks> callbacks() { return m_callbacks; }
+
+private:
+    PendingDeleteCall(PassRefPtr<IDBCallbacks> callbacks)
+        : m_callbacks(callbacks)
+    {
+    }
+    RefPtr<IDBCallbacks> m_callbacks;
+};
+
 class IDBDatabaseBackendImpl::PendingSetVersionCall : public RefCounted<PendingSetVersionCall> {
 public:
     static PassRefPtr<PendingSetVersionCall> create(const String& version, PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBDatabaseCallbacks> databaseCallbacks)
@@ -87,12 +103,19 @@ IDBDatabaseBackendImpl::IDBDatabaseBackendImpl(const String& name, IDBBackingSto
     , m_transactionCoordinator(coordinator)
 {
     ASSERT(!m_name.isNull());
+    openInternal();
+}
 
-    bool success = m_backingStore->extractIDBDatabaseMetaData(m_name, m_version, m_id);
-    ASSERT_UNUSED(success, success == (m_id != InvalidId));
-    if (!m_backingStore->setIDBDatabaseMetaData(m_name, m_version, m_id, m_id == InvalidId))
+void IDBDatabaseBackendImpl::openInternal()
+{
+    bool success = m_backingStore->getIDBDatabaseMetaData(m_name, m_version, m_id);
+    ASSERT(success == (m_id != InvalidId));
+    if (success) {
+        loadObjectStores();
+        return;
+    }
+    if (!m_backingStore->createIDBDatabaseMetaData(m_name, m_version, m_id))
         ASSERT_NOT_REACHED(); // FIXME: Need better error handling.
-    loadObjectStores();
 }
 
 IDBDatabaseBackendImpl::~IDBDatabaseBackendImpl()
@@ -192,7 +215,7 @@ void IDBDatabaseBackendImpl::setVersion(const String& version, PassRefPtr<IDBCal
     }
     // FIXME: Only fire onBlocked if there are open connections after the
     // VersionChangeEvents are received, not just set up to fire.
-    // http://crbug.com/100123
+    // https://bugs.webkit.org/show_bug.cgi?id=71130
     if (m_databaseCallbacksSet.size() > 1) {
         callbacks->onBlocked();
         RefPtr<PendingSetVersionCall> pendingSetVersionCall = PendingSetVersionCall::create(version, callbacks, databaseCallbacks);
@@ -218,7 +241,7 @@ void IDBDatabaseBackendImpl::setVersionInternal(ScriptExecutionContext*, PassRef
 {
     int64_t databaseId = database->id();
     database->m_version = version;
-    if (!database->m_backingStore->setIDBDatabaseMetaData(database->m_name, database->m_version, databaseId, databaseId == InvalidId)) {
+    if (!database->m_backingStore->updateIDBDatabaseMetaData(databaseId, database->m_version)) {
         // FIXME: The Indexed Database specification does not have an error code dedicated to I/O errors.
         callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Error writing data to stable storage."));
         transaction->abort();
@@ -258,7 +281,21 @@ void IDBDatabaseBackendImpl::processPendingCalls()
         ASSERT(!ec);
     }
 
-    while (!m_runningVersionChangeTransaction && m_pendingSetVersionCalls.isEmpty() && !m_pendingOpenCalls.isEmpty()) {
+    if (m_runningVersionChangeTransaction || !m_pendingSetVersionCalls.isEmpty())
+        return;
+
+    // Pending calls may be requeued.
+    Deque<RefPtr<PendingDeleteCall> > pendingDeleteCalls;
+    m_pendingDeleteCalls.swap(pendingDeleteCalls);
+    while (!pendingDeleteCalls.isEmpty()) {
+        RefPtr<PendingDeleteCall> pendingDeleteCall = pendingDeleteCalls.takeFirst();
+        deleteDatabase(pendingDeleteCall->callbacks());
+    }
+
+    if (m_runningVersionChangeTransaction || !m_pendingSetVersionCalls.isEmpty() || !m_pendingDeleteCalls.isEmpty())
+        return;
+
+    while (!m_pendingOpenCalls.isEmpty()) {
         RefPtr<PendingOpenCall> pendingOpenCall = m_pendingOpenCalls.takeFirst();
         openConnection(pendingOpenCall->callbacks());
     }
@@ -284,10 +321,43 @@ void IDBDatabaseBackendImpl::open(PassRefPtr<IDBDatabaseCallbacks> callbacks)
 
 void IDBDatabaseBackendImpl::openConnection(PassRefPtr<IDBCallbacks> callbacks)
 {
-    if (m_runningVersionChangeTransaction || !m_pendingSetVersionCalls.isEmpty())
+    if (!m_pendingDeleteCalls.isEmpty() || m_runningVersionChangeTransaction || !m_pendingSetVersionCalls.isEmpty())
         m_pendingOpenCalls.append(PendingOpenCall::create(callbacks));
-    else
+    else {
+        if (m_id == InvalidId)
+            openInternal();
         callbacks->onSuccess(this);
+    }
+}
+
+void IDBDatabaseBackendImpl::deleteDatabase(PassRefPtr<IDBCallbacks> prpCallbacks)
+{
+    if (m_runningVersionChangeTransaction || !m_pendingSetVersionCalls.isEmpty()) {
+        m_pendingDeleteCalls.append(PendingDeleteCall::create(prpCallbacks));
+        return;
+    }
+    RefPtr<IDBCallbacks> callbacks = prpCallbacks;
+    // FIXME: Only fire onVersionChange if there the connection isn't in
+    // the process of closing.
+    // https://bugs.webkit.org/show_bug.cgi?id=71129
+    for (DatabaseCallbacksSet::const_iterator it = m_databaseCallbacksSet.begin(); it != m_databaseCallbacksSet.end(); ++it)
+        (*it)->onVersionChange("");
+    // FIXME: Only fire onBlocked if there are open connections after the
+    // VersionChangeEvents are received, not just set up to fire.
+    // https://bugs.webkit.org/show_bug.cgi?id=71130
+    if (!m_databaseCallbacksSet.isEmpty()) {
+        m_pendingDeleteCalls.append(PendingDeleteCall::create(callbacks));
+        callbacks->onBlocked();
+        return;
+    }
+    if (!m_backingStore->deleteDatabase(m_name)) {
+        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Internal error."));
+        return;
+    }
+    m_version = "";
+    m_id = InvalidId;
+    m_objectStores.clear();
+    callbacks->onSuccess(SerializedScriptValue::nullValue());
 }
 
 void IDBDatabaseBackendImpl::close(PassRefPtr<IDBDatabaseCallbacks> prpCallbacks)

@@ -25,6 +25,7 @@
 
 #include "CallFrame.h"
 #include "ConstructData.h"
+#include "JSCell.h"
 
 namespace JSC {
 
@@ -58,7 +59,59 @@ namespace JSC {
 
         typedef bool (*GetOwnPropertySlotByIndexFunctionPtr)(JSCell*, ExecState*, unsigned, PropertySlot&);
         GetOwnPropertySlotByIndexFunctionPtr getOwnPropertySlotByIndex;
+
+        typedef JSObject* (*ToThisObjectFunctionPtr)(JSCell*, ExecState*);
+        ToThisObjectFunctionPtr toThisObject;
+
+        typedef void (*DefineGetterFunctionPtr)(JSObject*, ExecState*, const Identifier&, JSObject*, unsigned);
+        DefineGetterFunctionPtr defineGetter;
+
+        typedef void (*DefineSetterFunctionPtr)(JSObject*, ExecState*, const Identifier&, JSObject*, unsigned);
+        DefineSetterFunctionPtr defineSetter;
+
+        typedef JSValue (*DefaultValueFunctionPtr)(const JSObject*, ExecState*, PreferredPrimitiveType);
+        DefaultValueFunctionPtr defaultValue;
+
+        typedef void (*GetOwnPropertyNamesFunctionPtr)(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        GetOwnPropertyNamesFunctionPtr getOwnPropertyNames;
+
+        typedef void (*GetPropertyNamesFunctionPtr)(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        GetPropertyNamesFunctionPtr getPropertyNames;
+
+        typedef UString (*ClassNameFunctionPtr)(const JSObject*);
+        ClassNameFunctionPtr className;
+
+        typedef bool (*HasInstanceFunctionPtr)(JSObject*, ExecState*, JSValue, JSValue);
+        HasInstanceFunctionPtr hasInstance;
+
+        typedef void (*PutWithAttributesFunctionPtr)(JSObject*, ExecState*, const Identifier& propertyName, JSValue, unsigned attributes);
+        PutWithAttributesFunctionPtr putWithAttributes;
+
+        typedef bool (*DefineOwnPropertyFunctionPtr)(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&, bool);
+        DefineOwnPropertyFunctionPtr defineOwnProperty;
+
+        typedef bool (*GetOwnPropertyDescriptorFunctionPtr)(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
+        GetOwnPropertyDescriptorFunctionPtr getOwnPropertyDescriptor;
     };
+
+#define CREATE_MEMBER_CHECKER(member) \
+template <typename T> \
+struct MemberCheck##member { \
+    struct Fallback { \
+        void member(...); \
+    }; \
+    struct Derived : T, Fallback { }; \
+    template <typename U, U> struct Check; \
+    typedef char Yes[2]; \
+    typedef char No[1]; \
+    template <typename U> \
+    static No &func(Check<void (Fallback::*)(...), &U::member>*); \
+    template <typename U> \
+    static Yes &func(...); \
+    enum { has = sizeof(func<Derived>(0)) == sizeof(Yes) }; \
+}
+
+#define HAS_MEMBER_NAMED(klass, name) (MemberCheck##name<klass>::has)
 
 #define CREATE_METHOD_TABLE(ClassName) { \
         &ClassName::visitChildren, \
@@ -70,6 +123,17 @@ namespace JSC {
         &ClassName::deletePropertyByIndex, \
         &ClassName::getOwnPropertySlot, \
         &ClassName::getOwnPropertySlotByIndex, \
+        &ClassName::toThisObject, \
+        &ClassName::defineGetter, \
+        &ClassName::defineSetter, \
+        &ClassName::defaultValue, \
+        &ClassName::getOwnPropertyNames, \
+        &ClassName::getPropertyNames, \
+        &ClassName::className, \
+        &ClassName::hasInstance, \
+        &ClassName::putWithAttributes, \
+        &ClassName::defineOwnProperty, \
+        &ClassName::getOwnPropertyDescriptor, \
     }, \
     sizeof(ClassName)
 

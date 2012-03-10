@@ -104,19 +104,14 @@ void MathObject::finishCreation(ExecState* exec, JSGlobalObject* globalObject)
     putDirectWithoutTransition(exec->globalData(), Identifier(exec, "SQRT2"), jsNumber(sqrt(2.0)), DontDelete | DontEnum | ReadOnly);
 }
 
-bool MathObject::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
-{
-    return getOwnPropertySlot(this, exec, propertyName, slot);
-}
-
 bool MathObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::mathTable(exec), static_cast<MathObject*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<JSObject>(exec, ExecState::mathTable(exec), jsCast<MathObject*>(cell), propertyName, slot);
 }
 
-bool MathObject::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool MathObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    return getStaticFunctionDescriptor<JSObject>(exec, ExecState::mathTable(exec), this, propertyName, descriptor);
+    return getStaticFunctionDescriptor<JSObject>(exec, ExecState::mathTable(exec), jsCast<MathObject*>(object), propertyName, descriptor);
 }
 
 // ------------------------------ Functions --------------------------------

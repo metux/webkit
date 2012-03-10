@@ -28,7 +28,6 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
-#include "Document.h"
 #include "EventException.h"
 #include "EventQueue.h"
 #include "IDBDatabase.h"
@@ -42,7 +41,7 @@
 namespace WebCore {
 
 PassRefPtr<IDBTransaction> IDBTransaction::create(ScriptExecutionContext* context, PassRefPtr<IDBTransactionBackendInterface> backend, IDBDatabase* db)
-{ 
+{
     return adoptRef(new IDBTransaction(context, backend, db));
 }
 
@@ -122,11 +121,17 @@ void IDBTransaction::onAbort()
         request->abort();
     }
 
+    if (m_mode == IDBTransaction::VERSION_CHANGE)
+        m_database->clearVersionChangeTransaction(this);
+
     enqueueEvent(Event::create(eventNames().abortEvent, true, false));
 }
 
 void IDBTransaction::onComplete()
 {
+    if (m_mode == IDBTransaction::VERSION_CHANGE)
+        m_database->clearVersionChangeTransaction(this);
+
     enqueueEvent(Event::create(eventNames().completeEvent, false, false));
 }
 
@@ -191,8 +196,7 @@ void IDBTransaction::enqueueEvent(PassRefPtr<Event> event)
     if (!scriptExecutionContext())
         return;
 
-    ASSERT(scriptExecutionContext()->isDocument());
-    EventQueue* eventQueue = static_cast<Document*>(scriptExecutionContext())->eventQueue();
+    EventQueue* eventQueue = scriptExecutionContext()->eventQueue();
     event->setTarget(this);
     eventQueue->enqueueEvent(event);
 }

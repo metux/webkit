@@ -1095,24 +1095,6 @@ public:
     
     void movb_rm(RegisterID src, int offset, RegisterID base, RegisterID index, int scale)
     {
-#if CPU(X86)
-        // On 32-bit x86 we can only set the first 4 registers;
-        // esp..edi are mapped to the 'h' registers!
-        if (src >= 4) {
-            RegisterID originalSrc = src;
-            xchgl_rr(src, X86Registers::eax);
-            if (base == X86Registers::eax)
-                base = src;
-            else if (index == X86Registers::eax)
-                index = src;
-            src = X86Registers::eax;
-            
-            m_formatter.oneByteOp8(OP_MOV_EbGb, src, base, index, scale, offset);
-
-            xchgl_rr(originalSrc, X86Registers::eax);
-            return;
-        }
-#endif
         m_formatter.oneByteOp8(OP_MOV_EbGb, src, base, index, scale, offset);
     }
 
@@ -1231,6 +1213,11 @@ public:
         m_formatter.twoByteOp(OP2_MOVZX_GvEw, dst, base, index, scale, offset);
     }
 
+    void movzbl_mr(int offset, RegisterID base, RegisterID dst)
+    {
+        m_formatter.twoByteOp(OP2_MOVZX_GvEb, dst, base, offset);
+    }
+    
     void movzbl_mr(int offset, RegisterID base, RegisterID index, int scale, RegisterID dst)
     {
         m_formatter.twoByteOp(OP2_MOVZX_GvEb, dst, base, index, scale, offset);
@@ -1293,6 +1280,13 @@ public:
     {
         m_formatter.oneByteOp(OP_GROUP5_Ev, GROUP5_OP_JMPN, base, offset);
     }
+    
+#if !CPU(X86_64)
+    void jmp_m(const void* address)
+    {
+        m_formatter.oneByteOp(OP_GROUP5_Ev, GROUP5_OP_JMPN, address);
+    }
+#endif
 
     AssemblerLabel jne()
     {
@@ -1716,8 +1710,6 @@ public:
         return m_formatter.executableCopy(globalData);
     }
 
-    void rewindToLabel(AssemblerLabel rewindTo) { m_formatter.rewindToLabel(rewindTo); }
-
 #ifndef NDEBUG
     unsigned debugOffset() { return m_formatter.debugOffset(); }
 #endif
@@ -2067,8 +2059,6 @@ private:
         {
             return m_buffer.executableCopy(globalData);
         }
-
-        void rewindToLabel(AssemblerLabel rewindTo) { m_buffer.rewindToLabel(rewindTo); }
 
 #ifndef NDEBUG
         unsigned debugOffset() { return m_buffer.debugOffset(); }

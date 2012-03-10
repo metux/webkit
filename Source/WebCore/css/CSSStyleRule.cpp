@@ -23,6 +23,7 @@
 #include "CSSStyleRule.h"
 
 #include "CSSMutableStyleDeclaration.h"
+#include "CSSPageRule.h"
 #include "CSSParser.h"
 #include "CSSSelector.h"
 #include "CSSStyleSheet.h"
@@ -31,8 +32,8 @@
 
 namespace WebCore {
 
-CSSStyleRule::CSSStyleRule(CSSStyleSheet* parent, int sourceLine)
-    : CSSRule(parent)
+CSSStyleRule::CSSStyleRule(CSSStyleSheet* parent, int sourceLine, CSSRule::Type type)
+    : CSSRule(parent, type)
     , m_sourceLine(sourceLine)
 {
 }
@@ -45,6 +46,9 @@ CSSStyleRule::~CSSStyleRule()
 
 String CSSStyleRule::selectorText() const
 {
+    if (isPageRule())
+        return static_cast<const CSSPageRule*>(this)->pageSelectorText();
+
     String str;
     for (CSSSelector* s = selectorList().first(); s; s = CSSSelectorList::next(s)) {
         if (s != selectorList().first())
@@ -59,7 +63,7 @@ void CSSStyleRule::setSelectorText(const String& selectorText)
     Document* doc = 0;
 
     if (CSSStyleSheet* styleSheet = m_style->parentStyleSheet())
-        doc = styleSheet->document();
+        doc = styleSheet->findDocument();
 
     if (!doc)
         doc = m_style->node() ? m_style->node()->document() : 0;
@@ -90,17 +94,6 @@ String CSSStyleRule::cssText() const
     result += "}";
 
     return result;
-}
-
-bool CSSStyleRule::parseString(const String& /*string*/, bool /*strict*/)
-{
-    // FIXME
-    return false;
-}
-
-void CSSStyleRule::setDeclaration(PassRefPtr<CSSMutableStyleDeclaration> style)
-{
-    m_style = style;
 }
 
 void CSSStyleRule::addSubresourceStyleURLs(ListHashSet<KURL>& urls)

@@ -79,7 +79,6 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) = 0;
     virtual void scheduleCompositingLayerSync() = 0;
-    virtual void syncCompositingLayers() = 0;
 #if USE(TEXTURE_MAPPER)
     virtual void didReceiveLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) = 0;
 #endif
@@ -102,6 +101,11 @@ private:
     virtual void didUpdate() { }
     virtual void suspendPainting() { }
     virtual void resumePainting() { }
+
+#if PLATFORM(MAC)
+    // Used by TiledCoreAnimationDrawingArea.
+    virtual void updateGeometry(const WebCore::IntSize& viewSize) { }
+#endif
 
 #if USE(TILED_BACKING_STORE)
     virtual void setSize(const WebCore::IntSize& viewSize) { }

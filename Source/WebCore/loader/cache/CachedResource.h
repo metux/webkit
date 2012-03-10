@@ -44,11 +44,11 @@ class CachedMetadata;
 class CachedResourceClient;
 class CachedResourceHandleBase;
 class CachedResourceLoader;
-class CachedResourceRequest;
 class Frame;
 class InspectorResource;
 class PurgeableBuffer;
 class SecurityOrigin;
+class SubresourceLoader;
 
 // A resource that is held in the cache. Classes who want to use this object should derive
 // from CachedResourceClient, to get the function calls in case the requested data has arrived.
@@ -74,7 +74,10 @@ public:
         , LinkSubresource
 #endif
 #if ENABLE(VIDEO_TRACK)
-        , CueResource
+        , TextTrackResource
+#endif
+#if ENABLE(CSS_SHADERS)
+        , ShaderResource
 #endif
     };
 
@@ -187,7 +190,7 @@ public:
     // Returns cached metadata of the given type associated with this resource.
     CachedMetadata* cachedMetadata(unsigned dataTypeID) const;
 
-    bool canDelete() const { return !hasClients() && !m_request && !m_preloadCount && !m_handleCount && !m_resourceToRevalidate && !m_proxyResource; }
+    bool canDelete() const { return !hasClients() && !m_loader && !m_preloadCount && !m_handleCount && !m_resourceToRevalidate && !m_proxyResource; }
     bool hasOneHandle() const { return m_handleCount == 1; }
 
     bool isExpired() const;
@@ -253,7 +256,7 @@ protected:
 
     ResourceRequest m_resourceRequest;
     String m_accept;
-    OwnPtr<CachedResourceRequest> m_request;
+    RefPtr<SubresourceLoader> m_loader;
     ResourceLoaderOptions m_options;
     ResourceLoadPriority m_loadPriority;
 
@@ -290,7 +293,7 @@ private:
     bool m_inCache : 1;
     bool m_loading : 1;
 
-    unsigned m_type : 3; // Type
+    unsigned m_type : 4; // Type
     unsigned m_status : 3; // Status
 
 #ifndef NDEBUG

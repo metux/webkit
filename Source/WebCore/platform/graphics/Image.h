@@ -79,6 +79,8 @@ class ImageObserver;
 
 class Image : public RefCounted<Image> {
     friend class GeneratedImage;
+    friend class CrossfadeGeneratedImage;
+    friend class GeneratorGeneratedImage;
     friend class GraphicsContext;
 
 public:
@@ -129,6 +131,7 @@ public:
     
     // Typically the CachedImage that owns us.
     ImageObserver* imageObserver() const { return m_imageObserver; }
+    void setImageObserver(ImageObserver* observer) { m_imageObserver = observer; }
 
     enum TileRule { StretchTile, RoundTile, SpaceTile, RepeatTile };
 
@@ -155,6 +158,10 @@ public:
 #if PLATFORM(GTK)
     virtual GdkPixbuf* getGdkPixbuf() { return 0; }
     static PassRefPtr<Image> loadPlatformThemeIcon(const char* name, int size);
+#endif
+
+#if PLATFORM(QT)
+    static void setPlatformResource(const char* name, const QPixmap&);
 #endif
 
     virtual void drawPattern(GraphicsContext*, const FloatRect& srcRect, const AffineTransform& patternTransform,

@@ -173,18 +173,13 @@ CSSStyleSheet* InspectorCSSAgent::parentStyleSheet(CSSRule* rule)
     if (!rule)
         return 0;
 
-    StyleSheet* styleSheet = rule->stylesheet();
-    if (styleSheet && styleSheet->isCSSStyleSheet())
-        return static_cast<CSSStyleSheet*>(styleSheet);
-
-    return 0;
+    return rule->parentStyleSheet();
 }
 
 // static
 CSSStyleRule* InspectorCSSAgent::asCSSStyleRule(CSSRule* rule)
 {
-    // NOTE: CSSPageRule inherits from CSSStyleRule, so isStyleRule() is not enough.
-    if (rule->type() != CSSRule::STYLE_RULE)
+    if (!rule->isStyleRule())
         return 0;
     return static_cast<CSSStyleRule*>(rule);
 }
@@ -445,10 +440,10 @@ Element* InspectorCSSAgent::inlineStyleElement(CSSStyleDeclaration* style)
 {
     if (!style || !style->isMutableStyleDeclaration())
         return 0;
-    Node* node = static_cast<CSSMutableStyleDeclaration*>(style)->node();
-    if (!node || !node->isStyledElement() || static_cast<StyledElement*>(node)->getInlineStyleDecl() != style)
+    CSSMutableStyleDeclaration* mutableStyle = static_cast<CSSMutableStyleDeclaration*>(style);
+    if (!mutableStyle->isInlineStyleDeclaration())
         return 0;
-    return static_cast<Element*>(node);
+    return static_cast<Element*>(mutableStyle->node());
 }
 
 InspectorStyleSheetForInlineStyle* InspectorCSSAgent::asInspectorStyleSheet(Element* element)
@@ -502,7 +497,8 @@ InspectorStyleSheet* InspectorCSSAgent::bindStyleSheet(CSSStyleSheet* styleSheet
     RefPtr<InspectorStyleSheet> inspectorStyleSheet = m_cssStyleSheetToInspectorStyleSheet.get(styleSheet);
     if (!inspectorStyleSheet) {
         String id = String::number(m_lastStyleSheetId++);
-        inspectorStyleSheet = InspectorStyleSheet::create(id, styleSheet, detectOrigin(styleSheet, styleSheet->document()), m_domAgent->documentURLString(styleSheet->document()));
+        Document* document = styleSheet->findDocument();
+        inspectorStyleSheet = InspectorStyleSheet::create(id, styleSheet, detectOrigin(styleSheet, document), InspectorDOMAgent::documentURLString(document));
         m_idToInspectorStyleSheet.set(id, inspectorStyleSheet);
         m_cssStyleSheetToInspectorStyleSheet.set(styleSheet, inspectorStyleSheet);
     }
@@ -543,7 +539,7 @@ InspectorStyleSheet* InspectorCSSAgent::viaInspectorStyleSheet(Document* documen
         return 0;
     CSSStyleSheet* cssStyleSheet = static_cast<CSSStyleSheet*>(styleSheet);
     String id = String::number(m_lastStyleSheetId++);
-    inspectorStyleSheet = InspectorStyleSheet::create(id, cssStyleSheet, "inspector", m_domAgent->documentURLString(document));
+    inspectorStyleSheet = InspectorStyleSheet::create(id, cssStyleSheet, "inspector", InspectorDOMAgent::documentURLString(document));
     m_idToInspectorStyleSheet.set(id, inspectorStyleSheet);
     m_cssStyleSheetToInspectorStyleSheet.set(cssStyleSheet, inspectorStyleSheet);
     m_documentToInspectorStyleSheet.set(document, inspectorStyleSheet);

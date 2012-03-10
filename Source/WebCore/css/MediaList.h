@@ -64,7 +64,7 @@ public:
         return adoptRef(new MediaList(0, media, allowDescriptionSyntax));
     }
 
-    virtual ~MediaList();
+    ~MediaList();
 
     unsigned length() const { return m_queries.size(); }
     String item(unsigned index) const;
@@ -85,6 +85,9 @@ public:
         m_parentStyleSheet = styleSheet;
     }
 
+    int lastLine() const { return m_lastLine; }
+    void setLastLine(int lastLine) { m_lastLine = lastLine; }
+
 private:
     MediaList(CSSStyleSheet* parentSheet, bool fallbackToDescription);
     MediaList(CSSStyleSheet* parentSheet, const String& media, bool fallbackToDescription);
@@ -96,6 +99,7 @@ private:
 
     CSSStyleSheet* m_parentStyleSheet;
     Vector<MediaQuery*> m_queries;
+    int m_lastLine;
 };
 
 } // namespace

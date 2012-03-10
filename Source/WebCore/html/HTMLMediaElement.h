@@ -31,6 +31,7 @@
 #include "HTMLElement.h"
 #include "ActiveDOMObject.h"
 #include "MediaCanStartListener.h"
+#include "MediaControllerInterface.h"
 #include "MediaPlayer.h"
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
@@ -38,7 +39,9 @@
 #endif
 
 #if ENABLE(VIDEO_TRACK)
+#include "PODIntervalTree.h"
 #include "TextTrack.h"
+#include "TextTrackCue.h"
 #endif
 
 namespace WebCore {
@@ -49,11 +52,13 @@ class MediaElementAudioSourceNode;
 #endif
 class Event;
 class HTMLSourceElement;
+class HTMLTrackElement;
+class MediaController;
 class MediaControls;
 class MediaError;
 class KURL;
+class TextTrackList;
 class TimeRanges;
-class Uint8Array;
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
 class Widget;
 #endif
@@ -62,7 +67,7 @@ class Widget;
 // But it can't be until the Chromium WebMediaPlayerClientImpl class is fixed so it
 // no longer depends on typecasting a MediaPlayerClient to an HTMLMediaElement.
 
-class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, private MediaCanStartListener, public ActiveDOMObject
+class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface
 #if ENABLE(VIDEO_TRACK)
     , private TextTrackClient
 #endif
@@ -88,7 +93,11 @@ public:
     PlatformLayer* platformLayer() const;
 #endif
 
-    void scheduleLoad();
+    enum LoadType {
+        MediaResource = 1 << 0,
+        TextTrackResource = 1 << 1
+    };
+    void scheduleLoad(LoadType);
     
     MediaPlayer::MovieLoadType movieLoadType() const;
     
@@ -104,7 +113,7 @@ public:
 
     enum NetworkState { NETWORK_EMPTY, NETWORK_IDLE, NETWORK_LOADING, NETWORK_NO_SOURCE };
     NetworkState networkState() const;
-    
+
     String preload() const;    
     void setPreload(const String&);
 
@@ -113,7 +122,6 @@ public:
     String canPlayType(const String& mimeType) const;
 
 // ready state
-    enum ReadyState { HAVE_NOTHING, HAVE_METADATA, HAVE_CURRENT_DATA, HAVE_FUTURE_DATA, HAVE_ENOUGH_DATA };
     ReadyState readyState() const;
     bool seeking() const;
 
@@ -128,6 +136,7 @@ public:
     void setDefaultPlaybackRate(float);
     float playbackRate() const;
     void setPlaybackRate(float);
+    void updatePlaybackRate();
     bool webkitPreservesPitch() const;
     void setWebkitPreservesPitch(bool);
     PassRefPtr<TimeRanges> played();
@@ -179,7 +188,25 @@ public:
     float percentLoaded() const;
 
 #if ENABLE(VIDEO_TRACK)
-    PassRefPtr<TextTrack> addTrack(const String& kind, const String& label = "", const String& language = "");
+    PassRefPtr<TextTrack> addTrack(const String& kind, const String& label, const String& language, ExceptionCode&);
+    PassRefPtr<TextTrack> addTrack(const String& kind, const String& label, ExceptionCode& ec) { return addTrack(kind, label, emptyString(), ec); }
+    PassRefPtr<TextTrack> addTrack(const String& kind, ExceptionCode& ec) { return addTrack(kind, emptyString(), emptyString(), ec); }
+
+    TextTrackList* textTracks();
+
+    void addTextTrack(PassRefPtr<TextTrack>);
+
+    virtual void trackWasAdded(HTMLTrackElement*);
+    virtual void trackWillBeRemoved(HTMLTrackElement*);
+
+    // TextTrackClient
+    virtual void textTrackReadyStateChanged(TextTrack*);
+    virtual void textTrackKindChanged(TextTrack*);
+    virtual void textTrackModeChanged(TextTrack*);
+    virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*);
+    virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*);
+    virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>);
+    virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
 #endif
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
@@ -225,6 +252,15 @@ public:
 
     AudioSourceProvider* audioSourceProvider();
 #endif
+
+    enum InvalidURLAction { DoNothing, Complain };
+    bool isSafeToLoadURL(const KURL&, InvalidURLAction);
+
+    const String& mediaGroup() const;
+    void setMediaGroup(const String&);
+
+    MediaController* controller() const;
+    void setController(PassRefPtr<MediaController>);
 
 protected:
     HTMLMediaElement(const QualifiedName&, Document*);
@@ -345,22 +381,12 @@ private:
     void waitForSourceChange();
     void prepareToPlay();
 
-    enum InvalidSourceAction { DoNothing, Complain };
-    bool isSafeToLoadURL(const KURL&, InvalidSourceAction);
-    KURL selectNextSourceChild(ContentType*, InvalidSourceAction);
+    KURL selectNextSourceChild(ContentType*, InvalidURLAction);
     void mediaLoadingFailed(MediaPlayer::NetworkState);
 
 #if ENABLE(VIDEO_TRACK)
-    void loadTextTracks();
-
-    // TextTrackClient
-    virtual void textTrackReadyStateChanged(TextTrack*);
-    virtual void textTrackModeChanged(TextTrack*);
-    virtual void textTrackCreated(TextTrack*);
-    virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*);
-    virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*);
-    virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>);
-    virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
+    void configureTextTracks();
+    void updateActiveTextTrackCues(float);
 #endif
 
     // These "internal" functions do not check user gesture restrictions.
@@ -389,6 +415,8 @@ private:
     // Pauses playback without changing any states or generating events
     void setPausedInternal(bool);
 
+    void setPlaybackRateInternal(float);
+
     virtual void mediaCanStart();
 
     void setShouldDelayLoadEvent(bool);
@@ -406,6 +434,13 @@ private:
     virtual String itemValueText() const;
     virtual void setItemValueText(const String&, ExceptionCode&);
 #endif
+
+    void updateMediaController();
+    bool isBlocked() const;
+    bool isBlockedOnMediaController() const;
+    bool hasCurrentSrc() const { return !m_currentSrc.isEmpty(); }
+    bool isLiveStream() const { return movieLoadType() == MediaPlayer::LiveStream; }
+    bool isAutoplaying() const { return m_autoplaying; }
 
     Timer<HTMLMediaElement> m_loadTimer;
     Timer<HTMLMediaElement> m_asyncEventTimer;
@@ -466,6 +501,9 @@ private:
     mutable float m_cachedTime;
     mutable double m_cachedTimeWallClockUpdateTime;
     mutable double m_minimumWallClockTimeToCacheMediaTime;
+    
+    typedef unsigned PendingLoadFlags;
+    PendingLoadFlags m_pendingLoadFlags;
 
     bool m_playing : 1;
     bool m_isWaitingUntilMediaCanStart : 1;
@@ -507,7 +545,40 @@ private:
     // The value is cleared in MediaElementAudioSourceNode::~MediaElementAudioSourceNode().
     MediaElementAudioSourceNode* m_audioSourceNode;
 #endif
+
+#if ENABLE(VIDEO_TRACK)
+    RefPtr<TextTrackList> m_textTracks;
+    
+    typedef PODIntervalTree <double, TextTrackCue*> CueIntervalTree;
+    CueIntervalTree m_cueTree;
+    Vector<CueIntervalTree::IntervalType> m_currentlyVisibleCues;
+#endif
+
+    String m_mediaGroup;
+    friend class MediaController;
+    RefPtr<MediaController> m_mediaController;
 };
+
+#if ENABLE(VIDEO_TRACK)
+#ifndef NDEBUG
+// Template specializations required by PodIntervalTree in debug mode.
+template <>
+struct ValueToString<double> {
+    static String string(const double value)
+    {
+        return String::number(value);
+    }
+};
+
+template <>
+struct ValueToString<TextTrackCue*> {
+    static String string(TextTrackCue* const& cue)
+    {
+        return String::format("%p id=%s interval=%f-->%f cue=%s)", cue, cue->id().utf8().data(), cue->startTime(), cue->endTime(), cue->getCueAsSource().utf8().data());
+    }
+};
+#endif
+#endif
 
 } //namespace
 

@@ -20,27 +20,29 @@
 #include "config.h"
 #include "StyleSheet.h"
 
+#include "CSSRule.h"
 #include "CSSStyleSheet.h"
+#include "Document.h"
 #include "MediaList.h"
 #include "Node.h"
 
 namespace WebCore {
 
 StyleSheet::StyleSheet(Node* parentNode, const String& originalURL, const KURL& finalURL)
-    : StyleBase(0)
+    : m_disabled(false)
+    , m_parentRule(0)
     , m_parentNode(parentNode)
     , m_originalURL(originalURL)
     , m_finalURL(finalURL)
-    , m_disabled(false)
 {
 }
 
-StyleSheet::StyleSheet(StyleBase* owner, const String& originalURL, const KURL& finalURL)
-    : StyleBase(owner)
+StyleSheet::StyleSheet(CSSRule* parentRule, const String& originalURL, const KURL& finalURL)
+    : m_disabled(false)
+    , m_parentRule(parentRule)
     , m_parentNode(0)
     , m_originalURL(originalURL)
     , m_finalURL(finalURL)
-    , m_disabled(false)
 {
 }
 
@@ -52,7 +54,8 @@ StyleSheet::~StyleSheet()
 
 StyleSheet* StyleSheet::parentStyleSheet() const
 {
-    return (parent() && parent()->isStyleSheet()) ? static_cast<StyleSheet*>(parent()) : 0;
+    ASSERT(isCSSStyleSheet());
+    return m_parentRule ? m_parentRule->parentStyleSheet() : 0;
 }
 
 void StyleSheet::setMedia(PassRefPtr<MediaList> media)
@@ -67,6 +70,17 @@ void StyleSheet::setMedia(PassRefPtr<MediaList> media)
     m_media->setParentStyleSheet(static_cast<CSSStyleSheet*>(this));
 }
 
+KURL StyleSheet::baseURL() const
+{
+    if (!m_finalURL.isNull())
+        return m_finalURL;
+    if (StyleSheet* parentSheet = parentStyleSheet())
+        return parentSheet->baseURL();
+    if (!m_parentNode)
+        return KURL();
+    return m_parentNode->document()->baseURL();
+}
+
 KURL StyleSheet::completeURL(const String& url) const
 {
     // Always return a null URL when passed a null string.
@@ -75,6 +89,13 @@ KURL StyleSheet::completeURL(const String& url) const
     if (url.isNull())
         return KURL();
     return KURL(baseURL(), url);
+}
+
+void StyleSheet::setDisabled(bool disabled)
+{
+     m_disabled = disabled;
+     if (isCSSStyleSheet())
+         static_cast<CSSStyleSheet*>(this)->styleSheetChanged();
 }
 
 }

@@ -32,20 +32,30 @@
 #include "WebKitSettings.h"
 
 #include "WebKitPrivate.h"
-#include <WebKit2/WKPreferences.h>
+#include "WebKitSettingsPrivate.h"
+#include <WebKit2/WKAPICast.h>
+#include <WebKit2/WKString.h>
 #include <WebKit2/WKRetainPtr.h>
-#include <WebKit2/WKType.h>
 #include <glib/gi18n-lib.h>
+#include <wtf/text/CString.h>
 
 struct _WebKitSettingsPrivate {
     WKRetainPtr<WKPreferencesRef> preferences;
+    CString defaultFontFamily;
+    CString monospaceFontFamily;
+    CString serifFontFamily;
+    CString sansSerifFontFamily;
+    CString cursiveFontFamily;
+    CString fantasyFontFamily;
+    CString pictographFontFamily;
+    CString defaultCharset;
 };
 
 /**
  * SECTION:WebKitSettings
  * @short_description: Control the behaviour of a #WebKitWebView
  *
- * #WebKitSettings can be applied to a #WebKitWebView to control text encoding, 
+ * #WebKitSettings can be applied to a #WebKitWebView to control text charset, 
  * color, font sizes, printing mode, script support, loading of images and various other things. 
  * After creation, a #WebKitSettings object contains default settings. 
  *
@@ -76,6 +86,22 @@ enum {
     PROP_ENABLE_JAVA,
     PROP_JAVASCRIPT_CAN_OPEN_WINDOWS_AUTOMATICALLY,
     PROP_ENABLE_HYPERLINK_AUDITING,
+    PROP_DEFAULT_FONT_FAMILY,
+    PROP_MONOSPACE_FONT_FAMILY,
+    PROP_SERIF_FONT_FAMILY,
+    PROP_SANS_SERIF_FONT_FAMILY,
+    PROP_CURSIVE_FONT_FAMILY,
+    PROP_FANTASY_FONT_FAMILY,
+    PROP_PICTOGRAPH_FONT_FAMILY,
+    PROP_DEFAULT_FONT_SIZE,
+    PROP_DEFAULT_MONOSPACE_FONT_SIZE,
+    PROP_MINIMUM_FONT_SIZE,
+    PROP_DEFAULT_CHARSET,
+    PROP_ENABLE_PRIVATE_BROWSING,
+    PROP_ENABLE_DEVELOPER_EXTRAS,
+    PROP_ENABLE_RESIZABLE_TEXT_AREAS,
+    PROP_ENABLE_TABS_TO_LINKS,
+    PROP_ENABLE_CARET_BROWSING,
 };
 
 static void webKitSettingsSetProperty(GObject* object, guint propId, const GValue* value, GParamSpec* paramSpec)
@@ -118,6 +144,54 @@ static void webKitSettingsSetProperty(GObject* object, guint propId, const GValu
         break;
     case PROP_ENABLE_HYPERLINK_AUDITING:
         webkit_settings_set_enable_hyperlink_auditing(settings, g_value_get_boolean(value));
+        break;
+    case PROP_DEFAULT_FONT_FAMILY:
+        webkit_settings_set_default_font_family(settings, g_value_get_string(value));
+        break;
+    case PROP_MONOSPACE_FONT_FAMILY:
+        webkit_settings_set_monospace_font_family(settings, g_value_get_string(value));
+        break;
+    case PROP_SERIF_FONT_FAMILY:
+        webkit_settings_set_serif_font_family(settings, g_value_get_string(value));
+        break;
+    case PROP_SANS_SERIF_FONT_FAMILY:
+        webkit_settings_set_sans_serif_font_family(settings, g_value_get_string(value));
+        break;
+    case PROP_CURSIVE_FONT_FAMILY:
+        webkit_settings_set_cursive_font_family(settings, g_value_get_string(value));
+        break;
+    case PROP_FANTASY_FONT_FAMILY:
+        webkit_settings_set_fantasy_font_family(settings, g_value_get_string(value));
+        break;
+    case PROP_PICTOGRAPH_FONT_FAMILY:
+        webkit_settings_set_pictograph_font_family(settings, g_value_get_string(value));
+        break;
+    case PROP_DEFAULT_FONT_SIZE:
+        webkit_settings_set_default_font_size(settings, g_value_get_uint(value));
+        break;
+    case PROP_DEFAULT_MONOSPACE_FONT_SIZE:
+        webkit_settings_set_default_monospace_font_size(settings, g_value_get_uint(value));
+        break;
+    case PROP_MINIMUM_FONT_SIZE:
+        webkit_settings_set_minimum_font_size(settings, g_value_get_uint(value));
+        break;
+    case PROP_DEFAULT_CHARSET:
+        webkit_settings_set_default_charset(settings, g_value_get_string(value));
+        break;
+    case PROP_ENABLE_PRIVATE_BROWSING:
+        webkit_settings_set_enable_private_browsing(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_DEVELOPER_EXTRAS:
+        webkit_settings_set_enable_developer_extras(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_RESIZABLE_TEXT_AREAS:
+        webkit_settings_set_enable_resizable_text_areas(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_TABS_TO_LINKS:
+        webkit_settings_set_enable_tabs_to_links(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_CARET_BROWSING:
+        webkit_settings_set_enable_caret_browsing(settings, g_value_get_boolean(value));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
@@ -165,6 +239,54 @@ static void webKitSettingsGetProperty(GObject* object, guint propId, GValue* val
         break;
     case PROP_ENABLE_HYPERLINK_AUDITING:
         g_value_set_boolean(value, webkit_settings_get_enable_hyperlink_auditing(settings));
+        break;
+    case PROP_DEFAULT_FONT_FAMILY:
+        g_value_set_string(value, webkit_settings_get_default_font_family(settings));
+        break;
+    case PROP_MONOSPACE_FONT_FAMILY:
+        g_value_set_string(value, webkit_settings_get_monospace_font_family(settings));
+        break;
+    case PROP_SERIF_FONT_FAMILY:
+        g_value_set_string(value, webkit_settings_get_serif_font_family(settings));
+        break;
+    case PROP_SANS_SERIF_FONT_FAMILY:
+        g_value_set_string(value, webkit_settings_get_sans_serif_font_family(settings));
+        break;
+    case PROP_CURSIVE_FONT_FAMILY:
+        g_value_set_string(value, webkit_settings_get_cursive_font_family(settings));
+        break;
+    case PROP_FANTASY_FONT_FAMILY:
+        g_value_set_string(value, webkit_settings_get_fantasy_font_family(settings));
+        break;
+    case PROP_PICTOGRAPH_FONT_FAMILY:
+        g_value_set_string(value, webkit_settings_get_pictograph_font_family(settings));
+        break;
+    case PROP_DEFAULT_FONT_SIZE:
+        g_value_set_uint(value, webkit_settings_get_default_font_size(settings));
+        break;
+    case PROP_DEFAULT_MONOSPACE_FONT_SIZE:
+        g_value_set_uint(value, webkit_settings_get_default_monospace_font_size(settings));
+        break;
+    case PROP_MINIMUM_FONT_SIZE:
+        g_value_set_uint(value, webkit_settings_get_minimum_font_size(settings));
+        break;
+    case PROP_DEFAULT_CHARSET:
+        g_value_set_string(value, webkit_settings_get_default_charset(settings));
+        break;
+    case PROP_ENABLE_PRIVATE_BROWSING:
+        g_value_set_boolean(value, webkit_settings_get_enable_private_browsing(settings));
+        break;
+    case PROP_ENABLE_DEVELOPER_EXTRAS:
+        g_value_set_boolean(value, webkit_settings_get_enable_developer_extras(settings));
+        break;
+    case PROP_ENABLE_RESIZABLE_TEXT_AREAS:
+        g_value_set_boolean(value, webkit_settings_get_enable_resizable_text_areas(settings));
+        break;
+    case PROP_ENABLE_TABS_TO_LINKS:
+        g_value_set_boolean(value, webkit_settings_get_enable_tabs_to_links(settings));
+        break;
+    case PROP_ENABLE_CARET_BROWSING:
+        g_value_set_boolean(value, webkit_settings_get_enable_caret_browsing(settings));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
@@ -368,6 +490,223 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
                                                          FALSE,
                                                          readWriteConstructParamFlags));
 
+    /**
+    * WebKitWebSettings:default-font-family
+    *
+    * The font family to use as the default for content that does not specify a font.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_DEFAULT_FONT_FAMILY,
+                                    g_param_spec_string("default-font-family",
+                                                        _("Default font family"),
+                                                        _("The font family to use as the default for content that does not specify a font."),
+                                                        "sans-serif",
+                                                        readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:monospace-font-family
+    *
+    * The font family used as the default for content using a monospace font.
+    *
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_MONOSPACE_FONT_FAMILY,
+                                    g_param_spec_string("monospace-font-family",
+                                                        _("Monospace font family"),
+                                                        _("The font family used as the default for content using monospace font."),
+                                                        "monospace",
+                                                        readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:serif-font-family
+    *
+    * The font family used as the default for content using a serif font.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_SERIF_FONT_FAMILY,
+                                    g_param_spec_string("serif-font-family",
+                                                        _("Serif font family"),
+                                                        _("The font family used as the default for content using serif font."),
+                                                        "serif",
+                                                        readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:sans-serif-font-family
+    *
+    * The font family used as the default for content using a sans-serif font.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_SANS_SERIF_FONT_FAMILY,
+                                    g_param_spec_string("sans-serif-font-family",
+                                                        _("Sans-serif font family"),
+                                                        _("The font family used as the default for content using sans-serif font."),
+                                                        "sans-serif",
+                                                        readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:cursive-font-family
+    *
+    * The font family used as the default for content using a cursive font.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_CURSIVE_FONT_FAMILY,
+                                    g_param_spec_string("cursive-font-family",
+                                                        _("Cursive font family"),
+                                                        _("The font family used as the default for content using cursive font."),
+                                                        "serif",
+                                                        readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:fantasy-font-family
+    *
+    * The font family used as the default for content using a fantasy font.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_FANTASY_FONT_FAMILY,
+                                    g_param_spec_string("fantasy-font-family",
+                                                        _("Fantasy font family"),
+                                                        _("The font family used as the default for content using fantasy font."),
+                                                        "serif",
+                                                        readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:pictograph-font-family
+    *
+    * The font family used as the default for content using a pictograph font.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_PICTOGRAPH_FONT_FAMILY,
+                                    g_param_spec_string("pictograph-font-family",
+                                                        _("Pictograph font family"),
+                                                        _("The font family used as the default for content using pictograph font."),
+                                                        "serif",
+                                                        readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:default-font-size
+    *
+    * The default font size in pixels to use for content displayed if
+    * no font size is specified.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_DEFAULT_FONT_SIZE,
+                                    g_param_spec_uint("default-font-size",
+                                                      _("Default font size"),
+                                                      _("The default font size used to display text."),
+                                                      0, G_MAXUINT, 12,
+                                                      readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:default-monospace-font-size
+    *
+    * The default font size in pixels to use for content displayed in
+    * monospace font if no font size is specified.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_DEFAULT_MONOSPACE_FONT_SIZE,
+                                    g_param_spec_uint("default-monospace-font-size",
+                                                      _("Default monospace font size"),
+                                                      _("The default font size used to display monospace text."),
+                                                      0, G_MAXUINT, 10,
+                                                      readWriteConstructParamFlags));
+
+    /**
+    * WebKitWebSettings:minimum-font-size
+    *
+    * The minimum font size in points used to display text. This setting 
+    * controls the absolute smallest size. Values other than 0 can 
+    * potentially break page layouts.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_MINIMUM_FONT_SIZE,
+                                    g_param_spec_uint("minimum-font-size",
+                                                      _("Minimum font size"),
+                                                      _("The minimum font size used to display text."),
+                                                      0, G_MAXUINT, 0,
+                                                      readWriteConstructParamFlags));
+
+    /**
+    * WebKitSettings:default-charset
+    *
+    * The default text charset used when interpreting content with an unspecified charset.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_DEFAULT_CHARSET,
+                                    g_param_spec_string("default-charset",
+                                                        _("Default charset"),
+                                                        _("The default text charset used when interpreting content with unspecified charset."),
+                                                        "iso-8859-1",
+                                                        readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-private-browsing:
+     *
+     * Determines whether or not private browsing is enabled. Private browsing
+     * will disable history, cache and form auto-fill for any pages visited.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_PRIVATE_BROWSING,
+                                    g_param_spec_boolean("enable-private-browsing",
+                                                         _("Enable private browsing"),
+                                                         _("Whether to enable private browsing"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-developer-extras:
+     *
+     * Determines whether or not developer tools, such as the Web Inspector, are enabled.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_DEVELOPER_EXTRAS,
+                                    g_param_spec_boolean("enable-developer-extras",
+                                                         _("Enable developer extras"),
+                                                         _("Whether to enable developer extras"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-resizable-text-areas:
+     *
+     * Determines whether or not text areas can be resized.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_RESIZABLE_TEXT_AREAS,
+                                    g_param_spec_boolean("enable-resizable-text-areas",
+                                                         _("Enable resizable text areas"),
+                                                         _("Whether to enable resizable text areas"),
+                                                         TRUE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-tabs-to-links:
+     *
+     * Determines whether the tab key cycles through the elements on the page. 
+     * When this setting is enabled, users will be able to focus the next element 
+     * in the page by pressing the tab key. If the selected element is editable,
+     * then pressing tab key will insert the tab character.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_TABS_TO_LINKS,
+                                    g_param_spec_boolean("enable-tabs-to-links",
+                                                         _("Enable tabs to links"),
+                                                         _("Whether to enable tabs to links"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-caret-browsing:
+     *
+     * Whether to enable accessibility enhanced keyboard navigation.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_CARET_BROWSING,
+                                    g_param_spec_boolean("enable-caret-browsing",
+                                                         _("Enable Caret Browsing"),
+                                                         _("Whether to enable accessibility enhanced keyboard navigation"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
     g_type_class_add_private(klass, sizeof(WebKitSettingsPrivate));
 }
 
@@ -378,19 +717,69 @@ static void webkit_settings_init(WebKitSettings* settings)
     new (priv) WebKitSettingsPrivate();
 
     priv->preferences = adoptWK(WKPreferencesCreate());
+
+    WKRetainPtr<WKStringRef> defaultFontFamilyRef = WKPreferencesCopyStandardFontFamily(priv->preferences.get());
+    priv->defaultFontFamily =  WebKit::toImpl(defaultFontFamilyRef.get())->string().utf8();
+
+    WKRetainPtr<WKStringRef> monospaceFontFamilyRef = WKPreferencesCopyFixedFontFamily(priv->preferences.get());
+    priv->monospaceFontFamily = WebKit::toImpl(monospaceFontFamilyRef.get())->string().utf8();
+
+    WKRetainPtr<WKStringRef> serifFontFamilyRef = WKPreferencesCopySerifFontFamily(priv->preferences.get());
+    priv->serifFontFamily = WebKit::toImpl(serifFontFamilyRef.get())->string().utf8();
+
+    WKRetainPtr<WKStringRef> sansSerifFontFamilyRef = WKPreferencesCopySansSerifFontFamily(priv->preferences.get());
+    priv->sansSerifFontFamily = WebKit::toImpl(sansSerifFontFamilyRef.get())->string().utf8();
+
+    WKRetainPtr<WKStringRef> cursiveFontFamilyRef = WKPreferencesCopyCursiveFontFamily(priv->preferences.get());
+    priv->cursiveFontFamily = WebKit::toImpl(cursiveFontFamilyRef.get())->string().utf8();
+
+    WKRetainPtr<WKStringRef> fantasyFontFamilyRef = WKPreferencesCopyFantasyFontFamily(priv->preferences.get());
+    priv->fantasyFontFamily = WebKit::toImpl(fantasyFontFamilyRef.get())->string().utf8();
+
+    WKRetainPtr<WKStringRef> pictographFontFamilyRef = WKPreferencesCopyPictographFontFamily(priv->preferences.get());
+    priv->pictographFontFamily = WebKit::toImpl(pictographFontFamilyRef.get())->string().utf8();
+
+    WKRetainPtr<WKStringRef> defaultCharsetRef = WKPreferencesCopyDefaultTextEncodingName(priv->preferences.get());
+    priv->defaultCharset = WebKit::toImpl(defaultCharsetRef.get())->string().utf8();
+}
+
+void webkitSettingsAttachSettingsToPage(WebKitSettings* settings, WKPageRef wkPage)
+{
+    WKPageGroupSetPreferences(WKPageGetPageGroup(wkPage), settings->priv->preferences.get());
 }
 
 /**
  * webkit_settings_new:
  *
  * Creates a new #WebKitSettings instance with default values. It must
- * be manually attached to a WebView.
+ * be manually attached to a #WebKitWebView.
+ * See also webkit_settings_new_with_settings().
  *
  * Returns: a new #WebKitSettings instance.
  */
 WebKitSettings* webkit_settings_new()
 {
     return WEBKIT_SETTINGS(g_object_new(WEBKIT_TYPE_SETTINGS, NULL));
+}
+
+/**
+ * webkit_settings_new_with_settings:
+ * @first_setting_name: name of first setting to set
+ * @...: value of first setting, followed by more settings,
+ *    %NULL-terminated
+ *
+ * Creates a new #WebKitSettings instance with the given settings. It must
+ * be manually attached to a #WebKitWebView.
+ *
+ * Returns: a new #WebKitSettings instance.
+ */
+WebKitSettings* webkit_settings_new_with_settings(const gchar* firstSettingName, ...)
+{
+    va_list args;
+    va_start(args, firstSettingName);
+    WebKitSettings* settings = WEBKIT_SETTINGS(g_object_new_valist(WEBKIT_TYPE_SETTINGS, firstSettingName, args));
+    va_end(args);
+    return settings;
 }
 
 /**
@@ -812,4 +1201,591 @@ void webkit_settings_set_enable_hyperlink_auditing(WebKitSettings* settings, gbo
 
     WKPreferencesSetHyperlinkAuditingEnabled(priv->preferences.get(), enabled);
     g_object_notify(G_OBJECT(settings), "enable-hyperlink-auditing");
+}
+
+/**
+ * webkit_web_settings_get_default_font_family:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:default-font-family property.
+ *
+ * Returns: The default font family used to display content that does not specify a font.
+ */
+const gchar* webkit_settings_get_default_font_family(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->defaultFontFamily.data();
+}
+
+/**
+ * webkit_settings_set_default_font_family:
+ * @settings: a #WebKitSettings
+ * @default_font_family: the new default font family
+ *
+ * Set the #WebKitSettings:default-font-family property.
+ */
+void webkit_settings_set_default_font_family(WebKitSettings* settings, const gchar* defaultFontFamily)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(defaultFontFamily);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->defaultFontFamily.data(), defaultFontFamily))
+        return;
+
+    WKRetainPtr<WKStringRef> standardFontFamilyRef = adoptWK(WKStringCreateWithUTF8CString(defaultFontFamily));
+    WKPreferencesSetStandardFontFamily(priv->preferences.get(), standardFontFamilyRef.get());
+    priv->defaultFontFamily = WebKit::toImpl(standardFontFamilyRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "default-font-family");
+}
+
+/**
+ * webkit_settings_get_monospace_font_family:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:monospace-font-family property.
+ *
+ * Returns: Default font family used to display content marked with monospace font.
+ */
+const gchar* webkit_settings_get_monospace_font_family(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->monospaceFontFamily.data();
+}
+
+/**
+ * webkit_settings_set_monospace_font_family:
+ * @settings: a #WebKitSettings
+ * @monospace_font_family: the new default monospace font family
+ *
+ * Set the #WebKitSettings:monospace-font-family property.
+ */
+void webkit_settings_set_monospace_font_family(WebKitSettings* settings, const gchar* monospaceFontFamily)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(monospaceFontFamily);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->monospaceFontFamily.data(), monospaceFontFamily))
+        return;
+
+    WKRetainPtr<WKStringRef> fixedFontFamilyRef = adoptWK(WKStringCreateWithUTF8CString(monospaceFontFamily));
+    WKPreferencesSetFixedFontFamily(priv->preferences.get(), fixedFontFamilyRef.get());
+    priv->monospaceFontFamily = WebKit::toImpl(fixedFontFamilyRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "monospace-font-family");
+}
+
+/**
+ * webkit_settings_get_serif_font_family:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:serif-font-family property.
+ *
+ * Returns: The default font family used to display content marked with serif font.
+ */
+const gchar* webkit_settings_get_serif_font_family(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->serifFontFamily.data();
+}
+
+/**
+ * webkit_settings_set_serif_font_family:
+ * @settings: a #WebKitSettings
+ * @serif_font_family: the new default serif font family
+ *
+ * Set the #WebKitSettings:serif-font-family property.
+ */
+void webkit_settings_set_serif_font_family(WebKitSettings* settings, const gchar* serifFontFamily)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(serifFontFamily);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->serifFontFamily.data(), serifFontFamily))
+        return;
+
+    WKRetainPtr<WKStringRef> serifFontFamilyRef = WKStringCreateWithUTF8CString(serifFontFamily);
+    WKPreferencesSetSerifFontFamily(priv->preferences.get(), serifFontFamilyRef.get());
+    priv->serifFontFamily = WebKit::toImpl(serifFontFamilyRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "serif-font-family");
+}
+
+/**
+ * webkit_settings_get_sans_serif_font_family:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:sans-serif-font-family property.
+ *
+ * Returns: The default font family used to display content marked with sans-serif font.
+ */
+const gchar* webkit_settings_get_sans_serif_font_family(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->sansSerifFontFamily.data();
+}
+
+/**
+ * webkit_settings_set_sans_serif_font_family:
+ * @settings: a #WebKitSettings
+ * @sans_serif_font_family: the new default sans-serif font family
+ *
+ * Set the #WebKitSettings:sans-serif-font-family property.
+ */
+void webkit_settings_set_sans_serif_font_family(WebKitSettings* settings, const gchar* sansSerifFontFamily)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(sansSerifFontFamily);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->sansSerifFontFamily.data(), sansSerifFontFamily))
+        return;
+
+    WKRetainPtr<WKStringRef> sansSerifFontFamilyRef = adoptWK(WKStringCreateWithUTF8CString(sansSerifFontFamily));
+    WKPreferencesSetSansSerifFontFamily(priv->preferences.get(), sansSerifFontFamilyRef.get());
+    priv->sansSerifFontFamily = WebKit::toImpl(sansSerifFontFamilyRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "sans-serif-font-family");
+}
+
+/**
+ * webkit_settings_get_cursive_font_family:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:cursive-font-family property.
+ *
+ * Returns: The default font family used to display content marked with cursive font.
+ */
+const gchar* webkit_settings_get_cursive_font_family(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->cursiveFontFamily.data();
+}
+
+/**
+ * webkit_settings_set_cursive_font_family:
+ * @settings: a #WebKitSettings
+ * @cursive_font_family: the new default cursive font family
+ *
+ * Set the #WebKitSettings:cursive-font-family property.
+ */
+void webkit_settings_set_cursive_font_family(WebKitSettings* settings, const gchar* cursiveFontFamily)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(cursiveFontFamily);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->cursiveFontFamily.data(), cursiveFontFamily))
+        return;
+
+    WKRetainPtr<WKStringRef> cursiveFontFamilyRef = adoptWK(WKStringCreateWithUTF8CString(cursiveFontFamily));
+    WKPreferencesSetCursiveFontFamily(priv->preferences.get(), cursiveFontFamilyRef.get());
+    priv->cursiveFontFamily = WebKit::toImpl(cursiveFontFamilyRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "cursive-font-family");
+}
+
+/**
+ * webkit_settings_get_fantasy_font_family:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:fantasy-font-family property.
+ *
+ * Returns: The default font family used to display content marked with fantasy font.
+ */
+const gchar* webkit_settings_get_fantasy_font_family(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->fantasyFontFamily.data();
+}
+
+/**
+ * webkit_settings_set_fantasy_font_family:
+ * @settings: a #WebKitSettings
+ * @fantasy_font_family: the new default fantasy font family
+ *
+ * Set the #WebKitSettings:fantasy-font-family property.
+ */
+void webkit_settings_set_fantasy_font_family(WebKitSettings* settings, const gchar* fantasyFontFamily)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(fantasyFontFamily);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->fantasyFontFamily.data(), fantasyFontFamily))
+        return;
+
+    WKRetainPtr<WKStringRef> fantasyFontFamilyRef = adoptWK(WKStringCreateWithUTF8CString(fantasyFontFamily));
+    WKPreferencesSetFantasyFontFamily(priv->preferences.get(), fantasyFontFamilyRef.get());
+    priv->fantasyFontFamily = WebKit::toImpl(fantasyFontFamilyRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "fantasy-font-family");
+}
+
+/**
+ * webkit_settings_get_pictograph_font_family:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:pictograph-font-family property.
+ *
+ * Returns: The default font family used to display content marked with pictograph font.
+ */
+const gchar* webkit_settings_get_pictograph_font_family(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->pictographFontFamily.data();
+}
+
+/**
+ * webkit_settings_set_pictograph_font_family:
+ * @settings: a #WebKitSettings
+ * @pictograph_font_family: the new default pictograph font family
+ *
+ * Set the #WebKitSettings:pictograph-font-family property.
+ */
+void webkit_settings_set_pictograph_font_family(WebKitSettings* settings, const gchar* pictographFontFamily)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(pictographFontFamily);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->pictographFontFamily.data(), pictographFontFamily))
+        return;
+
+    WKRetainPtr<WKStringRef> pictographFontFamilyRef = adoptWK(WKStringCreateWithUTF8CString(pictographFontFamily));
+    WKPreferencesSetPictographFontFamily(priv->preferences.get(), pictographFontFamilyRef.get());
+    priv->pictographFontFamily = WebKit::toImpl(pictographFontFamilyRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "pictograph-font-family");
+}
+
+/**
+ * webkit_settings_get_default_font_size:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:default-font-size property.
+ *
+ * Returns: The default font size.
+ */
+guint32 webkit_settings_get_default_font_size(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return WKPreferencesGetDefaultFontSize(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_default_font_size:
+ * @settings: a #WebKitSettings
+ * @font_size: default font size to be set in pixels
+ *
+ * Set the #WebKitSettings:default-font-size property.
+ */
+void webkit_settings_set_default_font_size(WebKitSettings* settings, guint32 fontSize)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+
+    uint32_t currentSize = WKPreferencesGetDefaultFontSize(priv->preferences.get());
+    if (currentSize == fontSize)
+        return;
+
+    WKPreferencesSetDefaultFontSize(priv->preferences.get(), fontSize);
+    g_object_notify(G_OBJECT(settings), "default-font-size");
+}
+
+/**
+ * webkit_settings_get_default_monospace_font_size:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:default-monospace-font-size property.
+ *
+ * Returns: Default monospace font size.
+ */
+guint32 webkit_settings_get_default_monospace_font_size(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return WKPreferencesGetDefaultFixedFontSize(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_default_monospace_font_size:
+ * @settings: a #WebKitSettings
+ * @font_size: default monospace font size to be set in pixels
+ *
+ * Set the #WebKitSettings:default-monospace-font-size property.
+ */
+void webkit_settings_set_default_monospace_font_size(WebKitSettings* settings, guint32 fontSize)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+
+    uint32_t currentSize = WKPreferencesGetDefaultFixedFontSize(priv->preferences.get());
+    if (currentSize == fontSize)
+        return;
+
+    WKPreferencesSetDefaultFixedFontSize(priv->preferences.get(), fontSize);
+    g_object_notify(G_OBJECT(settings), "default-monospace-font-size");
+}
+
+/**
+ * webkit_settings_get_minimum_font_size:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:minimum-font-size property.
+ *
+ * Returns: Minimum font size.
+ */
+guint32 webkit_settings_get_minimum_font_size(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return WKPreferencesGetMinimumFontSize(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_minimum_font_size:
+ * @settings: a #WebKitSettings
+ * @font_size: minimum font size to be set in points
+ *
+ * Set the #WebKitSettings:minimum-font-size property.
+ */
+void webkit_settings_set_minimum_font_size(WebKitSettings* settings, guint32 fontSize)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+
+    uint32_t currentSize = WKPreferencesGetMinimumFontSize(priv->preferences.get());
+    if (currentSize == fontSize)
+        return;
+
+    WKPreferencesSetMinimumFontSize(priv->preferences.get(), fontSize);
+    g_object_notify(G_OBJECT(settings), "minimum-font-size");
+}
+
+/**
+ * webkit_settings_get_default_charset:
+ * @settings: a #WebKitSettings
+ *
+ * Gets the #WebKitSettings:default-charset property.
+ *
+ * Returns: Default charset.
+ */
+const gchar* webkit_settings_get_default_charset(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), 0);
+
+    return settings->priv->defaultCharset.data();
+}
+
+/**
+ * webkit_settings_set_default_charset:
+ * @settings: a #WebKitSettings
+ * @default_charset: default charset to be set
+ *
+ * Set the #WebKitSettings:default-charset property.
+ */
+void webkit_settings_set_default_charset(WebKitSettings* settings, const gchar* defaultCharset)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+    g_return_if_fail(defaultCharset);
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (!g_strcmp0(priv->defaultCharset.data(), defaultCharset))
+        return;
+
+    WKRetainPtr<WKStringRef> defaultCharsetRef = adoptWK(WKStringCreateWithUTF8CString(defaultCharset));
+    WKPreferencesSetDefaultTextEncodingName(priv->preferences.get(), defaultCharsetRef.get());
+    priv->defaultCharset = WebKit::toImpl(defaultCharsetRef.get())->string().utf8();
+
+    g_object_notify(G_OBJECT(settings), "default-charset");
+}
+
+/**
+ * webkit_settings_get_enable_private_browsing:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-private-browsing property.
+ *
+ * Returns: %TRUE If private browsing is enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_private_browsing(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetPrivateBrowsingEnabled(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_private_caret_browsing:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-private-browsing property.
+ */
+void webkit_settings_set_enable_private_browsing(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetPrivateBrowsingEnabled(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetPrivateBrowsingEnabled(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "enable-private-browsing");
+}
+
+/**
+ * webkit_settings_get_enable_developer_extras:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-developer-extras property.
+ *
+ * Returns: %TRUE If developer extras is enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_developer_extras(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetDeveloperExtrasEnabled(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_enable_developer_extras:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-developer-extras property.
+ */
+void webkit_settings_set_enable_developer_extras(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetDeveloperExtrasEnabled(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetDeveloperExtrasEnabled(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "enable-developer-extras");
+}
+
+/**
+ * webkit_settings_get_enable_resizable_text_areas:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-resizable-text-areas property.
+ *
+ * Returns: %TRUE If text areas can be resized or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_resizable_text_areas(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetTextAreasAreResizable(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_enable_resizable_text_areas:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-resizable-text-areas property.
+ */
+void webkit_settings_set_enable_resizable_text_areas(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetTextAreasAreResizable(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetTextAreasAreResizable(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "enable-resizable-text-areas");
+}
+
+/**
+ * webkit_settings_get_enable_tabs_to_links:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-tabs-to-links property.
+ *
+ * Returns: %TRUE If tabs to link is enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_tabs_to_links(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetTabsToLinks(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_enable_tabs_to_links:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-tabs-to-links property.
+ */
+void webkit_settings_set_enable_tabs_to_links(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetTabsToLinks(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetTabsToLinks(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "enable-tabs-to-links");
+}
+
+/**
+ * webkit_settings_get_enable_caret_browsing:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-caret-browsing property.
+ *
+ * Returns: %TRUE If caret browsing is enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_caret_browsing(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetCaretBrowsingEnabled(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_enable_caret_browsing:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-caret-browsing property.
+ */
+void webkit_settings_set_enable_caret_browsing(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetCaretBrowsingEnabled(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetCaretBrowsingEnabled(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "enable-caret-browsing");
 }

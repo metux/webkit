@@ -29,6 +29,7 @@
 #if ENABLE(VIDEO_TRACK)
 
 #include "ExceptionCode.h"
+#include "TrackBase.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
@@ -43,50 +44,68 @@ class TextTrackClient {
 public:
     virtual ~TextTrackClient() { }
     virtual void textTrackReadyStateChanged(TextTrack*) = 0;
+    virtual void textTrackKindChanged(TextTrack*) = 0;
     virtual void textTrackModeChanged(TextTrack*) = 0;
-    virtual void textTrackCreated(TextTrack*) = 0;
     virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*) = 0;
     virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*) = 0;
     virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>) = 0;
     virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>) = 0;
 };
 
-class TextTrack : public RefCounted<TextTrack> {
+class TextTrack : public TrackBase {
 public:
-    static PassRefPtr<TextTrack> create(TextTrackClient* client, const String& kind, const String& label, const String& language)
+    static PassRefPtr<TextTrack> create(ScriptExecutionContext* context, TextTrackClient* client, const String& kind, const String& label, const String& language)
     {
-        return adoptRef(new TextTrack(client, kind, label, language));
+        return adoptRef(new TextTrack(context, client, kind, label, language, AddTrack));
     }
     virtual ~TextTrack();
 
-    String kind() const;
-    String label() const;
-    String language() const;
+    String kind() const { return m_kind; }
+    void setKind(const String&);
 
-    enum ReadyState { None = 0, Loading = 1, Loaded = 2, Error = 3 };
-    ReadyState readyState() const;
+    static const AtomicString& subtitlesKeyword();
+    static const AtomicString& captionsKeyword();
+    static const AtomicString& descriptionsKeyword();
+    static const AtomicString& chaptersKeyword();
+    static const AtomicString& metadataKeyword();
+    static bool isValidKindKeyword(const String&);
 
-    enum Mode { Disabled = 0, Hidden = 1, Showing = 2 };
-    Mode mode() const;
+    String label() const { return m_label; }
+    void setLabel(const String& label) { m_label = label; }
+
+    String language() const { return m_language; }
+    void setLanguage(const String& language) { m_language = language; }
+
+    enum ReadyState { NONE = 0, LOADING = 1, LOADED = 2, HTML_ERROR = 3 };
+    ReadyState readyState() const { return m_readyState; }
+
+    enum Mode { DISABLED = 0, HIDDEN = 1, SHOWING = 2 };
+    Mode mode() const { return m_mode; }
     void setMode(unsigned short, ExceptionCode&);
 
-    PassRefPtr<TextTrackCueList> cues() const;
-    PassRefPtr<TextTrackCueList> activeCues() const;
+    TextTrackCueList* cues();
+    TextTrackCueList* activeCues() const;
 
     void readyStateChanged();
     void modeChanged();
 
+    virtual void clearClient() { m_client = 0; }
     TextTrackClient* client() { return m_client; }
-    void setClient(TextTrackClient* client) { m_client = client; }
 
     void addCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
     void removeCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
     
-    virtual void newCuesLoaded();
-    virtual void fetchNewestCues(Vector<TextTrackCue*>&);
+    void newCuesLoaded();
+    void fetchNewestCues(Vector<TextTrackCue*>&);
+    
+    virtual void fireCueChangeEvent();
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
+
+    enum TextTrackType { TrackElement, AddTrack, InBand };
+    TextTrackType trackType() const { return m_trackType; }
 
 protected:
-    TextTrack(TextTrackClient*, const String& kind, const String& label, const String& language);
+    TextTrack(ScriptExecutionContext*, TextTrackClient*, const String& kind, const String& label, const String& language, TextTrackType);
 
     void setReadyState(ReadyState);
 
@@ -99,6 +118,7 @@ private:
     TextTrack::ReadyState m_readyState;
     TextTrack::Mode m_mode;
     TextTrackClient* m_client;
+    TextTrackType m_trackType;
 };
 
 } // namespace WebCore

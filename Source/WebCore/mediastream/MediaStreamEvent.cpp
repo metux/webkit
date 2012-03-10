@@ -57,19 +57,14 @@ MediaStreamEvent::~MediaStreamEvent()
 {
 }
 
-void MediaStreamEvent::initMediaStreamEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStream> stream)
+MediaStream* MediaStreamEvent::stream() const
 {
-    if (dispatched())
-        return;
-
-    initEvent(type, canBubble, cancelable);
-
-    m_stream = stream;
+    return m_stream.get();
 }
 
-PassRefPtr<MediaStream> MediaStreamEvent::stream() const
+const AtomicString& MediaStreamEvent::interfaceName() const
 {
-    return m_stream;
+    return eventNames().interfaceForMediaStreamEvent;
 }
 
 } // namespace WebCore

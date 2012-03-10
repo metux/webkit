@@ -32,7 +32,9 @@
 
 #include "CodeOrigin.h"
 #include "CompactJITCodeMap.h"
+#include "DFGCodeBlocks.h"
 #include "DFGOSREntry.h"
+#include "DFGOSRExit.h"
 #include "EvalCodeCache.h"
 #include "Heuristics.h"
 #include "Instruction.h"
@@ -44,6 +46,7 @@
 #include "PredictionTracker.h"
 #include "RegExpObject.h"
 #include "UString.h"
+#include "UnconditionalFinalizer.h"
 #include "ValueProfile.h"
 #include <wtf/FastAllocBase.h>
 #include <wtf/PassOwnPtr.h>
@@ -69,6 +72,7 @@ namespace JSC {
     };
 
     class ExecState;
+    class DFGCodeBlocks;
 
     enum CodeType { GlobalCode, EvalCode, FunctionCode };
 
@@ -103,11 +107,22 @@ namespace JSC {
     };
 
 #if ENABLE(JIT)
-    struct CallLinkInfo: public BasicRawSentinelNode<CallLinkInfo> {
+    struct CallLinkInfo : public BasicRawSentinelNode<CallLinkInfo> {
+        enum CallType { None, Call, CallVarargs, Construct };
+        static CallType callTypeFor(OpcodeID opcodeID)
+        {
+            if (opcodeID == op_call || opcodeID == op_call_eval)
+                return Call;
+            if (opcodeID == op_construct)
+                return Construct;
+            ASSERT(opcodeID == op_call_varargs);
+            return CallVarargs;
+        }
+        
         CallLinkInfo()
             : hasSeenShouldRepatch(false)
-            , isCall(false)
             , isDFG(false)
+            , callType(None)
         {
         }
         
@@ -123,8 +138,8 @@ namespace JSC {
         JITWriteBarrier<JSFunction> callee;
         WriteBarrier<JSFunction> lastSeenCallee;
         bool hasSeenShouldRepatch : 1;
-        bool isCall : 1;
         bool isDFG : 1;
+        CallType callType : 2;
         unsigned bytecodeIndex;
 
         bool isLinked() { return callee; }
@@ -156,6 +171,8 @@ namespace JSC {
         {
             seen = true;
         }
+        
+        void reset(RepatchBuffer&, JITCode::JITType);
 
         unsigned bytecodeIndex;
         CodeLocationCall callReturnLocation;
@@ -235,10 +252,14 @@ namespace JSC {
     }
 #endif
 
-    class CodeBlock {
+    class CodeBlock : public UnconditionalFinalizer, public WeakReferenceHarvester {
         WTF_MAKE_FAST_ALLOCATED;
         friend class JIT;
+    public:
+        enum CopyParsedBlockTag { CopyParsedBlock };
     protected:
+        CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable*);
+        
         CodeBlock(ScriptExecutable* ownerExecutable, CodeType, JSGlobalObject*, PassRefPtr<SourceProvider>, unsigned sourceOffset, SymbolTable*, bool isConstructor, PassOwnPtr<CodeBlock> alternative);
 
         WriteBarrier<JSGlobalObject> m_globalObject;
@@ -250,7 +271,14 @@ namespace JSC {
         CodeBlock* alternative() { return m_alternative.get(); }
         PassOwnPtr<CodeBlock> releaseAlternative() { return m_alternative.release(); }
         void setAlternative(PassOwnPtr<CodeBlock> alternative) { m_alternative = alternative; }
-
+        
+        CodeSpecializationKind specializationKind()
+        {
+            if (m_isConstructor)
+                return CodeForConstruct;
+            return CodeForCall;
+        }
+        
 #if ENABLE(JIT)
         CodeBlock* baselineVersion()
         {
@@ -264,6 +292,8 @@ namespace JSC {
             return result;
         }
 #endif
+        
+        bool canProduceCopyWithBytecode() { return hasInstructions(); }
 
         void visitAggregate(SlotVisitor&);
 
@@ -361,19 +391,96 @@ namespace JSC {
             return m_jitCodeMap.get();
         }
         
+        void createDFGDataIfNecessary()
+        {
+            if (!!m_dfgData)
+                return;
+            
+            m_dfgData = adoptPtr(new DFGData);
+        }
+        
         DFG::OSREntryData* appendDFGOSREntryData(unsigned bytecodeIndex, unsigned machineCodeOffset)
         {
+            createDFGDataIfNecessary();
             DFG::OSREntryData entry;
             entry.m_bytecodeIndex = bytecodeIndex;
             entry.m_machineCodeOffset = machineCodeOffset;
-            m_dfgOSREntry.append(entry);
-            return &m_dfgOSREntry.last();
+            m_dfgData->osrEntry.append(entry);
+            return &m_dfgData->osrEntry.last();
         }
-        unsigned numberOfDFGOSREntries() const { return m_dfgOSREntry.size(); }
-        DFG::OSREntryData* dfgOSREntryData(unsigned i) { return &m_dfgOSREntry[i]; }
+        unsigned numberOfDFGOSREntries() const
+        {
+            if (!m_dfgData)
+                return 0;
+            return m_dfgData->osrEntry.size();
+        }
+        DFG::OSREntryData* dfgOSREntryData(unsigned i) { return &m_dfgData->osrEntry[i]; }
         DFG::OSREntryData* dfgOSREntryDataForBytecodeIndex(unsigned bytecodeIndex)
         {
-            return binarySearch<DFG::OSREntryData, unsigned, DFG::getOSREntryDataBytecodeIndex>(m_dfgOSREntry.begin(), m_dfgOSREntry.size(), bytecodeIndex);
+            return binarySearch<DFG::OSREntryData, unsigned, DFG::getOSREntryDataBytecodeIndex>(m_dfgData->osrEntry.begin(), m_dfgData->osrEntry.size(), bytecodeIndex);
+        }
+        
+        void appendOSRExit(const DFG::OSRExit& osrExit)
+        {
+            createDFGDataIfNecessary();
+            m_dfgData->osrExit.append(osrExit);
+        }
+        
+        void appendSpeculationRecovery(const DFG::SpeculationRecovery& recovery)
+        {
+            createDFGDataIfNecessary();
+            m_dfgData->speculationRecovery.append(recovery);
+        }
+        
+        unsigned numberOfOSRExits()
+        {
+            if (!m_dfgData)
+                return 0;
+            return m_dfgData->osrExit.size();
+        }
+        
+        unsigned numberOfSpeculationRecoveries()
+        {
+            if (!m_dfgData)
+                return 0;
+            return m_dfgData->speculationRecovery.size();
+        }
+        
+        DFG::OSRExit& osrExit(unsigned index)
+        {
+            return m_dfgData->osrExit[index];
+        }
+        
+        DFG::SpeculationRecovery& speculationRecovery(unsigned index)
+        {
+            return m_dfgData->speculationRecovery[index];
+        }
+        
+        void appendWeakReference(JSCell* target)
+        {
+            createDFGDataIfNecessary();
+            m_dfgData->weakReferences.append(WriteBarrier<JSCell>(*globalData(), ownerExecutable(), target));
+        }
+        
+        void shrinkWeakReferencesToFit()
+        {
+            if (!m_dfgData)
+                return;
+            m_dfgData->weakReferences.shrinkToFit();
+        }
+        
+        void appendWeakReferenceTransition(JSCell* codeOrigin, JSCell* from, JSCell* to)
+        {
+            createDFGDataIfNecessary();
+            m_dfgData->transitions.append(
+                WeakReferenceTransition(*globalData(), ownerExecutable(), codeOrigin, from, to));
+        }
+        
+        void shrinkWeakReferenceTransitionsToFit()
+        {
+            if (!m_dfgData)
+                return;
+            m_dfgData->transitions.shrinkToFit();
         }
 #endif
 
@@ -387,9 +494,23 @@ namespace JSC {
         void setIsNumericCompareFunction(bool isNumericCompareFunction) { m_isNumericCompareFunction = isNumericCompareFunction; }
         bool isNumericCompareFunction() { return m_isNumericCompareFunction; }
 
-        Vector<Instruction>& instructions() { return m_instructions; }
+        bool hasInstructions() const { return !!m_instructions; }
+        unsigned numberOfInstructions() const { return !m_instructions ? 0 : m_instructions->m_instructions.size(); }
+        Vector<Instruction>& instructions() { return m_instructions->m_instructions; }
+        const Vector<Instruction>& instructions() const { return m_instructions->m_instructions; }
         void discardBytecode() { m_instructions.clear(); }
-
+        void discardBytecodeLater()
+        {
+            m_shouldDiscardBytecode = true;
+        }
+        void handleBytecodeDiscardingOpportunity()
+        {
+            if (!!alternative())
+                discardBytecode();
+            else
+                discardBytecodeLater();
+        }
+        
 #ifndef NDEBUG
         bool usesOpcode(OpcodeID);
 #endif
@@ -402,13 +523,19 @@ namespace JSC {
         {
             m_jitCode = code;
             m_jitCodeWithArityCheck = codeWithArityCheck;
+#if ENABLE(DFG_JIT)
+            if (m_jitCode.jitType() == JITCode::DFGJIT) {
+                createDFGDataIfNecessary();
+                m_globalData->heap.m_dfgCodeBlocks.m_set.add(this);
+            }
+#endif
         }
         JITCode& getJITCode() { return m_jitCode; }
         MacroAssemblerCodePtr getJITCodeWithArityCheck() { return m_jitCodeWithArityCheck; }
         JITCode::JITType getJITType() { return m_jitCode.jitType(); }
         ExecutableMemoryHandle* executableMemory() { return getJITCode().getExecutableMemory(); }
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*) = 0;
-        virtual void jettison(JSGlobalData&) = 0;
+        virtual void jettison() = 0;
         virtual CodeBlock* replacement() = 0;
         virtual bool canCompileWithDFG() = 0;
         bool hasOptimizedReplacement()
@@ -731,6 +858,14 @@ namespace JSC {
         }
 
         JSGlobalObject* globalObject() { return m_globalObject.get(); }
+        
+        JSGlobalObject* globalObjectFor(CodeOrigin codeOrigin)
+        {
+            if (!codeOrigin.inlineCallFrame)
+                return globalObject();
+            // FIXME: if we ever inline based on executable not function, this code will need to change.
+            return codeOrigin.inlineCallFrame->callee->scope()->globalObject.get();
+        }
 
         // Jump Tables
 
@@ -754,8 +889,8 @@ namespace JSC {
 
         void shrinkToFit();
         
-        void copyDataFrom(CodeBlock* alternative);
-        void copyDataFromAlternative();
+        void copyPostParseDataFrom(CodeBlock* alternative);
+        void copyPostParseDataFromAlternative();
         
         // Functions for controlling when tiered compilation kicks in. This
         // controls both when the optimizing compiler is invoked and when OSR
@@ -899,21 +1034,23 @@ namespace JSC {
         
         static ptrdiff_t offsetOfSpeculativeSuccessCounter() { return OBJECT_OFFSETOF(CodeBlock, m_speculativeSuccessCounter); }
         static ptrdiff_t offsetOfSpeculativeFailCounter() { return OBJECT_OFFSETOF(CodeBlock, m_speculativeFailCounter); }
-        
+
+#if ENABLE(JIT)
         // The number of failures that triggers the use of the ratio.
-        unsigned largeFailCountThreshold() { return Heuristics::largeFailCountThresholdBase << alternative()->reoptimizationRetryCounter(); }
-        unsigned largeFailCountThresholdForLoop() { return Heuristics::largeFailCountThresholdBaseForLoop << alternative()->reoptimizationRetryCounter(); }
-        
+        unsigned largeFailCountThreshold() { return Heuristics::largeFailCountThresholdBase << baselineVersion()->reoptimizationRetryCounter(); }
+        unsigned largeFailCountThresholdForLoop() { return Heuristics::largeFailCountThresholdBaseForLoop << baselineVersion()->reoptimizationRetryCounter(); }
+
         bool shouldReoptimizeNow()
         {
             return Heuristics::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThreshold();
         }
-        
+
         bool shouldReoptimizeFromLoopNow()
         {
             return Heuristics::desiredSpeculativeSuccessFailRatio * speculativeFailCounter() >= speculativeSuccessCounter() && speculativeFailCounter() >= largeFailCountThresholdForLoop();
         }
-        
+#endif
+
 #if ENABLE(VALUE_PROFILER)
         bool shouldOptimizeNow();
 #else
@@ -921,10 +1058,10 @@ namespace JSC {
 #endif
         
 #if ENABLE(JIT)
-        void reoptimize(JSGlobalData& globalData)
+        void reoptimize()
         {
             ASSERT(replacement() != this);
-            replacement()->jettison(globalData);
+            replacement()->jettison();
             countReoptimization();
             optimizeAfterWarmUp();
         }
@@ -942,7 +1079,16 @@ namespace JSC {
         int m_numParameters;
         bool m_isConstructor;
 
+        // This is public because otherwise we would have many friends.
+        bool m_shouldDiscardBytecode;
+
+    protected:
+        virtual void visitWeakReferences(SlotVisitor&);
+        virtual void finalizeUnconditionally();
+        
     private:
+        friend class DFGCodeBlocks;
+        
 #if !defined(NDEBUG) || ENABLE(OPCODE_SAMPLING)
         void dump(ExecState*, const Vector<Instruction>::const_iterator& begin, Vector<Instruction>::const_iterator&) const;
 
@@ -954,17 +1100,47 @@ namespace JSC {
         void printPutByIdOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
 #endif
         void visitStructures(SlotVisitor&, Instruction* vPC) const;
+        
+#if ENABLE(DFG_JIT)
+        bool shouldImmediatelyAssumeLivenessDuringScan()
+        {
+            // Null m_dfgData means that this is a baseline JIT CodeBlock. Baseline JIT
+            // CodeBlocks don't need to be jettisoned when their weak references go
+            // stale. So if a basline JIT CodeBlock gets scanned, we can assume that
+            // this means that it's live.
+            if (!m_dfgData)
+                return true;
+            
+            // For simplicity, we don't attempt to jettison code blocks during GC if
+            // they are executing. Instead we strongly mark their weak references to
+            // allow them to continue to execute soundly.
+            if (m_dfgData->mayBeExecuting)
+                return true;
+
+            return false;
+        }
+#else
+        bool shouldImmediatelyAssumeLivenessDuringScan() { return true; }
+#endif
+        
+        void performTracingFixpointIteration(SlotVisitor&);
+        
+        void stronglyVisitStrongReferences(SlotVisitor&);
+        void stronglyVisitWeakReferences(SlotVisitor&);
 
         void createRareDataIfNecessary()
         {
             if (!m_rareData)
                 m_rareData = adoptPtr(new RareData);
         }
-
+        
         WriteBarrier<ScriptExecutable> m_ownerExecutable;
         JSGlobalData* m_globalData;
 
-        Vector<Instruction> m_instructions;
+        struct Instructions : public RefCounted<Instructions> {
+            Vector<Instruction> m_instructions;
+        };
+        RefPtr<Instructions> m_instructions;
         unsigned m_instructionCount;
 
         int m_thisRegister;
@@ -996,7 +1172,42 @@ namespace JSC {
 #endif
 #if ENABLE(DFG_JIT)
         OwnPtr<CompactJITCodeMap> m_jitCodeMap;
-        Vector<DFG::OSREntryData> m_dfgOSREntry;
+        
+        struct WeakReferenceTransition {
+            WeakReferenceTransition() { }
+            
+            WeakReferenceTransition(JSGlobalData& globalData, JSCell* owner, JSCell* codeOrigin, JSCell* from, JSCell* to)
+                : m_from(globalData, owner, from)
+                , m_to(globalData, owner, to)
+            {
+                if (!!codeOrigin)
+                    m_codeOrigin.set(globalData, owner, codeOrigin);
+            }
+
+            WriteBarrier<JSCell> m_codeOrigin;
+            WriteBarrier<JSCell> m_from;
+            WriteBarrier<JSCell> m_to;
+        };
+        
+        struct DFGData {
+            DFGData()
+                : mayBeExecuting(false)
+                , isJettisoned(false)
+            {
+            }
+            
+            Vector<DFG::OSREntryData> osrEntry;
+            SegmentedVector<DFG::OSRExit, 8> osrExit;
+            Vector<DFG::SpeculationRecovery> speculationRecovery;
+            Vector<WeakReferenceTransition> transitions;
+            Vector<WriteBarrier<JSCell> > weakReferences;
+            bool mayBeExecuting;
+            bool isJettisoned;
+            bool livenessHasBeenProved; // Initialized and used on every GC.
+            bool allTransitionsHaveBeenMarked; // Initialized and used on every GC.
+        };
+        
+        OwnPtr<DFGData> m_dfgData;
 #endif
 #if ENABLE(VALUE_PROFILER)
         SegmentedVector<ValueProfile, 8> m_valueProfiles;
@@ -1065,6 +1276,12 @@ namespace JSC {
 
     class GlobalCodeBlock : public CodeBlock {
     protected:
+        GlobalCodeBlock(CopyParsedBlockTag, GlobalCodeBlock& other)
+            : CodeBlock(CopyParsedBlock, other, &m_unsharedSymbolTable)
+            , m_unsharedSymbolTable(other.m_unsharedSymbolTable)
+        {
+        }
+        
         GlobalCodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlobalObject* globalObject, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, PassOwnPtr<CodeBlock> alternative)
             : CodeBlock(ownerExecutable, codeType, globalObject, sourceProvider, sourceOffset, &m_unsharedSymbolTable, false, alternative)
         {
@@ -1076,6 +1293,11 @@ namespace JSC {
 
     class ProgramCodeBlock : public GlobalCodeBlock {
     public:
+        ProgramCodeBlock(CopyParsedBlockTag, ProgramCodeBlock& other)
+            : GlobalCodeBlock(CopyParsedBlock, other)
+        {
+        }
+
         ProgramCodeBlock(ProgramExecutable* ownerExecutable, CodeType codeType, JSGlobalObject* globalObject, PassRefPtr<SourceProvider> sourceProvider, PassOwnPtr<CodeBlock> alternative)
             : GlobalCodeBlock(ownerExecutable, codeType, globalObject, sourceProvider, 0, alternative)
         {
@@ -1084,7 +1306,7 @@ namespace JSC {
 #if ENABLE(JIT)
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
-        virtual void jettison(JSGlobalData&);
+        virtual void jettison();
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFG();
 #endif
@@ -1092,6 +1314,13 @@ namespace JSC {
 
     class EvalCodeBlock : public GlobalCodeBlock {
     public:
+        EvalCodeBlock(CopyParsedBlockTag, EvalCodeBlock& other)
+            : GlobalCodeBlock(CopyParsedBlock, other)
+            , m_baseScopeDepth(other.m_baseScopeDepth)
+            , m_variables(other.m_variables)
+        {
+        }
+        
         EvalCodeBlock(EvalExecutable* ownerExecutable, JSGlobalObject* globalObject, PassRefPtr<SourceProvider> sourceProvider, int baseScopeDepth, PassOwnPtr<CodeBlock> alternative)
             : GlobalCodeBlock(ownerExecutable, EvalCode, globalObject, sourceProvider, 0, alternative)
             , m_baseScopeDepth(baseScopeDepth)
@@ -1111,7 +1340,7 @@ namespace JSC {
 #if ENABLE(JIT)
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
-        virtual void jettison(JSGlobalData&);
+        virtual void jettison();
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFG();
 #endif
@@ -1123,6 +1352,15 @@ namespace JSC {
 
     class FunctionCodeBlock : public CodeBlock {
     public:
+        FunctionCodeBlock(CopyParsedBlockTag, FunctionCodeBlock& other)
+            : CodeBlock(CopyParsedBlock, other, other.sharedSymbolTable())
+        {
+            // The fact that we have to do this is yucky, but is necessary because of the
+            // class hierarchy issues described in the comment block for the main
+            // constructor, below.
+            sharedSymbolTable()->ref();
+        }
+
         // Rather than using the usual RefCounted::create idiom for SharedSymbolTable we just use new
         // as we need to initialise the CodeBlock before we could initialise any RefPtr to hold the shared
         // symbol table, so we just pass as a raw pointer with a ref count of 1.  We then manually deref
@@ -1139,10 +1377,31 @@ namespace JSC {
 #if ENABLE(JIT)
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
-        virtual void jettison(JSGlobalData&);
+        virtual void jettison();
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFG();
 #endif
+    };
+
+    // Use this if you want to copy a code block and you're paranoid about a GC
+    // happening.
+    class BytecodeDestructionBlocker {
+    public:
+        BytecodeDestructionBlocker(CodeBlock* codeBlock)
+            : m_codeBlock(codeBlock)
+            , m_oldValueOfShouldDiscardBytecode(codeBlock->m_shouldDiscardBytecode)
+        {
+            codeBlock->m_shouldDiscardBytecode = false;
+        }
+        
+        ~BytecodeDestructionBlocker()
+        {
+            m_codeBlock->m_shouldDiscardBytecode = m_oldValueOfShouldDiscardBytecode;
+        }
+        
+    private:
+        CodeBlock* m_codeBlock;
+        bool m_oldValueOfShouldDiscardBytecode;
     };
 
     inline Register& ExecState::r(int index)
@@ -1166,12 +1425,25 @@ namespace JSC {
             return false;
         return isInlineCallFrameSlow();
     }
+#endif
 
-    inline ExecState* ExecState::trueCallerFrame()
+#if ENABLE(DFG_JIT)
+    inline void DFGCodeBlocks::mark(void* candidateCodeBlock)
     {
-        if (LIKELY(!codeBlock() || codeBlock()->getJITType() != JITCode::DFGJIT))
-            return callerFrame()->removeHostCallFrameFlag();
-        return trueCallerFrameSlow();
+        // We have to check for 0 and -1 because those are used by the HashMap as markers.
+        uintptr_t value = reinterpret_cast<uintptr_t>(candidateCodeBlock);
+        
+        // This checks for both of those nasty cases in one go.
+        // 0 + 1 = 1
+        // -1 + 1 = 0
+        if (value + 1 <= 1)
+            return;
+        
+        HashSet<CodeBlock*>::iterator iter = m_set.find(static_cast<CodeBlock*>(candidateCodeBlock));
+        if (iter == m_set.end())
+            return;
+        
+        (*iter)->m_dfgData->mayBeExecuting = true;
     }
 #endif
     

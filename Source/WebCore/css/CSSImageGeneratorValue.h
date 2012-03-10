@@ -27,40 +27,62 @@
 #define CSSImageGeneratorValue_h
 
 #include "CSSValue.h"
-#include "ImageBySizeCache.h"
+#include "IntSizeHash.h"
+#include <wtf/HashCountedSet.h>
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
+class CachedResourceLoader;
 class Image;
 class RenderObject;
 class StyleGeneratedImage;
+class StyleImage;
+
+struct SizeAndCount {
+    SizeAndCount(IntSize newSize = IntSize(), int newCount = 0)
+        : size(newSize)
+        , count(newCount)
+    {
+    }
+
+    IntSize size;
+    int count;
+};
+
+typedef HashMap<const RenderObject*, SizeAndCount> RenderObjectSizeCountMap;
 
 class CSSImageGeneratorValue : public CSSValue {
 public:
-    virtual ~CSSImageGeneratorValue();
+    ~CSSImageGeneratorValue();
 
     void addClient(RenderObject*, const IntSize&);
     void removeClient(RenderObject*);
-    virtual PassRefPtr<Image> image(RenderObject*, const IntSize&) = 0;
+    PassRefPtr<Image> image(RenderObject*, const IntSize&);
 
+    StyleImage* generatedOrPendingImage();
     StyleGeneratedImage* generatedImage();
 
-    virtual bool isFixedSize() const { return false; }
-    virtual IntSize fixedSize(const RenderObject*) { return IntSize(); }
+    bool isFixedSize() const;
+    IntSize fixedSize(const RenderObject*);
+
+    bool isPending() const;
+
+    void loadSubimages(CachedResourceLoader*);
 
 protected:
-    CSSImageGeneratorValue();
+    CSSImageGeneratorValue(ClassType);
 
     Image* getImage(RenderObject*, const IntSize&);
     void putImage(const IntSize&, PassRefPtr<Image>);
-    const RenderObjectSizeCountMap& clients() const { return m_imageCache.clients(); }
+    const RenderObjectSizeCountMap& clients() const { return m_clients; }
 
-    ImageBySizeCache m_imageCache;
-    RefPtr<StyleGeneratedImage> m_image;
+    RefPtr<StyleImage> m_image;
     bool m_accessedImage;
 
-private:
-    virtual bool isImageGeneratorValue() const { return true; }
+    HashCountedSet<IntSize> m_sizes; // A count of how many times a given image size is in use.
+    RenderObjectSizeCountMap m_clients; // A map from RenderObjects (with entry count) to image sizes.
+    HashMap<IntSize, RefPtr<Image> > m_images; // A cache of Image objects by image size.
 };
 
 } // namespace WebCore

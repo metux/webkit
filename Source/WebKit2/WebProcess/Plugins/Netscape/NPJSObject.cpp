@@ -236,7 +236,7 @@ bool NPJSObject::enumerate(NPIdentifier** identifiers, uint32_t* identifierCount
     JSLock lock(SilenceAssertionsOnly);
 
     PropertyNameArray propertyNames(exec);
-    m_jsObject->getPropertyNames(exec, propertyNames);
+    m_jsObject->methodTable()->getPropertyNames(m_jsObject.get(), exec, propertyNames, ExcludeDontEnumProperties);
 
     NPIdentifier* nameIdentifiers = npnMemNewArray<NPIdentifier>(propertyNames.size());
 
@@ -291,7 +291,7 @@ bool NPJSObject::invoke(ExecState* exec, JSGlobalObject* globalObject, JSValue f
         argumentList.append(m_objectMap->convertNPVariantToJSValue(exec, globalObject, arguments[i]));
 
     exec->globalData().timeoutChecker.start();
-    JSValue value = JSC::call(exec, function, callType, callData, m_jsObject->toThisObject(exec), argumentList);
+    JSValue value = JSC::call(exec, function, callType, callData, m_jsObject->methodTable()->toThisObject(m_jsObject.get(), exec), argumentList);
     exec->globalData().timeoutChecker.stop();
 
     // Convert and return the result of the function call.

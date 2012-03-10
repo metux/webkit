@@ -64,6 +64,7 @@ typedef void (*WKPageDidFirstVisuallyNonEmptyLayoutForFrameCallback)(WKPageRef p
 typedef void (*WKPageDidRemoveFrameFromHierarchyCallback)(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void *clientInfo);
 typedef void (*WKPageDidDisplayInsecureContentForFrameCallback)(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void *clientInfo);
 typedef void (*WKPageDidRunInsecureContentForFrameCallback)(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void *clientInfo);
+typedef void (*WKPageDidDetectXSSForFrameCallback)(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void *clientInfo);
 typedef bool (*WKPageCanAuthenticateAgainstProtectionSpaceInFrameCallback)(WKPageRef page, WKFrameRef frame, WKProtectionSpaceRef protectionSpace, const void *clientInfo);
 typedef void (*WKPageDidReceiveAuthenticationChallengeInFrameCallback)(WKPageRef page, WKFrameRef frame, WKAuthenticationChallengeRef authenticationChallenge, const void *clientInfo);
 typedef void (*WKPageDidChangeBackForwardListCallback)(WKPageRef page, WKBackForwardListItemRef addedItem, WKArrayRef removedItems, const void *clientInfo);
@@ -102,10 +103,13 @@ struct WKPageLoaderClient {
     WKPageDidChangeBackForwardListCallback                              didChangeBackForwardList;
     WKPageShouldGoToBackForwardListItemCallback                         shouldGoToBackForwardListItem;
     WKPageDidFailToInitializePluginCallback                             didFailToInitializePlugin;
+
+    // Version 1
+    WKPageDidDetectXSSForFrameCallback                                  didDetectXSSForFrame;
 };
 typedef struct WKPageLoaderClient WKPageLoaderClient;
 
-enum { kWKPageLoaderClientCurrentVersion = 0 };
+enum { kWKPageLoaderClientCurrentVersion = 1 };
 
 // Policy Client.
 typedef void (*WKPageDecidePolicyForNavigationActionCallback)(WKPageRef page, WKFrameRef frame, WKFrameNavigationType navigationType, WKEventModifiers modifiers, WKEventMouseButton mouseButton, WKURLRequestRef request, WKFramePolicyListenerRef listener, WKTypeRef userData, const void* clientInfo);

@@ -71,7 +71,9 @@
 #include "WebProtectionSpace.h"
 #include "WebSecurityOrigin.h"
 #include "WebURLRequest.h"
+#include <WebCore/DragController.h>
 #include <WebCore/DragData.h>
+#include <WebCore/DragSession.h>
 #include <WebCore/FloatRect.h>
 #include <WebCore/FocusDirection.h>
 #include <WebCore/MIMETypeRegistry.h>
@@ -148,6 +150,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_isInWindow(m_pageClient->isViewInWindow())
     , m_isVisible(m_pageClient->isViewVisible())
     , m_backForwardList(WebBackForwardList::create(this))
+    , m_loadStateAtProcessExit(WebFrameProxy::LoadStateFinished)
     , m_textZoomFactor(1)
     , m_pageZoomFactor(1)
     , m_pageScaleFactor(1)
@@ -157,11 +160,13 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_drawsTransparentBackground(false)
     , m_areMemoryCacheClientCallsEnabled(true)
     , m_useFixedLayout(false)
+    , m_paginationMode(Page::Pagination::Unpaginated)
+    , m_gapBetweenPages(0)
     , m_isValid(true)
     , m_isClosed(false)
     , m_isInPrintingMode(false)
     , m_isPerformingDOMPrintOperation(false)
-    , m_inDecidePolicyForMIMEType(false)
+    , m_inDecidePolicyForResponse(false)
     , m_syncMimeTypePolicyActionIsValid(false)
     , m_syncMimeTypePolicyAction(PolicyUse)
     , m_syncMimeTypePolicyDownloadID(0)
@@ -181,11 +186,11 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_hasSpellDocumentTag(false)
     , m_pendingLearnOrIgnoreWordMessageCount(0)
     , m_mainFrameHasCustomRepresentation(false)
-    , m_currentDragOperation(DragOperationNone)
     , m_mainFrameHasHorizontalScrollbar(false)
     , m_mainFrameHasVerticalScrollbar(false)
     , m_mainFrameIsPinnedToLeftSide(false)
     , m_mainFrameIsPinnedToRightSide(false)
+    , m_pageCount(0)
     , m_renderTreeSize(0)
     , m_shouldSendEventsSynchronously(false)
 {
@@ -411,9 +416,11 @@ bool WebPageProxy::maybeInitializeSandboxExtensionHandle(const KURL& url, Sandbo
     if (!url.isLocalFile())
         return false;
 
+#if ENABLE(INSPECTOR)
     // Don't give the inspector full access to the file system.
     if (WebInspectorProxy::isInspectorPage(this))
         return false;
+#endif
 
     SandboxExtension::createHandle("/", SandboxExtension::ReadOnly, sandboxExtensionHandle);
     return true;
@@ -802,6 +809,14 @@ void WebPageProxy::setFixedVisibleContentRect(const IntRect& rect)
 
     process()->send(Messages::WebPage::SetFixedVisibleContentRect(rect), m_pageID);
 }
+
+void WebPageProxy::setViewportSize(const IntSize& size)
+{
+    if (!isValid())
+        return;
+
+    process()->send(Messages::WebPage::SetViewportSize(size), m_pageID);
+}
 #endif
 
 void WebPageProxy::dragEntered(DragData* dragData, const String& dragStorageName)
@@ -842,9 +857,9 @@ void WebPageProxy::performDragControllerAction(DragControllerAction action, Drag
 #endif
 }
 
-void WebPageProxy::didPerformDragControllerAction(uint64_t resultOperation)
+void WebPageProxy::didPerformDragControllerAction(WebCore::DragSession dragSession)
 {
-    m_currentDragOperation = static_cast<DragOperation>(resultOperation);
+    m_currentDragSession = dragSession;
 }
 
 #if PLATFORM(QT) || PLATFORM(GTK)
@@ -960,7 +975,12 @@ void WebPageProxy::handleTouchEvent(const NativeWebTouchEvent& event)
     if (m_needTouchEvents) {
         m_touchEventQueue.append(event);
         process()->responsivenessTimer()->start();
-        process()->send(Messages::WebPage::TouchEvent(event), m_pageID);
+        if (m_shouldSendEventsSynchronously) {
+            bool handled = false;
+            process()->sendSync(Messages::WebPage::TouchEventSyncForTesting(event), Messages::WebPage::TouchEventSyncForTesting::Reply(handled), m_pageID);
+            didReceiveEvent(event.type(), handled);
+        } else
+            process()->send(Messages::WebPage::TouchEvent(event), m_pageID);
     } else {
         if (m_touchEventQueue.isEmpty()) {
             bool isEventHandled = false;
@@ -1002,12 +1022,17 @@ void WebPageProxy::receivedPolicyDecision(PolicyAction action, WebFrameProxy* fr
     uint64_t downloadID = 0;
     if (action == PolicyDownload) {
         // Create a download proxy.
-        downloadID = m_process->context()->createDownloadProxy()->downloadID();
+        DownloadProxy* download = m_process->context()->createDownloadProxy();
+        downloadID = download->downloadID();
+#if PLATFORM(QT)
+        // Our design does not suppport downloads without a WebPage.
+        handleDownloadRequest(download);
+#endif
     }
 
-    // If we received a policy decision while in decidePolicyForMIMEType the decision will 
-    // be sent back to the web process by decidePolicyForMIMEType. 
-    if (m_inDecidePolicyForMIMEType) {
+    // If we received a policy decision while in decidePolicyForResponse the decision will
+    // be sent back to the web process by decidePolicyForResponse.
+    if (m_inDecidePolicyForResponse) {
         m_syncMimeTypePolicyActionIsValid = true;
         m_syncMimeTypePolicyAction = action;
         m_syncMimeTypePolicyDownloadID = downloadID;
@@ -1257,6 +1282,30 @@ void WebPageProxy::setFixedLayoutSize(const IntSize& size)
     process()->send(Messages::WebPage::SetFixedLayoutSize(size), m_pageID);
 }
 
+void WebPageProxy::setPaginationMode(WebCore::Page::Pagination::Mode mode)
+{
+    if (mode == m_paginationMode)
+        return;
+
+    m_paginationMode = mode;
+
+    if (!isValid())
+        return;
+    process()->send(Messages::WebPage::SetPaginationMode(mode), m_pageID);
+}
+
+void WebPageProxy::setGapBetweenPages(double gap)
+{
+    if (gap == m_gapBetweenPages)
+        return;
+
+    m_gapBetweenPages = gap;
+
+    if (!isValid())
+        return;
+    process()->send(Messages::WebPage::SetGapBetweenPages(gap), m_pageID);
+}
+
 void WebPageProxy::pageScaleFactorDidChange(double scaleFactor)
 {
     m_pageScaleFactor = scaleFactor;
@@ -1432,13 +1481,6 @@ void WebPageProxy::preferencesDidChange()
     // Preferences need to be updated during synchronous printing to make "print backgrounds" preference work when toggled from a print dialog checkbox.
     process()->send(Messages::WebPage::PreferencesDidChange(pageGroup()->preferences()->store()), m_pageID, m_isPerformingDOMPrintOperation ? CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply : 0);
 }
-
-#if USE(TILED_BACKING_STORE)
-void WebPageProxy::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSize)
-{
-    process()->send(Messages::WebPage::SetResizesToContentsUsingLayoutSize(targetLayoutSize), m_pageID);
-}
-#endif
 
 void WebPageProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
@@ -1834,6 +1876,19 @@ void WebPageProxy::didRunInsecureContentForFrame(uint64_t frameID, CoreIPC::Argu
     m_loaderClient.didRunInsecureContentForFrame(this, frame, userData.get());
 }
 
+void WebPageProxy::didDetectXSSForFrame(uint64_t frameID, CoreIPC::ArgumentDecoder* arguments)
+{
+    RefPtr<APIObject> userData;
+    WebContextUserMessageDecoder messageDecoder(userData, m_process->context());
+    if (!arguments->decode(messageDecoder))
+        return;
+
+    WebFrameProxy* frame = process()->webFrame(frameID);
+    MESSAGE_CHECK(frame);
+
+    m_loaderClient.didDetectXSSForFrame(this, frame, userData.get());
+}
+
 void WebPageProxy::frameDidBecomeFrameSet(uint64_t frameID, bool value)
 {
     WebFrameProxy* frame = process()->webFrame(frameID);
@@ -1917,15 +1972,15 @@ void WebPageProxy::decidePolicyForResponse(uint64_t frameID, const ResourceRespo
     
     RefPtr<WebFramePolicyListenerProxy> listener = frame->setUpPolicyListenerProxy(listenerID);
 
-    ASSERT(!m_inDecidePolicyForMIMEType);
+    ASSERT(!m_inDecidePolicyForResponse);
 
-    m_inDecidePolicyForMIMEType = true;
+    m_inDecidePolicyForResponse = true;
     m_syncMimeTypePolicyActionIsValid = false;
 
     if (!m_policyClient.decidePolicyForResponse(this, frame, response, request, listener.get(), userData.get()))
         listener->use();
 
-    m_inDecidePolicyForMIMEType = false;
+    m_inDecidePolicyForResponse = false;
 
     // Check if we received a policy decision already. If we did, we can just pass it back.
     receivedPolicyAction = m_syncMimeTypePolicyActionIsValid;
@@ -2260,6 +2315,16 @@ void WebPageProxy::findZoomableAreaForPoint(const IntPoint& point)
 
     process()->send(Messages::WebPage::FindZoomableAreaForPoint(point), m_pageID);
 }
+
+void WebPageProxy::didReceiveMessageFromNavigatorQtObject(const String& contents)
+{
+    m_pageClient->didReceiveMessageFromNavigatorQtObject(contents);
+}
+
+void WebPageProxy::handleDownloadRequest(DownloadProxy* download)
+{
+    m_pageClient->handleDownloadRequest(download);
+}
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
@@ -2367,10 +2432,10 @@ void WebPageProxy::didCountStringMatches(const String& string, uint32_t matchCou
     m_findClient.didCountStringMatches(this, string, matchCount);
 }
 
-void WebPageProxy::setFindIndicator(const FloatRect& selectionRectInWindowCoordinates, const Vector<FloatRect>& textRectsInSelectionRectCoordinates, float contentImageScaleFactor, const ShareableBitmap::Handle& contentImageHandle, bool fadeOut)
+void WebPageProxy::setFindIndicator(const FloatRect& selectionRectInWindowCoordinates, const Vector<FloatRect>& textRectsInSelectionRectCoordinates, float contentImageScaleFactor, const ShareableBitmap::Handle& contentImageHandle, bool fadeOut, bool animate)
 {
     RefPtr<FindIndicator> findIndicator = FindIndicator::create(selectionRectInWindowCoordinates, textRectsInSelectionRectCoordinates, contentImageScaleFactor, contentImageHandle);
-    m_pageClient->setFindIndicator(findIndicator.release(), fadeOut);
+    m_pageClient->setFindIndicator(findIndicator.release(), fadeOut, animate);
 }
 
 void WebPageProxy::didFindString(const String& string, uint32_t matchCount)
@@ -2787,6 +2852,7 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
 #if ENABLE(GESTURE_EVENTS)
     case WebEvent::GestureScrollBegin:
     case WebEvent::GestureScrollEnd:
+    case WebEvent::GestureSingleTap:
 #endif
 #if ENABLE(TOUCH_EVENTS)
     case WebEvent::TouchStart:
@@ -2812,6 +2878,7 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
 #if ENABLE(GESTURE_EVENTS)
     case WebEvent::GestureScrollBegin:
     case WebEvent::GestureScrollEnd:
+    case WebEvent::GestureSingleTap:
 #endif
         break;
     case WebEvent::MouseUp:
@@ -3011,6 +3078,11 @@ void WebPageProxy::processDidCrash()
 
     m_isValid = false;
 
+    if (m_mainFrame) {
+        m_urlAtProcessExit = m_mainFrame->url();
+        m_loadStateAtProcessExit = m_mainFrame->loadState();
+    }
+
     m_mainFrame = nullptr;
     m_drawingArea = nullptr;
 
@@ -3116,6 +3188,8 @@ WebPageCreationParameters WebPageProxy::creationParameters() const
     parameters.areMemoryCacheClientCallsEnabled = m_areMemoryCacheClientCallsEnabled;
     parameters.useFixedLayout = m_useFixedLayout;
     parameters.fixedLayoutSize = m_fixedLayoutSize;
+    parameters.paginationMode = m_paginationMode;
+    parameters.gapBetweenPages = m_gapBetweenPages;
     parameters.userAgent = userAgent();
     parameters.sessionState = SessionState(m_backForwardList->entries(), m_backForwardList->currentIndex());
     parameters.highestUsedBackForwardItemID = WebBackForwardListItem::highedUsedItemID();
@@ -3238,6 +3312,11 @@ void WebPageProxy::didChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSid
 {
     m_mainFrameIsPinnedToLeftSide = pinnedToLeftSide;
     m_mainFrameIsPinnedToRightSide = pinnedToRightSide;
+}
+
+void WebPageProxy::didChangePageCount(unsigned pageCount)
+{
+    m_pageCount = pageCount;
 }
 
 void WebPageProxy::didFailToInitializePlugin(const String& mimeType)

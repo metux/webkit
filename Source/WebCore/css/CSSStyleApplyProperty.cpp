@@ -25,6 +25,7 @@
 #include "config.h"
 #include "CSSStyleApplyProperty.h"
 
+#include "CSSAspectRatioValue.h"
 #include "CSSCursorImageValue.h"
 #include "CSSFlexValue.h"
 #include "CSSPrimitiveValueMappings.h"
@@ -275,7 +276,6 @@ public:
     static void setValue(RenderStyle* style, Length value) { (style->*setterFunction)(value); }
     static void applyValue(CSSStyleSelector* selector, CSSValue* value)
     {
-#if ENABLE(CSS3_FLEXBOX)
         if (!value->isPrimitiveValue()) {
             if (!flexDirection || !value->isFlexValue())
                 return;
@@ -291,10 +291,6 @@ public:
                 selector->style()->setFlexboxHeightNegativeFlex(flexValue->negativeFlex());
             }
         }
-#else
-        if (!value->isPrimitiveValue())
-            return;
-#endif
 
         CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(value);
         if (noneEnabled && primitiveValue->getIdent() == CSSValueNone)
@@ -836,6 +832,41 @@ public:
     static PropertyHandler createHandler() { return PropertyHandler(&applyInheritValue, &applyInitialValue, &applyValue); }
 };
 
+class ApplyPropertyAspectRatio {
+public:
+    static void applyInheritValue(CSSStyleSelector* selector)
+    {
+        if (!selector->parentStyle()->hasAspectRatio())
+            return;
+        selector->style()->setAspectRatioDenominator(selector->parentStyle()->aspectRatioDenominator());
+        selector->style()->setAspectRatioNumerator(selector->parentStyle()->aspectRatioNumerator());
+    }
+
+    static void applyInitialValue(CSSStyleSelector* selector)
+    {
+        selector->style()->setHasAspectRatio(RenderStyle::initialHasAspectRatio());
+        selector->style()->setAspectRatioDenominator(RenderStyle::initialAspectRatioDenominator());
+        selector->style()->setAspectRatioNumerator(RenderStyle::initialAspectRatioNumerator());
+    }
+
+    static void applyValue(CSSStyleSelector* selector, CSSValue* value)
+    {
+        if (!value->isAspectRatioValue()) {
+            selector->style()->setHasAspectRatio(false);
+            return;
+        }
+        CSSAspectRatioValue* aspectRatioValue = static_cast<CSSAspectRatioValue*>(value);
+        selector->style()->setHasAspectRatio(true);
+        selector->style()->setAspectRatioDenominator(aspectRatioValue->denominatorValue());
+        selector->style()->setAspectRatioNumerator(aspectRatioValue->numeratorValue());
+    }
+
+    static PropertyHandler createHandler()
+    {
+        return PropertyHandler(&applyInheritValue, &applyInitialValue, &applyValue);
+    }
+};
+
 const CSSStyleApplyProperty& CSSStyleApplyProperty::sharedCSSStyleApplyProperty()
 {
     DEFINE_STATIC_LOCAL(CSSStyleApplyProperty, cssStyleApplyPropertyInstance, ());
@@ -846,6 +877,8 @@ CSSStyleApplyProperty::CSSStyleApplyProperty()
 {
     for (int i = 0; i < numCSSProperties; ++i)
         m_propertyMap[i] = PropertyHandler();
+
+    setPropertyHandler(CSSPropertyWebkitAspectRatio, ApplyPropertyAspectRatio::createHandler());
 
     setPropertyHandler(CSSPropertyColor, ApplyPropertyColor<InheritFromParent, &RenderStyle::color, &RenderStyle::setColor, &RenderStyle::setVisitedLinkColor, &RenderStyle::invalidColor, RenderStyle::initialColor>::createHandler());
     setPropertyHandler(CSSPropertyDirection, ApplyPropertyDirection<&RenderStyle::direction, &RenderStyle::setDirection, RenderStyle::initialDirection>::createHandler());
@@ -955,12 +988,10 @@ CSSStyleApplyProperty::CSSStyleApplyProperty()
     setPropertyHandler(CSSPropertyCounterIncrement, ApplyPropertyCounter<Increment>::createHandler());
     setPropertyHandler(CSSPropertyCounterReset, ApplyPropertyCounter<Reset>::createHandler());
 
-#if ENABLE(CSS3_FLEXBOX)
     setPropertyHandler(CSSPropertyWebkitFlexOrder, ApplyPropertyDefault<int, &RenderStyle::flexOrder, int, &RenderStyle::setFlexOrder, int, &RenderStyle::initialFlexOrder>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexPack, ApplyPropertyDefault<EFlexPack, &RenderStyle::flexPack, EFlexPack, &RenderStyle::setFlexPack, EFlexPack, &RenderStyle::initialFlexPack>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexAlign, ApplyPropertyDefault<EFlexAlign, &RenderStyle::flexAlign, EFlexAlign, &RenderStyle::setFlexAlign, EFlexAlign, &RenderStyle::initialFlexAlign>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexFlow, ApplyPropertyDefault<EFlexFlow, &RenderStyle::flexFlow, EFlexFlow, &RenderStyle::setFlexFlow, EFlexFlow, &RenderStyle::initialFlexFlow>::createHandler());
-#endif
 
     setPropertyHandler(CSSPropertyFontStyle, ApplyPropertyFont<FontItalic, &FontDescription::italic, &FontDescription::setItalic, FontItalicOff>::createHandler());
     setPropertyHandler(CSSPropertyFontVariant, ApplyPropertyFont<FontSmallCaps, &FontDescription::smallCaps, &FontDescription::setSmallCaps, FontSmallCapsOff>::createHandler());
@@ -1053,6 +1084,9 @@ CSSStyleApplyProperty::CSSStyleApplyProperty()
     setPropertyHandler(CSSPropertyWebkitTextCombine, ApplyPropertyDefault<TextCombine, &RenderStyle::textCombine, TextCombine, &RenderStyle::setTextCombine, TextCombine, &RenderStyle::initialTextCombine>::createHandler());
     setPropertyHandler(CSSPropertyWebkitTextEmphasisPosition, ApplyPropertyDefault<TextEmphasisPosition, &RenderStyle::textEmphasisPosition, TextEmphasisPosition, &RenderStyle::setTextEmphasisPosition, TextEmphasisPosition, &RenderStyle::initialTextEmphasisPosition>::createHandler());
     setPropertyHandler(CSSPropertyWebkitTextEmphasisStyle, ApplyPropertyTextEmphasisStyle::createHandler());
+
+    setPropertyHandler(CSSPropertyWebkitWrapMargin, ApplyPropertyLength<&RenderStyle::wrapMargin, &RenderStyle::setWrapMargin, &RenderStyle::initialWrapMargin>::createHandler());
+    setPropertyHandler(CSSPropertyWebkitWrapPadding, ApplyPropertyLength<&RenderStyle::wrapPadding, &RenderStyle::setWrapPadding, &RenderStyle::initialWrapPadding>::createHandler());
 
     setPropertyHandler(CSSPropertyZIndex, ApplyPropertyAuto<int, &RenderStyle::zIndex, &RenderStyle::setZIndex, &RenderStyle::hasAutoZIndex, &RenderStyle::setHasAutoZIndex>::createHandler());
 }

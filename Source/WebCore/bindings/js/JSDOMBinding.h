@@ -30,7 +30,6 @@
 #include "Document.h"
 #include "Element.h"
 #include "MediaList.h"
-#include "StyleBase.h"
 #include <heap/Weak.h>
 #include <runtime/FunctionPrototype.h>
 #include <runtime/Lookup.h>
@@ -39,6 +38,13 @@
 #include <wtf/Noncopyable.h>
 
 namespace WebCore {
+
+enum ParameterMissingPolicy {
+    MissingIsUndefined,
+    MissingIsEmpty
+};
+
+#define MAYBE_MISSING_PARAMETER(exec, index, policy) (((policy) == MissingIsEmpty && (index) >= (exec)->argumentCount()) ? (JSValue()) : ((exec)->argument(index)))
 
     class Frame;
     class KURL;
@@ -119,10 +125,6 @@ namespace WebCore {
     inline bool setInlineCachedWrapper(DOMWrapperWorld*, void*, JSDOMWrapper*) { return false; }
     inline bool clearInlineCachedWrapper(DOMWrapperWorld*, void*, JSDOMWrapper*) { return false; }
 
-    // Overload these functions to provide a custom WeakHandleOwner.
-    inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld* world, void*) { return world->defaultWrapperOwner(); }
-    inline void* wrapperContext(DOMWrapperWorld*, void* domObject) { return domObject; }
-
     template <typename DOMClass> inline JSDOMWrapper* getCachedWrapper(DOMWrapperWorld* world, DOMClass* domObject)
     {
         if (JSDOMWrapper* wrapper = getInlineCachedWrapper(world, domObject))
@@ -177,14 +179,24 @@ namespace WebCore {
         return node;
     }
 
-    inline void* root(StyleBase* styleBase)
-    {
-        while (styleBase->parent())
-            styleBase = styleBase->parent();
+    inline void* root(StyleSheet*);
 
-        if (Node* node = styleBase->node())
-            return root(node);
-        return styleBase;
+    inline void* root(CSSRule* rule)
+    {
+        if (rule->parentRule())
+            return root(rule->parentRule());
+        if (rule->parentStyleSheet())
+            return root(rule->parentStyleSheet());
+        return rule;
+    }
+
+    inline void* root(StyleSheet* styleSheet)
+    {
+        if (styleSheet->parentRule())
+            return root(styleSheet->parentRule());
+        if (styleSheet->ownerNode())
+            return root(styleSheet->ownerNode());
+        return styleSheet;
     }
 
     inline void* root(CSSStyleDeclaration* style)

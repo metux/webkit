@@ -33,17 +33,14 @@
 namespace WebCore {
 
 CSSFunctionValue::CSSFunctionValue(CSSParserFunction* function)
-    : m_name(function->name)
+    : CSSValue(FunctionClass)
+    , m_name(function->name)
 {
     if (function->args)
         m_args = CSSValueList::createFromParserValueList(function->args.get());
 }
 
-CSSFunctionValue::~CSSFunctionValue()
-{
-}
-
-String CSSFunctionValue::cssText() const
+String CSSFunctionValue::customCssText() const
 {
     String result = m_name; // Includes the '('
     if (m_args)

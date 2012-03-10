@@ -58,6 +58,7 @@
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/SecurityOrigin.h>
+#include <WebCore/Settings.h>
 
 using namespace WebCore;
 using namespace HTMLNames;
@@ -369,12 +370,12 @@ IntRect WebChromeClient::windowResizerRect() const
     return m_page->windowResizerRect();
 }
 
-void WebChromeClient::invalidateWindow(const IntRect&, bool)
+void WebChromeClient::invalidateRootView(const IntRect&, bool)
 {
     // Do nothing here, there's no concept of invalidating the window in the web process.
 }
 
-void WebChromeClient::invalidateContentsAndWindow(const IntRect& rect, bool)
+void WebChromeClient::invalidateContentsAndRootView(const IntRect& rect, bool)
 {
     if (Document* document = m_page->corePage()->mainFrame()->document()) {
         if (document->printing())
@@ -408,12 +409,12 @@ void WebChromeClient::delegatedScrollRequested(const IntPoint& scrollOffset)
 }
 #endif
 
-IntPoint WebChromeClient::screenToWindow(const IntPoint& point) const
+IntPoint WebChromeClient::screenToRootView(const IntPoint& point) const
 {
     return m_page->screenToWindow(point);
 }
 
-IntRect WebChromeClient::windowToScreen(const IntRect& rect) const
+IntRect WebChromeClient::rootViewToScreen(const IntRect& rect) const
 {
     return m_page->windowToScreen(rect);
 }
@@ -743,6 +744,20 @@ void WebChromeClient::setRootFullScreenLayer(GraphicsLayer* layer)
 void WebChromeClient::dispatchViewportPropertiesDidChange(const ViewportArguments& args) const
 {
     m_page->send(Messages::WebPageProxy::DidChangeViewportProperties(args));
+
+#if USE(TILED_BACKING_STORE)
+    // When viewport properties change, recalculate and set the new recommended layout size in case of fixed layout rendering.
+    if (m_page->mainFrameView() && m_page->mainFrameView()->useFixedLayout()) {
+        Page* page = m_page->corePage();
+        Settings* settings = page->settings();
+
+        int minimumLayoutFallbackWidth = std::max(settings->layoutFallbackWidth(), m_page->viewportSize().width());
+
+        IntSize targetLayoutSize = computeViewportAttributes(page->viewportArguments(), minimumLayoutFallbackWidth, settings->deviceWidth(), settings->deviceHeight(),
+            settings->deviceDPI(), m_page->viewportSize()).layoutSize;
+        m_page->setResizesToContentsUsingLayoutSize(targetLayoutSize);
+    }
+#endif
 }
 
 void WebChromeClient::didStartRubberBandForFrame(Frame*, const IntSize&) const

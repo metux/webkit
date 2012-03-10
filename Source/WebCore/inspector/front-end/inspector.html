@@ -41,10 +41,10 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <script type="text/javascript" src="inspector.js"></script>
     <script type="text/javascript" src="UIUtils.js"></script>
     <script type="text/javascript" src="InspectorBackendStub.js"></script>
-    <script type="text/javascript" src="InspectorFrontendHostStub.js"></script>
     <script type="text/javascript" src="ExtensionRegistryStub.js"></script>
     <script type="text/javascript" src="Object.js"></script>
     <script type="text/javascript" src="Settings.js"></script>
+    <script type="text/javascript" src="InspectorFrontendHostStub.js"></script>
     <script type="text/javascript" src="Checkbox.js"></script>
     <script type="text/javascript" src="ContextMenu.js"></script>
     <script type="text/javascript" src="SoftContextMenu.js"></script>
@@ -54,12 +54,12 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <script type="text/javascript" src="Placard.js"></script>
     <script type="text/javascript" src="View.js"></script>
     <script type="text/javascript" src="TabbedPane.js"></script>
-    <script type="text/javascript" src="IFrameView.js"></script>
     <script type="text/javascript" src="Drawer.js"></script>
     <script type="text/javascript" src="ConsoleModel.js"></script>
     <script type="text/javascript" src="ConsoleMessage.js"></script>
     <script type="text/javascript" src="ConsoleView.js"></script>
     <script type="text/javascript" src="Panel.js"></script>
+    <script type="text/javascript" src="InspectorView.js"></script>
     <script type="text/javascript" src="AdvancedSearchController.js"></script>
     <script type="text/javascript" src="TimelineGrid.js"></script>    
     <script type="text/javascript" src="Resource.js"></script>
@@ -67,6 +67,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <script type="text/javascript" src="NetworkManager.js"></script>
     <script type="text/javascript" src="NetworkLog.js"></script>
     <script type="text/javascript" src="ResourceTreeModel.js"></script>
+    <script type="text/javascript" src="ResourceUtils.js"></script>
     <script type="text/javascript" src="ResourceCategory.js"></script>
     <script type="text/javascript" src="TimelineManager.js"></script>
     <script type="text/javascript" src="Database.js"></script>
@@ -76,6 +77,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <script type="text/javascript" src="ShowMoreDataGridNode.js"></script>
     <script type="text/javascript" src="CookiesTable.js"></script>
     <script type="text/javascript" src="CookieItemsView.js"></script>
+    <script type="text/javascript" src="ApplicationCacheModel.js"></script>
     <script type="text/javascript" src="ApplicationCacheItemsView.js"></script>
     <script type="text/javascript" src="Script.js"></script>
     <script type="text/javascript" src="SidebarPane.js"></script>
@@ -109,8 +111,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <script type="text/javascript" src="TextViewer.js"></script>
     <script type="text/javascript" src="SourceFrame.js"></script>
     <script type="text/javascript" src="ResourceView.js"></script>
-    <script type="text/javascript" src="ScriptsPanel.js"></script>
     <script type="text/javascript" src="JavaScriptSourceFrame.js"></script>
+    <script type="text/javascript" src="ScriptsPanel.js"></script>
     <script type="text/javascript" src="ResourcesPanel.js"></script>
     <script type="text/javascript" src="ProfilesPanel.js"></script>
     <script type="text/javascript" src="ConsolePanel.js"></script>
@@ -162,7 +164,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <script type="text/javascript" src="ContentProviders.js"></script>
     <script type="text/javascript" src="RawSourceCode.js"></script>
     <script type="text/javascript" src="CompilerSourceMapping.js"></script>
-    <script type="text/javascript" src="CompilerSourceMappingProvider.js"></script>
     <script type="text/javascript" src="ScriptsSearchScope.js"></script>
     <script type="text/javascript" src="DOMAgent.js"></script>
     <script type="text/javascript" src="TimelineAgent.js"></script>
@@ -182,7 +183,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <script type="text/javascript" src="JavaScriptContextManager.js"></script>
     <script type="text/javascript" src="HandlerRegistry.js"></script>
 </head>
-<body class="detached">
+<body class="detached" id="-webkit-web-inspector">
     <div id="toolbar">
         <div class="toolbar-item close-left"><button id="close-button-left"></button></div>
         <div id="toolbar-controls">

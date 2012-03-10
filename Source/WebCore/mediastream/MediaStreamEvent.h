@@ -32,8 +32,6 @@
 
 namespace WebCore {
 
-class Stream;
-
 class MediaStreamEvent : public Event {
 public:
     virtual ~MediaStreamEvent();
@@ -41,12 +39,9 @@ public:
     static PassRefPtr<MediaStreamEvent> create();
     static PassRefPtr<MediaStreamEvent> create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStream>);
 
-    void initMediaStreamEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStream>);
+    MediaStream* stream() const;
 
-    // From EventTarget.
-    virtual bool isMediaStreamEvent() const { return true; }
-
-    PassRefPtr<MediaStream> stream() const;
+    virtual const AtomicString& interfaceName() const;
 
 private:
     MediaStreamEvent();

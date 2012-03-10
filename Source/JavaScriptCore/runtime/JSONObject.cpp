@@ -340,8 +340,8 @@ inline JSValue Stringifier::toJSON(JSValue value, const PropertyNameForFunctionC
     if (callType == CallTypeNone)
         return value;
 
-    JSValue list[] = { propertyName.value(m_exec) };
-    ArgList args(list, WTF_ARRAY_LENGTH(list));
+    MarkedArgumentBuffer args;
+    args.append(propertyName.value(m_exec));
     return call(m_exec, object, callType, callData, value, args);
 }
 
@@ -354,8 +354,9 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(UStringBuilder&
 
     // Call the replacer function.
     if (m_replacerCallType != CallTypeNone) {
-        JSValue list[] = { propertyName.value(m_exec), value };
-        ArgList args(list, WTF_ARRAY_LENGTH(list));
+        MarkedArgumentBuffer args;
+        args.append(propertyName.value(m_exec));
+        args.append(value);
         value = call(m_exec, m_replacer.get(), m_replacerCallType, m_replacerCallData, holder, args);
         if (m_exec->hadException())
             return StringifyFailed;
@@ -494,7 +495,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, UStringBu
                 m_propertyNames = stringifier.m_arrayReplacerPropertyNames.data();
             else {
                 PropertyNameArray objectPropertyNames(exec);
-                m_object->getOwnPropertyNames(exec, objectPropertyNames);
+                m_object->methodTable()->getOwnPropertyNames(m_object.get(), exec, objectPropertyNames, ExcludeDontEnumProperties);
                 m_propertyNames = objectPropertyNames.releaseData();
             }
             m_size = m_propertyNames->propertyNameVector().size();
@@ -523,7 +524,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, UStringBu
             value = asArray(m_object.get())->getIndex(index);
         else {
             PropertySlot slot(m_object.get());
-            if (!m_object->getOwnPropertySlotVirtual(exec, index, slot))
+            if (!m_object->methodTable()->getOwnPropertySlotByIndex(m_object.get(), exec, index, slot))
                 slot.setUndefined();
             if (exec->hadException())
                 return false;
@@ -541,7 +542,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, UStringBu
         // Get the value.
         PropertySlot slot(m_object.get());
         Identifier& propertyName = m_propertyNames->propertyNameVector()[index];
-        if (!m_object->getOwnPropertySlotVirtual(exec, propertyName, slot))
+        if (!m_object->methodTable()->getOwnPropertySlot(m_object.get(), exec, propertyName, slot))
             return true;
         JSValue value = slot.getValue(exec, propertyName);
         if (exec->hadException())
@@ -598,19 +599,14 @@ const ClassInfo JSONObject::s_info = { "JSON", &JSNonFinalObject::s_info, 0, Exe
 
 // ECMA 15.8
 
-bool JSONObject::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlot(this, exec, propertyName, slot);
-}
-
 bool JSONObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::jsonTable(exec), static_cast<JSONObject*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<JSObject>(exec, ExecState::jsonTable(exec), jsCast<JSONObject*>(cell), propertyName, slot);
 }
 
-bool JSONObject::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool JSONObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    return getStaticFunctionDescriptor<JSObject>(exec, ExecState::jsonTable(exec), this, propertyName, descriptor);
+    return getStaticFunctionDescriptor<JSObject>(exec, ExecState::jsonTable(exec), jsCast<JSONObject*>(object), propertyName, descriptor);
 }
 
 class Walker {
@@ -626,9 +622,10 @@ public:
 private:
     JSValue callReviver(JSObject* thisObj, JSValue property, JSValue unfiltered)
     {
-        JSValue args[] = { property, unfiltered };
-        ArgList argList(args, 2);
-        return call(m_exec, m_function.get(), m_callType, m_callData, thisObj, argList);
+        MarkedArgumentBuffer args;
+        args.append(property);
+        args.append(unfiltered);
+        return call(m_exec, m_function.get(), m_callType, m_callData, thisObj, args);
     }
 
     friend class Holder;
@@ -693,7 +690,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                     inValue = array->getIndex(index);
                 else {
                     PropertySlot slot;
-                    if (array->getOwnPropertySlotVirtual(m_exec, index, slot))
+                    if (array->methodTable()->getOwnPropertySlotByIndex(array, m_exec, index, slot))
                         inValue = slot.getValue(m_exec, index);
                     else
                         inValue = jsUndefined();
@@ -733,7 +730,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                 objectStack.push(object);
                 indexStack.append(0);
                 propertyStack.append(PropertyNameArray(m_exec));
-                object->getOwnPropertyNames(m_exec, propertyStack.last());
+                object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), ExcludeDontEnumProperties);
                 // fallthrough
             }
             objectStartVisitMember:
@@ -755,7 +752,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                     break;
                 }
                 PropertySlot slot;
-                if (object->getOwnPropertySlotVirtual(m_exec, properties[index], slot))
+                if (object->methodTable()->getOwnPropertySlot(object, m_exec, properties[index], slot))
                     inValue = slot.getValue(m_exec, properties[index]);
                 else
                     inValue = jsUndefined();
@@ -824,11 +821,19 @@ EncodedJSValue JSC_HOST_CALL JSONProtoFuncParse(ExecState* exec)
     if (exec->hadException())
         return JSValue::encode(jsNull());
 
+    JSValue unfiltered;
     LocalScope scope(exec->globalData());
-    LiteralParser jsonParser(exec, source.characters(), source.length(), LiteralParser::StrictJSON);
-    JSValue unfiltered = jsonParser.tryLiteralParse();
-    if (!unfiltered)
-        return throwVMError(exec, createSyntaxError(exec, jsonParser.getErrorMessage()));
+    if (source.is8Bit()) {
+        LiteralParser<LChar> jsonParser(exec, source.characters8(), source.length(), StrictJSON);
+        unfiltered = jsonParser.tryLiteralParse();
+        if (!unfiltered)
+            return throwVMError(exec, createSyntaxError(exec, jsonParser.getErrorMessage()));
+    } else {
+        LiteralParser<UChar> jsonParser(exec, source.characters16(), source.length(), StrictJSON);
+        unfiltered = jsonParser.tryLiteralParse();
+        if (!unfiltered)
+            return throwVMError(exec, createSyntaxError(exec, jsonParser.getErrorMessage()));        
+    }
     
     if (exec->argumentCount() < 2)
         return JSValue::encode(unfiltered);

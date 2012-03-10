@@ -38,19 +38,25 @@ namespace JSC {
 
 #if ENABLE(VALUE_PROFILER)
 struct ValueProfile {
-    static const unsigned logNumberOfBuckets = 3; // 8 buckets
+    static const unsigned logNumberOfBuckets = 0; // 1 bucket
     static const unsigned numberOfBuckets = 1 << logNumberOfBuckets;
+    static const unsigned numberOfSpecFailBuckets = 1;
     static const unsigned bucketIndexMask = numberOfBuckets - 1;
-    static const unsigned certainty = numberOfBuckets * numberOfBuckets;
-    static const unsigned majority = certainty / 2;
+    static const unsigned totalNumberOfBuckets = numberOfBuckets + numberOfSpecFailBuckets;
     
     ValueProfile(int bytecodeOffset)
         : m_bytecodeOffset(bytecodeOffset)
         , m_prediction(PredictNone)
         , m_numberOfSamplesInPrediction(0)
     {
-        for (unsigned i = 0; i < numberOfBuckets; ++i)
+        for (unsigned i = 0; i < totalNumberOfBuckets; ++i)
             m_buckets[i] = JSValue::encode(JSValue());
+    }
+    
+    EncodedJSValue* specFailBucket(unsigned i)
+    {
+        ASSERT(numberOfBuckets + i < totalNumberOfBuckets);
+        return m_buckets + numberOfBuckets + i;
     }
     
     const ClassInfo* classInfo(unsigned bucket) const
@@ -67,7 +73,7 @@ struct ValueProfile {
     unsigned numberOfSamples() const
     {
         unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
+        for (unsigned i = 0; i < totalNumberOfBuckets; ++i) {
             if (!!JSValue::decode(m_buckets[i]))
                 result++;
         }
@@ -81,163 +87,22 @@ struct ValueProfile {
     
     bool isLive() const
     {
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
+        for (unsigned i = 0; i < totalNumberOfBuckets; ++i) {
             if (!!JSValue::decode(m_buckets[i]))
                 return true;
         }
         return false;
     }
     
-    static unsigned computeProbability(unsigned counts, unsigned numberOfSamples)
-    {
-        if (!numberOfSamples)
-            return 0;
-        return counts * certainty / numberOfSamples;
-    }
-    
-    unsigned numberOfInt32s() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            if (JSValue::decode(m_buckets[i]).isInt32())
-                result++;
-        }
-        return result;
-    }
-        
-    unsigned numberOfDoubles() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            if (JSValue::decode(m_buckets[i]).isDouble())
-                result++;
-        }
-        return result;
-    }
-        
-    unsigned numberOfCells() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            if (!!classInfo(i))
-                result++;
-        }
-        return result;
-    }
-    
-    unsigned numberOfObjects() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            const ClassInfo* ci = classInfo(i);
-            if (!!ci && ci->isSubClassOf(&JSObject::s_info))
-                result++;
-        }
-        return result;
-    }
-    
-    unsigned numberOfFinalObjects() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            if (classInfo(i) == &JSFinalObject::s_info)
-                result++;
-        }
-        return result;
-    }
-    
-    unsigned numberOfStrings() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            if (classInfo(i) == &JSString::s_info)
-                result++;
-        }
-        return result;
-    }
-    
-    unsigned numberOfArrays() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            if (classInfo(i) == &JSArray::s_info)
-                result++;
-        }
-        return result;
-    }
-    
-    unsigned numberOfBooleans() const
-    {
-        unsigned result = 0;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
-            if (JSValue::decode(m_buckets[i]).isBoolean())
-                result++;
-        }
-        return result;
-    }
-        
-    // These methods are not particularly optimized, in that they will each
-    // perform two passes over the buckets array. However, they are
-    // probably the best bet unless you are sure that you will be making
-    // these calls with high frequency.
-        
-    unsigned probabilityOfInt32() const
-    {
-        return computeProbability(numberOfInt32s(), numberOfSamples());
-    }
-        
-    unsigned probabilityOfDouble() const
-    {
-        return computeProbability(numberOfDoubles(), numberOfSamples());
-    }
-    
-    unsigned probabilityOfCell() const
-    {
-        return computeProbability(numberOfCells(), numberOfSamples());
-    }
-    
-    unsigned probabilityOfObject() const
-    {
-        return computeProbability(numberOfObjects(), numberOfSamples());
-    }
-    
-    unsigned probabilityOfFinalObject() const
-    {
-        return computeProbability(numberOfFinalObjects(), numberOfSamples());
-    }
-    
-    unsigned probabilityOfArray() const
-    {
-        return computeProbability(numberOfArrays(), numberOfSamples());
-    }
-    
-    unsigned probabilityOfString() const
-    {
-        return computeProbability(numberOfStrings(), numberOfSamples());
-    }
-    
-    unsigned probabilityOfBoolean() const
-    {
-        return computeProbability(numberOfBooleans(), numberOfSamples());
-    }
-
 #ifndef NDEBUG
     void dump(FILE* out)
     {
         fprintf(out,
-                "samples = %u, int32 = %u (%u), double = %u (%u), cell = %u (%u), object = %u (%u), final object = %u (%u), array = %u (%u), string = %u (%u), boolean = %u (%u), prediction = %s, samples in prediction = %u",
-                numberOfSamples(),
-                probabilityOfInt32(), numberOfInt32s(),
-                probabilityOfDouble(), numberOfDoubles(),
-                probabilityOfCell(), numberOfCells(),
-                probabilityOfObject(), numberOfObjects(),
-                probabilityOfFinalObject(), numberOfFinalObjects(),
-                probabilityOfArray(), numberOfArrays(),
-                probabilityOfString(), numberOfStrings(),
-                probabilityOfBoolean(), numberOfBooleans(),
-                predictionToString(m_prediction), m_numberOfSamplesInPrediction);
+                "samples = %u, prediction = %s",
+                totalNumberOfSamples(),
+                predictionToString(m_prediction));
         bool first = true;
-        for (unsigned i = 0; i < numberOfBuckets; ++i) {
+        for (unsigned i = 0; i < totalNumberOfBuckets; ++i) {
             JSValue value = JSValue::decode(m_buckets[i]);
             if (!!value) {
                 if (first) {
@@ -251,31 +116,6 @@ struct ValueProfile {
     }
 #endif
     
-    struct Statistics {
-        unsigned samples;
-        unsigned int32s;
-        unsigned doubles;
-        unsigned cells;
-        unsigned objects;
-        unsigned finalObjects;
-        unsigned arrays;
-        unsigned strings;
-        unsigned booleans;
-        
-        Statistics()
-        {
-            bzero(this, sizeof(Statistics));
-        }
-    };
-    
-    // Method for incrementing all relevant statistics for a ClassInfo, except for
-    // incrementing the number of samples, which the caller is responsible for
-    // doing.
-    static void computeStatistics(const ClassInfo*, Statistics&);
-
-    // Optimized method for getting all counts at once.
-    void computeStatistics(Statistics&) const;
-    
     // Updates the prediction and returns the new one.
     PredictedType computeUpdatedPrediction();
     
@@ -284,7 +124,7 @@ struct ValueProfile {
     PredictedType m_prediction;
     unsigned m_numberOfSamplesInPrediction;
     
-    EncodedJSValue m_buckets[numberOfBuckets];
+    EncodedJSValue m_buckets[totalNumberOfBuckets];
 };
 
 inline int getValueProfileBytecodeOffset(ValueProfile* valueProfile)

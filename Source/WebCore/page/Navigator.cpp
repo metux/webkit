@@ -33,6 +33,7 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "Geolocation.h"
+#include "PointerLock.h"
 #include "KURL.h"
 #include "Language.h"
 #include "Page.h"
@@ -44,10 +45,14 @@
 #include <wtf/HashSet.h>
 #include <wtf/StdLibExtras.h>
 
+#if ENABLE(GAMEPAD)
+#include "GamepadList.h"
+#endif
+
 #if ENABLE(MEDIA_STREAM)
-#include "MediaStreamFrameController.h"
 #include "NavigatorUserMediaErrorCallback.h"
 #include "NavigatorUserMediaSuccessCallback.h"
+#include "UserMediaRequest.h"
 #endif
 
 namespace WebCore {
@@ -170,18 +175,18 @@ Geolocation* Navigator::geolocation() const
     return m_geolocation.get();
 }
 
+#if ENABLE(POINTER_LOCK)
+PointerLock* Navigator::webkitPointer() const
+{
+    if (!m_pointer)
+        m_pointer = PointerLock::create();
+    return m_pointer.get();
+}
+#endif
+
 void Navigator::getStorageUpdates()
 {
-    if (!m_frame)
-        return;
-
-    Page* page = m_frame->page();
-    if (!page)
-        return;
-
-    StorageNamespace* localStorage = page->group().localStorage();
-    if (localStorage)
-        localStorage->unlock();
+    // FIXME: Remove this method or rename to yieldForStorageUpdates.
 }
 
 #if ENABLE(REGISTER_PROTOCOL_HANDLER)
@@ -283,8 +288,31 @@ void Navigator::registerProtocolHandler(const String& scheme, const String& url,
 #if ENABLE(MEDIA_STREAM)
 void Navigator::webkitGetUserMedia(const String& options, PassRefPtr<NavigatorUserMediaSuccessCallback> successCallback, PassRefPtr<NavigatorUserMediaErrorCallback> errorCallback, ExceptionCode& ec)
 {
-    if (m_frame && m_frame->mediaStreamFrameController())
-        m_frame->mediaStreamFrameController()->generateStream(options, successCallback, errorCallback, ec);
+    if (!successCallback)
+        return;
+
+    if (!m_frame)
+        return;
+
+    Page* page = m_frame->page();
+    if (!page)
+        return;
+
+    RefPtr<UserMediaRequest> request = UserMediaRequest::create(m_frame->document(), page->userMediaClient(), options, successCallback, errorCallback);
+    if (!request) {
+        ec = NOT_SUPPORTED_ERR;
+        return;
+    }
+
+    request->start();
+}
+#endif
+
+#if ENABLE(GAMEPAD)
+GamepadList* Navigator::webkitGamepads()
+{
+    // Stubbed until platform/ changes landed.
+    return 0;
 }
 #endif
 

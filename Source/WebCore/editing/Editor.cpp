@@ -413,8 +413,11 @@ void Editor::replaceSelectionWithFragment(PassRefPtr<DocumentFragment> fragment,
     revealSelectionAfterEditingOperation();
 
     Node* nodeToCheck = m_frame->selection()->rootEditableElement();
-    if (m_spellChecker->canCheckAsynchronously(nodeToCheck))
-        m_spellChecker->requestCheckingFor(resolveTextCheckingTypeMask(TextCheckingTypeSpelling | TextCheckingTypeGrammar), nodeToCheck);
+    if (!nodeToCheck)
+        return;
+
+    m_spellChecker->requestCheckingFor(resolveTextCheckingTypeMask(TextCheckingTypeSpelling | TextCheckingTypeGrammar),
+        Range::create(m_frame->document(), firstPositionInNode(nodeToCheck), lastPositionInNode(nodeToCheck)));
 }
 
 void Editor::replaceSelectionWithText(const String& text, bool selectReplacement, bool smartReplace)
@@ -446,11 +449,6 @@ bool Editor::tryDHTMLCopy()
     if (m_frame->selection()->isInPasswordField())
         return false;
 
-    if (canCopy())
-        // Must be done before oncopy adds types and data to the pboard,
-        // also done for security, as it erases data from the last copy/paste.
-        Pasteboard::generalPasteboard()->clear();
-
     return !dispatchCPPEvent(eventNames().copyEvent, ClipboardWritable);
 }
 
@@ -459,11 +457,6 @@ bool Editor::tryDHTMLCut()
     if (m_frame->selection()->isInPasswordField())
         return false;
     
-    if (canCut())
-        // Must be done before oncut adds types and data to the pboard,
-        // also done for security, as it erases data from the last copy/paste.
-        Pasteboard::generalPasteboard()->clear();
-
     return !dispatchCPPEvent(eventNames().cutEvent, ClipboardWritable);
 }
 
@@ -490,7 +483,7 @@ bool Editor::shouldShowDeleteInterface(HTMLElement* element) const
 void Editor::respondToChangedSelection(const VisibleSelection& oldSelection)
 {
     if (client())
-        client()->respondToChangedSelection();
+        client()->respondToChangedSelection(m_frame);
     m_deleteButtonController->respondToChangedSelection(oldSelection);
     m_spellingCorrector->respondToChangedSelection(oldSelection);
 }
@@ -746,6 +739,11 @@ bool Editor::dispatchCPPEvent(const AtomicString &eventType, ClipboardAccessPoli
     RefPtr<Event> evt = ClipboardEvent::create(eventType, true, true, clipboard);
     target->dispatchEvent(evt, ec);
     bool noDefaultProcessing = evt->defaultPrevented();
+    if (noDefaultProcessing && policy == ClipboardWritable) {
+        Pasteboard* pasteboard = Pasteboard::generalPasteboard();
+        pasteboard->clear();
+        pasteboard->writeClipboard(clipboard.get());
+    }
 
     // invalidate clipboard here for security
     clipboard->setAccessPolicy(ClipboardNumb);
@@ -1850,6 +1848,10 @@ void Editor::markMisspellingsAndBadGrammar(const VisibleSelection &movingSelecti
 
 void Editor::markMisspellingsAfterTypingToWord(const VisiblePosition &wordStart, const VisibleSelection& selectionAfterTyping, bool doReplacement)
 {
+#if !USE(AUTOMATIC_TEXT_REPLACEMENT)
+    UNUSED_PARAM(doReplacement);
+#endif
+
     if (unifiedTextCheckerEnabled()) {
         m_spellingCorrector->applyPendingCorrection(selectionAfterTyping);
 
@@ -2603,7 +2605,7 @@ void Editor::changeSelectionAfterCommand(const VisibleSelection& newSelection, b
     // does not call EditorClient::respondToChangedSelection(), which, on the Mac, sends selection change notifications and
     // starts a new kill ring sequence, but we want to do these things (matches AppKit).
     if (selectionDidNotChangeDOMPosition)
-        client()->respondToChangedSelection();
+        client()->respondToChangedSelection(m_frame);
 }
 
 String Editor::selectedText() const

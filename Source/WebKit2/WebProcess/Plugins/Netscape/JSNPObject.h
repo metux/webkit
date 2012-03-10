@@ -82,9 +82,8 @@ private:
     static JSC::CallType getCallData(JSC::JSCell*, JSC::CallData&);
     static JSC::ConstructType getConstructData(JSC::JSCell*, JSC::ConstructData&);
 
-    virtual bool getOwnPropertySlotVirtual(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
     static bool getOwnPropertySlot(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertySlot&);
-    virtual bool getOwnPropertyDescriptor(JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertyDescriptor&);
+    static bool getOwnPropertyDescriptor(JSC::JSObject*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertyDescriptor&);
     static void put(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSValue, JSC::PutPropertySlot&);
 
     static bool deleteProperty(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName);
@@ -92,7 +91,7 @@ private:
 
     bool deleteProperty(JSC::ExecState*, NPIdentifier propertyName);
 
-    virtual void getOwnPropertyNames(JSC::ExecState*, JSC::PropertyNameArray&, JSC::EnumerationMode mode = JSC::ExcludeDontEnumProperties);
+    static void getOwnPropertyNames(JSC::JSObject*, JSC::ExecState*, JSC::PropertyNameArray&, JSC::EnumerationMode);
 
     static JSC::JSValue propertyGetter(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
     static JSC::JSValue methodGetter(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);

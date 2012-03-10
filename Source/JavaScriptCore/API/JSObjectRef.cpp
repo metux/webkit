@@ -124,7 +124,7 @@ JSObjectRef JSObjectMakeFunction(JSContextRef ctx, JSStringRef name, unsigned pa
         args.append(jsString(exec, parameterNames[i]->ustring()));
     args.append(jsString(exec, body->ustring()));
 
-    JSObject* result = constructFunction(exec, exec->lexicalGlobalObject(), args, nameID, sourceURL->ustring(), startingLineNumber);
+    JSObject* result = constructFunction(exec, exec->lexicalGlobalObject(), args, nameID, sourceURL->ustring(), TextPosition(OrdinalNumber::fromOneBasedInt(startingLineNumber), OrdinalNumber::first()));
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -274,7 +274,7 @@ void JSObjectSetProperty(JSContextRef ctx, JSObjectRef object, JSStringRef prope
     JSValue jsValue = toJS(exec, value);
 
     if (attributes && !jsObject->hasProperty(exec, name))
-        jsObject->putWithAttributes(exec, name, jsValue, attributes);
+        jsObject->methodTable()->putWithAttributes(jsObject, exec, name, jsValue, attributes);
     else {
         PutPropertySlot slot;
         jsObject->methodTable()->put(jsObject, exec, name, jsValue, slot);
@@ -506,7 +506,7 @@ JSPropertyNameArrayRef JSObjectCopyPropertyNames(JSContextRef ctx, JSObjectRef o
 
     JSPropertyNameArrayRef propertyNames = new OpaqueJSPropertyNameArray(globalData);
     PropertyNameArray array(globalData);
-    jsObject->getPropertyNames(exec, array);
+    jsObject->methodTable()->getPropertyNames(jsObject, exec, array, ExcludeDontEnumProperties);
 
     size_t size = array.size();
     propertyNames->array.reserveInitialCapacity(size);

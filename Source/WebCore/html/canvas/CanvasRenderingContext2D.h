@@ -280,6 +280,7 @@ private:
     void applyShadow();
 
     void didDraw(const FloatRect&, unsigned options = CanvasDidDrawApplyAll);
+    void didDrawEntireCanvas();
 
     GraphicsContext* drawingContext() const;
 
@@ -299,13 +300,14 @@ private:
     void clearCanvas();
     Path transformAreaToDevice(const Path&) const;
     Path transformAreaToDevice(const FloatRect&) const;
+    bool rectContainsCanvas(const FloatRect&) const;
 
     template<class T> IntRect calculateCompositingBufferRect(const T&, IntSize*);
     PassOwnPtr<ImageBuffer> createCompositingBuffer(const IntRect&);
     void compositeBuffer(ImageBuffer*, const IntRect&, CompositeOperator);
 
     template<class T> void fullCanvasCompositedFill(const T&);
-    void fullCanvasCompositedDrawImage(Image*, ColorSpace, const FloatRect&, const FloatRect&, CompositeOperator);
+    template<class T> void fullCanvasCompositedDrawImage(T*, ColorSpace, const FloatRect&, const FloatRect&, CompositeOperator);
 
     void prepareGradientForDashboard(CanvasGradient* gradient) const;
 

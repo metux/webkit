@@ -296,6 +296,11 @@ bool isBlock(const Node* node)
     return node && node->renderer() && !node->renderer()->isInline();
 }
 
+bool isInline(const Node* node)
+{
+    return node && node->renderer() && node->renderer()->isInline();
+}
+
 // FIXME: Deploy this in all of the places where enclosingBlockFlow/enclosingBlockFlowOrTableElement are used.
 // FIXME: Pass a position to this function.  The enclosing block of [table, x] for example, should be the 
 // block that contains the table and not the table, and this function should be the only one responsible for 
@@ -1138,6 +1143,48 @@ bool isRenderedAsNonInlineTableImageOrHR(const Node* node)
         return false;
     RenderObject* renderer = node->renderer();
     return renderer && ((renderer->isTable() && !renderer->isInline()) || (renderer->isImage() && !renderer->isInline()) || renderer->isHR());
+}
+
+bool areIdenticalElements(const Node* first, const Node* second)
+{
+    // check that tag name and all attribute names and values are identical
+
+    if (!first->isElementNode() || !second->isElementNode())
+        return false;
+
+    if (!toElement(first)->tagQName().matches(toElement(second)->tagQName()))
+        return false;
+
+    NamedNodeMap* firstMap = toElement(first)->attributes();
+    NamedNodeMap* secondMap = toElement(second)->attributes();
+    unsigned firstLength = firstMap->length();
+
+    if (firstLength != secondMap->length())
+        return false;
+
+    for (unsigned i = 0; i < firstLength; i++) {
+        Attribute* attribute = firstMap->attributeItem(i);
+        Attribute* secondAttribute = secondMap->getAttributeItem(attribute->name());
+        if (!secondAttribute || attribute->value() != secondAttribute->value())
+            return false;
+    }
+
+    return true;
+}
+
+bool isNonTableCellHTMLBlockElement(const Node* node)
+{
+    return node->hasTagName(listingTag)
+        || node->hasTagName(olTag)
+        || node->hasTagName(preTag)
+        || node->hasTagName(tableTag)
+        || node->hasTagName(ulTag)
+        || node->hasTagName(xmpTag)
+        || node->hasTagName(h1Tag)
+        || node->hasTagName(h2Tag)
+        || node->hasTagName(h3Tag)
+        || node->hasTagName(h4Tag)
+        || node->hasTagName(h5Tag);
 }
 
 PassRefPtr<Range> avoidIntersectionWithNode(const Range* range, Node* node)

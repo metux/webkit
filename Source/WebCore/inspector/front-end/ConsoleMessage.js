@@ -63,14 +63,6 @@ WebInspector.ConsoleMessageImpl = function(source, level, message, linkifier, ty
     this._stackTrace = stackTrace;
     this._request = request;
 
-    if (stackTrace && stackTrace.length) {
-        var topCallFrame = stackTrace[0];
-        if (!this.url)
-            this.url = topCallFrame.url;
-        if (!this.line)
-            this.line = topCallFrame.lineNumber;
-    }
-
     this._customFormatters = {
         "object": this._formatParameterAsObject,
         "array":  this._formatParameterAsArray,
@@ -194,7 +186,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
     _linkifyLocation: function(url, lineNumber, columnNumber)
     {
         // FIXME(62725): stack trace line/column numbers are one-based.
-        lineNumber = lineNumber ? lineNumber - 1 : undefined;
+        lineNumber = lineNumber ? lineNumber - 1 : 0;
         columnNumber = columnNumber ? columnNumber - 1 : 0;
         return this._linkifier.linkifyLocation(url, lineNumber, columnNumber, "console-message-url");
     },

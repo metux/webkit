@@ -34,45 +34,89 @@
 
 #include "TextTrack.h"
 
+#include "Event.h"
+#include "ExceptionCode.h"
 #include "TextTrackCueList.h"
+#include "TrackBase.h"
 
 namespace WebCore {
 
-TextTrack::TextTrack(TextTrackClient* client, const String& kind, const String& label, const String& language)
-    : m_kind(kind)
+const AtomicString& TextTrack::subtitlesKeyword()
+{
+    DEFINE_STATIC_LOCAL(const AtomicString, subtitles, ("subtitles"));
+    return subtitles;
+}
+
+const AtomicString& TextTrack::captionsKeyword()
+{
+    DEFINE_STATIC_LOCAL(const AtomicString, captions, ("captions"));
+    return captions;
+}
+
+const AtomicString& TextTrack::descriptionsKeyword()
+{
+    DEFINE_STATIC_LOCAL(const AtomicString, descriptions, ("descriptions"));
+    return descriptions;
+}
+
+const AtomicString& TextTrack::chaptersKeyword()
+{
+    DEFINE_STATIC_LOCAL(const AtomicString, chapters, ("chapters"));
+    return chapters;
+}
+
+const AtomicString& TextTrack::metadataKeyword()
+{
+    DEFINE_STATIC_LOCAL(const AtomicString, metadata, ("metadata"));
+    return metadata;
+}
+
+TextTrack::TextTrack(ScriptExecutionContext* context, TextTrackClient* client, const String& kind, const String& label, const String& language, TextTrackType type)
+    : TrackBase(context, TrackBase::TextTrack)
     , m_label(label)
     , m_language(language)
-    , m_readyState(TextTrack::None)
-    , m_mode(TextTrack::Showing)
+    , m_readyState(TextTrack::NONE)
+    , m_mode(TextTrack::HIDDEN)
     , m_client(client)
+    , m_trackType(type)
 {
+    setKind(kind);
 }
 
 TextTrack::~TextTrack()
 {
-    if (m_client)
+    if (m_client && m_cues)
         m_client->textTrackRemoveCues(this, m_cues.get());
-    setClient(0);
+    clearClient();
 }
 
-String TextTrack::kind() const
+bool TextTrack::isValidKindKeyword(const String& value)
 {
-    return m_kind;
+    if (equalIgnoringCase(value, subtitlesKeyword()))
+        return true;
+    if (equalIgnoringCase(value, captionsKeyword()))
+        return true;
+    if (equalIgnoringCase(value, descriptionsKeyword()))
+        return true;
+    if (equalIgnoringCase(value, chaptersKeyword()))
+        return true;
+    if (equalIgnoringCase(value, metadataKeyword()))
+        return true;
+
+    return false;
 }
 
-String TextTrack::label() const
+void TextTrack::setKind(const String& kind)
 {
-    return m_label;
-}
+    String oldKind = m_kind;
 
-String TextTrack::language() const
-{
-    return m_language;
-}
+    if (isValidKindKeyword(kind))
+        m_kind = kind;
+    else
+        m_kind = subtitlesKeyword();
 
-TextTrack::ReadyState TextTrack::readyState() const
-{
-    return m_readyState;
+    if (m_client && oldKind != m_kind)
+        m_client->textTrackKindChanged(this);
 }
 
 void TextTrack::setReadyState(ReadyState state)
@@ -82,16 +126,11 @@ void TextTrack::setReadyState(ReadyState state)
         m_client->textTrackReadyStateChanged(this);
 }
 
-TextTrack::Mode TextTrack::mode() const
-{
-    return m_mode;
-}
-
 void TextTrack::setMode(unsigned short mode, ExceptionCode& ec)
 {
     // 4.8.10.12.5 On setting the mode, if the new value is not either 0, 1, or 2,
     // the user agent must throw an INVALID_ACCESS_ERR exception.
-    if (mode == TextTrack::Disabled || mode == TextTrack::Hidden || mode == TextTrack::Showing) {
+    if (mode == TextTrack::DISABLED || mode == TextTrack::HIDDEN || mode == TextTrack::SHOWING) {
         m_mode = static_cast<Mode>(mode);
         if (m_client)
             m_client->textTrackModeChanged(this);
@@ -99,15 +138,31 @@ void TextTrack::setMode(unsigned short mode, ExceptionCode& ec)
         ec = INVALID_ACCESS_ERR;
 }
 
-PassRefPtr<TextTrackCueList> TextTrack::cues() const
+TextTrackCueList* TextTrack::cues()
 {
-    // FIXME(62885): Implement.
+    if (!m_cues)
+        m_cues = TextTrackCueList::create();    
+
+    // 4.8.10.12.5 If the text track mode ... is not the text track disabled mode,
+    // then the cues attribute must return a live TextTrackCueList object ...
+    // Otherwise, it must return null. When an object is returned, the
+    // same object must be returned each time.
+    // http://www.whatwg.org/specs/web-apps/current-work/#dom-texttrack-cues
+    if (m_cues && m_mode != TextTrack::DISABLED)
+        return m_cues.get();
     return 0;
 }
 
-PassRefPtr<TextTrackCueList> TextTrack::activeCues() const
+TextTrackCueList* TextTrack::activeCues() const
 {
-    // FIXME(62885): Implement.
+    // 4.8.10.12.5 If the text track mode ... is not the text track disabled mode,
+    // then the activeCues attribute must return a live TextTrackCueList object ...
+    // ... whose active flag was set when the script started, in text track cue
+    // order. Otherwise, it must return null. When an object is returned, the
+    // same object must be returned each time.
+    // http://www.whatwg.org/specs/web-apps/current-work/#dom-texttrack-activecues
+    if (m_cues && m_mode != TextTrack::DISABLED)
+        return m_cues->activeCues();
     return 0;
 }
 
@@ -132,6 +187,11 @@ void TextTrack::fetchNewestCues(Vector<TextTrackCue*>&)
     // FIXME(62890): Implement.
 }
 
+void TextTrack::fireCueChangeEvent()
+{
+    ExceptionCode ec = 0;
+    dispatchEvent(Event::create(eventNames().cuechangeEvent, false, false), ec);
+}
 
 } // namespace WebCore
 

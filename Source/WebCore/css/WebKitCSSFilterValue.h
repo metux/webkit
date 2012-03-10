@@ -50,23 +50,24 @@ public:
         BlurFilterOperation,
         SharpenFilterOperation,
         DropShadowFilterOperation
+#if ENABLE(CSS_SHADERS)
+        , CustomFilterOperation
+#endif
     };
+
+    static bool typeUsesSpaceSeparator(FilterOperationType);
 
     static PassRefPtr<WebKitCSSFilterValue> create(FilterOperationType type)
     {
         return adoptRef(new WebKitCSSFilterValue(type));
     }
 
-    virtual ~WebKitCSSFilterValue();
-
-    virtual String cssText() const;
+    String customCssText() const;
 
     FilterOperationType operationType() const { return m_type; }
 
 private:
     WebKitCSSFilterValue(FilterOperationType);
-
-    virtual bool isWebKitCSSFilterValue() const { return true; }
 
     FilterOperationType m_type;
 };

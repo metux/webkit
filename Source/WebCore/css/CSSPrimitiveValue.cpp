@@ -164,69 +164,78 @@ static const AtomicString& valueOrPropertyName(int valueOrPropertyID)
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue()
-    : m_type(0)
-    , m_hasCachedCSSText(false)
-    , m_isQuirkValue(false)
+    : CSSValue(PrimitiveClass)
 {
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue(int ident)
-    : m_type(CSS_IDENT)
-    , m_hasCachedCSSText(false)
-    , m_isQuirkValue(false)
+    : CSSValue(PrimitiveClass)
 {
+    m_primitiveUnitType = CSS_IDENT;
+    m_value.ident = ident;
+}
+
+CSSPrimitiveValue::CSSPrimitiveValue(ClassType classType, int ident)
+    : CSSValue(classType)
+{
+    m_primitiveUnitType = CSS_IDENT;
     m_value.ident = ident;
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue(double num, UnitTypes type)
-    : m_type(type)
-    , m_hasCachedCSSText(false)
-    , m_isQuirkValue(false)
+    : CSSValue(PrimitiveClass)
 {
+    m_primitiveUnitType = type;
     ASSERT(isfinite(num));
     m_value.num = num;
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue(const String& str, UnitTypes type)
-    : m_type(type)
-    , m_hasCachedCSSText(false)
-    , m_isQuirkValue(false)
+    : CSSValue(PrimitiveClass)
 {
+    m_primitiveUnitType = type;
+    if ((m_value.string = str.impl()))
+        m_value.string->ref();
+}
+
+
+CSSPrimitiveValue::CSSPrimitiveValue(ClassType classType, const String& str, UnitTypes type)
+    : CSSValue(classType)
+{
+    m_primitiveUnitType = type;
     if ((m_value.string = str.impl()))
         m_value.string->ref();
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue(RGBA32 color)
-    : m_type(CSS_RGBCOLOR)
-    , m_hasCachedCSSText(false)
-    , m_isQuirkValue(false)
+    : CSSValue(PrimitiveClass)
 {
+    m_primitiveUnitType = CSS_RGBCOLOR;
     m_value.rgbcolor = color;
 }
 
 CSSPrimitiveValue::CSSPrimitiveValue(const Length& length)
-    : m_hasCachedCSSText(false)
-    , m_isQuirkValue(false)
+    : CSSValue(PrimitiveClass)
 {
     switch (length.type()) {
         case Auto:
-            m_type = CSS_IDENT;
+            m_primitiveUnitType = CSS_IDENT;
             m_value.ident = CSSValueAuto;
             break;
         case WebCore::Fixed:
-            m_type = CSS_PX;
+            m_primitiveUnitType = CSS_PX;
             m_value.num = length.value();
             break;
         case Intrinsic:
-            m_type = CSS_IDENT;
+            m_primitiveUnitType = CSS_IDENT;
             m_value.ident = CSSValueIntrinsic;
             break;
         case MinIntrinsic:
-            m_type = CSS_IDENT;
+            m_primitiveUnitType = CSS_IDENT;
             m_value.ident = CSSValueMinIntrinsic;
             break;
         case Percent:
-            m_type = CSS_PERCENTAGE;
+            m_primitiveUnitType = CSS_PERCENTAGE;
             ASSERT(isfinite(length.percent()));
             m_value.num = length.percent();
             break;
@@ -239,21 +248,21 @@ CSSPrimitiveValue::CSSPrimitiveValue(const Length& length)
 
 void CSSPrimitiveValue::init(PassRefPtr<Counter> c)
 {
-    m_type = CSS_COUNTER;
+    m_primitiveUnitType = CSS_COUNTER;
     m_hasCachedCSSText = false;
     m_value.counter = c.leakRef();
 }
 
 void CSSPrimitiveValue::init(PassRefPtr<Rect> r)
 {
-    m_type = CSS_RECT;
+    m_primitiveUnitType = CSS_RECT;
     m_hasCachedCSSText = false;
     m_value.rect = r.leakRef();
 }
 
 void CSSPrimitiveValue::init(PassRefPtr<Quad> quad)
 {
-    m_type = CSS_QUAD;
+    m_primitiveUnitType = CSS_QUAD;
     m_hasCachedCSSText = false;
     m_value.quad = quad.leakRef();
 }
@@ -261,7 +270,7 @@ void CSSPrimitiveValue::init(PassRefPtr<Quad> quad)
 #if ENABLE(DASHBOARD_SUPPORT)
 void CSSPrimitiveValue::init(PassRefPtr<DashboardRegion> r)
 {
-    m_type = CSS_DASHBOARD_REGION;
+    m_primitiveUnitType = CSS_DASHBOARD_REGION;
     m_hasCachedCSSText = false;
     m_value.region = r.leakRef();
 }
@@ -269,14 +278,14 @@ void CSSPrimitiveValue::init(PassRefPtr<DashboardRegion> r)
 
 void CSSPrimitiveValue::init(PassRefPtr<Pair> p)
 {
-    m_type = CSS_PAIR;
+    m_primitiveUnitType = CSS_PAIR;
     m_hasCachedCSSText = false;
     m_value.pair = p.leakRef();
 }
 
 void CSSPrimitiveValue::init(PassRefPtr<CSSWrapShape> shape)
 {
-    m_type = CSS_SHAPE;
+    m_primitiveUnitType = CSS_SHAPE;
     m_hasCachedCSSText = false;
     m_value.shape = shape.leakRef();
 }
@@ -288,7 +297,7 @@ CSSPrimitiveValue::~CSSPrimitiveValue()
 
 void CSSPrimitiveValue::cleanup()
 {
-    switch (m_type) {
+    switch (m_primitiveUnitType) {
         case CSS_STRING:
         case CSS_URI:
         case CSS_ATTR:
@@ -321,7 +330,7 @@ void CSSPrimitiveValue::cleanup()
             break;
     }
 
-    m_type = 0;
+    m_primitiveUnitType = 0;
     if (m_hasCachedCSSText) {
         cssTextCache().remove(this);
         m_hasCachedCSSText = false;
@@ -519,14 +528,14 @@ CSSPrimitiveValue::UnitTypes CSSPrimitiveValue::canonicalUnitTypeForCategory(Uni
 
 bool CSSPrimitiveValue::getDoubleValueInternal(UnitTypes requestedUnitType, double* result) const
 {
-    if (!isValidCSSUnitTypeForDoubleConversion(static_cast<UnitTypes>(m_type)) || !isValidCSSUnitTypeForDoubleConversion(requestedUnitType))
+    if (!isValidCSSUnitTypeForDoubleConversion(static_cast<UnitTypes>(m_primitiveUnitType)) || !isValidCSSUnitTypeForDoubleConversion(requestedUnitType))
         return false;
-    if (requestedUnitType == m_type || requestedUnitType == CSS_DIMENSION) {
+    if (requestedUnitType == static_cast<UnitTypes>(m_primitiveUnitType) || requestedUnitType == CSS_DIMENSION) {
         *result = m_value.num;
         return true;
     }
 
-    UnitTypes sourceUnitType = static_cast<UnitTypes>(m_type);
+    UnitTypes sourceUnitType = static_cast<UnitTypes>(m_primitiveUnitType);
     UnitCategory sourceCategory = unitCategory(sourceUnitType);
     ASSERT(sourceCategory != UOther);
 
@@ -554,7 +563,7 @@ bool CSSPrimitiveValue::getDoubleValueInternal(UnitTypes requestedUnitType, doub
 
     double convertedValue = m_value.num;
 
-    // First convert the value from m_type to canonical type.
+    // First convert the value from m_primitiveUnitType to canonical type.
     double factor = conversionToCanonicalUnitsScaleFactor(sourceUnitType);
     convertedValue *= factor;
 
@@ -577,7 +586,7 @@ void CSSPrimitiveValue::setStringValue(unsigned short, const String&, ExceptionC
 String CSSPrimitiveValue::getStringValue(ExceptionCode& ec) const
 {
     ec = 0;
-    switch (m_type) {
+    switch (m_primitiveUnitType) {
         case CSS_STRING:
         case CSS_ATTR:
         case CSS_URI:
@@ -594,7 +603,7 @@ String CSSPrimitiveValue::getStringValue(ExceptionCode& ec) const
 
 String CSSPrimitiveValue::getStringValue() const
 {
-    switch (m_type) {
+    switch (m_primitiveUnitType) {
         case CSS_STRING:
         case CSS_ATTR:
         case CSS_URI:
@@ -611,7 +620,7 @@ String CSSPrimitiveValue::getStringValue() const
 Counter* CSSPrimitiveValue::getCounterValue(ExceptionCode& ec) const
 {
     ec = 0;
-    if (m_type != CSS_COUNTER) {
+    if (m_primitiveUnitType != CSS_COUNTER) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
@@ -622,7 +631,7 @@ Counter* CSSPrimitiveValue::getCounterValue(ExceptionCode& ec) const
 Rect* CSSPrimitiveValue::getRectValue(ExceptionCode& ec) const
 {
     ec = 0;
-    if (m_type != CSS_RECT) {
+    if (m_primitiveUnitType != CSS_RECT) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
@@ -633,7 +642,7 @@ Rect* CSSPrimitiveValue::getRectValue(ExceptionCode& ec) const
 Quad* CSSPrimitiveValue::getQuadValue(ExceptionCode& ec) const
 {
     ec = 0;
-    if (m_type != CSS_QUAD) {
+    if (m_primitiveUnitType != CSS_QUAD) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
@@ -644,7 +653,7 @@ Quad* CSSPrimitiveValue::getQuadValue(ExceptionCode& ec) const
 PassRefPtr<RGBColor> CSSPrimitiveValue::getRGBColorValue(ExceptionCode& ec) const
 {
     ec = 0;
-    if (m_type != CSS_RGBCOLOR) {
+    if (m_primitiveUnitType != CSS_RGBCOLOR) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
@@ -656,7 +665,7 @@ PassRefPtr<RGBColor> CSSPrimitiveValue::getRGBColorValue(ExceptionCode& ec) cons
 Pair* CSSPrimitiveValue::getPairValue(ExceptionCode& ec) const
 {
     ec = 0;
-    if (m_type != CSS_PAIR) {
+    if (m_primitiveUnitType != CSS_PAIR) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
@@ -664,20 +673,9 @@ Pair* CSSPrimitiveValue::getPairValue(ExceptionCode& ec) const
     return m_value.pair;
 }
 
-unsigned short CSSPrimitiveValue::cssValueType() const
-{
-    return CSS_PRIMITIVE_VALUE;
-}
-
-bool CSSPrimitiveValue::parseString(const String& /*string*/, bool /*strict*/)
-{
-    // FIXME
-    return false;
-}
-
 int CSSPrimitiveValue::getIdent() const
 {
-    if (m_type != CSS_IDENT)
+    if (m_primitiveUnitType != CSS_IDENT)
         return 0;
     return m_value.ident;
 }
@@ -686,14 +684,14 @@ static String formatNumber(double number)
 {
     DecimalNumber decimal(number);
 
-    StringBuffer buffer(decimal.bufferLengthForStringDecimal());
+    StringBuffer<UChar> buffer(decimal.bufferLengthForStringDecimal());
     unsigned length = decimal.toStringDecimal(buffer.characters(), buffer.length());
     ASSERT_UNUSED(length, length == buffer.length());
 
     return String::adopt(buffer);
 }
 
-String CSSPrimitiveValue::cssText() const
+String CSSPrimitiveValue::customCssText() const
 {
     // FIXME: return the original value instead of a generated one (e.g. color
     // name if it was specified) - check what spec says about this
@@ -704,7 +702,7 @@ String CSSPrimitiveValue::cssText() const
     }
 
     String text;
-    switch (m_type) {
+    switch (m_primitiveUnitType) {
         case CSS_UNKNOWN:
             // FIXME
             break;
@@ -870,7 +868,7 @@ String CSSPrimitiveValue::cssText() const
             DEFINE_STATIC_LOCAL(const String, rgbaParen, ("rgba("));
 
             RGBA32 rgbColor = m_value.rgbcolor;
-            if (m_type == CSS_PARSER_HEXCOLOR)
+            if (m_primitiveUnitType == CSS_PARSER_HEXCOLOR)
                 Color::parseHexColor(m_value.string, rgbColor);
             Color color(rgbColor);
 
@@ -917,10 +915,10 @@ String CSSPrimitiveValue::cssText() const
                     text += " rectangle";
                 else
                     break;
-                if (region->top()->m_type == CSS_IDENT && region->top()->getIdent() == CSSValueInvalid) {
-                    ASSERT(region->right()->m_type == CSS_IDENT);
-                    ASSERT(region->bottom()->m_type == CSS_IDENT);
-                    ASSERT(region->left()->m_type == CSS_IDENT);
+                if (region->top()->m_primitiveUnitType == CSS_IDENT && region->top()->getIdent() == CSSValueInvalid) {
+                    ASSERT(region->right()->m_primitiveUnitType == CSS_IDENT);
+                    ASSERT(region->bottom()->m_primitiveUnitType == CSS_IDENT);
+                    ASSERT(region->left()->m_primitiveUnitType == CSS_IDENT);
                     ASSERT(region->right()->getIdent() == CSSValueInvalid);
                     ASSERT(region->bottom()->getIdent() == CSSValueInvalid);
                     ASSERT(region->left()->getIdent() == CSSValueInvalid);
@@ -956,7 +954,7 @@ String CSSPrimitiveValue::cssText() const
 
 void CSSPrimitiveValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const CSSStyleSheet* styleSheet)
 {
-    if (m_type == CSS_URI)
+    if (m_primitiveUnitType == CSS_URI)
         addSubresourceURL(urls, styleSheet->completeURL(m_value.string));
 }
 

@@ -79,6 +79,7 @@
 #include <WebCore/DocumentMarkerController.h>
 #include <WebCore/DragController.h>
 #include <WebCore/DragData.h>
+#include <WebCore/DragSession.h>
 #include <WebCore/EventHandler.h>
 #include <WebCore/FocusController.h>
 #include <WebCore/FormState.h>
@@ -171,6 +172,7 @@ PassRefPtr<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParame
 
 WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     : m_viewSize(parameters.viewSize)
+    , m_useFixedLayout(false)
     , m_drawsBackground(true)
     , m_drawsTransparentBackground(false)
     , m_isInRedo(false)
@@ -192,6 +194,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_isRunningModal(false)
     , m_cachedMainFrameIsPinnedToLeftSide(false)
     , m_cachedMainFrameIsPinnedToRightSide(false)
+    , m_cachedPageCount(0)
     , m_isShowingContextMenu(false)
 #if PLATFORM(WIN)
     , m_gestureReachedScrollingLimit(false)
@@ -238,6 +241,9 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 
     setDrawsBackground(parameters.drawsBackground);
     setDrawsTransparentBackground(parameters.drawsTransparentBackground);
+
+    setPaginationMode(parameters.paginationMode);
+    setGapBetweenPages(parameters.gapBetweenPages);
 
     setMemoryCacheMessagesEnabled(parameters.areMemoryCacheClientCallsEnabled);
 
@@ -585,7 +591,7 @@ void WebPage::linkClicked(const String& url, const WebMouseEvent& event)
         coreEvent = MouseEvent::create(eventNames().clickEvent, frame->document()->defaultView(), platform(event), 0, 0);
 
     frame->loader()->loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(url)), 
-        false, false, coreEvent.get(), 0, SendReferrer);
+        false, false, coreEvent.get(), 0, MaybeSendReferrer);
 }
 
 void WebPage::stopLoadingFrame(uint64_t frameID)
@@ -703,18 +709,18 @@ void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSiz
 {
     FrameView* view = m_page->mainFrame()->view();
 
+    m_useFixedLayout = !targetLayoutSize.isEmpty();
+
+    // Set view attributes based on whether fixed layout is used.
+    view->setDelegatesScrolling(m_useFixedLayout);
+    view->setUseFixedLayout(m_useFixedLayout);
+    view->setPaintsEntireContents(m_useFixedLayout);
+
     if (view->fixedLayoutSize() == targetLayoutSize)
         return;
 
-    bool fixedLayout = !targetLayoutSize.isEmpty();
-
-    if (fixedLayout)
-        view->setFixedLayoutSize(targetLayoutSize);
-
-    // Set view attributes based on whether fixed layout is used.
-    view->setDelegatesScrolling(fixedLayout);
-    view->setUseFixedLayout(fixedLayout);
-    view->setPaintsEntireContents(fixedLayout);
+    // Always reset even when empty.
+    view->setFixedLayoutSize(targetLayoutSize);
 
     // Schedule a layout to use the new target size.
     if (!view->layoutPending()) {
@@ -738,6 +744,23 @@ void WebPage::resizeToContentsIfNeeded()
     view->resize(m_viewSize);
     view->setNeedsLayout();
 }
+
+void WebPage::setViewportSize(const IntSize& size)
+{
+    if (m_viewportSize == size)
+        return;
+
+     m_viewportSize = size;
+
+    // Recalculate the recommended layout size, when the available size (device pixel) changes.
+    Settings* settings = m_page->settings();
+
+    int minimumLayoutFallbackWidth = std::max(settings->layoutFallbackWidth(), size.width());
+
+    IntSize targetLayoutSize = computeViewportAttributes(m_page->viewportArguments(), minimumLayoutFallbackWidth, settings->deviceWidth(), settings->deviceHeight(), settings->deviceDPI(), size).layoutSize;
+    setResizesToContentsUsingLayoutSize(targetLayoutSize);
+}
+
 #endif
 
 void WebPage::scrollMainFrameIfNotAtMaxScrollPosition(const IntSize& scrollOffset)
@@ -856,10 +879,23 @@ void WebPage::setDeviceScaleFactor(float scaleFactor)
     for (HashSet<PluginView*>::const_iterator it = m_pluginViews.begin(), end = m_pluginViews.end(); it != end; ++it)
         (*it)->setDeviceScaleFactor(scaleFactor);
 #endif
+
+    if (m_findController.isShowingOverlay()) {
+        // We must have updated layout to get the selection rects right.
+        layoutIfNeeded();
+        m_findController.deviceScaleFactorDidChange();
+    }
+}
+
+float WebPage::deviceScaleFactor() const
+{
+    return m_page->deviceScaleFactor();
 }
 
 void WebPage::setUseFixedLayout(bool fixed)
 {
+    m_useFixedLayout = fixed;
+
     Frame* frame = m_mainFrame->coreFrame();
     if (!frame)
         return;
@@ -885,6 +921,20 @@ void WebPage::setFixedLayoutSize(const IntSize& size)
 
     view->setFixedLayoutSize(size);
     view->forceLayout();
+}
+
+void WebPage::setPaginationMode(uint32_t mode)
+{
+    Page::Pagination pagination = m_page->pagination();
+    pagination.mode = static_cast<Page::Pagination::Mode>(mode);
+    m_page->setPagination(pagination);
+}
+
+void WebPage::setGapBetweenPages(double gap)
+{
+    Page::Pagination pagination = m_page->pagination();
+    pagination.gap = gap;
+    m_page->setPagination(pagination);
 }
 
 void WebPage::installPageOverlay(PassRefPtr<PageOverlay> pageOverlay)
@@ -1076,7 +1126,7 @@ static bool handleContextMenuEvent(const PlatformMouseEvent& platformMouseEvent,
     return handled;
 }
 
-static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page)
+static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page, bool onlyUpdateScrollbars)
 {
     Frame* frame = page->mainFrame();
     if (!frame->view())
@@ -1099,7 +1149,7 @@ static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page)
         case WebCore::MouseEventReleased:
             return frame->eventHandler()->handleMouseReleaseEvent(platformMouseEvent);
         case WebCore::MouseEventMoved:
-            return frame->eventHandler()->mouseMoved(platformMouseEvent);
+            return frame->eventHandler()->mouseMoved(platformMouseEvent, onlyUpdateScrollbars);
 
         default:
             ASSERT_NOT_REACHED();
@@ -1125,7 +1175,7 @@ void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
     if (!handled) {
         CurrentEvent currentEvent(mouseEvent);
 
-        handled = handleMouseEvent(mouseEvent, m_page.get());
+        handled = handleMouseEvent(mouseEvent, m_page.get(), !windowIsFocused());
     }
 
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(mouseEvent.type()), handled));
@@ -1143,7 +1193,7 @@ void WebPage::mouseEventSyncForTesting(const WebMouseEvent& mouseEvent, bool& ha
 
     if (!handled) {
         CurrentEvent currentEvent(mouseEvent);
-        handled = handleMouseEvent(mouseEvent, m_page.get());
+        handled = handleMouseEvent(mouseEvent, m_page.get(), !windowIsFocused());
     }
 }
 
@@ -1303,6 +1353,12 @@ void WebPage::touchEvent(const WebTouchEvent& touchEvent)
     bool handled = handleTouchEvent(touchEvent, m_page.get());
 
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(touchEvent.type()), handled));
+}
+
+void WebPage::touchEventSyncForTesting(const WebTouchEvent& touchEvent, bool& handled)
+{
+    CurrentEvent currentEvent(touchEvent);
+    handled = handleTouchEvent(touchEvent, m_page.get());
 }
 #endif
 
@@ -1654,7 +1710,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
 #undef INITIALIZE_SETTINGS
 
-    settings->setJavaScriptEnabled(store.getBoolValueForKey(WebPreferencesKey::javaScriptEnabledKey()));
+    settings->setScriptEnabled(store.getBoolValueForKey(WebPreferencesKey::javaScriptEnabledKey()));
     settings->setLoadsImagesAutomatically(store.getBoolValueForKey(WebPreferencesKey::loadsImagesAutomaticallyKey()));
     settings->setLoadsSiteIconsIgnoringImageLoadingSetting(store.getBoolValueForKey(WebPreferencesKey::loadsSiteIconsIgnoringImageLoadingPreferenceKey()));
     settings->setPluginsEnabled(store.getBoolValueForKey(WebPreferencesKey::pluginsEnabledKey()));
@@ -1729,6 +1785,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
     settings->setApplicationChromeMode(store.getBoolValueForKey(WebPreferencesKey::applicationChromeModeKey()));    
     settings->setSuppressIncrementalRendering(store.getBoolValueForKey(WebPreferencesKey::suppressIncrementalRenderingKey()));
+    settings->setBackspaceKeyNavigationEnabled(store.getBoolValueForKey(WebPreferencesKey::backspaceKeyNavigationEnabledKey()));
+    settings->setCaretBrowsingEnabled(store.getBoolValueForKey(WebPreferencesKey::caretBrowsingEnabledKey()));
 
     platformPreferencesDidChange(store);
 }
@@ -1789,7 +1847,7 @@ bool WebPage::handleEditingKeyboardEvent(KeyboardEvent* evt)
 void WebPage::performDragControllerAction(uint64_t action, WebCore::IntPoint clientPosition, WebCore::IntPoint globalPosition, uint64_t draggingSourceOperationMask, const WebCore::DragDataMap& dataMap, uint32_t flags)
 {
     if (!m_page) {
-        send(Messages::WebPageProxy::DidPerformDragControllerAction(DragOperationNone));
+        send(Messages::WebPageProxy::DidPerformDragControllerAction(WebCore::DragSession()));
         return;
     }
 
@@ -1820,7 +1878,7 @@ void WebPage::performDragControllerAction(uint64_t action, WebCore::IntPoint cli
 void WebPage::performDragControllerAction(uint64_t action, WebCore::DragData dragData)
 {
     if (!m_page) {
-        send(Messages::WebPageProxy::DidPerformDragControllerAction(DragOperationNone));
+        send(Messages::WebPageProxy::DidPerformDragControllerAction(WebCore::DragSession()));
 #if PLATFORM(QT)
         QMimeData* data = const_cast<QMimeData*>(dragData.platformData());
 #elif PLATFORM(GTK)
@@ -1864,7 +1922,7 @@ void WebPage::performDragControllerAction(uint64_t action, WebCore::DragData dra
 void WebPage::performDragControllerAction(uint64_t action, WebCore::IntPoint clientPosition, WebCore::IntPoint globalPosition, uint64_t draggingSourceOperationMask, const String& dragStorageName, uint32_t flags, const SandboxExtension::Handle& sandboxExtensionHandle)
 {
     if (!m_page) {
-        send(Messages::WebPageProxy::DidPerformDragControllerAction(DragOperationNone));
+        send(Messages::WebPageProxy::DidPerformDragControllerAction(WebCore::DragSession()));
         return;
     }
 
@@ -2128,6 +2186,15 @@ void WebPage::didChangeScrollOffsetForMainFrame()
         
         m_cachedMainFrameIsPinnedToLeftSide = isPinnedToLeftSide;
         m_cachedMainFrameIsPinnedToRightSide = isPinnedToRightSide;
+    }
+}
+
+void WebPage::mainFrameDidLayout()
+{
+    unsigned pageCount = m_page->pageCount();
+    if (pageCount != m_cachedPageCount) {
+        send(Messages::WebPageProxy::DidChangePageCount(pageCount));
+        m_cachedPageCount = pageCount;
     }
 }
 
@@ -2591,6 +2658,8 @@ String WebPage::viewportConfigurationAsText(int deviceDPI, int deviceWidth, int 
 {
     ViewportArguments arguments = mainFrame()->document()->viewportArguments();
     ViewportAttributes attrs = WebCore::computeViewportAttributes(arguments, /* default layout width for non-mobile pages */ 980, deviceWidth, deviceHeight, deviceDPI, IntSize(availableWidth, availableHeight));
+    WebCore::restrictMinimumScaleFactorToViewportSize(attrs, IntSize(availableWidth, availableHeight));
+    WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(attrs);
     return String::format("viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", attrs.layoutSize.width(), attrs.layoutSize.height(), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
 }
 

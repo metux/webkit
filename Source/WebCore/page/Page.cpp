@@ -59,6 +59,7 @@
 #include "PluginViewBase.h"
 #include "ProgressTracker.h"
 #include "RenderTheme.h"
+#include "RenderView.h"
 #include "RenderWidget.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
@@ -80,8 +81,7 @@
 #endif
 
 #if ENABLE(MEDIA_STREAM)
-#include "MediaStreamClient.h"
-#include "MediaStreamController.h"
+#include "UserMediaClient.h"
 #endif
 
 namespace WebCore {
@@ -137,11 +137,11 @@ Page::Page(PageClients& pageClients)
     , m_deviceMotionController(RuntimeEnabledFeatures::deviceMotionEnabled() ? adoptPtr(new DeviceMotionController(pageClients.deviceMotionClient)) : nullptr)
     , m_deviceOrientationController(RuntimeEnabledFeatures::deviceOrientationEnabled() ? adoptPtr(new DeviceOrientationController(this, pageClients.deviceOrientationClient)) : nullptr)
 #endif
-#if ENABLE(MEDIA_STREAM)
-    , m_mediaStreamController(RuntimeEnabledFeatures::mediaStreamEnabled() ? adoptPtr(new MediaStreamController(pageClients.mediaStreamClient)) : PassOwnPtr<MediaStreamController>())
-#endif
 #if ENABLE(INPUT_SPEECH)
     , m_speechInputClient(pageClients.speechInputClient)
+#endif
+#if ENABLE(MEDIA_STREAM)
+    , m_userMediaClient(pageClients.userMediaClient)
 #endif
     , m_settings(adoptPtr(new Settings(this)))
     , m_progress(adoptPtr(new ProgressTracker))
@@ -208,6 +208,11 @@ Page::~Page()
     InspectorInstrumentation::inspectedPageDestroyed(this);
 #if ENABLE(INSPECTOR)
     m_inspectorController->inspectedPageDestroyed();
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+    if (m_userMediaClient)
+        m_userMediaClient->pageDestroyed();
 #endif
 
     backForward()->close();
@@ -399,7 +404,7 @@ void Page::setNeedsRecalcStyleInAllFrames()
 
 void Page::updateViewportArguments()
 {
-    if (!mainFrame() || !mainFrame()->document() || mainFrame()->document()->viewportArguments() == m_viewportArguments)
+    if (!mainFrame() || !mainFrame()->document())
         return;
 
     m_viewportArguments = mainFrame()->document()->viewportArguments();
@@ -619,7 +624,7 @@ void Page::setMediaVolume(float volume)
     }
 }
 
-void Page::setPageScaleFactor(float scale, const LayoutPoint& origin)
+void Page::setPageScaleFactor(float scale, const IntPoint& origin)
 {
     if (scale == m_pageScaleFactor)
         return;
@@ -656,13 +661,40 @@ void Page::setDeviceScaleFactor(float scaleFactor)
     setNeedsRecalcStyleInAllFrames();
 
 #if USE(ACCELERATED_COMPOSITING)
-    m_mainFrame->deviceOrPageScaleFactorChanged();
+    if (mainFrame())
+        mainFrame()->deviceOrPageScaleFactorChanged();
 #endif
 
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
         frame->editor()->deviceScaleFactorChanged();
 
     backForward()->markPagesForFullStyleRecalc();
+}
+
+void Page::setPagination(const Pagination& pagination)
+{
+    if (m_pagination.mode == pagination.mode && m_pagination.gap == pagination.gap)
+        return;
+
+    m_pagination = pagination;
+
+    setNeedsRecalcStyleInAllFrames();
+    backForward()->markPagesForFullStyleRecalc();
+}
+
+unsigned Page::pageCount() const
+{
+    if (m_pagination.mode == Pagination::Unpaginated)
+        return 0;
+
+    FrameView* frameView = mainFrame()->view();
+    if (!frameView->didFirstLayout())
+        return 0;
+
+    mainFrame()->view()->forceLayout();
+
+    RenderView* contentRenderer = mainFrame()->contentRenderer();
+    return contentRenderer->columnCount(contentRenderer->columnInfo());
 }
 
 void Page::didMoveOnscreen()
@@ -1031,7 +1063,7 @@ Page::PageClients::PageClients()
     , deviceMotionClient(0)
     , deviceOrientationClient(0)
     , speechInputClient(0)
-    , mediaStreamClient(0)
+    , userMediaClient(0)
 {
 }
 

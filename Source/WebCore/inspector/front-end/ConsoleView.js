@@ -56,17 +56,14 @@ WebInspector.ConsoleView = function(hideContextSelector)
     this.messagesElement.className = "monospace";
     this.messagesElement.addEventListener("click", this._messagesClicked.bind(this), true);
     this.element.appendChild(this.messagesElement);
+    this._scrolledToBottom = true;
 
     this.promptElement = document.createElement("div");
     this.promptElement.id = "console-prompt";
     this.promptElement.className = "source-code";
     this.promptElement.spellcheck = false;
-    this.promptElement.addEventListener("keydown", this._promptKeyDown.bind(this), true);
     this.messagesElement.appendChild(this.promptElement);
     this.messagesElement.appendChild(document.createElement("br"));
-
-    this.prompt = new WebInspector.TextPrompt(this.promptElement, this.completions.bind(this), ExpressionStopCharacters + ".");
-    this.prompt.history = WebInspector.settings.consoleHistory.get();
 
     this.topGroup = new WebInspector.ConsoleGroup(null);
     this.messagesElement.insertBefore(this.topGroup.element, this.promptElement);
@@ -103,6 +100,7 @@ WebInspector.ConsoleView = function(hideContextSelector)
 
     this.filter(this.allElement, false);
     this._registerShortcuts();
+    this.registerRequiredCSS("textPrompt.css");
 
     this.messagesElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), false);
 
@@ -112,6 +110,12 @@ WebInspector.ConsoleView = function(hideContextSelector)
     WebInspector.console.addEventListener(WebInspector.ConsoleModel.Events.ConsoleCleared, this._consoleCleared, this);
 
     this._linkifier = WebInspector.debuggerPresentationModel.createLinkifier();
+
+    this.prompt = new WebInspector.TextPromptWithHistory(this.completions.bind(this), ExpressionStopCharacters + ".");
+    this.prompt.setSuggestBoxEnabled("generic-suggest");
+    this.prompt.attach(this.promptElement);
+    this.prompt.proxyElement.addEventListener("keydown", this._promptKeyDown.bind(this), false);
+    this.prompt.setHistoryData(WebInspector.settings.consoleHistory.get());
 }
 
 WebInspector.ConsoleView.Events = {
@@ -232,7 +236,7 @@ WebInspector.ConsoleView.prototype = {
 
     afterShow: function()
     {
-        WebInspector.currentFocusElement = this.promptElement;
+        WebInspector.setCurrentFocusElement(this.promptElement);
     },
 
     storeScrollPositions: function()
@@ -331,16 +335,16 @@ WebInspector.ConsoleView.prototype = {
         this._linkifier.reset();
     },
 
-    completions: function(wordRange, bestMatchOnly, completionsReadyCallback)
+    completions: function(wordRange, force, completionsReadyCallback)
     {
         // Pass less stop characters to rangeOfWord so the range will be a more complete expression.
         var expressionRange = wordRange.startContainer.rangeOfWord(wordRange.startOffset, ExpressionStopCharacters, this.promptElement, "backward");
         var expressionString = expressionRange.toString();
         var prefix = wordRange.toString();
-        this._completions(expressionString, prefix, bestMatchOnly, completionsReadyCallback);
+        this._completions(expressionString, prefix, force, completionsReadyCallback);
     },
 
-    _completions: function(expressionString, prefix, bestMatchOnly, completionsReadyCallback)
+    _completions: function(expressionString, prefix, force, completionsReadyCallback)
     {
         var lastIndex = expressionString.length - 1;
 
@@ -350,19 +354,19 @@ WebInspector.ConsoleView.prototype = {
         if (dotNotation || bracketNotation)
             expressionString = expressionString.substr(0, lastIndex);
 
-        if (!expressionString && !prefix) {
-            completionsReadyCallback([]);
-            return;
-        }
-
-        if (parseInt(expressionString, 10) == expressionString) {
+        if (expressionString && parseInt(expressionString, 10) == expressionString) {
             // User is entering float value, do not suggest anything.
             completionsReadyCallback([]);
             return;
         }
 
-        if (!expressionString && WebInspector.panels.scripts.paused)
-            WebInspector.panels.scripts.getSelectedCallFrameVariables(receivedPropertyNames.bind(this));
+        if (!prefix && !expressionString && !force) {
+            completionsReadyCallback([]);
+            return;
+        }
+
+        if (!expressionString && WebInspector.debuggerPresentationModel.paused)
+            WebInspector.debuggerPresentationModel.getSelectedCallFrameVariables(receivedPropertyNames.bind(this));
         else
             this.evalInInspectedWindow(expressionString, "completion", true, true, false, evaluated.bind(this));
 
@@ -424,11 +428,11 @@ WebInspector.ConsoleView.prototype = {
                 for (var i = 0; i < commandLineAPI.length; ++i)
                     propertyNames[commandLineAPI[i]] = true;
             }
-            this._reportCompletions(bestMatchOnly, completionsReadyCallback, dotNotation, bracketNotation, prefix, Object.keys(propertyNames));
+            this._reportCompletions(completionsReadyCallback, dotNotation, bracketNotation, expressionString, prefix, Object.keys(propertyNames));
         }
     },
 
-    _reportCompletions: function(bestMatchOnly, completionsReadyCallback, dotNotation, bracketNotation, prefix, properties) {
+    _reportCompletions: function(completionsReadyCallback, dotNotation, bracketNotation, expressionString, prefix, properties) {
         if (bracketNotation) {
             if (prefix.length && prefix[0] === "'")
                 var quoteUsed = "'";
@@ -437,6 +441,13 @@ WebInspector.ConsoleView.prototype = {
         }
 
         var results = [];
+
+        if (!expressionString) {
+            const keywords = ["break", "case", "catch", "continue", "default", "delete", "do", "else", "finally", "for", "function", "if", "in",
+                              "instanceof", "new", "return", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with"];
+            properties = properties.concat(keywords);
+        }
+
         properties.sort();
 
         for (var i = 0; i < properties.length; ++i) {
@@ -453,12 +464,10 @@ WebInspector.ConsoleView.prototype = {
 
             if (property.length < prefix.length)
                 continue;
-            if (property.indexOf(prefix) !== 0)
+            if (prefix.length && property.indexOf(prefix) !== 0)
                 continue;
 
             results.push(property);
-            if (bestMatchOnly)
-                break;
         }
         completionsReadyCallback(results);
     },
@@ -573,8 +582,8 @@ WebInspector.ConsoleView.prototype = {
      */
     evalInInspectedWindow: function(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptions, returnByValue, callback)
     {
-        if (WebInspector.panels.scripts.paused) {
-            WebInspector.panels.scripts.evaluateInSelectedCallFrame(expression, objectGroup, includeCommandLineAPI, returnByValue, callback);
+        if (WebInspector.debuggerPresentationModel.paused) {
+            WebInspector.debuggerPresentationModel.evaluateInSelectedCallFrame(expression, objectGroup, includeCommandLineAPI, returnByValue, callback);
             return;
         }
 
@@ -599,6 +608,11 @@ WebInspector.ConsoleView.prototype = {
         RuntimeAgent.evaluate(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptions, this._currentEvaluationContextId(), returnByValue, evalCallback);
     },
 
+    evaluateUsingTextPrompt: function(expression)
+    {
+        this._appendCommand(expression, this.prompt.text);
+    },
+
     _enterKeyPressed: function(event)
     {
         if (event.altKey || event.ctrlKey || event.shiftKey)
@@ -612,8 +626,12 @@ WebInspector.ConsoleView.prototype = {
         var str = this.prompt.text;
         if (!str.length)
             return;
+        this._appendCommand(str, "");
+    },
 
-        var commandMessage = new WebInspector.ConsoleCommand(str);
+    _appendCommand: function(text, newPromptText)
+    {
+        var commandMessage = new WebInspector.ConsoleCommand(text);
         WebInspector.console.interruptRepeatCount();
         this._appendConsoleMessage(commandMessage);
 
@@ -622,15 +640,14 @@ WebInspector.ConsoleView.prototype = {
             if (!result)
                 return;
 
-            this.prompt.history.push(str);
-            this.prompt.historyOffset = 0;
-            this.prompt.text = "";
+            this.prompt.pushHistoryItem(text);
+            this.prompt.text = newPromptText;
 
-            WebInspector.settings.consoleHistory.set(this.prompt.history.slice(-30));
+            WebInspector.settings.consoleHistory.set(this.prompt.historyData.slice(-30));
 
             this._appendConsoleMessage(new WebInspector.ConsoleCommandResult(result, wasThrown, commandMessage, this._linkifier));
         }
-        this.evalInInspectedWindow(str, "console", true, false, false, printResult.bind(this));
+        this.evalInInspectedWindow(text, "console", true, false, false, printResult.bind(this));
 
         WebInspector.userMetrics.ConsoleEvaluated.record();
     },

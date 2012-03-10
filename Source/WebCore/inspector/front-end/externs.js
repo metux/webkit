@@ -28,6 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// WebKit Web Facing API
 var console = {}
 /** @param {...*} vararg */
 console.warn = function(vararg) {}
@@ -37,103 +38,48 @@ console.assert = function(vararg) {}
 console.error = function(vararg) {}
 console.trace = function() {}
 
-var WebInspector = {}
-
-/**
- * @param {string} url
- * @param {string=} linkText
- * @param {string=} classes
- * @param {boolean=} isExternal
- * @param {string=} tooltipText
- */
-WebInspector.linkifyURLAsNode = function(url, linkText, classes, isExternal, tooltipText) {}
-
-/**
- * @param {string} url
- * @param {string=} linkText
- * @param {string=} classes
- * @param {boolean=} isExternal
- * @param {string=} tooltipText
- */
-WebInspector.linkifyURL = function(url, linkText, classes, isExternal, tooltipText) {}
-
-/** @param {string} url */
-WebInspector.linkifyStringAsFragment = function(url) {}
-/** @param {string} url */
-WebInspector.linkifyStringAsFragmentWithCustomLinkifier = function(url, linkifier) {}
-
-/**
- * @param {string=} classes
- * @param {string=} tooltipText
- */
-WebInspector.linkifyResourceAsNode = function(url, lineNumber, classes, tooltipText) {}
-
-/**
- * @param {string} url
- * @param {number=} lineNumber
- */
-WebInspector.formatLinkText = function(url, lineNumber) {}
-
-/**
- * @param {string} url
- */
-WebInspector.displayNameForURL = function(url) {}
-
-/**
- * @param {string} url
- * @param {string} href
- */
-WebInspector.completeURL = function(url, href) {}
-
-/**
- * @param {string} str
- * @param {...*} varArgs
- */
-WebInspector.UIString = function(str, varArgs) {}
-var InspectorBackend = {}
-InspectorBackend.runAfterPendingDispatches = function(message) {}
-
 var JSON = {}
 /** @param {string} str */
 JSON.parse = function(str) {}
-
 /** @param {Object} obj */
 /** @return {string} */
 JSON.stringify = function(str) {}
 
-/**
- * @param {boolean=} param
- */
+/** @param {boolean=} param */
 Element.prototype.scrollIntoViewIfNeeded = function(param) {}
+/** @type {boolean} */
+Event.prototype.isMetaOrCtrlForTest = false;
+/** @param {...*} vararg */
+Event.prototype.initWebKitWheelEvent = function(vararg) {}
+/** @param {Element} element */
+window.getComputedStyle = function(element) {}
 
-/**
- * @return {number}
- */
-Element.prototype.selectionLeftOffset = function() {}
-
-
-/**
- * @param {boolean=} onlyFirst
- */
+/** @param {boolean=} onlyFirst */
 Array.prototype.remove = function(obj, onlyFirst) {}
-
 Array.prototype.keySet = function() {}
+
+DOMApplicationCache.prototype.UNCACHED = 0;
+DOMApplicationCache.prototype.IDLE = 1;
+DOMApplicationCache.prototype.CHECKING = 2;
+DOMApplicationCache.prototype.DOWNLOADING = 3;
+DOMApplicationCache.prototype.UPDATEREADY = 4;
+DOMApplicationCache.prototype.OBSOLETE = 5;
+
+
+
+// Inspector Backend
+var InspectorBackend = {}
+InspectorBackend.runAfterPendingDispatches = function(message) {}
+
+
+// FIXME: remove everything below.
+var WebInspector = {}
 
 WebInspector.extensionServer = {}
 WebInspector.extensionServer.notifyResourceContentCommitted = function(resource, content) {}
 WebInspector.extensionServer.notifyPanelShown = function(panel) {}
 WebInspector.extensionServer.notifyPanelHidden = function(panel) {}
 WebInspector.extensionServer.notifyObjectSelected = function(object) {}
-
-/**
- * @param {string} url
- * @return {?WebInspector.Resource}
- */
-WebInspector.resourceForURL = function(url) {}
-
-WebInspector.debuggerPresentationModel = {
-    linkifyLocation: function(url, lineNumber, columnNumber, className) {}
-}
 
 /**
  * @param {NetworkAgent.RequestId} requestId
@@ -143,23 +89,12 @@ WebInspector.networkResourceById = function(requestId)
 {
 }
 
-/**
- * @param {WebInspector.ContextMenu} contextMenu
- * @param {Node} contextNode
- * @param {Event} event
- */
-WebInspector.populateHrefContextMenu = function(contextMenu, contextNode, event)
-{
-}
-
-/**
- * @return {boolean}
- */
-WebInspector.useLowerCaseMenuTitles = function()
-{
-}
-
 WebInspector.panels = {};
+
+/**
+ * @type {WebInspector.InspectorView}
+ */
+WebInspector.inspectorView;
 
 /**
  * @type {WebInspector.ScriptsPanel}
@@ -167,52 +102,10 @@ WebInspector.panels = {};
 WebInspector.panels.scripts = null;
 
 /**
- * @return {WebInspector.Panel} 
- */
-WebInspector.currentPanel = function() {}
-
-/**
- * @param {WebInspector.Panel} panel
- */
-WebInspector.setCurrentPanel = function(panel) {}
-
-/**
- * @type {?Element}
- */
-WebInspector.currentFocusElement = null;
-
-/**
- * @type {?Element}
- */
-WebInspector.previousFocusElement = null;
-
-/**
  * @param {WebInspector.View} view
  */
 WebInspector.showViewInDrawer = function(view) {}
 
-/**
- * @type {WebInspector.AdvancedSearchController}
- */
-WebInspector.advancedSearchController = null;
-
-/**
- * @type {string}
- */
-WebInspector.platformFlavor = "";
-
-/** @param {Element} element */
-window.getComputedStyle = function(element) {}
-
-/**
- * @type {boolean}
- */
-Event.prototype.isMetaOrCtrlForTest = false;
-
-/**
- * @param {...*} vararg
- */
-Event.prototype.initWebKitWheelEvent = function(vararg) {}
 
 /**
  * @param {string=} messageLevel
@@ -220,20 +113,13 @@ Event.prototype.initWebKitWheelEvent = function(vararg) {}
  */
 WebInspector.log = function(message, messageLevel, showConsole) {}
 
-WebInspector.resourceURLForRelatedNode = function(node, url) {}
-
 WebInspector.addMainEventListeners = function(doc) {}
 
 WebInspector.openResource = function(url, external) {}
 
-DOMApplicationCache.prototype.UNCACHED = 0;
-DOMApplicationCache.prototype.IDLE = 1;
-DOMApplicationCache.prototype.CHECKING = 2;
-DOMApplicationCache.prototype.DOWNLOADING = 3;
-DOMApplicationCache.prototype.UPDATEREADY = 4;
-DOMApplicationCache.prototype.OBSOLETE = 5;
-
 WebInspector.openRequestInNetworkPanel = function(request) {}
+
+WebInspector.evaluateInConsole = function(expression) {}
 
 var InjectedFakeWorker = function() {}
 
@@ -276,11 +162,22 @@ function ExtensionDescriptor() {
 }
 
 /**
+ * @constructor
+ */
+function ExtensionReloadOptions() {
+    this.ignoreCache = false;
+    this.injectedScript = "";
+    this.userAgent = "";
+}
+
+/**
  * @type {WebInspector.HandlerRegistry}
  */
 WebInspector.openAnchorLocationRegistry = null;
 
 /**
- * @type {WebInspector.View}
+ * @param {WebInspector.Panel} panel
  */
-WebInspector.mainPanelsView;
+WebInspector.showPanelForAnchorNavigation = function(panel)
+{
+}

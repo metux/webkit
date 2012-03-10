@@ -65,14 +65,12 @@ namespace JSC {
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | JSObject::StructureFlags;
 
         // JSValue methods
-        virtual JSValue defaultValue(ExecState*, PreferredPrimitiveType) const;
+        static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
 
         // JSObject methods
-        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier& propertyName, PropertySlot&);
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
-        virtual bool getOwnPropertySlotVirtual(ExecState*, unsigned propertyName, PropertySlot&);
         static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
-        virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
+        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
 
         static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
         static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
@@ -80,7 +78,7 @@ namespace JSC {
         static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
         static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
 
-        virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
+        static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     };
 
 } // namespace JSC

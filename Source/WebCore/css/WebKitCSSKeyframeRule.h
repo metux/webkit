@@ -47,7 +47,7 @@ public:
         return adoptRef(new WebKitCSSKeyframeRule(parent));
     }
 
-    virtual ~WebKitCSSKeyframeRule();
+    ~WebKitCSSKeyframeRule();
 
     String keyText() const              { return m_key; }
     void setKeyText(const String& s)    { m_key = s; }
@@ -56,10 +56,7 @@ public:
 
     CSSMutableStyleDeclaration* style() const { return m_style.get(); }
 
-    virtual String cssText() const;
-
-    // Not part of the CSSOM
-    virtual bool parseString(const String&, bool = false);
+    String cssText() const;
 
     void setDeclaration(PassRefPtr<CSSMutableStyleDeclaration>);
 
@@ -67,10 +64,6 @@ public:
     const CSSMutableStyleDeclaration*   declaration() const { return m_style.get(); }
 
 private:
-    virtual bool isKeyframeRule() const { return true; }
-    // Inherited from CSSRule
-    virtual CSSRuleType type() const { return WEBKIT_KEYFRAME_RULE; }
-
     static void parseKeyString(const String& s, Vector<float>& keys);
 
     WebKitCSSKeyframeRule(CSSStyleSheet* parent);

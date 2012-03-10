@@ -64,17 +64,16 @@ public:
     {
     }
 
-    void setObserver(SVGImage* image) { m_image = image; }
     virtual bool isSVGImageChromeClient() const { return true; }
     SVGImage* image() const { return m_image; }
-    
+
 private:
     virtual void chromeDestroyed()
     {
         m_image = 0;
     }
 
-    virtual void invalidateContentsAndWindow(const LayoutRect& r, bool)
+    virtual void invalidateContentsAndRootView(const IntRect& r, bool)
     {
         if (m_image && m_image->imageObserver())
             m_image->imageObserver()->changedInRect(m_image, r);
@@ -103,34 +102,9 @@ SVGImage::~SVGImage()
     ASSERT(!m_chromeClient || !m_chromeClient->image());
 }
 
-void SVGImage::setContainerZoom(float containerZoom)
+void SVGImage::setContainerSize(const IntSize&)
 {
-    if (!m_page)
-        return;
-    m_chromeClient->setObserver(0);
-    m_page->mainFrame()->setPageZoomFactor(containerZoom);
-    m_chromeClient->setObserver(this);
-}
-
-void SVGImage::setContainerSize(const IntSize& containerSize)
-{
-    ASSERT(!containerSize.isEmpty());
-    
-    if (!m_page)
-        return;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
-    if (!rootElement)
-        return;
-
-    RenderSVGRoot* renderer = toRenderSVGRoot(rootElement->renderer());
-    if (!renderer)
-        return;
-    renderer->setContainerSize(containerSize);
-
-    frame->view()->resize(size());
-    if (frame->view()->needsLayout())
-        frame->view()->layout();
+    ASSERT_NOT_REACHED();
 }
 
 bool SVGImage::usesContainerSize() const
@@ -164,13 +138,67 @@ IntSize SVGImage::size() const
     if (!containerSize.isEmpty())
         return containerSize;
 
-    // Otherwise fallback to the viewBox size.
-    IntSize size = enclosingIntRect(rootElement->currentViewBoxRect()).size();
+    // Assure that a container size is always given for a non-identity zoom level.
+    ASSERT(renderer->style()->effectiveZoom() == 1);
+    IntSize size = enclosingIntRect(rootElement->currentViewBoxRect(SVGSVGElement::CalculateViewBoxInHostDocument)).size();
     if (!size.isEmpty())
         return size;
 
     // As last resort, use CSS default intrinsic size.
     return IntSize(300, 150);
+}
+
+void SVGImage::drawSVGToImageBuffer(ImageBuffer* buffer, const IntSize& size, float zoom, ShouldClearBuffer shouldClear)
+{
+    // FIXME: This doesn't work correctly with animations. If an image contains animations, that say run for 2 seconds,
+    // and we currently have one <img> that displays us. If we open another document referencing the same SVGImage it
+    // will display the document at a time where animations already ran - even though it has its own ImageBuffer.
+    // We currently don't implement SVGSVGElement::setCurrentTime, and can NOT go back in time, once animations started.
+    // There's no way to fix this besides avoiding style/attribute mutations from SVGAnimationElement.
+    ASSERT(buffer);
+    ASSERT(!size.isEmpty());
+
+    if (!m_page)
+        return;
+
+    Frame* frame = m_page->mainFrame();
+    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    if (!rootElement)
+        return;
+    RenderSVGRoot* renderer = toRenderSVGRoot(rootElement->renderer());
+    if (!renderer)
+        return;
+
+    // Draw image at requested size.
+    ImageObserver* observer = imageObserver();
+    ASSERT(observer);
+
+    // Temporarily reset image observer, we don't want to receive any changeInRect() calls due this relayout.
+    setImageObserver(0);
+    renderer->setContainerSize(size);
+    frame->view()->resize(this->size());
+    if (zoom != 1)
+        frame->setPageZoomFactor(zoom);
+
+    // Eventually clear image buffer.
+    IntRect rect(IntPoint(), size);
+    if (shouldClear == ClearImageBuffer)
+        buffer->context()->clearRect(rect);
+
+    // Draw SVG on top of ImageBuffer.
+    draw(buffer->context(), rect, rect, ColorSpaceDeviceRGB, CompositeSourceOver);
+
+    // Reset container size & zoom to initial state. Otherwhise the size() of this
+    // image would return whatever last size was set by drawSVGToImageBuffer().
+    if (zoom != 1)
+        frame->setPageZoomFactor(1);
+
+    renderer->setContainerSize(IntSize());
+    frame->view()->resize(this->size());
+    if (frame->view()->needsLayout())
+        frame->view()->layout();
+
+    setImageObserver(observer); 
 }
 
 void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp)
@@ -195,6 +223,11 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
 
     context->translate(destOffset.x(), destOffset.y());
     context->scale(scale);
+
+    view->resize(size());
+
+    if (view->needsLayout())
+        view->layout();
 
     view->paint(context, IntRect(0, 0, view->width(), view->height()));
 
@@ -292,14 +325,14 @@ bool SVGImage::dataChanged(bool allDataReceived)
         // loaded by a top-level document.
         m_page = adoptPtr(new Page(pageClients));
         m_page->settings()->setMediaEnabled(false);
-        m_page->settings()->setJavaScriptEnabled(false);
+        m_page->settings()->setScriptEnabled(false);
         m_page->settings()->setPluginsEnabled(false);
 
         RefPtr<Frame> frame = Frame::create(m_page.get(), 0, dummyFrameLoaderClient);
         frame->setView(FrameView::create(frame.get()));
         frame->init();
         FrameLoader* loader = frame->loader();
-        loader->setForcedSandboxFlags(SandboxAll);
+        loader->forceSandboxFlags(SandboxAll);
 
         frame->view()->setCanHaveScrollbars(false); // SVG Images will always synthesize a viewBox, if it's not available, and thus never see scrollbars.
         frame->view()->setTransparent(true); // SVG Images are transparent.
@@ -309,11 +342,6 @@ bool SVGImage::dataChanged(bool allDataReceived)
         loader->activeDocumentLoader()->writer()->begin(KURL()); // create the empty document
         loader->activeDocumentLoader()->writer()->addData(data()->data(), data()->size());
         loader->activeDocumentLoader()->writer()->end();
-    
-        frame->view()->resize(size());
-
-        if (frame->view()->needsLayout())
-            frame->view()->layout();
     }
 
     return m_page;

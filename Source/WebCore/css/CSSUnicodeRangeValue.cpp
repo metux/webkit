@@ -30,11 +30,7 @@
 
 namespace WebCore {
 
-CSSUnicodeRangeValue::~CSSUnicodeRangeValue()
-{
-}
-
-String CSSUnicodeRangeValue::cssText() const
+String CSSUnicodeRangeValue::customCssText() const
 {
     String result;
     // FIXME: Implement.

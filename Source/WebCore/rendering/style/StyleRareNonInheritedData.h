@@ -89,6 +89,9 @@ public:
 
     float opacity; // Whether or not we're transparent.
 
+    float m_aspectRatioDenominator;
+    float m_aspectRatioNumerator;
+
     short m_counterIncrement;
     short m_counterReset;
 
@@ -102,9 +105,7 @@ public:
 #endif
 
     DataRef<StyleDeprecatedFlexibleBoxData> m_deprecatedFlexibleBox; // Flexible box properties
-#if ENABLE(CSS3_FLEXBOX)
     DataRef<StyleFlexibleBoxData> m_flexibleBox;
-#endif
     DataRef<StyleMarqueeData> m_marquee; // Marquee properties
     DataRef<StyleMultiColData> m_multiCol; //  CSS3 multicol properties
     DataRef<StyleTransformData> m_transform; // Transform properties (rotate, scale, skew, etc.)
@@ -129,6 +130,8 @@ public:
     LengthSize m_pageSize;
 
     RefPtr<CSSWrapShape> m_wrapShape;
+    Length m_wrapMargin;
+    Length m_wrapPadding;
     
     Color m_visitedLinkBackgroundColor;
     Color m_visitedLinkOutlineColor;
@@ -158,6 +161,10 @@ public:
     unsigned m_borderFit : 1; // EBorderFit
     unsigned m_textCombine : 1; // CSS3 text-combine properties
 
+    unsigned m_wrapFlow: 3; // WrapFlow
+    unsigned m_wrapThrough: 1; // WrapThrough
+
+    bool m_hasAspectRatio : 1; // Whether or not an aspect ratio has been specified.
 #if USE(ACCELERATED_COMPOSITING)
     bool m_runningAcceleratedAnimation : 1;
 #endif

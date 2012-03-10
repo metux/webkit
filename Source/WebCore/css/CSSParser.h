@@ -70,14 +70,14 @@ public:
     static bool parseSystemColor(RGBA32& color, const String&, Document*);
     PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(int propId, CSSParserValue*);
     bool parseColor(CSSMutableStyleDeclaration*, const String&);
-    bool parseDeclaration(CSSMutableStyleDeclaration*, const String&, RefPtr<CSSStyleSourceData>* styleSourceData = 0);
+    bool parseDeclaration(CSSMutableStyleDeclaration*, const String&, RefPtr<CSSStyleSourceData>* = 0, CSSStyleSheet* contextStyleSheet = 0);
     bool parseMediaQuery(MediaList*, const String&);
 
-    Document* document() const;
+    Document* findDocument() const;
 
     CSSPrimitiveValueCache* primitiveValueCache() const { return m_primitiveValueCache.get(); }
 
-    void addProperty(int propId, PassRefPtr<CSSValue>, bool important);
+    void addProperty(int propId, PassRefPtr<CSSValue>, bool important, bool implicit = false);
     void rollbackLastProperties(int num);
     bool hasProperties() const { return m_numParsedProperties > 0; }
 
@@ -91,7 +91,7 @@ public:
 
     PassRefPtr<CSSValue> parseBackgroundColor();
 
-    bool parseFillImage(RefPtr<CSSValue>&);
+    bool parseFillImage(CSSParserValueList*, RefPtr<CSSValue>&);
 
     enum FillPositionFlag { InvalidFillPosition = 0, AmbiguousFillPosition = 1, XFillPosition = 2, YFillPosition = 4 };
     PassRefPtr<CSSValue> parseFillPositionComponent(CSSParserValueList*, unsigned& cumulativeFlags, FillPositionFlag& individualFlag);
@@ -163,7 +163,7 @@ public:
 #endif
 
     // CSS3 Parsing Routines (for properties specific to CSS3)
-    bool parseShadow(int propId, bool important);
+    PassRefPtr<CSSValueList> parseShadow(CSSParserValueList*, int propId);
     bool parseBorderImage(int propId, RefPtr<CSSValue>&);
     bool parseBorderImageRepeat(RefPtr<CSSValue>&);
     bool parseBorderImageSlice(int propId, RefPtr<CSSBorderImageSliceValue>&);
@@ -171,21 +171,28 @@ public:
     bool parseBorderImageOutset(RefPtr<CSSPrimitiveValue>&);
     bool parseBorderRadius(int propId, bool important);
 
+    bool parseAspectRatio(bool important);
+
     bool parseReflect(int propId, bool important);
 
     bool parseFlex(int propId, bool important);
 
     // Image generators
-    bool parseCanvas(RefPtr<CSSValue>&);
+    bool parseCanvas(CSSParserValueList*, RefPtr<CSSValue>&);
 
-    bool parseDeprecatedGradient(RefPtr<CSSValue>&);
-    bool parseLinearGradient(RefPtr<CSSValue>&, CSSGradientRepeat repeating);
-    bool parseRadialGradient(RefPtr<CSSValue>&, CSSGradientRepeat repeating);
+    bool parseDeprecatedGradient(CSSParserValueList*, RefPtr<CSSValue>&);
+    bool parseLinearGradient(CSSParserValueList*, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
+    bool parseRadialGradient(CSSParserValueList*, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
     bool parseGradientColorStops(CSSParserValueList*, CSSGradientValue*, bool expectComma);
+
+    bool parseCrossfade(CSSParserValueList*, RefPtr<CSSValue>&);
 
 #if ENABLE(CSS_FILTERS)
     bool isValidFilterArgument(CSSParserValue* argument, WebKitCSSFilterValue::FilterOperationType&, unsigned argumentCount);
     PassRefPtr<CSSValueList> parseFilter();
+#if ENABLE(CSS_SHADERS)
+    PassRefPtr<WebKitCSSFilterValue> parseCustomFilter(CSSParserValue*);
+#endif
 #endif
 
     PassRefPtr<CSSValueList> parseTransform();
@@ -253,6 +260,7 @@ public:
     Vector<OwnPtr<CSSParserSelector> >* reusableRegionSelectorVector() { return &m_reusableRegionSelectorVector; }
 
     void updateLastSelectorLineAndPosition();
+    void updateLastMediaLine(MediaList*);
 
     void clearProperties();
 
@@ -317,7 +325,7 @@ private:
     void deleteFontFaceOnlyValues();
 
     bool isGeneratedImageValue(CSSParserValue*) const;
-    bool parseGeneratedImage(RefPtr<CSSValue>&);
+    bool parseGeneratedImage(CSSParserValueList*, RefPtr<CSSValue>&);
 
     bool parseValue(CSSMutableStyleDeclaration*, int propId, const String&, bool important);
 

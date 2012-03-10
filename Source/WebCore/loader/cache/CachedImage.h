@@ -25,7 +25,7 @@
 
 #include "CachedResource.h"
 #include "CachedResourceClient.h"
-#include "ImageBySizeCache.h"
+#include "SVGImageCache.h"
 #include "ImageObserver.h"
 #include "IntRect.h"
 #include "Timer.h"
@@ -57,8 +57,6 @@ public:
     bool willPaintBrokenImage() const; 
 
     bool canRender(const RenderObject* renderer, float multiplier) { return !errorOccurred() && !imageSizeForRenderer(renderer, multiplier).isEmpty(); }
-    void addClientForRenderer(RenderObject*);
-    void removeClientForRenderer(RenderObject*);
 
     void setContainerSizeForRenderer(const RenderObject*, const IntSize&, float);
     bool usesImageContainerSize() const;
@@ -69,6 +67,7 @@ public:
     IntSize imageSizeForRenderer(const RenderObject*, float multiplier); // returns the size of the complete image.
     void computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio);
 
+    void removeClientForRenderer(RenderObject*);
     virtual void didAddClient(CachedResourceClient*);
     
     virtual void allClientsRemoved();
@@ -96,9 +95,7 @@ public:
     virtual void changedInRect(const Image*, const IntRect&);
 
 private:
-    Image* lookupImageForSize(const IntSize&) const;
-    Image* lookupImageForRenderer(const RenderObject*) const;
-    PassRefPtr<Image> lookupOrCreateImageForRenderer(const RenderObject*);
+    Image* lookupOrCreateImageForRenderer(const RenderObject*);
 
     void createImage();
     size_t maximumDecodedImageSize();
@@ -109,7 +106,9 @@ private:
     void checkShouldPaintBrokenImage();
 
     RefPtr<Image> m_image;
-    mutable ImageBySizeCache m_svgImageCache;
+#if ENABLE(SVG)
+    OwnPtr<SVGImageCache> m_svgImageCache;
+#endif
     Timer<CachedImage> m_decodedDataDeletionTimer;
     bool m_shouldPaintBrokenImage;
 };

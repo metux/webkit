@@ -88,6 +88,14 @@ WebInspector.ProfileType.prototype = {
     }
 }
 
+WebInspector.registerLinkifierPlugin(function(title)
+{
+    var profileStringMatches = WebInspector.ProfileType.URLRegExp.exec(title);
+    if (profileStringMatches)
+        title = WebInspector.panels.profiles.displayTitleForProfileLink(profileStringMatches[2], profileStringMatches[1]);
+    return title;
+});
+
 WebInspector.ProfilesPanel = function()
 {
     WebInspector.Panel.call(this, "profiles");
@@ -111,6 +119,8 @@ WebInspector.ProfilesPanel = function()
 
     this.enableToggleButton = new WebInspector.StatusBarButton("", "enable-toggle-status-bar-item");
     this.enableToggleButton.addEventListener("click", this._toggleProfiling.bind(this), false);
+    if (Preferences.profilerAlwaysEnabled)
+        this.enableToggleButton.element.addStyleClass("hidden");
 
     this.clearResultsButton = new WebInspector.StatusBarButton(WebInspector.UIString("Clear all profiles."), "clear-status-bar-item");
     this.clearResultsButton.addEventListener("click", this._clearProfiles.bind(this), false);

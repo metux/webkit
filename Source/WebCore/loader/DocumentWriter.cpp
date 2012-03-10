@@ -119,12 +119,12 @@ void DocumentWriter::begin(const KURL& urlReference, bool dispatch, Document* ow
     
     // If the new document is for a Plugin but we're supposed to be sandboxed from Plugins,
     // then replace the document with one whose parser will ignore the incoming data (bug 39323)
-    if (document->isPluginDocument() && m_frame->loader()->isSandboxed(SandboxPlugins))
+    if (document->isPluginDocument() && document->isSandboxed(SandboxPlugins))
         document = SinkDocument::create(m_frame, url);
 
     // FIXME: Do we need to consult the content security policy here about blocked plug-ins?
 
-    bool resetScripting = !(m_frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument() && m_frame->document()->securityOrigin()->isSecureTransitionTo(url));
+    bool resetScripting = !(m_frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument() && m_frame->document()->isSecureTransitionTo(url));
     m_frame->loader()->clear(resetScripting, resetScripting);
     clear();
     if (resetScripting)
@@ -244,7 +244,8 @@ void DocumentWriter::setEncoding(const String& name, bool userChosen)
 #if PLATFORM(MAC) || PLATFORM(WIN)
 String DocumentWriter::deprecatedFrameEncoding() const
 {
-    if (m_frame->document()->url().isEmpty())
+    Document* document = m_frame->document();
+    if (!document || document->url().isEmpty())
         return m_encoding;
 
     if (m_encodingWasChosenByUser && !m_encoding.isEmpty())

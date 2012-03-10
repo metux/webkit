@@ -273,11 +273,10 @@ enum AccessibilitySearchKey {
     VisitedLinkSearchKey
 };
 
-struct AccessibilitySearchPredicate {
-    AccessibilityObject* axContainerObject;
-    AccessibilityObject* axStartObject;
-    AccessibilitySearchDirection axSearchDirection;
-    AccessibilitySearchKey axSearchKey;
+struct AccessibilitySearchCriteria {
+    AccessibilityObject* startObject;
+    AccessibilitySearchDirection searchDirection;
+    AccessibilitySearchKey searchKey;
     String* searchText;
     unsigned resultsLimit;
 };
@@ -319,9 +318,6 @@ class AccessibilityObject : public RefCounted<AccessibilityObject> {
 protected:
     AccessibilityObject();
     
-    // Should only be called by accessibleObjectsWithAccessibilitySearchPredicate for AccessibilityObject searching.
-    static bool isAccessibilityObjectSearchMatch(AccessibilityObject*, AccessibilitySearchPredicate*);
-    static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchPredicate*);
 public:
     virtual ~AccessibilityObject();
     virtual void detach();
@@ -411,6 +407,9 @@ public:
     virtual bool isCollapsed() const { return false; }
     virtual void setIsExpanded(bool) { }
 
+    // In a multi-select list, many items can be selected but only one is active at a time.
+    virtual bool isSelectedOptionActive() const { return false; }
+
     virtual bool hasBoldFont() const { return false; }
     virtual bool hasItalicFont() const { return false; }
     bool hasMisspelling() const;
@@ -483,7 +482,7 @@ public:
     virtual AccessibilityObject* parentObjectUnignored() const;
     virtual AccessibilityObject* parentObjectIfExists() const { return 0; }
     static AccessibilityObject* firstAccessibleObjectFromNode(const Node*);
-    static void accessibleObjectsWithAccessibilitySearchPredicate(AccessibilitySearchPredicate*, AccessibilityChildrenVector&);
+    void findMatchingObjects(AccessibilitySearchCriteria*, AccessibilityChildrenVector&);
 
     virtual AccessibilityObject* observableObject() const { return 0; }
     virtual void linkedUIElements(AccessibilityChildrenVector&) const { }
@@ -491,7 +490,7 @@ public:
     virtual bool exposesTitleUIElement() const { return true; }
     virtual AccessibilityObject* correspondingLabelForControlElement() const { return 0; }
     virtual AccessibilityObject* correspondingControlForLabelElement() const { return 0; }
-    virtual AccessibilityObject* scrollBar(AccessibilityOrientation) const { return 0; }
+    virtual AccessibilityObject* scrollBar(AccessibilityOrientation) { return 0; }
     
     virtual AccessibilityRole ariaRoleAttribute() const { return UnknownRole; }
     virtual bool isPresentationalChildOfAriaRole() const { return false; }
@@ -564,6 +563,7 @@ public:
     virtual bool canHaveChildren() const { return true; }
     virtual bool hasChildren() const { return m_haveChildren; }
     virtual void updateChildrenIfNecessary();
+    virtual void setNeedsToUpdateChildren() { }
     virtual void clearChildren();
     virtual void detachFromParent() { }
 
@@ -688,7 +688,9 @@ protected:
     AccessibilityRole m_role;
     
     virtual bool isDetached() const { return true; }
-    
+    static bool isAccessibilityObjectSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
+    static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
+
 #if PLATFORM(GTK)
     bool allowsTextRanges() const;
     unsigned getLengthForTextRange() const;

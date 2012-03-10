@@ -2,14 +2,14 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [7])
-m4_define([webkit_micro_version], [1])
+m4_define([webkit_micro_version], [2])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
 m4_define([webkit_user_agent_major_version], [535])
-m4_define([webkit_user_agent_minor_version], [7])
+m4_define([webkit_user_agent_minor_version], [10])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,10 +35,10 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=11:1:11
+LIBWEBKITGTK_VERSION=11:2:11
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
-AM_INIT_AUTOMAKE([foreign subdir-objects tar-ustar])
+AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
 
 # Use AM_SILENT_RULES if present
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -277,6 +277,7 @@ SQLITE_REQUIRED_VERSION=3.0
 GSTREAMER_REQUIRED_VERSION=0.10
 GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=0.10.30
 ENCHANT_REQUIRED_VERSION=0.22
+LIBFFTW_REQUIRED_VERSION=3.2.2
 
 # Available modules
 #
@@ -570,8 +571,8 @@ fi
 AC_MSG_CHECKING([whether to enable HTML5 video track support])
 AC_ARG_ENABLE(video_track,
               AC_HELP_STRING([--enable-video-track],
-                             [enable HTML5 video track support [default=yes]]),
-              [],[enable_video_track="yes"])
+                             [enable HTML5 video track support [default=no]]),
+              [],[enable_video_track="no"])
 AC_MSG_RESULT([$enable_video_track])
 
 # check whether to enable media source support
@@ -1035,10 +1036,11 @@ if test "$os_win32" = "no"; then
 fi
 
 # check if gstreamer is available
-if test "$enable_video" = "yes"; then
+if test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"; then
    PKG_CHECK_MODULES([GSTREAMER],
                      [gstreamer-0.10 >= $GSTREAMER_REQUIRED_VERSION
                      gstreamer-app-0.10
+                     gstreamer-audio-0.10
                      gstreamer-base-0.10
                      gstreamer-interfaces-0.10
                      gstreamer-pbutils-0.10
@@ -1048,6 +1050,17 @@ if test "$enable_video" = "yes"; then
 
    AC_SUBST([GSTREAMER_CFLAGS])
    AC_SUBST([GSTREAMER_LIBS])
+fi
+
+# check if libfftw is available
+if test "$enable_web_audio" = "yes"; then
+   PKG_CHECK_MODULES([LIBFFTW],
+                     [fftw3 >= $LIBFFTW_REQUIRED_VERSION
+                     fftw3f >= $LIBFFTW_REQUIRED_VERSION],
+                     [have_fftw=yes])
+
+    AC_SUBST([LIBFFTW_CFLAGS])
+    AC_SUBST([LIBFFTW_LIBS])
 fi
 
 # check for code coverage support
@@ -1122,6 +1135,9 @@ AM_CONDITIONAL([USE_PANGO], [test "$with_font_backend" = "pango"])
 
 # GStreamer feature conditional
 AM_CONDITIONAL([USE_GSTREAMER], [test "$have_gstreamer" = "yes"])
+
+# Web Audio feature conditional
+AM_CONDITIONAL([USE_WEBAUDIO_FFTW], [test "$have_fftw" = "yes"])
 
 # WebKit feature conditionals
 AM_CONDITIONAL([ENABLE_DEBUG],[test "$enable_debug_features" = "yes"])

@@ -33,6 +33,7 @@
 #include "CollectionType.h"
 #include "Color.h"
 #include "DOMTimeStamp.h"
+#include "DocumentEventQueue.h"
 #include "DocumentTiming.h"
 #include "IconURL.h"
 #include "IntRect.h"
@@ -41,10 +42,12 @@
 #include "PlatformScreen.h"
 #include "QualifiedName.h"
 #include "ScriptExecutionContext.h"
+#include "SecurityPolicy.h"
 #include "StringWithDirection.h"
 #include "Timer.h"
 #include "TreeScope.h"
 #include "ViewportArguments.h"
+#include "WebKitMutationObserver.h"
 #include <wtf/Deque.h>
 #include <wtf/FixedArray.h>
 #include <wtf/OwnPtr.h>
@@ -81,7 +84,6 @@ class Element;
 class EntityReference;
 class Event;
 class EventListener;
-class EventQueue;
 class FontData;
 class FormAssociatedElement;
 class Frame;
@@ -322,6 +324,8 @@ public:
 
     ViewportArguments viewportArguments() const { return m_viewportArguments; }
 
+    SecurityPolicy::ReferrerPolicy referrerPolicy() const { return m_referrerPolicy; }
+
     DocumentType* doctype() const { return m_docType.get(); }
 
     DOMImplementation* implementation();
@@ -342,6 +346,7 @@ public:
     PassRefPtr<Attr> createAttribute(const String& name, ExceptionCode&);
     PassRefPtr<Attr> createAttributeNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&, bool shouldIgnoreNamespaceChecks = false);
     PassRefPtr<EntityReference> createEntityReference(const String& name, ExceptionCode&);
+    PassRefPtr<Node> importNode(Node* importedNode, ExceptionCode& ec) { return importNode(importedNode, true, ec); }
     PassRefPtr<Node> importNode(Node* importedNode, bool deep, ExceptionCode&);
     virtual PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&);
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
@@ -606,6 +611,8 @@ public:
     void setURL(const KURL&);
 
     const KURL& baseURL() const { return m_baseURL; }
+    void setBaseURLOverride(const KURL&);
+    const KURL& baseURLOverride() const { return m_baseURLOverride; }
     const String& baseTarget() const { return m_baseTarget; }
     void processBaseElement();
 
@@ -776,6 +783,15 @@ public:
     void addListenerType(ListenerType listenerType) { m_listenerTypes = m_listenerTypes | listenerType; }
     void addListenerTypeIfNeeded(const AtomicString& eventType);
 
+#if ENABLE(MUTATION_OBSERVERS)
+    bool hasSubtreeMutationObserverOfType(WebKitMutationObserver::MutationType type) const
+    {
+        return m_subtreeMutationObserverTypes & type;
+    }
+    bool hasSubtreeMutationObserver() const { return m_subtreeMutationObserverTypes; }
+    void addSubtreeMutationObserverTypes(MutationObserverOptions types) { m_subtreeMutationObserverTypes |= types; }
+#endif
+
     CSSStyleDeclaration* getOverrideStyle(Element*, const String& pseudoElt);
 
     int nodeAbsIndex(Node*);
@@ -792,6 +808,7 @@ public:
      */
     void processHttpEquiv(const String& equiv, const String& content);
     void processViewport(const String& features);
+    void processReferrerPolicy(const String& policy);
 
     // Returns the owning element in the parent document.
     // Returns 0 if this is the top level document.
@@ -1003,7 +1020,7 @@ public:
     // Explicitly override the security origin for this document.
     // Note: It is dangerous to change the security origin of a document
     //       that already contains content.
-    void setSecurityOrigin(SecurityOrigin*);
+    void setSecurityOrigin(PassRefPtr<SecurityOrigin>);
 
     void updateURLForPushOrReplaceState(const KURL&);
     void statePopped(SerializedScriptValue*);
@@ -1030,7 +1047,7 @@ public:
     void enqueuePageshowEvent(PageshowEventPersistence);
     void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
     void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject);
-    EventQueue* eventQueue() const { return m_eventQueue.get(); }
+    virtual DocumentEventQueue* eventQueue() const { return m_eventQueue.get(); }
 
     void addMediaCanStartListener(MediaCanStartListener*);
     void removeMediaCanStartListener(MediaCanStartListener*);
@@ -1105,6 +1122,8 @@ public:
     void removeCachedMicroDataItemList(MicroDataItemList*, const String&);
 #endif
     
+    bool isInDocumentWrite() { return m_writeRecursionDepth > 0; }
+
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
 
@@ -1173,6 +1192,7 @@ private:
     // Document URLs.
     KURL m_url; // Document.URL: The URL from which this document was retrieved.
     KURL m_baseURL; // Node.baseURI: The URL to use when resolving relative URLs.
+    KURL m_baseURLOverride; // An alternative base URL that takes precedence ove m_baseURL (but not m_baseElementURL).
     KURL m_baseElementURL; // The URL set by the <base> element.
     KURL m_cookieURL; // The URL to use for cookie access.
     KURL m_firstPartyForCookies; // The policy URL for third-party cookie blocking.
@@ -1235,6 +1255,10 @@ private:
     HashSet<Range*> m_ranges;
 
     unsigned short m_listenerTypes;
+
+#if ENABLE(MUTATION_OBSERVERS)
+    MutationObserverOptions m_subtreeMutationObserverTypes;
+#endif
 
     RefPtr<StyleSheetList> m_styleSheets; // All of the stylesheets that are currently in effect for our media type and stylesheet set.
     
@@ -1370,7 +1394,7 @@ private:
 
     bool m_usingGeolocation;
 
-    RefPtr<EventQueue> m_eventQueue;
+    RefPtr<DocumentEventQueue> m_eventQueue;
 
     RefPtr<DocumentWeakReference> m_weakReference;
 
@@ -1393,6 +1417,8 @@ private:
     Timer<Document> m_loadEventDelayTimer;
 
     ViewportArguments m_viewportArguments;
+
+    SecurityPolicy::ReferrerPolicy m_referrerPolicy;
 
     bool m_directionSetOnDocumentElement;
     bool m_writingModeSetOnDocumentElement;

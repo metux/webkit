@@ -31,10 +31,6 @@
 
 namespace WebCore {
 
-CSSFontFaceSrcValue::~CSSFontFaceSrcValue()
-{
-}
-
 #if ENABLE(SVG_FONTS)
 bool CSSFontFaceSrcValue::isSVGFontFaceSrc() const
 {
@@ -60,7 +56,7 @@ bool CSSFontFaceSrcValue::isSupportedFormat() const
            ;
 }
 
-String CSSFontFaceSrcValue::cssText() const
+String CSSFontFaceSrcValue::customCssText() const
 {
     String result;
     if (isLocal())

@@ -23,7 +23,6 @@
 #include "CSSMutableStyleDeclaration.h"
 
 #include "CSSImageValue.h"
-#include "CSSMutableValue.h"
 #include "CSSParser.h"
 #include "CSSPropertyLonghand.h"
 #include "CSSPropertyNames.h"
@@ -35,6 +34,7 @@
 #include "ExceptionCode.h"
 #include "InspectorInstrumentation.h"
 #include "StyledElement.h"
+#include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
 
 using namespace std;
@@ -42,44 +42,31 @@ using namespace std;
 namespace WebCore {
 
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration()
-    : m_node(0)
-    , m_strictParsing(false)
-#ifndef NDEBUG
-    , m_iteratorCount(0)
-#endif
+    : CSSStyleDeclaration(0, /* isMutable */ true)
+    , m_node(0)
 {
+    // This constructor is used for various inline style declarations, so disable strict parsing.
+    m_strictParsing = false;
 }
 
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent)
-    : CSSStyleDeclaration(parent)
+    : CSSStyleDeclaration(parent, /* isMutable */ true)
     , m_node(0)
-    , m_strictParsing(!parent || parent->useStrictParsing())
-#ifndef NDEBUG
-    , m_iteratorCount(0)
-#endif
 {
 }
 
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent, const Vector<CSSProperty>& properties)
-    : CSSStyleDeclaration(parent)
+    : CSSStyleDeclaration(parent, /* isMutable */ true)
     , m_properties(properties)
     , m_node(0)
-    , m_strictParsing(!parent || parent->useStrictParsing())
-#ifndef NDEBUG
-    , m_iteratorCount(0)
-#endif
 {
     m_properties.shrinkToFit();
     // FIXME: This allows duplicate properties.
 }
 
 CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent, const CSSProperty* const * properties, int numProperties)
-    : CSSStyleDeclaration(parent)
+    : CSSStyleDeclaration(parent, /* isMutable */ true)
     , m_node(0)
-    , m_strictParsing(!parent || parent->useStrictParsing())
-#ifndef NDEBUG
-    , m_iteratorCount(0)
-#endif
 {
     m_properties.reserveInitialCapacity(numProperties);
     HashMap<int, bool> candidates;
@@ -99,13 +86,6 @@ CSSMutableStyleDeclaration::CSSMutableStyleDeclaration(CSSRule* parent, const CS
 
 CSSMutableStyleDeclaration::~CSSMutableStyleDeclaration()
 {
-    const CSSMutableStyleDeclarationConstIterator end = this->end();
-    for (CSSMutableStyleDeclarationConstIterator it = begin(); it != end; ++it) {
-        CSSValue* value = it->value();
-        if (!value || !value->isMutableValue())
-            continue;
-        static_cast<CSSMutableValue*>(value)->setNode(0);
-    }
 }
 
 CSSMutableStyleDeclaration& CSSMutableStyleDeclaration::operator=(const CSSMutableStyleDeclaration& other)
@@ -214,6 +194,8 @@ String CSSMutableStyleDeclaration::getPropertyValue(int propertyID) const
                                         CSSPropertyBorderBottomStyle, CSSPropertyBorderLeftStyle };
             return get4Values(properties);
         }
+        case CSSPropertyFont:
+            return fontValue();
         case CSSPropertyMargin: {
             const int properties[4] = { CSSPropertyMarginTop, CSSPropertyMarginRight,
                                         CSSPropertyMarginBottom, CSSPropertyMarginLeft };
@@ -291,6 +273,62 @@ String CSSMutableStyleDeclaration::borderSpacingValue(const int properties[2]) c
     if (horizontalValueCSSText == verticalValueCSSText)
         return horizontalValueCSSText;
     return horizontalValueCSSText + ' ' + verticalValueCSSText;
+}
+
+bool CSSMutableStyleDeclaration::appendFontLonghandValueIfExplicit(int propertyId, StringBuilder& result) const
+{
+    const CSSProperty* property = findPropertyWithId(propertyId);
+    if (!property)
+        return false; // All longhands must have at least implicit values if "font" is specified.
+    if (property->isImplicit())
+        return true;
+
+    char prefix = '\0';
+    switch (propertyId) {
+    case CSSPropertyFontStyle:
+        break; // No prefix.
+    case CSSPropertyFontFamily:
+    case CSSPropertyFontVariant:
+    case CSSPropertyFontWeight:
+        prefix = ' ';
+        break;
+    case CSSPropertyLineHeight:
+        prefix = '/';
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+
+    if (prefix && !result.isEmpty())
+        result.append(prefix);
+    result.append(property->value()->cssText());
+
+    return true;
+}
+
+String CSSMutableStyleDeclaration::fontValue() const
+{
+    const CSSProperty* fontSizeProperty = findPropertyWithId(CSSPropertyFontSize);
+    if (!fontSizeProperty || fontSizeProperty->isImplicit())
+        return emptyString();
+
+    StringBuilder result;
+    bool success = true;
+    success &= appendFontLonghandValueIfExplicit(CSSPropertyFontStyle, result);
+    success &= appendFontLonghandValueIfExplicit(CSSPropertyFontVariant, result);
+    success &= appendFontLonghandValueIfExplicit(CSSPropertyFontWeight, result);
+    if (!result.isEmpty())
+        result.append(' ');
+    result.append(fontSizeProperty->value()->cssText());
+    success &= appendFontLonghandValueIfExplicit(CSSPropertyLineHeight, result);
+    success &= appendFontLonghandValueIfExplicit(CSSPropertyFontFamily, result);
+    if (!success) {
+        // An invalid "font" value has been built (should never happen, as at least implicit values
+        // for mandatory longhands are always found in the style), report empty value instead.
+        ASSERT_NOT_REACHED();
+        return emptyString();
+    }
+    return result.toString();
 }
 
 String CSSMutableStyleDeclaration::get4Values(const int* properties) const
@@ -520,7 +558,7 @@ void CSSMutableStyleDeclaration::setNeedsStyleRecalc()
     }
 
     if (CSSStyleSheet* styleSheet = parentStyleSheet()) {
-        if (Document* document = styleSheet->document())
+        if (Document* document = styleSheet->findDocument())
             document->styleSelectorChanged(DeferRecalcStyle);
     }
 }
@@ -787,6 +825,7 @@ void CSSMutableStyleDeclaration::addSubresourceStyleURLs(ListHashSet<KURL>& urls
 static const int blockProperties[] = {
     CSSPropertyOrphans,
     CSSPropertyOverflow, // This can be also be applied to replaced elements
+    CSSPropertyWebkitAspectRatio,
     CSSPropertyWebkitColumnCount,
     CSSPropertyWebkitColumnGap,
     CSSPropertyWebkitColumnRuleColor,

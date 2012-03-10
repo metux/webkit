@@ -55,6 +55,7 @@ namespace WebCore {
     class IDBVersionChangeRequest;
     class JavaScriptAudioNode;
     class LocalMediaStream;
+    class MediaController;
     class MediaStream;
     class MessagePort;
     class Node;
@@ -64,6 +65,8 @@ namespace WebCore {
     class ScriptExecutionContext;
     class SharedWorker;
     class SharedWorkerContext;
+    class TextTrack;
+    class TextTrackCue;
     class WebSocket;
     class Worker;
     class XMLHttpRequest;

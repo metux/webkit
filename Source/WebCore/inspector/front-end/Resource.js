@@ -44,6 +44,7 @@ WebInspector.MIMETypes = {
     "image/bmp":                   {2: true},
     "image/svg+xml":               {2: true},
     "image/vnd.microsoft.icon":    {2: true},
+    "image/webp":                  {2: true},
     "image/x-icon":                {2: true},
     "image/x-xbitmap":             {2: true},
     "font/ttf":                    {3: true},
@@ -69,7 +70,7 @@ WebInspector.MIMETypes = {
  * @constructor
  * @extends {WebInspector.Object}
  *
- * @param {?NetworkAgent.RequestId} requestId
+ * @param {NetworkAgent.RequestId} requestId
  * @param {string} url
  * @param {?string} frameId
  * @param {?NetworkAgent.LoaderId} loaderId
@@ -95,7 +96,7 @@ WebInspector.Resource = function(requestId, url, frameId, loaderId)
 
 WebInspector.Resource.displayName = function(url)
 {
-    return new WebInspector.Resource(null, url, null, null).displayName;
+    return new WebInspector.Resource("fake-transient-resource", url, null, null).displayName;
 }
 
 // Keep these in sync with WebCore::InspectorResource::Type

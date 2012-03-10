@@ -33,12 +33,10 @@ module window {
 
     interface [
         ActiveDOMObject,
-        CanBeConstructed,
         ConstructorParameters=1,
         Constructor(in DOMString scriptUrl),
         CallWith=ScriptExecutionContext,
         ConstructorRaisesException,
-        V8ConstructorSetsActiveDOMWrapper,
         EventTarget,
         NoStaticTables
     ] EventSource {

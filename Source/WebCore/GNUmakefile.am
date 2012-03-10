@@ -99,6 +99,7 @@ webcoregtk_cppflags += \
 	-I$(srcdir)/Source/WebCore/loader/gtk \
 	-I$(srcdir)/Source/WebCore/page/gtk \
 	-I$(srcdir)/Source/WebCore/platform/cairo \
+	-I$(srcdir)/Source/WebCore/platform/audio/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/graphics/cairo \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gtk \
@@ -500,6 +501,14 @@ DerivedSources/WebCore/XLinkNames.cpp : $(WebCore)/dom/make_names.pl $(WebCore)/
 if ENABLE_WEB_AUDIO
 FEATURE_DEFINES += ENABLE_WEB_AUDIO=1
 webcore_cppflags += -DENABLE_WEB_AUDIO=1
+
+if USE_WEBAUDIO_FFTW
+FEATURE_DEFINES += WTF_USE_WEBAUDIO_FFTW=1
+webcore_cppflags += -DWTF_USE_WEBAUDIO_FFTW=1
+webcore_sources += \
+	Source/WebCore/platform/audio/fftw/FFTFrameFFTW.cpp
+endif
+
 endif
 
 # ----
@@ -648,6 +657,7 @@ SCRIPTS_BINDINGS = \
 	$(WebCore)/bindings/scripts/CodeGenerator.pm \
 	$(WebCore)/bindings/scripts/IDLParser.pm \
 	$(WebCore)/bindings/scripts/IDLStructure.pm \
+	$(WebCore)/bindings/scripts/InFilesCompiler.pm \
 	$(WebCore)/bindings/scripts/InFilesParser.pm \
 	$(WebCore)/bindings/scripts/generate-bindings.pl \
 	$(WebCore)/bindings/scripts/preprocessor.pm
@@ -682,10 +692,13 @@ DerivedSources/WebCore/XMLNames.cpp DerivedSources/WebCore/XMLNames.h: $(WebCore
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/xml/xmlattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
 
 DerivedSources/WebCore/EventFactory.cpp DerivedSources/WebCore/EventHeaders.h DerivedSources/WebCore/EventInterfaces.h: $(WebCore)/dom/make_event_factory.pl $(WebCore)/dom/EventFactory.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --events $(WebCore)/dom/EventFactory.in --outputDir "$(GENSOURCES_WEBCORE)"
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventFactory.in --outputDir "$(GENSOURCES_WEBCORE)"
 
 DerivedSources/WebCore/EventTargetHeaders.h DerivedSources/WebCore/EventTargetInterfaces.h: $(WebCore)/dom/make_event_factory.pl $(WebCore)/dom/EventTargetFactory.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --events $(WebCore)/dom/EventTargetFactory.in --outputDir "$(GENSOURCES_WEBCORE)"
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventTargetFactory.in --outputDir "$(GENSOURCES_WEBCORE)"
+
+DerivedSources/WebCore/ExceptionCodeDescription.cpp DerivedSources/WebCore/ExceptionCodeDescription.h DerivedSources/WebCore/ExceptionHeaders.h DerivedSources/WebCore/ExceptionInterfaces.h: $(WebCore)/dom/make_dom_exceptions.pl $(WebCore)/dom/DOMExceptions.in
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/dom/DOMExceptions.in --outputDir "$(GENSOURCES_WEBCORE)"
 
 # All Web Inspector generated files are created with this one call to CodeGeneratorInspector.py
 DerivedSources/WebCore/InspectorProtocolVersion.h : $(WebCore)/inspector/Inspector.json $(WebCore)/inspector/generate-inspector-protocol-version
@@ -715,6 +728,7 @@ IDL_PATH := \
     $(WebCore)/fileapi \
     $(WebCore)/html \
     $(WebCore)/html/canvas \
+    $(WebCore)/html/track \
     $(WebCore)/inspector \
     $(WebCore)/loader/appcache \
     $(WebCore)/mediastream \
@@ -815,6 +829,7 @@ libWebCoreGtk_la_CPPFLAGS = \
 	$(GSTREAMER_CFLAGS) \
 	$(GTK_CFLAGS) \
 	$(HILDON_CFLAGS) \
+	$(LIBFFTW_CFLAGS) \
 	$(LIBSOUP_CFLAGS) \
 	$(LIBXML_CFLAGS) \
 	$(LIBXSLT_CFLAGS) \
@@ -828,6 +843,7 @@ EXTRA_DIST += \
 	$(shell ls $(srcdir)/Source/WebCore/dom/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/fileapi/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/html/canvas/*.idl) \
+	$(shell ls $(srcdir)/Source/WebCore/html/track/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/html/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/inspector/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/loader/appcache/*.idl) \
@@ -844,24 +860,21 @@ EXTRA_DIST += \
 	$(shell ls $(srcdir)/Source/WebCore/xml/*.idl) \
 	Source/ThirdParty/ANGLE/src/compiler/glslang.l \
 	Source/ThirdParty/ANGLE/src/compiler/glslang.y \
-	Source/WebCore/bindings/scripts/CodeGenerator.pm \
-	Source/WebCore/bindings/scripts/IDLParser.pm \
-	Source/WebCore/bindings/scripts/IDLStructure.pm \
-	Source/WebCore/bindings/scripts/InFilesParser.pm \
-	Source/WebCore/bindings/scripts/generate-bindings.pl \
-	Source/WebCore/bindings/scripts/preprocessor.pm \
 	Source/WebCore/bindings/scripts/CodeGeneratorGObject.pm \
 	Source/WebCore/bindings/scripts/CodeGeneratorJS.pm \
 	Source/WebCore/bindings/scripts/CodeGenerator.pm \
-	Source/WebCore/bindings/scripts/generate-bindings.pl \
-	Source/WebCore/bindings/scripts/gobject-generate-headers.pl \
 	Source/WebCore/bindings/scripts/IDLParser.pm \
 	Source/WebCore/bindings/scripts/IDLStructure.pm \
+	Source/WebCore/bindings/scripts/InFilesCompiler.pm \
 	Source/WebCore/bindings/scripts/InFilesParser.pm \
+	Source/WebCore/bindings/scripts/generate-bindings.pl \
+	Source/WebCore/bindings/scripts/gobject-generate-headers.pl \
+	Source/WebCore/bindings/scripts/preprocessor.pm \
 	Source/WebCore/ChangeLog \
 	Source/WebCore/css/CSSGrammar.y \
 	Source/WebCore/css/CSSPropertyNames.in \
 	Source/WebCore/css/CSSValueKeywords.in \
+	Source/WebCore/dom/DOMExceptions.in \
 	Source/WebCore/css/fullscreen.css \
 	Source/WebCore/css/fullscreenQuickTime.css \
 	Source/WebCore/css/html.css \
@@ -882,8 +895,9 @@ EXTRA_DIST += \
 	Source/WebCore/css/WebKitFontFamilyNames.in \
 	Source/WebCore/dom/EventFactory.in \
 	Source/WebCore/dom/EventTargetFactory.in \
-	Source/WebCore/dom/make_names.pl \
+	Source/WebCore/dom/make_dom_exceptions.pl \
 	Source/WebCore/dom/make_event_factory.pl \
+	Source/WebCore/dom/make_names.pl \
 	Source/WebCore/html/HTMLAttributeNames.in \
 	Source/WebCore/html/HTMLTagNames.in \
 	Source/WebCore/html/parser/create-html-entity-table \

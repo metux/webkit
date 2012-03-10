@@ -26,47 +26,13 @@
 #ifndef DFGNode_h
 #define DFGNode_h
 
+#include <wtf/Platform.h>
+
 #if ENABLE(DFG_JIT)
-
-/* DFG_ENABLE() - turn on a specific features in the DFG JIT */
-#define DFG_ENABLE(DFG_FEATURE) (defined DFG_ENABLE_##DFG_FEATURE && DFG_ENABLE_##DFG_FEATURE)
-
-// Emit various logging information for debugging, including dumping the dataflow graphs.
-#define DFG_ENABLE_DEBUG_VERBOSE 0
-// Emit dumps during propagation, in addition to just after.
-#define DFG_ENABLE_DEBUG_PROPAGATION_VERBOSE 0
-// Emit logging for OSR exit value recoveries at every node, not just nodes that
-// actually has speculation checks.
-#define DFG_ENABLE_VERBOSE_VALUE_RECOVERIES 0
-// Enable generation of dynamic checks into the instruction stream.
-#if !ASSERT_DISABLED
-#define DFG_ENABLE_JIT_ASSERT 1
-#else
-#define DFG_ENABLE_JIT_ASSERT 0
-#endif
-// Consistency check contents compiler data structures.
-#define DFG_ENABLE_CONSISTENCY_CHECK 0
-// Emit a breakpoint into the head of every generated function, to aid debugging in GDB.
-#define DFG_ENABLE_JIT_BREAK_ON_EVERY_FUNCTION 0
-// Emit a breakpoint into the head of every generated node, to aid debugging in GDB.
-#define DFG_ENABLE_JIT_BREAK_ON_EVERY_BLOCK 0
-// Emit a breakpoint into the head of every generated node, to aid debugging in GDB.
-#define DFG_ENABLE_JIT_BREAK_ON_EVERY_NODE 0
-// Emit a breakpoint into the speculation failure code.
-#define DFG_ENABLE_JIT_BREAK_ON_SPECULATION_FAILURE 0
-// Log every speculation failure.
-#define DFG_ENABLE_VERBOSE_SPECULATION_FAILURE 0
-// Disable the DFG JIT without having to touch Platform.h!
-#define DFG_DEBUG_LOCAL_DISBALE 0
-// Enable OSR entry from baseline JIT.
-#define DFG_ENABLE_OSR_ENTRY ENABLE(DFG_JIT)
-// Generate stats on how successful we were in making use of the DFG jit, and remaining on the hot path.
-#define DFG_ENABLE_SUCCESS_STATS 0
-// Used to enable conditionally supported opcodes that currently result in performance regressions.
-#define DFG_ENABLE_RESTRICTIONS 1
 
 #include "CodeBlock.h"
 #include "CodeOrigin.h"
+#include "DFGCommon.h"
 #include "DFGOperands.h"
 #include "DFGVariableAccessData.h"
 #include "JSValue.h"
@@ -76,17 +42,6 @@
 #include <wtf/Vector.h>
 
 namespace JSC { namespace DFG {
-
-// Type for a reference to another node in the graph.
-typedef uint32_t NodeIndex;
-static const NodeIndex NoNode = UINT_MAX;
-
-typedef uint32_t BlockIndex;
-static const BlockIndex NoBlock = UINT_MAX;
-
-struct NodeIndexTraits {
-    static NodeIndex defaultValue() { return NoNode; }
-};
 
 struct StructureTransitionData {
     Structure* previousStructure;
@@ -202,8 +157,12 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
 
 // This macro defines a set of information about all known node types, used to populate NodeId, NodeType below.
 #define FOR_EACH_DFG_OP(macro) \
-    /* Nodes for constants. */\
+    /* A constant in the CodeBlock's constant pool. */\
     macro(JSConstant, NodeResultJS) \
+    \
+    /* A constant not in the CodeBlock's constant pool. Uses get patched to jumps that exit the */\
+    /* code block. */\
+    macro(WeakJSConstant, NodeResultJS) \
     \
     /* Nodes for handling functions (both as call and as construct). */\
     macro(ConvertThis, NodeResultJS) \
@@ -219,6 +178,11 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
     \
     /* Marker for arguments being set. */\
     macro(SetArgument, 0) \
+    \
+    /* Hint that inlining begins here. No code is generated for this node. It's only */\
+    /* used for copying OSR data into inline frame data, to support reification of */\
+    /* call frames of inlined functions. */\
+    macro(InlineStart, 0) \
     \
     /* Nodes for bitwise operations. */\
     macro(BitAnd, NodeResultInt32) \
@@ -270,7 +234,6 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
     macro(GetStringLength, NodeResultInt32) \
     macro(GetByteArrayLength, NodeResultInt32) \
     macro(GetMethod, NodeResultJS | NodeMustGenerate) \
-    macro(CheckMethod, NodeResultJS | NodeMustGenerate) \
     macro(GetScopeChain, NodeResultJS) \
     macro(GetScopedVar, NodeResultJS | NodeMustGenerate) \
     macro(PutScopedVar, NodeMustGenerate | NodeClobbersWorld) \
@@ -437,9 +400,14 @@ struct Node {
         return op == JSConstant;
     }
     
+    bool isWeakConstant()
+    {
+        return op == WeakJSConstant;
+    }
+    
     bool hasConstant()
     {
-        return isConstant() || hasMethodCheckData();
+        return isConstant() || isWeakConstant();
     }
 
     unsigned constantNumber()
@@ -448,20 +416,26 @@ struct Node {
         return m_opInfo;
     }
     
-    // NOTE: this only works for JSConstant nodes.
-    JSValue valueOfJSConstantNode(CodeBlock* codeBlock)
+    JSCell* weakConstant()
     {
+        return bitwise_cast<JSCell*>(m_opInfo);
+    }
+    
+    JSValue valueOfJSConstant(CodeBlock* codeBlock)
+    {
+        if (op == WeakJSConstant)
+            return JSValue(weakConstant());
         return codeBlock->constantRegister(FirstConstantRegisterIndex + constantNumber()).get();
     }
 
     bool isInt32Constant(CodeBlock* codeBlock)
     {
-        return isConstant() && valueOfJSConstantNode(codeBlock).isInt32();
+        return isConstant() && valueOfJSConstant(codeBlock).isInt32();
     }
     
     bool isDoubleConstant(CodeBlock* codeBlock)
     {
-        bool result = isConstant() && valueOfJSConstantNode(codeBlock).isDouble();
+        bool result = isConstant() && valueOfJSConstant(codeBlock).isDouble();
         if (result)
             ASSERT(!isInt32Constant(codeBlock));
         return result;
@@ -469,14 +443,14 @@ struct Node {
     
     bool isNumberConstant(CodeBlock* codeBlock)
     {
-        bool result = isConstant() && valueOfJSConstantNode(codeBlock).isNumber();
+        bool result = isConstant() && valueOfJSConstant(codeBlock).isNumber();
         ASSERT(result == (isInt32Constant(codeBlock) || isDoubleConstant(codeBlock)));
         return result;
     }
     
     bool isBooleanConstant(CodeBlock* codeBlock)
     {
-        return isConstant() && valueOfJSConstantNode(codeBlock).isBoolean();
+        return isConstant() && valueOfJSConstant(codeBlock).isBoolean();
     }
     
     bool hasVariableAccessData()
@@ -509,7 +483,7 @@ struct Node {
         return variableAccessData()->local();
     }
 
-#if !ASSERT_DISABLED
+#ifndef NDEBUG
     bool hasIdentifier()
     {
         switch (op) {
@@ -517,7 +491,6 @@ struct Node {
         case PutById:
         case PutByIdDirect:
         case GetMethod:
-        case CheckMethod:
         case Resolve:
         case ResolveBase:
         case ResolveBaseStrictPut:
@@ -763,17 +736,6 @@ struct Node {
         return mergePrediction(m_opInfo2, prediction);
     }
     
-    bool hasMethodCheckData()
-    {
-        return op == CheckMethod;
-    }
-    
-    unsigned methodCheckDataIndex()
-    {
-        ASSERT(hasMethodCheckData());
-        return m_opInfo2;
-    }
-
     bool hasFunctionCheckData()
     {
         return op == CheckFunction;
@@ -967,7 +929,7 @@ struct Node {
     
     static bool shouldSpeculateInteger(Node& op1, Node& op2)
     {
-        return !(op1.shouldNotSpeculateInteger() || op2.shouldNotSpeculateInteger()) && (op1.shouldSpeculateInteger() || op2.shouldSpeculateInteger());
+        return op1.shouldSpeculateInteger() && op2.shouldSpeculateInteger();
     }
     
     static bool shouldSpeculateNumber(Node& op1, Node& op2)

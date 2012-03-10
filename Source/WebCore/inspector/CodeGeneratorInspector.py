@@ -37,6 +37,16 @@ try:
 except ImportError:
     import simplejson as json
 
+
+DOMAIN_DEFINE_NAME_MAP = {
+    "Database": "ENABLE_SQL_DATABASE",
+    "Debugger": "ENABLE_JAVASCRIPT_DEBUGGER",
+    "DOMDebugger": "ENABLE_JAVASCRIPT_DEBUGGER",
+    "Profiler": "ENABLE_JAVASCRIPT_DEBUGGER",
+    "Worker": "ENABLE_WORKERS",
+}
+
+
 cmdline_parser = optparse.OptionParser()
 cmdline_parser.add_option("--defines")
 cmdline_parser.add_option("--output_h_dir")
@@ -58,6 +68,9 @@ except Exception, e:
     sys.stderr.write("Usage: <script> Inspector.json --output_h_dir <output_header_dir> --output_cpp_dir <output_cpp_dir> [--defines <defines string>]\n")
     exit(1)
 
+
+def dash_to_camelcase(word):
+    return ''.join(x.capitalize() or '-' for x in word.split('-'))
 
 def parse_defines(str):
     if not str:
@@ -88,6 +101,27 @@ def parse_defines(str):
 defines_map = parse_defines(arg_options.defines)
 
 
+class Capitalizer:
+    @staticmethod
+    def upper_camel_case_to_lower(str):
+        pos = 0
+        while pos < len(str) and str[pos].isupper():
+            pos += 1
+        if pos == 0:
+            return str
+        if pos == 1:
+            return str[0].lower() + str[1:]
+        if pos < len(str):
+            pos -= 1
+        possible_abbreviation = str[0:pos]
+        if possible_abbreviation not in Capitalizer.ABBREVIATION:
+            raise Exception("Unknown abbreviation %s" % possible_abbreviation)
+        str = possible_abbreviation.lower() + str[pos:]
+        return str
+
+    ABBREVIATION = frozenset(["XHR", "DOM", "CSS"])
+
+
 class DomainNameFixes:
     @classmethod
     def get_fixed_data(cls, domain_name):
@@ -96,10 +130,7 @@ class DomainNameFixes:
         else:
             agent_name_res = "Inspector%sAgent" % domain_name
 
-        if domain_name in cls.agent_field_name_map:
-            field_name_res = cls.agent_field_name_map[domain_name]
-        else:
-            field_name_res = domain_name.lower() + "Agent"
+        field_name_res = Capitalizer.upper_camel_case_to_lower(domain_name) + "Agent"
 
         class Res(object):
             agent_type_name = agent_name_res
@@ -109,11 +140,11 @@ class DomainNameFixes:
 
             @staticmethod
             def is_disabled(defines):
-                if not domain_name in cls.domain_define_name_map:
+                if not domain_name in DOMAIN_DEFINE_NAME_MAP:
                     # Has not corresponding preprocessor symbol.
                     return False
 
-                define_name = cls.domain_define_name_map[domain_name]
+                define_name = DOMAIN_DEFINE_NAME_MAP[domain_name]
 
                 if not define_name in defines:
                     # Disabled when not mentioned
@@ -127,31 +158,6 @@ class DomainNameFixes:
     skip_js_bind_domains = set(["Runtime", "CSS", "DOMDebugger"])
     hidden_domains = set(["Inspector"])
     agent_type_map = {"Network": "InspectorResourceAgent"}
-
-    # TODO: get rid of this, generate names instead.
-    agent_field_name_map = {
-        "Page": "pageAgent",
-        "Runtime": "runtimeAgent",
-        "Console": "consoleAgent",
-        "Network":  "resourceAgent",
-        "Database":  "databaseAgent",
-        "DOMStorage":  "domStorageAgent",
-        "ApplicationCache":  "applicationCacheAgent",
-        "DOM":  "domAgent",
-        "CSS":  "cssAgent",
-        "Debugger": "debuggerAgent",
-        "DOMDebugger": "domDebuggerAgent",
-        "Profiler": "profilerAgent",
-        "Worker": "workerAgent",
-    }
-
-    domain_define_name_map = {
-        "Database": "ENABLE_SQL_DATABASE",
-        "Debugger": "ENABLE_JAVASCRIPT_DEBUGGER",
-        "DOMDebugger": "ENABLE_JAVASCRIPT_DEBUGGER",
-        "Profiler": "ENABLE_JAVASCRIPT_DEBUGGER",
-        "Worker": "ENABLE_WORKERS",
-    }
 
 
 class CParamType(object):
@@ -422,7 +428,7 @@ json_api = json.loads(json_string)
 class Templates:
     frontend_domain_class = string.Template(
 """    class $domainClassName {
-    public:
+    public:$domainCapabilities
         $domainClassName(InspectorFrontendChannel* inspectorFrontendChannel) : m_inspectorFrontendChannel(inspectorFrontendChannel) { }
 ${frontendDomainMethodDeclarations}        void setInspectorFrontendChannel(InspectorFrontendChannel* inspectorFrontendChannel) { m_inspectorFrontendChannel = inspectorFrontendChannel; }
         InspectorFrontendChannel* getInspectorFrontendChannel() { return m_inspectorFrontendChannel; }
@@ -444,11 +450,11 @@ ${frontendDomainMethodDeclarations}        void setInspectorFrontendChannel(Insp
 $methodOutCode
     ErrorString error;
 $methodInCode
-if (!protocolErrors->length())
-    $agentField->$methodName(&error$agentCallParams);
+    if (!protocolErrors->length())
+        $agentField->$methodName(&error$agentCallParams);
 
     RefPtr<InspectorObject> result = InspectorObject::create();
-${responseCook}sendResponse(callId, result, String::format("Some arguments of method '%s' can't be processed", "$domainName.$methodName"), protocolErrors, error);
+${responseCook}    sendResponse(callId, result, String::format("Some arguments of method '%s' can't be processed", "$domainName.$methodName"), protocolErrors, error);
 }
 """)
 
@@ -461,7 +467,7 @@ $code    if (m_inspectorFrontendChannel)
 }
 """)
 
-    frontend_h = string.Template("""// Copyright (c) 2010 The Chromium Authors. All rights reserved.
+    frontend_h = string.Template("""// Copyright (c) 2011 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 #ifndef InspectorFrontend_h
@@ -492,7 +498,7 @@ ${fieldDeclarations}};
 #endif // !defined(InspectorFrontend_h)
 """)
 
-    backend_h = string.Template("""// Copyright (c) 2010 The Chromium Authors. All rights reserved.
+    backend_h = string.Template("""// Copyright (c) 2011 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 #ifndef InspectorBackendDispatcher_h
@@ -564,7 +570,7 @@ $fieldDeclarations
 
 """)
 
-    backend_cpp = string.Template("""// Copyright (c) 2010 The Chromium Authors. All rights reserved.
+    backend_cpp = string.Template("""// Copyright (c) 2011 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -895,7 +901,7 @@ bool InspectorBackendDispatcher::getCommandName(const String& message, String* r
 #endif // ENABLE(INSPECTOR)
 """)
 
-    frontend_cpp = string.Template("""// Copyright (c) 2010 The Chromium Authors. All rights reserved.
+    frontend_cpp = string.Template("""// Copyright (c) 2011 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -913,7 +919,7 @@ bool InspectorBackendDispatcher::getCommandName(const String& message, String* r
 
 namespace WebCore {
 
-
+$capabilities
 
 InspectorFrontend::InspectorFrontend(InspectorFrontendChannel* inspectorFrontendChannel)
     : m_inspectorFrontendChannel(inspectorFrontendChannel)
@@ -927,7 +933,7 @@ $methods
 #endif // ENABLE(INSPECTOR)
 """)
 
-    backend_js = string.Template("""// Copyright (c) 2010 The Chromium Authors. All rights reserved.
+    backend_js = string.Template("""// Copyright (c) 2011 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -939,7 +945,8 @@ InspectorBackendStub = function()
     this._callbacks = {};
     this._domainDispatchers = {};
     this._eventArgs = {};
-$delegates$eventArgs$domainDispatchers    }
+    this._replyArgs = {};
+$delegates$eventArgs$replyArgs$domainDispatchers$capabilities}
 
 InspectorBackendStub.prototype = {
     dumpInspectorTimeStats: 0,
@@ -1020,11 +1027,11 @@ InspectorBackendStub.prototype = {
     {
         messageObject.id = this._wrap(callback);
 
-        if (this.dumpInspectorTimeStats) {
-            var wrappedCallback = this._callbacks[messageObject.id];
-            wrappedCallback.methodName = messageObject.method;
+        var wrappedCallback = this._callbacks[messageObject.id];
+        wrappedCallback.methodName = messageObject.method;
+
+        if (this.dumpInspectorTimeStats)
             wrappedCallback.sendRequestTime = Date.now();
-        }
 
         if (this.dumpInspectorProtocolMessages)
             console.log("frontend: " + JSON.stringify(messageObject));
@@ -1083,20 +1090,23 @@ InspectorBackendStub.prototype = {
                     this.reportProtocolError(messageObject);
             }
 
-            var arguments = [];
-            if (messageObject.result) {
-                for (var key in messageObject.result)
-                    arguments.push(messageObject.result[key]);
-            }
-
             var callback = this._callbacks[messageObject.id];
             if (callback) {
+                var argumentsArray = [];
+                if (messageObject.result) {
+                    var paramNames = this._replyArgs[callback.methodName];
+                    if (paramNames) {
+                        for (var i = 0; i < paramNames.length; ++i)
+                            argumentsArray.push(messageObject.result[paramNames[i]]);
+                    }
+                }
+
                 var processingStartTime;
                 if (this.dumpInspectorTimeStats && callback.methodName)
                     processingStartTime = Date.now();
 
-                arguments.unshift(messageObject.error);
-                callback.apply(null, arguments);
+                argumentsArray.unshift(messageObject.error);
+                callback.apply(null, argumentsArray);
                 --this._pendingResponsesCount;
                 delete this._callbacks[messageObject.id];
 
@@ -1178,7 +1188,6 @@ InspectorBackend = new InspectorBackendStub();""")
 
 type_map = TypeMap(json_api)
 
-
 class Generator:
     frontend_class_field_lines = []
     frontend_domain_class_lines = []
@@ -1191,7 +1200,9 @@ class Generator:
     frontend_method_list = []
     backend_js_initializer_list = []
     backend_js_event_list = []
+    backend_js_reply_list = []
     backend_js_domain_dispatcher_list = []
+    backend_js_capabilities_list = []
 
     backend_constructor_param_list = []
     backend_constructor_init_list = []
@@ -1199,6 +1210,7 @@ class Generator:
     backend_forward_list = []
     backend_include_list = []
     frontend_constructor_init_list = []
+    frontend_capabilities_constants_list = []
 
     @staticmethod
     def go():
@@ -1214,16 +1226,27 @@ class Generator:
             agent_field_name = domain_data.agent_field_name
 
             frontend_method_declaration_lines = []
+            domain_capabilities = []
+            if "capabilities" in json_domain:
+                for json_capability in json_domain["capabilities"]:
+                    name = json_capability["name"]
+                    capability_variable_name = "capability%s" % dash_to_camelcase(name)
+                    domain_capabilities.append("\n        static const char* %s;" % capability_variable_name)
+                    Generator.frontend_capabilities_constants_list.append("const char* InspectorFrontend::%s::%s = \"%s\";" % (domain_name, capability_variable_name, name))
+                    Generator.backend_js_capabilities_list.append("    %sAgent.%s = \"%s\";\n" % (domain_name, capability_variable_name, name))
+
             if "events" in json_domain:
                 for json_event in json_domain["events"]:
                     Generator.process_event(json_event, domain_name, frontend_method_declaration_lines)
 
-                Generator.frontend_class_field_lines.append("    %s m_%s;\n" % (domain_name, domain_name_lower))
-                Generator.frontend_constructor_init_list.append("    , m_%s(inspectorFrontendChannel)\n" % domain_name_lower)
-                Generator.frontend_domain_class_lines.append(Templates.frontend_domain_class.substitute(None,
-                    domainClassName=domain_name,
-                    domainFieldName=domain_name_lower,
-                    frontendDomainMethodDeclarations=join(frontend_method_declaration_lines, "")))
+            Generator.frontend_class_field_lines.append("    %s m_%s;\n" % (domain_name, domain_name_lower))
+            Generator.frontend_constructor_init_list.append("    , m_%s(inspectorFrontendChannel)\n" % domain_name_lower)
+            Generator.frontend_domain_class_lines.append(Templates.frontend_domain_class.substitute(None,
+                domainClassName=domain_name,
+                domainFieldName=domain_name_lower,
+                domainCapabilities=join(domain_capabilities, "\n"),
+                frontendDomainMethodDeclarations=join(frontend_method_declaration_lines, "")))
+
             if "commands" in json_domain:
                 for json_command in json_domain["commands"]:
                     Generator.process_command(json_command, domain_name, agent_field_name)
@@ -1299,13 +1322,14 @@ class Generator:
     def process_command(json_command, domain_name, agent_field_name):
         json_command_name = json_command["name"]
         Generator.method_name_enum_list.append("        k%s_%sCmd," % (domain_name, json_command["name"]))
-        Generator.method_handler_list.append("        &InspectorBackendDispatcher::%s_%s," % (domain_name, json_command_name))
+        Generator.method_handler_list.append("            &InspectorBackendDispatcher::%s_%s," % (domain_name, json_command_name))
         Generator.backend_method_declaration_list.append("    void %s_%s(long callId, InspectorObject* requestMessageObject);" % (domain_name, json_command_name))
 
         method_in_code = ""
         method_out_code = ""
         agent_call_param_list = []
         response_cook_list = []
+        backend_js_reply_param_list = []
         request_message_param = ""
         js_parameters_text = ""
         if "parameters" in json_command:
@@ -1364,6 +1388,12 @@ class Generator:
                 method_out_code += code
                 agent_call_param_list.append(param)
                 response_cook_list.append(cook)
+
+                backend_js_reply_param_list.append("\"%s\"" % json_return_name)
+
+            Generator.backend_js_reply_list.append("    this._replyArgs[\"%s.%s\"] = [%s];\n" % (
+                domain_name, json_command_name, join(backend_js_reply_param_list, ", ")))
+
             response_cook_text = "    if (!protocolErrors->length() && !error.length()) {\n%s    }\n" % join(response_cook_list, "")
 
         Generator.backend_method_implementation_list.append(Templates.backend_method.substitute(None,
@@ -1376,8 +1406,7 @@ class Generator:
             responseCook=response_cook_text))
         Generator.backend_method_name_declaration_list.append("    \"%s.%s\"," % (domain_name, json_command_name))
 
-        Generator.backend_js_initializer_list.append("        this._registerDelegate('{\"method\": \"%s.%s\"%s, \"id\": 0}');\n" % (domain_name, json_command_name, js_parameters_text))
-
+        Generator.backend_js_initializer_list.append("    this._registerDelegate('{\"method\": \"%s.%s\"%s, \"id\": 0}');\n" % (domain_name, json_command_name, js_parameters_text))
 
 Generator.go()
 
@@ -1404,7 +1433,8 @@ backend_h_file.write(Templates.backend_h.substitute(None,
 
 frontend_cpp_file.write(Templates.frontend_cpp.substitute(None,
     constructorInit=join(Generator.frontend_constructor_init_list, ""),
-    methods=join(Generator.frontend_method_list, "\n")))
+    methods=join(Generator.frontend_method_list, "\n"),
+    capabilities=join(Generator.frontend_capabilities_constants_list, "\n")))
 
 backend_cpp_file.write(Templates.backend_cpp.substitute(None,
     methodNameDeclarations=join(Generator.backend_method_name_declaration_list, "\n"),
@@ -1414,8 +1444,10 @@ backend_cpp_file.write(Templates.backend_cpp.substitute(None,
 
 backend_js_file.write(Templates.backend_js.substitute(None,
     delegates=join(Generator.backend_js_initializer_list, ""),
+    replyArgs=join(Generator.backend_js_reply_list, ""),
     eventArgs=join(Generator.backend_js_event_list, ""),
-    domainDispatchers=join(Generator.backend_js_domain_dispatcher_list, "")))
+    domainDispatchers=join(Generator.backend_js_domain_dispatcher_list, ""),
+    capabilities=join(Generator.backend_js_capabilities_list, "")))
 
 backend_h_file.close()
 backend_cpp_file.close()

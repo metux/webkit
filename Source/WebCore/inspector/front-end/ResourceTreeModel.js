@@ -114,6 +114,11 @@ WebInspector.ResourceTreeModel.prototype = {
         return this._subframes[parentFrameId] || [];
     },
 
+    frameForId: function(frameId)
+    {
+        return this._frameIds[frameId];
+    },
+
     resources: function(frameId)
     {
         var result = [];
@@ -393,7 +398,7 @@ WebInspector.ResourceTreeModel.prototype = {
      */
     _createResource: function(frame, url)
     {
-        var resource = new WebInspector.Resource(null, url, frame.id, frame.loaderId);
+        var resource = new WebInspector.Resource("", url, frame.id, frame.loaderId);
         resource.documentURL = frame.url;
         resource.mimeType = frame.mimeType;
         return resource;
@@ -443,3 +448,8 @@ WebInspector.PageDispatcher.prototype = {
  * @type {WebInspector.ResourceTreeModel}
  */
 WebInspector.resourceTreeModel = null;
+
+/**
+ * @type {WebInspector.Resource}
+ */
+WebInspector.mainResource = null;

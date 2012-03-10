@@ -40,8 +40,10 @@ namespace CoreIPC {
 }
 
 namespace WebCore {
+    class AffineTransform;
     class GraphicsContext;
     class IntRect;
+    class IntSize;
     class Scrollbar;
 }
 
@@ -115,8 +117,9 @@ public:
     // Returns whether the plug-in is transparent or not.
     virtual bool isTransparent() = 0;
 
-    // Tells the plug-in that either the plug-ins frame rect or its clip rect has changed. Both rects are in window coordinates.
-    virtual void geometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect) = 0;
+    // Tells the plug-in that its geometry has changed. The clip rect is in plug-in coordinates, and the affine transform can be used
+    // to convert from root view coordinates to plug-in coordinates.
+    virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform) = 0;
 
     // Tells the plug-in that it has been explicitly hidden or shown. (Note that this is not called when the plug-in becomes obscured from view on screen.)
     virtual void visibilityDidChange() = 0;
@@ -133,7 +136,7 @@ public:
 
     // Tells the plug-in that a stream has received its HTTP response.
     virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::KURL& responseURL, uint32_t streamLength, 
-                                          uint32_t lastModifiedTime, const String& mimeType, const String& headers) = 0;
+                                          uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) = 0;
 
     // Tells the plug-in that a stream did receive data.
     virtual void streamDidReceiveData(uint64_t streamID, const char* bytes, int length) = 0;
@@ -146,7 +149,7 @@ public:
 
     // Tells the plug-in that the manual stream has received its HTTP response.
     virtual void manualStreamDidReceiveResponse(const WebCore::KURL& responseURL, uint32_t streamLength, 
-                                                uint32_t lastModifiedTime, const String& mimeType, const String& headers) = 0;
+                                                uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) = 0;
 
     // Tells the plug-in that the manual stream did receive data.
     virtual void manualStreamDidReceiveData(const char* bytes, int length) = 0;
@@ -191,15 +194,15 @@ public:
     // Tells the plug-in about window visibility changes.
     virtual void windowVisibilityChanged(bool) = 0;
 
-    // Tells the plug-in about scale factor changes.
-    virtual void contentsScaleFactorChanged(float) = 0;
-
     // Get the per complex text input identifier.
     virtual uint64_t pluginComplexTextInputIdentifier() const = 0;
 
     // Send the complex text input to the plug-in.
     virtual void sendComplexTextInput(const String& textInput) = 0;
 #endif
+
+    // Tells the plug-in about scale factor changes.
+    virtual void contentsScaleFactorChanged(float) = 0;
 
     // Called when the private browsing state for this plug-in changes.
     virtual void privateBrowsingStateChanged(bool) = 0;
@@ -209,10 +212,6 @@ public:
 
     // Tells the plug-in that it should scroll. The plug-in should return true if it did scroll.
     virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity) = 0;
-
-    // Whether the plug-in wants its coordinates to be relative to the window.
-    // FIXME: No plug-ins should want window relative coordinates, so we should get rid of this.
-    virtual bool wantsWindowRelativeCoordinates() = 0;
 
     // A plug-in can use WebCore scroll bars. Make them known, so that hit testing can find them.
     // FIXME: This code should be in PluginView or its base class, not in individual plug-ins.

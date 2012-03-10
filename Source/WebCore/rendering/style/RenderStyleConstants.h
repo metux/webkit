@@ -36,6 +36,11 @@ namespace WebCore {
  * in CSSValueKeywords.in, otherwise some optimizations in the parser will fail,
  * and produce invalid results.
  */
+static const size_t PrintColorAdjustBits = 1;
+enum PrintColorAdjust {
+    PrintColorAdjustEconomy,
+    PrintColorAdjustExact
+};
 
 // The difference between two styles.  The following values are used:
 // (1) StyleDifferenceEqual - The two styles are identical
@@ -82,6 +87,8 @@ enum PseudoId {
     FIRST_INTERNAL_PSEUDOID = SCROLLBAR_THUMB,
     PUBLIC_PSEUDOID_MASK = ((1 << FIRST_INTERNAL_PSEUDOID) - 1) & ~((1 << FIRST_PUBLIC_PSEUDOID) - 1)
 };
+
+enum ColumnSpan { ColumnSpanOne = 0, ColumnSpanAll};
 
 enum EBorderCollapse { BSEPARATE = 0, BCOLLAPSE = 1 };
 
@@ -405,8 +412,9 @@ enum EDisplay {
     TABLE_HEADER_GROUP, TABLE_FOOTER_GROUP, TABLE_ROW,
     TABLE_COLUMN_GROUP, TABLE_COLUMN, TABLE_CELL,
     TABLE_CAPTION, BOX, INLINE_BOX, 
-#if ENABLE(CSS3_FLEXBOX)
     FLEXBOX, INLINE_FLEXBOX,
+#if ENABLE(CSS_GRID_LAYOUT)
+    GRID, INLINE_GRID,
 #endif
     NONE
 };
@@ -447,6 +455,14 @@ enum EImageRendering { ImageRenderingAuto, ImageRenderingOptimizeSpeed, ImageRen
 enum Order { LogicalOrder = 0, VisualOrder };
 
 enum RegionOverflow { AutoRegionOverflow, BreakRegionOverflow };
+
+enum ColumnAxis { HorizontalColumnAxis, VerticalColumnAxis, AutoColumnAxis };
+
+enum LineGridSnap { LineGridSnapNone, LineGridSnapBaseline, LineGridSnapBounds };
+
+enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowLeft, WrapFlowRight, WrapFlowMaximum, WrapFlowClear };
+
+enum WrapThrough { WrapThroughWrap, WrapThroughNone };
 
 } // namespace WebCore
 

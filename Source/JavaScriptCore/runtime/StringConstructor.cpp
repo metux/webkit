@@ -59,19 +59,14 @@ void StringConstructor::finishCreation(ExecState* exec, StringPrototype* stringP
     putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool StringConstructor::getOwnPropertySlotVirtual(ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
-{
-    return getOwnPropertySlot(this, exec, propertyName, slot);
-}
-
 bool StringConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::stringConstructorTable(exec), static_cast<StringConstructor*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::stringConstructorTable(exec), jsCast<StringConstructor*>(cell), propertyName, slot);
 }
 
-bool StringConstructor::getOwnPropertyDescriptor(ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool StringConstructor::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    return getStaticFunctionDescriptor<InternalFunction>(exec, ExecState::stringConstructorTable(exec), this, propertyName, descriptor);
+    return getStaticFunctionDescriptor<InternalFunction>(exec, ExecState::stringConstructorTable(exec), jsCast<StringConstructor*>(object), propertyName, descriptor);
 }
 
 // ------------------------------ Functions --------------------------------

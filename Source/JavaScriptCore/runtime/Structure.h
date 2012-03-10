@@ -50,11 +50,6 @@ namespace JSC {
     class StructureChain;
     class SlotVisitor;
 
-    enum EnumerationMode {
-        ExcludeDontEnumProperties,
-        IncludeDontEnumProperties
-    };
-
     class Structure : public JSCell {
     public:
         friend class StructureTransitionTable;
@@ -161,7 +156,7 @@ namespace JSC {
 
         void setEnumerationCache(JSGlobalData&, JSPropertyNameIterator* enumerationCache); // Defined in JSPropertyNameIterator.h.
         JSPropertyNameIterator* enumerationCache(); // Defined in JSPropertyNameIterator.h.
-        void getPropertyNames(JSGlobalData&, PropertyNameArray&, EnumerationMode mode);
+        void getPropertyNamesFromStructure(JSGlobalData&, PropertyNameArray&, EnumerationMode);
 
         bool staticFunctionsReified()
         {
@@ -230,11 +225,18 @@ namespace JSC {
         void despecifyAllFunctions(JSGlobalData&);
 
         PassOwnPtr<PropertyTable> copyPropertyTable(JSGlobalData&, Structure* owner);
+        PassOwnPtr<PropertyTable> copyPropertyTableForPinning(JSGlobalData&, Structure* owner);
         void materializePropertyMap(JSGlobalData&);
         void materializePropertyMapIfNecessary(JSGlobalData& globalData)
         {
             ASSERT(structure()->classInfo() == &s_info);
             if (!m_propertyTable && m_previous)
+                materializePropertyMap(globalData);
+        }
+        void materializePropertyMapIfNecessaryForPinning(JSGlobalData& globalData)
+        {
+            ASSERT(structure()->classInfo() == &s_info);
+            if (!m_propertyTable)
                 materializePropertyMap(globalData);
         }
 
@@ -281,14 +283,7 @@ namespace JSC {
         bool m_isPinnedPropertyTable : 1;
         bool m_hasGetterSetterProperties : 1;
         bool m_hasNonEnumerableProperties : 1;
-#if COMPILER(WINSCW)
-        // Workaround for Symbian WINSCW compiler that cannot resolve unsigned type of the declared 
-        // bitfield, when used as argument in make_pair() function calls in structure.ccp.
-        // This bitfield optimization is insignificant for the Symbian emulator target.
-        unsigned m_attributesInPrevious;
-#else
         unsigned m_attributesInPrevious : 7;
-#endif
         unsigned m_specificFunctionThrashCount : 2;
         unsigned m_preventExtensions : 1;
         unsigned m_didTransition : 1;
@@ -359,7 +354,7 @@ namespace JSC {
         validate(cell);
 #endif
         m_visitCount++;
-        if (Heap::testAndSetMarked(cell))
+        if (Heap::testAndSetMarked(cell) || !cell->structure())
             return;
         m_stack.append(cell);
     }

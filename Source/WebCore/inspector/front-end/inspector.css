@@ -58,8 +58,8 @@ body.inactive #toolbar {
     border-bottom: 1px solid rgb(64%, 64%, 64%);
 }
 
-body.detached.platform-mac-leopard:not(.remote) #toolbar,
-body.detached.platform-mac-snowleopard:not(.remote) #toolbar {
+body.detached.platform-mac-leopard #toolbar,
+body.detached.platform-mac-snowleopard #toolbar {
     background: transparent;
 }
 
@@ -494,6 +494,11 @@ button.status-bar-item.toggled-on .glyph {
 button.status-bar-item:disabled {
     opacity: 0.5;
     background-position: 0 0 !important;
+}
+
+button.status-bar-item.extension {
+    background-image: none;
+    background-color: auto;
 }
 
 select.status-bar-item {
@@ -2288,29 +2293,51 @@ a.worker-item:hover {
 
 .soft-context-menu {
     position: absolute;
-    border: 1px solid rgb(180, 180, 180);
-    border-radius: 5px;
-    background-color: rgba(255, 255, 255, 0.95);
-    -webkit-box-shadow: rgba(0, 0, 0, 0.5) 0 3px 10px;
+    font-family: 'Lucida Grande', 'Helvetica', 'sans-serif';
+    border: 1px solid rgba(196, 196, 196, 0.9);
+    border-top: 1px solid rgba(196, 196, 196, 0.5);
+    border-bottom: 1px solid rgba(150, 150, 150, 0.9);
+    padding: 4px 0 4px 0;
+    border-radius: 4px;
+    background-color: white;
+    -webkit-box-shadow: 0 5px 10px rgba(0, 0, 0, 0.25);
 }
 
 .soft-context-menu-item {
     width: 100%;
     line-height: 13px;
-    font-size: 13px;
-    padding: 4px 7px;
-    margin: 3px 0;
+    font-size: 14px;
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+    padding: 1px 7px 3px 6px;
+    margin: 0 13px 0 0;
     white-space: nowrap;
 }
 
 .soft-context-menu-separator {
-    margin-top: 6px;
-    margin-bottom: 6px;
-    border-bottom: 1px solid rgb(180, 180, 180);
+    margin: 5px 1px 6px 1px;
+    border-bottom: 1px solid rgb(227, 227, 227);
 }
 
 .soft-context-menu-item-mouse-over {
+    border-top: 1px solid rgb(56, 121, 217);
+    border-bottom: 1px solid rgb(56, 121, 217);
     background-color: rgb(56, 121, 217);
+    color: white;
+}
+
+body.platform-mac .soft-context-menu-item-mouse-over {
+    border-top: 1px solid rgb(90, 131, 236);
+    border-bottom: 1px solid rgb(18, 88, 233);
+    background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(100, 140, 243)), to(rgb(36, 101, 243)));
+}
+
+.soft-context-menu-item-checkmark {
+    color: rgb(108, 108, 108);
+    pointer-events: none;
+}
+
+.soft-context-menu-item-mouse-over .soft-context-menu-item-checkmark {
     color: white;
 }
 
@@ -2325,19 +2352,20 @@ a.worker-item:hover {
 .search-view .search-panel {
     position: absolute;
     top: 0;
-    height: 35px;
+    height: 28px;
     left: 0;
     right: 0;
-    padding-top: 4px;
+    padding-top: 2px;
     padding-left: 10px;
     background-color: #EBEBEB;
     border-bottom: 1px solid #BBB;
-    
+
     font-size: 11px;
 }
 
 .search-view .search-panel input[type="search"].search-config-search {
     margin-right: 8px;
+    font-size: 11px;
     color: #303030;
 }
 
@@ -2348,7 +2376,14 @@ a.worker-item:hover {
 
 .search-view .search-panel input[type="checkbox"].search-config-checkbox {
     vertical-align: bottom;
-    margin-bottom: 6px;
+}
+
+body:not(.platform-mac) .search-view .search-panel input[type="checkbox"].search-config-checkbox {
+    margin-bottom: 5px;
+}
+
+body.platform-mac .search-view .search-panel input[type="checkbox"].search-config-checkbox {
+    margin-bottom: 4px;
 }
 
 #drawer-status-bar .search-status-bar-item {
@@ -2365,10 +2400,17 @@ a.worker-item:hover {
 }
 
 #drawer-status-bar .search-status-bar-progress {
-    height: 10px;
+    height: 11px;
     width: 100px;
-    margin-top: 8px;
     float: left;
+}
+
+body:not(.platform-mac) #drawer-status-bar .search-status-bar-progress {
+    margin-top: 8px;
+}
+
+body.platform-mac #drawer-status-bar .search-status-bar-progress {
+    margin-top: 7px;
 }
 
 #drawer-status-bar .search-status-bar-stop-button-item {
@@ -2472,7 +2514,7 @@ a.worker-item:hover {
 
 #search-results-pane-file-based .search-match .search-match-content {
     color: #000;
-    white-space: pre;    
+    white-space: pre;
 }
 
 .record-profile-status-bar-item .glyph {
@@ -2500,4 +2542,124 @@ a.worker-item:hover {
     font-weight: bold;
     padding: 10px;
     white-space: pre-wrap;
+}
+
+/* Generic suggest box style */
+
+.suggest-box.generic-suggest {
+    margin-left: -1px;
+    border-color: rgb(66%, 66%, 66%);
+}
+
+.suggest-box.generic-suggest.above-anchor {
+   border-radius: 5px 5px 5px 0;
+}
+
+/* Custom popup scrollers */
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar, .custom-popup-vertical-scroll ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-corner, .custom-popup-vertical-scroll ::-webkit-scrollbar-corner {
+    display: none;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-resizer, .custom-popup-vertical-scroll ::-webkit-resizer {
+    display: none;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-button, .custom-popup-vertical-scroll ::-webkit-scrollbar-button {
+    display: none;
+}
+
+/* Custom Horizontal Scrollbar Styles */
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar:horizontal:corner-present {
+    border-right-width: 0;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-thumb:horizontal {
+    -webkit-border-image: url(Images/thumbHoriz.png) 0 11 0 11;
+    border-color: transparent;
+    border-width: 0 11px;
+    min-width: 20px;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-thumb:horizontal:hover {
+    -webkit-border-image: url(Images/thumbHoverHoriz.png) 0 11 0 11;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-thumb:horizontal:active {
+    -webkit-border-image: url(Images/thumbActiveHoriz.png) 0 11 0 11;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-track-piece:horizontal:start {
+    margin-left: 5px;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-track-piece:horizontal:end {
+    margin-right: 5px;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-track-piece:horizontal:end:corner-present {
+    margin-right: 4px;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-track-piece:horizontal:decrement {
+    -webkit-border-image: url(Images/trackHoriz.png) 0 11 0 11;
+    border-color: transparent;
+    border-width: 0 0 0 11px;
+}
+
+.custom-popup-horizontal-scroll ::-webkit-scrollbar-track-piece:horizontal:increment {
+    -webkit-border-image: url(Images/trackHoriz.png) 0 11 0 11;
+    border-color: transparent;
+    border-width: 0 11px 0 0;
+}
+
+/* Custom Vertical Scrollbar Styles */
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar:vertical:corner-present {
+    border-bottom-width: 0;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-thumb:vertical {
+    -webkit-border-image: url(Images/thumbVert.png) 11 0 11 0;
+    border-color: transparent;
+    border-width: 11px 0;
+    min-height: 20px;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-thumb:vertical:hover {
+    -webkit-border-image: url(Images/thumbHoverVert.png) 11 0 11 0;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-thumb:vertical:active {
+    -webkit-border-image: url(Images/thumbActiveVert.png) 11 0 11 0;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-track-piece:vertical:start {
+    margin-top: 5px;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-track-piece:vertical:end {
+    margin-bottom: 5px;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-track-piece:vertical:end:corner-present {
+    margin-bottom: 4px;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-track-piece:vertical:decrement {
+    -webkit-border-image: url(Images/trackVert.png) 11 0 11 0;
+    border-color: transparent;
+    border-width: 11px 0 0 0;
+}
+
+.custom-popup-vertical-scroll ::-webkit-scrollbar-track-piece:vertical:increment {
+    -webkit-border-image: url(Images/trackVert.png) 11 0 11 0;
+    border-color: transparent;
+    border-width: 0 0 11px 0;
 }

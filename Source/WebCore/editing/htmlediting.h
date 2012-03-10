@@ -96,6 +96,7 @@ inline bool canHaveChildrenForEditing(const Node* node)
 
 bool isAtomicNode(const Node*);
 bool isBlock(const Node*);
+bool isInline(const Node*);
 bool isSpecialElement(const Node*);
 bool isTabSpanNode(const Node*);
 bool isTabSpanTextNode(const Node*);
@@ -109,7 +110,8 @@ bool isListItem(Node*);
 bool isNodeRendered(const Node*);
 bool isNodeVisiblyContainedWithin(Node*, const Range*);
 bool isRenderedAsNonInlineTableImageOrHR(const Node*);
-    
+bool areIdenticalElements(const Node*, const Node*);
+bool isNonTableCellHTMLBlockElement(const Node*);
 TextDirection directionOfEnclosingBlock(const Position&);
 
 // -------------------------------------------------------------------------

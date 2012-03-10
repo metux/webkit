@@ -71,7 +71,6 @@ void CSSRuleList::deleteRule(unsigned index)
     if (index >= m_lstCSSRules.size())
         return;
 
-    m_lstCSSRules[index]->setParent(0);
     m_lstCSSRules.remove(index);
 }
 

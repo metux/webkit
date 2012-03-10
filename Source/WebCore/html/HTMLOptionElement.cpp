@@ -137,15 +137,24 @@ String HTMLOptionElement::text() const
 
 void HTMLOptionElement::setText(const String &text, ExceptionCode& ec)
 {
+    // Changing the text causes a recalc of a select's items, which will reset the selected
+    // index to the first item if the select is single selection with a menu list. We attempt to
+    // preserve the selected item.
+    HTMLSelectElement* select = ownerSelectElement();
+    bool selectIsMenuList = select && select->usesMenuList();
+    int oldSelectedIndex = selectIsMenuList ? select->selectedIndex() : -1;
+
     // Handle the common special case where there's exactly 1 child node, and it's a text node.
     Node* child = firstChild();
-    if (child && child->isTextNode() && !child->nextSibling()) {
+    if (child && child->isTextNode() && !child->nextSibling())
         static_cast<Text *>(child)->setData(text, ec);
-        return;
+    else {
+        removeChildren();
+        appendChild(Text::create(document(), text), ec);
     }
-
-    removeChildren();
-    appendChild(Text::create(document(), text), ec);
+    
+    if (selectIsMenuList && select->selectedIndex() != oldSelectedIndex)
+        select->setSelectedIndex(oldSelectedIndex);
 }
 
 void HTMLOptionElement::accessKeyAction(bool)
@@ -220,7 +229,7 @@ void HTMLOptionElement::setSelected(bool selected)
     setSelectedState(selected);
 
     if (HTMLSelectElement* select = ownerSelectElement())
-        select->setSelectedIndex(selected ? index() : -1, false);
+        select->optionSelectionStateChanged(this, selected);
 }
 
 void HTMLOptionElement::setSelectedState(bool selected)
@@ -267,9 +276,10 @@ void HTMLOptionElement::setLabel(const String& label)
 void HTMLOptionElement::setRenderStyle(PassRefPtr<RenderStyle> newStyle)
 {
     m_style = newStyle;
-    if (HTMLSelectElement* select = ownerSelectElement())
+    if (HTMLSelectElement* select = ownerSelectElement()) {
         if (RenderObject* renderer = select->renderer())
             renderer->repaint();
+    }
 }
 
 RenderStyle* HTMLOptionElement::nonRendererRenderStyle() const
@@ -296,8 +306,10 @@ void HTMLOptionElement::insertedIntoTree(bool deep)
         select->setRecalcListItems();
         // Do not call selected() since calling updateListItemSelectedStates()
         // at this time won't do the right thing. (Why, exactly?)
+        // FIXME: Might be better to call this unconditionally, always passing m_isSelected,
+        // rather than only calling it if we are selected.
         if (m_isSelected)
-            select->setSelectedIndex(index(), false);
+            select->optionSelectionStateChanged(this, true);
         select->scrollToSelection();
     }
 

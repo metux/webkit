@@ -34,9 +34,10 @@ namespace JSC {
     class JSActivation;
     class JSGlobalObject;
     class NativeExecutable;
+    class SourceCode;
     class VPtrHackExecutable;
     namespace DFG {
-    class JITCodeGenerator;
+    class SpeculativeJIT;
     class JITCompiler;
     }
 
@@ -46,7 +47,7 @@ namespace JSC {
 
     class JSFunction : public JSNonFinalObject {
         friend class JIT;
-        friend class DFG::JITCodeGenerator;
+        friend class DFG::SpeculativeJIT;
         friend class DFG::JITCompiler;
         friend class JSGlobalData;
 
@@ -96,6 +97,8 @@ namespace JSC {
         inline bool isHostFunction() const;
         FunctionExecutable* jsExecutable() const;
 
+        const SourceCode* sourceCode() const;
+
         static JS_EXPORTDATA const ClassInfo s_info;
 
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype) 
@@ -129,10 +132,9 @@ namespace JSC {
         void finishCreation(ExecState*, NativeExecutable*, int length, const Identifier& name);
         void finishCreation(ExecState*, FunctionExecutable*, ScopeChainNode*);
 
-        virtual bool getOwnPropertySlotVirtual(ExecState*, const Identifier&, PropertySlot&);
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
-        virtual bool getOwnPropertyDescriptor(ExecState*, const Identifier&, PropertyDescriptor&);
-        virtual void getOwnPropertyNames(ExecState*, PropertyNameArray&, EnumerationMode = ExcludeDontEnumProperties);
+        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
+        static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode = ExcludeDontEnumProperties);
 
         static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
 
