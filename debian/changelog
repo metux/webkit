@@ -12,8 +12,11 @@ webkit (1.7.91-1) experimental; urgency=low
     Build-Dependency
   - Recommend gstreamer packages required to play most formats
     with <video> and <audio>
+  * debian/rules:
+  - disable parallel builds to work-around the racy problems
+    we have seen in the wild
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sat, 10 Mar 2012 23:20:09 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sat, 10 Mar 2012 23:25:33 -0300
 
 webkit (1.7.90+svn20120304-1) experimental; urgency=low
 
