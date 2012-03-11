@@ -45,7 +45,11 @@ clean:
 
 	dh_clean
 
-build: build-stamp
+build: build-arch build-indep
+
+build-indep:
+
+build-arch: build-stamp
 
 build-stamp:
 	dh_testdir
