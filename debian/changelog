@@ -2,6 +2,9 @@ webkit (1.7.91-2) experimental; urgency=low
 
   * debian/control:
   - wrapped Build-Dependencies
+  * debian/rules:
+  - pass --no-keep-memory to the linker, to make build less likely
+    to fail with an OOM
 
  -- Gustavo Noronha Silva <kov@debian.org>  Tue, 13 Mar 2012 09:56:14 -0300
 
