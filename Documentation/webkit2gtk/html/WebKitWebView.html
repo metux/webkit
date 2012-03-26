@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWebContext.html" title="WebKitWebContext">
 <link rel="next" href="WebKitWebViewBase.html" title="WebKitWebViewBase">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -178,10 +178,6 @@ WebKitWebView implements
     WEBKIT_LOAD_FINISHED
 } WebKitLoadEvent;
 </pre>
-<p>
-Enum values used to denote the different events that happen during a
-<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> load operation.
-</p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody>
@@ -227,7 +223,7 @@ or there was an error during the load operation.
 </pre>
 <p>
 Enum values used for determining the type of a policy decision during
-<a class="link" href="WebKitWebView.html#WebKitWebView-decide-policy" title='The "decide-policy" signal'><span class="type">"decide-policy"</span></a>.
+WebKitWebView::decide-policy.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -1290,32 +1286,63 @@ specific type when making the decision. For example:
 </p>
 <p>
 </p>
-<div class="informalexample"><pre class="programlisting">
-static gboolean
+<div class="informalexample">
+  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
+    <tbody>
+      <tr>
+        <td class="listing_lines" align="right"><pre>1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre></td>
+        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> gboolean
 decide_policy_cb (WebKitWebView *web_view,
                   WebKitPolicyDecision *decision,
                   WebKitPolicyDecisionType type)
 {
-    switch (type) {
-    case WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION:
+    <span class="keyword">switch</span> (type) {
+    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION:
         WebKitNavigationPolicyDecision *navigation_decision = WEBKIT_NAVIGATION_POLICY_DECISION (decision);
-        /* Make a policy decision here. */
-        break;
-    case WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION:
+        <span class="comment">/*</span><span class="comment"> Make a policy decision here. </span><span class="comment">*/</span>
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION:
         WebKitNavigationPolicyDecision *navigation_decision = WEBKIT_NAVIGATION_POLICY_DECISION (decision);
-        /* Make a policy decision here. */
-        break;
-    case WEBKIT_POLICY_DECISION_TYPE_RESPONSE:
+        <span class="comment">/*</span><span class="comment"> Make a policy decision here. </span><span class="comment">*/</span>
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_RESPONSE:
         WebKitResponsePolicyDecision *response = WEBKIT_RESPONSE_POLICY_DECISION (decision);
-        /* Make a policy decision here. */
-        break;
-    default:
-        /* Making no decision results in webkit_policy_decision_use(). */
-        return FALSE;
+        <span class="comment">/*</span><span class="comment"> Make a policy decision here. </span><span class="comment">*/</span>
+        <span class="keyword">break</span>;
+    <span class="keyword">default</span>:
+        <span class="comment">/*</span><span class="comment"> Making no decision results in webkit_policy_decision_use(). </span><span class="comment">*/</span>
+        <span class="keyword">return</span> FALSE;
     }
-    return TRUE;
-}
-</pre></div>
+    <span class="keyword">return</span> TRUE;
+}</pre></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
 <p>
 </p>
 <p>
@@ -1382,34 +1409,67 @@ load operation.
 </p>
 <p>
 </p>
-<div class="informalexample"><pre class="programlisting">
-static void web_view_load_changed (WebKitWebView  *web_view,
+<div class="informalexample">
+  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
+    <tbody>
+      <tr>
+        <td class="listing_lines" align="right"><pre>1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre></td>
+        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span> web_view_load_changed (WebKitWebView  *web_view,
                                    WebKitLoadEvent load_event,
                                    gpointer        user_data)
 {
-    switch (load_event) {
-    case WEBKIT_LOAD_STARTED:
-        /* New load, we have now a provisional URI */
+    <span class="keyword">switch</span> (load_event) {
+    <span class="keyword">case</span> WEBKIT_LOAD_STARTED:
+        <span class="comment">/*</span><span class="comment"> New load, we have now a provisional URI </span><span class="comment">*/</span>
         provisional_uri = webkit_web_view_get_uri (web_view);
-        /* Here we could start a spinner or update the
-         * location bar with the provisional URI */
-        break;
-    case WEBKIT_LOAD_REDIRECTED:
+        <span class="comment">/*</span><span class="comment"> Here we could start a spinner or update the</span>
+<span class="comment">         * location bar with the provisional URI </span><span class="comment">*/</span>
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_LOAD_REDIRECTED:
         redirected_uri = webkit_web_view_get_uri (web_view);
-        break;
-    case WEBKIT_LOAD_COMMITTED:
-        /* The load is being performed. Current URI is
-         * the final one and it won't change unless a new
-         * load is requested or a navigation within the
-         * same page is performed */
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_LOAD_COMMITTED:
+        <span class="comment">/*</span><span class="comment"> The load is being performed. Current URI is</span>
+<span class="comment">         * the final one and it won't change unless a new</span>
+<span class="comment">         * load is requested or a navigation within the</span>
+<span class="comment">         * same page is performed </span><span class="comment">*/</span>
         uri = webkit_web_view_get_uri (web_view);
-        break;
-    case WEBKIT_LOAD_FINISHED:
-        /* Load finished, we can now stop the spinner */
-        break;
+        <span class="keyword">break</span>;
+    <span class="keyword">case</span> WEBKIT_LOAD_FINISHED:
+        <span class="comment">/*</span><span class="comment"> Load finished, we can now stop the spinner </span><span class="comment">*/</span>
+        <span class="keyword">break</span>;
     }
-}
-</pre></div>
+}</pre></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
 <p>
 </p>
 <div class="variablelist"><table border="0">
@@ -1713,6 +1773,6 @@ a text entry will be shown with the message text. If OK button is clicked
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

@@ -30,6 +30,7 @@
       <sub name="WebKitWebWindowFeatures" link="WebKitWebWindowFeatures.html"/>
       <sub name="WebKitIconDatabase" link="WebKitIconDatabase.html"/>
       <sub name="WebKitSpellChecker" link="WebKitSpellChecker.html"/>
+      <sub name="WebKitFaviconDatabase" link="WebKitFaviconDatabase.html"/>
     </sub>
     <sub name="Running WebKitGTK+-based programs" link="ch03.html">
       <sub name="Environment" link="webkit-environment.html"/>
@@ -72,7 +73,8 @@
     <keyword type="function" name="webkit_remove_all_web_databases ()" link="webkitgtk-Global-functions.html#webkit-remove-all-web-databases" since="1.1.14"/>
     <keyword type="function" name="webkit_set_default_web_database_quota ()" link="webkitgtk-Global-functions.html#webkit-set-default-web-database-quota" since="1.1.14"/>
     <keyword type="function" name="webkit_set_web_database_directory_path ()" link="webkitgtk-Global-functions.html#webkit-set-web-database-directory-path" since="1.1.14"/>
-    <keyword type="function" name="webkit_get_icon_database ()" link="webkitgtk-Global-functions.html#webkit-get-icon-database" since="1.3.13"/>
+    <keyword type="function" name="webkit_get_favicon_database ()" link="webkitgtk-Global-functions.html#webkit-get-favicon-database" since="1.8"/>
+    <keyword type="function" name="webkit_get_icon_database ()" link="webkitgtk-Global-functions.html#webkit-get-icon-database" deprecated="1.8: Use webkit_get_favicon_database() instead" since="1.3.13"/>
     <keyword type="function" name="webkit_get_text_checker ()" link="webkitgtk-Global-functions.html#webkit-get-text-checker" since="1.5.1"/>
     <keyword type="function" name="webkit_set_text_checker ()" link="webkitgtk-Global-functions.html#webkit-set-text-checker" since="1.5.1"/>
     <keyword type="function" name="webkit_application_cache_get_database_directory_path ()" link="webkitgtk-Global-functions.html#webkit-application-cache-get-database-directory-path" since="1.3.13"/>
@@ -107,7 +109,7 @@
     <keyword type="function" name="webkit_web_view_get_focused_frame ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-focused-frame"/>
     <keyword type="function" name="webkit_web_view_get_full_content_zoom ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-full-content-zoom" since="1.0.1"/>
     <keyword type="function" name="webkit_web_view_get_hit_test_result ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-hit-test-result" since="1.1.15"/>
-    <keyword type="function" name="webkit_web_view_get_icon_pixbuf ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-icon-pixbuf" since="1.3.13"/>
+    <keyword type="function" name="webkit_web_view_get_icon_pixbuf ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-icon-pixbuf" deprecated="1.8: Use webkit_web_view_try_get_favicon_pixbuf() instead." since="1.3.13"/>
     <keyword type="function" name="webkit_web_view_get_icon_uri ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-icon-uri" since="1.1.18"/>
     <keyword type="function" name="webkit_web_view_get_inspector ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-inspector" since="1.0.3"/>
     <keyword type="function" name="webkit_web_view_get_load_status ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-load-status" since="1.1.7"/>
@@ -152,6 +154,7 @@
     <keyword type="function" name="webkit_web_view_set_view_source_mode ()" link="webkitgtk-webkitwebview.html#webkit-web-view-set-view-source-mode" since="1.1.14"/>
     <keyword type="function" name="webkit_web_view_set_zoom_level ()" link="webkitgtk-webkitwebview.html#webkit-web-view-set-zoom-level" since="1.0.1"/>
     <keyword type="function" name="webkit_web_view_stop_loading ()" link="webkitgtk-webkitwebview.html#webkit-web-view-stop-loading"/>
+    <keyword type="function" name="webkit_web_view_try_get_favicon_pixbuf ()" link="webkitgtk-webkitwebview.html#webkit-web-view-try-get-favicon-pixbuf" since="1.8"/>
     <keyword type="function" name="webkit_web_view_undo ()" link="webkitgtk-webkitwebview.html#webkit-web-view-undo" since="1.1.14"/>
     <keyword type="function" name="webkit_web_view_unmark_text_matches ()" link="webkitgtk-webkitwebview.html#webkit-web-view-unmark-text-matches"/>
     <keyword type="function" name="webkit_web_view_zoom_in ()" link="webkitgtk-webkitwebview.html#webkit-web-view-zoom-in" since="1.0.1"/>
@@ -549,12 +552,12 @@
     <keyword type="property" name="The &quot;x&quot; property" link="WebKitWebWindowFeatures.html#WebKitWebWindowFeatures--x"/>
     <keyword type="property" name="The &quot;y&quot; property" link="WebKitWebWindowFeatures.html#WebKitWebWindowFeatures--y"/>
     <keyword type="struct" name="WebKitIconDatabase" link="WebKitIconDatabase.html#WebKitIconDatabase-struct"/>
-    <keyword type="function" name="webkit_icon_database_clear ()" link="WebKitIconDatabase.html#webkit-icon-database-clear" since="1.3.13"/>
-    <keyword type="function" name="webkit_icon_database_get_icon_pixbuf ()" link="WebKitIconDatabase.html#webkit-icon-database-get-icon-pixbuf" since="1.3.13"/>
-    <keyword type="function" name="webkit_icon_database_get_icon_uri ()" link="WebKitIconDatabase.html#webkit-icon-database-get-icon-uri" since="1.3.13"/>
-    <keyword type="function" name="webkit_icon_database_get_path ()" link="WebKitIconDatabase.html#webkit-icon-database-get-path" since="1.3.13"/>
+    <keyword type="function" name="webkit_icon_database_clear ()" link="WebKitIconDatabase.html#webkit-icon-database-clear" deprecated="1.8: Use webkit_favicon_database_clear() instead." since="1.3.13"/>
+    <keyword type="function" name="webkit_icon_database_get_icon_pixbuf ()" link="WebKitIconDatabase.html#webkit-icon-database-get-icon-pixbuf" deprecated="1.8: Use webkit_favicon_database_try_get_favicon_pixbuf() instead." since="1.3.13"/>
+    <keyword type="function" name="webkit_icon_database_get_icon_uri ()" link="WebKitIconDatabase.html#webkit-icon-database-get-icon-uri" deprecated="1.8: Use webkit_favicon_database_get_favicon_uri() instead." since="1.3.13"/>
+    <keyword type="function" name="webkit_icon_database_get_path ()" link="WebKitIconDatabase.html#webkit-icon-database-get-path" deprecated="1.8: Use webkit_favicon_database_get_path() instead." since="1.3.13"/>
     <keyword type="function" name="webkit_icon_database_get_type ()" link="WebKitIconDatabase.html#webkit-icon-database-get-type"/>
-    <keyword type="function" name="webkit_icon_database_set_path ()" link="WebKitIconDatabase.html#webkit-icon-database-set-path" since="1.3.13"/>
+    <keyword type="function" name="webkit_icon_database_set_path ()" link="WebKitIconDatabase.html#webkit-icon-database-set-path" deprecated="1.8: Use webkit_favicon_database_set_path() instead." since="1.3.13"/>
     <keyword type="property" name="The &quot;path&quot; property" link="WebKitIconDatabase.html#WebKitIconDatabase--path"/>
     <keyword type="signal" name="The &quot;icon-loaded&quot; signal" link="WebKitIconDatabase.html#WebKitIconDatabase-icon-loaded"/>
     <keyword type="struct" name="WebKitSpellChecker" link="WebKitSpellChecker.html#WebKitSpellChecker-struct"/>
@@ -564,7 +567,18 @@
     <keyword type="function" name="webkit_spell_checker_get_autocorrect_suggestions_for_misspelled_word ()" link="WebKitSpellChecker.html#webkit-spell-checker-get-autocorrect-suggestions-for-misspelled-word" since="1.5.1"/>
     <keyword type="function" name="webkit_spell_checker_learn_word ()" link="WebKitSpellChecker.html#webkit-spell-checker-learn-word" since="1.5.1"/>
     <keyword type="function" name="webkit_spell_checker_ignore_word ()" link="WebKitSpellChecker.html#webkit-spell-checker-ignore-word" since="1.5.1"/>
-    <keyword type="" name="Logging" link="webkit-environment.html#idp7593968"/>
+    <keyword type="struct" name="WebKitFaviconDatabase" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-struct"/>
+    <keyword type="function" name="webkit_favicon_database_clear ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-clear" since="1.8"/>
+    <keyword type="function" name="webkit_favicon_database_get_favicon_pixbuf ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-pixbuf" since="1.8"/>
+    <keyword type="function" name="webkit_favicon_database_get_favicon_pixbuf_finish ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-pixbuf-finish" since="1.8"/>
+    <keyword type="function" name="webkit_favicon_database_get_favicon_uri ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-uri" since="1.8"/>
+    <keyword type="function" name="webkit_favicon_database_get_path ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-path" since="1.8"/>
+    <keyword type="function" name="webkit_favicon_database_get_type ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-type"/>
+    <keyword type="function" name="webkit_favicon_database_set_path ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-set-path" since="1.8"/>
+    <keyword type="function" name="webkit_favicon_database_try_get_favicon_pixbuf ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-try-get-favicon-pixbuf" since="1.8"/>
+    <keyword type="property" name="The &quot;path&quot; property" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase--path"/>
+    <keyword type="signal" name="The &quot;icon-loaded&quot; signal" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-icon-loaded"/>
+    <keyword type="" name="Logging" link="webkit-environment.html#idp34700512"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DEFAULT" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DEFAULT:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>

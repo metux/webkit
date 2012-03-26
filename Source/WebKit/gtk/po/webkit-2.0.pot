@@ -5,9 +5,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: webkit 1.3.12\n"
+"Project-Id-Version: webkit 1.4.2\n"
 "Report-Msgid-Bugs-To: http://bugs.webkit.org/\n"
-"POT-Creation-Date: 2011-03-21 11:50-0700\n"
+"POT-Creation-Date: 2011-08-29 13:26-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: Source/WebKit/gtk/WebCoreSupport/ChromeClientGtk.cpp:616
+#: Source/WebKit/gtk/WebCoreSupport/ChromeClientGtk.cpp:626
 msgid "Upload File"
 msgstr ""
 
@@ -70,31 +70,31 @@ msgstr ""
 msgid "_Insert Unicode Control Character"
 msgstr ""
 
-#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1249
+#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1144
 msgid "Load request cancelled"
 msgstr ""
 
-#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1255
+#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1150
 msgid "Not allowed to use restricted network port"
 msgstr ""
 
-#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1261
+#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1156
 msgid "URL cannot be shown"
 msgstr ""
 
-#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1267
+#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1162
 msgid "Frame load was interrupted"
 msgstr ""
 
-#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1273
+#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1168
 msgid "Content with the specified MIME type cannot be shown"
 msgstr ""
 
-#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1279
+#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1174
 msgid "File does not exist"
 msgstr ""
 
-#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1285
+#: Source/WebKit/gtk/WebCoreSupport/FrameLoaderClientGtk.cpp:1180
 msgid "Plugin will handle load"
 msgstr ""
 
@@ -225,7 +225,7 @@ msgstr ""
 
 #: Source/WebKit/gtk/webkit/webkitwebframe.cpp:316
 #: Source/WebKit/gtk/webkit/webkitwebhistoryitem.cpp:143
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3015
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3010
 msgid "Title"
 msgstr ""
 
@@ -235,7 +235,7 @@ msgstr ""
 
 #: Source/WebKit/gtk/webkit/webkitwebframe.cpp:323
 #: Source/WebKit/gtk/webkit/webkitwebhistoryitem.cpp:175
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3029
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3024
 msgid "URI"
 msgstr ""
 
@@ -361,477 +361,477 @@ msgstr ""
 msgid "The target frame for the navigation"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:256
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:269
 msgid "Default Encoding"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:257
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:270
 msgid "The default encoding used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:265
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:278
 msgid "Cursive Font Family"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:266
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:279
 msgid "The default Cursive font family used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:274
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:287
 msgid "Default Font Family"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:275
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:288
 msgid "The default font family used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:283
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:296
 msgid "Fantasy Font Family"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:284
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:297
 msgid "The default Fantasy font family used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:292
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:305
 msgid "Monospace Font Family"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:293
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:306
 msgid "The default font family used to display monospace text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:301
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:314
 msgid "Sans Serif Font Family"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:302
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:315
 msgid "The default Sans Serif font family used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:310
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:323
 msgid "Serif Font Family"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:311
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:324
 msgid "The default Serif font family used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:319
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:332
 msgid "Default Font Size"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:320
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:333
 msgid "The default font size used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:328
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:341
 msgid "Default Monospace Font Size"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:329
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:342
 msgid "The default font size used to display monospace text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:337
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:350
 msgid "Minimum Font Size"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:338
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:351
 msgid "The minimum font size used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:346
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:359
 msgid "Minimum Logical Font Size"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:347
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:360
 msgid "The minimum logical font size used to display text."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:366
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:379
 msgid "Enforce 96 DPI"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:367
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:380
 msgid "Enforce a resolution of 96 DPI"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:375
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:388
 msgid "Auto Load Images"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:376
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:389
 msgid "Load images automatically."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:384
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:397
 msgid "Auto Shrink Images"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:385
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:398
 msgid "Automatically shrink standalone images to fit."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:393
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:406
 msgid "Print Backgrounds"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:394
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:407
 msgid "Whether background images should be printed."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:402
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:415
 msgid "Enable Scripts"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:403
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:416
 msgid "Enable embedded scripting languages."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:411
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:424
 msgid "Enable Plugins"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:412
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:425
 msgid "Enable embedded plugin objects."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:420
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:433
 msgid "Resizable Text Areas"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:421
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:434
 msgid "Whether text areas are resizable."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:428
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:441
 msgid "User Stylesheet URI"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:429
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:442
 msgid "The URI of a stylesheet that is applied to every page."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:444
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:457
 msgid "Zoom Stepping Value"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:445
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:458
 msgid "The value by which the zoom level is changed when zooming in or out."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:463
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:476
 msgid "Enable Developer Extras"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:464
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:477
 msgid "Enables special extensions that help developers"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:484
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:497
 msgid "Enable Private Browsing"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:485
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:498
 msgid "Enables private browsing mode"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:500
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:513
 msgid "Enable Spell Checking"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:501
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:514
 msgid "Enables spell checking while typing"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:524
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:537
 msgid "Languages to use for spell checking"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:525
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:538
 msgid "Comma separated list of languages to use for spell checking"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:539
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:552
 msgid "Enable Caret Browsing"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:540
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:553
 msgid "Whether to enable accessibility enhanced keyboard navigation"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:555
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:568
 msgid "Enable HTML5 Database"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:556
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:569
 msgid "Whether to enable HTML5 database support"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:571
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:584
 msgid "Enable HTML5 Local Storage"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:572
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:585
 msgid "Whether to enable HTML5 Local Storage support"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:586
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:599
 msgid "Enable XSS Auditor"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:587
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:600
 msgid "Whether to enable the XSS auditor"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:605
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:618
 msgid "Enable Spatial Navigation"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:606
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:619
 msgid "Whether to enable Spatial Navigation"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:624
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:637
 msgid "Enable Frame Flattening"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:625
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:638
 msgid "Whether to enable Frame Flattening"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:642
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:655
 msgid "User Agent"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:643
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:656
 msgid "The User-Agent string used by WebKitGtk"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:658
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:671
 msgid "JavaScript can open windows automatically"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:659
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:672
 msgid "Whether JavaScript can open windows automatically"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:673
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:686
 msgid "JavaScript can access Clipboard"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:674
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:687
 msgid "Whether JavaScript can access Clipboard"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:690
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:703
 msgid "Enable offline web application cache"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:691
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:704
 msgid "Whether to enable offline web application cache"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:716
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:729
 msgid "Editing behavior"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:717
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:730
 msgid "The behavior mode to use in editing mode"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:733
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:746
 msgid "Enable universal access from file URIs"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:734
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:747
 msgid "Whether to allow universal access from file URIs"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:749
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:762
 msgid "Enable DOM paste"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:750
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:763
 msgid "Whether to enable DOM paste"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:768
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:781
 msgid "Tab key cycles through elements"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:769
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:782
 msgid "Whether the tab key cycles through elements on the page."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:789
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:802
 msgid "Enable Default Context Menu"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:790
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:803
 msgid ""
 "Enables the handling of right-clicks for the creation of the default context "
 "menu"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:810
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:823
 msgid "Enable Site Specific Quirks"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:811
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:824
 msgid "Enables the site-specific compatibility workarounds"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:833
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:846
 msgid "Enable page cache"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:834
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:847
 msgid "Whether the page cache should be used"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:854
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:867
 msgid "Auto Resize Window"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:855
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:868
 msgid "Automatically resize the toplevel window when a page requests it"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:887
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:900
 msgid "Enable Java Applet"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:888
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:901
 msgid "Whether Java Applet support through <applet> should be enabled"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:902
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:915
 msgid "Enable Hyperlink Auditing"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:903
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:916
 msgid "Whether <a ping> should be able to send pings"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:911
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:924
 msgid "Enable Fullscreen"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:912
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:925
 msgid "Whether the Mozilla style API should be enabled."
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:927
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:940
 msgid "WebKit prefetches domain names"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:928
+#: Source/WebKit/gtk/webkit/webkitwebsettings.cpp:941
 msgid "Whether WebKit prefetches domain names"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3016
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3011
 msgid "Returns the @web_view's document title"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3030
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3025
 msgid "Returns the current URI of the contents displayed by the @web_view"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3043
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3038
 msgid "Copy target list"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3044
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3039
 msgid "The list of targets this web view supports for clipboard copying"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3057
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3052
 msgid "Paste target list"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3058
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3053
 msgid "The list of targets this web view supports for clipboard pasting"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3064
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3059
 msgid "Settings"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3065
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3060
 msgid "An associated WebKitWebSettings instance"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3078
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3073
 msgid "Web Inspector"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3079
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3074
 msgid "The associated WebKitWebInspector instance"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3092
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3087
 msgid "Viewport Attributes"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3093
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3088
 msgid "The associated WebKitViewportAttributes instance"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3113
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3108
 msgid "Editable"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3114
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3109
 msgid "Whether content can be modified by the user"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3120
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3115
 msgid "Transparent"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3121
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3116
 msgid "Whether content has a transparent background"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3134
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3129
 msgid "Zoom level"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3135
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3130
 msgid "The level of zoom of the content"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3150
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3145
 msgid "Full content zoom"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3151
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3146
 msgid "Whether the full content is scaled when zooming"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3164
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3159
 msgid "Encoding"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3165
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3160
 msgid "The default encoding of the web view"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3178
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3173
 msgid "Custom Encoding"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3179
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3174
 msgid "The custom encoding of the web view"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3231
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3226
 msgid "Icon URI"
 msgstr ""
 
-#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3232
+#: Source/WebKit/gtk/webkit/webkitwebview.cpp:3227
 msgid "The URI for the favicon for the #WebKitWebView."
 msgstr ""
 

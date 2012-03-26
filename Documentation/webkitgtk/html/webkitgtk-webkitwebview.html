@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="ch02.html" title="Class Overview">
 <link rel="next" href="WebKitWebFrame.html" title="WebKitWebFrame">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -163,6 +163,10 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-set-zoom-level" title="webkit_web_view_set_zoom_level ()">webkit_web_view_set_zoom_level</a>      (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gfloat"><span class="type">gfloat</span></a> zoom_level</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-stop-loading" title="webkit_web_view_stop_loading ()">webkit_web_view_stop_loading</a>        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+<a href="../gdk-pixbuf/gdk-pixbuf-The-GdkPixbuf-Structure.html#GdkPixbuf"><span class="returnvalue">GdkPixbuf</span></a> *         <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-try-get-favicon-pixbuf" title="webkit_web_view_try_get_favicon_pixbuf ()">webkit_web_view_try_get_favicon_pixbuf</a>
+                                                        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> width</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> height</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-undo" title="webkit_web_view_undo ()">webkit_web_view_undo</a>                (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-unmark-text-matches" title="webkit_web_view_unmark_text_matches ()">webkit_web_view_unmark_text_matches</a> (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-zoom-in" title="webkit_web_view_zoom_in ()">webkit_web_view_zoom_in</a>             (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
@@ -824,9 +828,6 @@ of WebKitWebSettings.
 <a name="webkit-web-view-get-editable"></a><h3>webkit_web_view_get_editable ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_web_view_get_editable        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
-Returns whether the user is allowed to edit the document.
-</p>
-<p>
 Returns <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if <em class="parameter"><code>web_view</code></em> allows the user to edit the HTML document, <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> if
 it doesn't. You can change <em class="parameter"><code>web_view</code></em>'s document programmatically regardless of
 this setting.
@@ -955,6 +956,10 @@ specified position. <span class="annotation">[<acronym title="Free data after th
 <div class="refsect2">
 <a name="webkit-web-view-get-icon-pixbuf"></a><h3>webkit_web_view_get_icon_pixbuf ()</h3>
 <pre class="programlisting"><a href="../gdk-pixbuf/gdk-pixbuf-The-GdkPixbuf-Structure.html#GdkPixbuf"><span class="returnvalue">GdkPixbuf</span></a> *         webkit_web_view_get_icon_pixbuf     (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<div class="warning" style="margin-left: 0.5in; margin-right: 0.5in;">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_web_view_get_icon_pixbuf</code> has been deprecated since version 1.8 and should not be used in newly-written code. Use <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-try-get-favicon-pixbuf" title="webkit_web_view_try_get_favicon_pixbuf ()"><code class="function">webkit_web_view_try_get_favicon_pixbuf()</code></a> instead.</p>
+</div>
 <p>
 Obtains a <a href="../gdk-pixbuf/gdk-pixbuf-The-GdkPixbuf-Structure.html#GdkPixbuf"><span class="type">GdkPixbuf</span></a> of the favicon for the given <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>, or
 a default icon if there is no icon for the given page. Use
@@ -2086,6 +2091,51 @@ Stops any ongoing load in the <em class="parameter"><code>web_view</code></em>.
 </td>
 </tr></tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-try-get-favicon-pixbuf"></a><h3>webkit_web_view_try_get_favicon_pixbuf ()</h3>
+<pre class="programlisting"><a href="../gdk-pixbuf/gdk-pixbuf-The-GdkPixbuf-Structure.html#GdkPixbuf"><span class="returnvalue">GdkPixbuf</span></a> *         webkit_web_view_try_get_favicon_pixbuf
+                                                        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> width</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> height</code></em>);</pre>
+<p>
+Obtains a <a href="../gdk-pixbuf/gdk-pixbuf-The-GdkPixbuf-Structure.html#GdkPixbuf"><span class="type">GdkPixbuf</span></a> of the favicon for the given
+<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>. This will return <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> is there is no icon for the
+current <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> or if the icon is in the database but not
+available at the moment of this call. Use
+<a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-get-icon-uri" title="webkit_web_view_get_icon_uri ()"><code class="function">webkit_web_view_get_icon_uri()</code></a> if you need to distinguish these
+cases.  Usually you want to connect to WebKitWebView::icon-loaded
+and call this method in the callback.
+</p>
+<p>
+See also <a class="link" href="WebKitFaviconDatabase.html#webkit-favicon-database-try-get-favicon-pixbuf" title="webkit_favicon_database_try_get_favicon_pixbuf ()"><code class="function">webkit_favicon_database_try_get_favicon_pixbuf()</code></a>. Contrary
+to this function the icon database one returns the URL of the page
+containing the icon.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> object</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>width</code></em> :</span></p></td>
+<td>the desired width for the icon</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>height</code></em> :</span></p></td>
+<td>the desired height for the icon</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a new reference to a <a href="../gdk-pixbuf/gdk-pixbuf-The-GdkPixbuf-Structure.html#GdkPixbuf"><span class="type">GdkPixbuf</span></a>, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 1.8</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -4352,6 +4402,6 @@ window object</td>
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>
