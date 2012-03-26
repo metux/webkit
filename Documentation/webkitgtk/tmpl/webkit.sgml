@@ -80,6 +80,15 @@ Global functions
 @path: 
 
 
+<!-- ##### FUNCTION webkit_get_favicon_database ##### -->
+<para>
+
+</para>
+
+@void: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_get_icon_database ##### -->
 <para>
 

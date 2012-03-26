@@ -1281,6 +1281,17 @@ WebKitWebView
 @web_view: 
 
 
+<!-- ##### FUNCTION webkit_web_view_try_get_favicon_pixbuf ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@width: 
+@height: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_web_view_undo ##### -->
 <para>
 

@@ -9,6 +9,7 @@
 <ANCHOR id="webkit-remove-all-web-databases" href="webkitgtk/webkitgtk-Global-functions.html#webkit-remove-all-web-databases">
 <ANCHOR id="webkit-set-default-web-database-quota" href="webkitgtk/webkitgtk-Global-functions.html#webkit-set-default-web-database-quota">
 <ANCHOR id="webkit-set-web-database-directory-path" href="webkitgtk/webkitgtk-Global-functions.html#webkit-set-web-database-directory-path">
+<ANCHOR id="webkit-get-favicon-database" href="webkitgtk/webkitgtk-Global-functions.html#webkit-get-favicon-database">
 <ANCHOR id="webkit-get-icon-database" href="webkitgtk/webkitgtk-Global-functions.html#webkit-get-icon-database">
 <ANCHOR id="webkit-get-text-checker" href="webkitgtk/webkitgtk-Global-functions.html#webkit-get-text-checker">
 <ANCHOR id="webkit-set-text-checker" href="webkitgtk/webkitgtk-Global-functions.html#webkit-set-text-checker">
@@ -115,6 +116,7 @@
 <ANCHOR id="webkit-web-view-set-view-source-mode" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-set-view-source-mode">
 <ANCHOR id="webkit-web-view-set-zoom-level" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-set-zoom-level">
 <ANCHOR id="webkit-web-view-stop-loading" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-stop-loading">
+<ANCHOR id="webkit-web-view-try-get-favicon-pixbuf" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-try-get-favicon-pixbuf">
 <ANCHOR id="webkit-web-view-undo" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-undo">
 <ANCHOR id="webkit-web-view-unmark-text-matches" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-unmark-text-matches">
 <ANCHOR id="webkit-web-view-zoom-in" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-zoom-in">
@@ -730,7 +732,28 @@
 <ANCHOR id="webkit-spell-checker-get-autocorrect-suggestions-for-misspelled-word" href="webkitgtk/WebKitSpellChecker.html#webkit-spell-checker-get-autocorrect-suggestions-for-misspelled-word">
 <ANCHOR id="webkit-spell-checker-learn-word" href="webkitgtk/WebKitSpellChecker.html#webkit-spell-checker-learn-word">
 <ANCHOR id="webkit-spell-checker-ignore-word" href="webkitgtk/WebKitSpellChecker.html#webkit-spell-checker-ignore-word">
+<ANCHOR id="WebKitFaviconDatabase" href="webkitgtk/WebKitFaviconDatabase.html">
+<ANCHOR id="WebKitFaviconDatabase.synopsis" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.synopsis">
+<ANCHOR id="WebKitFaviconDatabase.object-hierarchy" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.object-hierarchy">
+<ANCHOR id="WebKitFaviconDatabase.properties" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.properties">
+<ANCHOR id="WebKitFaviconDatabase.signals" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.signals">
+<ANCHOR id="WebKitFaviconDatabase.description" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.description">
+<ANCHOR id="WebKitFaviconDatabase.details" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.details">
+<ANCHOR id="WebKitFaviconDatabase-struct" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase-struct">
+<ANCHOR id="webkit-favicon-database-clear" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-clear">
+<ANCHOR id="webkit-favicon-database-get-favicon-pixbuf" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-pixbuf">
+<ANCHOR id="webkit-favicon-database-get-favicon-pixbuf-finish" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-pixbuf-finish">
+<ANCHOR id="webkit-favicon-database-get-favicon-uri" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-uri">
+<ANCHOR id="webkit-favicon-database-get-path" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-get-path">
+<ANCHOR id="webkit-favicon-database-get-type" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-get-type">
+<ANCHOR id="webkit-favicon-database-set-path" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-set-path">
+<ANCHOR id="webkit-favicon-database-try-get-favicon-pixbuf" href="webkitgtk/WebKitFaviconDatabase.html#webkit-favicon-database-try-get-favicon-pixbuf">
+<ANCHOR id="WebKitFaviconDatabase.property-details" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.property-details">
+<ANCHOR id="WebKitFaviconDatabase--path" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase--path">
+<ANCHOR id="WebKitFaviconDatabase.signal-details" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.signal-details">
+<ANCHOR id="WebKitFaviconDatabase-icon-loaded" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase-icon-loaded">
 <ANCHOR id="webkit-environment" href="webkitgtk/webkit-environment.html">
+<ANCHOR id="annotation-glossterm-allow-none" href="webkitgtk/annotation-glossary.html#annotation-glossterm-allow-none">
 <ANCHOR id="annotation-glossterm-element-type" href="webkitgtk/annotation-glossary.html#annotation-glossterm-element-type">
 <ANCHOR id="annotation-glossterm-transfer container" href="webkitgtk/annotation-glossary.html#annotation-glossterm-transfer container">
 <ANCHOR id="annotation-glossterm-transfer full" href="webkitgtk/annotation-glossary.html#annotation-glossterm-transfer full">
