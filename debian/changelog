@@ -3,8 +3,10 @@ webkit (1.8.0-1) experimental; urgency=low
   * New stable release
   * debian/control:
   - move libwebkit-dev to oldlibs
+  * debian/*.symbols:
+  - updated with symbols additions
 
- -- Gustavo Noronha Silva <kov@debian.org>  Tue, 27 Mar 2012 23:27:07 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 28 Mar 2012 09:53:38 -0300
 
 webkit (1.7.92-1) experimental; urgency=low
 
