@@ -112,7 +112,7 @@ Description: Web content engine library for GTK+
  This is the library for embedding in GTK+ applications.
 
 Package: libwebkit-dev
-Section: libdevel
+Section: oldlibs
 Priority: extra
 Architecture: any
 Depends: libwebkitgtk-dev (= ${binary:Version}), ${misc:Depends}
