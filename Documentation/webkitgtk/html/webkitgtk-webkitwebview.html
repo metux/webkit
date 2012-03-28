@@ -3024,7 +3024,7 @@ When a <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span c
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
                                                         <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> *web_frame,
                                                         <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>          *uri,
-                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        web_error,
+                                                        <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a>         *web_error,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 An error occurred while loading. By default, if the signal is not
@@ -3638,7 +3638,7 @@ provide progress information about the resource load operation.
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>     *web_view,
                                                         <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>    *web_frame,
                                                         <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *web_resource,
-                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>           error,
+                                                        <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a>            *error,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>           user_data)         : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Invoked when a resource failed to load

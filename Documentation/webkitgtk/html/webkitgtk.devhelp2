@@ -578,7 +578,7 @@
     <keyword type="function" name="webkit_favicon_database_try_get_favicon_pixbuf ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-try-get-favicon-pixbuf" since="1.8"/>
     <keyword type="property" name="The &quot;path&quot; property" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase--path"/>
     <keyword type="signal" name="The &quot;icon-loaded&quot; signal" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-icon-loaded"/>
-    <keyword type="" name="Logging" link="webkit-environment.html#idp34700512"/>
+    <keyword type="" name="Logging" link="webkit-environment.html#idp8543552"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DEFAULT" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DEFAULT:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
