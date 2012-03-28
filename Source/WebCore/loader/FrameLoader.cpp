@@ -736,6 +736,7 @@ void FrameLoader::checkCompleted()
 
     // OK, completed.
     m_isComplete = true;
+    m_requestedHistoryItem = 0;
     m_frame->document()->setReadyState(Document::Complete);
 
     RefPtr<Frame> protect(m_frame);
@@ -1641,22 +1642,6 @@ bool FrameLoader::isLoading() const
 bool FrameLoader::frameHasLoaded() const
 {
     return m_stateMachine.committedFirstRealDocumentLoad() || (m_provisionalDocumentLoader && !m_stateMachine.creatingInitialEmptyDocument()); 
-}
-
-void FrameLoader::transferLoadingResourcesFromPage(Page* oldPage)
-{
-    ASSERT(oldPage != m_frame->page());
-    if (isLoading()) {
-        activeDocumentLoader()->transferLoadingResourcesFromPage(oldPage);
-        oldPage->progress()->progressCompleted(m_frame);
-        if (m_frame->page())
-            m_frame->page()->progress()->progressStarted(m_frame);
-    }
-}
-
-void FrameLoader::dispatchTransferLoadingResourceFromPage(ResourceLoader* loader, const ResourceRequest& request, Page* oldPage)
-{
-    notifier()->dispatchTransferLoadingResourceFromPage(loader, request, oldPage);
 }
 
 void FrameLoader::setDocumentLoader(DocumentLoader* loader)
@@ -3171,6 +3156,7 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem* item, FrameLoadType loa
 // Loads content into this frame, as specified by history item
 void FrameLoader::loadItem(HistoryItem* item, FrameLoadType loadType)
 {
+    m_requestedHistoryItem = item;
     HistoryItem* currentItem = history()->currentItem();
     bool sameDocumentNavigation = currentItem && item->shouldDoSameDocumentNavigationTo(currentItem);
 

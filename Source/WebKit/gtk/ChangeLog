@@ -1,3 +1,104 @@
+2012-03-27  Martin Robinson  <mrobinson@igalia.com>
+
+        Update the NEWS and version for the impending 1.8.0 release.
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * NEWS: Update the news.
+
+2012-03-26  Gary Kramlich  <grim@reaperworld.com>
+
+        WebKitWebView signals with GError parameters cause crashes when using GObject Introspection
+        https://bugs.webkit.org/show_bug.cgi?id=81977
+
+        Reviewed by Martin Robinson.
+
+        Added marshalers for BOOLEAN:OBJECT,STRING,BOXED and VOID:OBJECT,OBJECT,BOXED
+        and changed the signal signatures for WebKitWebView::load-fail and
+        WebKitWebView::resource-load-failed to use the new marshalers since
+        GError has been a GBoxed type since Gtk 2.26.  This fixes these signals
+        for the gobject-introspection bindings.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_class_init):
+        * webkitmarshal.list:
+
+2012-03-26  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Replace occurrences of "uri" in the documentation with "URI"
+        https://bugs.webkit.org/show_bug.cgi?id=82025
+
+        Reviewed by Gustavo Noronha Silva.
+
+        In documentation "uri" should really be written as "URI" so
+        we should fix all existing strings.
+
+        * webkit/webkitdownload.cpp: Replace "uri" with "URI."
+        * webkit/webkitnetworkrequest.cpp: Ditto.
+        * webkit/webkitnetworkresponse.cpp: Ditto.
+        * webkit/webkitwebhistoryitem.cpp: Ditto.
+        * webkit/webkitwebresource.cpp: Ditto.
+        (webkit_web_resource_class_init):
+
+2012-03-26  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Webkit fails to build with --disable-geolocation
+        https://bugs.webkit.org/show_bug.cgi?id=81451
+
+        Reviewed by Benjamin Poulain.
+
+        Wrap uses of WebCore::Geolocation in WebKitGeolocationPolicyDecision
+        and WebKitWebView in ifdefs, removing compilation errors when compiling
+        with geolocation support disabled. Affected public API methods are then
+        stubs, throwing a warning that feature was not enabled at compile-time.
+
+        * webkit/webkitgeolocationpolicydecision.cpp:
+        (_WebKitGeolocationPolicyDecisionPrivate):
+        (webkit_geolocation_policy_decision_new):
+        (webkit_geolocation_policy_allow):
+        (webkit_geolocation_policy_deny):
+        * webkit/webkitgeolocationpolicydecisionprivate.h:
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init):
+
+2012-03-26  Zan Dobersek  <zandobersek@gmail.com>
+
+        [GObject bindings] Supplemental interfaces are not disabled with the "Conditional" attribute
+        https://bugs.webkit.org/show_bug.cgi?id=80030
+
+        Reviewed by Martin Robinson.
+
+        Add a private macro that can be used when necessary to throw a warning
+        about a future not enabled at compile-time.
+
+        * webkit/webkitglobalsprivate.h:
+
+2012-03-26  Zan Dobersek  <zandobersek@gmail.com>
+
+        [GObject bindings] Supplemental interfaces are not disabled with the "Conditional" attribute
+        https://bugs.webkit.org/show_bug.cgi?id=80030
+
+        Reviewed by Martin Robinson.
+
+        Add a private macro that can be used when necessary to throw a warning
+        about a future not enabled at compile-time.
+
+        * webkit/webkitglobalsprivate.h:
+
+2012-03-23  Adam Barth  <abarth@webkit.org>
+
+        Remove support for "magic" iframe
+        https://bugs.webkit.org/show_bug.cgi?id=81590
+
+        Reviewed by Eric Seidel.
+
+        Remove FrameLoaderClient methods that no longer exist.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit):
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        (FrameLoaderClient):
+
 2012-03-19  Martin Robinson  <mrobinson@igalia.com>
 
         Update the NEWS and version for the WebKitGTK+ 1.7.92 release.

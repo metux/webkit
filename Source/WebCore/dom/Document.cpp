@@ -946,15 +946,14 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionCode& ec)
         break;
     }       
     default:
+        // FIXME: What about <frame> and <object>?
         if (source->hasTagName(iframeTag)) {
             HTMLIFrameElement* iframe = static_cast<HTMLIFrameElement*>(source.get());
             if (frame() && frame()->tree()->isDescendantOf(iframe->contentFrame())) {
                 ec = HIERARCHY_REQUEST_ERR;
                 return 0;
             }
-            iframe->setRemainsAliveOnRemovalFromTree(attached() && source->attached() && iframe->canRemainAliveOnRemovalFromTree());
         }
-
         if (source->parentNode())
             source->parentNode()->removeChild(source.get(), ec);
     }
@@ -3040,19 +3039,20 @@ void Document::styleSelectorChanged(StyleSelectorUpdateFlag updateFlag)
 #endif
 
     bool stylesheetChangeRequiresStyleRecalc = updateActiveStylesheets(updateFlag);
-    if (!stylesheetChangeRequiresStyleRecalc)
-        return;
 
     if (updateFlag == DeferRecalcStyle) {
         scheduleForcedStyleRecalc();
         return;
     }
-    
+
     if (didLayoutWithPendingStylesheets() && m_pendingStylesheets <= 0) {
         m_pendingSheetLayout = IgnoreLayoutWithPendingSheets;
         if (renderer())
             renderer()->repaint();
     }
+
+    if (!stylesheetChangeRequiresStyleRecalc)
+        return;
 
     // This recalcStyle initiates a new recalc cycle. We need to bracket it to
     // make sure animations get the correct update time
