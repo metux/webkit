@@ -22,6 +22,7 @@
 #if ENABLE(SVG)
 #include "RenderSVGResourceContainer.h"
 
+#include "RenderSVGRoot.h"
 #include "RenderSVGShadowTreeRootContainer.h"
 #include "RenderView.h"
 #include "SVGResourcesCache.h"
@@ -54,7 +55,7 @@ void RenderSVGResourceContainer::layout()
 {
     // Invalidate all resources if our layout changed.
     if (everHadLayout() && selfNeedsLayout())
-        removeAllClientsFromCache();
+        RenderSVGRoot::addResourceForClientInvalidation(this);
 
     RenderSVGHiddenContainer::layout();
 }

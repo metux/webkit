@@ -817,12 +817,19 @@ void RenderBlock::addChildIgnoringAnonymousColumnBlocks(RenderObject* newChild, 
             // Someone may have put a <p> inside a <q>, causing a split.  When this happens, the :after content
             // has to move into the inline continuation.  Call updateBeforeAfterContent to ensure that our :after
             // content gets properly destroyed.
+            bool isFirstChild = (beforeChild == firstChild());
             bool isLastChild = (beforeChild == lastChild());
             if (document()->usesBeforeAfterRules())
                 children()->updateBeforeAfterContent(this, AFTER);
-            if (isLastChild && beforeChild != lastChild())
-                beforeChild = 0; // We destroyed the last child, so now we need to update our insertion
-                                 // point to be 0.  It's just a straight append now.
+            if (isLastChild && beforeChild != lastChild()) {
+                // We destroyed the last child, so now we need to update our insertion
+                // point to be 0. It's just a straight append now.
+                beforeChild = 0;
+            } else if (isFirstChild && beforeChild != firstChild()) {
+                // If beforeChild was the last anonymous block that collapsed,
+                // then we need to update its value.
+                beforeChild = firstChild();
+            }
 
             splitFlow(beforeChild, newBox, newChild, oldContinuation);
             return;
@@ -1756,7 +1763,7 @@ bool RenderBlock::handleRunInChild(RenderBox* child)
     // Move the nodes from the old child to the new child
     for (RenderObject* runInChild = blockRunIn->firstChild(); runInChild;) {
         RenderObject* nextSibling = runInChild->nextSibling();
-        blockRunIn->children()->removeChildNode(blockRunIn, runInChild, false);
+        blockRunIn->children()->removeChildNode(blockRunIn, runInChild);
         inlineRunIn->addChild(runInChild); // Use addChild instead of appendChildNode since it handles correct placement of the children relative to :after-generated content.
         runInChild = nextSibling;
     }
@@ -3931,6 +3938,17 @@ void RenderBlock::clearFloats(BlockLayoutPass layoutPass)
     // Clear our positioned floats boolean.
     m_hasPositionedFloats = false;
 
+    HashSet<RenderBox*> oldIntrudingFloatSet;
+    if (!childrenInline() && m_floatingObjects) {
+        const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
+        FloatingObjectSetIterator end = floatingObjectSet.end();
+        for (FloatingObjectSetIterator it = floatingObjectSet.begin(); it != end; ++it) {
+            FloatingObject* floatingObject = *it;
+            if (!floatingObject->isDescendant())
+                oldIntrudingFloatSet.add(floatingObject->m_renderer);
+        }
+    }
+
     // Inline blocks are covered by the isReplaced() check in the avoidFloats method.
     if (avoidsFloats() || isRoot() || isRenderView() || isFloatingOrPositioned() || isTableCell()) {
         if (m_floatingObjects) {
@@ -3939,6 +3957,8 @@ void RenderBlock::clearFloats(BlockLayoutPass layoutPass)
         }
         if (layoutPass == PositionedFloatLayoutPass)
             addPositionedFloats();
+        if (!oldIntrudingFloatSet.isEmpty())
+            markAllDescendantsWithFloatsForLayout();
         return;
     }
 
@@ -4049,6 +4069,15 @@ void RenderBlock::clearFloats(BlockLayoutPass layoutPass)
         deleteAllValues(floatMap);
 
         markLinesDirtyInBlockRange(changeLogicalTop, changeLogicalBottom);
+    } else if (!oldIntrudingFloatSet.isEmpty()) {
+        // If there are previously intruding floats that no longer intrude, then children with floats
+        // should also get layout because they might need their floating object lists cleared.
+        const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
+        FloatingObjectSetIterator end = floatingObjectSet.end();
+        for (FloatingObjectSetIterator it = floatingObjectSet.begin(); it != end; ++it)
+            oldIntrudingFloatSet.remove((*it)->m_renderer);
+        if (!oldIntrudingFloatSet.isEmpty())
+            markAllDescendantsWithFloatsForLayout();
     }
 }
 

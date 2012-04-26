@@ -329,11 +329,8 @@ void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
         children->insertChildNode(this, newChild, beforeChild);
     }
 
-    if (newChild->isText() && newChild->style()->textTransform() == CAPITALIZE) {
-        RefPtr<StringImpl> textToTransform = toRenderText(newChild)->originalText();
-        if (textToTransform)
-            toRenderText(newChild)->setText(textToTransform.release(), true);
-    }
+    if (newChild->isText() && newChild->style()->textTransform() == CAPITALIZE)
+        toRenderText(newChild)->transformText();
 
     // SVG creates renderers for <g display="none">, as SVG requires children of hidden
     // <g>s to have renderers - at least that's how our implementation works. Consider:
@@ -2801,6 +2798,15 @@ VisiblePosition RenderObject::createVisiblePosition(const Position& position)
 CursorDirective RenderObject::getCursor(const LayoutPoint&, Cursor&) const
 {
     return SetCursorBasedOnStyle;
+}
+
+bool RenderObject::canUpdateSelectionOnRootLineBoxes()
+{
+    if (needsLayout())
+        return false;
+
+    RenderBlock* containingBlock = this->containingBlock();
+    return containingBlock ? !containingBlock->needsLayout() : true;
 }
 
 #if ENABLE(SVG)
