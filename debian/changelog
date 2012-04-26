@@ -1,8 +1,11 @@
 webkit (1.8.1-1) unstable; urgency=low
 
   * New upstream release
+  * debian/patches/10_kfreebsd_support.patch:
+  - Patch by Steven Chamberlain <steven@pyro.eu.org> to fix the
+    build for kFreeBSD (Closes: #669308)
 
- -- Gustavo Noronha Silva <kov@debian.org>  Thu, 26 Apr 2012 07:41:37 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 26 Apr 2012 19:52:12 -0300
 
 webkit (1.8.0-2) unstable; urgency=low
 
