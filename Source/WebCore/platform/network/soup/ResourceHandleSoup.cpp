@@ -69,67 +69,95 @@ namespace WebCore {
 
 #define READ_BUFFER_SIZE 8192
 
+static bool loadingSynchronousRequest = false;
+
 class WebCoreSynchronousLoader : public ResourceHandleClient {
     WTF_MAKE_NONCOPYABLE(WebCoreSynchronousLoader);
 public:
-    WebCoreSynchronousLoader(ResourceError&, ResourceResponse &, Vector<char>&);
-    ~WebCoreSynchronousLoader();
 
-    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse&);
-    virtual void didReceiveData(ResourceHandle*, const char*, int, int encodedDataLength);
-    virtual void didFinishLoading(ResourceHandle*, double /*finishTime*/);
-    virtual void didFail(ResourceHandle*, const ResourceError&);
+    WebCoreSynchronousLoader(ResourceError& error, ResourceResponse& response, SoupSession* session, Vector<char>& data)
+        : m_error(error)
+        , m_response(response)
+        , m_session(session)
+        , m_data(data)
+        , m_finished(false)
+    {
+        // We don't want any timers to fire while we are doing our synchronous load
+        // so we replace the thread default main context. The main loop iterations
+        // will only process GSources associated with this inner context.
+        loadingSynchronousRequest = true;
+        GRefPtr<GMainContext> innerMainContext = adoptGRef(g_main_context_new());
+        g_main_context_push_thread_default(innerMainContext.get());
+        m_mainLoop = g_main_loop_new(innerMainContext.get(), false);
 
-    void run();
+        adjustMaxConnections(1);
+    }
+
+    ~WebCoreSynchronousLoader()
+    {
+        adjustMaxConnections(-1);
+        g_main_context_pop_thread_default(g_main_context_get_thread_default());
+        loadingSynchronousRequest = false;
+    }
+
+    void adjustMaxConnections(int adjustment)
+    {
+        int maxConnections, maxConnectionsPerHost;
+        g_object_get(m_session,
+                     SOUP_SESSION_MAX_CONNS, &maxConnections,
+                     SOUP_SESSION_MAX_CONNS_PER_HOST, &maxConnectionsPerHost,
+                     NULL);
+        maxConnections += adjustment;
+        maxConnectionsPerHost += adjustment;
+        g_object_set(m_session,
+                     SOUP_SESSION_MAX_CONNS, maxConnections,
+                     SOUP_SESSION_MAX_CONNS_PER_HOST, maxConnectionsPerHost,
+                     NULL);
+
+    }
+
+    virtual bool isSynchronousClient()
+    {
+        return true;
+    }
+
+    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse& response)
+    {
+        m_response = response;
+    }
+
+    virtual void didReceiveData(ResourceHandle*, const char* data, int length, int)
+    {
+        m_data.append(data, length);
+    }
+
+    virtual void didFinishLoading(ResourceHandle*, double)
+    {
+        if (g_main_loop_is_running(m_mainLoop.get()))
+            g_main_loop_quit(m_mainLoop.get());
+        m_finished = true;
+    }
+
+    virtual void didFail(ResourceHandle* handle, const ResourceError& error)
+    {
+        m_error = error;
+        didFinishLoading(handle, 0);
+    }
+
+    void run()
+    {
+        if (!m_finished)
+            g_main_loop_run(m_mainLoop.get());
+    }
 
 private:
     ResourceError& m_error;
     ResourceResponse& m_response;
+    SoupSession* m_session;
     Vector<char>& m_data;
     bool m_finished;
     GRefPtr<GMainLoop> m_mainLoop;
 };
-
-WebCoreSynchronousLoader::WebCoreSynchronousLoader(ResourceError& error, ResourceResponse& response, Vector<char>& data)
-    : m_error(error)
-    , m_response(response)
-    , m_data(data)
-    , m_finished(false)
-{
-    m_mainLoop = adoptGRef(g_main_loop_new(0, false));
-}
-
-WebCoreSynchronousLoader::~WebCoreSynchronousLoader()
-{
-}
-
-void WebCoreSynchronousLoader::didReceiveResponse(ResourceHandle*, const ResourceResponse& response)
-{
-    m_response = response;
-}
-
-void WebCoreSynchronousLoader::didReceiveData(ResourceHandle*, const char* data, int length, int)
-{
-    m_data.append(data, length);
-}
-
-void WebCoreSynchronousLoader::didFinishLoading(ResourceHandle*, double)
-{
-    g_main_loop_quit(m_mainLoop.get());
-    m_finished = true;
-}
-
-void WebCoreSynchronousLoader::didFail(ResourceHandle* handle, const ResourceError& error)
-{
-    m_error = error;
-    didFinishLoading(handle, 0);
-}
-
-void WebCoreSynchronousLoader::run()
-{
-    if (!m_finished)
-        g_main_loop_run(m_mainLoop.get());
-}
 
 static void cleanupSoupRequestOperation(ResourceHandle*, bool isDestroying);
 static void sendRequestCallback(GObject*, GAsyncResult*, gpointer);
@@ -141,9 +169,14 @@ ResourceHandleInternal::~ResourceHandleInternal()
 {
 }
 
+static SoupSession* sessionFromContext(NetworkingContext* context)
+{
+    return (context && context->isValid()) ? context->soupSession() : ResourceHandle::defaultSession();
+}
+
 SoupSession* ResourceHandleInternal::soupSession()
 {
-    return (m_context && m_context->isValid()) ? m_context->soupSession() : ResourceHandle::defaultSession();
+    return sessionFromContext(m_context.get());
 }
 
 ResourceHandle::~ResourceHandle()
@@ -177,14 +210,6 @@ static void ensureSessionIsInitialized(SoupSession* session)
     }
 
     g_object_set_data(G_OBJECT(session), "webkit-init", reinterpret_cast<void*>(0xdeadbeef));
-}
-
-void ResourceHandle::prepareForURL(const KURL& url)
-{
-    GOwnPtr<SoupURI> soupURI(soup_uri_new(url.string().utf8().data()));
-    if (!soupURI)
-        return;
-    soup_session_prepare_for_uri(ResourceHandle::defaultSession(), soupURI.get());
 }
 
 // Called each time the message is going to be sent again except the first time.
@@ -504,6 +529,15 @@ static bool startHTTPRequest(ResourceHandle* handle)
     if (!soup_message_headers_get_one(soupMessage->request_headers, "Accept"))
         soup_message_headers_append(soupMessage->request_headers, "Accept", "*/*");
 
+    // In the case of XHR .send() and .send("") explicitly tell libsoup
+    // to send a zero content-lenght header for consistency
+    // with other backends (e.g. Chromium's) and other UA implementations like FF.
+    // It's done in the backend here instead of in XHR code since in XHR CORS checking
+    // prevents us from this kind of late header manipulation.
+    if ((request.httpMethod() == "POST" || request.httpMethod() == "PUT")
+        && (!request.httpBody() || request.httpBody()->isEmpty()))
+        soup_message_headers_set_content_length(soupMessage->request_headers, 0);
+
     // Send the request only if it's not been explicitly deferred.
     if (!d->m_defersLoading) {
         d->m_cancellable = adoptGRef(g_cancellable_new());
@@ -617,8 +651,12 @@ void ResourceHandle::loadResourceSynchronously(NetworkingContext* context, const
         return;
     }
 #endif
+ 
+    ASSERT(!loadingSynchronousRequest);
+    if (loadingSynchronousRequest) // In practice this cannot happen, but if for some reason it does,
+        return;                    // we want to avoid accidentally going into an infinite loop of requests.
 
-    WebCoreSynchronousLoader syncLoader(error, response, data);
+    WebCoreSynchronousLoader syncLoader(error, response, sessionFromContext(context), data);
     RefPtr<ResourceHandle> handle = create(context, request, &syncLoader, false /*defersLoading*/, false /*shouldContentSniff*/);
     if (!handle)
         return;
@@ -633,9 +671,14 @@ void ResourceHandle::loadResourceSynchronously(NetworkingContext* context, const
 static void closeCallback(GObject* source, GAsyncResult* res, gpointer data)
 {
     RefPtr<ResourceHandle> handle = static_cast<ResourceHandle*>(data);
-
     ResourceHandleInternal* d = handle->getInternal();
+
     g_input_stream_close_finish(d->m_inputStream.get(), res, 0);
+
+    ResourceHandleClient* client = handle->client();
+    if (client && loadingSynchronousRequest)
+        client->didFinishLoading(handle.get(), 0);
+
     cleanupSoupRequestOperation(handle.get());
 }
 
@@ -666,8 +709,14 @@ static void readCallback(GObject* source, GAsyncResult* asyncResult, gpointer da
 
     if (!bytesRead) {
         // We inform WebCore of load completion now instead of waiting for the input
-        // stream to close because the input stream is closed asynchronously.
-        client->didFinishLoading(handle.get(), 0);
+        // stream to close because the input stream is closed asynchronously. If this
+        // is a synchronous request, we wait until the closeCallback, because we don't
+        // want to halt the internal main loop before the input stream closes.
+        if (client && !loadingSynchronousRequest) {
+            client->didFinishLoading(handle.get(), 0);
+            handle->setClient(0); // Unset the client so that we do not try to access th
+                                  // client in the closeCallback.
+        }
         g_input_stream_close_async(d->m_inputStream.get(), G_PRIORITY_DEFAULT, 0, closeCallback, handle.get());
         return;
     }
@@ -739,6 +788,7 @@ SoupSession* ResourceHandle::defaultSession()
                      SOUP_SESSION_ADD_FEATURE_BY_TYPE, SOUP_TYPE_CONTENT_DECODER,
                      SOUP_SESSION_ADD_FEATURE_BY_TYPE, SOUP_TYPE_CONTENT_SNIFFER,
                      SOUP_SESSION_ADD_FEATURE_BY_TYPE, SOUP_TYPE_PROXY_RESOLVER_DEFAULT,
+                     SOUP_SESSION_USE_THREAD_CONTEXT, TRUE,
                      NULL);
     }
 

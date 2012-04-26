@@ -1,3 +1,55 @@
+2012-04-17  Carlos Garnacho  <carlos@lanedo.com>
+
+        [GTK] Enable back double buffering on WebKitWebView to fix flickering
+        https://bugs.webkit.org/show_bug.cgi?id=84149
+
+        Reviewed by Martin Robinson.
+
+        Despite having WebKitWebView its own backing buffer, calling
+        gtk_widget_set_double_buffered(...,FALSE) may still pose side
+        effects, such as ensuring that all drawing operations are 
+        flushed to the X server before rendering a non-double buffered
+        widget, which may translate into flickering of the parent 
+        GdkWindow before the WebKitWebView itself is rendered. 
+
+        Enabling back double buffering solves this as all contents are 
+        first composited together before getting to the front buffer,
+        but effectively acts as 3rd buffer. This is sort of unavoidable
+        unless GTK+ gains a "let me take ownership of the backing buffer
+        for this widget", which currently lacks.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init): Remove call to gtk_widget_set_double_buffered(..., FALSE)
+
+2012-04-05  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Scrolling some iframes that are partially out of the viewport leads to repaint errors
+        https://bugs.webkit.org/show_bug.cgi?id=83309
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Instead of only updating scrollRect - preservedRegion, update
+        scrollRect - (preservedRegion - offscreenPreservedRegion). This ensures that
+        when part of the scroll rect is moved onscreen from offscreen that part is
+        queued for a redraw.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::scroll): Properly calculate the area to repaint.
+
+2012-03-31  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [Stable] --disable geolocation broken after recent merges
+        https://bugs.webkit.org/show_bug.cgi?id=82452
+
+        No review, as this is just a build fix.
+
+        Fix the geolocation build.
+
+        * webkit/webkitgeolocationpolicydecision.cpp:
+        (webkit_geolocation_policy_decision_new): When gelocation is off, just return null.
+        * webkit/webkitgeolocationpolicydecisionprivate.h: Activate webkit_geolocation_policy_decision_new
+        for non-Geolocation builds.
+
 2012-03-27  Martin Robinson  <mrobinson@igalia.com>
 
         Update the NEWS and version for the impending 1.8.0 release.

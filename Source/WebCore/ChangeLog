@@ -1,3 +1,705 @@
+2012-04-22  Martin Robinson  <mrobinson@igalia.com>
+
+        REGRESSION(113604): [Soup] Some pages that use synchronous XMLHttpRequests freeze the browser
+        https://bugs.webkit.org/show_bug.cgi?id=84560
+
+        Reviewed by Xan Lopez.
+
+        When kicking off a synchronous XMLHttpRequest, add one to the connection
+        limit. This ensures that when a page starts a synchronous request, while
+        already at the connection limit the request will not deadlock.
+
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::WebCoreSynchronousLoader::WebCoreSynchronousLoader): Accept a new SoupSession
+        argument so that we can get the correct SoupSession for the networking context. Bump
+        the connection limit.
+        (WebCore::WebCoreSynchronousLoader::~WebCoreSynchronousLoader): Decrement the connection limit.
+        (WebCore::WebCoreSynchronousLoader::adjustMaxConnections): Added this helper.
+        (WebCoreSynchronousLoader): Added a new SoupSession member.
+        (WebCore::sessionFromContext): Added this helper.
+        (WebCore::ResourceHandleInternal::soupSession): Use the new sessionFromContext helper.
+        (WebCore::ResourceHandle::loadResourceSynchronously): Pass the SoupSession from the NetworkingContext
+        to the synchronous loader.
+
+2012-04-18  MORITA Hajime  <morrita@google.com>
+
+        ShadowTree uses weak iteration patterns
+        https://bugs.webkit.org/show_bug.cgi?id=80572
+
+        Reviewed by Dimitri Glazkov.
+
+        Patch by Adam Barth.
+
+        This patch moves various ShadowTree to using a better iteration pattern
+        in which we collect all the ShadowRoots we're planning to iterate into
+        a vector and then iterate over them.
+
+        * dom/ShadowTree.cpp:
+        (ShadowRootVector):
+        (WebCore::ShadowRootVector::ShadowRootVector):
+        (WebCore):
+        (WebCore::ShadowTree::removeAllShadowRoots):
+        (WebCore::ShadowTree::insertedIntoDocument):
+        (WebCore::ShadowTree::removedFromDocument):
+        (WebCore::ShadowTree::insertedIntoTree):
+        (WebCore::ShadowTree::removedFromTree):
+        (WebCore::ShadowTree::willRemove):
+
+2012-04-18  Stephen Chenney  <schenney@chromium.org>
+
+        SVG layout leaves objects still needing layout
+        https://bugs.webkit.org/show_bug.cgi?id=81006
+
+        Reviewed by Nikolas Zimmermann.
+
+        Change the layout of SVG objects such that resources that trigger
+        layout of other objects are handled in a distinct pass, and then
+        objects still requiring layout are laid out again.
+
+        Test: svg/custom/delete-text-innerText-crash.html
+
+        * rendering/svg/RenderSVGResourceContainer.cpp:
+        (WebCore::RenderSVGResourceContainer::layout):
+        * rendering/svg/RenderSVGResourceMarker.cpp:
+        (WebCore::RenderSVGResourceMarker::layout):
+        * rendering/svg/RenderSVGRoot.cpp:
+        (WebCore::RenderSVGRoot::layout):
+        (WebCore::RenderSVGRoot::addResourceForClientInvalidation):
+        (WebCore):
+        * rendering/svg/RenderSVGRoot.h:
+        (RenderSVGRoot):
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Crash due to accessing removed parent lineboxes when clearing selection.
+        https://bugs.webkit.org/show_bug.cgi?id=81359
+
+        Reviewed by Eric Seidel.
+
+        Similar to r110323, adds the canUpdateSelectionOnRootLineBoxes
+        check to more places.
+
+        Test: editing/selection/clear-selection-crash.html
+
+        * rendering/RenderObject.cpp:
+        (WebCore::RenderObject::canUpdateSelectionOnRootLineBoxes):
+        * rendering/RenderSelectionInfo.h:
+        (WebCore::RenderSelectionInfo::RenderSelectionInfo):
+        (WebCore::RenderBlockSelectionInfo::RenderBlockSelectionInfo):
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Crash due to accessing removed parent lineboxes when clearing selection.
+        https://bugs.webkit.org/show_bug.cgi?id=79264
+
+        Reviewed by Dave Hyatt.
+
+        Test: editing/selection/first-letter-selection-crash.html
+
+        * rendering/RenderBoxModelObject.cpp:
+        (WebCore::RenderBoxModelObject::setSelectionState):
+        1. No need of checking if we are being set to same selection state.
+        Now tested by setSelectionStateIfNeeded. Rename 's' with 'state' and
+        'cb' with 'containingBlock'.
+        * rendering/RenderListMarker.cpp:
+        (WebCore::RenderListMarker::setSelectionState):
+        1. Add check to canUpdateSelectionOnRootLineBoxes to make sure our
+        root line boxes are still valid before setting them.
+        2. No need of calling setSelectionState on containing block since our base
+        class call to RenderBox::setSelectionState covers it. Added a comment to indicate that.
+        3. Use m_inlineBoxWrapper variable directly to simplify the ifs.
+        * rendering/RenderObject.cpp:
+        (WebCore::RenderObject::canUpdateSelectionOnRootLineBoxes):
+        (WebCore): helper function to tell if we can update selection information
+        on our root line boxes. This returns false if our containing block is pending layout.
+        * rendering/RenderObject.h:
+        (RenderObject):
+        (WebCore::RenderObject::setSelectionStateIfNeeded):
+        (WebCore): helper to set selection state only if it is different from our
+        current selection state.
+        * rendering/RenderReplaced.cpp:
+        (WebCore::RenderReplaced::setSelectionState):
+        1. Rename 's' to 'state', 'line' to 'root' and use m_inlineBoxWrapper directly
+        to simplify ifs.
+        2. Add check to canUpdateSelectionOnRootLineBoxes to make sure our
+        root line boxes are still valid before setting them.
+        * rendering/RenderText.cpp:
+        (WebCore::RenderText::setSelectionState):
+        1. Add check to canUpdateSelectionOnRootLineBoxes to make sure our
+        root line boxes are still valid before setting them.
+        2. Rename 'cb' to 'containingBlock', 'line' to 'root', move InlineTextBox
+        declaration to local.
+        * rendering/RenderView.cpp:
+        (WebCore::RenderView::setSelection): Replace all calls to setSelectionState
+        with setSelectionStateIfNeeded.
+        * rendering/RenderWidget.cpp:
+        (WebCore::RenderWidget::setSelectionState):
+        1. No need of checking if we are being set to same selection state.
+        Now tested by setSelectionStateIfNeeded.
+
+2012-04-18  Ken Buchanan  <kenrb@chromium.org>
+
+        Crash due to floating object lists not properly being cleared
+        https://bugs.webkit.org/show_bug.cgi?id=74056
+
+        Reviewed by David Hyatt.
+
+        Add a check to clearFloats() that determines when intruding floats
+        are being cleared and not re-added. In this condition, ensure
+        children with floats are also getting layout because they might
+        need to have the same intruding floats cleared from their floating
+        object lists also.
+
+        * rendering/RenderBlock.cpp:
+        (WebCore::RenderBlock::clearFloats):
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Crash in GenericEventQueue::~GenericEventQueue.
+        https://bugs.webkit.org/show_bug.cgi?id=81976
+
+        Reviewed by Eric Carlson.
+
+        * dom/GenericEventQueue.cpp:
+        (WebCore::GenericEventQueue::create):
+        (WebCore):
+        (WebCore::GenericEventQueue::GenericEventQueue):
+        (WebCore::GenericEventQueue::enqueueEvent):
+        (WebCore::GenericEventQueue::timerFired):
+        * dom/GenericEventQueue.h:
+        (GenericEventQueue):
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::HTMLMediaElement):
+        (WebCore::HTMLMediaElement::scheduleEvent):
+        (WebCore::HTMLMediaElement::updateActiveTextTrackCues):
+        (WebCore::HTMLMediaElement::cancelPendingEventsAndCallbacks):
+        (WebCore::HTMLMediaElement::hasPendingActivity):
+        * html/HTMLMediaElement.h:
+        (HTMLMediaElement):
+
+2012-04-18  Jer Noble  <jer.noble@apple.com>
+
+        Heap-use-after-free in WebCore::InlineFlowBox::deleteLine due to fullscreen issues.
+        https://bugs.webkit.org/show_bug.cgi?id=82055
+
+        Reviewed by David Hyatt.
+
+        No new tests; fixes fuzz test crasher which is not reproducible in DRT or WKTR.
+
+        When a RenderFullScreen object is inserted between a child and parent renderer, make sure the
+        parent renderer deletes its line boxes by calling setNeedsLayoutAndPrefWidthsRecalc().  This
+        forces its InlineBox renderers to be removed from the line boxes and their parents in the correct
+        order, fixing a double-delete crash.
+
+        The same is true when unwrapping the RenderFullScreen object, and when creating and inserting
+        the full screen placeholder.
+
+        * rendering/RenderFullScreen.cpp:
+        (RenderFullScreen::wrapRenderer):
+        (RenderFullScreen::unwrapRenderer):
+        (RenderFullScreen::createPlaceholder):
+
+2012-04-18  Ken Buchanan  <kenrb@chromium.org>
+
+        Assert failure from capitalized RenderTextFragment
+        https://bugs.webkit.org/show_bug.cgi?id=82096
+
+        Reviewed by Ryosuke Niwa.
+
+        The cause of this bug was the call to RenderTextFragment::setTextInternal
+        resulting from a style change from RenderObject::addChild. The idea here
+        is to better separate the code path for transforming existing text from
+        the code path for replacing the underlying text of a node. For
+        RenderTextFragment this has to be clear because only in the latter case
+        does the first-letter get reset.
+
+        * rendering/RenderObject.cpp:
+        (WebCore::RenderObject::addChild): Added call to transformText
+        * rendering/RenderText.cpp:
+        (WebCore::RenderText::styleDidChange): Added call to transformText
+        (WebCore::RenderText::transformText): Added
+        * rendering/RenderText.h:
+        (WebCore::RenderText::setText): Changed to virtual so RenderTextFragment can override
+        (WebCore::RenderText::transformText): Added
+        * rendering/RenderTextFragment.cpp:
+        (WebCore::RenderTextFragment::styleDidChange): Removed references to
+        m_allowFragmentReset which was the previous approach to separating the
+        code paths
+        (WebCore::RenderTextFragment::setTextInternal): Deleted
+        (WebCore::RenderTextFragment::setText): Added with most of logic that was
+        previously in setTextInternal
+        (WebCore::RenderTextFragment::transformText): Added
+        * rendering/RenderTextFragment.h:
+        (WebCore::RenderTextFragment::setText): Added
+        (WebCore::RenderTextFragment::transformText): Added
+        (WebCore::RenderTextFragment::setTextInternal): Deleted
+
+2012-04-18  Adam Barth  <abarth@webkit.org>
+
+        FrameLoader::shouldAllowNavigation uses Frame for context rather than Document
+        https://bugs.webkit.org/show_bug.cgi?id=81020
+
+        Reviewed by Eric Seidel.
+
+        The vast majority of security checks in the browser should use a
+        ScriptExecutionContext (aka a Document) to designate "who" is
+        attempting to perform a given action.  Unfortunately,
+        shouldAllowNavigation was using a Frame to designate "who" is
+        attempting the navigation.
+
+        In cases when the executing script is "inactive" (i.e., belongs to a
+        document that is not currently displayed in a Frame), using the Frame
+        can cause us to grant the script the privileges of the document that's
+        currently displayed in the Frame rather than the one that contains the
+        script.
+
+        This patch moves shouldAllowNavigation from FrameLoader to Document
+        (and renames it to canNavigate), effectively change the context object
+        from a Frame to a Document.
+
+        Test: http/tests/security/frameNavigation/inactive-function-in-popup-navigate-child.html
+
+        * bindings/generic/BindingSecurity.h:
+        (BindingSecurity):
+        (WebCore):
+        * bindings/v8/V8Utilities.cpp:
+        (WebCore):
+        * bindings/v8/V8Utilities.h:
+        (WebCore):
+            - Deletes unused code.
+        * dom/Document.cpp:
+        (WebCore::canAccessAncestor):
+        (WebCore):
+        (WebCore::Document::canNavigate):
+            - canNavigate is copied from FrameLoader::shouldAllowNavigation.
+              I've added a null-check bailout if the document is inactive.
+        * dom/Document.h:
+        (Document):
+        * loader/FormState.cpp:
+        (WebCore::FormState::FormState):
+        (WebCore::FormState::create):
+        * loader/FormState.h:
+        (WebCore):
+        (FormState):
+        (WebCore::FormState::sourceDocument):
+        * loader/FormSubmission.cpp:
+        (WebCore::FormSubmission::create):
+            - Changes the context object from Frame to Document.
+        * loader/FrameLoader.cpp:
+        (WebCore::FrameLoader::submitForm):
+        (WebCore::FrameLoader::loadFrameRequest):
+        (WebCore):
+        (WebCore::FrameLoader::findFrameForNavigation):
+            - FrameLoader::findFrameForNavigation still incorrectly uses Frame
+              as the context object, but that's a bug for another patch.
+        (WebCore::createWindow):
+        * loader/FrameLoader.h:
+        (FrameLoader):
+        * loader/NavigationScheduler.cpp:
+        (WebCore::ScheduledFormSubmission::fire):
+        * page/DOMWindow.cpp:
+        (WebCore::DOMWindow::close):
+        (WebCore::DOMWindow::setLocation):
+        (WebCore::DOMWindow::open):
+        * page/History.cpp:
+        (WebCore::History::go):
+
+2012-04-18  Stephen Chenney  <schenney@chromium.org>
+
+        Failure to invalidate text position attributes when DOM changes
+        https://bugs.webkit.org/show_bug.cgi?id=81464
+
+        Reviewed by Nikolas Zimmermann.
+
+        The text positioning elements data structure in RenderSVGText must be
+        updated when either the children of the corresponding element are
+        modified, or the length of the text inside the elements changes.
+        Previously, the call to clear the text positioning elements (to force
+        recomputation) was guarded by a flag. If code tried to invalidate when
+        the flag was not set, then something set the flag, the elements would
+        be invalid at use time.
+
+        This patch modifies the method that invalidates the positining
+        attributes so that the action always happens. It also renames the
+        method to more accurately reflect its function.
+
+        Test: svg/custom/delete-modified-text-in-defs-crash.svg
+
+        * rendering/svg/RenderSVGInlineText.cpp:
+        (WebCore::RenderSVGInlineText::setTextInternal): Rename textDOMChanged to invalidateTextPositioningElements
+        * rendering/svg/RenderSVGText.cpp:
+        (WebCore::RenderSVGText::invalidateTextPositioningElements): Rename
+        textDOMChanged to invalidateTextPositioningElements and remove the check against the needsPosition... flag.
+        * rendering/svg/RenderSVGText.h:
+        (RenderSVGText): Rename textDOMChanged to invalidateTextPositioningElements
+        * svg/SVGAElement.cpp:
+        (WebCore::SVGAElement::childrenChanged): Rename textDOMChanged to invalidateTextPositioningElements
+        * svg/SVGTextContentElement.cpp:
+        (WebCore::SVGTextContentElement::childrenChanged): Rename textDOMChanged to invalidateTextPositioningElements
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Crash in ApplyStyleCommand::applyInlineStyleToNodeRange.
+        https://bugs.webkit.org/show_bug.cgi?id=81959
+
+        Reviewed by Ryosuke Niwa.
+
+        Test: editing/execCommand/apply-style-command-crash.html
+
+        * editing/ApplyStyleCommand.cpp:
+        (WebCore::ApplyStyleCommand::applyInlineStyleToNodeRange): RefPtr the weak
+        node iterator |node|.
+        * editing/ApplyStyleCommand.h:
+        (ApplyStyleCommand): convert |startNode| and |pastEndNode| into PassRefPtr.
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Crash in RenderBlock::splitBlocks.
+        https://bugs.webkit.org/show_bug.cgi?id=81926
+
+        Reviewed by Julien Chaffraix.
+
+        We are updating the :after content before calling splitFlow. The :after content
+        gets blown away since it will go to the continuation. beforeChild was earlier
+        set to the first child. Being the last anonymous block, its children gets pulled
+        up in collapseAnonymousBoxChild and it gets destroyed. So, we need to update
+        beforeChild value. 
+
+        Test: fast/multicol/span/update-after-content-before-child-crash.html
+
+        * rendering/RenderBlock.cpp:
+        (WebCore::RenderBlock::addChildIgnoringAnonymousColumnBlocks):
+
+2012-04-18  Eric Carlson  <eric.carlson@apple.com>
+
+        Deal with DOM modifications when evaluating source elements.
+        https://bugs.webkit.org/show_bug.cgi?id=81163
+
+        Reviewed by Alexey Proskuryakov.
+
+        Test: media/video-beforeload-remove-source.html
+
+        * dom/ContainerNode.cpp: Make NodeVector and collectNodes public, renamed as getChildNodes.
+        (WebCore::ContainerNode::takeAllChildrenFrom): collectNodes -> getChildNodes.
+        (WebCore::ContainerNode::willRemove): collectNodes -> getChildNodes.
+        (WebCore::ContainerNode::willRemoveChildren): collectNodes -> getChildNodes.
+        (WebCore::ContainerNode::insertedIntoDocument): collectNodes -> getChildNodes.
+        (WebCore::ContainerNode::removedFromDocument): collectNodes -> getChildNodes.
+        * dom/ContainerNode.h:
+        (WebCore::getChildNodes):
+
+        * editing/ReplaceSelectionCommand.cpp: Remove unused NodeVector declaration.
+
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::HTMLMediaElement): m_nextChildNodeToConsider and m_currentSourceNode
+            are now RefPtrs.
+        (WebCore::HTMLMediaElement::loadTimerFired): Protect HTMLMediaElement from being deleted during
+            a DOM modification during an event callback.
+        (WebCore::HTMLMediaElement::load): Ditto.
+        (WebCore::HTMLMediaElement::selectMediaResource): Set m_nextChildNodeToConsider to the first
+            child node, it will be the first node considered.
+        (WebCore::HTMLMediaElement::havePotentialSourceChild): m_nextChildNodeToConsider and m_currentSourceNode
+            are now RefPtrs.
+        (WebCore::HTMLMediaElement::selectNextSourceChild): Collect all child nodes in a vector before
+            looking for <source> nodes because 'beforeload' event handlers can mutate the DOM. Don't
+            use a <source> that is no longer a child node after 'beforeload'. Use 0 to represent the end
+            of the child node list because m_nextChildNodeToConsider is now a RefPtr so using the previous 
+            sentinel, "this", would cause a retain cycle.
+        (WebCore::HTMLMediaElement::sourceWasAdded):  m_nextChildNodeToConsider and m_currentSourceNode
+            are now RefPtrs.
+        (WebCore::HTMLMediaElement::sourceWillBeRemoved): Ditto.
+        (WebCore::HTMLMediaElement::getPluginProxyParams): Protect HTMLMediaElement from being deleted during
+            a DOM modification during an event callback.
+        * html/HTMLMediaElement.h:
+
+2012-04-18  Adam Barth  <abarth@webkit.org>
+
+        ContainerNode::willRemove uses a weak iteration pattern
+        https://bugs.webkit.org/show_bug.cgi?id=80530
+
+        Reviewed by Ryosuke Niwa.
+
+        This patch moves ContainerNode::willRemove to using a better iteration
+        pattern in which we collect all the nodes we're planning to iterate
+        into a vector and then iterate over them.
+
+        * dom/ContainerNode.cpp:
+        (WebCore::ContainerNode::willRemove):
+
+2012-04-18  Adam Barth  <abarth@webkit.org>
+
+        ContainerNode::insertedIntoTree and removedFromTree use weak iteration patterns
+        https://bugs.webkit.org/show_bug.cgi?id=80570
+
+        Reviewed by Ryosuke Niwa.
+
+        These functions use weak iteration patterns, but as far as I can tell,
+        we never execute script below these functions.  This patch adds ASSERTs
+        to help us avoid adding events in the future.
+
+        * dom/ContainerNode.cpp:
+        (WebCore::ContainerNode::insertedIntoTree):
+        (WebCore::ContainerNode::removedFromTree):
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::loadInternal):
+            - There's a somewhat complex call chain from insertedIntoTree into
+              HTMLMediaElement, and somewhat complex control flow below
+              loadInternal that eventually leads to the BeforeLoad event being
+              fired.  In studying this code, I don't see a way for the
+              BeforeLoad event to be fired during insertedIntoTree, but I've
+              added this assert here to make sure we don't call loadInternal
+              when we're not supposed to dispatch events.  This ASSERT should
+              help us catch these BeforeLoad errors more quickly.
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Incorrect beforeChild parent calculation in RenderRubyBase::moveChildren.
+        https://bugs.webkit.org/show_bug.cgi?id=80297
+
+        Reviewed by Julien Chaffraix.
+
+        beforeChild might share the same anonymous block parent with other previous
+        siblings. Before moving the children across ruby bases, we need to make sure
+        to split the tree across the beforeChild correctly.
+
+        Test: fast/ruby/ruby-text-before-child-split.html
+
+        * rendering/RenderRubyBase.cpp:
+        (WebCore::RenderRubyBase::moveChildren):
+
+2012-04-18  Philip Rogers  <pdr@google.com>
+
+        Skip building resources if SVGTRef is not in a document
+        https://bugs.webkit.org/show_bug.cgi?id=81473
+
+        Reviewed by Nikolas Zimmermann.
+
+        We can skip the building of pending resources in SVGTRef if we're not
+        yet in a document. This mirrors the nearly identical logic in
+        SVGUseElement::buildPendingResource() and
+        SVGFEImageElement::buildPendingResource().
+
+        Test: http/tests/svg/tref-adoptNode-crash.html
+
+        * svg/SVGTRefElement.cpp:
+        (WebCore::SVGTRefElement::buildPendingResource):
+
+2012-03-28  Sergio Villar Senin  <svillar@igalia.com>
+
+        [Soup] DNS prefetching spams resolver, shoots self in the foot
+        https://bugs.webkit.org/show_bug.cgi?id=41630
+
+        Reviewed by Martin Robinson.
+
+        Added generic DNSResolveQueue class to throttle DNS
+        prefetches. It's an abstract refactoring of CFNET's
+        DNSResolveQueue. Platform specific methods implemented for soup
+        and CFNET backends.
+
+        No new tests required as we're just refactoring existing code to
+        be used by two different ports.
+
+        * CMakeLists.txt: added new file.
+        * GNUmakefile.list.am: ditto.
+        * WebCore.vcproj/WebCore.vcproj: ditto.
+        * WebCore.xcodeproj/project.pbxproj: ditto.
+        * platform/network/DNSResolveQueue.cpp: Added.
+        (WebCore):
+        (WebCore::DNSResolveQueue::add): adds a new host to be prefetched.
+        (WebCore::DNSResolveQueue::fired): by using a delay we coalesce
+        several prefetch requests and try to resolve them all here.
+        * platform/network/DNSResolveQueue.h: Added.
+        (WebCore):
+        (DNSResolveQueue): class that implements DNS prefetch
+        throttling using a template pattern.
+        (WebCore::DNSResolveQueue::shared):
+        (WebCore::DNSResolveQueue::decrementRequestCount):
+        * platform/network/cf/DNSCFNet.cpp:
+        (WebCore::DNSResolveQueue::platformProxyIsEnabledInSystemPreferences):
+        (WebCore::DNSResolveQueue::platformResolve):
+        * platform/network/soup/DNSSoup.cpp:
+        (WebCore):
+        (WebCore::DNSResolveQueue::platformProxyIsEnabledInSystemPreferences):
+        (WebCore::resolvedCallback):
+        (WebCore::DNSResolveQueue::platformResolve):
+        (WebCore::prefetchDNS):
+
+2012-03-14  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        Build error: DNSSoup.cpp:30: fatal error: CString.h: No such file or
+        directory
+        https://bugs.webkit.org/show_bug.cgi?id=81093
+
+        Reviewed by Philippe Normand.
+
+        Fix build error introduced by r110669.
+
+        * platform/network/soup/DNSSoup.cpp:
+
+2012-03-13  Sergio Villar Senin  <svillar@igalia.com>
+
+        [GTK] Use the same DNS prefetching path than the other ports.
+        https://bugs.webkit.org/show_bug.cgi?id=80997
+
+        Reviewed by Martin Robinson.
+
+        This patch basically reverts r56128. There is no need to add an
+        special code path for GTK+ DNS pre-fetching because the main
+        reason to do that (some potential changes in libsoup) is not
+        going to happen. It also reduces the amount of DNS queries by
+        adding a NULL hostname check.
+
+        No need for new tests as this just moves code around.
+
+        * GNUmakefile.list.am:
+        * html/HTMLAnchorElement.cpp:
+        (WebCore::HTMLAnchorElement::parseAttribute):
+        * html/HTMLLinkElement.cpp:
+        * loader/LinkLoader.cpp:
+        (WebCore::LinkLoader::loadLink):
+        * page/Chrome.cpp:
+        (WebCore::Chrome::mouseDidMoveOverElement):
+        * platform/network/DNS.h:
+        (WebCore):
+        * platform/network/ResourceHandle.cpp:
+        * platform/network/ResourceHandle.h:
+        (ResourceHandle):
+        * platform/network/chromium/DNSChromium.cpp:
+        * platform/network/soup/DNSSoup.cpp: restored.
+        (WebCore):
+        (WebCore::prefetchDNS):
+        * platform/network/soup/ResourceHandleSoup.cpp:
+
+2012-04-09  Martin Robinson  <mrobinson@igalia.com>
+
+        [soup] Crash while loading http://www.jusco.cn
+        https://bugs.webkit.org/show_bug.cgi?id=68238
+
+        Reviewed by Philippe Normand.
+
+        Test: http/tests/xmlhttprequest/xmlhttprequest-sync-no-timers.html
+
+        When running synchronous XMLHttpRequests, push a new inner thread default
+        context, so that other sources from timers and network activity do not run.
+        This will make synchronous requests truly synchronous with the rest of
+        WebCore.
+
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCoreSynchronousLoader): Clean up the method definitions a bit by writing them inline.
+        (WebCore::WebCoreSynchronousLoader::WebCoreSynchronousLoader): Push a new thread default
+        context to prevent other sources from running.
+        (WebCore::WebCoreSynchronousLoader::~WebCoreSynchronousLoader): Pop the inner thread default context.
+        (WebCore::closeCallback): If the client is synchronous call didFinishLoading now.
+        (WebCore::readCallback): Only call didFinishLoading if the client isn't synchronous.
+        (WebCore::ResourceHandle::defaultSession): Activate use-thread-context so that the soup session
+        respects the inner thread context.
+
+2012-04-09  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Toggle buttons do not size appropriately in some themes
+        https://bugs.webkit.org/show_bug.cgi?id=82833
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Test: platform/gtk/fast/forms/large-toggle-elements.html
+
+        Instead of drawing a toggle button across the entire rectangle of
+        the WebCore control, draw a default-sized one cenetered in the rectangle.
+
+        * platform/gtk/RenderThemeGtk3.cpp:
+        (WebCore::paintToggle): Draw default-sized toggles.
+
+2012-04-05  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Scrolling some iframes that are partially out of the viewport leads to repaint errors
+        https://bugs.webkit.org/show_bug.cgi?id=83309
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Test: platform/gtk/fast/frames/scrolling-iframe-out-of-viewport.html
+
+        The X11 backing store was not properly trimming the scroll region when it
+        was only a portion of the screen. This was hidden by subsequent repaints.
+
+        * platform/gtk/GtkWidgetBackingStoreX11.cpp:
+        (WebCore::WidgetBackingStore::scroll): Fix the calculation of the scrolling region.
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Crash due to layer tree information not updated when moving run-in children.
+        https://bugs.webkit.org/show_bug.cgi?id=81265
+
+        Reviewed by Julien Chaffraix.
+
+        We need to do a full removal as the run-in child is getting inserted into
+        the neighbouring block and |blockRunIn| is going to be destroyed later
+        in the function.
+
+        Test: fast/runin/run-in-layer-not-removed-crash.html
+
+        * rendering/RenderBlock.cpp:
+        (WebCore::RenderBlock::handleRunInChild):
+
+2012-04-18  Abhishek Arya  <inferno@chromium.org>
+
+        Crash in Text::splitText due to mutation events.
+        https://bugs.webkit.org/show_bug.cgi?id=80828
+
+        Reviewed by Ryosuke Niwa.
+
+        Test: fast/text/split-text-crash.xhtml
+
+        * dom/Range.cpp:
+        (WebCore::Range::insertNode): replace m_start.container() calls with ref protected node.
+
+2012-04-18  Tim Horton  <timothy_horton@apple.com>
+
+        Crash in SVGTextLayoutAttributesBuilder::fillCharacterDataMap
+        https://bugs.webkit.org/show_bug.cgi?id=78949
+        <rdar://problem/10889440>
+
+        Reviewed by Nikolas Zimmermann.
+
+        Invalidate the text positioning cache when the children of an SVGAElement change,
+        so that we regenerate the list the next time it's needed instead of using stale values.
+
+        Test: svg/text/text-positioning-remove-child-crash.svg
+
+        * rendering/svg/SVGAElement.cpp:
+        (WebCore::SVGAElement::childrenChanged):
+
+2012-04-16  Adam Barth  <abarth@webkit.org>
+
+        ContainerNode::insertedIntoDocument and removedFromDocument use weak iteration patterns
+        https://bugs.webkit.org/show_bug.cgi?id=80569
+
+        Reviewed by Ryosuke Niwa.
+
+        This patch moves ContainerNode::insertedIntoDocument and
+        removedFromDocument to using a better iteration pattern in which we
+        collect all the nodes we're planning to iterate into a vector and then
+        iterate over them.
+
+        * dom/ContainerNode.cpp:
+        (WebCore::ContainerNode::insertedIntoDocument):
+        (WebCore::ContainerNode::removedFromDocument):
+
+2012-04-03  Dominik Röttsches  <dominik.rottsches@linux.intel.com>
+
+        Soup HTTP backend does not send Content-Length in certain cases
+        https://bugs.webkit.org/show_bug.cgi?id=82036
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Telling soup explicitly when to send content-length header
+        in POST & PUT cases in order to align with e.g. Chromium and FF.
+
+        No new tests, already covered by *methods*.html in
+        http/tests/xmlhttprequest/.
+
+        * platform/network/soup/ResourceHandleSoup.cpp:
+        (WebCore::startHTTPRequest): Special handling for POST & PUT.
+
 2012-03-26  Zan Dobersek  <zandobersek@gmail.com>
 
         [GObject bindings] Supplemental interfaces are not disabled with the "Conditional" attribute
