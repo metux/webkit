@@ -30,7 +30,7 @@ ifeq ($(DEB_BUILD_ARCH),alpha)
 endif
 
 ifneq (,$(findstring $(DEB_BUILD_ARCH),mips mipsel s390 s390x))
-        CFLAGS += -gstabs
+	CFLAGS := $(CFLAGS:-g=)
 endif
 
 # FIXME: parallel builds are currently not 100% working, so disable

@@ -5,6 +5,9 @@ webkit (1.8.1-2) UNRELEASED; urgency=low
   - Use set -e in for loops to fail early
   - Standardize on $(shell ) for shell invocation and only add
     -Wl,--no-keep-memory for 32 bits architectures
+  - Disable debugging symbols completely for architectures for
+    which we were using -gstabs before, since they keep hitting
+    memory limits on the buildds
 
   [ Jeremy Bicha ]
   * debian/rules:
