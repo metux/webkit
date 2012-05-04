@@ -72,7 +72,6 @@ build-stamp:
 		fi; \
 		cd build-$${version}; \
 		env AR_FLAGS="cruT" \
-		LDFLAGS="$(LDFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
