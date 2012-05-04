@@ -1,4 +1,4 @@
-webkit (1.8.1-2) UNRELEASED; urgency=low
+webkit (1.8.1-2) unstable; urgency=low
 
   [ Michael Biebl ]
   * debian/rules:
