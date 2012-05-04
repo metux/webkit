@@ -5,17 +5,21 @@
 
 DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
 DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_BUILD_ARCH      ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+DEB_HOST_ARCH_BITS  ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_BITS)
 
 GTK_VERSIONS = 2.0 3.0
 
-CFLAGS = `dpkg-buildflags --get CFLAGS`
+CFLAGS = $(shell dpkg-buildflags --get CFLAGS)
 CFLAGS += -Wall -Wl,--as-needed
-LDFLAGS = `dpkg-buildflags --get LDFLAGS`
-CPPFLAGS = `dpkg-buildflags --get CPPFLAGS`
+LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
+CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS)
 
 # Sacrifice speed in order to make it more likely resource limits
 # won't be hit.
-LDFLAGS += -Wl,--no-keep-memory
+ifeq ($(DEB_HOST_ARCH_BITS),32)
+	LDFLAGS += -Wl,--no-keep-memory
+endif
 
 ifeq (armhf,$(filter $(DEB_BUILD_ARCH),armhf))
 	CFLAGS += -O1

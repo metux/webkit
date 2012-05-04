@@ -3,6 +3,8 @@ webkit (1.8.1-2) UNRELEASED; urgency=low
   [ Michael Biebl ]
   * debian/rules:
   - Use set -e in for loops to fail early
+  - Standardize on $(shell ) for shell invocation and only add
+    -Wl,--no-keep-memory for 32 bits architectures
 
   [ Jeremy Bicha ]
   * debian/rules:
