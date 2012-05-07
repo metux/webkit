@@ -30,6 +30,7 @@
 
 #include "WorkerThread.h"
 
+#include "DatabaseContext.h"
 #include "DedicatedWorkerContext.h"
 #include "InspectorInstrumentation.h"
 #include "KURL.h"
@@ -95,8 +96,8 @@ WorkerThread::WorkerThread(const KURL& scriptURL, const String& userAgent, const
     , m_workerLoaderProxy(workerLoaderProxy)
     , m_workerReportingProxy(workerReportingProxy)
     , m_startupData(WorkerThreadStartupData::create(scriptURL, userAgent, sourceCode, startMode, contentSecurityPolicy, contentSecurityPolicyType))
-#if ENABLE(NOTIFICATIONS)
-    , m_notificationPresenter(0)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    , m_notificationClient(0)
 #endif
 {
     MutexLocker lock(threadCountMutex());
@@ -141,6 +142,8 @@ void WorkerThread::workerThread()
         }
     }
 #if PLATFORM(CHROMIUM)
+    // The corresponding call to didStopWorkerRunLoop is in
+    // ~WorkerScriptController.
     PlatformSupport::didStartWorkerRunLoop(&m_runLoop);
 #endif
 
@@ -155,10 +158,6 @@ void WorkerThread::workerThread()
     m_startupData.clear();
 
     runEventLoop();
-
-#if PLATFORM(CHROMIUM)
-    PlatformSupport::didStopWorkerRunLoop(&m_runLoop);
-#endif
 
     ThreadIdentifier threadID = m_threadID;
 
@@ -215,8 +214,9 @@ public:
         WorkerContext* workerContext = static_cast<WorkerContext*>(context);
 
 #if ENABLE(SQL_DATABASE)
+        // FIXME: Should we stop the databases as part of stopActiveDOMObjects() below?
         DatabaseTaskSynchronizer cleanupSync;
-        workerContext->stopDatabases(&cleanupSync);
+        DatabaseContext::stopDatabases(workerContext, &cleanupSync);
 #endif
 
         workerContext->stopActiveDOMObjects();

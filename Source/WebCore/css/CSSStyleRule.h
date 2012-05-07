@@ -23,48 +23,39 @@
 #define CSSStyleRule_h
 
 #include "CSSRule.h"
-#include "CSSSelectorList.h"
-#include "StylePropertySet.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-class CSSSelector;
+class CSSStyleDeclaration;
+class StyleRuleCSSStyleDeclaration;
+class StyleRule;
 
 class CSSStyleRule : public CSSRule {
 public:
-    static PassRefPtr<CSSStyleRule> create(CSSStyleSheet* parent, int sourceLine)
-    {
-        return adoptRef(new CSSStyleRule(parent, sourceLine));
-    }
+    static PassRefPtr<CSSStyleRule> create(StyleRule* rule, CSSStyleSheet* sheet) { return adoptRef(new CSSStyleRule(rule, sheet)); }
+
     ~CSSStyleRule();
 
     String selectorText() const;
     void setSelectorText(const String&);
 
-    CSSStyleDeclaration* style() const { return m_style->ensureRuleCSSStyleDeclaration(this); }
+    CSSStyleDeclaration* style() const;
 
     String cssText() const;
-
-    void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectors) { m_selectorList.adoptSelectorVector(selectors); }
-    void setDeclaration(PassRefPtr<StylePropertySet> style) { m_style = style; }
-
-    const CSSSelectorList& selectorList() const { return m_selectorList; }
-    StylePropertySet* declaration() const { return m_style.get(); }
-
-    void addSubresourceStyleURLs(ListHashSet<KURL>& urls);
-
-    using CSSRule::sourceLine;
+    
+    // FIXME: Not CSSOM. Remove.
+    StyleRule* styleRule() const { return m_styleRule.get(); }
 
 private:
-    CSSStyleRule(CSSStyleSheet* parent, int sourceLine);
+    CSSStyleRule(StyleRule*, CSSStyleSheet*);
 
-    void cleanup();
     String generateSelectorText() const;
 
-    RefPtr<StylePropertySet> m_style;
-    CSSSelectorList m_selectorList;
+    RefPtr<StyleRule> m_styleRule;    
+
+    mutable RefPtr<StyleRuleCSSStyleDeclaration> m_propertiesCSSOMWrapper;
 };
 
 } // namespace WebCore

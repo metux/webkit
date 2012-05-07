@@ -28,12 +28,13 @@
 
 #if ENABLE(DFG_JIT)
 
-#include "DFGArithNodeFlagsInferencePhase.h"
 #include "DFGByteCodeParser.h"
 #include "DFGCFAPhase.h"
 #include "DFGCSEPhase.h"
+#include "DFGFixupPhase.h"
 #include "DFGJITCompiler.h"
 #include "DFGPredictionPropagationPhase.h"
+#include "DFGRedundantPhiEliminationPhase.h"
 #include "DFGVirtualRegisterAllocationPhase.h"
 
 namespace JSC { namespace DFG {
@@ -58,25 +59,32 @@ inline bool compile(CompileMode compileMode, JSGlobalData& globalData, CodeBlock
     if (compileMode == CompileFunction)
         dfg.predictArgumentTypes();
 
-    performArithNodeFlagsInference(dfg);
+    performRedundantPhiElimination(dfg);
     performPredictionPropagation(dfg);
+    performFixup(dfg);
     performCSE(dfg);
     performVirtualRegisterAllocation(dfg);
     performCFA(dfg);
+
+#if DFG_ENABLE(DEBUG_VERBOSE)
+    dataLog("Graph after optimization:\n");
+    dfg.dump();
+#endif
     
     JITCompiler dataFlowJIT(dfg);
+    bool result;
     if (compileMode == CompileFunction) {
         ASSERT(jitCodeWithArityCheck);
         
-        dataFlowJIT.compileFunction(jitCode, *jitCodeWithArityCheck);
+        result = dataFlowJIT.compileFunction(jitCode, *jitCodeWithArityCheck);
     } else {
         ASSERT(compileMode == CompileOther);
         ASSERT(!jitCodeWithArityCheck);
         
-        dataFlowJIT.compile(jitCode);
+        result = dataFlowJIT.compile(jitCode);
     }
     
-    return true;
+    return result;
 }
 
 bool tryCompile(JSGlobalData& globalData, CodeBlock* codeBlock, JITCode& jitCode)

@@ -80,6 +80,8 @@ public:
     WebPageProxy* page() const { return m_page; }
 
     bool isVisible() const { return m_isVisible; }
+    bool isFront();
+
     void show();
     void close();
     
@@ -117,6 +119,17 @@ public:
 
     static bool isInspectorPage(WebPageProxy*);
 
+    // Implemented the platform WebInspectorProxy file
+    String inspectorPageURL() const;
+    String inspectorBaseURL() const;
+
+#if ENABLE(INSPECTOR_SERVER)
+    void enableRemoteInspection();
+    void remoteFrontendConnected();
+    void remoteFrontendDisconnected();
+    void dispatchMessageFromRemoteFrontend(const String& message);
+#endif
+
 private:
     WebInspectorProxy(WebPageProxy* page);
 
@@ -126,15 +139,12 @@ private:
     void platformOpen();
     void platformDidClose();
     void platformBringToFront();
+    bool platformIsFront();
     void platformInspectedURLChanged(const String&);
     unsigned platformInspectedWindowHeight();
     void platformAttach();
     void platformDetach();
     void platformSetAttachedWindowHeight(unsigned);
-
-    // Implemented the platform WebInspectorProxy file
-    String inspectorPageURL() const;
-    String inspectorBaseURL() const;
 
     // Called by WebInspectorProxy messages
     void createInspectorPage(uint64_t& inspectorPageID, WebPageCreationParameters&);
@@ -142,6 +152,10 @@ private:
     void didClose();
     void bringToFront();
     void inspectedURLChanged(const String&);
+
+#if ENABLE(INSPECTOR_SERVER)
+    void sendMessageToRemoteFrontend(const String& message);
+#endif
 
     bool canAttach();
     bool shouldOpenAttached();
@@ -190,6 +204,9 @@ private:
 #elif PLATFORM(GTK)
     GtkWidget* m_inspectorView;
     GtkWidget* m_inspectorWindow;
+#endif
+#if ENABLE(INSPECTOR_SERVER)
+    int m_remoteInspectionPageId;
 #endif
 };
 

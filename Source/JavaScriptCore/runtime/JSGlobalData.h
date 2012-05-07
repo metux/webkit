@@ -30,15 +30,16 @@
 #define JSGlobalData_h
 
 #include "CachedTranscendentalFunction.h"
-#include "Intrinsic.h"
 #include "DateInstanceCache.h"
 #include "ExecutableAllocator.h"
 #include "Heap.h"
-#include "Strong.h"
+#include "Intrinsic.h"
 #include "JITStubs.h"
 #include "JSValue.h"
+#include "LLIntData.h"
 #include "NumericStrings.h"
 #include "SmallStrings.h"
+#include "Strong.h"
 #include "Terminator.h"
 #include "TimeoutChecker.h"
 #include "WeakRandom.h"
@@ -46,6 +47,7 @@
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
+#include <wtf/SimpleStats.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/WTFThreadData.h>
 #if ENABLE(REGEXP_TRACING)
@@ -65,6 +67,7 @@ namespace JSC {
     class JSGlobalObject;
     class JSObject;
     class Keywords;
+    class LLIntOffsetsExtractor;
     class NativeExecutable;
     class ParserArena;
     class RegExpCache;
@@ -149,6 +152,8 @@ namespace JSC {
 
         void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
 
+        Heap heap; // The heap is our first data member to ensure that it's destructed after all the objects that reference it.
+
         GlobalDataType globalDataType;
         ClientData* clientData;
         CallFrame* topCallFrame;
@@ -199,6 +204,7 @@ namespace JSC {
         SmallStrings smallStrings;
         NumericStrings numericStrings;
         DateInstanceCache dateInstanceCache;
+        WTF::SimpleStats machineCodeBytesPerBytecodeWordForBaselineJIT;
         Vector<CodeBlock*> codeBlocksBeingCompiled;
         void startedCompiling(CodeBlock* codeBlock)
         {
@@ -211,16 +217,34 @@ namespace JSC {
             codeBlocksBeingCompiled.removeLast();
         }
 
+        void setInDefineOwnProperty(bool inDefineOwnProperty)
+        {
+            m_inDefineOwnProperty = inDefineOwnProperty;
+        }
+
+        bool isInDefineOwnProperty()
+        {
+            return m_inDefineOwnProperty;
+        }
+
 #if ENABLE(ASSEMBLER)
         ExecutableAllocator executableAllocator;
 #endif
 
 #if !ENABLE(JIT)
         bool canUseJIT() { return false; } // interpreter only
-#elif !ENABLE(CLASSIC_INTERPRETER)
+#elif !ENABLE(CLASSIC_INTERPRETER) && !ENABLE(LLINT)
         bool canUseJIT() { return true; } // jit only
 #else
-        bool canUseJIT() { return m_canUseJIT; }
+        bool canUseJIT() { return m_canUseAssembler; }
+#endif
+
+#if !ENABLE(YARR_JIT)
+        bool canUseRegExpJIT() { return false; } // interpreter only
+#elif !ENABLE(CLASSIC_INTERPRETER) && !ENABLE(LLINT)
+        bool canUseRegExpJIT() { return true; } // jit only
+#else
+        bool canUseRegExpJIT() { return m_canUseAssembler; }
 #endif
 
         OwnPtr<ParserArena> parserArena;
@@ -238,10 +262,14 @@ namespace JSC {
 
         TimeoutChecker timeoutChecker;
         Terminator terminator;
-        Heap heap;
 
         JSValue exception;
-#if ENABLE(JIT)
+
+        const ClassInfo* const jsArrayClassInfo;
+        const ClassInfo* const jsFinalObjectClassInfo;
+
+        LLInt::Data llintData;
+
         ReturnAddressPtr exceptionLocation;
         JSValue hostCallReturnValue;
         CallFrame* callFrameForThrow;
@@ -270,7 +298,6 @@ namespace JSC {
             
             return scratchBuffers.last();
         }
-#endif
 #endif
 
         HashMap<OpaqueJSClass*, OwnPtr<OpaqueJSClassContextData> > opaqueJSClassData;
@@ -306,20 +333,18 @@ namespace JSC {
         JS_EXPORT_PRIVATE void startSampling();
         JS_EXPORT_PRIVATE void stopSampling();
         JS_EXPORT_PRIVATE void dumpSampleData(ExecState* exec);
-        void recompileAllJSFunctions();
         RegExpCache* regExpCache() { return m_regExpCache; }
 #if ENABLE(REGEXP_TRACING)
         void addRegExpToTrace(PassRefPtr<RegExp> regExp);
 #endif
         JS_EXPORT_PRIVATE void dumpRegExpTrace();
-        JS_EXPORT_PRIVATE void clearBuiltinStructures();
 
         bool isCollectorBusy() { return heap.isBusy(); }
         JS_EXPORT_PRIVATE void releaseExecutableMemory();
 
 #if ENABLE(GC_VALIDATION)
         bool isInitializingObject() const; 
-        void setInitializingObject(bool);
+        void setInitializingObjectClass(const ClassInfo*);
 #endif
 
 #if CPU(X86) && ENABLE(JIT)
@@ -332,7 +357,7 @@ namespace JSC {
             ASSERT(!m_##type##ArrayDescriptor.m_classInfo || m_##type##ArrayDescriptor.m_classInfo == descriptor.m_classInfo); \
             m_##type##ArrayDescriptor = descriptor; \
         } \
-        const TypedArrayDescriptor& type##ArrayDescriptor() const { return m_##type##ArrayDescriptor; }
+        const TypedArrayDescriptor& type##ArrayDescriptor() const { ASSERT(m_##type##ArrayDescriptor.m_classInfo); return m_##type##ArrayDescriptor; }
 
         registerTypedArrayFunction(int8, Int8);
         registerTypedArrayFunction(int16, Int16);
@@ -346,15 +371,19 @@ namespace JSC {
 #undef registerTypedArrayFunction
 
     private:
+        friend class LLIntOffsetsExtractor;
+        
         JSGlobalData(GlobalDataType, ThreadStackType, HeapSize);
         static JSGlobalData*& sharedInstanceInternal();
         void createNativeThunk();
-#if ENABLE(JIT) && ENABLE(CLASSIC_INTERPRETER)
-        bool m_canUseJIT;
+#if ENABLE(ASSEMBLER) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
+        bool m_canUseAssembler;
 #endif
 #if ENABLE(GC_VALIDATION)
-        bool m_isInitializingObject;
+        const ClassInfo* m_initializingObjectClass;
 #endif
+        bool m_inDefineOwnProperty;
+
         TypedArrayDescriptor m_int8ArrayDescriptor;
         TypedArrayDescriptor m_int16ArrayDescriptor;
         TypedArrayDescriptor m_int32ArrayDescriptor;
@@ -369,12 +398,12 @@ namespace JSC {
 #if ENABLE(GC_VALIDATION)
     inline bool JSGlobalData::isInitializingObject() const
     {
-        return m_isInitializingObject;
+        return !!m_initializingObjectClass;
     }
 
-    inline void JSGlobalData::setInitializingObject(bool initializingObject)
+    inline void JSGlobalData::setInitializingObjectClass(const ClassInfo* initializingObjectClass)
     {
-        m_isInitializingObject = initializingObject;
+        m_initializingObjectClass = initializingObjectClass;
     }
 #endif
 

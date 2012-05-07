@@ -52,7 +52,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPPF
 	$(javascriptcore_cppflags) \
 	$(webkitgtk_cppflags) \
 	-fno-strict-aliasing \
-	$(HILDON_CPPFLAGS) \
 	$(CLUTTER_CFLAGS) \
 	$(CLUTTER_GTK_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
@@ -62,7 +61,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPPF
 	$(GLIB_CFLAGS) \
 	$(GSTREAMER_CFLAGS) \
 	$(GTK_CFLAGS) \
-	$(HILDON_CFLAGS) \
 	$(LIBSOUP_CFLAGS) \
 	$(LIBXML_CFLAGS) \
 	$(LIBXSLT_CFLAGS) \
@@ -81,7 +79,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_LIBA
 	libWebCore.la \
 	libWebCoreGtk.la \
 	libjavascriptcoregtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la \
-	$(webcore_ldflags) \
 	$(CAIRO_LIBS) \
 	$(CLUTTER_LIBS) \
 	$(CLUTTER_GTK_LIBS) \
@@ -93,7 +90,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_LIBA
 	$(GLIB_LIBS) \
 	$(GSTREAMER_LIBS) \
 	$(GTK_LIBS) \
-	$(HILDON_LIBS) \
 	$(JPEG_LIBS) \
 	$(LIBSOUP_LIBS) \
 	$(LIBXML_LIBS) \
@@ -211,6 +207,12 @@ webkitgtk_sources += \
 	Source/WebKit/gtk/WebCoreSupport/InspectorClientGtk.cpp \
 	Source/WebKit/gtk/WebCoreSupport/InspectorClientGtk.h \
 	Source/WebKit/gtk/WebCoreSupport/PasteboardHelperGtk.h \
+	Source/WebKit/gtk/WebCoreSupport/PlatformStrategiesGtk.h \
+	Source/WebKit/gtk/WebCoreSupport/PlatformStrategiesGtk.cpp \
+	Source/WebKit/gtk/WebCoreSupport/UserMediaClientGtk.cpp \
+	Source/WebKit/gtk/WebCoreSupport/UserMediaClientGtk.h \
+	Source/WebKit/gtk/WebCoreSupport/WebViewInputMethodFilter.cpp \
+	Source/WebKit/gtk/WebCoreSupport/WebViewInputMethodFilter.h \
 	Source/WebKit/gtk/webkit/webkitapplicationcache.cpp \
 	Source/WebKit/gtk/webkit/webkitdownload.cpp \
 	Source/WebKit/gtk/webkit/webkitdownloadprivate.h \
@@ -433,6 +435,7 @@ webkit_tests_ldflags = \
 
 noinst_PROGRAMS += \
 	Programs/unittests/testapplicationcache \
+	Programs/unittests/testcontextmenu \
 	Programs/unittests/testdomdocument \
 	Programs/unittests/testdomdomwindow \
 	Programs/unittests/testdomnode \
@@ -465,6 +468,11 @@ Programs_unittests_testapplicationcache_SOURCES = Source/WebKit/gtk/tests/testap
 Programs_unittests_testapplicationcache_CFLAGS = $(webkit_tests_cflags)
 Programs_unittests_testapplicationcache_LDADD = $(webkit_tests_ldadd)
 Programs_unittests_testapplicationcache_LDFLAGS = $(webkit_tests_ldflags)
+
+Programs_unittests_testcontextmenu_SOURCES = Source/WebKit/gtk/tests/testcontextmenu.c
+Programs_unittests_testcontextmenu_CFLAGS = $(webkit_tests_cflags)
+Programs_unittests_testcontextmenu_LDADD = $(webkit_tests_ldadd)
+Programs_unittests_testcontextmenu_LDFLAGS = $(webkit_tests_ldflags)
 
 Programs_unittests_testdomdocument_SOURCES = Source/WebKit/gtk/tests/testdomdocument.c
 Programs_unittests_testdomdocument_CFLAGS = $(webkit_tests_cflags)

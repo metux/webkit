@@ -28,8 +28,8 @@
 #include <wtf/PassOwnPtr.h>
 
 #if USE(TEXTURE_MAPPER_GL)
+#include "GLContext.h"
 #include "TextureMapperLayer.h"
-#include "WindowGLContext.h"
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -63,17 +63,15 @@ public:
 
 private:
     WebKitWebView* m_webView;
-    OwnPtr<WebCore::GraphicsLayer> m_rootGraphicsLayer;
     unsigned int m_syncTimerCallbackId;
 
 #if USE(CLUTTER)
+    WebCore::GraphicsLayer* m_rootGraphicsLayer;
     GtkWidget* m_rootLayerEmbedder;
 #elif USE(TEXTURE_MAPPER_GL)
-    void initializeIfNecessary();
-
-    bool m_initialized;
+    WebCore::GLContext* glContext();
     WebCore::TextureMapperLayer* m_rootTextureMapperLayer;
-    OwnPtr<WebCore::WindowGLContext> m_context;
+    OwnPtr<WebCore::GraphicsLayer> m_rootGraphicsLayer;
     OwnPtr<WebCore::TextureMapper> m_textureMapper;
 #endif
 

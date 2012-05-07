@@ -3,12 +3,12 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebInspector</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse">
 <link rel="next" href="WebKitWebDatabase.html" title="WebKitWebDatabase">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -115,18 +115,18 @@ to true otherwise no inspector is available.
 10
 11
 12</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Enable the developer extras </span><span class="comment">*/</span>
-WebKitWebSettings *setting = webkit_web_view_get_settings (WEBKIT_WEB_VIEW(my_webview));
-g_object_set (G_OBJECT(settings), <span class="number">&quot;enable-developer-extras&quot;</span>, TRUE, <span class="number">NULL</span>);
+        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Enable the developer extras */</span>
+WebKitWebSettings <span class="gtkdoc opt">*</span>setting <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-settings">webkit_web_view_get_settings</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">));</span>
+<span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-set">g_object_set</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="gtkdoc opt">(</span>settings<span class="gtkdoc opt">),</span> <span class="string">&quot;enable-developer-extras&quot;</span><span class="gtkdoc opt">,</span> TRUE<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
 
-<span class="comment">/*</span><span class="comment"> load some data or reload to be able to inspect the page</span><span class="comment">*/</span>
-webkit_web_view_open (WEBKIT_WEB_VIEW(my_webview), <span class="number">&quot;<a href="http://www.gnome.org">http://www.gnome.org</a>&quot;</span>);
+<span class="comment">/* load some data or reload to be able to inspect the page*/</span>
+<span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-open">webkit_web_view_open</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">),</span> <span class="string">&quot;http://www.gnome.org&quot;</span><span class="gtkdoc opt">);</span>
 
-<span class="comment">/*</span><span class="comment"> Embed the inspector somewhere </span><span class="comment">*/</span>
-WebKitWebInspector *inspector = webkit_web_view_get_inspector (WEBKIT_WEB_VIEW(my_webview));
-g_signal_connect (G_OBJECT (inspector), <span class="number">&quot;inspect-web-view&quot;</span>, G_CALLBACK(create_gtk_window_around_it), <span class="number">NULL</span>);
-g_signal_connect (G_OBJECT (inspector), <span class="number">&quot;show-window&quot;</span>, G_CALLBACK(show_inpector_window), <span class="number">NULL</span>)<span class="Error">)</span>;
-g_signal_connect (G_OBJECT (inspector), <span class="number">&quot;notify::inspected-uri&quot;</span>, G_CALLBACK(inspected_uri_changed_do_stuff), <span class="number">NULL</span>);</pre></td>
+<span class="comment">/* Embed the inspector somewhere */</span>
+WebKitWebInspector <span class="gtkdoc opt">*</span>inspector <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-inspector">webkit_web_view_get_inspector</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">));</span>
+<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span> <span class="gtkdoc opt">(</span>inspector<span class="gtkdoc opt">),</span> <span class="string">&quot;inspect-web-view&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>create_gtk_window_around_it<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">);</span>
+<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span> <span class="gtkdoc opt">(</span>inspector<span class="gtkdoc opt">),</span> <span class="string">&quot;show-window&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>show_inpector_window<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">));</span>
+<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span> <span class="gtkdoc opt">(</span>inspector<span class="gtkdoc opt">),</span> <span class="string">&quot;notify::inspected-uri&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="gtkdoc opt">(</span>inspected_uri_changed_do_stuff<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">);</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -529,6 +529,6 @@ that the window must have been created already by handling
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>

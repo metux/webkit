@@ -307,9 +307,9 @@ PassRefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, 
 {
     // FIXME: Title should be set.
     // FIXME: Media could have wrong syntax, in which case we should generate an exception.
-    RefPtr<CSSStyleSheet> sheet = CSSStyleSheet::create();
-    sheet->setMedia(MediaList::createAllowingDescriptionSyntax(sheet.get(), media));
-    return sheet.release();
+    RefPtr<CSSStyleSheet> sheet = CSSStyleSheet::create(StyleSheetInternal::create());
+    sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(media));
+    return sheet;
 }
 
 static const char* const validXMLMIMETypeChars = "[0-9a-zA-Z_\\-+~!$\\^{}|.%'`#&*]"; // per RFCs: 3023, 2045
@@ -386,7 +386,8 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
 
 #if ENABLE(VIDEO)
      // Check to see if the type can be played by our MediaPlayer, if so create a MediaDocument
-     if (MediaPlayer::supportsType(ContentType(type)))
+    // Key system is not applicable here.
+    if (MediaPlayer::supportsType(ContentType(type), String()))
          return MediaDocument::create(frame, url);
 #endif
 
@@ -399,13 +400,8 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
         return TextDocument::create(frame, url);
 
 #if ENABLE(SVG)
-    if (type == "image/svg+xml") {
-#if ENABLE(DASHBOARD_SUPPORT)    
-        Settings* settings = frame ? frame->settings() : 0;
-        if (!settings || !settings->usesDashboardBackwardCompatibilityMode())
-#endif
-            return SVGDocument::create(frame, url);
-    }
+    if (type == "image/svg+xml")
+        return SVGDocument::create(frame, url);
 #endif
     if (isXMLMIMEType(type))
         return Document::create(frame, url);

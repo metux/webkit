@@ -103,6 +103,9 @@ namespace WebCore {
         void setDefaultFixedFontSize(int);
         int defaultFixedFontSize() const { return m_defaultFixedFontSize; }
 
+        void setDefaultDeviceScaleFactor(int);
+        int defaultDeviceScaleFactor() const { return m_defaultDeviceScaleFactor; }
+
         // Unlike areImagesEnabled, this only suppresses the network load of
         // the image URL.  A cached image will still be rendered if requested.
         void setLoadsImagesAutomatically(bool);
@@ -139,6 +142,10 @@ namespace WebCore {
 
         void setJavaEnabled(bool);
         bool isJavaEnabled() const { return m_isJavaEnabled; }
+
+        // This settings is only consulted if isJavaEnabled() returns true;
+        void setJavaEnabledForLocalFiles(bool);
+        bool isJavaEnabledForLocalFiles() const { return m_isJavaEnabledForLocalFiles; }
 
         void setImagesEnabled(bool);
         bool areImagesEnabled() const { return m_areImagesEnabled; }
@@ -316,6 +323,9 @@ namespace WebCore {
         void setCSSRegionsEnabled(bool enabled) { m_cssRegionsEnabled = enabled; }
         bool cssRegionsEnabled() const { return m_cssRegionsEnabled; }
 
+        void setRegionBasedColumnsEnabled(bool enabled) { m_regionBasedColumnsEnabled = enabled; }
+        bool regionBasedColumnsEnabled() const { return m_regionBasedColumnsEnabled; }
+
         void setAcceleratedCompositingEnabled(bool);
         bool acceleratedCompositingEnabled() const { return m_acceleratedCompositingEnabled; }
 
@@ -451,8 +461,8 @@ namespace WebCore {
         void setDeviceHeight(int height) { m_deviceHeight = height; }
         int deviceHeight() const { return m_deviceHeight; }
 
-        void setDeviceDPI(int deviceDPI) { m_deviceDPI = deviceDPI; }
-        int deviceDPI() const { return m_deviceDPI; }
+        void setDevicePixelRatio(double devicePixelRatio) { m_devicePixelRatio = devicePixelRatio; }
+        double devicePixelRatio() const { return m_devicePixelRatio; }
 
         void setForceCompositingMode(bool flag) { m_forceCompositingMode = flag; }
         bool forceCompositingMode() { return m_forceCompositingMode; }
@@ -483,8 +493,8 @@ namespace WebCore {
         void setPasswordEchoEnabled(bool flag) { m_passwordEchoEnabled = flag; }
         bool passwordEchoEnabled() const { return m_passwordEchoEnabled; }
 
-        void setSuppressIncrementalRendering(bool flag) { m_suppressIncrementalRendering = flag; }
-        bool suppressIncrementalRendering() const { return m_suppressIncrementalRendering; }
+        void setSuppressesIncrementalRendering(bool flag) { m_suppressesIncrementalRendering = flag; }
+        bool suppressesIncrementalRendering() const { return m_suppressesIncrementalRendering; }
         
         void setBackspaceKeyNavigationEnabled(bool flag) { m_backspaceKeyNavigationEnabled = flag; }
         bool backspaceKeyNavigationEnabled() const { return m_backspaceKeyNavigationEnabled; }
@@ -536,8 +546,30 @@ namespace WebCore {
         bool isTouchEventEmulationEnabled() const { return m_touchEventEmulationEnabled; }
 #endif
 
+        void setThreadedAnimationEnabled(bool enabled) { m_threadedAnimationEnabled = enabled; }
+        bool threadedAnimationEnabled() const { return m_threadedAnimationEnabled; }
+
+        void setShouldRespectImageOrientation(bool enabled) { m_shouldRespectImageOrientation = enabled; }
+        bool shouldRespectImageOrientation() const { return m_shouldRespectImageOrientation; }
+
+        void setWantsBalancedSetDefersLoadingBehavior(bool flag) { m_wantsBalancedSetDefersLoadingBehavior = flag; }
+        bool wantsBalancedSetDefersLoadingBehavior() const { return m_wantsBalancedSetDefersLoadingBehavior; }
+
+        void setIncrementalRenderingSuppressionTimeoutInSeconds(double timeout) { m_incrementalRenderingSuppressionTimeoutInSeconds = timeout; }
+        double incrementalRenderingSuppressionTimeoutInSeconds() const { return m_incrementalRenderingSuppressionTimeoutInSeconds; }
+
+        void setRequestAnimationFrameEnabled(bool enabled) { m_requestAnimationFrameEnabled = enabled; }
+        bool requestAnimationFrameEnabled() const { return m_requestAnimationFrameEnabled; }
+
+#if USE(JSC)
+        static void setShouldRespectPriorityInCSSAttributeSetters(bool);
+        static bool shouldRespectPriorityInCSSAttributeSetters();
+#endif
+
     private:
         Settings(Page*);
+
+        void initializeDefaultFontFamilies();
 
         Page* m_page;
 
@@ -559,10 +591,11 @@ namespace WebCore {
         int m_minimumLogicalFontSize;
         int m_defaultFontSize;
         int m_defaultFixedFontSize;
+        int m_defaultDeviceScaleFactor;
         int m_validationMessageTimerMagnification;
         int m_minimumAccelerated2dCanvasSize;
         int m_layoutFallbackWidth;
-        int m_deviceDPI;
+        double m_devicePixelRatio;
         size_t m_maximumDecodedImageSize;
         int m_deviceWidth;
         int m_deviceHeight;
@@ -571,6 +604,7 @@ namespace WebCore {
         unsigned m_maximumHTMLParserDOMTreeDepth;
         bool m_isSpatialNavigationEnabled : 1;
         bool m_isJavaEnabled : 1;
+        bool m_isJavaEnabledForLocalFiles : 1;
         bool m_loadsImagesAutomatically : 1;
         bool m_loadsSiteIconsIgnoringImageLoadingSetting : 1;
         bool m_privateBrowsingEnabled : 1;
@@ -618,6 +652,7 @@ namespace WebCore {
         bool m_acceleratedFiltersEnabled : 1;
         bool m_isCSSCustomFilterEnabled : 1;
         bool m_cssRegionsEnabled : 1;
+        bool m_regionBasedColumnsEnabled : 1;
         bool m_downloadableBinaryFontsEnabled : 1;
         bool m_xssAuditorEnabled : 1;
         bool m_acceleratedCompositingEnabled : 1;
@@ -666,7 +701,7 @@ namespace WebCore {
         bool m_mediaPlaybackRequiresUserGesture : 1;
         bool m_mediaPlaybackAllowsInline : 1;
         bool m_passwordEchoEnabled : 1;
-        bool m_suppressIncrementalRendering : 1;
+        bool m_suppressesIncrementalRendering : 1;
         bool m_backspaceKeyNavigationEnabled : 1;
         bool m_visualWordMovementEnabled : 1;
 
@@ -686,9 +721,15 @@ namespace WebCore {
 #if ENABLE(TOUCH_EVENTS)
         bool m_touchEventEmulationEnabled : 1;
 #endif
+        bool m_threadedAnimationEnabled : 1;
+        bool m_shouldRespectImageOrientation : 1;
+        bool m_wantsBalancedSetDefersLoadingBehavior : 1;
+        bool m_requestAnimationFrameEnabled : 1;
 
         Timer<Settings> m_loadsImagesAutomaticallyTimer;
         void loadsImagesAutomaticallyTimerFired(Timer<Settings>*);
+        
+        double m_incrementalRenderingSuppressionTimeoutInSeconds;
 
 #if USE(AVFOUNDATION)
         static bool gAVFoundationEnabled;
@@ -700,6 +741,9 @@ namespace WebCore {
 #endif
 #if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
         static bool gShouldUseHighResolutionTimers;
+#endif
+#if USE(JSC)
+        static bool gShouldRespectPriorityInCSSAttributeSetters;
 #endif
     };
 

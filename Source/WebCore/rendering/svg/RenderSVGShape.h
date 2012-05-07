@@ -113,7 +113,7 @@ private:
 
     virtual void layout();
     virtual void paint(PaintInfo&, const LayoutPoint&);
-    virtual void addFocusRingRects(Vector<LayoutRect>&, const LayoutPoint&);
+    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&);
 
     virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction);
 
@@ -144,7 +144,6 @@ private:
     bool m_needsShapeUpdate : 1;
     bool m_needsTransformUpdate : 1;
     bool m_fillFallback : 1;
-    bool m_strokeContainsFallBack : 1;
 };
 
 inline RenderSVGShape* toRenderSVGShape(RenderObject* object)

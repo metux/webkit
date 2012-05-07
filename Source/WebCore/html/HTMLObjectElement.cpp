@@ -77,11 +77,11 @@ RenderWidget* HTMLObjectElement::renderWidgetForJSBindings()
     return renderPart(); // This will return 0 if the renderer is not a RenderPart.
 }
 
-bool HTMLObjectElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLObjectElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == borderAttr)
+    if (name == borderAttr)
         return true;
-    return HTMLPlugInImageElement::isPresentationAttribute(attr);
+    return HTMLPlugInImageElement::isPresentationAttribute(name);
 }
 
 void HTMLObjectElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
@@ -328,16 +328,17 @@ bool HTMLObjectElement::rendererIsNeeded(const NodeRenderingContext& context)
     return HTMLPlugInImageElement::rendererIsNeeded(context);
 }
 
-void HTMLObjectElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLObjectElement::insertedInto(Node* insertionPoint)
 {
-    HTMLPlugInImageElement::insertedIntoDocument();
-    FormAssociatedElement::insertedIntoDocument();
+    HTMLPlugInImageElement::insertedInto(insertionPoint);
+    FormAssociatedElement::insertedInto(insertionPoint);
+    return InsertionDone;
 }
 
-void HTMLObjectElement::removedFromDocument()
+void HTMLObjectElement::removedFrom(Node* insertionPoint)
 {
-    HTMLPlugInImageElement::removedFromDocument();
-    FormAssociatedElement::removedFromDocument();
+    HTMLPlugInImageElement::removedFrom(insertionPoint);
+    FormAssociatedElement::removedFrom(insertionPoint);
 }
 
 void HTMLObjectElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
@@ -475,7 +476,7 @@ void HTMLObjectElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) con
     // FIXME: Passing a string that starts with "#" to the completeURL function does
     // not seem like it would work. The image element has similar but not identical code.
     const AtomicString& useMap = getAttribute(usemapAttr);
-    if (useMap.startsWith("#"))
+    if (useMap.startsWith('#'))
         addSubresourceURL(urls, document()->completeURL(useMap));
 }
 
@@ -483,18 +484,6 @@ void HTMLObjectElement::didMoveToNewDocument(Document* oldDocument)
 {
     FormAssociatedElement::didMoveToNewDocument(oldDocument);
     HTMLPlugInImageElement::didMoveToNewDocument(oldDocument);
-}
-
-void HTMLObjectElement::insertedIntoTree(bool deep)
-{
-    FormAssociatedElement::insertedIntoTree();
-    HTMLPlugInImageElement::insertedIntoTree(deep);
-}
-
-void HTMLObjectElement::removedFromTree(bool deep)
-{
-    FormAssociatedElement::removedFromTree();
-    HTMLPlugInImageElement::removedFromTree(deep);
 }
 
 bool HTMLObjectElement::appendFormData(FormDataList& encoding, bool)

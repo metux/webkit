@@ -3,12 +3,12 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebSettings</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebFrame.html" title="WebKitWebFrame">
 <link rel="next" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -86,6 +86,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-private-browsing" title='The "enable-private-browsing" property'>enable-private-browsing</a>"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-scripts" title='The "enable-scripts" property'>enable-scripts</a>"           <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-site-specific-quirks" title='The "enable-site-specific-quirks" property'>enable-site-specific-quirks</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-smooth-scrolling" title='The "enable-smooth-scrolling" property'>enable-smooth-scrolling</a>"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-spatial-navigation" title='The "enable-spatial-navigation" property'>enable-spatial-navigation</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-spell-checking" title='The "enable-spell-checking" property'>enable-spell-checking</a>"    <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-universal-access-from-file-uris" title='The "enable-universal-access-from-file-uris" property'>enable-universal-access-from-file-uris</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -130,12 +131,12 @@ After creation, a <a class="link" href="WebKitWebSettings.html" title="WebKitWeb
 4
 5
 6</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Create a new websettings and disable java script </span><span class="comment">*/</span>
-WebKitWebSettings *settings = webkit_web_settings_new ();
-g_object_set (G_OBJECT(settings), <span class="number">&quot;enable-scripts&quot;</span>, FALSE, <span class="number">NULL</span>);
+        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Create a new websettings and disable java script */</span>
+WebKitWebSettings <span class="gtkdoc opt">*</span>settings <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/WebKitWebSettings.html#webkit-web-settings-new">webkit_web_settings_new</a></span> <span class="gtkdoc opt">();</span>
+<span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-set">g_object_set</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="gtkdoc opt">(</span>settings<span class="gtkdoc opt">),</span> <span class="string">&quot;enable-scripts&quot;</span><span class="gtkdoc opt">,</span> FALSE<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
 
-<span class="comment">/*</span><span class="comment"> Apply the result </span><span class="comment">*/</span>
-webkit_web_view_set_settings (WEBKIT_WEB_VIEW(my_webview), settings);</pre></td>
+<span class="comment">/* Apply the result */</span>
+<span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-set-settings">webkit_web_view_set_settings</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">),</span> settings<span class="gtkdoc opt">);</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -361,6 +362,10 @@ Whether to enable caret browsing mode.
 <div class="refsect2">
 <a name="WebKitWebSettings--enable-default-context-menu"></a><h3>The <code class="literal">"enable-default-context-menu"</code> property</h3>
 <pre class="programlisting">  "enable-default-context-menu" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<div class="warning" style="margin-left: 0.5in; margin-right: 0.5in;">
+<h3 class="title">Warning</h3>
+<p><code class="literal">WebKitWebSettings:enable-default-context-menu</code> has been deprecated since version 1.10 and should not be used in newly-written code. Use <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-context-menu" title='The "context-menu" signal'><span class="type">"context-menu"</span></a> signal instead.</p>
+</div>
 <p>
 Whether right-clicks should be handled automatically to create,
 and display the context menu. Turning this off will make
@@ -554,6 +559,17 @@ This is currently experimental for WebKitGtk.
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitWebSettings--enable-smooth-scrolling"></a><h3>The <code class="literal">"enable-smooth-scrolling"</code> property</h3>
+<pre class="programlisting">  "enable-smooth-scrolling"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable support for smooth scrolling. The current implementation relies upon
+CPU work to produce a smooth scrolling experience.
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 1.9.0</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebSettings--enable-spatial-navigation"></a><h3>The <code class="literal">"enable-spatial-navigation"</code> property</h3>
 <pre class="programlisting">  "enable-spatial-navigation" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
 <p>
@@ -656,7 +672,7 @@ content from the web should provide a preference for this.
 Path to store persistent HTML5 localStorage databases, which are enabled by
 "enable-html5-local-storage". The default path is $XDG_DATA_HOME/webkit/databases/.
 </p>
-<p>Default value: "/home/martin/.local/share/webkit/databases"</p>
+<p>Default value: "/home/kov/.local/share/webkit/databases"</p>
 <p class="since">Since 1.5.2</p>
 </div>
 <hr>
@@ -805,6 +821,6 @@ The value by which the zoom level is changed when zooming in or out.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>

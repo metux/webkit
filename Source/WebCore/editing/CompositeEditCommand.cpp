@@ -292,9 +292,9 @@ void CompositeEditCommand::removeStyledElement(PassRefPtr<Element> element)
     applyCommandToComposite(ApplyStyleCommand::create(element, true));
 }
 
-void CompositeEditCommand::insertParagraphSeparator(bool useDefaultParagraphElement)
+void CompositeEditCommand::insertParagraphSeparator(bool useDefaultParagraphElement, bool pasteBlockqutoeIntoUnquotedArea)
 {
-    applyCommandToComposite(InsertParagraphSeparatorCommand::create(document(), useDefaultParagraphElement));
+    applyCommandToComposite(InsertParagraphSeparatorCommand::create(document(), useDefaultParagraphElement, pasteBlockqutoeIntoUnquotedArea));
 }
 
 void CompositeEditCommand::insertLineBreak()
@@ -304,11 +304,14 @@ void CompositeEditCommand::insertLineBreak()
 
 bool CompositeEditCommand::isRemovableBlock(const Node* node)
 {
-    Node* parentNode = node->parentNode();
-    if ((parentNode && parentNode->firstChild() != parentNode->lastChild()) || !node->hasTagName(divTag))
+    if (!node->hasTagName(divTag))
         return false;
 
-    if (!node->isElementNode() || !toElement(node)->hasAttributes())
+    Node* parentNode = node->parentNode();
+    if (parentNode && parentNode->firstChild() != parentNode->lastChild())
+        return false;
+
+    if (!toElement(node)->hasAttributes())
         return true;
 
     return false;
@@ -401,6 +404,14 @@ void CompositeEditCommand::removeNodeAndPruneAncestors(PassRefPtr<Node> node)
     RefPtr<ContainerNode> parent = node->parentNode();
     removeNode(node);
     prune(parent.release());
+}
+
+void CompositeEditCommand::updatePositionForNodeRemovalPreservingChildren(Position& position, Node* node)
+{
+    int offset = (position.anchorType() == Position::PositionIsOffsetInAnchor) ? position.offsetInContainerNode() : 0;
+    updatePositionForNodeRemoval(position, node);
+    if (offset)
+        position.moveToOffset(offset);    
 }
 
 HTMLElement* CompositeEditCommand::replaceElementWithSpanPreservingChildrenAndAttributes(PassRefPtr<HTMLElement> node)
@@ -1032,8 +1043,15 @@ void CompositeEditCommand::cleanupAfterDeletion(VisiblePosition destination)
         // doesn't require a placeholder to prop itself open (like a bordered
         // div or an li), remove it during the move (the list removal code
         // expects this behavior).
-        else if (isBlock(node))
+        else if (isBlock(node)) {
+            // If caret position after deletion and destination position coincides,
+            // node should not be removed.
+            if (!position.rendersInDifferentPosition(destination.deepEquivalent())) {
+                prune(node);
+                return;
+            }
             removeNodeAndPruneAncestors(node);
+        }
         else if (lineBreakExistsAtPosition(position)) {
             // There is a preserved '\n' at caretAfterDelete.
             // We can safely assume this is a text node.
@@ -1260,21 +1278,23 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
     if (!newBlock)
         newBlock = createDefaultParagraphElement(document());
 
-    if (emptyListItem->renderer()->nextSibling()) {
-        // If emptyListItem follows another list item, split the list node.
-        if (emptyListItem->renderer()->previousSibling())
+    Node* previousListNode = emptyListItem->isElementNode() ? toElement(emptyListItem)->previousElementSibling(): emptyListItem->previousSibling();
+    Node* nextListNode = emptyListItem->isElementNode() ? toElement(emptyListItem)->nextElementSibling(): emptyListItem->nextSibling();
+    if (isListItem(nextListNode) || isListElement(nextListNode)) {
+        // If emptyListItem follows another list item or nested list, split the list node.
+        if (isListItem(previousListNode) || isListElement(previousListNode))
             splitElement(static_cast<Element*>(listNode), emptyListItem);
 
-        // If emptyListItem is followed by other list item, then insert newBlock before the list node.
+        // If emptyListItem is followed by other list item or nested list, then insert newBlock before the list node.
         // Because we have splitted the element, emptyListItem is the first element in the list node.
         // i.e. insert newBlock before ul or ol whose first element is emptyListItem
         insertNodeBefore(newBlock, listNode);
         removeNode(emptyListItem);
     } else {
-        // When emptyListItem does not follow any list item, insert newBlock after the enclosing list node.
+        // When emptyListItem does not follow any list item or nested list, insert newBlock after the enclosing list node.
         // Remove the enclosing node if emptyListItem is the only child; otherwise just remove emptyListItem.
         insertNodeAfter(newBlock, listNode);
-        removeNode(emptyListItem->renderer()->previousSibling() ? emptyListItem : listNode);
+        removeNode(isListItem(previousListNode) || isListElement(previousListNode) ? emptyListItem : listNode);
     }
 
     appendBlockPlaceholder(newBlock);

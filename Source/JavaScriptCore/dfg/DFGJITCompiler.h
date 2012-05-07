@@ -130,9 +130,9 @@ struct PropertyAccessRecord {
     enum RegisterMode { RegistersFlushed, RegistersInUse };
     
 #if USE(JSVALUE64)
-    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
+    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::PatchableJump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
 #elif USE(JSVALUE32_64)
-    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToTagLoadOrStore, MacroAssembler::DataLabelCompact deltaCallToPayloadLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
+    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::PatchableJump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToTagLoadOrStore, MacroAssembler::DataLabelCompact deltaCallToPayloadLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
 #endif
         : m_codeOrigin(codeOrigin)
         , m_deltaCheckImmToCall(deltaCheckImmToCall)
@@ -159,7 +159,7 @@ struct PropertyAccessRecord {
     CodeOrigin m_codeOrigin;
     MacroAssembler::DataLabelPtr m_deltaCheckImmToCall;
     MacroAssembler::Call m_functionCall;
-    MacroAssembler::Jump m_deltaCallToStructCheck;
+    MacroAssembler::PatchableJump m_deltaCallToStructCheck;
 #if USE(JSVALUE64)
     MacroAssembler::DataLabelCompact m_deltaCallToLoadOrStore;
 #elif USE(JSVALUE32_64)
@@ -194,17 +194,11 @@ public:
     {
     }
 
-    void compile(JITCode& entry);
-    void compileFunction(JITCode& entry, MacroAssemblerCodePtr& entryWithArityCheck);
+    bool compile(JITCode& entry);
+    bool compileFunction(JITCode& entry, MacroAssemblerCodePtr& entryWithArityCheck);
 
     // Accessors for properties.
     Graph& graph() { return m_graph; }
-    
-    // Just get a token for beginning a call.
-    CallBeginToken beginJSCall()
-    {
-        return CallBeginToken(m_currentCodeOriginIndex++);
-    }
     
     // Get a token for beginning a call, and set the current code origin index in
     // the call frame.
@@ -247,7 +241,7 @@ public:
     // Helper methods to get predictions
     PredictedType getPrediction(Node& node) { return node.prediction(); }
     PredictedType getPrediction(NodeIndex nodeIndex) { return getPrediction(graph()[nodeIndex]); }
-    PredictedType getPrediction(NodeUse nodeUse) { return getPrediction(nodeUse.index()); }
+    PredictedType getPrediction(Edge nodeUse) { return getPrediction(nodeUse.index()); }
 
 #if USE(JSVALUE32_64)
     void* addressOfDoubleConstant(NodeIndex nodeIndex)
@@ -297,12 +291,13 @@ public:
         // value of (None, []). But the old JIT may stash some values there. So we really
         // need (Top, TOP).
         for (size_t argument = 0; argument < basicBlock.variablesAtHead.numberOfArguments(); ++argument) {
-            if (basicBlock.variablesAtHead.argument(argument) == NoNode)
+            NodeIndex nodeIndex = basicBlock.variablesAtHead.argument(argument);
+            if (nodeIndex == NoNode || !m_graph[nodeIndex].shouldGenerate())
                 entry->m_expectedValues.argument(argument).makeTop();
         }
         for (size_t local = 0; local < basicBlock.variablesAtHead.numberOfLocals(); ++local) {
             NodeIndex nodeIndex = basicBlock.variablesAtHead.local(local);
-            if (nodeIndex == NoNode)
+            if (nodeIndex == NoNode || !m_graph[nodeIndex].shouldGenerate())
                 entry->m_expectedValues.local(local).makeTop();
             else if (m_graph[nodeIndex].variableAccessData()->shouldUseDoubleFormat())
                 entry->m_localsForcedDouble.set(local);

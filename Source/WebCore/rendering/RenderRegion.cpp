@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Adobe Systems Incorporated. All Rights Reserved.
+ * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,24 +30,25 @@
 #include "config.h"
 #include "RenderRegion.h"
 
-#include "CSSStyleSelector.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "IntRect.h"
 #include "PaintInfo.h"
 #include "RenderBoxRegionInfo.h"
-#include "RenderFlowThread.h"
+#include "RenderNamedFlowThread.h"
 #include "RenderView.h"
+#include "StyleResolver.h"
 
 namespace WebCore {
 
 RenderRegion::RenderRegion(Node* node, RenderFlowThread* flowThread)
     : RenderReplaced(node, IntSize())
     , m_flowThread(flowThread)
-    , m_parentFlowThread(0)
+    , m_parentNamedFlowThread(0)
     , m_isValid(false)
     , m_hasCustomRegionStyle(false)
     , m_regionState(RegionUndefined)
+    , m_dispatchRegionLayoutUpdateEvent(false)
 {
     ASSERT(node->document()->cssRegionsEnabled());
 }
@@ -139,11 +140,6 @@ void RenderRegion::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintO
     if (!m_flowThread || !isValid())
         return;
 
-    if (Frame* frame = this->frame()) {
-        if (Page* page = frame->page())
-            page->addRelevantRepaintedObject(this, paintInfo.rect);
-    }
-
     setRegionBoxesRegionStyle();
     m_flowThread->paintIntoRegion(paintInfo, this, LayoutPoint(paintOffset.x() + borderLeft() + paddingLeft(), paintOffset.y() + borderTop() + paddingTop()));
     restoreRegionBoxesOriginalStyle();
@@ -179,7 +175,7 @@ void RenderRegion::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
     bool customRegionStyle = false;
     if (node()) {
         Element* regionElement = static_cast<Element*>(node());
-        customRegionStyle = view()->document()->styleSelector()->checkRegionStyle(regionElement);
+        customRegionStyle = view()->document()->styleResolver()->checkRegionStyle(regionElement);
     }
     setHasCustomRegionStyle(customRegionStyle);
 }
@@ -213,13 +209,13 @@ void RenderRegion::attachRegion()
     // so we go up the rendering parents and check that this region is not part of the same
     // flow that it actually needs to display. It would create a circular reference.
     RenderObject* parentObject = parent();
-    m_parentFlowThread = 0;
+    m_parentNamedFlowThread = 0;
     for ( ; parentObject; parentObject = parentObject->parent()) {
-        if (parentObject->isRenderFlowThread()) {
-            m_parentFlowThread = toRenderFlowThread(parentObject);
+        if (parentObject->isRenderNamedFlowThread()) {
+            m_parentNamedFlowThread = toRenderNamedFlowThread(parentObject);
             // Do not take into account a region that links a flow with itself. The dependency
             // cannot change, so it is not worth adding it to the list.
-            if (m_flowThread == m_parentFlowThread) {
+            if (m_flowThread == m_parentNamedFlowThread) {
                 m_flowThread = 0;
                 return;
             }
@@ -250,7 +246,7 @@ RenderBoxRegionInfo* RenderRegion::setRenderBoxRegionInfo(const RenderBox* box, 
     if (!m_isValid || !m_flowThread)
         return 0;
 
-    OwnPtr<RenderBoxRegionInfo>& boxInfo = m_renderBoxRegionInfo.add(box, nullptr).first->second;
+    OwnPtr<RenderBoxRegionInfo>& boxInfo = m_renderBoxRegionInfo.add(box, nullptr).iterator->second;
     if (boxInfo)
         *boxInfo = RenderBoxRegionInfo(logicalLeftInset, logicalRightInset, containingBlockChainIsInset);
     else
@@ -304,7 +300,7 @@ PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderBox* box)
     ASSERT(box->node() && box->node()->isElementNode());
 
     Element* element = toElement(box->node());
-    RefPtr<RenderStyle> renderBoxRegionStyle = box->view()->document()->styleSelector()->styleForElement(element, 0, false, false, this);
+    RefPtr<RenderStyle> renderBoxRegionStyle = box->view()->document()->styleResolver()->styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
     m_renderBoxRegionStyle.add(box, renderBoxRegionStyle);
 
     if (!box->hasBoxDecorations()) {

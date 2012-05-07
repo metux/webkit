@@ -39,6 +39,10 @@
 #include <wtf/gobject/GRefPtr.h>
 #endif
 
+#if PLATFORM(EFL)
+#include <Ecore.h>
+#endif
+
 namespace WebCore {
 
 class RunLoop {
@@ -95,6 +99,10 @@ public:
         void clearTimerSource();
         GRefPtr<GSource> m_timerSource;
         gboolean m_isRepeating;
+#elif PLATFORM(EFL)
+        static bool timerFired(void* data);
+        OwnPtr<Ecore_Timer> m_timer;
+        bool m_isRepeating;
 #endif
     };
 
@@ -151,10 +159,16 @@ private:
 #elif PLATFORM(GTK)
 public:
     static gboolean queueWork(RunLoop*);
-    GMainLoop* mainLoop();
+    GMainLoop* innermostLoop();
+    void pushNestedMainLoop(GMainLoop*);
+    void popNestedMainLoop();
 private:
     GRefPtr<GMainContext> m_runLoopContext;
-    GRefPtr<GMainLoop> m_runLoopMain;
+    Vector<GRefPtr<GMainLoop> > m_runLoopMainLoops;
+#elif PLATFORM(EFL)
+    bool m_initEfl;
+    OwnPtr<Ecore_Pipe> m_pipe;
+    static void wakeUpEvent(void* data, void*, unsigned int);
 #endif
 };
 

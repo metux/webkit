@@ -33,10 +33,28 @@
 
 namespace WebCore {
 
+class Attr;
 class Element;
 
+inline Attribute* findAttributeInVector(const Vector<Attribute>& attributes, const QualifiedName& name)
+{
+    for (unsigned i = 0; i < attributes.size(); ++i) {
+        if (attributes.at(i).name().matches(name))
+            return &const_cast<Vector<Attribute>& >(attributes).at(i);
+    }
+    return 0;
+}
+
+enum EInUpdateStyleAttribute { NotInUpdateStyleAttribute, InUpdateStyleAttribute };
+
 class ElementAttributeData {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
+    static PassOwnPtr<ElementAttributeData> create()
+    {
+        return adoptPtr(new ElementAttributeData);
+    }
+
     ~ElementAttributeData();
 
     void clearClass() { m_classNames.clear(); }
@@ -46,9 +64,11 @@ public:
     const AtomicString& idForStyleResolution() const { return m_idForStyleResolution; }
     void setIdForStyleResolution(const AtomicString& newId) { m_idForStyleResolution = newId; }
 
-    StylePropertySet* inlineStyleDecl() { return m_inlineStyleDecl.get(); }
-    StylePropertySet* ensureInlineStyleDecl(StyledElement*);
-    void destroyInlineStyleDecl(StyledElement* element);
+    StylePropertySet* inlineStyle() { return m_inlineStyleDecl.get(); }
+    StylePropertySet* ensureInlineStyle(StyledElement*);
+    StylePropertySet* ensureMutableInlineStyle(StyledElement*);
+    void updateInlineStyleAvoidingMutation(StyledElement*, const String& text);
+    void destroyInlineStyle(StyledElement*);
 
     StylePropertySet* attributeStyle() const { return m_attributeStyle.get(); }
     void setAttributeStyle(PassRefPtr<StylePropertySet> style) { m_attributeStyle = style; }
@@ -56,38 +76,57 @@ public:
     size_t length() const { return m_attributes.size(); }
     bool isEmpty() const { return m_attributes.isEmpty(); }
 
+    PassRefPtr<Attr> getAttributeNode(const String&, bool shouldIgnoreAttributeCase, Element*) const;
+    PassRefPtr<Attr> getAttributeNode(const QualifiedName&, Element*) const;
+
     // Internal interface.
-    Attribute* attributeItem(unsigned index) const { return m_attributes[index].get(); }
-    Attribute* getAttributeItem(const QualifiedName&) const;
+    Attribute* attributeItem(unsigned index) const { return &const_cast<ElementAttributeData*>(this)->m_attributes[index]; }
+    Attribute* getAttributeItem(const QualifiedName& name) const { return findAttributeInVector(m_attributes, name); }
     size_t getAttributeItemIndex(const QualifiedName&) const;
+    size_t getAttributeItemIndex(const String& name, bool shouldIgnoreAttributeCase) const;
 
     // These functions do no error checking.
-    void addAttribute(PassRefPtr<Attribute>, Element*);
+    void addAttribute(const Attribute&, Element*, EInUpdateStyleAttribute = NotInUpdateStyleAttribute);
     void removeAttribute(const QualifiedName&, Element*);
-    void removeAttribute(size_t index, Element*);
+    void removeAttribute(size_t index, Element*, EInUpdateStyleAttribute = NotInUpdateStyleAttribute);
+    PassRefPtr<Attr> takeAttribute(size_t index, Element*);
+
+    bool hasID() const { return !m_idForStyleResolution.isNull(); }
+    bool hasClass() const { return !m_classNames.isNull(); }
+
+    bool isEquivalent(const ElementAttributeData* other) const;
+
+    void setAttr(Element*, const QualifiedName&, Attr*);
+    void removeAttr(Element*, const QualifiedName&);
+    PassRefPtr<Attr> attrIfExists(Element*, const QualifiedName&);
+    PassRefPtr<Attr> ensureAttr(Element*, const QualifiedName&);
 
 private:
     friend class Element;
-    friend class NamedNodeMap;
+    friend class HTMLConstructionSite;
 
     ElementAttributeData()
+        : m_attrCount(0)
     {
     }
 
-    void detachAttributesFromElement();
-    void copyAttributesToVector(Vector<RefPtr<Attribute> >&);
+    const Vector<Attribute>& attributeVector() const { return m_attributes; }
+    Vector<Attribute> clonedAttributeVector() const { return m_attributes; }
+
+    void detachAttributesFromElement(Element*);
     Attribute* getAttributeItem(const String& name, bool shouldIgnoreAttributeCase) const;
-    size_t getAttributeItemIndex(const String& name, bool shouldIgnoreAttributeCase) const;
     size_t getAttributeItemIndexSlowCase(const String& name, bool shouldIgnoreAttributeCase) const;
     void setAttributes(const ElementAttributeData& other, Element*);
-    void clearAttributes();
-    void replaceAttribute(size_t index, PassRefPtr<Attribute>, Element*);
+    void clearAttributes(Element*);
+    void replaceAttribute(size_t index, const Attribute&, Element*);
 
     RefPtr<StylePropertySet> m_inlineStyleDecl;
     RefPtr<StylePropertySet> m_attributeStyle;
     SpaceSplitString m_classNames;
     AtomicString m_idForStyleResolution;
-    Vector<RefPtr<Attribute>, 4> m_attributes;
+    Vector<Attribute> m_attributes;
+
+    unsigned m_attrCount;
 };
 
 inline void ElementAttributeData::removeAttribute(const QualifiedName& name, Element* element)
@@ -97,36 +136,28 @@ inline void ElementAttributeData::removeAttribute(const QualifiedName& name, Ele
         return;
 
     removeAttribute(index, element);
+    return;
 }
 
 inline Attribute* ElementAttributeData::getAttributeItem(const String& name, bool shouldIgnoreAttributeCase) const
 {
     size_t index = getAttributeItemIndex(name, shouldIgnoreAttributeCase);
     if (index != notFound)
-        return m_attributes[index].get();
+        return &const_cast<ElementAttributeData*>(this)->m_attributes[index];
     return 0;
 }
 
-inline Attribute* ElementAttributeData::getAttributeItem(const QualifiedName& name) const
-{
-    size_t index = getAttributeItemIndex(name);
-    if (index != notFound)
-        return m_attributes[index].get();
-    return 0;
-}
-
-// We use a boolean parameter instead of calling shouldIgnoreAttributeCase so that the caller
-// can tune the behavior (hasAttribute is case sensitive whereas getAttribute is not).
 inline size_t ElementAttributeData::getAttributeItemIndex(const QualifiedName& name) const
 {
-    size_t len = length();
-    for (unsigned i = 0; i < len; ++i) {
-        if (m_attributes[i]->name().matches(name))
+    for (unsigned i = 0; i < m_attributes.size(); ++i) {
+        if (m_attributes.at(i).name().matches(name))
             return i;
     }
     return notFound;
 }
 
+// We use a boolean parameter instead of calling shouldIgnoreAttributeCase so that the caller
+// can tune the behavior (hasAttribute is case sensitive whereas getAttribute is not).
 inline size_t ElementAttributeData::getAttributeItemIndex(const String& name, bool shouldIgnoreAttributeCase) const
 {
     unsigned len = length();
@@ -134,9 +165,8 @@ inline size_t ElementAttributeData::getAttributeItemIndex(const String& name, bo
 
     // Optimize for the case where the attribute exists and its name exactly matches.
     for (unsigned i = 0; i < len; ++i) {
-        const QualifiedName& attrName = m_attributes[i]->name();
-        if (!attrName.hasPrefix()) {
-            if (name == attrName.localName())
+        if (!m_attributes[i].name().hasPrefix()) {
+            if (name == m_attributes[i].localName())
                 return i;
         } else
             doSlowCheck = true;

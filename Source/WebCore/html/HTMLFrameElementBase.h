@@ -54,7 +54,8 @@ protected:
     bool isURLAllowed() const;
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual void insertedIntoDocument();
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void didNotifyDescendantInseretions(Node*) OVERRIDE;
     virtual void attach();
 
 private:
@@ -78,7 +79,6 @@ private:
     int m_marginHeight;
 
     bool m_viewSource;
-    bool m_remainsAliveOnRemovalFromTree;
 };
 
 } // namespace WebCore

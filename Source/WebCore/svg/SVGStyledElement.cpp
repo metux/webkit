@@ -57,9 +57,12 @@ END_REGISTER_ANIMATED_PROPERTIES
 
 using namespace SVGNames;
 
-void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, int>* propertyNameToIdMap, const QualifiedName& attrName)
+void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap, const QualifiedName& attrName)
 {
-    int propertyId = cssPropertyID(attrName.localName());
+    // FIXME: when CSS supports "transform-origin" the special case for transform_originAttr can be removed.
+    CSSPropertyID propertyId = cssPropertyID(attrName.localName());
+    if (!propertyId && attrName == transform_originAttr)
+        propertyId = CSSPropertyWebkitTransformOrigin; // cssPropertyID("-webkit-transform-origin")
     ASSERT(propertyId > 0);
     propertyNameToIdMap->set(attrName.localName().impl(), propertyId);
 }
@@ -82,33 +85,26 @@ String SVGStyledElement::title() const
 {
     // According to spec, we should not return titles when hovering over root <svg> elements (those
     // <title> elements are the title of the document, not a tooltip) so we instantly return.
-    if (hasTagName(SVGNames::svgTag)) {
-        const SVGSVGElement* svg = static_cast<const SVGSVGElement*>(this);
-        if (svg->isOutermostSVGSVGElement())
-            return String();
-    }
-    
+    if (isOutermostSVGSVGElement())
+        return String();
+
     // Walk up the tree, to find out whether we're inside a <use> shadow tree, to find the right title.
-    Node* parent = const_cast<SVGStyledElement*>(this);
-    while (parent) {
-        if (!parent->isSVGShadowRoot()) {
-            parent = parent->parentNodeGuaranteedHostFree();
-            continue;
-        }
-        
-        // Get the <use> element.
-        Element* shadowParent = parent->svgShadowHost();
-        if (shadowParent && shadowParent->isSVGElement() && shadowParent->hasTagName(SVGNames::useTag)) {
-            SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowParent);
+    if (isInShadowTree()) {
+        Element* shadowHostElement = treeScope()->rootNode()->shadowHost();
+        // At this time, SVG nodes are not allowed in non-<use> shadow trees, so any shadow root we do
+        // have should be a use. The assert and following test is here to catch future shadow DOM changes
+        // that do enable SVG in a shadow tree.
+        ASSERT(!shadowHostElement || shadowHostElement->hasTagName(SVGNames::useTag));
+        if (shadowHostElement && shadowHostElement->hasTagName(SVGNames::useTag)) {
+            SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowHostElement);
+ 
             // If the <use> title is not empty we found the title to use.
             String useTitle(useElement->title());
-            if (useTitle.isEmpty())
-                break;
-            return useTitle;
+            if (!useTitle.isEmpty())
+               return useTitle;
         }
-        parent = parent->parentNode();
     }
-    
+
     // If we aren't an instance in a <use> or the <use> title was not found, then find the first
     // <title> child of this element.
     Element* titleElement = firstElementChild();
@@ -132,20 +128,20 @@ bool SVGStyledElement::rendererIsNeeded(const NodeRenderingContext& context)
     // Spec: SVG allows inclusion of elements from foreign namespaces anywhere
     // with the SVG content. In general, the SVG user agent will include the unknown
     // elements in the DOM but will otherwise ignore unknown elements. 
-    if (!parentNode() || parentNode()->isSVGElement())
+    if (!parentOrHostElement() || parentOrHostElement()->isSVGElement())
         return StyledElement::rendererIsNeeded(context);
 
     return false;
 }
 
-int SVGStyledElement::cssPropertyIdForSVGAttributeName(const QualifiedName& attrName)
+CSSPropertyID SVGStyledElement::cssPropertyIdForSVGAttributeName(const QualifiedName& attrName)
 {
     if (!attrName.namespaceURI().isNull())
-        return 0;
+        return CSSPropertyInvalid;
     
-    static HashMap<AtomicStringImpl*, int>* propertyNameToIdMap = 0;
+    static HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap = 0;
     if (!propertyNameToIdMap) {
-        propertyNameToIdMap = new HashMap<AtomicStringImpl*, int>;
+        propertyNameToIdMap = new HashMap<AtomicStringImpl*, CSSPropertyID>;
         // This is a list of all base CSS and SVG CSS properties which are exposed as SVG XML attributes
         mapAttributeToCSSProperty(propertyNameToIdMap, alignment_baselineAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, baseline_shiftAttr);
@@ -201,6 +197,7 @@ int SVGStyledElement::cssPropertyIdForSVGAttributeName(const QualifiedName& attr
         mapAttributeToCSSProperty(propertyNameToIdMap, text_anchorAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, text_decorationAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, text_renderingAttr);
+        mapAttributeToCSSProperty(propertyNameToIdMap, transform_originAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, unicode_bidiAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, vector_effectAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, visibilityAttr);
@@ -292,18 +289,18 @@ bool SVGStyledElement::isAnimatableCSSProperty(const QualifiedName& attrName)
     return cssPropertyToTypeMap().contains(attrName);
 }
 
-bool SVGStyledElement::isPresentationAttribute(Attribute* attr) const
+bool SVGStyledElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name()) > 0)
+    if (SVGStyledElement::cssPropertyIdForSVGAttributeName(name) > 0)
         return true;
-    return SVGElement::isPresentationAttribute(attr);
+    return SVGElement::isPresentationAttribute(name);
 }
 
 void SVGStyledElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
 {
-    int propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
+    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
     if (propertyID > 0)
-        style->setProperty(propertyID, attr->value());
+        addPropertyToAttributeStyle(style, propertyID, attr->value());
 }
 
 void SVGStyledElement::parseAttribute(Attribute* attr)
@@ -328,7 +325,7 @@ bool SVGStyledElement::isKnownAttribute(const QualifiedName& attrName)
 
 void SVGStyledElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    int propId = SVGStyledElement::cssPropertyIdForSVGAttributeName(attrName);
+    CSSPropertyID propId = SVGStyledElement::cssPropertyIdForSVGAttributeName(attrName);
     if (propId > 0) {
         SVGElementInstance::invalidateAllInstancesOfElement(this);
         return;
@@ -360,11 +357,12 @@ void SVGStyledElement::attach()
         object->updateFromElement();
 }
 
-void SVGStyledElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGStyledElement::insertedInto(Node* rootParent)
 {
-    SVGElement::insertedIntoDocument();
+    SVGElement::insertedInto(rootParent);
     updateRelativeLengthsInformation();
     buildPendingResourcesIfNeeded();
+    return InsertionDone;
 }
 
 void SVGStyledElement::buildPendingResourcesIfNeeded()
@@ -378,25 +376,27 @@ void SVGStyledElement::buildPendingResourcesIfNeeded()
     if (!extensions->hasPendingResource(resourceId))
         return;
 
-    OwnPtr<SVGDocumentExtensions::SVGPendingElements> clients(extensions->removePendingResource(resourceId));
-    ASSERT(!clients->isEmpty());
+    // Mark pending resources as pending for removal.
+    extensions->markPendingResourcesForRemoval(resourceId);
 
-    const SVGDocumentExtensions::SVGPendingElements::const_iterator end = clients->end();
-    for (SVGDocumentExtensions::SVGPendingElements::const_iterator it = clients->begin(); it != end; ++it) {
-        ASSERT((*it)->hasPendingResources());
-        (*it)->buildPendingResource();
-        (*it)->clearHasPendingResourcesIfPossible();
+    // Rebuild pending resources for each client of a pending resource that is being removed.
+    while (SVGStyledElement* clientElement = extensions->removeElementFromPendingResourcesForRemoval(resourceId)) {
+        ASSERT(clientElement->hasPendingResources());
+        if (clientElement->hasPendingResources()) {
+            clientElement->buildPendingResource();
+            clientElement->clearHasPendingResourcesIfPossible();
+        }
     }
 }
 
-void SVGStyledElement::removedFromDocument()
+void SVGStyledElement::removedFrom(Node* rootParent)
 {
-    updateRelativeLengthsInformation(false, this);
-    SVGElement::removedFromDocument();
+    if (rootParent->inDocument())
+        updateRelativeLengthsInformation(false, this);
+    SVGElement::removedFrom(rootParent);
     SVGElementInstance::invalidateAllInstancesOfElement(this);
-
     Document* document = this->document();
-    if (!needsPendingResourceHandling() || !document)
+    if (!rootParent->inDocument() || !needsPendingResourceHandling() || !document)
         return;
 
     document->accessSVGExtensions()->removeElementFromPendingResources(this);
@@ -421,11 +421,11 @@ PassRefPtr<CSSValue> SVGStyledElement::getPresentationAttribute(const String& na
     if (!attr)
         return 0;
 
-    RefPtr<StylePropertySet> style = StylePropertySet::create();
-    style->setStrictParsing(false);
-    int propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
+    RefPtr<StylePropertySet> style = StylePropertySet::create(SVGAttributeMode);
+    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
     style->setProperty(propertyID, attr->value());
-    return style->getPropertyCSSValue(propertyID);
+    RefPtr<CSSValue> cssValue = style->getPropertyCSSValue(propertyID);
+    return cssValue ? cssValue->cloneForCSSOM() : 0;
 }
 
 bool SVGStyledElement::instanceUpdatesBlocked() const
@@ -464,7 +464,7 @@ AffineTransform SVGStyledElement::localCoordinateSpaceTransform(SVGLocatable::CT
 
 void SVGStyledElement::updateRelativeLengthsInformation(bool hasRelativeLengths, SVGStyledElement* element)
 {
-    // If we're not yet in a document, this function will be called again from insertedIntoDocument(). Do nothing now.
+    // If we're not yet in a document, this function will be called again from insertedInto(). Do nothing now.
     if (!inDocument())
         return;
 

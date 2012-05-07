@@ -51,7 +51,7 @@ struct NodeListsNodeData {
     WTF_MAKE_NONCOPYABLE(NodeListsNodeData); WTF_MAKE_FAST_ALLOCATED;
 public:
     typedef HashSet<DynamicSubtreeNodeList*> NodeListSet;
-    NodeListSet m_listsWithCaches;
+    NodeListSet m_listsInvalidatedAtDocument;
 
     typedef HashMap<String, ClassNodeList*> ClassNodeListCache;
     ClassNodeListCache m_classNodeListCache;
@@ -71,18 +71,14 @@ public:
 #endif
 
     LabelsNodeList* m_labelsNodeListCache;
- 
+
     static PassOwnPtr<NodeListsNodeData> create()
     {
         return adoptPtr(new NodeListsNodeData);
     }
-    
+
     void invalidateCaches();
     void invalidateCachesThatDependOnAttributes();
-
-#if ENABLE(MICRODATA)
-    void invalidateMicrodataItemListCaches();
-#endif
 
     bool isEmpty() const;
 

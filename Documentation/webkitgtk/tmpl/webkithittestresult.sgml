@@ -9,12 +9,10 @@ WebKitHitTestResult
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -49,6 +47,16 @@ WebKitHitTestResult
 </para>
 
 <!-- ##### ARG WebKitHitTestResult:media-uri ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitHitTestResult:x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitHitTestResult:y ##### -->
 <para>
 
 </para>

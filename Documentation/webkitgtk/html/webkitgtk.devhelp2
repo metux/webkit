@@ -83,6 +83,8 @@
     <keyword type="enum" name="enum WebKitCacheModel" link="webkitgtk-Global-functions.html#WebKitCacheModel"/>
     <keyword type="function" name="webkit_get_cache_model ()" link="webkitgtk-Global-functions.html#webkit-get-cache-model" since="1.1.18"/>
     <keyword type="function" name="webkit_set_cache_model ()" link="webkitgtk-Global-functions.html#webkit-set-cache-model" since="1.1.18"/>
+    <keyword type="enum" name="enum WebKitContextMenuAction" link="webkitgtk-Global-functions.html#WebKitContextMenuAction" since="1.10"/>
+    <keyword type="function" name="webkit_context_menu_item_get_action ()" link="webkitgtk-Global-functions.html#webkit-context-menu-item-get-action" since="1.10"/>
     <keyword type="enum" name="enum WebKitNavigationResponse" link="webkitgtk-webkitwebview.html#WebKitNavigationResponse"/>
     <keyword type="enum" name="enum WebKitWebViewTargetInfo" link="webkitgtk-webkitwebview.html#WebKitWebViewTargetInfo"/>
     <keyword type="enum" name="enum WebKitWebViewViewMode" link="webkitgtk-webkitwebview.html#WebKitWebViewViewMode"/>
@@ -182,6 +184,7 @@
     <keyword type="property" name="The &quot;zoom-level&quot; property" link="webkitgtk-webkitwebview.html#WebKitWebView--zoom-level"/>
     <keyword type="signal" name="The &quot;close-web-view&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-close-web-view"/>
     <keyword type="signal" name="The &quot;console-message&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-console-message"/>
+    <keyword type="signal" name="The &quot;context-menu&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-context-menu"/>
     <keyword type="signal" name="The &quot;copy-clipboard&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-copy-clipboard"/>
     <keyword type="signal" name="The &quot;create-plugin-widget&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-create-plugin-widget"/>
     <keyword type="signal" name="The &quot;create-web-view&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-create-web-view"/>
@@ -191,11 +194,13 @@
     <keyword type="signal" name="The &quot;download-requested&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-download-requested"/>
     <keyword type="signal" name="The &quot;editing-began&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-editing-began"/>
     <keyword type="signal" name="The &quot;editing-ended&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-editing-ended"/>
+    <keyword type="signal" name="The &quot;entering-fullscreen&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-entering-fullscreen"/>
     <keyword type="signal" name="The &quot;frame-created&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-frame-created"/>
     <keyword type="signal" name="The &quot;geolocation-policy-decision-cancelled&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-geolocation-policy-decision-cancelled"/>
     <keyword type="signal" name="The &quot;geolocation-policy-decision-requested&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-geolocation-policy-decision-requested"/>
     <keyword type="signal" name="The &quot;hovering-over-link&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-hovering-over-link"/>
     <keyword type="signal" name="The &quot;icon-loaded&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-icon-loaded"/>
+    <keyword type="signal" name="The &quot;leaving-fullscreen&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-leaving-fullscreen"/>
     <keyword type="signal" name="The &quot;load-committed&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-load-committed"/>
     <keyword type="signal" name="The &quot;load-error&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-load-error"/>
     <keyword type="signal" name="The &quot;load-finished&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-load-finished"/>
@@ -270,6 +275,7 @@
     <keyword type="property" name="The &quot;vertical-scrollbar-policy&quot; property" link="WebKitWebFrame.html#WebKitWebFrame--vertical-scrollbar-policy"/>
     <keyword type="signal" name="The &quot;cleared&quot; signal" link="WebKitWebFrame.html#WebKitWebFrame-cleared"/>
     <keyword type="signal" name="The &quot;hovering-over-link&quot; signal" link="WebKitWebFrame.html#WebKitWebFrame-hovering-over-link"/>
+    <keyword type="signal" name="The &quot;insecure-content-run&quot; signal" link="WebKitWebFrame.html#WebKitWebFrame-insecure-content-run"/>
     <keyword type="signal" name="The &quot;load-committed&quot; signal" link="WebKitWebFrame.html#WebKitWebFrame-load-committed"/>
     <keyword type="signal" name="The &quot;load-done&quot; signal" link="WebKitWebFrame.html#WebKitWebFrame-load-done"/>
     <keyword type="signal" name="The &quot;resource-content-length-received&quot; signal" link="WebKitWebFrame.html#WebKitWebFrame-resource-content-length-received"/>
@@ -312,6 +318,7 @@
     <keyword type="property" name="The &quot;enable-private-browsing&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-private-browsing"/>
     <keyword type="property" name="The &quot;enable-scripts&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-scripts"/>
     <keyword type="property" name="The &quot;enable-site-specific-quirks&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-site-specific-quirks"/>
+    <keyword type="property" name="The &quot;enable-smooth-scrolling&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-smooth-scrolling"/>
     <keyword type="property" name="The &quot;enable-spatial-navigation&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-spatial-navigation"/>
     <keyword type="property" name="The &quot;enable-spell-checking&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-spell-checking"/>
     <keyword type="property" name="The &quot;enable-universal-access-from-file-uris&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-universal-access-from-file-uris"/>
@@ -508,6 +515,8 @@
     <keyword type="property" name="The &quot;inner-node&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--inner-node"/>
     <keyword type="property" name="The &quot;link-uri&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--link-uri"/>
     <keyword type="property" name="The &quot;media-uri&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--media-uri"/>
+    <keyword type="property" name="The &quot;x&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--x"/>
+    <keyword type="property" name="The &quot;y&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--y"/>
     <keyword type="struct" name="WebKitWebPlugin" link="WebKitWebPlugin.html#WebKitWebPlugin-struct"/>
     <keyword type="struct" name="WebKitWebPluginMIMEType" link="WebKitWebPlugin.html#WebKitWebPluginMIMEType" since="1.3.8"/>
     <keyword type="function" name="webkit_web_plugin_get_description ()" link="WebKitWebPlugin.html#webkit-web-plugin-get-description" since="1.3.8"/>
@@ -578,11 +587,50 @@
     <keyword type="function" name="webkit_favicon_database_try_get_favicon_pixbuf ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-try-get-favicon-pixbuf" since="1.8"/>
     <keyword type="property" name="The &quot;path&quot; property" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase--path"/>
     <keyword type="signal" name="The &quot;icon-loaded&quot; signal" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-icon-loaded"/>
-    <keyword type="" name="Logging" link="webkit-environment.html#id610160"/>
+    <keyword type="" name="Logging" link="webkit-environment.html#idp5897248"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DEFAULT" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DEFAULT:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_NO_ACTION" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-NO-ACTION:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_OPEN_LINK" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-OPEN-LINK:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_OPEN_LINK_IN_NEW_WINDOW" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-OPEN-LINK-IN-NEW-WINDOW:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_DOWNLOAD_LINK_TO_DISK" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-LINK-TO-DISK:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_COPY_LINK_TO_CLIPBOARD" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-COPY-LINK-TO-CLIPBOARD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_OPEN_IMAGE_IN_NEW_WINDOW" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-OPEN-IMAGE-IN-NEW-WINDOW:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_DOWNLOAD_IMAGE_TO_DISK" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-IMAGE-TO-DISK:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_COPY_IMAGE_TO_CLIPBOARD" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-COPY-IMAGE-TO-CLIPBOARD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_COPY_IMAGE_URL_TO_CLIPBOARD" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-COPY-IMAGE-URL-TO-CLIPBOARD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_OPEN_FRAME_IN_NEW_WINDOW" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-OPEN-FRAME-IN-NEW-WINDOW:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_GO_BACK" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-GO-BACK:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_GO_FORWARD" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-GO-FORWARD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_STOP" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-STOP:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_RELOAD" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-RELOAD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_COPY" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-COPY:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_CUT" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-CUT:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_PASTE" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-PASTE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_DELETE" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-DELETE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_SELECT_ALL" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-SELECT-ALL:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_INPUT_METHODS" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-INPUT-METHODS:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_UNICODE" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-UNICODE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_SPELLING_GUESS" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-SPELLING-GUESS:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_NO_GUESSES_FOUND" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-NO-GUESSES-FOUND:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_IGNORE_SPELLING" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-IGNORE-SPELLING:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_LEARN_SPELLING" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-LEARN-SPELLING:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_IGNORE_GRAMMAR" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-IGNORE-GRAMMAR:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_FONT_MENU" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-FONT-MENU:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_BOLD" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-BOLD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_ITALIC" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-ITALIC:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_UNDERLINE" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-UNDERLINE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_OUTLINE" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-OUTLINE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_INSPECT_ELEMENT" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-INSPECT-ELEMENT:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_OPEN_MEDIA_IN_NEW_WINDOW" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-OPEN-MEDIA-IN-NEW-WINDOW:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_COPY_MEDIA_LINK_TO_CLIPBOARD" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-COPY-MEDIA-LINK-TO-CLIPBOARD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_TOGGLE_MEDIA_CONTROLS" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-TOGGLE-MEDIA-CONTROLS:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_TOGGLE_MEDIA_LOOP" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-TOGGLE-MEDIA-LOOP:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_ENTER_VIDEO_FULLSCREEN" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-ENTER-VIDEO-FULLSCREEN:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_MEDIA_PLAY_PAUSE" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PLAY-PAUSE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_MEDIA_MUTE" link="webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-MUTE:CAPS"/>
     <keyword type="constant" name="WEBKIT_NAVIGATION_RESPONSE_ACCEPT" link="webkitgtk-webkitwebview.html#WEBKIT-NAVIGATION-RESPONSE-ACCEPT:CAPS"/>
     <keyword type="constant" name="WEBKIT_NAVIGATION_RESPONSE_IGNORE" link="webkitgtk-webkitwebview.html#WEBKIT-NAVIGATION-RESPONSE-IGNORE:CAPS"/>
     <keyword type="constant" name="WEBKIT_NAVIGATION_RESPONSE_DOWNLOAD" link="webkitgtk-webkitwebview.html#WEBKIT-NAVIGATION-RESPONSE-DOWNLOAD:CAPS"/>

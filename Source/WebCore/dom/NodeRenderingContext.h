@@ -34,12 +34,12 @@ namespace WebCore {
 
 class ContainerNode;
 class Document;
+class InsertionPoint;
 class Node;
-class RenderFlowThread;
+class RenderNamedFlowThread;
 class RenderObject;
 class RenderStyle;
-class HTMLContentElement;
-class ShadowRoot;
+class ShadowTree;
 
 class NodeRenderingContext {
 public:
@@ -52,7 +52,7 @@ public:
     RenderObject* parentRenderer() const;
     RenderObject* nextRenderer() const;
     RenderObject* previousRenderer() const;
-    HTMLContentElement* insertionPoint() const;
+    InsertionPoint* insertionPoint() const;
 
     RenderStyle* style() const;
     void setStyle(PassRefPtr<RenderStyle>);
@@ -62,8 +62,10 @@ public:
 
     void hostChildrenChanged();
 
+    bool isOnUpperEncapsulationBoundary() const;
+    bool isOnEncapsulationBoundary() const;
     bool hasFlowThreadParent() const { return m_parentFlowRenderer; }
-    RenderFlowThread* parentFlowRenderer() const { return m_parentFlowRenderer; }
+    RenderNamedFlowThread* parentFlowRenderer() const { return m_parentFlowRenderer; }
     void moveToFlowThreadIfNeeded();
 
 private:
@@ -71,19 +73,20 @@ private:
         Calculating,
         AttachingStraight,
         AttachingNotInTree,
-        AttachingNotDistributed,
         AttachingDistributed,
+        AttachingNotDistributed,
+        AttachingFallbacked,
+        AttachingNotFallbacked,
         AttachingShadowChild,
-        AttachingFallback,
     };
 
     AttachingPhase m_phase;
     Node* m_node;
     ContainerNode* m_parentNodeForRenderingAndStyle;
-    ShadowRoot* m_visualParentShadowRoot;
-    HTMLContentElement* m_insertionPoint;
+    ShadowTree* m_visualParentShadowTree;
+    InsertionPoint* m_insertionPoint;
     RefPtr<RenderStyle> m_style;
-    RenderFlowThread* m_parentFlowRenderer;
+    RenderNamedFlowThread* m_parentFlowRenderer;
     AtomicString m_flowThread;
 };
 
@@ -103,9 +106,21 @@ inline RenderStyle* NodeRenderingContext::style() const
     return m_style.get();
 }
 
-inline HTMLContentElement* NodeRenderingContext::insertionPoint() const
+inline InsertionPoint* NodeRenderingContext::insertionPoint() const
 {
     return m_insertionPoint;
+}
+
+inline bool NodeRenderingContext::isOnEncapsulationBoundary() const
+{
+    return (m_phase == AttachingDistributed
+            || m_phase == AttachingShadowChild
+            || m_phase == AttachingFallbacked);
+}
+
+inline bool NodeRenderingContext::isOnUpperEncapsulationBoundary() const
+{
+    return m_phase == AttachingShadowChild;
 }
 
 class NodeRendererFactory {

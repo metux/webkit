@@ -36,6 +36,7 @@ if (!window.InspectorFrontendHost) {
 WebInspector.InspectorFrontendHostStub = function()
 {
     this._attachedWindowHeight = 0;
+    this.isStub = true;
 }
 
 WebInspector.InspectorFrontendHostStub.prototype = {
@@ -117,12 +118,12 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         window.open(url, "_blank");
     },
 
-    canSaveAs: function(fileName, content)
+    canSave: function()
     {
         return true;
     },
 
-    saveAs: function(fileName, content)
+    save: function(url, content, forceSaveAs)
     {
         var builder = new WebKitBlobBuilder();
         builder.append(content);
@@ -136,9 +137,13 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         fr.readAsDataURL(blob);
     },
 
-    canAttachWindow: function()
+    canAppend: function()
     {
         return false;
+    },
+
+    append: function(url, content)
+    {
     },
 
     sendMessageToBackend: function(message)
@@ -160,6 +165,10 @@ WebInspector.InspectorFrontendHostStub.prototype = {
     loadResourceSynchronously: function(url)
     {
         return "";
+    },
+
+    setZoomFactor: function(zoom)
+    {
     }
 }
 
@@ -167,3 +176,4 @@ var InspectorFrontendHost = new WebInspector.InspectorFrontendHostStub();
 Preferences.localizeUI = false;
 
 }
+

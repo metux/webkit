@@ -95,6 +95,7 @@ class FloatPoint3D;
 class GraphicsContext;
 class Image;
 class TextStream;
+class TiledBacking;
 class TimingFunction;
 
 // Base class for animation values (also used for transitions). Here to
@@ -343,7 +344,7 @@ public:
     virtual void setNeedsDisplay() = 0;
     // mark the given rect (in layer coords) as needing dispay. Never goes deep.
     virtual void setNeedsDisplayInRect(const FloatRect&) = 0;
-    
+
     virtual void setContentsNeedsDisplay() { };
 
     // Set that the position/size of the contents (image or video).
@@ -425,10 +426,12 @@ public:
     // pointers for the layers and timing data will be included in the returned string.
     String layerTreeAsText(LayerTreeAsTextBehavior = LayerTreeAsTextBehaviorNormal) const;
 
+    // Return an estimate of the backing store area (in pixels). May be incorrect for tiled layers.
+    virtual double backingStoreArea() const;
+
     bool usingTiledLayer() const { return m_usingTiledLayer; }
 
-    // Called whenever the visible rect of the given GraphicsLayer changed.
-    virtual void visibleRectChanged() { }
+    virtual TiledBacking* tiledBacking() { return 0; }
 
 #if PLATFORM(QT) || PLATFORM(GTK)
     // This allows several alternative GraphicsLayer implementations in the same port,
@@ -438,6 +441,9 @@ public:
 #endif
 
 protected:
+    // Should be called from derived class destructors. Should call willBeDestroyed() on super.
+    virtual void willBeDestroyed();
+
 #if ENABLE(CSS_FILTERS)
     // This method is used by platform GraphicsLayer classes to clear the filters
     // when compositing is not done in hardware. It is not virtual, so the caller

@@ -3,12 +3,12 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebView</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="ch02.html" title="Class Overview">
 <link rel="next" href="WebKitWebFrame.html" title="WebKitWebFrame">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -221,6 +221,7 @@ WebKitWebView implements
 <pre class="synopsis">
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-close-web-view" title='The "close-web-view" signal'>close-web-view</a>"                                 : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-console-message" title='The "console-message" signal'>console-message</a>"                                : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-context-menu" title='The "context-menu" signal'>context-menu</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-copy-clipboard" title='The "copy-clipboard" signal'>copy-clipboard</a>"                                 : <a href="../gobject/gobject-Signals.html#G-SIGNAL-ACTION:CAPS"><code class="literal">Action</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-create-plugin-widget" title='The "create-plugin-widget" signal'>create-plugin-widget</a>"                           : <a href="../gobject/gobject-Signals.html#G-SIGNAL-ACTION:CAPS"><code class="literal">Action</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-create-web-view" title='The "create-web-view" signal'>create-web-view</a>"                                : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
@@ -230,11 +231,13 @@ WebKitWebView implements
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-download-requested" title='The "download-requested" signal'>download-requested</a>"                             : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-editing-began" title='The "editing-began" signal'>editing-began</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-ACTION:CAPS"><code class="literal">Action</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-editing-ended" title='The "editing-ended" signal'>editing-ended</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-ACTION:CAPS"><code class="literal">Action</code></a>
+  "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-entering-fullscreen" title='The "entering-fullscreen" signal'>entering-fullscreen</a>"                            : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-frame-created" title='The "frame-created" signal'>frame-created</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-ACTION:CAPS"><code class="literal">Action</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-geolocation-policy-decision-cancelled" title='The "geolocation-policy-decision-cancelled" signal'>geolocation-policy-decision-cancelled</a>"          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-geolocation-policy-decision-requested" title='The "geolocation-policy-decision-requested" signal'>geolocation-policy-decision-requested</a>"          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-hovering-over-link" title='The "hovering-over-link" signal'>hovering-over-link</a>"                             : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-icon-loaded" title='The "icon-loaded" signal'>icon-loaded</a>"                                    : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-leaving-fullscreen" title='The "leaving-fullscreen" signal'>leaving-fullscreen</a>"                             : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-load-committed" title='The "load-committed" signal'>load-committed</a>"                                 : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-load-error" title='The "load-error" signal'>load-error</a>"                                     : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-load-finished" title='The "load-finished" signal'>load-finished</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
@@ -827,6 +830,9 @@ of WebKitWebSettings.
 <div class="refsect2">
 <a name="webkit-web-view-get-editable"></a><h3>webkit_web_view_get_editable ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_web_view_get_editable        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<p>
+Returns whether the user is allowed to edit the document.
+</p>
 <p>
 Returns <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if <em class="parameter"><code>web_view</code></em> allows the user to edit the HTML document, <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> if
 it doesn't. You can change <em class="parameter"><code>web_view</code></em>'s document programmatically regardless of
@@ -2522,6 +2528,61 @@ event. <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="liter
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitWebView-context-menu"></a><h3>The <code class="literal">"context-menu"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>       *web_view,
+                                                        <a href="../gtk3/GtkWidget.html"><span class="type">GtkWidget</span></a>           *default_menu,
+                                                        <a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result,
+                                                        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>             triggered_with_keyboard,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)                    : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+Emmited when a context menu is about to be displayed to give the application
+a chance to create and handle its own context menu. If you only want to add custom
+options to the default context menu you can simply modify the given <em class="parameter"><code>default_menu</code></em>.
+</p>
+<p>
+When <em class="parameter"><code>triggered_with_keyboard</code></em> is <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> the coordinates of the given <em class="parameter"><code>hit_test_result</code></em> should be
+used to position the popup menu. When the context menu has been triggered by a
+mouse event you could either use the <em class="parameter"><code>hit_test_result</code></em> coordinates or pass <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
+to the <a href="../gtk3/GtkMenu.html#GtkMenuPositionFunc"><span class="type">GtkMenuPositionFunc</span></a> parameter of <a href="../gtk3/GtkMenu.html#gtk-menu-popup"><code class="function">gtk_menu_popup()</code></a> function.
+Note that coordinates of <em class="parameter"><code>hit_test_result</code></em> are relative to <em class="parameter"><code>web_view</code></em> window.
+</p>
+<p>
+If your application will create and display its own popup menu, <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> should be returned.
+Note that when the context menu is handled by the application, the <a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-default-context-menu" title='The "enable-default-context-menu" property'><span class="type">"enable-default-context-menu"</span></a>
+setting will be ignored and the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-populate-popup" title='The "populate-popup" signal'><span class="type">"populate-popup"</span></a> signal won't be emitted.
+If you don't want any context menu to be shown, you can simply connect to this signal
+and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> without doing anything else.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the object which received the signal</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>default_menu</code></em> :</span></p></td>
+<td>the default context menu</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>hit_test_result</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> with the context of the current position.</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>triggered_with_keyboard</code></em> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the context menu was triggered using the keyboard</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 1.10</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebView-copy-clipboard"></a><h3>The <code class="literal">"copy-clipboard"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-ACTION:CAPS"><code class="literal">Action</code></a></pre>
@@ -2829,6 +2890,47 @@ cancel it</td>
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitWebView-entering-fullscreen"></a><h3>The <code class="literal">"entering-fullscreen"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>        *web_view,
+                                                        <span class="type">WebKitDOMHTMLElement</span> *element,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+Emitted when JavaScript code calls
+<code class="function">element.webkitRequestFullScreen</code>. If the
+signal is not handled the WebView will proceed to full screen
+its top level window. This signal can be used by client code to
+request permission to the user prior doing the full screen
+transition and eventually prepare the top-level window
+(e.g. hide some widgets that would otherwise be part of the
+full screen window).
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted.</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>element</code></em> :</span></p></td>
+<td>the <span class="type">WebKitDOMHTMLElement</span> which has requested full screen display.</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to continue emission of the event.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 1.9.0</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebView-frame-created"></a><h3>The <code class="literal">"frame-created"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
                                                         <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> *web_frame,
@@ -2986,6 +3088,43 @@ icons for child frames.
 </tbody>
 </table></div>
 <p class="since">Since 1.1.18</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView-leaving-fullscreen"></a><h3>The <code class="literal">"leaving-fullscreen"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>        *web_view,
+                                                        <span class="type">WebKitDOMHTMLElement</span> *element,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+Emitted when the WebView is about to restore its top level
+window out of its full screen state. This signal can be used by
+client code to restore widgets hidden during the
+entering-fullscreen stage for instance.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted.</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>element</code></em> :</span></p></td>
+<td>the <span class="type">WebKitDOMHTMLElement</span> which is currently displayed full screen.</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to continue emission of the event.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 1.9.0</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -3176,7 +3315,7 @@ Notice that if you return TRUE, meaning that you handled the
 signal, you are expected to be aware of the "Content-Disposition"
 header. A value of "attachment" usually indicates a download
 regardless of the MIME type, see also
-<a href="../libsoup-2.4/SoupMessageHeaders.html#soup-message-headers-get-content-disposition"><code class="function">soup_message_headers_get_content_disposition()</code></a>. And you must call
+<code class="function">soup_message_headers_get_content_disposition()</code>. And you must call
 <a class="link" href="WebKitWebPolicyDecision.html#webkit-web-policy-decision-ignore" title="webkit_web_policy_decision_ignore ()"><code class="function">webkit_web_policy_decision_ignore()</code></a>,
 <a class="link" href="WebKitWebPolicyDecision.html#webkit-web-policy-decision-use" title="webkit_web_policy_decision_use ()"><code class="function">webkit_web_policy_decision_use()</code></a>, or
 <a class="link" href="WebKitWebPolicyDecision.html#webkit-web-policy-decision-download" title="webkit_web_policy_decision_download ()"><code class="function">webkit_web_policy_decision_download()</code></a> on the <em class="parameter"><code>policy_decision</code></em>
@@ -3497,6 +3636,10 @@ The default bindings for this signal are Ctrl-v and Shift-Insert.
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
                                                         <a href="../gtk3/GtkMenu.html"><span class="type">GtkMenu</span></a>       *menu,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<div class="warning" style="margin-left: 0.5in; margin-right: 0.5in;">
+<h3 class="title">Warning</h3>
+<p><code class="literal">WebKitWebView::populate-popup</code> has been deprecated since version 1.10 and should not be used in newly-written code. Use <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-context-menu" title='The "context-menu" signal'><span class="type">"context-menu"</span></a> signal instead.</p>
+</div>
 <p>
 When a context menu is about to be displayed this signal is emitted.
 </p>
@@ -3716,7 +3859,7 @@ Emitted when all the data for the resource was loaded
 Emitted when a request is about to be sent. You can modify the
 request while handling this signal. You can set the URI in the
 <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> object itself, and add/remove/replace
-headers using the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> object it carries, if it is
+headers using the <span class="type">SoupMessage</span> object it carries, if it is
 present. See <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-get-message" title="webkit_network_request_get_message ()"><code class="function">webkit_network_request_get_message()</code></a>. Setting the
 request URI to "about:blank" will effectively cause the request
 to load nothing, and can be used to disable the loading of
@@ -3724,7 +3867,7 @@ specific resources.
 </p>
 <p>
 Notice that information about an eventual redirect is available
-in <em class="parameter"><code>response</code></em>'s <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>, not in the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> carried by
+in <em class="parameter"><code>response</code></em>'s <span class="type">SoupMessage</span>, not in the <span class="type">SoupMessage</span> carried by
 the <em class="parameter"><code>request</code></em>. If <em class="parameter"><code>response</code></em> is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>, then this is not a
 redirected request.
 </p>
@@ -4402,6 +4545,6 @@ window object</td>
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>

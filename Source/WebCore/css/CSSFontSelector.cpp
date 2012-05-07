@@ -29,25 +29,24 @@
 
 #include "CachedFont.h"
 #include "CSSFontFace.h"
-#include "CSSFontFaceRule.h"
 #include "CSSFontFaceSource.h"
 #include "CSSFontFaceSrcValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPropertyNames.h"
 #include "CSSSegmentedFontFace.h"
-#include "CSSStyleSelector.h"
 #include "CSSUnicodeRangeValue.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
 #include "CachedResourceLoader.h"
 #include "Document.h"
 #include "FontCache.h"
-#include "FontFamilyValue.h"
 #include "Frame.h"
 #include "RenderObject.h"
 #include "Settings.h"
 #include "SimpleFontData.h"
 #include "StylePropertySet.h"
+#include "StyleResolver.h"
+#include "StyleRule.h"
 #include "WebKitFontFamilyNames.h"
 #include <wtf/text/AtomicString.h>
 
@@ -84,10 +83,10 @@ bool CSSFontSelector::isEmpty() const
     return m_fonts.isEmpty();
 }
 
-void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
+void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
 {
     // Obtain the font-family property and the src property.  Both must be defined.
-    const StylePropertySet* style = fontFaceRule->declaration();
+    const StylePropertySet* style = fontFaceRule->properties();
     RefPtr<CSSValue> fontFamily = style->getPropertyCSSValue(CSSPropertyFontFamily);
     RefPtr<CSSValue> src = style->getPropertyCSSValue(CSSPropertySrc);
     RefPtr<CSSValue> unicodeRange = style->getPropertyCSSValue(CSSPropertyUnicodeRange);
@@ -255,11 +254,10 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
         CSSPrimitiveValue* item = static_cast<CSSPrimitiveValue*>(familyList->itemWithoutBoundsCheck(i));
         String familyName;
         if (item->isString())
-            familyName = static_cast<FontFamilyValue*>(item)->familyName();
+            familyName = item->getStringValue();
         else if (item->isIdent()) {
             // We need to use the raw text for all the generic family types, since @font-face is a way of actually
             // defining what font to use for those types.
-            String familyName;
             switch (item->getIdent()) {
                 case CSSValueSerif:
                     familyName = serifFamily;
@@ -287,7 +285,7 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
         if (familyName.isEmpty())
             continue;
 
-        OwnPtr<Vector<RefPtr<CSSFontFace> > >& familyFontFaces = m_fontFaces.add(familyName, nullptr).first->second;
+        OwnPtr<Vector<RefPtr<CSSFontFace> > >& familyFontFaces = m_fontFaces.add(familyName, nullptr).iterator->second;
         if (!familyFontFaces) {
             familyFontFaces = adoptPtr(new Vector<RefPtr<CSSFontFace> >);
 
@@ -335,8 +333,8 @@ void CSSFontSelector::dispatchInvalidationCallbacks()
     // FIXME: Make Document a FontSelectorClient so that it can simply register for invalidation callbacks.
     if (!m_document)
         return;
-    if (CSSStyleSelector* styleSelector = m_document->styleSelectorIfExists())
-        styleSelector->invalidateMatchedPropertiesCache();
+    if (StyleResolver* styleResolver = m_document->styleResolverIfExists())
+        styleResolver->invalidateMatchedPropertiesCache();
     if (m_document->inPageCache() || !m_document->renderer())
         return;
     m_document->scheduleForcedStyleRecalc();
@@ -489,13 +487,13 @@ FontData* CSSFontSelector::getFontData(const FontDescription& fontDescription, c
         return fontDataForGenericFamily(m_document, fontDescription, familyName);
     }
 
-    OwnPtr<HashMap<unsigned, RefPtr<CSSSegmentedFontFace> > >& segmentedFontFaceCache = m_fonts.add(family, nullptr).first->second;
+    OwnPtr<HashMap<unsigned, RefPtr<CSSSegmentedFontFace> > >& segmentedFontFaceCache = m_fonts.add(family, nullptr).iterator->second;
     if (!segmentedFontFaceCache)
         segmentedFontFaceCache = adoptPtr(new HashMap<unsigned, RefPtr<CSSSegmentedFontFace> >);
 
     FontTraitsMask traitsMask = fontDescription.traitsMask();
 
-    RefPtr<CSSSegmentedFontFace>& face = segmentedFontFaceCache->add(traitsMask, 0).first->second;
+    RefPtr<CSSSegmentedFontFace>& face = segmentedFontFaceCache->add(traitsMask, 0).iterator->second;
     if (!face) {
         face = CSSSegmentedFontFace::create(this);
 

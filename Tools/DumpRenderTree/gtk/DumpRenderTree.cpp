@@ -36,10 +36,8 @@
 #include "EditingCallbacks.h"
 #include "EventSender.h"
 #include "GCController.h"
-#include "GOwnPtr.h"
 #include "LayoutTestController.h"
 #include "PixelDumpSupport.h"
-#include "PlainTextController.h"
 #include "SelfScrollingWebKitWebView.h"
 #include "TextInputController.h"
 #include "WebCoreSupport/DumpRenderTreeSupportGtk.h"
@@ -54,6 +52,7 @@
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
 #include <wtf/Assertions.h>
+#include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GlibUtilities.h>
 
 #if PLATFORM(X11)
@@ -99,6 +98,8 @@ static WebKitWebHistoryItem* prevTestBFItem = NULL;
 const unsigned historyItemIndent = 8;
 
 static void runTest(const string& testPathOrURL);
+
+static void didRunInsecureContent(WebKitWebFrame*, WebKitSecurityOrigin*, const char* url);
 
 static bool shouldLogFrameLoadDelegates(const string& pathOrURL)
 {
@@ -156,16 +157,6 @@ static void initializeGtkFontSettings(const char* testURL)
         g_object_set(settings, "gtk-xft-rgba", "rgb", NULL);
     else
         g_object_set(settings, "gtk-xft-rgba", "none", NULL);
-
-    GdkScreen* screen = gdk_screen_get_default();
-    ASSERT(screen);
-    const cairo_font_options_t* screenOptions = gdk_screen_get_font_options(screen);
-    ASSERT(screenOptions);
-    cairo_font_options_t* options = cairo_font_options_copy(screenOptions);
-    // Turn off text metrics hinting, which quantizes metrics to pixels in device space.
-    cairo_font_options_set_hint_metrics(options, CAIRO_HINT_METRICS_OFF);
-    gdk_screen_set_font_options(screen, options);
-    cairo_font_options_destroy(options);
 }
 
 CString getTopLevelPath()
@@ -458,6 +449,7 @@ static void resetDefaultsToConsistentValues()
     webkit_icon_database_set_path(webkit_get_icon_database(), 0);
     DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(false);
     DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(webView, true);
+    DumpRenderTreeSupportGtk::setDefersLoading(webView, false);
 
     if (axController)
         axController->resetToConsistentState();
@@ -835,7 +827,6 @@ static void webViewWindowObjectCleared(WebKitWebView* view, WebKitWebFrame* fram
     ASSERT(!exception);
 
     addControllerToWindow(context, windowObject, "eventSender", makeEventSender(context, !webkit_web_frame_get_parent(frame)));
-    addControllerToWindow(context, windowObject, "plainText", makePlainTextController(context));
     addControllerToWindow(context, windowObject, "textInputController", makeTextInputController(context));
     WebCoreTestSupport::injectInternalsObject(context);
 }
@@ -1065,6 +1056,7 @@ static void webFrameLoadStatusNotified(WebKitWebFrame* frame, gpointer user_data
 static void frameCreatedCallback(WebKitWebView* webView, WebKitWebFrame* webFrame, gpointer user_data)
 {
     g_signal_connect(webFrame, "notify::load-status", G_CALLBACK(webFrameLoadStatusNotified), NULL);
+    g_signal_connect(webFrame, "insecure-content-run", G_CALLBACK(didRunInsecureContent), NULL);
 }
 
 
@@ -1073,7 +1065,7 @@ static CString pathFromSoupURI(SoupURI* uri)
     if (!uri)
         return CString();
 
-    if (g_str_equal(uri->scheme, "http")) {
+    if (g_str_equal(uri->scheme, "http") || g_str_equal(uri->scheme, "ftp")) {
         GOwnPtr<char> uriString(soup_uri_to_string(uri, FALSE));
         return CString(uriString.get());
     }
@@ -1147,8 +1139,11 @@ static CString descriptionSuitableForTestResult(GError* error, WebKitWebResource
     const gchar* errorDomain = g_quark_to_string(error->domain);
     CString resourceURIString(urlSuitableForTestResult(webkit_web_resource_get_uri(webResource)));
 
-    if (g_str_equal(errorDomain, "webkit-network-error-quark"))
+    if (g_str_equal(errorDomain, "webkit-network-error-quark") || g_str_equal(errorDomain, "soup_http_error_quark"))
         errorDomain = "NSURLErrorDomain";
+
+    if (g_str_equal(errorDomain, "WebKitPolicyError"))
+        errorDomain = "WebKitErrorDomain";
 
     // TODO: the other ports get the failingURL from the ResourceError
     GOwnPtr<char> errorString(g_strdup_printf("<NSError domain %s, code %d, failing URL \"%s\">",
@@ -1160,10 +1155,8 @@ static CString descriptionSuitableForTestResult(WebKitNetworkRequest* request)
 {
     SoupMessage* soupMessage = webkit_network_request_get_message(request);
 
-    if (!soupMessage) {
-        g_printerr("GRR\n");
+    if (!soupMessage)
         return CString("");
-    }
 
     SoupURI* requestURI = soup_message_get_uri(soupMessage);
     SoupURI* mainDocumentURI = soup_message_get_first_party(soupMessage);
@@ -1264,6 +1257,12 @@ static void didFailLoadingWithError(WebKitWebView* webView, WebKitWebFrame* webF
     }
 }
 
+static void didRunInsecureContent(WebKitWebFrame*, WebKitSecurityOrigin*, const char* url)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks())
+        printf("didRunInsecureContent\n");
+}
+
 static WebKitWebView* createWebView()
 {
     // It is important to declare DRT is running early so when creating
@@ -1316,6 +1315,7 @@ static WebKitWebView* createWebView()
     // frame-created is not issued for main frame. That's why we must do this here
     WebKitWebFrame* frame = webkit_web_view_get_main_frame(view);
     g_signal_connect(frame, "notify::load-status", G_CALLBACK(webFrameLoadStatusNotified), NULL);
+    g_signal_connect(frame, "insecure-content-run", G_CALLBACK(didRunInsecureContent), NULL);
 
     return view;
 }

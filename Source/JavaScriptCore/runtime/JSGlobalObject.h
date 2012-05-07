@@ -44,6 +44,7 @@ namespace JSC {
     class FunctionPrototype;
     class GetterSetter;
     class GlobalCodeBlock;
+    class LLIntOffsetsExtractor;
     class NativeErrorConstructor;
     class ProgramCodeBlock;
     class RegExpConstructor;
@@ -56,6 +57,9 @@ namespace JSC {
     typedef Vector<ExecState*, 16> ExecStateStack;
     
     struct GlobalObjectMethodTable {
+        typedef bool (*AllowsAccessFromFunctionPtr)(const JSGlobalObject*, ExecState*);
+        AllowsAccessFromFunctionPtr allowsAccessFrom;
+
         typedef bool (*SupportsProfilingFunctionPtr)(const JSGlobalObject*); 
         SupportsProfilingFunctionPtr supportsProfiling;
 
@@ -81,8 +85,6 @@ namespace JSC {
         };
 
     protected:
-
-        RefPtr<JSGlobalData> m_globalData;
 
         size_t m_registerArraySize;
         Register m_globalCallFrame[RegisterFile::CallFrameHeaderSize];
@@ -279,6 +281,7 @@ namespace JSC {
 
         const GlobalObjectMethodTable* globalObjectMethodTable() const { return m_globalObjectMethodTable; }
 
+        static bool allowsAccessFrom(const JSGlobalObject*, ExecState*) { return true; }
         static bool supportsProfiling(const JSGlobalObject*) { return false; }
         static bool supportsRichSourceInfo(const JSGlobalObject*) { return true; }
 
@@ -297,7 +300,7 @@ namespace JSC {
 
         void resetPrototype(JSGlobalData&, JSValue prototype);
 
-        JSGlobalData& globalData() const { return *m_globalData.get(); }
+        JSGlobalData& globalData() const { return *Heap::heap(this)->globalData(); }
 
         static Structure* createStructure(JSGlobalData& globalData, JSValue prototype)
         {
@@ -336,6 +339,8 @@ namespace JSC {
         JS_EXPORT_PRIVATE void addStaticGlobals(GlobalPropertyInfo*, int count);
 
     private:
+        friend class LLIntOffsetsExtractor;
+        
         // FIXME: Fold reset into init.
         JS_EXPORT_PRIVATE void init(JSObject* thisValue);
         void reset(JSValue prototype);
@@ -351,7 +356,7 @@ namespace JSC {
     inline JSGlobalObject* asGlobalObject(JSValue value)
     {
         ASSERT(asObject(value)->isGlobalObject());
-        return static_cast<JSGlobalObject*>(asObject(value));
+        return jsCast<JSGlobalObject*>(asObject(value));
     }
 
     inline void JSGlobalObject::setRegisters(WriteBarrier<Unknown>* registers, PassOwnArrayPtr<WriteBarrier<Unknown> > registerArray, size_t count)

@@ -28,6 +28,7 @@
 #include "FloatRect.h"
 
 #include "FloatConversion.h"
+#include "FractionalLayoutRect.h"
 #include "IntRect.h"
 #include <algorithm>
 #include <math.h>
@@ -39,6 +40,10 @@ using std::min;
 namespace WebCore {
 
 FloatRect::FloatRect(const IntRect& r) : m_location(r.location()), m_size(r.size())
+{
+}
+
+FloatRect::FloatRect(const FractionalLayoutRect& r) : m_location(r.location()), m_size(r.size())
 {
 }
 
@@ -72,7 +77,7 @@ bool FloatRect::contains(const FloatPoint& point, ContainsMode containsMode) con
 {
     if (containsMode == InsideOrOnStroke)
         return contains(point.x(), point.y());
-    return x() < point.x() && maxX() > point.x() && y() < point.y() && maxY() > y();
+    return x() < point.x() && maxX() > point.x() && y() < point.y() && maxY() > point.y();
 }
 
 void FloatRect::intersect(const FloatRect& other)
@@ -229,6 +234,11 @@ IntRect enclosedIntRect(const FloatRect& rect)
     int height = max(clampToInteger(maxY - y), 0);
 
     return IntRect(x, y, width, height);
+}
+
+IntRect roundedIntRect(const FloatRect& rect)
+{
+    return IntRect(roundedIntPoint(rect.location()), roundedIntSize(rect.size()));
 }
 
 FloatRect mapRect(const FloatRect& r, const FloatRect& srcRect, const FloatRect& destRect)

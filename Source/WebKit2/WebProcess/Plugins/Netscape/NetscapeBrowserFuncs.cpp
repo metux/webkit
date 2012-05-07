@@ -36,6 +36,10 @@
 #include <WebCore/SharedBuffer.h>
 #include <utility>
 
+#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
+#include "NetscapeSandboxFunctions.h"
+#endif
+
 using namespace WebCore;
 using namespace std;
 
@@ -411,14 +415,13 @@ static const unsigned WKNVExpectsNonretainedLayer = 74657;
 // Whether plug-in code is allowed to enter (arbitrary) sandbox for the process.
 static const unsigned WKNVAllowedToEnterSandbox = 74658;
 
-// The Core Animation render server port.
-static const unsigned WKNVCALayerRenderServerPort = 71879;
+// WKNVSandboxFunctions = 74659 is defined in NetscapeSandboxFunctions.h
 
 #endif
 
 static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
 {
-    switch (variable) {
+    switch (static_cast<unsigned>(variable)) {
         case NPNVWindowNPObject: {
             RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
             PluginDestructionProtector protector(plugin.get());
@@ -502,6 +505,14 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             *(NPBool*)value = true;
             break;
 
+#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
+        case WKNVSandboxFunctions:
+        {
+            *(WKNSandboxFunctions **)value = netscapeSandboxFunctions();
+            break;
+        }
+#endif
+
 #ifndef NP_NO_QUICKDRAW
         case NPNVsupportsQuickDrawBool:
             // We don't support the QuickDraw drawing model.
@@ -537,23 +548,9 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
            break;
 
        case NPNVToolkit: {
-#if PLATFORM(GTK)
-           *reinterpret_cast<uint32_t*>(value) = 2;
-#else
-           const uint32_t expectedGTKToolKitVersion = 2;
-
-           // Set the expected GTK version if we know that this plugin needs it or if the plugin call us
-           // with a null instance. The latter is the case with NSPluginWrapper plugins.
-           bool requiresGTKToolKitVersion;
-           if (!npp)
-               requiresGTKToolKitVersion = true;
-           else {
-               RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
-               requiresGTKToolKitVersion = plugin->quirks().contains(PluginQuirks::RequiresGTKToolKit);
-           }
-
-           *reinterpret_cast<uint32_t*>(value) = requiresGTKToolKitVersion ? expectedGTKToolKitVersion : 0;
-#endif
+           // Gtk based plugins need to be assured about the toolkit version.
+           const uint32_t expectedGtkToolKitVersion = 2;
+           *reinterpret_cast<uint32_t*>(value) = expectedGtkToolKitVersion;
            break;
        }
 
@@ -692,12 +689,6 @@ static void NPN_ReleaseObject(NPObject *npObject)
 
 static bool NPN_Invoke(NPP npp, NPObject *npObject, NPIdentifier methodName, const NPVariant* arguments, uint32_t argumentCount, NPVariant* result)
 {
-    if (RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp)) {
-        bool returnValue;
-        if (plugin->tryToShortCircuitInvoke(npObject, methodName, arguments, argumentCount, returnValue, *result))
-            return returnValue;
-    }
-
     if (npObject->_class->invoke)
         return npObject->_class->invoke(npObject, methodName, arguments, argumentCount, result);
 

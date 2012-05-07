@@ -26,7 +26,7 @@
 #include "MarkedAllocator.h"
 #include "MarkedBlock.h"
 #include "MarkedBlockSet.h"
-#include "PageAllocationAligned.h"
+#include <wtf/PageAllocationAligned.h>
 #include <wtf/Bitmap.h>
 #include <wtf/DoublyLinkedList.h>
 #include <wtf/FixedArray.h>
@@ -41,6 +41,7 @@ namespace JSC {
 class Heap;
 class JSCell;
 class LiveObjectIterator;
+class LLIntOffsetsExtractor;
 class WeakGCHandle;
 class SlotVisitor;
 
@@ -51,6 +52,7 @@ public:
 
     MarkedSpace(Heap*);
 
+    MarkedAllocator& firstAllocator();
     MarkedAllocator& allocatorFor(size_t);
     MarkedAllocator& allocatorFor(MarkedBlock*);
     MarkedAllocator& destructorAllocatorFor(size_t);
@@ -63,9 +65,6 @@ public:
     
     void canonicalizeCellLivenessData();
 
-    size_t waterMark();
-    size_t nurseryWaterMark();
-
     typedef HashSet<MarkedBlock*>::iterator BlockIterator;
     
     template<typename Functor> typename Functor::ReturnType forEachCell(Functor&);
@@ -75,10 +74,15 @@ public:
     
     void shrink();
     void freeBlocks(MarkedBlock* head);
+
     void didAddBlock(MarkedBlock*);
     void didConsumeFreeList(MarkedBlock*);
 
+    bool isPagedOut(double deadline);
+
 private:
+    friend class LLIntOffsetsExtractor;
+    
     // [ 32... 256 ]
     static const size_t preciseStep = MarkedBlock::atomSize;
     static const size_t preciseCutoff = 256;
@@ -97,21 +101,9 @@ private:
     Subspace m_destructorSpace;
     Subspace m_normalSpace;
 
-    size_t m_waterMark;
-    size_t m_nurseryWaterMark;
     Heap* m_heap;
     MarkedBlockSet m_blocks;
 };
-
-inline size_t MarkedSpace::waterMark()
-{
-    return m_waterMark;
-}
-
-inline size_t MarkedSpace::nurseryWaterMark()
-{
-    return m_nurseryWaterMark;
-}
 
 template<typename Functor> inline typename Functor::ReturnType MarkedSpace::forEachCell(Functor& functor)
 {
@@ -127,6 +119,11 @@ template<typename Functor> inline typename Functor::ReturnType MarkedSpace::forE
 {
     Functor functor;
     return forEachCell(functor);
+}
+
+inline MarkedAllocator& MarkedSpace::firstAllocator()
+{
+    return m_normalSpace.preciseAllocators[0];
 }
 
 inline MarkedAllocator& MarkedSpace::allocatorFor(size_t bytes)
@@ -186,12 +183,6 @@ template <typename Functor> inline typename Functor::ReturnType MarkedSpace::for
 inline void MarkedSpace::didAddBlock(MarkedBlock* block)
 {
     m_blocks.add(block);
-}
-
-inline void MarkedSpace::didConsumeFreeList(MarkedBlock* block)
-{
-    m_nurseryWaterMark += block->capacity() - block->size();
-    m_waterMark += block->capacity();
 }
 
 } // namespace JSC

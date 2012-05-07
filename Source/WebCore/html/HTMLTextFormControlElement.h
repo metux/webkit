@@ -34,7 +34,7 @@ class RenderTextControl;
 class VisiblePosition;
 
 enum TextFieldSelectionDirection { SelectionHasNoDirection, SelectionHasForwardDirection, SelectionHasBackwardDirection };
-enum TextFieldEventBehavior { DispatchNoEvent, DispatchChangeEvent };
+enum TextFieldEventBehavior { DispatchNoEvent, DispatchChangeEvent, DispatchInputAndChangeEvent };
 
 class HTMLTextFormControlElement : public HTMLFormControlElementWithState {
 public:
@@ -45,7 +45,8 @@ public:
 
     void forwardEvent(Event*);
 
-    virtual void insertedIntoDocument();
+
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
 
     // The derived class should return true if placeholder processing is needed.
     virtual bool supportsPlaceholder() const = 0;
@@ -86,6 +87,7 @@ public:
 
 protected:
     HTMLTextFormControlElement(const QualifiedName&, Document*, HTMLFormElement*);
+    virtual bool isPlaceholderEmpty() const;
     virtual void updatePlaceholderText() = 0;
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
@@ -114,8 +116,7 @@ private:
 
     virtual void dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode);
     virtual void dispatchBlurEvent(PassRefPtr<Node> newFocusedNode);
-
-    bool isPlaceholderEmpty() const;
+    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
 
     // Returns true if user-editable value is empty. Used to check placeholder visibility.
     virtual bool isEmptyValue() const = 0;

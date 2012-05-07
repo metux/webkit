@@ -137,7 +137,7 @@ RenderedPosition RenderedPosition::leftBoundaryOfBidiRun(unsigned char bidiLevel
 
     InlineBox* box = m_inlineBox;
     do {
-        InlineBox* prev = box->prevLeafChild();
+        InlineBox* prev = box->prevLeafChildIgnoringLineBreak();
         if (!prev || prev->bidiLevel() < bidiLevelOfRun)
             return RenderedPosition(box->renderer(), box, box->caretLeftmostOffset());
         box = prev;
@@ -154,7 +154,7 @@ RenderedPosition RenderedPosition::rightBoundaryOfBidiRun(unsigned char bidiLeve
 
     InlineBox* box = m_inlineBox;
     do {
-        InlineBox* next = box->nextLeafChild();
+        InlineBox* next = box->nextLeafChildIgnoringLineBreak();
         if (!next || next->bidiLevel() < bidiLevelOfRun)
             return RenderedPosition(box->renderer(), box, box->caretRightmostOffset());
         box = next;
@@ -224,13 +224,13 @@ Position RenderedPosition::positionAtRightBoundaryOfBiDiRun() const
     return createLegacyEditingPosition(prevLeafChild()->renderer()->node(), prevLeafChild()->caretRightmostOffset());
 }
 
-LayoutRect RenderedPosition::absoluteRect(LayoutUnit* extraWidthToEndOfLine) const
+IntRect RenderedPosition::absoluteRect(LayoutUnit* extraWidthToEndOfLine) const
 {
     if (isNull())
-        return LayoutRect();
+        return IntRect();
 
-    LayoutRect localRect = m_renderer->localCaretRect(m_inlineBox, m_offset, extraWidthToEndOfLine);
-    return localRect == LayoutRect() ? LayoutRect() : m_renderer->localToAbsoluteQuad(FloatRect(localRect)).enclosingBoundingBox();
+    IntRect localRect = pixelSnappedIntRect(m_renderer->localCaretRect(m_inlineBox, m_offset, extraWidthToEndOfLine));
+    return localRect == IntRect() ? IntRect() : m_renderer->localToAbsoluteQuad(FloatRect(localRect)).enclosingBoundingBox();
 }
 
 bool renderObjectContainsPosition(RenderObject* target, const Position& position)

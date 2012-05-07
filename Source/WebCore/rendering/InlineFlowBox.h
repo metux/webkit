@@ -88,7 +88,7 @@ public:
     virtual void setConstructed()
     {
         InlineBox::setConstructed();
-        for (InlineBox* child = firstChild(); child; child = child->next())
+        for (InlineBox* child = firstChild(); child; child = child->nextOnLine())
             child->setConstructed();
     }
 
@@ -119,8 +119,8 @@ public:
     virtual RenderLineBoxList* rendererLineBoxes() const;
 
     // logicalLeft = left in a horizontal line and top in a vertical line.
-    int marginBorderPaddingLogicalLeft() const { return marginLogicalLeft() + borderLogicalLeft() + paddingLogicalLeft(); }
-    int marginBorderPaddingLogicalRight() const { return marginLogicalRight() + borderLogicalRight() + paddingLogicalRight(); }
+    LayoutUnit marginBorderPaddingLogicalLeft() const { return marginLogicalLeft() + borderLogicalLeft() + paddingLogicalLeft(); }
+    LayoutUnit marginBorderPaddingLogicalRight() const { return marginLogicalRight() + borderLogicalRight() + paddingLogicalRight(); }
     LayoutUnit marginLogicalLeft() const
     {
         if (!includeLogicalLeftEdge())
@@ -137,13 +137,13 @@ public:
     {
         if (!includeLogicalLeftEdge())
             return 0;
-        return isHorizontal() ? renderer()->style()->borderLeftWidth() : renderer()->style()->borderTopWidth();
+        return isHorizontal() ? renderer()->style(isFirstLineStyle())->borderLeftWidth() : renderer()->style(isFirstLineStyle())->borderTopWidth();
     }
     int borderLogicalRight() const
     {
         if (!includeLogicalRightEdge())
             return 0;
-        return isHorizontal() ? renderer()->style()->borderRightWidth() : renderer()->style()->borderBottomWidth();
+        return isHorizontal() ? renderer()->style(isFirstLineStyle())->borderRightWidth() : renderer()->style(isFirstLineStyle())->borderBottomWidth();
     }
     int paddingLogicalLeft() const
     {
@@ -168,7 +168,7 @@ public:
 
     // Helper functions used during line construction and placement.
     void determineSpacingForFlowBoxes(bool lastLine, bool isLogicallyLastRunWrapped, RenderObject* logicallyLastRunRenderer);
-    int getFlowSpacingLogicalWidth();
+    LayoutUnit getFlowSpacingLogicalWidth();
     float placeBoxesInInlineDirection(float logicalLeft, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap&);
     void computeLogicalBoxHeights(RootInlineBox*, LayoutUnit& maxPositionTop, LayoutUnit& maxPositionBottom,
                                   LayoutUnit& maxAscent, LayoutUnit& maxDescent, bool& setMaxAscent, bool& setMaxDescent,
@@ -207,8 +207,8 @@ public:
     { 
         return m_overflow ? m_overflow->layoutOverflowRect() : enclosingLayoutRect(frameRectIncludingLineHeight(lineTop, lineBottom));
     }
-    LayoutUnit logicalLeftLayoutOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->minXLayoutOverflow() : m_overflow->minYLayoutOverflow()) : logicalLeft(); }
-    LayoutUnit logicalRightLayoutOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->maxXLayoutOverflow() : m_overflow->maxYLayoutOverflow()) : ceilf(logicalRight()); }
+    LayoutUnit logicalLeftLayoutOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->minXLayoutOverflow() : m_overflow->minYLayoutOverflow()) : static_cast<LayoutUnit>(logicalLeft()); }
+    LayoutUnit logicalRightLayoutOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->maxXLayoutOverflow() : m_overflow->maxYLayoutOverflow()) : static_cast<LayoutUnit>(ceilf(logicalRight())); }
     LayoutUnit logicalTopLayoutOverflow(LayoutUnit lineTop) const
     {
         if (m_overflow)
@@ -233,8 +233,8 @@ public:
     { 
         return m_overflow ? m_overflow->visualOverflowRect() : enclosingLayoutRect(frameRectIncludingLineHeight(lineTop, lineBottom));
     }
-    LayoutUnit logicalLeftVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->minXVisualOverflow() : m_overflow->minYVisualOverflow()) : logicalLeft(); }
-    LayoutUnit logicalRightVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->maxXVisualOverflow() : m_overflow->maxYVisualOverflow()) : ceilf(logicalRight()); }
+    LayoutUnit logicalLeftVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->minXVisualOverflow() : m_overflow->minYVisualOverflow()) : static_cast<LayoutUnit>(logicalLeft()); }
+    LayoutUnit logicalRightVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->maxXVisualOverflow() : m_overflow->maxYVisualOverflow()) : static_cast<LayoutUnit>(ceilf(logicalRight())); }
     LayoutUnit logicalTopVisualOverflow(LayoutUnit lineTop) const
     {
         if (m_overflow)
@@ -297,20 +297,22 @@ protected:
     InlineFlowBox* m_prevLineBox; // The previous box that also uses our RenderObject
     InlineFlowBox* m_nextLineBox; // The next box that also uses our RenderObject
 
-    bool m_includeLogicalLeftEdge : 1;
-    bool m_includeLogicalRightEdge : 1;
-    bool m_hasTextChildren : 1;
-    bool m_hasTextDescendants : 1;
-    bool m_descendantsHaveSameLineHeightAndBaseline : 1;
+private:
+    unsigned m_includeLogicalLeftEdge : 1;
+    unsigned m_includeLogicalRightEdge : 1;
+    unsigned m_hasTextChildren : 1;
+    unsigned m_hasTextDescendants : 1;
+    unsigned m_descendantsHaveSameLineHeightAndBaseline : 1;
 
+protected:
     // The following members are only used by RootInlineBox but moved here to keep the bits packed.
 
     // Whether or not this line uses alphabetic or ideographic baselines by default.
     unsigned m_baselineType : 1; // FontBaseline
 
     // If the line contains any ruby runs, then this will be true.
-    bool m_hasAnnotationsBefore : 1;
-    bool m_hasAnnotationsAfter : 1;
+    unsigned m_hasAnnotationsBefore : 1;
+    unsigned m_hasAnnotationsAfter : 1;
 
     unsigned m_lineBreakBidiStatusEor : 5; // WTF::Unicode::Direction
     unsigned m_lineBreakBidiStatusLastStrong : 5; // WTF::Unicode::Direction
@@ -320,7 +322,7 @@ protected:
 
 #ifndef NDEBUG
 private:
-    bool m_hasBadChildList;
+    unsigned m_hasBadChildList : 1;
 #endif
 };
 

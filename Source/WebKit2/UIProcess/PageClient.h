@@ -29,8 +29,8 @@
 #include "ShareableBitmap.h"
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxy.h"
+#include <WebCore/AlternativeTextClient.h>
 #include <WebCore/EditorClient.h>
-#include <WebCore/SpellingCorrectionController.h>
 #include <wtf/Forward.h>
 
 #if PLATFORM(MAC)
@@ -41,7 +41,7 @@ OBJC_CLASS WKView;
 
 namespace WebCore {
     class Cursor;
-    struct ViewportArguments;
+    struct ViewportAttributes;
 }
 
 namespace WebKit {
@@ -93,7 +93,10 @@ public:
 
     // Return whether the view is in a window.
     virtual bool isViewInWindow() = 0;
-    
+
+    // Return the layer hosting mode for the view.
+    virtual LayerHostingMode viewLayerHostingMode() { return LayerHostingModeDefault; }
+
     virtual void processDidCrash() = 0;
     virtual void didRelaunchProcess() = 0;
     virtual void pageClosed() = 0;
@@ -111,6 +114,7 @@ public:
     virtual void updateTextInputState() = 0;
     virtual void handleAuthenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password) = 0;
     virtual void handleCertificateVerificationRequest(const String& hostname, bool& ignoreErrors) = 0;
+    virtual void handleProxyAuthenticationRequiredRequest(const String& hostname, uint16_t port, const String& prefilledUsername, String& username, String& password) = 0;
 #endif // PLATFORM(QT).
 
 #if PLATFORM(QT) || PLATFORM(GTK)
@@ -119,7 +123,7 @@ public:
 
     virtual void setCursor(const WebCore::Cursor&) = 0;
     virtual void setCursorHiddenUntilMouseMoves(bool) = 0;
-    virtual void didChangeViewportProperties(const WebCore::ViewportArguments&) = 0;
+    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&) = 0;
 
     virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo) = 0;
     virtual void clearAllEditCommands() = 0;
@@ -133,6 +137,8 @@ public:
     virtual void updateTextInputState(bool updateSecureInputState) = 0;
     virtual void resetTextInputState() = 0;
     virtual void makeFirstResponder() = 0;
+    virtual void setPromisedData(const String& pasteboardName, PassRefPtr<WebCore::SharedBuffer> imageBuffer, const String& filename, const String& extension, const String& title,
+                                 const String& url, const String& visibleUrl, PassRefPtr<WebCore::SharedBuffer> archiveBuffer) = 0;
 #endif
 #if PLATFORM(WIN)
     virtual void compositionSelectionChanged(bool) = 0;
@@ -164,6 +170,7 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) = 0;
     virtual void exitAcceleratedCompositingMode() = 0;
+    virtual void updateAcceleratedCompositingMode(const LayerTreeContext&) = 0;
 #endif
 
 #if PLATFORM(WIN)
@@ -178,10 +185,10 @@ public:
     virtual CGContextRef containingWindowGraphicsContext() = 0;
     virtual void didPerformDictionaryLookup(const String&, double scaleFactor, const DictionaryPopupInfo&) = 0;
     virtual void dismissDictionaryLookupPanel() = 0;
-    virtual void showCorrectionPanel(WebCore::CorrectionPanelInfo::PanelType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) = 0;
-    virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingCorrectionPanel) = 0;
-    virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingCorrectionPanel) = 0;
-    virtual void recordAutocorrectionResponse(WebCore::EditorClient::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
+    virtual void showCorrectionPanel(WebCore::AlternativeTextType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) = 0;
+    virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingAlternativeText) = 0;
+    virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText) = 0;
+    virtual void recordAutocorrectionResponse(WebCore::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) = 0;
     
     virtual WKView* wkView() const = 0;

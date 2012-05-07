@@ -44,14 +44,14 @@
 #ifndef RenderLayer_h
 #define RenderLayer_h
 
-#if ENABLE(CSS_FILTERS)
-#include "FilterEffectObserver.h"
-#endif
 #include "PaintInfo.h"
 #include "RenderBox.h"
-#include "ScrollBehavior.h"
 #include "ScrollableArea.h"
 #include <wtf/OwnPtr.h>
+
+#if ENABLE(CSS_FILTERS)
+#include "RenderLayerFilterInfo.h"
+#endif
 
 namespace WebCore {
 
@@ -100,6 +100,8 @@ public:
     void setHasRadius(bool hasRadius) { m_hasRadius = hasRadius; }
 
     bool operator==(const ClipRect& other) const { return rect() == other.rect() && hasRadius() == other.hasRadius(); }
+    bool operator!=(const ClipRect& other) const { return rect() != other.rect() || hasRadius() != other.hasRadius(); }
+    bool operator!=(const LayoutRect& otherRect) const { return rect() != otherRect; }
 
     void intersect(const LayoutRect& other) { m_rect.intersect(other); }
     void intersect(const ClipRect& other)
@@ -211,11 +213,7 @@ private:
     bool m_fixed : 1;
 };
 
-class RenderLayer : public ScrollableArea
-#if ENABLE(CSS_FILTERS)
-    , public FilterEffectObserver
-#endif
-{
+class RenderLayer : public ScrollableArea {
 public:
     friend class RenderReplica;
 
@@ -280,10 +278,8 @@ public:
 
     LayoutRect rect() const { return LayoutRect(location(), size()); }
 
-    LayoutUnit scrollWidth();
-    LayoutUnit scrollHeight();
-    int pixelSnappedScrollWidth();
-    int pixelSnappedScrollHeight();
+    int scrollWidth() const;
+    int scrollHeight() const;
 
     void panScrollFromPoint(const LayoutPoint&);
 
@@ -293,19 +289,17 @@ public:
     };
 
     // Scrolling methods for layers that can scroll their overflow.
-    void scrollByRecursively(LayoutUnit xDelta, LayoutUnit yDelta, ScrollOffsetClamping = ScrollOffsetUnclamped);
-
-    IntSize scrolledContentOffset() const { return scrollOffset() + roundedIntSize(m_scrollOverflow); }
+    void scrollByRecursively(int xDelta, int yDelta, ScrollOffsetClamping = ScrollOffsetUnclamped);
 
     int scrollXOffset() const { return m_scrollOffset.width() + scrollOrigin().x(); }
     int scrollYOffset() const { return m_scrollOffset.height() + scrollOrigin().y(); }
     IntSize scrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
 
-    void scrollToOffset(LayoutUnit, LayoutUnit, ScrollOffsetClamping = ScrollOffsetUnclamped);
-    void scrollToXOffset(LayoutUnit x, ScrollOffsetClamping clamp = ScrollOffsetUnclamped) { scrollToOffset(x, scrollYOffset(), clamp); }
-    void scrollToYOffset(LayoutUnit y, ScrollOffsetClamping clamp = ScrollOffsetUnclamped) { scrollToOffset(scrollXOffset(), y, clamp); }
+    void scrollToOffset(int, int, ScrollOffsetClamping = ScrollOffsetUnclamped);
+    void scrollToXOffset(int x, ScrollOffsetClamping clamp = ScrollOffsetUnclamped) { scrollToOffset(x, scrollYOffset(), clamp); }
+    void scrollToYOffset(int y, ScrollOffsetClamping clamp = ScrollOffsetUnclamped) { scrollToOffset(scrollXOffset(), y, clamp); }
 
-    void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX = ScrollAlignment::alignCenterIfNeeded, const ScrollAlignment& alignY = ScrollAlignment::alignCenterIfNeeded);
+    void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
     LayoutRect getRectToExpose(const LayoutRect& visibleRect, const LayoutRect& exposeRect, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
@@ -317,6 +311,9 @@ public:
 
     PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
     void destroyScrollbar(ScrollbarOrientation);
+
+    bool hasHorizontalScrollbar() const { return horizontalScrollbar(); }
+    bool hasVerticalScrollbar() const { return verticalScrollbar(); }
 
     // ScrollableArea overrides
     virtual Scrollbar* horizontalScrollbar() const { return m_hBar.get(); }
@@ -351,12 +348,8 @@ public:
     
     // Notification from the renderer that its content changed (e.g. current frame of image changed).
     // Allows updates of layer content without repainting.
-    enum ContentChangeType { ImageChanged, MaskImageChanged, CanvasChanged, VideoChanged, FullScreenChanged };
     void contentChanged(ContentChangeType);
 #endif
-
-    // Returns true if the accelerated compositing is enabled
-    bool hasAcceleratedCompositing() const;
 
     bool canRender3DTransforms() const;
 
@@ -393,13 +386,26 @@ public:
 
     void dirtyZOrderLists();
     void dirtyStackingContextZOrderLists();
-    void updateZOrderLists();
-    Vector<RenderLayer*>* posZOrderList() const { return m_posZOrderList; }
-    Vector<RenderLayer*>* negZOrderList() const { return m_negZOrderList; }
+
+    Vector<RenderLayer*>* posZOrderList() const
+    {
+        ASSERT(!m_zOrderListsDirty);
+        ASSERT(isStackingContext() || !m_posZOrderList);
+        return m_posZOrderList;
+    }
+
+    Vector<RenderLayer*>* negZOrderList() const
+    {
+        ASSERT(!m_zOrderListsDirty);
+        ASSERT(isStackingContext() || !m_negZOrderList);
+        return m_negZOrderList;
+    }
 
     void dirtyNormalFlowList();
-    void updateNormalFlowList();
-    Vector<RenderLayer*>* normalFlowList() const { return m_normalFlowList; }
+    Vector<RenderLayer*>* normalFlowList() const { ASSERT(!m_normalFlowListDirty); return m_normalFlowList; }
+
+    // Update our normal and z-index lists.
+    void updateLayerListsIfNeeded();
 
     // FIXME: We should ASSERT(!m_visibleContentStatusDirty) here, but see https://bugs.webkit.org/show_bug.cgi?id=71044
     // ditto for hasVisibleDescendant(), see https://bugs.webkit.org/show_bug.cgi?id=71277
@@ -421,8 +427,15 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     // Enclosing compositing layer; if includeSelf is true, may return this.
     RenderLayer* enclosingCompositingLayer(bool includeSelf = true) const;
+    RenderLayer* enclosingCompositingLayerForRepaint(bool includeSelf = true) const;
     // Ancestor compositing layer, excluding this.
     RenderLayer* ancestorCompositingLayer() const { return enclosingCompositingLayer(false); }
+#endif
+
+#if ENABLE(CSS_FILTERS)
+    RenderLayer* enclosingFilterLayer(bool includeSelf = true) const;
+    RenderLayer* enclosingFilterRepaintLayer() const;
+    void setFilterBackendNeedsRepaintingInRect(const LayoutRect&, bool immediate);
 #endif
 
     void convertToPixelSnappedLayerCoords(const RenderLayer* ancestorLayer, IntPoint& location) const;
@@ -472,6 +485,7 @@ public:
 
     LayoutRect childrenClipRect() const; // Returns the foreground clip rect of the layer in the document's coordinate space.
     LayoutRect selfClipRect() const; // Returns the background clip rect of the layer in the document's coordinate space.
+    LayoutRect localClipRect() const; // Returns the background clip rect of the layer in the local coordinate space.
 
     bool intersectsDamageRect(const LayoutRect& layerBounds, const LayoutRect& damageRect, const RenderLayer* rootLayer) const;
 
@@ -479,9 +493,18 @@ public:
     LayoutRect boundingBox(const RenderLayer* rootLayer) const;
     // Bounding box in the coordinates of this layer.
     LayoutRect localBoundingBox() const;
-    // Bounding box relative to the root.
-    LayoutRect absoluteBoundingBox() const;
+    // Pixel snapped bounding box relative to the root.
+    IntRect absoluteBoundingBox() const;
 
+    enum CalculateLayerBoundsFlag {
+        IncludeSelfTransform = 1 << 0,
+        UseLocalClipRectIfPossible = 1 << 1,
+        IncludeLayerFilterOutsets = 1 << 2,
+        DefaultCalculateLayerBoundsFlags =  IncludeSelfTransform | UseLocalClipRectIfPossible | IncludeLayerFilterOutsets
+    };
+    typedef unsigned CalculateLayerBoundsFlags;
+    static IntRect calculateLayerBounds(const RenderLayer*, const RenderLayer* ancestorLayer, CalculateLayerBoundsFlags = DefaultCalculateLayerBoundsFlags);
+    
     void updateHoverActiveState(const HitTestRequest&, HitTestResult&);
 
     // WARNING: This method returns the offset for the parent as this is what updateLayerPositions expects.
@@ -543,7 +566,7 @@ public:
     bool hasCompositedMask() const;
     RenderLayerBacking* backing() const { return m_backing.get(); }
     RenderLayerBacking* ensureBacking();
-    void clearBacking();
+    void clearBacking(bool layerBeingDestroyed = false);
     virtual GraphicsLayer* layerForHorizontalScrollbar() const;
     virtual GraphicsLayer* layerForVerticalScrollbar() const;
     virtual GraphicsLayer* layerForScrollCorner() const;
@@ -564,11 +587,38 @@ public:
 
 #if ENABLE(CSS_FILTERS)
     bool paintsWithFilters() const;
-    FilterEffectRenderer* filter() const { return m_filter.get(); }
+    bool requiresFullLayerImageForFilters() const;
+    FilterEffectRenderer* filterRenderer() const 
+    {
+        RenderLayerFilterInfo* filterInfo = this->filterInfo();
+        return filterInfo ? filterInfo->renderer() : 0;
+    }
+    
+    RenderLayerFilterInfo* filterInfo() const { return hasFilterInfo() ? RenderLayerFilterInfo::filterInfoForRenderLayer(this) : 0; }
+    RenderLayerFilterInfo* ensureFilterInfo() { return RenderLayerFilterInfo::createFilterInfoForRenderLayerIfNeeded(this); }
+    void removeFilterInfoIfNeeded() 
+    {
+        if (hasFilterInfo())
+            RenderLayerFilterInfo::removeFilterInfoForRenderLayer(this); 
+    }
+    
+    bool hasFilterInfo() const { return m_hasFilterInfo; }
+    void setHasFilterInfo(bool hasFilterInfo) { m_hasFilterInfo = hasFilterInfo; }
+#endif
+
+#if !ASSERT_DISABLED
+    bool layerListMutationAllowed() const { return m_layerListMutationAllowed; }
+    void setLayerListMutationAllowed(bool flag) { m_layerListMutationAllowed = flag; }
 #endif
 
 private:
-    void updateZOrderListsSlowCase();
+    void updateZOrderLists();
+    void rebuildZOrderLists();
+    void clearZOrderLists();
+
+    void updateNormalFlowList();
+
+    bool isDirtyStackingContext() const { return m_zOrderListsDirty && isStackingContext(); }
 
     void computeRepaintRects(LayoutPoint* offsetFromRoot = 0);
     void clearRepaintRects();
@@ -578,6 +628,12 @@ private:
     void restoreClip(GraphicsContext*, const LayoutRect& paintDirtyRect, const ClipRect&);
 
     bool shouldRepaintAfterLayout() const;
+
+    void updateScrollbarsAfterStyleChange(const RenderStyle* oldStyle);
+    void updateScrollbarsAfterLayout();
+
+    friend IntSize RenderBox::scrolledContentOffset() const;
+    IntSize scrolledContentOffset() const { return scrollOffset() + m_scrollOverflow; }
 
     // The normal operator new is disallowed on all render objects.
     void* operator new(size_t) throw();
@@ -594,7 +650,6 @@ private:
 
     void collectLayers(bool includeHiddenLayers, Vector<RenderLayer*>*&, Vector<RenderLayer*>*&);
 
-    void updateLayerListsIfNeeded();
     void updateCompositingAndLayerListsIfNeeded();
 
     void paintLayer(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
@@ -640,7 +695,9 @@ private:
     
     bool hitTestContents(const HitTestRequest&, HitTestResult&, const LayoutRect& layerBounds, const LayoutPoint& hitTestPoint, HitTestFilter) const;
     
-    void computeScrollDimensions(bool* needHBar = 0, bool* needVBar = 0);
+    void computeScrollDimensions();
+    bool hasHorizontalOverflow() const;
+    bool hasVerticalOverflow() const;
 
     bool shouldBeNormalFlowOnly() const; 
 
@@ -676,10 +733,11 @@ private:
 
     // NOTE: This should only be called by the overriden setScrollOffset from ScrollableArea.
     void scrollTo(int, int);
+    void updateCompositingLayersAfterScroll();
 
     IntSize scrollbarOffset(const Scrollbar*) const;
     
-    void updateOverflowStatus(bool horizontalOverflow, bool verticalOverflow);
+    void updateScrollableAreaSet(bool hasOverflow);
 
     void childVisibilityChanged(bool newVisibility);
     void dirtyVisibleDescendantStatus();
@@ -754,6 +812,9 @@ private:
             ;
     }
 
+    LayoutUnit verticalScrollbarStart(int minX, int maxX) const;
+    LayoutUnit horizontalScrollbarStart(int minX) const;
+
 protected:
     // The bitfields are up here so they will fall into the padding from ScrollableArea on 64-bit.
 
@@ -772,9 +833,6 @@ protected:
     bool m_inOverflowRelayout : 1;
     unsigned m_repaintStatus : 2; // RepaintStatus
 
-    bool m_overflowStatusDirty : 1;
-    bool m_horizontalOverflow : 1;
-    bool m_verticalOverflow : 1;
     bool m_visibleContentStatusDirty : 1;
     bool m_hasVisibleContent : 1;
     bool m_visibleDescendantStatusDirty : 1;
@@ -791,11 +849,17 @@ protected:
 #endif
 
     bool m_containsDirtyOverlayScrollbars : 1;
-
+#if !ASSERT_DISABLED
+    bool m_layerListMutationAllowed : 1;
+#endif
     // This is an optimization added for <table>.
     // Currently cells do not need to update their repaint rectangles when scrolling. This also
     // saves a lot of time when scrolling on a table.
     bool m_canSkipRepaintRectsUpdateOnScroll : 1;
+
+#if ENABLE(CSS_FILTERS)
+    bool m_hasFilterInfo : 1;
+#endif
 
     RenderBoxModelObject* m_renderer;
 
@@ -820,7 +884,7 @@ protected:
     // Our scroll offsets if the view is scrolled.
     IntSize m_scrollOffset;
 
-    LayoutSize m_scrollOverflow;
+    IntSize m_scrollOverflow;
     
     // The width/height of our scrolled area.
     LayoutSize m_scrollSize;
@@ -857,10 +921,6 @@ protected:
     
     // May ultimately be extended to many replicas (with their own paint order).
     RenderReplica* m_reflection;
-  
-#if ENABLE(CSS_FILTERS)
-    RefPtr<FilterEffectRenderer> m_filter;
-#endif
         
     // Renderers to hold our custom scroll corner and resizer.
     RenderScrollbarPart* m_scrollCorner;
@@ -874,12 +934,54 @@ private:
 #endif
 };
 
+inline void RenderLayer::clearZOrderLists()
+{
+    if (m_posZOrderList) {
+        delete m_posZOrderList;
+        m_posZOrderList = 0;
+    }
+
+    if (m_negZOrderList) {
+        delete m_negZOrderList;
+        m_negZOrderList = 0;
+    }
+}
+
 inline void RenderLayer::updateZOrderLists()
 {
-    if (!m_zOrderListsDirty || !isStackingContext())
+    if (!m_zOrderListsDirty)
         return;
-    updateZOrderListsSlowCase();
+
+    if (!isStackingContext()) {
+        clearZOrderLists();
+        m_zOrderListsDirty = false;
+        return;
+    }
+
+    rebuildZOrderLists();
 }
+
+#if !ASSERT_DISABLED
+class LayerListMutationDetector {
+public:
+    LayerListMutationDetector(RenderLayer* layer)
+        : m_layer(layer)
+        , m_previousMutationAllowedState(layer->layerListMutationAllowed())
+    {
+        m_layer->setLayerListMutationAllowed(false);
+    }
+    
+    ~LayerListMutationDetector()
+    {
+        m_layer->setLayerListMutationAllowed(m_previousMutationAllowedState);
+    }
+
+private:
+    RenderLayer* m_layer;
+    bool m_previousMutationAllowedState;
+};
+#endif
+
 
 } // namespace WebCore
 

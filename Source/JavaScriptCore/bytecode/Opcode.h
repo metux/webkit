@@ -82,7 +82,6 @@ namespace JSC {
         macro(op_bitand, 5) \
         macro(op_bitxor, 5) \
         macro(op_bitor, 5) \
-        macro(op_bitnot, 3) \
         \
         macro(op_check_has_instance, 2) \
         macro(op_instanceof, 5) \
@@ -123,6 +122,8 @@ namespace JSC {
         macro(op_get_arguments_length, 4) \
         macro(op_put_by_id, 9) \
         macro(op_put_by_id_transition, 9) \
+        macro(op_put_by_id_transition_direct, 9) \
+        macro(op_put_by_id_transition_normal, 9) \
         macro(op_put_by_id_replace, 9) \
         macro(op_put_by_id_generic, 9) \
         macro(op_del_by_id, 4) \
@@ -188,9 +189,6 @@ namespace JSC {
         macro(op_throw, 2) \
         macro(op_throw_reference_error, 2) \
         \
-        macro(op_jsr, 3) \
-        macro(op_sret, 2) \
-        \
         macro(op_debug, 4) \
         macro(op_profile_will_call, 2) \
         macro(op_profile_did_call, 2) \
@@ -201,6 +199,7 @@ namespace JSC {
         typedef enum { FOR_EACH_OPCODE_ID(OPCODE_ID_ENUM) } OpcodeID;
     #undef OPCODE_ID_ENUM
 
+    const int maxOpcodeLength = 9;
     const int numOpcodeIDs = op_end + 1;
 
     #define OPCODE_ID_LENGTHS(id, length) const int id##_length = length;
@@ -217,7 +216,7 @@ namespace JSC {
         FOR_EACH_OPCODE_ID(VERIFY_OPCODE_ID);
     #undef VERIFY_OPCODE_ID
 
-#if ENABLE(COMPUTED_GOTO_CLASSIC_INTERPRETER)
+#if ENABLE(COMPUTED_GOTO_CLASSIC_INTERPRETER) || ENABLE(LLINT)
 #if COMPILER(RVCT) || COMPILER(INTEL)
     typedef void* Opcode;
 #else
@@ -226,8 +225,6 @@ namespace JSC {
 #else
     typedef OpcodeID Opcode;
 #endif
-
-#if !defined(NDEBUG) || ENABLE(OPCODE_SAMPLING) || ENABLE(CODEBLOCK_SAMPLING) || ENABLE(OPCODE_STATS)
 
 #define PADDING_STRING "                                "
 #define PADDING_STRING_LENGTH static_cast<unsigned>(strlen(PADDING_STRING))
@@ -243,8 +240,6 @@ namespace JSC {
 
 #undef PADDING_STRING_LENGTH
 #undef PADDING_STRING
-
-#endif
 
 #if ENABLE(OPCODE_STATS)
 

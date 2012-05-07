@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Adobe Systems Incorporated. All Rights Reserved.
+ * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,16 +30,19 @@
 #ifndef WebKitNamedFlow_h
 #define WebKitNamedFlow_h
 
+#include <Node.h>
+#include <wtf/ListHashSet.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-class RenderFlowThread;
+class NodeList;
+class RenderNamedFlowThread;
 
 class WebKitNamedFlow : public RefCounted<WebKitNamedFlow> {
 public:
-    static PassRefPtr<WebKitNamedFlow> create(RenderFlowThread* parentFlowThread)
+    static PassRefPtr<WebKitNamedFlow> create(RenderNamedFlowThread* parentFlowThread)
     {
         return adoptRef(new WebKitNamedFlow(parentFlowThread));
     }
@@ -47,10 +50,13 @@ public:
     ~WebKitNamedFlow();
 
     bool overflow() const;
-private:
-    WebKitNamedFlow(RenderFlowThread*);
+    PassRefPtr<NodeList> getRegionsByContentNode(Node*);
+    PassRefPtr<NodeList> contentNodes() const;
 
-    RenderFlowThread* m_parentFlowThread;
+private:
+    WebKitNamedFlow(RenderNamedFlowThread*);
+
+    RenderNamedFlowThread* m_parentFlowThread;
 };
 
 }

@@ -30,7 +30,6 @@
 #include "CSSParser.h"
 #include "CSSProperty.h"
 #include "CSSPropertyNames.h"
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
 #include "Document.h"
@@ -45,6 +44,7 @@
 #include "RenderObject.h"
 #include "RenderText.h"
 #include "StylePropertySet.h"
+#include "StyleResolver.h"
 #include "Text.h"
 #include "TextIterator.h"
 #include "htmlediting.h"
@@ -80,7 +80,7 @@ static bool hasNoAttributeOrOnlyStyleAttribute(const StyledElement* element, Sho
     if (element->getAttribute(classAttr) == styleSpanClassString())
         matchedAttributes++;
     if (element->hasAttribute(styleAttr) && (shouldStyleAttributeBeEmpty == AllowNonEmptyStyleAttribute
-        || !element->inlineStyleDecl() || element->inlineStyleDecl()->isEmpty()))
+        || !element->inlineStyle() || element->inlineStyle()->isEmpty()))
         matchedAttributes++;
 
     ASSERT(matchedAttributes <= element->attributeCount());
@@ -382,7 +382,7 @@ void ApplyStyleCommand::applyRelativeFontStyleChange(EditingStyle* style)
         }
         lastStyledNode = node;
 
-        StylePropertySet* inlineStyleDecl = element->ensureInlineStyleDecl();
+        RefPtr<StylePropertySet> inlineStyleDecl = element->ensureInlineStyle()->copy();
         float currentFontSize = computedFontSize(node);
         float desiredFontSize = max(MinimumFontSize, startingFontSizes.get(node) + style->fontSizeDelta());
         RefPtr<CSSValue> value = inlineStyleDecl->getPropertyCSSValue(CSSPropertyFontSize);
@@ -509,7 +509,7 @@ void ApplyStyleCommand::removeEmbeddingUpToEnclosingBlock(Node* node, Node* unsp
             // other attributes, like we (should) do with B and I elements.
             removeNodeAttribute(element, dirAttr);
         } else {
-            RefPtr<StylePropertySet> inlineStyle = element->ensureInlineStyleDecl()->copy();
+            RefPtr<StylePropertySet> inlineStyle = element->ensureInlineStyle()->copy();
             inlineStyle->setProperty(CSSPropertyUnicodeBidi, CSSValueNormal);
             inlineStyle->removeProperty(CSSPropertyDirection);
             setNodeAttribute(element, styleAttr, inlineStyle->asText());
@@ -711,7 +711,7 @@ void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, PassRef
 
     RefPtr<Node> node = startNode;
     for (RefPtr<Node> next; node && node != pastEndNode; node = next) {
-         next = node->traverseNextNode();
+        next = node->traverseNextNode();
 
         if (!node->renderer() || !node->rendererIsEditable())
             continue;
@@ -724,7 +724,7 @@ void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, PassRef
                 break;
             // Add to this element's inline style and skip over its contents.
             HTMLElement* element = toHTMLElement(node.get());
-            RefPtr<StylePropertySet> inlineStyle = element->ensureInlineStyleDecl()->copy();
+            RefPtr<StylePropertySet> inlineStyle = element->ensureInlineStyle()->copy();
             inlineStyle->merge(style->style());
             setNodeAttribute(element, styleAttr, inlineStyle->asText());
             next = node->traverseNextSibling();
@@ -889,14 +889,12 @@ bool ApplyStyleCommand::removeCSSStyle(EditingStyle* style, HTMLElement* element
     if (!style->conflictsWithInlineStyleOfElement(element, extractedStyle, properties))
         return false;
 
-    StylePropertySet* inlineStyle = element->inlineStyleDecl();
-    ASSERT(inlineStyle);
     // FIXME: We should use a mass-removal function here but we don't have an undoable one yet.
     for (size_t i = 0; i < properties.size(); i++)
         removeCSSProperty(element, properties[i]);
 
     // No need to serialize <foo style=""> if we just removed the last css property
-    if (inlineStyle->isEmpty())
+    if (element->inlineStyle()->isEmpty())
         removeNodeAttribute(element, styleAttr);
 
     if (isSpanWithoutAttributesOrUnstyledStyleSpan(element))
@@ -933,7 +931,7 @@ void ApplyStyleCommand::applyInlineStyleToPushDown(Node* node, EditingStyle* sty
         return;
 
     RefPtr<EditingStyle> newInlineStyle = style;
-    if (node->isHTMLElement() && toHTMLElement(node)->inlineStyleDecl()) {
+    if (node->isHTMLElement() && toHTMLElement(node)->inlineStyle()) {
         newInlineStyle = style->copy();
         newInlineStyle->mergeInlineStyleOfElement(toHTMLElement(node), EditingStyle::OverrideValues);
     }
@@ -1065,8 +1063,7 @@ void ApplyStyleCommand::removeInlineStyle(EditingStyle* style, const Position &s
                     // Since elem must have been fully selected, and it is at the end
                     // of the selection, it is clear we can set the new e offset to
                     // the max range offset of prev.
-                    ASSERT(s.anchorType() == Position::PositionIsAfterAnchor
-                           || s.offsetInContainerNode() >= lastOffsetInNode(s.containerNode()));
+                    ASSERT(s.anchorType() == Position::PositionIsAfterAnchor || !offsetIsBeforeLastNodeOffset(s.offsetInContainerNode(), s.containerNode()));
                     e = lastPositionInOrAfterNode(prev.get());
                 }
             }
@@ -1229,7 +1226,7 @@ bool ApplyStyleCommand::mergeEndWithNextIfIdentical(const Position& start, const
     int endOffset = end.computeOffsetInContainerNode();
 
     if (isAtomicNode(endNode)) {
-        if (endOffset < lastOffsetInNode(endNode))
+        if (offsetIsBeforeLastNodeOffset(endOffset, endNode))
             return false;
 
         unsigned parentLastOffset = end.deprecatedNode()->parentNode()->childNodes()->length() - 1;
@@ -1309,7 +1306,7 @@ void ApplyStyleCommand::addBlockStyle(const StyleChange& styleChange, HTMLElemen
         return;
         
     String cssText = styleChange.cssStyle();
-    if (StylePropertySet* decl = block->inlineStyleDecl())
+    if (const StylePropertySet* decl = block->inlineStyle())
         cssText += decl->asText();
     setNodeAttribute(block, styleAttr, cssText);
 }
@@ -1374,7 +1371,7 @@ void ApplyStyleCommand::addInlineStyleIfNeeded(EditingStyle* style, PassRefPtr<N
 
     if (styleChange.cssStyle().length()) {
         if (styleContainer) {
-            if (StylePropertySet* existingStyle = styleContainer->inlineStyleDecl())
+            if (const StylePropertySet* existingStyle = styleContainer->inlineStyle())
                 setNodeAttribute(styleContainer, styleAttr, existingStyle->asText() + styleChange.cssStyle());
             else
                 setNodeAttribute(styleContainer, styleAttr, styleChange.cssStyle());

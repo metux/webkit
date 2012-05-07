@@ -33,6 +33,7 @@
 #include "FileIconLoader.h"
 #include "FileSystem.h"
 #include "FloatRect.h"
+#include "FocusController.h"
 #include "FrameLoadRequest.h"
 #include "FrameView.h"
 #include "GtkUtilities.h"
@@ -51,6 +52,8 @@
 #include "RefPtrCairo.h"
 #include "SearchPopupMenuGtk.h"
 #include "SecurityOrigin.h"
+#include "WebKitDOMBinding.h"
+#include "WebKitDOMHTMLElementPrivate.h"
 #include "WindowFeatures.h"
 #include "webkitgeolocationpolicydecision.h"
 #include "webkitgeolocationpolicydecisionprivate.h"
@@ -61,6 +64,8 @@
 #include "webkitwebview.h"
 #include "webkitwebviewprivate.h"
 #include "webkitwebwindowfeaturesprivate.h"
+#include <gdk/gdk.h>
+#include <gdk/gdkkeysyms.h>
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 #include <gtk/gtk.h>
@@ -594,6 +599,13 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     m_dirtyRegion = Region();
     m_lastDisplayTime = currentTime();
     m_repaintSoonSourceId = 0;
+
+    // We update the IM context window location here, because we want it to be
+    // synced with cursor movement. For instance, a text field can move without
+    // the selection changing.
+    Frame* focusedFrame = core(m_webView)->focusController()->focusedOrMainFrame();
+    if (focusedFrame && focusedFrame->editor()->canEdit())
+        m_webView->priv->imFilter.setCursorRect(frame->selection()->absoluteCaretBounds());
 }
 
 void ChromeClient::invalidateRootView(const IntRect&, bool immediate)
@@ -746,7 +758,7 @@ void ChromeClient::mouseDidMoveOverElement(const HitTestResult& hit, unsigned mo
     if (Node* node = hit.innerNonSharedNode()) {
         Frame* frame = node->document()->frame();
         FrameView* view = frame ? frame->view() : 0;
-        m_webView->priv->tooltipArea = view ? view->contentsToWindow(node->getRect()) : IntRect();
+        m_webView->priv->tooltipArea = view ? view->contentsToWindow(node->getPixelSnappedRect()) : IntRect();
     } else
         m_webView->priv->tooltipArea = IntRect();
 }
@@ -862,22 +874,6 @@ void ChromeClient::setCursorHiddenUntilMouseMoves(bool)
     notImplemented();
 }
 
-void ChromeClient::requestGeolocationPermissionForFrame(Frame* frame, Geolocation* geolocation)
-{
-    WebKitWebFrame* webFrame = kit(frame);
-    GRefPtr<WebKitGeolocationPolicyDecision> policyDecision(adoptGRef(webkit_geolocation_policy_decision_new(webFrame, geolocation)));
-
-    gboolean isHandled = FALSE;
-    g_signal_emit_by_name(m_webView, "geolocation-policy-decision-requested", webFrame, policyDecision.get(), &isHandled);
-    if (!isHandled)
-        webkit_geolocation_policy_deny(policyDecision.get());
-}
-
-void ChromeClient::cancelGeolocationPermissionRequestForFrame(WebCore::Frame* frame, WebCore::Geolocation*)
-{
-    g_signal_emit_by_name(m_webView, "geolocation-policy-decision-cancelled", kit(frame));
-}
-
 bool ChromeClient::selectItemWritingDirectionIsNatural()
 {
     return false;
@@ -925,29 +921,69 @@ void ChromeClient::exitFullscreenForNode(Node* node)
 #if ENABLE(FULLSCREEN_API)
 bool ChromeClient::supportsFullScreenForElement(const WebCore::Element* element, bool withKeyboard)
 {
-    return true;
+    return !withKeyboard;
+}
+
+static gboolean onFullscreenGtkKeyPressEvent(GtkWidget* widget, GdkEventKey* event, ChromeClient* chromeClient)
+{
+    switch (event->keyval) {
+    case GDK_KEY_Escape:
+    case GDK_KEY_f:
+    case GDK_KEY_F:
+        chromeClient->cancelFullScreen();
+        return TRUE;
+    default:
+        break;
+    }
+
+    return FALSE;
+}
+
+void ChromeClient::cancelFullScreen()
+{
+    ASSERT(m_fullScreenElement);
+    m_fullScreenElement->document()->webkitCancelFullScreen();
 }
 
 void ChromeClient::enterFullScreenForElement(WebCore::Element* element)
 {
+    gboolean returnValue;
+    GRefPtr<WebKitDOMHTMLElement> kitElement(adoptGRef(kit(reinterpret_cast<HTMLElement*>(element))));
+    g_signal_emit_by_name(m_webView, "entering-fullscreen", kitElement.get(), &returnValue);
+    if (returnValue)
+        return;
+
+    GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(m_webView));
+    if (!widgetIsOnscreenToplevelWindow(window))
+        return;
+
+    g_signal_connect(window, "key-press-event", G_CALLBACK(onFullscreenGtkKeyPressEvent), this);
+
+    m_fullScreenElement = element;
+
     element->document()->webkitWillEnterFullScreenForElement(element);
     m_adjustmentWatcher.disableAllScrollbars();
-#if ENABLE(VIDEO)
-    if (element->tagName() == "VIDEO")
-        enterFullscreenForNode(static_cast<Node*>(element));
-#endif
+    gtk_window_fullscreen(GTK_WINDOW(window));
     element->document()->webkitDidEnterFullScreenForElement(element);
 }
 
 void ChromeClient::exitFullScreenForElement(WebCore::Element* element)
 {
+    gboolean returnValue;
+    GRefPtr<WebKitDOMHTMLElement> kitElement(adoptGRef(kit(reinterpret_cast<HTMLElement*>(element))));
+    g_signal_emit_by_name(m_webView, "leaving-fullscreen", kitElement.get(), &returnValue);
+    if (returnValue)
+        return;
+
+    GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(m_webView));
+    ASSERT(widgetIsOnscreenToplevelWindow(window));
+    g_signal_handlers_disconnect_by_func(window, reinterpret_cast<void*>(onFullscreenGtkKeyPressEvent), this);
+
     element->document()->webkitWillExitFullScreenForElement(element);
+    gtk_window_unfullscreen(GTK_WINDOW(window));
     m_adjustmentWatcher.enableAllScrollbars();
-#if ENABLE(VIDEO)
-    if (element->tagName() == "VIDEO")
-        webViewExitFullscreen(m_webView);
-#endif
     element->document()->webkitDidExitFullScreenForElement(element);
+    m_fullScreenElement.clear();
 }
 #endif
 
