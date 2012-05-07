@@ -1,6 +1,8 @@
 webkit (1.9.2-1) experimental; urgency=low
 
   * New development release
+  * debian/patches/10_kfreebsd_support.patch:
+  - removed; applied upstream
 
  -- Gustavo Noronha Silva <kov@debian.org>  Sun, 06 May 2012 22:07:33 -0300
 
