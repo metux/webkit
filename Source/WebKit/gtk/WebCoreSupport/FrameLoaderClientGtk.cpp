@@ -39,8 +39,6 @@
 #include "FrameNetworkingContextGtk.h"
 #include "FrameTree.h"
 #include "FrameView.h"
-#include "GOwnPtr.h"
-#include "GRefPtr.h"
 #include "GtkPluginWidget.h"
 #include "HTMLAppletElement.h"
 #include "HTMLFormElement.h"
@@ -73,6 +71,7 @@
 #include "webkitnetworkrequestprivate.h"
 #include "webkitnetworkresponse.h"
 #include "webkitnetworkresponseprivate.h"
+#include "webkitsecurityoriginprivate.h"
 #include "webkitviewportattributes.h"
 #include "webkitviewportattributesprivate.h"
 #include "webkitwebdatasourceprivate.h"
@@ -92,6 +91,8 @@
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 #include <stdio.h>
+#include <wtf/gobject/GOwnPtr.h>
+#include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenate.h>
 
@@ -105,7 +106,6 @@ FrameLoaderClient::FrameLoaderClient(WebKitWebFrame* frame)
     , m_loadingErrorPage(false)
     , m_pluginView(0)
     , m_hasSentResponseToPlugin(false)
-    , m_hasRepresentation(false)
 {
     ASSERT(m_frame);
 }
@@ -654,19 +654,14 @@ void FrameLoaderClient::didDisplayInsecureContent()
     notImplemented();
 }
 
-void FrameLoaderClient::didRunInsecureContent(SecurityOrigin*, const KURL&)
+void FrameLoaderClient::didRunInsecureContent(SecurityOrigin* coreOrigin, const KURL& url)
 {
-    notImplemented();
+    g_signal_emit_by_name(m_frame, "insecure-content-run", kit(coreOrigin), url.string().utf8().data());
 }
 
 void FrameLoaderClient::didDetectXSS(const KURL&, bool)
 {
     notImplemented();
-}
-
-void FrameLoaderClient::makeRepresentation(WebCore::DocumentLoader*)
-{
-    m_hasRepresentation = true;
 }
 
 void FrameLoaderClient::forceLayout()
@@ -882,16 +877,6 @@ void FrameLoaderClient::cancelPolicyCheck()
         webkit_web_policy_decision_cancel(m_policyDecision);
 }
 
-void FrameLoaderClient::dispatchDidLoadMainResource(WebCore::DocumentLoader*)
-{
-    notImplemented();
-}
-
-void FrameLoaderClient::revertToProvisionalState(WebCore::DocumentLoader*)
-{
-    m_hasRepresentation = true;
-}
-
 void FrameLoaderClient::willChangeTitle(WebCore::DocumentLoader*)
 {
     notImplemented();
@@ -934,14 +919,9 @@ String FrameLoaderClient::generatedMIMETypeForURLScheme(const String&) const
     return String();
 }
 
-void FrameLoaderClient::finishedLoading(WebCore::DocumentLoader* documentLoader)
+void FrameLoaderClient::finishedLoading(WebCore::DocumentLoader*)
 {
-    if (!m_pluginView) {
-        // This is necessary to create an empty document,
-        // but it has to be skipped in the provisional phase.
-        if (m_hasRepresentation)
-            documentLoader->writer()->setEncoding("", false);
-    } else {
+    if (m_pluginView) {
         m_pluginView->didFinishLoading();
         m_pluginView = 0;
         m_hasSentResponseToPlugin = false;

@@ -31,6 +31,7 @@
 namespace WebCore {
 
 class Attribute;
+struct PresentationAttributeCacheKey;
 
 class StyledElement : public Element {
 public:
@@ -39,20 +40,22 @@ public:
     virtual StylePropertySet* additionalAttributeStyle() { return 0; }
     void invalidateStyleAttribute();
 
-    StylePropertySet* inlineStyleDecl() const { return attributeData() ? attributeData()->inlineStyleDecl() : 0; }
-    StylePropertySet* ensureInlineStyleDecl() { return ensureAttributeData()->ensureInlineStyleDecl(this); }
+    const StylePropertySet* inlineStyle() const { return attributeData() ? attributeData()->inlineStyle() : 0; }
+    const StylePropertySet* ensureInlineStyle() { return ensureAttributeData()->ensureInlineStyle(this); }
     
     // Unlike StylePropertySet setters, these implement invalidation.
-    bool setInlineStyleProperty(int propertyID, int value, bool important = false);
-    bool setInlineStyleProperty(int propertyID, double value, CSSPrimitiveValue::UnitTypes unit, bool important = false);
-    bool setInlineStyleProperty(int propertyID, const String& value, bool important = false);
-    bool removeInlineStyleProperty(int propertyID);
+    bool setInlineStyleProperty(CSSPropertyID, int identifier, bool important = false);
+    bool setInlineStyleProperty(CSSPropertyID, double value, CSSPrimitiveValue::UnitTypes, bool important = false);
+    bool setInlineStyleProperty(CSSPropertyID, const String& value, bool important = false);
+    bool removeInlineStyleProperty(CSSPropertyID);
     
-    virtual CSSStyleDeclaration* style() OVERRIDE { return ensureInlineStyleDecl()->ensureInlineCSSStyleDeclaration(this); }
+    virtual CSSStyleDeclaration* style() OVERRIDE;
 
     StylePropertySet* attributeStyle();
 
     const SpaceSplitString& classNames() const;
+
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) { }
 
 protected:
     StyledElement(const QualifiedName& name, Document* document, ConstructionType type)
@@ -64,8 +67,11 @@ protected:
     virtual void parseAttribute(Attribute*);
     virtual void copyNonAttributeProperties(const Element*);
 
-    virtual bool isPresentationAttribute(Attribute*) const { return false; }
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) { }
+    virtual bool isPresentationAttribute(const QualifiedName&) const { return false; }
+
+    void addPropertyToAttributeStyle(StylePropertySet*, CSSPropertyID, int identifier);
+    void addPropertyToAttributeStyle(StylePropertySet*, CSSPropertyID, double value, CSSPrimitiveValue::UnitTypes);
+    void addPropertyToAttributeStyle(StylePropertySet*, CSSPropertyID, const String& value);
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
@@ -73,20 +79,18 @@ protected:
     // parseAttribute (called via setAttribute()) and
     // svgAttributeChanged (called when element.className.baseValue is set)
     void classAttributeChanged(const AtomicString& newClassString);
-    
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
 
 private:
     virtual void updateStyleAttribute() const;
     void inlineStyleChanged();
 
+    void makePresentationAttributeCacheKey(PresentationAttributeCacheKey&) const;
     void updateAttributeStyle();
 
-    void destroyInlineStyleDecl()
+    void destroyInlineStyle()
     {
         if (attributeData())
-            attributeData()->destroyInlineStyleDecl(this);
+            attributeData()->destroyInlineStyle(this);
     }
 };
 

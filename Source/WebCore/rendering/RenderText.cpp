@@ -53,6 +53,15 @@ using namespace Unicode;
 
 namespace WebCore {
 
+class SameSizeAsRenderText : public RenderObject {
+    uint32_t bitfields : 16;
+    float widths[4];
+    String text;
+    void* pointers[2];
+};
+
+COMPILE_ASSERT(sizeof(RenderText) == sizeof(SameSizeAsRenderText), RenderText_should_stay_small);
+
 class SecureTextTimer;
 typedef HashMap<RenderText*, SecureTextTimer*> SecureTextTimerMap;
 static SecureTextTimerMap* gSecureTextTimers = 0;
@@ -126,22 +135,23 @@ static void makeCapitalized(String* string, UChar previous)
 
 RenderText::RenderText(Node* node, PassRefPtr<StringImpl> str)
      : RenderObject(node)
-     , m_minWidth(-1)
-     , m_text(str)
-     , m_firstTextBox(0)
-     , m_lastTextBox(0)
-     , m_maxWidth(-1)
-     , m_beginMinWidth(0)
-     , m_endMinWidth(0)
      , m_hasTab(false)
      , m_linesDirty(false)
      , m_containsReversedText(false)
-     , m_isAllASCII(m_text.containsOnlyASCII())
      , m_knownToHaveNoOverflowAndNoFallbackFonts(false)
      , m_needsTranscoding(false)
+     , m_minWidth(-1)
+     , m_maxWidth(-1)
+     , m_beginMinWidth(0)
+     , m_endMinWidth(0)
+     , m_text(str)
+     , m_firstTextBox(0)
+     , m_lastTextBox(0)
 {
     ASSERT(m_text);
 
+    m_isAllASCII = m_text.containsOnlyASCII();
+    m_canUseSimpleFontCodePath = computeCanUseSimpleFontCodePath();
     setIsText();
 
     view()->frameView()->incrementVisuallyNonEmptyCharacterCount(m_text.length());
@@ -220,12 +230,6 @@ void RenderText::removeAndDestroyTextBoxes()
             parent()->dirtyLinesFromChangedChild(this);
     }
     deleteTextBoxes();
-}
-
-void RenderText::transformText()
-{
-    if (RefPtr<StringImpl> textToTransform = originalText())
-        setText(textToTransform.release(), true);
 }
 
 void RenderText::willBeDestroyed()
@@ -307,16 +311,16 @@ PassRefPtr<StringImpl> RenderText::originalText() const
     return (e && e->isTextNode()) ? toText(e)->dataImpl() : 0;
 }
 
-void RenderText::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset) const
+void RenderText::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
     for (InlineTextBox* box = firstTextBox(); box; box = box->nextTextBox())
-        rects.append(enclosingLayoutRect(FloatRect(accumulatedOffset + box->topLeft(), box->size())));
+        rects.append(enclosingIntRect(FloatRect(accumulatedOffset + box->topLeft(), box->size())));
 }
 
 static FloatRect localQuadForTextBox(InlineTextBox* box, unsigned start, unsigned end, bool useSelectionHeight)
 {
     unsigned realEnd = min(box->end() + 1, end);
-    IntRect r = box->localSelectionRect(start, realEnd);
+    LayoutRect r = box->localSelectionRect(start, realEnd);
     if (r.height()) {
         if (!useSelectionHeight) {
             // Change the height and y position (or width and x for vertical text)
@@ -334,7 +338,7 @@ static FloatRect localQuadForTextBox(InlineTextBox* box, unsigned start, unsigne
     return FloatRect();
 }
 
-void RenderText::absoluteRectsForRange(Vector<LayoutRect>& rects, unsigned start, unsigned end, bool useSelectionHeight, bool* wasFixed)
+void RenderText::absoluteRectsForRange(Vector<IntRect>& rects, unsigned start, unsigned end, bool useSelectionHeight, bool* wasFixed)
 {
     // Work around signed/unsigned issues. This function takes unsigneds, and is often passed UINT_MAX
     // to mean "all the way to the end". InlineTextBox coordinates are unsigneds, so changing this 
@@ -351,8 +355,7 @@ void RenderText::absoluteRectsForRange(Vector<LayoutRect>& rects, unsigned start
         if (start <= box->start() && box->end() < end) {
             FloatRect r = box->calculateBoundaries();
             if (useSelectionHeight) {
-                // FIXME: localSelectionRect should switch to return FloatRect soon with the subpixellayout branch.
-                IntRect selectionRect = box->localSelectionRect(start, end);
+                LayoutRect selectionRect = box->localSelectionRect(start, end);
                 if (box->isHorizontal()) {
                     r.setHeight(selectionRect.height());
                     r.setY(selectionRect.y());
@@ -435,8 +438,7 @@ void RenderText::absoluteQuadsForRange(Vector<FloatQuad>& quads, unsigned start,
         if (start <= box->start() && box->end() < end) {
             FloatRect r = box->calculateBoundaries();
             if (useSelectionHeight) {
-                // FIXME: localSelectionRect should switch to return FloatRect soon with the subpixellayout branch.
-                IntRect selectionRect = box->localSelectionRect(start, end);
+                LayoutRect selectionRect = box->localSelectionRect(start, end);
                 if (box->isHorizontal()) {
                     r.setHeight(selectionRect.height());
                     r.setY(selectionRect.y());
@@ -759,6 +761,7 @@ ALWAYS_INLINE float RenderText::widthFromCache(const Font& f, int start, int len
     run.setCharactersLength(textLength() - start);
     ASSERT(run.charactersLength() >= run.length());
 
+    run.setCharacterScanForCodePath(!canUseSimpleFontCodePath());
     run.setAllowTabs(allowTabs());
     run.setXPos(xPos);
     return f.width(run, fallbackFonts, glyphOverflow);
@@ -1244,6 +1247,12 @@ void RenderText::setTextWithOffset(PassRefPtr<StringImpl> text, unsigned offset,
     setText(text, force);
 }
 
+void RenderText::transformText()
+{
+    if (RefPtr<StringImpl> textToTransform = originalText())
+        setText(textToTransform.release(), true);
+}
+
 static inline bool isInlineFlowOrEmptyText(const RenderObject* o)
 {
     if (o->isRenderInline())
@@ -1323,6 +1332,7 @@ void RenderText::setTextInternal(PassRefPtr<StringImpl> text)
     ASSERT(!isBR() || (textLength() == 1 && m_text[0] == '\n'));
 
     m_isAllASCII = m_text.containsOnlyASCII();
+    m_canUseSimpleFontCodePath = computeCanUseSimpleFontCodePath();
 }
 
 void RenderText::secureText(UChar mask)
@@ -1466,6 +1476,7 @@ float RenderText::width(unsigned from, unsigned len, const Font& f, float xPos, 
         run.setCharactersLength(textLength() - from);
         ASSERT(run.charactersLength() >= run.length());
 
+        run.setCharacterScanForCodePath(!canUseSimpleFontCodePath());
         run.setAllowTabs(allowTabs());
         run.setXPos(xPos);
         w = f.width(run, fallbackFonts, glyphOverflow);
@@ -1474,9 +1485,9 @@ float RenderText::width(unsigned from, unsigned len, const Font& f, float xPos, 
     return w;
 }
 
-LayoutRect RenderText::linesBoundingBox() const
+IntRect RenderText::linesBoundingBox() const
 {
-    LayoutRect result;
+    IntRect result;
     
     ASSERT(!firstTextBox() == !lastTextBox());  // Either both are null or both exist.
     if (firstTextBox() && lastTextBox()) {
@@ -1508,8 +1519,8 @@ LayoutRect RenderText::linesVisualOverflowBoundingBox() const
         return LayoutRect();
 
     // Return the width of the minimal left side and the maximal right side.
-    LayoutUnit logicalLeftSide = numeric_limits<LayoutUnit>::max();
-    LayoutUnit logicalRightSide = numeric_limits<LayoutUnit>::min();
+    LayoutUnit logicalLeftSide = MAX_LAYOUT_UNIT;
+    LayoutUnit logicalRightSide = MIN_LAYOUT_UNIT;
     for (InlineTextBox* curr = firstTextBox(); curr; curr = curr->nextTextBox()) {
         logicalLeftSide = min(logicalLeftSide, curr->logicalLeftVisualOverflow());
         logicalRightSide = max(logicalRightSide, curr->logicalRightVisualOverflow());
@@ -1553,7 +1564,7 @@ LayoutRect RenderText::selectionRectForRepaint(RenderBoxModelObject* repaintCont
 
     // Now calculate startPos and endPos for painting selection.
     // We include a selection while endPos > 0
-    LayoutUnit startPos, endPos;
+    int startPos, endPos;
     if (selectionState() == SelectionInside) {
         // We are fully selected.
         startPos = 0;
@@ -1784,6 +1795,13 @@ int RenderText::nextOffset(int current) const
 
 
     return result;
+}
+
+bool RenderText::computeCanUseSimpleFontCodePath() const
+{
+    if (isAllASCII())
+        return true;
+    return Font::characterRangeCodePath(characters(), length()) == Font::Simple;
 }
 
 #ifndef NDEBUG

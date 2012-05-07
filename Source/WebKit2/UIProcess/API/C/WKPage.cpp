@@ -82,6 +82,11 @@ void WKPageLoadPlainTextString(WKPageRef pageRef, WKStringRef plainTextStringRef
     toImpl(pageRef)->loadPlainTextString(toWTFString(plainTextStringRef));    
 }
 
+void WKPageLoadWebArchiveData(WKPageRef pageRef, WKDataRef webArchiveDataRef)
+{
+    toImpl(pageRef)->loadWebArchiveData(toImpl(webArchiveDataRef));
+}
+
 void WKPageStopLoading(WKPageRef pageRef)
 {
     toImpl(pageRef)->stopLoading();
@@ -456,7 +461,9 @@ void WKPageCountStringMatches(WKPageRef pageRef, WKStringRef string, WKFindOptio
 
 void WKPageSetPageContextMenuClient(WKPageRef pageRef, const WKPageContextMenuClient* wkClient)
 {
+#if ENABLE(CONTEXT_MENUS)
     toImpl(pageRef)->initializeContextMenuClient(wkClient);
+#endif
 }
 
 void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClient* wkClient)
@@ -659,6 +666,11 @@ void WKPageBeginPrinting(WKPageRef page, WKFrameRef frame, WKPrintInfo printInfo
 void WKPageDrawPagesToPDF(WKPageRef page, WKFrameRef frame, WKPrintInfo printInfo, uint32_t first, uint32_t count, WKPageDrawToPDFFunction callback, void* context)
 {
     toImpl(page)->drawPagesToPDF(toImpl(frame), printInfoFromWKPrintInfo(printInfo), first, count, DataCallback::create(context, callback));
+}
+
+void WKPageEndPrinting(WKPageRef page)
+{
+    toImpl(page)->endPrinting();
 }
 #endif
 

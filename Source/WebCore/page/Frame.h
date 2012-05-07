@@ -74,6 +74,8 @@ namespace WebCore {
     class TiledBackingStoreClient { };
 #endif
 
+    class TreeScope;
+
     class Frame : public RefCounted<Frame>, public TiledBackingStoreClient {
     public:
         static PassRefPtr<Frame> create(Page*, HTMLFrameOwnerElement*, FrameLoaderClient*);
@@ -89,8 +91,8 @@ namespace WebCore {
         void addDestructionObserver(FrameDestructionObserver*);
         void removeDestructionObserver(FrameDestructionObserver*);
 
+        void willDetachPage();
         void detachFromPage();
-        void pageDestroyed();
         void disconnectOwnerElement();
 
         Page* page() const;
@@ -121,6 +123,7 @@ namespace WebCore {
         void setIsDisconnected(bool);
         bool excludeFromTextSearch() const;
         void setExcludeFromTextSearch(bool);
+        bool inScope(TreeScope*) const;
 
         void injectUserScripts(UserScriptInjectionTime);
         
@@ -176,20 +179,23 @@ namespace WebCore {
         DragImageRef nodeImage(Node*);
         DragImageRef dragImageForSelection();
 
-        VisiblePosition visiblePositionForPoint(const LayoutPoint& framePoint);
+        VisiblePosition visiblePositionForPoint(const IntPoint& framePoint);
         Document* documentAtPoint(const IntPoint& windowPoint);
-        PassRefPtr<Range> rangeForPoint(const LayoutPoint& framePoint);
+        PassRefPtr<Range> rangeForPoint(const IntPoint& framePoint);
 
         String searchForLabelsAboveCell(RegularExpression*, HTMLTableCellElement*, size_t* resultDistanceFromStartOfCell);
         String searchForLabelsBeforeElement(const Vector<String>& labels, Element*, size_t* resultDistance, bool* resultIsInCellAbove);
         String matchLabelsAgainstElement(const Vector<String>& labels, Element*);
-        
+
 #if PLATFORM(MAC)
         NSImage* selectionImage(bool forceBlackText = false) const;
         NSImage* rangeImage(Range*, bool forceBlackText = false) const;
         NSImage* snapshotDragImage(Node*, NSRect* imageRect, NSRect* elementRect) const;
         NSImage* imageFromRect(NSRect) const;
 #endif
+        void suspendActiveDOMObjectsAndAnimations();
+        void resumeActiveDOMObjectsAndAnimations();
+        bool activeDOMObjectsAndAnimationsSuspended() const { return m_activeDOMObjectsAndAnimationsSuspendedCount > 0; }
 
         // Should only be called on the main frame of a page.
         void notifyChromeClientWheelEventHandlerCountChanged() const;
@@ -252,6 +258,7 @@ namespace WebCore {
         OwnPtr<TiledBackingStore> m_tiledBackingStore;
 #endif
 
+        int m_activeDOMObjectsAndAnimationsSuspendedCount;
     };
 
     inline void Frame::init()

@@ -52,6 +52,7 @@ class InstrumentingAgents;
 class Page;
 class ScriptHeapSnapshot;
 class ScriptProfile;
+class WorkerContext;
 
 typedef String ErrorString;
 
@@ -59,6 +60,9 @@ class InspectorProfilerAgent : public InspectorBaseAgent<InspectorProfilerAgent>
     WTF_MAKE_NONCOPYABLE(InspectorProfilerAgent); WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, Page*, InspectorState*, InjectedScriptManager*);
+#if ENABLE(WORKERS)
+    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, WorkerContext*, InspectorState*, InjectedScriptManager*);
+#endif
     virtual ~InspectorProfilerAgent();
 
     void addProfile(PassRefPtr<ScriptProfile> prpProfile, unsigned lineNumber, const String& sourceURL);
@@ -81,8 +85,8 @@ public:
     void enable(bool skipRecompile);
     bool enabled() { return m_enabled; }
     String getCurrentUserInitiatedProfileName(bool incrementProfileNumber = false);
-    virtual void getProfileHeaders(ErrorString*, RefPtr<InspectorArray>& headers);
-    virtual void getProfile(ErrorString*, const String& type, int uid, RefPtr<InspectorObject>& profileObject);
+    virtual void getProfileHeaders(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Profiler::ProfileHeader> >&);
+    virtual void getProfile(ErrorString*, const String& type, int uid, RefPtr<TypeBuilder::Profiler::Profile>&);
     virtual void removeProfile(ErrorString*, const String& type, int uid);
 
     virtual void setFrontend(InspectorFrontend*);
@@ -92,7 +96,12 @@ public:
     virtual void takeHeapSnapshot(ErrorString*);
     void toggleRecordButton(bool isProfiling);
 
-    virtual void getObjectByHeapObjectId(ErrorString*, int id, const String* objectGroup, RefPtr<InspectorObject>& result);
+    virtual void getObjectByHeapObjectId(ErrorString*, int id, const String* objectGroup, RefPtr<TypeBuilder::Runtime::RemoteObject>& result);
+
+protected:
+    InspectorProfilerAgent(InstrumentingAgents*, InspectorConsoleAgent*, InspectorState*, InjectedScriptManager*);
+    virtual void startProfiling(const String& title) = 0;
+    virtual PassRefPtr<ScriptProfile> stopProfiling(const String& title) = 0;
 
 private:
     typedef HashMap<unsigned int, RefPtr<ScriptProfile> > ProfilesMap;
@@ -101,12 +110,10 @@ private:
     void resetFrontendProfiles();
     void restoreEnablement();
 
-    InspectorProfilerAgent(InstrumentingAgents*, InspectorConsoleAgent*, Page*, InspectorState*, InjectedScriptManager*);
-    PassRefPtr<InspectorObject> createProfileHeader(const ScriptProfile& profile);
-    PassRefPtr<InspectorObject> createSnapshotHeader(const ScriptHeapSnapshot& snapshot);
+    PassRefPtr<TypeBuilder::Profiler::ProfileHeader> createProfileHeader(const ScriptProfile&);
+    PassRefPtr<TypeBuilder::Profiler::ProfileHeader> createSnapshotHeader(const ScriptHeapSnapshot&);
 
     InspectorConsoleAgent* m_consoleAgent;
-    Page* m_inspectedPage;
     InjectedScriptManager* m_injectedScriptManager;
     InspectorFrontend::Profiler* m_frontend;
     bool m_enabled;

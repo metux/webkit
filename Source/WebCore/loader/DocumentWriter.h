@@ -53,7 +53,6 @@ public:
     void begin(const KURL&, bool dispatchWindowObjectAvailable = true, Document* ownerDocument = 0);
     void addData(const char* bytes, size_t length);
     void end();
-    void endIfNotLoadingMainResource();
     
     void setFrame(Frame* frame) { m_frame = frame; }
 
@@ -81,6 +80,13 @@ private:
     String m_encoding;
     RefPtr<TextResourceDecoder> m_decoder;
     RefPtr<DocumentParser> m_parser;
+
+    enum WriterState {
+        NotStartedWritingState,
+        StartedWritingState,
+        FinishedWritingState,
+    };
+    WriterState m_state;
 };
 
 } // namespace WebCore

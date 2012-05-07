@@ -26,6 +26,7 @@
 #ifndef CopiedSpace_h
 #define CopiedSpace_h
 
+#include "CopiedAllocator.h"
 #include "HeapBlock.h"
 #include "TinyBloomFilter.h"
 #include <wtf/Assertions.h>
@@ -34,6 +35,7 @@
 #include <wtf/HashSet.h>
 #include <wtf/OSAllocator.h>
 #include <wtf/PageAllocationAligned.h>
+#include <wtf/PageBlock.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/ThreadingPrimitives.h>
 
@@ -45,6 +47,7 @@ class HeapBlock;
 
 class CopiedSpace {
     friend class SlotVisitor;
+    friend class JIT;
 public:
     CopiedSpace(Heap*);
     void init();
@@ -52,6 +55,8 @@ public:
     CheckedBoolean tryAllocate(size_t, void**);
     CheckedBoolean tryReallocate(void**, size_t, size_t);
     
+    CopiedAllocator& allocator() { return m_allocator; }
+
     void startedCopying();
     void doneCopying();
     bool isInCopyPhase() { return m_inCopyingPhase; }
@@ -61,8 +66,11 @@ public:
 
     bool contains(void*, CopiedBlock*&);
 
-    size_t totalMemoryAllocated() { return m_totalMemoryAllocated; }
-    size_t totalMemoryUtilized() { return m_totalMemoryUtilized; }
+    size_t size();
+    size_t capacity();
+
+    void freeAllBlocks();
+    bool isPagedOut(double deadline);
 
     static CopiedBlock* blockFor(void*);
 
@@ -70,7 +78,6 @@ private:
     CheckedBoolean tryAllocateSlowCase(size_t, void**);
     CheckedBoolean addNewBlock();
     CheckedBoolean allocateNewBlock(CopiedBlock**);
-    bool fitsInCurrentBlock(size_t);
     
     static void* allocateFromBlock(CopiedBlock*, size_t);
     CheckedBoolean tryAllocateOversize(size_t, void**);
@@ -87,14 +94,13 @@ private:
 
     Heap* m_heap;
 
-    CopiedBlock* m_currentBlock;
+    CopiedAllocator m_allocator;
 
     TinyBloomFilter m_toSpaceFilter;
     TinyBloomFilter m_oversizeFilter;
     HashSet<CopiedBlock*> m_toSpaceSet;
 
     Mutex m_toSpaceLock;
-    Mutex m_memoryStatsLock;
 
     DoublyLinkedList<HeapBlock>* m_toSpace;
     DoublyLinkedList<HeapBlock>* m_fromSpace;
@@ -103,21 +109,15 @@ private:
     DoublyLinkedList<HeapBlock> m_blocks2;
     DoublyLinkedList<HeapBlock> m_oversizeBlocks;
    
-    size_t m_totalMemoryAllocated;
-    size_t m_totalMemoryUtilized;
-
     bool m_inCopyingPhase;
 
     Mutex m_loanedBlocksLock; 
     ThreadCondition m_loanedBlocksCondition;
     size_t m_numberOfLoanedBlocks;
 
-    static const size_t s_blockSize = 64 * KB;
     static const size_t s_maxAllocationSize = 32 * KB;
-    static const size_t s_pageSize = 4 * KB;
-    static const size_t s_pageMask = ~(s_pageSize - 1);
     static const size_t s_initialBlockNum = 16;
-    static const size_t s_blockMask = ~(s_blockSize - 1);
+    static const size_t s_blockMask = ~(HeapBlock::s_blockSize - 1);
 };
 
 } // namespace JSC

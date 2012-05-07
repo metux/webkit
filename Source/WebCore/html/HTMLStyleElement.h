@@ -28,7 +28,11 @@
 
 namespace WebCore {
 
+class HTMLStyleElement;
 class StyleSheet;
+
+template<typename T> class EventSender;
+typedef EventSender<HTMLStyleElement> StyleEventSender;
 
 class HTMLStyleElement : public HTMLElement, private StyleElement {
 public:
@@ -48,13 +52,16 @@ public:
     bool disabled() const;
     void setDisabled(bool);
 
+    void dispatchPendingEvent(StyleEventSender*);
+    static void dispatchPendingLoadEvents();
+
 private:
     HTMLStyleElement(const QualifiedName&, Document*, bool createdByParser);
 
     // overload from HTMLElement
     virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
 #if ENABLE(STYLE_SCOPED)
     virtual void willRemove();
 #endif
@@ -64,6 +71,7 @@ private:
 
     virtual bool isLoading() const { return StyleElement::isLoading(); }
     virtual bool sheetLoaded() { return StyleElement::sheetLoaded(document()); }
+    virtual void notifyLoadedSheetAndAllCriticalSubresources(bool errorOccurred);
     virtual void startLoadingDynamicSheet() { StyleElement::startLoadingDynamicSheet(document()); }
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
@@ -73,6 +81,9 @@ private:
 
     void registerWithScopingNode();
     void unregisterWithScopingNode();
+
+    bool m_firedLoad;
+    bool m_loadedSheet;
 
 #if ENABLE(STYLE_SCOPED)
     bool m_isRegisteredWithScopingNode;

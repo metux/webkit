@@ -32,6 +32,7 @@
 #include "IntRect.h"
 #include "Page.h"
 #include "PlatformWheelEvent.h"
+#include "PluginViewBase.h"
 #include "Region.h"
 #include "RenderView.h"
 #include "ScrollAnimator.h"
@@ -51,27 +52,16 @@
 
 namespace WebCore {
 
-PassRefPtr<ScrollingCoordinator> ScrollingCoordinator::create(Page* page)
-{
-    return adoptRef(new ScrollingCoordinator(page));
-}
-
 ScrollingCoordinator::ScrollingCoordinator(Page* page)
     : m_page(page)
+    , m_forceMainThreadScrollLayerPositionUpdates(false)
 #if ENABLE(THREADED_SCROLLING)
     , m_scrollingTreeState(ScrollingTreeState::create())
     , m_scrollingTree(ScrollingTree::create(this))
     , m_scrollingTreeStateCommitterTimer(this, &ScrollingCoordinator::scrollingTreeStateCommitterTimerFired)
 #endif
+    , m_private(0)
 {
-}
-
-ScrollingCoordinator::~ScrollingCoordinator()
-{
-    ASSERT(!m_page);
-#if ENABLE(THREADED_SCROLLING)
-    ASSERT(!m_scrollingTree);
-#endif
 }
 
 void ScrollingCoordinator::pageDestroyed()
@@ -104,22 +94,32 @@ bool ScrollingCoordinator::coordinatesScrollingForFrameView(FrameView* frameView
     if (frameView->frame() != m_page->mainFrame())
         return false;
 
-    return true;
+    // We currently only support composited mode.
+#if USE(ACCELERATED_COMPOSITING)
+    RenderView* renderView = m_page->mainFrame()->contentRenderer();
+    if (!renderView)
+        return false;
+    return renderView->usesCompositing();
+#else
+    return false;
+#endif
 }
 
-static Region computeNonFastScrollableRegion(FrameView* frameView)
+static Region computeNonFastScrollableRegion(Frame* mainFrame)
 {
     Region nonFastScrollableRegion;
 
-        if (const FrameView::ScrollableAreaSet* scrollableAreas = frameView->scrollableAreas()) {
+    for (Frame* frame = mainFrame; frame; frame = frame->tree()->traverseNext()) {
+        FrameView* frameView = frame->view();
+        if (!frameView)
+            continue;
+
+        const FrameView::ScrollableAreaSet* scrollableAreas = frameView->scrollableAreas();
+        if (!scrollableAreas)
+            continue;
+
         for (FrameView::ScrollableAreaSet::const_iterator it = scrollableAreas->begin(), end = scrollableAreas->end(); it != end; ++it) {
             ScrollableArea* scrollableArea = *it;
-
-            // Check if this area can be scrolled at all.
-            if ((!scrollableArea->horizontalScrollbar() || !scrollableArea->horizontalScrollbar()->enabled())
-                && (!scrollableArea->verticalScrollbar() || !scrollableArea->verticalScrollbar()->enabled()))
-                continue;
-
             nonFastScrollableRegion.unite(scrollableArea->scrollableAreaBoundingBox());
         }
     }
@@ -135,19 +135,24 @@ void ScrollingCoordinator::frameViewLayoutUpdated(FrameView* frameView)
     // Compute the region of the page that we can't do fast scrolling for. This currently includes
     // all scrollable areas, such as subframes, overflow divs and list boxes. We need to do this even if the
     // frame view whose layout was updated is not the main frame.
-    Region nonFastScrollableRegion = computeNonFastScrollableRegion(m_page->mainFrame()->view());
+    Region nonFastScrollableRegion = computeNonFastScrollableRegion(m_page->mainFrame());
     setNonFastScrollableRegion(nonFastScrollableRegion);
 
     if (!coordinatesScrollingForFrameView(frameView))
         return;
 
-    setScrollParameters(frameView->horizontalScrollElasticity(),
-                        frameView->verticalScrollElasticity(),
-                        frameView->horizontalScrollbar() && frameView->horizontalScrollbar()->enabled(),
-                        frameView->verticalScrollbar() && frameView->verticalScrollbar()->enabled(),
-                        IntRect(IntPoint(), frameView->visibleContentRect().size()),
-                        frameView->contentsSize());
+    ScrollParameters scrollParameters;
+    scrollParameters.horizontalScrollElasticity = frameView->horizontalScrollElasticity();
+    scrollParameters.verticalScrollElasticity = frameView->verticalScrollElasticity();
+    scrollParameters.hasEnabledHorizontalScrollbar = frameView->horizontalScrollbar() && frameView->horizontalScrollbar()->enabled();
+    scrollParameters.hasEnabledVerticalScrollbar = frameView->verticalScrollbar() && frameView->verticalScrollbar()->enabled();
+    scrollParameters.horizontalScrollbarMode = frameView->horizontalScrollbarMode();
+    scrollParameters.verticalScrollbarMode = frameView->verticalScrollbarMode();
 
+    scrollParameters.viewportRect = IntRect(IntPoint(), frameView->visibleContentRect().size());
+    scrollParameters.contentsSize = frameView->contentsSize();
+
+    setScrollParameters(scrollParameters);
 }
 
 void ScrollingCoordinator::frameViewWheelEventHandlerCountChanged(FrameView*)
@@ -201,7 +206,7 @@ void ScrollingCoordinator::frameViewRootLayerDidChange(FrameView* frameView)
     ASSERT(isMainThread());
     ASSERT(m_page);
 
-    if (frameView->frame() != m_page->mainFrame())
+    if (!coordinatesScrollingForFrameView(frameView))
         return;
 
     frameViewLayoutUpdated(frameView);
@@ -219,7 +224,15 @@ bool ScrollingCoordinator::requestScrollPositionUpdate(FrameView* frameView, con
         return false;
 
 #if ENABLE(THREADED_SCROLLING)
-    ScrollingThread::dispatch(bind(&ScrollingTree::setMainFrameScrollPosition, m_scrollingTree.get(), scrollPosition));
+    if (frameView->frame()->document()->inPageCache()) {
+        // If this frame view's document is being put into the page cache, we don't want to update our
+        // main frame scroll position. Just let the FrameView think that we did.
+        updateMainFrameScrollPosition(scrollPosition);
+        return true;
+    }
+
+    m_scrollingTreeState->setRequestedScrollPosition(scrollPosition);
+    scheduleTreeStateCommit();
     return true;
 #else
     UNUSED_PARAM(scrollPosition);
@@ -259,21 +272,44 @@ void ScrollingCoordinator::updateMainFrameScrollPosition(const IntPoint& scrollP
     frameView->setConstrainsScrollingToContentEdge(true);
 }
 
-void ScrollingCoordinator::updateMainFrameScrollPositionAndScrollLayerPosition(const IntPoint& scrollPosition)
+void ScrollingCoordinator::updateMainFrameScrollPositionAndScrollLayerPosition()
 {
-#if USE(ACCELERATED_COMPOSITING)
-    FrameView* frameView = m_page->mainFrame()->view();
-    GraphicsLayer* scrollLayer = scrollLayerForFrameView(frameView);
-    if (!scrollLayer)
-        return;
-    scrollLayer->setPosition(-frameView->scrollPosition());
+#if USE(ACCELERATED_COMPOSITING) && ENABLE(THREADED_SCROLLING)
+    ASSERT(isMainThread());
 
-    frameView->updateCompositingLayers();
+    if (!m_page)
+        return;
+
+    FrameView* frameView = m_page->mainFrame()->view();
+    if (!frameView)
+        return;
+
+    IntPoint scrollPosition = m_scrollingTree->mainFrameScrollPosition();
+
     frameView->setConstrainsScrollingToContentEdge(false);
     frameView->notifyScrollPositionChanged(scrollPosition);
     frameView->setConstrainsScrollingToContentEdge(true);
+
+    if (GraphicsLayer* scrollLayer = scrollLayerForFrameView(frameView))
+        scrollLayer->setPosition(-frameView->scrollPosition());
 #endif
 }
+
+#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+void ScrollingCoordinator::handleWheelEventPhase(PlatformWheelEventPhase phase)
+{
+    ASSERT(isMainThread());
+
+    if (!m_page)
+        return;
+
+    FrameView* frameView = m_page->mainFrame()->view();
+    if (!frameView)
+        return;
+
+    frameView->scrollAnimator()->handleWheelEventPhase(phase);
+}
+#endif
 
 void ScrollingCoordinator::recomputeWheelEventHandlerCount()
 {
@@ -290,45 +326,17 @@ void ScrollingCoordinator::updateShouldUpdateScrollLayerPositionOnMainThread()
     FrameView* frameView = m_page->mainFrame()->view();
 
     // FIXME: Having fixed objects on the page should not trigger the slow path.
-    setShouldUpdateScrollLayerPositionOnMainThread(frameView->hasSlowRepaintObjects() || frameView->hasFixedObjects());
+    setShouldUpdateScrollLayerPositionOnMainThread(m_forceMainThreadScrollLayerPositionUpdates || frameView->hasSlowRepaintObjects() || frameView->hasFixedObjects() || m_page->mainFrame()->document()->isImageDocument());
 }
 
-#if !ENABLE(THREADED_SCROLLING) && !PLATFORM(CHROMIUM)
-void ScrollingCoordinator::frameViewHorizontalScrollbarLayerDidChange(FrameView*, GraphicsLayer*)
+void ScrollingCoordinator::setForceMainThreadScrollLayerPositionUpdates(bool forceMainThreadScrollLayerPositionUpdates)
 {
-    // FIXME: Implement
-}
+    if (m_forceMainThreadScrollLayerPositionUpdates == forceMainThreadScrollLayerPositionUpdates)
+        return;
 
-void ScrollingCoordinator::frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer*)
-{
-    // FIXME: Implement
+    m_forceMainThreadScrollLayerPositionUpdates = forceMainThreadScrollLayerPositionUpdates;
+    updateShouldUpdateScrollLayerPositionOnMainThread();
 }
-
-void ScrollingCoordinator::setScrollLayer(GraphicsLayer*)
-{
-    // FIXME: Implement
-}
-
-void ScrollingCoordinator::setNonFastScrollableRegion(const Region&)
-{
-    // FIXME: Implement
-}
-
-void ScrollingCoordinator::setScrollParameters(ScrollElasticity, ScrollElasticity, bool, bool, const IntRect&, const IntSize&)
-{
-    // FIXME: Implement
-}
-
-void ScrollingCoordinator::setWheelEventHandlerCount(unsigned)
-{
-    // FIXME: Implement
-}
-
-void ScrollingCoordinator::setShouldUpdateScrollLayerPositionOnMainThread(bool)
-{
-    // FIXME: Implement
-}
-#endif
 
 #if ENABLE(THREADED_SCROLLING)
 void ScrollingCoordinator::setScrollLayer(GraphicsLayer* scrollLayer)
@@ -343,20 +351,17 @@ void ScrollingCoordinator::setNonFastScrollableRegion(const Region& region)
     scheduleTreeStateCommit();
 }
 
-void ScrollingCoordinator::setScrollParameters(ScrollElasticity horizontalScrollElasticity,
-                                               ScrollElasticity verticalScrollElasticity,
-                                               bool hasEnabledHorizontalScrollbar,
-                                               bool hasEnabledVerticalScrollbar,
-                                               const IntRect& viewportRect,
-                                               const IntSize& contentsSize)
+void ScrollingCoordinator::setScrollParameters(const ScrollParameters& scrollParameters)
 {
-    m_scrollingTreeState->setHorizontalScrollElasticity(horizontalScrollElasticity);
-    m_scrollingTreeState->setVerticalScrollElasticity(verticalScrollElasticity);
-    m_scrollingTreeState->setHasEnabledHorizontalScrollbar(hasEnabledHorizontalScrollbar);
-    m_scrollingTreeState->setHasEnabledVerticalScrollbar(hasEnabledVerticalScrollbar);
+    m_scrollingTreeState->setHorizontalScrollElasticity(scrollParameters.horizontalScrollElasticity);
+    m_scrollingTreeState->setVerticalScrollElasticity(scrollParameters.verticalScrollElasticity);
+    m_scrollingTreeState->setHasEnabledHorizontalScrollbar(scrollParameters.hasEnabledHorizontalScrollbar);
+    m_scrollingTreeState->setHasEnabledVerticalScrollbar(scrollParameters.hasEnabledVerticalScrollbar);
+    m_scrollingTreeState->setHorizontalScrollbarMode(scrollParameters.horizontalScrollbarMode);
+    m_scrollingTreeState->setVerticalScrollbarMode(scrollParameters.verticalScrollbarMode);
 
-    m_scrollingTreeState->setViewportRect(viewportRect);
-    m_scrollingTreeState->setContentsSize(contentsSize);
+    m_scrollingTreeState->setViewportRect(scrollParameters.viewportRect);
+    m_scrollingTreeState->setContentsSize(scrollParameters.contentsSize);
     scheduleTreeStateCommit();
 }
 

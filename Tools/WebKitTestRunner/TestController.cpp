@@ -38,6 +38,10 @@
 #include <cstdio>
 #include <wtf/PassOwnPtr.h>
 
+#if PLATFORM(MAC)
+#include <WebKit2/WKPagePrivateMac.h>
+#endif
+
 #if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK)
 #include "EventSenderProxy.h"
 #endif
@@ -46,6 +50,7 @@ namespace WTR {
 
 static const double defaultLongTimeout = 30;
 static const double defaultShortTimeout = 5;
+static const double defaultNoTimeout = -1;
 
 static WKURLRef blankURL()
 {
@@ -63,7 +68,6 @@ TestController& TestController::shared()
 
 TestController::TestController(int argc, const char* argv[])
     : m_dumpPixels(false)
-    , m_skipPixelTestOption(false)
     , m_verbose(false)
     , m_printSeparators(false)
     , m_usingServerMode(false)
@@ -72,6 +76,8 @@ TestController::TestController(int argc, const char* argv[])
     , m_doneResetting(false)
     , m_longTimeout(defaultLongTimeout)
     , m_shortTimeout(defaultShortTimeout)
+    , m_noTimeout(defaultNoTimeout)
+    , m_useWaitToDumpWatchdogTimer(true)
     , m_didPrintWebProcessCrashedMessage(false)
     , m_shouldExitWhenWebProcessCrashes(true)
     , m_beforeUnloadReturnValue(true)
@@ -122,7 +128,7 @@ static bool runBeforeUnloadConfirmPanel(WKPageRef page, WKStringRef message, WKF
 
 static unsigned long long exceededDatabaseQuota(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKStringRef, WKStringRef, unsigned long long, unsigned long long, unsigned long long, unsigned long long, const void*)
 {
-    static const unsigned long long defaultQuota = 5 * 1024 * 1024;    
+    static const unsigned long long defaultQuota = 5 * 1024 * 1024;
     return defaultQuota;
 }
 
@@ -170,7 +176,7 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         0, // takeFocus
         focus,
         unfocus,
-        0, // runJavaScriptAlert        
+        0, // runJavaScriptAlert
         0, // runJavaScriptConfirm
         0, // runJavaScriptPrompt
         0, // setStatusText
@@ -248,8 +254,8 @@ void TestController::initialize(int argc, const char* argv[])
             continue;
         }
 
-        if (argument == "--skip-pixel-test-if-no-baseline") {
-            m_skipPixelTestOption = true;
+        if (argument == "--no-timeout") {
+            m_useWaitToDumpWatchdogTimer = false;
             continue;
         }
 
@@ -329,7 +335,7 @@ void TestController::initialize(int argc, const char* argv[])
         0, // takeFocus
         0, // focus
         0, // unfocus
-        0, // runJavaScriptAlert        
+        0, // runJavaScriptAlert
         0, // runJavaScriptConfirm
         0, // runJavaScriptPrompt
         0, // setStatusText
@@ -396,8 +402,10 @@ void TestController::initialize(int argc, const char* argv[])
         0, // didChangeBackForwardList
         0, // shouldGoToBackForwardListItem
         0, // didRunInsecureContentForFrame
-        0, // didDetectXSSForFrame 
-        0  // didNewFirstVisuallyNonEmptyLayout 
+        0, // didDetectXSSForFrame
+        0, // didNewFirstVisuallyNonEmptyLayout
+        0, // willGoToBackForwardListItem
+        0, // interactionOccurredWhileProcessUnresponsive
     };
     WKPageSetPageLoaderClient(m_mainWebView->page(), &pageLoaderClient);
 }
@@ -405,7 +413,7 @@ void TestController::initialize(int argc, const char* argv[])
 bool TestController::resetStateToConsistentValues()
 {
     m_state = Resetting;
-    
+
     m_beforeUnloadReturnValue = true;
 
     WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("Reset"));
@@ -419,6 +427,8 @@ bool TestController::resetStateToConsistentValues()
 
     WKContextSetShouldUseFontSmoothing(TestController::shared().context(), false);
 
+    WKContextSetCacheModel(TestController::shared().context(), kWKCacheModelDocumentBrowser);
+
     // FIXME: This function should also ensure that there is only one page open.
 
     // Reset preferences
@@ -427,6 +437,7 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetOfflineWebApplicationCacheEnabled(preferences, true);
     WKPreferencesSetFontSmoothingLevel(preferences, kWKFontSmoothingLevelNoSubpixelAntiAliasing);
     WKPreferencesSetXSSAuditorEnabled(preferences, false);
+    WKPreferencesSetWebAudioEnabled(preferences, true);
     WKPreferencesSetDeveloperExtrasEnabled(preferences, true);
     WKPreferencesSetJavaScriptCanOpenWindowsAutomatically(preferences, true);
     WKPreferencesSetJavaScriptCanAccessClipboard(preferences, true);
@@ -461,6 +472,7 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetSansSerifFontFamily(preferences, sansSerifFontFamily);
     WKPreferencesSetSerifFontFamily(preferences, serifFontFamily);
 #endif
+    WKPreferencesSetInspectorUsesWebKitUserInterface(preferences, true);
 
     // in the case that a test using the chrome input field failed, be sure to clean up for the next test
     m_mainWebView->removeChromeInputField();
@@ -480,7 +492,12 @@ bool TestController::resetStateToConsistentValues()
 bool TestController::runTest(const char* test)
 {
     if (!resetStateToConsistentValues()) {
+#if PLATFORM(MAC)
+        pid_t pid = WKPageGetProcessIdentifier(m_mainWebView->page());
+        fprintf(stderr, "#CRASHED - WebProcess (pid %ld)\n", static_cast<long>(pid));
+#else
         fputs("#CRASHED - WebProcess\n", stderr);
+#endif
         fflush(stderr);
         return false;
     }
@@ -496,9 +513,8 @@ bool TestController::runTest(const char* test)
     m_state = RunningTest;
 
     m_currentInvocation = adoptPtr(new TestInvocation(pathOrURL));
-    m_currentInvocation->setSkipPixelTestOption(m_skipPixelTestOption);
     if (m_dumpPixels)
-        m_currentInvocation->setIsPixelTest(expectedPixelHash);    
+        m_currentInvocation->setIsPixelTest(expectedPixelHash);
 
     m_currentInvocation->invoke();
     m_currentInvocation.clear();
@@ -536,7 +552,21 @@ void TestController::run()
 
 void TestController::runUntil(bool& done, TimeoutDuration timeoutDuration)
 {
-    platformRunUntil(done, timeoutDuration == ShortTimeout ? m_shortTimeout : m_longTimeout);
+    double timeout;
+    switch (timeoutDuration) {
+    case ShortTimeout:
+        timeout = m_shortTimeout;
+        break;
+    case LongTimeout:
+        timeout = m_longTimeout;
+        break;
+    case NoTimeout:
+    default:
+        timeout = m_noTimeout;
+        break;
+    }
+
+    platformRunUntil(done, timeout);
 }
 
 // WKContextInjectedBundleClient
@@ -677,6 +707,17 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             return 0;
         }
 
+        if (WKStringIsEqualToUTF8CString(subMessageName, "SetTouchPointRadius")) {
+            WKRetainPtr<WKStringRef> xKey = adoptWK(WKStringCreateWithUTF8CString("RadiusX"));
+            int x = static_cast<int>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, xKey.get()))));
+
+            WKRetainPtr<WKStringRef> yKey = adoptWK(WKStringCreateWithUTF8CString("RadiusY"));
+            int y = static_cast<int>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, yKey.get()))));
+
+            m_eventSenderProxy->setTouchPointRadius(x, y);
+            return 0;
+        }
+
         if (WKStringIsEqualToUTF8CString(subMessageName, "TouchStart")) {
             WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), true);
             m_eventSenderProxy->touchStart();
@@ -698,6 +739,13 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             return 0;
         }
 
+        if (WKStringIsEqualToUTF8CString(subMessageName, "TouchCancel")) {
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), true);
+            m_eventSenderProxy->touchCancel();
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), false);
+            return 0;
+        }
+
         if (WKStringIsEqualToUTF8CString(subMessageName, "ClearTouchPoints")) {
             m_eventSenderProxy->clearTouchPoints();
             return 0;
@@ -707,6 +755,13 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             WKRetainPtr<WKStringRef> indexKey = adoptWK(WKStringCreateWithUTF8CString("Index"));
             int index = static_cast<int>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, indexKey.get()))));
             m_eventSenderProxy->releaseTouchPoint(index);
+            return 0;
+        }
+
+        if (WKStringIsEqualToUTF8CString(subMessageName, "CancelTouchPoint")) {
+            WKRetainPtr<WKStringRef> indexKey = adoptWK(WKStringCreateWithUTF8CString("Index"));
+            int index = static_cast<int>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, indexKey.get()))));
+            m_eventSenderProxy->cancelTouchPoint(index);
             return 0;
         }
 #endif
@@ -762,7 +817,12 @@ void TestController::processDidCrash()
     // This function can be called multiple times when crash logs are being saved on Windows, so
     // ensure we only print the crashed message once.
     if (!m_didPrintWebProcessCrashedMessage) {
+#if PLATFORM(MAC)
+        pid_t pid = WKPageGetProcessIdentifier(m_mainWebView->page());
+        fprintf(stderr, "#CRASHED - WebProcess (pid %ld)\n", static_cast<long>(pid));
+#else
         fputs("#CRASHED - WebProcess\n", stderr);
+#endif
         fflush(stderr);
         m_didPrintWebProcessCrashedMessage = true;
     }

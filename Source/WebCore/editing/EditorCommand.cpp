@@ -103,25 +103,25 @@ static bool applyCommandToFrame(Frame* frame, EditorCommandSource source, EditAc
     // FIXME: We don't call shouldApplyStyle when the source is DOM; is there a good reason for that?
     switch (source) {
     case CommandFromMenuOrKeyBinding:
-        frame->editor()->applyStyleToSelection(style->ensureCSSStyleDeclaration(), action);
+        frame->editor()->applyStyleToSelection(style, action);
         return true;
     case CommandFromDOM:
     case CommandFromDOMWithUserInterface:
-        frame->editor()->applyStyle(style->ensureCSSStyleDeclaration());
+        frame->editor()->applyStyle(style);
         return true;
     }
     ASSERT_NOT_REACHED();
     return false;
 }
 
-static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditAction action, int propertyID, const String& propertyValue)
+static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditAction action, CSSPropertyID propertyID, const String& propertyValue)
 {
     RefPtr<StylePropertySet> style = StylePropertySet::create();
     style->setProperty(propertyID, propertyValue);
     return applyCommandToFrame(frame, source, action, style.get());
 }
 
-static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditAction action, int propertyID, int propertyValue)
+static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditAction action, CSSPropertyID propertyID, int propertyValue)
 {
     RefPtr<StylePropertySet> style = StylePropertySet::create();
     style->setProperty(propertyID, propertyValue);
@@ -131,7 +131,7 @@ static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditActi
 // FIXME: executeToggleStyleInList does not handle complicated cases such as <b><u>hello</u>world</b> properly.
 //        This function must use Editor::selectionHasStyle to determine the current style but we cannot fix this
 //        until https://bugs.webkit.org/show_bug.cgi?id=27818 is resolved.
-static bool executeToggleStyleInList(Frame* frame, EditorCommandSource source, EditAction action, int propertyID, CSSValue* value)
+static bool executeToggleStyleInList(Frame* frame, EditorCommandSource source, EditAction action, CSSPropertyID propertyID, CSSValue* value)
 {
     ExceptionCode ec = 0;
     RefPtr<EditingStyle> selectionStyle = EditingStyle::styleAtSelectionStart(frame->selection()->selection());
@@ -156,7 +156,7 @@ static bool executeToggleStyleInList(Frame* frame, EditorCommandSource source, E
     return applyCommandToFrame(frame, source, action, newMutableStyle.get());
 }
 
-static bool executeToggleStyle(Frame* frame, EditorCommandSource source, EditAction action, int propertyID, const char* offValue, const char* onValue)
+static bool executeToggleStyle(Frame* frame, EditorCommandSource source, EditAction action, CSSPropertyID propertyID, const char* offValue, const char* onValue)
 {
     // Style is considered present when
     // Mac: present at the beginning of selection
@@ -172,18 +172,18 @@ static bool executeToggleStyle(Frame* frame, EditorCommandSource source, EditAct
     return applyCommandToFrame(frame, source, action, style->style());
 }
 
-static bool executeApplyParagraphStyle(Frame* frame, EditorCommandSource source, EditAction action, int propertyID, const String& propertyValue)
+static bool executeApplyParagraphStyle(Frame* frame, EditorCommandSource source, EditAction action, CSSPropertyID propertyID, const String& propertyValue)
 {
     RefPtr<StylePropertySet> style = StylePropertySet::create();
     style->setProperty(propertyID, propertyValue);
     // FIXME: We don't call shouldApplyStyle when the source is DOM; is there a good reason for that?
     switch (source) {
     case CommandFromMenuOrKeyBinding:
-        frame->editor()->applyParagraphStyleToSelection(style->ensureCSSStyleDeclaration(), action);
+        frame->editor()->applyParagraphStyleToSelection(style.get(), action);
         return true;
     case CommandFromDOM:
     case CommandFromDOMWithUserInterface:
-        frame->editor()->applyParagraphStyle(style->ensureCSSStyleDeclaration());
+        frame->editor()->applyParagraphStyle(style.get());
         return true;
     }
     ASSERT_NOT_REACHED();
@@ -224,14 +224,14 @@ static bool expandSelectionToGranularity(Frame* frame, TextGranularity granulari
     return true;
 }
 
-static TriState stateStyle(Frame* frame, int propertyID, const char* desiredValue)
+static TriState stateStyle(Frame* frame, CSSPropertyID propertyID, const char* desiredValue)
 {
     if (frame->editor()->behavior().shouldToggleStyleBasedOnStartOfSelection())
         return frame->editor()->selectionStartHasStyle(propertyID, desiredValue) ? TrueTriState : FalseTriState;
     return frame->editor()->selectionHasStyle(propertyID, desiredValue);
 }
 
-static String valueStyle(Frame* frame, int propertyID)
+static String valueStyle(Frame* frame, CSSPropertyID propertyID)
 {
     // FIXME: Rather than retrieving the style at the start of the current selection,
     // we should retrieve the style present throughout the selection for non-Mac platforms.
@@ -304,6 +304,16 @@ static bool executeCut(Frame* frame, Event*, EditorCommandSource source, const S
         frame->editor()->cut();
     } else
         frame->editor()->cut();
+    return true;
+}
+
+static bool executeDefaultParagraphSeparator(Frame* frame, Event*, EditorCommandSource, const String& value)
+{
+    if (equalIgnoringCase(value, "div"))
+        frame->editor()->setDefaultParagraphSeparator(EditorParagraphSeparatorIsDiv);
+    else if (equalIgnoringCase(value, "p"))
+        frame->editor()->setDefaultParagraphSeparator(EditorParagraphSeparatorIsP);
+
     return true;
 }
 
@@ -585,7 +595,7 @@ static bool executeMakeTextWritingDirectionLeftToRight(Frame* frame, Event*, Edi
     RefPtr<StylePropertySet> style = StylePropertySet::create();
     style->setProperty(CSSPropertyUnicodeBidi, CSSValueEmbed);
     style->setProperty(CSSPropertyDirection, CSSValueLtr);
-    frame->editor()->applyStyle(style->ensureCSSStyleDeclaration(), EditActionSetWritingDirection);
+    frame->editor()->applyStyle(style.get(), EditActionSetWritingDirection);
     return true;
 }
 
@@ -593,7 +603,7 @@ static bool executeMakeTextWritingDirectionNatural(Frame* frame, Event*, EditorC
 {
     RefPtr<StylePropertySet> style = StylePropertySet::create();
     style->setProperty(CSSPropertyUnicodeBidi, CSSValueNormal);
-    frame->editor()->applyStyle(style->ensureCSSStyleDeclaration(), EditActionSetWritingDirection);
+    frame->editor()->applyStyle(style.get(), EditActionSetWritingDirection);
     return true;
 }
 
@@ -602,7 +612,7 @@ static bool executeMakeTextWritingDirectionRightToLeft(Frame* frame, Event*, Edi
     RefPtr<StylePropertySet> style = StylePropertySet::create();
     style->setProperty(CSSPropertyUnicodeBidi, CSSValueEmbed);
     style->setProperty(CSSPropertyDirection, CSSValueRtl);
-    frame->editor()->applyStyle(style->ensureCSSStyleDeclaration(), EditActionSetWritingDirection);
+    frame->editor()->applyStyle(style.get(), EditActionSetWritingDirection);
     return true;
 }
 
@@ -1378,6 +1388,19 @@ static String valueBackColor(Frame* frame, Event*)
     return valueStyle(frame, CSSPropertyBackgroundColor);
 }
 
+static String valueDefaultParagraphSeparator(Frame* frame, Event*)
+{
+    switch (frame->editor()->defaultParagraphSeparator()) {
+    case EditorParagraphSeparatorIsDiv:
+        return divTag.localName();
+    case EditorParagraphSeparatorIsP:
+        return pTag.localName();
+    }
+
+    ASSERT_NOT_REACHED();
+    return String();
+}
+
 static String valueFontName(Frame* frame, Event*)
 {
     return valueStyle(frame, CSSPropertyFontFamily);
@@ -1429,6 +1452,7 @@ static const CommandMap& createCommandMap()
         { "Copy", { executeCopy, supportedCopyCut, enabledCopy, stateNone, valueNull, notTextInsertion, allowExecutionWhenDisabled } },
         { "CreateLink", { executeCreateLink, supported, enabledInRichlyEditableText, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
         { "Cut", { executeCut, supportedCopyCut, enabledCut, stateNone, valueNull, notTextInsertion, allowExecutionWhenDisabled } },
+        { "DefaultParagraphSeparator", { executeDefaultParagraphSeparator, supported, enabled, stateNone, valueDefaultParagraphSeparator, notTextInsertion, doNotAllowExecutionWhenDisabled} },
         { "Delete", { executeDelete, supported, enabledDelete, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
         { "DeleteBackward", { executeDeleteBackward, supportedFromMenuOrKeyBinding, enabledInEditableText, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
         { "DeleteBackwardByDecomposingPreviousCharacter", { executeDeleteBackwardByDecomposingPreviousCharacter, supportedFromMenuOrKeyBinding, enabledInEditableText, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },

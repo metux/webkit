@@ -66,9 +66,9 @@
 #include "Navigator.h"
 #include "NodeList.h"
 #include "Page.h"
+#include "PageCache.h"
 #include "PageGroup.h"
 #include "RegularExpression.h"
-#include "RenderLayer.h"
 #include "RenderPart.h"
 #include "RenderTableCell.h"
 #include "RenderTextControl.h"
@@ -166,6 +166,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_inViewSourceMode(false)
     , m_isDisconnected(false)
     , m_excludeFromTextSearch(false)
+    , m_activeDOMObjectsAndAnimationsSuspendedCount(0)
 {
     ASSERT(page);
     AtomicString::init();
@@ -196,6 +197,11 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
 #ifndef NDEBUG
     frameCounter.increment();
 #endif
+
+    // Pause future ActiveDOMObjects if this frame is being created while the page is in a paused state.
+    Frame* parent = parentFromOwnerElement(ownerElement);
+    if (parent && parent->activeDOMObjectsAndAnimationsSuspended())
+        suspendActiveDOMObjectsAndAnimations();
 }
 
 PassRefPtr<Frame> Frame::create(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient* client)
@@ -227,6 +233,15 @@ Frame::~Frame()
         m_view->hide();
         m_view->clearFrame();
     }
+}
+
+bool Frame::inScope(TreeScope* scope) const
+{
+    ASSERT(scope);
+    HTMLFrameOwnerElement* owner = document()->ownerElement();
+    // Scoping test should be done only for child frames.
+    ASSERT(owner);
+    return owner->treeScope() == scope;
 }
 
 void Frame::addDestructionObserver(FrameDestructionObserver* observer)
@@ -296,6 +311,13 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
     if (m_page && m_page->mainFrame() == this) {
         notifyChromeClientWheelEventHandlerCountChanged();
         notifyChromeClientTouchEventHandlerCountChanged();
+    }
+
+    // Suspend document if this frame was created in suspended state.
+    if (m_doc && activeDOMObjectsAndAnimationsSuspended()) {
+        m_doc->suspendScriptedAnimationControllerCallbacks();
+        m_animationController.suspendAnimationsForDocument(m_doc.get());
+        m_doc->suspendActiveDOMObjects(ActiveDOMObject::PageWillBeSuspended);
     }
 }
 
@@ -499,7 +521,7 @@ void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSiz
     m_doc->setPrinting(printing);
     view()->adjustMediaTypeForPrinting(printing);
 
-    m_doc->styleSelectorChanged(RecalcStyleImmediately);
+    m_doc->styleResolverChanged(RecalcStyleImmediately);
     if (printing)
         view()->forceLayoutForPagination(pageSize, originalPageSize, maximumShrinkRatio, shouldAdjustViewSize);
     else {
@@ -571,8 +593,10 @@ void Frame::injectUserScriptsForWorld(DOMWrapperWorld* world, const UserScriptVe
 
 void Frame::clearDOMWindow()
 {
-    if (m_domWindow)
+    if (m_domWindow) {
+        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
         m_domWindow->clear();
+    }
     m_domWindow = 0;
 }
 
@@ -637,8 +661,10 @@ void Frame::clearTimers()
 
 void Frame::setDOMWindow(DOMWindow* domWindow)
 {
-    if (m_domWindow)
+    if (m_domWindow) {
+        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
         m_domWindow->clear();
+    }
     m_domWindow = domWindow;
 }
 
@@ -660,21 +686,14 @@ DOMWindow* Frame::domWindow() const
     return m_domWindow.get();
 }
 
-void Frame::pageDestroyed()
+void Frame::willDetachPage()
 {
-    // FIXME: Rename this function, since it's called not only from Page destructor, but in several other cases.
-    // This cleanup is needed whenever we remove a frame from page.
-
     if (Frame* parent = tree()->parent())
         parent->loader()->checkLoadComplete();
 
-    if (m_domWindow) {
-        m_domWindow->resetGeolocation();
-#if ENABLE(NOTIFICATIONS)
-        m_domWindow->resetNotifications();
-#endif
-        m_domWindow->pageDestroyed();
-    }
+    HashSet<FrameDestructionObserver*>::iterator stop = m_destructionObservers.end();
+    for (HashSet<FrameDestructionObserver*>::iterator it = m_destructionObservers.begin(); it != stop; ++it)
+        (*it)->willDetachPage();
 
     // FIXME: It's unclear as to why this is called more than once, but it is,
     // so page() could be NULL.
@@ -683,8 +702,6 @@ void Frame::pageDestroyed()
 
     script()->clearScriptObjects();
     script()->updatePlatformScriptObjects();
-
-    detachFromPage();
 }
 
 void Frame::disconnectOwnerElement()
@@ -712,7 +729,7 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
     return document() ? document()->displayStringModifiedByEncoding(str) : str;
 }
 
-VisiblePosition Frame::visiblePositionForPoint(const LayoutPoint& framePoint)
+VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
 {
     HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, true);
     Node* node = result.innerNonSharedNode();
@@ -732,7 +749,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     if (!view())
         return 0;
 
-    LayoutPoint pt = view()->windowToContents(point);
+    IntPoint pt = view()->windowToContents(point);
     HitTestResult result = HitTestResult(pt);
 
     if (contentRenderer())
@@ -740,7 +757,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     return result.innerNode() ? result.innerNode()->document() : 0;
 }
 
-PassRefPtr<Range> Frame::rangeForPoint(const LayoutPoint& framePoint)
+PassRefPtr<Range> Frame::rangeForPoint(const IntPoint& framePoint)
 {
     VisiblePosition position = visiblePositionForPoint(framePoint);
     if (position.isNull())
@@ -937,7 +954,7 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     }
 
     if (page->mainFrame() == this)
-        page->backForward()->markPagesForFullStyleRecalc();
+        pageCache()->markPagesForFullStyleRecalc(page);
 }
 
 float Frame::frameScaleFactor() const
@@ -948,6 +965,38 @@ float Frame::frameScaleFactor() const
     if (!page || page->mainFrame() != this)
         return 1;
     return page->pageScaleFactor();
+}
+
+void Frame::suspendActiveDOMObjectsAndAnimations()
+{
+    bool wasSuspended = activeDOMObjectsAndAnimationsSuspended();
+
+    m_activeDOMObjectsAndAnimationsSuspendedCount++;
+
+    if (wasSuspended)
+        return;
+
+    if (document()) {
+        document()->suspendScriptedAnimationControllerCallbacks();
+        animation()->suspendAnimationsForDocument(document());
+        document()->suspendActiveDOMObjects(ActiveDOMObject::PageWillBeSuspended);
+    }
+}
+
+void Frame::resumeActiveDOMObjectsAndAnimations()
+{
+    ASSERT(activeDOMObjectsAndAnimationsSuspended());
+
+    m_activeDOMObjectsAndAnimationsSuspendedCount--;
+
+    if (activeDOMObjectsAndAnimationsSuspended())
+        return;
+
+    if (document()) {
+        document()->resumeActiveDOMObjects();
+        animation()->resumeAnimationsForDocument(document());
+        document()->resumeScriptedAnimationControllerCallbacks();
+    }
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -1033,7 +1082,7 @@ DragImageRef Frame::nodeImage(Node* node)
     LayoutRect topLevelRect;
     IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), 1, ColorSpaceDeviceRGB));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
@@ -1042,7 +1091,7 @@ DragImageRef Frame::nodeImage(Node* node)
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return createDragImageFromImage(image.get());
+    return createDragImageFromImage(image.get(), renderer->shouldRespectImageOrientation());
 }
 
 DragImageRef Frame::dragImageForSelection()
@@ -1056,7 +1105,7 @@ DragImageRef Frame::dragImageForSelection()
 
     IntRect paintingRect = enclosingIntRect(selection()->bounds());
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), 1, ColorSpaceDeviceRGB));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());

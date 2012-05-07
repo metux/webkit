@@ -31,9 +31,9 @@
 #include "config.h"
 #include "CSSCalculationValue.h"
 
-#include "CSSStyleSelector.h"
 #include "CSSValueList.h"
 #include "Length.h"
+#include "StyleResolver.h"
 
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -76,15 +76,20 @@ String CSSCalcValue::customCssText() const
 {
     return "";
 }
-
+    
+double CSSCalcValue::clampToPermittedRange(double value) const
+{
+    return m_nonNegative && value < 0 ? 0 : value;
+}    
+    
 double CSSCalcValue::doubleValue() const 
 { 
-    return m_expression->doubleValue();
+    return clampToPermittedRange(m_expression->doubleValue());
 }
-    
+
 double CSSCalcValue::computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier, bool computingFontSize) const
 {
-    return m_expression->computeLengthPx(currentStyle, rootStyle, multiplier, computingFontSize);
+    return clampToPermittedRange(m_expression->computeLengthPx(currentStyle, rootStyle, multiplier, computingFontSize));
 }
     
 CSSCalcExpressionNode::~CSSCalcExpressionNode() 
@@ -107,6 +112,25 @@ public:
     virtual String cssText() const
     {
         return m_value->cssText();
+    }
+
+    virtual PassOwnPtr<CalcExpressionNode> toCalcValue(RenderStyle* style, RenderStyle* rootStyle, double zoom) const
+    {
+        switch (m_category) {
+        case CalcNumber:
+            return adoptPtr(new CalcExpressionNumber(m_value->getFloatValue()));
+        case CalcLength:
+            return adoptPtr(new CalcExpressionNumber(m_value->computeLength<float>(style, rootStyle, zoom)));
+        case CalcPercent:
+        case CalcPercentLength:
+            return adoptPtr(new CalcExpressionLength(StyleResolver::convertToFloatLength(m_value.get(), style, rootStyle, zoom)));
+        // Only types that could be part of a Length expression can be converted
+        // to a CalcExpressionNode. CalcPercentNumber makes no sense as a Length.
+        case CalcPercentNumber:
+        case CalcOther:
+            ASSERT_NOT_REACHED();
+        }
+        return nullptr;
     }
 
     virtual double doubleValue() const
@@ -201,6 +225,17 @@ public:
     virtual bool isZero() const
     {
         return !doubleValue();
+    }
+
+    virtual PassOwnPtr<CalcExpressionNode> toCalcValue(RenderStyle* style, RenderStyle* rootStyle, double zoom) const
+    {
+        OwnPtr<CalcExpressionNode> left(m_leftSide->toCalcValue(style, rootStyle, zoom));
+        if (!left)
+            return nullptr;
+        OwnPtr<CalcExpressionNode> right(m_rightSide->toCalcValue(style, rootStyle, zoom));
+        if (!right)
+            return nullptr;
+        return adoptPtr(new CalcExpressionBinaryOperation(left.release(), right.release(), m_operator));
     }
 
     virtual double doubleValue() const 
@@ -381,7 +416,7 @@ private:
     }
 };
 
-PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserValueList* parserValueList)
+PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserValueList* parserValueList, CalculationPermittedValueRange range)
 {    
     CSSCalcExpressionNodeParser parser;    
     RefPtr<CSSCalcExpressionNode> expression;
@@ -390,7 +425,7 @@ PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserVal
         expression = parser.parseCalc(parserValueList);    
     // FIXME calc (http://webkit.org/b/16662) Add parsing for min and max here
 
-    return expression ? adoptRef(new CSSCalcValue(expression)) : 0;
+    return expression ? adoptRef(new CSSCalcValue(expression, range)) : 0;
 }
 
 } // namespace WebCore

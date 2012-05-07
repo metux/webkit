@@ -41,7 +41,7 @@
 #include "RenderSVGResourceSolidColor.h"
 #include "SVGPathData.h"
 #include "SVGPathElement.h"
-#include "SVGRenderSupport.h"
+#include "SVGRenderingContext.h"
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
 #include "SVGStyledTransformableElement.h"
@@ -59,13 +59,6 @@ RenderSVGShape::RenderSVGShape(SVGStyledTransformableElement* node)
     , m_needsShapeUpdate(true) // Default is true, so we grab a Path object once from SVGStyledTransformableElement.
     , m_needsTransformUpdate(true) // Default is true, so we grab a AffineTransform object once from SVGStyledTransformableElement.
     , m_fillFallback(false)
-{
-}
-
-RenderSVGShape::RenderSVGShape(SVGStyledTransformableElement* node, Path* path, bool isFillFallback)
-    : RenderSVGModelObject(node)
-    , m_path(adoptPtr(path))
-    , m_fillFallback(isFillFallback)
 {
 }
 
@@ -101,7 +94,8 @@ FloatRect RenderSVGShape::objectBoundingBox() const
 
 void RenderSVGShape::strokeShape(GraphicsContext* context) const
 {
-    context->strokePath(path());
+    if (style()->svgStyle()->hasVisibleStroke())
+        context->strokePath(path());
 }
 
 bool RenderSVGShape::shapeDependentStrokeContains(const FloatPoint& point) const
@@ -129,7 +123,7 @@ bool RenderSVGShape::fillContains(const FloatPoint& point, bool requiresFill, co
 
 bool RenderSVGShape::strokeContains(const FloatPoint& point, bool requiresStroke)
 {
-    if (!m_strokeAndMarkerBoundingBox.contains(point))
+    if (!strokeBoundingBox().contains(point))
         return false;
 
     Color fallbackColor;
@@ -152,7 +146,7 @@ bool RenderSVGShape::strokeContains(const FloatPoint& point, bool requiresStroke
     }
 
     if (!svgStyle->strokeDashArray().isEmpty() || svgStyle->strokeMiterLimit() != svgStyle->initialStrokeMiterLimit()
-        || svgStyle->joinStyle() != svgStyle->initialJoinStyle() || svgStyle->capStyle() != svgStyle->initialCapStyle() || static_cast<SVGElement*>(node())->isStyled()) {
+        || svgStyle->joinStyle() != svgStyle->initialJoinStyle() || svgStyle->capStyle() != svgStyle->initialCapStyle()) {
         if (!m_path)
             RenderSVGShape::createShape();
         return RenderSVGShape::shapeDependentStrokeContains(point);
@@ -168,7 +162,7 @@ void RenderSVGShape::layout()
     bool updateCachedBoundariesInParents = false;
 
     bool needsShapeUpdate = m_needsShapeUpdate;
-    if (needsShapeUpdate) {
+    if (needsShapeUpdate || m_needsBoundariesUpdate) {
         setIsPaintingFallback(false);
         m_path.clear();
         createShape();
@@ -179,13 +173,6 @@ void RenderSVGShape::layout()
     if (m_needsTransformUpdate) {
         m_localTransform = element->animatedLocalTransform();
         m_needsTransformUpdate = false;
-        updateCachedBoundariesInParents = true;
-    }
-
-    if (m_needsBoundariesUpdate) {
-        setIsPaintingFallback(false);
-        m_path.clear();
-        createShape();
         updateCachedBoundariesInParents = true;
     }
 
@@ -279,6 +266,8 @@ void RenderSVGShape::strokePath(RenderStyle* style, GraphicsContext* context, Pa
                                 const Color& fallbackColor, bool nonScalingStroke, const AffineTransform& nonScalingStrokeTransform,
                                 int applyMode)
 {
+    if (!style->svgStyle()->hasVisibleStroke())
+        return;
     Path* usePath = path;
     if (nonScalingStroke) {
         usePath = nonScalingStrokePath(path, nonScalingStrokeTransform);
@@ -325,7 +314,7 @@ void RenderSVGShape::fillAndStrokePath(GraphicsContext* context)
 
 }
 
-void RenderSVGShape::paint(PaintInfo& paintInfo, const IntPoint&)
+void RenderSVGShape::paint(PaintInfo& paintInfo, const LayoutPoint&)
 {
     if (paintInfo.context->paintingDisabled() || style()->visibility() == HIDDEN || isEmpty())
         return;
@@ -340,9 +329,9 @@ void RenderSVGShape::paint(PaintInfo& paintInfo, const IntPoint&)
         childPaintInfo.applyTransform(m_localTransform);
 
         if (childPaintInfo.phase == PaintPhaseForeground) {
-            PaintInfo savedInfo(childPaintInfo);
+            SVGRenderingContext renderingContext(this, childPaintInfo);
 
-            if (SVGRenderSupport::prepareToRenderSVGContent(this, childPaintInfo)) {
+            if (renderingContext.isRenderingPrepared()) {
                 const SVGRenderStyle* svgStyle = style()->svgStyle();
                 if (svgStyle->shapeRendering() == SR_CRISPEDGES)
                     childPaintInfo.context->setShouldAntialias(false);
@@ -352,8 +341,6 @@ void RenderSVGShape::paint(PaintInfo& paintInfo, const IntPoint&)
                 if (svgStyle->hasMarkers())
                     m_markerLayoutInfo.drawMarkers(childPaintInfo);
             }
-
-            SVGRenderSupport::finishRenderSVGContent(this, childPaintInfo, savedInfo.context);
         }
 
         if (drawsOutline)
@@ -363,9 +350,9 @@ void RenderSVGShape::paint(PaintInfo& paintInfo, const IntPoint&)
 
 // This method is called from inside paintOutline() since we call paintOutline()
 // while transformed to our coord system, return local coords
-void RenderSVGShape::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoint&)
+void RenderSVGShape::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&)
 {
-    LayoutRect rect = enclosingLayoutRect(repaintRectInLocalCoordinates());
+    IntRect rect = enclosingIntRect(repaintRectInLocalCoordinates());
     if (!rect.isEmpty())
         rects.append(rect);
 }

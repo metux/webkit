@@ -25,19 +25,21 @@
 #define HTMLFormControlElement_h
 
 #include "FormAssociatedElement.h"
-#include "HTMLElement.h"
+#include "LabelableElement.h"
 
 namespace WebCore {
 
 class FormDataList;
+class HTMLFieldSetElement;
 class HTMLFormElement;
+class HTMLLegendElement;
 class ValidationMessage;
 class ValidityState;
 
 // HTMLFormControlElement is the default implementation of FormAssociatedElement,
 // and form-associated element implementations should use HTMLFormControlElement
 // unless there is a special reason.
-class HTMLFormControlElement : public HTMLElement, public FormAssociatedElement {
+class HTMLFormControlElement : public LabelableElement, public FormAssociatedElement {
 public:
     virtual ~HTMLFormControlElement();
 
@@ -48,6 +50,8 @@ public:
     String formMethod() const;
     void setFormMethod(const String&);
     bool formNoValidate() const;
+
+    void updateAncestors() const;
 
     virtual void reset() { }
 
@@ -60,7 +64,7 @@ public:
     virtual void dispatchFormControlChangeEvent();
     virtual void dispatchFormControlInputEvent();
 
-    virtual bool disabled() const { return m_disabled; }
+    virtual bool disabled() const;
     void setDisabled(bool);
 
     virtual bool isFocusable() const;
@@ -80,7 +84,6 @@ public:
     virtual bool isEnabledFormControl() const { return !disabled(); }
     virtual bool isReadOnlyFormControl() const { return readOnly(); }
 
-    virtual bool isRadioButton() const { return false; }
     virtual bool canTriggerImplicitSubmission() const { return false; }
 
     // Override in derived classes to get the encoded name=value pair for submitting.
@@ -100,13 +103,12 @@ public:
     void setNeedsValidityCheck();
     void setCustomValidity(const String&);
 
-    bool isLabelable() const;
-    PassRefPtr<NodeList> labels();
-
     bool readOnly() const { return m_readOnly; }
 
     bool hasAutofocused() { return m_hasAutofocused; }
     void setAutofocused() { m_hasAutofocused = true; }
+
+    static HTMLFormControlElement* enclosingFormControlElement(Node*);
 
     using TreeShared<ContainerNode>::ref;
     using TreeShared<ContainerNode>::deref;
@@ -116,11 +118,10 @@ protected:
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
     virtual void requiredAttributeChanged();
+    virtual void disabledAttributeChanged();
     virtual void attach();
-    virtual void insertedIntoTree(bool deep);
-    virtual void removedFromTree(bool deep);
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
     virtual bool supportsFocus() const;
@@ -149,7 +150,10 @@ private:
     virtual bool isValidFormControlElement();
     String visibleValidationMessage() const;
 
+    mutable HTMLFieldSetElement* m_fieldSetAncestor;
+    mutable HTMLLegendElement* m_legendAncestor;
     OwnPtr<ValidationMessage> m_validationMessage;
+    mutable bool m_ancestorsValid : 1;
     bool m_disabled : 1;
     bool m_readOnly : 1;
     bool m_required : 1;
@@ -168,6 +172,7 @@ private:
     bool m_wasChangedSinceLastFormControlChangeEvent : 1;
 
     bool m_hasAutofocused : 1;
+    mutable bool m_hasDataListAncestor : 1;
 };
 
 } // namespace

@@ -45,6 +45,7 @@
 #include <wtf/ArrayBufferView.h>
 #include <wtf/Float32Array.h>
 #include <wtf/Int32Array.h>
+#include <wtf/OwnArrayPtr.h>
 #include <wtf/Uint8Array.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
@@ -94,7 +95,7 @@ void GraphicsContext3D::validateAttributes()
         // Currently in Mac we only turn on antialias if vendor is NVIDIA,
         // or if ATI and on 10.7.2 and above.
         const char* vendor = reinterpret_cast<const char*>(::glGetString(GL_VENDOR));
-        if (!std::strstr(vendor, "NVIDIA") && !(std::strstr(vendor, "ATI") && systemAllowsMultisamplingOnATICards()))
+        if (!vendor || (!std::strstr(vendor, "NVIDIA") && !(std::strstr(vendor, "ATI") && systemAllowsMultisamplingOnATICards())))
             isValidVendor = false;
         if (!isValidVendor || !extensions->supports("GL_ANGLE_framebuffer_multisample") || isGLES2Compliant())
             m_attrs.antialias = false;
@@ -149,7 +150,7 @@ PassRefPtr<ImageData> GraphicsContext3D::paintRenderingResultsToImageData(Drawin
         return 0;
 
     RefPtr<ImageData> imageData = ImageData::create(IntSize(m_currentWidth, m_currentHeight));
-    unsigned char* pixels = imageData->data()->data()->data();
+    unsigned char* pixels = imageData->data()->data();
     int totalBytes = 4 * m_currentWidth * m_currentHeight;
 
     readRenderingResults(pixels, totalBytes);
@@ -168,7 +169,7 @@ void GraphicsContext3D::prepareTexture()
 
     makeContextCurrent();
     if (m_attrs.antialias)
-        resolveMultisamplingIfNecessary(IntRect(0, 0, m_currentWidth, m_currentHeight));
+        resolveMultisamplingIfNecessary();
 
     ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_fbo);
     ::glActiveTexture(GL_TEXTURE0);
@@ -183,15 +184,14 @@ void GraphicsContext3D::prepareTexture()
 
 void GraphicsContext3D::readRenderingResults(unsigned char *pixels, int pixelsSize)
 {
-    int totalBytes = m_currentWidth * m_currentHeight * 4;
-    if (pixelsSize < totalBytes)
+    if (pixelsSize < m_currentWidth * m_currentHeight * 4)
         return;
 
     makeContextCurrent();
 
     bool mustRestoreFBO = false;
     if (m_attrs.antialias) {
-        resolveMultisamplingIfNecessary(IntRect(0, 0, m_currentWidth, m_currentHeight));
+        resolveMultisamplingIfNecessary();
         ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_fbo);
         mustRestoreFBO = true;
     } else {
@@ -209,11 +209,7 @@ void GraphicsContext3D::readRenderingResults(unsigned char *pixels, int pixelsSi
         mustRestorePackAlignment = true;
     }
 
-    ::glReadPixels(0, 0, m_currentWidth, m_currentHeight, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
-    if (isGLES2Compliant()) {
-        for (int i = 0; i < totalBytes; i += 4)
-            std::swap(pixels[i], pixels[i + 2]); // Convert to BGRA.
-    }
+    readPixelsAndConvertToBGRAIfNecessary(0, 0, m_currentWidth, m_currentHeight, pixels);
 
     if (mustRestorePackAlignment)
         ::glPixelStorei(GL_PACK_ALIGNMENT, packAlignment);
@@ -907,7 +903,7 @@ void GraphicsContext3D::uniform1f(GC3Dint location, GC3Dfloat v0)
     ::glUniform1f(location, v0);
 }
 
-void GraphicsContext3D::uniform1fv(GC3Dint location, GC3Dfloat* array, GC3Dsizei size)
+void GraphicsContext3D::uniform1fv(GC3Dint location, GC3Dsizei size, GC3Dfloat* array)
 {
     makeContextCurrent();
     ::glUniform1fv(location, size, array);
@@ -919,7 +915,7 @@ void GraphicsContext3D::uniform2f(GC3Dint location, GC3Dfloat v0, GC3Dfloat v1)
     ::glUniform2f(location, v0, v1);
 }
 
-void GraphicsContext3D::uniform2fv(GC3Dint location, GC3Dfloat* array, GC3Dsizei size)
+void GraphicsContext3D::uniform2fv(GC3Dint location, GC3Dsizei size, GC3Dfloat* array)
 {
     // FIXME: length needs to be a multiple of 2.
     makeContextCurrent();
@@ -932,7 +928,7 @@ void GraphicsContext3D::uniform3f(GC3Dint location, GC3Dfloat v0, GC3Dfloat v1, 
     ::glUniform3f(location, v0, v1, v2);
 }
 
-void GraphicsContext3D::uniform3fv(GC3Dint location, GC3Dfloat* array, GC3Dsizei size)
+void GraphicsContext3D::uniform3fv(GC3Dint location, GC3Dsizei size, GC3Dfloat* array)
 {
     // FIXME: length needs to be a multiple of 3.
     makeContextCurrent();
@@ -945,7 +941,7 @@ void GraphicsContext3D::uniform4f(GC3Dint location, GC3Dfloat v0, GC3Dfloat v1, 
     ::glUniform4f(location, v0, v1, v2, v3);
 }
 
-void GraphicsContext3D::uniform4fv(GC3Dint location, GC3Dfloat* array, GC3Dsizei size)
+void GraphicsContext3D::uniform4fv(GC3Dint location, GC3Dsizei size, GC3Dfloat* array)
 {
     // FIXME: length needs to be a multiple of 4.
     makeContextCurrent();
@@ -958,7 +954,7 @@ void GraphicsContext3D::uniform1i(GC3Dint location, GC3Dint v0)
     ::glUniform1i(location, v0);
 }
 
-void GraphicsContext3D::uniform1iv(GC3Dint location, GC3Dint* array, GC3Dsizei size)
+void GraphicsContext3D::uniform1iv(GC3Dint location, GC3Dsizei size, GC3Dint* array)
 {
     makeContextCurrent();
     ::glUniform1iv(location, size, array);
@@ -970,7 +966,7 @@ void GraphicsContext3D::uniform2i(GC3Dint location, GC3Dint v0, GC3Dint v1)
     ::glUniform2i(location, v0, v1);
 }
 
-void GraphicsContext3D::uniform2iv(GC3Dint location, GC3Dint* array, GC3Dsizei size)
+void GraphicsContext3D::uniform2iv(GC3Dint location, GC3Dsizei size, GC3Dint* array)
 {
     // FIXME: length needs to be a multiple of 2.
     makeContextCurrent();
@@ -983,7 +979,7 @@ void GraphicsContext3D::uniform3i(GC3Dint location, GC3Dint v0, GC3Dint v1, GC3D
     ::glUniform3i(location, v0, v1, v2);
 }
 
-void GraphicsContext3D::uniform3iv(GC3Dint location, GC3Dint* array, GC3Dsizei size)
+void GraphicsContext3D::uniform3iv(GC3Dint location, GC3Dsizei size, GC3Dint* array)
 {
     // FIXME: length needs to be a multiple of 3.
     makeContextCurrent();
@@ -996,28 +992,28 @@ void GraphicsContext3D::uniform4i(GC3Dint location, GC3Dint v0, GC3Dint v1, GC3D
     ::glUniform4i(location, v0, v1, v2, v3);
 }
 
-void GraphicsContext3D::uniform4iv(GC3Dint location, GC3Dint* array, GC3Dsizei size)
+void GraphicsContext3D::uniform4iv(GC3Dint location, GC3Dsizei size, GC3Dint* array)
 {
     // FIXME: length needs to be a multiple of 4.
     makeContextCurrent();
     ::glUniform4iv(location, size, array);
 }
 
-void GraphicsContext3D::uniformMatrix2fv(GC3Dint location, GC3Dboolean transpose, GC3Dfloat* array, GC3Dsizei size)
+void GraphicsContext3D::uniformMatrix2fv(GC3Dint location, GC3Dsizei size, GC3Dboolean transpose, GC3Dfloat* array)
 {
     // FIXME: length needs to be a multiple of 4.
     makeContextCurrent();
     ::glUniformMatrix2fv(location, size, transpose, array);
 }
 
-void GraphicsContext3D::uniformMatrix3fv(GC3Dint location, GC3Dboolean transpose, GC3Dfloat* array, GC3Dsizei size)
+void GraphicsContext3D::uniformMatrix3fv(GC3Dint location, GC3Dsizei size, GC3Dboolean transpose, GC3Dfloat* array)
 {
     // FIXME: length needs to be a multiple of 9.
     makeContextCurrent();
     ::glUniformMatrix3fv(location, size, transpose, array);
 }
 
-void GraphicsContext3D::uniformMatrix4fv(GC3Dint location, GC3Dboolean transpose, GC3Dfloat* array, GC3Dsizei size)
+void GraphicsContext3D::uniformMatrix4fv(GC3Dint location, GC3Dsizei size, GC3Dboolean transpose, GC3Dfloat* array)
 {
     // FIXME: length needs to be a multiple of 16.
     makeContextCurrent();

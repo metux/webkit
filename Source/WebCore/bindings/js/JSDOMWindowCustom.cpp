@@ -99,17 +99,17 @@ JSValue nonCachingStaticFunctionGetter(ExecState* exec, JSValue, const Identifie
 
 static JSValue childFrameGetter(ExecState* exec, JSValue slotBase, const Identifier& propertyName)
 {
-    return toJS(exec, static_cast<JSDOMWindow*>(asObject(slotBase))->impl()->frame()->tree()->child(identifierToAtomicString(propertyName))->domWindow());
+    return toJS(exec, jsCast<JSDOMWindow*>(asObject(slotBase))->impl()->frame()->tree()->scopedChild(identifierToAtomicString(propertyName))->domWindow());
 }
 
 static JSValue indexGetter(ExecState* exec, JSValue slotBase, unsigned index)
 {
-    return toJS(exec, static_cast<JSDOMWindow*>(asObject(slotBase))->impl()->frame()->tree()->child(index)->domWindow());
+    return toJS(exec, jsCast<JSDOMWindow*>(asObject(slotBase))->impl()->frame()->tree()->scopedChild(index)->domWindow());
 }
 
 static JSValue namedItemGetter(ExecState* exec, JSValue slotBase, const Identifier& propertyName)
 {
-    JSDOMWindowBase* thisObj = static_cast<JSDOMWindow*>(asObject(slotBase));
+    JSDOMWindowBase* thisObj = jsCast<JSDOMWindow*>(asObject(slotBase));
     Document* document = thisObj->impl()->frame()->document();
 
     ASSERT(thisObj->allowsAccessFrom(exec));
@@ -220,7 +220,7 @@ bool JSDOMWindow::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identi
     // naming frames things that conflict with window properties that
     // are in Moz but not IE. Since we have some of these, we have to do
     // it the Moz way.
-    if (thisObject->impl()->frame()->tree()->child(identifierToAtomicString(propertyName))) {
+    if (thisObject->impl()->frame()->tree()->scopedChild(identifierToAtomicString(propertyName))) {
         slot.setCustom(thisObject, childFrameGetter);
         return true;
     }
@@ -244,7 +244,7 @@ bool JSDOMWindow::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identi
     // allow window[1] or parent[1] etc. (#56983)
     bool ok;
     unsigned i = propertyName.toArrayIndex(ok);
-    if (ok && i < thisObject->impl()->frame()->tree()->childCount()) {
+    if (ok && i < thisObject->impl()->frame()->tree()->scopedChildCount()) {
         slot.setCustomIndex(thisObject, i, indexGetter);
         return true;
     }
@@ -310,7 +310,7 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, co
     // naming frames things that conflict with window properties that
     // are in Moz but not IE. Since we have some of these, we have to do
     // it the Moz way.
-    if (thisObject->impl()->frame()->tree()->child(identifierToAtomicString(propertyName))) {
+    if (thisObject->impl()->frame()->tree()->scopedChild(identifierToAtomicString(propertyName))) {
         PropertySlot slot;
         slot.setCustom(thisObject, childFrameGetter);
         descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
@@ -319,7 +319,7 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, co
     
     bool ok;
     unsigned i = propertyName.toArrayIndex(ok);
-    if (ok && i < thisObject->impl()->frame()->tree()->childCount()) {
+    if (ok && i < thisObject->impl()->frame()->tree()->scopedChildCount()) {
         PropertySlot slot;
         slot.setCustomIndex(thisObject, i, indexGetter);
         descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
@@ -424,7 +424,8 @@ void JSDOMWindow::setLocation(ExecState* exec, JSValue value)
     if (exec->hadException())
         return;
 
-    impl()->setLocation(ustringToString(locationString), activeDOMWindow(exec), firstDOMWindow(exec));
+    if (Location* location = impl()->location())
+        location->setHref(ustringToString(locationString), activeDOMWindow(exec), firstDOMWindow(exec));
 }
 
 JSValue JSDOMWindow::event(ExecState* exec) const
@@ -515,7 +516,7 @@ inline JSValue DialogHandler::returnValue() const
         return jsUndefined();
     Identifier identifier(m_exec, "returnValue");
     PropertySlot slot;
-    if (!globalObject->methodTable()->getOwnPropertySlot(globalObject, m_exec, identifier, slot))
+    if (!JSGlobalObject::getOwnPropertySlot(globalObject, m_exec, identifier, slot))
         return jsUndefined();
     return slot.getValue(m_exec, identifier);
 }
@@ -544,6 +545,7 @@ JSValue JSDOMWindow::showModalDialog(ExecState* exec)
 static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransfer)
 {
     MessagePortArray messagePorts;
+    ArrayBufferArray arrayBuffers;
 
     // This function has variable arguments and can be:
     // Per current spec:
@@ -558,13 +560,14 @@ static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransf
             targetOriginArgIndex = 2;
             transferablesArgIndex = 1;
         }
-        fillMessagePortArray(exec, exec->argument(transferablesArgIndex), messagePorts);
+        fillMessagePortArray(exec, exec->argument(transferablesArgIndex), messagePorts, arrayBuffers);
     }
     if (exec->hadException())
         return jsUndefined();
 
-    RefPtr<SerializedScriptValue> message = SerializedScriptValue::create(exec, exec->argument(0), 
-                                                                         doTransfer ? &messagePorts : 0);
+    RefPtr<SerializedScriptValue> message = SerializedScriptValue::create(exec, exec->argument(0),
+                                                                         doTransfer ? &messagePorts : 0,
+                                                                         doTransfer ? &arrayBuffers : 0);
 
     if (exec->hadException())
         return jsUndefined();
@@ -661,9 +664,9 @@ DOMWindow* toDOMWindow(JSValue value)
         return 0;
     JSObject* object = asObject(value);
     if (object->inherits(&JSDOMWindow::s_info))
-        return static_cast<JSDOMWindow*>(object)->impl();
+        return jsCast<JSDOMWindow*>(object)->impl();
     if (object->inherits(&JSDOMWindowShell::s_info))
-        return static_cast<JSDOMWindowShell*>(object)->impl();
+        return jsCast<JSDOMWindowShell*>(object)->impl();
     return 0;
 }
 

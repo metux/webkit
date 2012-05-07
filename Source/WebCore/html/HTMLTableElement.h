@@ -53,6 +53,7 @@ public:
     void deleteTHead();
     PassRefPtr<HTMLElement> createTFoot();
     void deleteTFoot();
+    PassRefPtr<HTMLElement> createTBody();
     PassRefPtr<HTMLElement> createCaption();
     void deleteCaption();
     PassRefPtr<HTMLElement> insertRow(int index, ExceptionCode&);
@@ -64,8 +65,6 @@ public:
     String rules() const;
     String summary() const;
 
-    virtual void attach();
-
     StylePropertySet* additionalCellStyle();
     StylePropertySet* additionalGroupStyle(bool rows);
 
@@ -73,7 +72,7 @@ private:
     HTMLTableElement(const QualifiedName&, Document*);
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
     virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
     virtual bool isURLAttribute(Attribute*) const;
 

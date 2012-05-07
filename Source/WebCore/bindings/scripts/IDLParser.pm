@@ -32,6 +32,7 @@ use constant MODE_UNDEF    => 0; # Default mode.
 
 use constant MODE_MODULE  => 10; # 'module' section
 use constant MODE_INTERFACE  => 11; # 'interface' section
+use constant MODE_EXCEPTION  => 12; # 'exception' section
 
 # Helper variables
 my @temporaryContent;
@@ -215,7 +216,7 @@ sub parseExtendedAttributes
             if ($name eq "Constructor") {
                 $attrs{$name} = "";
             } else {
-                $attrs{$name} = 1;
+                $attrs{$name} = "VALUE_IS_MISSING";
             }
             $str =~ s/^\s*,?//;
         } else {
@@ -274,7 +275,7 @@ sub ParseInterface
     $data =~ s/[\n\r]/ /g;
 
     # Beginning of the regexp parsing magic
-    if ($sectionName eq "interface") {
+    if ($sectionName eq "interface" || $sectionName eq "exception") {
         print " |- Trying to parse interface...\n" unless $beQuiet;
 
         my $interfaceName = "";
@@ -283,12 +284,14 @@ sub ParseInterface
         # Match identifier of the interface, and enclosed data...
         $data =~ /$IDLStructure::interfaceSelector/;
 
-        my $interfaceExtendedAttributes = (defined($1) ? $1 : " "); chop($interfaceExtendedAttributes);
-        $interfaceName = (defined($2) ? $2 : die("Parsing error!\nSource:\n$data\n)"));
-        my $interfaceBase = (defined($3) ? $3 : "");
-        $interfaceData = (defined($4) ? $4 : die("Parsing error!\nSource:\n$data\n)"));
+        my $isException = (defined($1) ? ($1 eq 'exception') : die("Parsing error!\nSource:\n$data\n)"));
+        my $interfaceExtendedAttributes = (defined($2) ? $2 : " "); chop($interfaceExtendedAttributes);
+        $interfaceName = (defined($3) ? $3 : die("Parsing error!\nSource:\n$data\n)"));
+        my $interfaceBase = (defined($4) ? $4 : "");
+        $interfaceData = (defined($5) ? $5 : die("Parsing error!\nSource:\n$data\n)"));
 
         # Fill in known parts of the domClass datastructure now...
+        $dataNode->isException($isException);
         $dataNode->name($interfaceName);
         my $extendedAttributes = parseExtendedAttributes($interfaceExtendedAttributes);
         if (defined $extendedAttributes->{"Constructor"}) {
@@ -297,7 +300,7 @@ sub ParseInterface
             $newDataNode->signature->name("Constructor");
             $newDataNode->signature->extendedAttributes($extendedAttributes);
             parseParameters($newDataNode, $extendedAttributes->{"Constructor"});
-            $extendedAttributes->{"Constructor"} = 1;
+            $extendedAttributes->{"Constructor"} = "VALUE_IS_MISSING";
             $dataNode->constructor($newDataNode);
         } elsif (defined $extendedAttributes->{"NamedConstructor"}) {
             my $newDataNode = new domFunction();
@@ -326,6 +329,7 @@ sub ParseInterface
         my @interfaceMethods = split(/;/, $interfaceData);
 
         foreach my $line (@interfaceMethods) {
+            next if $line =~ /^\s*$/;
             if ($line =~ /\Wattribute\W/) {
                 $line =~ /$IDLStructure::interfaceAttributeSelector/;
 
@@ -361,11 +365,11 @@ sub ParseInterface
                 $setterException =~ s/\s+//g;
                 @{$newDataNode->getterExceptions} = split(/,/, $getterException);
                 @{$newDataNode->setterExceptions} = split(/,/, $setterException);
-            } elsif (($line !~ s/^\s*$//g) and ($line !~ /^\s*const/)) {
+            } elsif ($line !~ /^\s*($IDLStructure::extendedAttributeSyntax )?const\s+/) {
                 $line =~ /$IDLStructure::interfaceMethodSelector/ or die "Parsing error!\nSource:\n$line\n)";
 
-                my $isStatic = defined($1);
-                my $methodExtendedAttributes = (defined($2) ? $2 : " "); chop($methodExtendedAttributes);
+                my $methodExtendedAttributes = (defined($1) ? $1 : " "); chop($methodExtendedAttributes);
+                my $isStatic = defined($2);
                 my $methodType = (defined($3) ? $3 : die("Parsing error!\nSource:\n$line\n)"));
                 my $methodName = (defined($4) ? $4 : die("Parsing error!\nSource:\n$line\n)"));
                 my $methodSignature = (defined($5) ? $5 : die("Parsing error!\nSource:\n$line\n)"));
@@ -393,7 +397,7 @@ sub ParseInterface
 
                 my $arrayRef = $dataNode->functions;
                 push(@$arrayRef, $newDataNode);
-            } elsif ($line =~ /^\s*const/) {
+            } else {
                 $line =~ /$IDLStructure::constantSelector/;
                 my $constExtendedAttributes = (defined($1) ? $1 : " "); chop($constExtendedAttributes);
                 my $constType = (defined($2) ? $2 : die("Parsing error!\nSource:\n$line\n)"));
@@ -429,6 +433,8 @@ sub DetermineParseMode
         $mode = MODE_MODULE;
     } elsif ($_ =~ /interface/) {
         $mode = MODE_INTERFACE;
+    } elsif ($_ =~ /exception/) {
+        $mode = MODE_EXCEPTION;
     }
 
     return $mode;
@@ -443,9 +449,10 @@ sub ProcessSection
         die ("Two modules in one file! Fatal error!\n") if ($document ne 0);
         $document = new idlDocument();
         $object->ParseModule($document);
-    } elsif ($parseMode eq MODE_INTERFACE) {
+    } elsif ($parseMode eq MODE_INTERFACE || $parseMode eq MODE_EXCEPTION) {
         my $node = new domClass();
-        $object->ParseInterface($node, "interface");
+        my $sectionName = $parseMode eq MODE_INTERFACE ? "interface" : "exception";
+        $object->ParseInterface($node, $sectionName);
     
         die ("No module specified! Fatal Error!\n") if ($document eq 0);
         my $arrayRef = $document->classes;

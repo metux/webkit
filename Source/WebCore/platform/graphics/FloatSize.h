@@ -31,6 +31,14 @@
 #include "IntPoint.h"
 #include <wtf/MathExtras.h>
 
+#if PLATFORM(BLACKBERRY)
+namespace BlackBerry {
+namespace Platform {
+class FloatSize;
+}
+}
+#endif
+
 #if USE(CG) || (PLATFORM(WX) && OS(DARWIN)) || USE(SKIA_ON_MAC_CHROMIUM)
 typedef struct CGSize CGSize;
 #endif
@@ -106,6 +114,11 @@ public:
         return FloatSize(m_height, m_width);
     }
 
+#if PLATFORM(BLACKBERRY)
+    FloatSize(const BlackBerry::Platform::FloatSize&);
+    operator BlackBerry::Platform::FloatSize() const;
+#endif
+
 #if USE(CG) || (PLATFORM(WX) && OS(DARWIN)) || USE(SKIA_ON_MAC_CHROMIUM)
     explicit FloatSize(const CGSize&); // don't do this implicitly since it's lossy
     operator CGSize() const;
@@ -163,6 +176,11 @@ inline bool operator!=(const FloatSize& a, const FloatSize& b)
 inline IntSize roundedIntSize(const FloatSize& p)
 {
     return IntSize(static_cast<int>(roundf(p.width())), static_cast<int>(roundf(p.height())));
+}
+
+inline IntSize flooredIntSize(const FloatSize& p)
+{
+    return IntSize(static_cast<int>(p.width()), static_cast<int>(p.height()));
 }
 
 inline IntSize expandedIntSize(const FloatSize& p)

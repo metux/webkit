@@ -37,6 +37,7 @@
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "NodeRenderingContext.h"
 #include "Page.h"
 #include "RenderBox.h"
 #include "RenderTextControl.h"
@@ -64,11 +65,19 @@ HTMLTextFormControlElement::~HTMLTextFormControlElement()
 {
 }
 
-void HTMLTextFormControlElement::insertedIntoDocument()
+bool HTMLTextFormControlElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
-    HTMLFormControlElement::insertedIntoDocument();
+    return childContext.isOnEncapsulationBoundary() && HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
+}
+
+Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(Node* insertionPoint)
+{
+    HTMLFormControlElement::insertedInto(insertionPoint);
+    if (!insertionPoint->inDocument())
+        return InsertionDone;
     String initialValue = value();
     setTextAsOfLastFormControlChangeEvent(initialValue.isNull() ? emptyString() : initialValue);
+    return InsertionDone;
 }
 
 void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode)
@@ -464,7 +473,7 @@ void HTMLTextFormControlElement::setInnerTextValue(const String& value)
         innerTextElement()->setInnerText(value, ec);
         ASSERT(!ec);
 
-        if (value.endsWith("\n") || value.endsWith("\r")) {
+        if (value.endsWith('\n') || value.endsWith('\r')) {
             innerTextElement()->appendChild(HTMLBRElement::create(document()), ec);
             ASSERT(!ec);
         }

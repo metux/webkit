@@ -28,9 +28,10 @@
 
 module core {
 
-    interface [
+    exception [
         JSNoStaticTables,
-        DoNotCheckConstants
+        DoNotCheckConstants,
+        InterfaceName=DOMException
     ] DOMCoreException {
 
         readonly attribute unsigned short   code;

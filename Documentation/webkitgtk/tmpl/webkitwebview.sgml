@@ -9,12 +9,10 @@ WebKitWebView
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -76,6 +74,17 @@ WebKitWebView
 @arg1: 
 @arg2: 
 @arg3: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebView::context-menu ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@widget: 
+@arg1: 
+@arg2: 
 @Returns: 
 
 <!-- ##### SIGNAL WebKitWebView::copy-clipboard ##### -->
@@ -152,6 +161,15 @@ WebKitWebView
 
 @webkitwebview: the object which received the signal.
 
+<!-- ##### SIGNAL WebKitWebView::entering-fullscreen ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@Returns: 
+
 <!-- ##### SIGNAL WebKitWebView::frame-created ##### -->
 <para>
 
@@ -194,6 +212,15 @@ WebKitWebView
 
 @webkitwebview: the object which received the signal.
 @arg1: 
+
+<!-- ##### SIGNAL WebKitWebView::leaving-fullscreen ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@Returns: 
 
 <!-- ##### SIGNAL WebKitWebView::load-committed ##### -->
 <para>

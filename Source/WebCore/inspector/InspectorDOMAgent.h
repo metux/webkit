@@ -69,6 +69,7 @@ class NameNodeMap;
 class Node;
 class RevalidateStyleAttributeTask;
 class ScriptValue;
+class ShadowRoot;
 
 struct Highlight;
 struct HighlightData;
@@ -120,8 +121,8 @@ public:
 
     // Methods called from the frontend for DOM nodes inspection.
     virtual void querySelector(ErrorString*, int nodeId, const String& selectors, int* elementId);
-    virtual void querySelectorAll(ErrorString*, int nodeId, const String& selectors, RefPtr<InspectorArray>& result);
-    virtual void getDocument(ErrorString*, RefPtr<InspectorObject>& root);
+    virtual void querySelectorAll(ErrorString*, int nodeId, const String& selectors, RefPtr<TypeBuilder::Array<int> >& result);
+    virtual void getDocument(ErrorString*, RefPtr<TypeBuilder::DOM::Node>& root);
     virtual void requestChildNodes(ErrorString*, int nodeId);
     virtual void setAttributeValue(ErrorString*, int elementId, const String& name, const String& value);
     virtual void setAttributesAsText(ErrorString*, int elementId, const String& text, const String* name);
@@ -131,12 +132,12 @@ public:
     virtual void getOuterHTML(ErrorString*, int nodeId, WTF::String* outerHTML);
     virtual void setOuterHTML(ErrorString*, int nodeId, const String& outerHTML);
     virtual void setNodeValue(ErrorString*, int nodeId, const String& value);
-    virtual void getEventListenersForNode(ErrorString*, int nodeId, RefPtr<InspectorArray>& listenersArray);
+    virtual void getEventListenersForNode(ErrorString*, int nodeId, RefPtr<TypeBuilder::Array<TypeBuilder::DOM::EventListener> >& listenersArray);
     virtual void performSearch(ErrorString*, const String& whitespaceTrimmedQuery, String* searchId, int* resultCount);
-    virtual void getSearchResults(ErrorString*, const String& searchId, int fromIndex, int toIndex, RefPtr<InspectorArray>&);
+    virtual void getSearchResults(ErrorString*, const String& searchId, int fromIndex, int toIndex, RefPtr<TypeBuilder::Array<int> >&);
     virtual void discardSearchResults(ErrorString*, const String& searchId);
-    virtual void resolveNode(ErrorString*, int nodeId, const String* objectGroup, RefPtr<InspectorObject>& result);
-    virtual void getAttributes(ErrorString*, int nodeId, RefPtr<InspectorArray>& result);
+    virtual void resolveNode(ErrorString*, int nodeId, const String* objectGroup, RefPtr<TypeBuilder::Runtime::RemoteObject>& result);
+    virtual void getAttributes(ErrorString*, int nodeId, RefPtr<TypeBuilder::Array<String> >& result);
     virtual void setInspectModeEnabled(ErrorString*, bool enabled, const RefPtr<InspectorObject>* highlightConfig);
     virtual void requestNode(ErrorString*, const String& objectId, int* nodeId);
     virtual void pushNodeByPathToFrontend(ErrorString*, const String& path, int* nodeId);
@@ -152,6 +153,8 @@ public:
 
     Node* highlightedNode() const;
 
+    void getEventListeners(Node*, Vector<EventListenerInfo>& listenersArray, bool includeAncestors);
+
     // Methods called from the InspectorInstrumentation.
     void setDocument(Document*);
     void releaseDanglingNodes();
@@ -161,11 +164,14 @@ public:
 
     void didInsertDOMNode(Node*);
     void didRemoveDOMNode(Node*);
+    void willModifyDOMAttr(Element*, const AtomicString& oldValue, const AtomicString& newValue);
     void didModifyDOMAttr(Element*, const AtomicString& name, const AtomicString& value);
     void didRemoveDOMAttr(Element*, const AtomicString& name);
     void styleAttributeInvalidated(const Vector<Element*>& elements);
     void characterDataModified(CharacterData*);
     void didInvalidateStyleAttr(Node*);
+    void didPushShadowRoot(Element* host, ShadowRoot*);
+    void willPopShadowRoot(Element* host, ShadowRoot*);
 
     Node* nodeForId(int nodeId);
     int boundNodeId(Node*);
@@ -173,7 +179,7 @@ public:
 
     static String documentURLString(Document*);
 
-    PassRefPtr<InspectorObject> resolveNode(Node*, const String& objectGroup);
+    PassRefPtr<TypeBuilder::Runtime::RemoteObject> resolveNode(Node*, const String& objectGroup);
     bool handleMousePress();
     void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags);
     void inspect(Node*);
@@ -206,8 +212,10 @@ private:
     typedef HashMap<RefPtr<Node>, int> NodeToIdMap;
     int bind(Node*, NodeToIdMap*);
     void unbind(Node*, NodeToIdMap*);
+
     Element* assertElement(ErrorString*, int nodeId);
-    HTMLElement* assertHTMLElement(ErrorString*, int nodeId);
+    Node* assertEditableNode(ErrorString*, int nodeId);
+    Element* assertEditableElement(ErrorString*, int nodeId);
 
     int pushNodePathToFrontend(Node*);
     void pushChildNodesToFrontend(int nodeId);
@@ -216,10 +224,10 @@ private:
     void updateSubtreeBreakpoints(Node* root, uint32_t rootMask, bool value);
     void descriptionForDOMEvent(Node* target, int breakpointType, bool insertion, PassRefPtr<InspectorObject> description);
 
-    PassRefPtr<InspectorObject> buildObjectForNode(Node*, int depth, NodeToIdMap*);
-    PassRefPtr<InspectorArray> buildArrayForElementAttributes(Element*);
-    PassRefPtr<InspectorArray> buildArrayForContainerChildren(Node* container, int depth, NodeToIdMap* nodesMap);
-    PassRefPtr<InspectorObject> buildObjectForEventListener(const RegisteredEventListener&, const AtomicString& eventType, Node*);
+    PassRefPtr<TypeBuilder::DOM::Node> buildObjectForNode(Node*, int depth, NodeToIdMap*);
+    PassRefPtr<TypeBuilder::Array<String> > buildArrayForElementAttributes(Element*);
+    PassRefPtr<TypeBuilder::Array<TypeBuilder::DOM::Node> > buildArrayForContainerChildren(Node* container, int depth, NodeToIdMap* nodesMap);
+    PassRefPtr<TypeBuilder::DOM::EventListener> buildObjectForEventListener(const RegisteredEventListener&, const AtomicString& eventType, Node*);
 
     Node* nodeForPath(const String& path);
 
@@ -250,6 +258,7 @@ private:
     bool m_searchingForNode;
     OwnPtr<InspectorHistory> m_history;
     OwnPtr<DOMEditor> m_domEditor;
+    bool m_suppressAttributeModifiedEvent;
 };
 
 #endif // ENABLE(INSPECTOR)

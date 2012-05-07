@@ -48,7 +48,7 @@ namespace JSC {
         typedef void (*PutFunctionPtr)(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
         PutFunctionPtr put;
 
-        typedef void (*PutByIndexFunctionPtr)(JSCell*, ExecState*, unsigned propertyName, JSValue);
+        typedef void (*PutByIndexFunctionPtr)(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
         PutByIndexFunctionPtr putByIndex;
 
         typedef bool (*DeletePropertyFunctionPtr)(JSCell*, ExecState*, const Identifier&);
@@ -131,7 +131,6 @@ struct MemberCheck##member { \
         &ClassName::defineOwnProperty, \
         &ClassName::getOwnPropertyDescriptor, \
     }, \
-    sizeof(ClassName), \
     ClassName::TypedArrayStorageType
 
     struct ClassInfo {
@@ -180,8 +179,6 @@ struct MemberCheck##member { \
 
         MethodTable methodTable;
 
-        size_t cellSize;
-        
         TypedArrayType typedArrayStorageType;
     };
 

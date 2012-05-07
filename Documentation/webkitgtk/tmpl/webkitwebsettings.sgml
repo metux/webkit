@@ -9,12 +9,10 @@ WebKitWebSettings
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -164,6 +162,11 @@ WebKitWebSettings
 </para>
 
 <!-- ##### ARG WebKitWebSettings:enable-site-specific-quirks ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:enable-smooth-scrolling ##### -->
 <para>
 
 </para>

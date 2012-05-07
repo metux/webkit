@@ -37,7 +37,7 @@ namespace WebCore {
 
 JSEventListener::JSEventListener(JSObject* function, JSObject* wrapper, bool isAttribute, DOMWrapperWorld* isolatedWorld)
     : EventListener(JSEventListenerType)
-    , m_wrapper(*isolatedWorld->globalData(), wrapper)
+    , m_wrapper(wrapper)
     , m_isAttribute(isAttribute)
     , m_isolatedWorld(isolatedWorld)
 {
@@ -45,12 +45,16 @@ JSEventListener::JSEventListener(JSObject* function, JSObject* wrapper, bool isA
         m_jsFunction.setMayBeNull(*m_isolatedWorld->globalData(), wrapper, function);
     else
         ASSERT(!function);
-    InspectorCounters::incrementCounter(InspectorCounters::JSEventListenerCounter);
+#if ENABLE(INSPECTOR)
+    ThreadLocalInspectorCounters::current().incrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
+#endif
 }
 
 JSEventListener::~JSEventListener()
 {
-    InspectorCounters::decrementCounter(InspectorCounters::JSEventListenerCounter);
+#if ENABLE(INSPECTOR)
+    ThreadLocalInspectorCounters::current().decrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
+#endif
 }
 
 JSObject* JSEventListener::initializeJSFunction(ScriptExecutionContext*) const
@@ -83,7 +87,7 @@ void JSEventListener::handleEvent(ScriptExecutionContext* scriptExecutionContext
 
     Frame* frame = 0;
     if (scriptExecutionContext->isDocument()) {
-        JSDOMWindow* window = static_cast<JSDOMWindow*>(globalObject);
+        JSDOMWindow* window = jsCast<JSDOMWindow*>(globalObject);
         frame = window->impl()->frame();
         if (!frame)
             return;
@@ -121,10 +125,14 @@ void JSEventListener::handleEvent(ScriptExecutionContext* scriptExecutionContext
         DynamicGlobalObjectScope globalObjectScope(globalData, globalData.dynamicGlobalObject ? globalData.dynamicGlobalObject : globalObject);
 
         globalData.timeoutChecker.start();
+        InspectorInstrumentationCookie cookie = JSMainThreadExecState::instrumentFunctionCall(scriptExecutionContext, callType, callData);
+
         JSValue thisValue = handleEventFunction == jsFunction ? toJS(exec, globalObject, event->currentTarget()) : jsFunction;
         JSValue retval = scriptExecutionContext->isDocument()
-            ? JSMainThreadExecState::instrumentedCall(frame ? frame->page() : 0, exec, handleEventFunction, callType, callData, thisValue, args)
+            ? JSMainThreadExecState::call(exec, handleEventFunction, callType, callData, thisValue, args)
             : JSC::call(exec, handleEventFunction, callType, callData, thisValue, args);
+
+        InspectorInstrumentation::didCallFunction(cookie);
         globalData.timeoutChecker.stop();
 
         globalObject->setCurrentEvent(savedEvent);

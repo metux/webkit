@@ -40,6 +40,7 @@
 
 namespace WebCore {
 
+class EXTTextureFilterAnisotropic;
 class HTMLImageElement;
 class HTMLVideoElement;
 class ImageBuffer;
@@ -64,6 +65,7 @@ class WebGLProgram;
 class WebGLRenderbuffer;
 class WebGLShader;
 class WebGLSharedObject;
+class WebGLShaderPrecisionFormat;
 class WebGLTexture;
 class WebGLUniformLocation;
 class WebGLVertexArrayObjectOES;
@@ -77,7 +79,6 @@ public:
 
     virtual bool is3d() const { return true; }
     virtual bool isAccelerated() const { return true; }
-    virtual bool paintsIntoCanvasBuffer() const;
 
     int drawingBufferWidth() const;
     int drawingBufferHeight() const;
@@ -95,11 +96,11 @@ public:
     void blendFunc(GC3Denum sfactor, GC3Denum dfactor);
     void blendFuncSeparate(GC3Denum srcRGB, GC3Denum dstRGB, GC3Denum srcAlpha, GC3Denum dstAlpha);
 
-    void bufferData(GC3Denum target, GC3Dsizeiptr size, GC3Denum usage, ExceptionCode&);
+    void bufferData(GC3Denum target, long long size, GC3Denum usage, ExceptionCode&);
     void bufferData(GC3Denum target, ArrayBuffer* data, GC3Denum usage, ExceptionCode&);
     void bufferData(GC3Denum target, ArrayBufferView* data, GC3Denum usage, ExceptionCode&);
-    void bufferSubData(GC3Denum target, GC3Dintptr offset, ArrayBuffer* data, ExceptionCode&);
-    void bufferSubData(GC3Denum target, GC3Dintptr offset, ArrayBufferView* data, ExceptionCode&);
+    void bufferSubData(GC3Denum target, long long offset, ArrayBuffer* data, ExceptionCode&);
+    void bufferSubData(GC3Denum target, long long offset, ArrayBufferView* data, ExceptionCode&);
 
     GC3Denum checkFramebufferStatus(GC3Denum target);
     void clear(GC3Dbitfield mask);
@@ -140,7 +141,7 @@ public:
     void disable(GC3Denum cap);
     void disableVertexAttribArray(GC3Duint index, ExceptionCode&);
     void drawArrays(GC3Denum mode, GC3Dint first, GC3Dsizei count, ExceptionCode&);
-    void drawElements(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dintptr offset, ExceptionCode&);
+    void drawElements(GC3Denum mode, GC3Dsizei count, GC3Denum type, long long offset, ExceptionCode&);
 
     void enable(GC3Denum cap);
     void enableVertexAttribArray(GC3Duint index, ExceptionCode&);
@@ -166,17 +167,14 @@ public:
     WebGLGetInfo getRenderbufferParameter(GC3Denum target, GC3Denum pname, ExceptionCode&);
     WebGLGetInfo getShaderParameter(WebGLShader*, GC3Denum pname, ExceptionCode&);
     String getShaderInfoLog(WebGLShader*, ExceptionCode&);
-
-    // TBD
-    // void glGetShaderPrecisionFormat (GC3Denum shadertype, GC3Denum precisiontype, GC3Dint* range, GC3Dint* precision);
-
+    PassRefPtr<WebGLShaderPrecisionFormat> getShaderPrecisionFormat(GC3Denum shaderType, GC3Denum precisionType, ExceptionCode&);
     String getShaderSource(WebGLShader*, ExceptionCode&);
     Vector<String> getSupportedExtensions();
     WebGLGetInfo getTexParameter(GC3Denum target, GC3Denum pname, ExceptionCode&);
     WebGLGetInfo getUniform(WebGLProgram*, const WebGLUniformLocation*, ExceptionCode&);
     PassRefPtr<WebGLUniformLocation> getUniformLocation(WebGLProgram*, const String&, ExceptionCode&);
     WebGLGetInfo getVertexAttrib(GC3Duint index, GC3Denum pname, ExceptionCode&);
-    GC3Dsizeiptr getVertexAttribOffset(GC3Duint index, GC3Denum pname);
+    long long getVertexAttribOffset(GC3Duint index, GC3Denum pname);
 
     void hint(GC3Denum target, GC3Denum mode);
     GC3Dboolean isBuffer(WebGLBuffer*);
@@ -283,7 +281,7 @@ public:
     void vertexAttrib4fv(GC3Duint index, Float32Array* values);
     void vertexAttrib4fv(GC3Duint index, GC3Dfloat* values, GC3Dsizei size);
     void vertexAttribPointer(GC3Duint index, GC3Dint size, GC3Denum type, GC3Dboolean normalized,
-                             GC3Dsizei stride, GC3Dintptr offset, ExceptionCode&);
+                             GC3Dsizei stride, long long offset, ExceptionCode&);
 
     void viewport(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height);
 
@@ -485,7 +483,7 @@ public:
     GC3Dboolean m_colorMask[4];
     GC3Dboolean m_depthMask;
 
-    long m_stencilBits;
+    bool m_stencilEnabled;
     GC3Duint m_stencilMask, m_stencilMaskBack;
     GC3Dint m_stencilFuncRef, m_stencilFuncRefBack; // Note that these are the user specified values, not the internal clamped value.
     GC3Duint m_stencilFuncMask, m_stencilFuncMaskBack;
@@ -497,8 +495,10 @@ public:
     bool m_isDepthStencilSupported;
 
     bool m_synthesizedErrorsToConsole;
+    int m_numGLErrorsToConsoleAllowed;
 
     // Enabled extension objects.
+    OwnPtr<EXTTextureFilterAnisotropic> m_extTextureFilterAnisotropic;
     OwnPtr<OESTextureFloat> m_oesTextureFloat;
     OwnPtr<OESStandardDerivatives> m_oesStandardDerivatives;
     OwnPtr<OESVertexArrayObject> m_oesVertexArrayObject;
@@ -520,6 +520,9 @@ public:
     // clearMask is set to the bitfield of any clear that would happen anyway at this time
     // and the function returns true if that clear is now unnecessary.
     bool clearIfComposited(GC3Dbitfield clearMask = 0);
+
+    // Helper to restore state that clearing the framebuffer may destroy.
+    void restoreStateAfterClear();
 
     void texImage2DBase(GC3Denum target, GC3Dint level, GC3Denum internalformat,
                         GC3Dsizei width, GC3Dsizei height, GC3Dint border,
@@ -585,13 +588,19 @@ public:
                                    GC3Dsizei width, GC3Dsizei height, GC3Dint border,
                                    GC3Denum format, GC3Denum type);
 
+    enum NullDisposition {
+        NullAllowed,
+        NullNotAllowed
+    };
+
     // Helper function to validate that the given ArrayBufferView
     // is of the correct type and contains enough data for the texImage call.
     // Generates GL error and returns false if parameters are invalid.
     bool validateTexFuncData(const char* functionName,
                              GC3Dsizei width, GC3Dsizei height,
                              GC3Denum format, GC3Denum type,
-                             ArrayBufferView* pixels);
+                             ArrayBufferView* pixels,
+                             NullDisposition);
 
     // Helper function to validate compressed texture data is correct size
     // for the given format and dimensions.
@@ -622,6 +631,9 @@ public:
 
     // Helper function for texParameterf and texParameteri.
     void texParameter(GC3Denum target, GC3Denum pname, GC3Dfloat parami, GC3Dint paramf, bool isFloat);
+
+    // Helper function to print GL errors to console.
+    void printGLErrorToConsole(const String&);
 
     // Helper function to print warnings to console. Currently
     // used only to warn about use of obsolete functions.
@@ -686,6 +698,13 @@ public:
     void synthesizeGLError(GC3Denum, const char* functionName, const char* description);
 
     String ensureNotNull(const String&) const;
+
+    // Enable or disable stencil test based on user setting and
+    // whether the current FBO has a stencil buffer.
+    void applyStencilTest();
+
+    // Helper for enabling or disabling a capability.
+    void enableOrDisable(GC3Denum capability, bool enable);
 
     friend class WebGLStateRestorer;
 };

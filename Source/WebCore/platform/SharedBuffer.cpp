@@ -62,15 +62,29 @@ SharedBuffer::SharedBuffer()
 {
 }
 
+SharedBuffer::SharedBuffer(size_t size)
+    : m_size(size)
+    , m_buffer(size)
+{
+}
+
 SharedBuffer::SharedBuffer(const char* data, int size)
     : m_size(0)
 {
+    // FIXME: Use unsigned consistently, and check for invalid casts when calling into SharedBuffer from other code.
+    if (size < 0)
+        CRASH();
+
     append(data, size);
 }
 
 SharedBuffer::SharedBuffer(const unsigned char* data, int size)
     : m_size(0)
 {
+    // FIXME: Use unsigned consistently, and check for invalid casts when calling into SharedBuffer from other code.
+    if (size < 0)
+        CRASH();
+
     append(reinterpret_cast<const char*>(data), size);
 }
     

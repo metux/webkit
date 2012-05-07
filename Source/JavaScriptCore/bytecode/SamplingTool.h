@@ -124,7 +124,7 @@ namespace JSC {
         
         static void sample();
         
-        static void dump();
+        JS_EXPORT_PRIVATE static void dump();
         
     private:
         const char* m_name;
@@ -148,7 +148,7 @@ namespace JSC {
                 if (previousPtr)
                     *previousPtr = bitwise_cast<SamplingRegion*>(previous);
                 
-                if (WTF::weakCompareAndSwap(&s_currentOrReserved, previous, bitwise_cast<uintptr_t>(current)))
+                if (WTF::weakCompareAndSwapUIntPtr(&s_currentOrReserved, previous, bitwise_cast<uintptr_t>(current)))
                     break;
             }
         }

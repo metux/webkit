@@ -28,6 +28,7 @@
 
 #include "GraphicsLayer.h"
 #include "IntRect.h"
+#include "PlatformWheelEvent.h"
 #include "ScrollTypes.h"
 #include "Timer.h"
 #include <wtf/Forward.h>
@@ -46,16 +47,12 @@ namespace WebCore {
 class FrameView;
 class GraphicsLayer;
 class Page;
-class PlatformWheelEvent;
 class Region;
+class ScrollingCoordinatorPrivate;
 class ScrollingTreeState;
 
 #if ENABLE(THREADED_SCROLLING)
 class ScrollingTree;
-#endif
-
-#if ENABLE(GESTURE_EVENTS)
-class PlatformGestureEvent;
 #endif
 
 class ScrollingCoordinator : public ThreadSafeRefCounted<ScrollingCoordinator> {
@@ -67,6 +64,7 @@ public:
 
 #if ENABLE(THREADED_SCROLLING)
     ScrollingTree* scrollingTree() const;
+    void commitTreeStateIfNeeded();
 #endif
 
     // Return whether this scrolling coordinator handles scrolling for the given frame view.
@@ -94,7 +92,7 @@ public:
     // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
     void frameViewHorizontalScrollbarLayerDidChange(FrameView*, GraphicsLayer* horizontalScrollbarLayer);
 
-    // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
+    // Should be called whenever the vertical scrollbar layer for the given frame view changes.
     void frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer* verticalScrollbarLayer);
 
     // Requests that the scrolling coordinator updates the scroll position of the given frame view. If this function returns true, it means that the
@@ -108,7 +106,15 @@ public:
     void updateMainFrameScrollPosition(const IntPoint&);
 
     // Dispatched by the scrolling tree whenever the main frame scroll position changes and the scroll layer position needs to be updated as well.
-    void updateMainFrameScrollPositionAndScrollLayerPosition(const IntPoint&);
+    void updateMainFrameScrollPositionAndScrollLayerPosition();
+
+#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+    // Dispatched by the scrolling tree during handleWheelEvent. This is required as long as scrollbars are painted on the main thread.
+    void handleWheelEventPhase(PlatformWheelEventPhase);
+#endif
+
+    // Force all scroll layer position updates to happen on the main thread.
+    void setForceMainThreadScrollLayerPositionUpdates(bool);
 
 private:
     explicit ScrollingCoordinator(Page*);
@@ -118,25 +124,41 @@ private:
 
     void setScrollLayer(GraphicsLayer*);
     void setNonFastScrollableRegion(const Region&);
-    void setScrollParameters(ScrollElasticity horizontalScrollElasticity, ScrollElasticity verticalScrollElasticity,
-                             bool hasEnabledHorizontalScrollbar, bool hasEnabledVerticalScrollbar,
-                             const IntRect& viewportRect, const IntSize& contentsSize);
+
+    struct ScrollParameters {
+        ScrollElasticity horizontalScrollElasticity;
+        ScrollElasticity verticalScrollElasticity;
+
+        bool hasEnabledHorizontalScrollbar;
+        bool hasEnabledVerticalScrollbar;
+
+        ScrollbarMode horizontalScrollbarMode;
+        ScrollbarMode verticalScrollbarMode;
+
+        IntRect viewportRect;
+        IntSize contentsSize;
+    };
+
+    void setScrollParameters(const ScrollParameters&);
     void setWheelEventHandlerCount(unsigned);
     void setShouldUpdateScrollLayerPositionOnMainThread(bool);
 
     Page* m_page;
 
+    bool m_forceMainThreadScrollLayerPositionUpdates;
+
 #if ENABLE(THREADED_SCROLLING)
     void scheduleTreeStateCommit();
 
     void scrollingTreeStateCommitterTimerFired(Timer<ScrollingCoordinator>*);
-    void commitTreeStateIfNeeded();
     void commitTreeState();
 
     OwnPtr<ScrollingTreeState> m_scrollingTreeState;
     RefPtr<ScrollingTree> m_scrollingTree;
     Timer<ScrollingCoordinator> m_scrollingTreeStateCommitterTimer;
 #endif
+
+    ScrollingCoordinatorPrivate* m_private;
 };
 
 } // namespace WebCore

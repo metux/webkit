@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2002 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2012 Apple Inc. All rights reserved.
  *  Copyright (C) 2007 Cameron Zwarich (cwzwarich@uwaterloo.ca)
  *  Copyright (C) 2007 Maks Orlovich
  *
@@ -35,7 +35,7 @@
 #include "Nodes.h"
 #include "Parser.h"
 #include "UStringBuilder.h"
-#include "dtoa.h"
+#include <wtf/dtoa.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <wtf/ASCIICType.h>
@@ -295,16 +295,19 @@ static double parseInt(const UString& s, const CharType* data, int radix)
         number += digit;
         ++p;
     }
-    if (number >= mantissaOverflowLowerBound) {
-        if (radix == 10)
-            number = WTF::strtod<WTF::AllowTrailingJunk>(s.substringSharingImpl(firstDigitPosition, p - firstDigitPosition).utf8().data(), 0);
-        else if (radix == 2 || radix == 4 || radix == 8 || radix == 16 || radix == 32)
-            number = parseIntOverflow(s.substringSharingImpl(firstDigitPosition, p - firstDigitPosition).utf8().data(), p - firstDigitPosition, radix);
-    }
 
     // 12. If Z is empty, return NaN.
     if (!sawDigit)
         return std::numeric_limits<double>::quiet_NaN();
+
+    // Alternate code path for certain large numbers.
+    if (number >= mantissaOverflowLowerBound) {
+        if (radix == 10) {
+            size_t parsedLength;
+            number = parseDouble(s.characters() + firstDigitPosition, p - firstDigitPosition, parsedLength);
+        } else if (radix == 2 || radix == 4 || radix == 8 || radix == 16 || radix == 32)
+            number = parseIntOverflow(s.substringSharingImpl(firstDigitPosition, p - firstDigitPosition).utf8().data(), p - firstDigitPosition, radix);
+    }
 
     // 15. Return sign x number.
     return sign * number;
@@ -361,20 +364,10 @@ static double jsStrDecimalLiteral(const CharType*& data, const CharType* end)
 {
     ASSERT(data < end);
 
-    // Copy the sting into a null-terminated byte buffer, and call strtod.
-    Vector<char, 32> byteBuffer;
-    for (const CharType* characters = data; characters < end; ++characters) {
-        CharType character = *characters;
-        byteBuffer.append(isASCII(character) ? static_cast<char>(character) : 0);
-    }
-    byteBuffer.append(0);
-    char* endOfNumber;
-    double number = WTF::strtod<WTF::AllowTrailingJunk>(byteBuffer.data(), &endOfNumber);
-
-    // Check if strtod found a number; if so return it.
-    ptrdiff_t consumed = endOfNumber - byteBuffer.data();
-    if (consumed) {
-        data += consumed;
+    size_t parsedLength;
+    double number = parseDouble(data, end - data, parsedLength);
+    if (parsedLength) {
+        data += parsedLength;
         return number;
     }
 
@@ -505,7 +498,7 @@ EncodedJSValue JSC_HOST_CALL globalFuncEval(ExecState* exec)
 {
     JSObject* thisObject = exec->hostThisValue().toThisObject(exec);
     JSObject* unwrappedObject = thisObject->unwrappedObject();
-    if (!unwrappedObject->isGlobalObject() || static_cast<JSGlobalObject*>(unwrappedObject)->evalFunction() != exec->callee())
+    if (!unwrappedObject->isGlobalObject() || jsCast<JSGlobalObject*>(unwrappedObject)->evalFunction() != exec->callee())
         return throwVMError(exec, createEvalError(exec, "The \"this\" value passed to eval must be the global object from which eval originated"));
 
     JSValue x = exec->argument(0);
@@ -525,11 +518,11 @@ EncodedJSValue JSC_HOST_CALL globalFuncEval(ExecState* exec)
     }
 
     EvalExecutable* eval = EvalExecutable::create(exec, makeSource(s), false);
-    JSObject* error = eval->compile(exec, static_cast<JSGlobalObject*>(unwrappedObject)->globalScopeChain());
+    JSObject* error = eval->compile(exec, jsCast<JSGlobalObject*>(unwrappedObject)->globalScopeChain());
     if (error)
         return throwVMError(exec, error);
 
-    return JSValue::encode(exec->interpreter()->execute(eval, exec, thisObject, static_cast<JSGlobalObject*>(unwrappedObject)->globalScopeChain()));
+    return JSValue::encode(exec->interpreter()->execute(eval, exec, thisObject, jsCast<JSGlobalObject*>(unwrappedObject)->globalScopeChain()));
 }
 
 EncodedJSValue JSC_HOST_CALL globalFuncParseInt(ExecState* exec)
@@ -712,6 +705,42 @@ EncodedJSValue JSC_HOST_CALL globalFuncUnescape(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL globalFuncThrowTypeError(ExecState* exec)
 {
     return throwVMTypeError(exec);
+}
+
+EncodedJSValue JSC_HOST_CALL globalFuncProtoGetter(ExecState* exec)
+{
+    if (!exec->thisValue().isObject())
+        return JSValue::encode(exec->thisValue().synthesizePrototype(exec));
+
+    JSObject* thisObject = asObject(exec->thisValue());
+    if (!thisObject->allowsAccessFrom(exec->trueCallerFrame()))
+        return JSValue::encode(jsUndefined());
+
+    return JSValue::encode(thisObject->prototype());
+}
+
+EncodedJSValue JSC_HOST_CALL globalFuncProtoSetter(ExecState* exec)
+{
+    JSValue value = exec->argument(0);
+
+    // Setting __proto__ of a primitive should have no effect.
+    if (!exec->thisValue().isObject())
+        return JSValue::encode(jsUndefined());
+
+    JSObject* thisObject = asObject(exec->thisValue());
+    if (!thisObject->allowsAccessFrom(exec->trueCallerFrame()))
+        return JSValue::encode(jsUndefined());
+
+    // Setting __proto__ to a non-object, non-null value is silently ignored to match Mozilla.
+    if (!value.isObject() && !value.isNull())
+        return JSValue::encode(jsUndefined());
+
+    if (!thisObject->isExtensible())
+        return throwVMError(exec, createTypeError(exec, StrictModeReadonlyPropertyWriteError));
+
+    if (!thisObject->setPrototypeWithCycleCheck(exec->globalData(), value))
+        throwError(exec, createError(exec, "cyclic __proto__ value"));
+    return JSValue::encode(jsUndefined());
 }
 
 } // namespace JSC

@@ -78,7 +78,7 @@ namespace JSC {
 
 const ClassInfo JSGlobalObject::s_info = { "GlobalObject", &JSVariableObject::s_info, 0, ExecState::globalObjectTable, CREATE_METHOD_TABLE(JSGlobalObject) };
 
-const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript };
+const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript };
 
 /* Source for JSGlobalObject.lut.h
 @begin globalObjectTable
@@ -133,8 +133,7 @@ void JSGlobalObject::init(JSObject* thisValue)
     
     structure()->disableSpecificFunctionTracking();
 
-    m_globalData = Heap::heap(this)->globalData();
-    m_globalScopeChain.set(*m_globalData, this, ScopeChainNode::create(0, this, m_globalData.get(), this, thisValue));
+    m_globalScopeChain.set(globalData(), this, ScopeChainNode::create(0, this, &globalData(), this, thisValue));
 
     JSGlobalObject::globalExec()->init(0, 0, m_globalScopeChain.get(), CallFrame::noCaller(), 0, 0);
 
@@ -205,6 +204,10 @@ void JSGlobalObject::reset(JSValue prototype)
     m_callFunction.set(exec->globalData(), this, callFunction);
     m_applyFunction.set(exec->globalData(), this, applyFunction);
     m_objectPrototype.set(exec->globalData(), this, ObjectPrototype::create(exec, this, ObjectPrototype::createStructure(exec->globalData(), this, jsNull())));
+    GetterSetter* protoAccessor = GetterSetter::create(exec);
+    protoAccessor->setGetter(exec->globalData(), JSFunction::create(exec, this, 0, Identifier(), globalFuncProtoGetter));
+    protoAccessor->setSetter(exec->globalData(), JSFunction::create(exec, this, 0, Identifier(), globalFuncProtoSetter));
+    m_objectPrototype->putDirectAccessor(exec->globalData(), exec->propertyNames().underscoreProto, protoAccessor, Accessor | DontEnum);
     m_functionPrototype->structure()->setPrototypeWithoutTransition(exec->globalData(), m_objectPrototype.get());
 
     m_emptyObjectStructure.set(exec->globalData(), this, m_objectPrototype->inheritorID(exec->globalData()));
@@ -456,7 +459,7 @@ DynamicGlobalObjectScope::DynamicGlobalObjectScope(JSGlobalData& globalData, JSG
     if (!m_dynamicGlobalObjectSlot) {
 #if ENABLE(ASSEMBLER)
         if (ExecutableAllocator::underMemoryPressure())
-            globalData.recompileAllJSFunctions();
+            globalData.heap.discardAllCompiledCode();
 #endif
 
         m_dynamicGlobalObjectSlot = dynamicGlobalObject;

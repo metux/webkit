@@ -27,11 +27,12 @@
 #include "EventListener.h"
 #include "EventNames.h"
 #include "MutationEvent.h"
+#include "NodeRenderingContext.h"
 #include "RenderSVGInline.h"
 #include "RenderSVGInlineText.h"
 #include "RenderSVGResource.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include "SVGDocument.h"
 #include "SVGElementInstance.h"
 #include "SVGNames.h"
@@ -164,7 +165,7 @@ void SVGTRefElement::updateReferencedText()
         textContent = target->textContent();
 
     ASSERT(hasShadowRoot());
-    ShadowRoot* root = shadowRootList()->oldestShadowRoot();
+    ShadowRoot* root = shadowTree()->oldestShadowRoot();
     if (!root->firstChild())
         root->appendChild(SVGShadowText::create(document(), textContent), ASSERT_NO_EXCEPTION);
     else
@@ -180,7 +181,7 @@ void SVGTRefElement::detachTarget()
     ExceptionCode ignore = 0;
 
     ASSERT(hasShadowRoot());
-    Node* container = shadowRootList()->oldestShadowRoot()->firstChild();
+    Node* container = shadowTree()->oldestShadowRoot()->firstChild();
     if (container)
         container->setTextContent(emptyContent, ignore);
 
@@ -237,9 +238,9 @@ RenderObject* SVGTRefElement::createRenderer(RenderArena* arena, RenderStyle*)
     return new (arena) RenderSVGInline(this);
 }
 
-bool SVGTRefElement::childShouldCreateRenderer(Node* child) const
+bool SVGTRefElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
-    return child->isInShadowTree();
+    return childContext.node()->isInShadowTree();
 }
 
 bool SVGTRefElement::rendererIsNeeded(const NodeRenderingContext& context)
@@ -262,7 +263,7 @@ void SVGTRefElement::buildPendingResource()
     // Remove any existing event listener.
     clearEventListener();
 
-    // If we're not yet in a document, this function will be called again from insertedIntoDocument().
+    // If we're not yet in a document, this function will be called again from insertedInto().
     if (!inDocument())
         return;
 
@@ -280,21 +281,30 @@ void SVGTRefElement::buildPendingResource()
 
     updateReferencedText();
 
-    m_eventListener = TargetListener::create(this, id);
-    target->addEventListener(eventNames().DOMSubtreeModifiedEvent, m_eventListener.get(), false);
-    target->addEventListener(eventNames().DOMNodeRemovedFromDocumentEvent, m_eventListener.get(), false);
+    // Don't set up event listeners if this is a shadow tree node.
+    // SVGUseElement::transferEventListenersToShadowTree() handles this task, and addEventListener()
+    // expects every element instance to have an associated shadow tree element - which is not the
+    // case when we land here from SVGUseElement::buildShadowTree().
+    if (!isInShadowTree()) {
+        m_eventListener = TargetListener::create(this, id);
+        target->addEventListener(eventNames().DOMSubtreeModifiedEvent, m_eventListener.get(), false);
+        target->addEventListener(eventNames().DOMNodeRemovedFromDocumentEvent, m_eventListener.get(), false);
+    }
 }
 
-void SVGTRefElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGTRefElement::insertedInto(Node* rootParent)
 {
-    SVGStyledElement::insertedIntoDocument();
-    buildPendingResource();
+    SVGStyledElement::insertedInto(rootParent);
+    if (rootParent->inDocument())
+        buildPendingResource();
+    return InsertionDone;
 }
 
-void SVGTRefElement::removedFromDocument()
+void SVGTRefElement::removedFrom(Node* rootParent)
 {
-    SVGStyledElement::removedFromDocument();
-    clearEventListener();
+    SVGStyledElement::removedFrom(rootParent);
+    if (rootParent->inDocument())
+        clearEventListener();
 }
 
 void SVGTRefElement::clearEventListener()

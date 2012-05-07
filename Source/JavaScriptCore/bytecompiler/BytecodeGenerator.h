@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  * Copyright (C) 2012 Igalia, S.L.
  *
@@ -32,7 +32,7 @@
 #define BytecodeGenerator_h
 
 #include "CodeBlock.h"
-#include "HashTraits.h"
+#include <wtf/HashTraits.h>
 #include "Instruction.h"
 #include "Label.h"
 #include "LabelScope.h"
@@ -48,6 +48,7 @@
 namespace JSC {
 
     class Identifier;
+    class Label;
     class ScopeChainNode;
 
     class CallArguments {
@@ -70,8 +71,13 @@ namespace JSC {
     };
 
     struct FinallyContext {
-        Label* finallyAddr;
-        RegisterID* retAddrDst;
+        StatementNode* finallyBlock;
+        unsigned scopeContextStackSize;
+        unsigned switchContextStackSize;
+        unsigned forInContextStackSize;
+        unsigned labelScopesSize;
+        int finallyDepth;
+        int dynamicScopeDepth;
     };
 
     struct ControlFlowContext {
@@ -478,9 +484,6 @@ namespace JSC {
         PassRefPtr<Label> emitJumpIfNotFunctionApply(RegisterID* cond, Label* target);
         PassRefPtr<Label> emitJumpScopes(Label* target, int targetScopeDepth);
 
-        PassRefPtr<Label> emitJumpSubroutine(RegisterID* retAddrDst, Label*);
-        void emitSubroutineReturn(RegisterID* retAddrSrc);
-
         RegisterID* emitGetPropertyNames(RegisterID* dst, RegisterID* base, RegisterID* i, RegisterID* size, Label* breakTarget);
         RegisterID* emitNextPropertyName(RegisterID* dst, RegisterID* base, RegisterID* i, RegisterID* size, RegisterID* iter, Label* target);
 
@@ -503,7 +506,7 @@ namespace JSC {
         int scopeDepth() { return m_dynamicScopeDepth + m_finallyDepth; }
         bool hasFinaliser() { return m_finallyDepth != 0; }
 
-        void pushFinallyContext(Label* target, RegisterID* returnAddrDst);
+        void pushFinallyContext(StatementNode* finallyBlock);
         void popFinallyContext();
 
         void pushOptimisedForIn(RegisterID* expectedBase, RegisterID* iter, RegisterID* index, RegisterID* propertyRegister)
@@ -532,6 +535,8 @@ namespace JSC {
         ScopeChainNode* scopeChain() const { return m_scopeChain.get(); }
 
     private:
+        friend class Label;
+        
         void emitOpcode(OpcodeID);
         ValueProfile* emitProfiledOpcode(OpcodeID);
         void retrieveLastBinaryOp(int& dstIndex, int& src1Index, int& src2Index);
@@ -611,7 +616,7 @@ namespace JSC {
 
         RegisterID* emitInitLazyRegister(RegisterID*);
 
-        Vector<Instruction>& instructions() { return m_codeBlock->instructions(); }
+        Vector<Instruction>& instructions() { return m_instructions; }
         SymbolTable& symbolTable() { return *m_symbolTable; }
 
         bool shouldOptimizeLocals()
@@ -644,6 +649,8 @@ namespace JSC {
         void createArgumentsIfNecessary();
         void createActivationIfNecessary();
         RegisterID* createLazyRegisterIfNecessary(RegisterID*);
+        
+        Vector<Instruction> m_instructions;
 
         bool m_shouldEmitDebugHooks;
         bool m_shouldEmitProfileHooks;

@@ -32,16 +32,13 @@
 
 namespace WebCore {
     
+// Render a base with a subscript and/or a superscript.
 class RenderMathMLSubSup : public RenderMathMLBlock {
 public:
     RenderMathMLSubSup(Element*);
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
     
     virtual RenderMathMLOperator* unembellishedOperator();
-    virtual bool hasBase() const { return true; }
-    virtual int nonOperatorHeight() const;
-    virtual void stretchToHeight(int pixelHeight);
-    virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
 protected:
     virtual void layout();
@@ -55,7 +52,7 @@ private:
     
     enum SubSupType { Sub, Sup, SubSup };
     SubSupType m_kind;
-    RenderBlock* m_scripts;
+    RenderMathMLBlock* m_scripts;
 };
     
 }

@@ -86,10 +86,10 @@ WebInspector.FilteredItemSelectionDialog.prototype = {
         this.element.style.width = width + "px";
         this.element.style.height = height + "px";
 
-        const shadowPadding = 10;
+        const shadowPadding = 20; // shadow + padding
         element.positionAt(
-                relativeToElement.totalOffsetLeft() + Math.max(relativeToElement.offsetWidth - width - shadowPadding, shadowPadding),
-                relativeToElement.totalOffsetTop() + Math.max((relativeToElement.offsetHeight - height) / 2 + shadowPadding, shadowPadding));
+            relativeToElement.totalOffsetLeft() + Math.max((relativeToElement.offsetWidth - width - 2 * shadowPadding) / 2, shadowPadding),
+            relativeToElement.totalOffsetTop() + Math.max((relativeToElement.offsetHeight - height - 2 * shadowPadding) / 2, shadowPadding));
     },
 
     focus: function()
@@ -379,7 +379,7 @@ WebInspector.FilteredItemSelectionDialog.prototype = {
     {
         var changes = this._elementHighlightChanges.get(itemElement)
         if (changes) {
-            revertDomChanges(changes);
+            WebInspector.revertDomChanges(changes);
             this._elementHighlightChanges.remove(itemElement);
         }
     },
@@ -401,7 +401,7 @@ WebInspector.FilteredItemSelectionDialog.prototype = {
         }
 
         var changes = [];
-        highlightRangesWithStyleClass(itemElement, ranges, "highlight", changes);
+        WebInspector.highlightRangesWithStyleClass(itemElement, ranges, "highlight", changes);
 
         if (changes.length)
             this._elementHighlightChanges.put(itemElement, changes);
@@ -462,55 +462,29 @@ WebInspector.SelectionDialogContentProvider.prototype = {
 /**
  * @constructor
  * @implements {WebInspector.SelectionDialogContentProvider}
+ * @param {WebInspector.View} view
+ * @param {WebInspector.ContentProvider} contentProvider
  */
-WebInspector.JavaScriptOutlineDialog = function(panel, view)
+WebInspector.JavaScriptOutlineDialog = function(view, contentProvider)
 {
     WebInspector.SelectionDialogContentProvider.call(this);
 
     this._functionItems = [];
-
-    this._panel = panel;
     this._view = view;
+    this._contentProvider = contentProvider;
 }
 
 /**
- * @param {{chunk, index, total, id}} data
+ * @param {WebInspector.View} view
+ * @param {WebInspector.ContentProvider} contentProvider
  */
-WebInspector.JavaScriptOutlineDialog.didAddChunk = function(data)
-{
-    var instance = WebInspector.JavaScriptOutlineDialog._instance;
-    if (!instance)
-        return;
-
-    if (data.id !== instance._view.uiSourceCode.id)
-        return;
-
-    instance._appendItemElements(data.chunk, data.index, data.total);
-},
-
-WebInspector.JavaScriptOutlineDialog.install = function(panel, viewGetter)
-{
-    function showJavaScriptOutlineDialog()
-    {
-         var view = viewGetter();
-         if (view)
-             WebInspector.JavaScriptOutlineDialog._show(panel, view);
-    }
-
-    var javaScriptOutlineShortcut = WebInspector.JavaScriptOutlineDialog.createShortcut();
-    panel.registerShortcut(javaScriptOutlineShortcut.key, showJavaScriptOutlineDialog);
-}
-
-WebInspector.JavaScriptOutlineDialog._show = function(panel, sourceView)
+WebInspector.JavaScriptOutlineDialog.show = function(view, contentProvider)
 {
     if (WebInspector.Dialog.currentInstance())
-        return;
-    if (!sourceView || !sourceView.canHighlightLine())
-        return;
-    WebInspector.JavaScriptOutlineDialog._instance = new WebInspector.JavaScriptOutlineDialog(panel, sourceView);
-
-    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(WebInspector.JavaScriptOutlineDialog._instance);
-    WebInspector.Dialog.show(sourceView.element, filteredItemSelectionDialog);
+        return null;
+    var delegate = new WebInspector.JavaScriptOutlineDialog(view, contentProvider);
+    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(delegate);
+    WebInspector.Dialog.show(view.element, filteredItemSelectionDialog);
 }
 
 WebInspector.JavaScriptOutlineDialog.createShortcut = function()
@@ -551,8 +525,37 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
      */
     requestItems: function(callback)
     {
-        this._itemsAddedCallback = callback;
-        this._panel.requestVisibleScriptOutline();
+        /**
+         * @param {?string} content
+         * @param {boolean} contentEncoded
+         * @param {string} mimeType
+         */
+        function contentCallback(content, contentEncoded, mimeType)
+        {
+            if (this._outlineWorker)
+                this._outlineWorker.terminate();
+            this._outlineWorker = new Worker("ScriptFormatterWorker.js");
+            this._outlineWorker.onmessage = this._didBuildOutlineChunk.bind(this, callback);
+            const method = "outline";
+            this._outlineWorker.postMessage({ method: method, params: { content: content } });
+        }
+        this._contentProvider.requestContent(contentCallback.bind(this));
+    },
+
+    _didBuildOutlineChunk: function(callback, event)
+    {
+        var data = event.data;
+
+        var index = this._functionItems.length;
+        var chunk = data["chunk"];
+        for (var i = 0; i < chunk.length; ++i)
+            this._functionItems.push(chunk[i]);
+        callback(index, chunk.length, data.index, data.total);
+
+        if (data.total === data.index && this._outlineWorker) {
+            this._outlineWorker.terminate();
+            delete this._outlineWorker;
+        }
     },
 
     /**
@@ -564,21 +567,6 @@ WebInspector.JavaScriptOutlineDialog.prototype = {
         if (!isNaN(lineNumber) && lineNumber >= 0)
             this._view.highlightLine(lineNumber);
         this._view.focus();
-        delete WebInspector.JavaScriptOutlineDialog._instance;
-    },
-
-    /**
-     * @param {Array.<Object>} chunk
-     * @param {number} chunkIndex
-     * @param {number} chunkCount
-     */
-    _appendItemElements: function(chunk, chunkIndex, chunkCount)
-    {
-        var index = this._functionItems.length;
-        for (var i = 0; i < chunk.length; ++i) {
-            this._functionItems.push(chunk[i]);
-        }
-        this._itemsAddedCallback(index, chunk.length, chunkIndex, chunkCount);
     }
 }
 
@@ -587,51 +575,26 @@ WebInspector.JavaScriptOutlineDialog.prototype.__proto__ = WebInspector.Selectio
 /**
  * @constructor
  * @implements {WebInspector.SelectionDialogContentProvider}
- * @param {WebInspector.ScriptsPanel} panel
- * @param {WebInspector.DebuggerPresentationModel} presentationModel
+ * @param {Array.<WebInspector.Resource>} resources
  */
-WebInspector.OpenResourceDialog = function(panel, presentationModel)
+WebInspector.OpenResourceDialog = function(resources)
 {
+    // FIXME: migrate from WebInspector.Resource to WebInspector.Source (base for Resource and UISourceCode) and make this dialog OpenSource.
     WebInspector.SelectionDialogContentProvider.call(this);
 
-    this._panel = panel;
-    this._uiSourceCodes = presentationModel.uiSourceCodes();
-    
-    function filterOutEmptyURLs(uiSourceCode)
+    this.resources = resources;
+
+    function filterOutEmptyURLs(resource)
     {
-        return !!uiSourceCode.fileName;
+        return !!resource.parsedURL.lastPathComponent;
     }
-    
-    this._uiSourceCodes = this._uiSourceCodes.filter(filterOutEmptyURLs);
-}
+    this.resources = this.resources.filter(filterOutEmptyURLs);
 
-/**
- * @param {WebInspector.ScriptsPanel} panel
- * @param {WebInspector.DebuggerPresentationModel} presentationModel
- */
-WebInspector.OpenResourceDialog.install = function(panel, presentationModel, relativeToElement)
-{
-    function showOpenResourceDialog()
+    function compareFunction(resource1, resource2)
     {
-        WebInspector.OpenResourceDialog._show(panel, presentationModel, relativeToElement);
+        return resource1.parsedURL.lastPathComponent.localeCompare(resource2.parsedURL.lastPathComponent);
     }
-
-    var openResourceShortcut = WebInspector.OpenResourceDialog.createShortcut();
-    panel.registerShortcut(openResourceShortcut.key, showOpenResourceDialog);
-}
-
-/**
- * @param {WebInspector.ScriptsPanel} panel
- * @param {WebInspector.DebuggerPresentationModel} presentationModel
- * @param {Element} relativeToElement
- */
-WebInspector.OpenResourceDialog._show = function(panel, presentationModel, relativeToElement)
-{
-    if (WebInspector.Dialog.currentInstance())
-        return;
-    
-    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.OpenResourceDialog(panel, presentationModel));
-    WebInspector.Dialog.show(relativeToElement, filteredItemSelectionDialog);
+    this.resources.sort(compareFunction);
 }
 
 WebInspector.OpenResourceDialog.createShortcut = function()
@@ -646,7 +609,7 @@ WebInspector.OpenResourceDialog.prototype = {
      */
     itemTitleAt: function(itemIndex)
     {
-        return this._uiSourceCodes[itemIndex].fileName;
+        return this.resources[itemIndex].parsedURL.lastPathComponent;
     },
 
     /**
@@ -655,7 +618,7 @@ WebInspector.OpenResourceDialog.prototype = {
      */
     itemKeyAt: function(itemIndex)
     {
-        return this._uiSourceCodes[itemIndex].fileName;
+        return this.resources[itemIndex].parsedURL.lastPathComponent;
     },
 
     /**
@@ -663,7 +626,7 @@ WebInspector.OpenResourceDialog.prototype = {
      */
     itemsCount: function()
     {
-        return this._uiSourceCodes.length;
+        return this.resources.length;
     },
 
     /**
@@ -671,7 +634,7 @@ WebInspector.OpenResourceDialog.prototype = {
      */
     requestItems: function(callback)
     {
-        callback(0, this._uiSourceCodes.length, 1, 1);
+        callback(0, this.resources.length, 1, 1);
     },
 
     /**
@@ -679,8 +642,61 @@ WebInspector.OpenResourceDialog.prototype = {
      */
     selectItem: function(itemIndex)
     {
-        this._panel.showUISourceCode(this._uiSourceCodes[itemIndex]);
+        // Overriden by descendants;
     }
 }
 
 WebInspector.OpenResourceDialog.prototype.__proto__ = WebInspector.SelectionDialogContentProvider.prototype;
+
+/**
+ * @constructor
+ * @extends {WebInspector.OpenResourceDialog}
+ * @param {WebInspector.ScriptsPanel} panel
+ * @param {WebInspector.DebuggerPresentationModel} presentationModel
+ */
+WebInspector.OpenScriptDialog = function(panel, presentationModel)
+{
+    WebInspector.OpenResourceDialog.call(this, presentationModel.uiSourceCodes());
+    this._panel = panel;
+}
+
+/**
+ * @param {WebInspector.ScriptsPanel} panel
+ * @param {WebInspector.DebuggerPresentationModel} presentationModel
+ */
+WebInspector.OpenScriptDialog.install = function(panel, presentationModel, relativeToElement)
+{
+    function showOpenResourceDialog()
+    {
+        WebInspector.OpenScriptDialog._show(panel, presentationModel, relativeToElement);
+    }
+
+    var openResourceShortcut = WebInspector.OpenResourceDialog.createShortcut();
+    panel.registerShortcut(openResourceShortcut.key, showOpenResourceDialog);
+}
+
+/**
+ * @param {WebInspector.ScriptsPanel} panel
+ * @param {WebInspector.DebuggerPresentationModel} presentationModel
+ * @param {Element} relativeToElement
+ */
+WebInspector.OpenScriptDialog._show = function(panel, presentationModel, relativeToElement)
+{
+    if (WebInspector.Dialog.currentInstance())
+        return;
+
+    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.OpenScriptDialog(panel, presentationModel));
+    WebInspector.Dialog.show(relativeToElement, filteredItemSelectionDialog);
+}
+
+WebInspector.OpenScriptDialog.prototype = {
+    /**
+     * @param {number} itemIndex
+     */
+    selectItem: function(itemIndex)
+    {
+        this._panel.showUISourceCode(this.resources[itemIndex]);
+    }
+}
+
+WebInspector.OpenScriptDialog.prototype.__proto__ = WebInspector.OpenResourceDialog.prototype;

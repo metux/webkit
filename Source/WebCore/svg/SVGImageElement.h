@@ -50,12 +50,12 @@ private:
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
     virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
 
     virtual void attach();
-    virtual void insertedIntoDocument();
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
 
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
  

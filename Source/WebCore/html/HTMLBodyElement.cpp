@@ -61,11 +61,11 @@ HTMLBodyElement::~HTMLBodyElement()
 {
 }
 
-bool HTMLBodyElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLBodyElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == backgroundAttr || attr->name() == marginwidthAttr || attr->name() == leftmarginAttr || attr->name() == marginheightAttr || attr->name() == topmarginAttr || attr->name() == bgcolorAttr || attr->name() == textAttr || attr->name() == bgpropertiesAttr)
+    if (name == backgroundAttr || name == marginwidthAttr || name == leftmarginAttr || name == marginheightAttr || name == topmarginAttr || name == bgcolorAttr || name == textAttr || name == bgpropertiesAttr)
         return true;
-    return HTMLElement::isPresentationAttribute(attr);
+    return HTMLElement::isPresentationAttribute(name);
 }
 
 void HTMLBodyElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
@@ -86,7 +86,7 @@ void HTMLBodyElement::collectStyleForAttribute(Attribute* attr, StylePropertySet
         addHTMLColorToStyle(style, CSSPropertyColor, attr->value());
     } else if (attr->name() == bgpropertiesAttr) {
         if (equalIgnoringCase(attr->value(), "fixed"))
-           style->setProperty(CSSPropertyBackgroundAttachment, CSSValueFixed);
+           addPropertyToAttributeStyle(style, CSSPropertyBackgroundAttachment, CSSValueFixed);
     } else
         HTMLElement::collectStyleForAttribute(attr, style);
 }
@@ -152,10 +152,17 @@ void HTMLBodyElement::parseAttribute(Attribute* attr)
         HTMLElement::parseAttribute(attr);
 }
 
-void HTMLBodyElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLBodyElement::insertedInto(Node* insertionPoint)
 {
-    HTMLElement::insertedIntoDocument();
+    HTMLElement::insertedInto(insertionPoint);
+    if (insertionPoint->inDocument())
+        return InsertionShouldCallDidNotifyDescendantInseretions;
+    return InsertionDone;
+}
 
+void HTMLBodyElement::didNotifyDescendantInseretions(Node* insertionPoint)
+{
+    ASSERT_UNUSED(insertionPoint, insertionPoint->inDocument());
     ASSERT(document());
 
     // FIXME: Perhaps this code should be in attach() instead of here.
@@ -174,8 +181,6 @@ void HTMLBodyElement::insertedIntoDocument()
     // But without it we hang during WebKit tests; need to fix that and remove this.
     if (FrameView* view = document()->view())
         view->scheduleRelayout();
-
-    document()->updateViewportArguments();
 }
 
 bool HTMLBodyElement::isURLAttribute(Attribute *attr) const

@@ -30,9 +30,9 @@
 
 #include "config.h"
 
-#include "PageConsoleAgent.h"
-
 #if ENABLE(INSPECTOR)
+
+#include "PageConsoleAgent.h"
 
 #include "DOMWindow.h"
 #include "InjectedScriptHost.h"
@@ -77,7 +77,7 @@ private:
 void PageConsoleAgent::addInspectedNode(ErrorString* errorString, int nodeId)
 {
     Node* node = m_inspectorDOMAgent->nodeForId(nodeId);
-    if (!node) {
+    if (!node || node->isInShadowTree()) {
         *errorString = "nodeId is not valid";
         return;
     }

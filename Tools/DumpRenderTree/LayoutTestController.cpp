@@ -39,6 +39,7 @@
 #include <locale.h>
 #include <stdio.h>
 #include <wtf/Assertions.h>
+#include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/RefPtr.h>
@@ -91,6 +92,7 @@ LayoutTestController::LayoutTestController(const std::string& testPathOrURL, con
     , m_shouldPaintBrokenImage(true)
     , m_shouldStayOnPageAfterHandlingBeforeUnload(false)
     , m_areDesktopNotificationPermissionRequestsIgnored(false)
+    , m_customFullScreenBehavior(false) 
     , m_testPathOrURL(testPathOrURL)
     , m_expectedPixelHash(expectedPixelHash)
 {
@@ -744,24 +746,6 @@ static JSValueRef computedStyleIncludingVisitedInfoCallback(JSContextRef context
     // Has mac implementation
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
     return controller->computedStyleIncludingVisitedInfo(context, arguments[0]);
-}
-
-static JSValueRef nodesFromRectCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    if (argumentCount != 8)
-        return JSValueMakeUndefined(context);
-
-    int x = JSValueToNumber(context, arguments[1], NULL);
-    int y = JSValueToNumber(context, arguments[2], NULL);
-    int top = static_cast<unsigned>(JSValueToNumber(context, arguments[3], NULL));
-    int right = static_cast<unsigned>(JSValueToNumber(context, arguments[4], NULL));
-    int bottom = static_cast<unsigned>(JSValueToNumber(context, arguments[5], NULL));
-    int left = static_cast<unsigned>(JSValueToNumber(context, arguments[6], NULL));
-    bool ignoreClipping = JSValueToBoolean(context, arguments[7]);
-
-    // Has mac implementation.
-    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-    return controller->nodesFromRect(context, arguments[0], x, y, top, right, bottom, left, ignoreClipping);
 }
 
 static JSValueRef layerTreeAsTextCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -1843,6 +1827,18 @@ static JSValueRef evaluateScriptInIsolatedWorldCallback(JSContextRef context, JS
     return JSValueMakeUndefined(context);
 }
 
+static JSValueRef evaluateScriptInIsolatedWorldAndReturnValueCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
+    double worldID = JSValueToNumber(context, arguments[0], exception);
+    ASSERT(!*exception);
+    JSRetainPtr<JSStringRef> script(Adopt, JSValueToStringCopy(context, arguments[1], exception));
+    ASSERT(!*exception);
+
+    controller->evaluateScriptInIsolatedWorldAndReturnValue(static_cast<unsigned>(worldID), JSContextGetGlobalObject(context), script.get());
+    return JSValueMakeUndefined(context);
+}
+
 static JSValueRef elementDoesAutoCompleteForElementWithIdCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
@@ -2051,32 +2047,6 @@ static JSValueRef abortModalCallback(JSContextRef context, JSObjectRef function,
     return JSValueMakeUndefined(context);
 }
 
-static JSValueRef hasSpellingMarkerCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    if (argumentCount != 2)
-        return JSValueMakeUndefined(context);
-
-    int from = JSValueToNumber(context, arguments[0], 0);
-    int length = JSValueToNumber(context, arguments[1], 0);
-    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-    bool ok = controller->hasSpellingMarker(from, length);
-
-    return JSValueMakeBoolean(context, ok);
-}
-
-static JSValueRef hasGrammarMarkerCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    if (argumentCount != 2)
-        return JSValueMakeUndefined(context);
-    
-    int from = JSValueToNumber(context, arguments[0], 0);
-    int length = JSValueToNumber(context, arguments[1], 0);
-    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-    bool ok = controller->hasGrammarMarker(from, length);
-    
-    return JSValueMakeBoolean(context, ok);
-}
-
 static JSValueRef markerTextForListItemCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
@@ -2204,6 +2174,11 @@ static JSValueRef setBackingScaleFactorCallback(JSContextRef context, JSObjectRe
     return JSValueMakeUndefined(context);
 }
 
+static JSValueRef preciseTimeCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    return JSValueMakeNumber(context, WTF::currentTime());
+}
+
 // Static Values
 
 static JSValueRef getGlobalFlagCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
@@ -2280,6 +2255,18 @@ static JSValueRef setTextDirectionCallback(JSContextRef context, JSObjectRef fun
     }
 
     return JSValueMakeUndefined(context);
+
+}
+
+static JSValueRef setHasCustomFullScreenBehaviorCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount == 1) {
+        bool hasCustomBehavior = JSValueToBoolean(context, arguments[0]);
+        LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
+        controller->setHasCustomFullScreenBehavior(hasCustomBehavior);
+    }
+
+    return JSValueMakeUndefined(context);
 }
 
 static void layoutTestControllerObjectFinalize(JSObjectRef object)
@@ -2347,7 +2334,6 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "clearPersistentUserStyleSheet", clearPersistentUserStyleSheetCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "closeWebInspector", closeWebInspectorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "computedStyleIncludingVisitedInfo", computedStyleIncludingVisitedInfoCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "nodesFromRect", nodesFromRectCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "decodeHostName", decodeHostNameCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "disableImageLoading", disableImageLoadingCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "disallowIncreaseForApplicationCacheQuota", disallowIncreaseForApplicationCacheQuotaCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2377,6 +2363,7 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "elementDoesAutoCompleteForElementWithId", elementDoesAutoCompleteForElementWithIdCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "encodeHostName", encodeHostNameCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "evaluateInWebInspector", evaluateInWebInspectorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "evaluateScriptInIsolatedWorldAndReturnValue", evaluateScriptInIsolatedWorldAndReturnValueCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "evaluateScriptInIsolatedWorld", evaluateScriptInIsolatedWorldCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "execCommand", execCommandCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "findString", findStringCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2384,8 +2371,6 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "originsWithApplicationCache", originsWithApplicationCacheCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "goBack", goBackCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete }, 
         { "grantDesktopNotificationPermission", grantDesktopNotificationPermissionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete }, 
-        { "hasSpellingMarker", hasSpellingMarkerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "hasGrammarMarker", hasGrammarMarkerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "ignoreDesktopNotificationPermissionRequests", ignoreDesktopNotificationPermissionRequestsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "isCommandEnabled", isCommandEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "isPageBoxVisible", isPageBoxVisibleCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2501,6 +2486,8 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "removeChromeInputField", removeChromeInputFieldCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "focusWebView", focusWebViewCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setBackingScaleFactor", setBackingScaleFactorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "preciseTime", preciseTimeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "setHasCustomFullScreenBehavior", setHasCustomFullScreenBehaviorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0 }
     };
 

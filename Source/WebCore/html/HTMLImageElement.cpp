@@ -73,16 +73,16 @@ PassRefPtr<HTMLImageElement> HTMLImageElement::createForJSConstructor(Document* 
     RefPtr<HTMLImageElement> image = adoptRef(new HTMLImageElement(imgTag, document));
     if (optionalWidth)
         image->setWidth(*optionalWidth);
-    if (optionalHeight > 0)
+    if (optionalHeight)
         image->setHeight(*optionalHeight);
     return image.release();
 }
 
-bool HTMLImageElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLImageElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == widthAttr || attr->name() == heightAttr || attr->name() == borderAttr || attr->name() == vspaceAttr || attr->name() == hspaceAttr || attr->name() == alignAttr || attr->name() == valignAttr)
+    if (name == widthAttr || name == heightAttr || name == borderAttr || name == vspaceAttr || name == hspaceAttr || name == alignAttr || name == valignAttr)
         return true;
-    return HTMLElement::isPresentationAttribute(attr);
+    return HTMLElement::isPresentationAttribute(name);
 }
 
 void HTMLImageElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
@@ -102,7 +102,7 @@ void HTMLImageElement::collectStyleForAttribute(Attribute* attr, StylePropertySe
     } else if (attr->name() == alignAttr)
         applyAlignmentAttributeToStyle(attr, style);
     else if (attr->name() == valignAttr)
-        style->setProperty(CSSPropertyVerticalAlign, attr->value());
+        addPropertyToAttributeStyle(style, CSSPropertyVerticalAlign, attr->value());
     else
         HTMLElement::collectStyleForAttribute(attr, style);
 }
@@ -117,8 +117,6 @@ void HTMLImageElement::parseAttribute(Attribute* attr)
         m_imageLoader.updateFromElementIgnoringPreviousError();
     else if (attrName == usemapAttr)
         setIsLink(!attr->isNull());
-    else if (attrName == onabortAttr)
-        setAttributeEventListener(eventNames().abortEvent, createAttributeEventListener(this, attr));
     else if (attrName == onloadAttr)
         setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attr));
     else if (attrName == onbeforeloadAttr)
@@ -156,7 +154,7 @@ void HTMLImageElement::attach()
 {
     HTMLElement::attach();
 
-    if (renderer() && renderer()->isImage() && m_imageLoader.haveFiredBeforeLoadEvent()) {
+    if (renderer() && renderer()->isImage() && !m_imageLoader.hasPendingBeforeLoadEvent()) {
         RenderImage* renderImage = toRenderImage(renderer());
         RenderImageResource* renderImageResource = renderImage->imageResource();
         if (renderImageResource->hasImage())
@@ -170,17 +168,7 @@ void HTMLImageElement::attach()
     }
 }
 
-void HTMLImageElement::insertedIntoDocument()
-{
-    // If we have been inserted from a renderer-less document,
-    // our loader may have not fetched the image, so do it now.
-    if (!m_imageLoader.image())
-        m_imageLoader.updateFromElement();
-
-    HTMLElement::insertedIntoDocument();
-}
-
-void HTMLImageElement::insertedIntoTree(bool deep)
+Node::InsertionNotificationRequest HTMLImageElement::insertedInto(Node* insertionPoint)
 {
     if (!m_form) {
         // m_form can be non-null if it was set in constructor.
@@ -193,15 +181,20 @@ void HTMLImageElement::insertedIntoTree(bool deep)
         }
     }
 
-    HTMLElement::insertedIntoTree(deep);
+    // If we have been inserted from a renderer-less document,
+    // our loader may have not fetched the image, so do it now.
+    if (insertionPoint->inDocument() && !m_imageLoader.image())
+        m_imageLoader.updateFromElement();
+
+    return HTMLElement::insertedInto(insertionPoint);
 }
 
-void HTMLImageElement::removedFromTree(bool deep)
+void HTMLImageElement::removedFrom(Node* insertionPoint)
 {
     if (m_form)
         m_form->removeImgElement(this);
     m_form = 0;
-    HTMLElement::removedFromTree(deep);
+    HTMLElement::removedFrom(insertionPoint);
 }
 
 int HTMLImageElement::width(bool ignorePendingStylesheets)
@@ -224,7 +217,7 @@ int HTMLImageElement::width(bool ignorePendingStylesheets)
         document()->updateLayout();
 
     RenderBox* box = renderBox();
-    return box ? adjustForAbsoluteZoom(box->contentWidth(), box) : 0;
+    return box ? adjustForAbsoluteZoom(box->contentBoxRect().pixelSnappedWidth(), box) : 0;
 }
 
 int HTMLImageElement::height(bool ignorePendingStylesheets)
@@ -247,7 +240,7 @@ int HTMLImageElement::height(bool ignorePendingStylesheets)
         document()->updateLayout();
 
     RenderBox* box = renderBox();
-    return box ? adjustForAbsoluteZoom(box->contentHeight(), box) : 0;
+    return box ? adjustForAbsoluteZoom(box->contentBoxRect().pixelSnappedHeight(), box) : 0;
 }
 
 int HTMLImageElement::naturalWidth() const

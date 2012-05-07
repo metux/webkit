@@ -77,9 +77,9 @@ static StyleContextMap& styleContextMap()
 
 static GtkStyleContext* getStyleContext(GType widgetType)
 {
-    std::pair<StyleContextMap::iterator, bool> result = styleContextMap().add(widgetType, 0);
-    if (!result.second)
-        return result.first->second.get();
+    StyleContextMap::AddResult result = styleContextMap().add(widgetType, 0);
+    if (!result.isNewEntry)
+        return result.iterator->second.get();
 
     GtkWidgetPath* path = gtk_widget_path_new();
     gtk_widget_path_append_type(path, widgetType);
@@ -111,7 +111,7 @@ static GtkStyleContext* getStyleContext(GType widgetType)
     gtk_style_context_set_path(context.get(), path);
     gtk_widget_path_free(path);
 
-    result.first->second = context;
+    result.iterator->second = context;
     return context.get();
 }
 
@@ -774,7 +774,7 @@ static gint spinButtonArrowSize(GtkStyleContext* context)
     return arrowSize - arrowSize % 2; // Force even.
 }
 
-void RenderThemeGtk::adjustInnerSpinButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeGtk::adjustInnerSpinButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     GtkStyleContext* context = getStyleContext(GTK_TYPE_SPIN_BUTTON);
 

@@ -9,12 +9,10 @@ WebKitWebFrame
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -47,6 +45,15 @@ WebKitWebFrame
 @webkitwebframe: the object which received the signal.
 
 <!-- ##### SIGNAL WebKitWebFrame::hovering-over-link ##### -->
+<para>
+
+</para>
+
+@webkitwebframe: the object which received the signal.
+@arg1: 
+@arg2: 
+
+<!-- ##### SIGNAL WebKitWebFrame::insecure-content-run ##### -->
 <para>
 
 </para>

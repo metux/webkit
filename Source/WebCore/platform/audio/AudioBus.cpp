@@ -225,6 +225,32 @@ void AudioBus::copyFrom(const AudioBus& sourceBus)
         vadd(sourceL, 1, sourceR, 1, destination, 1, length());
         float scale = 0.5;
         vsmul(destination, 1, &scale, destination, 1, length());
+    } else if (numberOfDestinationChannels == 6 && numberOfSourceChannels == 1) {
+        // Handle mono -> 5.1 case, copy mono channel to center. 
+        channel(2)->copyFrom(sourceBus.channel(0));
+        channel(0)->zero();
+        channel(1)->zero();
+        channel(3)->zero();
+        channel(4)->zero();
+        channel(5)->zero();
+    } else if (numberOfDestinationChannels == 1 && numberOfSourceChannels == 6) {
+        // Handle 5.1 -> mono case, copy center channel into mono.
+        // FIXME: We should have a better algorithm for this down mixing.
+        channel(0)->copyFrom(sourceBus.channel(2));
+    } else if (numberOfDestinationChannels < numberOfSourceChannels) {
+        // Default down mixing handling, just match the source channels with the first available destination channels. 
+        // 5.1 -> stereo case covered here. 
+        // FIXME: We should have a better algorithm for down mixing 5.1 to stereo.
+        // https://bugs.webkit.org/show_bug.cgi?id=79192
+        for (unsigned i = 0; i < numberOfDestinationChannels; ++i)
+            channel(i)->copyFrom(sourceBus.channel(i));
+    } else if (numberOfDestinationChannels > numberOfSourceChannels) {
+        // Default up mixing handling, just match the destination channels with the first available source channels. 
+        // Stereo -> 5.1 case covered here. 
+        for (unsigned i = 0; i < numberOfSourceChannels; ++i) 
+            channel(i)->copyFrom(sourceBus.channel(i));
+        for (unsigned i = numberOfSourceChannels; i < numberOfDestinationChannels; ++i)
+            channel(i)->zero();
     } else {
         // Case not handled
         ASSERT_NOT_REACHED();
@@ -256,6 +282,25 @@ void AudioBus::sumFrom(const AudioBus &sourceBus)
         float scale = 0.5;
         vsma(sourceL, 1, &scale, destination, 1, length());
         vsma(sourceR, 1, &scale, destination, 1, length());
+    } else if (numberOfDestinationChannels == 6 && numberOfSourceChannels == 1) {
+        // Handle mono -> 5.1 case, sum mono channel into center.
+        channel(2)->sumFrom(sourceBus.channel(0));
+    } else if (numberOfDestinationChannels == 1 && numberOfSourceChannels == 6) {
+        // Handle 5.1 -> mono case, sum center channel into mono.
+        // FIXME: We should have a better algorithm for this down mixing.
+        channel(0)->sumFrom(sourceBus.channel(2));
+    } else if (numberOfDestinationChannels < numberOfSourceChannels) {
+        // Default down mixing, just summing the first available destination channels. 
+        // 5.1 -> stereo case covered here.
+        // FIXME: We should have a better algorithm for down mixing 5.1 to stereo.
+        // https://bugs.webkit.org/show_bug.cgi?id=79192
+        for (unsigned i = 0; i < numberOfDestinationChannels; ++i) 
+            channel(i)->sumFrom(sourceBus.channel(i));
+    } else if (numberOfDestinationChannels > numberOfSourceChannels) {
+        // Default up mixing, just summing the first available source channels. 
+        // stereo -> 5.1 case covered here.
+        for (unsigned i = 0; i < numberOfSourceChannels; ++i) 
+            channel(i)->sumFrom(sourceBus.channel(i));
     } else {
         // Case not handled
         ASSERT_NOT_REACHED();
@@ -379,6 +424,12 @@ void AudioBus::processWithGainFromMonoStereo(const AudioBus &sourceBus, float* l
     const float* sourceL = sourceBusSafe.channelByType(ChannelLeft)->data();
     const float* sourceR = numberOfSourceChannels > 1 ? sourceBusSafe.channelByType(ChannelRight)->data() : 0;
 
+    if (sourceBusSafe.isSilent()) {
+        if (!sumToBus)
+            zero();
+        return;
+    }
+
     float* destinationL = channelByType(ChannelLeft)->mutableData();
     float* destinationR = numberOfDestinationChannels > 1 ? channelByType(ChannelRight)->mutableData() : 0;
 
@@ -409,10 +460,6 @@ void AudioBus::processWithGainFromMonoStereo(const AudioBus &sourceBus, float* l
         }
     } else {
         // Process directly (without summing) to our bus
-        // If it is from the same bus and no need to change gain, just return
-        if (this == &sourceBus && *lastMixGain == targetGain && targetGain == 1.0)
-            return;
-
         if (sourceR && destinationR) {
             // Stereo
             PROCESS_WITH_GAIN(STEREO_NO_SUM)
@@ -437,6 +484,9 @@ void AudioBus::processWithGainFrom(const AudioBus &sourceBus, float* lastMixGain
         ASSERT_NOT_REACHED();
         return;
     }
+    // If it is copying from the same bus and no need to change gain, just return
+    if (!sumToBus && this == &sourceBus && *lastMixGain == targetGain && targetGain == 1.0)
+        return;
 
     // Dispatch for different channel layouts
     switch (numberOfChannels()) {
@@ -463,6 +513,11 @@ void AudioBus::copyWithSampleAccurateGainValuesFrom(const AudioBus &sourceBus, f
 
     if (!gainValues || numberOfGainValues > sourceBus.length()) {
         ASSERT_NOT_REACHED();
+        return;
+    }
+
+    if (sourceBus.length() == numberOfGainValues && sourceBus.length() == length() && sourceBus.isSilent()) {
+        zero();
         return;
     }
 
@@ -495,6 +550,7 @@ PassOwnPtr<AudioBus> AudioBus::createBySampleRateConverting(const AudioBus* sour
 
     double sourceSampleRate = sourceBus->sampleRate();
     double destinationSampleRate = newSampleRate;
+    double sampleRateRatio = sourceSampleRate / destinationSampleRate;
     unsigned numberOfSourceChannels = sourceBus->numberOfChannels();
 
     if (numberOfSourceChannels == 1)
@@ -508,7 +564,13 @@ PassOwnPtr<AudioBus> AudioBus::createBySampleRateConverting(const AudioBus* sour
         // Return exact copy.
         return AudioBus::createBufferFromRange(sourceBus, 0, sourceBus->length());
     }
-    
+
+    if (sourceBus->isSilent()) {
+        OwnPtr<AudioBus> silentBus = adoptPtr(new AudioBus(numberOfSourceChannels, sourceBus->length() / sampleRateRatio));
+        silentBus->setSampleRate(newSampleRate);
+        return silentBus.release();
+    }
+
     // First, mix to mono (if necessary) then sample-rate convert.
     const AudioBus* resamplerSourceBus;
     OwnPtr<AudioBus> mixedMonoBus;
@@ -521,7 +583,6 @@ PassOwnPtr<AudioBus> AudioBus::createBySampleRateConverting(const AudioBus* sour
     }
 
     // Calculate destination length based on the sample-rates.
-    double sampleRateRatio = sourceSampleRate / destinationSampleRate;
     int sourceLength = resamplerSourceBus->length();
     int destinationLength = sourceLength / sampleRateRatio;
 
@@ -538,12 +599,16 @@ PassOwnPtr<AudioBus> AudioBus::createBySampleRateConverting(const AudioBus* sour
         resampler.process(source, destination, sourceLength);
     }
 
+    destinationBus->clearSilentFlag();
     destinationBus->setSampleRate(newSampleRate);    
     return destinationBus.release();
 }
 
 PassOwnPtr<AudioBus> AudioBus::createByMixingToMono(const AudioBus* sourceBus)
 {
+    if (sourceBus->isSilent())
+        return adoptPtr(new AudioBus(1, sourceBus->length()));
+
     switch (sourceBus->numberOfChannels()) {
     case 1:
         // Simply create an exact copy.
@@ -561,6 +626,7 @@ PassOwnPtr<AudioBus> AudioBus::createByMixingToMono(const AudioBus* sourceBus)
             for (unsigned i = 0; i < n; ++i)
                 destination[i] = (sourceL[i] + sourceR[i]) / 2;
 
+            destinationBus->clearSilentFlag();
             destinationBus->setSampleRate(sourceBus->sampleRate());    
             return destinationBus.release();
         }
@@ -568,6 +634,21 @@ PassOwnPtr<AudioBus> AudioBus::createByMixingToMono(const AudioBus* sourceBus)
 
     ASSERT_NOT_REACHED();
     return nullptr;
+}
+
+bool AudioBus::isSilent() const
+{
+    for (size_t i = 0; i < m_channels.size(); ++i) {
+        if (!m_channels[i]->isSilent())
+            return false;
+    }
+    return true;
+}
+
+void AudioBus::clearSilentFlag()
+{
+    for (size_t i = 0; i < m_channels.size(); ++i)
+        m_channels[i]->clearSilentFlag();
 }
 
 } // WebCore

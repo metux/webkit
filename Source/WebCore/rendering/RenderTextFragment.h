@@ -39,6 +39,8 @@ public:
 
     virtual bool isTextFragment() const { return true; }
 
+    virtual bool canBeSelectionLeaf() const OVERRIDE { return node() && node()->rendererIsEditable(); }
+
     unsigned start() const { return m_start; }
     unsigned end() const { return m_end; }
 
@@ -47,6 +49,7 @@ public:
 
     StringImpl* contentString() const { return m_contentString.get(); }
     virtual PassRefPtr<StringImpl> originalText() const;
+
     virtual void setText(PassRefPtr<StringImpl>, bool force = false) OVERRIDE;
 
     virtual void transformText() OVERRIDE;

@@ -27,11 +27,12 @@
 #include "FullscreenVideoController.h"
 #include "GtkClickCounter.h"
 #include "GtkDragAndDropHelper.h"
-#include "GOwnPtr.h"
 #include "Page.h"
 #include "ResourceHandle.h"
+#include "WebViewInputMethodFilter.h"
 #include "WidgetBackingStore.h"
 #include <webkit/webkitwebview.h>
+#include <wtf/gobject/GOwnPtr.h>
 
 namespace WebKit {
 WebCore::Page* core(WebKitWebView*);
@@ -59,7 +60,7 @@ struct _WebKitWebViewPrivate {
     gint lastPopupYPosition;
 
     HashSet<GtkWidget*> children;
-    GRefPtr<GtkIMContext> imContext;
+    WebKit::WebViewInputMethodFilter imFilter;
 
     gboolean transparent;
     bool needsResizeOnMap;
@@ -80,7 +81,7 @@ struct _WebKitWebViewPrivate {
 
     gboolean disposing;
 
-#if ENABLE(VIDEO)
+#if ENABLE(VIDEO) && !defined(GST_API_VERSION_1)
     FullscreenVideoController* fullscreenVideoController;
 #endif
 

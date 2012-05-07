@@ -91,7 +91,7 @@ public:
         return adoptRef(new EditingStyle(style));
     }
 
-    static PassRefPtr<EditingStyle> create(int propertyID, const String& value)
+    static PassRefPtr<EditingStyle> create(CSSPropertyID propertyID, const String& value)
     {
         return adoptRef(new EditingStyle(propertyID, value));
     }
@@ -152,16 +152,16 @@ private:
     EditingStyle(const Position&, PropertiesToInclude);
     EditingStyle(const StylePropertySet*);
     EditingStyle(const CSSStyleDeclaration*);
-    EditingStyle(int propertyID, const String& value);
+    EditingStyle(CSSPropertyID, const String& value);
     void init(Node*, PropertiesToInclude);
     void removeTextFillAndStrokeColorsIfNeeded(RenderStyle*);
-    void setProperty(int propertyID, const String& value, bool important = false);
+    void setProperty(CSSPropertyID, const String& value, bool important = false);
     void replaceFontSizeByKeywordIfPossible(RenderStyle*, CSSComputedStyleDeclaration*);
     void extractFontSizeDelta();
     TriState triStateOfStyle(CSSStyleDeclaration* styleToCompare, ShouldIgnoreTextOnlyProperties) const;
     bool conflictsWithInlineStyleOfElement(StyledElement*, EditingStyle* extractedStyle, Vector<CSSPropertyID>* conflictingProperties) const;
     void mergeInlineAndImplicitStyleOfElement(StyledElement*, CSSPropertyOverrideMode, PropertiesToInclude);
-    void mergeStyle(StylePropertySet*, CSSPropertyOverrideMode);
+    void mergeStyle(const StylePropertySet*, CSSPropertyOverrideMode);
 
     RefPtr<StylePropertySet> m_mutableStyle;
     bool m_shouldUseFixedDefaultFontSize;

@@ -47,6 +47,7 @@ public:
     TreeScope* parentTreeScope() const { return m_parentTreeScope; }
     void setParentTreeScope(TreeScope*);
 
+    Node* focusedNode();
     Element* getElementById(const AtomicString&) const;
     bool hasElementWithId(AtomicStringImpl* id) const;
     bool containsMultipleElementsWithId(const AtomicString& id) const;
@@ -105,4 +106,3 @@ inline bool TreeScope::containsMultipleElementsWithId(const AtomicString& id) co
 } // namespace WebCore
 
 #endif // TreeScope_h
-
