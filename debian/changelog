@@ -6,8 +6,10 @@ webkit (1.9.2-1) experimental; urgency=low
   * debian/rules:
   - disable AR_FLAGS space optimization for now, since linking two libtool
     convenience libraries seems to break that
+  * debian/*.symbols:
+  - updated with symbols of the new version
 
- -- Gustavo Noronha Silva <kov@debian.org>  Mon, 07 May 2012 20:01:49 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 08 May 2012 12:01:33 -0300
 
 webkit (1.8.1-2) unstable; urgency=low
 
