@@ -30,6 +30,8 @@
 
 namespace WebCore {
 
+class MemoryObjectInfo;
+
 class CSSProperty {
 public:
     CSSProperty(CSSPropertyID propID, PassRefPtr<CSSValue> value, bool important = false, CSSPropertyID shorthandID = CSSPropertyInvalid, bool implicit = false)
@@ -51,12 +53,15 @@ public:
 
     CSSValue* value() const { return m_value.get(); }
 
+    String cssName() const;
     String cssText() const;
 
     void wrapValueInCommaSeparatedList();
 
     static CSSPropertyID resolveDirectionAwareProperty(CSSPropertyID, TextDirection, WritingMode);
     static bool isInheritedProperty(CSSPropertyID);
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     // Make sure the following fits in 4 bytes. Really.
@@ -70,5 +75,12 @@ private:
 };
 
 } // namespace WebCore
+
+namespace WTF {
+template <> struct VectorTraits<WebCore::CSSProperty> : VectorTraitsBase<false, WebCore::CSSProperty> {
+    static const bool canInitializeWithMemset = true;
+    static const bool canMoveWithMemcpy = true;
+};
+}
 
 #endif // CSSProperty_h

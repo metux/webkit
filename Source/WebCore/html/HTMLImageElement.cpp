@@ -26,20 +26,46 @@
 #include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
+#include "ElementShadow.h"
 #include "EventNames.h"
 #include "FrameView.h"
 #include "HTMLDocument.h"
 #include "HTMLFormElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
+#include "ImageInnerElement.h"
 #include "RenderImage.h"
 #include "ScriptEventListener.h"
+#include "ShadowRoot.h"
 
 using namespace std;
 
 namespace WebCore {
 
 using namespace HTMLNames;
+
+void ImageElement::setImageIfNecessary(RenderObject* renderObject, ImageLoader* imageLoader)
+{
+    if (renderObject && renderObject->isImage() && !imageLoader->hasPendingBeforeLoadEvent()) {
+        RenderImage* renderImage = toRenderImage(renderObject);
+        RenderImageResource* renderImageResource = renderImage->imageResource();
+        if (renderImageResource->hasImage())
+            return;
+        renderImageResource->setCachedImage(imageLoader->image());
+
+        // If we have no image at all because we have no src attribute, set
+        // image height and width for the alt text instead.
+        if (!imageLoader->image() && !renderImageResource->cachedImage())
+            renderImage->setImageSizeForAltText();
+    }
+}
+
+RenderObject* ImageElement::createRendererForImage(HTMLElement* element, RenderArena* arena)
+{
+    RenderImage* image = new (arena) RenderImage(element);
+    image->setImageResource(RenderImageResource::create());
+    return image;
+}
 
 HTMLImageElement::HTMLImageElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
     : HTMLElement(tagName, document)
@@ -68,6 +94,32 @@ HTMLImageElement::~HTMLImageElement()
         m_form->removeImgElement(this);
 }
 
+void HTMLImageElement::willAddAuthorShadowRoot()
+{
+    if (userAgentShadowRoot())
+        return;
+
+    createShadowSubtree();
+}
+
+void HTMLImageElement::createShadowSubtree()
+{
+    RefPtr<ImageInnerElement> innerElement = ImageInnerElement::create(document());
+    
+    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot);
+    root->appendChild(innerElement);
+}
+
+Element* HTMLImageElement::imageElement()
+{
+    if (ShadowRoot* root = userAgentShadowRoot()) {
+        ASSERT(root->firstChild()->hasTagName(webkitInnerImageTag));
+        return toElement(root->firstChild());
+    }
+
+    return this;
+}
+
 PassRefPtr<HTMLImageElement> HTMLImageElement::createForJSConstructor(Document* document, const int* optionalWidth, const int* optionalHeight)
 {
     RefPtr<HTMLImageElement> image = adoptRef(new HTMLImageElement(imgTag, document));
@@ -85,47 +137,49 @@ bool HTMLImageElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLImageElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLImageElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == widthAttr)
-        addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
-    else if (attr->name() == heightAttr)
-        addHTMLLengthToStyle(style, CSSPropertyHeight, attr->value());
-    else if (attr->name() == borderAttr)
-        applyBorderAttributeToStyle(attr, style);
-    else if (attr->name() == vspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attr->value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attr->value());
-    } else if (attr->name() == hspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attr->value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attr->value());
-    } else if (attr->name() == alignAttr)
-        applyAlignmentAttributeToStyle(attr, style);
-    else if (attr->name() == valignAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyVerticalAlign, attr->value());
+    if (attribute.name() == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
+    else if (attribute.name() == heightAttr)
+        addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
+    else if (attribute.name() == borderAttr)
+        applyBorderAttributeToStyle(attribute, style);
+    else if (attribute.name() == vspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attribute.value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attribute.value());
+    } else if (attribute.name() == hspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attribute.value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attribute.value());
+    } else if (attribute.name() == alignAttr)
+        applyAlignmentAttributeToStyle(attribute, style);
+    else if (attribute.name() == valignAttr)
+        addPropertyToAttributeStyle(style, CSSPropertyVerticalAlign, attribute.value());
     else
-        HTMLElement::collectStyleForAttribute(attr, style);
+        HTMLElement::collectStyleForAttribute(attribute, style);
 }
 
-void HTMLImageElement::parseAttribute(Attribute* attr)
+void HTMLImageElement::parseAttribute(const Attribute& attribute)
 {
-    const QualifiedName& attrName = attr->name();
-    if (attrName == altAttr) {
-        if (renderer() && renderer()->isImage())
-            toRenderImage(renderer())->updateAltText();
-    } else if (attrName == srcAttr)
+    if (attribute.name() == altAttr) {
+        RenderObject* renderObject = shadow() ? innerElement()->renderer() : renderer();
+        if (renderObject && renderObject->isImage())
+            toRenderImage(renderObject)->updateAltText();
+    } else if (attribute.name() == srcAttr) {
         m_imageLoader.updateFromElementIgnoringPreviousError();
-    else if (attrName == usemapAttr)
-        setIsLink(!attr->isNull());
-    else if (attrName == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attr));
-    else if (attrName == onbeforeloadAttr)
-        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attr));
-    else if (attrName == compositeAttr) {
-        if (!parseCompositeOperator(attr->value(), m_compositeOperator))
+        if (ElementShadow* elementShadow = shadow())
+            elementShadow->invalidateDistribution();
+    } else if (attribute.name() == usemapAttr)
+        setIsLink(!attribute.isNull());
+    else if (attribute.name() == onloadAttr)
+        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attribute));
+    else if (attribute.name() == onbeforeloadAttr)
+        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attribute));
+    else if (attribute.name() == compositeAttr) {
+        if (!parseCompositeOperator(attribute.value(), m_compositeOperator))
             m_compositeOperator = CompositeSourceOver;
     } else
-        HTMLElement::parseAttribute(attr);
+        HTMLElement::parseAttribute(attribute);
 }
 
 String HTMLImageElement::altText() const
@@ -142,33 +196,27 @@ String HTMLImageElement::altText() const
 
 RenderObject* HTMLImageElement::createRenderer(RenderArena* arena, RenderStyle* style)
 {
-    if (style->hasContent())
+    if (style->hasContent() || shadow())
         return RenderObject::createObject(this, style);
 
-    RenderImage* image = new (arena) RenderImage(this);
-    image->setImageResource(RenderImageResource::create());
-    return image;
+    return createRendererForImage(this, arena);
+}
+
+bool HTMLImageElement::canStartSelection() const
+{
+    if (shadow())
+        return HTMLElement::canStartSelection();
+
+    return false;
 }
 
 void HTMLImageElement::attach()
 {
     HTMLElement::attach();
-
-    if (renderer() && renderer()->isImage() && !m_imageLoader.hasPendingBeforeLoadEvent()) {
-        RenderImage* renderImage = toRenderImage(renderer());
-        RenderImageResource* renderImageResource = renderImage->imageResource();
-        if (renderImageResource->hasImage())
-            return;
-        renderImageResource->setCachedImage(m_imageLoader.image());
-
-        // If we have no image at all because we have no src attribute, set
-        // image height and width for the alt text instead.
-        if (!m_imageLoader.image() && !renderImageResource->cachedImage())
-            renderImage->setImageSizeForAltText();
-    }
+    setImageIfNecessary(renderer(), imageLoader());
 }
 
-Node::InsertionNotificationRequest HTMLImageElement::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest HTMLImageElement::insertedInto(ContainerNode* insertionPoint)
 {
     if (!m_form) {
         // m_form can be non-null if it was set in constructor.
@@ -189,7 +237,7 @@ Node::InsertionNotificationRequest HTMLImageElement::insertedInto(Node* insertio
     return HTMLElement::insertedInto(insertionPoint);
 }
 
-void HTMLImageElement::removedFrom(Node* insertionPoint)
+void HTMLImageElement::removedFrom(ContainerNode* insertionPoint)
 {
     if (m_form)
         m_form->removeImgElement(this);
@@ -259,13 +307,13 @@ int HTMLImageElement::naturalHeight() const
     return m_imageLoader.image()->imageSizeForRenderer(renderer(), 1.0f).height();
 }
 
-bool HTMLImageElement::isURLAttribute(Attribute* attr) const
+bool HTMLImageElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == srcAttr
-        || attr->name() == lowsrcAttr
-        || attr->name() == longdescAttr
-        || (attr->name() == usemapAttr && attr->value().string()[0] != '#')
-        || HTMLElement::isURLAttribute(attr);
+    return attribute.name() == srcAttr
+        || attribute.name() == lowsrcAttr
+        || attribute.name() == longdescAttr
+        || (attribute.name() == usemapAttr && attribute.value().string()[0] != '#')
+        || HTMLElement::isURLAttribute(attribute);
 }
 
 const AtomicString& HTMLImageElement::alt() const
@@ -366,5 +414,11 @@ void HTMLImageElement::setItemValueText(const String& value, ExceptionCode&)
     setAttribute(srcAttr, value);
 }
 #endif
+
+inline ImageInnerElement* HTMLImageElement::innerElement() const
+{
+    ASSERT(userAgentShadowRoot());
+    return toImageInnerElement(userAgentShadowRoot()->firstChild());
+}
 
 }

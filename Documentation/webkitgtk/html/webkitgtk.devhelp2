@@ -31,6 +31,7 @@
       <sub name="WebKitIconDatabase" link="WebKitIconDatabase.html"/>
       <sub name="WebKitSpellChecker" link="WebKitSpellChecker.html"/>
       <sub name="WebKitFaviconDatabase" link="WebKitFaviconDatabase.html"/>
+      <sub name="WebKitFileChooserRequest" link="WebKitFileChooserRequest.html"/>
     </sub>
     <sub name="Running WebKitGTK+-based programs" link="ch03.html">
       <sub name="Environment" link="webkit-environment.html"/>
@@ -162,6 +163,7 @@
     <keyword type="function" name="webkit_web_view_zoom_in ()" link="webkitgtk-webkitwebview.html#webkit-web-view-zoom-in" since="1.0.1"/>
     <keyword type="function" name="webkit_web_view_zoom_out ()" link="webkitgtk-webkitwebview.html#webkit-web-view-zoom-out" since="1.0.1"/>
     <keyword type="function" name="webkit_web_view_get_window_features ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-window-features" since="1.0.3"/>
+    <keyword type="function" name="webkit_web_view_get_snapshot ()" link="webkitgtk-webkitwebview.html#webkit-web-view-get-snapshot" since="1.10"/>
     <keyword type="property" name="The &quot;copy-target-list&quot; property" link="webkitgtk-webkitwebview.html#WebKitWebView--copy-target-list"/>
     <keyword type="property" name="The &quot;custom-encoding&quot; property" link="webkitgtk-webkitwebview.html#WebKitWebView--custom-encoding"/>
     <keyword type="property" name="The &quot;editable&quot; property" link="webkitgtk-webkitwebview.html#WebKitWebView--editable"/>
@@ -221,6 +223,7 @@
     <keyword type="signal" name="The &quot;resource-load-finished&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-resource-load-finished"/>
     <keyword type="signal" name="The &quot;resource-request-starting&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-resource-request-starting"/>
     <keyword type="signal" name="The &quot;resource-response-received&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-resource-response-received"/>
+    <keyword type="signal" name="The &quot;run-file-chooser&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-run-file-chooser"/>
     <keyword type="signal" name="The &quot;script-alert&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-script-alert"/>
     <keyword type="signal" name="The &quot;script-confirm&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-script-confirm"/>
     <keyword type="signal" name="The &quot;script-prompt&quot; signal" link="webkitgtk-webkitwebview.html#WebKitWebView-script-prompt"/>
@@ -246,6 +249,7 @@
     <keyword type="struct" name="WebKitWebFrame" link="WebKitWebFrame.html#WebKitWebFrame-struct"/>
     <keyword type="function" name="webkit_web_frame_find_frame ()" link="WebKitWebFrame.html#webkit-web-frame-find-frame"/>
     <keyword type="function" name="webkit_web_frame_get_data_source ()" link="WebKitWebFrame.html#webkit-web-frame-get-data-source" since="1.1.14"/>
+    <keyword type="function" name="webkit_web_frame_get_dom_document ()" link="WebKitWebFrame.html#webkit-web-frame-get-dom-document" since="1.10"/>
     <keyword type="function" name="webkit_web_frame_get_global_context ()" link="WebKitWebFrame.html#webkit-web-frame-get-global-context"/>
     <keyword type="function" name="webkit_web_frame_get_horizontal_scrollbar_policy ()" link="WebKitWebFrame.html#webkit-web-frame-get-horizontal-scrollbar-policy"/>
     <keyword type="function" name="webkit_web_frame_get_load_status ()" link="WebKitWebFrame.html#webkit-web-frame-get-load-status" since="1.1.7"/>
@@ -330,6 +334,8 @@
     <keyword type="property" name="The &quot;html5-local-storage-database-path&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--html5-local-storage-database-path"/>
     <keyword type="property" name="The &quot;javascript-can-access-clipboard&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--javascript-can-access-clipboard"/>
     <keyword type="property" name="The &quot;javascript-can-open-windows-automatically&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--javascript-can-open-windows-automatically"/>
+    <keyword type="property" name="The &quot;media-playback-allows-inline&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--media-playback-allows-inline"/>
+    <keyword type="property" name="The &quot;media-playback-requires-user-gesture&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--media-playback-requires-user-gesture"/>
     <keyword type="property" name="The &quot;minimum-font-size&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--minimum-font-size"/>
     <keyword type="property" name="The &quot;minimum-logical-font-size&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--minimum-logical-font-size"/>
     <keyword type="property" name="The &quot;monospace-font-family&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--monospace-font-family"/>
@@ -406,8 +412,10 @@
     <keyword type="struct" name="WebKitNetworkResponse" link="WebKitNetworkResponse.html#WebKitNetworkResponse-struct"/>
     <keyword type="function" name="webkit_network_response_get_uri ()" link="WebKitNetworkResponse.html#webkit-network-response-get-uri" since="1.1.14"/>
     <keyword type="function" name="webkit_network_response_get_message ()" link="WebKitNetworkResponse.html#webkit-network-response-get-message" since="1.1.14"/>
+    <keyword type="function" name="webkit_network_response_get_suggested_filename ()" link="WebKitNetworkResponse.html#webkit-network-response-get-suggested-filename" since="1.10"/>
     <keyword type="function" name="webkit_network_response_set_uri ()" link="WebKitNetworkResponse.html#webkit-network-response-set-uri" since="1.1.14"/>
     <keyword type="property" name="The &quot;message&quot; property" link="WebKitNetworkResponse.html#WebKitNetworkResponse--message"/>
+    <keyword type="property" name="The &quot;suggested-filename&quot; property" link="WebKitNetworkResponse.html#WebKitNetworkResponse--suggested-filename"/>
     <keyword type="property" name="The &quot;uri&quot; property" link="WebKitNetworkResponse.html#WebKitNetworkResponse--uri"/>
     <keyword type="struct" name="WebKitWebInspector" link="WebKitWebInspector.html#WebKitWebInspector-struct"/>
     <keyword type="function" name="webkit_web_inspector_get_inspected_uri ()" link="WebKitWebInspector.html#webkit-web-inspector-get-inspected-uri" since="1.0.3"/>
@@ -587,7 +595,17 @@
     <keyword type="function" name="webkit_favicon_database_try_get_favicon_pixbuf ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-try-get-favicon-pixbuf" since="1.8"/>
     <keyword type="property" name="The &quot;path&quot; property" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase--path"/>
     <keyword type="signal" name="The &quot;icon-loaded&quot; signal" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-icon-loaded"/>
-    <keyword type="" name="Logging" link="webkit-environment.html#idp5897248"/>
+    <keyword type="struct" name="struct WebKitFileChooserRequest" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest-struct"/>
+    <keyword type="function" name="webkit_file_chooser_request_get_select_multiple ()" link="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-select-multiple" since="1.10"/>
+    <keyword type="function" name="webkit_file_chooser_request_get_mime_types ()" link="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types" since="1.10"/>
+    <keyword type="function" name="webkit_file_chooser_request_get_mime_types_filter ()" link="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types-filter" since="1.10"/>
+    <keyword type="function" name="webkit_file_chooser_request_get_selected_files ()" link="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-selected-files" since="1.10"/>
+    <keyword type="function" name="webkit_file_chooser_request_select_files ()" link="WebKitFileChooserRequest.html#webkit-file-chooser-request-select-files" since="1.10"/>
+    <keyword type="property" name="The &quot;filter&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--filter"/>
+    <keyword type="property" name="The &quot;mime-types&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--mime-types"/>
+    <keyword type="property" name="The &quot;select-multiple&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--select-multiple"/>
+    <keyword type="property" name="The &quot;selected-files&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--selected-files"/>
+    <keyword type="" name="Logging" link="webkit-environment.html#id480174"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DEFAULT" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DEFAULT:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>

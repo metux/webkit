@@ -38,7 +38,6 @@
 #include "Page.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGResourceFilterPrimitive.h"
-#include "Settings.h"
 #include "SVGElement.h"
 #include "SVGFilter.h"
 #include "SVGFilterElement.h"
@@ -47,6 +46,9 @@
 #include "SVGRenderingContext.h"
 #include "SVGStyledElement.h"
 #include "SVGUnitTypes.h"
+#include "Settings.h"
+#include "SourceAlpha.h"
+#include "SourceGraphic.h"
 
 #include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
@@ -101,7 +103,7 @@ PassRefPtr<SVGFilterBuilder> RenderSVGResourceFilter::buildPrimitives(SVGFilter*
     FloatRect targetBoundingBox = filter->targetBoundingBox();
 
     // Add effects to the builder
-    RefPtr<SVGFilterBuilder> builder = SVGFilterBuilder::create(filter);
+    RefPtr<SVGFilterBuilder> builder = SVGFilterBuilder::create(SourceGraphic::create(filter), SourceAlpha::create(filter));
     for (Node* node = filterElement->firstChild(); node; node = node->nextSibling()) {
         if (!node->isSVGElement())
             continue;
@@ -119,6 +121,8 @@ PassRefPtr<SVGFilterBuilder> RenderSVGResourceFilter::buildPrimitives(SVGFilter*
         builder->appendEffectToEffectReferences(effect, effectElement->renderer());
         effectElement->setStandardAttributes(effect.get());
         effect->setEffectBoundaries(SVGLengthContext::resolveRectangle<SVGFilterPrimitiveStandardAttributes>(effectElement, filterElement->primitiveUnits(), targetBoundingBox));
+        effect->setColorSpace(effectElement->renderer()->style()->svgStyle()->colorInterpolationFilters() == CI_LINEARRGB
+                ? ColorSpaceLinearRGB : ColorSpaceDeviceRGB);
         builder->add(effectElement->result(), effect);
     }
     return builder.release();
@@ -282,10 +286,6 @@ void RenderSVGResourceFilter::postApplyResource(RenderObject* object, GraphicsCo
 
         context = filterData->savedContext;
         filterData->savedContext = 0;
-#if !USE(CG)
-        if (filterData->sourceGraphicBuffer)
-            filterData->sourceGraphicBuffer->transformColorSpace(ColorSpaceDeviceRGB, ColorSpaceLinearRGB);
-#endif
     }
 
     FilterEffect* lastEffect = filterData->builder->lastEffect();
@@ -304,7 +304,7 @@ void RenderSVGResourceFilter::postApplyResource(RenderObject* object, GraphicsCo
 #if !USE(CG)
             ImageBuffer* resultImage = lastEffect->asImageBuffer();
             if (resultImage)
-                resultImage->transformColorSpace(ColorSpaceLinearRGB, ColorSpaceDeviceRGB);
+                resultImage->transformColorSpace(lastEffect->colorSpace(), ColorSpaceDeviceRGB);
 #endif
         }
         filterData->builded = true;
@@ -314,7 +314,6 @@ void RenderSVGResourceFilter::postApplyResource(RenderObject* object, GraphicsCo
             context->concatCTM(filterData->shearFreeAbsoluteTransform.inverse());
 
             context->scale(FloatSize(1 / filterData->filter->filterResolution().width(), 1 / filterData->filter->filterResolution().height()));
-            context->clip(lastEffect->maxEffectRect());
             context->drawImageBuffer(resultImage, object->style()->colorSpace(), lastEffect->absolutePaintRect());
             context->scale(filterData->filter->filterResolution());
 

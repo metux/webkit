@@ -27,6 +27,7 @@
 #define EventDispatcher_h
 
 #include <wtf/Forward.h>
+#include <wtf/HashMap.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -39,11 +40,31 @@ class FrameView;
 class Node;
 class PlatformKeyboardEvent;
 class PlatformMouseEvent;
-class PlatformWheelEvent;
+class ShadowRoot;
+class TreeScope;
+class WindowEventContext;
 
 enum EventDispatchBehavior {
     RetargetEvent,
     StayInsideShadowDOM
+};
+
+enum EventDispatchContinuation {
+    ContinueDispatching,
+    DoneDispatching
+};
+
+class EventRelatedTargetAdjuster {
+public:
+    EventRelatedTargetAdjuster(PassRefPtr<Node>, PassRefPtr<Node> relatedTarget);
+    void adjust(Vector<EventContext>&);
+private:
+    typedef HashMap<TreeScope*, EventTarget*> RelatedTargetMap;
+    EventTarget* findRelatedTarget(TreeScope*);
+
+    RefPtr<Node> m_node;
+    RefPtr<Node> m_relatedTarget;
+    RelatedTargetMap m_relatedTargetMap;
 };
 
 class EventDispatcher {
@@ -54,23 +75,30 @@ public:
     static void dispatchSimulatedClick(Node*, PassRefPtr<Event> underlyingEvent, bool sendMouseEvents, bool showPressedLook);
 
     bool dispatchEvent(PassRefPtr<Event>);
-    PassRefPtr<EventTarget> adjustRelatedTarget(Event*, PassRefPtr<EventTarget>);
+    void adjustRelatedTarget(Event*, PassRefPtr<EventTarget> prpRelatedTarget);
     Node* node() const;
 
 private:
     EventDispatcher(Node*);
 
-    PassRefPtr<EventTarget> adjustToShadowBoundaries(PassRefPtr<Node> relatedTarget, const Vector<Node*> relatedTargetAncestors);
-    EventDispatchBehavior determineDispatchBehavior(Event*, Node* shadowRoot);
+    EventDispatchBehavior determineDispatchBehavior(Event*, ShadowRoot*, EventTarget*);
+
     void ensureEventAncestors(Event*);
     const EventContext* topEventContext();
 
+    EventDispatchContinuation dispatchEventPreProcess(PassRefPtr<Event>, void*& preDispatchEventHandlerResult);
+    EventDispatchContinuation dispatchEventAtCapturing(PassRefPtr<Event>, WindowEventContext&);
+    EventDispatchContinuation dispatchEventAtTarget(PassRefPtr<Event>);
+    EventDispatchContinuation dispatchEventAtBubbling(PassRefPtr<Event>, WindowEventContext&);
+    void dispatchEventPostProcess(PassRefPtr<Event>, void* preDispatchEventHandlerResult);
+
     Vector<EventContext> m_ancestors;
     RefPtr<Node> m_node;
-    RefPtr<EventTarget> m_originalTarget;
     RefPtr<FrameView> m_view;
     bool m_ancestorsInitialized;
-    bool m_shouldPreventDispatch;
+#ifndef NDEBUG
+    bool m_eventDispatched;
+#endif
 };
 
 inline Node* EventDispatcher::node() const

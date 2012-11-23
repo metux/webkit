@@ -74,8 +74,11 @@ public:
 
     void syncLocalStorage();
 
+    double storageDatabaseIdleInterval() { return m_StorageDatabaseIdleInterval; }
+    void setStorageDatabaseIdleInterval(double interval) { m_StorageDatabaseIdleInterval = interval; }
+
 private:
-    StorageTracker(const String& storagePath);
+    explicit StorageTracker(const String& storagePath);
     static void scheduleTask(void*);
 
     void internalInitialize();
@@ -118,6 +121,7 @@ private:
     bool m_isActive;
     bool m_needsInitialization;
     bool m_finishedImportingOriginIdentifiers;
+    double m_StorageDatabaseIdleInterval;
 };
     
 } // namespace WebCore

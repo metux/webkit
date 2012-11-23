@@ -37,6 +37,7 @@ namespace WebCore {
 inline SVGStyleElement::SVGStyleElement(const QualifiedName& tagName, Document* document, bool createdByParser)
     : SVGElement(tagName, document)
     , StyleElement(document, createdByParser)
+    , m_svgLoadEventTimer(this, &SVGElement::svgLoadEventTimerFired)
 {
     ASSERT(hasTagName(SVGNames::styleTag));
 }
@@ -109,20 +110,20 @@ bool SVGStyleElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGStyleElement::parseAttribute(Attribute* attr)
+void SVGStyleElement::parseAttribute(const Attribute& attribute)
 {
-    if (!isSupportedAttribute(attr->name())) {
-        SVGElement::parseAttribute(attr);
+    if (!isSupportedAttribute(attribute.name())) {
+        SVGElement::parseAttribute(attribute);
         return;
     }
 
-    if (attr->name() == SVGNames::titleAttr) {
+    if (attribute.name() == SVGNames::titleAttr) {
         if (m_sheet)
-            m_sheet->setTitle(attr->value());
+            m_sheet->setTitle(attribute.value());
         return;
     }
 
-    if (SVGLangSpace::parseAttribute(attr))
+    if (SVGLangSpace::parseAttribute(attribute))
         return;
 
     ASSERT_NOT_REACHED();
@@ -134,7 +135,7 @@ void SVGStyleElement::finishParsingChildren()
     SVGElement::finishParsingChildren();
 }
 
-Node::InsertionNotificationRequest SVGStyleElement::insertedInto(Node* rootParent)
+Node::InsertionNotificationRequest SVGStyleElement::insertedInto(ContainerNode* rootParent)
 {
     SVGElement::insertedInto(rootParent);
     if (rootParent->inDocument())
@@ -142,7 +143,7 @@ Node::InsertionNotificationRequest SVGStyleElement::insertedInto(Node* rootParen
     return InsertionDone;
 }
 
-void SVGStyleElement::removedFrom(Node* rootParent)
+void SVGStyleElement::removedFrom(ContainerNode* rootParent)
 {
     SVGElement::removedFrom(rootParent);
     if (rootParent->inDocument())

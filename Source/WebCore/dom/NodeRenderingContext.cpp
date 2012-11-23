@@ -26,10 +26,12 @@
 #include "config.h"
 #include "NodeRenderingContext.h"
 
+#include "ComposedShadowTreeWalker.h"
 #include "ContainerNode.h"
+#include "ContentDistributor.h"
+#include "ElementShadow.h"
 #include "FlowThreadController.h"
 #include "HTMLContentElement.h"
-#include "HTMLContentSelector.h"
 #include "HTMLNames.h"
 #include "HTMLShadowElement.h"
 #include "Node.h"
@@ -38,7 +40,7 @@
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
+#include "StyleInheritedData.h"
 
 #if ENABLE(SVG)
 #include "SVGNames.h"
@@ -48,78 +50,16 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static RenderObject* firstRendererOf(Node*);
-static RenderObject* lastRendererOf(Node*);
-
 NodeRenderingContext::NodeRenderingContext(Node* node)
-    : m_phase(AttachingNotInTree)
-    , m_node(node)
-    , m_parentNodeForRenderingAndStyle(0)
-    , m_visualParentShadowTree(0)
-    , m_insertionPoint(0)
+    : m_node(node)
     , m_style(0)
     , m_parentFlowRenderer(0)
 {
-    ContainerNode* parent = m_node->parentOrHostNode();
-    if (!parent)
-        return;
-
-    if (parent->isShadowRoot() && toShadowRoot(parent)->isYoungest()) {
-        m_phase = AttachingShadowChild;
-        m_parentNodeForRenderingAndStyle = parent->shadowHost();
-        return;
-    }
-
-    if (parent->isElementNode() || parent->isShadowRoot()) {
-        if (parent->isElementNode() && toElement(parent)->hasShadowRoot())
-            m_visualParentShadowTree = toElement(parent)->shadowTree();
-        else if (parent->isShadowRoot())
-            m_visualParentShadowTree = toShadowRoot(parent)->tree();
-
-        if (m_visualParentShadowTree) {
-            if ((m_insertionPoint = m_visualParentShadowTree->insertionPointFor(m_node))) {
-                if (toShadowRoot(m_insertionPoint->shadowTreeRootNode())->isUsedForRendering()) {
-                    m_phase = AttachingDistributed;
-                    m_parentNodeForRenderingAndStyle = NodeRenderingContext(m_insertionPoint).parentNodeForRenderingAndStyle();
-                    return;
-                }
-            }
-
-            m_phase = AttachingNotDistributed;
-            m_parentNodeForRenderingAndStyle = parent;
-            return;
-        }
-
-        if (isShadowBoundary(parent)) {
-            if (!toShadowRoot(parent->shadowTreeRootNode())->isUsedForRendering()) {
-                m_phase = AttachingNotDistributed;
-                m_parentNodeForRenderingAndStyle = parent;
-                return;
-            }
-
-            if (toInsertionPoint(parent)->hasSelection())
-                m_phase = AttachingNotFallbacked;
-            else
-                m_phase = AttachingFallbacked;
-
-            if (toInsertionPoint(parent)->isActive())
-                m_parentNodeForRenderingAndStyle = NodeRenderingContext(parent).parentNodeForRenderingAndStyle();
-            else
-                m_parentNodeForRenderingAndStyle = parent;
-            return;
-        }
-    }
-
-    m_phase = AttachingStraight;
-    m_parentNodeForRenderingAndStyle = parent;
+    ComposedShadowTreeWalker::findParent(m_node, &m_parentDetails);
 }
 
 NodeRenderingContext::NodeRenderingContext(Node* node, RenderStyle* style)
-    : m_phase(Calculating)
-    , m_node(node)
-    , m_parentNodeForRenderingAndStyle(0)
-    , m_visualParentShadowTree(0)
-    , m_insertionPoint(0)
+    : m_node(node)
     , m_style(style)
     , m_parentFlowRenderer(0)
 {
@@ -140,176 +80,84 @@ PassRefPtr<RenderStyle> NodeRenderingContext::releaseStyle()
     return m_style.release();
 }
 
-static inline RenderObject* nextRendererOfInsertionPoint(InsertionPoint* parent, Node* current)
-{
-    HTMLContentSelection* currentSelection = parent->selections()->find(current);
-    if (!currentSelection)
-        return 0;
-
-    for (HTMLContentSelection* selection = currentSelection->next(); selection; selection = selection->next()) {
-        if (RenderObject* renderer = selection->node()->renderer())
-            return renderer;
-    }
-
-    return 0;
-}
-
-static inline RenderObject* previousRendererOfInsertionPoint(InsertionPoint* parent, Node* current)
-{
-    RenderObject* lastRenderer = 0;
-
-    for (HTMLContentSelection* selection = parent->selections()->first(); selection; selection = selection->next()) {
-        if (selection->node() == current)
-            break;
-        if (RenderObject* renderer = selection->node()->renderer())
-            lastRenderer = renderer;
-    }
-
-    return lastRenderer;
-}
-
-static inline RenderObject* firstRendererOfInsertionPoint(InsertionPoint* parent)
-{
-    if (parent->hasSelection()) {
-        for (HTMLContentSelection* selection = parent->selections()->first(); selection; selection = selection->next()) {
-            if (RenderObject* renderer = selection->node()->renderer())
-                return renderer;
-        }
-
-        return 0;
-    }
-
-    return firstRendererOf(parent->firstChild());
-}
-
-static inline RenderObject* lastRendererOfInsertionPoint(InsertionPoint* parent)
-{
-    if (parent->hasSelection()) {
-        for (HTMLContentSelection* selection = parent->selections()->last(); selection; selection = selection->previous()) {
-            if (RenderObject* renderer = selection->node()->renderer())
-                return renderer;
-        }
-
-        return 0;
-    }
-
-    return lastRendererOf(parent->lastChild());
-}
-
-static inline RenderObject* firstRendererOf(Node* node)
-{
-    for (; node; node = node->nextSibling()) {
-        if (node->renderer()) {
-            // Do not return elements that are attached to a different flow-thread.
-            if (node->renderer()->style() && !node->renderer()->style()->flowThread().isEmpty())
-                continue;
-            return node->renderer();
-        }
-
-        if (isInsertionPoint(node) && toInsertionPoint(node)->isActive()) {
-            if (RenderObject* first = firstRendererOfInsertionPoint(toInsertionPoint(node)))
-                return first;
-        }
-    }
-
-    return 0;
-}
-
-static inline RenderObject* lastRendererOf(Node* node)
-{
-    for (; node; node = node->previousSibling()) {
-        if (node->renderer()) {
-            // Do not return elements that are attached to a different flow-thread.
-            if (node->renderer()->style() && !node->renderer()->style()->flowThread().isEmpty())
-                continue;
-            return node->renderer();
-        }
-        if (isInsertionPoint(node) && toInsertionPoint(node)->isActive()) {
-            if (RenderObject* last = lastRendererOfInsertionPoint(toInsertionPoint(node)))
-                return last;
-        }
-    }
-
-    return 0;
-}
-
 RenderObject* NodeRenderingContext::nextRenderer() const
 {
-    ASSERT(m_node->renderer() || m_phase != Calculating);
     if (RenderObject* renderer = m_node->renderer())
         return renderer->nextSibling();
 
     if (m_parentFlowRenderer)
         return m_parentFlowRenderer->nextRendererForNode(m_node);
 
-    if (m_phase == AttachingDistributed) {
-        if (RenderObject* found = nextRendererOfInsertionPoint(m_insertionPoint, m_node))
-            return found;
-        return NodeRenderingContext(m_insertionPoint).nextRenderer();
-    }
-
     // Avoid an O(N^2) problem with this function by not checking for
     // nextRenderer() when the parent element hasn't attached yet.
-    if (m_node->parentOrHostNode() && !m_node->parentOrHostNode()->attached())
+    if (m_parentDetails.node() && !m_parentDetails.node()->attached())
         return 0;
 
-    return firstRendererOf(m_node->nextSibling());
+    ComposedShadowTreeWalker walker(m_node);
+    do {
+        walker.nextSibling();
+        if (!walker.get())
+            return 0;
+        if (RenderObject* renderer = walker.get()->renderer()) {
+            // Do not return elements that are attached to a different flow-thread.
+            if (renderer->style() && !renderer->style()->flowThread().isEmpty())
+                continue;
+            return renderer;
+        }
+    } while (true);
+
+    ASSERT_NOT_REACHED();
+    return 0;
 }
 
 RenderObject* NodeRenderingContext::previousRenderer() const
 {
-    ASSERT(m_node->renderer() || m_phase != Calculating);
-
     if (RenderObject* renderer = m_node->renderer())
         return renderer->previousSibling();
 
     if (m_parentFlowRenderer)
         return m_parentFlowRenderer->previousRendererForNode(m_node);
 
-    if (m_phase == AttachingDistributed) {
-        if (RenderObject* found = previousRendererOfInsertionPoint(m_insertionPoint, m_node))
-            return found;
-        return NodeRenderingContext(m_insertionPoint).previousRenderer();
-    }
-
     // FIXME: We should have the same O(N^2) avoidance as nextRenderer does
     // however, when I tried adding it, several tests failed.
-    return lastRendererOf(m_node->previousSibling());
+
+    ComposedShadowTreeWalker walker(m_node);
+    do {
+        walker.previousSibling();
+        if (!walker.get())
+            return 0;
+        if (RenderObject* renderer = walker.get()->renderer()) {
+            // Do not return elements that are attached to a different flow-thread.
+            if (renderer->style() && !renderer->style()->flowThread().isEmpty())
+                continue;
+            return renderer;
+        }
+    } while (true);
+
+    ASSERT_NOT_REACHED();
+    return 0;
 }
 
 RenderObject* NodeRenderingContext::parentRenderer() const
 {
-    if (RenderObject* renderer = m_node->renderer()) {
-        ASSERT(m_phase == Calculating);
+    if (RenderObject* renderer = m_node->renderer())
         return renderer->parent();
-    }
-
     if (m_parentFlowRenderer)
         return m_parentFlowRenderer;
 
-    ASSERT(m_phase != Calculating);
-    return m_parentNodeForRenderingAndStyle ? m_parentNodeForRenderingAndStyle->renderer() : 0;
-}
-
-void NodeRenderingContext::hostChildrenChanged()
-{
-    if (m_phase == AttachingNotDistributed && m_visualParentShadowTree)
-        m_visualParentShadowTree->hostChildrenChanged();
+    return m_parentDetails.node() ? m_parentDetails.node()->renderer() : 0;
 }
 
 bool NodeRenderingContext::shouldCreateRenderer() const
 {
-    ASSERT(m_phase != Calculating);
-    ASSERT(parentNodeForRenderingAndStyle());
-
-    if (m_phase == AttachingNotInTree || m_phase == AttachingNotDistributed || m_phase == AttachingNotFallbacked)
+    if (!m_parentDetails.node())
         return false;
     RenderObject* parentRenderer = this->parentRenderer();
     if (!parentRenderer)
         return false;
     if (!parentRenderer->canHaveChildren())
         return false;
-    if (!m_parentNodeForRenderingAndStyle->childShouldCreateRenderer(*this))
+    if (!m_parentDetails.node()->childShouldCreateRenderer(*this))
         return false;
     return true;
 }
@@ -338,6 +186,16 @@ void NodeRenderingContext::moveToFlowThreadIfNeeded()
     FlowThreadController* flowThreadController = m_node->document()->renderView()->flowThreadController();
     m_parentFlowRenderer = flowThreadController->ensureRenderFlowThreadWithName(m_flowThread);
     flowThreadController->registerNamedFlowContentNode(m_node, m_parentFlowRenderer);
+}
+
+bool NodeRenderingContext::isOnEncapsulationBoundary() const
+{
+    return isOnUpperEncapsulationBoundary() || isLowerEncapsulationBoundary(m_parentDetails.insertionPoint()) || isLowerEncapsulationBoundary(m_node->parentNode());
+}
+
+bool NodeRenderingContext::isOnUpperEncapsulationBoundary() const
+{
+    return m_node->parentNode() && m_node->parentNode()->isShadowRoot();
 }
 
 NodeRendererFactory::NodeRendererFactory(Node* node)
@@ -372,9 +230,6 @@ void NodeRendererFactory::createRendererIfNeeded()
     ASSERT(!node->renderer());
     ASSERT(document->shouldCreateRenderers());
 
-    // FIXME: This side effect should be visible from attach() code.
-    m_context.hostChildrenChanged();
-
     if (!m_context.shouldCreateRenderer())
         return;
 
@@ -398,7 +253,7 @@ void NodeRendererFactory::createRendererIfNeeded()
 
 #if ENABLE(FULLSCREEN_API)
     if (document->webkitIsFullScreen() && document->webkitCurrentFullScreenElement() == node)
-        newRenderer = RenderFullScreen::wrapRenderer(newRenderer, document);
+        newRenderer = RenderFullScreen::wrapRenderer(newRenderer, parentRenderer, document);
 #endif
 
     if (!newRenderer)

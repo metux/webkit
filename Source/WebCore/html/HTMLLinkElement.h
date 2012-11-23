@@ -55,6 +55,11 @@ public:
 
     String type() const;
 
+    IconType iconType() const;
+
+    // the icon size string as parsed from the HTML attribute
+    String iconSizes() const;
+
     CSSStyleSheet* sheet() const { return m_sheet.get(); }
 
     bool styleSheetIsLoading() const;
@@ -68,15 +73,15 @@ public:
     static void dispatchPendingLoadEvents();
 
 private:
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
 
     virtual bool shouldLoadLink();
     void process();
     static void processCallback(Node*);
     void clearSheet();
 
-    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
-    virtual void removedFrom(Node*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
 
     // from CachedResourceClient
     virtual void setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet* sheet);
@@ -91,7 +96,7 @@ private:
     
     void setDisabledState(bool);
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
 private:
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
@@ -100,7 +105,13 @@ private:
     
     enum PendingSheetType { None, NonBlocking, Blocking };
     void addPendingSheet(PendingSheetType);
-    void removePendingSheet();
+
+    enum RemovePendingSheetNotificationType {
+        RemovePendingSheetNotifyImmediately,
+        RemovePendingSheetNotifyLater
+    };
+
+    void removePendingSheet(RemovePendingSheetNotificationType = RemovePendingSheetNotifyImmediately);
 
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const OVERRIDE;

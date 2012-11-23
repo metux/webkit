@@ -117,10 +117,9 @@ unsigned WidthIterator::advance(int offset, GlyphBuffer* glyphBuffer)
 
         // Now that we have a glyph and font data, get its width.
         float width;
-        if (character == '\t' && m_run.allowTabs()) {
-            float tabWidth = m_font->tabWidth(*fontData);
-            width = tabWidth - fmodf(m_run.xPos() + m_runWidthSoFar + widthSinceLastRounding, tabWidth);
-        } else {
+        if (character == '\t' && m_run.allowTabs())
+            width = m_font->tabWidth(*fontData, m_run.tabSize(), m_run.xPos() + m_runWidthSoFar + widthSinceLastRounding);
+        else {
             width = fontData->widthForGlyph(glyph);
 
 #if ENABLE(SVG)
@@ -186,7 +185,8 @@ unsigned WidthIterator::advance(int offset, GlyphBuffer* glyphBuffer)
 
                 // Account for word spacing.
                 // We apply additional space between "words" by adding width to the space character.
-                if (treatAsSpace && textIterator.currentCharacter() && !Font::treatAsSpace(textIterator.characters()[-1]) && m_font->wordSpacing())
+                // Word-spacing affects each space (U+0020) and non-breaking space (U+00A0).
+                if ((character == noBreakSpace || character == ' ') && textIterator.currentCharacter() && m_font->wordSpacing())
                     width += m_font->wordSpacing();
             } else
                 m_isAfterExpansion = false;

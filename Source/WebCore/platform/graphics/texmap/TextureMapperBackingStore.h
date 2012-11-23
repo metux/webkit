@@ -20,12 +20,17 @@
 #ifndef TextureMapperBackingStore_h
 #define TextureMapperBackingStore_h
 
+#if USE(ACCELERATED_COMPOSITING)
+
 #include "FloatRect.h"
 #include "Image.h"
 #include "TextureMapper.h"
 #include "TextureMapperPlatformLayer.h"
-
 #include <wtf/RefPtr.h>
+
+#if USE(GRAPHICS_SURFACE)
+#include "GraphicsSurface.h"
+#endif
 
 namespace WebCore {
 
@@ -36,7 +41,35 @@ public:
     virtual PassRefPtr<BitmapTexture> texture() const = 0;
     virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float, BitmapTexture*) = 0;
     virtual ~TextureMapperBackingStore() { }
+
+protected:
+    static unsigned calculateExposedTileEdges(const FloatRect& totalRect, const FloatRect& tileRect);
 };
+
+#if USE(GRAPHICS_SURFACE)
+class TextureMapperSurfaceBackingStore : public TextureMapperBackingStore {
+public:
+    static PassRefPtr<TextureMapperSurfaceBackingStore> create() { return adoptRef(new TextureMapperSurfaceBackingStore); }
+    void setGraphicsSurface(uint64_t graphicsSurfaceToken, const IntSize& surfaceSize, uint32_t frontBuffer);
+    PassRefPtr<WebCore::GraphicsSurface> graphicsSurface() const { return m_graphicsSurface; }
+    virtual PassRefPtr<BitmapTexture> texture() const;
+    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float, BitmapTexture*);
+    virtual ~TextureMapperSurfaceBackingStore() { }
+
+protected:
+    void setSurface(PassRefPtr<GraphicsSurface>);
+
+private:
+    TextureMapperSurfaceBackingStore()
+        : TextureMapperBackingStore()
+        , m_graphicsSurfaceToken(0)
+        { }
+
+    uint64_t m_graphicsSurfaceToken;
+    RefPtr<WebCore::GraphicsSurface> m_graphicsSurface;
+    IntSize m_graphicsSurfaceSize;
+};
+#endif
 
 class TextureMapperTile {
 public:
@@ -46,7 +79,7 @@ public:
     inline void setRect(const FloatRect& rect) { m_rect = rect; }
 
     void updateContents(TextureMapper*, Image*, const IntRect&);
-    virtual void paint(TextureMapper*, const TransformationMatrix&, float, BitmapTexture*);
+    virtual void paint(TextureMapper*, const TransformationMatrix&, float, BitmapTexture*, const unsigned exposedEdges);
     virtual ~TextureMapperTile() { }
 
     TextureMapperTile(const FloatRect& rect)
@@ -72,14 +105,23 @@ public:
     void setContentsToImage(Image* image) { m_image = image; }
     void updateContentsFromImageIfNeeded(TextureMapper*);
 
+    void setShowDebugBorders(bool drawsDebugBorders) { m_drawsDebugBorders = drawsDebugBorders; }
+    void setDebugBorder(const Color&, float width);
+
 private:
-    TextureMapperTiledBackingStore() { }
+    TextureMapperTiledBackingStore();
     void createOrDestroyTilesIfNeeded(const FloatSize& backingStoreSize, const IntSize& tileSize, bool hasAlpha);
 
     Vector<TextureMapperTile> m_tiles;
     FloatSize m_size;
     RefPtr<Image> m_image;
+
+    bool m_drawsDebugBorders;
+    Color m_debugBorderColor;
+    float m_debugBorderWidth;
 };
 
 }
+#endif
+
 #endif // TextureMapperBackingStore_h

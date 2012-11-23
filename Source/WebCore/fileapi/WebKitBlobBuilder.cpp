@@ -35,15 +35,34 @@
 #include "Blob.h"
 #include "ExceptionCode.h"
 #include "File.h"
+#include "HistogramSupport.h"
 #include "LineEnding.h"
+#include "ScriptCallStack.h"
+#include "ScriptExecutionContext.h"
 #include "TextEncoding.h"
 #include <wtf/ArrayBuffer.h>
+#include <wtf/ArrayBufferView.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
+
+enum BlobConstructorArrayBufferOrView {
+    BlobConstructorArrayBuffer,
+    BlobConstructorArrayBufferView,
+    BlobConstructorArrayBufferOrViewMax,
+};
+
+// static
+PassRefPtr<WebKitBlobBuilder> WebKitBlobBuilder::create(ScriptExecutionContext* context)
+{
+    String message("BlobBuilder is deprecated. Use \"Blob\" constructor instead.");
+    context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, message);
+
+    return adoptRef(new WebKitBlobBuilder());
+}
 
 WebKitBlobBuilder::WebKitBlobBuilder()
     : m_size(0)
@@ -86,14 +105,27 @@ void WebKitBlobBuilder::append(const String& text, ExceptionCode& ec)
 }
 
 #if ENABLE(BLOB)
-void WebKitBlobBuilder::append(ArrayBuffer* arrayBuffer)
+void WebKitBlobBuilder::append(ScriptExecutionContext* context, ArrayBuffer* arrayBuffer)
 {
+    String consoleMessage("ArrayBuffer values are deprecated in Blob Constructor. Use ArrayBufferView instead.");
+    context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
+
+    HistogramSupport::histogramEnumeration("WebCore.Blob.constructor.ArrayBufferOrView", BlobConstructorArrayBuffer, BlobConstructorArrayBufferOrViewMax);
+
     if (!arrayBuffer)
         return;
-    Vector<char>& buffer = getBuffer();
-    size_t oldSize = buffer.size();
-    buffer.append(static_cast<const char*>(arrayBuffer->data()), arrayBuffer->byteLength());
-    m_size += buffer.size() - oldSize;
+
+    appendBytesData(arrayBuffer->data(), arrayBuffer->byteLength());
+}
+
+void WebKitBlobBuilder::append(ArrayBufferView* arrayBufferView)
+{
+    HistogramSupport::histogramEnumeration("WebCore.Blob.constructor.ArrayBufferOrView", BlobConstructorArrayBufferView, BlobConstructorArrayBufferOrViewMax);
+
+    if (!arrayBufferView)
+        return;
+
+    appendBytesData(arrayBufferView->baseAddress(), arrayBufferView->byteLength());
 }
 #endif
 
@@ -102,14 +134,19 @@ void WebKitBlobBuilder::append(Blob* blob)
     if (!blob)
         return;
     if (blob->isFile()) {
+        File* file = toFile(blob);
         // If the blob is file that is not snapshoted, capture the snapshot now.
         // FIXME: This involves synchronous file operation. We need to figure out how to make it asynchronous.
-        File* file = static_cast<File*>(blob);
         long long snapshotSize;
         double snapshotModificationTime;
         file->captureSnapshot(snapshotSize, snapshotModificationTime);
 
         m_size += snapshotSize;
+#if ENABLE(FILE_SYSTEM)
+        if (!file->fileSystemURL().isEmpty())
+            m_items.append(BlobDataItem(file->fileSystemURL(), 0, snapshotSize, snapshotModificationTime));
+        else
+#endif
         m_items.append(BlobDataItem(file->path(), 0, snapshotSize, snapshotModificationTime));
     } else {
         long long blobSize = static_cast<long long>(blob->size());
@@ -118,8 +155,18 @@ void WebKitBlobBuilder::append(Blob* blob)
     }
 }
 
-PassRefPtr<Blob> WebKitBlobBuilder::getBlob(const String& contentType)
+void WebKitBlobBuilder::appendBytesData(const void* data, size_t length)
 {
+    Vector<char>& buffer = getBuffer();
+    size_t oldSize = buffer.size();
+    buffer.append(static_cast<const char*>(data), length);
+    m_size += buffer.size() - oldSize;
+}
+
+PassRefPtr<Blob> WebKitBlobBuilder::getBlob(const String& contentType, BlobConstructionReason constructionReason)
+{
+    HistogramSupport::histogramEnumeration("WebCore.BlobBuilder.getBlob", constructionReason, BlobConstructionReasonMax);
+
     OwnPtr<BlobData> blobData = BlobData::create();
     blobData->setContentType(contentType);
     blobData->swapItems(m_items);

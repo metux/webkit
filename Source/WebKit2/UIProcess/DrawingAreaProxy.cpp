@@ -28,8 +28,8 @@
 
 #include "WebPageProxy.h"
 
-#if USE(UI_SIDE_COMPOSITING)
-#include "LayerTreeHostProxy.h"
+#if USE(COORDINATED_GRAPHICS)
+#include "LayerTreeCoordinatorProxy.h"
 #include <CoreIPC/MessageID.h>
 #endif
 
@@ -58,7 +58,7 @@ void DrawingAreaProxy::setSize(const IntSize& size, const IntSize& scrollOffset)
     sizeDidChange();
 }
 
-#if USE(UI_SIDE_COMPOSITING)
+#if USE(COORDINATED_GRAPHICS)
 void DrawingAreaProxy::updateViewport()
 {
     m_webPageProxy->setViewNeedsDisplay(viewportVisibleRect());
@@ -69,7 +69,7 @@ WebCore::IntRect DrawingAreaProxy::contentsRect() const
     return IntRect(IntPoint::zero(), m_webPageProxy->viewSize());
 }
 
-void DrawingAreaProxy::didReceiveLayerTreeHostProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void DrawingAreaProxy::didReceiveLayerTreeCoordinatorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
 }
 #endif

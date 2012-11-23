@@ -19,11 +19,9 @@
  */
 
 #include "config.h"
-
-#if ENABLE(METER_TAG)
-
 #include "RenderMeter.h"
 
+#if ENABLE(METER_ELEMENT)
 #include "HTMLMeterElement.h"
 #include "HTMLNames.h"
 #include "RenderTheme.h"
@@ -34,13 +32,24 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderMeter::RenderMeter(HTMLMeterElement* element)
+RenderMeter::RenderMeter(HTMLElement* element)
     : RenderBlock(element)
 {
 }
 
 RenderMeter::~RenderMeter()
 {
+}
+
+HTMLMeterElement* RenderMeter::meterElement() const
+{
+    ASSERT(node());
+
+    if (isHTMLMeterElement(node()))
+        return toHTMLMeterElement(node());
+
+    ASSERT(node()->shadowHost());
+    return toHTMLMeterElement(node()->shadowHost());
 }
 
 void RenderMeter::computeLogicalWidth()
@@ -57,7 +66,7 @@ void RenderMeter::computeLogicalHeight()
 
 double RenderMeter::valueRatio() const
 {
-    return static_cast<HTMLMeterElement*>(node())->valueRatio();
+    return meterElement()->valueRatio();
 }
 
 void RenderMeter::updateFromElement()

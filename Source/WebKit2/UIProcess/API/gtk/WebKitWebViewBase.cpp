@@ -36,6 +36,7 @@
 #include "WebContext.h"
 #include "WebEventFactory.h"
 #include "WebFullScreenClientGtk.h"
+#include "WebInspectorProxy.h"
 #include "WebKitPrivate.h"
 #include "WebKitWebViewBaseAccessible.h"
 #include "WebKitWebViewBasePrivate.h"
@@ -45,6 +46,7 @@
 #include <WebCore/DataObjectGtk.h>
 #include <WebCore/DragData.h>
 #include <WebCore/DragIcon.h>
+#include <WebCore/GOwnPtrGtk.h>
 #include <WebCore/GtkClickCounter.h>
 #include <WebCore/GtkDragAndDropHelper.h>
 #include <WebCore/GtkUtilities.h>
@@ -64,10 +66,18 @@
 #include "WebFullScreenManagerProxy.h"
 #endif
 
+#if USE(TEXTURE_MAPPER_GL) && defined(GDK_WINDOWING_X11)
+#include <WebCore/RedirectedXCompositeWindow.h>
+#endif
+
 using namespace WebKit;
 using namespace WebCore;
 
 typedef HashMap<GtkWidget*, IntRect> WebKitWebViewChildrenMap;
+
+#if USE(TEXTURE_MAPPER_GL)
+void redirectedWindowDamagedCallback(void* data);
+#endif
 
 struct _WebKitWebViewBasePrivate {
     WebKitWebViewChildrenMap children;
@@ -83,9 +93,18 @@ struct _WebKitWebViewBasePrivate {
     IntSize resizerSize;
     GRefPtr<AtkObject> accessible;
     bool needsResizeOnMap;
+    GtkWidget* inspectorView;
+    unsigned inspectorViewHeight;
+    GOwnPtr<GdkEvent> contextMenuEvent;
+    WebContextMenuProxyGtk* activeContextMenuProxy;
+
 #if ENABLE(FULLSCREEN_API)
     bool fullScreenModeActive;
     WebFullScreenClientGtk fullScreenClient;
+#endif
+
+#if USE(TEXTURE_MAPPER_GL)
+    OwnPtr<RedirectedXCompositeWindow> redirectedWindow;
 #endif
 };
 
@@ -137,6 +156,9 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
         | GDK_BUTTON_PRESS_MASK
         | GDK_BUTTON_RELEASE_MASK
         | GDK_SCROLL_MASK
+#if GTK_CHECK_VERSION(3, 3, 18)
+        | GDK_SMOOTH_SCROLL_MASK
+#endif
         | GDK_POINTER_MOTION_MASK
         | GDK_KEY_PRESS_MASK
         | GDK_KEY_RELEASE_MASK
@@ -170,9 +192,15 @@ static void webkitWebViewBaseContainerAdd(GtkContainer* container, GtkWidget* wi
     WebKitWebViewBase* webView = WEBKIT_WEB_VIEW_BASE(container);
     WebKitWebViewBasePrivate* priv = webView->priv;
 
-    GtkAllocation childAllocation;
-    gtk_widget_get_allocation(widget, &childAllocation);
-    priv->children.set(widget, childAllocation);
+    if (WEBKIT_IS_WEB_VIEW_BASE(widget)
+        && WebInspectorProxy::isInspectorPage(WEBKIT_WEB_VIEW_BASE(widget)->priv->pageProxy.get())) {
+        ASSERT(!priv->inspectorView);
+        priv->inspectorView = widget;
+    } else {
+        GtkAllocation childAllocation;
+        gtk_widget_get_allocation(widget, &childAllocation);
+        priv->children.set(widget, childAllocation);
+    }
 
     gtk_widget_set_parent(widget, GTK_WIDGET(container));
 }
@@ -183,11 +211,16 @@ static void webkitWebViewBaseContainerRemove(GtkContainer* container, GtkWidget*
     WebKitWebViewBasePrivate* priv = webView->priv;
     GtkWidget* widgetContainer = GTK_WIDGET(container);
 
-    ASSERT(priv->children.contains(widget));
     gboolean wasVisible = gtk_widget_get_visible(widget);
     gtk_widget_unparent(widget);
 
-    priv->children.remove(widget);
+    if (priv->inspectorView == widget) {
+        priv->inspectorView = 0;
+        priv->inspectorViewHeight = 0;
+    } else {
+        ASSERT(priv->children.contains(widget));
+        priv->children.remove(widget);
+    }
     if (wasVisible && gtk_widget_get_visible(widgetContainer))
         gtk_widget_queue_resize(widgetContainer);
 }
@@ -201,6 +234,9 @@ static void webkitWebViewBaseContainerForall(GtkContainer* container, gboolean i
     WebKitWebViewChildrenMap::const_iterator end = children.end();
     for (WebKitWebViewChildrenMap::const_iterator current = children.begin(); current != end; ++current)
         (*callback)(current->first, callbackData);
+
+    if (includeInternals && priv->inspectorView)
+        (*callback)(priv->inspectorView, callbackData);
 }
 
 void webkitWebViewBaseChildMoveResize(WebKitWebViewBase* webView, GtkWidget* child, const IntRect& childRect)
@@ -233,7 +269,6 @@ static void webkit_web_view_base_init(WebKitWebViewBase* webkitWebViewBase)
     priv->shouldForwardNextKeyEvent = FALSE;
 
     GtkWidget* viewWidget = GTK_WIDGET(webkitWebViewBase);
-    gtk_widget_set_double_buffered(viewWidget, FALSE);
     gtk_widget_set_can_focus(viewWidget, TRUE);
     priv->imContext = adoptGRef(gtk_im_multicontext_new());
 
@@ -244,11 +279,38 @@ static void webkit_web_view_base_init(WebKitWebViewBase* webkitWebViewBase)
     gtk_drag_dest_set(viewWidget, static_cast<GtkDestDefaults>(0), 0, 0,
                       static_cast<GdkDragAction>(GDK_ACTION_COPY | GDK_ACTION_MOVE | GDK_ACTION_LINK | GDK_ACTION_PRIVATE));
     gtk_drag_dest_set_target_list(viewWidget, PasteboardHelper::defaultPasteboardHelper()->targetList());
+
+#if USE(TEXTURE_MAPPER_GL)
+    priv->redirectedWindow = RedirectedXCompositeWindow::create(IntSize(1, 1));
+    if (priv->redirectedWindow)
+        priv->redirectedWindow->setDamageNotifyCallback(redirectedWindowDamagedCallback, webkitWebViewBase);
+#endif
 }
+
+#if USE(TEXTURE_MAPPER_GL)
+static bool webkitWebViewRenderAcceleratedCompositingResults(WebKitWebViewBase* webViewBase, DrawingAreaProxyImpl* drawingArea, cairo_t* cr, GdkRectangle* clipRect)
+{
+    if (!drawingArea->isInAcceleratedCompositingMode())
+        return false;
+
+    // To avoid flashes when initializing accelerated compositing for the first
+    // time, we wait until we know there's a frame ready before rendering.
+    WebKitWebViewBasePrivate* priv = webViewBase->priv;
+    if (!priv->redirectedWindow)
+        return false;
+
+    cairo_rectangle(cr, clipRect->x, clipRect->y, clipRect->width, clipRect->height);
+    cairo_surface_t* surface = priv->redirectedWindow->cairoSurfaceForWidget(GTK_WIDGET(webViewBase));
+    cairo_set_source_surface(cr, surface, 0, 0);
+    cairo_fill(cr);
+    return true;
+}
+#endif
 
 static gboolean webkitWebViewBaseDraw(GtkWidget* widget, cairo_t* cr)
 {
-    DrawingAreaProxy* drawingArea = WEBKIT_WEB_VIEW_BASE(widget)->priv->pageProxy->drawingArea();
+    WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(widget);
+    DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(webViewBase->priv->pageProxy->drawingArea());
     if (!drawingArea)
         return FALSE;
 
@@ -256,8 +318,13 @@ static gboolean webkitWebViewBaseDraw(GtkWidget* widget, cairo_t* cr)
     if (!gdk_cairo_get_clip_rectangle(cr, &clipRect))
         return FALSE;
 
+#if USE(TEXTURE_MAPPER_GL)
+    if (webkitWebViewRenderAcceleratedCompositingResults(webViewBase, drawingArea, cr, &clipRect))
+        return FALSE;
+#endif
+
     WebCore::Region unpaintedRegion; // This is simply unused.
-    static_cast<DrawingAreaProxyImpl*>(drawingArea)->paint(cr, clipRect, unpaintedRegion);
+    drawingArea->paint(cr, clipRect, unpaintedRegion);
 
     return FALSE;
 }
@@ -278,13 +345,28 @@ static void webkitWebViewBaseChildAllocate(GtkWidget* child, gpointer userData)
     priv->children.set(child, IntRect());
 }
 
-static void resizeWebKitWebViewBaseFromAllocation(WebKitWebViewBase* webViewBase, GtkAllocation* allocation)
+static void resizeWebKitWebViewBaseFromAllocation(WebKitWebViewBase* webViewBase, GtkAllocation* allocation, bool sizeChanged)
 {
     gtk_container_foreach(GTK_CONTAINER(webViewBase), webkitWebViewBaseChildAllocate, webViewBase);
 
+    IntRect viewRect(allocation->x, allocation->y, allocation->width, allocation->height);
     WebKitWebViewBasePrivate* priv = webViewBase->priv;
+    if (priv->inspectorView) {
+        GtkAllocation childAllocation = viewRect;
+        childAllocation.y = allocation->height - priv->inspectorViewHeight;
+        childAllocation.height = priv->inspectorViewHeight;
+        gtk_widget_size_allocate(priv->inspectorView, &childAllocation);
+
+        viewRect.setHeight(allocation->height - priv->inspectorViewHeight);
+    }
+
+#if USE(TEXTURE_MAPPER_GL)
+    if (sizeChanged && webViewBase->priv->redirectedWindow)
+        webViewBase->priv->redirectedWindow->resize(viewRect.size());
+#endif
+
     if (priv->pageProxy->drawingArea())
-        priv->pageProxy->drawingArea()->setSize(IntSize(allocation->width, allocation->height), IntSize());
+        priv->pageProxy->drawingArea()->setSize(viewRect.size(), IntSize());
 
     GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(webViewBase));
     if (widgetIsOnscreenToplevelWindow(toplevel))
@@ -293,14 +375,18 @@ static void resizeWebKitWebViewBaseFromAllocation(WebKitWebViewBase* webViewBase
 
 static void webkitWebViewBaseSizeAllocate(GtkWidget* widget, GtkAllocation* allocation)
 {
+    bool sizeChanged = gtk_widget_get_allocated_width(widget) != allocation->width
+                       || gtk_widget_get_allocated_height(widget) != allocation->height;
+
     GTK_WIDGET_CLASS(webkit_web_view_base_parent_class)->size_allocate(widget, allocation);
 
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(widget);
-    if (!gtk_widget_get_mapped(GTK_WIDGET(webViewBase)) && !webViewBase->priv->pageProxy->drawingArea()->size().isEmpty()) {
+    if (sizeChanged && !gtk_widget_get_mapped(widget) && !webViewBase->priv->pageProxy->drawingArea()->size().isEmpty()) {
         webViewBase->priv->needsResizeOnMap = true;
         return;
     }
-    resizeWebKitWebViewBaseFromAllocation(webViewBase, allocation);
+
+    resizeWebKitWebViewBaseFromAllocation(webViewBase, allocation, sizeChanged);
 }
 
 static void webkitWebViewBaseMap(GtkWidget* widget)
@@ -313,7 +399,7 @@ static void webkitWebViewBaseMap(GtkWidget* widget)
 
     GtkAllocation allocation;
     gtk_widget_get_allocation(widget, &allocation);
-    resizeWebKitWebViewBaseFromAllocation(webViewBase, &allocation);
+    resizeWebKitWebViewBaseFromAllocation(webViewBase, &allocation, true /* sizeChanged */);
     webViewBase->priv->needsResizeOnMap = false;
 }
 
@@ -402,9 +488,13 @@ static gboolean webkitWebViewBaseButtonPressEvent(GtkWidget* widget, GdkEventBut
 
     if (!priv->clickCounter.shouldProcessButtonEvent(buttonEvent))
         return TRUE;
+
+    // If it's a right click event save it as a possible context menu event.
+    if (buttonEvent->button == 3)
+        priv->contextMenuEvent.set(gdk_event_copy(reinterpret_cast<GdkEvent*>(buttonEvent)));
     priv->pageProxy->handleMouseEvent(NativeWebMouseEvent(reinterpret_cast<GdkEvent*>(buttonEvent),
                                                      priv->clickCounter.clickCountForGdkButtonEvent(widget, buttonEvent)));
-    return FALSE;
+    return TRUE;
 }
 
 static gboolean webkitWebViewBaseButtonReleaseEvent(GtkWidget* widget, GdkEventButton* event)
@@ -415,7 +505,7 @@ static gboolean webkitWebViewBaseButtonReleaseEvent(GtkWidget* widget, GdkEventB
     gtk_widget_grab_focus(widget);
     priv->pageProxy->handleMouseEvent(NativeWebMouseEvent(reinterpret_cast<GdkEvent*>(event), 0 /* currentClickCount */));
 
-    return FALSE;
+    return TRUE;
 }
 
 static gboolean webkitWebViewBaseScrollEvent(GtkWidget* widget, GdkEventScroll* event)
@@ -425,7 +515,7 @@ static gboolean webkitWebViewBaseScrollEvent(GtkWidget* widget, GdkEventScroll* 
 
     priv->pageProxy->handleWheelEvent(NativeWebWheelEvent(reinterpret_cast<GdkEvent*>(event)));
 
-    return FALSE;
+    return TRUE;
 }
 
 static gboolean webkitWebViewBaseMotionNotifyEvent(GtkWidget* widget, GdkEventMotion* event)
@@ -435,7 +525,7 @@ static gboolean webkitWebViewBaseMotionNotifyEvent(GtkWidget* widget, GdkEventMo
 
     priv->pageProxy->handleMouseEvent(NativeWebMouseEvent(reinterpret_cast<GdkEvent*>(event), 0 /* currentClickCount */));
 
-    return FALSE;
+    return TRUE;
 }
 
 static gboolean webkitWebViewBaseQueryTooltip(GtkWidget* widget, gint x, gint y, gboolean keyboardMode, GtkTooltip* tooltip)
@@ -624,6 +714,11 @@ void webkitWebViewBaseCreateWebPage(WebKitWebViewBase* webkitWebViewBase, WKCont
 #if ENABLE(FULLSCREEN_API)
     priv->pageProxy->fullScreenManager()->setWebView(webkitWebViewBase);
 #endif
+
+#if USE(TEXTURE_MAPPER_GL)
+    if (priv->redirectedWindow)
+        priv->pageProxy->setAcceleratedCompositingWindowId(priv->redirectedWindow->windowId());
+#endif
 }
 
 void webkitWebViewBaseSetTooltipText(WebKitWebViewBase* webViewBase, const char* tooltip)
@@ -644,8 +739,8 @@ void webkitWebViewBaseStartDrag(WebKitWebViewBase* webViewBase, const DragData& 
 {
     WebKitWebViewBasePrivate* priv = webViewBase->priv;
 
-    RefPtr<DataObjectGtk> dataObject(dragData.platformData());
-    GRefPtr<GtkTargetList> targetList(PasteboardHelper::defaultPasteboardHelper()->targetListForDataObject(dataObject.get()));
+    RefPtr<DataObjectGtk> dataObject = adoptRef(dragData.platformData());
+    GRefPtr<GtkTargetList> targetList = adoptGRef(PasteboardHelper::defaultPasteboardHelper()->targetListForDataObject(dataObject.get()));
     GOwnPtr<GdkEvent> currentEvent(gtk_get_current_event());
     GdkDragContext* context = gtk_drag_begin(GTK_WIDGET(webViewBase),
                                              targetList.get(),
@@ -718,3 +813,34 @@ void webkitWebViewBaseInitializeFullScreenClient(WebKitWebViewBase* webkitWebVie
 {
     webkitWebViewBase->priv->fullScreenClient.initialize(wkClient);
 }
+
+void webkitWebViewBaseSetInspectorViewHeight(WebKitWebViewBase* webkitWebViewBase, unsigned height)
+{
+    if (webkitWebViewBase->priv->inspectorViewHeight == height)
+        return;
+    webkitWebViewBase->priv->inspectorViewHeight = height;
+    if (webkitWebViewBase->priv->inspectorView)
+        gtk_widget_queue_resize_no_redraw(GTK_WIDGET(webkitWebViewBase));
+}
+
+void webkitWebViewBaseSetActiveContextMenuProxy(WebKitWebViewBase* webkitWebViewBase, WebContextMenuProxyGtk* contextMenuProxy)
+{
+    webkitWebViewBase->priv->activeContextMenuProxy = contextMenuProxy;
+}
+
+WebContextMenuProxyGtk* webkitWebViewBaseGetActiveContextMenuProxy(WebKitWebViewBase* webkitWebViewBase)
+{
+    return webkitWebViewBase->priv->activeContextMenuProxy;
+}
+
+GdkEvent* webkitWebViewBaseTakeContextMenuEvent(WebKitWebViewBase* webkitWebViewBase)
+{
+    return webkitWebViewBase->priv->contextMenuEvent.release();
+}
+
+#if USE(TEXTURE_MAPPER_GL)
+void redirectedWindowDamagedCallback(void* data)
+{
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+}
+#endif

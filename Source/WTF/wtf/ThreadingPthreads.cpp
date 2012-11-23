@@ -55,22 +55,53 @@
 #include <sys/time.h>
 #endif
 
-#if OS(MAC_OS_X) && !defined(BUILDING_ON_LEOPARD)
+#if OS(MAC_OS_X) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #include <objc/objc-auto.h>
-#endif
-
-#if PLATFORM(BLACKBERRY)
-#include <BlackBerryPlatformMisc.h>
-#include <BlackBerryPlatformSettings.h>
 #endif
 
 namespace WTF {
 
-typedef HashMap<ThreadIdentifier, pthread_t> ThreadMap;
+class PthreadState {
+public:
+    enum JoinableState {
+        Joinable, // The default thread state. The thread can be joined on.
+
+        Joined, // Somebody waited on this thread to exit and this thread finally exited. This state is here because there can be a 
+                // period of time between when the thread exits (which causes pthread_join to return and the remainder of waitOnThreadCompletion to run) 
+                // and when threadDidExit is called. We need threadDidExit to take charge and delete the thread data since there's 
+                // nobody else to pick up the slack in this case (since waitOnThreadCompletion has already returned).
+
+        Detached // The thread has been detached and can no longer be joined on. At this point, the thread must take care of cleaning up after itself.
+    };
+
+    // Currently all threads created by WTF start out as joinable. 
+    PthreadState(pthread_t handle)
+        : m_joinableState(Joinable)
+        , m_didExit(false)
+        , m_pthreadHandle(handle)
+    {
+    }
+
+    JoinableState joinableState() { return m_joinableState; }
+    pthread_t pthreadHandle() { return m_pthreadHandle; }
+    void didBecomeDetached() { m_joinableState = Detached; }
+    void didExit() { m_didExit = true; }
+    void didJoin() { m_joinableState = Joined; }
+    bool hasExited() { return m_didExit; }
+
+private:
+    JoinableState m_joinableState;
+    bool m_didExit;
+    pthread_t m_pthreadHandle;
+};
+
+typedef HashMap<ThreadIdentifier, OwnPtr<PthreadState> > ThreadMap;
 
 static Mutex* atomicallyInitializedStaticMutex;
 
-void clearPthreadHandleForIdentifier(ThreadIdentifier);
+void unsafeThreadWasDetached(ThreadIdentifier);
+void threadDidExit(ThreadIdentifier);
+void threadWasJoined(ThreadIdentifier);
 
 static Mutex& threadMapMutex()
 {
@@ -119,7 +150,7 @@ static ThreadIdentifier identifierByPthreadHandle(const pthread_t& pthreadHandle
 
     ThreadMap::iterator i = threadMap().begin();
     for (; i != threadMap().end(); ++i) {
-        if (pthread_equal(i->second, pthreadHandle))
+        if (pthread_equal(i->second->pthreadHandle(), pthreadHandle) && !i->second->hasExited())
             return i->first;
     }
 
@@ -129,30 +160,15 @@ static ThreadIdentifier identifierByPthreadHandle(const pthread_t& pthreadHandle
 static ThreadIdentifier establishIdentifierForPthreadHandle(const pthread_t& pthreadHandle)
 {
     ASSERT(!identifierByPthreadHandle(pthreadHandle));
-
     MutexLocker locker(threadMapMutex());
-
     static ThreadIdentifier identifierCount = 1;
-
-    threadMap().add(identifierCount, pthreadHandle);
-
+    threadMap().add(identifierCount, adoptPtr(new PthreadState(pthreadHandle)));
     return identifierCount++;
 }
 
-static pthread_t pthreadHandleForIdentifier(ThreadIdentifier id)
+static pthread_t pthreadHandleForIdentifierWithLockAlreadyHeld(ThreadIdentifier id)
 {
-    MutexLocker locker(threadMapMutex());
-
-    return threadMap().get(id);
-}
-
-void clearPthreadHandleForIdentifier(ThreadIdentifier id)
-{
-    MutexLocker locker(threadMapMutex());
-
-    ASSERT(threadMap().contains(id));
-
-    threadMap().remove(id);
+    return threadMap().get(id)->pthreadHandle();
 }
 
 static void* wtfThreadEntryPoint(void* param)
@@ -160,49 +176,9 @@ static void* wtfThreadEntryPoint(void* param)
     // Balanced by .leakPtr() in createThreadInternal.
     OwnPtr<ThreadFunctionInvocation> invocation = adoptPtr(static_cast<ThreadFunctionInvocation*>(param));
     invocation->function(invocation->data);
-
     return 0;
 }
 
-#if PLATFORM(BLACKBERRY)
-ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, const char* threadName)
-{
-    pthread_attr_t attr;
-    if (pthread_attr_init(&attr)) {
-        LOG_ERROR("pthread_attr_init() failed: %d", errno);
-        return 0;
-    }
-
-    void* stackAddr;
-    size_t stackSize;
-    if (pthread_attr_getstack(&attr, &stackAddr, &stackSize))
-        LOG_ERROR("pthread_attr_getstack() failed: %d", errno);
-    else {
-        stackSize = BlackBerry::Platform::Settings::get()->secondaryThreadStackSize();
-        if (pthread_attr_setstack(&attr, stackAddr, stackSize))
-            LOG_ERROR("pthread_attr_getstack() failed: %d", errno);
-    }
-
-    OwnPtr<ThreadFunctionInvocation> invocation = adoptPtr(new ThreadFunctionInvocation(entryPoint, data));
-    pthread_t threadHandle;
-    if (pthread_create(&threadHandle, &attr, wtfThreadEntryPoint, invocation.get())) {
-        LOG_ERROR("pthread_create() failed: %d", errno);
-        threadHandle = 0;
-    }
-    pthread_setname_np(threadHandle, threadName);
-
-    pthread_attr_destroy(&attr);
-
-    if (!threadHandle)
-        return 0;
-
-    // Balanced by adoptPtr() in wtfThreadEntryPoint.
-    ThreadFunctionInvocation* leakedInvocation = invocation.leakPtr();
-    UNUSED_PARAM(leakedInvocation);
-
-    return establishIdentifierForPthreadHandle(threadHandle);
-}
-#else
 ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, const char*)
 {
     OwnPtr<ThreadFunctionInvocation> invocation = adoptPtr(new ThreadFunctionInvocation(entryPoint, data));
@@ -218,17 +194,18 @@ ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, con
 
     return establishIdentifierForPthreadHandle(threadHandle);
 }
-#endif
 
 void initializeCurrentThreadInternal(const char* threadName)
 {
 #if HAVE(PTHREAD_SETNAME_NP)
     pthread_setname_np(threadName);
+#elif OS(QNX)
+    pthread_setname_np(pthread_self(), threadName);
 #else
     UNUSED_PARAM(threadName);
 #endif
 
-#if OS(MAC_OS_X) && !defined(BUILDING_ON_LEOPARD)
+#if OS(MAC_OS_X) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
     // All threads that potentially use APIs above the BSD layer must be registered with the Objective-C
     // garbage collector in case API implementations use garbage-collected memory.
     objc_registerThreadWithCollector();
@@ -241,15 +218,34 @@ void initializeCurrentThreadInternal(const char* threadName)
 
 int waitForThreadCompletion(ThreadIdentifier threadID)
 {
+    pthread_t pthreadHandle;
     ASSERT(threadID);
 
-    pthread_t pthreadHandle = pthreadHandleForIdentifier(threadID);
-    if (!pthreadHandle)
-        return 0;
+    {
+        // We don't want to lock across the call to join, since that can block our thread and cause deadlock.
+        MutexLocker locker(threadMapMutex());
+        pthreadHandle = pthreadHandleForIdentifierWithLockAlreadyHeld(threadID);
+        ASSERT(pthreadHandle);
+    }
 
     int joinResult = pthread_join(pthreadHandle, 0);
+
     if (joinResult == EDEADLK)
         LOG_ERROR("ThreadIdentifier %u was found to be deadlocked trying to quit", threadID);
+    else if (joinResult)
+        LOG_ERROR("ThreadIdentifier %u was unable to be joined.\n", threadID);
+
+    MutexLocker locker(threadMapMutex());
+    PthreadState* state = threadMap().get(threadID);
+    ASSERT(state);
+    ASSERT(state->joinableState() == PthreadState::Joinable);
+
+    // The thread has already exited, so clean up after it.
+    if (state->hasExited())
+        threadMap().remove(threadID);
+    // The thread hasn't exited yet, so don't clean anything up. Just signal that we've already joined on it so that it will clean up after itself.
+    else
+        state->didJoin();
 
     return joinResult;
 }
@@ -258,11 +254,32 @@ void detachThread(ThreadIdentifier threadID)
 {
     ASSERT(threadID);
 
-    pthread_t pthreadHandle = pthreadHandleForIdentifier(threadID);
-    if (!pthreadHandle)
-        return;
+    MutexLocker locker(threadMapMutex());
+    pthread_t pthreadHandle = pthreadHandleForIdentifierWithLockAlreadyHeld(threadID);
+    ASSERT(pthreadHandle);
 
-    pthread_detach(pthreadHandle);
+    int detachResult = pthread_detach(pthreadHandle);
+    if (detachResult)
+        LOG_ERROR("ThreadIdentifier %u was unable to be detached\n", threadID);
+
+    PthreadState* state = threadMap().get(threadID);
+    ASSERT(state);
+    if (state->hasExited())
+        threadMap().remove(threadID);
+    else
+        threadMap().get(threadID)->didBecomeDetached();
+}
+
+void threadDidExit(ThreadIdentifier threadID)
+{
+    MutexLocker locker(threadMapMutex());
+    PthreadState* state = threadMap().get(threadID);
+    ASSERT(state);
+    
+    state->didExit();
+
+    if (state->joinableState() != PthreadState::Joinable)
+        threadMap().remove(threadID);
 }
 
 void yield()

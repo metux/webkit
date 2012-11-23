@@ -22,6 +22,7 @@
 #ifndef JSDOMBinding_h
 #define JSDOMBinding_h
 
+#include "BindingState.h"
 #include "CSSImportRule.h"
 #include "CSSStyleDeclaration.h"
 #include "CSSStyleSheet.h"
@@ -34,6 +35,7 @@
 #include "StylePropertySet.h"
 #include "StyledElement.h"
 #include <heap/Weak.h>
+#include <runtime/Error.h>
 #include <runtime/FunctionPrototype.h>
 #include <runtime/JSArray.h>
 #include <runtime/Lookup.h>
@@ -43,6 +45,8 @@
 #include <wtf/Vector.h>
 
 namespace WebCore {
+
+class DOMStringList;
 
 enum ParameterDefaultPolicy {
     DefaultIsUndefined,
@@ -142,16 +146,14 @@ enum ParameterDefaultPolicy {
         if (setInlineCachedWrapper(world, domObject, wrapper))
             return;
         JSC::PassWeak<JSDOMWrapper> passWeak(wrapper, wrapperOwner(world, domObject), wrapperContext(world, domObject));
-        DOMObjectWrapperMap::AddResult result = world->m_wrappers.add(domObject, passWeak);
-        ASSERT_UNUSED(result, result.isNewEntry);
+        weakAdd(world->m_wrappers, (void*)domObject, passWeak);
     }
 
     template <typename DOMClass> inline void uncacheWrapper(DOMWrapperWorld* world, DOMClass* domObject, JSDOMWrapper* wrapper)
     {
         if (clearInlineCachedWrapper(world, domObject, wrapper))
             return;
-        ASSERT(world->m_wrappers.find(domObject)->second.was(wrapper));
-        world->m_wrappers.remove(domObject);
+        weakRemove(world->m_wrappers, (void*)domObject, wrapper);
     }
     
     #define CREATE_DOM_WRAPPER(exec, globalObject, className, object) createWrapper<JS##className>(exec, globalObject, static_cast<className*>(object))
@@ -245,20 +247,17 @@ enum ParameterDefaultPolicy {
     JSC::JSValue jsStringOrUndefined(JSC::ExecState*, const String&); // undefined if the string is null
     JSC::JSValue jsStringOrUndefined(JSC::ExecState*, const KURL&); // undefined if the URL is null
 
-    JSC::JSValue jsStringOrFalse(JSC::ExecState*, const String&); // boolean false if the string is null
-    JSC::JSValue jsStringOrFalse(JSC::ExecState*, const KURL&); // boolean false if the URL is null
-
     // See JavaScriptCore for explanation: Should be used for any string that is already owned by another
     // object, to let the engine know that collecting the JSString wrapper is unlikely to save memory.
     JSC::JSValue jsOwnedStringOrNull(JSC::ExecState*, const String&); 
 
-    String identifierToString(const JSC::Identifier&);
+    String propertyNameToString(JSC::PropertyName);
     String ustringToString(const JSC::UString&);
     JSC::UString stringToUString(const String&);
 
-    AtomicString identifierToAtomicString(const JSC::Identifier&);
+    AtomicString propertyNameToAtomicString(JSC::PropertyName);
     AtomicString ustringToAtomicString(const JSC::UString&);
-    AtomicStringImpl* findAtomicString(const JSC::Identifier&);
+    AtomicStringImpl* findAtomicString(JSC::PropertyName);
 
     String valueToStringWithNullCheck(JSC::ExecState*, JSC::JSValue); // null if the value is null
     String valueToStringWithUndefinedOrNullCheck(JSC::ExecState*, JSC::JSValue); // null if the value is null or undefined
@@ -275,69 +274,140 @@ enum ParameterDefaultPolicy {
     // NaN if the value can't be converted to a date.
     double valueToDate(JSC::ExecState*, JSC::JSValue);
 
+    // Validates that the passed object is a sequence type per section 4.1.13 of the WebIDL spec.
+    inline JSC::JSObject* toJSSequence(JSC::ExecState* exec, JSC::JSValue value, unsigned& length)
+    {
+        JSC::JSObject* object = value.getObject();
+        if (!object) {
+            throwTypeError(exec);
+            return 0;
+        }
+
+        JSC::JSValue lengthValue = object->get(exec, exec->propertyNames().length);
+        if (exec->hadException())
+            return 0;
+
+        if (lengthValue.isUndefinedOrNull()) {
+            throwTypeError(exec);
+            return 0;
+        }
+
+        length = lengthValue.toUInt32(exec);
+        if (exec->hadException())
+            return 0;
+
+        return object;
+    }
+
     template <typename T>
     inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<T> ptr)
     {
         return toJS(exec, globalObject, ptr.get());
     }
 
-    template <typename T>
-    JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Vector<T>& iterator)
+    template <class T>
+    struct JSValueTraits {
+        static inline JSC::JSValue arrayJSValue(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const T& value)
+        {
+            return toJS(exec, globalObject, WTF::getPtr(value));
+        }
+    };
+
+    template<>
+    struct JSValueTraits<String> {
+        static inline JSC::JSValue arrayJSValue(JSC::ExecState* exec, JSDOMGlobalObject*, const String& value)
+        {
+            return jsString(exec, stringToUString(value));
+        }
+    };
+
+    template<>
+    struct JSValueTraits<float> {
+        static inline JSC::JSValue arrayJSValue(JSC::ExecState*, JSDOMGlobalObject*, const float& value)
+        {
+            return JSC::jsNumber(value);
+        }
+    };
+
+    template<>
+    struct JSValueTraits<unsigned long> {
+        static inline JSC::JSValue arrayJSValue(JSC::ExecState*, JSDOMGlobalObject*, const unsigned long& value)
+        {
+            return JSC::jsNumber(value);
+        }
+    };
+
+    template <typename T, size_t inlineCapacity>
+    JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Vector<T, inlineCapacity>& iterator)
     {
         JSC::MarkedArgumentBuffer list;
-        typename Vector<T>::const_iterator end = iterator.end();
+        typename Vector<T, inlineCapacity>::const_iterator end = iterator.end();        
+        typedef JSValueTraits<T> TraitsType;
 
-        for (typename Vector<T>::const_iterator iter = iterator.begin(); iter != end; ++iter)
-            list.append(toJS(exec, globalObject, WTF::getPtr(*iter)));
+        for (typename Vector<T, inlineCapacity>::const_iterator iter = iterator.begin(); iter != end; ++iter)
+            list.append(TraitsType::arrayJSValue(exec, globalObject, *iter));
 
         return JSC::constructArray(exec, globalObject, list);
     }
 
+    JSC::JSValue jsArray(JSC::ExecState*, JSDOMGlobalObject*, PassRefPtr<DOMStringList>);
+
+    template<class T> struct NativeValueTraits;
+
     template<>
-    inline JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Vector<String>& iterator)
-    {
-        JSC::MarkedArgumentBuffer array;
-        Vector<String>::const_iterator end = iterator.end();
+    struct NativeValueTraits<String> {
+        static inline bool arrayNativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, String& indexedValue)
+        {
+            indexedValue = ustringToString(jsValue.toString(exec)->value(exec));
+            return true;
+        }
+    };
 
-        for (Vector<String>::const_iterator it = iterator.begin(); it != end; ++it)
-            array.append(jsString(exec, stringToUString(*it)));
+    template<>
+    struct NativeValueTraits<unsigned long> {
+        static inline bool arrayNativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, unsigned long& indexedValue)
+        {
+            if (!jsValue.isNumber())
+                return false;
 
-        return JSC::constructArray(exec, globalObject, array);
-    }
+            indexedValue = jsValue.toUInt32(exec);
+            if (exec->hadException())
+                return false;
+
+            return true;
+        }
+    };
 
     template <class T>
     Vector<T> toNativeArray(JSC::ExecState* exec, JSC::JSValue value)
     {
-        if (!isJSArray(value))
-            return Vector<T>();
+        unsigned length = 0;
+        if (isJSArray(value)) {
+            JSC::JSArray* array = asArray(value);
+            length = array->length();
+        } else
+            toJSSequence(exec, value, length);
 
+        JSC::JSObject* object = value.getObject();
         Vector<T> result;
-        JSC::JSArray* array = asArray(value);
+        typedef NativeValueTraits<T> TraitsType;
 
-        for (unsigned i = 0; i < array->length(); ++i) {
-            String indexedValue = ustringToString(array->getIndex(i).toString(exec)->value(exec));
-            result.append(indexedValue);
+        for (unsigned i = 0; i < length; ++i) {
+            T indexValue;
+            if (!TraitsType::arrayNativeValue(exec, object->get(exec, i), indexValue))
+                return Vector<T>();
+            result.append(indexValue);
         }
         return result;
     }
 
-    // Validates that the passed object is a sequence type per section 4.1.13 of the WebIDL spec.
-    JSC::JSObject* toJSSequence(JSC::ExecState*, JSC::JSValue, unsigned&);
-
-    // FIXME: Implement allowAccessToContext(JSC::ExecState*, ScriptExecutionContext*);
     bool shouldAllowAccessToNode(JSC::ExecState*, Node*);
     bool shouldAllowAccessToFrame(JSC::ExecState*, Frame*);
     bool shouldAllowAccessToFrame(JSC::ExecState*, Frame*, String& message);
-    // FIXME: Implement allowAccessToDOMWindow(JSC::ExecState*, DOMWindow*);
-
-    // FIXME: Remove these functions in favor of activeContext and
-    // firstContext, which return ScriptExecutionContext*. We prefer to use
-    // ScriptExecutionContext* as the context object in the bindings.
-    DOMWindow* activeDOMWindow(JSC::ExecState*);
-    DOMWindow* firstDOMWindow(JSC::ExecState*);
+    bool shouldAllowAccessToDOMWindow(BindingState*, DOMWindow*, String& message);
 
     void printErrorMessageForFrame(Frame*, const String& message);
-    JSC::JSValue objectToStringFunctionGetter(JSC::ExecState*, JSC::JSValue, const JSC::Identifier& propertyName);
+    JSC::JSValue objectToStringFunctionGetter(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
 
     inline JSC::JSValue jsString(JSC::ExecState* exec, const String& s)
     {
@@ -349,16 +419,10 @@ enum ParameterDefaultPolicy {
             return jsString(exec, stringToUString(s));
 
         JSStringCache& stringCache = currentWorld(exec)->m_stringCache;
-        JSStringCache::iterator it = stringCache.find(stringImpl);
-        if (it != stringCache.end())
-            return it->second.get();
+        if (JSC::JSString* string = stringCache.get(stringImpl))
+            return string;
 
         return jsStringSlowCase(exec, stringCache, stringImpl);
-    }
-
-    inline DOMObjectWrapperMap& domObjectWrapperMapFor(JSC::ExecState* exec)
-    {
-        return currentWorld(exec)->m_wrappers;
     }
 
     inline String ustringToString(const JSC::UString& u)
@@ -371,9 +435,9 @@ enum ParameterDefaultPolicy {
         return JSC::UString(s.impl());
     }
 
-    inline String identifierToString(const JSC::Identifier& i)
+    inline String propertyNameToString(JSC::PropertyName propertyName)
     {
-        return i.impl();
+        return propertyName.publicName();
     }
 
     inline AtomicString ustringToAtomicString(const JSC::UString& u)
@@ -381,28 +445,11 @@ enum ParameterDefaultPolicy {
         return AtomicString(u.impl());
     }
 
-    inline AtomicString identifierToAtomicString(const JSC::Identifier& identifier)
+    inline AtomicString propertyNameToAtomicString(JSC::PropertyName propertyName)
     {
-        return AtomicString(identifier.impl());
+        return AtomicString(propertyName.publicName());
     }
 
-    inline Vector<unsigned long> jsUnsignedLongArrayToVector(JSC::ExecState* exec, JSC::JSValue value)
-    {
-        unsigned length;
-        JSC::JSObject* object = toJSSequence(exec, value, length);
-        if (exec->hadException())
-            return Vector<unsigned long>();
-
-        Vector<unsigned long> result;
-        for (unsigned i = 0; i < length; i++) {
-            JSC::JSValue indexedValue;
-            indexedValue = object->get(exec, i);
-            if (exec->hadException() || indexedValue.isUndefinedOrNull() || !indexedValue.isNumber())
-                return Vector<unsigned long>();
-            result.append(indexedValue.toUInt32(exec));
-        }
-        return result;
-    }
 } // namespace WebCore
 
 #endif // JSDOMBinding_h

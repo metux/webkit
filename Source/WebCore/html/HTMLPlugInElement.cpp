@@ -33,10 +33,12 @@
 #include "FrameTree.h"
 #include "HTMLNames.h"
 #include "Page.h"
+#include "PluginViewBase.h"
 #include "RenderEmbeddedObject.h"
 #include "RenderWidget.h"
 #include "Settings.h"
 #include "Widget.h"
+#include <wtf/UnusedParam.h>
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
 #include "npruntime_impl.h"
@@ -88,6 +90,11 @@ void HTMLPlugInElement::detach()
     HTMLFrameOwnerElement::detach();
 }
 
+void HTMLPlugInElement::resetInstance()
+{
+    m_instance.clear();
+}
+
 PassScriptInstance HTMLPlugInElement::getInstance()
 {
     Frame* frame = document()->frame();
@@ -120,7 +127,7 @@ bool HTMLPlugInElement::guardedDispatchBeforeLoadEvent(const String& sourceURL)
     return beforeLoadAllowedLoad;
 }
 
-Widget* HTMLPlugInElement::pluginWidget()
+Widget* HTMLPlugInElement::pluginWidget() const
 {
     if (m_inBeforeLoadEventHandler) {
         // The plug-in hasn't loaded yet, and it makes no sense to try to load if beforeload handler happened to touch the plug-in element.
@@ -142,22 +149,22 @@ bool HTMLPlugInElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLFrameOwnerElement::isPresentationAttribute(name);
 }
 
-void HTMLPlugInElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLPlugInElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == widthAttr)
-        addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
-    else if (attr->name() == heightAttr)
-        addHTMLLengthToStyle(style, CSSPropertyHeight, attr->value());
-    else if (attr->name() == vspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attr->value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attr->value());
-    } else if (attr->name() == hspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attr->value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attr->value());
-    } else if (attr->name() == alignAttr)
-        applyAlignmentAttributeToStyle(attr, style);
+    if (attribute.name() == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
+    else if (attribute.name() == heightAttr)
+        addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
+    else if (attribute.name() == vspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attribute.value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attribute.value());
+    } else if (attribute.name() == hspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attribute.value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attribute.value());
+    } else if (attribute.name() == alignAttr)
+        applyAlignmentAttributeToStyle(attribute, style);
     else
-        HTMLFrameOwnerElement::collectStyleForAttribute(attr, style);
+        HTMLFrameOwnerElement::collectStyleForAttribute(attribute, style);
 }
 
 void HTMLPlugInElement::defaultEventHandler(Event* event)
@@ -169,8 +176,8 @@ void HTMLPlugInElement::defaultEventHandler(Event* event)
     // FIXME: Mouse down and scroll events are passed down to plug-in via custom code in EventHandler; these code paths should be united.
 
     RenderObject* r = renderer();
-    if (r && r->isEmbeddedObject() && toRenderEmbeddedObject(r)->showsMissingPluginIndicator()) {
-        toRenderEmbeddedObject(r)->handleMissingPluginIndicatorEvent(event);
+    if (r && r->isEmbeddedObject() && toRenderEmbeddedObject(r)->showsUnavailablePluginIndicator()) {
+        toRenderEmbeddedObject(r)->handleUnavailablePluginIndicatorEvent(event);
         return;
     }
 
@@ -183,6 +190,24 @@ void HTMLPlugInElement::defaultEventHandler(Event* event)
     if (event->defaultHandled())
         return;
     HTMLFrameOwnerElement::defaultEventHandler(event);
+}
+
+bool HTMLPlugInElement::isKeyboardFocusable(KeyboardEvent* event) const
+{
+    UNUSED_PARAM(event);
+    if (!document()->page())
+        return false;
+
+    const PluginViewBase* plugin = pluginWidget() && pluginWidget()->isPluginViewBase() ? static_cast<const PluginViewBase*>(pluginWidget()) : 0;
+    if (plugin)
+        return plugin->supportsKeyboardFocus();
+
+    return false;
+}
+
+bool HTMLPlugInElement::isPluginElement() const
+{
+    return true;
 }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)

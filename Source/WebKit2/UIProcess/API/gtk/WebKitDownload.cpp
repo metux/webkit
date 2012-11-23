@@ -20,8 +20,10 @@
 #include "config.h"
 #include "WebKitDownload.h"
 
+#include "DownloadProxy.h"
 #include "WebKitDownloadPrivate.h"
 #include "WebKitMarshal.h"
+#include "WebKitURIRequestPrivate.h"
 #include "WebKitURIResponsePrivate.h"
 #include <WebCore/ErrorsGtk.h>
 #include <WebCore/ResourceResponse.h>
@@ -53,6 +55,7 @@ enum {
 struct _WebKitDownloadPrivate {
     WKRetainPtr<WKDownloadRef> wkDownload;
 
+    GRefPtr<WebKitURIRequest> request;
     GRefPtr<WebKitURIResponse> response;
     CString destinationURI;
     guint64 currentSize;
@@ -95,7 +98,9 @@ static gboolean webkitDownloadDecideDestination(WebKitDownload* download, const 
 {
     if (!download->priv->destinationURI.isNull())
         return FALSE;
-    GOwnPtr<char> destination(g_build_filename(g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD), suggestedFilename, NULL));
+
+    GOwnPtr<char> filename(g_strdelimit(g_strdup(suggestedFilename), G_DIR_SEPARATOR_S, '_'));
+    GOwnPtr<char> destination(g_build_filename(g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD), filename.get(), NULL));
     GOwnPtr<char> destinationURI(g_filename_to_uri(destination.get(), 0, 0));
     download->priv->destinationURI = destinationURI.get();
     g_object_notify(G_OBJECT(download), "destination");
@@ -360,6 +365,25 @@ void webkitDownloadDestinationCreated(WebKitDownload* download, const CString& d
 }
 
 /**
+ * webkit_download_get_request:
+ * @download: a #WebKitDownload
+ *
+ * Retrieves the #WebKitURIRequest object that backs the download
+ * process.
+ *
+ * Returns: (transfer none): the #WebKitURIRequest of @download
+ */
+WebKitURIRequest* webkit_download_get_request(WebKitDownload* download)
+{
+    g_return_val_if_fail(WEBKIT_IS_DOWNLOAD(download), 0);
+
+    WebKitDownloadPrivate* priv = download->priv;
+    if (!priv->request)
+        priv->request = adoptGRef(webkitURIRequestCreateForResourceRequest(toImpl(priv->wkDownload.get())->request()));
+    return download->priv->request.get();
+}
+
+/**
  * webkit_download_get_destination:
  * @download: a #WebKitDownload
  *
@@ -489,4 +513,20 @@ gdouble webkit_download_get_elapsed_time(WebKitDownload* download)
         return 0;
 
     return g_timer_elapsed(priv->timer.get(), 0);
+}
+
+/**
+ * webkit_download_get_received_data_length:
+ * @download: a #WebKitDownload
+ *
+ * Gets the length of the data already downloaded for @download
+ * in bytes.
+ *
+ * Returns: the amount of bytes already downloaded.
+ */
+guint64 webkit_download_get_received_data_length(WebKitDownload* download)
+{
+    g_return_val_if_fail(WEBKIT_IS_DOWNLOAD(download), 0);
+
+    return download->priv->currentSize;
 }

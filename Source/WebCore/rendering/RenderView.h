@@ -32,9 +32,14 @@ namespace WebCore {
 
 class FlowThreadController;
 class RenderWidget;
+class RenderQuote;
 
 #if USE(ACCELERATED_COMPOSITING)
 class RenderLayerCompositor;
+#endif
+
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+class CustomFilterGlobalContext;
 #endif
 
 class RenderView : public RenderBlock {
@@ -58,6 +63,8 @@ public:
     // FIXME: This override is not needed and should be removed
     // it only exists to make computePreferredLogicalWidths public.
     virtual void computePreferredLogicalWidths() OVERRIDE;
+
+    virtual LayoutUnit availableLogicalHeight() const OVERRIDE;
 
     // The same as the FrameView's layoutHeight/layoutWidth but with null check guards.
     int viewHeight() const;
@@ -168,6 +175,10 @@ public:
     bool usesCompositing() const;
 #endif
 
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+    CustomFilterGlobalContext* customFilterGlobalContext();
+#endif
+
     IntRect unscaledDocumentRect() const;
     LayoutRect backgroundRect(RenderBox* backgroundRenderer) const;
 
@@ -183,11 +194,21 @@ public:
     IntSize viewportSize() const { return document()->viewportSize(); }
 
     void setFixedPositionedObjectsNeedLayout();
-    void insertFixedPositionedObject(RenderBox*);
-    void removeFixedPositionedObject(RenderBox*);
+
+    void setRenderQuoteHead(RenderQuote* head) { m_renderQuoteHead = head; }
+    RenderQuote* renderQuoteHead() const { return m_renderQuoteHead; }
+
+    // FIXME: This is a work around because the current implementation of counters
+    // requires walking the entire tree repeatedly and most pages don't actually use either
+    // feature so we shouldn't take the performance hit when not needed. Long term we should
+    // rewrite the counter and quotes code.
+    void addRenderCounter() { m_renderCounterCount++; }
+    void removeRenderCounter() { ASSERT(m_renderCounterCount > 0); m_renderCounterCount--; }
+    bool hasRenderCounters() { return m_renderCounterCount; }
 
 protected:
-    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, ApplyContainerFlipOrNot = ApplyContainerFlip, bool* wasFixed = 0) const;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState&, MapLocalToContainerFlags mode = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
+    virtual const RenderObject* pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap&) const;
     virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
     virtual bool requiresColumns(int desiredColumnCount) const OVERRIDE;
 
@@ -266,6 +287,8 @@ protected:
     OwnPtr<RenderBoxSet> m_fixedPositionedElements;
 
 private:
+    bool shouldUsePrintingLayout() const;
+
     unsigned m_pageLogicalHeight;
     bool m_pageLogicalHeightChanged;
     LayoutState* m_layoutState;
@@ -273,8 +296,14 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     OwnPtr<RenderLayerCompositor> m_compositor;
 #endif
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+    OwnPtr<CustomFilterGlobalContext> m_customFilterGlobalContext;
+#endif
     OwnPtr<FlowThreadController> m_flowThreadController;
     RefPtr<IntervalArena> m_intervalArena;
+
+    RenderQuote* m_renderQuoteHead;
+    unsigned m_renderCounterCount;
 };
 
 inline RenderView* toRenderView(RenderObject* object)

@@ -31,6 +31,7 @@
 
 #include "WebProcessCreationParameters.h"
 #include <WebCore/FileSystem.h>
+#include <WebCore/Language.h>
 #include <WebCore/MemoryCache.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/PageCache.h>
@@ -38,6 +39,8 @@
 #include <libsoup/soup-cache.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/StringBuilder.h>
 
 #if !OS(WINDOWS)
 #include <unistd.h>
@@ -47,8 +50,7 @@ namespace WebKit {
 
 static uint64_t getCacheDiskFreeSize(SoupCache* cache)
 {
-    if (!cache)
-        return 0;
+    ASSERT(cache);
 
     GOwnPtr<char> cacheDir;
     g_object_get(G_OBJECT(cache), "cache-dir", &cacheDir.outPtr(), NULL);
@@ -89,8 +91,8 @@ void WebProcess::platformSetCacheModel(CacheModel cacheModel)
     unsigned long urlCacheDiskCapacity = 0;
 
     SoupSession* session = WebCore::ResourceHandle::defaultSession();
-    SoupCache* cache = reinterpret_cast<SoupCache*>(soup_session_get_feature(session, SOUP_TYPE_CACHE));
-    uint64_t diskFreeSize = getCacheDiskFreeSize(cache);
+    SoupCache* cache = SOUP_CACHE(soup_session_get_feature(session, SOUP_TYPE_CACHE));
+    uint64_t diskFreeSize = getCacheDiskFreeSize(cache) / 1024 / 1024;
 
     uint64_t memSize = getMemorySize();
     calculateCacheSizes(cacheModel, memSize, diskFreeSize,
@@ -101,24 +103,85 @@ void WebProcess::platformSetCacheModel(CacheModel cacheModel)
     WebCore::memoryCache()->setDeadDecodedDataDeletionInterval(deadDecodedDataDeletionInterval);
     WebCore::pageCache()->setCapacity(pageCacheCapacity);
 
-    if (cache) {
-        if (urlCacheDiskCapacity > soup_cache_get_max_size(cache))
-            soup_cache_set_max_size(cache, urlCacheDiskCapacity);
+    if (urlCacheDiskCapacity > soup_cache_get_max_size(cache))
+        soup_cache_set_max_size(cache, urlCacheDiskCapacity);
+}
+
+void WebProcess::platformClearResourceCaches(ResourceCachesToClear cachesToClear)
+{
+    if (cachesToClear == InMemoryResourceCachesOnly)
+        return;
+
+    SoupSession* session = WebCore::ResourceHandle::defaultSession();
+    soup_cache_clear(SOUP_CACHE(soup_session_get_feature(session, SOUP_TYPE_CACHE)));
+}
+
+// This function is based on Epiphany code in ephy-embed-prefs.c.
+static CString buildAcceptLanguages(Vector<String> languages)
+{
+    // Ignore "C" locale.
+    size_t position = languages.find("c");
+    if (position != notFound)
+        languages.remove(position);
+
+    // Fallback to "en" if the list is empty.
+    if (languages.isEmpty())
+        return "en";
+
+    // Calculate deltas for the quality values.
+    int delta;
+    if (languages.size() < 10)
+        delta = 10;
+    else if (languages.size() < 20)
+        delta = 5;
+    else
+        delta = 1;
+
+    // Set quality values for each language.
+    StringBuilder builder;
+    for (size_t i = 0; i < languages.size(); ++i) {
+        if (i)
+            builder.append(", ");
+
+        builder.append(languages[i]);
+
+        int quality = 100 - i * delta;
+        if (quality > 0 && quality < 100) {
+            char buffer[8];
+            g_ascii_formatd(buffer, 8, "%.2f", quality / 100.0);
+            builder.append(String::format(";q=%s", buffer));
+        }
     }
+
+    return builder.toString().utf8();
 }
 
-void WebProcess::platformClearResourceCaches(ResourceCachesToClear)
+static void setSoupSessionAcceptLanguage(Vector<String> languages)
 {
-    notImplemented();
+    g_object_set(WebCore::ResourceHandle::defaultSession(), "accept-language", buildAcceptLanguages(languages).data(), NULL);
 }
 
-void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters&, CoreIPC::ArgumentDecoder*)
+static void languageChanged(void*)
 {
-    notImplemented();
+    setSoupSessionAcceptLanguage(WebCore::userPreferredLanguages());
+}
+
+void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters& parameters, CoreIPC::ArgumentDecoder*)
+{
+    if (!parameters.languages.isEmpty())
+        setSoupSessionAcceptLanguage(parameters.languages);
+
+    WebCore::addLanguageChangeObserver(this, languageChanged);
 }
 
 void WebProcess::platformTerminate()
 {
+    SoupSession* session = WebCore::ResourceHandle::defaultSession();
+    SoupCache* cache = SOUP_CACHE(soup_session_get_feature(session, SOUP_TYPE_CACHE));
+    soup_cache_flush(cache);
+    soup_cache_dump(cache);
+
+    WebCore::removeLanguageChangeObserver(this);
 }
 
 } // namespace WebKit

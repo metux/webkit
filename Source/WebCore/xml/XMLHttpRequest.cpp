@@ -25,6 +25,7 @@
 #include "Blob.h"
 #include "BlobData.h"
 #include "ContentSecurityPolicy.h"
+#include "ContextFeatures.h"
 #include "CrossOriginAccessControl.h"
 #include "DOMFormData.h"
 #include "DOMImplementation.h"
@@ -37,6 +38,7 @@
 #include "HTMLDocument.h"
 #include "HTTPParsers.h"
 #include "HTTPValidation.h"
+#include "HistogramSupport.h"
 #include "InspectorInstrumentation.h"
 #include "MemoryCache.h"
 #include "ResourceError.h"
@@ -53,6 +55,7 @@
 #include "XMLHttpRequestUpload.h"
 #include "markup.h"
 #include <wtf/ArrayBuffer.h>
+#include <wtf/ArrayBufferView.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/UnusedParam.h>
@@ -68,6 +71,13 @@
 namespace WebCore {
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, xmlHttpRequestCounter, ("XMLHttpRequest"));
+
+// Histogram enum to see when we can deprecate xhr.send(ArrayBuffer).
+enum XMLHttpRequestSendArrayBufferOrView {
+    XMLHttpRequestSendArrayBuffer,
+    XMLHttpRequestSendArrayBufferView,
+    XMLHttpRequestSendArrayBufferOrViewMax,
+};
 
 struct XMLHttpRequestStaticData {
     WTF_MAKE_NONCOPYABLE(XMLHttpRequestStaticData); WTF_MAKE_FAST_ALLOCATED;
@@ -253,6 +263,7 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
             // FIXME: Set Last-Modified.
             m_responseDocument->setContent(m_responseBuilder.toStringPreserveCapacity());
             m_responseDocument->setSecurityOrigin(securityOrigin());
+            m_responseDocument->setContextFeatures(document()->contextFeatures());
             if (!m_responseDocument->wellFormed())
                 m_responseDocument = 0;
         }
@@ -262,7 +273,6 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
     return m_responseDocument.get();
 }
 
-#if ENABLE(XHR_RESPONSE_BLOB)
 Blob* XMLHttpRequest::responseBlob(ExceptionCode& ec)
 {
     if (m_responseTypeCode != ResponseTypeBlob) {
@@ -273,7 +283,7 @@ Blob* XMLHttpRequest::responseBlob(ExceptionCode& ec)
     if (m_state != DONE)
         return 0;
 
-    if (!m_responseBlob.get()) {
+    if (!m_responseBlob) {
         // FIXME: This causes two (or more) unnecessary copies of the data.
         // Chromium stores blob data in the browser process, so we're pulling the data
         // from the network only to copy it into the renderer to copy it back to the browser.
@@ -283,20 +293,20 @@ Blob* XMLHttpRequest::responseBlob(ExceptionCode& ec)
         // a SharedBuffer, even if they don't get the Blob from the network layer directly.
         OwnPtr<BlobData> blobData = BlobData::create();
         // If we errored out or got no data, we still return a blob, just an empty one.
-        if (m_binaryResponseBuilder.get()) {
+        size_t size = 0;
+        if (m_binaryResponseBuilder) {
             RefPtr<RawData> rawData = RawData::create();
-            size_t size = m_binaryResponseBuilder->size();
+            size = m_binaryResponseBuilder->size();
             rawData->mutableData()->append(m_binaryResponseBuilder->data(), size);
             blobData->appendData(rawData, 0, BlobDataItem::toEndOfFile);
             blobData->setContentType(responseMIMEType()); // responseMIMEType defaults to text/xml which may be incorrect.
             m_binaryResponseBuilder.clear();
         }
-        m_responseBlob = Blob::create(blobData.release(), m_binaryResponseBuilder.get() ? m_binaryResponseBuilder->size() : 0);
+        m_responseBlob = Blob::create(blobData.release(), size);
     }
 
     return m_responseBlob.get();
 }
-#endif
 
 ArrayBuffer* XMLHttpRequest::responseArrayBuffer(ExceptionCode& ec)
 {
@@ -339,14 +349,12 @@ void XMLHttpRequest::setResponseType(const String& responseType, ExceptionCode& 
         m_responseTypeCode = ResponseTypeText;
     else if (responseType == "document")
         m_responseTypeCode = ResponseTypeDocument;
-    else if (responseType == "blob") {
-#if ENABLE(XHR_RESPONSE_BLOB)
+    else if (responseType == "blob")
         m_responseTypeCode = ResponseTypeBlob;
-#endif
-    } else if (responseType == "arraybuffer") {
+    else if (responseType == "arraybuffer")
         m_responseTypeCode = ResponseTypeArrayBuffer;
-    } else
-        ec = SYNTAX_ERR;
+    else
+        logConsoleError(scriptExecutionContext(), "XMLHttpRequest.responseType \"" + responseType + "\" is not supported.");
 }
 
 String XMLHttpRequest::responseType()
@@ -411,18 +419,6 @@ void XMLHttpRequest::setWithCredentials(bool value, ExceptionCode& ec)
     m_includeCredentials = value;
 }
 
-#if ENABLE(XHR_RESPONSE_BLOB)
-void XMLHttpRequest::setAsBlob(bool value, ExceptionCode& ec)
-{
-    if (m_state != OPENED || m_loader) {
-        ec = INVALID_STATE_ERR;
-        return;
-    }
-    
-    m_responseTypeCode = value ? ResponseTypeBlob : ResponseTypeDefault;
-}
-#endif
-
 bool XMLHttpRequest::isAllowedHTTPMethod(const String& method)
 {
     return !equalIgnoringCase(method, "TRACE")
@@ -478,20 +474,28 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
         return;
     }
 
-    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectFromSource(url)) {
+    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return;
     }
 
-    // Newer functionality is not available to synchronous requests in window contexts, as a spec-mandated 
-    // attempt to discourage synchronous XHR use. responseType is one such piece of functionality.
-    // We'll only disable this functionality for HTTP(S) requests since sync requests for local protocols
-    // such as file: and data: still make sense to allow.
-    if (!async && scriptExecutionContext()->isDocument() && url.protocolIsInHTTPFamily() && m_responseTypeCode != ResponseTypeDefault) {
-        logConsoleError(scriptExecutionContext(), "Synchronous HTTP(S) requests made from the window context cannot have XMLHttpRequest.responseType set.");
-        ec = INVALID_ACCESS_ERR;
-        return;
+    if (!async && scriptExecutionContext()->isDocument()) {
+        if (document()->settings() && !document()->settings()->syncXHRInDocumentsEnabled()) {
+            logConsoleError(scriptExecutionContext(), "Synchronous XMLHttpRequests are disabled for this page.");
+            ec = INVALID_ACCESS_ERR;
+            return;
+        }
+
+        // Newer functionality is not available to synchronous requests in window contexts, as a spec-mandated
+        // attempt to discourage synchronous XHR use. responseType is one such piece of functionality.
+        // We'll only disable this functionality for HTTP(S) requests since sync requests for local protocols
+        // such as file: and data: still make sense to allow.
+        if (url.protocolIsInHTTPFamily() && m_responseTypeCode != ResponseTypeDefault) {
+            logConsoleError(scriptExecutionContext(), "Synchronous HTTP(S) requests made from the window context cannot have XMLHttpRequest.responseType set.");
+            ec = INVALID_ACCESS_ERR;
+            return;
+        }
     }
 
     m_method = uppercaseKnownHTTPMethod(method);
@@ -616,7 +620,7 @@ void XMLHttpRequest::send(Blob* body, ExceptionCode& ec)
         // FIXME: add support for uploading bundles.
         m_requestEntityBody = FormData::create();
         if (body->isFile())
-            m_requestEntityBody->appendFile(static_cast<File*>(body)->path());
+            m_requestEntityBody->appendFile(toFile(body)->path());
 #if ENABLE(BLOB)
         else
             m_requestEntityBody->appendBlob(body->url());
@@ -651,11 +655,28 @@ void XMLHttpRequest::send(DOMFormData* body, ExceptionCode& ec)
 
 void XMLHttpRequest::send(ArrayBuffer* body, ExceptionCode& ec)
 {
+    String consoleMessage("ArrayBuffer is deprecated in XMLHttpRequest.send(). Use ArrayBufferView instead.");
+    scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
+
+    HistogramSupport::histogramEnumeration("WebCore.XHR.send.ArrayBufferOrView", XMLHttpRequestSendArrayBuffer, XMLHttpRequestSendArrayBufferOrViewMax);
+
+    sendBytesData(body->data(), body->byteLength(), ec);
+}
+
+void XMLHttpRequest::send(ArrayBufferView* body, ExceptionCode& ec)
+{
+    HistogramSupport::histogramEnumeration("WebCore.XHR.send.ArrayBufferOrView", XMLHttpRequestSendArrayBufferView, XMLHttpRequestSendArrayBufferOrViewMax);
+
+    sendBytesData(body->baseAddress(), body->byteLength(), ec);
+}
+
+void XMLHttpRequest::sendBytesData(const void* data, size_t length, ExceptionCode& ec)
+{
     if (!initSend(ec))
         return;
 
     if (m_method != "GET" && m_method != "HEAD" && m_url.protocolIsInHTTPFamily()) {
-        m_requestEntityBody = FormData::create(body->data(), body->byteLength());
+        m_requestEntityBody = FormData::create(data, length);
         if (m_upload)
             m_requestEntityBody->setAlwaysStream(true);
     }
@@ -804,9 +825,7 @@ void XMLHttpRequest::clearResponseBuffers()
     m_responseBuilder.clear();
     m_createdDocument = false;
     m_responseDocument = 0;
-#if ENABLE(XHR_RESPONSE_BLOB)
     m_responseBlob = 0;
-#endif
     m_binaryResponseBuilder.clear();
     m_responseArrayBuffer.clear();
 }
@@ -858,8 +877,8 @@ void XMLHttpRequest::dropProtection()
     // out. But it is protected from GC while loading, so this
     // can't be recouped until the load is done, so only
     // report the extra cost at that point.
-    JSC::JSLock lock(JSC::SilenceAssertionsOnly);
     JSC::JSGlobalData* globalData = scriptExecutionContext()->globalData();
+    JSC::JSLockHolder lock(globalData);
     globalData->heap.reportExtraMemoryCost(m_responseBuilder.length() * 2);
 #endif
 
@@ -1125,11 +1144,7 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
 
     if (useDecoder)
         m_responseBuilder.append(m_decoder->decode(data, len));
-    else if (m_responseTypeCode == ResponseTypeArrayBuffer
-#if ENABLE(XHR_RESPONSE_BLOB)
-             || m_responseTypeCode == ResponseTypeBlob
-#endif
-             ) {
+    else if (m_responseTypeCode == ResponseTypeArrayBuffer || m_responseTypeCode == ResponseTypeBlob) {
         // Buffer binary data.
         if (!m_binaryResponseBuilder)
             m_binaryResponseBuilder = SharedBuffer::create();

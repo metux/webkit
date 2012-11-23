@@ -29,6 +29,10 @@
 #include "TextStream.h"
 #include <wtf/Uint8ClampedArray.h>
 
+#if HAVE(ARM_NEON_INTRINSICS)
+#include <arm_neon.h>
+#endif
+
 namespace WebCore {
 
 FilterEffect::FilterEffect(Filter* filter)
@@ -39,6 +43,8 @@ FilterEffect::FilterEffect(Filter* filter)
     , m_hasWidth(false)
     , m_hasHeight(false)
     , m_clipsToBounds(true)
+    , m_colorSpace(ColorSpaceLinearRGB)
+    , m_resultColorSpace(ColorSpaceDeviceRGB)
 {
     ASSERT(m_filter);
 }
@@ -100,8 +106,13 @@ void FilterEffect::apply()
         in->apply();
         if (!in->hasResult())
             return;
+
+        // Convert input results to the current effect's color space.
+        in->transformResultColorSpace(m_colorSpace);
     }
+
     determineAbsolutePaintRect();
+    m_resultColorSpace = m_colorSpace;
 
     if (!isFilterSizeValid(m_absolutePaintRect))
         return;
@@ -131,6 +142,26 @@ void FilterEffect::forceValidPreMultipliedPixels()
 
     // We must have four bytes per pixel, and complete pixels
     ASSERT(!(pixelArrayLength % 4));
+
+#if HAVE(ARM_NEON_INTRINSICS)
+    if (pixelArrayLength >= 64) {
+        unsigned char* lastPixel = pixelData + (pixelArrayLength & ~0x3f);
+        do {
+            // Increments pixelData by 64.
+            uint8x16x4_t sixteenPixels = vld4q_u8(pixelData);
+            sixteenPixels.val[0] = vminq_u8(sixteenPixels.val[0], sixteenPixels.val[3]);
+            sixteenPixels.val[1] = vminq_u8(sixteenPixels.val[1], sixteenPixels.val[3]);
+            sixteenPixels.val[2] = vminq_u8(sixteenPixels.val[2], sixteenPixels.val[3]);
+            vst4q_u8(pixelData, sixteenPixels);
+            pixelData += 64;
+        } while (pixelData < lastPixel);
+
+        pixelArrayLength &= 0x3f;
+        if (!pixelArrayLength)
+            return;
+    }
+#endif
+
     int numPixels = pixelArrayLength / 4;
 
     // Iterate over each pixel, checking alpha and adjusting color components if necessary
@@ -164,7 +195,7 @@ ImageBuffer* FilterEffect::asImageBuffer()
         return 0;
     if (m_imageBufferResult)
         return m_imageBufferResult.get();
-    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), 1, ColorSpaceLinearRGB, m_filter->renderingMode());
+    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), 1, m_resultColorSpace, m_filter->renderingMode());
     IntRect destinationRect(IntPoint(), m_absolutePaintRect.size());
     if (m_premultipliedImageResult)
         m_imageBufferResult->putByteArray(Premultiplied, m_premultipliedImageResult.get(), destinationRect.size(), destinationRect, IntPoint());
@@ -301,7 +332,7 @@ ImageBuffer* FilterEffect::createImageBufferResult()
     ASSERT(!hasResult());
     if (m_absolutePaintRect.isEmpty())
         return 0;
-    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), 1, ColorSpaceLinearRGB, m_filter->renderingMode());
+    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), 1, m_colorSpace, m_filter->renderingMode());
     if (!m_imageBufferResult)
         return 0;
     ASSERT(m_imageBufferResult->context());
@@ -330,6 +361,32 @@ Uint8ClampedArray* FilterEffect::createPremultipliedImageResult()
         return 0;
     m_premultipliedImageResult = Uint8ClampedArray::createUninitialized(m_absolutePaintRect.width() * m_absolutePaintRect.height() * 4);
     return m_premultipliedImageResult.get();
+}
+
+void FilterEffect::transformResultColorSpace(ColorSpace dstColorSpace)
+{
+#if USE(CG)
+    // CG handles color space adjustments internally.
+    UNUSED_PARAM(dstColorSpace);
+#else
+    if (!hasResult() || dstColorSpace == m_resultColorSpace)
+        return;
+
+    // FIXME: We can avoid this potentially unnecessary ImageBuffer conversion by adding
+    // color space transform support for the {pre,un}multiplied arrays.
+    if (!m_imageBufferResult) {
+        asImageBuffer();
+        ASSERT(m_imageBufferResult);
+    }
+
+    m_imageBufferResult->transformColorSpace(m_resultColorSpace, dstColorSpace);
+    m_resultColorSpace = dstColorSpace;
+
+    if (m_unmultipliedImageResult)
+        m_unmultipliedImageResult.clear();
+    if (m_premultipliedImageResult)
+        m_premultipliedImageResult.clear();
+#endif
 }
 
 TextStream& FilterEffect::externalRepresentation(TextStream& ts, int) const

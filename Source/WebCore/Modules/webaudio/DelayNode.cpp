@@ -30,11 +30,14 @@
 
 namespace WebCore {
 
+// FIXME: What should be the maximum allowed delay? Arbitrarily set to 300 sec (5 minutes).
+const double maximumAllowedDelayTime = 300;
+
 DelayNode::DelayNode(AudioContext* context, float sampleRate, double maxDelayTime)
     : AudioBasicProcessorNode(context, sampleRate)
 {
-    m_processor = adoptPtr(new DelayProcessor(sampleRate, 1, maxDelayTime));
-    delayTime()->setContext(context);
+    maxDelayTime = std::max(std::min(maxDelayTime, maximumAllowedDelayTime), 0.0);
+    m_processor = adoptPtr(new DelayProcessor(context, sampleRate, 1, maxDelayTime));
     setNodeType(NodeTypeDelay);
 }
 

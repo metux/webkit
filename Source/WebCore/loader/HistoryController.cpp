@@ -124,10 +124,11 @@ void HistoryController::restoreScrollPositionAndViewState()
     
     if (FrameView* view = m_frame->view()) {
         if (!view->wasScrolledByUser()) {
-            view->setScrollPosition(m_currentItem->scrollPoint());
             Page* page = m_frame->page();
-            if (page && page->mainFrame() == m_frame)
+            if (page && page->mainFrame() == m_frame && m_currentItem->pageScaleFactor())
                 page->setPageScaleFactor(m_currentItem->pageScaleFactor(), m_currentItem->scrollPoint());
+            else
+                view->setScrollPosition(m_currentItem->scrollPoint());
         }
     }
 }
@@ -437,7 +438,7 @@ void HistoryController::updateForCommit()
     FrameLoadType type = frameLoader->loadType();
     if (isBackForwardLoadType(type)
         || isReplaceLoadTypeWithProvisionalItem(type)
-        || ((type == FrameLoadTypeReload || type == FrameLoadTypeReloadFromOrigin) && !frameLoader->provisionalDocumentLoader()->unreachableURL().isEmpty())) {
+        || (isReloadTypeWithProvisionalItem(type) && !frameLoader->provisionalDocumentLoader()->unreachableURL().isEmpty())) {
         // Once committed, we want to use current item for saving DocState, and
         // the provisional item for restoring state.
         // Note previousItem must be set before we close the URL, which will
@@ -462,6 +463,11 @@ bool HistoryController::isReplaceLoadTypeWithProvisionalItem(FrameLoadType type)
     // Going back to an error page in a subframe can trigger a FrameLoadTypeReplace
     // while m_provisionalItem is set, so we need to commit it.
     return type == FrameLoadTypeReplace && m_provisionalItem;
+}
+
+bool HistoryController::isReloadTypeWithProvisionalItem(FrameLoadType type)
+{
+    return (type == FrameLoadTypeReload || type == FrameLoadTypeReloadFromOrigin) && m_provisionalItem;
 }
 
 void HistoryController::recursiveUpdateForCommit()

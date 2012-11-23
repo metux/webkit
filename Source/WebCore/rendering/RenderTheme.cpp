@@ -41,16 +41,25 @@
 #include "RenderStyle.h"
 #include "RenderView.h"
 #include "Settings.h"
+#include "SpinButtonElement.h"
 #include "StringTruncator.h"
 #include "TextControlInnerElements.h"
 
-#if ENABLE(METER_TAG)
+#if ENABLE(METER_ELEMENT)
 #include "HTMLMeterElement.h"
 #include "RenderMeter.h"
 #endif
 
 #if ENABLE(INPUT_SPEECH)
 #include "RenderInputSpeech.h"
+#endif
+
+#if ENABLE(DATALIST_ELEMENT)
+#include "ElementShadow.h"
+#include "HTMLCollection.h"
+#include "HTMLDataListElement.h"
+#include "HTMLOptionElement.h"
+#include "HTMLParserIdioms.h"
 #endif
 
 // The methods in this file are shared by all themes on every platform.
@@ -202,6 +211,14 @@ void RenderTheme::adjustStyle(StyleResolver* styleResolver, RenderStyle* style, 
             return adjustMenuListStyle(styleResolver, style, e);
         case MenulistButtonPart:
             return adjustMenuListButtonStyle(styleResolver, style, e);
+        case MediaPlayButtonPart:
+        case MediaCurrentTimePart:
+        case MediaTimeRemainingPart:
+        case MediaEnterFullscreenButtonPart:
+        case MediaExitFullscreenButtonPart:
+        case MediaMuteButtonPart:
+        case MediaVolumeSliderContainerPart:
+            return adjustMediaControlStyle(styleResolver, style, e);
         case MediaSliderPart:
         case MediaVolumeSliderPart:
         case MediaFullScreenVolumeSliderPart:
@@ -221,11 +238,11 @@ void RenderTheme::adjustStyle(StyleResolver* styleResolver, RenderStyle* style, 
             return adjustSearchFieldResultsDecorationStyle(styleResolver, style, e);
         case SearchFieldResultsButtonPart:
             return adjustSearchFieldResultsButtonStyle(styleResolver, style, e);
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
         case ProgressBarPart:
             return adjustProgressBarStyle(styleResolver, style, e);
 #endif
-#if ENABLE(METER_TAG)
+#if ENABLE(METER_ELEMENT)
         case MeterPart:
         case RelevancyLevelIndicatorPart:
         case ContinuousCapacityLevelIndicatorPart:
@@ -290,7 +307,7 @@ bool RenderTheme::paint(RenderObject* o, const PaintInfo& paintInfo, const IntRe
 #endif
         case MenulistPart:
             return paintMenuList(o, paintInfo, r);
-#if ENABLE(METER_TAG)
+#if ENABLE(METER_ELEMENT)
         case MeterPart:
         case RelevancyLevelIndicatorPart:
         case ContinuousCapacityLevelIndicatorPart:
@@ -298,7 +315,7 @@ bool RenderTheme::paint(RenderObject* o, const PaintInfo& paintInfo, const IntRe
         case RatingLevelIndicatorPart:
             return paintMeter(o, paintInfo, r);
 #endif
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
         case ProgressBarPart:
             return paintProgressBar(o, paintInfo, r);
 #endif
@@ -313,6 +330,8 @@ bool RenderTheme::paint(RenderObject* o, const PaintInfo& paintInfo, const IntRe
             return paintMediaFullscreenButton(o, paintInfo, r);
         case MediaPlayButtonPart:
             return paintMediaPlayButton(o, paintInfo, r);
+        case MediaOverlayPlayButtonPart:
+            return paintMediaOverlayPlayButton(o, paintInfo, r);
         case MediaMuteButtonPart:
             return paintMediaMuteButton(o, paintInfo, r);
         case MediaSeekBackButtonPart:
@@ -395,14 +414,14 @@ bool RenderTheme::paintBorderOnly(RenderObject* o, const PaintInfo& paintInfo, c
         case DefaultButtonPart:
         case ButtonPart:
         case MenulistPart:
-#if ENABLE(METER_TAG)
+#if ENABLE(METER_ELEMENT)
         case MeterPart:
         case RelevancyLevelIndicatorPart:
         case ContinuousCapacityLevelIndicatorPart:
         case DiscreteCapacityLevelIndicatorPart:
         case RatingLevelIndicatorPart:
 #endif
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
         case ProgressBarPart:
 #endif
         case SliderHorizontalPart:
@@ -442,14 +461,14 @@ bool RenderTheme::paintDecorations(RenderObject* o, const PaintInfo& paintInfo, 
         case DefaultButtonPart:
         case ButtonPart:
         case MenulistPart:
-#if ENABLE(METER_TAG)
+#if ENABLE(METER_ELEMENT)
         case MeterPart:
         case RelevancyLevelIndicatorPart:
         case ContinuousCapacityLevelIndicatorPart:
         case DiscreteCapacityLevelIndicatorPart:
         case RatingLevelIndicatorPart:
 #endif
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
         case ProgressBarPart:
 #endif
         case SliderHorizontalPart:
@@ -810,7 +829,7 @@ bool RenderTheme::isReadOnlyControl(const RenderObject* o) const
     Node* node = o->node();
     if (!node || !node->isElementNode())
         return false;
-    return static_cast<Element*>(node)->isReadOnlyFormControl();
+    return static_cast<Element*>(node)->shouldMatchReadOnlySelector();
 }
 
 bool RenderTheme::isHovered(const RenderObject* o) const
@@ -921,7 +940,7 @@ bool RenderTheme::paintInputFieldSpeechButton(RenderObject* object, const PaintI
 }
 #endif
 
-#if ENABLE(METER_TAG)
+#if ENABLE(METER_ELEMENT)
 void RenderTheme::adjustMeterStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     style->setBoxShadow(nullptr);
@@ -944,7 +963,86 @@ bool RenderTheme::paintMeter(RenderObject*, const PaintInfo&, const IntRect&)
 
 #endif
 
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(DATALIST_ELEMENT)
+LayoutUnit RenderTheme::sliderTickSnappingThreshold() const
+{
+    return 0;
+}
+
+void RenderTheme::paintSliderTicks(RenderObject* o, const PaintInfo& paintInfo, const IntRect& rect)
+{
+    Node* node = o->node();
+    if (!node)
+        return;
+
+    HTMLInputElement* input = node->toInputElement();
+    if (!input)
+        return;
+
+    HTMLDataListElement* dataList = static_cast<HTMLDataListElement*>(input->list());
+    if (!dataList)
+        return;
+
+    double min = input->minimum();
+    double max = input->maximum();
+    ControlPart part = o->style()->appearance();
+    // We don't support ticks on alternate sliders like MediaVolumeSliders.
+    if (part !=  SliderHorizontalPart && part != SliderVerticalPart)
+        return;
+    bool isHorizontal = part ==  SliderHorizontalPart;
+
+    IntSize thumbSize;
+    RenderObject* thumbRenderer = input->sliderThumbElement()->renderer();
+    if (thumbRenderer) {
+        RenderStyle* thumbStyle = thumbRenderer->style();
+        int thumbWidth = thumbStyle->width().intValue();
+        int thumbHeight = thumbStyle->height().intValue();
+        thumbSize.setWidth(isHorizontal ? thumbWidth : thumbHeight);
+        thumbSize.setHeight(isHorizontal ? thumbHeight : thumbWidth);
+    }
+
+    IntSize tickSize = sliderTickSize();
+    float zoomFactor = o->style()->effectiveZoom();
+    FloatRect tickRect;
+    int tickRegionMargin = (thumbSize.width() - tickSize.width()) / 2.0;
+    int tickRegionSideMargin = 0;
+    int tickRegionWidth = 0;
+    if (isHorizontal) {
+        tickRect.setWidth(floor(tickSize.width() * zoomFactor));
+        tickRect.setHeight(floor(tickSize.height() * zoomFactor));
+        tickRect.setY(floor(rect.y() + rect.height() / 2.0 + sliderTickOffsetFromTrackCenter() * zoomFactor));
+        tickRegionSideMargin = rect.x() + tickRegionMargin;
+        tickRegionWidth = rect.width() - tickRegionMargin * 2 - tickSize.width() * zoomFactor;
+    } else {
+        tickRect.setWidth(floor(tickSize.height() * zoomFactor));
+        tickRect.setHeight(floor(tickSize.width() * zoomFactor));
+        tickRect.setX(floor(rect.x() + rect.width() / 2.0 + sliderTickOffsetFromTrackCenter() * zoomFactor));
+        tickRegionSideMargin = rect.y() + tickRegionMargin;
+        tickRegionWidth = rect.height() - tickRegionMargin * 2 - tickSize.width() * zoomFactor;
+    }
+    RefPtr<HTMLCollection> options = dataList->options();
+    GraphicsContextStateSaver stateSaver(*paintInfo.context);
+    paintInfo.context->setFillColor(o->style()->visitedDependentColor(CSSPropertyColor), ColorSpaceDeviceRGB);
+    for (unsigned i = 0; Node* node = options->item(i); i++) {
+        ASSERT(node->hasTagName(optionTag));
+        HTMLOptionElement* optionElement = static_cast<HTMLOptionElement*>(node);
+        String value = optionElement->value();
+        if (!input->isValidValue(value))
+            continue;
+        double parsedValue = parseToDoubleForNumberType(input->sanitizeValue(value));
+        double tickFraction = (parsedValue - min) / (max - min);
+        double tickRatio = isHorizontal && o->style()->isLeftToRightDirection() ? tickFraction : 1.0 - tickFraction;
+        double tickPosition = round(tickRegionSideMargin + tickRegionWidth * tickRatio);
+        if (isHorizontal)
+            tickRect.setX(tickPosition);
+        else
+            tickRect.setY(tickPosition);
+        paintInfo.context->fillRect(tickRect);
+    }
+}
+#endif
+
+#if ENABLE(PROGRESS_ELEMENT)
 double RenderTheme::animationRepeatIntervalForProgressBar(RenderProgress*) const
 {
     return 0;
@@ -969,16 +1067,20 @@ void RenderTheme::adjustMenuListButtonStyle(StyleResolver*, RenderStyle*, Elemen
 {
 }
 
+void RenderTheme::adjustMediaControlStyle(StyleResolver*, RenderStyle*, Element*) const
+{
+}
+
 void RenderTheme::adjustSliderTrackStyle(StyleResolver*, RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustSliderThumbStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderTheme::adjustSliderThumbStyle(StyleResolver*, RenderStyle* style, Element* element) const
 {
-    adjustSliderThumbSize(style);
+    adjustSliderThumbSize(style, element);
 }
 
-void RenderTheme::adjustSliderThumbSize(RenderStyle*) const
+void RenderTheme::adjustSliderThumbSize(RenderStyle*, Element*) const
 {
 }
 

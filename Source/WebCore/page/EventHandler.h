@@ -93,7 +93,7 @@ enum HitTestScrollbars { ShouldHitTestScrollbars, DontHitTestScrollbars };
 class EventHandler {
     WTF_MAKE_NONCOPYABLE(EventHandler);
 public:
-    EventHandler(Frame*);
+    explicit EventHandler(Frame*);
     ~EventHandler();
 
     void clear();
@@ -163,18 +163,24 @@ public:
 
 #if ENABLE(GESTURE_EVENTS)
     bool handleGestureEvent(const PlatformGestureEvent&);
-    bool handleGestureTap(const PlatformGestureEvent&, Node* preTargetedNode = 0);
+    bool handleGestureTap(const PlatformGestureEvent&);
     bool handleGestureScrollUpdate(const PlatformGestureEvent&);
 #endif
 
 #if ENABLE(TOUCH_ADJUSTMENT)
     bool bestClickableNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
+    bool bestContextMenuNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
     bool bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntRect& targetArea, Node*& targetNode);
+
+    bool adjustGesturePosition(const PlatformGestureEvent&, IntPoint& adjustedPoint);
 #endif
 
 #if ENABLE(CONTEXT_MENUS)
     bool sendContextMenuEvent(const PlatformMouseEvent&);
     bool sendContextMenuEventForKey();
+#if ENABLE(GESTURE_EVENTS)
+    bool sendContextMenuEventForGesture(const PlatformGestureEvent&);
+#endif
 #endif
 
     void setMouseDownMayStartAutoscroll() { m_mouseDownMayStartAutoscroll = true; }
@@ -238,9 +244,6 @@ private:
 
     bool handleMouseDoubleClickEvent(const PlatformMouseEvent&);
 
-    static Node* targetNode(const MouseEventWithHitTestResults&);
-    static Node* targetNode(const HitTestResult&);
-
     bool handleMousePressEvent(const MouseEventWithHitTestResults&);
     bool handleMousePressEventSingleClick(const MouseEventWithHitTestResults&);
     bool handleMousePressEventDoubleClick(const MouseEventWithHitTestResults&);
@@ -263,7 +266,7 @@ private:
     void autoscrollTimerFired(Timer<EventHandler>*);
     bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
     
-    bool shouldTurnVerticalTicksIntoHorizontal(const HitTestResult&) const;
+    bool shouldTurnVerticalTicksIntoHorizontal(const HitTestResult&, const PlatformWheelEvent&) const;
     bool mouseDownMayStartSelect() const { return m_mouseDownMayStartSelect; }
 
     static bool isKeyboardOptionTab(KeyboardEvent*);
@@ -422,6 +425,7 @@ private:
     LayoutSize m_offsetFromResizeCorner; // In the coords of m_resizeLayer.
     
     IntPoint m_currentMousePosition;
+    IntPoint m_currentMouseGlobalPosition;
     IntPoint m_mouseDownPos; // In our view's coords.
     double m_mouseDownTimestamp;
     PlatformMouseEvent m_mouseDown;
@@ -442,6 +446,11 @@ private:
     TouchTargetMap m_originatingTouchPointTargets;
     bool m_touchPressed;
 #endif
+
+#if ENABLE(GESTURE_EVENTS)
+    RefPtr<Node> m_scrollGestureHandlingNode;
+#endif
+
     double m_maxMouseMovedDuration;
     PlatformEvent::Type m_baseEventType;
 };

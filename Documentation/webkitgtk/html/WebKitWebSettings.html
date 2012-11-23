@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebFrame.html" title="WebKitWebFrame">
 <link rel="next" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -98,6 +98,8 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--html5-local-storage-database-path" title='The "html5-local-storage-database-path" property'>html5-local-storage-database-path</a>" <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--javascript-can-access-clipboard" title='The "javascript-can-access-clipboard" property'>javascript-can-access-clipboard</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--javascript-can-open-windows-automatically" title='The "javascript-can-open-windows-automatically" property'>javascript-can-open-windows-automatically</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--media-playback-allows-inline" title='The "media-playback-allows-inline" property'>media-playback-allows-inline</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--media-playback-requires-user-gesture" title='The "media-playback-requires-user-gesture" property'>media-playback-requires-user-gesture</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--minimum-font-size" title='The "minimum-font-size" property'>minimum-font-size</a>"        <a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a>                  : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--minimum-logical-font-size" title='The "minimum-logical-font-size" property'>minimum-logical-font-size</a>" <a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a>                  : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--monospace-font-family" title='The "monospace-font-family" property'>monospace-font-family</a>"    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
@@ -131,12 +133,12 @@ After creation, a <a class="link" href="WebKitWebSettings.html" title="WebKitWeb
 4
 5
 6</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Create a new websettings and disable java script */</span>
-WebKitWebSettings <span class="gtkdoc opt">*</span>settings <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/WebKitWebSettings.html#webkit-web-settings-new">webkit_web_settings_new</a></span> <span class="gtkdoc opt">();</span>
-<span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-set">g_object_set</a></span> <span class="gtkdoc opt">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="gtkdoc opt">(</span>settings<span class="gtkdoc opt">),</span> <span class="string">&quot;enable-scripts&quot;</span><span class="gtkdoc opt">,</span> FALSE<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
+        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Create a new websettings and disable java script </span><span class="comment">*/</span>
+WebKitWebSettings *settings = webkit_web_settings_new ();
+g_object_set (G_OBJECT(settings), <span class="number">&quot;enable-scripts&quot;</span>, FALSE, <span class="number">NULL</span>);
 
-<span class="comment">/* Apply the result */</span>
-<span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-set-settings">webkit_web_view_set_settings</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_webview<span class="gtkdoc opt">),</span> settings<span class="gtkdoc opt">);</span></pre></td>
+<span class="comment">/*</span><span class="comment"> Apply the result </span><span class="comment">*/</span>
+webkit_web_view_set_settings (WEBKIT_WEB_VIEW(my_webview), settings);</pre></td>
       </tr>
     </tbody>
   </table>
@@ -672,7 +674,7 @@ content from the web should provide a preference for this.
 Path to store persistent HTML5 localStorage databases, which are enabled by
 "enable-html5-local-storage". The default path is $XDG_DATA_HOME/webkit/databases/.
 </p>
-<p>Default value: "/home/kov/.local/share/webkit/databases"</p>
+<p>Default value: "/home/martin/.local/share/webkit/databases"</p>
 <p class="since">Since 1.5.2</p>
 </div>
 <hr>
@@ -695,6 +697,32 @@ intervention.
 </p>
 <p>Default value: FALSE</p>
 <p class="since">Since 1.1.11</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--media-playback-allows-inline"></a><h3>The <code class="literal">"media-playback-allows-inline"</code> property</h3>
+<pre class="programlisting">  "media-playback-allows-inline" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Whether media playback is full-screen only or inline playback is allowed.
+This is true by default, so media playback can be inline. Setting it to
+false allows specifying that media playback should be always fullscreen.
+</p>
+<p>Default value: TRUE</p>
+<p class="since">Since 1.10.0</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--media-playback-requires-user-gesture"></a><h3>The <code class="literal">"media-playback-requires-user-gesture"</code> property</h3>
+<pre class="programlisting">  "media-playback-requires-user-gesture" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Whether a user gesture (such as clicking the play button) would
+be required to start media playback or load media. This is off
+by default, so media playback could start automatically. Setting
+it on requires a gesture by the user to start playback, or to load
+the media.
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 1.10.0</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -821,6 +849,6 @@ The value by which the zoom level is changed when zooming in or out.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

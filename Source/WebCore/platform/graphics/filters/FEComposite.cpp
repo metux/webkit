@@ -124,27 +124,23 @@ void FEComposite::correctFilterResultIfNeeded()
     forceValidPreMultipliedPixels();
 }
 
-template <int b1, int b2, int b3, int b4>
+template <int b1, int b4>
 static inline void computeArithmeticPixels(unsigned char* source, unsigned char* destination, int pixelArrayLength,
                                     float k1, float k2, float k3, float k4)
 {
     float scaledK1;
     float scaledK4;
     if (b1)
-        scaledK1 = k1 / 255.f;
+        scaledK1 = k1 / 255.0f;
     if (b4)
-        scaledK4 = k4 * 255.f;
+        scaledK4 = k4 * 255.0f;
 
     while (--pixelArrayLength >= 0) {
         unsigned char i1 = *source;
         unsigned char i2 = *destination;
-        float result = 0;
+        float result = k2 * i1 + k3 * i2;
         if (b1)
             result += scaledK1 * i1 * i2;
-        if (b2)
-            result += k2 * i1;
-        if (b3)
-            result += k3 * i2;
         if (b4)
             result += scaledK4;
 
@@ -159,24 +155,63 @@ static inline void computeArithmeticPixels(unsigned char* source, unsigned char*
     }
 }
 
-static inline void arithmeticSoftware(unsigned char* source, unsigned char* destination, int pixelArrayLength,
-                       float k1, float k2, float k3, float k4)
+// computeArithmeticPixelsUnclamped is a faster version of computeArithmeticPixels for the common case where clamping
+// is not necessary. This enables aggresive compiler optimizations such as auto-vectorization.
+template <int b1, int b4>
+static inline void computeArithmeticPixelsUnclamped(unsigned char* source, unsigned char* destination, int pixelArrayLength, float k1, float k2, float k3, float k4)
 {
-    if (!k4) {
-        if (!k1) {
-            computeArithmeticPixels<0, 1, 1, 0>(source, destination, pixelArrayLength, k1, k2, k3, k4);
-            return;
+    float scaledK1;
+    float scaledK4;
+    if (b1)
+        scaledK1 = k1 / 255.0f;
+    if (b4)
+        scaledK4 = k4 * 255.0f;
+
+    while (--pixelArrayLength >= 0) {
+        unsigned char i1 = *source;
+        unsigned char i2 = *destination;
+        float result = k2 * i1 + k3 * i2;
+        if (b1)
+            result += scaledK1 * i1 * i2;
+        if (b4)
+            result += scaledK4;
+
+        *destination = result;
+        ++source;
+        ++destination;
+    }
+}
+
+static inline void arithmeticSoftware(unsigned char* source, unsigned char* destination, int pixelArrayLength, float k1, float k2, float k3, float k4)
+{
+    float upperLimit = std::max(0.0f, k1) + std::max(0.0f, k2) + std::max(0.0f, k3) + k4;
+    float lowerLimit = std::min(0.0f, k1) + std::min(0.0f, k2) + std::min(0.0f, k3) + k4;
+    if ((k4 >= 0.0f && k4 <= 1.0f) && (upperLimit >= 0.0f && upperLimit <= 1.0f) && (lowerLimit >= 0.0f && lowerLimit <= 1.0f)) {
+        if (k4) {
+            if (k1)
+                computeArithmeticPixelsUnclamped<1, 1>(source, destination, pixelArrayLength, k1, k2, k3, k4);
+            else
+                computeArithmeticPixelsUnclamped<0, 1>(source, destination, pixelArrayLength, k1, k2, k3, k4);
+        } else {
+            if (k1)
+                computeArithmeticPixelsUnclamped<1, 0>(source, destination, pixelArrayLength, k1, k2, k3, k4);
+            else
+                computeArithmeticPixelsUnclamped<0, 0>(source, destination, pixelArrayLength, k1, k2, k3, k4);
         }
-
-        computeArithmeticPixels<1, 1, 1, 0>(source, destination, pixelArrayLength, k1, k2, k3, k4);
         return;
     }
 
-    if (!k1) {
-        computeArithmeticPixels<0, 1, 1, 1>(source, destination, pixelArrayLength, k1, k2, k3, k4);
-        return;
+    if (k4) {
+        if (k1)
+            computeArithmeticPixels<1, 1>(source, destination, pixelArrayLength, k1, k2, k3, k4);
+        else
+            computeArithmeticPixels<0, 1>(source, destination, pixelArrayLength, k1, k2, k3, k4);
+    } else {
+        if (k1)
+            computeArithmeticPixels<1, 0>(source, destination, pixelArrayLength, k1, k2, k3, k4);
+        else
+            computeArithmeticPixels<0, 0>(source, destination, pixelArrayLength, k1, k2, k3, k4);
     }
-    computeArithmeticPixels<1, 1, 1, 1>(source, destination, pixelArrayLength, k1, k2, k3, k4);
 }
 
 inline void FEComposite::platformArithmeticSoftware(Uint8ClampedArray* source, Uint8ClampedArray* destination,
@@ -185,10 +220,9 @@ inline void FEComposite::platformArithmeticSoftware(Uint8ClampedArray* source, U
     int length = source->length();
     ASSERT(length == static_cast<int>(destination->length()));
     // The selection here eventually should happen dynamically.
-#if CPU(ARM_NEON) && COMPILER(GCC)
+#if HAVE(ARM_NEON_INTRINSICS)
     ASSERT(!(length & 0x3));
-    float coefficients[4]  = { k1, k2, k3, k4 };
-    platformArithmeticNeon(source->data(), destination->data(), length, coefficients);
+    platformArithmeticNeon(source->data(), destination->data(), length, k1, k2, k3, k4);
 #else
     arithmeticSoftware(source->data(), destination->data(), length, k1, k2, k3, k4);
 #endif

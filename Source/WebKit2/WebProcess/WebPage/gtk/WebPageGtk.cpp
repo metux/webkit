@@ -37,6 +37,7 @@
 #include <WebCore/Frame.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/Page.h>
+#include <WebCore/PasteboardHelper.h>
 #include <WebCore/PlatformKeyboardEvent.h>
 #include <WebCore/Settings.h>
 #include <wtf/gobject/GOwnPtr.h>
@@ -54,6 +55,10 @@ void WebPage::platformInitialize()
     m_accessibilityObject = webPageAccessibilityObjectNew(this);
     GOwnPtr<gchar> plugID(atk_plug_get_id(ATK_PLUG(m_accessibilityObject)));
     send(Messages::WebPageProxy::BindAccessibilityTree(String(plugID.get())));
+
+#if USE(TEXTURE_MAPPER_GL)
+    m_nativeWindowHandle = 0;
+#endif
 }
 
 void WebPage::updateAccessibilityTree()
@@ -148,6 +153,38 @@ PassRefPtr<SharedBuffer> WebPage::cachedResponseDataForURL(const KURL&)
 {
     notImplemented();
     return 0;
+}
+
+#if USE(TEXTURE_MAPPER_GL)
+void WebPage::setAcceleratedCompositingWindowId(int64_t nativeWindowHandle)
+{
+    m_nativeWindowHandle = nativeWindowHandle;
+}
+#endif
+
+bool WebPage::handleMousePressedEvent(const PlatformMouseEvent& platformMouseEvent)
+{
+    bool returnValue = false;
+    if (platformMouseEvent.button() != WebCore::MiddleButton)
+        return returnValue;
+
+#if PLATFORM(X11)
+    Frame* frame = m_page->focusController()->focusedOrMainFrame();
+    if (!frame)
+        return returnValue;
+
+    PasteboardHelper* pasteboardHelper = PasteboardHelper::defaultPasteboardHelper();
+    bool wasUsingPrimary = pasteboardHelper->usePrimarySelectionClipboard();
+    pasteboardHelper->setUsePrimarySelectionClipboard(true);
+
+    Editor* editor = frame->editor();
+    returnValue = editor->canPaste() || editor->canDHTMLPaste();
+    editor->paste();
+
+    pasteboardHelper->setUsePrimarySelectionClipboard(wasUsingPrimary);
+#endif
+
+    return returnValue;
 }
 
 } // namespace WebKit

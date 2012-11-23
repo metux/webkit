@@ -79,6 +79,7 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_acceleratesDrawing(false)
     , m_maintainsPixelAlignment(false)
     , m_appliesPageScale(false)
+    , m_usingTileCache(false)
     , m_paintingPhase(GraphicsLayerPaintAll)
     , m_contentsOrientation(CompositingCoordinatesTopDown)
     , m_parent(0)
@@ -340,9 +341,7 @@ void GraphicsLayer::updateDebugIndicators()
 {
     if (GraphicsLayer::showDebugBorders()) {
         if (drawsContent()) {
-            // FIXME: It's weird to ask the client if this layer is a tile cache layer.
-            // Maybe we should just cache that information inside GraphicsLayer?
-            if (m_client->shouldUseTileCache(this)) // tile cache layer: dark blue
+            if (m_usingTileCache) // tile cache layer: dark blue
                 setDebugBorder(Color(0, 0, 128, 128), 0.5);
             else if (m_usingTiledLayer)
                 setDebugBorder(Color(255, 128, 0, 128), 2); // tiled layer: orange
@@ -385,7 +384,7 @@ void GraphicsLayer::distributeOpacity(float accumulatedOpacity)
     }
 }
 
-#if PLATFORM(QT) || PLATFORM(GTK)
+#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
 GraphicsLayer::GraphicsLayerFactory* GraphicsLayer::s_graphicsLayerFactory = 0;
 
 void GraphicsLayer::setGraphicsLayerFactory(GraphicsLayer::GraphicsLayerFactory factory)
@@ -509,13 +508,13 @@ int GraphicsLayer::validateTransformOperations(const KeyframeValueList& valueLis
     return firstIndex;
 }
 
-double GraphicsLayer::backingStoreArea() const
+double GraphicsLayer::backingStoreMemoryEstimate() const
 {
     if (!drawsContent())
         return 0;
     
     // Effects of page and device scale are ignored; subclasses should override to take these into account.
-    return static_cast<double>(size().width()) * size().height();
+    return static_cast<double>(4 * size().width()) * size().height();
 }
 
 static void writeIndent(TextStream& ts, int indent)

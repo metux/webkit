@@ -27,6 +27,7 @@
 #define WKPage_h
 
 #include <WebKit2/WKBase.h>
+#include <WebKit2/WKError.h>
 #include <WebKit2/WKEvent.h>
 #include <WebKit2/WKFindOptions.h>
 #include <WebKit2/WKGeometry.h>
@@ -69,9 +70,14 @@ typedef bool (*WKPageCanAuthenticateAgainstProtectionSpaceInFrameCallback)(WKPag
 typedef void (*WKPageDidReceiveAuthenticationChallengeInFrameCallback)(WKPageRef page, WKFrameRef frame, WKAuthenticationChallengeRef authenticationChallenge, const void *clientInfo);
 typedef void (*WKPageDidChangeBackForwardListCallback)(WKPageRef page, WKBackForwardListItemRef addedItem, WKArrayRef removedItems, const void *clientInfo);
 typedef bool (*WKPageShouldGoToBackForwardListItemCallback)(WKPageRef page, WKBackForwardListItemRef item, const void *clientInfo);
-typedef void (*WKPageDidFailToInitializePluginCallback)(WKPageRef page, WKStringRef mimeType, const void* clientInfo);
 typedef void (*WKPageDidNewFirstVisuallyNonEmptyLayoutCallback)(WKPageRef page, WKTypeRef userData, const void *clientInfo);
 typedef void (*WKPageWillGoToBackForwardListItemCallback)(WKPageRef page, WKBackForwardListItemRef item, WKTypeRef userData, const void *clientInfo);
+typedef void (*WKPagePluginDidFailCallback)(WKPageRef page, WKErrorCode errorCode, WKStringRef mimeType, WKStringRef pluginIdentifier, WKStringRef pluginVersion, const void* clientInfo);
+typedef void (*WKPageDidReceiveIntentForFrameCallback)(WKPageRef page, WKFrameRef frame, WKIntentDataRef intent, WKTypeRef userData, const void *clientInfo);
+typedef void (*WKPageRegisterIntentServiceForFrameCallback)(WKPageRef page, WKFrameRef frame, WKIntentServiceInfoRef serviceInfo, WKTypeRef userData, const void *clientInfo);
+
+// Deprecated
+typedef void (*WKPageDidFailToInitializePluginCallback_deprecatedForUseWithV0)(WKPageRef page, WKStringRef mimeType, const void* clientInfo);
 
 struct WKPageLoaderClient {
     int                                                                 version;
@@ -104,7 +110,7 @@ struct WKPageLoaderClient {
     WKPageCallback                                                      processDidCrash;
     WKPageDidChangeBackForwardListCallback                              didChangeBackForwardList;
     WKPageShouldGoToBackForwardListItemCallback                         shouldGoToBackForwardListItem;
-    WKPageDidFailToInitializePluginCallback                             didFailToInitializePlugin;
+    WKPageDidFailToInitializePluginCallback_deprecatedForUseWithV0      didFailToInitializePlugin_deprecatedForUseWithV0;
 
     // Version 1
     WKPageDidDetectXSSForFrameCallback                                  didDetectXSSForFrame;
@@ -115,10 +121,15 @@ struct WKPageLoaderClient {
     WKPageWillGoToBackForwardListItemCallback                           willGoToBackForwardListItem;
 
     WKPageCallback                                                      interactionOccurredWhileProcessUnresponsive;
+    WKPagePluginDidFailCallback                                         pluginDidFail;
+
+    // Version 2
+    WKPageDidReceiveIntentForFrameCallback                              didReceiveIntentForFrame;
+    WKPageRegisterIntentServiceForFrameCallback                         registerIntentServiceForFrame;
 };
 typedef struct WKPageLoaderClient WKPageLoaderClient;
 
-enum { kWKPageLoaderClientCurrentVersion = 1 };
+enum { kWKPageLoaderClientCurrentVersion = 2 };
 
 // Policy Client.
 typedef void (*WKPageDecidePolicyForNavigationActionCallback)(WKPageRef page, WKFrameRef frame, WKFrameNavigationType navigationType, WKEventModifiers modifiers, WKEventMouseButton mouseButton, WKURLRequestRef request, WKFramePolicyListenerRef listener, WKTypeRef userData, const void* clientInfo);
@@ -172,6 +183,13 @@ typedef struct WKPageResourceLoadClient WKPageResourceLoadClient;
 
 enum { kWKPageResourceLoadClientCurrentVersion = 0 };
 
+enum {
+    kWKPluginUnavailabilityReasonPluginMissing,
+    kWKPluginUnavailabilityReasonPluginCrashed,
+    kWKPluginUnavailabilityReasonInsecurePluginVersion
+};
+typedef uint32_t WKPluginUnavailabilityReason;
+
 // UI Client
 typedef WKPageRef (*WKPageCreateNewPageCallback)(WKPageRef page, WKURLRequestRef urlRequest, WKDictionaryRef features, WKEventModifiers modifiers, WKEventMouseButton mouseButton, const void *clientInfo);
 typedef void (*WKPageRunJavaScriptAlertCallback)(WKPageRef page, WKStringRef alertText, WKFrameRef frame, const void *clientInfo);
@@ -182,7 +200,6 @@ typedef void (*WKPageFocusCallback)(WKPageRef page, const void *clientInfo);
 typedef void (*WKPageUnfocusCallback)(WKPageRef page, const void *clientInfo);
 typedef void (*WKPageSetStatusTextCallback)(WKPageRef page, WKStringRef text, const void *clientInfo);
 typedef void (*WKPageMouseDidMoveOverElementCallback)(WKPageRef page, WKHitTestResultRef hitTestResult, WKEventModifiers modifiers, WKTypeRef userData, const void *clientInfo);
-typedef void (*WKPageMissingPluginButtonClickedCallback)(WKPageRef page, WKStringRef mimeType, WKStringRef url, WKStringRef pluginsPageURL, const void* clientInfo);
 typedef void (*WKPageDidNotHandleKeyEventCallback)(WKPageRef page, WKNativeEventPtr event, const void *clientInfo);
 typedef void (*WKPageDidNotHandleWheelEventCallback)(WKPageRef page, WKNativeEventPtr event, const void *clientInfo);
 typedef bool (*WKPageGetToolbarsAreVisibleCallback)(WKPageRef page, const void *clientInfo);
@@ -207,10 +224,12 @@ typedef void (*WKPagePrintFrameCallback)(WKPageRef page, WKFrameRef frame, const
 typedef void (*WKPageSaveDataToFileInDownloadsFolderCallback)(WKPageRef page, WKStringRef suggestedFilename, WKStringRef mimeType, WKURLRef originatingURL, WKDataRef data, const void* clientInfo);
 typedef bool (*WKPageShouldInterruptJavaScriptCallback)(WKPageRef page, const void *clientInfo);
 typedef void (*WKPageDecidePolicyForNotificationPermissionRequestCallback)(WKPageRef page, WKSecurityOriginRef origin, WKNotificationPermissionRequestRef permissionRequest, const void *clientInfo);
+typedef void (*WKPageUnavailablePluginButtonClickedCallback)(WKPageRef page, WKPluginUnavailabilityReason pluginUnavailabilityReason, WKStringRef mimeType, WKStringRef url, WKStringRef pluginsPageURL, const void* clientInfo);
 
 // Deprecated    
 typedef WKPageRef (*WKPageCreateNewPageCallback_deprecatedForUseWithV0)(WKPageRef page, WKDictionaryRef features, WKEventModifiers modifiers, WKEventMouseButton mouseButton, const void *clientInfo);
 typedef void      (*WKPageMouseDidMoveOverElementCallback_deprecatedForUseWithV0)(WKPageRef page, WKEventModifiers modifiers, WKTypeRef userData, const void *clientInfo);
+typedef void (*WKPageMissingPluginButtonClickedCallback_deprecatedForUseWithV0)(WKPageRef page, WKStringRef mimeType, WKStringRef url, WKStringRef pluginsPageURL, const void* clientInfo);
 
 struct WKPageUIClient {
     int                                                                 version;
@@ -228,7 +247,7 @@ struct WKPageUIClient {
     WKPageRunJavaScriptPromptCallback                                   runJavaScriptPrompt;
     WKPageSetStatusTextCallback                                         setStatusText;
     WKPageMouseDidMoveOverElementCallback_deprecatedForUseWithV0        mouseDidMoveOverElement_deprecatedForUseWithV0;
-    WKPageMissingPluginButtonClickedCallback                            missingPluginButtonClicked;
+    WKPageMissingPluginButtonClickedCallback_deprecatedForUseWithV0     missingPluginButtonClicked_deprecatedForUseWithV0;
     WKPageDidNotHandleKeyEventCallback                                  didNotHandleKeyEvent;
     WKPageDidNotHandleWheelEventCallback                                didNotHandleWheelEvent;
     WKPageGetToolbarsAreVisibleCallback                                 toolbarsAreVisible;
@@ -261,6 +280,7 @@ struct WKPageUIClient {
     WKPageCreateNewPageCallback                                         createNewPage;
     WKPageMouseDidMoveOverElementCallback                               mouseDidMoveOverElement;
     WKPageDecidePolicyForNotificationPermissionRequestCallback          decidePolicyForNotificationPermissionRequest;
+    WKPageUnavailablePluginButtonClickedCallback                        unavailablePluginButtonClicked;
 };
 typedef struct WKPageUIClient WKPageUIClient;
 
@@ -445,8 +465,13 @@ typedef void (^WKPageGetContentsAsStringBlock)(WKStringRef, WKErrorRef);
 WK_EXPORT void WKPageGetContentsAsString_b(WKPageRef page, WKPageGetContentsAsStringBlock block);
 #endif
 
+typedef void (*WKPageGetContentsAsMHTMLDataFunction)(WKDataRef, WKErrorRef, void*);
+WK_EXPORT void WKPageGetContentsAsMHTMLData(WKPageRef page, bool useBinaryEncoding, void* context, WKPageGetContentsAsMHTMLDataFunction function);
+
 typedef void (*WKPageForceRepaintFunction)(WKErrorRef, void*);
 WK_EXPORT void WKPageForceRepaint(WKPageRef page, void* context, WKPageForceRepaintFunction function);
+
+WK_EXPORT void WKPageDeliverIntentToFrame(WKPageRef page, WKFrameRef frame, WKIntentDataRef intent);
 
 /*
     Some of the more common command name strings include the following, although any WebCore EditorCommand string is supported:
@@ -463,6 +488,8 @@ WK_EXPORT void WKPageForceRepaint(WKPageRef page, void* context, WKPageForceRepa
 typedef void (*WKPageValidateCommandCallback)(WKStringRef command, bool isEnabled, int32_t state, WKErrorRef, void* context);
 WK_EXPORT void WKPageValidateCommand(WKPageRef page, WKStringRef command, void* context, WKPageValidateCommandCallback callback);
 WK_EXPORT void WKPageExecuteCommand(WKPageRef page, WKStringRef command);
+
+WK_EXPORT void WKPagePostMessageToInjectedBundle(WKPageRef page, WKStringRef messageName, WKTypeRef messageBody);
 
 #ifdef __cplusplus
 }

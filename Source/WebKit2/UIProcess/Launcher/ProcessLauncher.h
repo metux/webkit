@@ -31,6 +31,10 @@
 #include <wtf/RefPtr.h>
 #include <wtf/Threading.h>
 
+#ifndef NDEBUG
+#include <wtf/text/WTFString.h>
+#endif
+
 namespace WebKit {
 
 class ProcessLauncher : public ThreadSafeRefCounted<ProcessLauncher> {
@@ -53,6 +57,12 @@ public:
         static const cpu_type_t MatchCurrentArchitecture = 0;
         cpu_type_t architecture;
         bool executableHeap;
+#if HAVE(XPC)
+        bool useXPC;
+#endif
+#endif
+#ifndef NDEBUG
+        String processCmdPrefix;
 #endif
     };
 
@@ -68,10 +78,10 @@ public:
     void invalidate();
 
     static bool getProcessTypeFromString(const char*, ProcessType&);
+    static const char* processTypeAsString(ProcessType);
+
 private:
     ProcessLauncher(Client*, const LaunchOptions& launchOptions);
-
-    static const char* processTypeAsString(ProcessType);
 
     void launchProcess();
     void didFinishLaunchingProcess(PlatformProcessIdentifier, CoreIPC::Connection::Identifier);

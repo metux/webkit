@@ -26,14 +26,16 @@
 #include "config.h"
 #include "JSDictionary.h"
 
+#include "ArrayValue.h"
+#include "Dictionary.h"
 #include "JSDOMWindow.h"
 #include "JSEventTarget.h"
 #include "JSMessagePortCustom.h"
 #include "JSNode.h"
 #include "JSStorage.h"
 #include "JSTrackCustom.h"
-#include "SerializedScriptValue.h"
 #include "ScriptValue.h"
+#include "SerializedScriptValue.h"
 #include <wtf/HashMap.h>
 #include <wtf/MathExtras.h>
 #include <wtf/text/AtomicString.h>
@@ -44,10 +46,11 @@ namespace WebCore {
 
 JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propertyName, JSValue& finalResult) const
 {
+    ASSERT(isValid());
     Identifier identifier(m_exec, propertyName);
-    PropertySlot slot(m_initializerObject);
+    PropertySlot slot(m_initializerObject.get());
 
-    if (!m_initializerObject->getPropertySlot(m_exec, identifier, slot))
+    if (!m_initializerObject.get()->getPropertySlot(m_exec, identifier, slot))
         return NoPropertyFound;
 
     if (m_exec->hadException())
@@ -60,9 +63,9 @@ JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propert
     return PropertyFound;
 }
 
-void JSDictionary::convertValue(ExecState* exec, JSValue value, bool& result)
+void JSDictionary::convertValue(ExecState*, JSValue value, bool& result)
 {
-    result = value.toBoolean(exec);
+    result = value.toBoolean();
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, int& result)
@@ -91,9 +94,32 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, double& result)
     result = value.toNumber(exec);
 }
 
+void JSDictionary::convertValue(JSC::ExecState* exec, JSC::JSValue value, Dictionary& result)
+{
+    result = Dictionary(exec, value);
+}
+
 void JSDictionary::convertValue(ExecState* exec, JSValue value, String& result)
 {
     result = ustringToString(value.toString(exec)->value(exec));
+}
+
+void JSDictionary::convertValue(ExecState* exec, JSValue value, Vector<String>& result)
+{
+    if (value.isUndefinedOrNull())
+        return;
+
+    unsigned length = 0;
+    JSObject* object = toJSSequence(exec, value, length);
+    if (exec->hadException())
+        return;
+
+    for (unsigned i = 0 ; i < length; ++i) {
+        JSValue itemValue = object->get(exec, i);
+        if (exec->hadException())
+            return;
+        result.append(ustringToString(itemValue.toString(exec)->value(exec)));
+    }
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, ScriptValue& result)
@@ -139,7 +165,7 @@ void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<TrackBase>& re
 }
 #endif
 
-#if ENABLE(MUTATION_OBSERVERS)
+#if ENABLE(MUTATION_OBSERVERS) || ENABLE(WEB_INTENTS)
 void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicString>& result)
 {
     result.clear();
@@ -147,7 +173,7 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicSt
     if (value.isUndefinedOrNull())
         return;
 
-    unsigned length;
+    unsigned length = 0;
     JSObject* object = toJSSequence(exec, value, length);
     if (exec->hadException())
         return;
@@ -160,5 +186,24 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicSt
     }
 }
 #endif
+
+void JSDictionary::convertValue(ExecState* exec, JSValue value, ArrayValue& result)
+{
+    if (value.isUndefinedOrNull())
+        return;
+
+    result = ArrayValue(exec, value);
+}
+
+bool JSDictionary::getWithUndefinedOrNullCheck(const String& propertyName, String& result) const
+{
+    ASSERT(isValid());
+    JSValue value;
+    if (tryGetProperty(propertyName.utf8().data(), value) != PropertyFound || value.isUndefinedOrNull())
+        return false;
+
+    result = ustringToString(value.toString(m_exec)->value(m_exec));
+    return true;
+}
 
 } // namespace WebCore

@@ -74,6 +74,7 @@ enum MediaControlElementType {
     MediaTextTrackDisplayContainer,
     MediaTextTrackDisplay,
     MediaExitFullscreenButton,
+    MediaOverlayPlayButton,
 };
 
 HTMLMediaElement* toParentMediaElement(Node*);
@@ -114,6 +115,9 @@ public:
     void resetPosition();
     void makeOpaque();
     void makeTransparent();
+
+    virtual bool willRespondToMouseMoveEvents() OVERRIDE { return true; }
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
 
 private:
     MediaControlPanelElement(Document*);
@@ -159,8 +163,11 @@ class MediaControlVolumeSliderContainerElement : public MediaControlElement {
 public:
     static PassRefPtr<MediaControlVolumeSliderContainerElement> create(Document*);
 
+    virtual bool willRespondToMouseMoveEvents() OVERRIDE { return true; }
+
 private:
     MediaControlVolumeSliderContainerElement(Document*);
+    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual void defaultEventHandler(Event*);
     virtual MediaControlElementType displayType() const;
     virtual const AtomicString& shadowPseudoId() const;
@@ -216,10 +223,11 @@ class MediaControlMuteButtonElement : public MediaControlInputElement {
 public:
     void changedMute();
 
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
+
 protected:
     MediaControlMuteButtonElement(Document*, MediaControlElementType);
     virtual void defaultEventHandler(Event*);
-
 
 private:
     virtual void updateDisplayType();
@@ -230,6 +238,8 @@ private:
 class MediaControlPanelMuteButtonElement : public MediaControlMuteButtonElement {
 public:
     static PassRefPtr<MediaControlPanelMuteButtonElement> create(Document*, MediaControls*);
+
+    virtual bool willRespondToMouseMoveEvents() OVERRIDE { return true; }
 
 private:
     MediaControlPanelMuteButtonElement(Document*, MediaControls*);
@@ -260,6 +270,7 @@ public:
     static PassRefPtr<MediaControlPlayButtonElement> create(Document*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
     virtual void updateDisplayType();
 
 private:
@@ -270,9 +281,24 @@ private:
 
 // ----------------------------
 
+class MediaControlOverlayPlayButtonElement : public MediaControlInputElement {
+public:
+    static PassRefPtr<MediaControlOverlayPlayButtonElement> create(Document*);
+
+    virtual void defaultEventHandler(Event*);
+    virtual void updateDisplayType();
+
+private:
+    explicit MediaControlOverlayPlayButtonElement(Document*);
+
+    virtual const AtomicString& shadowPseudoId() const;
+};
+
+// ----------------------------
 class MediaControlSeekButtonElement : public MediaControlInputElement {
 public:
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
 
 protected:
     MediaControlSeekButtonElement(Document*, MediaControlElementType);
@@ -326,6 +352,7 @@ public:
     static PassRefPtr<MediaControlRewindButtonElement> create(Document*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
 
 private:
     MediaControlRewindButtonElement(Document*);
@@ -340,6 +367,7 @@ public:
     static PassRefPtr<MediaControlReturnToRealtimeButtonElement> create(Document*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
 
 private:
     MediaControlReturnToRealtimeButtonElement(Document*);
@@ -354,6 +382,7 @@ public:
     static PassRefPtr<MediaControlToggleClosedCaptionsButtonElement> create(Document*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
     virtual void updateDisplayType();
 
 private:
@@ -369,6 +398,7 @@ public:
     static PassRefPtr<MediaControlTimelineElement> create(Document*, MediaControls*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
     void setPosition(float);
     void setDuration(float);
 
@@ -387,13 +417,17 @@ public:
     static PassRefPtr<MediaControlVolumeSliderElement> create(Document*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseMoveEvents() OVERRIDE;
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
     void setVolume(float);
+    void setClearMutedOnUserInteraction(bool);
 
 protected:
     MediaControlVolumeSliderElement(Document*);
 
 private:
     virtual const AtomicString& shadowPseudoId() const;
+    bool m_clearMutedOnUserInteraction;
 };
 
 // ----------------------------
@@ -403,14 +437,13 @@ public:
     static PassRefPtr<MediaControlFullscreenButtonElement> create(Document*, MediaControls*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
     void setIsFullscreen(bool);
 
 private:
     MediaControlFullscreenButtonElement(Document*, MediaControls*);
 
     virtual const AtomicString& shadowPseudoId() const;
-
-    MediaControls* m_controls;
 };
 
 // ----------------------------
@@ -432,7 +465,8 @@ public:
     static PassRefPtr<MediaControlFullscreenVolumeMinButtonElement> create(Document*);
     
     virtual void defaultEventHandler(Event*);
-    
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
+
 private:
     MediaControlFullscreenVolumeMinButtonElement(Document*);
     
@@ -446,7 +480,8 @@ public:
     static PassRefPtr<MediaControlFullscreenVolumeMaxButtonElement> create(Document*);
     
     virtual void defaultEventHandler(Event*);
-    
+    virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
+
 private:
     MediaControlFullscreenVolumeMaxButtonElement(Document*);
     

@@ -29,6 +29,7 @@
 #define IDBFactoryBackendImpl_h
 
 #include "IDBFactoryBackendInterface.h"
+#include "SecurityOrigin.h"
 #include <wtf/HashMap.h>
 #include <wtf/text/StringHash.h>
 
@@ -51,22 +52,20 @@ public:
     virtual ~IDBFactoryBackendImpl();
 
     // Notifications from weak pointers.
-    void removeIDBDatabaseBackend(const String& uniqueIdentifier);
+    virtual void removeIDBDatabaseBackend(const String& uniqueIdentifier);
     void addIDBBackingStore(const String& fileIdentifier, IDBBackingStore*);
-    void removeIDBBackingStore(const String& fileIdentifier);
+    virtual void removeIDBBackingStore(const String& fileIdentifier);
 
-    virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, Frame*, const String& dataDir);
+    virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
+    virtual void open(const String& name, int64_t version, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
+    virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
 
-    virtual void open(const String& name, IDBCallbacks*, PassRefPtr<SecurityOrigin>, Frame*, const String& dataDir);
-    virtual void openFromWorker(const String& name, IDBCallbacks*, PassRefPtr<SecurityOrigin>, WorkerContext*, const String& dataDir);
-    virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, Frame*, const String& dataDir);
+protected:
+    IDBFactoryBackendImpl();
+    virtual PassRefPtr<IDBBackingStore> openBackingStore(PassRefPtr<SecurityOrigin>, const String& dataDir);
 
 private:
-    IDBFactoryBackendImpl();
-    PassRefPtr<IDBBackingStore> openBackingStore(PassRefPtr<SecurityOrigin>, const String& dataDir);
-    void openInternal(const String& name, IDBCallbacks*, PassRefPtr<SecurityOrigin>, const String& dataDir);
-
-    typedef HashMap<String, IDBDatabaseBackendImpl*> IDBDatabaseBackendMap;
+    typedef HashMap<String, RefPtr<IDBDatabaseBackendImpl> > IDBDatabaseBackendMap;
     IDBDatabaseBackendMap m_databaseBackendMap;
 
     typedef HashMap<String, IDBBackingStore*> IDBBackingStoreMap;

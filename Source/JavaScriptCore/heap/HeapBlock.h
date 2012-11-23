@@ -34,22 +34,42 @@ namespace JSC {
 
 enum AllocationEffort { AllocationCanFail, AllocationMustSucceed };
 
-class HeapBlock : public DoublyLinkedListNode<HeapBlock> {
+#if COMPILER(GCC)
+#define CLASS_IF_GCC class
+#else
+#define CLASS_IF_GCC
+#endif
+
+template<typename T>
+class HeapBlock : public DoublyLinkedListNode<T> {
+    friend CLASS_IF_GCC DoublyLinkedListNode<T>;
 public:
-    HeapBlock(PageAllocationAligned& allocation)
-        : DoublyLinkedListNode<HeapBlock>()
-        , m_prev(0)
-        , m_next(0)
-        , m_allocation(allocation)
+    static const size_t s_blockSize = 64 * KB;
+
+    static PageAllocationAligned destroy(HeapBlock* block)
     {
-        ASSERT(allocation);
+        static_cast<T*>(block)->~T();
+
+        PageAllocationAligned allocation;
+        std::swap(allocation, block->m_allocation);
+        return allocation;
     }
 
-    HeapBlock* m_prev;
-    HeapBlock* m_next;
+    HeapBlock(const PageAllocationAligned& allocation)
+        : DoublyLinkedListNode<T>()
+        , m_allocation(allocation)
+        , m_prev(0)
+        , m_next(0)
+    {
+        ASSERT(m_allocation);
+    }
+
+    const PageAllocationAligned allocation() const { return m_allocation; }
+
+private:
     PageAllocationAligned m_allocation;
-    
-    static const size_t s_blockSize = 64 * KB;
+    T* m_prev;
+    T* m_next;
 };
 
 } // namespace JSC

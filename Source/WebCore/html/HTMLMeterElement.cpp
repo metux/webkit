@@ -19,9 +19,9 @@
  */
 
 #include "config.h"
-#if ENABLE(METER_TAG)
 #include "HTMLMeterElement.h"
 
+#if ENABLE(METER_ELEMENT)
 #include "Attribute.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
@@ -31,7 +31,9 @@
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "MeterShadowElement.h"
+#include "Page.h"
 #include "RenderMeter.h"
+#include "RenderTheme.h"
 #include "ShadowRoot.h"
 #include <wtf/StdLibExtras.h>
 
@@ -41,6 +43,7 @@ using namespace HTMLNames;
 
 HTMLMeterElement::HTMLMeterElement(const QualifiedName& tagName, Document* document)
     : LabelableElement(tagName, document)
+    , m_hasAuthorShadowRoot(false)
 {
     ASSERT(hasTagName(meterTag));
 }
@@ -56,8 +59,11 @@ PassRefPtr<HTMLMeterElement> HTMLMeterElement::create(const QualifiedName& tagNa
     return meter;
 }
 
-RenderObject* HTMLMeterElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* HTMLMeterElement::createRenderer(RenderArena* arena, RenderStyle* style)
 {
+    if (hasAuthorShadowRoot() || !document()->page()->theme()->supportsMeter(style->appearance()))
+        return RenderObject::createObject(this, style);
+
     return new (arena) RenderMeter(this);
 }
 
@@ -71,19 +77,23 @@ bool HTMLMeterElement::supportsFocus() const
     return Node::supportsFocus() && !disabled();
 }
 
-void HTMLMeterElement::parseAttribute(Attribute* attribute)
+void HTMLMeterElement::parseAttribute(const Attribute& attribute)
 {
-    if (attribute->name() == valueAttr || attribute->name() == minAttr || attribute->name() == maxAttr || attribute->name() == lowAttr || attribute->name() == highAttr || attribute->name() == optimumAttr)
+    if (attribute.name() == valueAttr || attribute.name() == minAttr || attribute.name() == maxAttr || attribute.name() == lowAttr || attribute.name() == highAttr || attribute.name() == optimumAttr)
         didElementStateChange();
     else
         LabelableElement::parseAttribute(attribute);
 }
 
+void HTMLMeterElement::attach()
+{
+    m_value->setWidthPercentage(valueRatio()*100);
+    LabelableElement::attach();
+}
+
 double HTMLMeterElement::min() const
 {
-    double min = 0;
-    parseToDoubleForNumberType(getAttribute(minAttr), &min);
-    return min;
+    return parseToDoubleForNumberType(getAttribute(minAttr), 0);
 }
 
 void HTMLMeterElement::setMin(double min, ExceptionCode& ec)
@@ -97,9 +107,7 @@ void HTMLMeterElement::setMin(double min, ExceptionCode& ec)
 
 double HTMLMeterElement::max() const
 {
-    double max = std::max(1.0, min());
-    parseToDoubleForNumberType(getAttribute(maxAttr), &max);
-    return std::max(max, min());
+    return std::max(parseToDoubleForNumberType(getAttribute(maxAttr), std::max(1.0, min())), min());
 }
 
 void HTMLMeterElement::setMax(double max, ExceptionCode& ec)
@@ -113,8 +121,7 @@ void HTMLMeterElement::setMax(double max, ExceptionCode& ec)
 
 double HTMLMeterElement::value() const
 {
-    double value = 0;
-    parseToDoubleForNumberType(getAttribute(valueAttr), &value);
+    double value = parseToDoubleForNumberType(getAttribute(valueAttr), 0);
     return std::min(std::max(value, min()), max());
 }
 
@@ -129,8 +136,7 @@ void HTMLMeterElement::setValue(double value, ExceptionCode& ec)
 
 double HTMLMeterElement::low() const
 {
-    double low = min();
-    parseToDoubleForNumberType(getAttribute(lowAttr), &low);
+    double low = parseToDoubleForNumberType(getAttribute(lowAttr), min());
     return std::min(std::max(low, min()), max());
 }
 
@@ -145,8 +151,7 @@ void HTMLMeterElement::setLow(double low, ExceptionCode& ec)
 
 double HTMLMeterElement::high() const
 {
-    double high = max();
-    parseToDoubleForNumberType(getAttribute(highAttr), &high);
+    double high = parseToDoubleForNumberType(getAttribute(highAttr), max());
     return std::min(std::max(high, low()), max());
 }
 
@@ -161,8 +166,7 @@ void HTMLMeterElement::setHigh(double high, ExceptionCode& ec)
 
 double HTMLMeterElement::optimum() const
 {
-    double optimum = (max() + min()) / 2;
-    parseToDoubleForNumberType(getAttribute(optimumAttr), &optimum);
+    double optimum = parseToDoubleForNumberType(getAttribute(optimumAttr), (max() + min()) / 2);
     return std::min(std::max(optimum, min()), max());
 }
 
@@ -222,22 +226,40 @@ double HTMLMeterElement::valueRatio() const
 void HTMLMeterElement::didElementStateChange()
 {
     m_value->setWidthPercentage(valueRatio()*100);
-    if (RenderObject* render = renderer())
+    if (RenderMeter* render = renderMeter())
         render->updateFromElement();
+}
+
+void HTMLMeterElement::willAddAuthorShadowRoot()
+{
+    m_hasAuthorShadowRoot = true;
+}
+
+RenderMeter* HTMLMeterElement::renderMeter() const
+{
+    if (renderer() && renderer()->isMeter())
+        return static_cast<RenderMeter*>(renderer());
+
+    RenderObject* renderObject = userAgentShadowRoot()->firstChild()->renderer();
+    ASSERT(!renderObject || renderObject->isMeter());
+    return static_cast<RenderMeter*>(renderObject);
 }
 
 void HTMLMeterElement::createShadowSubtree()
 {
-    ASSERT(!hasShadowRoot());
+    ASSERT(!userAgentShadowRoot());
+           
+    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot, ASSERT_NO_EXCEPTION);
+
+    RefPtr<MeterInnerElement> inner = MeterInnerElement::create(document());
+    root->appendChild(inner);
 
     RefPtr<MeterBarElement> bar = MeterBarElement::create(document());
     m_value = MeterValueElement::create(document());
     m_value->setWidthPercentage(0);
-    ExceptionCode ec = 0;
-    bar->appendChild(m_value, ec);
+    bar->appendChild(m_value, ASSERT_NO_EXCEPTION);
 
-    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
-    root->appendChild(bar, ec);
+    inner->appendChild(bar, ASSERT_NO_EXCEPTION);
 }
 
 } // namespace

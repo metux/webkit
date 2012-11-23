@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Igalia S.L
+ * Copyright (C) 2010, 2011, 2012 Igalia S.L
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,12 +23,14 @@
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
 #include "BitmapImage.h"
-#include <gst/gst.h>
-#include <gst/video/video.h>
+#include "FloatRect.h"
+#include "GStreamerVersioning.h"
 #include <wtf/PassRefPtr.h>
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
-#if USE(CAIRO)
-#include <cairo.h>
+#if PLATFORM(QT)
+#include <QImage>
 #endif
 
 namespace WebCore {
@@ -36,7 +38,10 @@ class IntSize;
 
 class ImageGStreamer : public RefCounted<ImageGStreamer> {
     public:
-        static PassRefPtr<ImageGStreamer> createImage(GstBuffer*);
+        static PassRefPtr<ImageGStreamer> createImage(GstBuffer* buffer, GstCaps* caps)
+        {
+            return adoptRef(new ImageGStreamer(buffer, caps));
+        }
         ~ImageGStreamer();
 
         PassRefPtr<BitmapImage> image()
@@ -45,21 +50,20 @@ class ImageGStreamer : public RefCounted<ImageGStreamer> {
             return m_image.get();
         }
 
+        void setCropRect(FloatRect rect) { m_cropRect = rect; }
+        FloatRect rect()
+        {
+            if (!m_cropRect.isEmpty())
+                return FloatRect(m_cropRect);
+
+            // Default rectangle used by GraphicsContext::drawImage().
+            return FloatRect(0, 0, -1, -1);
+        }
+
     private:
+        ImageGStreamer(GstBuffer*, GstCaps*);
         RefPtr<BitmapImage> m_image;
-
-#if USE(CAIRO)
-        ImageGStreamer(GstBuffer*&, IntSize, cairo_format_t&);
-#endif
-
-#if PLATFORM(QT)
-        ImageGStreamer(GstBuffer*&, IntSize, QImage::Format);
-#endif
-
-#if PLATFORM(MAC)
-        ImageGStreamer(GstBuffer*&, IntSize);
-#endif
-
+        FloatRect m_cropRect;
     };
 }
 

@@ -67,8 +67,8 @@ public:
 private:
     GeolocationController(Page*, GeolocationClient*);
 
-    Page* m_page;
     GeolocationClient* m_client;
+    Page* m_page;
 
     RefPtr<GeolocationPosition> m_lastPosition;
     typedef HashSet<RefPtr<Geolocation> > ObserversSet;

@@ -25,6 +25,7 @@
 #define DOMImplementation_h
 
 #include "Document.h"
+#include "MediaPlayer.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -69,7 +70,7 @@ public:
     static bool isTextMIMEType(const String& MIMEType);
 
 private:
-    DOMImplementation(Document*);
+    explicit DOMImplementation(Document*);
 
     Document* m_document;
 };

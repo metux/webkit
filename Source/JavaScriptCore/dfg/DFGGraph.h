@@ -26,12 +26,15 @@
 #ifndef DFGGraph_h
 #define DFGGraph_h
 
+#include <wtf/Platform.h>
+
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlock.h"
 #include "DFGArgumentPosition.h"
 #include "DFGAssemblyHelpers.h"
 #include "DFGBasicBlock.h"
+#include "DFGDominators.h"
 #include "DFGNode.h"
 #include "MethodOfGettingAValueProfile.h"
 #include "RegisterFile.h"
@@ -73,13 +76,7 @@ struct ResolveGlobalData {
 // Nodes that are 'dead' remain in the vector with refCount 0.
 class Graph : public Vector<Node, 64> {
 public:
-    Graph(JSGlobalData& globalData, CodeBlock* codeBlock)
-        : m_globalData(globalData)
-        , m_codeBlock(codeBlock)
-        , m_profiledBlock(codeBlock->alternative())
-    {
-        ASSERT(m_profiledBlock);
-    }
+    Graph(JSGlobalData&, CodeBlock*, unsigned osrEntryBytecodeIndex, const Operands<JSValue>& mustHandleValues);
     
     using Vector<Node, 64>::operator[];
     using Vector<Node, 64>::at;
@@ -105,12 +102,46 @@ public:
     
     void deref(NodeIndex nodeIndex)
     {
+        if (!at(nodeIndex).refCount())
+            dump();
         if (at(nodeIndex).deref())
             derefChildren(nodeIndex);
     }
     void deref(Edge nodeUse)
     {
         deref(nodeUse.index());
+    }
+    
+    void changeIndex(Edge& edge, NodeIndex newIndex, bool changeRef = true)
+    {
+        if (changeRef) {
+            ref(newIndex);
+            deref(edge.index());
+        }
+        edge.setIndex(newIndex);
+    }
+    
+    void changeEdge(Edge& edge, Edge newEdge, bool changeRef = true)
+    {
+        if (changeRef) {
+            ref(newEdge);
+            deref(edge);
+        }
+        edge = newEdge;
+    }
+    
+    void compareAndSwap(Edge& edge, NodeIndex oldIndex, NodeIndex newIndex, bool changeRef)
+    {
+        if (edge.index() != oldIndex)
+            return;
+        changeIndex(edge, newIndex, changeRef);
+    }
+    
+    void compareAndSwap(Edge& edge, Edge oldEdge, Edge newEdge, bool changeRef)
+    {
+        if (edge != oldEdge)
+            return;
+        changeEdge(edge, newEdge, changeRef);
     }
     
     void clearAndDerefChild1(Node& node)
@@ -136,20 +167,40 @@ public:
         deref(node.child3());
         node.children.child3() = Edge();
     }
+    
+    // Call this if you've modified the reference counts of nodes that deal with
+    // local variables. This is necessary because local variable references can form
+    // cycles, and hence reference counting is not enough. This will reset the
+    // reference counts according to reachability.
+    void collectGarbage();
+    
+    void convertToConstant(NodeIndex nodeIndex, unsigned constantNumber)
+    {
+        at(nodeIndex).convertToConstant(constantNumber);
+    }
+    
+    void convertToConstant(NodeIndex nodeIndex, JSValue value)
+    {
+        convertToConstant(nodeIndex, m_codeBlock->addOrFindConstant(value));
+    }
 
     // CodeBlock is optional, but may allow additional information to be dumped (e.g. Identifier names).
     void dump();
-    void dump(NodeIndex);
+    enum PhiNodeDumpMode { DumpLivePhisOnly, DumpAllPhis };
+    void dumpBlockHeader(const char* prefix, BlockIndex, PhiNodeDumpMode);
+    void dump(const char* prefix, NodeIndex);
+    static int amountOfNodeWhiteSpace(Node&);
+    static void printNodeWhiteSpace(Node&);
 
     // Dump the code origin of the given node as a diff from the code origin of the
     // preceding node.
-    void dumpCodeOrigin(NodeIndex, NodeIndex);
+    void dumpCodeOrigin(const char* prefix, NodeIndex, NodeIndex);
 
     BlockIndex blockIndexForBytecodeOffset(Vector<BlockIndex>& blocks, unsigned bytecodeBegin);
 
-    PredictedType getJSConstantPrediction(Node& node)
+    SpeculatedType getJSConstantSpeculation(Node& node)
     {
-        return predictionFromValue(node.valueOfJSConstant(m_codeBlock));
+        return speculationFromValue(node.valueOfJSConstant(m_codeBlock));
     }
     
     bool addShouldSpeculateInteger(Node& add)
@@ -165,6 +216,21 @@ public:
             return addImmediateShouldSpeculateInteger(add, left, right);
         
         return Node::shouldSpeculateInteger(left, right) && add.canSpeculateInteger();
+    }
+    
+    bool mulShouldSpeculateInteger(Node& mul)
+    {
+        ASSERT(mul.op() == ArithMul);
+        
+        Node& left = at(mul.child1());
+        Node& right = at(mul.child2());
+        
+        if (left.hasConstant())
+            return mulImmediateShouldSpeculateInteger(mul, right, left);
+        if (right.hasConstant())
+            return mulImmediateShouldSpeculateInteger(mul, left, right);
+        
+        return Node::shouldSpeculateInteger(left, right) && mul.canSpeculateInteger() && !nodeMayOverflow(mul.arithNodeFlags());
     }
     
     bool negateShouldSpeculateInteger(Node& negate)
@@ -203,11 +269,30 @@ public:
     {
         return at(nodeIndex).isBooleanConstant(m_codeBlock);
     }
+    bool isCellConstant(NodeIndex nodeIndex)
+    {
+        if (!isJSConstant(nodeIndex))
+            return false;
+        JSValue value = valueOfJSConstant(nodeIndex);
+        return value.isCell() && !!value;
+    }
     bool isFunctionConstant(NodeIndex nodeIndex)
     {
         if (!isJSConstant(nodeIndex))
             return false;
         if (!getJSFunction(valueOfJSConstant(nodeIndex)))
+            return false;
+        return true;
+    }
+    bool isInternalFunctionConstant(NodeIndex nodeIndex)
+    {
+        if (!isJSConstant(nodeIndex))
+            return false;
+        JSValue value = valueOfJSConstant(nodeIndex);
+        if (!value.isCell() || !value)
+            return false;
+        JSCell* cell = value.asCell();
+        if (!cell->inherits(&InternalFunction::s_info))
             return false;
         return true;
     }
@@ -234,6 +319,10 @@ public:
         ASSERT(function);
         return jsCast<JSFunction*>(function);
     }
+    InternalFunction* valueOfInternalFunctionConstant(NodeIndex nodeIndex)
+    {
+        return jsCast<InternalFunction*>(valueOfJSConstant(nodeIndex).asCell());
+    }
 
     static const char *opName(NodeType);
     
@@ -255,9 +344,57 @@ public:
         return &m_structureTransitionData.last();
     }
     
+    JSGlobalObject* globalObjectFor(CodeOrigin codeOrigin)
+    {
+        return m_codeBlock->globalObjectFor(codeOrigin);
+    }
+    
+    ExecutableBase* executableFor(InlineCallFrame* inlineCallFrame)
+    {
+        if (!inlineCallFrame)
+            return m_codeBlock->ownerExecutable();
+        
+        return inlineCallFrame->executable.get();
+    }
+    
+    ExecutableBase* executableFor(const CodeOrigin& codeOrigin)
+    {
+        return executableFor(codeOrigin.inlineCallFrame);
+    }
+    
     CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
     {
         return baselineCodeBlockForOriginAndBaselineCodeBlock(codeOrigin, m_profiledBlock);
+    }
+    
+    int argumentsRegisterFor(const CodeOrigin& codeOrigin)
+    {
+        if (!codeOrigin.inlineCallFrame)
+            return m_codeBlock->argumentsRegister();
+        
+        return baselineCodeBlockForInlineCallFrame(
+            codeOrigin.inlineCallFrame)->argumentsRegister() +
+            codeOrigin.inlineCallFrame->stackOffset;
+    }
+    
+    int uncheckedArgumentsRegisterFor(const CodeOrigin& codeOrigin)
+    {
+        if (!codeOrigin.inlineCallFrame)
+            return m_codeBlock->uncheckedArgumentsRegister();
+        
+        CodeBlock* codeBlock = baselineCodeBlockForInlineCallFrame(
+            codeOrigin.inlineCallFrame);
+        if (!codeBlock->usesArguments())
+            return InvalidVirtualRegister;
+        
+        return codeBlock->argumentsRegister() +
+            codeOrigin.inlineCallFrame->stackOffset;
+    }
+    
+    int uncheckedActivationRegisterFor(const CodeOrigin& codeOrigin)
+    {
+        ASSERT_UNUSED(codeOrigin, !codeOrigin.inlineCallFrame);
+        return m_codeBlock->uncheckedActivationRegister();
     }
     
     ValueProfile* valueProfileFor(NodeIndex nodeIndex)
@@ -303,37 +440,223 @@ public:
     
     bool needsActivation() const
     {
-#if DFG_ENABLE(ALL_VARIABLES_CAPTURED)
-        return true;
-#else
         return m_codeBlock->needsFullScopeChain() && m_codeBlock->codeType() != GlobalCode;
-#endif
     }
     
-    // Pass an argument index. Currently it's ignored, but that's somewhat
-    // of a bug.
-    bool argumentIsCaptured(int) const
+    bool usesArguments() const
     {
-        return needsActivation();
-    }
-    bool localIsCaptured(int operand) const
-    {
-#if DFG_ENABLE(ALL_VARIABLES_CAPTURED)
-        return operand < m_codeBlock->m_numVars;
-#else
-        return operand < m_codeBlock->m_numCapturedVars;
-#endif
+        return m_codeBlock->usesArguments();
     }
     
-    bool isCaptured(int operand) const
+    bool isCreatedThisArgument(int operand)
     {
-        if (operandIsArgument(operand))
-            return argumentIsCaptured(operandToArgument(operand));
-        return localIsCaptured(operand);
+        if (!operandIsArgument(operand))
+            return false;
+        if (operandToArgument(operand))
+            return false;
+        return m_codeBlock->specializationKind() == CodeForConstruct;
     }
-    bool isCaptured(VirtualRegister virtualRegister) const
+    
+    unsigned numSuccessors(BasicBlock* block)
     {
-        return isCaptured(static_cast<int>(virtualRegister));
+        return at(block->last()).numSuccessors();
+    }
+    BlockIndex successor(BasicBlock* block, unsigned index)
+    {
+        return at(block->last()).successor(index);
+    }
+    BlockIndex successorForCondition(BasicBlock* block, bool condition)
+    {
+        return at(block->last()).successorForCondition(condition);
+    }
+    
+    bool isPredictedNumerical(Node& node)
+    {
+        SpeculatedType left = at(node.child1()).prediction();
+        SpeculatedType right = at(node.child2()).prediction();
+        return isNumberSpeculation(left) && isNumberSpeculation(right);
+    }
+    
+    bool byValIsPure(Node& node)
+    {
+        switch (node.arrayMode()) {
+        case Array::Generic:
+        case Array::JSArrayOutOfBounds:
+            return false;
+        case Array::String:
+            return node.op() == GetByVal;
+#if USE(JSVALUE32_64)
+        case Array::Arguments:
+            if (node.op() == GetByVal)
+                return true;
+            return false;
+#endif // USE(JSVALUE32_64)
+        default:
+            return true;
+        }
+    }
+    
+    bool clobbersWorld(Node& node)
+    {
+        if (node.flags() & NodeClobbersWorld)
+            return true;
+        if (!(node.flags() & NodeMightClobber))
+            return false;
+        switch (node.op()) {
+        case ValueAdd:
+        case CompareLess:
+        case CompareLessEq:
+        case CompareGreater:
+        case CompareGreaterEq:
+        case CompareEq:
+            return !isPredictedNumerical(node);
+        case GetByVal:
+        case PutByVal:
+        case PutByValAlias:
+            return !byValIsPure(node);
+        default:
+            ASSERT_NOT_REACHED();
+            return true; // If by some oddity we hit this case in release build it's safer to have CSE assume the worst.
+        }
+    }
+    
+    bool clobbersWorld(NodeIndex nodeIndex)
+    {
+        return clobbersWorld(at(nodeIndex));
+    }
+    
+    void determineReachability();
+    void resetReachability();
+    
+    void resetExitStates();
+    
+    unsigned varArgNumChildren(Node& node)
+    {
+        ASSERT(node.flags() & NodeHasVarArgs);
+        return node.numChildren();
+    }
+    
+    unsigned numChildren(Node& node)
+    {
+        if (node.flags() & NodeHasVarArgs)
+            return varArgNumChildren(node);
+        return AdjacencyList::Size;
+    }
+    
+    Edge& varArgChild(Node& node, unsigned index)
+    {
+        ASSERT(node.flags() & NodeHasVarArgs);
+        return m_varArgChildren[node.firstChild() + index];
+    }
+    
+    Edge& child(Node& node, unsigned index)
+    {
+        if (node.flags() & NodeHasVarArgs)
+            return varArgChild(node, index);
+        return node.children.child(index);
+    }
+    
+    void vote(Edge edge, unsigned ballot)
+    {
+        switch (at(edge).op()) {
+        case ValueToInt32:
+        case UInt32ToNumber:
+            edge = at(edge).child1();
+            break;
+        default:
+            break;
+        }
+        
+        if (at(edge).op() == GetLocal)
+            at(edge).variableAccessData()->vote(ballot);
+    }
+    
+    void vote(Node& node, unsigned ballot)
+    {
+        if (node.flags() & NodeHasVarArgs) {
+            for (unsigned childIdx = node.firstChild();
+                 childIdx < node.firstChild() + node.numChildren();
+                 childIdx++) {
+                if (!!m_varArgChildren[childIdx])
+                    vote(m_varArgChildren[childIdx], ballot);
+            }
+            return;
+        }
+        
+        if (!node.child1())
+            return;
+        vote(node.child1(), ballot);
+        if (!node.child2())
+            return;
+        vote(node.child2(), ballot);
+        if (!node.child3())
+            return;
+        vote(node.child3(), ballot);
+    }
+    
+    template<typename T> // T = NodeIndex or Edge
+    void substitute(BasicBlock& block, unsigned startIndexInBlock, T oldThing, T newThing)
+    {
+        for (unsigned indexInBlock = startIndexInBlock; indexInBlock < block.size(); ++indexInBlock) {
+            NodeIndex nodeIndex = block[indexInBlock];
+            Node& node = at(nodeIndex);
+            if (node.flags() & NodeHasVarArgs) {
+                for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); ++childIdx) {
+                    if (!!m_varArgChildren[childIdx])
+                        compareAndSwap(m_varArgChildren[childIdx], oldThing, newThing, node.shouldGenerate());
+                }
+                continue;
+            }
+            if (!node.child1())
+                continue;
+            compareAndSwap(node.children.child1(), oldThing, newThing, node.shouldGenerate());
+            if (!node.child2())
+                continue;
+            compareAndSwap(node.children.child2(), oldThing, newThing, node.shouldGenerate());
+            if (!node.child3())
+                continue;
+            compareAndSwap(node.children.child3(), oldThing, newThing, node.shouldGenerate());
+        }
+    }
+    
+    // Use this if you introduce a new GetLocal and you know that you introduced it *before*
+    // any GetLocals in the basic block.
+    // FIXME: it may be appropriate, in the future, to generalize this to handle GetLocals
+    // introduced anywhere in the basic block.
+    void substituteGetLocal(BasicBlock& block, unsigned startIndexInBlock, VariableAccessData* variableAccessData, NodeIndex newGetLocal)
+    {
+        if (variableAccessData->isCaptured()) {
+            // Let CSE worry about this one.
+            return;
+        }
+        for (unsigned indexInBlock = startIndexInBlock; indexInBlock < block.size(); ++indexInBlock) {
+            NodeIndex nodeIndex = block[indexInBlock];
+            Node& node = at(nodeIndex);
+            bool shouldContinue = true;
+            switch (node.op()) {
+            case SetLocal: {
+                if (node.local() == variableAccessData->local())
+                    shouldContinue = false;
+                break;
+            }
+                
+            case GetLocal: {
+                if (node.variableAccessData() != variableAccessData)
+                    continue;
+                substitute(block, indexInBlock, nodeIndex, newGetLocal);
+                NodeIndex oldTailIndex = block.variablesAtTail.operand(variableAccessData->local());
+                if (oldTailIndex == nodeIndex)
+                    block.variablesAtTail.operand(variableAccessData->local()) = newGetLocal;
+                shouldContinue = false;
+                break;
+            }
+                
+            default:
+                break;
+            }
+            if (!shouldContinue)
+                break;
+        }
     }
     
     JSGlobalData& m_globalData;
@@ -349,10 +672,19 @@ public:
     SegmentedVector<ArgumentPosition, 8> m_argumentPositions;
     SegmentedVector<StructureSet, 16> m_structureSet;
     SegmentedVector<StructureTransitionData, 8> m_structureTransitionData;
+    bool m_hasArguments;
+    HashSet<ExecutableBase*> m_executablesWhoseArgumentsEscaped;
     BitVector m_preservedVars;
+    Dominators m_dominators;
     unsigned m_localVars;
     unsigned m_parameterSlots;
+    unsigned m_osrEntryBytecodeIndex;
+    Operands<JSValue> m_mustHandleValues;
+    
+    OptimizationFixpointState m_fixpointState;
 private:
+    
+    void handleSuccessor(Vector<BlockIndex, 16>& worklist, BlockIndex blockIndex, BlockIndex successorIndex);
     
     bool addImmediateShouldSpeculateInteger(Node& add, Node& variable, Node& immediate)
     {
@@ -374,6 +706,30 @@ private:
             return false;
         
         return nodeCanTruncateInteger(add.arithNodeFlags());
+    }
+    
+    bool mulImmediateShouldSpeculateInteger(Node& mul, Node& variable, Node& immediate)
+    {
+        ASSERT(immediate.hasConstant());
+        
+        JSValue immediateValue = immediate.valueOfJSConstant(m_codeBlock);
+        if (!immediateValue.isInt32())
+            return false;
+        
+        if (!variable.shouldSpeculateInteger())
+            return false;
+        
+        int32_t intImmediate = immediateValue.asInt32();
+        // Doubles have a 53 bit mantissa so we expect a multiplication of 2^31 (the highest
+        // magnitude possible int32 value) and any value less than 2^22 to not result in any
+        // rounding in a double multiplication - hence it will be equivalent to an integer
+        // multiplication, if we are doing int32 truncation afterwards (which is what
+        // canSpeculateInteger() implies).
+        const int32_t twoToThe22 = 1 << 22;
+        if (intImmediate <= -twoToThe22 || intImmediate >= twoToThe22)
+            return mul.canSpeculateInteger() && !nodeMayOverflow(mul.arithNodeFlags());
+
+        return mul.canSpeculateInteger();
     }
     
     // When a node's refCount goes from 0 to 1, it must (logically) recursively ref all of its children, and vice versa.

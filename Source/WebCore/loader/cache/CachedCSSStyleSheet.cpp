@@ -32,7 +32,9 @@
 #include "CachedStyleSheetClient.h"
 #include "HTTPParsers.h"
 #include "MemoryCache.h"
+#include "MemoryInstrumentation.h"
 #include "SharedBuffer.h"
+#include "StyleSheetContents.h"
 #include "TextResourceDecoder.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/Vector.h>
@@ -50,19 +52,20 @@ CachedCSSStyleSheet::CachedCSSStyleSheet(const ResourceRequest& resourceRequest,
 
 CachedCSSStyleSheet::~CachedCSSStyleSheet()
 {
+    if (m_parsedStyleSheetCache)
+        m_parsedStyleSheetCache->removedFromMemoryCache();
 }
 
 void CachedCSSStyleSheet::didAddClient(CachedResourceClient* c)
 {
     ASSERT(c->resourceClientType() == CachedStyleSheetClient::expectedType());
+    // CachedResource::didAddClient() must be before setCSSStyleSheet(),
+    // because setCSSStyleSheet() may cause scripts to be executed, which could destroy 'c' if it is an instance of HTMLLinkElement.
+    // see the comment of HTMLLinkElement::setCSSStyleSheet.
+    CachedResource::didAddClient(c);
+
     if (!isLoading())
         static_cast<CachedStyleSheetClient*>(c)->setCSSStyleSheet(m_resourceRequest.url(), m_response.url(), m_decoder->encoding().name(), this);
-}
-
-void CachedCSSStyleSheet::allClientsRemoved()
-{
-    if (!MemoryCache::shouldMakeResourcePurgeableOnEviction() && isSafeToMakePurgeable())
-        makePurgeable(true);
 }
 
 void CachedCSSStyleSheet::setEncoding(const String& chs)
@@ -153,35 +156,59 @@ bool CachedCSSStyleSheet::canUseSheet(bool enforceMIMEType, bool* hasValidMIMETy
 
 void CachedCSSStyleSheet::destroyDecodedData()
 {
+    if (!m_parsedStyleSheetCache)
+        return;
+
+    m_parsedStyleSheetCache->removedFromMemoryCache();
     m_parsedStyleSheetCache.clear();
+
     setDecodedSize(0);
+
+    if (!MemoryCache::shouldMakeResourcePurgeableOnEviction() && isSafeToMakePurgeable())
+        makePurgeable(true);
 }
 
-PassRefPtr<StyleSheetInternal> CachedCSSStyleSheet::restoreParsedStyleSheet(const CSSParserContext& context)
+PassRefPtr<StyleSheetContents> CachedCSSStyleSheet::restoreParsedStyleSheet(const CSSParserContext& context)
 {
     if (!m_parsedStyleSheetCache)
         return 0;
-    // Cached parsed stylesheet has mutated, kick it out.
-    if (!m_parsedStyleSheetCache->isCacheable()) {
+    if (m_parsedStyleSheetCache->hasFailedOrCanceledSubresources()) {
+        m_parsedStyleSheetCache->removedFromMemoryCache();
         m_parsedStyleSheetCache.clear();
-        setDecodedSize(0);
         return 0;
     }
+
+    ASSERT(m_parsedStyleSheetCache->isCacheable());
+    ASSERT(m_parsedStyleSheetCache->isInMemoryCache());
+
     // Contexts must be identical so we know we would get the same exact result if we parsed again.
     if (m_parsedStyleSheetCache->parserContext() != context)
         return 0;
 
     didAccessDecodedData(currentTime());
-    // FIXME: Implement copy-on-write to avoid copying when not necessary.
-    return m_parsedStyleSheetCache->copy();
+
+    return m_parsedStyleSheetCache;
 }
 
-void CachedCSSStyleSheet::saveParsedStyleSheet(PassRefPtr<StyleSheetInternal> sheet)
+void CachedCSSStyleSheet::saveParsedStyleSheet(PassRefPtr<StyleSheetContents> sheet)
 {
     ASSERT(sheet && sheet->isCacheable());
+
+    if (m_parsedStyleSheetCache)
+        m_parsedStyleSheetCache->removedFromMemoryCache();
     m_parsedStyleSheetCache = sheet;
+    m_parsedStyleSheetCache->addedToMemoryCache();
 
     setDecodedSize(m_parsedStyleSheetCache->estimatedSizeInBytes());
+}
+
+void CachedCSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CachedResourceCSS);
+    CachedResource::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_decoder);
+    info.addInstrumentedMember(m_parsedStyleSheetCache);
+    info.addInstrumentedMember(m_decodedSheetText);
 }
 
 }

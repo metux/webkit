@@ -38,11 +38,17 @@ public:
     ~InjectedBundlePage();
 
     WKBundlePageRef page() const { return m_page; }
+
+#if ENABLE(WEB_INTENTS)
+    WKBundleIntentRequestRef currentIntentRequest() const { return m_currentIntentRequest.get(); }
+#endif
+
     void dump();
 
     void stopLoading();
 
-    void reset();
+    void prepare();
+    void resetAfterTest();
 
     void dumpBackForwardList();
 
@@ -53,6 +59,7 @@ private:
     static void didFailProvisionalLoadWithErrorForFrame(WKBundlePageRef, WKBundleFrameRef, WKErrorRef, WKTypeRef*, const void*);
     static void didCommitLoadForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
     static void didFinishLoadForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void*);
+    static void didFinishProgress(WKBundlePageRef, const void*);
     static void didFinishDocumentLoadForFrame(WKBundlePageRef, WKBundleFrameRef,  WKTypeRef*, const void*);
     static void didFailLoadWithErrorForFrame(WKBundlePageRef, WKBundleFrameRef, WKErrorRef, WKTypeRef*, const void*);
     static void didReceiveTitleForFrame(WKBundlePageRef, WKStringRef title, WKBundleFrameRef, WKTypeRef*, const void*);
@@ -70,12 +77,15 @@ private:
     static void didReceiveContentLengthForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t identifier, uint64_t length, const void*);
     static void didFinishLoadForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t identifier, const void*);
     static void didFailLoadForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t identifier, WKErrorRef, const void*);
+    static void didReceiveIntentForFrame(WKBundlePageRef, WKBundleFrameRef, WKBundleIntentRequestRef, WKTypeRef*, const void*);
+    static void registerIntentServiceForFrame(WKBundlePageRef, WKBundleFrameRef, WKIntentServiceInfoRef, WKTypeRef*, const void*);
 
     void didStartProvisionalLoadForFrame(WKBundleFrameRef);
     void didReceiveServerRedirectForProvisionalLoadForFrame(WKBundleFrameRef);
     void didFailProvisionalLoadWithErrorForFrame(WKBundleFrameRef, WKErrorRef);
     void didCommitLoadForFrame(WKBundleFrameRef);
     void didFinishLoadForFrame(WKBundleFrameRef);
+    void didFinishProgress();
     void didFailLoadWithErrorForFrame(WKBundleFrameRef, WKErrorRef);
     void didReceiveTitleForFrame(WKStringRef title, WKBundleFrameRef);
     void didClearWindowForFrame(WKBundleFrameRef, WKBundleScriptWorldRef);
@@ -159,6 +169,10 @@ private:
     WKBundlePageRef m_page;
     WKRetainPtr<WKBundleScriptWorldRef> m_world;
     WKRetainPtr<WKBundleBackForwardListItemRef> m_previousTestBackForwardListItem;
+
+#if ENABLE(WEB_INTENTS)
+    WKRetainPtr<WKBundleIntentRequestRef> m_currentIntentRequest;
+#endif
 };
 
 } // namespace WTR

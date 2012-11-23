@@ -32,7 +32,6 @@
 #include "ExceptionCode.h"
 #include "MediaStreamCenter.h"
 #include "MediaStreamSource.h"
-#include "ScriptExecutionContext.h"
 #include "UUID.h"
 
 namespace WebCore {
@@ -75,22 +74,18 @@ PassRefPtr<MediaStream> MediaStream::create(ScriptExecutionContext* context, Pas
         return 0;
 
     RefPtr<MediaStreamDescriptor> descriptor = MediaStreamDescriptor::create(createCanonicalUUIDString(), audioSources, videoSources);
-    MediaStreamCenter::instance().didConstructMediaStream(descriptor.get());
+    MediaStreamCenter::instance().didCreateMediaStream(descriptor.get());
 
-    RefPtr<MediaStream> stream = adoptRef(new MediaStream(context, descriptor.release()));
-    stream->suspendIfNeeded();
-    return stream.release();
+    return adoptRef(new MediaStream(context, descriptor.release()));
 }
 
 PassRefPtr<MediaStream> MediaStream::create(ScriptExecutionContext* context, PassRefPtr<MediaStreamDescriptor> streamDescriptor)
 {
-    RefPtr<MediaStream> stream = adoptRef(new MediaStream(context, streamDescriptor));
-    stream->suspendIfNeeded();
-    return stream.release();
+    return adoptRef(new MediaStream(context, streamDescriptor));
 }
 
 MediaStream::MediaStream(ScriptExecutionContext* context, PassRefPtr<MediaStreamDescriptor> streamDescriptor)
-    : ActiveDOMObject(context, this)
+    : ContextDestructionObserver(context)
     , m_descriptor(streamDescriptor)
 {
     m_descriptor->setOwner(this);
@@ -99,20 +94,22 @@ MediaStream::MediaStream(ScriptExecutionContext* context, PassRefPtr<MediaStream
     size_t numberOfAudioTracks = m_descriptor->numberOfAudioComponents();
     audioTrackVector.reserveCapacity(numberOfAudioTracks);
     for (size_t i = 0; i < numberOfAudioTracks; i++)
-        audioTrackVector.append(MediaStreamTrack::create(m_descriptor, m_descriptor->audioComponent(i)));
-    m_audioTracks = MediaStreamTrackList::create(audioTrackVector);
+        audioTrackVector.append(MediaStreamTrack::create(context, m_descriptor, m_descriptor->audioComponent(i)));
+    m_audioTracks = MediaStreamTrackList::create(this, audioTrackVector);
 
     MediaStreamTrackVector videoTrackVector;
     size_t numberOfVideoTracks = m_descriptor->numberOfVideoComponents();
     videoTrackVector.reserveCapacity(numberOfVideoTracks);
     for (size_t i = 0; i < numberOfVideoTracks; i++)
-        videoTrackVector.append(MediaStreamTrack::create(m_descriptor, m_descriptor->videoComponent(i)));
-    m_videoTracks = MediaStreamTrackList::create(videoTrackVector);
+        videoTrackVector.append(MediaStreamTrack::create(context, m_descriptor, m_descriptor->videoComponent(i)));
+    m_videoTracks = MediaStreamTrackList::create(this, videoTrackVector);
 }
 
 MediaStream::~MediaStream()
 {
     m_descriptor->setOwner(0);
+    m_audioTracks->detachOwner();
+    m_videoTracks->detachOwner();
 }
 
 MediaStream::ReadyState MediaStream::readyState() const
@@ -126,6 +123,8 @@ void MediaStream::streamEnded()
         return;
 
     m_descriptor->setEnded();
+    m_audioTracks->detachOwner();
+    m_videoTracks->detachOwner();
 
     dispatchEvent(Event::create(eventNames().endedEvent, false, false));
 }
@@ -137,7 +136,7 @@ const AtomicString& MediaStream::interfaceName() const
 
 ScriptExecutionContext* MediaStream::scriptExecutionContext() const
 {
-    return ActiveDOMObject::scriptExecutionContext();
+    return ContextDestructionObserver::scriptExecutionContext();
 }
 
 EventTargetData* MediaStream::eventTargetData()
@@ -148,6 +147,33 @@ EventTargetData* MediaStream::eventTargetData()
 EventTargetData* MediaStream::ensureEventTargetData()
 {
     return &m_eventTargetData;
+}
+
+void MediaStream::addTrack(MediaStreamComponent* component)
+{
+    RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(scriptExecutionContext(), m_descriptor, component);
+    ExceptionCode ec = 0;
+    switch (component->source()->type()) {
+    case MediaStreamSource::TypeAudio:
+        m_audioTracks->add(track, ec);
+        break;
+    case MediaStreamSource::TypeVideo:
+        m_videoTracks->add(track, ec);
+        break;
+    }
+    ASSERT(!ec);
+}
+
+void MediaStream::removeTrack(MediaStreamComponent* component)
+{
+    switch (component->source()->type()) {
+    case MediaStreamSource::TypeAudio:
+        m_audioTracks->remove(component);
+        break;
+    case MediaStreamSource::TypeVideo:
+        m_videoTracks->remove(component);
+        break;
+    }
 }
 
 } // namespace WebCore

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -157,6 +157,7 @@ namespace JSC {
         MacroAssembler::Label hotPathBegin;
         MacroAssembler::DataLabelPtr getStructureToCompare;
         MacroAssembler::PatchableJump getStructureCheck;
+        MacroAssembler::ConvertibleLoadLabel propertyStorageLoad;
 #if USE(JSVALUE64)
         MacroAssembler::DataLabelCompact getDisplacementLabel;
 #else
@@ -185,17 +186,24 @@ namespace JSC {
 #endif
 
 
-        PropertyStubCompilationInfo(PropertyStubGetById_T, unsigned bytecodeIndex, MacroAssembler::Label hotPathBegin,
+        PropertyStubCompilationInfo(
+            PropertyStubGetById_T, unsigned bytecodeIndex, MacroAssembler::Label hotPathBegin,
+            MacroAssembler::DataLabelPtr structureToCompare,
+            MacroAssembler::PatchableJump structureCheck,
+            MacroAssembler::ConvertibleLoadLabel propertyStorageLoad,
 #if USE(JSVALUE64)
-            MacroAssembler::DataLabelPtr structureToCompare, MacroAssembler::PatchableJump structureCheck, MacroAssembler::DataLabelCompact displacementLabel, MacroAssembler::Label putResult)
+            MacroAssembler::DataLabelCompact displacementLabel,
 #else
-            MacroAssembler::DataLabelPtr structureToCompare, MacroAssembler::PatchableJump structureCheck, MacroAssembler::DataLabelCompact displacementLabel1, MacroAssembler::DataLabelCompact displacementLabel2, MacroAssembler::Label putResult)
+            MacroAssembler::DataLabelCompact displacementLabel1,
+            MacroAssembler::DataLabelCompact displacementLabel2,
 #endif
+            MacroAssembler::Label putResult)
             : m_type(GetById)
             , bytecodeIndex(bytecodeIndex)
             , hotPathBegin(hotPathBegin)
             , getStructureToCompare(structureToCompare)
             , getStructureCheck(structureCheck)
+            , propertyStorageLoad(propertyStorageLoad)
 #if USE(JSVALUE64)
             , getDisplacementLabel(displacementLabel)
 #else
@@ -206,15 +214,21 @@ namespace JSC {
         {
         }
 
-        PropertyStubCompilationInfo(PropertyStubPutById_T, unsigned bytecodeIndex, MacroAssembler::Label hotPathBegin,
+        PropertyStubCompilationInfo(
+            PropertyStubPutById_T, unsigned bytecodeIndex, MacroAssembler::Label hotPathBegin,
+            MacroAssembler::DataLabelPtr structureToCompare,
+            MacroAssembler::ConvertibleLoadLabel propertyStorageLoad,
 #if USE(JSVALUE64)
-            MacroAssembler::DataLabelPtr structureToCompare, MacroAssembler::DataLabel32 displacementLabel)
+            MacroAssembler::DataLabel32 displacementLabel
 #else
-            MacroAssembler::DataLabelPtr structureToCompare, MacroAssembler::DataLabel32 displacementLabel1, MacroAssembler::DataLabel32 displacementLabel2)
+            MacroAssembler::DataLabel32 displacementLabel1,
+            MacroAssembler::DataLabel32 displacementLabel2
 #endif
+            )
             : m_type(PutById)
             , bytecodeIndex(bytecodeIndex)
             , hotPathBegin(hotPathBegin)
+            , propertyStorageLoad(propertyStorageLoad)
             , putStructureToCompare(structureToCompare)
 #if USE(JSVALUE64)
             , putDisplacementLabel(displacementLabel)
@@ -295,40 +309,40 @@ namespace JSC {
             return JIT(globalData, codeBlock).privateCompile(functionEntryArityCheck, effort);
         }
 
-        static void compileGetByIdProto(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, ReturnAddressPtr returnAddress)
+        static void compileGetByIdProto(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress)
         {
             JIT jit(globalData, codeBlock);
             jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdProto(stubInfo, structure, prototypeStructure, ident, slot, cachedOffset, returnAddress, callFrame);
         }
 
-        static void compileGetByIdSelfList(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* polymorphicStructures, int currentIndex, Structure* structure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset)
+        static void compileGetByIdSelfList(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* polymorphicStructures, int currentIndex, Structure* structure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
         {
             JIT jit(globalData, codeBlock);
             jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdSelfList(stubInfo, polymorphicStructures, currentIndex, structure, ident, slot, cachedOffset);
         }
-        static void compileGetByIdProtoList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset)
+        static void compileGetByIdProtoList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
         {
             JIT jit(globalData, codeBlock);
             jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdProtoList(stubInfo, prototypeStructureList, currentIndex, structure, prototypeStructure, ident, slot, cachedOffset, callFrame);
         }
-        static void compileGetByIdChainList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset)
+        static void compileGetByIdChainList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
         {
             JIT jit(globalData, codeBlock);
             jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdChainList(stubInfo, prototypeStructureList, currentIndex, structure, chain, count, ident, slot, cachedOffset, callFrame);
         }
 
-        static void compileGetByIdChain(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, ReturnAddressPtr returnAddress)
+        static void compileGetByIdChain(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress)
         {
             JIT jit(globalData, codeBlock);
             jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
             jit.privateCompileGetByIdChain(stubInfo, structure, chain, count, ident, slot, cachedOffset, returnAddress, callFrame);
         }
         
-        static void compilePutByIdTransition(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, size_t cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
+        static void compilePutByIdTransition(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, PropertyOffset cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
         {
             JIT jit(globalData, codeBlock);
             jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
@@ -358,9 +372,9 @@ namespace JSC {
 
         static void resetPatchGetById(RepatchBuffer&, StructureStubInfo*);
         static void resetPatchPutById(RepatchBuffer&, StructureStubInfo*);
-        static void patchGetByIdSelf(CodeBlock* codeblock, StructureStubInfo*, Structure*, size_t cachedOffset, ReturnAddressPtr returnAddress);
-        static void patchPutByIdReplace(CodeBlock* codeblock, StructureStubInfo*, Structure*, size_t cachedOffset, ReturnAddressPtr returnAddress, bool direct);
-        static void patchMethodCallProto(JSGlobalData&, CodeBlock* codeblock, MethodCallLinkInfo&, StructureStubInfo&, JSObject*, Structure*, JSObject*, ReturnAddressPtr);
+        static void patchGetByIdSelf(CodeBlock*, StructureStubInfo*, Structure*, PropertyOffset cachedOffset, ReturnAddressPtr);
+        static void patchPutByIdReplace(CodeBlock*, StructureStubInfo*, Structure*, PropertyOffset cachedOffset, ReturnAddressPtr, bool direct);
+        static void patchMethodCallProto(JSGlobalData&, CodeBlock*, MethodCallLinkInfo&, StructureStubInfo&, JSObject*, Structure*, JSObject*, ReturnAddressPtr);
 
         static void compilePatchGetArrayLength(JSGlobalData* globalData, CodeBlock* codeBlock, ReturnAddressPtr returnAddress)
         {
@@ -377,12 +391,12 @@ namespace JSC {
         void privateCompileLinkPass();
         void privateCompileSlowCases();
         JITCode privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffort);
-        void privateCompileGetByIdProto(StructureStubInfo*, Structure*, Structure* prototypeStructure, const Identifier&, const PropertySlot&, size_t cachedOffset, ReturnAddressPtr returnAddress, CallFrame* callFrame);
-        void privateCompileGetByIdSelfList(StructureStubInfo*, PolymorphicAccessStructureList*, int, Structure*, const Identifier&, const PropertySlot&, size_t cachedOffset);
-        void privateCompileGetByIdProtoList(StructureStubInfo*, PolymorphicAccessStructureList*, int, Structure*, Structure* prototypeStructure, const Identifier&, const PropertySlot&, size_t cachedOffset, CallFrame* callFrame);
-        void privateCompileGetByIdChainList(StructureStubInfo*, PolymorphicAccessStructureList*, int, Structure*, StructureChain* chain, size_t count, const Identifier&, const PropertySlot&, size_t cachedOffset, CallFrame* callFrame);
-        void privateCompileGetByIdChain(StructureStubInfo*, Structure*, StructureChain*, size_t count, const Identifier&, const PropertySlot&, size_t cachedOffset, ReturnAddressPtr returnAddress, CallFrame* callFrame);
-        void privateCompilePutByIdTransition(StructureStubInfo*, Structure*, Structure*, size_t cachedOffset, StructureChain*, ReturnAddressPtr returnAddress, bool direct);
+        void privateCompileGetByIdProto(StructureStubInfo*, Structure*, Structure* prototypeStructure, const Identifier&, const PropertySlot&, PropertyOffset cachedOffset, ReturnAddressPtr, CallFrame*);
+        void privateCompileGetByIdSelfList(StructureStubInfo*, PolymorphicAccessStructureList*, int, Structure*, const Identifier&, const PropertySlot&, PropertyOffset cachedOffset);
+        void privateCompileGetByIdProtoList(StructureStubInfo*, PolymorphicAccessStructureList*, int, Structure*, Structure* prototypeStructure, const Identifier&, const PropertySlot&, PropertyOffset cachedOffset, CallFrame*);
+        void privateCompileGetByIdChainList(StructureStubInfo*, PolymorphicAccessStructureList*, int, Structure*, StructureChain*, size_t count, const Identifier&, const PropertySlot&, PropertyOffset cachedOffset, CallFrame*);
+        void privateCompileGetByIdChain(StructureStubInfo*, Structure*, StructureChain*, size_t count, const Identifier&, const PropertySlot&, PropertyOffset cachedOffset, ReturnAddressPtr, CallFrame*);
+        void privateCompilePutByIdTransition(StructureStubInfo*, Structure*, Structure*, PropertyOffset cachedOffset, StructureChain*, ReturnAddressPtr, bool direct);
 
         PassRefPtr<ExecutableMemoryHandle> privateCompileCTIMachineTrampolines(JSGlobalData*, TrampolineStructure*);
         Label privateCompileCTINativeCall(JSGlobalData*, bool isConstruct = false);
@@ -421,9 +435,8 @@ namespace JSC {
         void emitWriteBarrier(JSCell* owner, RegisterID value, RegisterID scratch, WriteBarrierMode, WriteBarrierUseKind);
 
         template<typename ClassType, bool destructor, typename StructureType> void emitAllocateBasicJSObject(StructureType, RegisterID result, RegisterID storagePtr);
-        void emitAllocateBasicStorage(size_t, RegisterID result, RegisterID storagePtr);
+        void emitAllocateBasicStorage(size_t, RegisterID result);
         template<typename T> void emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID storagePtr);
-        void emitAllocateJSFunction(FunctionExecutable*, RegisterID scopeChain, RegisterID result, RegisterID storagePtr);
         void emitAllocateJSArray(unsigned valuesRegister, unsigned length, RegisterID cellResult, RegisterID storageResult, RegisterID storagePtr);
         
 #if ENABLE(VALUE_PROFILER)
@@ -436,6 +449,8 @@ namespace JSC {
         void emitValueProfilingSite(unsigned) { }
         void emitValueProfilingSite() { }
 #endif
+
+        enum FinalObjectMode { MayBeFinal, KnownNotFinal };
 
 #if USE(JSVALUE32_64)
         bool getOperandConstantImmediateInt(unsigned op1, unsigned op2, unsigned& op, int32_t& constant);
@@ -463,16 +478,16 @@ namespace JSC {
         bool isMapped(int virtualRegisterIndex);
         bool getMappedPayload(int virtualRegisterIndex, RegisterID& payload);
         bool getMappedTag(int virtualRegisterIndex, RegisterID& tag);
-
+        
         void emitJumpSlowCaseIfNotJSCell(int virtualRegisterIndex);
         void emitJumpSlowCaseIfNotJSCell(int virtualRegisterIndex, RegisterID tag);
 
         void compileGetByIdHotPath();
         void compileGetByIdSlowCase(int resultVReg, int baseVReg, Identifier* ident, Vector<SlowCaseEntry>::iterator& iter, bool isMethodCheck = false);
-        void compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, size_t cachedOffset);
-        void compileGetDirectOffset(JSObject* base, RegisterID resultTag, RegisterID resultPayload, size_t cachedOffset);
-        void compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, RegisterID offset);
-        void compilePutDirectOffset(RegisterID base, RegisterID valueTag, RegisterID valuePayload, size_t cachedOffset);
+        void compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, PropertyOffset cachedOffset);
+        void compileGetDirectOffset(JSObject* base, RegisterID resultTag, RegisterID resultPayload, PropertyOffset cachedOffset);
+        void compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, RegisterID offset, FinalObjectMode = MayBeFinal);
+        void compilePutDirectOffset(RegisterID base, RegisterID valueTag, RegisterID valuePayload, PropertyOffset cachedOffset);
 
         // Arithmetic opcode helpers
         void emitAdd32Constant(unsigned dst, unsigned op, int32_t constant, ResultType opType);
@@ -548,10 +563,10 @@ namespace JSC {
 
         void compileGetByIdHotPath(int baseVReg, Identifier*);
         void compileGetByIdSlowCase(int resultVReg, int baseVReg, Identifier* ident, Vector<SlowCaseEntry>::iterator& iter, bool isMethodCheck = false);
-        void compileGetDirectOffset(RegisterID base, RegisterID result, size_t cachedOffset);
-        void compileGetDirectOffset(JSObject* base, RegisterID result, size_t cachedOffset);
-        void compileGetDirectOffset(RegisterID base, RegisterID result, RegisterID offset, RegisterID scratch);
-        void compilePutDirectOffset(RegisterID base, RegisterID value, size_t cachedOffset);
+        void compileGetDirectOffset(RegisterID base, RegisterID result, PropertyOffset cachedOffset);
+        void compileGetDirectOffset(JSObject* base, RegisterID result, PropertyOffset cachedOffset);
+        void compileGetDirectOffset(RegisterID base, RegisterID result, RegisterID offset, RegisterID scratch, FinalObjectMode = MayBeFinal);
+        void compilePutDirectOffset(RegisterID base, RegisterID value, PropertyOffset cachedOffset);
 
 #endif // USE(JSVALUE32_64)
 
@@ -582,7 +597,6 @@ namespace JSC {
         void emit_op_call_put_result(Instruction*);
         void emit_op_catch(Instruction*);
         void emit_op_construct(Instruction*);
-        void emit_op_get_callee(Instruction*);
         void emit_op_create_this(Instruction*);
         void emit_op_convert_this(Instruction*);
         void emit_op_create_arguments(Instruction*);
@@ -600,6 +614,7 @@ namespace JSC {
         void emit_op_get_argument_by_val(Instruction*);
         void emit_op_get_by_pname(Instruction*);
         void emit_op_get_global_var(Instruction*);
+        void emit_op_get_global_var_watchable(Instruction* instruction) { emit_op_get_global_var(instruction); }
         void emit_op_get_scoped_var(Instruction*);
         void emit_op_init_lazy_reg(Instruction*);
         void emit_op_check_has_instance(Instruction*);
@@ -663,6 +678,7 @@ namespace JSC {
         void emit_op_put_by_val(Instruction*);
         void emit_op_put_getter_setter(Instruction*);
         void emit_op_put_global_var(Instruction*);
+        void emit_op_put_global_var_check(Instruction*);
         void emit_op_put_scoped_var(Instruction*);
         void emit_op_resolve(Instruction*);
         void emit_op_resolve_base(Instruction*);
@@ -740,6 +756,7 @@ namespace JSC {
         void emitSlow_op_pre_inc(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_put_by_id(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_put_by_val(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_put_global_var_check(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_resolve_global(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_resolve_global_dynamic(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_rshift(Instruction*, Vector<SlowCaseEntry>::iterator&);
@@ -748,8 +765,6 @@ namespace JSC {
         void emitSlow_op_to_jsnumber(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_to_primitive(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_urshift(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_new_func(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_new_func_exp(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_new_array(Instruction*, Vector<SlowCaseEntry>::iterator&);
         
         void emitRightShift(Instruction*, bool isUnsigned);
@@ -804,7 +819,7 @@ namespace JSC {
         // Loads the character value of a single character string into dst.
         void emitLoadCharacterString(RegisterID src, RegisterID dst, JumpList& failures);
         
-        enum OptimizationCheckKind { LoopOptimizationCheck, RetOptimizationCheck };
+        enum OptimizationCheckKind { LoopOptimizationCheck, EnterOptimizationCheck };
 #if ENABLE(DFG_JIT)
         void emitOptimizationCheck(OptimizationCheckKind);
 #else
@@ -837,7 +852,7 @@ namespace JSC {
 
 #if ENABLE(DFG_JIT)
         bool canBeOptimized() { return m_canBeOptimized; }
-        bool shouldEmitProfiling() { return m_canBeOptimized; }
+        bool shouldEmitProfiling() { return m_shouldEmitProfiling; }
 #else
         bool canBeOptimized() { return false; }
         // Enables use of value profiler with tiered compilation turned off,
@@ -886,6 +901,7 @@ namespace JSC {
 
 #if ENABLE(VALUE_PROFILER)
         bool m_canBeOptimized;
+        bool m_shouldEmitProfiling;
 #endif
     } JIT_CLASS_ALIGNMENT;
 

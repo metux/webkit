@@ -34,49 +34,125 @@ namespace JSC {
 
 class CopiedSpace;
 
-class CopiedBlock : public HeapBlock {
+class CopiedBlock : public HeapBlock<CopiedBlock> {
     friend class CopiedSpace;
     friend class CopiedAllocator;
 public:
-    CopiedBlock(PageAllocationAligned& allocation)
-        : HeapBlock(allocation)
-        , m_offset(payload())
-        , m_isPinned(false)
-    {
-        ASSERT(is8ByteAligned(static_cast<void*>(m_offset)));
-#if USE(JSVALUE64)
-        char* offset = static_cast<char*>(m_offset);
-        memset(static_cast<void*>(offset), 0, static_cast<size_t>((reinterpret_cast<char*>(this) + allocation.size()) - offset));
-#else
-        JSValue emptyValue;
-        JSValue* limit = reinterpret_cast_ptr<JSValue*>(reinterpret_cast<char*>(this) + allocation.size());
-        for (JSValue* currentValue = reinterpret_cast<JSValue*>(m_offset); currentValue < limit; currentValue++)
-            *currentValue = emptyValue;
-#endif
-    }
+    static CopiedBlock* create(const PageAllocationAligned&);
+    static CopiedBlock* createNoZeroFill(const PageAllocationAligned&);
 
+    // The payload is the region of the block that is usable for allocations.
     char* payload();
+    char* payloadEnd();
+    size_t payloadCapacity();
+    
+    // The data is the region of the block that has been used for allocations.
+    char* data();
+    char* dataEnd();
+    size_t dataSize();
+    
+    // The wilderness is the region of the block that is usable for allocations
+    // but has not been so used.
+    char* wilderness();
+    char* wildernessEnd();
+    size_t wildernessSize();
+    
     size_t size();
     size_t capacity();
 
 private:
-    void* m_offset;
+    CopiedBlock(const PageAllocationAligned&);
+    void zeroFillWilderness(); // Can be called at any time to zero-fill to the end of the block.
+
+    size_t m_remaining;
     uintptr_t m_isPinned;
 };
+
+inline CopiedBlock* CopiedBlock::createNoZeroFill(const PageAllocationAligned& allocation)
+{
+    return new(NotNull, allocation.base()) CopiedBlock(allocation);
+}
+
+inline CopiedBlock* CopiedBlock::create(const PageAllocationAligned& allocation)
+{
+    CopiedBlock* block = createNoZeroFill(allocation);
+    block->zeroFillWilderness();
+    return block;
+}
+
+inline void CopiedBlock::zeroFillWilderness()
+{
+#if USE(JSVALUE64)
+    memset(wilderness(), 0, wildernessSize());
+#else
+    JSValue emptyValue;
+    JSValue* limit = reinterpret_cast_ptr<JSValue*>(wildernessEnd());
+    for (JSValue* currentValue = reinterpret_cast<JSValue*>(wilderness()); currentValue < limit; currentValue++)
+        *currentValue = emptyValue;
+#endif
+}
+
+inline CopiedBlock::CopiedBlock(const PageAllocationAligned& allocation)
+    : HeapBlock<CopiedBlock>(allocation)
+    , m_remaining(payloadCapacity())
+    , m_isPinned(false)
+{
+    ASSERT(is8ByteAligned(reinterpret_cast<void*>(m_remaining)));
+}
 
 inline char* CopiedBlock::payload()
 {
     return reinterpret_cast<char*>(this) + ((sizeof(CopiedBlock) + 7) & ~7);
 }
 
+inline char* CopiedBlock::payloadEnd()
+{
+    return reinterpret_cast<char*>(this) + allocation().size();
+}
+
+inline size_t CopiedBlock::payloadCapacity()
+{
+    return payloadEnd() - payload();
+}
+
+inline char* CopiedBlock::data()
+{
+    return payload();
+}
+
+inline char* CopiedBlock::dataEnd()
+{
+    return payloadEnd() - m_remaining;
+}
+
+inline size_t CopiedBlock::dataSize()
+{
+    return dataEnd() - data();
+}
+
+inline char* CopiedBlock::wilderness()
+{
+    return dataEnd();
+}
+
+inline char* CopiedBlock::wildernessEnd()
+{
+    return payloadEnd();
+}
+
+inline size_t CopiedBlock::wildernessSize()
+{
+    return wildernessEnd() - wilderness();
+}
+
 inline size_t CopiedBlock::size()
 {
-    return static_cast<size_t>(static_cast<char*>(m_offset) - payload());
+    return dataSize();
 }
 
 inline size_t CopiedBlock::capacity()
 {
-    return m_allocation.size();
+    return allocation().size();
 }
 
 } // namespace JSC

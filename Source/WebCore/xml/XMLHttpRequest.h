@@ -83,10 +83,6 @@ public:
     State readyState() const;
     bool withCredentials() const { return m_includeCredentials; }
     void setWithCredentials(bool, ExceptionCode&);
-#if ENABLE(XHR_RESPONSE_BLOB)
-    bool asBlob() const { return m_responseTypeCode == ResponseTypeBlob; }
-    void setAsBlob(bool, ExceptionCode&);
-#endif
     void open(const String& method, const KURL&, ExceptionCode&);
     void open(const String& method, const KURL&, bool async, ExceptionCode&);
     void open(const String& method, const KURL&, bool async, const String& user, ExceptionCode&);
@@ -97,6 +93,7 @@ public:
     void send(Blob*, ExceptionCode&);
     void send(DOMFormData*, ExceptionCode&);
     void send(ArrayBuffer*, ExceptionCode&);
+    void send(ArrayBufferView*, ExceptionCode&);
     void abort();
     void setRequestHeader(const AtomicString& name, const String& value, ExceptionCode&);
     void overrideMimeType(const String& override);
@@ -105,10 +102,8 @@ public:
     String responseText(ExceptionCode&);
     Document* responseXML(ExceptionCode&);
     Document* optionalResponseXML() const { return m_responseDocument.get(); }
-#if ENABLE(XHR_RESPONSE_BLOB)
     Blob* responseBlob(ExceptionCode&);
     Blob* optionalResponseBlob() const { return m_responseBlob.get(); }
-#endif
 
     // Expose HTTP validation methods for other untrusted requests.
     static bool isAllowedHTTPMethod(const String&);
@@ -166,6 +161,7 @@ private:
     bool responseIsXML() const;
 
     bool initSend(ExceptionCode&);
+    void sendBytesData(const void*, size_t, ExceptionCode&);
 
     String getRequestHeader(const AtomicString& name) const;
     void setRequestHeaderInternal(const AtomicString& name, const String& value);
@@ -193,9 +189,7 @@ private:
     String m_mimeTypeOverride;
     bool m_async;
     bool m_includeCredentials;
-#if ENABLE(XHR_RESPONSE_BLOB)
     RefPtr<Blob> m_responseBlob;
-#endif
 
     RefPtr<ThreadableLoader> m_loader;
     State m_state;

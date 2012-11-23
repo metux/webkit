@@ -31,6 +31,12 @@
 #include "IntPoint.h"
 #include <wtf/MathExtras.h>
 
+#if PLATFORM(QT)
+QT_BEGIN_NAMESPACE
+class QSizeF;
+QT_END_NAMESPACE
+#endif
+
 #if PLATFORM(BLACKBERRY)
 namespace BlackBerry {
 namespace Platform {
@@ -114,6 +120,11 @@ public:
         return FloatSize(m_height, m_width);
     }
 
+#if PLATFORM(QT)
+    FloatSize(const QSizeF&);
+    operator QSizeF() const;
+#endif
+
 #if PLATFORM(BLACKBERRY)
     FloatSize(const BlackBerry::Platform::FloatSize&);
     operator BlackBerry::Platform::FloatSize() const;
@@ -175,12 +186,12 @@ inline bool operator!=(const FloatSize& a, const FloatSize& b)
 
 inline IntSize roundedIntSize(const FloatSize& p)
 {
-    return IntSize(static_cast<int>(roundf(p.width())), static_cast<int>(roundf(p.height())));
+    return IntSize(clampToInteger(roundf(p.width())), clampToInteger(roundf(p.height())));
 }
 
 inline IntSize flooredIntSize(const FloatSize& p)
 {
-    return IntSize(static_cast<int>(p.width()), static_cast<int>(p.height()));
+    return IntSize(clampToInteger(floorf(p.width())), clampToInteger(floorf(p.height())));
 }
 
 inline IntSize expandedIntSize(const FloatSize& p)
@@ -190,7 +201,7 @@ inline IntSize expandedIntSize(const FloatSize& p)
 
 inline IntPoint flooredIntPoint(const FloatSize& p)
 {
-    return IntPoint(static_cast<int>(p.width()), static_cast<int>(p.height()));
+    return IntPoint(clampToInteger(floorf(p.width())), clampToInteger(floorf(p.height())));
 }
 
 } // namespace WebCore

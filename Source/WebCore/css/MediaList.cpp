@@ -26,6 +26,7 @@
 #include "ExceptionCode.h"
 #include "MediaQuery.h"
 #include "MediaQueryExp.h"
+#include "MemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -209,6 +210,12 @@ String MediaQuerySet::mediaText() const
     }
     return text;
 }
+
+void MediaQuerySet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedVector(m_queries);
+}
     
 MediaList::MediaList(MediaQuerySet* mediaQueries, CSSStyleSheet* parentSheet)
     : m_mediaQueries(mediaQueries)
@@ -230,12 +237,15 @@ MediaList::~MediaList()
 
 void MediaList::setMediaText(const String& value, ExceptionCode& ec)
 {
+    CSSStyleSheet::RuleMutationScope mutationScope(m_parentRule);
+
     bool success = m_mediaQueries->parse(value);
     if (!success) {
         ec = SYNTAX_ERR;
         return;
     }
-    notifyChanged();
+    if (m_parentStyleSheet)
+        m_parentStyleSheet->didMutate();
 }
 
 String MediaList::item(unsigned index) const
@@ -248,31 +258,41 @@ String MediaList::item(unsigned index) const
 
 void MediaList::deleteMedium(const String& medium, ExceptionCode& ec)
 {
+    CSSStyleSheet::RuleMutationScope mutationScope(m_parentRule);
+
     bool success = m_mediaQueries->remove(medium);
     if (!success) {
         ec = NOT_FOUND_ERR;
         return;
     }
-    notifyChanged();
+    if (m_parentStyleSheet)
+        m_parentStyleSheet->didMutate();
 }
 
 void MediaList::appendMedium(const String& medium, ExceptionCode& ec)
 {
+    CSSStyleSheet::RuleMutationScope mutationScope(m_parentRule);
+
     bool success = m_mediaQueries->add(medium);
     if (!success) {
         // FIXME: Should this really be INVALID_CHARACTER_ERR?
         ec = INVALID_CHARACTER_ERR;
         return;
     }
-    notifyChanged();
+    if (m_parentStyleSheet)
+        m_parentStyleSheet->didMutate();
 }
 
-void MediaList::notifyChanged()
+void MediaList::reattach(MediaQuerySet* mediaQueries)
 {
-    CSSStyleSheet* parentStyleSheet = m_parentRule ? m_parentRule->parentStyleSheet() : m_parentStyleSheet;
-    if (!parentStyleSheet)
-        return;
-    parentStyleSheet->styleSheetChanged();
+    ASSERT(mediaQueries);
+    m_mediaQueries = mediaQueries;
+}
+
+void MediaList::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_mediaQueries);
 }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -61,6 +61,12 @@ public:
     {
         move(TrustedImmPtr(address.m_ptr), scratchRegister);
         and32(imm, Address(scratchRegister));
+    }
+    
+    void add32(AbsoluteAddress address, RegisterID dest)
+    {
+        move(TrustedImmPtr(address.m_ptr), scratchRegister);
+        add32(Address(scratchRegister), dest);
     }
     
     void or32(TrustedImm32 imm, AbsoluteAddress address)
@@ -140,6 +146,17 @@ public:
     {
         m_assembler.addq_rr(src, dest);
     }
+    
+    void addPtr(Address src, RegisterID dest)
+    {
+        m_assembler.addq_mr(src.offset, src.base, dest);
+    }
+
+    void addPtr(AbsoluteAddress src, RegisterID dest)
+    {
+        move(TrustedImmPtr(src.m_ptr), scratchRegister);
+        addPtr(Address(scratchRegister), dest);
+    }
 
     void addPtr(TrustedImm32 imm, RegisterID srcDest)
     {
@@ -181,6 +198,11 @@ public:
     void andPtr(TrustedImm32 imm, RegisterID srcDest)
     {
         m_assembler.andq_ir(imm.m_value, srcDest);
+    }
+    
+    void negPtr(RegisterID dest)
+    {
+        m_assembler.negq_r(dest);
     }
 
     void orPtr(RegisterID src, RegisterID dest)
@@ -258,6 +280,13 @@ public:
         m_assembler.movq_mr(address.offset, address.base, dest);
     }
 
+    ConvertibleLoadLabel convertibleLoadPtr(Address address, RegisterID dest)
+    {
+        ConvertibleLoadLabel result = ConvertibleLoadLabel(this);
+        m_assembler.movq_mr(address.offset, address.base, dest);
+        return result;
+    }
+
     void loadPtr(BaseIndex address, RegisterID dest)
     {
         m_assembler.movq_mr(address.offset, address.base, address.index, address.scale, dest);
@@ -275,12 +304,14 @@ public:
 
     DataLabel32 loadPtrWithAddressOffsetPatch(Address address, RegisterID dest)
     {
+        padBeforePatch();
         m_assembler.movq_mr_disp32(address.offset, address.base, dest);
         return DataLabel32(this);
     }
     
     DataLabelCompact loadPtrWithCompactAddressOffsetPatch(Address address, RegisterID dest)
     {
+        padBeforePatch();
         m_assembler.movq_mr_disp8(address.offset, address.base, dest);
         return DataLabelCompact(this);
     }
@@ -319,6 +350,7 @@ public:
     
     DataLabel32 storePtrWithAddressOffsetPatch(RegisterID src, Address address)
     {
+        padBeforePatch();
         m_assembler.movq_rm_disp32(src, address.offset, address.base);
         return DataLabel32(this);
     }
@@ -447,6 +479,12 @@ public:
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
+    Jump branchTestPtr(ResultCondition cond, Address address, RegisterID reg)
+    {
+        m_assembler.testq_rm(reg, address.offset, address.base);
+        return Jump(m_assembler.jCC(x86Condition(cond)));
+    }
+
     Jump branchTestPtr(ResultCondition cond, BaseIndex address, TrustedImm32 mask = TrustedImm32(-1))
     {
         if (mask.m_value == -1)
@@ -483,6 +521,7 @@ public:
 
     DataLabelPtr moveWithPatch(TrustedImmPtr initialValue, RegisterID dest)
     {
+        padBeforePatch();
         m_assembler.movq_i64r(initialValue.asIntptr(), dest);
         return DataLabelPtr(this);
     }
@@ -512,6 +551,12 @@ public:
         TrustedImmPtr addr(reinterpret_cast<void*>(address.offset));
         MacroAssemblerX86Common::move(addr, scratchRegister);
         return MacroAssemblerX86Common::branchTest8(cond, BaseIndex(scratchRegister, address.base, TimesOne), mask);
+    }
+    
+    Jump branchTest8(ResultCondition cond, AbsoluteAddress address, TrustedImm32 mask = TrustedImm32(-1))
+    {
+        MacroAssemblerX86Common::move(TrustedImmPtr(address.m_ptr), scratchRegister);
+        return MacroAssemblerX86Common::branchTest8(cond, Address(scratchRegister), mask);
     }
 
     static bool supportsFloatingPoint() { return true; }

@@ -27,6 +27,7 @@
 #include "RenderText.h"
 #include "RenderTheme.h"
 #include "ScrollbarTheme.h"
+#include "StyleInheritedData.h"
 #include "TextIterator.h"
 #include "VisiblePosition.h"
 #include <wtf/unicode/CharacterNames.h>
@@ -81,7 +82,7 @@ static inline bool updateUserModifyProperty(Node* node, RenderStyle* style)
     if (node->isElementNode()) {
         Element* element = static_cast<Element*>(node);
         isEnabled = element->isEnabledFormControl();
-        isReadOnlyControl = element->isReadOnlyFormControl();
+        isReadOnlyControl = element->isTextFormControl() && static_cast<HTMLTextFormControlElement*>(element)->readOnly();
     }
 
     style->setUserModify((isReadOnlyControl || !isEnabled) ? READ_ONLY : READ_WRITE_PLAINTEXT_ONLY);
@@ -155,11 +156,14 @@ void RenderTextControl::computeLogicalHeight()
 
 void RenderTextControl::hitInnerTextElement(HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset)
 {
-    LayoutPoint adjustedLocation = accumulatedOffset + location();
     HTMLElement* innerText = innerTextElement();
+    LayoutPoint adjustedLocation = accumulatedOffset + location();
+    LayoutPoint localPoint = pointInContainer - toLayoutSize(adjustedLocation + innerText->renderBox()->location());
+    if (hasOverflowClip())
+        localPoint += scrolledContentOffset();
     result.setInnerNode(innerText);
     result.setInnerNonSharedNode(innerText);
-    result.setLocalPoint(pointInContainer - toLayoutSize(adjustedLocation + innerText->renderBox()->location()));
+    result.setLocalPoint(localPoint);
 }
 
 static const char* fontFamiliesWithInvalidCharWidth[] = {
@@ -207,6 +211,9 @@ static const char* fontFamiliesWithInvalidCharWidth[] = {
 bool RenderTextControl::hasValidAvgCharWidth(AtomicString family)
 {
     static HashSet<AtomicString>* fontFamiliesWithInvalidCharWidthMap = 0;
+
+    if (family.isEmpty())
+        return false;
 
     if (!fontFamiliesWithInvalidCharWidthMap) {
         fontFamiliesWithInvalidCharWidthMap = new HashSet<AtomicString>;
@@ -294,6 +301,11 @@ RenderObject* RenderTextControl::layoutSpecialExcludedChild(bool relayoutChildre
         placeholderRenderer->setChildNeedsLayout(true, MarkOnlyThis);
     }
     return placeholderRenderer;
+}
+
+bool RenderTextControl::canBeReplacedWithInlineRunIn() const
+{
+    return false;
 }
 
 } // namespace WebCore

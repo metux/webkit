@@ -90,7 +90,7 @@ class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateInterface {
 
             PassRefPtr<TimeRanges> buffered() const;
             float maxTimeSeekable() const;
-            unsigned bytesLoaded() const;
+            bool didLoadingProgress() const;
             unsigned totalBytes() const;
 
             void setVisible(bool);
@@ -124,13 +124,16 @@ class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateInterface {
             unsigned audioDecodedByteCount() const;
             unsigned videoDecodedByteCount() const;
 
+            MediaPlayer::MovieLoadType movieLoadType() const;
+
         private:
             MediaPlayerPrivateGStreamer(MediaPlayer*);
 
             static PassOwnPtr<MediaPlayerPrivateInterface> create(MediaPlayer*);
 
             static void getSupportedTypes(HashSet<String>&);
-            static MediaPlayer::SupportsType supportsType(const String& type, const String& codecs);
+            static MediaPlayer::SupportsType supportsType(const String& type, const String& codecs, const KURL&);
+
             static bool isAvailable();
 
             void updateAudioSink();
@@ -148,6 +151,9 @@ class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateInterface {
             void mediaLocationChanged(GstMessage*);
 
             void processBufferingStats(GstMessage*);
+
+            virtual String engineDescription() const { return "GStreamer"; }
+            bool isLiveStream() const { return m_isStreaming; }
 
         private:
             MediaPlayer* m_player;
@@ -181,6 +187,7 @@ class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateInterface {
             MediaPlayer::Preload m_preload;
             bool m_delayingLoad;
             bool m_mediaDurationKnown;
+            mutable float m_maxTimeLoadedAtLastDidLoadingProgress;
 #ifndef GST_API_VERSION_1
             RefPtr<GStreamerGWorld> m_gstGWorld;
 #endif
@@ -191,6 +198,11 @@ class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateInterface {
             guint m_audioTimerHandler;
             guint m_videoTimerHandler;
             GRefPtr<GstElement> m_webkitAudioSink;
+            mutable long m_totalBytes;
+            GRefPtr<GstPad> m_videoSinkPad;
+            mutable IntSize m_videoSize;
+            KURL m_url;
+            bool m_originalPreloadWasAutoAndWasOverridden;
     };
 }
 

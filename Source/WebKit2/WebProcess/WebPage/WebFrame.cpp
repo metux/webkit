@@ -59,6 +59,14 @@
 #include <WebCore/TextResourceDecoder.h>
 #include <wtf/text/StringBuilder.h>
 
+#if ENABLE(WEB_INTENTS)
+#include "IntentData.h"
+#include <WebCore/DOMWindowIntents.h>
+#include <WebCore/DeliveredIntent.h>
+#include <WebCore/Intent.h>
+#include <WebCore/PlatformMessagePortChannel.h>
+#endif
+
 #if PLATFORM(MAC) || PLATFORM(WIN)
 #include <WebCore/LegacyWebArchive.h>
 #endif
@@ -235,6 +243,45 @@ void WebFrame::convertHandleToDownload(ResourceHandle* handle, const ResourceReq
     DownloadManager::shared().convertHandleToDownload(m_policyDownloadID, page(), handle, request, response);
     m_policyDownloadID = 0;
 }
+
+#if ENABLE(WEB_INTENTS)
+void WebFrame::deliverIntent(const IntentData& intentData)
+{
+    OwnPtr<DeliveredIntentClient> dummyClient;
+    Vector<uint8_t> dataCopy = intentData.data;
+
+    OwnPtr<WebCore::MessagePortChannelArray> channels;
+    if (!intentData.messagePorts.isEmpty()) {
+        channels = adoptPtr(new WebCore::MessagePortChannelArray(intentData.messagePorts.size()));
+        for (size_t i = 0; i < intentData.messagePorts.size(); ++i)
+            (*channels)[i] = MessagePortChannel::create(WebProcess::shared().messagePortChannel(intentData.messagePorts.at(i)));
+    }
+    OwnPtr<WebCore::MessagePortArray> messagePorts = WebCore::MessagePort::entanglePorts(*m_coreFrame->document()->domWindow()->scriptExecutionContext(), channels.release());
+
+    RefPtr<DeliveredIntent> deliveredIntent = DeliveredIntent::create(m_coreFrame, dummyClient.release(), intentData.action, intentData.type,
+                                                                      SerializedScriptValue::adopt(dataCopy), messagePorts.release(),
+                                                                      intentData.extras);
+    WebCore::DOMWindowIntents::from(m_coreFrame->document()->domWindow())->deliver(deliveredIntent.release());
+}
+
+void WebFrame::deliverIntent(WebCore::Intent* intent)
+{
+    OwnPtr<DeliveredIntentClient> dummyClient;
+
+    OwnPtr<WebCore::MessagePortChannelArray> channels;
+    WebCore::MessagePortChannelArray* origChannels = intent->messagePorts();
+    if (origChannels && origChannels->size()) {
+        channels = adoptPtr(new WebCore::MessagePortChannelArray(origChannels->size()));
+        for (size_t i = 0; i < origChannels->size(); ++i)
+            (*channels)[i] = origChannels->at(i).release();
+    }
+    OwnPtr<WebCore::MessagePortArray> messagePorts = WebCore::MessagePort::entanglePorts(*m_coreFrame->document()->domWindow()->scriptExecutionContext(), channels.release());
+
+    RefPtr<DeliveredIntent> deliveredIntent = DeliveredIntent::create(m_coreFrame, dummyClient.release(), intent->action(), intent->type(),
+                                                                      intent->data(), messagePorts.release(), intent->extras());
+    WebCore::DOMWindowIntents::from(m_coreFrame->document()->domWindow())->deliver(deliveredIntent.release());
+}
+#endif
 
 String WebFrame::source() const 
 {
@@ -474,7 +521,7 @@ unsigned WebFrame::pendingUnloadCount() const
     if (!m_coreFrame)
         return 0;
 
-    return m_coreFrame->domWindow()->pendingUnloadEventListeners();
+    return m_coreFrame->document()->domWindow()->pendingUnloadEventListeners();
 }
 
 bool WebFrame::allowsFollowingLink(const WebCore::KURL& url) const
@@ -623,7 +670,7 @@ JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleNodeHandle* nodeHandle, Inj
     JSDOMWindow* globalObject = m_coreFrame->script()->globalObject(world->coreWorld());
     ExecState* exec = globalObject->globalExec();
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
     return toRef(exec, toJS(exec, globalObject, nodeHandle->coreNode()));
 }
 
@@ -635,7 +682,7 @@ JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleRangeHandle* rangeHandle, I
     JSDOMWindow* globalObject = m_coreFrame->script()->globalObject(world->coreWorld());
     ExecState* exec = globalObject->globalExec();
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
     return toRef(exec, toJS(exec, globalObject, rangeHandle->coreRange()));
 }
 
@@ -652,7 +699,7 @@ JSValueRef WebFrame::computedStyleIncludingVisitedInfo(JSObjectRef element)
 
     RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(static_cast<JSElement*>(toJS(element))->impl(), true);
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
     return toRef(exec, toJS(exec, globalObject, style.get()));
 }
 

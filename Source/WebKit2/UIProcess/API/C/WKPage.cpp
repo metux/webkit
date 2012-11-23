@@ -352,16 +352,22 @@ bool WKPageIsPinnedToRightSide(WKPageRef pageRef)
 
 void WKPageSetPaginationMode(WKPageRef pageRef, WKPaginationMode paginationMode)
 {
-    Page::Pagination::Mode mode;
+    Pagination::Mode mode;
     switch (paginationMode) {
     case kWKPaginationModeUnpaginated:
-        mode = Page::Pagination::Unpaginated;
+        mode = Pagination::Unpaginated;
         break;
-    case kWKPaginationModeHorizontal:
-        mode = Page::Pagination::HorizontallyPaginated;
+    case kWKPaginationModeLeftToRight:
+        mode = Pagination::LeftToRightPaginated;
         break;
-    case kWKPaginationModeVertical:
-        mode = Page::Pagination::VerticallyPaginated;
+    case kWKPaginationModeRightToLeft:
+        mode = Pagination::RightToLeftPaginated;
+        break;
+    case kWKPaginationModeTopToBottom:
+        mode = Pagination::TopToBottomPaginated;
+        break;
+    case kWKPaginationModeBottomToTop:
+        mode = Pagination::BottomToTopPaginated;
         break;
     default:
         return;
@@ -372,12 +378,16 @@ void WKPageSetPaginationMode(WKPageRef pageRef, WKPaginationMode paginationMode)
 WKPaginationMode WKPageGetPaginationMode(WKPageRef pageRef)
 {
     switch (toImpl(pageRef)->paginationMode()) {
-    case Page::Pagination::Unpaginated:
+    case Pagination::Unpaginated:
         return kWKPaginationModeUnpaginated;
-    case Page::Pagination::HorizontallyPaginated:
-        return kWKPaginationModeHorizontal;
-    case Page::Pagination::VerticallyPaginated:
-        return kWKPaginationModeVertical;
+    case Pagination::LeftToRightPaginated:
+        return kWKPaginationModeLeftToRight;
+    case Pagination::RightToLeftPaginated:
+        return kWKPaginationModeRightToLeft;
+    case Pagination::TopToBottomPaginated:
+        return kWKPaginationModeTopToBottom;
+    case Pagination::BottomToTopPaginated:
+        return kWKPaginationModeBottomToTop;
     }
 
     ASSERT_NOT_REACHED();
@@ -572,6 +582,13 @@ void WKPageGetContentsAsString_b(WKPageRef pageRef, WKPageGetSourceForFrameBlock
 }
 #endif
 
+void WKPageGetContentsAsMHTMLData(WKPageRef pageRef, bool useBinaryEncoding, void* context, WKPageGetContentsAsMHTMLDataFunction callback)
+{
+#if ENABLE(MHTML)
+    toImpl(pageRef)->getContentsAsMHTMLData(DataCallback::create(context, callback), useBinaryEncoding);
+#endif
+}
+
 void WKPageForceRepaint(WKPageRef pageRef, void* context, WKPageForceRepaintFunction callback)
 {
     toImpl(pageRef)->forceRepaint(VoidCallback::create(context, callback));
@@ -674,6 +691,13 @@ void WKPageEndPrinting(WKPageRef page)
 }
 #endif
 
+void WKPageDeliverIntentToFrame(WKPageRef page, WKFrameRef frame, WKIntentDataRef intent)
+{
+#if ENABLE(WEB_INTENTS)
+    toImpl(page)->deliverIntentToFrame(toImpl(frame), toImpl(intent));
+#endif
+}
+
 WKImageRef WKPageCreateSnapshotOfVisibleContent(WKPageRef)
 {
     return 0;
@@ -688,3 +712,9 @@ void WKPageSetMediaVolume(WKPageRef page, float volume)
 {
     toImpl(page)->setMediaVolume(volume);    
 }
+
+void WKPagePostMessageToInjectedBundle(WKPageRef pageRef, WKStringRef messageNameRef, WKTypeRef messageBodyRef)
+{
+    toImpl(pageRef)->postMessageToInjectedBundle(toImpl(messageNameRef)->string(), toImpl(messageBodyRef));
+}
+

@@ -33,17 +33,17 @@ using namespace JSC;
 
 namespace WebCore {
 
-bool JSRequestAnimationFrameCallback::handleEvent(double highResNowMs)
+bool JSRequestAnimationFrameCallback::handleEvent(DOMTimeStamp time)
 {
     if (!canInvokeCallback())
         return true;
 
     RefPtr<JSRequestAnimationFrameCallback> protect(this);
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(m_data->globalObject()->globalData());
 
     MarkedArgumentBuffer args;
-    args.append(jsNumber(highResNowMs));
+    args.append(jsNumber(time));
 
     bool raisedException = false;
     m_data->invokeCallback(args, &raisedException);

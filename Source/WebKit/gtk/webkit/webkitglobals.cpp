@@ -504,7 +504,9 @@ void webkitInit()
     JSC::initializeThreading();
     WTF::initializeMainThread();
 
+#if !LOG_DISABLED
     WebCore::initializeLoggingChannelsIfNecessary();
+#endif // !LOG_DISABLED
     PlatformStrategiesGtk::initialize();
 
     // We make sure the text codecs have been initialized, because
@@ -528,6 +530,8 @@ void webkitInit()
     g_signal_connect(authDialog, "current-toplevel", G_CALLBACK(currentToplevelCallback), NULL);
     soup_session_add_feature(session, authDialog);
     g_object_unref(authDialog);
+
+    WebCore::ResourceHandle::setIgnoreSSLErrors(true);
 
 #if USE(CLUTTER)
     gtk_clutter_init(0, 0);

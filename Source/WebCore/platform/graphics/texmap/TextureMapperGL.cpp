@@ -1,5 +1,6 @@
 /*
  Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
+ Copyright (C) 2012 Igalia S.L.
 
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Library General Public
@@ -22,6 +23,7 @@
 
 #include "GraphicsContext.h"
 #include "Image.h"
+#include "NotImplemented.h"
 #include "TextureMapperShaderManager.h"
 #include "Timer.h"
 #include <wtf/HashMap.h>
@@ -30,13 +32,13 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
+#if USE(GRAPHICS_SURFACE)
+#include "GraphicsSurface.h"
+#endif
+
 #if PLATFORM(QT)
-#if QT_VERSION >= 0x050000
+#include "NativeImageQt.h"
 #include <QOpenGLContext>
-#include <QPlatformPixmap>
-#else
-#include <QGLContext>
-#endif // QT_VERSION
 #elif OS(WINDOWS)
 #include <windows.h>
 #elif OS(MAC_OS_X)
@@ -56,19 +58,11 @@ namespace WebCore {
 struct TextureMapperGLData {
     struct SharedGLData : public RefCounted<SharedGLData> {
 #if PLATFORM(QT)
-#if QT_VERSION >= 0x050000
         typedef QOpenGLContext* GLContext;
         static GLContext getCurrentGLContext()
         {
             return QOpenGLContext::currentContext();
         }
-#else
-        typedef const QGLContext* GLContext;
-        static GLContext getCurrentGLContext()
-        {
-            return QGLContext::currentContext();
-        }
-#endif
 #elif OS(WINDOWS)
         typedef HGLRC GLContext;
         static GLContext getCurrentGLContext()
@@ -234,8 +228,10 @@ BitmapTextureGL* toBitmapTextureGL(BitmapTexture* texture)
 }
 
 TextureMapperGL::TextureMapperGL()
-    : m_data(new TextureMapperGLData)
+    : TextureMapper(OpenGLMode)
+    , m_data(new TextureMapperGLData)
     , m_context(0)
+    , m_enableEdgeDistanceAntialiasing(false)
 {
 }
 
@@ -255,8 +251,6 @@ void TextureMapperGL::beginPainting(PaintFlags flags)
     GL_CMD(glGetIntegerv(GL_CURRENT_PROGRAM, &data().previousProgram));
     data().previousScissorState = glIsEnabled(GL_SCISSOR_TEST);
     data().previousDepthState = glIsEnabled(GL_DEPTH_TEST);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_SCISSOR_TEST);
 #if PLATFORM(QT)
     if (m_context) {
         QPainter* painter = m_context->platformContext();
@@ -264,11 +258,12 @@ void TextureMapperGL::beginPainting(PaintFlags flags)
         painter->beginNativePainting();
     }
 #endif
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_SCISSOR_TEST);
     data().didModifyStencil = false;
     GL_CMD(glDepthMask(0));
     GL_CMD(glGetIntegerv(GL_VIEWPORT, data().viewport));
     GL_CMD(glGetIntegerv(GL_SCISSOR_BOX, data().previousScissor));
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &data().targetFrameBuffer);
     m_clipStack.init(IntRect(0, 0, data().viewport[2], data().viewport[3]));
     GL_CMD(glGetIntegerv(GL_FRAMEBUFFER_BINDING, &data().targetFrameBuffer));
     data().PaintFlags = flags;
@@ -304,8 +299,94 @@ void TextureMapperGL::endPainting()
 #endif
 }
 
+void TextureMapperGL::drawQuad(const DrawQuad& quadToDraw, const TransformationMatrix& modelViewMatrix, TextureMapperShaderProgram* shaderProgram, GLenum drawingMode, bool needsBlending)
+{
+    GL_CMD(glEnableVertexAttribArray(shaderProgram->vertexAttrib()));
+    GL_CMD(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
-void TextureMapperGL::drawTexture(const BitmapTexture& texture, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, const BitmapTexture* mask)
+    const GLfloat quad[] = {
+        quadToDraw.targetRectMappedToUnitSquare.p1().x(), quadToDraw.targetRectMappedToUnitSquare.p1().y(),
+        quadToDraw.targetRectMappedToUnitSquare.p2().x(), quadToDraw.targetRectMappedToUnitSquare.p2().y(),
+        quadToDraw.targetRectMappedToUnitSquare.p3().x(), quadToDraw.targetRectMappedToUnitSquare.p3().y(),
+        quadToDraw.targetRectMappedToUnitSquare.p4().x(), quadToDraw.targetRectMappedToUnitSquare.p4().y()
+    };
+    GL_CMD(glVertexAttribPointer(shaderProgram->vertexAttrib(), 2, GL_FLOAT, GL_FALSE, 0, quad));
+
+    TransformationMatrix matrix = TransformationMatrix(data().projectionMatrix).multiply(modelViewMatrix).multiply(TransformationMatrix(
+            quadToDraw.originalTargetRect.width(), 0, 0, 0,
+            0, quadToDraw.originalTargetRect.height(), 0, 0,
+            0, 0, 1, 0,
+            quadToDraw.originalTargetRect.x(), quadToDraw.originalTargetRect.y(), 0, 1));
+    const GLfloat m4[] = {
+        matrix.m11(), matrix.m12(), matrix.m13(), matrix.m14(),
+        matrix.m21(), matrix.m22(), matrix.m23(), matrix.m24(),
+        matrix.m31(), matrix.m32(), matrix.m33(), matrix.m34(),
+        matrix.m41(), matrix.m42(), matrix.m43(), matrix.m44()
+    };
+    GL_CMD(glUniformMatrix4fv(shaderProgram->matrixLocation(), 1, GL_FALSE, m4));
+
+    if (needsBlending) {
+        GL_CMD(glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
+        GL_CMD(glEnable(GL_BLEND));
+    } else
+        GL_CMD(glDisable(GL_BLEND));
+
+    GL_CMD(glDrawArrays(drawingMode, 0, 4));
+    GL_CMD(glDisableVertexAttribArray(shaderProgram->vertexAttrib()));
+}
+
+void TextureMapperGL::drawBorder(const Color& color, float width, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix)
+{
+    if (clipStack().current().scissorBox.isEmpty())
+        return;
+
+    RefPtr<TextureMapperShaderProgramSolidColor> program = data().sharedGLData().textureMapperShaderManager.solidColorProgram();
+    GL_CMD(glUseProgram(program->id()));
+
+    float alpha = color.alpha() / 255.0;
+    GL_CMD(glUniform4f(program->colorLocation(),
+                       (color.red() / 255.0) * alpha,
+                       (color.green() / 255.0) * alpha,
+                       (color.blue() / 255.0) * alpha,
+                       alpha));
+    GL_CMD(glLineWidth(width));
+
+    drawQuad(targetRect, modelViewMatrix, program.get(), GL_LINE_LOOP, color.hasAlpha());
+}
+
+void TextureMapperGL::drawRepaintCounter(int value, int pointSize, const FloatPoint& targetPoint, const TransformationMatrix& modelViewMatrix)
+{
+#if PLATFORM(QT)
+    QString counterString = QString::number(value);
+
+    QFont font(QString::fromLatin1("Monospace"), pointSize, QFont::Bold);
+    font.setStyleHint(QFont::TypeWriter);
+
+    QFontMetrics fontMetrics(font);
+    int width = fontMetrics.width(counterString) + 4;
+    int height = fontMetrics.height();
+
+    IntSize size(width, height);
+    IntRect sourceRect(IntPoint::zero(), size);
+    IntRect targetRect(roundedIntPoint(targetPoint), size);
+
+    QImage image(size, NativeImageQt::defaultFormatForAlphaEnabledImages());
+    QPainter painter(&image);
+    painter.fillRect(sourceRect, Qt::blue); // Since we won't swap R+B for speed, this will paint red.
+    painter.setFont(font);
+    painter.setPen(Qt::white);
+    painter.drawText(2, height * 0.85, counterString);
+
+    RefPtr<BitmapTexture> texture = acquireTextureFromPool(size);
+    const uchar* bits = image.bits();
+    texture->updateContents(bits, sourceRect, IntPoint::zero(), image.bytesPerLine());
+    drawTexture(*texture, targetRect, modelViewMatrix, 1.0f, 0, AllEdges);
+#else
+    notImplemented();
+#endif
+}
+
+void TextureMapperGL::drawTexture(const BitmapTexture& texture, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, const BitmapTexture* mask, unsigned exposedEdges)
 {
     if (!texture.isValid())
         return;
@@ -314,65 +395,212 @@ void TextureMapperGL::drawTexture(const BitmapTexture& texture, const FloatRect&
         return;
 
     const BitmapTextureGL& textureGL = static_cast<const BitmapTextureGL&>(texture);
-    drawTexture(textureGL.id(), textureGL.isOpaque() ? 0 : SupportsBlending, textureGL.size(), targetRect, matrix, opacity, mask);
+    drawTexture(textureGL.id(), textureGL.isOpaque() ? 0 : SupportsBlending, textureGL.size(), targetRect, matrix, opacity, mask, exposedEdges);
 }
 
-void TextureMapperGL::drawTexture(uint32_t texture, Flags flags, const IntSize& textureSize, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture)
+#if defined(GL_ARB_texture_rectangle)
+void TextureMapperGL::drawTextureRectangleARB(uint32_t texture, Flags flags, const IntSize& textureSize, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture)
 {
-    RefPtr<TextureMapperShaderProgram> shaderInfo;
+    RefPtr<TextureMapperShaderProgram> program;
     if (maskTexture)
-        shaderInfo = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::OpacityAndMask);
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::RectOpacityAndMask);
     else
-        shaderInfo = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Simple);
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::RectSimple);
+    GL_CMD(glUseProgram(program->id()));
 
-    GL_CMD(glUseProgram(shaderInfo->id()));
-    GL_CMD(glEnableVertexAttribArray(shaderInfo->vertexAttrib()));
+    GL_CMD(glEnableVertexAttribArray(program->vertexAttrib()));
     GL_CMD(glActiveTexture(GL_TEXTURE0));
-    GL_CMD(glBindTexture(GL_TEXTURE_2D, texture));
-    GL_CMD(glBindBuffer(GL_ARRAY_BUFFER, 0));
-    const GLfloat unitRect[] = {0, 0, 1, 0, 1, 1, 0, 1};
-    GL_CMD(glVertexAttribPointer(shaderInfo->vertexAttrib(), 2, GL_FLOAT, GL_FALSE, 0, unitRect));
+    GL_CMD(glBindTexture(GL_TEXTURE_RECTANGLE_ARB, texture));
+    GL_CMD(glUniform1i(program->sourceTextureLocation(), 0));
 
-    TransformationMatrix matrix = TransformationMatrix(data().projectionMatrix).multiply(modelViewMatrix).multiply(TransformationMatrix(
-            targetRect.width(), 0, 0, 0,
-            0, targetRect.height(), 0, 0,
-            0, 0, 1, 0,
-            targetRect.x(), targetRect.y(), 0, 1));
+    GL_CMD(glUniform1f(program->flipLocation(), !!(flags & ShouldFlipTexture)));
+    GL_CMD(glUniform2f(program->textureSizeLocation(), textureSize.width(), textureSize.height()));
 
-    const GLfloat m4[] = {
-        matrix.m11(), matrix.m12(), matrix.m13(), matrix.m14(),
-        matrix.m21(), matrix.m22(), matrix.m23(), matrix.m24(),
-        matrix.m31(), matrix.m32(), matrix.m33(), matrix.m34(),
-        matrix.m41(), matrix.m42(), matrix.m43(), matrix.m44()
-    };
+    if (TextureMapperShaderProgram::isValidUniformLocation(program->opacityLocation()))
+        GL_CMD(glUniform1f(program->opacityLocation(), opacity));
 
-    const GLfloat m4src[] = {
-        1, 0, 0, 0,
-        0, (flags & ShouldFlipTexture) ? -1 : 1, 0, 0,
-        0, 0, 1, 0,
-        0, (flags & ShouldFlipTexture) ? 1 : 0, 0, 1};
-
-    GL_CMD(glUniformMatrix4fv(shaderInfo->matrixVariable(), 1, GL_FALSE, m4));
-    GL_CMD(glUniformMatrix4fv(shaderInfo->sourceMatrixVariable(), 1, GL_FALSE, m4src));
-    GL_CMD(glUniform1i(shaderInfo->sourceTextureVariable(), 0));
-
-    shaderInfo->prepare(opacity, maskTexture);
+    if (maskTexture && maskTexture->isValid() && TextureMapperShaderProgram::isValidUniformLocation(program->maskTextureLocation())) {
+        const BitmapTextureGL* maskTextureGL = static_cast<const BitmapTextureGL*>(maskTexture);
+        GL_CMD(glActiveTexture(GL_TEXTURE1));
+        GL_CMD(glBindTexture(GL_TEXTURE_2D, maskTextureGL->id()));
+        GL_CMD(glUniform1i(program->maskTextureLocation(), 1));
+        GL_CMD(glActiveTexture(GL_TEXTURE0));
+    }
 
     bool needsBlending = (flags & SupportsBlending) || opacity < 0.99 || maskTexture;
+    drawQuad(targetRect, modelViewMatrix, program.get(), GL_TRIANGLE_FAN, needsBlending);
+}
+#endif // defined(GL_ARB_texture_rectangle) 
 
-    if (needsBlending) {
-        GL_CMD(glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
-        GL_CMD(glEnable(GL_BLEND));
-    } else
-        GL_CMD(glDisable(GL_BLEND));
+void TextureMapperGL::drawTexture(uint32_t texture, Flags flags, const IntSize& /* textureSize */, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture, unsigned exposedEdges)
+{
+    bool needsAntiliaing = m_enableEdgeDistanceAntialiasing && !modelViewMatrix.isIntegerTranslation();
+    if (needsAntiliaing && drawTextureWithAntialiasing(texture, flags, targetRect, modelViewMatrix, opacity, maskTexture, exposedEdges))
+       return;
 
-    GL_CMD(glDrawArrays(GL_TRIANGLE_FAN, 0, 4));
-    GL_CMD(glDisableVertexAttribArray(shaderInfo->vertexAttrib()));
+    RefPtr<TextureMapperShaderProgram> program;
+    if (maskTexture)
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::OpacityAndMask);
+    else
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Simple);
+    GL_CMD(glUseProgram(program->id()));
+
+    drawTexturedQuadWithProgram(program.get(), texture, flags, targetRect, modelViewMatrix, opacity, maskTexture);
 }
 
-const char* TextureMapperGL::type() const
+static TransformationMatrix viewportMatrix()
 {
-    return "OpenGL";
+    GLint viewport[4];
+    GL_CMD(glGetIntegerv(GL_VIEWPORT, viewport));
+
+    TransformationMatrix matrix;
+    matrix.translate3d(viewport[0], viewport[1], 0);
+    matrix.scale3d(viewport[2], viewport[3], 0);
+
+    // Map x, y and z to unit square from OpenGL normalized device
+    // coordinates which are -1 to 1 on every axis.
+    matrix.translate3d(0.5, 0.5, 0.5);
+    matrix.scale3d(0.5, 0.5, 0.5);
+
+    return matrix;
+}
+
+static void scaleLineEquationCoeffecientsToOptimizeDistanceCalculation(float* coeffecients)
+{
+    // In the fragment shader we want to calculate the distance from this
+    // line to a point (p), which is given by the formula:
+    // (A*p.x + B*p.y + C) / sqrt (a^2 + b^2)
+    // We can do a small amount of precalculation here to reduce the
+    // amount of math in the shader by scaling the coeffecients now.
+    float scale = 1.0 / FloatPoint(coeffecients[0], coeffecients[1]).length();
+    coeffecients[0] = coeffecients[0] * scale;
+    coeffecients[1] = coeffecients[1] * scale;
+    coeffecients[2] = coeffecients[2] * scale;
+}
+
+static void getStandardEquationCoeffecientsForLine(const FloatPoint& p1, const FloatPoint& p2, float* coeffecients)
+{
+    // Given two points, the standard equation of a line (Ax + By + C = 0)
+    // can be calculated via the formula:
+    // (p1.y – p2.y)x + (p1.x – p2.x)y + ((p1.x*p2.y) – (p2.x*p1.y)) = 0
+    coeffecients[0] = p1.y() - p2.y();
+    coeffecients[1] = p2.x() - p1.x();
+    coeffecients[2] = p1.x() * p2.y() - p2.x() * p1.y();
+    scaleLineEquationCoeffecientsToOptimizeDistanceCalculation(coeffecients);
+}
+
+static void quadToEdgeArray(const FloatQuad& quad, float* edgeArray)
+{
+    if (quad.isCounterclockwise()) {
+        getStandardEquationCoeffecientsForLine(quad.p4(), quad.p3(), edgeArray);
+        getStandardEquationCoeffecientsForLine(quad.p3(), quad.p2(), edgeArray + 3);
+        getStandardEquationCoeffecientsForLine(quad.p2(), quad.p1(), edgeArray + 6);
+        getStandardEquationCoeffecientsForLine(quad.p1(), quad.p4(), edgeArray + 9);
+        return;
+    }
+    getStandardEquationCoeffecientsForLine(quad.p4(), quad.p1(), edgeArray);
+    getStandardEquationCoeffecientsForLine(quad.p1(), quad.p2(), edgeArray + 3);
+    getStandardEquationCoeffecientsForLine(quad.p2(), quad.p3(), edgeArray + 6);
+    getStandardEquationCoeffecientsForLine(quad.p3(), quad.p4(), edgeArray + 9);
+}
+
+static FloatSize scaledVectorDifference(const FloatPoint& point1, const FloatPoint& point2, float scale)
+{
+    FloatSize vector = point1 - point2;
+    if (vector.diagonalLengthSquared())
+        vector.scale(1.0 / vector.diagonalLength());
+
+    vector.scale(scale);
+    return vector;
+}
+
+static FloatQuad inflateQuad(const FloatQuad& quad, float distance)
+{
+    FloatQuad expandedQuad = quad;
+    expandedQuad.setP1(expandedQuad.p1() + scaledVectorDifference(quad.p1(), quad.p2(), distance));
+    expandedQuad.setP4(expandedQuad.p4() + scaledVectorDifference(quad.p4(), quad.p3(), distance));
+
+    expandedQuad.setP1(expandedQuad.p1() + scaledVectorDifference(quad.p1(), quad.p4(), distance));
+    expandedQuad.setP2(expandedQuad.p2() + scaledVectorDifference(quad.p2(), quad.p3(), distance));
+
+    expandedQuad.setP2(expandedQuad.p2() + scaledVectorDifference(quad.p2(), quad.p1(), distance));
+    expandedQuad.setP3(expandedQuad.p3() + scaledVectorDifference(quad.p3(), quad.p4(), distance));
+
+    expandedQuad.setP3(expandedQuad.p3() + scaledVectorDifference(quad.p3(), quad.p2(), distance));
+    expandedQuad.setP4(expandedQuad.p4() + scaledVectorDifference(quad.p4(), quad.p1(), distance));
+
+    return expandedQuad;
+}
+
+bool TextureMapperGL::drawTextureWithAntialiasing(uint32_t texture, Flags flags, const FloatRect& originalTargetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture, unsigned exposedEdges)
+{
+    // The antialiasing path does not support mask textures at the moment.
+    if (maskTexture)
+        return false;
+
+    // For now we punt on rendering tiled layers with antialiasing. It's quite hard
+    // to render them without seams.
+    if (exposedEdges != AllEdges)
+        return false;
+
+    // The goal here is render a slightly larger (0.75 pixels in screen space) quad and to
+    // gradually taper off the alpha values to do a simple version of edge distance
+    // antialiasing. Note here that we are also including the viewport matrix (which
+    // translates from normalized device coordinates to screen coordinates), because these
+    // values are consumed in the fragment shader, which works in screen coordinates.
+    TransformationMatrix screenSpaceTransform = viewportMatrix().multiply(TransformationMatrix(data().projectionMatrix)).multiply(modelViewMatrix).to2dTransform();
+    if (!screenSpaceTransform.isInvertible())
+        return false;
+    FloatQuad quadInScreenSpace = screenSpaceTransform.mapQuad(originalTargetRect);
+
+    const float inflationDistance = 0.75;
+    FloatQuad expandedQuadInScreenSpace = inflateQuad(quadInScreenSpace, inflationDistance);
+
+    // In the non-antialiased case the vertices passed are the unit rectangle and double
+    // as the texture coordinates (0,0 1,0, 1,1 and 0,1). Here we map the expanded quad
+    // coordinates in screen space back to the original rect's texture coordinates.
+    // This has the effect of slightly increasing the size of the original quad's geometry
+    // in the vertex shader.
+    FloatQuad expandedQuadInTextureCoordinates = screenSpaceTransform.inverse().mapQuad(expandedQuadInScreenSpace);
+    expandedQuadInTextureCoordinates.move(-originalTargetRect.x(), -originalTargetRect.y());
+    expandedQuadInTextureCoordinates.scale(1 / originalTargetRect.width(), 1 / originalTargetRect.height());
+
+    // We prepare both the expanded quad for the fragment shader as well as the rectangular bounding
+    // box of that quad, as that seems necessary to properly antialias backfacing quads.
+    float targetQuadEdges[24];
+    quadToEdgeArray(expandedQuadInScreenSpace, targetQuadEdges);
+    quadToEdgeArray(inflateQuad(quadInScreenSpace.boundingBox(),  inflationDistance), targetQuadEdges + 12);
+
+    RefPtr<TextureMapperShaderProgramAntialiasingNoMask> program = data().sharedGLData().textureMapperShaderManager.antialiasingNoMaskProgram();
+    GL_CMD(glUseProgram(program->id()));
+    GL_CMD(glUniform3fv(program->expandedQuadEdgesInScreenSpaceLocation(), 8, targetQuadEdges));
+
+    drawTexturedQuadWithProgram(program.get(), texture, flags, DrawQuad(originalTargetRect, expandedQuadInTextureCoordinates), modelViewMatrix, opacity, 0 /* maskTexture */);
+    return true;
+}
+
+void TextureMapperGL::drawTexturedQuadWithProgram(TextureMapperShaderProgram* program, uint32_t texture, Flags flags, const DrawQuad& quadToDraw, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture)
+{
+    GL_CMD(glEnableVertexAttribArray(program->vertexAttrib()));
+    GL_CMD(glActiveTexture(GL_TEXTURE0));
+    GL_CMD(glBindTexture(GL_TEXTURE_2D, texture));
+    GL_CMD(glUniform1i(program->sourceTextureLocation(), 0));
+
+    GL_CMD(glUniform1f(program->flipLocation(), !!(flags & ShouldFlipTexture)));
+
+    if (TextureMapperShaderProgram::isValidUniformLocation(program->opacityLocation()))
+        GL_CMD(glUniform1f(program->opacityLocation(), opacity));
+
+    if (maskTexture && maskTexture->isValid() && TextureMapperShaderProgram::isValidUniformLocation(program->maskTextureLocation())) {
+        const BitmapTextureGL* maskTextureGL = static_cast<const BitmapTextureGL*>(maskTexture);
+        GL_CMD(glActiveTexture(GL_TEXTURE1));
+        GL_CMD(glBindTexture(GL_TEXTURE_2D, maskTextureGL->id()));
+        GL_CMD(glUniform1i(program->maskTextureLocation(), 1));
+        GL_CMD(glActiveTexture(GL_TEXTURE0));
+    }
+
+    bool needsBlending = (flags & SupportsBlending) || opacity < 0.99 || maskTexture;
+    drawQuad(quadToDraw, modelViewMatrix, program, GL_TRIANGLE_FAN, needsBlending);
 }
 
 bool BitmapTextureGL::canReuseWith(const IntSize& contentsSize, Flags)
@@ -442,29 +670,38 @@ void BitmapTextureGL::updateContents(const void* data, const IntRect& targetRect
     GLuint glFormat = GL_RGBA;
     GL_CMD(glBindTexture(GL_TEXTURE_2D, m_id));
 
+    const unsigned bytesPerPixel = 4;
     if (driverSupportsBGRASwizzling())
         glFormat = GL_BGRA;
     else
-        swizzleBGRAToRGBA(reinterpret_cast<uint32_t*>(const_cast<void*>(data)), IntRect(sourceOffset, targetRect.size()), bytesPerLine / 4);
+        swizzleBGRAToRGBA(reinterpret_cast<uint32_t*>(const_cast<void*>(data)), IntRect(sourceOffset, targetRect.size()), bytesPerLine / bytesPerPixel);
 
     if (bytesPerLine == targetRect.width() / 4 && sourceOffset == IntPoint::zero()) {
         GL_CMD(glTexSubImage2D(GL_TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, (const char*)data));
         return;
     }
 
-    // For ES drivers that don't support sub-images, transfer the pixels row-by-row.
+    // For ES drivers that don't support sub-images.
     if (!driverSupportsSubImage()) {
         const char* bits = static_cast<const char*>(data);
+        const char* src = bits + sourceOffset.y() * bytesPerLine + sourceOffset.x() * bytesPerPixel;
+        Vector<char> temporaryData(targetRect.width() * targetRect.height() * bytesPerPixel);
+        char* dst = temporaryData.data();
+
+        const int targetBytesPerLine = targetRect.width() * bytesPerPixel;
         for (int y = 0; y < targetRect.height(); ++y) {
-            const char *row = bits + ((sourceOffset.y() + y) * bytesPerLine + sourceOffset.x() * 4);
-            GL_CMD(glTexSubImage2D(GL_TEXTURE_2D, 0, targetRect.x(), targetRect.y() + y, targetRect.width(), 1, glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, row));
+            memcpy(dst, src, targetBytesPerLine);
+            src += bytesPerLine;
+            dst += targetBytesPerLine;
         }
+
+        GL_CMD(glTexSubImage2D(GL_TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, temporaryData.data()));
         return;
     }
 
 #if !defined(TEXMAP_OPENGL_ES_2)
     // Use the OpenGL sub-image extension, now that we know it's available.
-    GL_CMD(glPixelStorei(GL_UNPACK_ROW_LENGTH, bytesPerLine / 4));
+    GL_CMD(glPixelStorei(GL_UNPACK_ROW_LENGTH, bytesPerLine / bytesPerPixel));
     GL_CMD(glPixelStorei(GL_UNPACK_SKIP_ROWS, sourceOffset.y()));
     GL_CMD(glPixelStorei(GL_UNPACK_SKIP_PIXELS, sourceOffset.x()));
     GL_CMD(glTexSubImage2D(GL_TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, (const char*)data));
@@ -486,16 +723,8 @@ void BitmapTextureGL::updateContents(Image* image, const IntRect& targetRect, co
     const char* imageData;
 
 #if PLATFORM(QT)
-    QImage qtImage;
-#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
-    // With QPA, we can avoid a deep copy.
-    qtImage = *frameImage->handle()->buffer();
-#else
-    // This might be a deep copy, depending on other references to the pixmap.
-    qtImage = frameImage->toImage();
-#endif
-    imageData = reinterpret_cast<const char*>(qtImage.constBits());
-    bytesPerLine = qtImage.bytesPerLine();
+    imageData = reinterpret_cast<const char*>(frameImage->constBits());
+    bytesPerLine = frameImage->bytesPerLine();
 #elif USE(CAIRO)
     cairo_surface_t* surface = frameImage->surface();
     imageData = reinterpret_cast<const char*>(cairo_image_surface_get_data(surface));
@@ -506,14 +735,14 @@ void BitmapTextureGL::updateContents(Image* image, const IntRect& targetRect, co
 }
 
 #if ENABLE(CSS_FILTERS)
-void TextureMapperGL::drawFiltered(const BitmapTexture& sourceTexture, const BitmapTexture& contentTexture, const FilterOperation& filter)
+void TextureMapperGL::drawFiltered(const BitmapTexture& sourceTexture, const BitmapTexture& contentTexture, const FilterOperation& filter, int pass)
 {
     // For standard filters, we always draw the whole texture without transformations.
-    RefPtr<StandardFilterProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderForFilter(filter);
-    if (!program) {
-        drawTexture(sourceTexture, FloatRect(FloatPoint::zero(), sourceTexture.size()), TransformationMatrix(), 1, 0);
-        return;
-    }
+    RefPtr<StandardFilterProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderForFilter(filter, pass);
+    ASSERT(program);
+
+    program->prepare(filter, pass, sourceTexture.contentSize(), static_cast<const BitmapTextureGL&>(contentTexture).id());
+
     GL_CMD(glEnableVertexAttribArray(program->vertexAttrib()));
     GL_CMD(glEnableVertexAttribArray(program->texCoordAttrib()));
     GL_CMD(glActiveTexture(GL_TEXTURE0));
@@ -539,9 +768,12 @@ PassRefPtr<BitmapTexture> BitmapTextureGL::applyFilters(const BitmapTexture& con
         const FilterOperation* filter = filters.at(i);
         ASSERT(filter);
 
-        m_textureMapper->bindSurface(target.get());
-        m_textureMapper->drawFiltered(i ? *source.get() : contentTexture, contentTexture, *filter);
-        std::swap(source, target);
+        int numPasses = m_textureMapper->data().sharedGLData().textureMapperShaderManager.getPassesRequiredForFilter(*filter);
+        for (int j = 0; j < numPasses; ++j) {
+            m_textureMapper->bindSurface(target.get());
+            m_textureMapper->drawFiltered((i || j) ? *source : contentTexture, contentTexture, *filter, j);
+            std::swap(source, target);
+        }
     }
 
     m_textureMapper->bindSurface(previousSurface.get());
@@ -686,12 +918,12 @@ void TextureMapperGL::beginClip(const TransformationMatrix& modelViewMatrix, con
 
     data().initializeStencil();
 
-    RefPtr<TextureMapperShaderProgram> shaderInfo = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Simple);
+    RefPtr<TextureMapperShaderProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Simple);
 
-    GL_CMD(glUseProgram(shaderInfo->id()));
-    GL_CMD(glEnableVertexAttribArray(shaderInfo->vertexAttrib()));
+    GL_CMD(glUseProgram(program->id()));
+    GL_CMD(glEnableVertexAttribArray(program->vertexAttrib()));
     const GLfloat unitRect[] = {0, 0, 1, 0, 1, 1, 0, 1};
-    GL_CMD(glVertexAttribPointer(shaderInfo->vertexAttrib(), 2, GL_FLOAT, GL_FALSE, 0, unitRect));
+    GL_CMD(glVertexAttribPointer(program->vertexAttrib(), 2, GL_FLOAT, GL_FALSE, 0, unitRect));
 
     TransformationMatrix matrix = TransformationMatrix(data().projectionMatrix)
             .multiply(modelViewMatrix)
@@ -725,17 +957,17 @@ void TextureMapperGL::beginClip(const TransformationMatrix& modelViewMatrix, con
     GL_CMD(glStencilMask(0xff & ~(stencilIndex - 1)));
 
     // First clear the entire buffer at the current index.
-    GL_CMD(glUniformMatrix4fv(shaderInfo->matrixVariable(), 1, GL_FALSE, m4all));
+    GL_CMD(glUniformMatrix4fv(program->matrixLocation(), 1, GL_FALSE, m4all));
     GL_CMD(glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO));
     GL_CMD(glDrawArrays(GL_TRIANGLE_FAN, 0, 4));
 
     // Now apply the current index to the new quad.
     GL_CMD(glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE));
-    GL_CMD(glUniformMatrix4fv(shaderInfo->matrixVariable(), 1, GL_FALSE, m4));
+    GL_CMD(glUniformMatrix4fv(program->matrixLocation(), 1, GL_FALSE, m4));
     GL_CMD(glDrawArrays(GL_TRIANGLE_FAN, 0, 4));
 
     // Clear the state.
-    GL_CMD(glDisableVertexAttribArray(shaderInfo->vertexAttrib()));
+    GL_CMD(glDisableVertexAttribArray(program->vertexAttrib()));
     GL_CMD(glStencilMask(0));
 
     // Increase stencilIndex and apply stencil testing.

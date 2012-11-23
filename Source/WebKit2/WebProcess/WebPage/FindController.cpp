@@ -97,6 +97,8 @@ void FindController::updateFindUIAfterPageScroll(bool found, const String& strin
     bool shouldShowOverlay = false;
 
     if (!found) {
+        m_webPage->corePage()->unmarkAllTextMatches();
+
         // Clear the selection.
         if (selectedFrame)
             selectedFrame->selection()->clear();
@@ -114,6 +116,7 @@ void FindController::updateFindUIAfterPageScroll(bool found, const String& strin
             if (maxMatchCount == numeric_limits<unsigned>::max())
                 --maxMatchCount;
 
+            m_webPage->corePage()->unmarkAllTextMatches();
             matchCount = m_webPage->corePage()->markAllMatchesForText(string, core(options), shouldShowHighlight, maxMatchCount + 1);
 
             // Check if we have more matches than allowed.
@@ -152,11 +155,9 @@ void FindController::updateFindUIAfterPageScroll(bool found, const String& strin
 
 void FindController::findString(const String& string, FindOptions options, unsigned maxMatchCount)
 {
-    m_webPage->corePage()->unmarkAllTextMatches();
-
     bool found = m_webPage->corePage()->findString(string, core(options));
 
-    m_webPage->drawingArea()->dispatchAfterEnsuringUpdatedScrollPosition(bind(&FindController::updateFindUIAfterPageScroll, this, found, string, options, maxMatchCount));
+    m_webPage->drawingArea()->dispatchAfterEnsuringUpdatedScrollPosition(WTF::bind(&FindController::updateFindUIAfterPageScroll, this, found, string, options, maxMatchCount));
 }
 
 void FindController::hideFindUI()
@@ -164,6 +165,7 @@ void FindController::hideFindUI()
     if (m_findPageOverlay)
         m_webPage->uninstallPageOverlay(m_findPageOverlay, false);
 
+    m_webPage->corePage()->unmarkAllTextMatches();
     hideFindIndicator();
 }
 

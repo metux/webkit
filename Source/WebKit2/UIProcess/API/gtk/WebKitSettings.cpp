@@ -33,6 +33,7 @@
 
 #include "WebKitPrivate.h"
 #include "WebKitSettingsPrivate.h"
+#include "WebPageProxy.h"
 #include <glib/gi18n-lib.h>
 #include <wtf/text/CString.h>
 
@@ -46,6 +47,7 @@ struct _WebKitSettingsPrivate {
     CString fantasyFontFamily;
     CString pictographFontFamily;
     CString defaultCharset;
+    bool allowModalDialogs;
     bool zoomTextOnly;
 };
 
@@ -105,8 +107,14 @@ enum {
     PROP_PRINT_BACKGROUNDS,
     PROP_ENABLE_WEBAUDIO,
     PROP_ENABLE_WEBGL,
+    PROP_ALLOW_MODAL_DIALOGS,
     PROP_ZOOM_TEXT_ONLY,
-    PROP_JAVASCRIPT_CAN_ACCESS_CLIPBOARD
+    PROP_JAVASCRIPT_CAN_ACCESS_CLIPBOARD,
+    PROP_MEDIA_PLAYBACK_REQUIRES_USER_GESTURE,
+    PROP_MEDIA_PLAYBACK_ALLOWS_INLINE,
+    PROP_DRAW_COMPOSITING_INDICATORS,
+    PROP_ENABLE_SITE_SPECIFIC_QUIRKS,
+    PROP_ENABLE_PAGE_CACHE
 };
 
 static void webKitSettingsSetProperty(GObject* object, guint propId, const GValue* value, GParamSpec* paramSpec)
@@ -213,11 +221,29 @@ static void webKitSettingsSetProperty(GObject* object, guint propId, const GValu
     case PROP_ENABLE_WEBGL:
         webkit_settings_set_enable_webgl(settings, g_value_get_boolean(value));
         break;
+    case PROP_ALLOW_MODAL_DIALOGS:
+        webkit_settings_set_allow_modal_dialogs(settings, g_value_get_boolean(value));
+        break;
     case PROP_ZOOM_TEXT_ONLY:
         webkit_settings_set_zoom_text_only(settings, g_value_get_boolean(value));
         break;
     case PROP_JAVASCRIPT_CAN_ACCESS_CLIPBOARD:
         webkit_settings_set_javascript_can_access_clipboard(settings, g_value_get_boolean(value));
+        break;
+    case PROP_MEDIA_PLAYBACK_REQUIRES_USER_GESTURE:
+        webkit_settings_set_media_playback_requires_user_gesture(settings, g_value_get_boolean(value));
+        break;
+    case PROP_MEDIA_PLAYBACK_ALLOWS_INLINE:
+        webkit_settings_set_media_playback_allows_inline(settings, g_value_get_boolean(value));
+        break;
+    case PROP_DRAW_COMPOSITING_INDICATORS:
+        webkit_settings_set_draw_compositing_indicators(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_SITE_SPECIFIC_QUIRKS:
+        webkit_settings_set_enable_site_specific_quirks(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_PAGE_CACHE:
+        webkit_settings_set_enable_page_cache(settings, g_value_get_boolean(value));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
@@ -329,11 +355,29 @@ static void webKitSettingsGetProperty(GObject* object, guint propId, GValue* val
     case PROP_ENABLE_WEBGL:
         g_value_set_boolean(value, webkit_settings_get_enable_webgl(settings));
         break;
+    case PROP_ALLOW_MODAL_DIALOGS:
+        g_value_set_boolean(value, webkit_settings_get_allow_modal_dialogs(settings));
+        break;
     case PROP_ZOOM_TEXT_ONLY:
         g_value_set_boolean(value, webkit_settings_get_zoom_text_only(settings));
         break;
     case PROP_JAVASCRIPT_CAN_ACCESS_CLIPBOARD:
         g_value_set_boolean(value, webkit_settings_get_javascript_can_access_clipboard(settings));
+        break;
+    case PROP_MEDIA_PLAYBACK_REQUIRES_USER_GESTURE:
+        g_value_set_boolean(value, webkit_settings_get_media_playback_requires_user_gesture(settings));
+        break;
+    case PROP_MEDIA_PLAYBACK_ALLOWS_INLINE:
+        g_value_set_boolean(value, webkit_settings_get_media_playback_allows_inline(settings));
+        break;
+    case PROP_DRAW_COMPOSITING_INDICATORS:
+        g_value_set_boolean(value, webkit_settings_get_draw_compositing_indicators(settings));
+        break;
+    case PROP_ENABLE_SITE_SPECIFIC_QUIRKS:
+        g_value_set_boolean(value, webkit_settings_get_enable_site_specific_quirks(settings));
+        break;
+    case PROP_ENABLE_PAGE_CACHE:
+        g_value_set_boolean(value, webkit_settings_get_enable_page_cache(settings));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
@@ -832,6 +876,24 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
                                                          readWriteConstructParamFlags));
 
     /**
+     * WebKitSettings:allow-modal-dialogs:
+     *
+     * Determine whether it's allowed to create and run modal dialogs
+     * from a #WebKitWebView through JavaScript with
+     * <function>window.showModalDialog</function>. If it's set to
+     * %FALSE, the associated #WebKitWebView won't be able to create
+     * new modal dialogs, so not even the #WebKitWebView::create
+     * signal will be emitted.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ALLOW_MODAL_DIALOGS,
+                                    g_param_spec_boolean("allow-modal-dialogs",
+                                                         _("Allow modal dialogs"),
+                                                         _("Whether it is possible to create modal dialogs"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
      * WebKitSettings:zoom-text-only:
      *
      * Whether #WebKitWebView:zoom-level affects only the
@@ -862,6 +924,92 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
                                                          FALSE,
                                                          readWriteConstructParamFlags));
 
+    /**
+     * WebKitSettings:media-playback-requires-user-gesture:
+     *
+     * Whether a user gesture (such as clicking the play button)
+     * would be required to start media playback or load media. This is off
+     * by default, so media playback could start automatically.
+     * Setting it on requires a gesture by the user to start playback, or to
+     * load the media.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_MEDIA_PLAYBACK_REQUIRES_USER_GESTURE,
+                                    g_param_spec_boolean("media-playback-requires-user-gesture",
+                                                         _("Media playback requires user gesture"),
+                                                         _("Whether media playback requires user gesture"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:media-playback-allows-inline
+     *
+     * Whether media playback is full-screen only or inline playback is allowed.
+     * This is %TRUE by default, so media playback can be inline. Setting it to
+     * %FALSE allows specifying that media playback should be always fullscreen.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_MEDIA_PLAYBACK_ALLOWS_INLINE,
+                                    g_param_spec_boolean("media-playback-allows-inline",
+                                                         _("Media playback allows inline"),
+                                                         _("Whether media playback allows inline"),
+                                                         TRUE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:draw-compositing-indicators:
+     *
+     * Whether to draw compositing borders and repaint counters on layers drawn
+     * with accelerated compositing. This is useful for debugging issues related
+     * to web content that is composited with the GPU.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_DRAW_COMPOSITING_INDICATORS,
+                                    g_param_spec_boolean("draw-compositing-indicators",
+                                                         _("Draw compositing indicators"),
+                                                         _("Whether to draw compositing borders and repaint counters"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-site-specific-quirks:
+     *
+     * Whether to turn on site-specific quirks. Turning this on will
+     * tell WebKit to use some site-specific workarounds for
+     * better web compatibility. For example, older versions of
+     * MediaWiki will incorrectly send to WebKit a css file with KHTML
+     * workarounds. By turning on site-specific quirks, WebKit will
+     * special-case this and other cases to make some specific sites work.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_SITE_SPECIFIC_QUIRKS,
+                                    g_param_spec_boolean("enable-site-specific-quirks",
+                                                         _("Enable Site Specific Quirks"),
+                                                         _("Enables the site-specific compatibility workarounds"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-page-cache:
+     *
+     * Enable or disable the page cache. Disabling the page cache is
+     * generally only useful for special circumstances like low-memory
+     * scenarios or special purpose applications like static HTML
+     * viewers. This setting only controls the Page Cache, this cache
+     * is different than the disk-based or memory-based traditional
+     * resource caches, its point is to make going back and forth
+     * between pages much faster. For details about the different types
+     * of caches and their purposes see:
+     * http://webkit.org/blog/427/webkit-page-cache-i-the-basics/
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_PAGE_CACHE,
+                                    g_param_spec_boolean("enable-page-cache",
+                                                         _("Enable page cache"),
+                                                         _("Whether the page cache should be used"),
+                                                         TRUE,
+                                                         readWriteConstructParamFlags));
+
     g_type_class_add_private(klass, sizeof(WebKitSettingsPrivate));
 }
 
@@ -873,34 +1021,35 @@ static void webkit_settings_init(WebKitSettings* settings)
 
     priv->preferences = adoptWK(WKPreferencesCreate());
 
-    WKRetainPtr<WKStringRef> defaultFontFamilyRef = WKPreferencesCopyStandardFontFamily(priv->preferences.get());
+    WKRetainPtr<WKStringRef> defaultFontFamilyRef = adoptWK(WKPreferencesCopyStandardFontFamily(priv->preferences.get()));
     priv->defaultFontFamily =  WebKit::toImpl(defaultFontFamilyRef.get())->string().utf8();
 
-    WKRetainPtr<WKStringRef> monospaceFontFamilyRef = WKPreferencesCopyFixedFontFamily(priv->preferences.get());
+    WKRetainPtr<WKStringRef> monospaceFontFamilyRef = adoptWK(WKPreferencesCopyFixedFontFamily(priv->preferences.get()));
     priv->monospaceFontFamily = WebKit::toImpl(monospaceFontFamilyRef.get())->string().utf8();
 
-    WKRetainPtr<WKStringRef> serifFontFamilyRef = WKPreferencesCopySerifFontFamily(priv->preferences.get());
+    WKRetainPtr<WKStringRef> serifFontFamilyRef = adoptWK(WKPreferencesCopySerifFontFamily(priv->preferences.get()));
     priv->serifFontFamily = WebKit::toImpl(serifFontFamilyRef.get())->string().utf8();
 
-    WKRetainPtr<WKStringRef> sansSerifFontFamilyRef = WKPreferencesCopySansSerifFontFamily(priv->preferences.get());
+    WKRetainPtr<WKStringRef> sansSerifFontFamilyRef = adoptWK(WKPreferencesCopySansSerifFontFamily(priv->preferences.get()));
     priv->sansSerifFontFamily = WebKit::toImpl(sansSerifFontFamilyRef.get())->string().utf8();
 
-    WKRetainPtr<WKStringRef> cursiveFontFamilyRef = WKPreferencesCopyCursiveFontFamily(priv->preferences.get());
+    WKRetainPtr<WKStringRef> cursiveFontFamilyRef = adoptWK(WKPreferencesCopyCursiveFontFamily(priv->preferences.get()));
     priv->cursiveFontFamily = WebKit::toImpl(cursiveFontFamilyRef.get())->string().utf8();
 
-    WKRetainPtr<WKStringRef> fantasyFontFamilyRef = WKPreferencesCopyFantasyFontFamily(priv->preferences.get());
+    WKRetainPtr<WKStringRef> fantasyFontFamilyRef = adoptWK(WKPreferencesCopyFantasyFontFamily(priv->preferences.get()));
     priv->fantasyFontFamily = WebKit::toImpl(fantasyFontFamilyRef.get())->string().utf8();
 
-    WKRetainPtr<WKStringRef> pictographFontFamilyRef = WKPreferencesCopyPictographFontFamily(priv->preferences.get());
+    WKRetainPtr<WKStringRef> pictographFontFamilyRef = adoptWK(WKPreferencesCopyPictographFontFamily(priv->preferences.get()));
     priv->pictographFontFamily = WebKit::toImpl(pictographFontFamilyRef.get())->string().utf8();
 
-    WKRetainPtr<WKStringRef> defaultCharsetRef = WKPreferencesCopyDefaultTextEncodingName(priv->preferences.get());
+    WKRetainPtr<WKStringRef> defaultCharsetRef = adoptWK(WKPreferencesCopyDefaultTextEncodingName(priv->preferences.get()));
     priv->defaultCharset = WebKit::toImpl(defaultCharsetRef.get())->string().utf8();
 }
 
 void webkitSettingsAttachSettingsToPage(WebKitSettings* settings, WKPageRef wkPage)
 {
     WKPageGroupSetPreferences(WKPageGetPageGroup(wkPage), settings->priv->preferences.get());
+    WebKit::toImpl(wkPage)->setCanRunModal(settings->priv->allowModalDialogs);
 }
 
 /**
@@ -1465,7 +1614,7 @@ void webkit_settings_set_serif_font_family(WebKitSettings* settings, const gchar
     if (!g_strcmp0(priv->serifFontFamily.data(), serifFontFamily))
         return;
 
-    WKRetainPtr<WKStringRef> serifFontFamilyRef = WKStringCreateWithUTF8CString(serifFontFamily);
+    WKRetainPtr<WKStringRef> serifFontFamilyRef = adoptWK(WKStringCreateWithUTF8CString(serifFontFamily));
     WKPreferencesSetSerifFontFamily(priv->preferences.get(), serifFontFamilyRef.get());
     priv->serifFontFamily = WebKit::toImpl(serifFontFamilyRef.get())->string().utf8();
 
@@ -2121,6 +2270,39 @@ void webkit_settings_set_enable_webgl(WebKitSettings* settings, gboolean enabled
 }
 
 /**
+ * webkit_settings_set_allow_modal_dialogs:
+ * @settings: a #WebKitSettings
+ * @allowed: Value to be set
+ *
+ * Set the #WebKitSettings:allow-modal-dialogs property.
+ */
+void webkit_settings_set_allow_modal_dialogs(WebKitSettings* settings, gboolean allowed)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (priv->allowModalDialogs == allowed)
+        return;
+
+    priv->allowModalDialogs = allowed;
+    g_object_notify(G_OBJECT(settings), "allow-modal-dialogs");
+}
+
+/**
+ * webkit_settings_get_allow_modal_dialogs:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:allow-modal-dialogs property.
+ *
+ * Returns: %TRUE if it's allowed to create and run modal dialogs or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_allow_modal_dialogs(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+    return settings->priv->allowModalDialogs;
+}
+
+/**
  * webkit_settings_set_zoom_text_only:
  * @settings: a #WebKitSettings
  * @zoom_text_only: Value to be set
@@ -2192,4 +2374,184 @@ void webkit_settings_set_javascript_can_access_clipboard(WebKitSettings* setting
     WKPreferencesSetDOMPasteAllowed(priv->preferences.get(), enabled);
 
     g_object_notify(G_OBJECT(settings), "javascript-can-access-clipboard");
+}
+
+/**
+ * webkit_settings_set_media_playback_requires_user_gesture:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:media-playback-requires-user-gesture property.
+ */
+void webkit_settings_set_media_playback_requires_user_gesture(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetMediaPlaybackRequiresUserGesture(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetMediaPlaybackRequiresUserGesture(priv->preferences.get(), enabled);
+
+    g_object_notify(G_OBJECT(settings), "media-playback-requires-user-gesture");
+}
+
+/**
+ * webkit_settings_get_media_playback_requires_user_gesture:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:media-playback-requires-user-gesture property.
+ *
+ * Returns: %TRUE If an user gesture is needed to play or load media
+ *    or %FALSE if no user gesture is needed.
+ */
+gboolean webkit_settings_get_media_playback_requires_user_gesture(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetMediaPlaybackRequiresUserGesture(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_media_playback_allows_inline:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:media-playback-allows-inline property.
+ */
+void webkit_settings_set_media_playback_allows_inline(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetMediaPlaybackAllowsInline(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetMediaPlaybackAllowsInline(priv->preferences.get(), enabled);
+
+    g_object_notify(G_OBJECT(settings), "media-playback-allows-inline");
+}
+
+/**
+ * webkit_settings_get_media_playback_allows_inline:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:media-playback-allows-inline property.
+ *
+ * Returns: %TRUE If inline playback is allowed for media
+ *    or %FALSE if only fullscreen playback is allowed.
+ */
+gboolean webkit_settings_get_media_playback_allows_inline(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), TRUE);
+
+    return WKPreferencesGetMediaPlaybackAllowsInline(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_draw_compositing_indicators:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:draw-compositing-indicators property.
+ */
+void webkit_settings_set_draw_compositing_indicators(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (WKPreferencesGetCompositingBordersVisible(priv->preferences.get()) == enabled
+        && WKPreferencesGetCompositingRepaintCountersVisible(priv->preferences.get()) == enabled)
+        return;
+
+    WKPreferencesSetCompositingBordersVisible(priv->preferences.get(), enabled);
+    WKPreferencesSetCompositingRepaintCountersVisible(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "draw-compositing-indicators");
+}
+
+/**
+ * webkit_settings_get_draw_compositing_indicators:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:draw-compositing-indicators property.
+ *
+ * Returns: %TRUE If compositing borders are drawn or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_draw_compositing_indicators(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+    return WKPreferencesGetCompositingBordersVisible(settings->priv->preferences.get())
+           && WKPreferencesGetCompositingRepaintCountersVisible(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_get_enable_site_specific_quirks:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-site-specific-quirks property.
+ *
+ * Returns: %TRUE if site specific quirks are enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_site_specific_quirks(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetNeedsSiteSpecificQuirks(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_enable_site_specific_quirks:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-site-specific-quirks property.
+ */
+void webkit_settings_set_enable_site_specific_quirks(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetNeedsSiteSpecificQuirks(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetNeedsSiteSpecificQuirks(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "enable-site-specific-quirks");
+}
+
+/**
+ * webkit_settings_get_enable_page_cache:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-page-cache property.
+ *
+ * Returns: %TRUE if page cache enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_page_cache(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return WKPreferencesGetPageCacheEnabled(settings->priv->preferences.get());
+}
+
+/**
+ * webkit_settings_set_enable_page_cache:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-page-cache property.
+ */
+void webkit_settings_set_enable_page_cache(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = WKPreferencesGetPageCacheEnabled(priv->preferences.get());
+    if (currentValue == enabled)
+        return;
+
+    WKPreferencesSetPageCacheEnabled(priv->preferences.get(), enabled);
+    g_object_notify(G_OBJECT(settings), "enable-page-cache");
 }

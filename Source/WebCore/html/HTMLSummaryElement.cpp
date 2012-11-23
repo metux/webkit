@@ -21,9 +21,9 @@
 #include "config.h"
 #include "HTMLSummaryElement.h"
 
-#if ENABLE(DETAILS)
-
+#if ENABLE(DETAILS_ELEMENT)
 #include "DetailsMarkerControl.h"
+#include "ElementShadow.h"
 #include "HTMLContentElement.h"
 #include "HTMLDetailsElement.h"
 #include "HTMLNames.h"
@@ -33,7 +33,6 @@
 #include "PlatformMouseEvent.h"
 #include "RenderBlock.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 
 namespace WebCore {
 
@@ -80,8 +79,8 @@ bool HTMLSummaryElement::childShouldCreateRenderer(const NodeRenderingContext& c
 
 void HTMLSummaryElement::createShadowSubtree()
 {
-    ASSERT(!hasShadowRoot());
-    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
+    ASSERT(!shadow());
+    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot);
     root->appendChild(DetailsMarkerControl::create(document()), ASSERT_NO_EXCEPTION, true);
     root->appendChild(SummaryContentElement::create(document()), ASSERT_NO_EXCEPTION, true);
 }
@@ -109,7 +108,7 @@ static bool isClickableControl(Node* node)
     Element* element = toElement(node);
     if (element->isFormControlElement())
         return true;
-    Element* host = toElement(element->shadowAncestorNode());
+    Element* host = element->shadowHost();
     return host && host->isFormControlElement();
 }
 
@@ -156,6 +155,14 @@ void HTMLSummaryElement::defaultEventHandler(Event* event)
     }
 
     HTMLElement::defaultEventHandler(event);
+}
+
+bool HTMLSummaryElement::willRespondToMouseClickEvents()
+{
+    if (isMainSummary() && renderer())
+        return true;
+
+    return HTMLElement::willRespondToMouseClickEvents();
 }
 
 }

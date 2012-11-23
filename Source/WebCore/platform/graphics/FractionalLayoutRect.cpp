@@ -128,31 +128,22 @@ FractionalLayoutRect unionRect(const Vector<FractionalLayoutRect>& rects)
 
 IntRect enclosingIntRect(const FractionalLayoutRect& rect)
 {
-    float x = floorf(rect.x().toFloat());
-    float y = floorf(rect.y().toFloat());
-    float width = ceilf(rect.maxX().toFloat()) - x;
-    float height = ceilf(rect.maxY().toFloat()) - y;
+    IntPoint location = flooredIntPoint(rect.minXMinYCorner());
+    IntPoint maxPoint = ceiledIntPoint(rect.maxXMaxYCorner());
 
-    return IntRect(clampToInteger(x), clampToInteger(y), 
-                   clampToInteger(width), clampToInteger(height));
+    return IntRect(location, maxPoint - location);
 }
 
 FractionalLayoutRect enclosingFractionalLayoutRect(const FloatRect& rect)
 {
 #if ENABLE(SUBPIXEL_LAYOUT)
-    return FractionalLayoutRect(rect.x(), rect.y(),
-                     rect.maxX() - rect.x() + FractionalLayoutUnit::epsilon(),
-                     rect.maxY() - rect.y() + FractionalLayoutUnit::epsilon());
+    FractionalLayoutPoint location = flooredFractionalLayoutPoint(rect.minXMinYCorner());
+    FractionalLayoutPoint maxPoint = ceiledFractionalLayoutPoint(rect.maxXMaxYCorner());
+
+    return FractionalLayoutRect(location, maxPoint - location);
 #else
     return enclosingIntRect(rect);
 #endif
-}
-
-IntRect pixelSnappedIntRect(const FractionalLayoutRect& rect)
-{
-    IntPoint roundedLocation = roundedIntPoint(rect.location());
-    return IntRect(roundedLocation, IntSize((rect.x() + rect.width()).round() - roundedLocation.x(),
-                                            (rect.y() + rect.height()).round() - roundedLocation.y()));
 }
 
 } // namespace WebCore

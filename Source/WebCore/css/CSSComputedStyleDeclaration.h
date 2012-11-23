@@ -72,6 +72,8 @@ public:
 
     PassRefPtr<StylePropertySet> copyPropertiesInSet(const CSSPropertyID* set, unsigned length) const;
 
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 private:
     CSSComputedStyleDeclaration(PassRefPtr<Node>, bool allowVisitedStyle, const String&);
 
@@ -111,6 +113,7 @@ private:
 
     PassRefPtr<CSSValueList> getCSSPropertyValuesForShorthandProperties(const StylePropertyShorthand&) const;
     PassRefPtr<CSSValueList> getCSSPropertyValuesForSidesShorthand(const StylePropertyShorthand&) const;
+    PassRefPtr<CSSValueList> getBackgroundShorthandValue() const;
 
     RefPtr<Node> m_node;
     PseudoId m_pseudoElementSpecifier;

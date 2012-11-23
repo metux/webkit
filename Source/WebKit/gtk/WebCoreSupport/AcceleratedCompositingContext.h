@@ -27,9 +27,13 @@
 #include "webkitwebview.h"
 #include <wtf/PassOwnPtr.h>
 
+#if USE(TEXTURE_MAPPER)
+#include "TextureMapperLayer.h"
+#endif
+
 #if USE(TEXTURE_MAPPER_GL)
 #include "GLContext.h"
-#include "TextureMapperLayer.h"
+#include "RedirectedXCompositeWindow.h"
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -45,13 +49,11 @@ public:
     }
 
     virtual ~AcceleratedCompositingContext();
-    void attachRootGraphicsLayer(WebCore::GraphicsLayer*);
-    void scheduleRootLayerRepaint(const WebCore::IntRect&);
-    void markForSync();
-    void syncLayersTimeout();
-    void syncLayersNow();
+    void setRootCompositingLayer(WebCore::GraphicsLayer*);
+    void setNonCompositedContentsNeedDisplay(const WebCore::IntRect&);
+    void scheduleLayerFlush();
     void resizeRootLayer(const WebCore::IntSize&);
-    bool renderLayersToWindow(const WebCore::IntRect& clipRect);
+    bool renderLayersToWindow(cairo_t*, const WebCore::IntRect& clipRect);
     bool enabled();
 
     // GraphicsLayerClient
@@ -61,15 +63,37 @@ public:
     virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
     virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
 
+    void initialize();
+
+    enum CompositePurpose { ForResize, NotForResize };
+    void compositeLayersToContext(CompositePurpose = NotForResize);
+
+    void flushAndRenderLayers();
+    bool flushPendingLayerChanges();
+    void scrollNonCompositedContents(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
+
 private:
     WebKitWebView* m_webView;
-    unsigned int m_syncTimerCallbackId;
+    unsigned int m_layerFlushTimerCallbackId;
 
 #if USE(CLUTTER)
     WebCore::GraphicsLayer* m_rootGraphicsLayer;
     GtkWidget* m_rootLayerEmbedder;
 #elif USE(TEXTURE_MAPPER_GL)
-    WebCore::GLContext* glContext();
+    OwnPtr<WebCore::RedirectedXCompositeWindow> m_redirectedWindow;
+    OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
+    OwnPtr<WebCore::GraphicsLayer> m_nonCompositedContentLayer;
+    OwnPtr<WebCore::TextureMapper> m_textureMapper;
+    double m_lastFlushTime;
+    double m_redrawPendingTime;
+    bool m_needsExtraFlush;
+
+    void layerFlushTimerFired();
+    void stopAnyPendingLayerFlush();
+    static gboolean layerFlushTimerFiredCallback(AcceleratedCompositingContext*);
+    WebCore::GLContext* prepareForRendering();
+    void clearEverywhere();
+#elif USE(TEXTURE_MAPPER)
     WebCore::TextureMapperLayer* m_rootTextureMapperLayer;
     OwnPtr<WebCore::GraphicsLayer> m_rootGraphicsLayer;
     OwnPtr<WebCore::TextureMapper> m_textureMapper;

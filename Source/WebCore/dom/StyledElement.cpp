@@ -37,13 +37,17 @@
 #include "Document.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
+#include "ScriptableDocumentParser.h"
 #include "StylePropertySet.h"
 #include "StyleResolver.h"
 #include <wtf/HashFunctions.h>
+#include <wtf/text/TextPosition.h>
 
 using namespace std;
 
 namespace WebCore {
+
+COMPILE_ASSERT(sizeof(StyledElement) == sizeof(Element), styledelement_should_remain_same_size_as_element);
 
 using namespace HTMLNames;
 
@@ -123,7 +127,12 @@ void StyledElement::updateStyleAttribute() const
     ASSERT(!isStyleAttributeValid());
     setIsStyleAttributeValid();
     if (const StylePropertySet* inlineStyle = this->inlineStyle())
-        const_cast<StyledElement*>(this)->setAttribute(styleAttr, inlineStyle->asText(), InUpdateStyleAttribute);
+        const_cast<StyledElement*>(this)->setSynchronizedLazyAttribute(styleAttr, inlineStyle->asText());
+}
+
+StyledElement::StyledElement(const QualifiedName& name, Document* document, ConstructionType type)
+    : Element(name, document, type)
+{
 }
 
 StyledElement::~StyledElement()
@@ -131,56 +140,43 @@ StyledElement::~StyledElement()
     destroyInlineStyle();
 }
 
-CSSStyleDeclaration* StyledElement::style() 
-{ 
-    return ensureAttributeData()->ensureMutableInlineStyle(this)->ensureInlineCSSStyleDeclaration(this); 
+CSSStyleDeclaration* StyledElement::style()
+{
+    return ensureInlineStyle()->ensureInlineCSSStyleDeclaration(this);
 }
 
-void StyledElement::attributeChanged(Attribute* attr)
+void StyledElement::attributeChanged(const Attribute& attribute)
 {
-    parseAttribute(attr);
-
-    if (isPresentationAttribute(attr->name())) {
+    if (isPresentationAttribute(attribute.name())) {
         setAttributeStyleDirty();
         setNeedsStyleRecalc(InlineStyleChange);
     }
 
-    Element::attributeChanged(attr);
+    Element::attributeChanged(attribute);
 }
 
-void StyledElement::classAttributeChanged(const AtomicString& newClassString)
+void StyledElement::styleAttributeChanged(const AtomicString& newStyleString, ShouldReparseStyleAttribute shouldReparse)
 {
-    const UChar* characters = newClassString.characters();
-    unsigned length = newClassString.length();
-    unsigned i;
-    for (i = 0; i < length; ++i) {
-        if (isNotHTMLSpace(characters[i]))
-            break;
-    }
-    bool hasClass = i < length;
-    if (hasClass) {
-        const bool shouldFoldCase = document()->inQuirksMode();
-        ensureAttributeData()->setClass(newClassString, shouldFoldCase);
-        if (DOMTokenList* classList = optionalClassList())
-            static_cast<ClassList*>(classList)->reset(newClassString);
-    } else if (attributeData())
-        attributeData()->clearClass();
-    setNeedsStyleRecalc();
-}
-
-void StyledElement::parseAttribute(Attribute* attr)
-{
-    if (attr->name() == classAttr)
-        classAttributeChanged(attr->value());
-    else if (attr->name() == styleAttr) {
-        if (attr->isNull())
+    if (shouldReparse) {
+        WTF::OrdinalNumber startLineNumber = WTF::OrdinalNumber::beforeFirst();
+        if (document() && document()->scriptableDocumentParser() && !document()->isInDocumentWrite())
+            startLineNumber = document()->scriptableDocumentParser()->lineNumber();
+        if (newStyleString.isNull())
             destroyInlineStyle();
-        else if (document()->contentSecurityPolicy()->allowInlineStyle())
-            ensureAttributeData()->updateInlineStyleAvoidingMutation(this, attr->value());
+        else if (document()->contentSecurityPolicy()->allowInlineStyle(document()->url(), startLineNumber))
+            ensureAttributeData()->updateInlineStyleAvoidingMutation(this, newStyleString);
         setIsStyleAttributeValid();
-        setNeedsStyleRecalc();
-        InspectorInstrumentation::didInvalidateStyleAttr(document(), this);
     }
+    setNeedsStyleRecalc();
+    InspectorInstrumentation::didInvalidateStyleAttr(document(), this);
+}
+
+void StyledElement::parseAttribute(const Attribute& attribute)
+{
+    if (attribute.name() == styleAttr)
+        styleAttributeChanged(attribute.value());
+    else
+        Element::parseAttribute(attribute);
 }
 
 void StyledElement::inlineStyleChanged()
@@ -192,21 +188,21 @@ void StyledElement::inlineStyleChanged()
     
 bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, int identifier, bool important)
 {
-    ensureAttributeData()->ensureMutableInlineStyle(this)->setProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important);
+    ensureInlineStyle()->setProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important);
     inlineStyleChanged();
     return true;
 }
 
 bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, double value, CSSPrimitiveValue::UnitTypes unit, bool important)
 {
-    ensureAttributeData()->ensureMutableInlineStyle(this)->setProperty(propertyID, cssValuePool().createValue(value, unit), important);
+    ensureInlineStyle()->setProperty(propertyID, cssValuePool().createValue(value, unit), important);
     inlineStyleChanged();
     return true;
 }
 
 bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, const String& value, bool important)
 {
-    bool changes = ensureAttributeData()->ensureMutableInlineStyle(this)->setProperty(propertyID, value, important, document()->elementSheet()->internal());
+    bool changes = ensureInlineStyle()->setProperty(propertyID, value, important, document()->elementSheet()->contents());
     if (changes)
         inlineStyleChanged();
     return changes;
@@ -214,10 +210,9 @@ bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, const Strin
 
 bool StyledElement::removeInlineStyleProperty(CSSPropertyID propertyID)
 {
-    StylePropertySet* inlineStyle = attributeData() ? attributeData()->inlineStyle() : 0;
-    if (!inlineStyle)
+    if (!attributeData() || !attributeData()->inlineStyle())
         return false;
-    bool changes = inlineStyle->removeProperty(propertyID);
+    bool changes = ensureInlineStyle()->removeProperty(propertyID);
     if (changes)
         inlineStyleChanged();
     return changes;
@@ -225,8 +220,8 @@ bool StyledElement::removeInlineStyleProperty(CSSPropertyID propertyID)
 
 void StyledElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
 {
-    if (StylePropertySet* inlineStyle = attributeData() ? attributeData()->inlineStyle() : 0)
-        inlineStyle->addSubresourceStyleURLs(urls, document()->elementSheet()->internal());
+    if (const StylePropertySet* inlineStyle = attributeData() ? attributeData()->inlineStyle() : 0)
+        inlineStyle->addSubresourceStyleURLs(urls, document()->elementSheet()->contents());
 }
 
 static inline bool attributeNameSort(const pair<AtomicStringImpl*, AtomicString>& p1, const pair<AtomicStringImpl*, AtomicString>& p2)
@@ -245,7 +240,7 @@ void StyledElement::makePresentationAttributeCacheKey(PresentationAttributeCache
         return;
     unsigned size = attributeCount();
     for (unsigned i = 0; i < size; ++i) {
-        Attribute* attribute = attributeItem(i);
+        const Attribute* attribute = attributeItem(i);
         if (!isPresentationAttribute(attribute->name()))
             continue;
         if (!attribute->namespaceURI().isNull())
@@ -295,18 +290,13 @@ void StyledElement::updateAttributeStyle()
         style = StylePropertySet::create(isSVGElement() ? SVGAttributeMode : CSSQuirksMode);
         unsigned size = attributeCount();
         for (unsigned i = 0; i < size; ++i) {
-            Attribute* attribute = attributeItem(i);
-            collectStyleForAttribute(attribute, style.get());
+            const Attribute* attribute = attributeItem(i);
+            collectStyleForAttribute(*attribute, style.get());
         }
     }
     clearAttributeStyleDirty();
 
-    if (style->isEmpty())
-        attributeData()->setAttributeStyle(0);
-    else {
-        style->shrinkToFit();
-        attributeData()->setAttributeStyle(style);
-    }
+    attributeData()->setAttributeStyle(style->isEmpty() ? 0 : style);
 
     if (!cacheHash || cacheIterator->second)
         return;
@@ -336,7 +326,7 @@ void StyledElement::addPropertyToAttributeStyle(StylePropertySet* style, CSSProp
     
 void StyledElement::addPropertyToAttributeStyle(StylePropertySet* style, CSSPropertyID propertyID, const String& value)
 {
-    style->setProperty(propertyID, value, false, document()->elementSheet()->internal());
+    style->setProperty(propertyID, value, false, document()->elementSheet()->contents());
 }
 
 }

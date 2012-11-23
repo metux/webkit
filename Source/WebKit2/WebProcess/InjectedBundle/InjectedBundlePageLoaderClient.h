@@ -46,6 +46,12 @@ class APIObject;
 class InjectedBundleBackForwardListItem;
 class WebPage;
 class WebFrame;
+#if ENABLE(WEB_INTENTS)
+class InjectedBundleIntentRequest;
+#endif
+#if ENABLE(WEB_INTENTS_TAG)
+class WebIntentServiceInfo;
+#endif
 
 class InjectedBundlePageLoaderClient : public APIClient<WKBundlePageLoaderClient, kWKBundlePageLoaderClientCurrentVersion> {
 public:
@@ -56,6 +62,7 @@ public:
     void didCommitLoadForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didFinishDocumentLoadForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didFinishLoadForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
+    void didFinishProgress(WebPage*);
     void didFailLoadWithErrorForFrame(WebPage*, WebFrame*, const WebCore::ResourceError&, RefPtr<APIObject>& userData);
     void didSameDocumentNavigationForFrame(WebPage*, WebFrame*, SameDocumentNavigationType, RefPtr<APIObject>& userData);
     void didReceiveTitleForFrame(WebPage*, const String&, WebFrame*, RefPtr<APIObject>& userData);
@@ -63,6 +70,13 @@ public:
     void didDisplayInsecureContentForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didRunInsecureContentForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didDetectXSSForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
+
+#if ENABLE(WEB_INTENTS)
+    void didReceiveIntentForFrame(WebPage*, WebFrame*, InjectedBundleIntentRequest*, RefPtr<APIObject>& userData);
+#endif
+#if ENABLE(WEB_INTENTS_TAG)
+    void registerIntentServiceForFrame(WebPage*, WebFrame*, WebIntentServiceInfo*, RefPtr<APIObject>& userData);
+#endif
 
     void didFirstLayoutForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didFirstVisuallyNonEmptyLayoutForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
@@ -78,6 +92,8 @@ public:
     void willDisconnectDOMWindowExtensionFromGlobalObject(WebPage*, WebCore::DOMWindowExtension*);
     void didReconnectDOMWindowExtensionToGlobalObject(WebPage*, WebCore::DOMWindowExtension*);
     void willDestroyGlobalObjectForDOMWindowExtension(WebPage*, WebCore::DOMWindowExtension*);
+
+    bool shouldForceUniversalAccessFromLocalURL(WebPage*, const String& url);
 };
 
 } // namespace WebKit

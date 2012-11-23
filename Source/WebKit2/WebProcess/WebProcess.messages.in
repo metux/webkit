@@ -27,6 +27,10 @@ messages -> WebProcess {
     # Create a new page.
     CreateWebPage(uint64_t newPageID, WebKit::WebPageCreationParameters pageCreationParameters)
 
+#if ENABLE(WEB_INTENTS)
+    RemoveMessagePortChannel(uint64_t channelID);
+#endif
+
     # Visited link tracking.
     SetVisitedLinkTable(WebKit::SharedMemory::Handle handle)
     VisitedLinkStateChanged(Vector<WebCore::LinkHash> linkHashes)
@@ -54,6 +58,8 @@ messages -> WebProcess {
     ClearPluginSiteData(Vector<WTF::String> pluginPaths, Vector<WTF::String> sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID)
 #endif
 
+    DidGetPlugins(uint64_t requestID, Vector<WebCore::PluginInfo> plugins) DispatchOnConnectionQueue
+
 #if ENABLE(PLUGIN_PROCESS)
     PluginProcessCrashed(String pluginProcess) DispatchOnConnectionQueue
 #endif
@@ -75,8 +81,9 @@ messages -> WebProcess {
 
     GetWebCoreStatistics(uint64_t callbackID)
     GarbageCollectJavaScriptObjects()
+    SetJavaScriptGarbageCollectorTimerEnabled(bool enable)
 
-#if PLATFORM(MAC)
+#if USE(SECURITY_FRAMEWORK)
     SecItemResponse(uint64_t requestID, WebKit::SecItemResponseData response) DispatchOnConnectionQueue
     SecKeychainItemResponse(uint64_t requestID, WebKit::SecKeychainItemResponseData response) DispatchOnConnectionQueue
 #endif

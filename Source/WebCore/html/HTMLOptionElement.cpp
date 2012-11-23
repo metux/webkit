@@ -30,6 +30,7 @@
 #include "Attribute.h"
 #include "Document.h"
 #include "ExceptionCode.h"
+#include "HTMLDataListElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "HTMLSelectElement.h"
@@ -185,26 +186,32 @@ int HTMLOptionElement::index() const
     return 0;
 }
 
-void HTMLOptionElement::parseAttribute(Attribute* attr)
+void HTMLOptionElement::parseAttribute(const Attribute& attribute)
 {
-    if (attr->name() == disabledAttr) {
+#if ENABLE(DATALIST_ELEMENT)
+    if (attribute.name() == valueAttr) {
+        if (HTMLDataListElement* dataList = ownerDataListElement())
+            dataList->optionElementChildrenChanged();
+    } else
+#endif
+    if (attribute.name() == disabledAttr) {
         bool oldDisabled = m_disabled;
-        m_disabled = !attr->isNull();
+        m_disabled = !attribute.isNull();
         if (oldDisabled != m_disabled) {
             setNeedsStyleRecalc();
             if (renderer() && renderer()->style()->hasAppearance())
                 renderer()->theme()->stateChanged(renderer(), EnabledState);
         }
-    } else if (attr->name() == selectedAttr) {
+    } else if (attribute.name() == selectedAttr) {
         // FIXME: This doesn't match what the HTML specification says.
         // The specification implies that removing the selected attribute or
         // changing the value of a selected attribute that is already present
         // has no effect on whether the element is selected. Further, it seems
         // that we need to do more than just set m_isSelected to select in that
         // case; we'd need to do the other work from the setSelected function.
-        m_isSelected = !attr->isNull();
+        m_isSelected = !attribute.isNull();
     } else
-        HTMLElement::parseAttribute(attr);
+        HTMLElement::parseAttribute(attribute);
 }
 
 String HTMLOptionElement::value() const
@@ -245,14 +252,33 @@ void HTMLOptionElement::setSelectedState(bool selected)
 
     m_isSelected = selected;
     setNeedsStyleRecalc();
+
+    if (HTMLSelectElement* select = ownerSelectElement())
+        select->invalidateSelectedItems();
 }
 
 void HTMLOptionElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
+#if ENABLE(DATALIST_ELEMENT)
+    if (HTMLDataListElement* dataList = ownerDataListElement())
+        dataList->optionElementChildrenChanged();
+    else
+#endif
     if (HTMLSelectElement* select = ownerSelectElement())
         select->optionElementChildrenChanged();
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
+
+#if ENABLE(DATALIST_ELEMENT)
+HTMLDataListElement* HTMLOptionElement::ownerDataListElement() const
+{
+    for (ContainerNode* parent = parentNode(); parent ; parent = parent->parentNode()) {
+        if (parent->hasTagName(datalistTag))
+            return static_cast<HTMLDataListElement*>(parent);
+    }
+    return 0;
+}
+#endif
 
 HTMLSelectElement* HTMLOptionElement::ownerSelectElement() const
 {
@@ -303,10 +329,17 @@ String HTMLOptionElement::textIndentedToRespectGroupLabel() const
 
 bool HTMLOptionElement::disabled() const
 {
-    return ownElementDisabled() || (parentNode() && parentNode()->isHTMLElement() && static_cast<HTMLElement*>(parentNode())->disabled());
+    if (ownElementDisabled())
+        return true;
+
+    if (!parentNode() || !parentNode()->isHTMLElement())
+        return false;
+
+    HTMLElement* parentElement = static_cast<HTMLElement*>(parentNode());
+    return parentElement->hasTagName(optgroupTag) && parentElement->disabled();
 }
 
-Node::InsertionNotificationRequest HTMLOptionElement::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest HTMLOptionElement::insertedInto(ContainerNode* insertionPoint)
 {
     if (HTMLSelectElement* select = ownerSelectElement()) {
         select->setRecalcListItems();

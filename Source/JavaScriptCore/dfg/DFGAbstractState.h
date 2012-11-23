@@ -92,6 +92,36 @@ public:
         MergeToSuccessors
     };
     
+    enum BranchDirection {
+        // This is not a branch and so there is no branch direction, or
+        // the branch direction has yet to be set.
+        InvalidBranchDirection,
+        
+        // The branch takes the true case.
+        TakeTrue,
+        
+        // The branch takes the false case.
+        TakeFalse,
+        
+        // For all we know, the branch could go either direction, so we
+        // have to assume the worst.
+        TakeBoth
+    };
+    
+    static const char* branchDirectionToString(BranchDirection branchDirection)
+    {
+        switch (branchDirection) {
+        case InvalidBranchDirection:
+            return "Invalid";
+        case TakeTrue:
+            return "TakeTrue";
+        case TakeFalse:
+            return "TakeFalse";
+        case TakeBoth:
+            return "TakeBoth";
+        }
+    }
+
     AbstractState(Graph&);
     
     ~AbstractState();
@@ -104,6 +134,11 @@ public:
     AbstractValue& forNode(Edge nodeUse)
     {
         return forNode(nodeUse.index());
+    }
+    
+    Operands<AbstractValue>& variables()
+    {
+        return m_variables;
     }
     
     // Call this before beginning CFA to initialize the abstract values of
@@ -139,7 +174,11 @@ public:
     //    A true return means that you must revisit (at least) the successor
     //    blocks. This also sets cfaShouldRevisit to true for basic blocks
     //    that must be visited next.
-    bool endBasicBlock(MergeMode);
+    //
+    // If you'd like to know what direction the branch at the end of the
+    // basic block is thought to have taken, you can pass a non-0 pointer
+    // for BranchDirection.
+    bool endBasicBlock(MergeMode, BranchDirection* = 0);
     
     // Reset the AbstractState. This throws away any results, and at this point
     // you can safely call beginBasicBlock() on any basic block.
@@ -153,6 +192,9 @@ public:
     // for block terminals, so long as those terminals are not Return or variants
     // of Throw.
     bool execute(unsigned);
+    
+    // Did the last executed node clobber the world?
+    bool didClobber() const { return m_didClobber; }
     
     // Is the execution state still valid? This will be false if execute() has
     // returned false previously.
@@ -169,18 +211,79 @@ public:
     // successors. Returns true if any of the successors' states changed. Note
     // that this is automatically called in endBasicBlock() if MergeMode is
     // MergeToSuccessors.
-    bool mergeToSuccessors(Graph&, BasicBlock*);
+    bool mergeToSuccessors(Graph&, BasicBlock*, BranchDirection);
 
-#ifndef NDEBUG
     void dump(FILE* out);
-#endif
     
 private:
-    void clobberStructures(unsigned);
+    void clobberWorld(const CodeOrigin&, unsigned indexInBlock);
+    void clobberCapturedVars(const CodeOrigin&);
+    void clobberStructures(unsigned indexInBlock);
     
     bool mergeStateAtTail(AbstractValue& destination, AbstractValue& inVariable, NodeIndex);
     
     static bool mergeVariableBetweenBlocks(AbstractValue& destination, AbstractValue& source, NodeIndex destinationNodeIndex, NodeIndex sourceNodeIndex);
+    
+    void speculateInt32Unary(Node& node, bool forceCanExit = false)
+    {
+        AbstractValue& childValue = forNode(node.child1());
+        node.setCanExit(forceCanExit || !isInt32Speculation(childValue.m_type));
+        childValue.filter(SpecInt32);
+    }
+    
+    void speculateNumberUnary(Node& node)
+    {
+        AbstractValue& childValue = forNode(node.child1());
+        node.setCanExit(!isNumberSpeculation(childValue.m_type));
+        childValue.filter(SpecNumber);
+    }
+    
+    void speculateBooleanUnary(Node& node)
+    {
+        AbstractValue& childValue = forNode(node.child1());
+        node.setCanExit(!isBooleanSpeculation(childValue.m_type));
+        childValue.filter(SpecBoolean);
+    }
+    
+    void speculateInt32Binary(Node& node, bool forceCanExit = false)
+    {
+        AbstractValue& childValue1 = forNode(node.child1());
+        AbstractValue& childValue2 = forNode(node.child2());
+        node.setCanExit(
+            forceCanExit
+            || !isInt32Speculation(childValue1.m_type)
+            || !isInt32Speculation(childValue2.m_type));
+        childValue1.filter(SpecInt32);
+        childValue2.filter(SpecInt32);
+    }
+    
+    void speculateNumberBinary(Node& node)
+    {
+        AbstractValue& childValue1 = forNode(node.child1());
+        AbstractValue& childValue2 = forNode(node.child2());
+        node.setCanExit(
+            !isNumberSpeculation(childValue1.m_type)
+            || !isNumberSpeculation(childValue2.m_type));
+        childValue1.filter(SpecNumber);
+        childValue2.filter(SpecNumber);
+    }
+    
+    bool trySetConstant(NodeIndex nodeIndex, JSValue value)
+    {
+        // Make sure we don't constant fold something that will produce values that contravene
+        // predictions. If that happens then we know that the code will OSR exit, forcing
+        // recompilation. But if we tried to constant fold then we'll have a very degenerate
+        // IR: namely we'll have a JSConstant that contravenes its own prediction. There's a
+        // lot of subtle code that assumes that
+        // speculationFromValue(jsConstant) == jsConstant.prediction(). "Hardening" that code
+        // is probably less sane than just pulling back on constant folding.
+        SpeculatedType oldType = m_graph[nodeIndex].prediction();
+        if (mergeSpeculations(speculationFromValue(value), oldType) != oldType)
+            return false;
+        
+        forNode(nodeIndex).set(value);
+        return true;
+    }
     
     CodeBlock* m_codeBlock;
     Graph& m_graph;
@@ -189,8 +292,12 @@ private:
     Operands<AbstractValue> m_variables;
     BasicBlock* m_block;
     bool m_haveStructures;
+    bool m_foundConstants;
     
     bool m_isValid;
+    bool m_didClobber;
+    
+    BranchDirection m_branchDirection; // This is only set for blocks that end in Branch and that execute to completion (i.e. m_isValid == true).
 };
 
 } } // namespace JSC::DFG

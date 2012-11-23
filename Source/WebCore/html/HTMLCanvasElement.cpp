@@ -59,7 +59,7 @@
 #endif
 
 #if PLATFORM(CHROMIUM)
-#include "PlatformSupport.h"
+#include <public/Platform.h>
 #endif
 
 namespace WebCore {
@@ -116,12 +116,11 @@ HTMLCanvasElement::~HTMLCanvasElement()
     m_context.clear(); // Ensure this goes away before the ImageBuffer.
 }
 
-void HTMLCanvasElement::parseAttribute(Attribute* attr)
+void HTMLCanvasElement::parseAttribute(const Attribute& attribute)
 {
-    const QualifiedName& attrName = attr->name();
-    if (attrName == widthAttr || attrName == heightAttr)
+    if (attribute.name() == widthAttr || attribute.name() == heightAttr)
         reset();
-    HTMLElement::parseAttribute(attr);
+    HTMLElement::parseAttribute(attribute);
 }
 
 RenderObject* HTMLCanvasElement::createRenderer(RenderArena* arena, RenderStyle* style)
@@ -134,6 +133,12 @@ RenderObject* HTMLCanvasElement::createRenderer(RenderArena* arena, RenderStyle*
 
     m_rendererIsCanvas = false;
     return HTMLElement::createRenderer(arena, style);
+}
+
+void HTMLCanvasElement::attach()
+{
+    setIsInCanvasSubtree(true);
+    HTMLElement::attach();
 }
 
 void HTMLCanvasElement::addObserver(CanvasObserver* observer)
@@ -486,7 +491,7 @@ bool HTMLCanvasElement::shouldAccelerate(const IntSize& size) const
         return false;
 
 #if PLATFORM(CHROMIUM)
-    if (!PlatformSupport::canAccelerate2dCanvas())
+    if (!WebKit::Platform::current()->canAccelerate2dCanvas())
         return false;
 #endif
 
@@ -552,7 +557,7 @@ void HTMLCanvasElement::createImageBuffer() const
     m_contextStateSaver = adoptPtr(new GraphicsContextStateSaver(*m_imageBuffer->context()));
 
 #if USE(JSC)
-    JSC::JSLock lock(JSC::SilenceAssertionsOnly);
+    JSC::JSLockHolder lock(scriptExecutionContext()->globalData());
     size_t numBytes = 4 * m_imageBuffer->internalSize().width() * m_imageBuffer->internalSize().height();
     scriptExecutionContext()->globalData()->heap.reportExtraMemoryCost(numBytes);
 #endif

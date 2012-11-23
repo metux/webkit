@@ -42,10 +42,6 @@ public:
     int width();
     int height();
 
-#if ENABLE(FULLSCREEN_API)
-    virtual bool allowFullScreen() const;
-#endif
-
     virtual bool canContainRangeEndPoint() const { return false; }
 
 protected:
@@ -53,16 +49,16 @@ protected:
 
     bool isURLAllowed() const;
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
-    virtual void didNotifyDescendantInseretions(Node*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void didNotifySubtreeInsertions(ContainerNode*) OVERRIDE;
     virtual void attach();
 
 private:
     virtual bool supportsFocus() const;
     virtual void setFocus(bool);
     
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual bool isFrameElementBase() const { return true; }
 
     bool viewSourceMode() const { return m_viewSource; }

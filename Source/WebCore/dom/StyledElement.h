@@ -37,11 +37,11 @@ class StyledElement : public Element {
 public:
     virtual ~StyledElement();
 
-    virtual StylePropertySet* additionalAttributeStyle() { return 0; }
+    virtual const StylePropertySet* additionalAttributeStyle() { return 0; }
     void invalidateStyleAttribute();
 
     const StylePropertySet* inlineStyle() const { return attributeData() ? attributeData()->inlineStyle() : 0; }
-    const StylePropertySet* ensureInlineStyle() { return ensureAttributeData()->ensureInlineStyle(this); }
+    StylePropertySet* ensureInlineStyle() { return mutableAttributeData()->ensureMutableInlineStyle(this); }
     
     // Unlike StylePropertySet setters, these implement invalidation.
     bool setInlineStyleProperty(CSSPropertyID, int identifier, bool important = false);
@@ -51,21 +51,19 @@ public:
     
     virtual CSSStyleDeclaration* style() OVERRIDE;
 
-    StylePropertySet* attributeStyle();
+    const StylePropertySet* attributeStyle();
 
-    const SpaceSplitString& classNames() const;
+    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) { }
 
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) { }
+    // May be called by ElementAttributeData::cloneDataFrom().
+    enum ShouldReparseStyleAttribute { DoNotReparseStyleAttribute = 0, ReparseStyleAttribute = 1 };
+    void styleAttributeChanged(const AtomicString& newStyleString, ShouldReparseStyleAttribute = ReparseStyleAttribute);
 
 protected:
-    StyledElement(const QualifiedName& name, Document* document, ConstructionType type)
-        : Element(name, document, type)
-    {
-    }
+    StyledElement(const QualifiedName&, Document*, ConstructionType);
 
-    virtual void attributeChanged(Attribute*) OVERRIDE;
-    virtual void parseAttribute(Attribute*);
-    virtual void copyNonAttributeProperties(const Element*);
+    virtual void attributeChanged(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
 
     virtual bool isPresentationAttribute(const QualifiedName&) const { return false; }
 
@@ -74,11 +72,6 @@ protected:
     void addPropertyToAttributeStyle(StylePropertySet*, CSSPropertyID, const String& value);
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
-
-    // classAttributeChanged() exists to share code between
-    // parseAttribute (called via setAttribute()) and
-    // svgAttributeChanged (called when element.className.baseValue is set)
-    void classAttributeChanged(const AtomicString& newClassString);
 
 private:
     virtual void updateStyleAttribute() const;
@@ -94,19 +87,12 @@ private:
     }
 };
 
-inline const SpaceSplitString& StyledElement::classNames() const
-{
-    ASSERT(hasClass());
-    ASSERT(attributeData());
-    return attributeData()->classNames();
-}
-
 inline void StyledElement::invalidateStyleAttribute()
 {
     clearIsStyleAttributeValid();
 }
 
-inline StylePropertySet* StyledElement::attributeStyle()
+inline const StylePropertySet* StyledElement::attributeStyle()
 {
     if (attributeStyleDirty())
         updateAttributeStyle();

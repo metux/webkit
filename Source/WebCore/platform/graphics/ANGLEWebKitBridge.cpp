@@ -25,18 +25,18 @@
 
 #include "config.h"
 
-#if ENABLE(WEBGL)
+#if USE(3D_GRAPHICS)
 
 #include "ANGLEWebKitBridge.h"
 #include <wtf/OwnArrayPtr.h>
 
 namespace WebCore {
 
-
-ANGLEWebKitBridge::ANGLEWebKitBridge() :
+ANGLEWebKitBridge::ANGLEWebKitBridge(ShShaderOutput shaderOutput) :
     builtCompilers(false),
     m_fragmentCompiler(0),
-    m_vertexCompiler(0)
+    m_vertexCompiler(0),
+    m_shaderOutput(shaderOutput)
 {
     ShInitialize();
 }
@@ -66,11 +66,11 @@ void ANGLEWebKitBridge::setResources(ShBuiltInResources resources)
     m_resources = resources;
 }
 
-bool ANGLEWebKitBridge::validateShaderSource(const char* shaderSource, ANGLEShaderType shaderType, String& translatedShaderSource, String& shaderValidationLog)
+bool ANGLEWebKitBridge::validateShaderSource(const char* shaderSource, ANGLEShaderType shaderType, String& translatedShaderSource, String& shaderValidationLog, int extraCompileOptions)
 {
     if (!builtCompilers) {
-        m_fragmentCompiler = ShConstructCompiler(SH_FRAGMENT_SHADER, SH_WEBGL_SPEC, SH_GLSL_OUTPUT, &m_resources);
-        m_vertexCompiler = ShConstructCompiler(SH_VERTEX_SHADER, SH_WEBGL_SPEC, SH_GLSL_OUTPUT, &m_resources);
+        m_fragmentCompiler = ShConstructCompiler(SH_FRAGMENT_SHADER, SH_WEBGL_SPEC, m_shaderOutput, &m_resources);
+        m_vertexCompiler = ShConstructCompiler(SH_VERTEX_SHADER, SH_WEBGL_SPEC, m_shaderOutput, &m_resources);
         if (!m_fragmentCompiler || !m_vertexCompiler) {
             cleanupCompilers();
             return false;
@@ -88,7 +88,7 @@ bool ANGLEWebKitBridge::validateShaderSource(const char* shaderSource, ANGLEShad
 
     const char* const shaderSourceStrings[] = { shaderSource };
 
-    bool validateSuccess = ShCompile(compiler, shaderSourceStrings, 1, SH_OBJECT_CODE);
+    bool validateSuccess = ShCompile(compiler, shaderSourceStrings, 1, SH_OBJECT_CODE | extraCompileOptions);
     if (!validateSuccess) {
         int logSize = 0;
         ShGetInfo(compiler, SH_INFO_LOG_LENGTH, &logSize);
@@ -117,4 +117,4 @@ bool ANGLEWebKitBridge::validateShaderSource(const char* shaderSource, ANGLEShad
 
 }
 
-#endif // ENABLE(WEBGL)
+#endif // USE(3D_GRAPHICS)

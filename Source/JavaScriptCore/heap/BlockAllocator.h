@@ -26,24 +26,43 @@
 #ifndef BlockAllocator_h
 #define BlockAllocator_h
 
+#include "HeapBlock.h"
 #include <wtf/DoublyLinkedList.h>
 #include <wtf/Forward.h>
+#include <wtf/PageAllocationAligned.h>
+#include <wtf/TCSpinLock.h>
 #include <wtf/Threading.h>
 
 namespace JSC {
 
-class HeapBlock;
-
 // Simple allocator to reduce VM cost by holding onto blocks of memory for
 // short periods of time and then freeing them on a secondary thread.
+
+class DeadBlock : public HeapBlock<DeadBlock> {
+public:
+    static DeadBlock* create(const PageAllocationAligned&);
+
+private:
+    DeadBlock(const PageAllocationAligned&);
+};
+
+inline DeadBlock::DeadBlock(const PageAllocationAligned& allocation)
+    : HeapBlock<DeadBlock>(allocation)
+{
+}
+
+inline DeadBlock* DeadBlock::create(const PageAllocationAligned& allocation)
+{
+    return new(NotNull, allocation.base()) DeadBlock(allocation);
+}
 
 class BlockAllocator {
 public:
     BlockAllocator();
     ~BlockAllocator();
 
-    HeapBlock* allocate();
-    void deallocate(HeapBlock*);
+    PageAllocationAligned allocate();
+    void deallocate(PageAllocationAligned);
 
 private:
     void waitForRelativeTimeWhileHoldingLock(double relative);
@@ -54,31 +73,39 @@ private:
 
     void releaseFreeBlocks();
 
-    DoublyLinkedList<HeapBlock> m_freeBlocks;
+    DoublyLinkedList<DeadBlock> m_freeBlocks;
     size_t m_numberOfFreeBlocks;
+    bool m_isCurrentlyAllocating;
     bool m_blockFreeingThreadShouldQuit;
-    Mutex m_freeBlockLock;
+    SpinLock m_freeBlockLock;
+    Mutex m_freeBlockConditionLock;
     ThreadCondition m_freeBlockCondition;
     ThreadIdentifier m_blockFreeingThread;
 };
 
-inline HeapBlock* BlockAllocator::allocate()
+inline PageAllocationAligned BlockAllocator::allocate()
 {
-    MutexLocker locker(m_freeBlockLock);
-    if (!m_numberOfFreeBlocks) {
-        ASSERT(m_freeBlocks.isEmpty());
-        return 0;
+    {
+        SpinLockHolder locker(&m_freeBlockLock);
+        m_isCurrentlyAllocating = true;
+        if (m_numberOfFreeBlocks) {
+            ASSERT(!m_freeBlocks.isEmpty());
+            m_numberOfFreeBlocks--;
+            return DeadBlock::destroy(m_freeBlocks.removeHead());
+        }
     }
 
-    ASSERT(!m_freeBlocks.isEmpty());
-    m_numberOfFreeBlocks--;
-    return m_freeBlocks.removeHead();
+    ASSERT(m_freeBlocks.isEmpty());
+    PageAllocationAligned allocation = PageAllocationAligned::allocate(DeadBlock::s_blockSize, DeadBlock::s_blockSize, OSAllocator::JSGCHeapPages);
+    if (!static_cast<bool>(allocation))
+        CRASH();
+    return allocation;
 }
 
-inline void BlockAllocator::deallocate(HeapBlock* block)
+inline void BlockAllocator::deallocate(PageAllocationAligned allocation)
 {
-    MutexLocker locker(m_freeBlockLock);
-    m_freeBlocks.push(block);
+    SpinLockHolder locker(&m_freeBlockLock);
+    m_freeBlocks.push(DeadBlock::create(allocation));
     m_numberOfFreeBlocks++;
 }
 

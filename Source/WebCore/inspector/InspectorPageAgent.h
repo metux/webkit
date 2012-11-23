@@ -33,7 +33,9 @@
 
 #if ENABLE(INSPECTOR)
 
+#include "DeviceOrientationData.h"
 #include "Frame.h"
+#include "GeolocationPosition.h"
 #include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
 #include "PlatformString.h"
@@ -49,9 +51,11 @@ class DocumentLoader;
 class Frame;
 class Frontend;
 class InjectedScriptManager;
+class InspectorAgent;
 class InspectorArray;
 class InspectorClient;
 class InspectorObject;
+class InspectorOverlay;
 class InspectorState;
 class InstrumentingAgents;
 class KURL;
@@ -76,7 +80,7 @@ public:
         OtherResource
     };
 
-    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*, InspectorClient*);
+    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InspectorAgent*, InspectorState*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
 
     static bool cachedResourceContent(CachedResource*, String* result, bool* base64Encoded);
     static bool sharedBufferContent(PassRefPtr<SharedBuffer>, const String& textEncodingName, bool withBase64Encode, String* result);
@@ -107,6 +111,19 @@ public:
     virtual void setShowPaintRects(ErrorString*, bool show);
     virtual void getScriptExecutionStatus(ErrorString*, PageCommandHandler::Result::Enum*);
     virtual void setScriptExecutionDisabled(ErrorString*, bool);
+    virtual void setGeolocationOverride(ErrorString*, const double*, const double*, const double*);
+    virtual void clearGeolocationOverride(ErrorString*);
+    virtual void canOverrideGeolocation(ErrorString*, bool* out_param);
+    virtual void setDeviceOrientationOverride(ErrorString*, double, double, double);
+    virtual void clearDeviceOrientationOverride(ErrorString*);
+    virtual void canOverrideDeviceOrientation(ErrorString*, bool*);
+    virtual void setTouchEmulationEnabled(ErrorString*, bool);
+
+    // Geolocation override helpers.
+    GeolocationPosition* overrideGeolocationPosition(GeolocationPosition*);
+
+    // DeviceOrientation helper
+    DeviceOrientationData* overrideDeviceOrientation(DeviceOrientationData*);
 
     // InspectorInstrumentation API
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
@@ -136,15 +153,20 @@ public:
     static DocumentLoader* assertDocumentLoader(ErrorString*, Frame*);
 
 private:
-    InspectorPageAgent(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*, InspectorClient*);
+    InspectorPageAgent(InstrumentingAgents*, Page*, InspectorAgent*, InspectorState*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
     void updateViewMetrics(int, int, double, bool);
+#if ENABLE(TOUCH_EVENTS)
+    void updateTouchEventEmulationInPage(bool);
+#endif
 
     PassRefPtr<TypeBuilder::Page::Frame> buildObjectForFrame(Frame*);
     PassRefPtr<TypeBuilder::Page::FrameResourceTree> buildObjectForFrameTree(Frame*);
     Page* m_page;
+    InspectorAgent* m_inspectorAgent;
     InjectedScriptManager* m_injectedScriptManager;
     InspectorClient* m_client;
     InspectorFrontend::Page* m_frontend;
+    InspectorOverlay* m_overlay;
     long m_lastScriptIdentifier;
     String m_pendingScriptToEvaluateOnLoadOnce;
     String m_scriptToEvaluateOnLoadOnce;
@@ -154,6 +176,10 @@ private:
     GraphicsContext* m_lastPaintContext;
     LayoutRect m_lastPaintRect;
     bool m_didLoadEventFire;
+    bool m_geolocationOverridden;
+    RefPtr<GeolocationPosition> m_geolocationPosition;
+    RefPtr<GeolocationPosition> m_platformGeolocationPosition;
+    RefPtr<DeviceOrientationData> m_deviceOrientation;
 };
 
 

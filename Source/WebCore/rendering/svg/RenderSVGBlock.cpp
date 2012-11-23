@@ -27,6 +27,7 @@
 #include "RenderSVGResource.h"
 #include "SVGElement.h"
 #include "SVGResourcesCache.h"
+#include "StyleInheritedData.h"
 
 namespace WebCore {
 
@@ -102,12 +103,6 @@ void RenderSVGBlock::styleDidChange(StyleDifference diff, const RenderStyle* old
 {
     RenderBlock::styleDidChange(diff, oldStyle);
     SVGResourcesCache::clientStyleChanged(this, diff, style());
-}
-
-void RenderSVGBlock::updateFromElement()
-{
-    RenderBlock::updateFromElement();
-    SVGResourcesCache::clientUpdatedFromElement(this, style());
 }
 
 }

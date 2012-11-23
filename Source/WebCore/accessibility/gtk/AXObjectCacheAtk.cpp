@@ -21,6 +21,7 @@
 #include "AXObjectCache.h"
 
 #include "AccessibilityObject.h"
+#include "AccessibilityRenderObject.h"
 #include "Document.h"
 #include "Element.h"
 #include <wtf/gobject/GOwnPtr.h>
@@ -80,11 +81,16 @@ static void notifyChildrenSelectionChange(AccessibilityObject* object)
     if (!object || !(object->isListBox() || object->isMenuList()))
         return;
 
+    // Only support HTML select elements so far (ARIA selectors not supported).
+    Node* node = object->node();
+    if (!node || !node->hasTagName(HTMLNames::selectTag))
+        return;
+
     // Emit signal from the listbox's point of view first.
     g_signal_emit_by_name(object->wrapper(), "selection-changed");
 
     // Find the item where the selection change was triggered from.
-    HTMLSelectElement* select = toHTMLSelectElement(object->node());
+    HTMLSelectElement* select = toHTMLSelectElement(node);
     if (!select)
         return;
     int changedItemIndex = select->activeSelectionStartListIndex();
@@ -158,11 +164,26 @@ void AXObjectCache::postPlatformNotification(AccessibilityObject* coreObject, AX
     }
 }
 
-static void emitTextChanged(AccessibilityObject* object, AXObjectCache::AXTextChange textChange, unsigned offset, const String& text)
+void AXObjectCache::nodeTextChangePlatformNotification(AccessibilityObject* object, AXTextChange textChange, unsigned offset, const String& text)
 {
-    AtkObject* wrapper = object->parentObjectUnignored()->wrapper();
+    if (!object || text.isEmpty())
+        return;
+
+    AccessibilityObject* parentObject = object->parentObjectUnignored();
+    if (!parentObject)
+        return;
+
+    AtkObject* wrapper = parentObject->wrapper();
     if (!wrapper || !ATK_IS_TEXT(wrapper))
         return;
+
+    Node* node = object->node();
+    if (!node)
+        return;
+
+    // Ensure document's layout is up-to-date before using TextIterator.
+    Document* document = node->document();
+    document->updateLayout();
 
     // Select the right signal to be emitted
     CString detail;
@@ -175,18 +196,23 @@ static void emitTextChanged(AccessibilityObject* object, AXObjectCache::AXTextCh
         break;
     }
 
-    if (!detail.isNull())
-        g_signal_emit_by_name(wrapper, detail.data(), offset, text.length(), text.utf8().data());
-}
+    String textToEmit = text;
+    unsigned offsetToEmit = offset;
 
-void AXObjectCache::nodeTextChangePlatformNotification(AccessibilityObject* object, AXTextChange textChange, unsigned offset, const String& text)
-{
-    if (!object || !object->isAccessibilityRenderObject() || text.isEmpty())
-        return;
+    // If the object we're emitting the signal from represents a
+    // password field, we will emit the masked text.
+    if (parentObject->isPasswordField()) {
+        String maskedText = parentObject->passwordFieldValue();
+        textToEmit = maskedText.substring(offset, text.length());
+    } else {
+        // Consider previous text objects that might be present for
+        // the current accessibility object to ensure we emit the
+        // right offset (e.g. multiline text areas).
+        RefPtr<Range> range = Range::create(document, node->parentNode(), 0, node, 0);
+        offsetToEmit = offset + TextIterator::rangeLength(range.get());
+    }
 
-    Node* node = object->node();
-    RefPtr<Range> range = Range::create(node->document(), node->parentNode(), 0, node, 0);
-    emitTextChanged(object, textChange, offset + TextIterator::rangeLength(range.get()), text);
+    g_signal_emit_by_name(wrapper, detail.data(), offsetToEmit, textToEmit.length(), textToEmit.utf8().data());
 }
 
 void AXObjectCache::frameLoadingEventPlatformNotification(AccessibilityObject* object, AXLoadingEvent loadingEvent)
@@ -217,14 +243,14 @@ void AXObjectCache::frameLoadingEventPlatformNotification(AccessibilityObject* o
     }
 }
 
-void AXObjectCache::handleFocusedUIElementChanged(RenderObject* oldFocusedRender, RenderObject* newFocusedRender)
+void AXObjectCache::handleFocusedUIElementChanged(Node* oldFocusedNode, Node* newFocusedNode)
 {
-    RefPtr<AccessibilityObject> oldObject = getOrCreate(oldFocusedRender);
+    RefPtr<AccessibilityObject> oldObject = getOrCreate(oldFocusedNode);
     if (oldObject) {
         g_signal_emit_by_name(oldObject->wrapper(), "focus-event", false);
         g_signal_emit_by_name(oldObject->wrapper(), "state-change", "focused", false);
     }
-    RefPtr<AccessibilityObject> newObject = getOrCreate(newFocusedRender);
+    RefPtr<AccessibilityObject> newObject = getOrCreate(newFocusedNode);
     if (newObject) {
         g_signal_emit_by_name(newObject->wrapper(), "focus-event", true);
         g_signal_emit_by_name(newObject->wrapper(), "state-change", "focused", true);

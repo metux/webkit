@@ -34,7 +34,7 @@
 
 namespace WebCore {
 
-class DeviceOrientation;
+class DeviceOrientationData;
 class DeviceOrientationClient;
 
 class DeviceOrientationController : public Supplement<Page> {
@@ -50,7 +50,7 @@ public:
     void suspendEventsForAllListeners(DOMWindow*);
     void resumeEventsForAllListeners(DOMWindow*);
 
-    void didChangeDeviceOrientation(DeviceOrientation*);
+    void didChangeDeviceOrientation(DeviceOrientationData*);
 
     bool isActive() { return !m_listeners.isEmpty(); }
 
@@ -61,12 +61,12 @@ public:
     static bool isActiveAt(Page*);
 
 private:
-    DeviceOrientationController(Page*, DeviceOrientationClient*);
+    explicit DeviceOrientationController(Page*, DeviceOrientationClient*);
 
     void timerFired(Timer<DeviceOrientationController>*);
 
-    Page* m_page;
     DeviceOrientationClient* m_client;
+    Page* m_page;
     typedef HashCountedSet<RefPtr<DOMWindow> > ListenersCountedSet;
     ListenersCountedSet m_listeners;
     ListenersCountedSet m_suspendedListeners;

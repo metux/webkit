@@ -73,7 +73,7 @@ void CInstance::moveGlobalExceptionToExecState(ExecState* exec)
         return;
 
     {
-        JSLock lock(SilenceAssertionsOnly);
+        JSLockHolder lock(exec);
         throwError(exec, createError(exec, globalExceptionString()));
     }
 
@@ -113,7 +113,7 @@ class CRuntimeMethod : public RuntimeMethod {
 public:
     typedef RuntimeMethod Base;
 
-    static CRuntimeMethod* create(ExecState* exec, JSGlobalObject* globalObject, const Identifier& name, Bindings::MethodList& list)
+    static CRuntimeMethod* create(ExecState* exec, JSGlobalObject* globalObject, const UString& name, Bindings::MethodList& list)
     {
         // FIXME: deprecatedGetDOMStructure uses the prototype off of the wrong global object
         // We need to pass in the right global object for "i".
@@ -136,7 +136,7 @@ private:
     {
     }
 
-    void finishCreation(JSGlobalData& globalData, const Identifier& name)
+    void finishCreation(JSGlobalData& globalData, const UString& name)
     {
         Base::finishCreation(globalData, name);
         ASSERT(inherits(&s_info));
@@ -146,10 +146,10 @@ private:
 
 const ClassInfo CRuntimeMethod::s_info = { "CRuntimeMethod", &RuntimeMethod::s_info, 0, 0, CREATE_METHOD_TABLE(CRuntimeMethod) };
 
-JSValue CInstance::getMethod(ExecState* exec, const Identifier& propertyName)
+JSValue CInstance::getMethod(ExecState* exec, PropertyName propertyName)
 {
     MethodList methodList = getClass()->methodsNamed(propertyName, this);
-    return CRuntimeMethod::create(exec, exec->lexicalGlobalObject(), propertyName, methodList);
+    return CRuntimeMethod::create(exec, exec->lexicalGlobalObject(), propertyName.publicName(), methodList);
 }
 
 JSValue CInstance::invokeMethod(ExecState* exec, RuntimeMethod* runtimeMethod)
@@ -182,7 +182,7 @@ JSValue CInstance::invokeMethod(ExecState* exec, RuntimeMethod* runtimeMethod)
     VOID_TO_NPVARIANT(resultVariant);
 
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(exec);
         ASSERT(globalExceptionString().isNull());
         retval = _object->_class->invoke(_object, ident, cArgs.data(), count, &resultVariant);
         moveGlobalExceptionToExecState(exec);
@@ -217,7 +217,7 @@ JSValue CInstance::invokeDefaultMethod(ExecState* exec)
     NPVariant resultVariant;
     VOID_TO_NPVARIANT(resultVariant);
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(exec);
         ASSERT(globalExceptionString().isNull());
         retval = _object->_class->invokeDefault(_object, cArgs.data(), count, &resultVariant);
         moveGlobalExceptionToExecState(exec);
@@ -256,7 +256,7 @@ JSValue CInstance::invokeConstruct(ExecState* exec, const ArgList& args)
     NPVariant resultVariant;
     VOID_TO_NPVARIANT(resultVariant);
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(exec);
         ASSERT(globalExceptionString().isNull());
         retval = _object->_class->construct(_object, cArgs.data(), count, &resultVariant);
         moveGlobalExceptionToExecState(exec);
@@ -315,7 +315,7 @@ void CInstance::getPropertyNames(ExecState* exec, PropertyNameArray& nameArray)
     NPIdentifier* identifiers;
 
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(exec);
         ASSERT(globalExceptionString().isNull());
         bool ok = _object->_class->enumerate(_object, &identifiers, &count);
         moveGlobalExceptionToExecState(exec);

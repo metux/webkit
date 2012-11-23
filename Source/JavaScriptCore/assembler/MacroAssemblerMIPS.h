@@ -43,6 +43,11 @@ public:
     {
     }
 
+    static bool isCompactPtrAlignedAddressOffset(ptrdiff_t value)
+    {
+        return value >= -2147483647 - 1 && value <= 2147483647;
+    }
+
     static const Scale ScalePtr = TimesFour;
 
     // For storing immediate number
@@ -116,7 +121,7 @@ public:
 
     void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
-        if (!imm.m_isPointer && imm.m_value >= -32768 && imm.m_value <= 32767
+        if (imm.m_value >= -32768 && imm.m_value <= 32767
             && !m_fixedWidth) {
             /*
               addiu     dest, src, imm
@@ -148,8 +153,7 @@ public:
               sw        dataTemp, offset(base)
             */
             m_assembler.lw(dataTempRegister, address.base, address.offset);
-            if (!imm.m_isPointer
-                && imm.m_value >= -32768 && imm.m_value <= 32767
+            if (imm.m_value >= -32768 && imm.m_value <= 32767
                 && !m_fixedWidth)
                 m_assembler.addiu(dataTempRegister, dataTempRegister,
                                   imm.m_value);
@@ -187,6 +191,12 @@ public:
     void add32(Address src, RegisterID dest)
     {
         load32(src, dataTempRegister);
+        add32(dataTempRegister, dest);
+    }
+
+    void add32(AbsoluteAddress src, RegisterID dest)
+    {
+        load32(src.m_ptr, dataTempRegister);
         add32(dataTempRegister, dest);
     }
 
@@ -228,7 +238,7 @@ public:
         */
         move(TrustedImmPtr(address.m_ptr), addrTempRegister);
         m_assembler.lw(dataTempRegister, addrTempRegister, 0);
-        if (!imm.m_isPointer && imm.m_value >= -32768 && imm.m_value <= 32767
+        if (imm.m_value >= -32768 && imm.m_value <= 32767
             && !m_fixedWidth)
             m_assembler.addiu(dataTempRegister, dataTempRegister, imm.m_value);
         else {
@@ -245,9 +255,9 @@ public:
 
     void and32(TrustedImm32 imm, RegisterID dest)
     {
-        if (!imm.m_isPointer && !imm.m_value && !m_fixedWidth)
+        if (!imm.m_value && !m_fixedWidth)
             move(MIPSRegisters::zero, dest);
-        else if (!imm.m_isPointer && imm.m_value > 0 && imm.m_value < 65535
+        else if (imm.m_value > 0 && imm.m_value < 65535
                  && !m_fixedWidth)
             m_assembler.andi(dest, dest, imm.m_value);
         else {
@@ -277,9 +287,9 @@ public:
 
     void mul32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
-        if (!imm.m_isPointer && !imm.m_value && !m_fixedWidth)
+        if (!imm.m_value && !m_fixedWidth)
             move(MIPSRegisters::zero, dest);
-        else if (!imm.m_isPointer && imm.m_value == 1 && !m_fixedWidth)
+        else if (imm.m_value == 1 && !m_fixedWidth)
             move(src, dest);
         else {
             /*
@@ -308,10 +318,10 @@ public:
 
     void or32(TrustedImm32 imm, RegisterID dest)
     {
-        if (!imm.m_isPointer && !imm.m_value && !m_fixedWidth)
+        if (!imm.m_value && !m_fixedWidth)
             return;
 
-        if (!imm.m_isPointer && imm.m_value > 0 && imm.m_value < 65535
+        if (imm.m_value > 0 && imm.m_value < 65535
             && !m_fixedWidth) {
             m_assembler.ori(dest, dest, imm.m_value);
             return;
@@ -357,7 +367,7 @@ public:
 
     void sub32(TrustedImm32 imm, RegisterID dest)
     {
-        if (!imm.m_isPointer && imm.m_value >= -32767 && imm.m_value <= 32768
+        if (imm.m_value >= -32767 && imm.m_value <= 32768
             && !m_fixedWidth) {
             /*
               addiu     dest, src, imm
@@ -375,7 +385,7 @@ public:
 
     void sub32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        if (!imm.m_isPointer && imm.m_value >= -32767 && imm.m_value <= 32768
+        if (imm.m_value >= -32767 && imm.m_value <= 32768
             && !m_fixedWidth) {
             /*
               addiu     dest, src, imm
@@ -402,8 +412,7 @@ public:
               sw        dataTemp, offset(base)
             */
             m_assembler.lw(dataTempRegister, address.base, address.offset);
-            if (!imm.m_isPointer
-                && imm.m_value >= -32767 && imm.m_value <= 32768
+            if (imm.m_value >= -32767 && imm.m_value <= 32768
                 && !m_fixedWidth)
                 m_assembler.addiu(dataTempRegister, dataTempRegister,
                                   -imm.m_value);
@@ -426,8 +435,7 @@ public:
             m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
             m_assembler.lw(dataTempRegister, addrTempRegister, address.offset);
 
-            if (!imm.m_isPointer
-                && imm.m_value >= -32767 && imm.m_value <= 32768
+            if (imm.m_value >= -32767 && imm.m_value <= 32768
                 && !m_fixedWidth)
                 m_assembler.addiu(dataTempRegister, dataTempRegister,
                                   -imm.m_value);
@@ -458,7 +466,7 @@ public:
         move(TrustedImmPtr(address.m_ptr), addrTempRegister);
         m_assembler.lw(dataTempRegister, addrTempRegister, 0);
 
-        if (!imm.m_isPointer && imm.m_value >= -32767 && imm.m_value <= 32768
+        if (imm.m_value >= -32767 && imm.m_value <= 32768
             && !m_fixedWidth) {
             m_assembler.addiu(dataTempRegister, dataTempRegister,
                               -imm.m_value);
@@ -497,6 +505,20 @@ public:
     void absDouble(FPRegisterID, FPRegisterID)
     {
         ASSERT_NOT_REACHED();
+    }
+
+    ConvertibleLoadLabel convertibleLoadPtr(Address address, RegisterID dest)
+    {
+        ConvertibleLoadLabel result(this);
+        /*
+            lui     addrTemp, (offset + 0x8000) >> 16
+            addu    addrTemp, addrTemp, base
+            lw      dest, (offset & 0xffff)(addrTemp)
+        */
+        m_assembler.lui(addrTempRegister, (address.offset + 0x8000) >> 16);
+        m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
+        m_assembler.lw(dest, addrTempRegister, address.offset);
+        return result;
     }
 
     // Memory access operations:
@@ -807,7 +829,7 @@ public:
     {
         if (address.offset >= -32768 && address.offset <= 32767
             && !m_fixedWidth) {
-            if (!imm.m_isPointer && !imm.m_value)
+            if (!imm.m_value)
                 m_assembler.sw(MIPSRegisters::zero, address.base,
                                address.offset);
             else {
@@ -822,7 +844,7 @@ public:
               */
             m_assembler.lui(addrTempRegister, (address.offset + 0x8000) >> 16);
             m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
-            if (!imm.m_isPointer && !imm.m_value && !m_fixedWidth)
+            if (!imm.m_value && !m_fixedWidth)
                 m_assembler.sw(MIPSRegisters::zero, addrTempRegister,
                                address.offset);
             else {
@@ -850,7 +872,7 @@ public:
             li  addrTemp, address
             sw  src, 0(addrTemp)
         */
-        if (!imm.m_isPointer && !imm.m_value && !m_fixedWidth) {
+        if (!imm.m_value && !m_fixedWidth) {
             move(TrustedImmPtr(address), addrTempRegister);
             m_assembler.sw(MIPSRegisters::zero, addrTempRegister, 0);
         } else {
@@ -928,9 +950,9 @@ public:
 
     void move(TrustedImm32 imm, RegisterID dest)
     {
-        if (!imm.m_isPointer && !imm.m_value && !m_fixedWidth)
+        if (!imm.m_value && !m_fixedWidth)
             move(MIPSRegisters::zero, dest);
-        else if (imm.m_isPointer || m_fixedWidth) {
+        else if (m_fixedWidth) {
             m_assembler.lui(dest, imm.m_value >> 16);
             m_assembler.ori(dest, dest, imm.m_value);
         } else
@@ -1149,6 +1171,13 @@ public:
     Jump branchTest8(ResultCondition cond, Address address, TrustedImm32 mask = TrustedImm32(-1))
     {
         load8(address, dataTempRegister);
+        return branchTest32(cond, dataTempRegister, mask);
+    }
+
+    Jump branchTest8(ResultCondition cond, AbsoluteAddress address, TrustedImm32 mask = TrustedImm32(-1))
+    {
+        move(TrustedImmPtr(address.m_ptr), dataTempRegister);
+        load8(Address(dataTempRegister), dataTempRegister);
         return branchTest32(cond, dataTempRegister, mask);
     }
 
@@ -1869,6 +1898,17 @@ public:
     static FunctionPtr readCallTarget(CodeLocationCall call)
     {
         return FunctionPtr(reinterpret_cast<void(*)()>(MIPSAssembler::readCallTarget(call.dataLocation())));
+    }
+
+    static void replaceWithJump(CodeLocationLabel instructionStart, CodeLocationLabel destination)
+    {
+        ASSERT_NOT_REACHED();
+    }
+    
+    static ptrdiff_t maxJumpReplacementSize()
+    {
+        ASSERT_NOT_REACHED();
+        return 0;
     }
 
 private:

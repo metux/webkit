@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "MarkStack.h"
+#include "MarkStackInlineMethods.h"
 
 #include "CopiedSpace.h"
 #include "CopiedSpaceInlineMethods.h"
@@ -35,8 +36,12 @@
 #include "JSCell.h"
 #include "JSObject.h"
 #include "ScopeChain.h"
+#include "SlotVisitorInlineMethods.h"
 #include "Structure.h"
+#include "UString.h"
 #include "WriteBarrier.h"
+#include <wtf/Atomics.h>
+#include <wtf/DataLog.h>
 #include <wtf/MainThread.h>
 
 namespace JSC {
@@ -44,6 +49,7 @@ namespace JSC {
 MarkStackSegmentAllocator::MarkStackSegmentAllocator()
     : m_nextFreeSegment(0)
 {
+    m_lock.Init();
 }
 
 MarkStackSegmentAllocator::~MarkStackSegmentAllocator()
@@ -54,7 +60,7 @@ MarkStackSegmentAllocator::~MarkStackSegmentAllocator()
 MarkStackSegment* MarkStackSegmentAllocator::allocate()
 {
     {
-        MutexLocker locker(m_lock);
+        SpinLockHolder locker(&m_lock);
         if (m_nextFreeSegment) {
             MarkStackSegment* result = m_nextFreeSegment;
             m_nextFreeSegment = result->m_previous;
@@ -62,12 +68,12 @@ MarkStackSegment* MarkStackSegmentAllocator::allocate()
         }
     }
 
-    return static_cast<MarkStackSegment*>(OSAllocator::reserveAndCommit(Options::gcMarkStackSegmentSize));
+    return static_cast<MarkStackSegment*>(OSAllocator::reserveAndCommit(Options::gcMarkStackSegmentSize()));
 }
 
 void MarkStackSegmentAllocator::release(MarkStackSegment* segment)
 {
-    MutexLocker locker(m_lock);
+    SpinLockHolder locker(&m_lock);
     segment->m_previous = m_nextFreeSegment;
     m_nextFreeSegment = segment;
 }
@@ -76,20 +82,20 @@ void MarkStackSegmentAllocator::shrinkReserve()
 {
     MarkStackSegment* segments;
     {
-        MutexLocker locker(m_lock);
+        SpinLockHolder locker(&m_lock);
         segments = m_nextFreeSegment;
         m_nextFreeSegment = 0;
     }
     while (segments) {
         MarkStackSegment* toFree = segments;
         segments = segments->m_previous;
-        OSAllocator::decommitAndRelease(toFree, Options::gcMarkStackSegmentSize);
+        OSAllocator::decommitAndRelease(toFree, Options::gcMarkStackSegmentSize());
     }
 }
 
 MarkStackArray::MarkStackArray(MarkStackSegmentAllocator& allocator)
     : m_allocator(allocator)
-    , m_segmentCapacity(MarkStackSegment::capacityFromSize(Options::gcMarkStackSegmentSize))
+    , m_segmentCapacity(MarkStackSegment::capacityFromSize(Options::gcMarkStackSegmentSize()))
     , m_top(0)
     , m_numberOfPreviousSegments(0)
 {
@@ -140,23 +146,31 @@ bool MarkStackArray::refill()
     return true;
 }
 
-bool MarkStackArray::donateSomeCellsTo(MarkStackArray& other)
+void MarkStackArray::donateSomeCellsTo(MarkStackArray& other)
 {
+    // Try to donate about 1 / 2 of our cells. To reduce copying costs,
+    // we prefer donating whole segments over donating individual cells,
+    // even if this skews away from our 1 / 2 target.
+
     ASSERT(m_segmentCapacity == other.m_segmentCapacity);
+
+    size_t segmentsToDonate = (m_numberOfPreviousSegments + 2 - 1) / 2; // Round up to donate 1 / 1 previous segments.
+
+    if (!segmentsToDonate) {
+        size_t cellsToDonate = m_top / 2; // Round down to donate 0 / 1 cells.
+        while (cellsToDonate--) {
+            ASSERT(m_top);
+            other.append(removeLast());
+        }
+        return;
+    }
+
     validatePrevious();
     other.validatePrevious();
-        
-    // Fast check: see if the other mark stack already has enough segments.
-    if (other.m_numberOfPreviousSegments + 1 >= Options::maximumNumberOfSharedSegments)
-        return false;
-        
-    size_t numberOfCellsToKeep = Options::minimumNumberOfCellsToKeep;
-    ASSERT(m_top > numberOfCellsToKeep || m_topSegment->m_previous);
-        
-    // Looks like we should donate! Give the other mark stack all of our
-    // previous segments, and then top it off.
+
     MarkStackSegment* previous = m_topSegment->m_previous;
-    while (previous) {
+    while (segmentsToDonate--) {
+        ASSERT(previous);
         ASSERT(m_numberOfPreviousSegments);
 
         MarkStackSegment* current = previous;
@@ -168,23 +182,18 @@ bool MarkStackArray::donateSomeCellsTo(MarkStackArray& other)
         m_numberOfPreviousSegments--;
         other.m_numberOfPreviousSegments++;
     }
-    ASSERT(!m_numberOfPreviousSegments);
-    m_topSegment->m_previous = 0;
+    m_topSegment->m_previous = previous;
+
     validatePrevious();
     other.validatePrevious();
-        
-    // Now top off. We want to keep at a minimum numberOfCellsToKeep, but if
-    // we really have a lot of work, we give up half.
-    if (m_top > numberOfCellsToKeep * 2)
-        numberOfCellsToKeep = m_top / 2;
-    while (m_top > numberOfCellsToKeep)
-        other.append(removeLast());
-        
-    return true;
 }
 
-void MarkStackArray::stealSomeCellsFrom(MarkStackArray& other)
+void MarkStackArray::stealSomeCellsFrom(MarkStackArray& other, size_t idleThreadCount)
 {
+    // Try to steal 1 / Nth of the shared array, where N is the number of idle threads.
+    // To reduce copying costs, we prefer stealing a whole segment over stealing
+    // individual cells, even if this skews away from our 1 / N target.
+
     ASSERT(m_segmentCapacity == other.m_segmentCapacity);
     validatePrevious();
     other.validatePrevious();
@@ -209,72 +218,38 @@ void MarkStackArray::stealSomeCellsFrom(MarkStackArray& other)
         other.validatePrevious();
         return;
     }
-        
-    // Otherwise drain 1/Nth of the shared array where N is the number of
-    // workers, or Options::minimumNumberOfCellsToKeep, whichever is bigger.
-    size_t numberOfCellsToSteal = std::max((size_t)Options::minimumNumberOfCellsToKeep, other.size() / Options::numberOfGCMarkers);
+
+    size_t numberOfCellsToSteal = (other.size() + idleThreadCount - 1) / idleThreadCount; // Round up to steal 1 / 1.
     while (numberOfCellsToSteal-- > 0 && other.canRemoveLast())
         append(other.removeLast());
 }
 
-#if ENABLE(PARALLEL_GC)
-void MarkStackThreadSharedData::markingThreadMain()
+MarkStack::MarkStack(GCThreadSharedData& shared)
+    : m_stack(shared.m_segmentAllocator)
+#if !ASSERT_DISABLED
+    , m_isCheckingForDefaultMarkViolation(false)
+    , m_isDraining(false)
+#endif
+    , m_visitCount(0)
+    , m_isInParallelMode(false)
+    , m_shared(shared)
+    , m_shouldHashConst(false)
 {
-    WTF::registerGCThread();
-    SlotVisitor slotVisitor(*this);
-    ParallelModeEnabler enabler(slotVisitor);
-    slotVisitor.drainFromShared(SlotVisitor::SlaveDrain);
 }
 
-void MarkStackThreadSharedData::markingThreadStartFunc(void* shared)
+MarkStack::~MarkStack()
 {
-    static_cast<MarkStackThreadSharedData*>(shared)->markingThreadMain();
-}
-#endif
-
-MarkStackThreadSharedData::MarkStackThreadSharedData(JSGlobalData* globalData)
-    : m_globalData(globalData)
-    , m_copiedSpace(&globalData->heap.m_storageSpace)
-    , m_sharedMarkStack(m_segmentAllocator)
-    , m_numberOfActiveParallelMarkers(0)
-    , m_parallelMarkersShouldExit(false)
-{
-#if ENABLE(PARALLEL_GC)
-    for (unsigned i = 1; i < Options::numberOfGCMarkers; ++i) {
-        m_markingThreads.append(createThread(markingThreadStartFunc, this, "JavaScriptCore::Marking"));
-        ASSERT(m_markingThreads.last());
-    }
-#endif
+    ASSERT(m_stack.isEmpty());
 }
 
-MarkStackThreadSharedData::~MarkStackThreadSharedData()
+void MarkStack::setup()
 {
-#if ENABLE(PARALLEL_GC)    
-    // Destroy our marking threads.
-    {
-        MutexLocker locker(m_markingLock);
-        m_parallelMarkersShouldExit = true;
-        m_markingCondition.broadcast();
-    }
-    for (unsigned i = 0; i < m_markingThreads.size(); ++i)
-        waitForThreadCompletion(m_markingThreads[i]);
-#endif
-}
-    
-void MarkStackThreadSharedData::reset()
-{
-    ASSERT(!m_numberOfActiveParallelMarkers);
-    ASSERT(!m_parallelMarkersShouldExit);
-    ASSERT(m_sharedMarkStack.isEmpty());
-    
+    m_shared.m_shouldHashConst = m_shared.m_globalData->haveEnoughNewStringsToHashConst();
+    m_shouldHashConst = m_shared.m_shouldHashConst;
 #if ENABLE(PARALLEL_GC)
-    m_segmentAllocator.shrinkReserve();
-    m_opaqueRoots.clear();
-#else
-    ASSERT(m_opaqueRoots.isEmpty());
+    for (unsigned i = 0; i < m_shared.m_markingThreadsMarkStack.size(); ++i)
+        m_shared.m_markingThreadsMarkStack[i]->m_shouldHashConst = m_shared.m_shouldHashConst;
 #endif
-    
-    m_weakReferenceHarvesters.removeAll();
 }
 
 void MarkStack::reset()
@@ -286,6 +261,10 @@ void MarkStack::reset()
 #else
     m_opaqueRoots.clear();
 #endif
+    if (m_shouldHashConst) {
+        m_uniqueStrings.clear();
+        m_shouldHashConst = false;
+    }
 }
 
 void MarkStack::append(ConservativeRoots& conservativeRoots)
@@ -310,7 +289,7 @@ ALWAYS_INLINE static void visitChildren(SlotVisitor& visitor, const JSCell* cell
     }
 
     if (isJSFinalObject(cell)) {
-        JSObject::visitChildren(const_cast<JSCell*>(cell), visitor);
+        JSFinalObject::visitChildren(const_cast<JSCell*>(cell), visitor);
         return;
     }
 
@@ -322,18 +301,31 @@ ALWAYS_INLINE static void visitChildren(SlotVisitor& visitor, const JSCell* cell
     cell->methodTable()->visitChildren(const_cast<JSCell*>(cell), visitor);
 }
 
-void SlotVisitor::donateSlow()
+void SlotVisitor::donateKnownParallel()
 {
-    // Refuse to donate if shared has more entries than I do.
-    if (m_shared.m_sharedMarkStack.size() > m_stack.size())
+    // NOTE: Because we re-try often, we can afford to be conservative, and
+    // assume that donating is not profitable.
+
+    // Avoid locking when a thread reaches a dead end in the object graph.
+    if (m_stack.size() < 2)
         return;
-    MutexLocker locker(m_shared.m_markingLock);
-    if (m_stack.donateSomeCellsTo(m_shared.m_sharedMarkStack)) {
-        // Only wake up threads if the shared stack is big enough; otherwise assume that
-        // it's more profitable for us to just scan this ourselves later.
-        if (m_shared.m_sharedMarkStack.size() >= Options::sharedStackWakeupThreshold)
-            m_shared.m_markingCondition.broadcast();
-    }
+
+    // If there's already some shared work queued up, be conservative and assume
+    // that donating more is not profitable.
+    if (m_shared.m_sharedMarkStack.size())
+        return;
+
+    // If we're contending on the lock, be conservative and assume that another
+    // thread is already donating.
+    MutexTryLocker locker(m_shared.m_markingLock);
+    if (!locker.locked())
+        return;
+
+    // Otherwise, assume that a thread will go idle soon, and donate.
+    m_stack.donateSomeCellsTo(m_shared.m_sharedMarkStack);
+
+    if (m_shared.m_numberOfActiveParallelMarkers < Options::numberOfGCMarkers())
+        m_shared.m_markingCondition.broadcast();
 }
 
 void SlotVisitor::drain()
@@ -341,10 +333,10 @@ void SlotVisitor::drain()
     ASSERT(m_isInParallelMode);
    
 #if ENABLE(PARALLEL_GC)
-    if (Options::numberOfGCMarkers > 1) {
+    if (Options::numberOfGCMarkers() > 1) {
         while (!m_stack.isEmpty()) {
             m_stack.refill();
-            for (unsigned countdown = Options::minimumNumberOfScansBetweenRebalance; m_stack.canRemoveLast() && countdown--;)
+            for (unsigned countdown = Options::minimumNumberOfScansBetweenRebalance(); m_stack.canRemoveLast() && countdown--;)
                 visitChildren(*this, m_stack.removeLast());
             donateKnownParallel();
         }
@@ -365,14 +357,14 @@ void SlotVisitor::drainFromShared(SharedDrainMode sharedDrainMode)
 {
     ASSERT(m_isInParallelMode);
     
-    ASSERT(Options::numberOfGCMarkers);
+    ASSERT(Options::numberOfGCMarkers());
     
     bool shouldBeParallel;
 
 #if ENABLE(PARALLEL_GC)
-    shouldBeParallel = Options::numberOfGCMarkers > 1;
+    shouldBeParallel = Options::numberOfGCMarkers() > 1;
 #else
-    ASSERT(Options::numberOfGCMarkers == 1);
+    ASSERT(Options::numberOfGCMarkers() == 1);
     shouldBeParallel = false;
 #endif
     
@@ -433,7 +425,8 @@ void SlotVisitor::drainFromShared(SharedDrainMode sharedDrainMode)
                 }
             }
            
-            m_stack.stealSomeCellsFrom(m_shared.m_sharedMarkStack);
+            size_t idleThreadCount = Options::numberOfGCMarkers() - m_shared.m_numberOfActiveParallelMarkers;
+            m_stack.stealSomeCellsFrom(m_shared.m_sharedMarkStack, idleThreadCount);
             m_shared.m_numberOfActiveParallelMarkers++;
         }
         
@@ -457,39 +450,105 @@ void MarkStack::mergeOpaqueRoots()
 
 void SlotVisitor::startCopying()
 {
-    ASSERT(!m_copyBlock);
-    if (!m_shared.m_copiedSpace->borrowBlock(&m_copyBlock))
-        CRASH();
-}    
+    ASSERT(!m_copiedAllocator.isValid());
+}
 
-void* SlotVisitor::allocateNewSpace(void* ptr, size_t bytes)
+void* SlotVisitor::allocateNewSpaceSlow(size_t bytes)
 {
-    if (CopiedSpace::isOversize(bytes)) {
-        m_shared.m_copiedSpace->pin(CopiedSpace::oversizeBlockFor(ptr));
+    m_shared.m_copiedSpace->doneFillingBlock(m_copiedAllocator.resetCurrentBlock());
+    m_copiedAllocator.setCurrentBlock(m_shared.m_copiedSpace->allocateBlockForCopyingPhase());
+
+    void* result = 0;
+    CheckedBoolean didSucceed = m_copiedAllocator.tryAllocate(bytes, &result);
+    ASSERT(didSucceed);
+    return result;
+}
+
+void* SlotVisitor::allocateNewSpaceOrPin(void* ptr, size_t bytes)
+{
+    if (!checkIfShouldCopyAndPinOtherwise(ptr, bytes))
         return 0;
+    
+    return allocateNewSpace(bytes);
+}
+
+ALWAYS_INLINE bool JSString::tryHashConstLock()
+{
+#if ENABLE(PARALLEL_GC)
+    unsigned currentFlags = m_flags;
+
+    if (currentFlags & HashConstLock)
+        return false;
+
+    unsigned newFlags = currentFlags | HashConstLock;
+
+    if (!WTF::weakCompareAndSwap(&m_flags, currentFlags, newFlags))
+        return false;
+
+    WTF::memoryBarrierAfterLock();
+    return true;
+#else
+    if (isHashConstSingleton())
+        return false;
+
+    m_flags |= HashConstLock;
+
+    return true;
+#endif
+}
+
+ALWAYS_INLINE void JSString::releaseHashConstLock()
+{
+#if ENABLE(PARALLEL_GC)
+    WTF::memoryBarrierBeforeUnlock();
+#endif
+    m_flags &= ~HashConstLock;
+}
+
+ALWAYS_INLINE bool JSString::shouldTryHashConst()
+{
+    return ((length() > 1) && !isRope() && !isHashConstSingleton());
+}
+
+ALWAYS_INLINE void MarkStack::internalAppend(JSValue* slot)
+{
+    // This internalAppend is only intended for visits to object and array backing stores.
+    // as it can change the JSValue pointed to be the argument when the original JSValue
+    // is a string that contains the same contents as another string.
+
+    ASSERT(slot);
+    JSValue value = *slot;
+    ASSERT(value);
+    if (!value.isCell())
+        return;
+
+    JSCell* cell = value.asCell();
+
+    if (m_shouldHashConst && cell->isString()) {
+        JSString* string = jsCast<JSString*>(cell);
+        if (string->shouldTryHashConst() && string->tryHashConstLock()) {
+            UniqueStringMap::AddResult addResult = m_uniqueStrings.add(string->string().impl(), value);
+            if (addResult.isNewEntry)
+                string->setHashConstSingleton();
+            else {
+                JSValue existingJSValue = addResult.iterator->second;
+                if (value != existingJSValue)
+                    jsCast<JSString*>(existingJSValue.asCell())->clearHashConstSingleton();
+                *slot = existingJSValue;
+                string->releaseHashConstLock();
+                return;
+            }
+            string->releaseHashConstLock();
+        }
     }
 
-    if (m_shared.m_copiedSpace->isPinned(ptr))
-        return 0;
-
-    // The only time it's possible to have a null copy block is if we have just started copying.
-    if (!m_copyBlock)
-        startCopying();
-
-    if (!CopiedSpace::fitsInBlock(m_copyBlock, bytes)) {
-        // We don't need to lock across these two calls because the master thread won't 
-        // call doneCopying() because this thread is considered active.
-        m_shared.m_copiedSpace->doneFillingBlock(m_copyBlock);
-        if (!m_shared.m_copiedSpace->borrowBlock(&m_copyBlock))
-            CRASH();
-    }
-    return CopiedSpace::allocateFromBlock(m_copyBlock, bytes);
+    internalAppend(cell);
 }
 
 void SlotVisitor::copyAndAppend(void** ptr, size_t bytes, JSValue* values, unsigned length)
 {
     void* oldPtr = *ptr;
-    void* newPtr = allocateNewSpace(oldPtr, bytes);
+    void* newPtr = allocateNewSpaceOrPin(oldPtr, bytes);
     if (newPtr) {
         size_t jsValuesOffset = static_cast<size_t>(reinterpret_cast<char*>(values) - static_cast<char*>(oldPtr));
 
@@ -499,7 +558,7 @@ void SlotVisitor::copyAndAppend(void** ptr, size_t bytes, JSValue* values, unsig
             newValues[i] = value;
             if (!value)
                 continue;
-            internalAppend(value);
+            internalAppend(&newValues[i]);
         }
 
         memcpy(newPtr, oldPtr, jsValuesOffset);
@@ -510,12 +569,10 @@ void SlotVisitor::copyAndAppend(void** ptr, size_t bytes, JSValue* values, unsig
     
 void SlotVisitor::doneCopying()
 {
-    if (!m_copyBlock)
+    if (!m_copiedAllocator.isValid())
         return;
 
-    m_shared.m_copiedSpace->doneFillingBlock(m_copyBlock);
-
-    m_copyBlock = 0;
+    m_shared.m_copiedSpace->doneFillingBlock(m_copiedAllocator.resetCurrentBlock());
 }
 
 void SlotVisitor::harvestWeakReferences()
@@ -533,16 +590,29 @@ void SlotVisitor::finalizeUnconditionalFinalizers()
 #if ENABLE(GC_VALIDATION)
 void MarkStack::validate(JSCell* cell)
 {
-    if (!cell)
+    if (!cell) {
+        dataLog("cell is NULL\n");
         CRASH();
+    }
 
-    if (!cell->structure())
+    if (!cell->structure()) {
+        dataLog("cell at %p has a null structure\n" , cell);
         CRASH();
+    }
 
     // Both the cell's structure, and the cell's structure's structure should be the Structure Structure.
     // I hate this sentence.
-    if (cell->structure()->structure()->JSCell::classInfo() != cell->structure()->JSCell::classInfo())
+    if (cell->structure()->structure()->JSCell::classInfo() != cell->structure()->JSCell::classInfo()) {
+        const char* parentClassName = 0;
+        const char* ourClassName = 0;
+        if (cell->structure()->structure() && cell->structure()->structure()->JSCell::classInfo())
+            parentClassName = cell->structure()->structure()->JSCell::classInfo()->className;
+        if (cell->structure()->JSCell::classInfo())
+            ourClassName = cell->structure()->JSCell::classInfo()->className;
+        dataLog("parent structure (%p <%s>) of cell at %p doesn't match cell's structure (%p <%s>)\n",
+                cell->structure()->structure(), parentClassName, cell, cell->structure(), ourClassName);
         CRASH();
+    }
 }
 #else
 void MarkStack::validate(JSCell*)

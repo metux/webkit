@@ -48,7 +48,7 @@ bool JSSQLStatementErrorCallback::handleEvent(SQLTransaction* transaction, SQLEr
 
     RefPtr<JSSQLStatementErrorCallback> protect(this);
 
-    JSC::JSLock lock(SilenceAssertionsOnly);
+    JSC::JSLockHolder lock(m_data->globalObject()->globalData());
 
     ExecState* exec = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
@@ -64,7 +64,7 @@ bool JSSQLStatementErrorCallback::handleEvent(SQLTransaction* transaction, SQLEr
         // Therefore an exception and returning true are the same thing - so, return true on an exception
         return true;
     }
-    return result.toBoolean(exec);
+    return result.toBoolean();
 }
 
 }

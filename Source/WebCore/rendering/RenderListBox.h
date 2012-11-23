@@ -36,6 +36,8 @@
 
 namespace WebCore {
 
+class HTMLSelectElement;
+
 class RenderListBox : public RenderBlock, private ScrollableArea {
 public:
     RenderListBox(Element*);
@@ -56,12 +58,14 @@ public:
     int size() const;
 
 private:
+    HTMLSelectElement* selectElement() const;
+
     virtual const char* renderName() const { return "RenderListBox"; }
 
     virtual bool isListBox() const { return true; }
 
     virtual void updateFromElement();
-
+    virtual bool canBeReplacedWithInlineRunIn() const OVERRIDE;
     virtual bool hasControlClip() const { return true; }
     virtual void paintObject(PaintInfo&, const LayoutPoint&);
     virtual LayoutRect controlClipRect(const LayoutPoint&) const;
@@ -94,12 +98,13 @@ private:
     virtual void setScrollLeft(int);
     virtual void setScrollTop(int);
 
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     // ScrollableArea interface.
     virtual int scrollSize(ScrollbarOrientation) const;
     virtual int scrollPosition(Scrollbar*) const;
     virtual void setScrollOffset(const IntPoint&);
+    virtual IntPoint scrollPosition() const OVERRIDE;
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&);
     virtual bool isActive() const;
     virtual bool isScrollCornerVisible() const { return false; } // We don't support resize on list boxes yet. If we did these would have to change.

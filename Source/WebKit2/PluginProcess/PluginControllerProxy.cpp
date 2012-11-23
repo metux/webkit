@@ -43,6 +43,7 @@
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/IdentifierRep.h>
 #include <WebCore/NotImplemented.h>
+#include <wtf/TemporaryChange.h>
 #include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
@@ -66,6 +67,7 @@ PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, c
 #if USE(ACCELERATED_COMPOSITING)
     , m_isAcceleratedCompositingEnabled(creationParameters.isAcceleratedCompositingEnabled)
 #endif
+    , m_isInitializing(false)
     , m_paintTimer(RunLoop::main(), this, &PluginControllerProxy::paint)
     , m_pluginDestructionProtectCount(0)
     , m_pluginDestroyTimer(RunLoop::main(), this, &PluginControllerProxy::destroy)
@@ -91,9 +93,22 @@ PluginControllerProxy::~PluginControllerProxy()
         releaseNPObject(m_pluginElementNPObject);
 }
 
+void PluginControllerProxy::setInitializationReply(PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> reply)
+{
+    ASSERT(!m_initializationReply);
+    m_initializationReply = reply;
+}
+
+PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> PluginControllerProxy::takeInitializationReply()
+{
+    return m_initializationReply.release();
+}
+
 bool PluginControllerProxy::initialize(const PluginCreationParameters& creationParameters)
 {
     ASSERT(!m_plugin);
+    
+    TemporaryChange<bool> initializing(m_isInitializing, true);
 
     m_plugin = NetscapePlugin::create(PluginProcess::shared().netscapePluginModule());
     if (!m_plugin) {
@@ -102,8 +117,8 @@ bool PluginControllerProxy::initialize(const PluginCreationParameters& creationP
         return false;
     }
 
-    m_windowNPObject = m_connection->npRemoteObjectMap()->createNPObjectProxy(creationParameters.windowNPObjectID, m_plugin.get());
-    ASSERT(m_windowNPObject);
+    if (creationParameters.windowNPObjectID)
+        m_windowNPObject = m_connection->npRemoteObjectMap()->createNPObjectProxy(creationParameters.windowNPObjectID, m_plugin.get());
 
     bool returnValue = m_plugin->initialize(this, creationParameters.parameters);
 
@@ -146,6 +161,11 @@ void PluginControllerProxy::destroy()
 
     // This will delete the plug-in controller proxy object.
     m_connection->removePluginControllerProxy(this, plugin);
+}
+
+bool PluginControllerProxy::wantsWheelEvents() const
+{
+    return m_plugin->wantsWheelEvents();
 }
 
 void PluginControllerProxy::paint()
@@ -241,6 +261,9 @@ void PluginControllerProxy::cancelManualStreamLoad()
 
 NPObject* PluginControllerProxy::windowScriptNPObject()
 {
+    if (!m_windowNPObject)
+        return 0;
+
     retainNPObject(m_windowNPObject);
     return m_windowNPObject;
 }
@@ -306,6 +329,18 @@ void PluginControllerProxy::pluginProcessCrashed()
 void PluginControllerProxy::willSendEventToPlugin()
 {
     // This is only used when running plugins in the web process.
+    ASSERT_NOT_REACHED();
+}
+
+void PluginControllerProxy::didInitializePlugin()
+{
+    // This should only be called on the plugin in the web process.
+    ASSERT_NOT_REACHED();
+}
+
+void PluginControllerProxy::didFailToInitializePlugin()
+{
+    // This should only be called on the plugin in the web process.
     ASSERT_NOT_REACHED();
 }
 

@@ -36,6 +36,7 @@
 #include "FrameLoader.h"
 #include "Logging.h"
 #include "MemoryCache.h"
+#include "MemoryInstrumentation.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include <wtf/RefCountedLeakCounter.h>
@@ -121,12 +122,26 @@ PassRefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedReso
     return subloader.release();
 }
 
+CachedResource* SubresourceLoader::cachedResource()
+{
+    return m_resource;
+}
+
 void SubresourceLoader::cancelIfNotFinishing()
 {
     if (m_state != Initialized)
         return;
 
     ResourceLoader::cancel();
+}
+
+void SubresourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
+    ResourceLoader::reportMemoryUsage(memoryObjectInfo);
+    info.addInstrumentedMember(m_resource);
+    info.addInstrumentedMember(m_document);
+    info.addMember(m_requestCountTracker);
 }
 
 bool SubresourceLoader::init(const ResourceRequest& request)
@@ -137,6 +152,11 @@ bool SubresourceLoader::init(const ResourceRequest& request)
     ASSERT(!reachedTerminalState());
     m_state = Initialized;
     m_documentLoader->addSubresourceLoader(this);
+    return true;
+}
+
+bool SubresourceLoader::isSubresourceLoader()
+{
     return true;
 }
 
@@ -209,6 +229,8 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         m_documentLoader->subresourceLoaderFinishedLoadingOnePart(this);
         didFinishLoadingOnePart(0);
     }
+
+    checkForHTTPStatusCodeError();
 }
 
 void SubresourceLoader::didReceiveData(const char* data, int length, long long encodedDataLength, bool allAtOnce)
@@ -221,13 +243,13 @@ void SubresourceLoader::didReceiveData(const char* data, int length, long long e
     RefPtr<SubresourceLoader> protect(this);
     ResourceLoader::didReceiveData(data, length, encodedDataLength, allAtOnce);
 
-    if (errorLoadingResource() || m_loadingMultipartContent)
+    if (m_loadingMultipartContent)
         return;
 
     sendDataToResource(data, length);
 }
 
-bool SubresourceLoader::errorLoadingResource()
+bool SubresourceLoader::checkForHTTPStatusCodeError()
 {
     if (m_resource->response().httpStatusCode() < 400 || m_resource->shouldIgnoreHTTPStatusCodeErrors())
         return false;

@@ -35,21 +35,28 @@
 #include <WebKit2/WKPagePrivate.h>
 #include <WebKit2/WKPreferencesPrivate.h>
 #include <WebKit2/WKRetainPtr.h>
+#include <algorithm>
 #include <cstdio>
+#include <ctype.h>
+#include <stdlib.h>
+#include <string>
 #include <wtf/PassOwnPtr.h>
 
 #if PLATFORM(MAC)
 #include <WebKit2/WKPagePrivateMac.h>
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK)
+#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
 #include "EventSenderProxy.h"
 #endif
 
 namespace WTR {
 
+// defaultLongTimeout + defaultShortTimeout should be less than 50,
+// the default timeout value of the test harness so we can detect an
+// unresponsive web process.
 static const double defaultLongTimeout = 30;
-static const double defaultShortTimeout = 5;
+static const double defaultShortTimeout = 15;
 static const double defaultNoTimeout = -1;
 
 static WKURLRef blankURL()
@@ -67,8 +74,7 @@ TestController& TestController::shared()
 }
 
 TestController::TestController(int argc, const char* argv[])
-    : m_dumpPixels(false)
-    , m_verbose(false)
+    : m_verbose(false)
     , m_printSeparators(false)
     , m_usingServerMode(false)
     , m_gcBetweenTests(false)
@@ -78,10 +84,11 @@ TestController::TestController(int argc, const char* argv[])
     , m_shortTimeout(defaultShortTimeout)
     , m_noTimeout(defaultNoTimeout)
     , m_useWaitToDumpWatchdogTimer(true)
+    , m_forceNoTimeout(false)
     , m_didPrintWebProcessCrashedMessage(false)
     , m_shouldExitWhenWebProcessCrashes(true)
     , m_beforeUnloadReturnValue(true)
-#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK)
+#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
     , m_eventSenderProxy(new EventSenderProxy(this))
 #endif
 {
@@ -212,6 +219,7 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         createOtherPage,
         0, // mouseDidMoveOverElement
         0, // decidePolicyForNotificationPermissionRequest
+        0, // unavailablePluginButtonClicked
     };
     WKPageSetPageUIClient(newPage, &otherPageUIClient);
 
@@ -259,10 +267,12 @@ void TestController::initialize(int argc, const char* argv[])
             continue;
         }
 
-        if (argument == "--pixel-tests") {
-            m_dumpPixels = true;
+        if (argument == "--no-timeout-at-all") {
+            m_useWaitToDumpWatchdogTimer = false;
+            m_forceNoTimeout = true;
             continue;
         }
+
         if (argument == "--verbose") {
             m_verbose = true;
             continue;
@@ -318,11 +328,13 @@ void TestController::initialize(int argc, const char* argv[])
         kWKContextInjectedBundleClientCurrentVersion,
         this,
         didReceiveMessageFromInjectedBundle,
-        didReceiveSynchronousMessageFromInjectedBundle
+        didReceiveSynchronousMessageFromInjectedBundle,
+        0 // getInjectedBundleInitializationUserData
     };
     WKContextSetInjectedBundleClient(m_context.get(), &injectedBundleClient);
 
-    WKContextSetAdditionalPluginsDirectory(m_context.get(), testPluginDirectory());
+    if (testPluginDirectory())
+        WKContextSetAdditionalPluginsDirectory(m_context.get(), testPluginDirectory());
 
     m_mainWebView = adoptPtr(new PlatformWebView(m_context.get(), m_pageGroup.get()));
 
@@ -371,6 +383,7 @@ void TestController::initialize(int argc, const char* argv[])
         createOtherPage,
         0, // mouseDidMoveOverElement
         0, // decidePolicyForNotificationPermissionRequest
+        0, // unavailablePluginButtonClicked
     };
     WKPageSetPageUIClient(m_mainWebView->page(), &pageUIClient);
 
@@ -406,6 +419,9 @@ void TestController::initialize(int argc, const char* argv[])
         0, // didNewFirstVisuallyNonEmptyLayout
         0, // willGoToBackForwardListItem
         0, // interactionOccurredWhileProcessUnresponsive
+        0, // pluginDidFail
+        0, // didReceiveIntentForFrame
+        0, // registerIntentServiceForFrame
     };
     WKPageSetPageLoaderClient(m_mainWebView->page(), &pageLoaderClient);
 }
@@ -439,6 +455,7 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetXSSAuditorEnabled(preferences, false);
     WKPreferencesSetWebAudioEnabled(preferences, true);
     WKPreferencesSetDeveloperExtrasEnabled(preferences, true);
+    WKPreferencesSetJavaScriptExperimentsEnabled(preferences, true);
     WKPreferencesSetJavaScriptCanOpenWindowsAutomatically(preferences, true);
     WKPreferencesSetJavaScriptCanAccessClipboard(preferences, true);
     WKPreferencesSetDOMPasteAllowed(preferences, true);
@@ -448,6 +465,9 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetFullScreenEnabled(preferences, true);
 #endif
     WKPreferencesSetPageCacheEnabled(preferences, false);
+    WKPreferencesSetAsynchronousPluginInitializationEnabled(preferences, false);
+    WKPreferencesSetAsynchronousPluginInitializationEnabledForAllPlugins(preferences, false);
+    WKPreferencesSetArtificialPluginInitializationDelayEnabled(preferences, false);
 
 // [Qt][WK2]REGRESSION(r104881):It broke hundreds of tests
 // FIXME: https://bugs.webkit.org/show_bug.cgi?id=76247
@@ -489,32 +509,97 @@ bool TestController::resetStateToConsistentValues()
     return m_doneResetting;
 }
 
-bool TestController::runTest(const char* test)
-{
-    if (!resetStateToConsistentValues()) {
-#if PLATFORM(MAC)
-        pid_t pid = WKPageGetProcessIdentifier(m_mainWebView->page());
-        fprintf(stderr, "#CRASHED - WebProcess (pid %ld)\n", static_cast<long>(pid));
-#else
-        fputs("#CRASHED - WebProcess\n", stderr);
-#endif
-        fflush(stderr);
-        return false;
+struct TestCommand {
+    TestCommand() : shouldDumpPixels(false) { }
+
+    std::string pathOrURL;
+    bool shouldDumpPixels;
+    std::string expectedPixelHash;
+};
+
+class CommandTokenizer {
+public:
+    explicit CommandTokenizer(const std::string& input)
+        : m_input(input)
+        , m_posNextSeparator(0)
+    {
+        pump();
     }
 
-    std::string pathOrURL(test);
-    std::string expectedPixelHash;
-    size_t separatorPos = pathOrURL.find("'");
-    if (separatorPos != std::string::npos) {
-        pathOrURL = std::string(std::string(test), 0, separatorPos);
-        expectedPixelHash = std::string(std::string(test), separatorPos + 1);
+    bool hasNext() const;
+    std::string next();
+
+private:
+    void pump();
+    static const char kSeparator = '\'';
+    const std::string& m_input;
+    std::string m_next;
+    size_t m_posNextSeparator;
+};
+
+void CommandTokenizer::pump()
+{
+    if (m_posNextSeparator == std::string::npos || m_posNextSeparator == m_input.size()) {
+        m_next = std::string();
+        return;
     }
+    size_t start = m_posNextSeparator ? m_posNextSeparator + 1 : 0;
+    m_posNextSeparator = m_input.find(kSeparator, start);
+    size_t size = m_posNextSeparator == std::string::npos ? std::string::npos : m_posNextSeparator - start;
+    m_next = std::string(m_input, start, size);
+}
+
+std::string CommandTokenizer::next()
+{
+    ASSERT(hasNext());
+
+    std::string oldNext = m_next;
+    pump();
+    return oldNext;
+}
+
+bool CommandTokenizer::hasNext() const
+{
+    return !m_next.empty();
+}
+
+NO_RETURN static void die(const std::string& inputLine)
+{
+    fprintf(stderr, "Unexpected input line: %s\n", inputLine.c_str());
+    exit(1);
+}
+
+TestCommand parseInputLine(const std::string& inputLine)
+{
+    TestCommand result;
+    CommandTokenizer tokenizer(inputLine);
+    if (!tokenizer.hasNext())
+        die(inputLine);
+
+    result.pathOrURL = tokenizer.next();
+    if (!tokenizer.hasNext())
+        return result;
+
+    std::string arg = tokenizer.next();
+    if (arg != std::string("-p") && arg != std::string("--pixel-test"))
+        die(inputLine);
+    result.shouldDumpPixels = true;
+
+    if (tokenizer.hasNext())
+        result.expectedPixelHash = tokenizer.next();
+
+    return result;
+}
+
+bool TestController::runTest(const char* inputLine)
+{
+    TestCommand command = parseInputLine(std::string(inputLine));
 
     m_state = RunningTest;
 
-    m_currentInvocation = adoptPtr(new TestInvocation(pathOrURL));
-    if (m_dumpPixels)
-        m_currentInvocation->setIsPixelTest(expectedPixelHash);
+    m_currentInvocation = adoptPtr(new TestInvocation(command.pathOrURL));
+    if (command.shouldDumpPixels)
+        m_currentInvocation->setIsPixelTest(command.expectedPixelHash);
 
     m_currentInvocation->invoke();
     m_currentInvocation.clear();
@@ -540,6 +625,11 @@ void TestController::runTestingServerLoop()
 
 void TestController::run()
 {
+    if (!resetStateToConsistentValues()) {
+        TestInvocation::dumpWebProcessUnresponsiveness("Failed to reset to consistent state before the first test");
+        return;
+    }
+
     if (m_usingServerMode)
         runTestingServerLoop();
     else {
@@ -552,18 +642,20 @@ void TestController::run()
 
 void TestController::runUntil(bool& done, TimeoutDuration timeoutDuration)
 {
-    double timeout;
-    switch (timeoutDuration) {
-    case ShortTimeout:
-        timeout = m_shortTimeout;
-        break;
-    case LongTimeout:
-        timeout = m_longTimeout;
-        break;
-    case NoTimeout:
-    default:
-        timeout = m_noTimeout;
-        break;
+    double timeout = m_noTimeout;
+    if (!m_forceNoTimeout) {
+        switch (timeoutDuration) {
+        case ShortTimeout:
+            timeout = m_shortTimeout;
+            break;
+        case LongTimeout:
+            timeout = m_longTimeout;
+            break;
+        case NoTimeout:
+        default:
+            timeout = m_noTimeout;
+            break;
+        }
     }
 
     platformRunUntil(done, timeout);
@@ -590,7 +682,7 @@ void TestController::didReceiveMessageFromInjectedBundle(WKStringRef messageName
 
 WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody)
 {
-#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK)
+#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
     if (WKStringIsEqualToUTF8CString(messageName, "EventSender")) {
         ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
         WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
@@ -615,7 +707,6 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             return 0;
         }
 
-#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK)
         if (WKStringIsEqualToUTF8CString(subMessageName, "MouseDown") || WKStringIsEqualToUTF8CString(subMessageName, "MouseUp")) {
             WKRetainPtr<WKStringRef> buttonKey = adoptWK(WKStringCreateWithUTF8CString("Button"));
             unsigned button = static_cast<unsigned>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, buttonKey.get()))));
@@ -661,6 +752,23 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             return 0;
         }
 
+        if (WKStringIsEqualToUTF8CString(subMessageName, "ContinuousMouseScrollBy")) {
+            WKRetainPtr<WKStringRef> xKey = adoptWK(WKStringCreateWithUTF8CString("X"));
+            double x = WKDoubleGetValue(static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, xKey.get())));
+
+            WKRetainPtr<WKStringRef> yKey = adoptWK(WKStringCreateWithUTF8CString("Y"));
+            double y = WKDoubleGetValue(static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, yKey.get())));
+
+            WKRetainPtr<WKStringRef> pagedKey = adoptWK(WKStringCreateWithUTF8CString("Paged"));
+            bool paged = static_cast<bool>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, pagedKey.get()))));
+
+            // Forward to WebProcess
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), true);
+            m_eventSenderProxy->continuousMouseScrollBy(x, y, paged);
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), false);
+            return 0;
+        }
+
         if (WKStringIsEqualToUTF8CString(subMessageName, "LeapForward")) {
             WKRetainPtr<WKStringRef> timeKey = adoptWK(WKStringCreateWithUTF8CString("TimeInMilliseconds"));
             unsigned time = static_cast<unsigned>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, timeKey.get()))));
@@ -668,7 +776,6 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             m_eventSenderProxy->leapForward(time);
             return 0;
         }
-#endif
 
 #if ENABLE(TOUCH_EVENTS)
         if (WKStringIsEqualToUTF8CString(subMessageName, "AddTouchPoint")) {

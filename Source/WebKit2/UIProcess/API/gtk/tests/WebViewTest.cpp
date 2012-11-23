@@ -29,6 +29,7 @@ WebViewTest::WebViewTest()
     , m_mainLoop(g_main_loop_new(0, TRUE))
     , m_parentWindow(0)
     , m_javascriptResult(0)
+    , m_resourceDataSize(0)
 {
     assertObjectIsDeletedWhenTestFinishes(G_OBJECT(m_webView));
 }
@@ -41,12 +42,6 @@ WebViewTest::~WebViewTest()
         webkit_javascript_result_unref(m_javascriptResult);
     g_object_unref(m_webView);
     g_main_loop_unref(m_mainLoop);
-}
-
-static gboolean testLoadTimeoutFinishLoop(GMainLoop* loop)
-{
-    g_main_loop_quit(loop);
-    return FALSE;
 }
 
 void WebViewTest::loadURI(const char* uri)
@@ -76,10 +71,10 @@ void WebViewTest::loadRequest(WebKitURIRequest* request)
     webkit_web_view_load_request(m_webView, request);
 }
 
-void WebViewTest::replaceContent(const char* html, const char* contentURI, const char* baseURI)
+void WebViewTest::loadAlternateHTML(const char* html, const char* contentURI, const char* baseURI)
 {
     m_activeURI = contentURI;
-    webkit_web_view_replace_content(m_webView, html, contentURI, baseURI);
+    webkit_web_view_load_alternate_html(m_webView, html, contentURI, baseURI);
 }
 
 void WebViewTest::goBack()
@@ -112,9 +107,27 @@ void WebViewTest::goToBackForwardListItem(WebKitBackForwardListItem* item)
     webkit_web_view_go_to_back_forward_list_item(m_webView, item);
 }
 
+void WebViewTest::quitMainLoop()
+{
+    g_main_loop_quit(m_mainLoop);
+}
+
+void WebViewTest::quitMainLoopAfterProcessingPendingEvents()
+{
+    while (gtk_events_pending())
+        gtk_main_iteration();
+    quitMainLoop();
+}
+
+static gboolean quitMainLoopIdleCallback(WebViewTest* test)
+{
+    test->quitMainLoop();
+    return FALSE;
+}
+
 void WebViewTest::wait(double seconds)
 {
-    g_timeout_add_seconds(seconds, reinterpret_cast<GSourceFunc>(testLoadTimeoutFinishLoop), m_mainLoop);
+    g_timeout_add_seconds(seconds, reinterpret_cast<GSourceFunc>(quitMainLoopIdleCallback), this);
     g_main_loop_run(m_mainLoop);
 }
 
@@ -162,16 +175,54 @@ static gboolean parentWindowMapped(GtkWidget* widget, GdkEvent*, WebViewTest* te
     return FALSE;
 }
 
-void WebViewTest::showInWindowAndWaitUntilMapped()
+void WebViewTest::showInWindowAndWaitUntilMapped(GtkWindowType windowType)
 {
     g_assert(!m_parentWindow);
-    m_parentWindow = gtk_window_new(GTK_WINDOW_POPUP);
+    m_parentWindow = gtk_window_new(windowType);
     gtk_container_add(GTK_CONTAINER(m_parentWindow), GTK_WIDGET(m_webView));
     gtk_widget_show(GTK_WIDGET(m_webView));
 
     g_signal_connect(m_parentWindow, "map-event", G_CALLBACK(parentWindowMapped), this);
     gtk_widget_show(m_parentWindow);
     g_main_loop_run(m_mainLoop);
+}
+
+void WebViewTest::resizeView(int width, int height)
+{
+    GtkAllocation allocation;
+    gtk_widget_get_allocation(GTK_WIDGET(m_webView), &allocation);
+    if (width != -1)
+        allocation.width = width;
+    if (height != -1)
+        allocation.height = height;
+    gtk_widget_size_allocate(GTK_WIDGET(m_webView), &allocation);
+}
+
+static void resourceGetDataCallback(GObject* object, GAsyncResult* result, gpointer userData)
+{
+    size_t dataSize;
+    GOwnPtr<GError> error;
+    unsigned char* data = webkit_web_resource_get_data_finish(WEBKIT_WEB_RESOURCE(object), result, &dataSize, &error.outPtr());
+    g_assert(data);
+
+    WebViewTest* test = static_cast<WebViewTest*>(userData);
+    test->m_resourceData.set(reinterpret_cast<char*>(data));
+    test->m_resourceDataSize = dataSize;
+    g_main_loop_quit(test->m_mainLoop);
+}
+
+const char* WebViewTest::mainResourceData(size_t& mainResourceDataSize)
+{
+    m_resourceDataSize = 0;
+    m_resourceData.clear();
+    WebKitWebResource* resource = webkit_web_view_get_main_resource(m_webView);
+    g_assert(resource);
+
+    webkit_web_resource_get_data(resource, 0, resourceGetDataCallback, this);
+    g_main_loop_run(m_mainLoop);
+
+    mainResourceDataSize = m_resourceDataSize;
+    return m_resourceData.get();
 }
 
 void WebViewTest::mouseMoveTo(int x, int y, unsigned int mouseModifiers)
@@ -268,7 +319,7 @@ WebKitJavascriptResult* WebViewTest::runJavaScriptAndWaitUntilFinished(const cha
         webkit_javascript_result_unref(m_javascriptResult);
     m_javascriptResult = 0;
     m_javascriptError = error;
-    webkit_web_view_run_javascript(m_webView, javascript, reinterpret_cast<GAsyncReadyCallback>(runJavaScriptReadyCallback), this);
+    webkit_web_view_run_javascript(m_webView, javascript, 0, reinterpret_cast<GAsyncReadyCallback>(runJavaScriptReadyCallback), this);
     g_main_loop_run(m_mainLoop);
 
     return m_javascriptResult;

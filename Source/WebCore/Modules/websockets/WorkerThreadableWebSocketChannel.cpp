@@ -66,12 +66,6 @@ WorkerThreadableWebSocketChannel::~WorkerThreadableWebSocketChannel()
         m_bridge->disconnect();
 }
 
-bool WorkerThreadableWebSocketChannel::useHixie76Protocol()
-{
-    ASSERT(m_workerClientWrapper);
-    return m_workerClientWrapper->useHixie76Protocol();
-}
-
 void WorkerThreadableWebSocketChannel::connect(const KURL& url, const String& protocol)
 {
     if (m_bridge)
@@ -97,11 +91,11 @@ ThreadableWebSocketChannel::SendResult WorkerThreadableWebSocketChannel::send(co
     return m_bridge->send(message);
 }
 
-ThreadableWebSocketChannel::SendResult WorkerThreadableWebSocketChannel::send(const ArrayBuffer& binaryData)
+ThreadableWebSocketChannel::SendResult WorkerThreadableWebSocketChannel::send(const ArrayBuffer& binaryData, unsigned byteOffset, unsigned byteLength)
 {
     if (!m_bridge)
         return ThreadableWebSocketChannel::SendFail;
-    return m_bridge->send(binaryData);
+    return m_bridge->send(binaryData, byteOffset, byteLength);
 }
 
 ThreadableWebSocketChannel::SendResult WorkerThreadableWebSocketChannel::send(const Blob& binaryData)
@@ -166,13 +160,6 @@ WorkerThreadableWebSocketChannel::Peer::~Peer()
         m_mainWebSocketChannel->disconnect();
 }
 
-bool WorkerThreadableWebSocketChannel::Peer::useHixie76Protocol()
-{
-    ASSERT(isMainThread());
-    ASSERT(m_mainWebSocketChannel);
-    return m_mainWebSocketChannel->useHixie76Protocol();
-}
-
 void WorkerThreadableWebSocketChannel::Peer::connect(const KURL& url, const String& protocol)
 {
     ASSERT(isMainThread());
@@ -201,7 +188,7 @@ void WorkerThreadableWebSocketChannel::Peer::send(const ArrayBuffer& binaryData)
     ASSERT(isMainThread());
     if (!m_mainWebSocketChannel || !m_workerClientWrapper)
         return;
-    ThreadableWebSocketChannel::SendResult sendRequestResult = m_mainWebSocketChannel->send(binaryData);
+    ThreadableWebSocketChannel::SendResult sendRequestResult = m_mainWebSocketChannel->send(binaryData, 0, binaryData.byteLength());
     m_loaderProxy.postTaskForModeToWorkerContext(createCallbackTask(&workerContextDidSend, m_workerClientWrapper, sendRequestResult), m_taskMode);
 }
 
@@ -345,6 +332,18 @@ void WorkerThreadableWebSocketChannel::Peer::didClose(unsigned long unhandledBuf
     m_loaderProxy.postTaskForModeToWorkerContext(createCallbackTask(&workerContextDidClose, m_workerClientWrapper, unhandledBufferedAmount, closingHandshakeCompletion, code, reason), m_taskMode);
 }
 
+static void workerContextDidReceiveMessageError(ScriptExecutionContext* context, PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper)
+{
+    ASSERT_UNUSED(context, context->isWorkerContext());
+    workerClientWrapper->didReceiveMessageError();
+}
+
+void WorkerThreadableWebSocketChannel::Peer::didReceiveMessageError()
+{
+     ASSERT(isMainThread());
+     m_loaderProxy.postTaskForModeToWorkerContext(createCallbackTask(&workerContextDidReceiveMessageError, m_workerClientWrapper), m_taskMode);
+}
+
 WorkerThreadableWebSocketChannel::Bridge::Bridge(PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper, PassRefPtr<WorkerContext> workerContext, const String& taskMode)
     : m_workerClientWrapper(workerClientWrapper)
     , m_workerContext(workerContext)
@@ -364,10 +363,9 @@ class WorkerThreadableWebSocketChannel::WorkerContextDidInitializeTask : public 
 public:
     static PassOwnPtr<ScriptExecutionContext::Task> create(WorkerThreadableWebSocketChannel::Peer* peer,
                                                            WorkerLoaderProxy* loaderProxy,
-                                                           PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper,
-                                                           bool useHixie76Protocol)
+                                                           PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper)
     {
-        return adoptPtr(new WorkerContextDidInitializeTask(peer, loaderProxy, workerClientWrapper, useHixie76Protocol));
+        return adoptPtr(new WorkerContextDidInitializeTask(peer, loaderProxy, workerClientWrapper));
     }
 
     virtual ~WorkerContextDidInitializeTask() { }
@@ -380,26 +378,23 @@ public:
             m_peer = 0;
             m_loaderProxy->postTaskToLoader(createCallbackTask(&WorkerThreadableWebSocketChannel::mainThreadDestroy, peer.release()));
         } else
-            m_workerClientWrapper->didCreateWebSocketChannel(m_peer, m_useHixie76Protocol);
+            m_workerClientWrapper->didCreateWebSocketChannel(m_peer);
     }
     virtual bool isCleanupTask() const OVERRIDE { return true; }
 
 private:
     WorkerContextDidInitializeTask(WorkerThreadableWebSocketChannel::Peer* peer,
                                    WorkerLoaderProxy* loaderProxy,
-                                   PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper,
-                                   bool useHixie76Protocol)
+                                   PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper)
         : m_peer(peer)
         , m_loaderProxy(loaderProxy)
         , m_workerClientWrapper(workerClientWrapper)
-        , m_useHixie76Protocol(useHixie76Protocol)
     {
     }
 
     WorkerThreadableWebSocketChannel::Peer* m_peer;
     WorkerLoaderProxy* m_loaderProxy;
     RefPtr<ThreadableWebSocketChannelClientWrapper> m_workerClientWrapper;
-    bool m_useHixie76Protocol;
 };
 
 void WorkerThreadableWebSocketChannel::Bridge::mainThreadInitialize(ScriptExecutionContext* context, WorkerLoaderProxy* loaderProxy, PassRefPtr<ThreadableWebSocketChannelClientWrapper> prpClientWrapper, const String& taskMode)
@@ -411,7 +406,7 @@ void WorkerThreadableWebSocketChannel::Bridge::mainThreadInitialize(ScriptExecut
 
     Peer* peer = Peer::create(clientWrapper, *loaderProxy, context, taskMode);
     bool sent = loaderProxy->postTaskForModeToWorkerContext(
-        WorkerThreadableWebSocketChannel::WorkerContextDidInitializeTask::create(peer, loaderProxy, clientWrapper, peer->useHixie76Protocol()), taskMode);
+        WorkerThreadableWebSocketChannel::WorkerContextDidInitializeTask::create(peer, loaderProxy, clientWrapper), taskMode);
     if (!sent) {
         clientWrapper->clearPeer();
         delete peer;
@@ -493,14 +488,14 @@ ThreadableWebSocketChannel::SendResult WorkerThreadableWebSocketChannel::Bridge:
     return clientWrapper->sendRequestResult();
 }
 
-ThreadableWebSocketChannel::SendResult WorkerThreadableWebSocketChannel::Bridge::send(const ArrayBuffer& binaryData)
+ThreadableWebSocketChannel::SendResult WorkerThreadableWebSocketChannel::Bridge::send(const ArrayBuffer& binaryData, unsigned byteOffset, unsigned byteLength)
 {
     if (!m_workerClientWrapper || !m_peer)
         return ThreadableWebSocketChannel::SendFail;
     // ArrayBuffer isn't thread-safe, hence the content of ArrayBuffer is copied into Vector<char>.
-    OwnPtr<Vector<char> > data = adoptPtr(new Vector<char>(binaryData.byteLength()));
+    OwnPtr<Vector<char> > data = adoptPtr(new Vector<char>(byteLength));
     if (binaryData.byteLength())
-        memcpy(data->data(), binaryData.data(), binaryData.byteLength());
+        memcpy(data->data(), static_cast<const char*>(binaryData.data()) + byteOffset, byteLength);
     setMethodNotCompleted();
     m_loaderProxy.postTaskToLoader(createCallbackTask(&WorkerThreadableWebSocketChannel::mainThreadSendArrayBuffer, AllowCrossThreadAccess(m_peer), data.release()));
     RefPtr<Bridge> protect(this);

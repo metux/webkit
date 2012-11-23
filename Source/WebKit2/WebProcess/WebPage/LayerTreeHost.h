@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,6 +41,10 @@ class FloatPoint;
 class IntRect;
 class IntSize;
 class GraphicsLayer;
+
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+struct GraphicsDeviceAdapter;
+#endif
 }
 
 namespace WebKit {
@@ -69,6 +73,7 @@ public:
     virtual void setNonCompositedContentsNeedDisplay(const WebCore::IntRect&) = 0;
     virtual void scrollNonCompositedContents(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) = 0;
     virtual void forceRepaint() = 0;
+    virtual bool forceRepaintAsync(uint64_t callbackID) { return false; }
     virtual void sizeDidChange(const WebCore::IntSize& newSize) = 0;
     virtual void deviceScaleFactorDidChange() = 0;
 
@@ -81,12 +86,12 @@ public:
     virtual void pauseRendering() { }
     virtual void resumeRendering() { }
 
-#if USE(UI_SIDE_COMPOSITING)
+#if USE(COORDINATED_GRAPHICS)
     virtual void setVisibleContentsRect(const WebCore::IntRect&, float scale, const WebCore::FloatPoint&) { }
     virtual void setVisibleContentsRectForLayer(int layerID, const WebCore::IntRect&) { }
     virtual void renderNextFrame() { }
     virtual void purgeBackingStores() { }
-    virtual void didReceiveLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    virtual void didReceiveLayerTreeCoordinatorMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) = 0;
 #endif
 
 #if PLATFORM(WIN)
@@ -97,17 +102,25 @@ public:
     virtual void setLayerHostingMode(LayerHostingMode) { }
 #endif
 
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+    virtual WebCore::GraphicsDeviceAdapter* graphicsDeviceAdapter() const { return 0; }
+#endif
+
+#if USE(COORDINATED_GRAPHICS)
+    virtual void scheduleAnimation() = 0;
+#endif
+
 protected:
     explicit LayerTreeHost(WebPage*);
 
     WebPage* m_webPage;
 
-#if USE(UI_SIDE_COMPOSITING)
+#if USE(COORDINATED_GRAPHICS)
     bool m_waitingForUIProcess;
 #endif
 };
 
-#if !PLATFORM(WIN) && !PLATFORM(QT)
+#if !PLATFORM(WIN) && !USE(COORDINATED_GRAPHICS)
 inline bool LayerTreeHost::supportsAcceleratedCompositing()
 {
     return true;

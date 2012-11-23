@@ -35,6 +35,7 @@
 #include "CachedResourceLoader.h"
 #include "CSSParser.h"
 #include "Document.h"
+#include "MemoryInstrumentation.h"
 #include "StyleCachedShader.h"
 #include "StylePendingShader.h"
 
@@ -59,8 +60,8 @@ StyleCachedShader* WebKitCSSShaderValue::cachedShader(CachedResourceLoader* load
         m_accessedShader = true;
 
         ResourceRequest request(loader->document()->completeURL(m_url));
-        if (CachedShader* cachedShader = loader->requestShader(request))
-            m_shader = StyleCachedShader::create(cachedShader);
+        if (CachedResourceHandle<CachedShader> cachedShader = loader->requestShader(request))
+            m_shader = StyleCachedShader::create(cachedShader.get());
     }
 
     return (m_shader && m_shader->isCachedShader()) ? static_cast<StyleCachedShader*>(m_shader.get()) : 0;
@@ -79,6 +80,12 @@ String WebKitCSSShaderValue::customCssText() const
     return "url(" + quoteCSSURLIfNeeded(m_url) + ")";
 }
 
+void WebKitCSSShaderValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_url);
+}
+    
 } // namespace WebCore
 
 #endif // ENABLE(CSS_SHADERS)

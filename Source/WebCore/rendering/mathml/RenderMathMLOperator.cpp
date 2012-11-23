@@ -70,6 +70,14 @@ void RenderMathMLOperator::stretchToHeight(int height)
     updateFromElement();
 }
 
+void RenderMathMLOperator::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
+{
+    RenderMathMLBlock::styleDidChange(diff, oldStyle);
+    
+    if (firstChild())
+        updateFromElement();
+}
+
 void RenderMathMLOperator::computePreferredLogicalWidths() 
 {
     ASSERT(preferredLogicalWidthsDirty());
@@ -150,6 +158,10 @@ int RenderMathMLOperator::lineHeightForCharacter(UChar character)
     return gGlyphLineHeight;
 }
 
+// FIXME: It's cleaner to only call updateFromElement when an attribute has changed. The body of
+// this method should probably be moved to a private stretchHeightChanged or checkStretchHeight
+// method. Probably at the same time, addChild/removeChild methods should be made to work for
+// dynamic DOM changes.
 void RenderMathMLOperator::updateFromElement()
 {
     RenderObject* savedRenderer = node()->renderer();
@@ -319,7 +331,7 @@ void RenderMathMLOperator::updateFromElement()
     setNeedsLayoutAndPrefWidthsRecalc();
 }
 
-PassRefPtr<RenderStyle> RenderMathMLOperator::createStackableStyle(int lineHeight, int maxHeightForRenderer, int topRelative)
+PassRefPtr<RenderStyle> RenderMathMLOperator::createStackableStyle(int /* lineHeight */, int maxHeightForRenderer, int topRelative)
 {
     RefPtr<RenderStyle> newStyle = RenderStyle::create();
     newStyle->inheritFrom(style());
@@ -331,8 +343,7 @@ PassRefPtr<RenderStyle> RenderMathMLOperator::createStackableStyle(int lineHeigh
     desc.setComputedSize(gGlyphFontSize);
     newStyle->setFontDescription(desc);
     newStyle->font().update(style()->font().fontSelector());
-    newStyle->setLineHeight(Length(lineHeight, Fixed));
-    newStyle->setVerticalAlign(TOP);
+    // FIXME: With -webkit-line-box-contain, this method's lineHeight argument is no longer used. It should be removed in a future patch.
 
     if (maxHeightForRenderer > 0)
         newStyle->setMaxHeight(Length(maxHeightForRenderer, Fixed));
@@ -375,7 +386,7 @@ LayoutUnit RenderMathMLOperator::baselinePosition(FontBaseline, bool firstLine, 
 {
     if (m_isStacked)
         return m_stretchHeight * 2 / 3 - (m_stretchHeight - static_cast<int>(m_stretchHeight / gOperatorExpansion)) / 2;    
-    return RenderBlock::baselinePosition(AlphabeticBaseline, firstLine, lineDirection, linePositionMode);
+    return RenderMathMLBlock::baselinePosition(AlphabeticBaseline, firstLine, lineDirection, linePositionMode);
 }
     
 }

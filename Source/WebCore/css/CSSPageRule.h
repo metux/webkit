@@ -45,7 +45,11 @@ public:
     void setSelectorText(const String&);
 
     String cssText() const;
-    
+
+    void reattach(StyleRulePage*);
+
+    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+
 private:
     CSSPageRule(StyleRulePage*, CSSStyleSheet*);
     

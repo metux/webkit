@@ -25,6 +25,7 @@
 #include "FindOptions.h"
 #include "LayoutTypes.h"
 #include "PageVisibilityState.h"
+#include "Pagination.h"
 #include "PlatformScreen.h"
 #include "PlatformString.h"
 #include "Region.h"
@@ -125,7 +126,7 @@ namespace WebCore {
             RefPtr<BackForwardList> backForwardClient;
         };
 
-        Page(PageClients&);
+        explicit Page(PageClients&);
         ~Page();
 
         ArenaSize renderTreeSize() const;
@@ -237,9 +238,6 @@ namespace WebCore {
         bool inLowQualityImageInterpolationMode() const;
         void setInLowQualityImageInterpolationMode(bool = true);
 
-        bool cookieEnabled() const { return m_cookieEnabled; }
-        void setCookieEnabled(bool enabled) { m_cookieEnabled = enabled; }
-
         float mediaVolume() const { return m_mediaVolume; }
         void setMediaVolume(float volume);
 
@@ -249,28 +247,10 @@ namespace WebCore {
         float deviceScaleFactor() const { return m_deviceScaleFactor; }
         void setDeviceScaleFactor(float);
 
-        struct Pagination {
-            enum Mode { Unpaginated, HorizontallyPaginated, VerticallyPaginated };
-
-            Pagination()
-                : mode(Unpaginated)
-                , behavesLikeColumns(false)
-                , pageLength(0)
-                , gap(0)
-            {
-            };
-
-            bool operator==(const Pagination& other) const
-            {
-                return mode == other.mode && behavesLikeColumns == other.behavesLikeColumns && pageLength == other.pageLength && gap == other.gap;
-            }
-
-            Mode mode;
-            bool behavesLikeColumns;
-            unsigned pageLength;
-            unsigned gap;
-        };
-
+        // Page and FrameView both store a Pagination value. Page::pagination() is set only by API,
+        // and FrameView::pagination() is set only by CSS. Page::pagination() will affect all
+        // FrameViews in the page cache, but FrameView::pagination() only affects the current
+        // FrameView. 
         const Pagination& pagination() const { return m_pagination; }
         void setPagination(const Pagination&);
 
@@ -350,6 +330,11 @@ namespace WebCore {
 #endif
 
         AlternativeTextClient* alternativeTextClient() const { return m_alternativeTextClient; }
+
+        bool hasSeenPlugin(const String& serviceType) const;
+        bool hasSeenAnyPlugin() const;
+        void sawPlugin(const String& serviceType);
+        void resetSeenPlugins();
 
     private:
         void initGroup();
@@ -454,6 +439,8 @@ namespace WebCore {
         AlternativeTextClient* m_alternativeTextClient;
 
         bool m_scriptedAnimationsSuspended;
+
+        HashSet<String> m_seenPlugins;
     };
 
 } // namespace WebCore

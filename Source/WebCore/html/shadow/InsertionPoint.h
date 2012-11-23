@@ -31,9 +31,10 @@
 #ifndef InsertionPoint_h
 #define InsertionPoint_h
 
-#include "HTMLContentSelector.h"
+#include "ContentDistributor.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
+#include "ShadowRoot.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -42,8 +43,9 @@ class InsertionPoint : public HTMLElement {
 public:
     virtual ~InsertionPoint();
 
-    const HTMLContentSelectionList* selections() const { return &m_selections; }
-    bool hasSelection() const { return m_selections.first(); }
+    bool hasDistribution() const { return !m_distribution.isEmpty(); }
+    void setDistribution(ContentDistribution& distribution) { m_distribution.swap(distribution); }
+    void clearDistribution() { m_distribution.clear(); }
     bool isShadowBoundary() const;
     bool isActive() const;
 
@@ -53,29 +55,32 @@ public:
 
     virtual void attach();
     virtual void detach();
-
     virtual bool isInsertionPoint() const OVERRIDE { return true; }
-    ShadowRoot* assignedFrom() const;
+
+    size_t indexOf(Node* node) const { return m_distribution.find(node); }
+    bool contains(const Node* node) const { return m_distribution.contains(const_cast<Node*>(node)) || (node->isShadowRoot() && toShadowRoot(node)->assignedTo() == this); }
+    size_t size() const { return m_distribution.size(); }
+    Node* at(size_t index)  const { return m_distribution.at(index).get(); }
+    Node* first() const { return m_distribution.isEmpty() ? 0 : m_distribution.first().get(); }
+    Node* last() const { return m_distribution.isEmpty() ? 0 : m_distribution.last().get(); }
+    Node* nextTo(const Node*) const;
+    Node* previousTo(const Node*) const;
 
 protected:
     InsertionPoint(const QualifiedName&, Document*);
     virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
+    virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
 
 private:
-    void distributeHostChildren(ShadowTree*);
-    void clearDistribution(ShadowTree*);
-    void attachDistributedNode();
-
-    void assignShadowRoot(ShadowRoot*);
-    void clearAssignment(ShadowRoot*);
-
-    HTMLContentSelectionList m_selections;
+    ContentDistribution m_distribution;
 };
 
 inline bool isInsertionPoint(const Node* node)
 {
     if (!node)
-        return true;
+        return false;
 
     if (node->isHTMLElement() && toHTMLElement(node)->isInsertionPoint())
         return true;
@@ -95,7 +100,12 @@ inline const InsertionPoint* toInsertionPoint(const Node* node)
     return static_cast<const InsertionPoint*>(node);
 }
 
-inline bool isShadowBoundary(Node* node)
+inline bool isActiveInsertionPoint(const Node* node)
+{
+    return isInsertionPoint(node) && toInsertionPoint(node)->isActive();
+}
+
+inline bool isLowerEncapsulationBoundary(Node* node)
 {
     if (!isInsertionPoint(node))
         return false;

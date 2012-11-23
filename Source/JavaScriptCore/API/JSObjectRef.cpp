@@ -92,10 +92,7 @@ JSObjectRef JSObjectMakeFunctionWithCallback(JSContextRef ctx, JSStringRef name,
 {
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
-
-    Identifier nameID = name ? name->identifier(&exec->globalData()) : Identifier(exec, "anonymous");
-    
-    return toRef(JSCallbackFunction::create(exec, exec->lexicalGlobalObject(), callAsFunction, nameID));
+    return toRef(JSCallbackFunction::create(exec, exec->lexicalGlobalObject(), callAsFunction, name ? name->ustring() : "anonymous"));
 }
 
 JSObjectRef JSObjectMakeConstructor(JSContextRef ctx, JSClassRef jsClass, JSObjectCallAsConstructorCallback callAsConstructor)
@@ -431,6 +428,8 @@ JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObject
     if (!jsThisObject)
         jsThisObject = exec->globalThisValue();
 
+    jsThisObject = jsThisObject->methodTable()->toThisObject(jsThisObject, exec);
+    
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; i++)
         argList.append(toJS(exec, arguments[i]));

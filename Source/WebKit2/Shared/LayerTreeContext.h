@@ -56,6 +56,10 @@ public:
     HWND window;
 #elif PLATFORM(QT)
     uint32_t webLayerID;
+#elif PLATFORM(GTK)
+    uint64_t windowHandle;
+#elif PLATFORM(EFL)
+    uint32_t webLayerID;
 #endif
 };
 

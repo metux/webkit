@@ -56,6 +56,7 @@ public:
     virtual ~GraphicsLayerClient() {}
 
     virtual bool shouldUseTileCache(const GraphicsLayer*) const { return false; }
+    virtual bool usingTileCache(const GraphicsLayer*) const { return false; }
     
     // Callback for when hardware-accelerated animation started.
     virtual void notifyAnimationStarted(const GraphicsLayer*, double time) = 0;
@@ -82,6 +83,10 @@ public:
     // to verify that we don't create or destroy GraphicsLayers
     // while painting.
     virtual void verifyNotPainting() { }
+#endif
+
+#if PLATFORM(BLACKBERRY)
+    virtual bool contentsVisible(const GraphicsLayer*, const IntRect& contentRect) const { return false; }
 #endif
 };
 

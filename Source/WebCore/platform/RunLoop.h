@@ -28,12 +28,12 @@
 #ifndef RunLoop_h
 #define RunLoop_h
 
+#include <wtf/Deque.h>
 #include <wtf/Forward.h>
 #include <wtf/Functional.h>
 #include <wtf/HashMap.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/Threading.h>
-#include <wtf/Vector.h>
 
 #if PLATFORM(GTK)
 #include <wtf/gobject/GRefPtr.h>
@@ -58,6 +58,7 @@ public:
 
     static void run();
     void stop();
+    void wakeUp();
 
 #if PLATFORM(MAC)
     void runForDuration(double duration);
@@ -66,7 +67,7 @@ public:
     class TimerBase {
         friend class RunLoop;
     public:
-        TimerBase(RunLoop*);
+        explicit TimerBase(RunLoop*);
         virtual ~TimerBase();
 
         void startRepeating(double repeatInterval) { start(repeatInterval, true); }
@@ -132,10 +133,9 @@ private:
     ~RunLoop();
 
     void performWork();
-    void wakeUp();
 
     Mutex m_functionQueueLock;
-    Vector<Function<void()> > m_functionQueue;
+    Deque<Function<void()> > m_functionQueue;
 
 #if PLATFORM(WIN)
     static bool registerRunLoopMessageWindowClass();

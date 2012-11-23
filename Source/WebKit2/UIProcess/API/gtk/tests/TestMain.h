@@ -75,6 +75,26 @@ public:
         return resourcesDir.get();
     }
 
+    static CString getResourcesDir()
+    {
+        GOwnPtr<char> resourcesDir(g_build_filename(WEBKIT_SRC_DIR, "Source", "WebKit2", "UIProcess", "API", "gtk", "tests", "resources", NULL));
+        return resourcesDir.get();
+    }
+
+    void addLogFatalFlag(unsigned flag)
+    {
+        unsigned fatalMask = g_log_set_always_fatal(static_cast<GLogLevelFlags>(G_LOG_FATAL_MASK));
+        fatalMask |= flag;
+        g_log_set_always_fatal(static_cast<GLogLevelFlags>(fatalMask));
+    }
+
+    void removeLogFatalFlag(unsigned flag)
+    {
+        unsigned fatalMask = g_log_set_always_fatal(static_cast<GLogLevelFlags>(G_LOG_FATAL_MASK));
+        fatalMask &= ~flag;
+        g_log_set_always_fatal(static_cast<GLogLevelFlags>(fatalMask));
+    }
+
     HashSet<GObject*> m_watchedObjects;
 };
 

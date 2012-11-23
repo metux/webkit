@@ -43,6 +43,7 @@ public:
     AtomicString() { }
     AtomicString(const LChar* s) : m_string(add(s)) { }
     AtomicString(const char* s) : m_string(add(s)) { }
+    AtomicString(const LChar* s, unsigned length) : m_string(add(s, length)) { }
     AtomicString(const UChar* s, unsigned length) : m_string(add(s, length)) { }
     AtomicString(const UChar* s, unsigned length, unsigned existingHash) : m_string(add(s, length, existingHash)) { }
     AtomicString(const UChar* s) : m_string(add(s)) { }
@@ -51,11 +52,35 @@ public:
     ATOMICSTRING_CONVERSION AtomicString(const String& s) : m_string(add(s.impl())) { }
     AtomicString(StringImpl* baseString, unsigned start, unsigned length) : m_string(add(baseString, start, length)) { }
 
+    enum ConstructFromLiteralTag { ConstructFromLiteral };
+    AtomicString(const char* characters, unsigned length, ConstructFromLiteralTag)
+        : m_string(addFromLiteralData(characters, length))
+    {
+    }
+    template<unsigned charactersCount>
+    ALWAYS_INLINE AtomicString(const char (&characters)[charactersCount], ConstructFromLiteralTag)
+        : m_string(addFromLiteralData(characters, charactersCount - 1))
+    {
+        COMPILE_ASSERT(charactersCount > 1, AtomicStringFromLiteralNotEmpty);
+        COMPILE_ASSERT((charactersCount - 1 <= ((unsigned(~0) - sizeof(StringImpl)) / sizeof(LChar))), AtomicStringFromLiteralCannotOverflow);
+    }
+
+#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
+    // We have to declare the copy constructor and copy assignment operator as well, otherwise
+    // they'll be implicitly deleted by adding the move constructor and move assignment operator.
+    // FIXME: Instead of explicitly casting to String&& here, we should use std::move, but that requires us to
+    // have a standard library that supports move semantics.
+    AtomicString(const AtomicString& other) : m_string(other.m_string) { }
+    AtomicString(AtomicString&& other) : m_string(static_cast<String&&>(other.m_string)) { }
+    AtomicString& operator=(const AtomicString& other) { m_string = other.m_string; return *this; }
+    AtomicString& operator=(AtomicString&& other) { m_string = static_cast<String&&>(other.m_string); return *this; }
+#endif
+
     // Hash table deleted values, which are only constructed and never copied or destroyed.
     AtomicString(WTF::HashTableDeletedValueType) : m_string(WTF::HashTableDeletedValue) { }
     bool isHashTableDeletedValue() const { return m_string.isHashTableDeletedValue(); }
 
-    WTF_EXPORT_PRIVATE static AtomicStringImpl* find(const UChar* s, unsigned length, unsigned existingHash);
+    WTF_EXPORT_STRING_API static AtomicStringImpl* find(const StringImpl*);
 
     operator const String&() const { return m_string; }
     const String& string() const { return m_string; };
@@ -95,7 +120,7 @@ public:
     bool endsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const
         { return m_string.endsWith<matchLength>(prefix, caseSensitive); }
     
-    WTF_EXPORT_PRIVATE AtomicString lower() const;
+    WTF_EXPORT_STRING_API AtomicString lower() const;
     AtomicString upper() const { return AtomicString(impl()->upper()); }
     
     int toInt(bool* ok = 0) const { return m_string.toInt(ok); }
@@ -132,21 +157,23 @@ public:
 private:
     String m_string;
     
-    WTF_EXPORT_PRIVATE static PassRefPtr<StringImpl> add(const LChar*);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const LChar*);
     ALWAYS_INLINE static PassRefPtr<StringImpl> add(const char* s) { return add(reinterpret_cast<const LChar*>(s)); };
-    WTF_EXPORT_PRIVATE static PassRefPtr<StringImpl> add(const UChar*, unsigned length);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const LChar*, unsigned length);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*, unsigned length);
     ALWAYS_INLINE static PassRefPtr<StringImpl> add(const char* s, unsigned length) { return add(reinterpret_cast<const char*>(s), length); };
-    WTF_EXPORT_PRIVATE static PassRefPtr<StringImpl> add(const UChar*, unsigned length, unsigned existingHash);
-    WTF_EXPORT_PRIVATE static PassRefPtr<StringImpl> add(const UChar*);
-    WTF_EXPORT_PRIVATE static PassRefPtr<StringImpl> add(StringImpl*, unsigned offset, unsigned length);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*, unsigned length, unsigned existingHash);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(StringImpl*, unsigned offset, unsigned length);
     ALWAYS_INLINE static PassRefPtr<StringImpl> add(StringImpl* r)
     {
         if (!r || r->isAtomic())
             return r;
         return addSlowCase(r);
     }
-    WTF_EXPORT_PRIVATE static PassRefPtr<StringImpl> addSlowCase(StringImpl*);
-    WTF_EXPORT_PRIVATE static AtomicString fromUTF8Internal(const char*, const char*);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addFromLiteralData(const char* characters, unsigned length);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addSlowCase(StringImpl*);
+    WTF_EXPORT_STRING_API static AtomicString fromUTF8Internal(const char*, const char*);
 };
 
 inline bool operator==(const AtomicString& a, const AtomicString& b) { return a.impl() == b.impl(); }
@@ -185,6 +212,7 @@ extern const WTF_EXPORTDATA AtomicString commentAtom;
 extern const WTF_EXPORTDATA AtomicString starAtom;
 extern const WTF_EXPORTDATA AtomicString xmlAtom;
 extern const WTF_EXPORTDATA AtomicString xmlnsAtom;
+extern const WTF_EXPORTDATA AtomicString xlinkAtom;
 
 inline AtomicString AtomicString::fromUTF8(const char* characters, size_t length)
 {
@@ -222,6 +250,7 @@ using WTF::commentAtom;
 using WTF::starAtom;
 using WTF::xmlAtom;
 using WTF::xmlnsAtom;
+using WTF::xlinkAtom;
 #endif
 
 #include <wtf/text/StringConcatenate.h>

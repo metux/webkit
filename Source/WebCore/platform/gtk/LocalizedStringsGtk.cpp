@@ -473,6 +473,18 @@ String crashedPluginText()
     return String::fromUTF8(_("Plug-in Failure"));
 }
 
+String blockedPluginByContentSecurityPolicyText()
+{
+    notImplemented();
+    return String();
+}
+
+String insecurePluginVersionText()
+{
+    notImplemented();
+    return String();
+}
+
 String multipleFileUploadText(unsigned numberOfFiles)
 {
     // FIXME: If this file gets localized, this should really be localized as one string with a wildcard for the number.
@@ -709,6 +721,11 @@ String validationMessageRangeOverflowText(const String&)
 String validationMessageStepMismatchText(const String&, const String&)
 {
     return String::fromUTF8(_("step mismatch"));
+}
+
+String unacceptableTLSCertificate()
+{
+    return String::fromUTF8(_("Unacceptable TLS certificate"));
 }
 
 String localizedString(const char* key)

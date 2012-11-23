@@ -25,13 +25,13 @@
 #ifndef StyleRareNonInheritedData_h
 #define StyleRareNonInheritedData_h
 
-#include "CSSWrapShapes.h"
 #include "CounterDirectives.h"
 #include "CursorData.h"
 #include "DataRef.h"
 #include "FillLayer.h"
 #include "LineClampValue.h"
 #include "NinePieceImage.h"
+#include "WrapShapes.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
@@ -39,16 +39,15 @@
 namespace WebCore {
 
 class AnimationList;
+class MemoryObjectInfo;
 class ShadowData;
 class StyleDeprecatedFlexibleBoxData;
 #if ENABLE(CSS_FILTERS)
 class StyleFilterData;
 #endif
 class StyleFlexibleBoxData;
-#if ENABLE(CSS_GRID_LAYOUT)
 class StyleGridData;
 class StyleGridItemData;
-#endif
 class StyleMarqueeData;
 class StyleMultiColData;
 class StyleReflection;
@@ -58,7 +57,7 @@ class StyleTransformData;
 class ContentData;
 struct LengthSize;
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 struct StyleDashboardRegion;
 #endif
 
@@ -91,20 +90,19 @@ public:
     bool animationDataEquivalent(const StyleRareNonInheritedData&) const;
     bool transitionDataEquivalent(const StyleRareNonInheritedData&) const;
 
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
     float opacity; // Whether or not we're transparent.
 
     float m_aspectRatioDenominator;
     float m_aspectRatioNumerator;
-
-    short m_counterIncrement;
-    short m_counterReset;
 
     float m_perspective;
     Length m_perspectiveOriginX;
     Length m_perspectiveOriginY;
 
     LineClampValue lineClamp; // An Apple extension.
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     Vector<StyleDashboardRegion> m_dashboardRegions;
 #endif
 
@@ -118,10 +116,8 @@ public:
     DataRef<StyleFilterData> m_filter; // Filter operations (url, sepia, blur, etc.)
 #endif
 
-#if ENABLE(CSS_GRID_LAYOUT)
     DataRef<StyleGridData> m_grid;
     DataRef<StyleGridItemData> m_gridItem;
-#endif
 
     OwnPtr<ContentData> m_content;
     OwnPtr<CounterDirectiveMap> m_counterDirectives;
@@ -138,8 +134,8 @@ public:
 
     LengthSize m_pageSize;
 
-    RefPtr<CSSWrapShape> m_wrapShapeInside;
-    RefPtr<CSSWrapShape> m_wrapShapeOutside;
+    RefPtr<WrapShape> m_wrapShapeInside;
+    RefPtr<WrapShape> m_wrapShapeOutside;
     Length m_wrapMargin;
     Length m_wrapPadding;
     
@@ -149,6 +145,8 @@ public:
     Color m_visitedLinkBorderRightColor;
     Color m_visitedLinkBorderTopColor;
     Color m_visitedLinkBorderBottomColor;
+
+    int m_order;
 
     AtomicString m_flowThread;
     AtomicString m_regionThread;
@@ -162,21 +160,33 @@ public:
     unsigned m_transformStyle3D : 1; // ETransformStyle3D
     unsigned m_backfaceVisibility : 1; // EBackfaceVisibility
 
+    unsigned m_alignContent : 3; // EAlignContent
+    unsigned m_alignItems : 3; // EAlignItems
+    unsigned m_alignSelf : 3; // EAlignItems
+    unsigned m_justifyContent : 3; // EJustifyContent
+
     unsigned userDrag : 2; // EUserDrag
     unsigned textOverflow : 1; // Whether or not lines that spill out should be truncated with "..."
     unsigned marginBeforeCollapse : 2; // EMarginCollapse
     unsigned marginAfterCollapse : 2; // EMarginCollapse
-    unsigned matchNearestMailBlockquoteColor : 1; // EMatchNearestMailBlockquoteColor, FIXME: This property needs to be eliminated. It should never have been added.
     unsigned m_appearance : 6; // EAppearance
     unsigned m_borderFit : 1; // EBorderFit
     unsigned m_textCombine : 1; // CSS3 text-combine properties
 
+#if ENABLE(CSS3_TEXT_DECORATION)
+    unsigned m_textDecorationStyle : 3; // TextDecorationStyle
+#endif // CSS3_TEXT_DECORATION
     unsigned m_wrapFlow: 3; // WrapFlow
     unsigned m_wrapThrough: 1; // WrapThrough
 
-    bool m_hasAspectRatio : 1; // Whether or not an aspect ratio has been specified.
 #if USE(ACCELERATED_COMPOSITING)
-    bool m_runningAcceleratedAnimation : 1;
+    unsigned m_runningAcceleratedAnimation : 1;
+#endif
+
+    unsigned m_hasAspectRatio : 1; // Whether or not an aspect ratio has been specified.
+
+#if ENABLE(CSS_COMPOSITING)
+    unsigned m_effectiveBlendMode: 5; // EBlendMode
 #endif
 
 private:

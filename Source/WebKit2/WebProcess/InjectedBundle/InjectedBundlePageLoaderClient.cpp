@@ -33,6 +33,13 @@
 #include "WebError.h"
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(WEB_INTENTS)
+#include "InjectedBundleIntentRequest.h"
+#endif
+#if ENABLE(WEB_INTENTS_TAG)
+#include "WebIntentServiceInfo.h"
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -109,6 +116,14 @@ void InjectedBundlePageLoaderClient::didFinishLoadForFrame(WebPage* page, WebFra
     userData = adoptRef(toImpl(userDataToPass));
 }
 
+void InjectedBundlePageLoaderClient::didFinishProgress(WebPage* page)
+{
+    if (!m_client.didFinishProgress)
+        return;
+
+    m_client.didFinishProgress(toAPI(page), m_client.clientInfo);
+}
+
 void InjectedBundlePageLoaderClient::didFailLoadWithErrorForFrame(WebPage* page, WebFrame* frame, const ResourceError& error, RefPtr<APIObject>& userData)
 {
     if (!m_client.didFailLoadWithErrorForFrame)
@@ -178,6 +193,30 @@ void InjectedBundlePageLoaderClient::didDetectXSSForFrame(WebPage* page, WebFram
     m_client.didDetectXSSForFrame(toAPI(page), toAPI(frame), &userDataToPass, m_client.clientInfo);
     userData = adoptRef(toImpl(userDataToPass));
 }
+
+#if ENABLE(WEB_INTENTS)
+void InjectedBundlePageLoaderClient::didReceiveIntentForFrame(WebPage* page, WebFrame* frame, InjectedBundleIntentRequest* intentRequest, RefPtr<APIObject>& userData)
+{
+    if (!m_client.didReceiveIntentForFrame)
+        return;
+
+    WKTypeRef userDataToPass = 0;
+    m_client.didReceiveIntentForFrame(toAPI(page), toAPI(frame), toAPI(intentRequest), &userDataToPass, m_client.clientInfo);
+    userData = adoptRef(toImpl(userDataToPass));
+}
+#endif
+
+#if ENABLE(WEB_INTENTS_TAG)
+void InjectedBundlePageLoaderClient::registerIntentServiceForFrame(WebPage* page, WebFrame* frame, WebIntentServiceInfo* service, RefPtr<APIObject>& userData)
+{
+    if (!m_client.registerIntentServiceForFrame)
+        return;
+
+    WKTypeRef userDataToPass = 0;
+    m_client.registerIntentServiceForFrame(toAPI(page), toAPI(frame), toAPI(service), &userDataToPass, m_client.clientInfo);
+    userData = adoptRef(toImpl(userDataToPass));
+}
+#endif
 
 void InjectedBundlePageLoaderClient::didFirstLayoutForFrame(WebPage* page, WebFrame* frame, RefPtr<APIObject>& userData)
 {
@@ -286,6 +325,14 @@ void InjectedBundlePageLoaderClient::willDestroyGlobalObjectForDOMWindowExtensio
     RefPtr<InjectedBundleDOMWindowExtension> extension = InjectedBundleDOMWindowExtension::get(coreExtension);
     ASSERT(extension);
     m_client.willDestroyGlobalObjectForDOMWindowExtension(toAPI(page), toAPI(extension.get()), m_client.clientInfo);
+}
+
+bool InjectedBundlePageLoaderClient::shouldForceUniversalAccessFromLocalURL(WebPage* page, const String& url)
+{
+    if (!m_client.shouldForceUniversalAccessFromLocalURL)
+        return false;
+
+    return m_client.shouldForceUniversalAccessFromLocalURL(toAPI(page), toAPI(url.impl()), m_client.clientInfo);
 }
 
 } // namespace WebKit

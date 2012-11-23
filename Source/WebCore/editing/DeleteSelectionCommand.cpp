@@ -68,7 +68,7 @@ static bool isTableRowEmpty(Node* row)
     return true;
 }
 
-DeleteSelectionCommand::DeleteSelectionCommand(Document *document, bool smartDelete, bool mergeBlocksAfterDelete, bool replace, bool expandForSpecialElements)
+DeleteSelectionCommand::DeleteSelectionCommand(Document *document, bool smartDelete, bool mergeBlocksAfterDelete, bool replace, bool expandForSpecialElements, bool sanitizeMarkup)
     : CompositeEditCommand(document)
     , m_hasSelectionToDelete(false)
     , m_smartDelete(smartDelete)
@@ -78,6 +78,7 @@ DeleteSelectionCommand::DeleteSelectionCommand(Document *document, bool smartDel
     , m_expandForSpecialElements(expandForSpecialElements)
     , m_pruneStartBlockIfNecessary(false)
     , m_startsAtEmptyLine(false)
+    , m_sanitizeMarkup(sanitizeMarkup)
     , m_startBlock(0)
     , m_endBlock(0)
     , m_typingStyle(0)
@@ -85,7 +86,7 @@ DeleteSelectionCommand::DeleteSelectionCommand(Document *document, bool smartDel
 {
 }
 
-DeleteSelectionCommand::DeleteSelectionCommand(const VisibleSelection& selection, bool smartDelete, bool mergeBlocksAfterDelete, bool replace, bool expandForSpecialElements)
+DeleteSelectionCommand::DeleteSelectionCommand(const VisibleSelection& selection, bool smartDelete, bool mergeBlocksAfterDelete, bool replace, bool expandForSpecialElements, bool sanitizeMarkup)
     : CompositeEditCommand(selection.start().anchorNode()->document())
     , m_hasSelectionToDelete(true)
     , m_smartDelete(smartDelete)
@@ -95,6 +96,7 @@ DeleteSelectionCommand::DeleteSelectionCommand(const VisibleSelection& selection
     , m_expandForSpecialElements(expandForSpecialElements)
     , m_pruneStartBlockIfNecessary(false)
     , m_startsAtEmptyLine(false)
+    , m_sanitizeMarkup(sanitizeMarkup)
     , m_selectionToDelete(selection)
     , m_startBlock(0)
     , m_endBlock(0)
@@ -295,18 +297,26 @@ void DeleteSelectionCommand::saveTypingStyleState()
 
 bool DeleteSelectionCommand::handleSpecialCaseBRDelete()
 {
+    Node* nodeAfterUpstreamStart = m_upstreamStart.computeNodeAfterPosition();
+    Node* nodeAfterDownstreamStart = m_downstreamStart.computeNodeAfterPosition();
+    // Upstream end will appear before BR due to canonicalization
+    Node* nodeAfterUpstreamEnd = m_upstreamEnd.computeNodeAfterPosition();
+
+    if (!nodeAfterUpstreamStart || !nodeAfterDownstreamStart)
+        return false;
+
     // Check for special-case where the selection contains only a BR on a line by itself after another BR.
-    bool upstreamStartIsBR = m_upstreamStart.deprecatedNode()->hasTagName(brTag);
-    bool downstreamStartIsBR = m_downstreamStart.deprecatedNode()->hasTagName(brTag);
-    bool isBROnLineByItself = upstreamStartIsBR && downstreamStartIsBR && m_downstreamStart.deprecatedNode() == m_upstreamEnd.deprecatedNode();
+    bool upstreamStartIsBR = nodeAfterUpstreamStart->hasTagName(brTag);
+    bool downstreamStartIsBR = nodeAfterDownstreamStart->hasTagName(brTag);
+    bool isBROnLineByItself = upstreamStartIsBR && downstreamStartIsBR && nodeAfterDownstreamStart == nodeAfterUpstreamEnd;
     if (isBROnLineByItself) {
-        removeNode(m_downstreamStart.deprecatedNode());
+        removeNode(nodeAfterDownstreamStart);
         return true;
     }
 
-    // Not a special-case delete per se, but we can detect that the merging of content between blocks
-    // should not be done.
-    if (upstreamStartIsBR && downstreamStartIsBR) {
+    // FIXME: This code doesn't belong in here.
+    // We detect the case where the start is an empty line consisting of BR not wrapped in a block element.
+    if (upstreamStartIsBR && downstreamStartIsBR && !(isStartOfBlock(positionBeforeNode(nodeAfterUpstreamStart)) && isEndOfBlock(positionAfterNode(nodeAfterUpstreamStart)))) {
         m_startsAtEmptyLine = true;
         m_endingPosition = m_downstreamEnd;
     }
@@ -350,7 +360,7 @@ void DeleteSelectionCommand::removeNode(PassRefPtr<Node> node)
         }
     }
     
-    if (isTableStructureNode(node.get()) || node == node->rootEditableElement()) {
+    if (isTableStructureNode(node.get()) || node->isRootEditableElement()) {
         // Do not remove an element of table structure; remove its contents.
         // Likewise for the root editable element.
         Node* child = node->firstChild();
@@ -406,6 +416,22 @@ void DeleteSelectionCommand::deleteTextFromNode(PassRefPtr<Text> node, unsigned 
     CompositeEditCommand::deleteTextFromNode(node, offset, count);
 }
 
+void DeleteSelectionCommand::makeStylingElementsDirectChildrenOfEditableRootToPreventStyleLoss()
+{
+    RefPtr<Range> range = m_selectionToDelete.toNormalizedRange();
+    RefPtr<Node> node = range->firstNode();
+    while (node && node != range->pastLastNode()) {
+        RefPtr<Node> nextNode = node->traverseNextNode();
+        if ((node->hasTagName(styleTag) && !(toElement(node.get())->hasAttribute(scopedAttr))) || node->hasTagName(linkTag)) {
+            nextNode = node->traverseNextSibling();
+            RefPtr<ContainerNode> rootEditableElement = node->rootEditableElement();
+            removeNode(node);
+            appendNode(node, rootEditableElement);
+        }
+        node = nextNode;
+    }
+}
+
 void DeleteSelectionCommand::handleGeneralDelete()
 {
     if (m_upstreamStart.isNull())
@@ -413,6 +439,8 @@ void DeleteSelectionCommand::handleGeneralDelete()
 
     int startOffset = m_upstreamStart.deprecatedEditingOffset();
     Node* startNode = m_upstreamStart.deprecatedNode();
+    
+    makeStylingElementsDirectChildrenOfEditableRootToPreventStyleLoss();
 
     // Never remove the start block unless it's a table, in which case we won't merge content in.
     if (startNode == m_startBlock && startOffset == 0 && canHaveChildrenForEditing(startNode) && !startNode->hasTagName(tableTag)) {
@@ -579,7 +607,7 @@ void DeleteSelectionCommand::mergeParagraphs()
     
     // m_downstreamEnd's block has been emptied out by deletion.  There is no content inside of it to
     // move, so just remove it.
-    Element* endBlock = static_cast<Element*>(enclosingBlock(m_downstreamEnd.deprecatedNode()));
+    Element* endBlock = enclosingBlock(m_downstreamEnd.deprecatedNode());
     if (!endBlock || !endBlock->contains(startOfParagraphToMove.deepEquivalent().deprecatedNode()) || !startOfParagraphToMove.deepEquivalent().deprecatedNode()) {
         removeNode(enclosingBlock(m_downstreamEnd.deprecatedNode()));
         return;
@@ -814,7 +842,8 @@ void DeleteSelectionCommand::doApply()
     RefPtr<Node> placeholder = m_needPlaceholder ? createBreakElement(document()).get() : 0;
     
     if (placeholder) {
-        removeRedundantBlocks();
+        if (m_sanitizeMarkup)
+            removeRedundantBlocks();
         insertNodeAt(placeholder.get(), m_endingPosition);
     }
 

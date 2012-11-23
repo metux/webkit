@@ -66,10 +66,15 @@ public:
     }
 
     String customCssText() const;
+#if ENABLE(CSS_VARIABLES)
+    String customSerializeResolvingVariables(const HashMap<AtomicString, String>&) const;
+#endif
 
     TransformOperationType operationType() const { return m_type; }
     
     PassRefPtr<WebKitCSSTransformValue> cloneForCSSOM() const;
+
+    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     WebKitCSSTransformValue(TransformOperationType);

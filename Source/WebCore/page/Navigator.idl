@@ -40,10 +40,6 @@ module window {
 
         readonly attribute boolean onLine;
 
-#if defined(ENABLE_POINTER_LOCK) && ENABLE_POINTER_LOCK
-        readonly attribute [V8EnabledAtRuntime] PointerLock webkitPointer;
-#endif
-
         void getStorageUpdates(); // FIXME: Remove this method or rename to yieldForStorageUpdates.
     };
 

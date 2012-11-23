@@ -28,15 +28,18 @@
 
 #if USE(PLATFORM_STRATEGIES)
 
+#include "BlockingResponseMap.h"
 #include "PluginInfoStore.h"
 #include "WebContextMessages.h"
 #include "WebCookieManager.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
+#include "WebProcessProxyMessages.h"
 #include <WebCore/Color.h>
 #include <WebCore/KURL.h>
 #include <WebCore/Page.h>
 #include <WebCore/PlatformPasteboard.h>
+#include <wtf/Atomics.h>
 
 #if USE(CF)
 #include <wtf/RetainPtr.h>
@@ -102,6 +105,23 @@ void WebPlatformStrategies::getPluginInfo(const WebCore::Page*, Vector<WebCore::
     plugins = m_cachedPlugins;
 }
 
+static BlockingResponseMap<Vector<WebCore::PluginInfo> >& responseMap()
+{
+    AtomicallyInitializedStatic(BlockingResponseMap<Vector<WebCore::PluginInfo> >&, responseMap = *new BlockingResponseMap<Vector<WebCore::PluginInfo> >);
+    return responseMap;
+}
+
+void handleDidGetPlugins(uint64_t requestID, const Vector<WebCore::PluginInfo>& plugins)
+{
+    responseMap().didReceiveResponse(requestID, adoptPtr(new Vector<WebCore::PluginInfo>(plugins)));
+}
+
+static uint64_t generateRequestID()
+{
+    static int uniqueID;
+    return atomicIncrement(&uniqueID);
+}
+
 void WebPlatformStrategies::populatePluginCache()
 {
     if (m_pluginCacheIsPopulated)
@@ -109,13 +129,11 @@ void WebPlatformStrategies::populatePluginCache()
 
     ASSERT(m_cachedPlugins.isEmpty());
     
-    Vector<PluginInfo> plugins;
-    
     // FIXME: Should we do something in case of error here?
-    WebProcess::shared().connection()->sendSync(Messages::WebContext::GetPlugins(m_shouldRefreshPlugins),
-                                                Messages::WebContext::GetPlugins::Reply(plugins), 0);
+    uint64_t requestID = generateRequestID();
+    WebProcess::shared().connection()->send(Messages::WebProcessProxy::GetPlugins(requestID, m_shouldRefreshPlugins), 0);
 
-    m_cachedPlugins.swap(plugins);
+    m_cachedPlugins = *responseMap().waitForResponse(requestID);
     
     m_shouldRefreshPlugins = false;
     m_pluginCacheIsPopulated = true;

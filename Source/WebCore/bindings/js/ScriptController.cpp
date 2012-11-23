@@ -21,6 +21,7 @@
 #include "config.h"
 #include "ScriptController.h"
 
+#include "ContentSecurityPolicy.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "Frame.h"
@@ -34,6 +35,8 @@
 #include "NP_jsobject.h"
 #include "Page.h"
 #include "PageGroup.h"
+#include "PluginView.h"
+#include "ScriptCallStack.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
 #include "ScriptableDocumentParser.h"
@@ -109,7 +112,7 @@ JSDOMWindowShell* ScriptController::createWindowShell(DOMWrapperWorld* world)
 {
     ASSERT(!m_windowShells.contains(world));
     Structure* structure = JSDOMWindowShell::createStructure(*world->globalData(), jsNull());
-    Strong<JSDOMWindowShell> windowShell(*world->globalData(), JSDOMWindowShell::create(m_frame->domWindow(), structure, world));
+    Strong<JSDOMWindowShell> windowShell(*world->globalData(), JSDOMWindowShell::create(m_frame->document()->domWindow(), structure, world));
     Strong<JSDOMWindowShell> windowShell2(windowShell);
     m_windowShells.add(world, windowShell);
     world->didCreateWindowShell(this);
@@ -133,7 +136,7 @@ ScriptValue ScriptController::evaluateInWorld(const ScriptSourceCode& sourceCode
     const String* savedSourceURL = m_sourceURL;
     m_sourceURL = &sourceURL;
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
 
     RefPtr<Frame> protect = m_frame;
 
@@ -172,21 +175,24 @@ void ScriptController::getAllWorlds(Vector<RefPtr<DOMWrapperWorld> >& worlds)
     static_cast<WebCoreJSClientData*>(JSDOMWindow::commonJSGlobalData()->clientData)->getAllWorlds(worlds);
 }
 
-void ScriptController::clearWindowShell(bool goingIntoPageCache)
+void ScriptController::clearWindowShell(DOMWindow* newDOMWindow, bool goingIntoPageCache)
 {
     if (m_windowShells.isEmpty())
         return;
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
 
     for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter) {
         JSDOMWindowShell* windowShell = iter->second.get();
+
+        if (windowShell->window()->impl() == newDOMWindow)
+            continue;
 
         // Clear the debugger from the current window before setting the new window.
         attachDebugger(windowShell, 0);
 
         windowShell->window()->willRemoveFromWindowShell();
-        windowShell->setWindow(m_frame->domWindow());
+        windowShell->setWindow(newDOMWindow);
 
         // An m_cacheableBindingRootObject persists between page navigations
         // so needs to know about the new JSDOMWindow.
@@ -209,11 +215,14 @@ JSDOMWindowShell* ScriptController::initScript(DOMWrapperWorld* world)
 {
     ASSERT(!m_windowShells.contains(world));
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(world->globalData());
 
     JSDOMWindowShell* windowShell = createWindowShell(world);
 
     windowShell->window()->updateDocument();
+
+    if (m_frame->document())
+        windowShell->window()->setEvalEnabled(m_frame->document()->contentSecurityPolicy()->allowEval(0, ContentSecurityPolicy::SuppressReport));   
 
     if (Page* page = m_frame->page()) {
         attachDebugger(windowShell, page->debugger());
@@ -230,12 +239,23 @@ TextPosition ScriptController::eventHandlerPosition() const
     ScriptableDocumentParser* parser = m_frame->document()->scriptableDocumentParser();
     if (parser)
         return parser->textPosition();
-    return TextPosition::belowRangePosition();
+    return TextPosition::minimumPosition();
+}
+
+void ScriptController::enableEval()
+{
+    JSDOMWindowShell* windowShell = existingWindowShell(mainThreadNormalWorld());
+    if (!windowShell)
+        return;
+    windowShell->window()->setEvalEnabled(true);
 }
 
 void ScriptController::disableEval()
 {
-    windowShell(mainThreadNormalWorld())->window()->setEvalEnabled(false);
+    JSDOMWindowShell* windowShell = existingWindowShell(mainThreadNormalWorld());
+    if (!windowShell)
+        return;
+    windowShell->window()->setEvalEnabled(false);
 }
 
 bool ScriptController::processingUserGesture()
@@ -276,9 +296,10 @@ void ScriptController::updateDocument()
     if (!m_frame->document())
         return;
 
-    JSLock lock(SilenceAssertionsOnly);
-    for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter)
+    for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter) {
+        JSLockHolder lock(iter->first->globalData());
         iter->second->window()->updateDocument();
+    }
 }
 
 void ScriptController::updateSecurityOrigin()
@@ -292,7 +313,7 @@ Bindings::RootObject* ScriptController::cacheableBindingRootObject()
         return 0;
 
     if (!m_cacheableBindingRootObject) {
-        JSLock lock(SilenceAssertionsOnly);
+        JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
         m_cacheableBindingRootObject = Bindings::RootObject::create(0, globalObject(pluginWorld()));
     }
     return m_cacheableBindingRootObject.get();
@@ -304,7 +325,7 @@ Bindings::RootObject* ScriptController::bindingRootObject()
         return 0;
 
     if (!m_bindingRootObject) {
-        JSLock lock(SilenceAssertionsOnly);
+        JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
         m_bindingRootObject = Bindings::RootObject::create(0, globalObject(pluginWorld()));
     }
     return m_bindingRootObject.get();
@@ -326,6 +347,16 @@ PassRefPtr<Bindings::RootObject> ScriptController::createRootObject(void* native
 void ScriptController::setCaptureCallStackForUncaughtExceptions(bool)
 {
 }
+
+void ScriptController::collectIsolatedContexts(Vector<std::pair<JSC::ExecState*, SecurityOrigin*> >& result)
+{
+    for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter) {
+        JSC::ExecState* exec = iter->second->window()->globalExec();
+        SecurityOrigin* origin = iter->second->window()->impl()->document()->securityOrigin();
+        result.append(std::pair<ScriptState*, SecurityOrigin*>(exec, origin));
+    }
+}
+
 #endif
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -336,9 +367,9 @@ NPObject* ScriptController::windowScriptNPObject()
         if (canExecuteScripts(NotAboutToExecuteScript)) {
             // JavaScript is enabled, so there is a JavaScript window object.
             // Return an NPObject bound to the window object.
-            JSC::JSLock lock(SilenceAssertionsOnly);
-            JSObject* win = windowShell(pluginWorld())->window();
+            JSDOMWindow* win = windowShell(pluginWorld())->window();
             ASSERT(win);
+            JSC::JSLockHolder lock(win->globalExec());
             Bindings::RootObject* root = bindingRootObject();
             m_windowScriptNPObject = _NPN_CreateScriptObject(0, win, root);
         } else {
@@ -363,6 +394,16 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
 
 #endif
 
+#if !PLATFORM(MAC) && !PLATFORM(QT)
+PassRefPtr<JSC::Bindings::Instance> ScriptController::createScriptInstanceForWidget(Widget* widget)
+{
+    if (!widget->isPluginView())
+        return 0;
+
+    return static_cast<PluginView*>(widget)->bindingInstance();
+}
+#endif
+
 JSObject* ScriptController::jsObjectForPluginElement(HTMLPlugInElement* plugin)
 {
     // Can't create JSObjects when JavaScript is disabled
@@ -370,8 +411,8 @@ JSObject* ScriptController::jsObjectForPluginElement(HTMLPlugInElement* plugin)
         return 0;
 
     // Create a JSObject bound to this element
-    JSLock lock(SilenceAssertionsOnly);
     JSDOMWindow* globalObj = globalObject(pluginWorld());
+    JSLockHolder lock(globalObj->globalExec());
     // FIXME: is normal okay? - used for NP plugins?
     JSValue jsElementValue = toJS(globalObj->globalExec(), globalObj, plugin);
     if (!jsElementValue || !jsElementValue.isObject())
@@ -405,7 +446,7 @@ void ScriptController::cleanupScriptObjectsForPlugin(void* nativeHandle)
 
 void ScriptController::clearScriptObjects()
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
 
     RootObjectMap::const_iterator end = m_rootObjects.end();
     for (RootObjectMap::const_iterator it = m_rootObjects.begin(); it != end; ++it)

@@ -39,7 +39,7 @@ class Region;
 
 namespace WebKit {
 
-class LayerTreeHostProxy;
+class LayerTreeCoordinatorProxy;
 
 class DrawingAreaProxyImpl : public DrawingAreaProxy {
 public:
@@ -47,6 +47,10 @@ public:
     virtual ~DrawingAreaProxyImpl();
 
     void paint(BackingStore::PlatformGraphicsContext, const WebCore::IntRect&, WebCore::Region& unpaintedRegion);
+
+#if USE(ACCELERATED_COMPOSITING)
+    bool isInAcceleratedCompositingMode() const { return !m_layerTreeContext.isEmpty(); }
+#endif
 
 private:
     explicit DrawingAreaProxyImpl(WebPageProxy*);
@@ -65,6 +69,7 @@ private:
     virtual void didUpdateBackingStoreState(uint64_t backingStoreStateID, const UpdateInfo&, const LayerTreeContext&);
     virtual void enterAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&);
     virtual void exitAcceleratedCompositingMode(uint64_t backingStoreStateID, const UpdateInfo&);
+    virtual void updateAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&);
 
     void incorporateUpdate(const UpdateInfo&);
 
@@ -76,12 +81,10 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     void enterAcceleratedCompositingMode(const LayerTreeContext&);
     void exitAcceleratedCompositingMode();
-
-    bool isInAcceleratedCompositingMode() const { return !m_layerTreeContext.isEmpty(); }
-
-#if USE(UI_SIDE_COMPOSITING)
-    virtual void setVisibleContentsRect(const WebCore::IntRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectory, const WebCore::FloatPoint& accurateVisibleContentsPosition = WebCore::FloatPoint());
-    void didReceiveLayerTreeHostProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void updateAcceleratedCompositingMode(const LayerTreeContext&);
+#if USE(COORDINATED_GRAPHICS)
+    virtual void setVisibleContentsRect(const WebCore::FloatRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectory);
+    void didReceiveLayerTreeCoordinatorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 #endif
 #else
     bool isInAcceleratedCompositingMode() const { return false; }

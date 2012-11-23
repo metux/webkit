@@ -35,6 +35,7 @@
 #include "Document.h"
 #include "Logging.h"
 #include "ResourceHandle.h"
+#include "ScriptCallStack.h"
 #include "SecurityOrigin.h"
 #include "SharedBuffer.h"
 #include "WebVTTParser.h"
@@ -167,7 +168,7 @@ bool TextTrackLoader::load(const KURL& url, const String& crossOriginMode)
     }
 
     CachedResourceLoader* cachedResourceLoader = document->cachedResourceLoader();
-    m_cachedCueData = static_cast<CachedTextTrack*>(cachedResourceLoader->requestTextTrack(cueRequest));
+    m_cachedCueData = cachedResourceLoader->requestTextTrack(cueRequest);
     if (m_cachedCueData)
         m_cachedCueData->addClient(this);
     

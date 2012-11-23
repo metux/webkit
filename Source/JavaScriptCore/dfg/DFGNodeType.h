@@ -37,32 +37,39 @@ namespace JSC { namespace DFG {
 // This macro defines a set of information about all known node types, used to populate NodeId, NodeType below.
 #define FOR_EACH_DFG_OP(macro) \
     /* A constant in the CodeBlock's constant pool. */\
-    macro(JSConstant, NodeResultJS) \
+    macro(JSConstant, NodeResultJS | NodeDoesNotExit) \
     \
     /* A constant not in the CodeBlock's constant pool. Uses get patched to jumps that exit the */\
     /* code block. */\
-    macro(WeakJSConstant, NodeResultJS) \
+    macro(WeakJSConstant, NodeResultJS | NodeDoesNotExit) \
     \
     /* Nodes for handling functions (both as call and as construct). */\
     macro(ConvertThis, NodeResultJS) \
     macro(CreateThis, NodeResultJS) /* Note this is not MustGenerate since we're returning it anyway. */ \
     macro(GetCallee, NodeResultJS) \
     \
-    /* Nodes for local variable access. */\
+    /* Nodes for local variable access. These nodes are linked together using Phi nodes. */\
+    /* Any two nodes that are part of the same Phi graph will share the same */\
+    /* VariableAccessData, and thus will share predictions. */\
     macro(GetLocal, NodeResultJS) \
     macro(SetLocal, 0) \
-    macro(Phantom, NodeMustGenerate) \
-    macro(Nop, 0) \
-    macro(Phi, 0) \
-    macro(Flush, NodeMustGenerate) \
+    macro(Phantom, NodeMustGenerate | NodeDoesNotExit) \
+    macro(Nop, 0 | NodeDoesNotExit) \
+    macro(Phi, 0 | NodeDoesNotExit) \
+    macro(Flush, NodeMustGenerate | NodeDoesNotExit) \
     \
-    /* Marker for arguments being set. */\
-    macro(SetArgument, 0) \
+    /* Get the value of a local variable, without linking into the VariableAccessData */\
+    /* network. This is only valid for variable accesses whose predictions originated */\
+    /* as something other than a local access, and thus had their own profiling. */\
+    macro(GetLocalUnlinked, NodeResultJS) \
+    \
+    /* Marker for an argument being set at the prologue of a function. */\
+    macro(SetArgument, 0 | NodeDoesNotExit) \
     \
     /* Hint that inlining begins here. No code is generated for this node. It's only */\
     /* used for copying OSR data into inline frame data, to support reification of */\
     /* call frames of inlined functions. */\
-    macro(InlineStart, 0) \
+    macro(InlineStart, 0 | NodeDoesNotExit) \
     \
     /* Nodes for bitwise operations. */\
     macro(BitAnd, NodeResultInt32) \
@@ -102,36 +109,47 @@ namespace JSC { namespace DFG {
     /* Property access. */\
     /* PutByValAlias indicates a 'put' aliases a prior write to the same property. */\
     /* Since a put to 'length' may invalidate optimizations here, */\
-    /* this must be the directly subsequent property put. */\
+    /* this must be the directly subsequent property put. Note that PutByVal */\
+    /* opcodes use VarArgs beause they may have up to 4 children. */\
     macro(GetByVal, NodeResultJS | NodeMustGenerate | NodeMightClobber) \
-    macro(PutByVal, NodeMustGenerate | NodeClobbersWorld) \
-    macro(PutByValAlias, NodeMustGenerate | NodeClobbersWorld) \
+    macro(PutByVal, NodeMustGenerate | NodeHasVarArgs | NodeMightClobber) \
+    macro(PutByValAlias, NodeMustGenerate | NodeHasVarArgs | NodeMightClobber) \
     macro(GetById, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(GetByIdFlush, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(PutById, NodeMustGenerate | NodeClobbersWorld) \
     macro(PutByIdDirect, NodeMustGenerate | NodeClobbersWorld) \
     macro(CheckStructure, NodeMustGenerate) \
-    macro(PutStructure, NodeMustGenerate | NodeClobbersWorld) \
+    macro(ForwardCheckStructure, NodeMustGenerate) \
+    /* Transition watchpoints are a contract between the party setting the watchpoint */\
+    /* and the runtime system, where the party promises that the child object once had */\
+    /* the structure being watched, and the runtime system in turn promises that the */\
+    /* watchpoint will be turned into an OSR exit if any object with that structure */\
+    /* ever transitions to a different structure. Hence, the child object must have */\
+    /* previously had a CheckStructure executed on it or we're dealing with an object */\
+    /* constant (WeakJSConstant) and the object was known to have that structure at */\
+    /* compile-time. In the latter case this means that no structure checks have to be */\
+    /* performed for this object by JITted code. In the former case this means that*/\
+    /* the object's structure does not need to be rechecked due to side-effecting */\
+    /* (clobbering) operations. */\
+    macro(StructureTransitionWatchpoint, NodeMustGenerate) \
+    macro(ForwardStructureTransitionWatchpoint, NodeMustGenerate) \
+    macro(PutStructure, NodeMustGenerate) \
+    macro(PhantomPutStructure, NodeMustGenerate | NodeDoesNotExit) \
+    macro(AllocatePropertyStorage, NodeMustGenerate | NodeDoesNotExit | NodeResultStorage) \
+    macro(ReallocatePropertyStorage, NodeMustGenerate | NodeDoesNotExit | NodeResultStorage) \
     macro(GetPropertyStorage, NodeResultStorage) \
-    macro(GetIndexedPropertyStorage, NodeMustGenerate | NodeResultStorage) \
+    macro(CheckArray, NodeMustGenerate) \
+    macro(GetIndexedPropertyStorage, NodeResultStorage) \
     macro(GetByOffset, NodeResultJS) \
-    macro(PutByOffset, NodeMustGenerate | NodeClobbersWorld) \
+    macro(PutByOffset, NodeMustGenerate) \
     macro(GetArrayLength, NodeResultInt32) \
-    macro(GetStringLength, NodeResultInt32) \
-    macro(GetInt8ArrayLength, NodeResultInt32) \
-    macro(GetInt16ArrayLength, NodeResultInt32) \
-    macro(GetInt32ArrayLength, NodeResultInt32) \
-    macro(GetUint8ArrayLength, NodeResultInt32) \
-    macro(GetUint8ClampedArrayLength, NodeResultInt32) \
-    macro(GetUint16ArrayLength, NodeResultInt32) \
-    macro(GetUint32ArrayLength, NodeResultInt32) \
-    macro(GetFloat32ArrayLength, NodeResultInt32) \
-    macro(GetFloat64ArrayLength, NodeResultInt32) \
     macro(GetScopeChain, NodeResultJS) \
     macro(GetScopedVar, NodeResultJS | NodeMustGenerate) \
     macro(PutScopedVar, NodeMustGenerate | NodeClobbersWorld) \
     macro(GetGlobalVar, NodeResultJS | NodeMustGenerate) \
-    macro(PutGlobalVar, NodeMustGenerate | NodeClobbersWorld) \
+    macro(PutGlobalVar, NodeMustGenerate) \
+    macro(GlobalVarWatchpoint, NodeMustGenerate) \
+    macro(PutGlobalVarCheck, NodeMustGenerate) \
     macro(CheckFunction, NodeMustGenerate) \
     \
     /* Optimizations for array mutation. */\
@@ -161,6 +179,7 @@ namespace JSC { namespace DFG {
     /* Allocations. */\
     macro(NewObject, NodeResultJS) \
     macro(NewArray, NodeResultJS | NodeHasVarArgs) \
+    macro(NewArrayWithSize, NodeResultJS) \
     macro(NewArrayBuffer, NodeResultJS) \
     macro(NewRegexp, NodeResultJS) \
     \
@@ -180,7 +199,7 @@ namespace JSC { namespace DFG {
     macro(IsString, NodeResultBoolean) \
     macro(IsObject, NodeResultBoolean) \
     macro(IsFunction, NodeResultBoolean) \
-    macro(LogicalNot, NodeResultBoolean | NodeMightClobber) \
+    macro(LogicalNot, NodeResultBoolean) \
     macro(ToPrimitive, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(StrCat, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     \
@@ -189,6 +208,17 @@ namespace JSC { namespace DFG {
     /* being threaded with each other. */\
     macro(CreateActivation, NodeResultJS) \
     macro(TearOffActivation, NodeMustGenerate) \
+    \
+    /* Nodes used for arguments. Similar to activation support, only it makes even less */\
+    /* sense. */\
+    macro(CreateArguments, NodeResultJS) \
+    macro(PhantomArguments, NodeResultJS | NodeDoesNotExit) \
+    macro(TearOffArguments, NodeMustGenerate) \
+    macro(GetMyArgumentsLength, NodeResultJS | NodeMustGenerate) \
+    macro(GetMyArgumentByVal, NodeResultJS | NodeMustGenerate) \
+    macro(GetMyArgumentsLengthSafe, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
+    macro(GetMyArgumentByValSafe, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
+    macro(CheckArgumentsNotCreated, NodeMustGenerate) \
     \
     /* Nodes for creating functions. */\
     macro(NewFunctionNoCheck, NodeResultJS) \

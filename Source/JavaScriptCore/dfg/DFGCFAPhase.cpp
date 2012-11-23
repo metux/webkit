@@ -42,7 +42,7 @@ public:
     {
     }
     
-    void run()
+    bool run()
     {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         m_count = 0;
@@ -65,12 +65,16 @@ public:
             m_changed = false;
             performForwardCFA();
         } while (m_changed);
+        
+        return true;
     }
     
 private:
     void performBlockCFA(BlockIndex blockIndex)
     {
         BasicBlock* block = m_graph.m_blocks[blockIndex].get();
+        if (!block)
+            return;
         if (!block->cfaShouldRevisit)
             return;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
@@ -91,8 +95,12 @@ private:
             m_state.dump(WTF::dataFile());
             dataLog("\n");
 #endif
-            if (!m_state.execute(i))
+            if (!m_state.execute(i)) {
+#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+                dataLog("         Expect OSR exit.\n");
+#endif
                 break;
+            }
         }
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLog("      tail regs: ");
@@ -126,9 +134,10 @@ private:
 #endif
 };
 
-void performCFA(Graph& graph)
+bool performCFA(Graph& graph)
 {
-    runPhase<CFAPhase>(graph);
+    SamplingRegion samplingRegion("DFG CFA Phase");
+    return runPhase<CFAPhase>(graph);
 }
 
 } } // namespace JSC::DFG

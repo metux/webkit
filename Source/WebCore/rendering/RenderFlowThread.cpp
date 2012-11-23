@@ -51,8 +51,7 @@ RenderFlowThread::RenderFlowThread(Node* node)
     , m_regionsInvalidated(false)
     , m_regionsHaveUniformLogicalWidth(true)
     , m_regionsHaveUniformLogicalHeight(true)
-    , m_overflow(false)
-    , m_regionLayoutUpdateEventTimer(this, &RenderFlowThread::regionLayoutUpdateEventTimerFired)
+    , m_overset(true)
 {
     ASSERT(node->document()->cssRegionsEnabled());
     setIsAnonymous(false);
@@ -85,11 +84,9 @@ void RenderFlowThread::styleDidChange(StyleDifference diff, const RenderStyle* o
 
 void RenderFlowThread::removeFlowChildInfo(RenderObject* child)
 {
-    if (child->isBox()) {
+    if (child->isBox())
         removeRenderBoxRegionInfo(toRenderBox(child));
-        if (child->canHaveRegionStyle())
-            clearRenderBoxCustomStyle(toRenderBox(child));
-    }
+    clearRenderObjectCustomStyle(child);
 }
 
 void RenderFlowThread::addRegionToThread(RenderRegion* renderRegion)
@@ -98,6 +95,7 @@ void RenderFlowThread::addRegionToThread(RenderRegion* renderRegion)
     m_regionList.add(renderRegion);
     renderRegion->setIsValid(true);
     invalidateRegions();
+    checkRegionsWithStyling();
 }
 
 void RenderFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
@@ -106,6 +104,7 @@ void RenderFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
     m_regionRangeMap.clear();
     m_regionList.remove(renderRegion);
     invalidateRegions();
+    checkRegionsWithStyling();
 }
 
 class CurrentRenderFlowThreadMaintainer {
@@ -169,16 +168,8 @@ void RenderFlowThread::layout()
                 
                 region->deleteAllRenderBoxRegionInfo();
 
-                LayoutUnit regionLogicalWidth;
-                LayoutUnit regionLogicalHeight;
-
-                if (isHorizontalWritingMode()) {
-                    regionLogicalWidth = region->contentWidth();
-                    regionLogicalHeight = region->contentHeight();
-                } else {
-                    regionLogicalWidth = region->contentHeight();
-                    regionLogicalHeight = region->contentWidth();
-                }
+                LayoutUnit regionLogicalWidth = region->logicalWidthForFlowThreadContent();
+                LayoutUnit regionLogicalHeight = region->logicalHeightForFlowThreadContent();
 
                 if (!m_hasValidRegions)
                     m_hasValidRegions = true;
@@ -199,15 +190,13 @@ void RenderFlowThread::layout()
                 RenderRegion* region = *iter;
                 if (!region->isValid())
                     continue;
-                LayoutRect regionRect;
-                if (isHorizontalWritingMode()) {
-                    regionRect = LayoutRect(style()->direction() == LTR ? ZERO_LAYOUT_UNIT : logicalWidth() - region->contentWidth(), logicalHeight, region->contentWidth(), region->contentHeight());
-                    logicalHeight += regionRect.height();
-                } else {
-                    regionRect = LayoutRect(logicalHeight, style()->direction() == LTR ? ZERO_LAYOUT_UNIT : logicalWidth() - region->contentHeight(), region->contentWidth(), region->contentHeight());
-                    logicalHeight += regionRect.width();
-                }
-                region->setRegionRect(regionRect);
+                    
+                LayoutUnit regionLogicalWidth = region->logicalWidthForFlowThreadContent();
+                LayoutUnit regionLogicalHeight = region->logicalHeightForFlowThreadContent();
+    
+                LayoutRect regionRect(style()->direction() == LTR ? ZERO_LAYOUT_UNIT : logicalWidth() - regionLogicalWidth, logicalHeight, regionLogicalWidth, regionLogicalHeight);
+                region->setRegionRect(isHorizontalWritingMode() ? regionRect : regionRect.transposedRect());
+                logicalHeight += regionLogicalHeight;
             }
         }
     }
@@ -216,15 +205,9 @@ void RenderFlowThread::layout()
     LayoutStateMaintainer statePusher(view(), this, regionsChanged);
     RenderBlock::layout();
     statePusher.pop();
-    if (document()->hasListenerType(Document::REGIONLAYOUTUPDATE_LISTENER) && !m_regionLayoutUpdateEventTimer.isActive())
-        for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
-            RenderRegion* region = *iter;
-            if (region->shouldDispatchRegionLayoutUpdateEvent()) {
-                // at least one region needs to dispatch the event
-                m_regionLayoutUpdateEventTimer.startOneShot(0);
-                break;
-            }
-        }
+    
+    if (shouldDispatchRegionLayoutUpdateEvent())
+        dispatchRegionLayoutUpdateEvent();
 }
 
 void RenderFlowThread::computeLogicalWidth()
@@ -235,7 +218,7 @@ void RenderFlowThread::computeLogicalWidth()
         if (!region->isValid())
             continue;
         ASSERT(!region->needsLayout());
-        logicalWidth = max(isHorizontalWritingMode() ? region->contentWidth() : region->contentHeight(), logicalWidth);
+        logicalWidth = max(region->logicalWidthForFlowThreadContent(), logicalWidth);
     }
     setLogicalWidth(logicalWidth);
 
@@ -245,7 +228,7 @@ void RenderFlowThread::computeLogicalWidth()
         if (!region->isValid())
             continue;
         
-        LayoutUnit regionLogicalWidth = isHorizontalWritingMode() ? region->contentWidth() : region->contentHeight();
+        LayoutUnit regionLogicalWidth = region->logicalWidthForFlowThreadContent();
         if (regionLogicalWidth != logicalWidth) {
             LayoutUnit logicalLeft = style()->direction() == LTR ? ZERO_LAYOUT_UNIT : logicalWidth - regionLogicalWidth;
             region->setRenderBoxRegionInfo(this, logicalLeft, regionLogicalWidth, false);
@@ -262,7 +245,7 @@ void RenderFlowThread::computeLogicalHeight()
         if (!region->isValid())
             continue;
         ASSERT(!region->needsLayout());
-        logicalHeight += isHorizontalWritingMode() ? region->contentHeight() : region->contentWidth();
+        logicalHeight += region->logicalHeightForFlowThreadContent();
     }
 
     setLogicalHeight(logicalHeight);
@@ -278,8 +261,8 @@ void RenderFlowThread::paintIntoRegion(PaintInfo& paintInfo, RenderRegion* regio
     // paintOffset contains the offset where the painting should occur
     // adjusted with the region padding and border.
     LayoutRect regionRect(region->regionRect());
-    LayoutRect regionOverflowRect(region->regionOverflowRect());
-    LayoutRect regionClippingRect(paintOffset + (regionOverflowRect.location() - regionRect.location()), regionOverflowRect.size());
+    LayoutRect regionOversetRect(region->regionOversetRect());
+    LayoutRect regionClippingRect(paintOffset + (regionOversetRect.location() - regionRect.location()), regionOversetRect.size());
 
     PaintInfo info(paintInfo);
     info.rect.intersect(pixelSnappedIntRect(regionClippingRect));
@@ -292,16 +275,16 @@ void RenderFlowThread::paintIntoRegion(PaintInfo& paintInfo, RenderRegion* regio
         // RenderFlowThread should start painting its content in a position that is offset
         // from the region rect's current position. The amount of offset is equal to the location of
         // region in flow coordinates.
-        LayoutPoint renderFlowThreadOffset;
+        IntPoint renderFlowThreadOffset;
         if (style()->isFlippedBlocksWritingMode()) {
             LayoutRect flippedRegionRect(regionRect);
             flipForWritingMode(flippedRegionRect);
-            renderFlowThreadOffset = LayoutPoint(paintOffset - flippedRegionRect.location());
+            renderFlowThreadOffset = roundedIntPoint(paintOffset - flippedRegionRect.location());
         } else
-            renderFlowThreadOffset = LayoutPoint(paintOffset - regionRect.location());
+            renderFlowThreadOffset = roundedIntPoint(paintOffset - regionRect.location());
 
         context->translate(renderFlowThreadOffset.x(), renderFlowThreadOffset.y());
-        info.rect.moveBy(-roundedIntPoint(renderFlowThreadOffset));
+        info.rect.moveBy(-renderFlowThreadOffset);
         
         layer()->paint(context, info.rect, 0, 0, region, RenderLayer::PaintLayerTemporaryClipRects);
 
@@ -309,34 +292,29 @@ void RenderFlowThread::paintIntoRegion(PaintInfo& paintInfo, RenderRegion* regio
     }
 }
 
-bool RenderFlowThread::hitTestRegion(RenderRegion* region, const HitTestRequest& request, HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset)
+bool RenderFlowThread::hitTestRegion(RenderRegion* region, const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset)
 {
     LayoutRect regionRect(region->regionRect());
-    LayoutRect regionOverflowRect = region->regionOverflowRect();
-    LayoutRect regionClippingRect(accumulatedOffset + (regionOverflowRect.location() - regionRect.location()), regionOverflowRect.size());
-    if (!regionClippingRect.contains(pointInContainer))
+    LayoutRect regionOversetRect = region->regionOversetRect();
+    LayoutRect regionClippingRect(accumulatedOffset + (regionOversetRect.location() - regionRect.location()), regionOversetRect.size());
+    if (!regionClippingRect.contains(pointInContainer.point()))
         return false;
-    
-    LayoutPoint renderFlowThreadOffset;
+
+    LayoutSize renderFlowThreadOffset;
     if (style()->isFlippedBlocksWritingMode()) {
         LayoutRect flippedRegionRect(regionRect);
         flipForWritingMode(flippedRegionRect);
-        renderFlowThreadOffset = LayoutPoint(accumulatedOffset - flippedRegionRect.location());
+        renderFlowThreadOffset = accumulatedOffset - flippedRegionRect.location();
     } else
-        renderFlowThreadOffset = LayoutPoint(accumulatedOffset - regionRect.location());
+        renderFlowThreadOffset = accumulatedOffset - regionRect.location();
 
-    LayoutPoint transformedPoint(pointInContainer.x() - renderFlowThreadOffset.x(), pointInContainer.y() - renderFlowThreadOffset.y());
-    
     // Always ignore clipping, since the RenderFlowThread has nothing to do with the bounds of the FrameView.
     HitTestRequest newRequest(request.type() | HitTestRequest::IgnoreClipping);
 
-    RenderRegion* oldRegion = result.region();
-    result.setRegion(region);
-    LayoutPoint oldPoint = result.point();
-    result.setPoint(transformedPoint);
-    bool isPointInsideFlowThread = layer()->hitTest(newRequest, result);
-    result.setPoint(oldPoint);
-    result.setRegion(oldRegion);
+    // Make a new temporary hitTestPoint in the new region.
+    HitTestPoint newHitTestPoint(pointInContainer, -renderFlowThreadOffset, region);
+
+    bool isPointInsideFlowThread = layer()->hitTest(newRequest, newHitTestPoint, result);
 
     // FIXME: Should we set result.m_localPoint back to the RenderRegion's coordinate space or leave it in the RenderFlowThread's coordinate
     // space? Right now it's staying in the RenderFlowThread's coordinate space, which may end up being ok. We will know more when we get around to
@@ -364,12 +342,12 @@ void RenderFlowThread::repaintRectangleInRegions(const LayoutRect& repaintRect, 
 
         // We only have to issue a repaint in this region if the region rect intersects the repaint rect.
         LayoutRect flippedRegionRect(region->regionRect());
-        LayoutRect flippedRegionOverflowRect(region->regionOverflowRect());
+        LayoutRect flippedRegionOversetRect(region->regionOversetRect());
         flipForWritingMode(flippedRegionRect); // Put the region rects into physical coordinates.
-        flipForWritingMode(flippedRegionOverflowRect);
+        flipForWritingMode(flippedRegionOversetRect);
 
         LayoutRect clippedRect(repaintRect);
-        clippedRect.intersect(flippedRegionOverflowRect);
+        clippedRect.intersect(flippedRegionOversetRect);
         if (clippedRect.isEmpty())
             continue;
 
@@ -453,7 +431,7 @@ LayoutUnit RenderFlowThread::regionRemainingLogicalHeightForLine(LayoutUnit posi
         // If IncludePageBoundary is set, the line exactly on the top edge of a
         // region will act as being part of the previous region.
         LayoutUnit regionHeight = isHorizontalWritingMode() ? region->regionRect().height() : region->regionRect().width();
-        remainingHeight = layoutMod(remainingHeight, regionHeight);
+        remainingHeight = intMod(remainingHeight, regionHeight);
     }
     return remainingHeight;
 }
@@ -615,7 +593,7 @@ RenderRegion* RenderFlowThread::lastRegion() const
     return 0;
 }
 
-void RenderFlowThread::clearRenderBoxCustomStyle(const RenderBox* box,
+void RenderFlowThread::clearRenderObjectCustomStyle(const RenderObject* object,
     const RenderRegion* oldStartRegion, const RenderRegion* oldEndRegion,
     const RenderRegion* newStartRegion, const RenderRegion* newEndRegion)
 {
@@ -632,7 +610,7 @@ void RenderFlowThread::clearRenderBoxCustomStyle(const RenderBox* box,
             insideNewRegionRange = true;
 
         if (!(insideOldRegionRange && insideNewRegionRange))
-            region->clearBoxStyleInRegion(box);
+            region->clearObjectStyleInRegion(object);
 
         if (oldEndRegion == region)
             insideOldRegionRange = false;
@@ -652,6 +630,7 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
     RenderRegionRangeMap::iterator it = m_regionRangeMap.find(box);
     if (it == m_regionRangeMap.end()) {
         m_regionRangeMap.set(box, RenderRegionRange(startRegion, endRegion));
+        clearRenderObjectCustomStyle(box);
         return;
     }
 
@@ -674,7 +653,7 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
             break;
     }
 
-    clearRenderBoxCustomStyle(box, range.startRegion(), range.endRegion(), startRegion, endRegion);
+    clearRenderObjectCustomStyle(box, range.startRegion(), range.endRegion(), startRegion, endRegion);
     range.setRange(startRegion, endRegion);
 }
 
@@ -699,9 +678,11 @@ void RenderFlowThread::computeOverflowStateForRegions(LayoutUnit oldClientAfterE
     // might not be taken into account because the render flow thread height is greater that that regions height + its visual overflow
     // because of how computeLogicalHeight is implemented for RenderFlowThread (as a sum of all regions height).
     // This means that the middle region will be marked as fit (even if it has visual overflow flowing into the next region)
-    if (hasRenderOverflow())
+    if (hasRenderOverflow() && ( (isHorizontalWritingMode() && visualOverflowRect().maxY() > clientBoxRect().maxY()) 
+                                || (!isHorizontalWritingMode() && visualOverflowRect().maxX() > clientBoxRect().maxX())))
         height = isHorizontalWritingMode() ? visualOverflowRect().maxY() : visualOverflowRect().maxX();
 
+    RenderRegion* lastReg = lastRegion();
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
         if (!region->isValid()) {
@@ -714,50 +695,21 @@ void RenderFlowThread::computeOverflowStateForRegions(LayoutUnit oldClientAfterE
         RenderRegion::RegionState state = RenderRegion::RegionFit;
         if (flowMin <= 0)
             state = RenderRegion::RegionEmpty;
-        if (flowMax > 0)
-            state = RenderRegion::RegionOverflow;
+        if (flowMax > 0 && region == lastReg)
+            state = RenderRegion::RegionOverset;
         region->setRegionState(state);
-        // determine whether this region should dispatch a regionLayoutUpdate event
-        // FIXME: currently it cannot determine whether a region whose regionOverflow state remained either "fit" or "overflow" has actually
-        // changed, so it just assumes that those region should dispatch the event
+        // determine whether the NamedFlow object should dispatch a regionLayoutUpdate event
+        // FIXME: currently it cannot determine whether a region whose regionOverset state remained either "fit" or "overset" has actually
+        // changed, so it just assumes that the NamedFlow should dispatch the event
         if (previousState != state
             || state == RenderRegion::RegionFit
-            || state == RenderRegion::RegionOverflow)
-            region->setDispatchRegionLayoutUpdateEvent(true);
+            || state == RenderRegion::RegionOverset)
+            setDispatchRegionLayoutUpdateEvent(true);
     }
 
-    // With the regions overflow state computed we can also set the overflow for the named flow.
-    RenderRegion* lastReg = lastRegion();
-    m_overflow = lastReg && (lastReg->regionState() == RenderRegion::RegionOverflow);
-}
-
-void RenderFlowThread::regionLayoutUpdateEventTimerFired(Timer<RenderFlowThread>*)
-{
-    // Create a copy of region nodes, to protect them for being destroyed in the event listener
-    Vector<RefPtr<Node> > regionNodes;
-    regionNodes.reserveCapacity(m_regionList.size());
-    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
-        RenderRegion* region = *iter;
-        ASSERT(region->node() && region->node()->isElementNode());
-        // dispatch the event only for marked regions and only for those who have a listener
-        if (region->shouldDispatchRegionLayoutUpdateEvent()) {
-            regionNodes.append(region->node());
-            // clear the dispatch flag here, as it is possible to be set again due to event listeners
-            region->setDispatchRegionLayoutUpdateEvent(false);
-        }
-    }
-    for (Vector<RefPtr<Node> >::const_iterator it = regionNodes.begin(); it != regionNodes.end(); ++it) {
-        RefPtr<Node> node = *it;
-        RefPtr<Document> document = node->document();
-        if (!document)
-            continue;
-        RenderObject* renderer = node->renderer();
-        if (renderer && renderer->isRenderRegion()) {
-            node->dispatchRegionLayoutUpdateEvent();
-            // Layout needs to be uptodate after each event listener
-            document->updateLayoutIgnorePendingStylesheets();
-        }
-    }
+    // With the regions overflow state computed we can also set the overset flag for the named flow.
+    // If there are no valid regions in the chain, overset is true
+    m_overset = lastReg ? lastReg->regionState() == RenderRegion::RegionOverset : true;
 }
 
 bool RenderFlowThread::regionInRange(const RenderRegion* targetRegion, const RenderRegion* startRegion, const RenderRegion* endRegion) const
@@ -775,6 +727,22 @@ bool RenderFlowThread::regionInRange(const RenderRegion* targetRegion, const Ren
     }
 
     return false;
+}
+
+// Check if the content is flown into at least a region with region styling rules.
+void RenderFlowThread::checkRegionsWithStyling()
+{
+    bool hasRegionsWithStyling = false;
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid())
+            continue;
+        if (region->hasCustomRegionStyle()) {
+            hasRegionsWithStyling = true;
+            break;
+        }
+    }
+    m_hasRegionsWithStyling = hasRegionsWithStyling;
 }
 
 bool RenderFlowThread::objectInFlowRegion(const RenderObject* object, const RenderRegion* region) const

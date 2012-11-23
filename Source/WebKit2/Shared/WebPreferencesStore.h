@@ -48,6 +48,12 @@ namespace WebKit {
 #define DEFAULT_WEBKIT_TABSTOLINKS_ENABLED false
 #endif
 
+#if ENABLE(SMOOTH_SCROLLING) && !PLATFORM(QT)
+#define DEFAULT_WEBKIT_SCROLL_ANIMATOR_ENABLED true
+#else
+#define DEFAULT_WEBKIT_SCROLL_ANIMATOR_ENABLED false
+#endif
+
 #define FOR_EACH_WEBKIT_BOOL_PREFERENCE(macro) \
     macro(JavaScriptEnabled, javaScriptEnabled, Bool, bool, true) \
     macro(LoadsImagesAutomatically, loadsImagesAutomatically, Bool, bool, true) \
@@ -61,6 +67,7 @@ namespace WebKit {
     macro(XSSAuditorEnabled, xssAuditorEnabled, Bool, bool, true) \
     macro(FrameFlatteningEnabled, frameFlatteningEnabled, Bool, bool, false) \
     macro(DeveloperExtrasEnabled, developerExtrasEnabled, Bool, bool, false) \
+    macro(JavaScriptExperimentsEnabled, javaScriptExperimentsEnabled, Bool, bool, false) \
     macro(PrivateBrowsingEnabled, privateBrowsingEnabled, Bool, bool, false) \
     macro(TextAreasAreResizable, textAreasAreResizable, Bool, bool, true) \
     macro(JavaScriptCanOpenWindowsAutomatically, javaScriptCanOpenWindowsAutomatically, Bool, bool, true) \
@@ -75,6 +82,7 @@ namespace WebKit {
     macro(CSSCustomFilterEnabled, cssCustomFilterEnabled, Bool, bool, true) \
     macro(WebGLEnabled, webGLEnabled, Bool, bool, false) \
     macro(CSSRegionsEnabled, cssRegionsEnabled, Bool, bool, true) \
+    macro(CSSGridLayoutEnabled, cssGridLayoutEnabled, Bool, bool, false) \
     macro(RegionBasedColumnsEnabled, regionBasedColumnsEnabled, Bool, bool, false) \
     macro(ForceFTPDirectoryListings, forceFTPDirectoryListings, Bool, bool, false) \
     macro(TabsToLinks, tabsToLinks, Bool, bool, DEFAULT_WEBKIT_TABSTOLINKS_ENABLED) \
@@ -93,7 +101,6 @@ namespace WebKit {
     macro(AllowUniversalAccessFromFileURLs, allowUniversalAccessFromFileURLs, Bool, bool, false) \
     macro(AllowFileAccessFromFileURLs, allowFileAccessFromFileURLs, Bool, bool, false) \
     macro(AVFoundationEnabled, isAVFoundationEnabled, Bool, bool, DEFAULT_WEBKIT_AVFOUNDATION_ENABLED) \
-    macro(Hixie76WebSocketProtocolEnabled, hixie76WebSocketProtocolEnabled, Bool, bool, false) \
     macro(MediaPlaybackRequiresUserGesture, mediaPlaybackRequiresUserGesture, Bool, bool, false) \
     macro(MediaPlaybackAllowsInline, mediaPlaybackAllowsInline, Bool, bool, true) \
     macro(InspectorStartsAttached, inspectorStartsAttached, Bool, bool, true) \
@@ -112,6 +119,13 @@ namespace WebKit {
     macro(ShouldRespectImageOrientation, shouldRespectImageOrientation, Bool, bool, false) \
     macro(WantsBalancedSetDefersLoadingBehavior, wantsBalancedSetDefersLoadingBehavior, Bool, bool, false) \
     macro(RequestAnimationFrameEnabled, requestAnimationFrameEnabled, Bool, bool, true) \
+    macro(DiagnosticLoggingEnabled, diagnosticLoggingEnabled, Bool, bool, false) \
+    macro(AsynchronousPluginInitializationEnabled, asynchronousPluginInitializationEnabled, Bool, bool, false) \
+    macro(AsynchronousPluginInitializationEnabledForAllPlugins, asynchronousPluginInitializationEnabledForAllPlugins, Bool, bool, false) \
+    macro(ArtificialPluginInitializationDelayEnabled, artificialPluginInitializationDelayEnabled, Bool, bool, false) \
+    macro(ScrollingPerformanceLoggingEnabled, scrollingPerformanceLoggingEnabled, Bool, bool, false) \
+    macro(ThirdPartyStorageBlockingEnabled, thirdPartyStorageBlockingEnabled, Bool, bool, false) \
+    macro(ScrollAnimatorEnabled, scrollAnimatorEnabled, Bool, bool, DEFAULT_WEBKIT_SCROLL_ANIMATOR_ENABLED) \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \
@@ -131,9 +145,8 @@ namespace WebKit {
     macro(DefaultFontSize, defaultFontSize, UInt32, uint32_t, 16) \
     macro(DefaultFixedFontSize, defaultFixedFontSize, UInt32, uint32_t, 13) \
     macro(LayoutFallbackWidth, layoutFallbackWidth, UInt32, uint32_t, 980) \
-    macro(DevicePixelRatio, devicePixelRatio, Double, double, 1.0) \
-    macro(DeviceWidth, deviceWidth, UInt32, uint32_t, 480) \
-    macro(DeviceHeight, deviceHeight, UInt32, uint32_t, 854) \
+    macro(DeviceWidth, deviceWidth, UInt32, uint32_t, 0) \
+    macro(DeviceHeight, deviceHeight, UInt32, uint32_t, 0) \
     macro(PDFDisplayMode, pdfDisplayMode, UInt32, uint32_t, 1) \
     macro(EditableLinkBehavior, editableLinkBehavior, UInt32, uint32_t, WebCore::EditableLinkNeverLive) \
     macro(InspectorAttachedHeight, inspectorAttachedHeight, UInt32, uint32_t, 300) \

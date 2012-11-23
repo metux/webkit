@@ -89,8 +89,7 @@ public:
     String toHTML() const;
     String text() const;
 
-    PassRefPtr<DocumentFragment> createContextualFragment(const String& html, ExceptionCode&, FragmentScriptingPermission = FragmentScriptingAllowed);
-    static PassRefPtr<DocumentFragment> createDocumentFragmentForElement(const String& markup, Element*,  FragmentScriptingPermission = FragmentScriptingAllowed);
+    PassRefPtr<DocumentFragment> createContextualFragment(const String& html, ExceptionCode&);
 
     void detach(ExceptionCode&);
     PassRefPtr<Range> cloneRange(ExceptionCode&) const;
@@ -111,18 +110,18 @@ public:
     Node* firstNode() const;
     Node* pastLastNode() const;
 
-    Node* shadowTreeRootNode() const;
+    ShadowRoot* shadowRoot() const;
 
-    IntRect boundingBox();
-    
     enum RangeInFixedPosition {
         NotFixedPosition,
         PartiallyFixedPosition,
         EntirelyFixedPosition
     };
-    
+
     // Not transform-friendly
-    void textRects(Vector<IntRect>&, bool useSelectionHeight = false, RangeInFixedPosition* = 0);
+    void textRects(Vector<IntRect>&, bool useSelectionHeight = false, RangeInFixedPosition* = 0) const;
+    IntRect boundingBox() const;
+
     // Transform-friendly
     void textQuads(Vector<FloatQuad>&, bool useSelectionHeight = false, RangeInFixedPosition* = 0) const;
     void getBorderAndTextQuads(Vector<FloatQuad>&) const;
@@ -150,7 +149,7 @@ public:
 #endif
 
 private:
-    Range(PassRefPtr<Document>);
+    explicit Range(PassRefPtr<Document>);
     Range(PassRefPtr<Document>, PassRefPtr<Node> startContainer, int startOffset, PassRefPtr<Node> endContainer, int endOffset);
 
     void setDocument(Document*);

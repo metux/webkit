@@ -23,6 +23,7 @@
 #define RenderSVGInlineText_h
 
 #if ENABLE(SVG)
+#include "Font.h"
 #include "RenderText.h"
 #include "SVGTextLayoutAttributes.h"
 
@@ -48,7 +49,6 @@ public:
 private:
     virtual const char* renderName() const { return "RenderSVGInlineText"; }
 
-    virtual void willBeDestroyed();
     virtual void setTextInternal(PassRefPtr<StringImpl>);
     virtual void styleDidChange(StyleDifference, const RenderStyle*);
 

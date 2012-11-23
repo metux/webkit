@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Global functions">
 <link rel="prev" href="ch01.html" title="Global functions">
 <link rel="next" href="ch02.html" title="Class Overview">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -37,7 +37,7 @@
 </tr></table></div>
 <div class="refsynopsisdiv">
 <a name="webkitgtk-Global-functions.synopsis"></a><h2>Synopsis</h2>
-<pre class="synopsis"><span class="returnvalue">SoupSession</span> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
+<pre class="synopsis"><a href="../libsoup-2.4/SoupSession.html"><span class="returnvalue">SoupSession</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-session" title="webkit_get_default_session ()">webkit_get_default_session</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="webkitgtk-Global-functions.html#webkit-get-default-web-database-quota" title="webkit_get_default_web_database_quota ()">webkit_get_default_web_database_quota</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path" title="webkit_get_web_database_directory_path ()">webkit_get_web_database_directory_path</a>
@@ -82,18 +82,18 @@ sizes, database quotas, and the HTTP session management.
 <a name="webkitgtk-Global-functions.details"></a><h2>Details</h2>
 <div class="refsect2">
 <a name="webkit-get-default-session"></a><h3>webkit_get_default_session ()</h3>
-<pre class="programlisting"><span class="returnvalue">SoupSession</span> *       webkit_get_default_session          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../libsoup-2.4/SoupSession.html"><span class="returnvalue">SoupSession</span></a> *       webkit_get_default_session          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
-Retrieves the default <span class="type">SoupSession</span> used by all web views.
+Retrieves the default <a href="../libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a> used by all web views.
 Note that the session features are added by WebKit on demand,
-so if you insert your own <span class="type">SoupCookieJar</span> before any network
+so if you insert your own <a href="../libsoup-2.4/SoupCookieJar.html"><span class="type">SoupCookieJar</span></a> before any network
 traffic occurs, WebKit will use it instead of the default.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the default <span class="type">SoupSession</span>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the default <a href="../libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr></tbody>
 </table></div>
@@ -170,8 +170,7 @@ Removes all web databases from the current database directory path.
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_default_web_database_quota
                                                         (<em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a> defaultQuota</code></em>);</pre>
 <p>
-Sets the current path to the directory WebKit will write Web 
-Database databases.
+Sets the default quota for Web Database databases.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -694,7 +693,7 @@ In order to inspect the default context menu, you should connect to
 <p>
 </p>
 <div class="example">
-<a name="idp9765120"></a><p class="title"><b>Example 1. Inspecting the default context menu</b></p>
+<a name="id486778"></a><p class="title"><b>Example 1. Inspecting the default context menu</b></p>
 <div class="example-contents">
   <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
     <tbody>
@@ -749,56 +748,56 @@ In order to inspect the default context menu, you should connect to
 48
 49
 50</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="gtkdoc kwb">static</span> gboolean <span class="function">context_menu_cb</span> <span class="gtkdoc opt">(</span>WebKitWebView       <span class="gtkdoc opt">*</span>webView<span class="gtkdoc opt">,</span>
-                                 GtkWidget           <span class="gtkdoc opt">*</span>default_menu<span class="gtkdoc opt">,</span>
-                                 WebKitHitTestResult <span class="gtkdoc opt">*</span>hit_test_result<span class="gtkdoc opt">,</span>
-                                 gboolean             triggered_with_keyboard<span class="gtkdoc opt">,</span>
-                                 gpointer             user_data<span class="gtkdoc opt">)</span>
-<span class="gtkdoc opt">{</span>
-    GList <span class="gtkdoc opt">*</span>items <span class="gtkdoc opt">=</span> <span class="function"><a href="../gtk3/GtkContainer.html#gtk-container-get-children">gtk_container_get_children</a></span> <span class="gtkdoc opt">(</span><span class="function">GTK_CONTAINER</span> <span class="gtkdoc opt">(</span>default_menu<span class="gtkdoc opt">));</span>
-    GList <span class="gtkdoc opt">*</span>l<span class="gtkdoc opt">;</span>
-    GtkAction <span class="gtkdoc opt">*</span>action<span class="gtkdoc opt">;</span>
-    GtkWidget <span class="gtkdoc opt">*</span>sub_menu<span class="gtkdoc opt">;</span>
+        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> gboolean context_menu_cb (WebKitWebView       *webView,
+                                 GtkWidget           *default_menu,
+                                 WebKitHitTestResult *hit_test_result,
+                                 gboolean             triggered_with_keyboard,
+                                 gpointer             user_data)
+{
+    GList *items = gtk_container_get_children (GTK_CONTAINER (default_menu));
+    GList *l;
+    GtkAction *action;
+    GtkWidget *sub_menu;
 
-    <span class="keyword">for</span> <span class="gtkdoc opt">(</span>l <span class="gtkdoc opt">=</span> items<span class="gtkdoc opt">;</span> l<span class="gtkdoc opt">;</span> l <span class="gtkdoc opt">=</span> <span class="function"><a href="../glib/glib-Doubly-Linked-Lists.html#g-list-next">g_list_next</a></span> <span class="gtkdoc opt">(</span>l<span class="gtkdoc opt">)) {</span>
-        GtkMenuItem <span class="gtkdoc opt">*</span>item <span class="gtkdoc opt">= (</span>GtkMenuItem <span class="gtkdoc opt">*)</span>l<span class="gtkdoc opt">-&gt;</span>data<span class="gtkdoc opt">;</span>
+    <span class="keyword">for</span> (l = items; l; l = g_list_next (l)) {
+        GtkMenuItem *item = (GtkMenuItem *)l-&gt;data;
 
-        <span class="keyword">if</span> <span class="gtkdoc opt">(</span><span class="function">GTK_IS_SEPARATOR_MENU_ITEM</span> <span class="gtkdoc opt">(</span>item<span class="gtkdoc opt">)) {</span>
-            <span class="comment">/* It's  separator, do nothing */</span>
-            <span class="keyword">continue</span><span class="gtkdoc opt">;</span>
-        <span class="gtkdoc opt">}</span>
+        <span class="keyword">if</span> (GTK_IS_SEPARATOR_MENU_ITEM (item)) {
+            <span class="comment">/*</span><span class="comment"> It's  separator, do nothing </span><span class="comment">*/</span>
+            <span class="keyword">continue</span>;
+        }
 
-        <span class="keyword">switch</span> <span class="gtkdoc opt">(</span><span class="function"><a href="../webkitgtk/webkitgtk-Global-functions.html#webkit-context-menu-item-get-action">webkit_context_menu_item_get_action</a></span> <span class="gtkdoc opt">(</span>item<span class="gtkdoc opt">)) {</span>
-        <span class="keyword">case</span> WEBKIT_CONTEXT_MENU_ACTION_NO_ACTION<span class="gtkdoc opt">:</span>
-            <span class="comment">/* No action for this item */</span>
-            <span class="keyword">break</span><span class="gtkdoc opt">;</span>
-        <span class="comment">/* Don't allow to ope links from context menu */</span>
-        <span class="keyword">case</span> WEBKIT_CONTEXT_MENU_ACTION_OPEN_LINK<span class="gtkdoc opt">:</span>
-        <span class="keyword">case</span> WEBKIT_CONTEXT_MENU_ACTION_OPEN_LINK_IN_NEW_WINDOW<span class="gtkdoc opt">:</span>
-            action <span class="gtkdoc opt">=</span> <span class="function"><a href="../gtk3/GtkActivatable.html#gtk-activatable-get-related-action">gtk_activatable_get_related_action</a></span> <span class="gtkdoc opt">(</span><span class="function">GTK_ACTIVATABLE</span> <span class="gtkdoc opt">(</span>item<span class="gtkdoc opt">));</span>
-            <span class="function"><a href="../gtk3/GtkAction.html#gtk-action-set-sensitive">gtk_action_set_sensitive</a></span> <span class="gtkdoc opt">(</span>action<span class="gtkdoc opt">,</span> FALSE<span class="gtkdoc opt">);</span>
-            <span class="keyword">break</span><span class="gtkdoc opt">;</span>
-        <span class="keyword">default</span><span class="gtkdoc opt">:</span>
-            <span class="keyword">break</span><span class="gtkdoc opt">;</span>
-        <span class="gtkdoc opt">}</span>
+        <span class="keyword">switch</span> (webkit_context_menu_item_get_action (item)) {
+        <span class="keyword">case</span> WEBKIT_CONTEXT_MENU_ACTION_NO_ACTION:
+            <span class="comment">/*</span><span class="comment"> No action for this item </span><span class="comment">*/</span>
+            <span class="keyword">break</span>;
+        <span class="comment">/*</span><span class="comment"> Don't allow to ope links from context menu </span><span class="comment">*/</span>
+        <span class="keyword">case</span> WEBKIT_CONTEXT_MENU_ACTION_OPEN_LINK:
+        <span class="keyword">case</span> WEBKIT_CONTEXT_MENU_ACTION_OPEN_LINK_IN_NEW_WINDOW:
+            action = gtk_activatable_get_related_action (GTK_ACTIVATABLE (item));
+            gtk_action_set_sensitive (action, FALSE);
+            <span class="keyword">break</span>;
+        <span class="keyword">default</span>:
+            <span class="keyword">break</span>;
+        }
 
-        sub_menu <span class="gtkdoc opt">=</span> <span class="function"><a href="../gtk3/GtkMenuItem.html#gtk-menu-item-get-submenu">gtk_menu_item_get_submenu</a></span> <span class="gtkdoc opt">(</span>item<span class="gtkdoc opt">);</span>
-        <span class="keyword">if</span> <span class="gtkdoc opt">(</span>sub_menu<span class="gtkdoc opt">) {</span>
-            GtkWidget <span class="gtkdoc opt">*</span>menu_item<span class="gtkdoc opt">;</span>
+        sub_menu = gtk_menu_item_get_submenu (item);
+        <span class="keyword">if</span> (sub_menu) {
+            GtkWidget *menu_item;
 
-            <span class="comment">/* Add custom action to submenu */</span>
-            action <span class="gtkdoc opt">=</span> <span class="function"><a href="../gtk3/GtkAction.html#gtk-action-new">gtk_action_new</a></span> <span class="gtkdoc opt">(</span><span class="string">&quot;CustomItemName&quot;</span><span class="gtkdoc opt">,</span> <span class="string">&quot;Custom Action&quot;</span><span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
-            <span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span> <span class="gtkdoc opt">(</span>action<span class="gtkdoc opt">,</span> <span class="string">&quot;activate&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span> <span class="gtkdoc opt">(</span>custom_menu_item_activated<span class="gtkdoc opt">),</span> NULL<span class="gtkdoc opt">);</span>
+            <span class="comment">/*</span><span class="comment"> Add custom action to submenu </span><span class="comment">*/</span>
+            action = gtk_action_new (<span class="number">&quot;CustomItemName&quot;</span>, <span class="number">&quot;Custom Action&quot;</span>, <span class="number">NULL</span>, <span class="number">NULL</span>);
+            g_signal_connect (action, <span class="number">&quot;activate&quot;</span>, G_CALLBACK (custom_menu_item_activated), <span class="number">NULL</span>);
 
-            menu_item <span class="gtkdoc opt">=</span> <span class="function"><a href="../gtk3/GtkAction.html#gtk-action-create-menu-item">gtk_action_create_menu_item</a></span> <span class="gtkdoc opt">(</span>action<span class="gtkdoc opt">);</span>
-            <span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-unref">g_object_unref</a></span> <span class="gtkdoc opt">(</span>action<span class="gtkdoc opt">);</span>
-            <span class="function"><a href="../gtk3/GtkMenuShell.html#gtk-menu-shell-append">gtk_menu_shell_append</a></span> <span class="gtkdoc opt">(</span><span class="function">GTK_MENU_SHELL</span> <span class="gtkdoc opt">(</span>sub_menu<span class="gtkdoc opt">),</span> menu_item<span class="gtkdoc opt">);</span>
-            <span class="function"><a href="../gtk3/GtkWidget.html#gtk-widget-show">gtk_widget_show</a></span> <span class="gtkdoc opt">(</span>menu_item<span class="gtkdoc opt">);</span>
-        <span class="gtkdoc opt">}</span>
-    <span class="gtkdoc opt">}</span>
+            menu_item = gtk_action_create_menu_item (action);
+            g_object_unref (action);
+            gtk_menu_shell_append (GTK_MENU_SHELL (sub_menu), menu_item);
+            gtk_widget_show (menu_item);
+        }
+    }
 
-    <span class="function"><a href="../glib/glib-Doubly-Linked-Lists.html#g-list-free">g_list_free</a></span><span class="gtkdoc opt">(</span>items<span class="gtkdoc opt">);</span>
-<span class="gtkdoc opt">}</span></pre></td>
+    g_list_free(items);
+}</pre></td>
       </tr>
     </tbody>
   </table>
@@ -831,6 +830,6 @@ Note that you can get the <a href="../gtk3/GtkAction.html"><span class="type">Gt
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

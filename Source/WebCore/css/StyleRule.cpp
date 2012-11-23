@@ -28,11 +28,19 @@
 #include "CSSMediaRule.h"
 #include "CSSPageRule.h"
 #include "CSSStyleRule.h"
+#include "MemoryInstrumentation.h"
+#include "StyleRuleImport.h"
 #include "WebKitCSSKeyframeRule.h"
 #include "WebKitCSSKeyframesRule.h"
 #include "WebKitCSSRegionRule.h"
 
 namespace WebCore {
+
+struct SameSizeAsStyleRuleBase : public WTF::RefCountedBase {
+    unsigned bitfields;
+};
+
+COMPILE_ASSERT(sizeof(StyleRuleBase) == sizeof(SameSizeAsStyleRuleBase), StyleRuleBase_should_stay_small);
 
 PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet) const
 {
@@ -42,6 +50,41 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
 PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSRule* parentRule) const
 { 
     return createCSSOMWrapper(0, parentRule);
+}
+
+void StyleRuleBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    switch (type()) {
+    case Style:
+        static_cast<const StyleRule*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+    case Page:
+        static_cast<const StyleRulePage*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+    case FontFace:
+        static_cast<const StyleRuleFontFace*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+    case Media:
+        static_cast<const StyleRuleMedia*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+#if ENABLE(CSS_REGIONS)
+    case Region:
+        static_cast<const StyleRuleRegion*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+#endif
+    case Import:
+        static_cast<const StyleRuleImport*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+    case Keyframes:
+        static_cast<const StyleRuleKeyframes*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+    case Unknown:
+    case Charset:
+    case Keyframe:
+        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+        return;
+    }
+    ASSERT_NOT_REACHED();
 }
 
 void StyleRuleBase::destroy()
@@ -59,9 +102,11 @@ void StyleRuleBase::destroy()
     case Media:
         delete static_cast<StyleRuleMedia*>(this);
         return;
+#if ENABLE(CSS_REGIONS)
     case Region:
         delete static_cast<StyleRuleRegion*>(this);
         return;
+#endif
     case Import:
         delete static_cast<StyleRuleImport*>(this);
         return;
@@ -71,6 +116,9 @@ void StyleRuleBase::destroy()
     case Unknown:
     case Charset:
     case Keyframe:
+#if !ENABLE(CSS_REGIONS)
+    case Region:
+#endif
         ASSERT_NOT_REACHED();
         return;
     }
@@ -88,8 +136,10 @@ PassRefPtr<StyleRuleBase> StyleRuleBase::copy() const
         return static_cast<const StyleRuleFontFace*>(this)->copy();
     case Media:
         return static_cast<const StyleRuleMedia*>(this)->copy();
+#if ENABLE(CSS_REGIONS)
     case Region:
         return static_cast<const StyleRuleRegion*>(this)->copy();
+#endif
     case Import:
         // FIXME: Copy import rules.
         ASSERT_NOT_REACHED();
@@ -99,6 +149,9 @@ PassRefPtr<StyleRuleBase> StyleRuleBase::copy() const
     case Unknown:
     case Charset:
     case Keyframe:
+#if !ENABLE(CSS_REGIONS)
+    case Region:
+#endif
         ASSERT_NOT_REACHED();
         return 0;
     }
@@ -123,9 +176,11 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
     case Media:
         rule = CSSMediaRule::create(static_cast<StyleRuleMedia*>(self), parentSheet);
         break;
+#if ENABLE(CSS_REGIONS)
     case Region:
         rule = WebKitCSSRegionRule::create(static_cast<StyleRuleRegion*>(self), parentSheet);
         break;
+#endif
     case Import:
         rule = CSSImportRule::create(static_cast<StyleRuleImport*>(self), parentSheet);
         break;
@@ -135,6 +190,9 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
     case Unknown:
     case Charset:
     case Keyframe:
+#if !ENABLE(CSS_REGIONS)
+    case Region:
+#endif
         ASSERT_NOT_REACHED();
         return 0;
     }
@@ -146,6 +204,13 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
 unsigned StyleRule::averageSizeInBytes()
 {
     return sizeof(StyleRule) + StylePropertySet::averageSizeInBytes();
+}
+
+void StyleRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_properties);
+    info.addInstrumentedMember(m_selectorList);
 }
 
 StyleRule::StyleRule(int sourceLine)
@@ -162,6 +227,13 @@ StyleRule::StyleRule(const StyleRule& o)
 
 StyleRule::~StyleRule()
 {
+}
+
+StylePropertySet* StyleRule::mutableProperties()
+{
+    if (!m_properties->isMutable())
+        m_properties = m_properties->copy();
+    return m_properties.get();
 }
 
 void StyleRule::setProperties(PassRefPtr<StylePropertySet> properties)
@@ -185,9 +257,23 @@ StyleRulePage::~StyleRulePage()
 {
 }
 
+StylePropertySet* StyleRulePage::mutableProperties()
+{
+    if (!m_properties->isMutable())
+        m_properties = m_properties->copy();
+    return m_properties.get();
+}
+
 void StyleRulePage::setProperties(PassRefPtr<StylePropertySet> properties)
 { 
     m_properties = properties;
+}
+
+void StyleRulePage::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_properties);
+    info.addInstrumentedMember(m_selectorList);
 }
 
 StyleRuleFontFace::StyleRuleFontFace()
@@ -205,10 +291,24 @@ StyleRuleFontFace::~StyleRuleFontFace()
 {
 }
 
+StylePropertySet* StyleRuleFontFace::mutableProperties()
+{
+    if (!m_properties->isMutable())
+        m_properties = m_properties->copy();
+    return m_properties.get();
+}
+
 void StyleRuleFontFace::setProperties(PassRefPtr<StylePropertySet> properties)
 { 
     m_properties = properties;
 }
+
+void StyleRuleFontFace::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_properties);
+}
+
 
 StyleRuleBlock::StyleRuleBlock(Type type, Vector<RefPtr<StyleRuleBase> >& adoptRule)
     : StyleRuleBase(type, 0)
@@ -234,6 +334,12 @@ void StyleRuleBlock::wrapperRemoveRule(unsigned index)
     m_childRules.remove(index);
 }
 
+void StyleRuleBlock::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedVector(m_childRules);
+}
+
 StyleRuleMedia::StyleRuleMedia(PassRefPtr<MediaQuerySet> media, Vector<RefPtr<StyleRuleBase> >& adoptRules)
     : StyleRuleBlock(Media, adoptRules)
     , m_mediaQueries(media)
@@ -242,11 +348,18 @@ StyleRuleMedia::StyleRuleMedia(PassRefPtr<MediaQuerySet> media, Vector<RefPtr<St
 
 StyleRuleMedia::StyleRuleMedia(const StyleRuleMedia& o)
     : StyleRuleBlock(o)
-    , m_mediaQueries(o.m_mediaQueries->copy())
 {
+    if (o.m_mediaQueries)
+        m_mediaQueries = o.m_mediaQueries->copy();
 }
 
-StyleRuleRegion::StyleRuleRegion(Vector<OwnPtr<CSSParserSelector> >* selectors, Vector<RefPtr<StyleRuleBase> >& adoptRules)
+void StyleRuleMedia::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_mediaQueries);
+}
+
+StyleRuleRegion::StyleRuleRegion(CSSSelectorVector* selectors, Vector<RefPtr<StyleRuleBase> >& adoptRules)
     : StyleRuleBlock(Region, adoptRules)
 {
     m_selectorList.adoptSelectorVector(*selectors);
@@ -256,6 +369,12 @@ StyleRuleRegion::StyleRuleRegion(const StyleRuleRegion& o)
     : StyleRuleBlock(o)
     , m_selectorList(o.m_selectorList)
 {
+}
+
+void StyleRuleRegion::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_selectorList);
 }
 
 } // namespace WebCore

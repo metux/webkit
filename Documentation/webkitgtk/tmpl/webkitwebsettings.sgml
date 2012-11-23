@@ -226,6 +226,16 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:media-playback-allows-inline ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:media-playback-requires-user-gesture ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:minimum-font-size ##### -->
 <para>
 

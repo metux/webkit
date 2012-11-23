@@ -1,4 +1,4 @@
-# generated automatically by aclocal 1.11.5 -*- Autoconf -*-
+# generated automatically by aclocal 1.11.3 -*- Autoconf -*-
 
 # Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 # 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation,
@@ -14,8 +14,8 @@
 
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
-m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.69],,
-[m4_warning([this file was generated for autoconf 2.69.
+m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.68],,
+[m4_warning([this file was generated for autoconf 2.68.
 You have another version of autoconf.  It may work, but is not guaranteed to.
 If you have problems, you may need to regenerate the build system entirely.
 To do so, use the procedure documented by the package, typically `autoreconf'.])])
@@ -413,7 +413,7 @@ AC_DEFUN([AM_AUTOMAKE_VERSION],
 [am__api_version='1.11'
 dnl Some users find AM_AUTOMAKE_VERSION and mistake it for a way to
 dnl require some minimum version.  Point them to the right macro.
-m4_if([$1], [1.11.5], [],
+m4_if([$1], [1.11.3], [],
       [AC_FATAL([Do not call $0, use AM_INIT_AUTOMAKE([$1]).])])dnl
 ])
 
@@ -429,7 +429,7 @@ m4_define([_AM_AUTOCONF_VERSION], [])
 # Call AM_AUTOMAKE_VERSION and AM_AUTOMAKE_VERSION so they can be traced.
 # This function is AC_REQUIREd by AM_INIT_AUTOMAKE.
 AC_DEFUN([AM_SET_CURRENT_AUTOMAKE_VERSION],
-[AM_AUTOMAKE_VERSION([1.11.5])dnl
+[AM_AUTOMAKE_VERSION([1.11.3])dnl
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
 _AM_AUTOCONF_VERSION(m4_defn([AC_AUTOCONF_VERSION]))])
@@ -488,29 +488,6 @@ AC_PREREQ([2.50])dnl
 # expand $ac_aux_dir to an absolute path
 am_aux_dir=`cd $ac_aux_dir && pwd`
 ])
-
-
-# Copyright (C) 1996, 1997, 1999, 2000, 2001, 2002, 2003, 2005
-# Free Software Foundation, Inc.
-#
-# This file is free software; the Free Software Foundation
-# gives unlimited permission to copy and/or distribute it,
-# with or without modifications, as long as this notice is preserved.
-
-# serial 4
-
-# This was merged into AC_PROG_CC in Autoconf.
-
-AU_DEFUN([AM_PROG_CC_STDC],
-[AC_PROG_CC
-AC_DIAGNOSE([obsolete], [$0:
-	your code should no longer depend upon `am_cv_prog_cc_stdc', but upon
-	`ac_cv_prog_cc_stdc'.  Remove this warning and the assignment when
-	you adjust the code.  You can also remove the above call to
-	AC_PROG_CC if you already called it elsewhere.])
-am_cv_prog_cc_stdc=$ac_cv_prog_cc_stdc
-])
-AU_DEFUN([fp_PROG_CC_STDC])
 
 # AM_CONDITIONAL                                            -*- Autoconf -*-
 

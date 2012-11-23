@@ -40,9 +40,10 @@ class ClientRectList;
 class DOMStringMap;
 class DOMTokenList;
 class ElementRareData;
+class ElementShadow;
 class IntSize;
+class RenderRegion;
 class ShadowRoot;
-class ShadowTree;
 class WebKitAnimationList;
 
 enum SpellcheckAttributeState {
@@ -113,7 +114,8 @@ public:
 
     bool hasAttribute(const QualifiedName&) const;
     const AtomicString& getAttribute(const QualifiedName&) const;
-    void setAttribute(const QualifiedName&, const AtomicString& value, EInUpdateStyleAttribute = NotInUpdateStyleAttribute);
+    void setAttribute(const QualifiedName&, const AtomicString& value);
+    void setSynchronizedLazyAttribute(const QualifiedName&, const AtomicString& value);
     void removeAttribute(const QualifiedName&);
     void removeAttribute(size_t index);
 
@@ -139,14 +141,15 @@ public:
     // in style attribute or one of the SVG animation attributes.
     bool hasAttributesWithoutUpdate() const;
 
-    bool hasAttribute(const String& name) const;
-    bool hasAttributeNS(const String& namespaceURI, const String& localName) const;
+    bool hasAttribute(const AtomicString& name) const;
+    bool hasAttributeNS(const AtomicString& namespaceURI, const AtomicString& localName) const;
 
-    const AtomicString& getAttribute(const String& name) const;
-    const AtomicString& getAttributeNS(const String& namespaceURI, const String& localName) const;
+    const AtomicString& getAttribute(const AtomicString& name) const;
+    const AtomicString& getAttributeNS(const AtomicString& namespaceURI, const AtomicString& localName) const;
 
     void setAttribute(const AtomicString& name, const AtomicString& value, ExceptionCode&);
-    void setAttributeNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, const AtomicString& value, ExceptionCode&, FragmentScriptingPermission = FragmentScriptingAllowed);
+    static bool parseAttributeName(QualifiedName&, const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionCode&);
+    void setAttributeNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, const AtomicString& value, ExceptionCode&);
 
     bool isIdAttributeName(const QualifiedName&) const;
     const AtomicString& getIdAttribute() const;
@@ -162,10 +165,11 @@ public:
     // Internal methods that assume the existence of attribute storage, one should use hasAttributes()
     // before calling them.
     size_t attributeCount() const;
-    Attribute* attributeItem(unsigned index) const;
-    Attribute* getAttributeItem(const QualifiedName&) const;
+    const Attribute* attributeItem(unsigned index) const;
+    const Attribute* getAttributeItem(const QualifiedName&) const;
+    Attribute* getAttributeItem(const QualifiedName&);
     size_t getAttributeItemIndex(const QualifiedName& name) const { return attributeData()->getAttributeItemIndex(name); }
-    size_t getAttributeItemIndex(const String& name, bool shouldIgnoreAttributeCase) const { return attributeData()->getAttributeItemIndex(name, shouldIgnoreAttributeCase); }
+    size_t getAttributeItemIndex(const AtomicString& name, bool shouldIgnoreAttributeCase) const { return attributeData()->getAttributeItemIndex(name, shouldIgnoreAttributeCase); }
 
     void scrollIntoView(bool alignToTop = true);
     void scrollIntoViewIfNeeded(bool centerIfNeeded = true);
@@ -197,13 +201,13 @@ public:
     // Returns the absolute bounding box translated into screen coordinates:
     IntRect screenRect() const;
 
-    void removeAttribute(const String& name);
-    void removeAttributeNS(const String& namespaceURI, const String& localName);
+    void removeAttribute(const AtomicString& name);
+    void removeAttributeNS(const AtomicString& namespaceURI, const AtomicString& localName);
 
     PassRefPtr<Attr> detachAttribute(size_t index);
 
-    PassRefPtr<Attr> getAttributeNode(const String& name);
-    PassRefPtr<Attr> getAttributeNodeNS(const String& namespaceURI, const String& localName);
+    PassRefPtr<Attr> getAttributeNode(const AtomicString& name);
+    PassRefPtr<Attr> getAttributeNodeNS(const AtomicString& namespaceURI, const AtomicString& localName);
     PassRefPtr<Attr> setAttributeNode(Attr*, ExceptionCode&);
     PassRefPtr<Attr> setAttributeNodeNS(Attr*, ExceptionCode&);
     PassRefPtr<Attr> removeAttributeNode(Attr*, ExceptionCode&);
@@ -241,33 +245,38 @@ public:
     NamedNodeMap* attributes() const;
 
     // This method is called whenever an attribute is added, changed or removed.
-    virtual void attributeChanged(Attribute*);
+    virtual void attributeChanged(const Attribute&);
+    virtual void parseAttribute(const Attribute&);
 
     // Only called by the parser immediately after element construction.
     void parserSetAttributes(const Vector<Attribute>&, FragmentScriptingPermission);
 
-    ElementAttributeData* attributeData() const { return m_attributeData.get(); }
-    ElementAttributeData* ensureAttributeData() const;
-    ElementAttributeData* updatedAttributeData() const;
-    ElementAttributeData* ensureUpdatedAttributeData() const;
+    const ElementAttributeData* attributeData() const { return m_attributeData.get(); }
+    ElementAttributeData* mutableAttributeData();
+    const ElementAttributeData* ensureAttributeData();
+    const ElementAttributeData* updatedAttributeData() const;
+    const ElementAttributeData* ensureUpdatedAttributeData() const;
 
-    void setAttributesFromElement(const Element&);
+    // Clones attributes only.
+    void cloneAttributesFromElement(const Element&);
+
+    // Clones all attribute-derived data, including subclass specifics (through copyNonAttributeProperties.)
+    void cloneDataFromElement(const Element&);
+
     bool hasEquivalentAttributes(const Element* other) const;
 
-    virtual void copyNonAttributeProperties(const Element* source);
+    virtual void copyNonAttributePropertiesFromElement(const Element&) { }
 
     virtual void attach();
     virtual void detach();
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     void recalcStyle(StyleChange = NoChange);
 
-    bool hasShadowRoot() const;
-    ShadowTree* shadowTree() const;
-    ShadowTree* ensureShadowTree();
+    ElementShadow* shadow() const;
+    ElementShadow* ensureShadow();
+    virtual void willAddAuthorShadowRoot() { }
 
-    // FIXME: Remove Element::ensureShadowRoot
-    // https://bugs.webkit.org/show_bug.cgi?id=77608
-    ShadowRoot* ensureShadowRoot();
+    ShadowRoot* userAgentShadowRoot() const;
 
     virtual const AtomicString& shadowPseudoId() const;
     void setShadowPseudoId(const AtomicString&, ExceptionCode& = ASSERT_NO_EXCEPTION);
@@ -277,11 +286,14 @@ public:
     void setStyleAffectedByEmpty();
     bool styleAffectedByEmpty() const;
 
+    void setIsInCanvasSubtree(bool);
+    bool isInCanvasSubtree() const;
+
     AtomicString computeInheritedLanguage() const;
 
     virtual void accessKeyAction(bool /*sendToAnyEvent*/) { }
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const { return false; }
 
     KURL getURLAttribute(const QualifiedName&) const;
     KURL getNonEmptyURLAttribute(const QualifiedName&) const;
@@ -299,13 +311,16 @@ public:
     virtual String title() const;
 
     void updateId(const AtomicString& oldId, const AtomicString& newId);
+    void updateId(TreeScope*, const AtomicString& oldId, const AtomicString& newId);
     void updateName(const AtomicString& oldName, const AtomicString& newName);
 
     void willModifyAttribute(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue);
     void willRemoveAttribute(const QualifiedName&, const AtomicString& value);
-    void didAddAttribute(Attribute*);
-    void didModifyAttribute(Attribute*);
+    void didAddAttribute(const Attribute&);
+    void didModifyAttribute(const Attribute&);
     void didRemoveAttribute(const QualifiedName&);
+
+    void removeCachedHTMLCollection(HTMLCollection*, CollectionType);
 
     LayoutSize minimumSizeForResizing() const;
     void setMinimumSizeForResizing(const LayoutSize&);
@@ -334,6 +349,8 @@ public:
     Element* nextElementSibling() const;
     unsigned childElementCount() const;
 
+    virtual bool shouldMatchReadOnlySelector() const;
+    virtual bool shouldMatchReadWriteSelector() const;
     bool webkitMatchesSelector(const String& selectors, ExceptionCode&);
 
     DOMTokenList* classList();
@@ -357,7 +374,6 @@ public:
 
     virtual bool isFormControlElement() const { return false; }
     virtual bool isEnabledFormControl() const { return true; }
-    virtual bool isReadOnlyFormControl() const { return false; }
     virtual bool isSpinButtonElement() const { return false; }
     virtual bool isTextFormControl() const { return false; }
     virtual bool isOptionalFormControl() const { return false; }
@@ -373,7 +389,6 @@ public:
 
     virtual bool canContainRangeEndPoint() const { return true; }
 
-    virtual const AtomicString& formControlName() const { return nullAtom; }
     virtual const AtomicString& formControlType() const { return nullAtom; }
 
     virtual bool wasChangedSinceLastFormControlChangeEvent() const;
@@ -399,19 +414,33 @@ public:
     void webkitRequestFullscreen();
 #endif
 
+#if ENABLE(POINTER_LOCK)
+    void webkitRequestPointerLock();
+#endif
+
     virtual bool isSpellCheckingEnabled() const;
 
     PassRefPtr<WebKitAnimationList> webkitGetAnimations() const;
     
     PassRefPtr<RenderStyle> styleForRenderer();
 
-    const AtomicString& webkitRegionOverflow() const;
+    RenderRegion* renderRegion() const;
+    const AtomicString& webkitRegionOverset() const;
 
     bool hasID() const;
     bool hasClass() const;
+    const SpaceSplitString& classNames() const;
 
     IntSize savedLayerScrollOffset() const;
     void setSavedLayerScrollOffset(const IntSize&);
+
+    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+    {
+        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+        ContainerNode::reportMemoryUsage(memoryObjectInfo);
+        info.addInstrumentedMember(m_tagName);
+        info.addInstrumentedMember(m_attributeData);
+    }
 
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
@@ -420,20 +449,24 @@ protected:
     {
     }
 
-    virtual void willRemove();
-    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
-    virtual void removedFrom(Node*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
-    virtual bool willRecalcStyle(StyleChange) { return true; }
-    virtual void didRecalcStyle(StyleChange) { }
+
+    virtual bool willRecalcStyle(StyleChange);
+    virtual void didRecalcStyle(StyleChange);
     virtual PassRefPtr<RenderStyle> customStyleForRenderer();
 
     virtual bool shouldRegisterAsNamedItem() const { return false; }
     virtual bool shouldRegisterAsExtraNamedItem() const { return false; }
 
-    void idAttributeChanged(Attribute*);
+    PassRefPtr<HTMLCollection> ensureCachedHTMLCollection(CollectionType);
+    HTMLCollection* cachedHTMLCollection(CollectionType);
 
-    HTMLCollection* ensureCachedHTMLCollection(CollectionType);
+    // classAttributeChanged() exists to share code between
+    // parseAttribute (called via setAttribute()) and
+    // svgAttributeChanged (called when element.className.baseValue is set)
+    void classAttributeChanged(const AtomicString& newClassString);
 
 private:
     void updateInvalidAttributes() const;
@@ -444,15 +477,13 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
 
-    void setAttributeInternal(size_t index, const QualifiedName&, const AtomicString& value, EInUpdateStyleAttribute);
+    void setAttributeInternal(size_t index, const QualifiedName&, const AtomicString& value, SynchronizationOfLazyAttribute);
 
 #ifndef NDEBUG
     virtual void formatForDebugger(char* buffer, unsigned length) const;
 #endif
 
     bool pseudoStyleCacheIsInvalid(const RenderStyle* currentStyle, RenderStyle* newStyle);
-
-    void createAttributeData() const;
 
     virtual void updateStyleAttribute() const { }
 
@@ -475,9 +506,6 @@ private:
     QualifiedName m_tagName;
     virtual OwnPtr<NodeRareData> createRareData();
 
-    ElementRareData* rareData() const;
-    ElementRareData* ensureRareData();
-
     SpellcheckAttributeState spellcheckAttributeState() const;
 
     void updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
@@ -485,8 +513,13 @@ private:
 
     void unregisterNamedFlowContentNode();
 
+    void createMutableAttributeData();
+
 private:
-    mutable OwnPtr<ElementAttributeData> m_attributeData;
+    ElementRareData* elementRareData() const;
+    ElementRareData* ensureElementRareData();
+
+    OwnPtr<ElementAttributeData> m_attributeData;
 };
     
 inline Element* toElement(Node* node)
@@ -546,29 +579,25 @@ inline Element* Element::nextElementSibling() const
     return static_cast<Element*>(n);
 }
 
-inline ElementAttributeData* Element::ensureAttributeData() const
-{
-    if (!m_attributeData)
-        createAttributeData();
-    return m_attributeData.get();
-}
-
-inline ElementAttributeData* Element::updatedAttributeData() const
+inline const ElementAttributeData* Element::updatedAttributeData() const
 {
     updateInvalidAttributes();
     return attributeData();
 }
 
-inline ElementAttributeData* Element::ensureUpdatedAttributeData() const
+inline const ElementAttributeData* Element::ensureAttributeData()
 {
-    updateInvalidAttributes();
-    return ensureAttributeData();
+    if (attributeData())
+        return attributeData();
+    return mutableAttributeData();
 }
 
-inline void Element::setAttributesFromElement(const Element& other)
+inline const ElementAttributeData* Element::ensureUpdatedAttributeData() const
 {
-    if (ElementAttributeData* attributeData = other.updatedAttributeData())
-        ensureUpdatedAttributeData()->setAttributes(*attributeData, this);
+    updateInvalidAttributes();
+    if (attributeData())
+        return attributeData();
+    return const_cast<Element*>(this)->mutableAttributeData();
 }
 
 inline void Element::updateName(const AtomicString& oldName, const AtomicString& newName)
@@ -591,7 +620,14 @@ inline void Element::updateId(const AtomicString& oldId, const AtomicString& new
     if (oldId == newId)
         return;
 
-    TreeScope* scope = treeScope();
+    updateId(treeScope(), oldId, newId);
+}
+
+inline void Element::updateId(TreeScope* scope, const AtomicString& oldId, const AtomicString& newId)
+{
+    ASSERT(inDocument());
+    ASSERT(oldId != newId);
+
     if (!oldId.isEmpty())
         scope->removeElementById(oldId, this);
     if (!newId.isEmpty())
@@ -610,14 +646,14 @@ inline void Element::willRemoveAttribute(const QualifiedName& name, const Atomic
 inline bool Element::fastHasAttribute(const QualifiedName& name) const
 {
     ASSERT(fastAttributeLookupAllowed(name));
-    return m_attributeData && getAttributeItem(name);
+    return attributeData() && getAttributeItem(name);
 }
 
 inline const AtomicString& Element::fastGetAttribute(const QualifiedName& name) const
 {
     ASSERT(fastAttributeLookupAllowed(name));
-    if (m_attributeData) {
-        if (Attribute* attribute = getAttributeItem(name))
+    if (attributeData()) {
+        if (const Attribute* attribute = getAttributeItem(name))
             return attribute->value();
     }
     return nullAtom;
@@ -625,13 +661,13 @@ inline const AtomicString& Element::fastGetAttribute(const QualifiedName& name) 
 
 inline bool Element::hasAttributesWithoutUpdate() const
 {
-    return m_attributeData && !m_attributeData->isEmpty();
+    return attributeData() && !attributeData()->isEmpty();
 }
 
 inline const AtomicString& Element::idForStyleResolution() const
 {
     ASSERT(hasID());
-    return m_attributeData->idForStyleResolution();
+    return attributeData()->idForStyleResolution();
 }
 
 inline bool Element::isIdAttributeName(const QualifiedName& attributeName) const
@@ -658,22 +694,35 @@ inline void Element::setIdAttribute(const AtomicString& value)
     setAttribute(document()->idAttributeName(), value);
 }
 
+inline const SpaceSplitString& Element::classNames() const
+{
+    ASSERT(hasClass());
+    ASSERT(attributeData());
+    return attributeData()->classNames();
+}
+
 inline size_t Element::attributeCount() const
 {
-    ASSERT(m_attributeData);
-    return m_attributeData->length();
+    ASSERT(attributeData());
+    return attributeData()->length();
 }
 
-inline Attribute* Element::attributeItem(unsigned index) const
+inline const Attribute* Element::attributeItem(unsigned index) const
 {
-    ASSERT(m_attributeData);
-    return m_attributeData->attributeItem(index);
+    ASSERT(attributeData());
+    return attributeData()->attributeItem(index);
 }
 
-inline Attribute* Element::getAttributeItem(const QualifiedName& name) const
+inline const Attribute* Element::getAttributeItem(const QualifiedName& name) const
 {
-    ASSERT(m_attributeData);
-    return m_attributeData->getAttributeItem(name);
+    ASSERT(attributeData());
+    return attributeData()->getAttributeItem(name);
+}
+
+inline Attribute* Element::getAttributeItem(const QualifiedName& name)
+{
+    ASSERT(attributeData());
+    return mutableAttributeData()->getAttributeItem(name);
 }
 
 inline void Element::updateInvalidAttributes() const
@@ -706,6 +755,13 @@ inline bool Element::hasClass() const
     return attributeData() && attributeData()->hasClass();
 }
 
+inline ElementAttributeData* Element::mutableAttributeData()
+{
+    if (!attributeData() || !attributeData()->isMutable())
+        createMutableAttributeData();
+    return m_attributeData.get();
+}
+
 // Put here to make them inline.
 inline bool Node::hasID() const
 {
@@ -715,6 +771,11 @@ inline bool Node::hasID() const
 inline bool Node::hasClass() const
 {
     return isElementNode() && toElement(this)->hasClass();
+}
+
+inline bool isShadowHost(const Node* node)
+{
+    return node && node->isElementNode() && toElement(node)->shadow();
 }
 
 } // namespace

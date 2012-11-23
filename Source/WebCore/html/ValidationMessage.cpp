@@ -33,6 +33,7 @@
 
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
+#include "ElementShadow.h"
 #include "ExceptionCodePlaceholder.h"
 #include "FormAssociatedElement.h"
 #include "HTMLBRElement.h"
@@ -43,7 +44,6 @@
 #include "RenderObject.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 #include "StyleResolver.h"
 #include "Text.h"
 #include <wtf/PassOwnPtr.h>
@@ -114,10 +114,12 @@ static void adjustBubblePosition(const LayoutRect& hostRect, HTMLElement* bubble
         return;
     double hostX = hostRect.x();
     double hostY = hostRect.y();
-    if (RenderBox* container = bubble->renderer()->containingBlock()) {
-        FloatPoint containerLocation = container->localToAbsolute();
-        hostX -= containerLocation.x() + container->borderLeft();
-        hostY -= containerLocation.y() + container->borderTop();
+    if (RenderObject* renderer = bubble->renderer()) {
+        if (RenderBox* container = renderer->containingBlock()) {
+            FloatPoint containerLocation = container->localToAbsolute();
+            hostX -= containerLocation.x() + container->borderLeft();
+            hostY -= containerLocation.y() + container->borderTop();
+        }
     }
 
     bubble->setInlineStyleProperty(CSSPropertyTop, hostY + hostRect.height(), CSSPrimitiveValue::CSS_PX);
@@ -132,6 +134,8 @@ static void adjustBubblePosition(const LayoutRect& hostRect, HTMLElement* bubble
 void ValidationMessage::buildBubbleTree(Timer<ValidationMessage>*)
 {
     HTMLElement* host = toHTMLElement(m_element);
+    ShadowRoot* shadowRoot = m_element->ensureUserAgentShadowRoot();
+
     Document* doc = host->document();
     m_bubble = HTMLDivElement::create(doc);
     m_bubble->setShadowPseudoId("-webkit-validation-bubble");
@@ -139,8 +143,9 @@ void ValidationMessage::buildBubbleTree(Timer<ValidationMessage>*)
     // contains non-absolute or non-fixed renderers as children.
     m_bubble->setInlineStyleProperty(CSSPropertyPosition, CSSValueAbsolute);
     ExceptionCode ec = 0;
-    host->ensureShadowRoot()->appendChild(m_bubble.get(), ec);
+    shadowRoot->appendChild(m_bubble.get(), ec);
     ASSERT(!ec);
+    host->document()->updateLayout();
     adjustBubblePosition(host->getRect(), m_bubble.get());
 
     RefPtr<HTMLDivElement> clipper = HTMLDivElement::create(doc);
@@ -180,6 +185,13 @@ void ValidationMessage::requestToHideMessage()
     m_timer->startOneShot(0);
 }
 
+bool ValidationMessage::shadowTreeContains(Node* node) const
+{
+    if (!m_bubble)
+        return false;
+    return m_bubble->treeScope() == node->treeScope();
+}
+
 void ValidationMessage::deleteBubbleTree(Timer<ValidationMessage>*)
 {
     if (m_bubble) {
@@ -187,7 +199,7 @@ void ValidationMessage::deleteBubbleTree(Timer<ValidationMessage>*)
         m_messageBody = 0;
         HTMLElement* host = toHTMLElement(m_element);
         ExceptionCode ec;
-        host->shadowTree()->oldestShadowRoot()->removeChild(m_bubble.get(), ec);
+        host->userAgentShadowRoot()->removeChild(m_bubble.get(), ec);
         m_bubble = 0;
     }
     m_message = String();

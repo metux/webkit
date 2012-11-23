@@ -23,15 +23,18 @@
 #define StyleResolver_h
 
 #include "CSSRule.h"
+#include "CSSToStyleMap.h"
 #include "CSSValueList.h"
 #include "LinkHash.h"
 #include "MediaQueryExp.h"
 #include "RenderStyle.h"
 #include "SelectorChecker.h"
+#include "StyleInheritedData.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/StringHash.h>
 
 namespace WebCore {
@@ -63,6 +66,7 @@ class KURL;
 class KeyframeList;
 class KeyframeValue;
 class MediaQueryEvaluator;
+class MemoryObjectInfo;
 class Node;
 class RenderRegion;
 class RuleData;
@@ -80,11 +84,12 @@ class StyleRulePage;
 class StyleRuleRegion;
 class StyleShader;
 class StyleSheet;
-class StyleSheetInternal;
+class StyleSheetContents;
 class StyleSheetList;
 class StyledElement;
 class WebKitCSSFilterValue;
 class WebKitCSSShaderValue;
+class WebKitCSSSVGDocumentValue;
 
 #if ENABLE(CSS_SHADERS)
 typedef Vector<RefPtr<CustomFilterParameter> > CustomFilterParameterList;
@@ -98,6 +103,7 @@ public:
         , m_result(result)
     {
     }
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
     MediaQueryExp m_expression;
     bool m_result;
@@ -136,7 +142,7 @@ public:
 
     void keyframeStylesForAnimation(Element*, const RenderStyle*, KeyframeList&);
 
-    PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle = 0);
+    PassRefPtr<RenderStyle> pseudoStyleForElement(PseudoId, Element*, RenderStyle* parentStyle);
 
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
@@ -158,7 +164,7 @@ public:
     void appendAuthorStylesheets(unsigned firstNew, const Vector<RefPtr<StyleSheet> >&);
     
     // Find the ids or classes the selectors on a stylesheet are scoped to. The selectors only apply to elements in subtrees where the root element matches the scope.
-    static bool determineStylesheetSelectorScopes(StyleSheetInternal*, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes);
+    static bool determineStylesheetSelectorScopes(StyleSheetContents*, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes);
 
 private:
     void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);
@@ -208,6 +214,7 @@ public:
     void applyPropertyToCurrentStyle(CSSPropertyID, CSSValue*);
 
     void updateFont();
+    void initializeFontStyle(Settings*);
 
     static float getComputedSizeFromSpecifiedSize(Document*, float zoomFactor, bool isAbsoluteSize, float specifiedSize, ESmartMinimumForFontSize = UseSmartMinimumForFontFize);
 
@@ -219,6 +226,7 @@ private:
 public:
     bool useSVGZoomRules();
 
+    static bool colorFromPrimitiveValueIsDerivedFromElement(CSSPrimitiveValue*);
     Color colorFromPrimitiveValue(CSSPrimitiveValue*, bool forVisitedLink = false) const;
 
     bool hasSelectorForAttribute(const AtomicString&) const;
@@ -259,17 +267,22 @@ public:
     PassRefPtr<CustomFilterOperation> createCustomFilterOperation(WebKitCSSFilterValue*);
     void loadPendingShaders();
 #endif
+#if ENABLE(SVG)
+    void loadPendingSVGDocuments();
+#endif
 #endif // ENABLE(CSS_FILTERS)
 
+    void loadPendingResources();
+
     struct RuleFeature {
-        RuleFeature(StyleRule* rule, CSSSelector* selector, bool hasDocumentSecurityOrigin)
+        RuleFeature(StyleRule* rule, unsigned selectorIndex, bool hasDocumentSecurityOrigin)
             : rule(rule)
-            , selector(selector)
+            , selectorIndex(selectorIndex)
             , hasDocumentSecurityOrigin(hasDocumentSecurityOrigin) 
         { 
         }
         StyleRule* rule;
-        CSSSelector* selector;
+        unsigned selectorIndex;
         bool hasDocumentSecurityOrigin;
     };
     struct Features {
@@ -277,6 +290,7 @@ public:
         ~Features();
         void add(const StyleResolver::Features&);
         void clear();
+        void reportMemoryUsage(MemoryObjectInfo*) const;
         HashSet<AtomicStringImpl*> idsInRules;
         HashSet<AtomicStringImpl*> attrsInRules;
         Vector<RuleFeature> siblingRules;
@@ -308,6 +322,7 @@ private:
 
     struct MatchedProperties {
         MatchedProperties() : possiblyPaddedMember(0) { }
+        void reportMemoryUsage(MemoryObjectInfo*) const;
         
         RefPtr<StylePropertySet> properties;
         union {
@@ -334,8 +349,8 @@ private:
         bool includeEmptyRules;
     };
 
-    static void addMatchedProperties(MatchResult&, StylePropertySet* properties, StyleRule* = 0, unsigned linkMatchType = SelectorChecker::MatchAll, bool inRegionRule = false);
-    void addElementStyleProperties(MatchResult&, StylePropertySet*, bool isCacheable = true);
+    static void addMatchedProperties(MatchResult&, const StylePropertySet* properties, StyleRule* = 0, unsigned linkMatchType = SelectorChecker::MatchAll, bool inRegionRule = false);
+    void addElementStyleProperties(MatchResult&, const StylePropertySet*, bool isCacheable = true);
 
     void matchAllRules(MatchResult&, bool includeSMILProperties);
     void matchUARules(MatchResult&);
@@ -352,16 +367,27 @@ private:
 
     bool checkSelector(const RuleData&, const ContainerNode* scope = 0);
     bool checkRegionSelector(CSSSelector* regionSelector, Element* regionElement);
-    void applyMatchedProperties(const MatchResult&);
-    template <bool firstPass>
+    void applyMatchedProperties(const MatchResult&, const Element*);
+    enum StyleApplicationPass {
+#if ENABLE(CSS_VARIABLES)
+        VariableDefinitions,
+#endif
+        HighPriorityProperties,
+        LowPriorityProperties
+    };
+    template <StyleApplicationPass pass>
     void applyMatchedProperties(const MatchResult&, bool important, int startIndex, int endIndex, bool inheritedOnly);
-    template <bool firstPass>
+    template <StyleApplicationPass pass>
     void applyProperties(const StylePropertySet* properties, StyleRule*, bool isImportant, bool inheritedOnly, bool filterRegionProperties);
-
+#if ENABLE(CSS_VARIABLES)
+    void resolveVariables(CSSPropertyID, CSSValue*, Vector<std::pair<CSSPropertyID, String> >& knownExpressions);
+#endif
     static bool isValidRegionStyleProperty(CSSPropertyID);
 
     void matchPageRules(MatchResult&, RuleSet*, bool isLeftPage, bool isFirstPage, const String& pageName);
     void matchPageRulesForList(Vector<StyleRulePage*>& matchedRules, const Vector<StyleRulePage*>&, bool isLeftPage, bool isFirstPage, const String& pageName);
+    Settings* documentSettings() { return m_checker.document()->settings(); }
+
     bool isLeftPage(int pageIndex) const;
     bool isRightPage(int pageIndex) const { return !isLeftPage(pageIndex); }
     bool isFirstPage(int pageIndex) const;
@@ -398,39 +424,18 @@ public:
     static Length convertToIntLength(CSSPrimitiveValue*, RenderStyle*, RenderStyle* rootStyle, double multiplier = 1);
     static Length convertToFloatLength(CSSPrimitiveValue*, RenderStyle*, RenderStyle* rootStyle, double multiplier = 1);
 
+    CSSToStyleMap* styleMap() { return &m_styleMap; }
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+    
 private:
     static RenderStyle* s_styleNotYetAvailable;
 
+    void addStylesheetsFromSeamlessParents();
     void addAuthorRulesAndCollectUserRulesFromSheets(const Vector<RefPtr<CSSStyleSheet> >*, RuleSet& userStyle);
 
     void cacheBorderAndBackground();
 
-    void mapFillAttachment(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillClip(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillComposite(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillOrigin(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillImage(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillRepeatX(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillRepeatY(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillSize(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillXPosition(CSSPropertyID, FillLayer*, CSSValue*);
-    void mapFillYPosition(CSSPropertyID, FillLayer*, CSSValue*);
-
-    void mapAnimationDelay(Animation*, CSSValue*);
-    void mapAnimationDirection(Animation*, CSSValue*);
-    void mapAnimationDuration(Animation*, CSSValue*);
-    void mapAnimationFillMode(Animation*, CSSValue*);
-    void mapAnimationIterationCount(Animation*, CSSValue*);
-    void mapAnimationName(Animation*, CSSValue*);
-    void mapAnimationPlayState(Animation*, CSSValue*);
-    void mapAnimationProperty(Animation*, CSSValue*);
-    void mapAnimationTimingFunction(Animation*, CSSValue*);
-
-public:
-    void mapNinePieceImage(CSSPropertyID, CSSValue*, NinePieceImage&);
-    void mapNinePieceImageSlice(CSSValue*, NinePieceImage&);
-    LengthBox mapNinePieceImageQuad(CSSValue*);
-    void mapNinePieceImageRepeat(CSSValue*, NinePieceImage&);
 private:
     bool canShareStyleWithControl(StyledElement*) const;
 
@@ -445,6 +450,7 @@ private:
 
     static unsigned computeMatchedPropertiesHash(const MatchedProperties*, unsigned size);
     struct MatchedPropertiesCacheItem {
+        void reportMemoryUsage(MemoryObjectInfo*) const;
         Vector<MatchedProperties> matchedProperties;
         MatchRanges ranges;
         RefPtr<RenderStyle> renderStyle;
@@ -468,7 +474,8 @@ private:
 
     RefPtr<StaticCSSRuleList> m_ruleList;
 
-    HashSet<CSSPropertyID> m_pendingImageProperties;
+    typedef HashMap<CSSPropertyID, RefPtr<CSSValue> > PendingImagePropertyMap;
+    PendingImagePropertyMap m_pendingImageProperties;
 
     OwnPtr<MediaQueryEvaluator> m_medium;
     RefPtr<RenderStyle> m_rootDefaultStyle;
@@ -504,8 +511,12 @@ private:
     bool m_hasPendingShaders;
 #endif
 
+#if ENABLE(CSS_FILTERS) && ENABLE(SVG)
+    HashMap<FilterOperation*, WebKitCSSSVGDocumentValue*> m_pendingSVGDocuments;
+#endif
+
 #if ENABLE(STYLE_SCOPED)
-    static const ContainerNode* determineScope(const StyleSheetInternal*);
+    const ContainerNode* determineScope(const CSSStyleSheet*);
 
     typedef HashMap<const ContainerNode*, OwnPtr<RuleSet> > ScopedRuleSetMap;
 
@@ -517,9 +528,10 @@ private:
     ScopedRuleSetMap m_scopedAuthorStyles;
     
     struct ScopeStackFrame {
-        ScopeStackFrame() : m_scope(0), m_ruleSet(0) { }
-        ScopeStackFrame(const ContainerNode* scope, RuleSet* ruleSet) : m_scope(scope), m_ruleSet(ruleSet) { }
+        ScopeStackFrame() : m_scope(0), m_authorStyleBoundsIndex(0), m_ruleSet(0) { }
+        ScopeStackFrame(const ContainerNode* scope, int authorStyleBoundsIndex, RuleSet* ruleSet) : m_scope(scope), m_authorStyleBoundsIndex(authorStyleBoundsIndex), m_ruleSet(ruleSet) { }
         const ContainerNode* m_scope;
+        int m_authorStyleBoundsIndex;
         RuleSet* m_ruleSet;
     };
     // Vector (used as stack) that keeps track of scoping elements (i.e., elements with a <style scoped> child)
@@ -528,7 +540,10 @@ private:
     // Element last seen as parent element when updating m_scopingElementStack.
     // This is used to decide whether m_scopingElementStack is consistent, separately from SelectorChecker::m_parentStack.
     const ContainerNode* m_scopeStackParent;
+    int m_scopeStackParentBoundsIndex;
 #endif
+
+    CSSToStyleMap m_styleMap;
 
     friend class StyleBuilder;
     friend bool operator==(const MatchedProperties&, const MatchedProperties&);

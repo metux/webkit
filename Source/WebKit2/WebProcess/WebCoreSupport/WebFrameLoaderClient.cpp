@@ -73,6 +73,17 @@
 #include <WebCore/Widget.h>
 #include <WebCore/WindowFeatures.h>
 
+#if ENABLE(WEB_INTENTS)
+#include "InjectedBundleIntentRequest.h"
+#include "IntentData.h"
+#include <WebCore/IntentRequest.h>
+#endif
+
+#if ENABLE(WEB_INTENTS_TAG)
+#include "IntentServiceInfo.h"
+#include "WebIntentServiceInfo.h"
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -827,8 +838,12 @@ void WebFrameLoaderClient::postProgressEstimateChangedNotification()
 void WebFrameLoaderClient::postProgressFinishedNotification()
 {
     if (WebPage* webPage = m_frame->page()) {
-        if (m_frame->isMainFrame())
+        if (m_frame->isMainFrame()) {
+            // Notify the bundle client.
+            webPage->injectedBundleLoaderClient().didFinishProgress(webPage);
+
             webPage->send(Messages::WebPageProxy::DidFinishProgress());
+        }
     }
 }
 
@@ -897,8 +912,17 @@ void WebFrameLoaderClient::finishedLoading(DocumentLoader* loader)
         }
     }
 
-    // Plugin view could have been created inside committedLoad().
     if (m_pluginView) {
+        // If we just received an empty response without any data, we won't have sent a response to the plug-in view.
+        // Make sure to do this before calling manualLoadDidFinishLoading.
+        if (!m_hasSentResponseToPluginView) {
+            m_pluginView->manualLoadDidReceiveResponse(loader->response());
+
+            // Protect against the above call nulling out the plug-in (by trying to cancel the load for example).
+            if (!m_pluginView)
+                return;
+        }
+
         m_pluginView->manualLoadDidFinishLoading();
         m_pluginView = 0;
         m_hasSentResponseToPluginView = false;
@@ -919,7 +943,7 @@ void WebFrameLoaderClient::updateGlobalHistory()
     data.title = loader->title().string();
     data.originalRequest = loader->originalRequestCopy();
 
-    WebProcess::shared().connection()->send(Messages::WebContext::DidNavigateWithNavigationData(webPage->pageID(), data, m_frame->frameID()), 0);
+    WebProcess::shared().connection()->send(Messages::WebProcessProxy::DidNavigateWithNavigationData(webPage->pageID(), data, m_frame->frameID()), 0);
 }
 
 void WebFrameLoaderClient::updateGlobalHistoryRedirectLinks()
@@ -933,13 +957,13 @@ void WebFrameLoaderClient::updateGlobalHistoryRedirectLinks()
 
     // Client redirect
     if (!loader->clientRedirectSourceForHistory().isNull()) {
-        WebProcess::shared().connection()->send(Messages::WebContext::DidPerformClientRedirect(webPage->pageID(),
+        WebProcess::shared().connection()->send(Messages::WebProcessProxy::DidPerformClientRedirect(webPage->pageID(),
             loader->clientRedirectSourceForHistory(), loader->clientRedirectDestinationForHistory(), m_frame->frameID()), 0);
     }
 
     // Server redirect
     if (!loader->serverRedirectSourceForHistory().isNull()) {
-        WebProcess::shared().connection()->send(Messages::WebContext::DidPerformServerRedirect(webPage->pageID(),
+        WebProcess::shared().connection()->send(Messages::WebProcessProxy::DidPerformServerRedirect(webPage->pageID(),
             loader->serverRedirectSourceForHistory(), loader->serverRedirectDestinationForHistory(), m_frame->frameID()), 0);
     }
 }
@@ -1124,6 +1148,10 @@ void WebFrameLoaderClient::restoreViewState()
 {
     // Inform the UI process of the scale factor.
     double scaleFactor = m_frame->coreFrame()->loader()->history()->currentItem()->pageScaleFactor();
+
+    // A scale factor of 0.0 means the history item actually has the "default scale factor" of 1.0.
+    if (!scaleFactor)
+        scaleFactor = 1.0;
     m_frame->page()->send(Messages::WebPageProxy::PageScaleFactorDidChange(scaleFactor));
 
     // FIXME: This should not be necessary. WebCore should be correctly invalidating
@@ -1166,7 +1194,7 @@ void WebFrameLoaderClient::setTitle(const StringWithDirection& title, const KURL
         return;
 
     // FIXME: use direction of title.
-    WebProcess::shared().connection()->send(Messages::WebContext::DidUpdateHistoryTitle(webPage->pageID(),
+    WebProcess::shared().connection()->send(Messages::WebProcessProxy::DidUpdateHistoryTitle(webPage->pageID(),
         title.string(), url.string(), m_frame->frameID()), 0);
 }
 
@@ -1207,6 +1235,8 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
 
     m_frame->coreFrame()->createView(webPage->size(), backgroundColor, /* transparent */ false, IntSize(), shouldUseFixedLayout);
     m_frame->coreFrame()->view()->setTransparent(!webPage->drawsBackground());
+    if (shouldUseFixedLayout)
+        m_frame->coreFrame()->view()->setFixedVisibleContentRect(webPage->bounds());
 }
 
 void WebFrameLoaderClient::didSaveToPageCache()
@@ -1317,7 +1347,7 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
     }
 #endif
 
-    RefPtr<Plugin> plugin = webPage->createPlugin(m_frame, parameters);
+    RefPtr<Plugin> plugin = webPage->createPlugin(m_frame, pluginElement, parameters);
     if (!plugin)
         return 0;
     
@@ -1326,22 +1356,36 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
 
 void WebFrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
 {
-    ASSERT(!m_pluginView);
-    ASSERT(pluginWidget);
-    
     m_pluginView = static_cast<PluginView*>(pluginWidget);
 }
 
 PassRefPtr<Widget> WebFrameLoaderClient::createJavaAppletWidget(const IntSize& pluginSize, HTMLAppletElement* appletElement, const KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues)
 {
-    const String mimeType = "application/x-java-applet";
-    RefPtr<Widget> plugin = createPlugin(pluginSize, appletElement, KURL(), paramNames, paramValues, mimeType, false);
+    RefPtr<Widget> plugin = createPlugin(pluginSize, appletElement, KURL(), paramNames, paramValues, appletElement->serviceType(), false);
     if (!plugin) {
         if (WebPage* webPage = m_frame->page())
-            webPage->send(Messages::WebPageProxy::DidFailToInitializePlugin(mimeType));
+            webPage->send(Messages::WebPageProxy::DidFailToInitializePlugin(appletElement->serviceType()));
     }
     return plugin.release();
 }
+
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+PassRefPtr<Widget> WebFrameLoaderClient::createMediaPlayerProxyPlugin(const IntSize&, HTMLMediaElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&)
+{
+    notImplemented();
+    return 0;
+}
+
+void WebFrameLoaderClient::hideMediaPlayerProxyPlugin(Widget*)
+{
+    notImplemented();
+}
+
+void WebFrameLoaderClient::showMediaPlayerProxyPlugin(Widget*)
+{
+    notImplemented();
+}
+#endif
 
 static bool pluginSupportsExtension(PluginData* pluginData, const String& extension)
 {
@@ -1507,6 +1551,44 @@ bool WebFrameLoaderClient::shouldCacheResponse(DocumentLoader*, unsigned long id
 }
 #endif // PLATFORM(WIN) && USE(CFNETWORK)
 
+#if ENABLE(WEB_INTENTS)
+void WebFrameLoaderClient::dispatchIntent(PassRefPtr<IntentRequest> request)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+
+    RefPtr<APIObject> userData;
+    RefPtr<InjectedBundleIntentRequest> bundleIntentRequest = InjectedBundleIntentRequest::create(request.get());
+    webPage->injectedBundleLoaderClient().didReceiveIntentForFrame(webPage, m_frame, bundleIntentRequest.get(), userData);
+
+    IntentData intentData(request->intent());
+    webPage->send(Messages::WebPageProxy::DidReceiveIntentForFrame(m_frame->frameID(), intentData, InjectedBundleUserMessageEncoder(userData.get())));
+}
+#endif
+
+#if ENABLE(WEB_INTENTS_TAG)
+void WebFrameLoaderClient::registerIntentService(const String& action, const String& type, const KURL& href, const String& title, const String& disposition)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+
+    IntentServiceInfo serviceInfo;
+    serviceInfo.action = action;
+    serviceInfo.type = type;
+    serviceInfo.href = href;
+    serviceInfo.title = title;
+    serviceInfo.disposition = disposition;
+
+    RefPtr<APIObject> userData;
+    RefPtr<WebIntentServiceInfo> webIntentServiceInfo = WebIntentServiceInfo::create(serviceInfo);
+    webPage->injectedBundleLoaderClient().registerIntentServiceForFrame(webPage, m_frame, webIntentServiceInfo.get(), userData);
+
+    webPage->send(Messages::WebPageProxy::RegisterIntentServiceForFrame(m_frame->frameID(), serviceInfo, InjectedBundleUserMessageEncoder(userData.get())));
+}
+#endif
+
 bool WebFrameLoaderClient::shouldUsePluginDocument(const String& /*mimeType*/) const
 {
     notImplemented();
@@ -1528,6 +1610,15 @@ void WebFrameLoaderClient::didChangeScrollOffset()
         return;
 
     webPage->didChangeScrollOffsetForMainFrame();
+}
+
+bool WebFrameLoaderClient::shouldForceUniversalAccessFromLocalURL(const WebCore::KURL& url)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return false;
+
+    return webPage->injectedBundleLoaderClient().shouldForceUniversalAccessFromLocalURL(webPage, url.string());
 }
 
 PassRefPtr<FrameNetworkingContext> WebFrameLoaderClient::createNetworkingContext()

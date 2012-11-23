@@ -35,6 +35,7 @@
 #include "KURL.h"
 #include "SchemeRegistry.h"
 #include "SecurityPolicy.h"
+#include "ThreadableBlobRegistry.h"
 #include <wtf/MainThread.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
@@ -89,6 +90,15 @@ static KURL extractInnerURL(const KURL& url)
     return KURL(ParsedURLString, decodeURLEscapeSequences(url.path()));
 }
 
+static PassRefPtr<SecurityOrigin> getCachedOrigin(const KURL& url)
+{
+#if ENABLE(BLOB)
+    if (url.protocolIs("blob"))
+        return ThreadableBlobRegistry::getCachedOrigin(url);
+#endif
+    return 0;
+}
+
 static bool shouldTreatAsUniqueOrigin(const KURL& url)
 {
     if (!url.isValid())
@@ -123,6 +133,7 @@ SecurityOrigin::SecurityOrigin(const KURL& url)
     , m_isUnique(false)
     , m_universalAccess(false)
     , m_domainWasSetInDOM(false)
+    , m_blockThirdPartyStorage(false)
     , m_enforceFilePathSeparation(false)
     , m_needsDatabaseIdentifierQuirkForFiles(false)
 {
@@ -148,6 +159,7 @@ SecurityOrigin::SecurityOrigin()
     , m_universalAccess(false)
     , m_domainWasSetInDOM(false)
     , m_canLoadLocalResources(false)
+    , m_blockThirdPartyStorage(false)
     , m_enforceFilePathSeparation(false)
     , m_needsDatabaseIdentifierQuirkForFiles(false)
 {
@@ -164,6 +176,7 @@ SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
     , m_universalAccess(other->m_universalAccess)
     , m_domainWasSetInDOM(other->m_domainWasSetInDOM)
     , m_canLoadLocalResources(other->m_canLoadLocalResources)
+    , m_blockThirdPartyStorage(other->m_blockThirdPartyStorage)
     , m_enforceFilePathSeparation(other->m_enforceFilePathSeparation)
     , m_needsDatabaseIdentifierQuirkForFiles(other->m_needsDatabaseIdentifierQuirkForFiles)
 {
@@ -171,6 +184,10 @@ SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
 
 PassRefPtr<SecurityOrigin> SecurityOrigin::create(const KURL& url)
 {
+    RefPtr<SecurityOrigin> cachedOrigin = getCachedOrigin(url);
+    if (cachedOrigin.get())
+        return cachedOrigin;
+
     if (shouldTreatAsUniqueOrigin(url)) {
         RefPtr<SecurityOrigin> origin = adoptRef(new SecurityOrigin());
 
@@ -198,7 +215,7 @@ PassRefPtr<SecurityOrigin> SecurityOrigin::createUnique()
     return origin.release();
 }
 
-PassRefPtr<SecurityOrigin> SecurityOrigin::isolatedCopy()
+PassRefPtr<SecurityOrigin> SecurityOrigin::isolatedCopy() const
 {
     return adoptRef(new SecurityOrigin(this));
 }
@@ -207,6 +224,19 @@ void SecurityOrigin::setDomainFromDOM(const String& newDomain)
 {
     m_domainWasSetInDOM = true;
     m_domain = newDomain.lower();
+}
+
+bool SecurityOrigin::isSecure(const KURL& url)
+{
+    // Invalid URLs are secure, as are URLs which have a secure protocol.
+    if (!url.isValid() || SchemeRegistry::shouldTreatURLSchemeAsSecure(url.protocol()))
+        return true;
+
+    // URLs that wrap inner URLs are secure if those inner URLs are secure.
+    if (shouldUseInnerURL(url) && SchemeRegistry::shouldTreatURLSchemeAsSecure(extractInnerURL(url).protocol()))
+        return true;
+
+    return false;
 }
 
 bool SecurityOrigin::canAccess(const SecurityOrigin* other) const
@@ -270,6 +300,9 @@ bool SecurityOrigin::passesFileCheck(const SecurityOrigin* other) const
 bool SecurityOrigin::canRequest(const KURL& url) const
 {
     if (m_universalAccess)
+        return true;
+
+    if (getCachedOrigin(url) == this)
         return true;
 
     if (isUnique())
@@ -338,6 +371,9 @@ static bool isFeedWithNestedProtocolInHTTPFamily(const KURL& url)
 
 bool SecurityOrigin::canDisplay(const KURL& url) const
 {
+    if (m_universalAccess)
+        return true;
+
     String protocol = url.protocol().lower();
 
     if (isFeedWithNestedProtocolInHTTPFamily(url))
@@ -355,6 +391,21 @@ bool SecurityOrigin::canDisplay(const KURL& url) const
     return true;
 }
 
+bool SecurityOrigin::canAccessStorage(const SecurityOrigin* topOrigin) const
+{
+    if (isUnique())
+        return false;
+
+    // FIXME: This check should be replaced with an ASSERT once we can guarantee that topOrigin is not null.
+    if (!topOrigin)
+        return true;
+
+    if ((m_blockThirdPartyStorage || topOrigin->m_blockThirdPartyStorage) && topOrigin->isThirdParty(this))
+        return false;
+
+    return true;
+}
+
 SecurityOrigin::Policy SecurityOrigin::canShowNotifications() const
 {
     if (m_universalAccess)
@@ -362,6 +413,20 @@ SecurityOrigin::Policy SecurityOrigin::canShowNotifications() const
     if (isUnique())
         return AlwaysDeny;
     return Ask;
+}
+
+bool SecurityOrigin::isThirdParty(const SecurityOrigin* child) const
+{
+    if (child->m_universalAccess)
+        return false;
+
+    if (this == child)
+        return false;
+
+    if (isUnique() || child->isUnique())
+        return true;
+
+    return !isSameSchemeHostPort(child);
 }
 
 void SecurityOrigin::grantLoadLocalResources()

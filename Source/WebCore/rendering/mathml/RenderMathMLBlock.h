@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Alex Milowski (alex@milowski.com). All rights reserved.
+ * Copyright (C) 2012 David Barton (dbarton@mathscribe.com). All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +30,7 @@
 #if ENABLE(MATHML)
 
 #include "RenderBlock.h"
+#include "StyleInheritedData.h"
 
 #define ENABLE_DEBUG_MATH_LAYOUT 0
 
@@ -75,36 +77,17 @@ public:
     // computePreferredLogicalWidths() in derived classes must ensure m_preferredLogicalHeight is set to < 0 or its correct value.
     virtual void computePreferredLogicalWidths() OVERRIDE;
     
+    virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const OVERRIDE;
+    
 #if ENABLE(DEBUG_MATH_LAYOUT)
     virtual void paint(PaintInfo&, const LayoutPoint&);
 #endif
     
-    // Create a new RenderBlock, with a new style inheriting from this->style().
-    // FIXME: Create a true anonymous block, like RenderBlock::createAnonymousBlock().
-    RenderMathMLBlock* createAlmostAnonymousBlock(EDisplay = BLOCK);
+    // Create a new RenderMathMLBlock, with a new style inheriting from this->style().
+    RenderMathMLBlock* createAnonymousMathMLBlock(EDisplay = BLOCK);
     
-protected:
-    static LayoutUnit getBoxModelObjectHeight(const RenderObject* object)
-    {
-        if (object && object->isBoxModelObject()) {
-            const RenderBoxModelObject* box = toRenderBoxModelObject(object);
-            return box->offsetHeight();
-        }
-        
-        return 0;
-    }
-    static LayoutUnit getBoxModelObjectWidth(const RenderObject* object)
-    {
-        if (object && object->isBoxModelObject()) {
-            const RenderBoxModelObject* box = toRenderBoxModelObject(object);
-            return box->offsetWidth();
-        }
-        
-        return 0;
-    }
-
 private:
-    virtual const char* renderName() const { return isAnonymous() ? "RenderMathMLBlock (anonymous)" : "RenderMathMLBlock"; }
+    virtual const char* renderName() const OVERRIDE;
     
 protected:
     // Set our logical width to a large value, and compute our children's preferred logical heights.

@@ -35,11 +35,21 @@
 
 namespace JSC {
 
+inline bool CopiedSpace::contains(CopiedBlock* block)
+{
+    return !m_blockFilter.ruleOut(reinterpret_cast<Bits>(block)) && m_blockSet.contains(block);
+}
+
 inline bool CopiedSpace::contains(void* ptr, CopiedBlock*& result)
 {
     CopiedBlock* block = blockFor(ptr);
+    if (contains(block)) {
+        result = block;
+        return true;
+    }
+    block = oversizeBlockFor(ptr);
     result = block;
-    return !m_toSpaceFilter.ruleOut(reinterpret_cast<Bits>(block)) && m_toSpaceSet.contains(block);
+    return contains(block);
 }
 
 inline void CopiedSpace::pin(CopiedBlock* block)
@@ -47,14 +57,48 @@ inline void CopiedSpace::pin(CopiedBlock* block)
     block->m_isPinned = true;
 }
 
+inline void CopiedSpace::pinIfNecessary(void* opaquePointer)
+{
+    // Pointers into the copied space come in the following varieties:
+    // 1)  Pointers to the start of a span of memory. This is the most
+    //     natural though not necessarily the most common.
+    // 2)  Pointers to one value-sized (8 byte) word past the end of
+    //     a span of memory. This currently occurs with semi-butterflies
+    //     and should be fixed soon, once the other half of the
+    //     butterfly lands.
+    // 3)  Pointers to the innards arising from loop induction variable
+    //     optimizations (either manual ones or automatic, by the
+    //     compiler).
+    // 4)  Pointers to the end of a span of memory in arising from
+    //     induction variable optimizations combined with the
+    //     GC-to-compiler contract laid out in the C spec: a pointer to
+    //     the end of a span of memory must be considered to be a
+    //     pointer to that memory.
+    
+    EncodedJSValue* pointer = reinterpret_cast<EncodedJSValue*>(opaquePointer);
+    CopiedBlock* block;
+
+    // Handle (1) and (3).
+    if (contains(pointer, block))
+        pin(block);
+    
+    // Handle (4). We don't have to explicitly check and pin the block under this
+    // pointer because it cannot possibly point to something that cases (1) and
+    // (3) above or case (2) below wouldn't already catch.
+    pointer--;
+    
+    // Handle (2)
+    pointer--;
+    if (contains(pointer, block))
+        pin(block);
+}
+
 inline void CopiedSpace::startedCopying()
 {
-    DoublyLinkedList<HeapBlock>* temp = m_fromSpace;
-    m_fromSpace = m_toSpace;
-    m_toSpace = temp;
+    std::swap(m_fromSpace, m_toSpace);
 
-    m_toSpaceFilter.reset();
-    m_allocator.startedCopying();
+    m_blockFilter.reset();
+    m_allocator.resetCurrentBlock();
 
     ASSERT(!m_inCopyingPhase);
     ASSERT(!m_numberOfLoanedBlocks);
@@ -63,7 +107,7 @@ inline void CopiedSpace::startedCopying()
 
 inline void CopiedSpace::recycleBlock(CopiedBlock* block)
 {
-    m_heap->blockAllocator().deallocate(block);
+    m_heap->blockAllocator().deallocate(CopiedBlock::destroy(block));
 
     {
         MutexLocker locker(m_loanedBlocksLock);
@@ -74,77 +118,44 @@ inline void CopiedSpace::recycleBlock(CopiedBlock* block)
     }
 }
 
-inline CheckedBoolean CopiedSpace::borrowBlock(CopiedBlock** outBlock)
+inline CopiedBlock* CopiedSpace::allocateBlockForCopyingPhase()
 {
-    CopiedBlock* block = 0;
-    if (!getFreshBlock(AllocationMustSucceed, &block)) {
-        *outBlock = 0;
-        return false;
+    ASSERT(m_inCopyingPhase);
+    CopiedBlock* block = CopiedBlock::createNoZeroFill(m_heap->blockAllocator().allocate());
+
+    {
+        MutexLocker locker(m_loanedBlocksLock);
+        m_numberOfLoanedBlocks++;
     }
 
-    ASSERT(m_inCopyingPhase);
-    MutexLocker locker(m_loanedBlocksLock);
-    m_numberOfLoanedBlocks++;
-
-    ASSERT(block->m_offset == block->payload());
-    *outBlock = block;
-    return true;
+    ASSERT(!block->dataSize());
+    return block;
 }
 
-inline CheckedBoolean CopiedSpace::addNewBlock()
+inline void CopiedSpace::allocateBlock()
 {
-    CopiedBlock* block = 0;
-    if (!getFreshBlock(AllocationCanFail, &block))
-        return false;
+    if (m_heap->shouldCollect())
+        m_heap->collect(Heap::DoNotSweep);
+
+    m_allocator.resetCurrentBlock();
+    
+    CopiedBlock* block = CopiedBlock::create(m_heap->blockAllocator().allocate());
         
     m_toSpace->push(block);
-    m_toSpaceFilter.add(reinterpret_cast<Bits>(block));
-    m_toSpaceSet.add(block);
-    m_allocator.resetCurrentBlock(block);
-    return true;
-}
-
-inline CheckedBoolean CopiedSpace::allocateNewBlock(CopiedBlock** outBlock)
-{
-    PageAllocationAligned allocation = PageAllocationAligned::allocate(HeapBlock::s_blockSize, HeapBlock::s_blockSize, OSAllocator::JSGCHeapPages);
-    if (!static_cast<bool>(allocation)) {
-        *outBlock = 0;
-        return false;
-    }
-
-    *outBlock = new (NotNull, allocation.base()) CopiedBlock(allocation);
-    return true;
-}
-
-inline bool CopiedSpace::fitsInBlock(CopiedBlock* block, size_t bytes)
-{
-    return static_cast<char*>(block->m_offset) + bytes < reinterpret_cast<char*>(block) + block->capacity() && static_cast<char*>(block->m_offset) + bytes > block->m_offset;
+    m_blockFilter.add(reinterpret_cast<Bits>(block));
+    m_blockSet.add(block);
+    m_allocator.setCurrentBlock(block);
 }
 
 inline CheckedBoolean CopiedSpace::tryAllocate(size_t bytes, void** outPtr)
 {
     ASSERT(!m_heap->globalData()->isInitializingObject());
 
-    if (isOversize(bytes) || !m_allocator.fitsInCurrentBlock(bytes))
+    if (isOversize(bytes) || !m_allocator.tryAllocate(bytes, outPtr))
         return tryAllocateSlowCase(bytes, outPtr);
     
-    *outPtr = m_allocator.allocate(bytes);
     ASSERT(*outPtr);
     return true;
-}
-
-inline void* CopiedSpace::allocateFromBlock(CopiedBlock* block, size_t bytes)
-{
-    ASSERT(fitsInBlock(block, bytes));
-    ASSERT(is8ByteAligned(block->m_offset));
-    
-    void* ptr = block->m_offset;
-    ASSERT(block->m_offset >= block->payload() && block->m_offset < reinterpret_cast<char*>(block) + block->capacity());
-    block->m_offset = static_cast<void*>((static_cast<char*>(ptr) + bytes));
-    ASSERT(block->m_offset >= block->payload() && block->m_offset < reinterpret_cast<char*>(block) + block->capacity());
-
-    ASSERT(is8ByteAligned(ptr));
-    return ptr;
 }
 
 inline bool CopiedSpace::isOversize(size_t bytes)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@
 #include <WebKit2/WKBundlePagePrivate.h>
 #include <WebKit2/WKBundlePrivate.h>
 #include <WebKit2/WKRetainPtr.h>
-#include <WebKit2/WebKit2.h>
+#include <WebKit2/WebKit2_C.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -72,9 +72,14 @@ void InjectedBundle::didInitializePageGroup(WKBundleRef bundle, WKBundlePageGrou
     static_cast<InjectedBundle*>(const_cast<void*>(clientInfo))->didInitializePageGroup(pageGroup);
 }
 
-void InjectedBundle::didReceiveMessage(WKBundleRef bundle, WKStringRef messageName, WKTypeRef messageBody, const void *clientInfo)
+void InjectedBundle::didReceiveMessage(WKBundleRef bundle, WKStringRef messageName, WKTypeRef messageBody, const void* clientInfo)
 {
     static_cast<InjectedBundle*>(const_cast<void*>(clientInfo))->didReceiveMessage(messageName, messageBody);
+}
+
+void InjectedBundle::didReceiveMessageToPage(WKBundleRef bundle, WKBundlePageRef page, WKStringRef messageName, WKTypeRef messageBody, const void* clientInfo)
+{
+    static_cast<InjectedBundle*>(const_cast<void*>(clientInfo))->didReceiveMessageToPage(page, messageName, messageBody);
 }
 
 void InjectedBundle::initialize(WKBundleRef bundle, WKTypeRef initializationUserData)
@@ -88,7 +93,8 @@ void InjectedBundle::initialize(WKBundleRef bundle, WKTypeRef initializationUser
         didCreatePage,
         willDestroyPage,
         didInitializePageGroup,
-        didReceiveMessage
+        didReceiveMessage,
+        didReceiveMessageToPage
     };
     WKBundleSetClient(m_bundle, &client);
 
@@ -148,7 +154,7 @@ void InjectedBundle::didReceiveMessage(WKStringRef messageName, WKTypeRef messag
         WKRetainPtr<WKStringRef> ackMessageBody(AdoptWK, WKStringCreateWithUTF8CString("BeginTest"));
         WKBundlePostMessage(m_bundle, ackMessageName.get(), ackMessageBody.get());
 
-        beginTesting();
+        beginTesting(messageBodyDictionary);
         return;
     } else if (WKStringIsEqualToUTF8CString(messageName, "Reset")) {
         ASSERT(messageBody);
@@ -169,19 +175,19 @@ void InjectedBundle::didReceiveMessage(WKStringRef messageName, WKTypeRef messag
         return;
     }
     if (WKStringIsEqualToUTF8CString(messageName, "CallAddChromeInputFieldCallback")) {
-        m_layoutTestController->callAddChromeInputFieldCallback();
+        m_testRunner->callAddChromeInputFieldCallback();
         return;
     }
     if (WKStringIsEqualToUTF8CString(messageName, "CallRemoveChromeInputFieldCallback")) {
-        m_layoutTestController->callRemoveChromeInputFieldCallback();
+        m_testRunner->callRemoveChromeInputFieldCallback();
         return;
     }
     if (WKStringIsEqualToUTF8CString(messageName, "CallFocusWebViewCallback")) {
-        m_layoutTestController->callFocusWebViewCallback();
+        m_testRunner->callFocusWebViewCallback();
         return;
     }
     if (WKStringIsEqualToUTF8CString(messageName, "CallSetBackingScaleFactorCallback")) {
-        m_layoutTestController->callSetBackingScaleFactorCallback();
+        m_testRunner->callSetBackingScaleFactorCallback();
         return;
     }
 
@@ -190,7 +196,27 @@ void InjectedBundle::didReceiveMessage(WKStringRef messageName, WKTypeRef messag
     WKBundlePostMessage(m_bundle, errorMessageName.get(), errorMessageBody.get());
 }
 
-void InjectedBundle::beginTesting()
+void InjectedBundle::didReceiveMessageToPage(WKBundlePageRef page, WKStringRef messageName, WKTypeRef messageBody)
+{
+    WKRetainPtr<WKStringRef> errorMessageName(AdoptWK, WKStringCreateWithUTF8CString("Error"));
+    WKRetainPtr<WKStringRef> errorMessageBody(AdoptWK, WKStringCreateWithUTF8CString("Unknown"));
+    WKBundlePostMessage(m_bundle, errorMessageName.get(), errorMessageBody.get());
+}
+
+bool InjectedBundle::booleanForKey(WKDictionaryRef dictionary, const char* key)
+{
+    WKRetainPtr<WKStringRef> wkKey(AdoptWK, WKStringCreateWithUTF8CString(key));
+    WKTypeRef value = WKDictionaryGetItemForKey(dictionary, wkKey.get());
+    if (WKGetTypeID(value) != WKBooleanGetTypeID()) {
+        stringBuilder()->append("Boolean value for key \"");
+        stringBuilder()->append(key);
+        stringBuilder()->append("\" not found in dictionary\n");
+        return false;
+    }
+    return WKBooleanGetValue(static_cast<WKBooleanRef>(value));
+}
+
+void InjectedBundle::beginTesting(WKDictionaryRef settings)
 {
     m_state = Testing;
 
@@ -198,7 +224,7 @@ void InjectedBundle::beginTesting()
     m_repaintRects.clear();
     m_stringBuilder->clear();
 
-    m_layoutTestController = LayoutTestController::create();
+    m_testRunner = TestRunner::create();
     m_gcController = GCController::create();
     m_eventSendingController = EventSendingController::create();
     m_textInputController = TextInputController::create();
@@ -215,7 +241,9 @@ void InjectedBundle::beginTesting()
 
     WKBundleRemoveAllUserContent(m_bundle, m_pageGroup);
 
-    page()->reset();
+    m_testRunner->setShouldDumpFrameLoadCallbacks(booleanForKey(settings, "DumpFrameLoadDelegates"));
+
+    page()->prepare();
 
     WKBundleClearAllDatabases(m_bundle);
     WKBundleClearApplicationCache(m_bundle);
@@ -228,6 +256,8 @@ void InjectedBundle::done()
 
     page()->stopLoading();
     setTopLoadingFrame(0);
+
+    m_accessibilityController->resetToConsistentState();
 
     WKRetainPtr<WKStringRef> doneMessageName(AdoptWK, WKStringCreateWithUTF8CString("Done"));
     WKRetainPtr<WKMutableDictionaryRef> doneMessageBody(AdoptWK, WKMutableDictionaryCreate());
@@ -245,7 +275,9 @@ void InjectedBundle::done()
     WKBundlePostMessage(m_bundle, doneMessageName.get(), doneMessageBody.get());
 
     closeOtherPages();
-    
+
+    page()->resetAfterTest();
+
     m_state = Idle;
 }
 

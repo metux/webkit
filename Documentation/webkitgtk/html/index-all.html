@@ -8,7 +8,7 @@
 <link rel="up" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="prev" href="webkit-environment.html" title="Environment">
 <link rel="next" href="index-deprecated.html" title="Index of deprecated symbols">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -61,6 +61,16 @@
 </dt>
 <dt>WebKitFaviconDatabase:path, <a class="indexterm" href="WebKitFaviconDatabase.html#WebKitFaviconDatabase--path">The "path" property</a>
 </dt>
+<dt>WebKitFileChooserRequest, <a class="indexterm" href="WebKitFileChooserRequest.html#WebKitFileChooserRequest-struct">struct WebKitFileChooserRequest</a>
+</dt>
+<dt>WebKitFileChooserRequest:filter, <a class="indexterm" href="WebKitFileChooserRequest.html#WebKitFileChooserRequest--filter">The "filter" property</a>
+</dt>
+<dt>WebKitFileChooserRequest:mime-types, <a class="indexterm" href="WebKitFileChooserRequest.html#WebKitFileChooserRequest--mime-types">The "mime-types" property</a>
+</dt>
+<dt>WebKitFileChooserRequest:select-multiple, <a class="indexterm" href="WebKitFileChooserRequest.html#WebKitFileChooserRequest--select-multiple">The "select-multiple" property</a>
+</dt>
+<dt>WebKitFileChooserRequest:selected-files, <a class="indexterm" href="WebKitFileChooserRequest.html#WebKitFileChooserRequest--selected-files">The "selected-files" property</a>
+</dt>
 <dt>WebKitGeolocationPolicyDecision, <a class="indexterm" href="WebKitGeolocationPolicyDecision.html#WebKitGeolocationPolicyDecision-struct">WebKitGeolocationPolicyDecision</a>
 </dt>
 <dt>WebKitHitTestResult, <a class="indexterm" href="WebKitHitTestResult.html#WebKitHitTestResult-struct">WebKitHitTestResult</a>
@@ -100,6 +110,8 @@
 <dt>WebKitNetworkResponse, <a class="indexterm" href="WebKitNetworkResponse.html#WebKitNetworkResponse-struct">WebKitNetworkResponse</a>
 </dt>
 <dt>WebKitNetworkResponse:message, <a class="indexterm" href="WebKitNetworkResponse.html#WebKitNetworkResponse--message">The "message" property</a>
+</dt>
+<dt>WebKitNetworkResponse:suggested-filename, <a class="indexterm" href="WebKitNetworkResponse.html#WebKitNetworkResponse--suggested-filename">The "suggested-filename" property</a>
 </dt>
 <dt>WebKitNetworkResponse:uri, <a class="indexterm" href="WebKitNetworkResponse.html#WebKitNetworkResponse--uri">The "uri" property</a>
 </dt>
@@ -365,6 +377,10 @@
 </dt>
 <dt>WebKitWebSettings:javascript-can-open-windows-automatically, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--javascript-can-open-windows-automatically">The "javascript-can-open-windows-automatically" property</a>
 </dt>
+<dt>WebKitWebSettings:media-playback-allows-inline, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--media-playback-allows-inline">The "media-playback-allows-inline" property</a>
+</dt>
+<dt>WebKitWebSettings:media-playback-requires-user-gesture, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--media-playback-requires-user-gesture">The "media-playback-requires-user-gesture" property</a>
+</dt>
 <dt>WebKitWebSettings:minimum-font-size, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--minimum-font-size">The "minimum-font-size" property</a>
 </dt>
 <dt>WebKitWebSettings:minimum-logical-font-size, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--minimum-logical-font-size">The "minimum-logical-font-size" property</a>
@@ -468,6 +484,8 @@
 <dt>WebKitWebView::resource-request-starting, <a class="indexterm" href="webkitgtk-webkitwebview.html#WebKitWebView-resource-request-starting">The "resource-request-starting" signal</a>
 </dt>
 <dt>WebKitWebView::resource-response-received, <a class="indexterm" href="webkitgtk-webkitwebview.html#WebKitWebView-resource-response-received">The "resource-response-received" signal</a>
+</dt>
+<dt>WebKitWebView::run-file-chooser, <a class="indexterm" href="webkitgtk-webkitwebview.html#WebKitWebView-run-file-chooser">The "run-file-chooser" signal</a>
 </dt>
 <dt>WebKitWebView::script-alert, <a class="indexterm" href="webkitgtk-webkitwebview.html#WebKitWebView-script-alert">The "script-alert" signal</a>
 </dt>
@@ -629,6 +647,16 @@
 </dt>
 <dt>webkit_favicon_database_try_get_favicon_pixbuf, <a class="indexterm" href="WebKitFaviconDatabase.html#webkit-favicon-database-try-get-favicon-pixbuf">webkit_favicon_database_try_get_favicon_pixbuf ()</a>
 </dt>
+<dt>webkit_file_chooser_request_get_mime_types, <a class="indexterm" href="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types">webkit_file_chooser_request_get_mime_types ()</a>
+</dt>
+<dt>webkit_file_chooser_request_get_mime_types_filter, <a class="indexterm" href="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types-filter">webkit_file_chooser_request_get_mime_types_filter ()</a>
+</dt>
+<dt>webkit_file_chooser_request_get_selected_files, <a class="indexterm" href="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-selected-files">webkit_file_chooser_request_get_selected_files ()</a>
+</dt>
+<dt>webkit_file_chooser_request_get_select_multiple, <a class="indexterm" href="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-select-multiple">webkit_file_chooser_request_get_select_multiple ()</a>
+</dt>
+<dt>webkit_file_chooser_request_select_files, <a class="indexterm" href="WebKitFileChooserRequest.html#webkit-file-chooser-request-select-files">webkit_file_chooser_request_select_files ()</a>
+</dt>
 <dt>webkit_geolocation_policy_allow, <a class="indexterm" href="WebKitGeolocationPolicyDecision.html#webkit-geolocation-policy-allow">webkit_geolocation_policy_allow ()</a>
 </dt>
 <dt>webkit_geolocation_policy_deny, <a class="indexterm" href="WebKitGeolocationPolicyDecision.html#webkit-geolocation-policy-deny">webkit_geolocation_policy_deny ()</a>
@@ -670,6 +698,8 @@
 <dt>webkit_network_request_set_uri, <a class="indexterm" href="WebKitNetworkRequest.html#webkit-network-request-set-uri">webkit_network_request_set_uri ()</a>
 </dt>
 <dt>webkit_network_response_get_message, <a class="indexterm" href="WebKitNetworkResponse.html#webkit-network-response-get-message">webkit_network_response_get_message ()</a>
+</dt>
+<dt>webkit_network_response_get_suggested_filename, <a class="indexterm" href="WebKitNetworkResponse.html#webkit-network-response-get-suggested-filename">webkit_network_response_get_suggested_filename ()</a>
 </dt>
 <dt>webkit_network_response_get_uri, <a class="indexterm" href="WebKitNetworkResponse.html#webkit-network-response-get-uri">webkit_network_response_get_uri ()</a>
 </dt>
@@ -786,6 +816,8 @@
 <dt>webkit_web_frame_find_frame, <a class="indexterm" href="WebKitWebFrame.html#webkit-web-frame-find-frame">webkit_web_frame_find_frame ()</a>
 </dt>
 <dt>webkit_web_frame_get_data_source, <a class="indexterm" href="WebKitWebFrame.html#webkit-web-frame-get-data-source">webkit_web_frame_get_data_source ()</a>
+</dt>
+<dt>webkit_web_frame_get_dom_document, <a class="indexterm" href="WebKitWebFrame.html#webkit-web-frame-get-dom-document">webkit_web_frame_get_dom_document ()</a>
 </dt>
 <dt>webkit_web_frame_get_global_context, <a class="indexterm" href="WebKitWebFrame.html#webkit-web-frame-get-global-context">webkit_web_frame_get_global_context ()</a>
 </dt>
@@ -977,6 +1009,8 @@
 </dt>
 <dt>webkit_web_view_get_settings, <a class="indexterm" href="webkitgtk-webkitwebview.html#webkit-web-view-get-settings">webkit_web_view_get_settings ()</a>
 </dt>
+<dt>webkit_web_view_get_snapshot, <a class="indexterm" href="webkitgtk-webkitwebview.html#webkit-web-view-get-snapshot">webkit_web_view_get_snapshot ()</a>
+</dt>
 <dt>webkit_web_view_get_title, <a class="indexterm" href="webkitgtk-webkitwebview.html#webkit-web-view-get-title">webkit_web_view_get_title ()</a>
 </dt>
 <dt>webkit_web_view_get_transparent, <a class="indexterm" href="webkitgtk-webkitwebview.html#webkit-web-view-get-transparent">webkit_web_view_get_transparent ()</a>
@@ -1072,6 +1106,6 @@
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

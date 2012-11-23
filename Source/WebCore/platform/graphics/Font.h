@@ -36,12 +36,10 @@
 #include <wtf/unicode/CharacterNames.h>
 
 #if PLATFORM(QT)
-#if HAVE(QRAWFONT)
 #include <QRawFont>
+QT_BEGIN_NAMESPACE
 class QTextLayout;
-#else
-#include <QFont>
-#endif
+QT_END_NAMESPACE
 #endif
 
 namespace WebCore {
@@ -160,7 +158,9 @@ public:
     // Metrics that we query the FontFallbackList for.
     const FontMetrics& fontMetrics() const { return primaryFont()->fontMetrics(); }
     float spaceWidth() const { return primaryFont()->spaceWidth() + m_letterSpacing; }
-    float tabWidth(const SimpleFontData& fontData) const { return 8 * fontData.spaceWidth() + letterSpacing(); }
+    float tabWidth(const SimpleFontData&, unsigned tabSize, float position) const;
+    float tabWidth(unsigned tabSize, float position) const { return tabWidth(*primaryFont(), tabSize, position); }
+
     int emphasisMarkAscent(const AtomicString&) const;
     int emphasisMarkDescent(const AtomicString&) const;
     int emphasisMarkHeight(const AtomicString&) const;
@@ -180,11 +180,7 @@ public:
     static unsigned expansionOpportunityCount(const UChar*, size_t length, TextDirection, bool& isAfterExpansion);
 
 #if PLATFORM(QT)
-#if HAVE(QRAWFONT)
     QRawFont rawFont() const;
-#else
-    QFont font() const;
-#endif
     QFont syntheticFont() const;
 #endif
 
@@ -264,7 +260,8 @@ private:
     {
         return m_fontList && m_fontList->loadingCustomFonts();
     }
-#if PLATFORM(QT) && HAVE(QRAWFONT)
+
+#if PLATFORM(QT)
     void initFormatForTextLayout(QTextLayout*) const;
 #endif
 
@@ -301,6 +298,14 @@ inline bool Font::isFixedPitch() const
 inline FontSelector* Font::fontSelector() const
 {
     return m_fontList ? m_fontList->fontSelector() : 0;
+}
+
+inline float Font::tabWidth(const SimpleFontData& fontData, unsigned tabSize, float position) const
+{
+    if (!tabSize)
+        return letterSpacing();
+    float tabWidth = tabSize * fontData.spaceWidth() + letterSpacing();
+    return tabWidth - fmodf(position, tabWidth);
 }
 
 }

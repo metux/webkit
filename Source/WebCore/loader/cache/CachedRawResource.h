@@ -29,6 +29,7 @@
 namespace WebCore {
 class CachedRawResourceCallback;
 class CachedRawResourceClient;
+class MemoryObjectInfo;
 
 class CachedRawResource : public CachedResource {
 public:
@@ -43,6 +44,8 @@ public:
     unsigned long identifier() const { return m_identifier; }
 
     bool canReuse(const ResourceRequest&) const;
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
     virtual void didAddClient(CachedResourceClient*);
@@ -66,7 +69,7 @@ class CachedRawResourceClient : public CachedResourceClient {
 public:
     virtual ~CachedRawResourceClient() { }
     static CachedResourceClientType expectedType() { return RawResourceType; }
-    virtual CachedResourceClientType resourceClientType() { return expectedType(); }
+    virtual CachedResourceClientType resourceClientType() const { return expectedType(); }
 
     virtual void dataSent(CachedResource*, unsigned long long /* bytesSent */, unsigned long long /* totalBytesToBeSent */) { }
     virtual void responseReceived(CachedResource*, const ResourceResponse&) { }

@@ -47,6 +47,7 @@
 #include "InspectorInstrumentation.h"
 #include "Logging.h"
 #include "MainResourceLoader.h"
+#include "MemoryInstrumentation.h"
 #include "Page.h"
 #include "PlatformString.h"
 #include "Settings.h"
@@ -335,18 +336,48 @@ void DocumentLoader::commitData(const char* bytes, size_t length)
             m_frame->document()->setBaseURLOverride(m_archive->mainResource()->url());
 #endif
 
-        frameLoader()->receivedFirstData();
+        if (!frameLoader()->isReplacing())
+            frameLoader()->receivedFirstData();
 
         bool userChosen = true;
         String encoding = overrideEncoding();
         if (encoding.isNull()) {
             userChosen = false;
             encoding = response().textEncodingName();
+#if ENABLE(WEB_ARCHIVE)
+            if (m_archive && m_archive->type() == Archive::WebArchive)
+                encoding = m_archive->mainResource()->textEncoding();
+#endif
         }
         m_writer.setEncoding(encoding, userChosen);
     }
     ASSERT(m_frame->document()->parsing());
     m_writer.addData(bytes, length);
+}
+
+void DocumentLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
+    info.addInstrumentedMember(m_frame);
+    info.addInstrumentedMember(m_mainResourceLoader);
+    info.addInstrumentedHashSet(m_subresourceLoaders);
+    info.addInstrumentedHashSet(m_multipartSubresourceLoaders);
+    info.addInstrumentedHashSet(m_plugInStreamLoaders);
+    info.addInstrumentedMember(m_substituteData);
+    info.addInstrumentedMember(m_pageTitle.string());
+    info.addInstrumentedMember(m_overrideEncoding);
+    info.addVector(m_responses);
+    info.addInstrumentedMember(m_originalRequest);
+    info.addInstrumentedMember(m_originalRequestCopy);
+    info.addInstrumentedMember(m_request);
+    info.addInstrumentedMember(m_response);
+    info.addInstrumentedMember(m_lastCheckedRequest);
+    info.addInstrumentedVector(m_responses);
+    info.addHashMap(m_pendingSubstituteResources);
+    info.addInstrumentedHashSet(m_resourcesClientKnowsAbout);
+    info.addVector(m_resourcesLoadedFromMemoryCacheForClientNotification);
+    info.addInstrumentedMember(m_clientRedirectSourceForHistory);
+    info.addInstrumentedMember(m_mainResourceData);
 }
 
 bool DocumentLoader::doesProgressiveLoad(const String& MIMEType) const
@@ -362,7 +393,7 @@ void DocumentLoader::receivedData(const char* data, int length)
 
 void DocumentLoader::setupForReplaceByMIMEType(const String& newMIMEType)
 {
-    if (!m_gotFirstByte)
+    if (!mainResourceData())
         return;
     
     String oldMIMEType = m_response.mimeType();
@@ -397,9 +428,7 @@ void DocumentLoader::checkLoadComplete()
     if (!m_frame || isLoading())
         return;
     ASSERT(this == frameLoader()->activeDocumentLoader());
-
-    if (DOMWindow* window = m_frame->existingDOMWindow())
-        window->finishedLoading();
+    m_frame->document()->domWindow()->finishedLoading();
 }
 
 void DocumentLoader::setFrame(Frame* frame)
@@ -837,17 +866,7 @@ void DocumentLoader::startLoadingMainResource()
     // FIXME: Is there any way the extra fields could have not been added by now?
     // If not, it would be great to remove this line of code.
     frameLoader()->addExtraFieldsToMainResourceRequest(m_request);
-    
-    // Protect MainResourceLoader::load() method chain from clearMainResourceLoader() stomping m_mainResourceLoader.
-    RefPtr<MainResourceLoader> protectedMainResourceLoader(m_mainResourceLoader);
-    if (!protectedMainResourceLoader->load(m_request, m_substituteData)) {
-        // FIXME: If this should really be caught, we should just ASSERT this doesn't happen;
-        // should it be caught by other parts of WebKit or other parts of the app?
-        LOG_ERROR("could not create WebResourceHandle for URL %s -- should be caught by policy handler level", m_request.url().string().ascii().data());
-        m_mainResourceLoader = 0;
-        ASSERT(!isLoading());
-        checkLoadComplete();
-    }
+    m_mainResourceLoader->load(m_request, m_substituteData);
 }
 
 void DocumentLoader::cancelMainResourceLoad(const ResourceError& error)

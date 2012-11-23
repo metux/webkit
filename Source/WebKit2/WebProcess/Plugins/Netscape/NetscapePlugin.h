@@ -26,6 +26,8 @@
 #ifndef NetscapePlugin_h
 #define NetscapePlugin_h
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
+
 #include "NetscapePluginModule.h"
 #include "Plugin.h"
 #include <WebCore/AffineTransform.h>
@@ -51,6 +53,10 @@ public:
     virtual ~NetscapePlugin();
 
     static PassRefPtr<NetscapePlugin> fromNPP(NPP);
+
+    // In-process NetscapePlugins don't support asynchronous initialization.
+    virtual void waitForAsynchronousInitialization() { }
+    virtual bool isBeingAsynchronouslyInitialized() const { return false; }
 
 #if PLATFORM(MAC)
     NPError setDrawingModel(NPDrawingModel);
@@ -173,6 +179,7 @@ private:
     virtual PlatformLayer* pluginLayer();
 #endif
     virtual bool isTransparent();
+    virtual bool wantsWheelEvents() OVERRIDE;
     virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform);
     virtual void visibilityDidChange();
     virtual void frameDidFinishLoading(uint64_t requestID);
@@ -269,6 +276,8 @@ private:
     bool m_isTransparent;
     bool m_inNPPNew;
     bool m_shouldUseManualLoader;
+    bool m_hasCalledSetWindow;
+
     RefPtr<NetscapePluginStream> m_manualStream;
     Vector<bool, 8> m_popupEnabledStates;
 
@@ -358,5 +367,7 @@ public: // Need to call it in the NPN_GetValue browser callback.
 };
 
 } // namespace WebKit
+
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #endif // NetscapePlugin_h

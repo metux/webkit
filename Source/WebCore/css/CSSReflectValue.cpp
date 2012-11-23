@@ -27,6 +27,7 @@
 #include "CSSReflectValue.h"
 
 #include "CSSPrimitiveValue.h"
+#include "MemoryInstrumentation.h"
 #include "PlatformString.h"
 
 using namespace std;
@@ -59,10 +60,17 @@ String CSSReflectValue::customCssText() const
     return result;
 }
 
-void CSSReflectValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const StyleSheetInternal* styleSheet)
+void CSSReflectValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const StyleSheetContents* styleSheet) const
 {
     if (m_mask)
         m_mask->addSubresourceStyleURLs(urls, styleSheet);
+}
+
+void CSSReflectValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_offset);
+    info.addInstrumentedMember(m_mask);
 }
 
 } // namespace WebCore

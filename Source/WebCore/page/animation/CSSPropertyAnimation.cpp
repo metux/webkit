@@ -901,6 +901,7 @@ private:
     Vector<AnimationPropertyWrapperBase*> m_propertyWrappers;
 };
 
+#if ENABLE(CSS3_FLEXBOX)
 class PropertyWrapperFlex : public AnimationPropertyWrapperBase {
 public:
     PropertyWrapperFlex() : AnimationPropertyWrapperBase(CSSPropertyWebkitFlex)
@@ -916,16 +917,17 @@ public:
         if (!a || !b)
             return false;
 
-        return a->flexPreferredSize() == b->flexPreferredSize() && a->positiveFlex() == b->positiveFlex() && a->negativeFlex() == b->negativeFlex();
+        return a->flexBasis() == b->flexBasis() && a->flexGrow() == b->flexGrow() && a->flexShrink() == b->flexShrink();
     }
 
     virtual void blend(const AnimationBase* anim, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress) const
     {
-        dst->setFlexPreferredSize(blendFunc(anim, a->flexPreferredSize(), b->flexPreferredSize(), progress));
-        dst->setPositiveFlex(blendFunc(anim, a->positiveFlex(), b->positiveFlex(), progress));
-        dst->setNegativeFlex(blendFunc(anim, a->negativeFlex(), b->negativeFlex(), progress));
+        dst->setFlexBasis(blendFunc(anim, a->flexBasis(), b->flexBasis(), progress));
+        dst->setFlexGrow(blendFunc(anim, a->flexGrow(), b->flexGrow(), progress));
+        dst->setFlexShrink(blendFunc(anim, a->flexShrink(), b->flexShrink(), progress));
     }
 };
+#endif
 
 #if ENABLE(SVG)
 class PropertyWrapperSVGPaint : public AnimationPropertyWrapperBase {
@@ -1044,7 +1046,9 @@ void CSSPropertyAnimation::ensurePropertyMap()
     gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyMinHeight, &RenderStyle::minHeight, &RenderStyle::setMinHeight));
     gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyMaxHeight, &RenderStyle::maxHeight, &RenderStyle::setMaxHeight));
 
+#if ENABLE(CSS3_FLEXBOX)
     gPropertyWrappers->append(new PropertyWrapperFlex());
+#endif
 
     gPropertyWrappers->append(new PropertyWrapper<unsigned>(CSSPropertyBorderLeftWidth, &RenderStyle::borderLeftWidth, &RenderStyle::setBorderLeftWidth));
     gPropertyWrappers->append(new PropertyWrapper<unsigned>(CSSPropertyBorderRightWidth, &RenderStyle::borderRightWidth, &RenderStyle::setBorderRightWidth));
@@ -1083,7 +1087,16 @@ void CSSPropertyAnimation::ensurePropertyMap()
     gPropertyWrappers->append(new FillLayersPropertyWrapper(CSSPropertyWebkitMaskPositionY, &RenderStyle::maskLayers, &RenderStyle::accessMaskLayers));
     gPropertyWrappers->append(new FillLayersPropertyWrapper(CSSPropertyWebkitMaskSize, &RenderStyle::maskLayers, &RenderStyle::accessMaskLayers));
 
-    gPropertyWrappers->append(new PropertyWrapper<int>(CSSPropertyFontSize, &RenderStyle::fontSize, &RenderStyle::setBlendedFontSize));
+    gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyFontSize,
+        // Must pass a specified size to setFontSize if Text Autosizing is enabled, but a computed size
+        // if text zoom is enabled (if neither is enabled it's irrelevant as they're probably the same).
+        // FIXME: Find some way to assert that text zoom isn't activated when Text Autosizing is compiled in.
+#if ENABLE(TEXT_AUTOSIZING)
+        &RenderStyle::specifiedFontSize,
+#else
+        &RenderStyle::computedFontSize,
+#endif
+        &RenderStyle::setFontSize));
     gPropertyWrappers->append(new PropertyWrapper<unsigned short>(CSSPropertyWebkitColumnRuleWidth, &RenderStyle::columnRuleWidth, &RenderStyle::setColumnRuleWidth));
     gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyWebkitColumnGap, &RenderStyle::columnGap, &RenderStyle::setColumnGap));
     gPropertyWrappers->append(new PropertyWrapper<unsigned short>(CSSPropertyWebkitColumnCount, &RenderStyle::columnCount, &RenderStyle::setColumnCount));
@@ -1091,7 +1104,7 @@ void CSSPropertyAnimation::ensurePropertyMap()
     gPropertyWrappers->append(new PropertyWrapper<short>(CSSPropertyWebkitBorderHorizontalSpacing, &RenderStyle::horizontalBorderSpacing, &RenderStyle::setHorizontalBorderSpacing));
     gPropertyWrappers->append(new PropertyWrapper<short>(CSSPropertyWebkitBorderVerticalSpacing, &RenderStyle::verticalBorderSpacing, &RenderStyle::setVerticalBorderSpacing));
     gPropertyWrappers->append(new PropertyWrapper<int>(CSSPropertyZIndex, &RenderStyle::zIndex, &RenderStyle::setZIndex));
-    gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyLineHeight, &RenderStyle::lineHeight, &RenderStyle::setLineHeight));
+    gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyLineHeight, &RenderStyle::specifiedLineHeight, &RenderStyle::setLineHeight));
     gPropertyWrappers->append(new PropertyWrapper<int>(CSSPropertyOutlineOffset, &RenderStyle::outlineOffset, &RenderStyle::setOutlineOffset));
     gPropertyWrappers->append(new PropertyWrapper<unsigned short>(CSSPropertyOutlineWidth, &RenderStyle::outlineWidth, &RenderStyle::setOutlineWidth));
     gPropertyWrappers->append(new PropertyWrapper<int>(CSSPropertyLetterSpacing, &RenderStyle::letterSpacing, &RenderStyle::setLetterSpacing));

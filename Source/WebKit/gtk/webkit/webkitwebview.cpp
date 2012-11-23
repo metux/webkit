@@ -61,7 +61,6 @@
 #include "FrameView.h"
 #include "GOwnPtrGtk.h"
 #include "GeolocationClientGtk.h"
-#include "GeolocationClientMock.h"
 #include "GeolocationController.h"
 #include "GraphicsContext.h"
 #include "GtkUtilities.h"
@@ -117,10 +116,6 @@
 #if ENABLE(DEVICE_ORIENTATION)
 #include "DeviceMotionClientGtk.h"
 #include "DeviceOrientationClientGtk.h"
-#endif
-
-#if ENABLE(MEDIA_STREAM)
-#include "UserMediaClientGtk.h"
 #endif
 
 /**
@@ -221,6 +216,7 @@ enum {
     ENTERING_FULLSCREEN,
     LEAVING_FULLSCREEN,
     CONTEXT_MENU,
+    RUN_FILE_CHOOSER,
 
     LAST_SIGNAL
 };
@@ -682,9 +678,11 @@ static gboolean webkit_web_view_draw(GtkWidget* widget, cairo_t* cr)
         return FALSE;
 
     WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW(widget)->priv;
-#if USE(TEXTURE_MAPPER_GL)
-    if (priv->acceleratedCompositingContext->renderLayersToWindow(clipRect))
+#if USE(TEXTURE_MAPPER)
+    if (priv->acceleratedCompositingContext->renderLayersToWindow(cr, clipRect)) {
+        GTK_WIDGET_CLASS(webkit_web_view_parent_class)->draw(widget, cr);
         return FALSE;
+    }
 #endif
 
     cairo_rectangle_list_t* rectList = cairo_copy_clip_rectangle_list(cr);
@@ -871,36 +869,40 @@ static void updateChildAllocationFromPendingAllocation(GtkWidget* child, void*)
     *allocation = IntRect();
 }
 
-static void resizeWebViewFromAllocation(WebKitWebView* webView, GtkAllocation* allocation)
+static void resizeWebViewFromAllocation(WebKitWebView* webView, GtkAllocation* allocation, bool sizeChanged)
 {
     Page* page = core(webView);
     IntSize oldSize;
-    if (FrameView* frameView = page->mainFrame()->view()) {
+    FrameView* frameView = page->mainFrame()->view();
+    if (sizeChanged && frameView) {
         oldSize = frameView->size();
         frameView->resize(allocation->width, allocation->height);
     }
 
     gtk_container_forall(GTK_CONTAINER(webView), updateChildAllocationFromPendingAllocation, 0);
 
+    if (!sizeChanged)
+        return;
+
     WebKit::ChromeClient* chromeClient = static_cast<WebKit::ChromeClient*>(page->chrome()->client());
     chromeClient->widgetSizeChanged(oldSize, IntSize(allocation->width, allocation->height));
     chromeClient->adjustmentWatcher()->updateAdjustmentsFromScrollbars();
-
-#if USE(ACCELERATED_COMPOSITING)
-    webView->priv->acceleratedCompositingContext->resizeRootLayer(IntSize(allocation->width, allocation->height));
-#endif
 }
 
 static void webkit_web_view_size_allocate(GtkWidget* widget, GtkAllocation* allocation)
 {
+    GtkAllocation oldAllocation;
+    gtk_widget_get_allocation(widget, &oldAllocation);
+    bool sizeChanged = allocation->width != oldAllocation.width || allocation->height != oldAllocation.height;
+
     GTK_WIDGET_CLASS(webkit_web_view_parent_class)->size_allocate(widget, allocation);
 
     WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
-    if (!gtk_widget_get_mapped(widget)) {
+    if (sizeChanged && !gtk_widget_get_mapped(widget)) {
         webView->priv->needsResizeOnMap = true;
         return;
     }
-    resizeWebViewFromAllocation(webView, allocation);
+    resizeWebViewFromAllocation(webView, allocation, sizeChanged);
 }
 
 static void webkitWebViewMap(GtkWidget* widget)
@@ -913,7 +915,7 @@ static void webkitWebViewMap(GtkWidget* widget)
 
     GtkAllocation allocation;
     gtk_widget_get_allocation(widget, &allocation);
-    resizeWebViewFromAllocation(webView, &allocation);
+    resizeWebViewFromAllocation(webView, &allocation, true);
     webView->priv->needsResizeOnMap = false;
 }
 
@@ -999,6 +1001,9 @@ static void webkit_web_view_realize(GtkWidget* widget)
                             | GDK_BUTTON_PRESS_MASK
                             | GDK_BUTTON_RELEASE_MASK
                             | GDK_SCROLL_MASK
+#if GTK_CHECK_VERSION(3, 3, 18)
+                            | GDK_SMOOTH_SCROLL_MASK
+#endif
                             | GDK_POINTER_MOTION_MASK
                             | GDK_KEY_PRESS_MASK
                             | GDK_KEY_RELEASE_MASK
@@ -1013,9 +1018,6 @@ static void webkit_web_view_realize(GtkWidget* widget)
 #endif
     GdkWindow* window = gdk_window_new(gtk_widget_get_parent_window(widget), &attributes, attributes_mask);
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL)
-    priv->hasNativeWindow = gdk_window_ensure_native(window);
-#endif
     gtk_widget_set_window(widget, window);
     gdk_window_set_user_data(window, widget);
 
@@ -1302,6 +1304,48 @@ static gboolean webkit_web_view_real_entering_fullscreen(WebKitWebView* webView)
 static gboolean webkit_web_view_real_leaving_fullscreen(WebKitWebView* webView)
 {
     return FALSE;
+}
+
+static void fileChooserDialogResponseCallback(GtkDialog* dialog, gint responseID, WebKitFileChooserRequest* request)
+{
+    GRefPtr<WebKitFileChooserRequest> adoptedRequest = adoptGRef(request);
+    if (responseID == GTK_RESPONSE_ACCEPT) {
+        GOwnPtr<GSList> filesList(gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog)));
+        GRefPtr<GPtrArray> filesArray = adoptGRef(g_ptr_array_new());
+        for (GSList* file = filesList.get(); file; file = g_slist_next(file))
+            g_ptr_array_add(filesArray.get(), file->data);
+        g_ptr_array_add(filesArray.get(), 0);
+        webkit_file_chooser_request_select_files(adoptedRequest.get(), reinterpret_cast<const gchar* const*>(filesArray->pdata));
+    }
+
+    gtk_widget_destroy(GTK_WIDGET(dialog));
+}
+
+static gboolean webkitWebViewRealRunFileChooser(WebKitWebView* webView, WebKitFileChooserRequest* request)
+{
+    GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(webView));
+    if (!widgetIsOnscreenToplevelWindow(toplevel))
+        toplevel = 0;
+
+    gboolean allowsMultipleSelection = webkit_file_chooser_request_get_select_multiple(request);
+    GtkWidget* dialog = gtk_file_chooser_dialog_new(allowsMultipleSelection ? _("Select Files") : _("Select File"),
+                                                    toplevel ? GTK_WINDOW(toplevel) : 0,
+                                                    GTK_FILE_CHOOSER_ACTION_OPEN,
+                                                    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+                                                    GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
+                                                    NULL);
+
+    if (GtkFileFilter* filter = webkit_file_chooser_request_get_mime_types_filter(request))
+        gtk_file_chooser_set_filter(GTK_FILE_CHOOSER(dialog), filter);
+    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), allowsMultipleSelection);
+
+    if (const gchar* const* selectedFiles = webkit_file_chooser_request_get_selected_files(request))
+        gtk_file_chooser_select_filename(GTK_FILE_CHOOSER(dialog), selectedFiles[0]);
+
+    g_signal_connect(dialog, "response", G_CALLBACK(fileChooserDialogResponseCallback), g_object_ref(request));
+    gtk_widget_show(dialog);
+
+    return TRUE;
 }
 
 static void webkit_web_view_dispose(GObject* object)
@@ -2257,7 +2301,7 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      *
      * The default bindings for this signal is Ctrl-a.
      */
-    webkit_web_view_signals[SELECT_ALL] = g_signal_new("select-all",
+    webkit_web_view_signals[::SELECT_ALL] = g_signal_new("select-all",
             G_TYPE_FROM_CLASS(webViewClass),
             (GSignalFlags)(G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION),
             G_STRUCT_OFFSET(WebKitWebViewClass, select_all),
@@ -2557,6 +2601,42 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             G_TYPE_NONE, 1,
             WEBKIT_TYPE_WEB_FRAME);
 
+     /**
+     * WebKitWebView::run-file-chooser:
+     * @web_view: the #WebKitWebView on which the signal is emitted
+     * @request: a #WebKitFileChooserRequest
+     *
+     * This signal is emitted when the user interacts with a &lt;input
+     * type='file' /&gt; HTML element, requesting from WebKit to show
+     * a dialog to select one or more files to be uploaded. To let the
+     * application know the details of the file chooser, as well as to
+     * allow the client application to either cancel the request or
+     * perform an actual selection of files, the signal will pass an
+     * instance of the #WebKitFileChooserRequest in the @request
+     * argument.
+     *
+     * The default signal handler will asynchronously run a regular
+     * #GtkFileChooserDialog for the user to interact with.
+     *
+     * If this signal is to be handled asynchronously, you must
+     * call g_object_ref() on the @request, and return %TRUE to indicate
+     * that the request is being handled. When you are ready to complete the
+     * request, call webkit_file_chooser_request_select_files().
+     *
+     * Returns: %TRUE to stop other handlers from being invoked for the event.
+     *   %FALSE to propagate the event further.
+     *
+     */
+    webkit_web_view_signals[RUN_FILE_CHOOSER] =
+        g_signal_new("run-file-chooser",
+                     G_TYPE_FROM_CLASS(webViewClass),
+                     G_SIGNAL_RUN_LAST,
+                     G_STRUCT_OFFSET(WebKitWebViewClass, run_file_chooser),
+                     g_signal_accumulator_true_handled, 0 /* accumulator data */,
+                     webkit_marshal_BOOLEAN__OBJECT,
+                     G_TYPE_BOOLEAN, 1, /* number of parameters */
+                     WEBKIT_TYPE_FILE_CHOOSER_REQUEST);
+
     webkit_web_view_signals[SHOULD_BEGIN_EDITING] = g_signal_new("should-begin-editing",
         G_TYPE_FROM_CLASS(webViewClass), static_cast<GSignalFlags>(G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION),
         G_STRUCT_OFFSET(WebKitWebViewClass, should_allow_editing_action), g_signal_accumulator_first_wins, 0,
@@ -2586,7 +2666,7 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
 
     webkit_web_view_signals[SHOULD_SHOW_DELETE_INTERFACE_FOR_ELEMENT] = g_signal_new("should-show-delete-interface-for-element",
         G_TYPE_FROM_CLASS(webViewClass), static_cast<GSignalFlags>(G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION),
-        G_STRUCT_OFFSET(WebKitWebViewClass, should_allow_editing_action), g_signal_accumulator_first_wins, 0,
+        0, g_signal_accumulator_first_wins, 0,
         webkit_marshal_BOOLEAN__OBJECT, G_TYPE_BOOLEAN, 1, WEBKIT_TYPE_DOM_HTML_ELEMENT);
 
     webkit_web_view_signals[SHOULD_CHANGE_SELECTED_RANGE] = g_signal_new("should-change-selected-range",
@@ -2866,6 +2946,7 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
     webViewClass->should_allow_editing_action = webkit_web_view_real_should_allow_editing_action;
     webViewClass->entering_fullscreen = webkit_web_view_real_entering_fullscreen;
     webViewClass->leaving_fullscreen = webkit_web_view_real_leaving_fullscreen;
+    webViewClass->run_file_chooser = webkitWebViewRealRunFileChooser;
 
     GObjectClass* objectClass = G_OBJECT_CLASS(webViewClass);
     objectClass->dispose = webkit_web_view_dispose;
@@ -3338,6 +3419,8 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     coreSettings->setJavaEnabled(settingsPrivate->enableJavaApplet);
     coreSettings->setHyperlinkAuditingEnabled(settingsPrivate->enableHyperlinkAuditing);
     coreSettings->setDNSPrefetchingEnabled(settingsPrivate->enableDNSPrefetching);
+    coreSettings->setMediaPlaybackRequiresUserGesture(settingsPrivate->mediaPlaybackRequiresUserGesture);
+    coreSettings->setMediaPlaybackAllowsInline(settingsPrivate->mediaPlaybackAllowsInline);
 
 #if ENABLE(SQL_DATABASE)
     AbstractDatabase::setIsAvailable(settingsPrivate->enableHTML5Database);
@@ -3364,10 +3447,6 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
 
 #if ENABLE(WEB_AUDIO)
     coreSettings->setWebAudioEnabled(settingsPrivate->enableWebAudio);
-#endif
-
-#if ENABLE(WEB_SOCKETS)
-    coreSettings->setUseHixie76WebSocketProtocol(false);
 #endif
 
 #if ENABLE(SMOOTH_SCROLLING)
@@ -3479,6 +3558,10 @@ static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GPar
         settings->setJavaEnabled(g_value_get_boolean(&value));
     else if (name == g_intern_string("enable-hyperlink-auditing"))
         settings->setHyperlinkAuditingEnabled(g_value_get_boolean(&value));
+    else if (name == g_intern_string("media-playback-requires-user-gesture"))
+        settings->setMediaPlaybackRequiresUserGesture(g_value_get_boolean(&value));
+    else if (name == g_intern_string("media-playback-allows-inline"))
+        settings->setMediaPlaybackAllowsInline(g_value_get_boolean(&value));
 
 #if ENABLE(SPELLCHECK)
     else if (name == g_intern_string("spell-checking-languages")) {
@@ -3542,9 +3625,9 @@ static void webkit_web_view_init(WebKitWebView* webView)
 
 #if ENABLE(GEOLOCATION)
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
-        GeolocationClientMock* mock = new GeolocationClientMock;
-        WebCore::provideGeolocationTo(priv->corePage, mock);
-        mock->setController(GeolocationController::from(priv->corePage));
+        priv->geolocationClientMock = adoptPtr(new GeolocationClientMock);
+        WebCore::provideGeolocationTo(priv->corePage, priv->geolocationClientMock.get());
+        priv->geolocationClientMock.get()->setController(GeolocationController::from(priv->corePage));
     } else
         WebCore::provideGeolocationTo(priv->corePage, new WebKit::GeolocationClient(webView));
 #endif
@@ -3554,7 +3637,13 @@ static void webkit_web_view_init(WebKitWebView* webView)
 #endif
 
 #if ENABLE(MEDIA_STREAM)
-    WebCore::provideUserMediaTo(priv->corePage, new UserMediaClientGtk);
+    priv->userMediaClient = adoptPtr(new UserMediaClientGtk);
+    WebCore::provideUserMediaTo(priv->corePage, priv->userMediaClient.get());
+#endif
+
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
+    priv->registerProtocolHandlerClient = WebKit::RegisterProtocolHandlerClient::create();
+    WebCore::provideRegisterProtocolHandlerTo(priv->corePage, priv->registerProtocolHandlerClient.get());
 #endif
 
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
@@ -3611,6 +3700,12 @@ GtkWidget* webkit_web_view_new(void)
     WebKitWebView* webView = WEBKIT_WEB_VIEW(g_object_new(WEBKIT_TYPE_WEB_VIEW, NULL));
 
     return GTK_WIDGET(webView);
+}
+
+void webkitWebViewRunFileChooserRequest(WebKitWebView* webView, WebKitFileChooserRequest* request)
+{
+    gboolean returnValue;
+    g_signal_emit(webView, webkit_web_view_signals[RUN_FILE_CHOOSER], 0, request, &returnValue);
 }
 
 // for internal use only
@@ -4335,7 +4430,7 @@ void webkit_web_view_select_all(WebKitWebView* webView)
 {
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
-    g_signal_emit(webView, webkit_web_view_signals[SELECT_ALL], 0);
+    g_signal_emit(webView, webkit_web_view_signals[::SELECT_ALL], 0);
 }
 
 /**
@@ -5145,7 +5240,8 @@ GdkPixbuf* webkit_web_view_try_get_favicon_pixbuf(WebKitWebView* webView, guint 
  * webkit_web_view_get_dom_document:
  * @web_view: a #WebKitWebView
  * 
- * Returns: (transfer none): the #WebKitDOMDocument currently loaded in the @web_view
+ * Returns: (transfer none): the #WebKitDOMDocument currently loaded in
+ * the main frame of the @web_view or %NULL if no document is loaded
  *
  * Since: 1.3.1
  **/
@@ -5154,15 +5250,7 @@ webkit_web_view_get_dom_document(WebKitWebView* webView)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
 
-    Frame* coreFrame = core(webView)->mainFrame();
-    if (!coreFrame)
-        return 0;
-
-    Document* doc = coreFrame->document();
-    if (!doc)
-        return 0;
-
-    return kit(doc);
+    return webkit_web_frame_get_dom_document(webView->priv->mainFrame);
 }
 
 GtkMenu* webkit_web_view_get_context_menu(WebKitWebView* webView)
@@ -5177,6 +5265,44 @@ GtkMenu* webkit_web_view_get_context_menu(WebKitWebView* webView)
 #else
     return 0;
 #endif
+}
+
+/**
+ * webkit_web_view_get_snapshot:
+ * @web_view: a #WebKitWebView
+ *
+ * Retrieves a snapshot with the visible contents of @webview.
+ *
+ * Returns: (transfer full): a @cairo_surface_t
+ *
+ * Since: 1.10
+ **/
+cairo_surface_t*
+webkit_web_view_get_snapshot(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    Frame* frame = core(webView)->mainFrame();
+    if (!frame || !frame->contentRenderer() || !frame->view())
+        return 0;
+
+    frame->view()->updateLayoutAndStyleIfNeededRecursive();
+    GtkAllocation allocation;
+    gtk_widget_get_allocation(GTK_WIDGET(webView), &allocation);
+    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, allocation.width, allocation.height);
+    RefPtr<cairo_t> cr = adoptRef(cairo_create(surface));
+    GraphicsContext gc(cr.get());
+
+    IntRect rect = allocation;
+    gc.applyDeviceScaleFactor(frame->page()->deviceScaleFactor());
+    gc.save();
+    gc.clip(rect);
+    if (webView->priv->transparent)
+        gc.clearRect(rect);
+    frame->view()->paint(&gc, rect);
+    gc.restore();
+
+    return surface;
 }
 
 void webViewEnterFullscreen(WebKitWebView* webView, Node* node)

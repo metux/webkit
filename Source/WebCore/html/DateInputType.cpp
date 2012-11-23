@@ -45,11 +45,15 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static const double dateDefaultStep = 1.0;
-static const double dateStepScaleFactor = 86400000.0;
+static const int dateDefaultStep = 1;
+static const int dateDefaultStepBase = 0;
+static const int dateStepScaleFactor = 86400000;
 
 inline DateInputType::DateInputType(HTMLInputElement* element)
     : BaseDateAndTimeInputType(element)
+#if ENABLE(CALENDAR_PICKER)
+    , m_pickerElement(0)
+#endif
 {
 }
 
@@ -68,29 +72,15 @@ DateComponents::Type DateInputType::dateType() const
     return DateComponents::Date;
 }
 
-double DateInputType::minimum() const
+StepRange DateInputType::createStepRange(AnyStepHandling anyStepHandling) const
 {
-    return parseToDouble(element()->fastGetAttribute(minAttr), DateComponents::minimumDate());
-}
+    DEFINE_STATIC_LOCAL(const StepRange::StepDescription, stepDescription, (dateDefaultStep, dateDefaultStepBase, dateStepScaleFactor, StepRange::ParsedStepValueShouldBeInteger));
 
-double DateInputType::maximum() const
-{
-    return parseToDouble(element()->fastGetAttribute(maxAttr), DateComponents::maximumDate());
-}
-
-double DateInputType::defaultStep() const
-{
-    return dateDefaultStep;
-}
-
-double DateInputType::stepScaleFactor() const
-{
-    return dateStepScaleFactor;
-}
-
-bool DateInputType::parsedStepValueShouldBeInteger() const
-{
-    return true;
+    const Decimal stepBase = parseToNumber(element()->fastGetAttribute(minAttr), 0);
+    const Decimal minimum = parseToNumber(element()->fastGetAttribute(minAttr), Decimal::fromDouble(DateComponents::minimumDate()));
+    const Decimal maximum = parseToNumber(element()->fastGetAttribute(maxAttr), Decimal::fromDouble(DateComponents::maximumDate()));
+    const Decimal step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
+    return StepRange(stepBase, minimum, maximum, step, stepDescription);
 }
 
 bool DateInputType::parseToDateComponentsInternal(const UChar* characters, unsigned length, DateComponents* out) const
@@ -106,18 +96,24 @@ bool DateInputType::setMillisecondToDateComponents(double value, DateComponents*
     return date->setMillisecondsSinceEpochForDate(value);
 }
 
+bool DateInputType::isDateField() const
+{
+    return true;
+}
+
 #if ENABLE(CALENDAR_PICKER)
 void DateInputType::createShadowSubtree()
 {
     BaseDateAndTimeInputType::createShadowSubtree();
-    m_pickerElement = CalendarPickerElement::create(element()->document());
-    containerElement()->insertBefore(m_pickerElement.get(), innerBlockElement()->nextSibling(), ASSERT_NO_EXCEPTION);
+    RefPtr<CalendarPickerElement> pickerElement = CalendarPickerElement::create(element()->document());
+    m_pickerElement = pickerElement.get();
+    containerElement()->insertBefore(m_pickerElement, innerBlockElement()->nextSibling(), ASSERT_NO_EXCEPTION);
 }
 
 void DateInputType::destroyShadowSubtree()
 {
     TextFieldInputType::destroyShadowSubtree();
-    m_pickerElement.clear();
+    m_pickerElement = 0;
 }
 
 bool DateInputType::needsContainer() const
@@ -152,7 +148,7 @@ void DateInputType::handleBlurEvent()
     element()->setFormControlValueMatchesRenderer(false);
     // We need to reset the renderer value explicitly because an unacceptable
     // renderer value should be purged before style calculation.
-    element()->updateInnerTextValue();
+    updateInnerTextValue();
 }
 
 bool DateInputType::supportsPlaceholder() const

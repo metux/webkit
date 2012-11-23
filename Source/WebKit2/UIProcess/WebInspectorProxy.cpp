@@ -50,6 +50,14 @@ using namespace WebCore;
 
 namespace WebKit {
 
+const unsigned WebInspectorProxy::minimumWindowWidth = 500;
+const unsigned WebInspectorProxy::minimumWindowHeight = 400;
+
+const unsigned WebInspectorProxy::initialWindowWidth = 750;
+const unsigned WebInspectorProxy::initialWindowHeight = 650;
+
+const unsigned WebInspectorProxy::minimumAttachedHeight = 250;
+
 static PassRefPtr<WebPageGroup> createInspectorPageGroup()
 {
     RefPtr<WebPageGroup> pageGroup = WebPageGroup::create("__WebInspectorPageGroup__", false, false);
@@ -80,7 +88,7 @@ WebInspectorProxy::WebInspectorProxy(WebPageProxy* page)
     , m_isProfilingPage(false)
 #if PLATFORM(WIN)
     , m_inspectorWindow(0)
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || PLATFORM(EFL)
     , m_inspectorView(0)
     , m_inspectorWindow(0)
 #endif

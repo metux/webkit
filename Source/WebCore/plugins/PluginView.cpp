@@ -126,9 +126,8 @@ IntRect PluginView::windowClipRect() const
     IntRect clipRect(m_windowRect);
     
     // Take our element and get the clip rect from the enclosing layer and frame view.
-    RenderLayer* layer = m_element->renderer()->enclosingLayer();
     FrameView* parentView = m_element->document()->view();
-    clipRect.intersect(parentView->windowClipRectForLayer(layer, true));
+    clipRect.intersect(parentView->windowClipRectForFrameOwner(m_element, true));
 
     return clipRect;
 }
@@ -241,7 +240,7 @@ bool PluginView::start()
     {
         PluginView::setCurrentPluginView(this);
 #if USE(JSC)
-        JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+        JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
 #endif
         setCallingPlugin(true);
         npErr = m_plugin->pluginFuncs()->newp((NPMIMEType)m_mimeType.utf8().data(), m_instance, m_mode, m_paramCount, m_paramNames, m_paramValues, NULL);
@@ -331,7 +330,7 @@ void PluginView::stop()
     m_isStarted = false;
 
 #if USE(JSC)
-    JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
 #endif
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -447,7 +446,7 @@ void PluginView::performRequest(PluginRequest* request)
             if (request->sendNotification()) {
                 PluginView::setCurrentPluginView(this);
 #if USE(JSC)
-                JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+                JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
 #endif
                 setCallingPlugin(true);
                 m_plugin->pluginFuncs()->urlnotify(m_instance, requestURL.string().utf8().data(), NPRES_DONE, request->notifyData());
@@ -737,7 +736,7 @@ NPObject* PluginView::npObject()
     {
         PluginView::setCurrentPluginView(this);
 #if USE(JSC)
-        JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+        JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
 #endif
         setCallingPlugin(true);
         npErr = m_plugin->pluginFuncs()->getvalue(m_instance, NPPVpluginScriptableNPObject, &object);
@@ -812,7 +811,7 @@ void PluginView::setParameters(const Vector<String>& paramNames, const Vector<St
     m_paramCount = paramCount;
 }
 
-PluginView::PluginView(Frame* parentFrame, const IntSize& size, PluginPackage* plugin, Element* element, const KURL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
+PluginView::PluginView(Frame* parentFrame, const IntSize& size, PluginPackage* plugin, HTMLPlugInElement* element, const KURL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
     : m_parentFrame(parentFrame)
     , m_plugin(plugin)
     , m_element(element)
@@ -965,7 +964,7 @@ bool PluginView::isCallingPlugin()
     return s_callingPlugin > 0;
 }
 
-PassRefPtr<PluginView> PluginView::create(Frame* parentFrame, const IntSize& size, Element* element, const KURL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
+PassRefPtr<PluginView> PluginView::create(Frame* parentFrame, const IntSize& size, HTMLPlugInElement* element, const KURL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
 {
     // if we fail to find a plugin for this MIME type, findPlugin will search for
     // a plugin by the file extension and update the MIME type, so pass a mutable String
@@ -1493,7 +1492,7 @@ void PluginView::privateBrowsingStateChanged(bool privateBrowsingEnabled)
 
     PluginView::setCurrentPluginView(this);
 #if USE(JSC)
-    JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
 #endif
     setCallingPlugin(true);
     NPBool value = privateBrowsingEnabled;

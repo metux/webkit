@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,7 +22,9 @@
 #ifndef HitTestResult_h
 #define HitTestResult_h
 
+#include "FloatQuad.h"
 #include "FloatRect.h"
+#include "HitTestRequest.h"
 #include "LayoutTypes.h"
 #include "TextDirection.h"
 #include <wtf/Forward.h>
@@ -44,7 +47,62 @@ class Scrollbar;
 
 enum ShadowContentFilterPolicy { DoNotAllowShadowContent, AllowShadowContent };
 
-class HitTestResult {
+class HitTestPoint {
+public:
+
+    HitTestPoint();
+    HitTestPoint(const LayoutPoint&);
+    HitTestPoint(const FloatPoint&);
+    HitTestPoint(const FloatPoint&, const FloatQuad&);
+    // Pass non-zero padding values to perform a rect-based hit test.
+    HitTestPoint(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
+    // Make a copy the HitTestPoint in a new region by applying given offset to internal point and area.
+    HitTestPoint(const HitTestPoint&, const LayoutSize& offset, RenderRegion*);
+    HitTestPoint(const HitTestPoint&);
+    ~HitTestPoint();
+    HitTestPoint& operator=(const HitTestPoint&);
+
+    LayoutPoint point() const { return m_point; }
+    IntPoint roundedPoint() const { return roundedIntPoint(m_point); }
+
+    RenderRegion* region() const { return m_region; }
+
+    // Rect-based hit test related methods.
+    bool isRectBasedTest() const { return m_isRectBased; }
+    bool isRectilinear() const { return m_isRectilinear; }
+    IntRect boundingBox() const { return m_boundingBox; }
+
+    static IntRect rectForPoint(const LayoutPoint&, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
+    int topPadding() const { return roundedPoint().y() - m_boundingBox.y(); }
+    int rightPadding() const { return m_boundingBox.maxX() - roundedPoint().x() - 1; }
+    int bottomPadding() const { return m_boundingBox.maxY() - roundedPoint().y() - 1; }
+    int leftPadding() const { return roundedPoint().x() - m_boundingBox.x(); }
+
+    bool intersects(const LayoutRect&) const;
+    bool intersects(const FloatRect&) const;
+
+    const FloatPoint& transformedPoint() const { return m_transformedPoint; }
+    const FloatQuad& transformedRect() const { return m_transformedRect; }
+
+private:
+    template<typename RectType>
+    bool intersectsRect(const RectType&) const;
+    void move(const LayoutSize& offset);
+
+    // This is cached forms of the more accurate point and area below.
+    LayoutPoint m_point;
+    IntRect m_boundingBox;
+
+    FloatPoint m_transformedPoint;
+    FloatQuad m_transformedRect;
+
+    RenderRegion* m_region; // The region we're inside.
+
+    bool m_isRectBased;
+    bool m_isRectilinear;
+};
+
+class HitTestResult : public HitTestPoint {
 public:
     typedef ListHashSet<RefPtr<Node> > NodeSet;
 
@@ -52,29 +110,25 @@ public:
     HitTestResult(const LayoutPoint&);
     // Pass non-negative padding values to perform a rect-based hit test.
     HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding, ShadowContentFilterPolicy);
+    HitTestResult(const HitTestPoint&, ShadowContentFilterPolicy);
     HitTestResult(const HitTestResult&);
     ~HitTestResult();
     HitTestResult& operator=(const HitTestResult&);
 
     Node* innerNode() const { return m_innerNode.get(); }
     Node* innerNonSharedNode() const { return m_innerNonSharedNode.get(); }
-    LayoutPoint point() const { return m_point; }
-    IntPoint roundedPoint() const { return roundedIntPoint(m_point); }
     LayoutPoint localPoint() const { return m_localPoint; }
     Element* URLElement() const { return m_innerURLElement.get(); }
     Scrollbar* scrollbar() const { return m_scrollbar.get(); }
     bool isOverWidget() const { return m_isOverWidget; }
 
-    RenderRegion* region() const { return m_region; }
-    void setRegion(RenderRegion* region) { m_region = region; }
-
     void setToNonShadowAncestor();
 
+    const HitTestPoint& hitTestPoint() const { return *this; }
     ShadowContentFilterPolicy shadowContentFilterPolicy() const { return m_shadowContentFilterPolicy; }
 
     void setInnerNode(Node*);
     void setInnerNonSharedNode(Node*);
-    void setPoint(const LayoutPoint& p) { m_point = p; }
     void setLocalPoint(const LayoutPoint& p) { m_localPoint = p; }
     void setURLElement(Element*);
     void setScrollbar(Scrollbar*);
@@ -110,25 +164,20 @@ public:
     bool mediaMuted() const;
     void toggleMediaMuteState() const;
 
-    // Rect-based hit test related methods.
-    bool isRectBasedTest() const { return m_isRectBased; }
-    IntRect rectForPoint(const LayoutPoint&) const;
-    static IntRect rectForPoint(const LayoutPoint&, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
-    int topPadding() const { return m_topPadding; }
-    int rightPadding() const { return m_rightPadding; }
-    int bottomPadding() const { return m_bottomPadding; }
-    int leftPadding() const { return m_leftPadding; }
-
     // Returns true if it is rect-based hit test and needs to continue until the rect is fully
     // enclosed by the boundaries of a node.
-    bool addNodeToRectBasedTestResult(Node*, const LayoutPoint& pointInContainer, const IntRect& = IntRect());
-    bool addNodeToRectBasedTestResult(Node*, const LayoutPoint& pointInContainer, const FloatRect&);
+    bool addNodeToRectBasedTestResult(Node*, const HitTestPoint& pointInContainer, const LayoutRect& = LayoutRect());
+    bool addNodeToRectBasedTestResult(Node*, const HitTestPoint& pointInContainer, const FloatRect&);
     void append(const HitTestResult&);
 
     // If m_rectBasedTestResult is 0 then set it to a new NodeSet. Return *m_rectBasedTestResult. Lazy allocation makes
     // sense because the NodeSet is seldom necessary, and it's somewhat expensive to allocate and initialize. This method does
     // the same thing as mutableRectBasedTestResult(), but here the return value is const.
     const NodeSet& rectBasedTestResult() const;
+
+    Vector<String> dictationAlternatives() const;
+
+    Node* targetNode() const;
 
 private:
     NodeSet& mutableRectBasedTestResult(); // See above.
@@ -139,33 +188,16 @@ private:
 
     RefPtr<Node> m_innerNode;
     RefPtr<Node> m_innerNonSharedNode;
-    LayoutPoint m_point;
     LayoutPoint m_localPoint; // A point in the local coordinate space of m_innerNonSharedNode's renderer. Allows us to efficiently
                               // determine where inside the renderer we hit on subsequent operations.
     RefPtr<Element> m_innerURLElement;
     RefPtr<Scrollbar> m_scrollbar;
     bool m_isOverWidget; // Returns true if we are over a widget (and not in the border/padding area of a RenderWidget for example).
-    bool m_isRectBased;
-    int m_topPadding;
-    int m_rightPadding;
-    int m_bottomPadding;
-    int m_leftPadding;
+
     ShadowContentFilterPolicy m_shadowContentFilterPolicy;
-    
-    RenderRegion* m_region; // The region we're inside.
 
     mutable OwnPtr<NodeSet> m_rectBasedTestResult;
 };
-
-// Formula:
-// x = p.x() - rightPadding
-// y = p.y() - topPadding
-// width = leftPadding + rightPadding + 1
-// height = topPadding + bottomPadding + 1
-inline IntRect HitTestResult::rectForPoint(const LayoutPoint& point) const
-{
-    return rectForPoint(point, m_topPadding, m_rightPadding, m_bottomPadding, m_leftPadding);
-}
 
 String displayString(const String&, const Node*);
 

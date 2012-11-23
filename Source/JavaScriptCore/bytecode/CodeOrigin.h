@@ -28,6 +28,7 @@
 
 #include "ValueRecovery.h"
 #include "WriteBarrier.h"
+#include <wtf/BitVector.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
 
@@ -38,6 +39,8 @@ class ExecutableBase;
 class JSFunction;
 
 struct CodeOrigin {
+    static const unsigned maximumBytecodeIndex = (1u << 29) - 1;
+    
     // Bytecode offset that you'd use to re-execute this instruction.
     unsigned bytecodeIndex : 29;
     // Bytecode offset corresponding to the opcode that gives the result (needed to handle
@@ -47,7 +50,7 @@ struct CodeOrigin {
     InlineCallFrame* inlineCallFrame;
     
     CodeOrigin()
-        : bytecodeIndex(std::numeric_limits<uint32_t>::max())
+        : bytecodeIndex(maximumBytecodeIndex)
         , valueProfileOffset(0)
         , inlineCallFrame(0)
     {
@@ -58,11 +61,11 @@ struct CodeOrigin {
         , valueProfileOffset(valueProfileOffset)
         , inlineCallFrame(inlineCallFrame)
     {
-        ASSERT(bytecodeIndex < (1u << 29));
+        ASSERT(bytecodeIndex <= maximumBytecodeIndex);
         ASSERT(valueProfileOffset < (1u << 3));
     }
     
-    bool isSet() const { return bytecodeIndex != std::numeric_limits<uint32_t>::max(); }
+    bool isSet() const { return bytecodeIndex != maximumBytecodeIndex; }
     
     unsigned bytecodeIndexForValueProfile() const
     {
@@ -92,6 +95,7 @@ struct InlineCallFrame {
     WriteBarrier<ExecutableBase> executable;
     WriteBarrier<JSFunction> callee;
     CodeOrigin caller;
+    BitVector capturedVars; // Indexed by the machine call frame's variable numbering.
     unsigned stackOffset : 31;
     bool isCall : 1;
 };

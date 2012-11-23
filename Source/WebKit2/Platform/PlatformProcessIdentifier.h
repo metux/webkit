@@ -28,7 +28,11 @@
 #define PlatformProcessIdentifier_h
 
 #if PLATFORM(QT)
+QT_BEGIN_NAMESPACE
 class QProcess;
+QT_END_NAMESPACE
+#elif PLATFORM(EFL)
+#include <unistd.h>
 #endif
 
 namespace WebKit {

@@ -30,7 +30,7 @@
 
 namespace WebKit {
 
-class APIObject : public RefCounted<APIObject> {
+class APIObject : public ThreadSafeRefCounted<APIObject> {
 public:
     enum Type {
         // Base types
@@ -72,6 +72,8 @@ public:
         TypeApplicationCacheManager,
         TypeBackForwardList,
         TypeBackForwardListItem,
+        TypeBatteryManager,
+        TypeBatteryStatus,
         TypeCacheManager,
         TypeContext,
         TypeCookieManager,
@@ -88,9 +90,13 @@ public:
         TypeGrammarDetail,
         TypeIconDatabase,
         TypeInspector,
+        TypeIntentData,
+        TypeIntentServiceInfo,
         TypeKeyValueStorageManager,
         TypeMediaCacheManager,
         TypeNavigationData,
+        TypeNetworkInfo,
+        TypeNetworkInfoManager,
         TypeNotification,
         TypeNotificationManager,
         TypeNotificationPermissionRequest,
@@ -101,6 +107,7 @@ public:
         TypePluginSiteDataManager,
         TypePreferences,
         TypeTextChecker,
+        TypeVibration,
 
         // Bundle types
         TypeBundle,
@@ -110,6 +117,8 @@ public:
         TypeBundleFrame,
         TypeBundleHitTestResult,
         TypeBundleInspector,
+        TypeBundleIntent,
+        TypeBundleIntentRequest,
         TypeBundleNavigationAction,
         TypeBundleNodeHandle,
         TypeBundlePage,

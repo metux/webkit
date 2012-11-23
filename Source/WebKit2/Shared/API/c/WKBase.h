@@ -41,6 +41,10 @@
 #include <WebKit2/WKBaseSoup.h>
 #endif
 
+#if defined(BUILDING_EFL__)
+#include <WebKit2/WKBaseEfl.h>
+#endif
+
 /* WebKit2 shared types */
 
 typedef uint32_t WKTypeID;
@@ -82,6 +86,8 @@ typedef const struct OpaqueWKAuthenticationChallenge* WKAuthenticationChallengeR
 typedef const struct OpaqueWKAuthenticationDecisionListener* WKAuthenticationDecisionListenerRef;
 typedef const struct OpaqueWKBackForwardList* WKBackForwardListRef;
 typedef const struct OpaqueWKBackForwardListItem* WKBackForwardListItemRef;
+typedef const struct OpaqueWKBatteryManager* WKBatteryManagerRef;
+typedef const struct OpaqueWKBatteryStatus* WKBatteryStatusRef;
 typedef const struct OpaqueWKResourceCacheManager* WKResourceCacheManagerRef;
 typedef const struct OpaqueWKContext* WKContextRef;
 typedef const struct OpaqueWKCookieManager* WKCookieManagerRef;
@@ -98,9 +104,13 @@ typedef const struct OpaqueWKGrammarDetail* WKGrammarDetailRef;
 typedef const struct OpaqueWKHitTestResult* WKHitTestResultRef;
 typedef const struct OpaqueWKIconDatabase* WKIconDatabaseRef;
 typedef const struct OpaqueWKInspector* WKInspectorRef;
+typedef const struct OpaqueWKIntentData* WKIntentDataRef;
+typedef const struct OpaqueWKIntentServiceInfo* WKIntentServiceInfoRef;
 typedef const struct OpaqueWKKeyValueStorageManager* WKKeyValueStorageManagerRef;
 typedef const struct OpaqueWKMediaCacheManager* WKMediaCacheManagerRef;
 typedef const struct OpaqueWKNavigationData* WKNavigationDataRef;
+typedef const struct OpaqueWKNetworkInfoManager* WKNetworkInfoManagerRef;
+typedef const struct OpaqueWKNetworkInfo* WKNetworkInfoRef;
 typedef const struct OpaqueWKNotification* WKNotificationRef;
 typedef const struct OpaqueWKNotificationManager* WKNotificationManagerRef;
 typedef const struct OpaqueWKNotificationPermissionRequest* WKNotificationPermissionRequestRef;
@@ -113,6 +123,7 @@ typedef const struct OpaqueWKPluginSiteDataManager* WKPluginSiteDataManagerRef;
 typedef const struct OpaqueWKPreferences* WKPreferencesRef;
 typedef const struct OpaqueWKProtectionSpace* WKProtectionSpaceRef;
 typedef const struct OpaqueWKTextChecker* WKTextCheckerRef;
+typedef const struct OpaqueWKVibration* WKVibrationRef;
 
 /* WebKit2 Bundle types */
 
@@ -124,6 +135,8 @@ typedef const struct OpaqueWKBundleDOMWindowExtension* WKBundleDOMWindowExtensio
 typedef const struct OpaqueWKBundleFrame* WKBundleFrameRef;
 typedef const struct OpaqueWKBundleHitTestResult* WKBundleHitTestResultRef;
 typedef const struct OpaqueWKBundleInspector* WKBundleInspectorRef;
+typedef const struct OpaqueWKBundleIntent* WKBundleIntentRef;
+typedef const struct OpaqueWKBundleIntentRequest* WKBundleIntentRequestRef;
 typedef const struct OpaqueWKBundleNavigationAction* WKBundleNavigationActionRef;
 typedef const struct OpaqueWKBundleNodeHandle* WKBundleNodeHandleRef;
 typedef const struct OpaqueWKBundlePage* WKBundlePageRef;

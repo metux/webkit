@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -84,7 +84,7 @@ ALWAYS_INLINE void JIT::emitGetFromCallFrameHeaderPtr(RegisterFile::CallFrameHea
 
 ALWAYS_INLINE void JIT::emitLoadCharacterString(RegisterID src, RegisterID dst, JumpList& failures)
 {
-    failures.append(branchPtr(NotEqual, Address(src, JSCell::classInfoOffset()), TrustedImmPtr(&JSString::s_info)));
+    failures.append(branchPtr(NotEqual, Address(src, JSCell::structureOffset()), TrustedImmPtr(m_globalData->stringStructure.get())));
     failures.append(branch32(NotEqual, MacroAssembler::Address(src, ThunkHelpers::jsStringLengthOffset()), TrustedImm32(1)));
     loadPtr(MacroAssembler::Address(src, ThunkHelpers::jsStringValueOffset()), dst);
     failures.append(branchTest32(Zero, dst));
@@ -425,12 +425,8 @@ template <typename ClassType, bool destructor, typename StructureType> inline vo
     // initialize the object's classInfo pointer
     storePtr(TrustedImmPtr(&ClassType::s_info), Address(result, JSCell::classInfoOffset()));
 
-    // initialize the inheritor ID
-    storePtr(TrustedImmPtr(0), Address(result, JSObject::offsetOfInheritorID()));
-
     // initialize the object's property storage pointer
-    addPtr(TrustedImm32(sizeof(JSObject)), result, storagePtr);
-    storePtr(storagePtr, Address(result, ClassType::offsetOfPropertyStorage()));
+    storePtr(TrustedImmPtr(0), Address(result, ClassType::offsetOfOutOfLineStorage()));
 }
 
 template <typename T> inline void JIT::emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID scratch)
@@ -438,44 +434,16 @@ template <typename T> inline void JIT::emitAllocateJSFinalObject(T structure, Re
     emitAllocateBasicJSObject<JSFinalObject, false, T>(structure, result, scratch);
 }
 
-inline void JIT::emitAllocateJSFunction(FunctionExecutable* executable, RegisterID scopeChain, RegisterID result, RegisterID storagePtr)
-{
-    emitAllocateBasicJSObject<JSFunction, true>(TrustedImmPtr(m_codeBlock->globalObject()->namedFunctionStructure()), result, storagePtr);
-
-    // store the function's scope chain
-    storePtr(scopeChain, Address(result, JSFunction::offsetOfScopeChain()));
-
-    // store the function's executable member
-    storePtr(TrustedImmPtr(executable), Address(result, JSFunction::offsetOfExecutable()));
-
-    // store the function's name
-    ASSERT(executable->nameValue());
-    int functionNameOffset = sizeof(JSValue) * m_codeBlock->globalObject()->functionNameOffset();
-    storePtr(TrustedImmPtr(executable->nameValue()), Address(regT1, functionNameOffset + OBJECT_OFFSETOF(JSValue, u.asBits.payload)));
-#if USE(JSVALUE32_64)
-    store32(TrustedImm32(JSValue::CellTag), Address(regT1, functionNameOffset + OBJECT_OFFSETOF(JSValue, u.asBits.tag)));
-#endif
-}
-
-inline void JIT::emitAllocateBasicStorage(size_t size, RegisterID result, RegisterID storagePtr)
+inline void JIT::emitAllocateBasicStorage(size_t size, RegisterID result)
 {
     CopiedAllocator* allocator = &m_globalData->heap.storageAllocator();
 
-    // FIXME: We need to check for wrap-around.
-    // Check to make sure that the allocation will fit in the current block.
-    loadPtr(&allocator->m_currentOffset, result);
-    addPtr(TrustedImm32(size), result);
-    loadPtr(&allocator->m_currentBlock, storagePtr);
-    addPtr(TrustedImm32(HeapBlock::s_blockSize), storagePtr);
-    addSlowCase(branchPtr(AboveOrEqual, result, storagePtr));
-
-    // Load the original offset.
-    loadPtr(&allocator->m_currentOffset, result);
-
-    // Bump the pointer forward.
-    move(result, storagePtr);
-    addPtr(TrustedImm32(size), storagePtr);
-    storePtr(storagePtr, &allocator->m_currentOffset);
+    loadPtr(&allocator->m_currentRemaining, result);
+    addSlowCase(branchSubPtr(Signed, TrustedImm32(size), result));
+    storePtr(result, &allocator->m_currentRemaining);
+    negPtr(result);
+    addPtr(AbsoluteAddress(&allocator->m_currentPayloadEnd), result);
+    subPtr(TrustedImm32(size), result);
 }
 
 inline void JIT::emitAllocateJSArray(unsigned valuesRegister, unsigned length, RegisterID cellResult, RegisterID storageResult, RegisterID storagePtr)
@@ -485,7 +453,7 @@ inline void JIT::emitAllocateJSArray(unsigned valuesRegister, unsigned length, R
 
     // We allocate the backing store first to ensure that garbage collection 
     // doesn't happen during JSArray initialization.
-    emitAllocateBasicStorage(initialStorage, storageResult, storagePtr);
+    emitAllocateBasicStorage(initialStorage, storageResult);
 
     // Allocate the cell for the array.
     emitAllocateBasicJSObject<JSArray, false>(TrustedImmPtr(m_codeBlock->globalObject()->arrayStructure()), cellResult, storagePtr);

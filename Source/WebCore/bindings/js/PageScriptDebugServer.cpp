@@ -75,7 +75,6 @@ PageScriptDebugServer::PageScriptDebugServer()
 
 PageScriptDebugServer::~PageScriptDebugServer()
 {
-    deleteAllValues(m_pageListenersMap);
 }
 
 void PageScriptDebugServer::addListener(ScriptDebugListener* listener, Page* page)
@@ -83,11 +82,9 @@ void PageScriptDebugServer::addListener(ScriptDebugListener* listener, Page* pag
     ASSERT_ARG(listener, listener);
     ASSERT_ARG(page, page);
 
-    PageListenersMap::AddResult result = m_pageListenersMap.add(page, 0);
-    if (result.isNewEntry)
-        result.iterator->second = new ListenerSet;
-
-    ListenerSet* listeners = result.iterator->second;
+    OwnPtr<ListenerSet>& listeners = m_pageListenersMap.add(page, nullptr).iterator->second;
+    if (!listeners)
+        listeners = adoptPtr(new ListenerSet);
     listeners->add(listener);
 
     recompileAllJSFunctionsSoon();
@@ -103,18 +100,17 @@ void PageScriptDebugServer::removeListener(ScriptDebugListener* listener, Page* 
     if (it == m_pageListenersMap.end())
         return;
 
-    ListenerSet* listeners = it->second;
+    ListenerSet* listeners = it->second.get();
     listeners->remove(listener);
     if (listeners->isEmpty()) {
         m_pageListenersMap.remove(it);
-        delete listeners;
         didRemoveLastListener(page);
     }
 }
 
 void PageScriptDebugServer::recompileAllJSFunctions(Timer<ScriptDebugServer>*)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindow::commonJSGlobalData());
     // If JavaScript stack is not empty postpone recompilation.
     if (JSDOMWindow::commonJSGlobalData()->dynamicGlobalObject)
         recompileAllJSFunctionsSoon();

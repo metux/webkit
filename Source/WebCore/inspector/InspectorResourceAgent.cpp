@@ -54,11 +54,13 @@
 #include "Page.h"
 #include "ProgressTracker.h"
 #include "ResourceError.h"
+#include "ResourceLoader.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
 #include "ScriptableDocumentParser.h"
+#include "SubresourceLoader.h"
 #include "WebSocketFrame.h"
 #include "WebSocketHandshakeRequest.h"
 #include "WebSocketHandshakeResponse.h"
@@ -221,8 +223,8 @@ void InspectorResourceAgent::willSendRequest(unsigned long identifier, DocumentL
     request.setReportRawHeaders(true);
 
     if (m_state->getBoolean(ResourceAgentState::cacheDisabled)) {
-        request.setCachePolicy(ReloadIgnoringCacheData);
         request.setHTTPHeaderField("Pragma", "no-cache");
+        request.setCachePolicy(ReloadIgnoringCacheData);
         request.setHTTPHeaderField("Cache-Control", "no-cache");
     }
 
@@ -235,15 +237,20 @@ void InspectorResourceAgent::markResourceAsCached(unsigned long identifier)
     m_frontend->requestServedFromCache(IdentifiersFactory::requestId(identifier));
 }
 
-void InspectorResourceAgent::didReceiveResponse(unsigned long identifier, DocumentLoader* loader, const ResourceResponse& response)
+void InspectorResourceAgent::didReceiveResponse(unsigned long identifier, DocumentLoader* loader, const ResourceResponse& response, ResourceLoader* resourceLoader)
 {
     String requestId = IdentifiersFactory::requestId(identifier);
     RefPtr<TypeBuilder::Network::Response> resourceResponse = buildObjectForResourceResponse(response, loader);
     InspectorPageAgent::ResourceType type = InspectorPageAgent::OtherResource;
     long cachedResourceSize = 0;
 
+    bool isNotModified = response.httpStatusCode() == 304;
     if (loader) {
-        CachedResource* cachedResource = InspectorPageAgent::cachedResource(loader->frame(), response.url());
+        CachedResource* cachedResource = 0;
+        if (resourceLoader && resourceLoader->isSubresourceLoader() && !isNotModified)
+            cachedResource = static_cast<SubresourceLoader*>(resourceLoader)->cachedResource();
+        if (!cachedResource)
+            cachedResource = InspectorPageAgent::cachedResource(loader->frame(), response.url());
         if (cachedResource) {
             type = InspectorPageAgent::cachedResourceType(*cachedResource);
             cachedResourceSize = cachedResource->encodedSize();
@@ -268,7 +275,7 @@ void InspectorResourceAgent::didReceiveResponse(unsigned long identifier, Docume
     m_frontend->responseReceived(requestId, m_pageAgent->frameId(loader->frame()), m_pageAgent->loaderId(loader), currentTime(), InspectorPageAgent::resourceTypeJson(type), resourceResponse);
     // If we revalidated the resource and got Not modified, send content length following didReceiveResponse
     // as there will be no calls to didReceiveData from the network stack.
-    if (cachedResourceSize && response.httpStatusCode() == 304)
+    if (cachedResourceSize && isNotModified)
         didReceiveData(identifier, 0, cachedResourceSize, 0);
 }
 
@@ -283,7 +290,7 @@ void InspectorResourceAgent::didReceiveData(unsigned long identifier, const char
 
     if (data) {
         NetworkResourcesData::ResourceData const* resourceData = m_resourcesData->data(requestId);
-        if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::OtherResource || (resourceData && isErrorStatusCode(resourceData->httpStatusCode()) && (resourceData->cachedResource())))
+        if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::OtherResource || (resourceData && isErrorStatusCode(resourceData->httpStatusCode()) && resourceData->cachedResource()))
             m_resourcesData->maybeAddResourceData(requestId, data, dataLength);
     }
 
@@ -362,6 +369,21 @@ void InspectorResourceAgent::willLoadXHRSynchronously()
 void InspectorResourceAgent::didLoadXHRSynchronously()
 {
     m_loadingXHRSynchronously = false;
+}
+
+void InspectorResourceAgent::willDestroyCachedResource(CachedResource* cachedResource)
+{
+    Vector<String> requestIds = m_resourcesData->removeCachedResource(cachedResource);
+    if (!requestIds.size())
+        return;
+
+    String content;
+    bool base64Encoded;
+    if (!InspectorPageAgent::cachedResourceContent(cachedResource, &content, &base64Encoded))
+        return;
+    Vector<String>::iterator end = requestIds.end();
+    for (Vector<String>::iterator it = requestIds.begin(); it != end; ++it)
+        m_resourcesData->setResourceContent(*it, content, base64Encoded);
 }
 
 void InspectorResourceAgent::applyUserAgentOverride(String* userAgent)
@@ -529,7 +551,7 @@ void InspectorResourceAgent::getResponseBody(ErrorString* errorString, const Str
     }
 
     if (resourceData->hasContent()) {
-        *base64Encoded = false;
+        *base64Encoded = resourceData->base64Encoded();
         *content = resourceData->content();
         return;
     }

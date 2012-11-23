@@ -36,6 +36,7 @@ namespace WebCore {
 
 class IDBCallbacks;
 class IDBKey;
+class IDBKeyPath;
 class IDBKeyRange;
 class IDBTransactionBackendInterface;
 
@@ -44,12 +45,6 @@ typedef int ExceptionCode;
 class IDBIndexBackendInterface : public ThreadSafeRefCounted<IDBIndexBackendInterface> {
 public:
     virtual ~IDBIndexBackendInterface() { }
-
-    virtual String name() = 0;
-    virtual String storeName() = 0;
-    virtual String keyPath() = 0;
-    virtual bool unique() = 0;
-    virtual bool multiEntry() = 0;
 
     virtual void openCursor(PassRefPtr<IDBKeyRange>, unsigned short direction, PassRefPtr<IDBCallbacks>, IDBTransactionBackendInterface*, ExceptionCode&) = 0;
     virtual void count(PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>, IDBTransactionBackendInterface*, ExceptionCode&) = 0;

@@ -29,6 +29,7 @@
 #include "Color.h"
 #include "Frame.h"
 #include "LayoutTypes.h"
+#include "Pagination.h"
 #include "PaintPhase.h"
 #include "ScrollView.h"
 #include <wtf/Forward.h>
@@ -51,6 +52,8 @@ class RenderEmbeddedObject;
 class RenderLayer;
 class RenderObject;
 class RenderScrollbarPart;
+
+Pagination::Mode paginationModeForRenderStyle(RenderStyle*);
 
 typedef unsigned long long DOMTimeStamp;
 
@@ -112,7 +115,7 @@ public:
     bool needsFullRepaint() const { return m_doFullRepaint; }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-    void serviceScriptedAnimations(double monotonicAnimationStartTime);
+    void serviceScriptedAnimations(DOMTimeStamp);
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -168,7 +171,7 @@ public:
     void adjustViewSize();
     
     virtual IntRect windowClipRect(bool clipToContents = true) const;
-    IntRect windowClipRectForLayer(const RenderLayer*, bool clipToLayerContents) const;
+    IntRect windowClipRectForFrameOwner(const HTMLFrameOwnerElement*, bool clipToLayerContents) const;
 
     virtual IntRect windowResizerRect() const;
 
@@ -194,14 +197,14 @@ public:
     void removeSlowRepaintObject();
     bool hasSlowRepaintObjects() const { return m_slowRepaintObjectCount; }
 
-    void addFixedObject();
-    void removeFixedObject();
-    bool hasFixedObjects() const { return m_fixedObjectCount > 0; }
+    typedef HashSet<RenderObject*> FixedObjectSet;
+    void addFixedObject(RenderObject*);
+    void removeFixedObject(RenderObject*);
+    const FixedObjectSet* fixedObjects() const { return m_fixedObjects.get(); }
+    bool hasFixedObjects() const { return m_fixedObjects && m_fixedObjects->size() > 0; }
 
     // Functions for querying the current scrolled position, negating the effects of overhang
     // and adjusting for page scale.
-    int scrollXForFixedPosition() const;
-    int scrollYForFixedPosition() const;
     IntSize scrollOffsetForFixedPosition() const;
 
     bool fixedElementsLayoutRelativeToFrame() const;
@@ -209,6 +212,7 @@ public:
     void beginDeferredRepaints();
     void endDeferredRepaints();
     void checkStopDelayingDeferredRepaints();
+    void stopDelayingDeferredRepaints();
     void startDeferredRepaintTimer(double delay);
     void resetDeferredRepaintDelay();
 
@@ -216,7 +220,7 @@ public:
     void endDisableRepaints();
     bool repaintsDisabled() { return m_disableRepaints > 0; }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     void updateDashboardRegions();
 #endif
     void updateControlTints();
@@ -242,13 +246,20 @@ public:
     PaintBehavior paintBehavior() const;
     bool isPainting() const;
     bool hasEverPainted() const { return m_lastPaintTime; }
+    void setLastPaintTime(double lastPaintTime) { m_lastPaintTime = lastPaintTime; }
     void setNodeToDraw(Node*);
+
+    enum SelectionInSnaphot { IncludeSelection, ExcludeSelection };
+    enum CoordinateSpaceForSnapshot { DocumentCoordinates, ViewCoordinates };
+    void paintContentsForSnapshot(GraphicsContext*, const IntRect& imageRect, SelectionInSnaphot shouldPaintSelection, CoordinateSpaceForSnapshot);
 
     virtual void paintOverhangAreas(GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
     virtual void paintScrollCorner(GraphicsContext*, const IntRect& cornerRect);
     virtual void paintScrollbar(GraphicsContext*, Scrollbar*, const IntRect&) OVERRIDE;
 
     Color documentBackgroundColor() const;
+
+    bool isInChildFrameWithFrameFlattening() const;
 
     static double currentPaintTimeStamp() { return sCurrentPaintTimeStamp; } // returns 0 if not painting
     
@@ -318,8 +329,6 @@ public:
     void setAnimatorsAreActive();
 
     RenderBox* embeddedContentBox() const;
-
-    void clearOwningRendererForCustomScrollbars(RenderBox*);
     
     void setTracksRepaints(bool);
     bool isTrackingRepaints() const { return m_isTrackingRepaints; }
@@ -339,6 +348,17 @@ public:
     // we need this function in order to do the scroll ourselves.
     bool wheelEvent(const PlatformWheelEvent&);
 
+    void setScrollingPerformanceLoggingEnabled(bool);
+
+    // Page and FrameView both store a Pagination value. Page::pagination() is set only by API,
+    // and FrameView::pagination() is set only by CSS. Page::pagination() will affect all
+    // FrameViews in the page cache, but FrameView::pagination() only affects the current
+    // FrameView. FrameView::pagination() will return m_pagination if it has been set. Otherwise,
+    // it will return Page::pagination() since currently there are no callers that need to
+    // distinguish between the two.
+    const Pagination& pagination() const;
+    void setPagination(const Pagination&);
+
 protected:
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);
     virtual void scrollContentsSlowPath(const IntRect& updateRect);
@@ -347,7 +367,7 @@ protected:
     virtual bool isFlippedDocument() const;
 
 private:
-    FrameView(Frame*);
+    explicit FrameView(Frame*);
 
     void reset();
     void init();
@@ -424,7 +444,6 @@ private:
 
     FrameView* parentFrameView() const;
 
-    bool isInChildFrameWithFrameFlattening();
     bool doLayoutWithFrameFlattening(bool allowSubtree);
 
     virtual AXObjectCache* axObjectCache() const;
@@ -446,7 +465,6 @@ private:
     bool m_isOverlapped;
     bool m_contentIsOpaque;
     unsigned m_slowRepaintObjectCount;
-    unsigned m_fixedObjectCount;
     int m_borderX;
     int m_borderY;
 
@@ -477,6 +495,8 @@ private:
     bool m_horizontalOverflow;
     bool m_verticalOverflow;    
     RenderObject* m_viewportRenderer;
+
+    Pagination m_pagination;
 
     bool m_wasScrolledByUser;
     bool m_inProgrammaticScroll;
@@ -524,6 +544,7 @@ private:
     IntSize m_maxAutoSize;
 
     OwnPtr<ScrollableAreaSet> m_scrollableAreas;
+    OwnPtr<FixedObjectSet> m_fixedObjects;
 
     static double s_deferredRepaintDelay;
     static double s_initialDeferredRepaintDelayDuringLoading;

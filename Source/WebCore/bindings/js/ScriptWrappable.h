@@ -32,6 +32,7 @@
 #define ScriptWrappable_h
 
 #include "JSDOMWrapper.h"
+#include "MemoryInstrumentation.h"
 #include <heap/Weak.h>
 
 namespace WebCore {
@@ -51,8 +52,13 @@ public:
 
     void clearWrapper(JSDOMWrapper* wrapper)
     {
-        ASSERT_UNUSED(wrapper, m_wrapper.was(wrapper));
-        m_wrapper.clear();
+        weakClear(m_wrapper, wrapper);
+    }
+
+    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+    {
+        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+        info.addMember(m_wrapper);
     }
 
 private:

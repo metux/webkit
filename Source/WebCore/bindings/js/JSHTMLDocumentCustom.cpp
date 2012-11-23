@@ -51,25 +51,24 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-bool JSHTMLDocument::canGetItemsForName(ExecState*, HTMLDocument* document, const Identifier& propertyName)
+bool JSHTMLDocument::canGetItemsForName(ExecState*, HTMLDocument* document, PropertyName propertyName)
 {
     AtomicStringImpl* atomicPropertyName = findAtomicString(propertyName);
     return atomicPropertyName && (document->hasNamedItem(atomicPropertyName) || document->hasExtraNamedItem(atomicPropertyName));
 }
 
-JSValue JSHTMLDocument::nameGetter(ExecState* exec, JSValue slotBase, const Identifier& propertyName)
+JSValue JSHTMLDocument::nameGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
 {
     JSHTMLDocument* thisObj = jsCast<JSHTMLDocument*>(asObject(slotBase));
     HTMLDocument* document = static_cast<HTMLDocument*>(thisObj->impl());
 
-    HTMLCollection* collection = document->documentNamedItems(identifierToAtomicString(propertyName));
+    RefPtr<HTMLCollection> collection = document->documentNamedItems(propertyNameToAtomicString(propertyName));
 
-    unsigned length = collection->length();
-    if (!length)
+    if (collection->isEmpty())
         return jsUndefined();
 
-    if (length == 1) {
-        Node* node = collection->firstItem();
+    if (collection->hasExactlyOneItem()) {
+        Node* node = collection->item(0);
 
         Frame* frame;
         if (node->hasTagName(iframeTag) && (frame = static_cast<HTMLIFrameElement*>(node)->contentFrame()))
@@ -78,7 +77,7 @@ JSValue JSHTMLDocument::nameGetter(ExecState* exec, JSValue slotBase, const Iden
         return toJS(exec, thisObj->globalObject(), node);
     } 
 
-    return toJS(exec, thisObj->globalObject(), collection);
+    return toJS(exec, thisObj->globalObject(), WTF::getPtr(collection));
 }
 
 // Custom attributes

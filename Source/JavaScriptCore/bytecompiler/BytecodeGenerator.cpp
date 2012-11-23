@@ -32,6 +32,7 @@
 #include "BytecodeGenerator.h"
 
 #include "BatchedTransitionOptimizer.h"
+#include "Comment.h"
 #include "JSActivation.h"
 #include "JSFunction.h"
 #include "Interpreter.h"
@@ -148,6 +149,7 @@ void ResolveResult::checkValidity()
         return;
     case IndexedGlobal:
     case ReadOnlyIndexedGlobal:
+    case WatchedIndexedGlobal:
     case DynamicIndexedGlobal:
     case DynamicReadOnlyIndexedGlobal:
         ASSERT(m_index != missingSymbolMarker());
@@ -160,6 +162,11 @@ void ResolveResult::checkValidity()
     }
 }
 #endif
+
+WriteBarrier<Unknown>* ResolveResult::registerPointer() const
+{
+    return &jsCast<JSGlobalObject*>(globalObject())->registerAt(index());
+}
 
 static bool s_dumpsGeneratedCode = false;
 
@@ -186,10 +193,12 @@ JSObject* BytecodeGenerator::generate()
     if (s_dumpsGeneratedCode)
         m_codeBlock->dump(m_scopeChain->globalObject->globalExec());
 
+#ifdef NDEBUG
     if ((m_codeType == FunctionCode && !m_codeBlock->needsFullScopeChain() && !m_codeBlock->usesArguments()) || m_codeType == EvalCode)
         symbolTable().clear();
+#endif
 
-    m_codeBlock->shrinkToFit();
+    m_codeBlock->shrinkToFit(CodeBlock::EarlyShrink);
 
     if (m_expressionTooDeep)
         return createOutOfMemoryError(m_scopeChain->globalObject.get());
@@ -211,13 +220,19 @@ bool BytecodeGenerator::addVar(const Identifier& ident, bool isConstant, Registe
     return true;
 }
 
-int BytecodeGenerator::addGlobalVar(const Identifier& ident, bool isConstant)
+int BytecodeGenerator::addGlobalVar(
+    const Identifier& ident, ConstantMode constantMode, FunctionMode functionMode)
 {
+    UNUSED_PARAM(functionMode);
     int index = symbolTable().size();
-    SymbolTableEntry newEntry(index, isConstant ? ReadOnly : 0);
+    SymbolTableEntry newEntry(index, (constantMode == IsConstant) ? ReadOnly : 0);
+    if (functionMode == IsFunctionToSpecialize)
+        newEntry.attemptToWatch();
     SymbolTable::AddResult result = symbolTable().add(ident.impl(), newEntry);
-    if (!result.isNewEntry)
+    if (!result.isNewEntry) {
+        result.iterator->second.notifyWrite();
         index = result.iterator->second.getIndex();
+    }
     return index;
 }
 
@@ -233,6 +248,9 @@ BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, ScopeChainNode* s
     , m_shouldEmitRichSourceInfo(scopeChain->globalObject->globalObjectMethodTable()->supportsRichSourceInfo(scopeChain->globalObject.get()))
     , m_scopeChain(*scopeChain->globalData, scopeChain)
     , m_symbolTable(symbolTable)
+#if ENABLE(BYTECODE_COMMENTS)
+    , m_currentCommentString(0)
+#endif
     , m_scopeNode(programNode)
     , m_codeBlock(codeBlock)
     , m_thisRegister(CallFrame::thisArgumentOffset())
@@ -258,6 +276,7 @@ BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, ScopeChainNode* s
     if (m_shouldEmitDebugHooks)
         m_codeBlock->setNeedsFullScopeChain(true);
 
+    prependComment("entering Program block");
     emitOpcode(op_enter);
     codeBlock->setGlobalData(m_globalData);
 
@@ -280,21 +299,27 @@ BytecodeGenerator::BytecodeGenerator(ProgramNode* programNode, ScopeChainNode* s
     size_t newGlobals = varStack.size() + functionStack.size();
     if (!newGlobals)
         return;
-    globalObject->resizeRegisters(symbolTable->size() + newGlobals);
+    globalObject->addRegisters(newGlobals);
 
     for (size_t i = 0; i < functionStack.size(); ++i) {
         FunctionBodyNode* function = functionStack[i];
-        globalObject->removeDirect(*m_globalData, function->ident()); // Newly declared functions overwrite existing properties.
-
+        bool propertyDidExist = 
+            globalObject->removeDirect(*m_globalData, function->ident()); // Newly declared functions overwrite existing properties.
+        
         JSValue value = JSFunction::create(exec, makeFunction(exec, function), scopeChain);
-        int index = addGlobalVar(function->ident(), false);
+        int index = addGlobalVar(
+            function->ident(), IsVariable,
+            !propertyDidExist ? IsFunctionToSpecialize : NotFunctionOrNotSpecializable);
         globalObject->registerAt(index).set(*m_globalData, globalObject, value);
     }
 
     for (size_t i = 0; i < varStack.size(); ++i) {
         if (globalObject->hasProperty(exec, *varStack[i].first))
             continue;
-        addGlobalVar(*varStack[i].first, varStack[i].second & DeclarationStacks::IsConstant);
+        addGlobalVar(
+            *varStack[i].first,
+            (varStack[i].second & DeclarationStacks::IsConstant) ? IsConstant : IsVariable,
+            NotFunctionOrNotSpecializable);
     }
 }
 
@@ -304,6 +329,9 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
     , m_shouldEmitRichSourceInfo(scopeChain->globalObject->globalObjectMethodTable()->supportsRichSourceInfo(scopeChain->globalObject.get()))
     , m_scopeChain(*scopeChain->globalData, scopeChain)
     , m_symbolTable(symbolTable)
+#if ENABLE(BYTECODE_COMMENTS)
+    , m_currentCommentString(0)
+#endif
     , m_scopeNode(functionBody)
     , m_codeBlock(codeBlock)
     , m_activationRegister(0)
@@ -331,9 +359,11 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
 
     codeBlock->setGlobalData(m_globalData);
     
+    prependComment("entering Function block");
     emitOpcode(op_enter);
     if (m_codeBlock->needsFullScopeChain()) {
         m_activationRegister = addVar();
+        prependComment("activation for Full Scope Chain");
         emitInitLazyRegister(m_activationRegister);
         m_codeBlock->setActivationRegister(m_activationRegister->index());
     }
@@ -350,10 +380,13 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
         codeBlock->setArgumentsRegister(argumentsRegister->index());
         ASSERT_UNUSED(unmodifiedArgumentsRegister, unmodifiedArgumentsRegister->index() == JSC::unmodifiedArgumentsRegister(codeBlock->argumentsRegister()));
 
+        prependComment("arguments for Full Scope Chain");
         emitInitLazyRegister(argumentsRegister);
+        prependComment("unmodified arguments for Full Scope Chain");
         emitInitLazyRegister(unmodifiedArgumentsRegister);
         
         if (m_codeBlock->isStrictMode()) {
+            prependComment("create arguments for strict mode");
             emitOpcode(op_create_arguments);
             instructions().append(argumentsRegister->index());
         }
@@ -362,6 +395,7 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
         // it from a call frame.  In the long-term it should stop doing that (<rdar://problem/6911886>),
         // but for now we force eager creation of the arguments object when debugging.
         if (m_shouldEmitDebugHooks) {
+            prependComment("create arguments for debug hooks");
             emitOpcode(op_create_arguments);
             instructions().append(argumentsRegister->index());
         }
@@ -380,10 +414,12 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
             if (functionBody->captures(ident)) {
                 if (!m_hasCreatedActivation) {
                     m_hasCreatedActivation = true;
+                    prependComment("activation for captured vars");
                     emitOpcode(op_create_activation);
                     instructions().append(m_activationRegister->index());
                 }
                 m_functions.add(ident.impl());
+                prependComment("captured function var");
                 emitNewFunction(addVar(ident, false), function);
             }
         }
@@ -396,6 +432,7 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
     bool canLazilyCreateFunctions = !functionBody->needsActivationForMoreThanVariables() && !m_shouldEmitDebugHooks;
     if (!canLazilyCreateFunctions && !m_hasCreatedActivation) {
         m_hasCreatedActivation = true;
+        prependComment("cannot lazily create functions");
         emitOpcode(op_create_activation);
         instructions().append(m_activationRegister->index());
     }
@@ -410,6 +447,7 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
             RefPtr<RegisterID> reg = addVar(ident, false);
             // Don't lazily create functions that override the name 'arguments'
             // as this would complicate lazy instantiation of actual arguments.
+            prependComment("a function that override 'arguments'");
             if (!canLazilyCreateFunctions || ident == propertyNames().arguments)
                 emitNewFunction(reg.get(), function);
             else {
@@ -442,20 +480,13 @@ BytecodeGenerator::BytecodeGenerator(FunctionBodyNode* functionBody, ScopeChainN
     preserveLastVar();
 
     if (isConstructor()) {
-        RefPtr<RegisterID> func = newTemporary();
-        RefPtr<RegisterID> funcProto = newTemporary();
-
-        emitOpcode(op_get_callee);
-        instructions().append(func->index());
-        // Load prototype.
-        emitGetById(funcProto.get(), func.get(), globalData()->propertyNames->prototype);
-
+        prependComment("'this' because we are a Constructor function");
         emitOpcode(op_create_this);
         instructions().append(m_thisRegister.index());
-        instructions().append(funcProto->index());
     } else if (!codeBlock->isStrictMode() && (functionBody->usesThis() || codeBlock->usesEval() || m_shouldEmitDebugHooks)) {
-        emitOpcode(op_convert_this);
+        ValueProfile* profile = emitProfiledOpcode(op_convert_this);
         instructions().append(m_thisRegister.index());
+        instructions().append(profile);
     }
 }
 
@@ -465,6 +496,9 @@ BytecodeGenerator::BytecodeGenerator(EvalNode* evalNode, ScopeChainNode* scopeCh
     , m_shouldEmitRichSourceInfo(scopeChain->globalObject->globalObjectMethodTable()->supportsRichSourceInfo(scopeChain->globalObject.get()))
     , m_scopeChain(*scopeChain->globalData, scopeChain)
     , m_symbolTable(symbolTable)
+#if ENABLE(BYTECODE_COMMENTS)
+    , m_currentCommentString(0)
+#endif
     , m_scopeNode(evalNode)
     , m_codeBlock(codeBlock)
     , m_thisRegister(CallFrame::thisArgumentOffset())
@@ -490,6 +524,7 @@ BytecodeGenerator::BytecodeGenerator(EvalNode* evalNode, ScopeChainNode* scopeCh
     if (m_shouldEmitDebugHooks || m_baseScopeDepth)
         m_codeBlock->setNeedsFullScopeChain(true);
 
+    prependComment("entering Eval block");
     emitOpcode(op_enter);
     codeBlock->setGlobalData(m_globalData);
     m_codeBlock->setNumParameters(1);
@@ -648,8 +683,38 @@ void BytecodeGenerator::emitOpcode(OpcodeID opcodeID)
     ASSERT(opcodePosition - m_lastOpcodePosition == opcodeLength(m_lastOpcodeID) || m_lastOpcodeID == op_end);
     m_lastOpcodePosition = opcodePosition;
 #endif
+    emitComment();
     instructions().append(globalData()->interpreter->getOpcode(opcodeID));
     m_lastOpcodeID = opcodeID;
+}
+
+#if ENABLE(BYTECODE_COMMENTS)
+// Record a comment in the CodeBlock's comments list for the current opcode
+// that is about to be emitted.
+void BytecodeGenerator::emitComment()
+{
+    if (m_currentCommentString) {
+        size_t opcodePosition = instructions().size();
+        Comment comment = { opcodePosition, m_currentCommentString };
+        m_codeBlock->bytecodeComments().append(comment);
+        m_currentCommentString = 0;
+    }
+}
+
+// Register a comment to be associated with the next opcode that will be emitted.
+void BytecodeGenerator::prependComment(const char* string)
+{
+    m_currentCommentString = string;
+}
+#endif
+
+ArrayProfile* BytecodeGenerator::newArrayProfile()
+{
+#if ENABLE(VALUE_PROFILER)
+    return m_codeBlock->addArrayProfile(instructions().size());
+#else
+    return 0;
+#endif
 }
 
 ValueProfile* BytecodeGenerator::emitProfiledOpcode(OpcodeID opcodeID)
@@ -684,6 +749,14 @@ void BytecodeGenerator::retrieveLastUnaryOp(int& dstIndex, int& srcIndex)
     ASSERT(instructions().size() >= 3);
     size_t size = instructions().size();
     dstIndex = instructions().at(size - 2).u.operand;
+    srcIndex = instructions().at(size - 1).u.operand;
+}
+
+void BytecodeGenerator::retrieveLastUnaryOp(WriteBarrier<Unknown>*& dstPointer, int& srcIndex)
+{
+    ASSERT(instructions().size() >= 3);
+    size_t size = instructions().size();
+    dstPointer = instructions().at(size - 2).u.registerPointer;
     srcIndex = instructions().at(size - 1).u.operand;
 }
 
@@ -1178,14 +1251,15 @@ ResolveResult BytecodeGenerator::resolve(const Identifier& property)
     ScopeChainIterator iter = m_scopeChain->begin();
     ScopeChainIterator end = m_scopeChain->end();
     size_t depth = 0;
+    size_t depthOfFirstScopeWithDynamicChecks = 0;
     unsigned flags = 0;
     for (; iter != end; ++iter, ++depth) {
         JSObject* currentScope = iter->get();
         if (!currentScope->isVariableObject()) {
             flags |= ResolveResult::DynamicFlag;
             break;
-        }        
-        JSVariableObject* currentVariableObject = jsCast<JSVariableObject*>(currentScope);
+        }
+        JSSymbolTableObject* currentVariableObject = jsCast<JSSymbolTableObject*>(currentScope);
         SymbolTableEntry entry = currentVariableObject->symbolTable().get(property.impl());
 
         // Found the property
@@ -1196,7 +1270,9 @@ ResolveResult BytecodeGenerator::resolve(const Identifier& property)
             if (++iter == end) {
                 if (flags & ResolveResult::DynamicFlag)
                     return ResolveResult::dynamicIndexedGlobalResolve(entry.getIndex(), depth, currentScope, flags);
-                return ResolveResult::indexedGlobalResolve(entry.getIndex(), currentScope, flags);
+                return ResolveResult::indexedGlobalResolve(
+                    entry.getIndex(), currentScope,
+                    flags | (entry.couldBeWatched() ? ResolveResult::WatchedFlag : 0));
             }
 #if !ASSERT_DISABLED
             if (JSActivation* activation = jsDynamicCast<JSActivation*>(currentVariableObject))
@@ -1207,19 +1283,27 @@ ResolveResult BytecodeGenerator::resolve(const Identifier& property)
         bool scopeRequiresDynamicChecks = false;
         if (currentVariableObject->isDynamicScope(scopeRequiresDynamicChecks))
             break;
-        if (scopeRequiresDynamicChecks)
-            flags |= ResolveResult::DynamicFlag;
+        if (!(flags & ResolveResult::DynamicFlag)) {
+            if (scopeRequiresDynamicChecks)
+                flags |= ResolveResult::DynamicFlag;
+            else
+                ++depthOfFirstScopeWithDynamicChecks;
+        }
     }
 
     // Can't locate the property but we're able to avoid a few lookups.
     JSObject* scope = iter->get();
+    // Step over the function's activation, if it needs one. At this point we
+    // know there is no dynamic scope in the function itself, so this is safe to
+    // do.
     depth += m_codeBlock->needsFullScopeChain();
+    depthOfFirstScopeWithDynamicChecks += m_codeBlock->needsFullScopeChain();
     if (++iter == end) {
         if ((flags & ResolveResult::DynamicFlag) && depth)
             return ResolveResult::dynamicGlobalResolve(depth, scope);
         return ResolveResult::globalResolve(scope);
     }
-    return ResolveResult::dynamicResolve(depth);
+    return ResolveResult::dynamicResolve(depthOfFirstScopeWithDynamicChecks);
 }
 
 ResolveResult BytecodeGenerator::resolveConstDecl(const Identifier& property)
@@ -1242,7 +1326,7 @@ ResolveResult BytecodeGenerator::resolveConstDecl(const Identifier& property)
         JSObject* currentScope = iter->get();
         if (!currentScope->isVariableObject())
             continue;
-        JSVariableObject* currentVariableObject = jsCast<JSVariableObject*>(currentScope);
+        JSSymbolTableObject* currentVariableObject = jsCast<JSSymbolTableObject*>(currentScope);
         SymbolTableEntry entry = currentVariableObject->symbolTable().get(property.impl());
         if (entry.isNull())
             continue;
@@ -1282,7 +1366,7 @@ bool BytecodeGenerator::shouldAvoidResolveGlobal()
 RegisterID* BytecodeGenerator::emitResolve(RegisterID* dst, const ResolveResult& resolveResult, const Identifier& property)
 {
     if (resolveResult.isStatic())
-        return emitGetStaticVar(dst, resolveResult);
+        return emitGetStaticVar(dst, resolveResult, property);
     
     if (resolveResult.isGlobal() && !shouldAvoidResolveGlobal()) {
 #if ENABLE(JIT)
@@ -1365,7 +1449,7 @@ RegisterID* BytecodeGenerator::emitResolveWithBase(RegisterID* baseDst, Register
 
         if (resolveResult.isStatic()) {
             // Directly index the property lookup across multiple scopes.
-            emitGetStaticVar(propDst, resolveResult);
+            emitGetStaticVar(propDst, resolveResult, property);
             return baseDst;
         }
 
@@ -1380,9 +1464,7 @@ RegisterID* BytecodeGenerator::emitResolveWithBase(RegisterID* baseDst, Register
 #if ENABLE(JIT)
         m_codeBlock->addGlobalResolveInfo(instructions().size());
 #endif
-#if ENABLE(CLASSIC_INTERPRETER)
         m_codeBlock->addGlobalResolveInstruction(instructions().size());
-#endif
         ValueProfile* profile = emitProfiledOpcode(op_resolve_global);
         instructions().append(propDst->index());
         instructions().append(addConstant(property));
@@ -1404,7 +1486,7 @@ RegisterID* BytecodeGenerator::emitResolveWithThis(RegisterID* baseDst, Register
 {
     if (resolveResult.isStatic()) {
         emitLoad(baseDst, jsUndefined());
-        emitGetStaticVar(propDst, resolveResult);
+        emitGetStaticVar(propDst, resolveResult, property);
         return baseDst;
     }
 
@@ -1422,7 +1504,7 @@ RegisterID* BytecodeGenerator::emitResolveWithThis(RegisterID* baseDst, Register
     return emitResolve(propDst, resolveResult, property);
 }
 
-RegisterID* BytecodeGenerator::emitGetStaticVar(RegisterID* dst, const ResolveResult& resolveResult)
+RegisterID* BytecodeGenerator::emitGetStaticVar(RegisterID* dst, const ResolveResult& resolveResult, const Identifier& identifier)
 {
     ValueProfile* profile = 0;
 
@@ -1445,16 +1527,27 @@ RegisterID* BytecodeGenerator::emitGetStaticVar(RegisterID* dst, const ResolveRe
     case ResolveResult::IndexedGlobal:
     case ResolveResult::ReadOnlyIndexedGlobal:
         if (m_lastOpcodeID == op_put_global_var) {
-            int dstIndex;
+            WriteBarrier<Unknown>* dstPointer;
             int srcIndex;
-            retrieveLastUnaryOp(dstIndex, srcIndex);
-            if (dstIndex == resolveResult.index() && srcIndex == dst->index())
+            retrieveLastUnaryOp(dstPointer, srcIndex);
+            if (dstPointer == resolveResult.registerPointer() && srcIndex == dst->index())
                 return dst;
         }
 
         profile = emitProfiledOpcode(op_get_global_var);
         instructions().append(dst->index());
-        instructions().append(resolveResult.index());
+        instructions().append(resolveResult.registerPointer());
+        instructions().append(profile);
+        return dst;
+
+    case ResolveResult::WatchedIndexedGlobal:
+        // Skip the peephole for now. It's not clear that it's profitable given
+        // the DFG's capabilities, and the fact that if it's watchable then we
+        // don't expect to see any put_global_var's anyway.
+        profile = emitProfiledOpcode(op_get_global_var_watchable);
+        instructions().append(dst->index());
+        instructions().append(resolveResult.registerPointer());
+        instructions().append(addConstant(identifier)); // For the benefit of the DFG.
         instructions().append(profile);
         return dst;
 
@@ -1464,7 +1557,7 @@ RegisterID* BytecodeGenerator::emitGetStaticVar(RegisterID* dst, const ResolveRe
     }
 }
 
-RegisterID* BytecodeGenerator::emitPutStaticVar(const ResolveResult& resolveResult, RegisterID* value)
+RegisterID* BytecodeGenerator::emitPutStaticVar(const ResolveResult& resolveResult, const Identifier& identifier, RegisterID* value)
 {
     switch (resolveResult.type()) {
     case ResolveResult::Register:
@@ -1482,8 +1575,16 @@ RegisterID* BytecodeGenerator::emitPutStaticVar(const ResolveResult& resolveResu
     case ResolveResult::IndexedGlobal:
     case ResolveResult::ReadOnlyIndexedGlobal:
         emitOpcode(op_put_global_var);
-        instructions().append(resolveResult.index());
+        instructions().append(resolveResult.registerPointer());
         instructions().append(value->index());
+        return value;
+        
+    case ResolveResult::WatchedIndexedGlobal:
+        emitOpcode(op_put_global_var_check);
+        instructions().append(resolveResult.registerPointer());
+        instructions().append(value->index());
+        instructions().append(jsCast<JSGlobalObject*>(resolveResult.globalObject())->symbolTable().get(identifier.impl()).addressOfIsWatched());
+        instructions().append(addConstant(identifier));
         return value;
 
     default:
@@ -1575,11 +1676,13 @@ RegisterID* BytecodeGenerator::emitDeleteById(RegisterID* dst, RegisterID* base,
 
 RegisterID* BytecodeGenerator::emitGetArgumentByVal(RegisterID* dst, RegisterID* base, RegisterID* property)
 {
+    ArrayProfile* arrayProfile = newArrayProfile();
     ValueProfile* profile = emitProfiledOpcode(op_get_argument_by_val);
     instructions().append(dst->index());
     ASSERT(base->index() == m_codeBlock->argumentsRegister());
     instructions().append(base->index());
     instructions().append(property->index());
+    instructions().append(arrayProfile);
     instructions().append(profile);
     return dst;
 }
@@ -1599,20 +1702,24 @@ RegisterID* BytecodeGenerator::emitGetByVal(RegisterID* dst, RegisterID* base, R
             return dst;
         }
     }
+    ArrayProfile* arrayProfile = newArrayProfile();
     ValueProfile* profile = emitProfiledOpcode(op_get_by_val);
     instructions().append(dst->index());
     instructions().append(base->index());
     instructions().append(property->index());
+    instructions().append(arrayProfile);
     instructions().append(profile);
     return dst;
 }
 
 RegisterID* BytecodeGenerator::emitPutByVal(RegisterID* base, RegisterID* property, RegisterID* value)
 {
+    ArrayProfile* arrayProfile = newArrayProfile();
     emitOpcode(op_put_by_val);
     instructions().append(base->index());
     instructions().append(property->index());
     instructions().append(value->index());
+    instructions().append(arrayProfile);
     return value;
 }
 
@@ -1818,6 +1925,7 @@ RegisterID* BytecodeGenerator::emitCall(OpcodeID opcodeID, RegisterID* dst, Regi
     emitExpressionInfo(divot, startOffset, endOffset);
 
     // Emit call.
+    ArrayProfile* arrayProfile = newArrayProfile();
     emitOpcode(opcodeID);
     instructions().append(func->index()); // func
     instructions().append(callArguments.argumentCountIncludingThis()); // argCount
@@ -1827,7 +1935,7 @@ RegisterID* BytecodeGenerator::emitCall(OpcodeID opcodeID, RegisterID* dst, Regi
 #else
     instructions().append(0);
 #endif
-    instructions().append(0);
+    instructions().append(arrayProfile);
     if (dst != ignoredResult()) {
         ValueProfile* profile = emitProfiledOpcode(op_call_put_result);
         instructions().append(dst->index()); // dst
@@ -1989,7 +2097,7 @@ void BytecodeGenerator::emitPopScope()
     m_dynamicScopeDepth--;
 }
 
-void BytecodeGenerator::emitDebugHook(DebugHookID debugHookID, int firstLine, int lastLine)
+void BytecodeGenerator::emitDebugHook(DebugHookID debugHookID, int firstLine, int lastLine, int column)
 {
 #if ENABLE(DEBUG_WITH_BREAKPOINT)
     if (debugHookID != DidReachBreakpoint)
@@ -2002,6 +2110,7 @@ void BytecodeGenerator::emitDebugHook(DebugHookID debugHookID, int firstLine, in
     instructions().append(debugHookID);
     instructions().append(firstLine);
     instructions().append(lastLine);
+    instructions().append(column);
 }
 
 void BytecodeGenerator::pushFinallyContext(StatementNode* finallyBlock)

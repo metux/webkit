@@ -45,8 +45,42 @@ class RenderMultiColumnSet : public RenderRegionSet {
 public:
     RenderMultiColumnSet(Node*, RenderFlowThread*);
     
+    virtual bool isRenderMultiColumnSet() const OVERRIDE { return true; }
+
+    unsigned columnCount() const { return m_columnCount; }
+    LayoutUnit columnWidth() const { return m_columnWidth; }
+    LayoutUnit columnHeight() const { return m_columnHeight; }
+
+    void setColumnWidthAndCount(LayoutUnit width, unsigned count)
+    {
+        m_columnWidth = width;
+        m_columnCount = count;
+    }
+    void setColumnHeight(LayoutUnit height)
+    {
+        m_columnHeight = height;
+    }
+
 private:
+    virtual void computeLogicalWidth() OVERRIDE;
+    virtual void computeLogicalHeight() OVERRIDE;
+
+    virtual void paintReplaced(PaintInfo&, const LayoutPoint& paintOffset) OVERRIDE;
+
+    virtual LayoutUnit logicalWidthForFlowThreadContent() const OVERRIDE { return m_columnWidth; }
+    virtual LayoutUnit logicalHeightForFlowThreadContent() const OVERRIDE { return m_columnHeight; } // FIXME: Will be wrong once we have multiple sets.
+
     virtual const char* renderName() const;
+    
+    void paintColumnRules(PaintInfo&, const LayoutPoint& paintOffset);
+    void paintColumnContents(PaintInfo&, const LayoutPoint& paintOffset);
+
+    LayoutUnit columnGap() const;
+    LayoutRect columnRectAt( unsigned index) const;
+    
+    unsigned m_columnCount;
+    LayoutUnit m_columnWidth;
+    LayoutUnit m_columnHeight;
 };
 
 } // namespace WebCore

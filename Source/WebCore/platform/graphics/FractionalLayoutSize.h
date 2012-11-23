@@ -35,6 +35,14 @@
 #include "FractionalLayoutUnit.h"
 #include "IntSize.h"
 
+#if PLATFORM(QT)
+#include <qglobal.h>
+QT_BEGIN_NAMESPACE
+class QSize;
+class QSizeF;
+QT_END_NAMESPACE
+#endif
+
 namespace WebCore {
 
 class FractionalLayoutPoint;
@@ -66,8 +74,8 @@ public:
     
     void scale(float scale)
     {
-        m_width = static_cast<int>(static_cast<float>(m_width) * scale);
-        m_height = static_cast<int>(static_cast<float>(m_height) * scale);
+        m_width *= scale;
+        m_height *= scale;
     }
     
     FractionalLayoutSize expandedTo(const FractionalLayoutSize& other) const
@@ -91,6 +99,12 @@ public:
     {
         return FractionalLayoutSize(m_height, m_width);
     }
+
+#if PLATFORM(QT)
+    explicit FractionalLayoutSize(const QSize&);
+    explicit FractionalLayoutSize(const QSizeF&);
+    operator QSizeF() const;
+#endif
 
 private:
     FractionalLayoutUnit m_width, m_height;
@@ -137,15 +151,13 @@ inline bool operator!=(const FractionalLayoutSize& a, const FractionalLayoutSize
 
 inline IntSize flooredIntSize(const FractionalLayoutSize& s)
 {
-    return IntSize(s.width().toInt(), s.height().toInt());
+    return IntSize(s.width().floor(), s.height().floor());
 }
 
 inline IntSize roundedIntSize(const FractionalLayoutSize& s)
 {
     return IntSize(s.width().round(), s.height().round());
 }
-
-IntSize pixelSnappedIntSize(const FractionalLayoutSize&, const FractionalLayoutPoint&);
 
 } // namespace WebCore
 

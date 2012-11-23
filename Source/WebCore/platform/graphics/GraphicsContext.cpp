@@ -376,7 +376,7 @@ bool GraphicsContext::paintingDisabled() const
     return m_state.paintingDisabled;
 }
 
-#if !OS(WINCE) || (PLATFORM(QT) && !HAVE(QRAWFONT))
+#if !OS(WINCE)
 void GraphicsContext::drawText(const Font& font, const TextRun& run, const FloatPoint& point, int from, int to)
 {
     if (paintingDisabled())
@@ -482,14 +482,15 @@ void GraphicsContext::drawImage(Image* image, ColorSpace styleColorSpace, const 
 
     if (useLowQualityScale) {
         previousInterpolationQuality = imageInterpolationQuality();
+#if PLATFORM(CHROMIUM)
+        setImageInterpolationQuality(InterpolationLow);
+#else
         // FIXME (49002): Should be InterpolationLow
         setImageInterpolationQuality(InterpolationNone);
+#endif
     }
 
-    if (image->isBitmapImage())
-        static_cast<BitmapImage*>(image)->draw(this, FloatRect(dest.location(), FloatSize(tw, th)), FloatRect(src.location(), FloatSize(tsw, tsh)), styleColorSpace, op, shouldRespectImageOrientation);
-    else
-        image->draw(this, FloatRect(dest.location(), FloatSize(tw, th)), FloatRect(src.location(), FloatSize(tsw, tsh)), styleColorSpace, op);
+    image->draw(this, FloatRect(dest.location(), FloatSize(tw, th)), FloatRect(src.location(), FloatSize(tsw, tsh)), styleColorSpace, op, shouldRespectImageOrientation);
 
     if (useLowQualityScale)
         setImageInterpolationQuality(previousInterpolationQuality);
@@ -572,8 +573,12 @@ void GraphicsContext::drawImageBuffer(ImageBuffer* image, ColorSpace styleColorS
 
     if (useLowQualityScale) {
         InterpolationQuality previousInterpolationQuality = imageInterpolationQuality();
+#if PLATFORM(CHROMIUM)
+        setImageInterpolationQuality(InterpolationLow);
+#else
         // FIXME (49002): Should be InterpolationLow
         setImageInterpolationQuality(InterpolationNone);
+#endif
         image->draw(this, styleColorSpace, FloatRect(dest.location(), FloatSize(tw, th)), FloatRect(src.location(), FloatSize(tsw, tsh)), op, useLowQualityScale);
         setImageInterpolationQuality(previousInterpolationQuality);
     } else
@@ -753,13 +758,18 @@ void GraphicsContext::adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2
     }
 }
 
+static bool scalesMatch(AffineTransform a, AffineTransform b)
+{
+    return a.xScale() == b.xScale() && a.yScale() == b.yScale();
+}
+
 PassOwnPtr<ImageBuffer> GraphicsContext::createCompatibleBuffer(const IntSize& size) const
 {
     // Make the buffer larger if the context's transform is scaling it so we need a higher
     // resolution than one pixel per unit. Also set up a corresponding scale factor on the
     // graphics context.
 
-    AffineTransform transform = getCTM();
+    AffineTransform transform = getCTM(DefinitelyIncludeDeviceScale);
     IntSize scaledSize(static_cast<int>(ceil(size.width() * transform.xScale())), static_cast<int>(ceil(size.height() * transform.yScale())));
 
     OwnPtr<ImageBuffer> buffer = ImageBuffer::create(scaledSize, 1, ColorSpaceDeviceRGB, isAcceleratedContext() ? Accelerated : Unaccelerated);
@@ -770,6 +780,13 @@ PassOwnPtr<ImageBuffer> GraphicsContext::createCompatibleBuffer(const IntSize& s
         static_cast<float>(scaledSize.height()) / size.height()));
 
     return buffer.release();
+}
+
+bool GraphicsContext::isCompatibleWithBuffer(ImageBuffer* buffer) const
+{
+    GraphicsContext* bufferContext = buffer->context();
+
+    return scalesMatch(getCTM(), bufferContext->getCTM()) && isAcceleratedContext() == bufferContext->isAcceleratedContext();
 }
 
 #if !USE(CG)

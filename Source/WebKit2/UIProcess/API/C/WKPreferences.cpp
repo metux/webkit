@@ -328,6 +328,16 @@ bool WKPreferencesGetDeveloperExtrasEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->developerExtrasEnabled();
 }
 
+void WKPreferencesSetJavaScriptExperimentsEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setJavaScriptExperimentsEnabled(enabled);
+}
+
+bool WKPreferencesGetJavaScriptExperimentsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->javaScriptExperimentsEnabled();
+}
+
 void WKPreferencesSetTextAreasAreResizable(WKPreferencesRef preferencesRef, bool resizable)
 {
     toImpl(preferencesRef)->setTextAreasAreResizable(resizable);
@@ -426,6 +436,16 @@ void WKPreferencesSetCSSRegionsEnabled(WKPreferencesRef preferencesRef, bool fla
 bool WKPreferencesGetCSSRegionsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->cssRegionsEnabled();
+}
+
+void WKPreferencesSetCSSGridLayoutEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setCSSGridLayoutEnabled(flag);
+}
+
+bool WKPreferencesGetCSSGridLayoutEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->cssGridLayoutEnabled();
 }
 
 void WKPreferencesSetRegionBasedColumnsEnabled(WKPreferencesRef preferencesRef, bool flag)
@@ -630,12 +650,11 @@ bool WKPreferencesGetFileAccessFromFileURLsAllowed(WKPreferencesRef preferencesR
 
 void WKPreferencesSetHixie76WebSocketProtocolEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
-    toImpl(preferencesRef)->setHixie76WebSocketProtocolEnabled(enabled);
 }
 
 bool WKPreferencesGetHixie76WebSocketProtocolEnabled(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->hixie76WebSocketProtocolEnabled();
+    return false;
 }
 
 void WKPreferencesSetMediaPlaybackRequiresUserGesture(WKPreferencesRef preferencesRef, bool flag)
@@ -798,9 +817,69 @@ bool WKPreferencesGetRequestAnimationFrameEnabled(WKPreferencesRef preferencesRe
     return toImpl(preferencesRef)->requestAnimationFrameEnabled();
 }
 
+void WKPreferencesSetThirdPartyStorageBlockingEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setThirdPartyStorageBlockingEnabled(flag);
+}
+
+bool WKPreferencesGetThirdPartyStorageBlockingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->thirdPartyStorageBlockingEnabled();
+}
+
 void WKPreferencesResetTestRunnerOverrides(WKPreferencesRef preferencesRef)
 {
     // Currently we reset the overrides on the web process when preferencesDidChange() is called. Since WTR preferences
     // are usually always the same (in the UI process), they are not sent to web process, not triggering the reset.
     toImpl(preferencesRef)->forceUpdate();
+}
+
+void WKPreferencesSetDiagnosticLoggingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setDiagnosticLoggingEnabled(enabled);
+}
+
+bool WKPreferencesGetDiagnosticLoggingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->diagnosticLoggingEnabled();
+}
+
+void WKPreferencesSetAsynchronousPluginInitializationEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setAsynchronousPluginInitializationEnabled(enabled);
+}
+
+bool WKPreferencesGetAsynchronousPluginInitializationEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->asynchronousPluginInitializationEnabled();
+}
+
+void WKPreferencesSetAsynchronousPluginInitializationEnabledForAllPlugins(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setAsynchronousPluginInitializationEnabledForAllPlugins(enabled);
+}
+
+bool WKPreferencesGetAsynchronousPluginInitializationEnabledForAllPlugins(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->asynchronousPluginInitializationEnabledForAllPlugins();
+}
+
+void WKPreferencesSetArtificialPluginInitializationDelayEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setArtificialPluginInitializationDelayEnabled(enabled);
+}
+
+bool WKPreferencesGetArtificialPluginInitializationDelayEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->artificialPluginInitializationDelayEnabled();
+}
+
+void WKPreferencesSetScrollingPerformanceLoggingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setScrollingPerformanceLoggingEnabled(enabled);
+}
+
+bool WKPreferencesGetScrollingPerformanceLoggingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->scrollingPerformanceLoggingEnabled();
 }

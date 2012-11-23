@@ -31,8 +31,14 @@
 
 namespace WebKit {
 
+const size_t APIClientTraits<WKBundleClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundleClient, didReceiveMessageToPage),
+    sizeof(WKBundleClient)
+};
+
 const size_t APIClientTraits<WKBundlePageLoaderClient>::interfaceSizesByVersion[] = {
     offsetof(WKBundlePageLoaderClient, didLayoutForFrame),
+    offsetof(WKBundlePageLoaderClient, didFinishProgress),
     sizeof(WKBundlePageLoaderClient)
 };
 
@@ -48,11 +54,12 @@ const size_t APIClientTraits<WKBundlePageFullScreenClient>::interfaceSizesByVers
     
 const size_t APIClientTraits<WKPageContextMenuClient>::interfaceSizesByVersion[] = {
     offsetof(WKPageContextMenuClient, contextMenuDismissed),
+    offsetof(WKPageContextMenuClient, getContextMenuFromProposedMenu),
     sizeof(WKPageContextMenuClient)
 };
 
 const size_t APIClientTraits<WKPageLoaderClient>::interfaceSizesByVersion[] = {
-    offsetof(WKPageLoaderClient, didFailToInitializePlugin),
+    offsetof(WKPageLoaderClient, didDetectXSSForFrame),
     sizeof(WKPageLoaderClient)
 };
 
@@ -64,6 +71,11 @@ const size_t APIClientTraits<WKPageUIClient>::interfaceSizesByVersion[] = {
 const size_t APIClientTraits<WKBundlePageFormClient>::interfaceSizesByVersion[] = {
     offsetof(WKBundlePageFormClient, willSendSubmitEvent),
     sizeof(WKBundlePageFormClient)
+};
+
+const size_t APIClientTraits<WKContextInjectedBundleClient>::interfaceSizesByVersion[] = {
+    offsetof(WKContextInjectedBundleClient, getInjectedBundleInitializationUserData),
+    sizeof(WKContextInjectedBundleClient)
 };
 
 } // namespace WebKit

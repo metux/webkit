@@ -35,6 +35,7 @@
 WebInspector.TimelineModel = function()
 {
     this._records = [];
+    this._stringPool = new StringPool();
     this._minimumRecordTime = -1;
     this._maximumRecordTime = -1;
     this._collectionEnabled = false;
@@ -44,12 +45,16 @@ WebInspector.TimelineModel = function()
 
 WebInspector.TimelineModel.RecordType = {
     Root: "Root",
+    Program: "Program",
     EventDispatch: "EventDispatch",
 
     BeginFrame: "BeginFrame",
     Layout: "Layout",
     RecalculateStyles: "RecalculateStyles",
     Paint: "Paint",
+    DecodeImage: "DecodeImage",
+    ResizeImage: "ResizeImage",
+    CompositeLayers: "CompositeLayers",
 
     ParseHTML: "ParseHTML",
 
@@ -61,10 +66,12 @@ WebInspector.TimelineModel.RecordType = {
     XHRLoad: "XHRLoad",
     EvaluateScript: "EvaluateScript",
 
-    TimeStamp: "TimeStamp",
-
     MarkLoad: "MarkLoad",
     MarkDOMContent: "MarkDOMContent",
+
+    TimeStamp: "TimeStamp",
+    Time: "Time",
+    TimeEnd: "TimeEnd",
 
     ScheduleResourceRequest: "ScheduleResourceRequest",
     ResourceSendRequest: "ResourceSendRequest",
@@ -148,49 +155,130 @@ WebInspector.TimelineModel.prototype = {
 
     _addRecord: function(record)
     {
+        this._stringPool.internObjectStrings(record);
         this._records.push(record);
         this._updateBoundaries(record);
         this.dispatchEventToListeners(WebInspector.TimelineModel.Events.RecordAdded, record);
     },
 
-    _loadNextChunk: function(data, index)
+    /**
+     * @param {WebInspector.Progress} progress
+     * @param {Array.<Object>} data
+     * @param {number} index
+     */
+    _loadNextChunk: function(progress, data, index)
     {
-        for (var i = 0; i < 20 && index < data.length; ++i, ++index)
+        if (progress.isCanceled()) {
+            this.reset();
+            progress.done();
+            return;
+        }
+        progress.setWorked(index);
+
+        for (var i = 0; i < 100 && index < data.length; ++i, ++index)
             this._addRecord(data[index]);
 
         if (index !== data.length)
-            setTimeout(this._loadNextChunk.bind(this, data, index), 0);
+            setTimeout(this._loadNextChunk.bind(this, progress, data, index), 0);
+        else
+            progress.done();
     },
 
-    loadFromFile: function(file)
+    /**
+     * @param {!Blob} file
+     * @param {WebInspector.Progress} progress
+     */
+    loadFromFile: function(file, progress)
     {
+        var compositeProgress = new WebInspector.CompositeProgress(progress);
+        var loadingProgress = compositeProgress.createSubProgress(1);
+        var parsingProgress = compositeProgress.createSubProgress(1);
+        var processingProgress = compositeProgress.createSubProgress(1);
+
+        function parseAndImportData(data)
+        {
+            try {
+                var records = JSON.parse(data);
+                parsingProgress.done();
+                this.reset();
+                processingProgress.setTotalWork(records.length);
+                this._loadNextChunk(processingProgress, records, 1);
+            } catch (e) {
+                WebInspector.showErrorMessage("Malformed timeline data.");
+                progress.done();
+            }
+        }
+
         function onLoad(e)
         {
-            var data = JSON.parse(e.target.result);
-            this.reset();
-            this._loadNextChunk(data, 1);
+            loadingProgress.done();
+            parsingProgress.setTotalWork(1);
+            setTimeout(parseAndImportData.bind(this, e.target.result), 0);
         }
 
         function onError(e)
         {
+            progress.done();
             switch(e.target.error.code) {
             case e.target.error.NOT_FOUND_ERR:
-                WebInspector.log(WebInspector.UIString('Timeline.loadFromFile: File "%s" not found.', file.name));
+                WebInspector.showErrorMessage(WebInspector.UIString("File \"%s\" not found.", file.name));
             break;
             case e.target.error.NOT_READABLE_ERR:
-                WebInspector.log(WebInspector.UIString('Timeline.loadFromFile: File "%s" is not readable', file.name));
+                WebInspector.showErrorMessage(WebInspector.UIString("File \"%s\" is not readable", file.name));
             break;
             case e.target.error.ABORT_ERR:
                 break;
             default:
-                WebInspector.log(WebInspector.UIString('Timeline.loadFromFile: An error occurred while reading the file "%s"', file.name));
+                WebInspector.showErrorMessage(WebInspector.UIString("An error occurred while reading the file \"%s\"", file.name));
             }
+        }
+
+        function onProgress(e)
+        {
+            if (e.lengthComputable)
+                loadingProgress.setWorked(e.loaded / e.total);
         }
 
         var reader = new FileReader();
         reader.onload = onLoad.bind(this);
         reader.onerror = onError;
+        reader.onprogress = onProgress;
+        loadingProgress.setTitle(WebInspector.UIString("Loading\u2026"));
+        loadingProgress.setTotalWork(1);
         reader.readAsText(file);
+    },
+
+    /**
+     * @param {string} url
+     */
+    loadFromURL: function(url, progress)
+    {
+        var compositeProgress = new WebInspector.CompositeProgress(progress);
+        var loadingProgress = compositeProgress.createSubProgress(1);
+        var parsingProgress = compositeProgress.createSubProgress(1);
+        var processingProgress = compositeProgress.createSubProgress(1);
+
+        // FIXME: extract parsing routines so that they did not require too many progress objects.
+        function parseAndImportData(data)
+        {
+            try {
+                var records = JSON.parse(data);
+                parsingProgress.done();
+                this.reset();
+                processingProgress.setTotalWork(records.length);
+                this._loadNextChunk(processingProgress, records, 1);
+            } catch (e) {
+                WebInspector.showErrorMessage("Malformed timeline data.");
+                progress.done();
+            }
+        }
+
+        var responseText = loadXHR(url);
+        if (responseText) {
+            loadingProgress.done();
+            parsingProgress.setTotalWork(1);
+            setTimeout(parseAndImportData.bind(this, responseText), 0);
+        }
     },
 
     saveToFile: function()
@@ -210,6 +298,7 @@ WebInspector.TimelineModel.prototype = {
     reset: function()
     {
         this._records = [];
+        this._stringPool.reset();
         this._minimumRecordTime = -1;
         this._maximumRecordTime = -1;
         this.dispatchEventToListeners(WebInspector.TimelineModel.Events.RecordsCleared);

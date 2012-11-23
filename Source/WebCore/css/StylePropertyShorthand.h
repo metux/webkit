@@ -86,7 +86,10 @@ const StylePropertyShorthand& webkitBorderEndShorthand();
 const StylePropertyShorthand& webkitBorderStartShorthand();
 const StylePropertyShorthand& webkitColumnsShorthand();
 const StylePropertyShorthand& webkitColumnRuleShorthand();
+#if ENABLE(CSS3_FLEXBOX)
 const StylePropertyShorthand& webkitFlexFlowShorthand();
+const StylePropertyShorthand& webkitFlexShorthand();
+#endif
 const StylePropertyShorthand& webkitMarginCollapseShorthand();
 const StylePropertyShorthand& webkitMarqueeShorthand();
 const StylePropertyShorthand& webkitMaskShorthand();
@@ -96,7 +99,9 @@ const StylePropertyShorthand& webkitTextEmphasisShorthand();
 const StylePropertyShorthand& webkitTextStrokeShorthand();
 const StylePropertyShorthand& webkitTransitionShorthand();
 const StylePropertyShorthand& webkitTransformOriginShorthand();
+#if ENABLE(CSS_EXCLUSIONS)
 const StylePropertyShorthand& webkitWrapShorthand();
+#endif
 
 // Returns an empty list if the property is not a shorthand
 const StylePropertyShorthand& shorthandForProperty(CSSPropertyID);

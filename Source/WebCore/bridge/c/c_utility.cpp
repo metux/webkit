@@ -68,7 +68,7 @@ static String convertUTF8ToUTF16WithLatin1Fallback(const NPUTF8* UTF8Chars, int 
 // Variant value must be released with NPReleaseVariantValue()
 void convertValueToNPVariant(ExecState* exec, JSValue value, NPVariant* result)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
 
     VOID_TO_NPVARIANT(*result);
 
@@ -80,7 +80,7 @@ void convertValueToNPVariant(ExecState* exec, JSValue value, NPVariant* result)
     } else if (value.isNumber()) {
         DOUBLE_TO_NPVARIANT(value.toNumber(exec), *result);
     } else if (value.isBoolean()) {
-        BOOLEAN_TO_NPVARIANT(value.toBoolean(exec), *result);
+        BOOLEAN_TO_NPVARIANT(value.toBoolean(), *result);
     } else if (value.isNull()) {
         NULL_TO_NPVARIANT(*result);
     } else if (value.isObject()) {
@@ -107,7 +107,7 @@ void convertValueToNPVariant(ExecState* exec, JSValue value, NPVariant* result)
 
 JSValue convertNPVariantToValue(ExecState* exec, const NPVariant* variant, RootObject* rootObject)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
     
     NPVariantType type = variant->type;
 

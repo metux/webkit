@@ -28,24 +28,53 @@
 
 #include "CopiedSpace.h"
 #include "HandleTypes.h"
-#include "Options.h"
 #include "JSValue.h"
+#include "Options.h"
 #include "Register.h"
 #include "UnconditionalFinalizer.h"
 #include "VTableSpectrum.h"
 #include "WeakReferenceHarvester.h"
+#include <wtf/DataLog.h>
+#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/Vector.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/OSAllocator.h>
 #include <wtf/PageBlock.h>
+#include <wtf/TCSpinLock.h>
+#include <wtf/text/StringHash.h>
+#include <wtf/Vector.h>
+
+#if ENABLE(OBJECT_MARK_LOGGING)
+#define MARK_LOG_MESSAGE0(message) dataLog(message)
+#define MARK_LOG_MESSAGE1(message, arg1) dataLog(message, arg1)
+#define MARK_LOG_MESSAGE2(message, arg1, arg2) dataLog(message, arg1, arg2)
+#define MARK_LOG_ROOT(visitor, rootName) \
+    dataLog("\n%s: ", rootName); \
+    (visitor).resetChildCount()
+#define MARK_LOG_PARENT(visitor, parent) \
+    dataLog("\n%p (%s): ", parent, parent->className() ? parent->className() : "unknown"); \
+    (visitor).resetChildCount()
+#define MARK_LOG_CHILD(visitor, child) \
+    if ((visitor).childCount()) \
+    dataLogString(", "); \
+    dataLog("%p", child); \
+    (visitor).incrementChildCount()
+#else
+#define MARK_LOG_MESSAGE0(message) do { } while (false)
+#define MARK_LOG_MESSAGE1(message, arg1) do { } while (false)
+#define MARK_LOG_MESSAGE2(message, arg1, arg2) do { } while (false)
+#define MARK_LOG_ROOT(visitor, rootName) do { } while (false)
+#define MARK_LOG_PARENT(visitor, parent) do { } while (false)
+#define MARK_LOG_CHILD(visitor, child) do { } while (false)
+#endif
 
 namespace JSC {
 
     class ConservativeRoots;
     class JSGlobalData;
     class MarkStack;
+    class GCThreadSharedData;
     class ParallelModeEnabler;
     class Register;
     class SlotVisitor;
@@ -85,7 +114,7 @@ namespace JSC {
         void shrinkReserve();
         
     private:
-        Mutex m_lock;
+        SpinLock m_lock;
         MarkStackSegment* m_nextFreeSegment;
     };
 
@@ -102,10 +131,9 @@ namespace JSC {
         
         bool isEmpty();
         
-        bool canDonateSomeCells(); // Returns false if you should definitely not call doanteSomeCellsTo().
-        bool donateSomeCellsTo(MarkStackArray& other); // Returns true if some cells were donated.
+        void donateSomeCellsTo(MarkStackArray& other);
         
-        void stealSomeCellsFrom(MarkStackArray& other);
+        void stealSomeCellsFrom(MarkStackArray& other, size_t idleThreadCount);
 
         size_t size();
 
@@ -165,48 +193,12 @@ namespace JSC {
 #endif
     };
 
-    class MarkStackThreadSharedData {
-    public:
-        MarkStackThreadSharedData(JSGlobalData*);
-        ~MarkStackThreadSharedData();
-        
-        void reset();
-    
-    private:
-        friend class MarkStack;
-        friend class SlotVisitor;
-
-#if ENABLE(PARALLEL_GC)
-        void markingThreadMain();
-        static void markingThreadStartFunc(void* heap);
-#endif
-
-        JSGlobalData* m_globalData;
-        CopiedSpace* m_copiedSpace;
-        
-        MarkStackSegmentAllocator m_segmentAllocator;
-        
-        Vector<ThreadIdentifier> m_markingThreads;
-        
-        Mutex m_markingLock;
-        ThreadCondition m_markingCondition;
-        MarkStackArray m_sharedMarkStack;
-        unsigned m_numberOfActiveParallelMarkers;
-        bool m_parallelMarkersShouldExit;
-
-        Mutex m_opaqueRootsLock;
-        HashSet<void*> m_opaqueRoots;
-
-        ListableHandler<WeakReferenceHarvester>::List m_weakReferenceHarvesters;
-        ListableHandler<UnconditionalFinalizer>::List m_unconditionalFinalizers;
-    };
-
     class MarkStack {
         WTF_MAKE_NONCOPYABLE(MarkStack);
         friend class HeapRootVisitor; // Allowed to mark a JSValue* or JSCell** directly.
 
     public:
-        MarkStack(MarkStackThreadSharedData&);
+        MarkStack(GCThreadSharedData&);
         ~MarkStack();
 
         void append(ConservativeRoots&);
@@ -217,13 +209,16 @@ namespace JSC {
         
         template<typename T>
         void appendUnbarrieredPointer(T**);
+        void appendUnbarrieredValue(JSValue*);
         
         void addOpaqueRoot(void*);
         bool containsOpaqueRoot(void*);
         int opaqueRootCount();
-        
+
+        GCThreadSharedData& sharedData() { return m_shared; }
         bool isEmpty() { return m_stack.isEmpty(); }
 
+        void setup();
         void reset();
 
         size_t visitCount() const { return m_visitCount; }
@@ -232,15 +227,14 @@ namespace JSC {
         VTableSpectrum m_visitedTypeCounts;
 #endif
 
-        void addWeakReferenceHarvester(WeakReferenceHarvester* weakReferenceHarvester)
-        {
-            m_shared.m_weakReferenceHarvesters.addThreadSafe(weakReferenceHarvester);
-        }
-        
-        void addUnconditionalFinalizer(UnconditionalFinalizer* unconditionalFinalizer)
-        {
-            m_shared.m_unconditionalFinalizers.addThreadSafe(unconditionalFinalizer);
-        }
+        void addWeakReferenceHarvester(WeakReferenceHarvester*);
+        void addUnconditionalFinalizer(UnconditionalFinalizer*);
+
+#if ENABLE(OBJECT_MARK_LOGGING)
+        inline void resetChildCount() { m_logChildCount = 0; }
+        inline unsigned childCount() { return m_logChildCount; }
+        inline void incrementChildCount() { m_logChildCount++; }
+#endif
 
     protected:
         JS_EXPORT_PRIVATE static void validate(JSCell*);
@@ -251,6 +245,7 @@ namespace JSC {
 
         void internalAppend(JSCell*);
         void internalAppend(JSValue);
+        void internalAppend(JSValue*);
         
         JS_EXPORT_PRIVATE void mergeOpaqueRoots();
         
@@ -263,7 +258,7 @@ namespace JSC {
         
         void mergeOpaqueRootsIfProfitable()
         {
-            if (static_cast<unsigned>(m_opaqueRoots.size()) < Options::opaqueRootMergeThreshold)
+            if (static_cast<unsigned>(m_opaqueRoots.size()) < Options::opaqueRootMergeThreshold())
                 return;
             mergeOpaqueRoots();
         }
@@ -282,64 +277,16 @@ namespace JSC {
         size_t m_visitCount;
         bool m_isInParallelMode;
         
-        MarkStackThreadSharedData& m_shared;
+        GCThreadSharedData& m_shared;
+
+        bool m_shouldHashConst; // Local per-thread copy of shared flag for performance reasons
+        typedef HashMap<StringImpl*, JSValue> UniqueStringMap;
+        UniqueStringMap m_uniqueStrings;
+
+#if ENABLE(OBJECT_MARK_LOGGING)
+        unsigned m_logChildCount;
+#endif
     };
-
-    inline MarkStack::MarkStack(MarkStackThreadSharedData& shared)
-        : m_stack(shared.m_segmentAllocator)
-#if !ASSERT_DISABLED
-        , m_isCheckingForDefaultMarkViolation(false)
-        , m_isDraining(false)
-#endif
-        , m_visitCount(0)
-        , m_isInParallelMode(false)
-        , m_shared(shared)
-    {
-    }
-
-    inline MarkStack::~MarkStack()
-    {
-        ASSERT(m_stack.isEmpty());
-    }
-
-    inline void MarkStack::addOpaqueRoot(void* root)
-    {
-#if ENABLE(PARALLEL_GC)
-        if (Options::numberOfGCMarkers == 1) {
-            // Put directly into the shared HashSet.
-            m_shared.m_opaqueRoots.add(root);
-            return;
-        }
-        // Put into the local set, but merge with the shared one every once in
-        // a while to make sure that the local sets don't grow too large.
-        mergeOpaqueRootsIfProfitable();
-        m_opaqueRoots.add(root);
-#else
-        m_opaqueRoots.add(root);
-#endif
-    }
-
-    inline bool MarkStack::containsOpaqueRoot(void* root)
-    {
-        ASSERT(!m_isInParallelMode);
-#if ENABLE(PARALLEL_GC)
-        ASSERT(m_opaqueRoots.isEmpty());
-        return m_shared.m_opaqueRoots.contains(root);
-#else
-        return m_opaqueRoots.contains(root);
-#endif
-    }
-
-    inline int MarkStack::opaqueRootCount()
-    {
-        ASSERT(!m_isInParallelMode);
-#if ENABLE(PARALLEL_GC)
-        ASSERT(m_opaqueRoots.isEmpty());
-        return m_shared.m_opaqueRoots.size();
-#else
-        return m_opaqueRoots.size();
-#endif
-    }
 
     inline void MarkStackArray::append(const JSCell* cell)
     {
@@ -369,64 +316,9 @@ namespace JSC {
         return true;
     }
 
-    inline bool MarkStackArray::canDonateSomeCells()
-    {
-        size_t numberOfCellsToKeep = Options::minimumNumberOfCellsToKeep;
-        // Another check: see if we have enough cells to warrant donation.
-        if (m_top <= numberOfCellsToKeep) {
-            // This indicates that we might not want to donate anything; check if we have
-            // another full segment. If not, then don't donate.
-            if (!m_topSegment->m_previous)
-                return false;
-            
-            ASSERT(m_topSegment->m_previous->m_top == m_segmentCapacity);
-        }
-        
-        return true;
-    }
-
     inline size_t MarkStackArray::size()
     {
         return m_top + m_segmentCapacity * m_numberOfPreviousSegments;
-    }
-
-    ALWAYS_INLINE void MarkStack::append(JSValue* slot, size_t count)
-    {
-        for (size_t i = 0; i < count; ++i) {
-            JSValue& value = slot[i];
-            if (!value)
-                continue;
-            internalAppend(value);
-        }
-    }
-
-    template<typename T>
-    inline void MarkStack::appendUnbarrieredPointer(T** slot)
-    {
-        ASSERT(slot);
-        JSCell* cell = *slot;
-        if (cell)
-            internalAppend(cell);
-    }
-    
-    ALWAYS_INLINE void MarkStack::append(JSValue* slot)
-    {
-        ASSERT(slot);
-        internalAppend(*slot);
-    }
-
-    ALWAYS_INLINE void MarkStack::append(JSCell** slot)
-    {
-        ASSERT(slot);
-        internalAppend(*slot);
-    }
-
-    ALWAYS_INLINE void MarkStack::internalAppend(JSValue value)
-    {
-        ASSERT(value);
-        if (!value.isCell())
-            return;
-        internalAppend(value.asCell());
     }
 
     class ParallelModeEnabler {

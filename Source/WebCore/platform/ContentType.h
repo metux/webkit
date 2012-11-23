@@ -33,10 +33,11 @@ namespace WebCore {
 
     class ContentType {
     public:
-        ContentType(const String& type);
+        explicit ContentType(const String& type);
 
         String parameter (const String& parameterName) const;
         String type() const;
+        Vector<String> codecs() const;
         const String& raw() const { return m_type; }
     private:
         String m_type;

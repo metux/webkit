@@ -79,11 +79,11 @@ void RenderScrollbarPart::layoutVerticalPart()
     } 
 }
 
-static int calcScrollbarThicknessUsing(const Length& length, int containingLength, RenderView* renderView)
+static int calcScrollbarThicknessUsing(SizeType sizeType, const Length& length, int containingLength, RenderView* renderView)
 {
-    if (length.isIntrinsicOrAuto())
-        return ScrollbarTheme::theme()->scrollbarThickness();
-    return minimumValueForLength(length, containingLength, renderView);
+    if (!length.isIntrinsicOrAuto() || (sizeType == MinSize && length.isAuto()))
+        return minimumValueForLength(length, containingLength, renderView);
+    return ScrollbarTheme::theme()->scrollbarThickness();
 }
 
 void RenderScrollbarPart::computeScrollbarWidth()
@@ -92,14 +92,14 @@ void RenderScrollbarPart::computeScrollbarWidth()
         return;
     RenderView* renderView = view();
     int visibleSize = m_scrollbar->owningRenderer()->width() - m_scrollbar->owningRenderer()->borderLeft() - m_scrollbar->owningRenderer()->borderRight();
-    int w = calcScrollbarThicknessUsing(style()->width(), visibleSize, renderView);
-    int minWidth = calcScrollbarThicknessUsing(style()->minWidth(), visibleSize, renderView);
-    int maxWidth = style()->maxWidth().isUndefined() ? w : calcScrollbarThicknessUsing(style()->maxWidth(), visibleSize, renderView);
+    int w = calcScrollbarThicknessUsing(MainOrPreferredSize, style()->width(), visibleSize, renderView);
+    int minWidth = calcScrollbarThicknessUsing(MinSize, style()->minWidth(), visibleSize, renderView);
+    int maxWidth = style()->maxWidth().isUndefined() ? w : calcScrollbarThicknessUsing(MaxSize, style()->maxWidth(), visibleSize, renderView);
     setWidth(max(minWidth, min(maxWidth, w)));
     
     // Buttons and track pieces can all have margins along the axis of the scrollbar. 
-    m_marginLeft = minimumValueForLength(style()->marginLeft(), visibleSize, renderView);
-    m_marginRight = minimumValueForLength(style()->marginRight(), visibleSize, renderView);
+    m_marginBox.setLeft(minimumValueForLength(style()->marginLeft(), visibleSize, renderView));
+    m_marginBox.setRight(minimumValueForLength(style()->marginRight(), visibleSize, renderView));
 }
 
 void RenderScrollbarPart::computeScrollbarHeight()
@@ -108,14 +108,14 @@ void RenderScrollbarPart::computeScrollbarHeight()
         return;
     RenderView* renderView = view();
     int visibleSize = m_scrollbar->owningRenderer()->height() -  m_scrollbar->owningRenderer()->borderTop() - m_scrollbar->owningRenderer()->borderBottom();
-    int h = calcScrollbarThicknessUsing(style()->height(), visibleSize, renderView);
-    int minHeight = calcScrollbarThicknessUsing(style()->minHeight(), visibleSize, renderView);
-    int maxHeight = style()->maxHeight().isUndefined() ? h : calcScrollbarThicknessUsing(style()->maxHeight(), visibleSize, renderView);
+    int h = calcScrollbarThicknessUsing(MainOrPreferredSize, style()->height(), visibleSize, renderView);
+    int minHeight = calcScrollbarThicknessUsing(MinSize, style()->minHeight(), visibleSize, renderView);
+    int maxHeight = style()->maxHeight().isUndefined() ? h : calcScrollbarThicknessUsing(MaxSize, style()->maxHeight(), visibleSize, renderView);
     setHeight(max(minHeight, min(maxHeight, h)));
 
     // Buttons and track pieces can all have margins along the axis of the scrollbar. 
-    m_marginTop = minimumValueForLength(style()->marginTop(), visibleSize, renderView);
-    m_marginBottom = minimumValueForLength(style()->marginBottom(), visibleSize, renderView);
+    m_marginBox.setTop(minimumValueForLength(style()->marginTop(), visibleSize, renderView));
+    m_marginBox.setBottom(minimumValueForLength(style()->marginBottom(), visibleSize, renderView));
 }
 
 void RenderScrollbarPart::computePreferredLogicalWidths()
@@ -182,6 +182,13 @@ void RenderScrollbarPart::paintIntoRect(GraphicsContext* graphicsContext, const 
     paint(paintInfo, paintOffset);
     paintInfo.phase = PaintPhaseOutline;
     paint(paintInfo, paintOffset);
+}
+
+RenderObject* RenderScrollbarPart::rendererOwningScrollbar() const
+{
+    if (!m_scrollbar)
+        return 0;
+    return m_scrollbar->owningRenderer();
 }
 
 }

@@ -38,6 +38,7 @@ public:
     virtual ~IDBDatabaseCallbacks() { }
 
     virtual void onVersionChange(const String& version) = 0;
+    virtual void onVersionChange(int64_t oldVersion, int64_t newVersion) = 0;
 };
 
 } // namespace WebCore

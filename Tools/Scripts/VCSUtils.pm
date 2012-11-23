@@ -78,6 +78,7 @@ BEGIN {
         &possiblyColored
         &prepareParsedPatch
         &removeEOL
+        &runCommand
         &runPatchCommand
         &scmMoveOrRenameFile
         &scmToggleExecutableBit
@@ -365,6 +366,11 @@ sub determineVCSRoot()
     return determineSVNRoot();
 }
 
+sub isWindows()
+{
+    return ($^O eq "MSWin32") || 0;
+}
+
 sub svnRevisionForDirectory($)
 {
     my ($dir) = @_;
@@ -372,10 +378,15 @@ sub svnRevisionForDirectory($)
 
     if (isSVNDirectory($dir)) {
         my $escapedDir = escapeSubversionPath($dir);
-        my $svnInfo = `LC_ALL=C svn info $escapedDir | grep Revision:`;
+        my $command = "svn info $escapedDir | grep Revision:";
+        $command = "LC_ALL=C $command" if !isWindows();
+        my $svnInfo = `$command`;
         ($revision) = ($svnInfo =~ m/Revision: (\d+).*/g);
     } elsif (isGitDirectory($dir)) {
-        my $gitLog = `cd $dir && LC_ALL=C git log --grep='git-svn-id: ' -n 1 | grep git-svn-id:`;
+        my $command = "git log --grep=\"git-svn-id: \" -n 1 | grep git-svn-id:";
+        $command = "LC_ALL=C $command" if !isWindows();
+        $command = "cd $dir && $command";
+        my $gitLog = `$command`;
         ($revision) = ($gitLog =~ m/ +git-svn-id: .+@(\d+) /g);
     }
     if (!defined($revision)) {
@@ -393,9 +404,13 @@ sub pathRelativeToSVNRepositoryRootForPath($)
     my $svnInfo;
     if (isSVN()) {
         my $escapedRelativePath = escapeSubversionPath($relativePath);
-        $svnInfo = `LC_ALL=C svn info $escapedRelativePath`;
+        my $command = "svn info $escapedRelativePath";
+        $command = "LC_ALL=C $command" if !isWindows();
+        $svnInfo = `$command`;
     } elsif (isGit()) {
-        $svnInfo = `LC_ALL=C git svn info $relativePath`;
+        my $command = "git svn info $relativePath";
+        $command = "LC_ALL=C $command" if !isWindows();
+        $svnInfo = `$command`;
     }
 
     $svnInfo =~ /.*^URL: (.*?)$/m;
@@ -443,6 +458,7 @@ sub adjustPathForRecentRenamings($)
  
     $fullPath =~ s|WebCore/webaudio|WebCore/Modules/webaudio|g;
     $fullPath =~ s|JavaScriptCore/wtf|WTF/wtf|g;
+    $fullPath =~ s|test_expectations.txt|TestExpectations|g;
 
     return $fullPath; 
 } 
@@ -770,9 +786,9 @@ sub parseSvnDiffHeader($$)
         s/([\n\r]+)$//;
         my $eol = $1;
 
-        # Fix paths on ""---" and "+++" lines to match the leading
+        # Fix paths on "---" and "+++" lines to match the leading
         # index line.
-        if (s/^--- \S+/--- $indexPath/) {
+        if (s/^--- [^\t\n\r]+/--- $indexPath/) {
             # ---
             if (/^--- .+\(revision (\d+)\)/) {
                 $sourceRevision = $1;
@@ -785,7 +801,7 @@ sub parseSvnDiffHeader($$)
                         "source revision number \"$sourceRevision\".") if ($2 != $sourceRevision);
                 }
             }
-        } elsif (s/^\+\+\+ \S+/+++ $indexPath/) {
+        } elsif (s/^\+\+\+ [^\t\n\r]+/+++ $indexPath/) {
             $foundHeaderEnding = 1;
         } elsif (/^Cannot display: file marked as a binary type.$/) {
             $isBinary = 1;
@@ -1460,6 +1476,8 @@ sub fixChangeLogPatch($)
 {
     my $patch = shift; # $patch will only contain patch fragments for ChangeLog.
 
+    $patch =~ s|test_expectations.txt:|TestExpectations:|g;
+
     $patch =~ /(\r?\n)/;
     my $lineEnding = $1;
     my @lines = split(/$lineEnding/, $patch);
@@ -2015,6 +2033,30 @@ sub escapeSubversionPath($)
     my ($path) = @_;
     $path .= "@" if $path =~ /@/;
     return $path;
+}
+
+sub runCommand(@)
+{
+    my @args = @_;
+    my $pid = open(CHILD, "-|");
+    if (!defined($pid)) {
+        die "Failed to fork(): $!";
+    }
+    if ($pid) {
+        # Parent process
+        my $childStdout;
+        while (<CHILD>) {
+            $childStdout .= $_;
+        }
+        close(CHILD);
+        my %childOutput;
+        $childOutput{exitStatus} = exitStatus($?);
+        $childOutput{stdout} = $childStdout if $childStdout;
+        return \%childOutput;
+    }
+    # Child process
+    # FIXME: Consider further hardening of this function, including sanitizing the environment.
+    exec { $args[0] } @args or die "Failed to exec(): $!";
 }
 
 1;

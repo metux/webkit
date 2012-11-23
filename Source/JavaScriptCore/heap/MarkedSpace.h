@@ -45,12 +45,34 @@ class LLIntOffsetsExtractor;
 class WeakGCHandle;
 class SlotVisitor;
 
+struct ClearMarks : MarkedBlock::VoidFunctor {
+    void operator()(MarkedBlock* block) { block->clearMarks(); }
+};
+
+struct Sweep : MarkedBlock::VoidFunctor {
+    void operator()(MarkedBlock* block) { block->sweep(); }
+};
+
+struct MarkCount : MarkedBlock::CountFunctor {
+    void operator()(MarkedBlock* block) { count(block->markCount()); }
+};
+
+struct Size : MarkedBlock::CountFunctor {
+    void operator()(MarkedBlock* block) { count(block->markCount() * block->cellSize()); }
+};
+
+struct Capacity : MarkedBlock::CountFunctor {
+    void operator()(MarkedBlock* block) { count(block->capacity()); }
+};
+
 class MarkedSpace {
     WTF_MAKE_NONCOPYABLE(MarkedSpace);
 public:
     static const size_t maxCellSize = 2048;
 
     MarkedSpace(Heap*);
+    ~MarkedSpace();
+    void lastChanceToFinalize();
 
     MarkedAllocator& firstAllocator();
     MarkedAllocator& allocatorFor(size_t);
@@ -58,8 +80,12 @@ public:
     MarkedAllocator& destructorAllocatorFor(size_t);
     void* allocateWithDestructor(size_t);
     void* allocateWithoutDestructor(size_t);
-    
+    void* allocateStructure();
+ 
     void resetAllocators();
+
+    void visitWeakSets(HeapRootVisitor&);
+    void reapWeakSets();
 
     MarkedBlockSet& blocks() { return m_blocks; }
     
@@ -73,10 +99,17 @@ public:
     template<typename Functor> typename Functor::ReturnType forEachBlock();
     
     void shrink();
-    void freeBlocks(MarkedBlock* head);
+    void freeBlock(MarkedBlock*);
+    void freeOrShrinkBlock(MarkedBlock*);
 
     void didAddBlock(MarkedBlock*);
     void didConsumeFreeList(MarkedBlock*);
+
+    void clearMarks();
+    void sweep();
+    size_t objectCount();
+    size_t size();
+    size_t capacity();
 
     bool isPagedOut(double deadline);
 
@@ -100,6 +133,7 @@ private:
 
     Subspace m_destructorSpace;
     Subspace m_normalSpace;
+    MarkedAllocator m_structureAllocator;
 
     Heap* m_heap;
     MarkedBlockSet m_blocks;
@@ -136,8 +170,12 @@ inline MarkedAllocator& MarkedSpace::allocatorFor(size_t bytes)
 
 inline MarkedAllocator& MarkedSpace::allocatorFor(MarkedBlock* block)
 {
+    if (block->onlyContainsStructures())
+        return m_structureAllocator;
+
     if (block->cellsNeedDestruction())
         return destructorAllocatorFor(block->cellSize());
+
     return allocatorFor(block->cellSize());
 }
 
@@ -159,6 +197,11 @@ inline void* MarkedSpace::allocateWithDestructor(size_t bytes)
     return destructorAllocatorFor(bytes).allocate();
 }
 
+inline void* MarkedSpace::allocateStructure()
+{
+    return m_structureAllocator.allocate();
+}
+
 template <typename Functor> inline typename Functor::ReturnType MarkedSpace::forEachBlock(Functor& functor)
 {
     for (size_t i = 0; i < preciseCount; ++i) {
@@ -170,6 +213,8 @@ template <typename Functor> inline typename Functor::ReturnType MarkedSpace::for
         m_normalSpace.impreciseAllocators[i].forEachBlock(functor);
         m_destructorSpace.impreciseAllocators[i].forEachBlock(functor);
     }
+
+    m_structureAllocator.forEachBlock(functor);
 
     return functor.returnValue();
 }
@@ -183,6 +228,26 @@ template <typename Functor> inline typename Functor::ReturnType MarkedSpace::for
 inline void MarkedSpace::didAddBlock(MarkedBlock* block)
 {
     m_blocks.add(block);
+}
+
+inline void MarkedSpace::clearMarks()
+{
+    forEachBlock<ClearMarks>();
+}
+
+inline size_t MarkedSpace::objectCount()
+{
+    return forEachBlock<MarkCount>();
+}
+
+inline size_t MarkedSpace::size()
+{
+    return forEachBlock<Size>();
+}
+
+inline size_t MarkedSpace::capacity()
+{
+    return forEachBlock<Capacity>();
 }
 
 } // namespace JSC

@@ -47,6 +47,7 @@ class CachedResourceHandleBase;
 class CachedResourceLoader;
 class Frame;
 class InspectorResource;
+class MemoryObjectInfo;
 class PurgeableBuffer;
 class SecurityOrigin;
 class SubresourceLoader;
@@ -74,7 +75,6 @@ public:
 #endif
 #if ENABLE(LINK_PREFETCH)
         , LinkPrefetch
-        , LinkPrerender
         , LinkSubresource
 #endif
 #if ENABLE(VIDEO_TRACK)
@@ -116,7 +116,7 @@ public:
     void addClient(CachedResourceClient*);
     void removeClient(CachedResourceClient*);
     bool hasClients() const { return !m_clients.isEmpty() || !m_clientsAwaitingCallback.isEmpty(); }
-    void deleteIfPossible();
+    bool deleteIfPossible();
 
     enum PreloadResult {
         PreloadNotReferenced,
@@ -127,7 +127,9 @@ public:
     PreloadResult preloadResult() const { return static_cast<PreloadResult>(m_preloadResult); }
 
     virtual void didAddClient(CachedResourceClient*);
+    virtual void didRemoveClient(CachedResourceClient*) { }
     virtual void allClientsRemoved() { }
+    void destroyDecodedDataIfNeeded();
 
     unsigned count() const { return m_clients.size(); }
 
@@ -150,7 +152,6 @@ public:
         return false
 #if ENABLE(LINK_PREFETCH)
             || type() == LinkPrefetch
-            || type() == LinkPrerender
             || type() == LinkSubresource
 #endif
             || type() == RawResource;
@@ -172,7 +173,6 @@ public:
     void setInCache(bool inCache) { m_inCache = inCache; }
     bool inCache() const { return m_inCache; }
     
-    void setInLiveDecodedResourcesList(bool b) { m_inLiveDecodedResourcesList = b; }
     bool inLiveDecodedResourcesList() { return m_inLiveDecodedResourcesList; }
     
     void stopLoading();
@@ -206,6 +206,7 @@ public:
 
     bool wasCanceled() const { return m_status == Canceled; }
     bool errorOccurred() const { return (m_status == LoadError || m_status == DecodeError); }
+    bool loadFailedOrCanceled() { return m_status == Canceled || m_status == LoadError; }
 
     bool sendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks == SendCallbacks; }
     
@@ -213,6 +214,9 @@ public:
 
     void setOwningCachedResourceLoader(CachedResourceLoader* cachedResourceLoader) { m_owningCachedResourceLoader = cachedResourceLoader; }
     
+    // MemoryCache does not destroy the decoded data of a CachedResource if the decoded data will be likely used.
+    virtual bool likelyToBeUsedSoon() { return false; }
+
     bool isPreloaded() const { return m_preloadCount; }
     void increasePreloadCount() { ++m_preloadCount; }
     void decreasePreloadCount() { ASSERT(m_preloadCount); --m_preloadCount; }
@@ -246,6 +250,8 @@ public:
 
     void setLoadFinishTime(double finishTime) { m_loadFinishTime = finishTime; }
     double loadFinishTime() const { return m_loadFinishTime; }
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     void checkNotify();
@@ -285,9 +291,11 @@ protected:
 
     RefPtr<SharedBuffer> m_data;
     OwnPtr<PurgeableBuffer> m_purgeableData;
+    Timer<CachedResource> m_decodedDataDeletionTimer;
 
 private:
     bool addClientToSet(CachedResourceClient*);
+    void decodedDataDeletionTimerFired(Timer<CachedResource>*);
 
     virtual PurgePriority purgePriority() const { return PurgeDefault; }
 

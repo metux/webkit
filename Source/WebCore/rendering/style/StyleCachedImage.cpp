@@ -24,6 +24,7 @@
 #include "config.h"
 #include "StyleCachedImage.h"
 
+#include "CachedImage.h"
 #include "RenderObject.h"
 
 namespace WebCore {
@@ -97,7 +98,7 @@ void StyleCachedImage::addClient(RenderObject* renderer)
 
 void StyleCachedImage::removeClient(RenderObject* renderer)
 {
-    m_image->removeClientForRenderer(renderer);
+    m_image->removeClient(renderer);
 }
 
 PassRefPtr<Image> StyleCachedImage::image(RenderObject* renderer, const IntSize&) const

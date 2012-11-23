@@ -34,16 +34,16 @@ public:
 private:
     HTMLEmbedElement(const QualifiedName&, Document*, bool createdByParser);
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
 
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual const QualifiedName& imageSourceAttributeName() const;
 
-    virtual RenderWidget* renderWidgetForJSBindings();
+    virtual RenderWidget* renderWidgetForJSBindings() const;
 
     virtual void updateWidget(PluginCreationOption);
 

@@ -54,7 +54,7 @@ public:
 
     // Create a deep copy of this SecurityOrigin. This method is useful
     // when marshalling a SecurityOrigin to another thread.
-    PassRefPtr<SecurityOrigin> isolatedCopy();
+    PassRefPtr<SecurityOrigin> isolatedCopy() const;
 
     // Set the domain property of this security origin to newDomain. This
     // function does not check whether newDomain is a suffix of the current
@@ -66,6 +66,11 @@ public:
     String host() const { return m_host; }
     String domain() const { return m_domain; }
     unsigned short port() const { return m_port; }
+
+    // Returns true if a given URL is secure, based either directly on its
+    // own protocol, or, when relevant, on the protocol of its "inner URL"
+    // Protocols like blob: and filesystem: fall into this latter category.
+    static bool isSecure(const KURL&);
 
     // Returns true if this SecurityOrigin can script objects in the given
     // SecurityOrigin. For example, call this function before allowing
@@ -116,8 +121,10 @@ public:
     // WARNING: This is an extremely powerful ability. Use with caution!
     void grantUniversalAccess();
 
-    bool canAccessDatabase() const { return !isUnique(); }
-    bool canAccessLocalStorage() const { return !isUnique(); }
+    void blockThirdPartyStorage() { m_blockThirdPartyStorage = true; }
+
+    bool canAccessDatabase(const SecurityOrigin* topOrigin = 0) const { return canAccessStorage(topOrigin); };
+    bool canAccessLocalStorage(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); };
     bool canAccessCookies() const { return !isUnique(); }
     bool canAccessPasswordManager() const { return !isUnique(); }
     bool canAccessFileSystem() const { return !isUnique(); }
@@ -184,6 +191,8 @@ private:
 
     // FIXME: Rename this function to something more semantic.
     bool passesFileCheck(const SecurityOrigin*) const;
+    bool isThirdParty(const SecurityOrigin*) const;
+    bool canAccessStorage(const SecurityOrigin*) const;
 
     String m_protocol;
     String m_host;
@@ -195,6 +204,7 @@ private:
     bool m_universalAccess;
     bool m_domainWasSetInDOM;
     bool m_canLoadLocalResources;
+    bool m_blockThirdPartyStorage;
     bool m_enforceFilePathSeparation;
     bool m_needsDatabaseIdentifierQuirkForFiles;
 };

@@ -34,6 +34,7 @@ class CSSRule;
 class CSSStyleSheet;
 class MediaList;
 class MediaQuery;
+class MemoryObjectInfo;
 
 class MediaQuerySet : public RefCounted<MediaQuerySet> {
 public:
@@ -65,6 +66,8 @@ public:
     String mediaText() const;
 
     PassRefPtr<MediaQuerySet> copy() const { return adoptRef(new MediaQuerySet(*this)); }
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     MediaQuerySet();
@@ -104,12 +107,14 @@ public:
     void clearParentRule() { ASSERT(m_parentRule); m_parentRule = 0; }
     const MediaQuerySet* queries() const { return m_mediaQueries.get(); }
 
+    void reattach(MediaQuerySet*);
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
 private:
     MediaList();
     MediaList(MediaQuerySet*, CSSStyleSheet* parentSheet);
     MediaList(MediaQuerySet*, CSSRule* parentRule);
-
-    void notifyChanged();
 
     RefPtr<MediaQuerySet> m_mediaQueries;
     CSSStyleSheet* m_parentStyleSheet;
