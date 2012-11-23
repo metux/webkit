@@ -23,6 +23,7 @@
 #include "config.h"
 #include "HTMLFormCollection.h"
 
+#include "HTMLFieldSetElement.h"
 #include "HTMLFormControlElement.h"
 #include "HTMLFormElement.h"
 #include "HTMLImageElement.h"
@@ -35,104 +36,72 @@ using namespace HTMLNames;
 // Since the collections are to be "live", we have to do the
 // calculation every time if anything has changed.
 
-HTMLFormCollection::HTMLFormCollection(HTMLFormElement* form)
-    : HTMLCollection(form, OtherCollection)
-    , currentPos(0)
+HTMLFormCollection::HTMLFormCollection(Element* base)
+    : HTMLCollection(base, FormControls, OverridesItemAfter)
 {
+    ASSERT(base->hasTagName(formTag) || base->hasTagName(fieldsetTag));
 }
 
-PassOwnPtr<HTMLFormCollection> HTMLFormCollection::create(HTMLFormElement* form)
+PassRefPtr<HTMLFormCollection> HTMLFormCollection::create(Element* base)
 {
-    return adoptPtr(new HTMLFormCollection(form));
+    return adoptRef(new HTMLFormCollection(base));
 }
 
 HTMLFormCollection::~HTMLFormCollection()
 {
 }
 
-unsigned HTMLFormCollection::calcLength() const
+const Vector<FormAssociatedElement*>& HTMLFormCollection::formControlElements() const
 {
-    return static_cast<HTMLFormElement*>(base())->length();
+    ASSERT(base());
+    ASSERT(base()->hasTagName(formTag) || base()->hasTagName(fieldsetTag));
+    if (base()->hasTagName(formTag))
+        return static_cast<HTMLFormElement*>(base())->associatedElements();
+    return static_cast<HTMLFieldSetElement*>(base())->associatedElements();
 }
 
-Node* HTMLFormCollection::item(unsigned index) const
+const Vector<HTMLImageElement*>& HTMLFormCollection::formImageElements() const
 {
-    invalidateCacheIfNeeded();
+    ASSERT(base());
+    ASSERT(base()->hasTagName(formTag));
+    return static_cast<HTMLFormElement*>(base())->imageElements();
+}
 
-    if (m_cache.current && m_cache.position == index)
-        return m_cache.current;
-
-    if (m_cache.hasLength && m_cache.length <= index)
-        return 0;
-
-    if (!m_cache.current || m_cache.position > index) {
-        m_cache.current = 0;
-        m_cache.position = 0;
-        m_cache.elementsArrayPosition = 0;
+Element* HTMLFormCollection::virtualItemAfter(unsigned& offset, Element* previousItem) const
+{
+    const Vector<FormAssociatedElement*>& elementsArray = formControlElements();
+    if (previousItem)
+        offset++;
+    while (offset < elementsArray.size()) {
+        FormAssociatedElement* element = elementsArray[offset];
+        if (element->isEnumeratable())
+            return toHTMLElement(element);
+        offset++;
     }
-
-    Vector<FormAssociatedElement*>& elementsArray = static_cast<HTMLFormElement*>(base())->m_associatedElements;
-    unsigned currentIndex = m_cache.position;
-    
-    for (unsigned i = m_cache.elementsArrayPosition; i < elementsArray.size(); i++) {
-        if (elementsArray[i]->isEnumeratable()) {
-            HTMLElement* element = toHTMLElement(elementsArray[i]);
-            if (index == currentIndex) {
-                m_cache.position = index;
-                m_cache.current = element;
-                m_cache.elementsArrayPosition = i;
-                return element;
-            }
-
-            currentIndex++;
-        }
-    }
-
     return 0;
 }
 
-Element* HTMLFormCollection::getNamedItem(const QualifiedName& attrName, const AtomicString& name) const
+static HTMLElement* firstNamedItem(const Vector<FormAssociatedElement*>& elementsArray,
+    const Vector<HTMLImageElement*>* imageElementsArray, const QualifiedName& attrName, const String& name)
 {
-    m_cache.position = 0;
-    return getNamedFormItem(attrName, name, 0);
-}
+    ASSERT(attrName == idAttr || attrName == nameAttr);
 
-Element* HTMLFormCollection::getNamedFormItem(const QualifiedName& attrName, const String& name, int duplicateNumber) const
-{
-    HTMLFormElement* form = static_cast<HTMLFormElement*>(base());
-
-    if (!form)
-        return 0;
-
-    bool foundInputElements = false;
-    for (unsigned i = 0; i < form->m_associatedElements.size(); ++i) {
-        FormAssociatedElement* associatedElement = form->m_associatedElements[i];
-        HTMLElement* element = toHTMLElement(associatedElement);
-        if (associatedElement->isEnumeratable() && element->getAttribute(attrName) == name) {
-            foundInputElements = true;
-            if (!duplicateNumber)
-                return element;
-            --duplicateNumber;
-        }
+    for (unsigned i = 0; i < elementsArray.size(); ++i) {
+        HTMLElement* element = toHTMLElement(elementsArray[i]);
+        if (elementsArray[i]->isEnumeratable() && element->fastGetAttribute(attrName) == name)
+            return element;
     }
 
-    if (!foundInputElements) {
-        for (unsigned i = 0; i < form->m_imageElements.size(); ++i) {
-            HTMLImageElement* element = form->m_imageElements[i];
-            if (element->getAttribute(attrName) == name) {
-                if (!duplicateNumber)
-                    return element;
-                --duplicateNumber;
-            }
-        }
+    if (!imageElementsArray)
+        return 0;
+
+    for (unsigned i = 0; i < imageElementsArray->size(); ++i) {
+        HTMLImageElement* element = (*imageElementsArray)[i];
+        if (element->fastGetAttribute(attrName) == name)
+            return element;
     }
 
     return 0;
-}
-
-Node* HTMLFormCollection::nextItem() const
-{
-    return item(m_cache.position + 1);
 }
 
 Node* HTMLFormCollection::namedItem(const AtomicString& name) const
@@ -142,51 +111,53 @@ Node* HTMLFormCollection::namedItem(const AtomicString& name) const
     // attribute. If a match is not found, the method then searches for an
     // object with a matching name attribute, but only on those elements
     // that are allowed a name attribute.
-    invalidateCacheIfNeeded();
-    m_cache.current = getNamedItem(idAttr, name);
-    if (m_cache.current)
-        return m_cache.current;
-    m_cache.current = getNamedItem(nameAttr, name);
-    return m_cache.current;
+    const Vector<HTMLImageElement*>* imagesElements = base()->hasTagName(fieldsetTag) ? 0 : &formImageElements();
+    if (HTMLElement* item = firstNamedItem(formControlElements(), imagesElements, idAttr, name))
+        return item;
+
+    return firstNamedItem(formControlElements(), imagesElements, nameAttr, name);
 }
 
 void HTMLFormCollection::updateNameCache() const
 {
-    if (m_cache.hasNameCache)
+    if (hasNameCache())
         return;
 
     HashSet<AtomicStringImpl*> foundInputElements;
 
-    HTMLFormElement* f = static_cast<HTMLFormElement*>(base());
+    const Vector<FormAssociatedElement*>& elementsArray = formControlElements();
 
-    for (unsigned i = 0; i < f->m_associatedElements.size(); ++i) {
-        FormAssociatedElement* associatedElement = f->m_associatedElements[i];
+    for (unsigned i = 0; i < elementsArray.size(); ++i) {
+        FormAssociatedElement* associatedElement = elementsArray[i];
         if (associatedElement->isEnumeratable()) {
             HTMLElement* element = toHTMLElement(associatedElement);
             const AtomicString& idAttrVal = element->getIdAttribute();
             const AtomicString& nameAttrVal = element->getNameAttribute();
             if (!idAttrVal.isEmpty()) {
-                append(m_cache.idCache, idAttrVal, element);
+                appendIdCache(idAttrVal, element);
                 foundInputElements.add(idAttrVal.impl());
             }
             if (!nameAttrVal.isEmpty() && idAttrVal != nameAttrVal) {
-                append(m_cache.nameCache, nameAttrVal, element);
+                appendNameCache(nameAttrVal, element);
                 foundInputElements.add(nameAttrVal.impl());
             }
         }
     }
 
-    for (unsigned i = 0; i < f->m_imageElements.size(); ++i) {
-        HTMLImageElement* element = f->m_imageElements[i];
-        const AtomicString& idAttrVal = element->getIdAttribute();
-        const AtomicString& nameAttrVal = element->getNameAttribute();
-        if (!idAttrVal.isEmpty() && !foundInputElements.contains(idAttrVal.impl()))
-            append(m_cache.idCache, idAttrVal, element);
-        if (!nameAttrVal.isEmpty() && idAttrVal != nameAttrVal && !foundInputElements.contains(nameAttrVal.impl()))
-            append(m_cache.nameCache, nameAttrVal, element);
+    if (base()->hasTagName(formTag)) {
+        const Vector<HTMLImageElement*>& imageElementsArray = formImageElements();
+        for (unsigned i = 0; i < imageElementsArray.size(); ++i) {
+            HTMLImageElement* element = imageElementsArray[i];
+            const AtomicString& idAttrVal = element->getIdAttribute();
+            const AtomicString& nameAttrVal = element->getNameAttribute();
+            if (!idAttrVal.isEmpty() && !foundInputElements.contains(idAttrVal.impl()))
+                appendIdCache(idAttrVal, element);
+            if (!nameAttrVal.isEmpty() && idAttrVal != nameAttrVal && !foundInputElements.contains(nameAttrVal.impl()))
+                appendNameCache(nameAttrVal, element);
+        }
     }
 
-    m_cache.hasNameCache = true;
+    setHasNameCache();
 }
 
 }

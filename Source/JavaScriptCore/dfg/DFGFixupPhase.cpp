@@ -41,15 +41,19 @@ public:
     {
     }
     
-    void run()
+    bool run()
     {
         for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex)
             fixupBlock(m_graph.m_blocks[blockIndex].get());
+        return true;
     }
 
 private:
     void fixupBlock(BasicBlock* block)
     {
+        if (!block)
+            return;
+        ASSERT(block->isReachable);
         for (m_indexInBlock = 0; m_indexInBlock < block->size(); ++m_indexInBlock) {
             m_compileIndex = block->at(m_indexInBlock);
             fixupNode(m_graph[m_compileIndex]);
@@ -70,78 +74,85 @@ private:
         
         switch (op) {
         case GetById: {
-            if (!isInt32Prediction(m_graph[m_compileIndex].prediction()))
-                break;
-            if (codeBlock()->identifier(node.identifierNumber()) != globalData().propertyNames->length)
-                break;
-            bool isArray = isArrayPrediction(m_graph[node.child1()].prediction());
-            bool isString = isStringPrediction(m_graph[node.child1()].prediction());
-            bool isInt8Array = m_graph[node.child1()].shouldSpeculateInt8Array();
-            bool isInt16Array = m_graph[node.child1()].shouldSpeculateInt16Array();
-            bool isInt32Array = m_graph[node.child1()].shouldSpeculateInt32Array();
-            bool isUint8Array = m_graph[node.child1()].shouldSpeculateUint8Array();
-            bool isUint8ClampedArray = m_graph[node.child1()].shouldSpeculateUint8ClampedArray();
-            bool isUint16Array = m_graph[node.child1()].shouldSpeculateUint16Array();
-            bool isUint32Array = m_graph[node.child1()].shouldSpeculateUint32Array();
-            bool isFloat32Array = m_graph[node.child1()].shouldSpeculateFloat32Array();
-            bool isFloat64Array = m_graph[node.child1()].shouldSpeculateFloat64Array();
-            if (!isArray && !isString && !isInt8Array && !isInt16Array && !isInt32Array && !isUint8Array && !isUint8ClampedArray && !isUint16Array && !isUint32Array && !isFloat32Array && !isFloat64Array)
+            if (m_graph.m_fixpointState > BeforeFixpoint)
                 break;
             
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("  @%u -> %s", m_compileIndex, isArray ? "GetArrayLength" : "GetStringLength");
-#endif
-            if (isArray)
-                node.setOp(GetArrayLength);
-            else if (isString)
-                node.setOp(GetStringLength);
-            else if (isInt8Array)
-                node.setOp(GetInt8ArrayLength);
-            else if (isInt16Array)
-                node.setOp(GetInt16ArrayLength);
-            else if (isInt32Array)
-                node.setOp(GetInt32ArrayLength);
-            else if (isUint8Array)
-                node.setOp(GetUint8ArrayLength);
-            else if (isUint8ClampedArray)
-                node.setOp(GetUint8ClampedArrayLength);
-            else if (isUint16Array)
-                node.setOp(GetUint16ArrayLength);
-            else if (isUint32Array)
-                node.setOp(GetUint32ArrayLength);
-            else if (isFloat32Array)
-                node.setOp(GetFloat32ArrayLength);
-            else if (isFloat64Array)
-                node.setOp(GetFloat64ArrayLength);
-            else
-                ASSERT_NOT_REACHED();
-            // No longer MustGenerate
-            ASSERT(node.flags() & NodeMustGenerate);
-            node.clearFlags(NodeMustGenerate);
+            Node* nodePtr = &node;
+            
+            if (!isInt32Speculation(m_graph[m_compileIndex].prediction()))
+                break;
+            if (codeBlock()->identifier(nodePtr->identifierNumber()) != globalData().propertyNames->length)
+                break;
+            ArrayProfile* arrayProfile = 
+                m_graph.baselineCodeBlockFor(nodePtr->codeOrigin)->getArrayProfile(
+                    nodePtr->codeOrigin.bytecodeIndex);
+            Array::Mode arrayMode = Array::Undecided;
+            if (arrayProfile) {
+                arrayProfile->computeUpdatedPrediction();
+                arrayMode = refineArrayMode(
+                    fromObserved(arrayProfile->observedArrayModes(), false),
+                    m_graph[node.child1()].prediction(),
+                    m_graph[m_compileIndex].prediction());                    
+                if (modeSupportsLength(arrayMode) && arrayProfile->hasDefiniteStructure()) {
+                    m_graph.ref(nodePtr->child1());
+                    Node checkStructure(CheckStructure, nodePtr->codeOrigin, OpInfo(m_graph.addStructureSet(arrayProfile->expectedStructure())), nodePtr->child1().index());
+                    checkStructure.ref();
+                    NodeIndex checkStructureIndex = m_graph.size();
+                    m_graph.append(checkStructure);
+                    m_insertionSet.append(m_indexInBlock, checkStructureIndex);
+                    nodePtr = &m_graph[m_compileIndex];
+                }
+            } else {
+                arrayMode = refineArrayMode(
+                    arrayMode,
+                    m_graph[node.child1()].prediction(),
+                    m_graph[m_compileIndex].prediction());
+            }
+            if (!modeSupportsLength(arrayMode))
+                break;
+            nodePtr->setOp(GetArrayLength);
+            ASSERT(nodePtr->flags() & NodeMustGenerate);
+            nodePtr->clearFlags(NodeMustGenerate);
             m_graph.deref(m_compileIndex);
+            nodePtr->setArrayMode(arrayMode);
+            
+            NodeIndex storage = checkArray(arrayMode, nodePtr->codeOrigin, nodePtr->child1().index(), lengthNeedsStorage, nodePtr->shouldGenerate());
+            if (storage == NoNode)
+                break;
+            
+            nodePtr = &m_graph[m_compileIndex];
+            nodePtr->children.child2() = Edge(storage);
             break;
         }
         case GetIndexedPropertyStorage: {
-            PredictedType basePrediction = m_graph[node.child2()].prediction();
-            if (!(basePrediction & PredictInt32) && basePrediction) {
-                node.setOpAndDefaultFlags(Nop);
-                m_graph.clearAndDerefChild1(node);
-                m_graph.clearAndDerefChild2(node);
-                m_graph.clearAndDerefChild3(node);
-                node.setRefCount(0);
-            }
+            ASSERT(canCSEStorage(node.arrayMode()));
             break;
         }
         case GetByVal:
         case StringCharAt:
         case StringCharCodeAt: {
-            if (!!node.child3() && m_graph[node.child3()].op() == Nop)
-                node.children.child3() = Edge();
+            node.setArrayMode(
+                refineArrayMode(
+                    node.arrayMode(),
+                    m_graph[node.child1()].prediction(),
+                    m_graph[node.child2()].prediction()));
+            
+            blessArrayOperation(node.child1(), 2);
             break;
         }
             
+        case ArrayPush: {
+            blessArrayOperation(node.child1(), 2);
+            break;
+        }
+            
+        case ArrayPop: {
+            blessArrayOperation(node.child1(), 1);
+        }
+            
         case ValueToInt32: {
-            if (m_graph[node.child1()].shouldSpeculateNumber()) {
+            if (m_graph[node.child1()].shouldSpeculateNumber()
+                && node.mustGenerate()) {
                 node.clearFlags(NodeMustGenerate);
                 m_graph.deref(m_compileIndex);
             }
@@ -209,7 +220,7 @@ private:
         }
             
         case SetLocal: {
-            if (m_graph.isCaptured(node.local()))
+            if (node.variableAccessData()->isCaptured())
                 break;
             if (!node.variableAccessData()->shouldUseDoubleFormat())
                 break;
@@ -246,7 +257,6 @@ private:
             
         case ArithMin:
         case ArithMax:
-        case ArithMul:
         case ArithMod: {
             if (Node::shouldSpeculateInteger(m_graph[node.child1()], m_graph[node.child2()])
                 && node.canSpeculateInteger())
@@ -256,6 +266,14 @@ private:
             break;
         }
             
+        case ArithMul: {
+            if (m_graph.mulShouldSpeculateInteger(node))
+                break;
+            fixDoubleEdge(0);
+            fixDoubleEdge(1);
+            break;
+        }
+
         case ArithDiv: {
             if (Node::shouldSpeculateInteger(m_graph[node.child1()], m_graph[node.child2()])
                 && node.canSpeculateInteger()) {
@@ -268,7 +286,7 @@ private:
                 
                 Node newDivision = oldDivision;
                 newDivision.setRefCount(2);
-                newDivision.predict(PredictDouble);
+                newDivision.predict(SpecDouble);
                 NodeIndex newDivisionIndex = m_graph.size();
                 
                 oldDivision.setOp(DoubleAsInt32);
@@ -297,21 +315,38 @@ private:
             break;
         }
             
-        case PutByVal: {
-            if (!m_graph[node.child1()].prediction() || !m_graph[node.child2()].prediction())
+        case PutByVal:
+        case PutByValAlias: {
+            Edge child1 = m_graph.varArgChild(node, 0);
+            Edge child2 = m_graph.varArgChild(node, 1);
+            Edge child3 = m_graph.varArgChild(node, 2);
+
+            node.setArrayMode(
+                refineArrayMode(
+                    node.arrayMode(),
+                    m_graph[child1].prediction(),
+                    m_graph[child2].prediction()));
+            
+            blessArrayOperation(child1, 3);
+            
+            Node* nodePtr = &m_graph[m_compileIndex];
+            
+            switch (modeForPut(nodePtr->arrayMode())) {
+            case Array::Int8Array:
+            case Array::Int16Array:
+            case Array::Int32Array:
+            case Array::Uint8Array:
+            case Array::Uint8ClampedArray:
+            case Array::Uint16Array:
+            case Array::Uint32Array:
+                if (!m_graph[child3].shouldSpeculateInteger())
+                    fixDoubleEdge(2);
                 break;
-            if (!m_graph[node.child2()].shouldSpeculateInteger())
-                break;
-            if (isActionableIntMutableArrayPrediction(m_graph[node.child1()].prediction())) {
-                if (m_graph[node.child3()].isConstant())
-                    break;
-                if (m_graph[node.child3()].shouldSpeculateInteger())
-                    break;
+            case Array::Float32Array:
+            case Array::Float64Array:
                 fixDoubleEdge(2);
                 break;
-            }
-            if (isActionableFloatMutableArrayPrediction(m_graph[node.child1()].prediction())) {
-                fixDoubleEdge(2);
+            default:
                 break;
             }
             break;
@@ -328,6 +363,59 @@ private:
         }
         dataLog("\n");
 #endif
+    }
+    
+    NodeIndex checkArray(Array::Mode arrayMode, CodeOrigin codeOrigin, NodeIndex array, bool (*storageCheck)(Array::Mode) = canCSEStorage, bool shouldGenerate = true)
+    {
+        ASSERT(modeIsSpecific(arrayMode));
+        
+        m_graph.ref(array);
+        Node checkArray(CheckArray, codeOrigin, OpInfo(arrayMode), array);
+        checkArray.ref();
+        NodeIndex checkArrayIndex = m_graph.size();
+        m_graph.append(checkArray);
+        m_insertionSet.append(m_indexInBlock, checkArrayIndex);
+
+        if (!storageCheck(arrayMode))
+            return NoNode;
+        
+        if (shouldGenerate)
+            m_graph.ref(array);
+        Node getIndexedPropertyStorage(
+            GetIndexedPropertyStorage, codeOrigin, OpInfo(arrayMode), array);
+        if (shouldGenerate)
+            getIndexedPropertyStorage.ref();
+        NodeIndex getIndexedPropertyStorageIndex = m_graph.size();
+        m_graph.append(getIndexedPropertyStorage);
+        m_insertionSet.append(m_indexInBlock, getIndexedPropertyStorageIndex);
+        
+        return getIndexedPropertyStorageIndex;
+    }
+    
+    void blessArrayOperation(Edge base, unsigned storageChildIdx)
+    {
+        if (m_graph.m_fixpointState > BeforeFixpoint)
+            return;
+            
+        Node* nodePtr = &m_graph[m_compileIndex];
+        
+        if (nodePtr->arrayMode() == Array::ForceExit) {
+            Node forceExit(ForceOSRExit, nodePtr->codeOrigin);
+            forceExit.ref();
+            NodeIndex forceExitIndex = m_graph.size();
+            m_graph.append(forceExit);
+            m_insertionSet.append(m_indexInBlock, forceExitIndex);
+            return;
+        }
+        
+        if (!modeIsSpecific(nodePtr->arrayMode()))
+            return;
+            
+        NodeIndex storage = checkArray(nodePtr->arrayMode(), nodePtr->codeOrigin, base.index());
+        if (storage == NoNode)
+            return;
+            
+        m_graph.child(m_graph[m_compileIndex], storageChildIdx) = Edge(storage);
     }
     
     void fixIntEdge(Edge& edge)
@@ -351,7 +439,7 @@ private:
     void fixDoubleEdge(unsigned childIndex)
     {
         Node& source = m_graph[m_compileIndex];
-        Edge& edge = source.children.child(childIndex);
+        Edge& edge = m_graph.child(source, childIndex);
         
         if (!m_graph[edge].shouldSpeculateInteger()) {
             edge.setUseKind(DoubleUse);
@@ -374,7 +462,7 @@ private:
         m_insertionSet.append(m_indexInBlock, resultIndex);
         
         Node& int32ToDouble = m_graph[resultIndex];
-        int32ToDouble.predict(PredictDouble);
+        int32ToDouble.predict(SpecDouble);
         int32ToDouble.ref();
     }
     
@@ -383,9 +471,10 @@ private:
     InsertionSet<NodeIndex> m_insertionSet;
 };
     
-void performFixup(Graph& graph)
+bool performFixup(Graph& graph)
 {
-    runPhase<FixupPhase>(graph);
+    SamplingRegion samplingRegion("DFG Fixup Phase");
+    return runPhase<FixupPhase>(graph);
 }
 
 } } // namespace JSC::DFG

@@ -18,13 +18,67 @@
  */
 
 #include "config.h"
+
+#if USE(ACCELERATED_COMPOSITING)
 #include "TextureMapperBackingStore.h"
 
 #include "GraphicsLayer.h"
 #include "ImageBuffer.h"
 #include "TextureMapper.h"
 
+#if USE(GRAPHICS_SURFACE)
+#include "GraphicsSurface.h"
+#include "TextureMapperGL.h"
+#endif
+
 namespace WebCore {
+
+#if USE(GRAPHICS_SURFACE)
+void TextureMapperSurfaceBackingStore::setGraphicsSurface(uint64_t graphicsSurfaceToken, const IntSize& surfaceSize, uint32_t frontBuffer)
+{
+    if (graphicsSurfaceToken != m_graphicsSurfaceToken) {
+        GraphicsSurface::Flags surfaceFlags = GraphicsSurface::SupportsTextureTarget
+                                            | GraphicsSurface::SupportsSharing;
+        setSurface(GraphicsSurface::create(surfaceSize, surfaceFlags, graphicsSurfaceToken));
+        m_graphicsSurfaceSize = surfaceSize;
+    }
+
+    RefPtr<WebCore::GraphicsSurface> surface = graphicsSurface();
+    if (surface->frontBuffer() != frontBuffer)
+        surface->swapBuffers();
+
+}
+
+PassRefPtr<BitmapTexture> TextureMapperSurfaceBackingStore::texture() const
+{
+    // FIXME: Instead of just returning an empty texture, we should wrap the texture contents into a BitmapTexture.
+    RefPtr<BitmapTexture> emptyTexture;
+    return emptyTexture;
+}
+
+void TextureMapperSurfaceBackingStore::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& transform, float opacity, BitmapTexture* mask)
+{
+    TransformationMatrix adjustedTransform = transform;
+    adjustedTransform.multiply(TransformationMatrix::rectToRect(FloatRect(FloatPoint::zero(), m_graphicsSurfaceSize), targetRect));
+#if OS(DARWIN)
+    // This is specific to the Mac implementation of GraphicsSurface. IOSurface requires GL_TEXTURE_RECTANGLE_ARB to be used.
+    static_cast<TextureMapperGL*>(textureMapper)->drawTextureRectangleARB(m_graphicsSurface->getTextureID(), 0, m_graphicsSurfaceSize, targetRect, adjustedTransform, opacity, mask);
+#else
+    static_cast<TextureMapperGL*>(textureMapper)->drawTexture(m_graphicsSurface->getTextureID(), 0, m_graphicsSurfaceSize, targetRect, adjustedTransform, opacity, mask);
+#endif
+}
+
+void TextureMapperSurfaceBackingStore::setSurface(PassRefPtr<GraphicsSurface> surface)
+{
+    if (surface) {
+        m_graphicsSurface = surface;
+        m_graphicsSurfaceToken = m_graphicsSurface->exportToken();
+    } else {
+        m_graphicsSurface = RefPtr<GraphicsSurface>();
+        m_graphicsSurfaceToken = 0;
+    }
+}
+#endif
 
 void TextureMapperTile::updateContents(TextureMapper* textureMapper, Image* image, const IntRect& dirtyRect)
 {
@@ -47,9 +101,15 @@ void TextureMapperTile::updateContents(TextureMapper* textureMapper, Image* imag
     m_texture->updateContents(image, targetRect, sourceOffset);
 }
 
-void TextureMapperTile::paint(TextureMapper* textureMapper, const TransformationMatrix& transform, float opacity, BitmapTexture* mask)
+void TextureMapperTile::paint(TextureMapper* textureMapper, const TransformationMatrix& transform, float opacity, BitmapTexture* mask, const unsigned exposedEdges)
 {
-    textureMapper->drawTexture(*texture().get(), rect(), transform, opacity, mask);
+    if (texture().get())
+        textureMapper->drawTexture(*texture().get(), rect(), transform, opacity, mask, exposedEdges);
+}
+
+TextureMapperTiledBackingStore::TextureMapperTiledBackingStore()
+    : m_drawsDebugBorders(false)
+{
 }
 
 void TextureMapperTiledBackingStore::updateContentsFromImageIfNeeded(TextureMapper* textureMapper)
@@ -61,13 +121,30 @@ void TextureMapperTiledBackingStore::updateContentsFromImageIfNeeded(TextureMapp
     m_image.clear();
 }
 
+unsigned TextureMapperBackingStore::calculateExposedTileEdges(const FloatRect& totalRect, const FloatRect& tileRect)
+{
+    unsigned exposedEdges = TextureMapper::NoEdges;
+    if (!tileRect.x())
+        exposedEdges |= TextureMapper::LeftEdge;
+    if (!tileRect.y())
+        exposedEdges |= TextureMapper::TopEdge;
+    if (tileRect.width() + tileRect.x() >= totalRect.width())
+        exposedEdges |= TextureMapper::RightEdge;
+    if (tileRect.height() + tileRect.y() >= totalRect.height())
+        exposedEdges |= TextureMapper::BottomEdge;
+    return exposedEdges;
+}
+
 void TextureMapperTiledBackingStore::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& transform, float opacity, BitmapTexture* mask)
 {
     updateContentsFromImageIfNeeded(textureMapper);
     TransformationMatrix adjustedTransform = transform;
     adjustedTransform.multiply(TransformationMatrix::rectToRect(rect(), targetRect));
-    for (size_t i = 0; i < m_tiles.size(); ++i)
-        m_tiles[i].paint(textureMapper, adjustedTransform, opacity, mask);
+    for (size_t i = 0; i < m_tiles.size(); ++i) {
+        m_tiles[i].paint(textureMapper, adjustedTransform, opacity, mask, calculateExposedTileEdges(rect(), m_tiles[i].rect()));
+        if (m_drawsDebugBorders)
+            textureMapper->drawBorder(m_debugBorderColor, m_debugBorderWidth, m_tiles[i].rect(), adjustedTransform);
+    }
 }
 
 void TextureMapperTiledBackingStore::createOrDestroyTilesIfNeeded(const FloatSize& size, const IntSize& tileSize, bool hasAlpha)
@@ -152,4 +229,11 @@ PassRefPtr<BitmapTexture> TextureMapperTiledBackingStore::texture() const
     return PassRefPtr<BitmapTexture>();
 }
 
+void TextureMapperTiledBackingStore::setDebugBorder(const Color& color, float width)
+{
+    m_debugBorderColor = color;
+    m_debugBorderWidth = width;
 }
+
+}
+#endif

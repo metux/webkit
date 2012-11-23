@@ -24,6 +24,7 @@
 #include "Document.h"
 #include "Frame.h"
 #include "GRefPtrGStreamer.h"
+#include "GStreamerVersioning.h"
 #include "MediaPlayer.h"
 #include "NetworkingContext.h"
 #include "NotImplemented.h"
@@ -155,15 +156,8 @@ static void webkit_web_src_class_init(WebKitWebSrcClass* klass)
 
     gst_element_class_add_pad_template(eklass,
                                        gst_static_pad_template_get(&srcTemplate));
-#ifdef GST_API_VERSION_1
-    gst_element_class_set_metadata(eklass,
-#else
-    gst_element_class_set_details_simple(eklass,
-#endif
-                                         (gchar*) "WebKit Web source element",
-                                         (gchar*) "Source",
-                                         (gchar*) "Handles HTTP/HTTPS uris",
-                                         (gchar*) "Sebastian Dröge <sebastian.droege@collabora.co.uk>");
+    setGstElementClassMetadata(eklass, "WebKit Web source element", "Source", "Handles HTTP/HTTPS uris",
+                               "Sebastian Dröge <sebastian.droege@collabora.co.uk>");
 
     // icecast stuff
     g_object_class_install_property(oklass,
@@ -788,18 +782,15 @@ void StreamingClient::didReceiveResponse(ResourceHandle*, const ResourceResponse
     if (length > 0) {
         length += priv->requestedOffset;
         gst_app_src_set_size(priv->appsrc, length);
+
+#ifndef GST_API_VERSION_1
         if (!priv->haveAppSrc27) {
-#ifdef GST_API_VERSION_1
-            GstSegment* segment = &GST_BASE_SRC(priv->appsrc)->segment;
-            segment->duration = length;
-            segment->format = GST_FORMAT_BYTES;
-#else
             gst_segment_set_duration(&GST_BASE_SRC(priv->appsrc)->segment, GST_FORMAT_BYTES, length);
-#endif
             gst_element_post_message(GST_ELEMENT(priv->appsrc),
                                      gst_message_new_duration(GST_OBJECT(priv->appsrc),
                                                               GST_FORMAT_BYTES, length));
         }
+#endif
     }
 
     priv->size = length >= 0 ? length : 0;
@@ -853,13 +844,13 @@ void StreamingClient::didReceiveResponse(ResourceHandle*, const ResourceResponse
     }
 
     if (gst_tag_list_is_empty(tags))
-        gst_tag_list_free(tags);
-    else
 #ifdef GST_API_VERSION_1
-        gst_pad_push_event(GST_PAD_CAST(m_src->priv->srcpad), gst_event_new_tag(tags));
+        gst_tag_list_unref(tags);
 #else
-        gst_element_found_tags_for_pad(GST_ELEMENT(m_src), m_src->priv->srcpad, tags);
+        gst_tag_list_free(tags);
 #endif
+    else
+        notifyGstTagsOnPad(GST_ELEMENT(m_src), m_src->priv->srcpad, tags);
 }
 
 void StreamingClient::didReceiveData(ResourceHandle* handle, const char* data, int length, int encodedDataLength)

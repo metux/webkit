@@ -82,7 +82,7 @@ Node* InjectedScriptHost::scriptValueAsNode(ScriptValue value)
 
 ScriptValue InjectedScriptHost::nodeAsScriptValue(ScriptState* state, Node* node)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(state);
     return ScriptValue(state->globalData(), toJS(state, deprecatedGlobalObjectForPrototype(state), node));
 }
 
@@ -95,7 +95,7 @@ JSValue JSInjectedScriptHost::inspectedObject(ExecState* exec)
     if (!object)
         return jsUndefined();
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
     ScriptValue scriptValue = object->get(exec);
     if (scriptValue.hasNoValue())
         return jsUndefined();
@@ -184,6 +184,8 @@ JSValue JSInjectedScriptHost::functionDetails(ExecState* exec)
     UString displayName = function->displayName(exec);
     if (!displayName.isEmpty())
         result->putDirect(exec->globalData(), Identifier(exec, "displayName"), jsString(exec, displayName));
+    // FIXME: provide function scope data in "scopesRaw" property when JSC supports it.
+    //     https://bugs.webkit.org/show_bug.cgi?id=87192
     return result;
 }
 
@@ -201,6 +203,8 @@ static JSArray* getJSListenerFunctions(ExecState* exec, Document* document, cons
         if (jsListener->isolatedWorld() != currentWorld(exec))
             continue;
         JSObject* function = jsListener->jsFunction(document);
+        if (!function)
+            continue;
         JSObject* listenerEntry = constructEmptyObject(exec);
         listenerEntry->putDirect(exec->globalData(), Identifier(exec, "listener"), function);
         listenerEntry->putDirect(exec->globalData(), Identifier(exec, "useCapture"), jsBoolean(listenerInfo.eventListenerVector[i].useCapture));
@@ -269,6 +273,28 @@ JSValue JSInjectedScriptHost::storageId(ExecState* exec)
     if (storage)
         return jsString(exec, impl()->storageIdImpl(storage));
     return jsUndefined();
+}
+
+JSValue JSInjectedScriptHost::evaluate(ExecState* exec)
+{
+    JSValue expression = exec->argument(0);
+    if (!expression.isString())
+        return throwError(exec, createError(exec, "String argument expected."));
+    JSGlobalObject* globalObject = exec->lexicalGlobalObject();
+    JSFunction* evalFunction = globalObject->evalFunction();
+    CallData callData;
+    CallType callType = evalFunction->methodTable()->getCallData(evalFunction, callData);
+    if (callType == CallTypeNone)
+        return jsUndefined();
+    MarkedArgumentBuffer args;
+    args.append(expression);
+
+    bool wasEvalEnabled = globalObject->evalEnabled();
+    globalObject->setEvalEnabled(true);
+    JSValue result = JSC::call(exec, evalFunction, callType, callData, exec->globalThisValue(), args);
+    globalObject->setEvalEnabled(wasEvalEnabled);
+
+    return result;
 }
 
 } // namespace WebCore

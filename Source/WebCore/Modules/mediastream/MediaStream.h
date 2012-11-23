@@ -28,7 +28,7 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ActiveDOMObject.h"
+#include "ContextDestructionObserver.h"
 #include "EventTarget.h"
 #include "MediaStreamDescriptor.h"
 #include "MediaStreamTrackList.h"
@@ -37,11 +37,8 @@
 
 namespace WebCore {
 
-class ScriptExecutionContext;
-
-class MediaStream : public RefCounted<MediaStream>, public MediaStreamDescriptorOwner, public EventTarget, public ActiveDOMObject {
+class MediaStream : public RefCounted<MediaStream>, public MediaStreamDescriptorOwner, public EventTarget, public ContextDestructionObserver {
 public:
-    // Must match the constants in the .idl file.
     enum ReadyState {
         LIVE = 1,
         ENDED = 2
@@ -59,7 +56,10 @@ public:
     MediaStreamTrackList* audioTracks() { return m_audioTracks.get(); }
     MediaStreamTrackList* videoTracks() { return m_videoTracks.get(); }
 
-    void streamEnded();
+    virtual bool isLocal() const { return false; }
+
+    // MediaStreamDescriptorOwner
+    virtual void streamEnded() OVERRIDE;
 
     MediaStreamDescriptor* descriptor() const { return m_descriptor.get(); }
 
@@ -81,6 +81,10 @@ private:
     // EventTarget
     virtual void refEventTarget() OVERRIDE { ref(); }
     virtual void derefEventTarget() OVERRIDE { deref(); }
+
+    // MediaStreamDescriptorOwner
+    virtual void addTrack(MediaStreamComponent*) OVERRIDE;
+    virtual void removeTrack(MediaStreamComponent*) OVERRIDE;
 
     EventTargetData m_eventTargetData;
 

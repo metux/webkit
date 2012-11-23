@@ -69,10 +69,30 @@ StringImpl::~StringImpl()
         fastFree(const_cast<LChar*>(m_data8));
         return;
     }
+#if PLATFORM(QT)
+    if (ownership == BufferAdoptedQString) {
+        if (!m_qStringData->ref.deref())
+            QStringData::deallocate(m_qStringData);
+        return;
+    }
+#endif
 
     ASSERT(ownership == BufferSubstring);
     ASSERT(m_substringBuffer);
     m_substringBuffer->deref();
+}
+
+PassRefPtr<StringImpl> StringImpl::createFromLiteral(const char* characters, unsigned length)
+{
+    ASSERT(charactersAreAllASCII<LChar>(reinterpret_cast<const LChar*>(characters), length));
+    return adoptRef(new StringImpl(characters, length, ConstructFromLiteral));
+}
+
+PassRefPtr<StringImpl> StringImpl::createFromLiteral(const char* characters)
+{
+    size_t length = strlen(characters);
+    ASSERT(charactersAreAllASCII<LChar>(reinterpret_cast<const LChar*>(characters), length));
+    return adoptRef(new StringImpl(characters, length, ConstructFromLiteral));
 }
 
 PassRefPtr<StringImpl> StringImpl::createUninitialized(unsigned length, LChar*& data)
@@ -1644,6 +1664,18 @@ PassRefPtr<StringImpl> StringImpl::adopt(StringBuffer<UChar>& buffer)
     return adoptRef(new StringImpl(buffer.release(), length));
 }
 
+#if PLATFORM(QT)
+PassRefPtr<StringImpl> StringImpl::adopt(QStringData* qStringData)
+{
+    ASSERT(qStringData);
+
+    if (!qStringData->size)
+        return empty();
+
+    return adoptRef(new StringImpl(qStringData, ConstructAdoptedQString));
+}
+#endif
+
 PassRefPtr<StringImpl> StringImpl::createWithTerminatingNullCharacter(const StringImpl& string)
 {
     // Use createUninitialized instead of 'new StringImpl' so that the string and its buffer
@@ -1666,6 +1698,21 @@ PassRefPtr<StringImpl> StringImpl::createWithTerminatingNullCharacter(const Stri
     terminatedString->m_length--;
     terminatedString->m_hashAndFlags = (string.m_hashAndFlags & (~s_flagMask | s_hashFlag8BitBuffer)) | s_hashFlagHasTerminatingNullCharacter;
     return terminatedString.release();
+}
+
+size_t StringImpl::sizeInBytes() const
+{
+    // FIXME: support substrings
+    size_t size = length();
+    if (is8Bit()) {
+        if (has16BitShadow()) {
+            size += 2 * size;
+            if (hasTerminatingNullCharacter())
+                size += 2;
+        }
+    } else
+        size *= 2;
+    return size + sizeof(*this);
 }
 
 } // namespace WTF

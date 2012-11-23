@@ -42,9 +42,8 @@ namespace JSC {
         macro(op_create_activation, 2) \
         macro(op_init_lazy_reg, 2) \
         macro(op_create_arguments, 2) \
-        macro(op_create_this, 3) \
-        macro(op_get_callee, 2) \
-        macro(op_convert_this, 2) \
+        macro(op_create_this, 2) \
+        macro(op_convert_this, 3) \
         \
         macro(op_new_object, 2) \
         macro(op_new_array, 4) \
@@ -101,12 +100,15 @@ namespace JSC {
         macro(op_get_scoped_var, 5) /* has value profiling */ \
         macro(op_put_scoped_var, 4) \
         macro(op_get_global_var, 4) /* has value profiling */ \
+        macro(op_get_global_var_watchable, 5) /* has value profiling */ \
         macro(op_put_global_var, 3) \
+        macro(op_put_global_var_check, 5) \
         macro(op_resolve_base, 5) /* has value profiling */ \
         macro(op_ensure_property_exists, 3) \
         macro(op_resolve_with_base, 5) /* has value profiling */ \
         macro(op_resolve_with_this, 5) /* has value profiling */ \
         macro(op_get_by_id, 9) /* has value profiling */ \
+        macro(op_get_by_id_out_of_line, 9) /* has value profiling */ \
         macro(op_get_by_id_self, 9) /* has value profiling */ \
         macro(op_get_by_id_proto, 9) /* has value profiling */ \
         macro(op_get_by_id_chain, 9) /* has value profiling */ \
@@ -121,16 +123,19 @@ namespace JSC {
         macro(op_get_string_length, 9) /* has value profiling */ \
         macro(op_get_arguments_length, 4) \
         macro(op_put_by_id, 9) \
+        macro(op_put_by_id_out_of_line, 9) \
         macro(op_put_by_id_transition, 9) \
         macro(op_put_by_id_transition_direct, 9) \
+        macro(op_put_by_id_transition_direct_out_of_line, 9) \
         macro(op_put_by_id_transition_normal, 9) \
+        macro(op_put_by_id_transition_normal_out_of_line, 9) \
         macro(op_put_by_id_replace, 9) \
         macro(op_put_by_id_generic, 9) \
         macro(op_del_by_id, 4) \
-        macro(op_get_by_val, 5) /* has value profiling */ \
-        macro(op_get_argument_by_val, 5) /* must be the same size as op_get_by_val */ \
+        macro(op_get_by_val, 6) /* has value profiling */ \
+        macro(op_get_argument_by_val, 6) /* must be the same size as op_get_by_val */ \
         macro(op_get_by_pname, 7) \
-        macro(op_put_by_val, 4) \
+        macro(op_put_by_val, 5) \
         macro(op_del_by_val, 4) \
         macro(op_put_by_index, 4) \
         macro(op_put_getter_setter, 5) \
@@ -189,7 +194,7 @@ namespace JSC {
         macro(op_throw, 2) \
         macro(op_throw_reference_error, 2) \
         \
-        macro(op_debug, 4) \
+        macro(op_debug, 5) \
         macro(op_profile_will_call, 2) \
         macro(op_profile_did_call, 2) \
         \

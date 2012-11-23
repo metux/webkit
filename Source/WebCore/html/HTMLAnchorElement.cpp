@@ -210,15 +210,15 @@ void HTMLAnchorElement::setActive(bool down, bool pause)
     ContainerNode::setActive(down, pause);
 }
 
-void HTMLAnchorElement::parseAttribute(Attribute* attr)
+void HTMLAnchorElement::parseAttribute(const Attribute& attribute)
 {
-    if (attr->name() == hrefAttr) {
+    if (attribute.name() == hrefAttr) {
         bool wasLink = isLink();
-        setIsLink(!attr->isNull());
+        setIsLink(!attribute.isNull());
         if (wasLink != isLink())
             setNeedsStyleRecalc();
         if (isLink()) {
-            String parsedURL = stripLeadingAndTrailingHTMLSpaces(attr->value());
+            String parsedURL = stripLeadingAndTrailingHTMLSpaces(attribute.value());
             if (document()->isDNSPrefetchEnabled()) {
                 if (protocolIs(parsedURL, "http") || protocolIs(parsedURL, "https") || parsedURL.startsWith("//"))
                     prefetchDNS(document()->completeURL(parsedURL).host());
@@ -231,12 +231,12 @@ void HTMLAnchorElement::parseAttribute(Attribute* attr)
             }
         }
         invalidateCachedVisitedLinkHash();
-    } else if (attr->name() == nameAttr || attr->name() == titleAttr) {
+    } else if (attribute.name() == nameAttr || attribute.name() == titleAttr) {
         // Do nothing.
-    } else if (attr->name() == relAttr)
-        setRel(attr->value());
+    } else if (attribute.name() == relAttr)
+        setRel(attribute.value());
     else
-        HTMLElement::parseAttribute(attr);
+        HTMLElement::parseAttribute(attribute);
 }
 
 void HTMLAnchorElement::accessKeyAction(bool sendMouseEvents)
@@ -245,9 +245,9 @@ void HTMLAnchorElement::accessKeyAction(bool sendMouseEvents)
     dispatchSimulatedClick(0, sendMouseEvents);
 }
 
-bool HTMLAnchorElement::isURLAttribute(Attribute *attr) const
+bool HTMLAnchorElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == hrefAttr || HTMLElement::isURLAttribute(attr);
+    return attribute.name() == hrefAttr || HTMLElement::isURLAttribute(attribute);
 }
 
 bool HTMLAnchorElement::canStartSelection() const
@@ -569,24 +569,14 @@ bool isEnterKeyKeydownEvent(Event* event)
     return event->type() == eventNames().keydownEvent && event->isKeyboardEvent() && static_cast<KeyboardEvent*>(event)->keyIdentifier() == "Enter";
 }
 
-bool isMiddleMouseButtonEvent(Event* event)
-{
-    return event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == MiddleButton;
-}
-
 bool isLinkClick(Event* event)
 {
     return event->type() == eventNames().clickEvent && (!event->isMouseEvent() || static_cast<MouseEvent*>(event)->button() != RightButton);
 }
 
-void handleLinkClick(Event* event, Document* document, const String& url, const String& target, bool hideReferrer)
+bool HTMLAnchorElement::willRespondToMouseClickEvents()
 {
-    event->setDefaultHandled();
-
-    Frame* frame = document->frame();
-    if (!frame)
-        return;
-    frame->loader()->urlSelected(document->completeURL(url), target, event, false, false, hideReferrer ? NeverSendReferrer : MaybeSendReferrer);
+    return isLink() || HTMLElement::willRespondToMouseClickEvents();
 }
 
 #if ENABLE(MICRODATA)

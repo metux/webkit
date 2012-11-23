@@ -43,8 +43,6 @@
 #elif PLATFORM(WIN) && !OS(WINCE)
 #include "AccessibilityObjectWrapperWin.h"
 #include "COMPtr.h"
-#elif PLATFORM(CHROMIUM)
-#include "AccessibilityObjectWrapper.h"
 #endif
 
 #if PLATFORM(MAC)
@@ -65,6 +63,8 @@ typedef WebAccessibilityObjectWrapper AccessibilityObjectWrapper;
 #elif PLATFORM(GTK)
 typedef struct _AtkObject AtkObject;
 typedef struct _AtkObject AccessibilityObjectWrapper;
+#elif PLATFORM(CHROMIUM)
+// Chromium does not use a wrapper.
 #else
 class AccessibilityObjectWrapper;
 #endif
@@ -103,6 +103,7 @@ enum AccessibilityRole {
     BrowserRole,
     BusyIndicatorRole,
     ButtonRole,
+    CanvasRole,
     CellRole, 
     CheckBoxRole,
     ColorWellRole,
@@ -128,6 +129,7 @@ enum AccessibilityRole {
     GrowAreaRole,
     HeadingRole,
     HelpTagRole,
+    HorizontalRuleRole,
     IgnoredRole,
     ImageRole,
     ImageMapRole,
@@ -141,6 +143,7 @@ enum AccessibilityRole {
     LandmarkMainRole,
     LandmarkNavigationRole,
     LandmarkSearchRole,
+    LegendRole,
     LinkRole,
     ListRole,
     ListBoxRole,
@@ -187,6 +190,7 @@ enum AccessibilityRole {
     TreeGridRole,
     TreeItemRole,
     TextFieldRole,
+    ToggleButtonRole,
     ToolbarRole,
     UnknownRole,
     UserInterfaceTooltipRole,
@@ -313,9 +317,11 @@ protected:
 public:
     virtual ~AccessibilityObject();
     virtual void detach();
-        
+    virtual bool isDetached() const;
+
     typedef Vector<RefPtr<AccessibilityObject> > AccessibilityChildrenVector;
     
+    virtual bool isAccessibilityNodeObject() const { return false; }    
     virtual bool isAccessibilityRenderObject() const { return false; }
     virtual bool isAccessibilityScrollbar() const { return false; }
     virtual bool isAccessibilityScrollView() const { return false; }
@@ -361,7 +367,7 @@ public:
     virtual bool isMenuList() const { return false; }
     virtual bool isMenuListPopup() const { return false; }
     virtual bool isMenuListOption() const { return false; }
-    virtual bool isSpinButton() const { return false; }
+    virtual bool isSpinButton() const { return roleValue() == SpinButtonRole; }
     virtual bool isSpinButtonPart() const { return false; }
     virtual bool isMockObject() const { return false; }
     bool isTextControl() const { return roleValue() == TextAreaRole || roleValue() == TextFieldRole; }
@@ -377,6 +383,7 @@ public:
     bool isListItem() const { return roleValue() == ListItemRole; }
     bool isCheckboxOrRadio() const { return isCheckbox() || isRadioButton(); }
     bool isScrollView() const { return roleValue() == ScrollAreaRole; }
+    bool isCanvas() const { return roleValue() == CanvasRole; }
     bool isBlockquote() const;
     bool isLandmark() const;
     
@@ -449,10 +456,13 @@ public:
     virtual bool supportsARIAFlowTo() const { return false; }
     virtual void ariaFlowToElements(AccessibilityChildrenVector&) const { }
     virtual bool ariaHasPopup() const { return false; }
+    virtual bool ariaPressedIsPresent() const;
     bool ariaIsMultiline() const;
     virtual const AtomicString& invalidStatus() const;
     bool supportsARIAExpanded() const;
     AccessibilitySortDirection sortDirection() const;
+    virtual bool canvasHasFallbackContent() const { return false; }
+    bool supportsRangeValue() const;
     
     // ARIA drag and drop
     virtual bool supportsARIADropping() const { return false; }
@@ -555,6 +565,7 @@ public:
 
     virtual void childrenChanged() { }
     virtual void contentChanged() { }
+    virtual void updateAccessibilityRole() { }
     const AccessibilityChildrenVector& children();
     virtual void addChildren() { }
     virtual bool canHaveChildren() const { return true; }
@@ -577,8 +588,10 @@ public:
     virtual void handleAriaExpandedChanged() { }
     bool isDescendantOfObject(const AccessibilityObject*) const;
     bool isAncestorOfObject(const AccessibilityObject*) const;
+    AccessibilityObject* firstAnonymousBlockChild() const;
     
     static AccessibilityRole ariaRoleToWebCoreRole(const String&);
+    bool hasAttribute(const QualifiedName&) const;
     const AtomicString& getAttribute(const QualifiedName&) const;
 
     virtual VisiblePositionRange visiblePositionRange() const { return VisiblePositionRange(); }
@@ -637,6 +650,8 @@ public:
     virtual String descriptionForMSAA() const { return String(); }
     virtual AccessibilityRole roleValueForMSAA() const { return roleValue(); }
 
+    virtual String passwordFieldValue() const { return String(); }
+
     // Used by an ARIA tree to get all its rows.
     void ariaTreeRows(AccessibilityChildrenVector&);
     // Used by an ARIA tree item to get all of its direct rows that it can disclose.
@@ -668,7 +683,7 @@ public:
 #if PLATFORM(GTK)
     AccessibilityObjectWrapper* wrapper() const;
     void setWrapper(AccessibilityObjectWrapper*);
-#else
+#elif !PLATFORM(CHROMIUM)
     AccessibilityObjectWrapper* wrapper() const { return m_wrapper.get(); }
     void setWrapper(AccessibilityObjectWrapper* wrapper) 
     {
@@ -707,10 +722,10 @@ protected:
     virtual ScrollableArea* getScrollableAreaIfScrollable() const { return 0; }
     virtual void scrollTo(const IntPoint&) const { }
 
-    virtual bool isDetached() const { return true; }
     static bool isAccessibilityObjectSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool objectMatchesSearchCriteriaWithResultLimit(AccessibilityObject*, AccessibilitySearchCriteria*, AccessibilityChildrenVector&);
+    virtual AccessibilityRole buttonRoleType() const;
     
 #if PLATFORM(GTK)
     bool allowsTextRanges() const;
@@ -727,9 +742,16 @@ protected:
 #elif PLATFORM(GTK)
     AtkObject* m_wrapper;
 #elif PLATFORM(CHROMIUM)
-    RefPtr<AccessibilityObjectWrapper> m_wrapper;
+    bool m_detached;
 #endif
 };
+
+#if !HAVE(ACCESSIBILITY)
+inline const AccessibilityObject::AccessibilityChildrenVector& AccessibilityObject::children() { return m_children; }
+inline const String& AccessibilityObject::actionVerb() const { return emptyString(); }
+inline int AccessibilityObject::lineForPosition(const VisiblePosition&) const { return -1; }
+inline void AccessibilityObject::updateBackingStore() { }
+#endif
 
 } // namespace WebCore
 

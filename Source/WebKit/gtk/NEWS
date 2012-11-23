@@ -1,4 +1,204 @@
 =================
+WebKitGTK+ 1.10.1
+=================
+
+What's new in WebKitGTK+ 1.10.1?
+
+  - Fix an infinite recursive loop in the accessibility code when browsing
+    pages with ARIA.
+  - Fix the MinGW build in the spellchecker.
+  - Restore support for Geode processors.
+  - Use XDamage to improve accelerated compositing performance.
+  - Fix a crash when accelerated compositing is disabled.
+  - Fix a bug causing plugins to be invisible.
+  - Fix accelerated content visibility issues on ATI drivers.
+
+=================
+WebKitGTK+ 1.10.0
+=================
+
+What's new in WebKitGTK+ 1.10.0?
+
+  - Make WebKitWebView work again inside a GtkOverlay in WebKit2 by
+    not using a native window for Accelerated Compositing
+    implementation.
+
+=================
+WebKitGTK+ 1.9.92
+=================
+
+What's new in WebKitGTK+ 1.9.92?
+
+  - Properly expose <legend> elements to ATs.
+  - The new accessibility CanvasRole is now mapped to ATK_ROLE_CANVAS.
+  - Fix the build in Windows platform.
+  - Fix an infinite loop in accessibility code.
+  - Fix the build with GStreamer 0.11.
+  - Fix a crash in network backend with non-UTF8 HTTP header names.
+  - Properly close audio device after playing sound.
+  - Sanitize the suggested filename when building the download
+    destination URI in WebKit2.
+  - Fix a crash in WebKit2 when navigating between pages in the
+    history cache.
+  - Purge unused favicons from IconDatabase after 30 days.
+  - Fix a crash in
+    AccessibilityObject::accessibilityPlatformIncludesObject().
+  - Fix a crash in WebCore::HTMLSelectElement::selectedIndex().
+  - Fix caret-moved events not emitted for certain content.
+  - Fix incorrect/unexpected characters in the text of certain
+    accessibles.
+  - Implement AccessibilityUIElement::titleUIElement() and
+    AccessibilityUIElement::stringValue().
+  - Fix LLint build with -g -02.
+
+=================
+WebKitGTK+ 1.9.91
+=================
+
+What's new in WebKitGTK+ 1.9.91?
+
+  - Fix more API breaks in DOM bindings introduced in previous
+    versions.
+  - Properly process GDK_SMOOTH_SCROLL events.
+
+=================
+WebKitGTK+ 1.9.90
+=================
+
+What's new in WebKitGTK+ 1.9.90?
+
+  - Make WebKitWebView work again inside a GtkOverlay by not using a
+    native window for Accelerated Compositing implementation.
+  - Fix several API breaks in DOM bindings introduced in 1.9.6.
+  - Change spellchecker languages API in WebKit2 to use a GStrv for
+    the list of languages to make the API more consistent and
+    convenient to use.
+  - Add destroy notify parameter to
+    webkit_web_context_register_uri_scheme in WebKit2 GTK+ API.
+  - Replace webkit_web_view_replace_content with
+    webkit_web_view_load_alternate_html in WebKit2 GTK+ API.
+  - Rename WebKitWebView "print-requested" signal to "print" in
+    WebKit2 GTK+ API for consistenty.
+  - Add API to set preferred languages to WebKit2 GTK+.
+  - Add webkit_uri_response_get_suggested_filename to WebKit2 GTK+
+    API.
+  - Add API to save a web page in MHTML format to WebKit2 GTK+.
+  - Implement smart separators for context menu in WebKit2 GTK+.
+  - Fix invalid UTF-8 data passed to the spellchecker.
+  - Fix caret-moved events not emitted for certain content.
+  - Expose ROLE_TOGGLE_BUTTON instead of ROLE_PUSH_BUTTON when
+    aria-pressed is present.
+  - Fix several memory leaks.
+
+=================
+WebKitGTK+ 1.9.6
+=================
+
+What's new in WebKitGTK+ 1.9.6?
+
+  - Add spell checker API to WebKit2 GTK+ API.
+  - Add WebKitWebView::submit-form signal to WebKit2 GTK+ API.
+  - Add API to get the suggested filename from a
+    WebKitNetworkResponse.
+  - Add webkit_web_view_get_snapshot() to WebKit1 API.
+  - Paste primary selection when middle clicking in X11 WebKit2.
+  - Make sure WebKitWebView always has a main resource and it has
+    already been set when the load has been committed, even for pages
+    loaded from the history cache in WebKit2.
+  - Fix a run time critical warning when gdk_window_get_cursor() is
+    called before WebKitWebView has been realized in WebKit2.
+  - Fix continuous insertion of newlines in Etherpad.
+  - Fix several memory leaks.
+
+=================
+WebKitGTK+ 1.9.5
+=================
+
+What's new in WebKitGTK+ 1.9.5?
+
+  - Add API to get HTTPS status to WebKit2 GTK+.
+  - Add API to clear the cache to WebKit2 GTK+.
+  - Add webkit_cookie_manager_set_persistent_storage() to WebKit2 GTK+
+    API.
+  - Improve performance of searching in WebKit2.
+  - Implement disk cache in WebKit2.
+  - Add site specific quirks setting to WebKit2 GTK+ API.
+  - Add a setting to enable/disable page cache to WebKit2 GTK+ API.
+  - Add WebKitWebView::context-menu-dismissed signal to WebKit2 GTK+
+    API.
+  - Add webkit_web_frame_get_dom_document() to WebKit GTK+ API.
+  - Use soup_cookie_jar_is_persistent() to set whether cookie is a
+    session one or not.
+  - Fix recognition of contractions (apostrophes) in spell checker.
+  - Fix a crash when showing the context menu in the Web Inspector.
+  - WebKitWebView::mouse-target-changed is not emitted when moved
+    to/from editable content.
+  - Fix inspector detach when inspector was attached by the client in
+    WebKit2.
+  - Don't show accel labels in WebKit2 context menu items.
+  - Cache the video dimensions to not query the video-sink sink-pad
+    caps every time.
+  - Fix several memory leaks.
+
+=================
+WebKitGTK+ 1.9.4
+=================
+
+What's new in WebKitGTK+ 1.9.4?
+
+  - Add an accelerated compositing implementation for WebKit2.
+  - Add API to register custom URI schemes to WebKit2 GTK+ API.
+  - Add support for window.showModalDialog in WebKit2 GTK+ API.
+  - Add webkit_download_get_received_data_length to WebKit2 GTK+ API.
+  - Add ContextMenu API to WebKit2 GTK+.
+  - Add Geolocation permission requests API to WebKit2 GTK.
+  - Add API to get the library version to WebKit2 GTK+.
+  - Add WebKitWebView::run-file-chooser signal to WebKit1 API.
+  - Port the video sink to GStreamer 0.11 API.
+  - Add TextureMapper ImageBuffer support as a fallback from the
+    hardware accelerated path
+  - Add input methods submenu item to the default context menu for
+    editable content.
+  - Unmark highlighted text matches when find operation finishes.
+  - Honor the device scale factor property when drawing.
+  - Prevent setting or editing httpOnly cookies from JavaScript.
+  - Fix several memory leaks.
+
+=================
+WebKitGTK+ 1.9.3
+=================
+
+What's new in WebKitGTK+ 1.9.3?
+
+  - Add webkit_download_get_request to WebKit2 GTK+ API.
+  - Add API to get the list of plugins to WebKit2 GTK+.
+  - Add webkit_web_view_can_show_mime_type() to WebKit2 GTK+ API.
+  - Add GCancellable parameter to all methods using gio async pattern
+    in WebKit2 GTK+ API.
+  - Add settings to enable and disable composited layer indicators to
+    WebKit2 GTK+ API.
+  - Add generic permission requests API to WebKit2 GTK+ API.
+  - Add initial inspector API to WebKit2 GTK+.
+  - Allow to attach/detach the inspector in WebKit2.
+  - Add media-playback-requires-user-gesture and
+    media-playback-allows-inline settings to WebKit1 and WebKit2 GTK+.
+  - Use defers loading instead of pausing the soup message in
+    WebKitDownload.
+  - Properly set the input method context window location.
+  - Fix a crash in the WebProcess when a download is started from
+    an existing ResourceHandle.
+  - Fix cursor used for ne-resize.
+  - Fix contractions recognition by the spell checker.
+  - Fix a crash rendering scrollbars on GTK wxWebkit.
+  - Fix KURL::fileSystemPath() implementation to strip the query part
+    of the uri.
+  - Check for GTK2/GTK3 symbol mismatch earlier to fix plugins run
+    with nspluginwrapper.
+  - Fix thin archives support while building GTK+ port.
+  - Fix several memory leaks.
+  - Fix several compilation warnings.
+
+=================
 WebKitGTK+ 1.9.2
 =================
 

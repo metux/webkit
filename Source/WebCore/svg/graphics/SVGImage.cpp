@@ -30,27 +30,13 @@
 #if ENABLE(SVG)
 #include "SVGImage.h"
 
-#include "CachedPage.h"
 #include "DocumentLoader.h"
 #include "EmptyClients.h"
-#include "FileChooser.h"
-#include "FileIconLoader.h"
-#include "FloatRect.h"
-#include "Frame.h"
-#include "FrameLoader.h"
 #include "FrameView.h"
-#include "GraphicsContext.h"
-#include "HTMLFormElement.h"
 #include "ImageBuffer.h"
 #include "ImageObserver.h"
-#include "Length.h"
-#include "Page.h"
 #include "RenderSVGRoot.h"
-#include "RenderView.h"
-#include "ResourceError.h"
 #include "SVGDocument.h"
-#include "SVGLength.h"
-#include "SVGRenderSupport.h"
 #include "SVGSVGElement.h"
 #include "Settings.h"
 
@@ -179,11 +165,12 @@ void SVGImage::drawSVGToImageBuffer(ImageBuffer* buffer, const IntSize& size, fl
 
     // Eventually clear image buffer.
     IntRect rect(IntPoint(), size);
-    if (shouldClear == ClearImageBuffer)
-        buffer->context()->clearRect(rect);
 
     FloatRect scaledRect(rect);
     scaledRect.scale(scale);
+
+    if (shouldClear == ClearImageBuffer)
+        buffer->context()->clearRect(enclosingIntRect(scaledRect));
 
     // Draw SVG on top of ImageBuffer.
     draw(buffer->context(), enclosingIntRect(scaledRect), rect, ColorSpaceDeviceRGB, CompositeSourceOver);

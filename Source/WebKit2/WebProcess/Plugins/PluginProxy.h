@@ -49,6 +49,8 @@ class ShareableBitmap;
 class NPVariantData;
 class PluginProcessConnection;
 
+struct PluginCreationParameters;
+
 class PluginProxy : public Plugin {
 public:
     static PassRefPtr<PluginProxy> create(const String& pluginPath);
@@ -60,11 +62,16 @@ public:
     void didReceivePluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments);
     void didReceiveSyncPluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
 
+    bool isBeingAsynchronouslyInitialized() const { return m_waitingOnAsynchronousInitialization; }
+
 private:
     explicit PluginProxy(const String& pluginPath);
 
     // Plugin
     virtual bool initialize(const Parameters&);
+    bool initializeSynchronously();
+
+    virtual void waitForAsynchronousInitialization();
     virtual void destroy();
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect);
     virtual PassRefPtr<ShareableBitmap> snapshot();
@@ -72,6 +79,7 @@ private:
     virtual PlatformLayer* pluginLayer();
 #endif
     virtual bool isTransparent();
+    virtual bool wantsWheelEvents() OVERRIDE;
     virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform);
     virtual void visibilityDidChange();
     virtual void frameDidFinishLoading(uint64_t requestID);
@@ -140,6 +148,14 @@ private:
     void windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID);
 #endif
 
+    bool canInitializeAsynchronously() const;
+
+    void didCreatePlugin(bool wantsWheelEvents, uint32_t remoteLayerClientID);
+    void didFailToCreatePlugin();
+    
+    void didCreatePluginInternal(bool wantsWheelEvents, uint32_t remoteLayerClientID);
+    void didFailToCreatePluginInternal();
+
     String m_pluginPath;
 
     RefPtr<PluginProcessConnection> m_connection;
@@ -168,8 +184,14 @@ private:
     // Whether we're called invalidate in response to an update call, and are now waiting for a paint call.
     bool m_waitingForPaintInResponseToUpdate;
 
+    // Whether we should send wheel events to this plug-in or not.
+    bool m_wantsWheelEvents;
+
     // The client ID for the CA layer in the plug-in process. Will be 0 if the plug-in is not a CA plug-in.
     uint32_t m_remoteLayerClientID;
+    
+    OwnPtr<PluginCreationParameters> m_pendingPluginCreationParameters;
+    bool m_waitingOnAsynchronousInitialization;
 
 #if PLATFORM(MAC)
     RetainPtr<CALayer> m_pluginLayer;

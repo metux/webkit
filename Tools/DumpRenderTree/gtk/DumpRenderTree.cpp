@@ -36,9 +36,9 @@
 #include "EditingCallbacks.h"
 #include "EventSender.h"
 #include "GCController.h"
-#include "LayoutTestController.h"
 #include "PixelDumpSupport.h"
 #include "SelfScrollingWebKitWebView.h"
+#include "TestRunner.h"
 #include "TextInputController.h"
 #include "WebCoreSupport/DumpRenderTreeSupportGtk.h"
 #include "WebCoreTestSupport.h"
@@ -73,12 +73,12 @@ extern gchar* webkit_web_frame_get_response_mime_type(WebKitWebFrame* frame);
 
 volatile bool done;
 static bool printSeparators;
-static int dumpPixels;
+static bool dumpPixelsForCurrentTest;
 static int dumpTree = 1;
 static int useTimeoutWatchdog = 1;
 
 AccessibilityController* axController = 0;
-RefPtr<LayoutTestController> gLayoutTestController;
+RefPtr<TestRunner> gTestRunner;
 static GCController* gcController = 0;
 static WebKitWebView* webView;
 static GtkWidget* window;
@@ -97,7 +97,7 @@ static WebKitWebHistoryItem* prevTestBFItem = NULL;
 
 const unsigned historyItemIndent = 8;
 
-static void runTest(const string& testPathOrURL);
+static void runTest(const string& inputLine);
 
 static void didRunInsecureContent(WebKitWebFrame*, WebKitSecurityOrigin*, const char* url);
 
@@ -123,15 +123,39 @@ static bool shouldEnableDeveloperExtras(const string& pathOrURL)
 
 void dumpFrameScrollPosition(WebKitWebFrame* frame)
 {
+    WebKitDOMDocument* document = webkit_web_frame_get_dom_document(frame);
+    if (!document)
+        return;
 
+    WebKitDOMDOMWindow* domWindow = webkit_dom_document_get_default_view(document);
+    if (!domWindow)
+        return;
+
+    glong x = webkit_dom_dom_window_get_page_x_offset(domWindow);
+    glong y = webkit_dom_dom_window_get_page_y_offset(domWindow);
+
+    if (abs(x) > 0 || abs(y) > 0) {
+        if (webkit_web_frame_get_parent(frame))
+            printf("frame '%s' ", webkit_web_frame_get_name(frame));
+        printf("scrolled to %ld,%ld\n", x, y);
+    }
+
+    if (gTestRunner->dumpChildFrameScrollPositions()) {
+        GSList* children = DumpRenderTreeSupportGtk::getFrameChildren(frame);
+        for (GSList* child = children; child; child = g_slist_next(child))
+            dumpFrameScrollPosition(static_cast<WebKitWebFrame*>(child->data));
+        g_slist_free(children);
+    }
 }
 
 void displayWebView()
 {
-    gtk_widget_queue_draw(GTK_WIDGET(webView));
+    DumpRenderTreeSupportGtk::forceWebViewPaint(webView);
+    DumpRenderTreeSupportGtk::setTracksRepaints(mainFrame, true);
+    DumpRenderTreeSupportGtk::resetTrackedRepaints(mainFrame);
 }
 
-static void appendString(gchar*& target, gchar* string)
+static void appendString(gchar*& target, const gchar* string)
 {
     gchar* oldString = target;
     target = g_strconcat(target, string, NULL);
@@ -167,6 +191,32 @@ CString getTopLevelPath()
     return TOP_LEVEL_DIR;
 }
 
+CString getOutputDir()
+{
+    const char* webkitOutputDir = g_getenv("WEBKITOUTPUTDIR");
+    if (webkitOutputDir)
+        return webkitOutputDir;
+
+    CString topLevelPath = getTopLevelPath();
+    GOwnPtr<char> outputDir(g_build_filename(topLevelPath.data(), "WebKitBuild", NULL));
+    return outputDir.get();
+}
+
+static CString getFontsPath()
+{
+    CString webkitOutputDir = getOutputDir();
+    GOwnPtr<char> fontsPath(g_build_filename(webkitOutputDir.data(), "Dependencies", "Root", "webkitgtk-test-fonts", NULL));
+    if (g_file_test(fontsPath.get(), static_cast<GFileTest>(G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+        return fontsPath.get();
+
+    // Try alternative fonts path.
+    fontsPath.set(g_build_filename(webkitOutputDir.data(), "webkitgtk-test-fonts", NULL));
+    if (g_file_test(fontsPath.get(), static_cast<GFileTest>(G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+        return fontsPath.get();
+
+    return CString();
+}
+
 static void initializeFonts(const char* testURL = 0)
 {
 #if PLATFORM(X11)
@@ -188,18 +238,16 @@ static void initializeFonts(const char* testURL = 0)
     if (!FcConfigParseAndLoad(config, reinterpret_cast<FcChar8*>(fontConfigFilename.get()), true))
         g_error("Couldn't load font configuration file from: %s", fontConfigFilename.get());
 
-    CString topLevelPath = getTopLevelPath();
-    GOwnPtr<char> fontsPath(g_build_filename(topLevelPath.data(), "WebKitBuild", "Dependencies",
-                                             "Root", "webkitgtk-test-fonts", NULL));
-    if (!g_file_test(fontsPath.get(), static_cast<GFileTest>(G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
-        g_error("Could not locate test fonts at %s. Is WEBKIT_TOP_LEVEL set?", fontsPath.get());
+    CString fontsPath = getFontsPath();
+    if (fontsPath.isNull())
+        g_error("Could not locate test fonts at %s. Is WEBKIT_TOP_LEVEL set?", fontsPath.data());
 
     GOwnPtr<GError> error;
-    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.get(), 0, &error.outPtr()));
+    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.data(), 0, &error.outPtr()));
     while (const char* directoryEntry = g_dir_read_name(fontsDirectory.get())) {
         if (!g_str_has_suffix(directoryEntry, ".ttf") && !g_str_has_suffix(directoryEntry, ".otf"))
             continue;
-        GOwnPtr<gchar> fontPath(g_build_filename(fontsPath.get(), directoryEntry, NULL));
+        GOwnPtr<gchar> fontPath(g_build_filename(fontsPath.data(), directoryEntry, NULL));
         if (!FcConfigAppFontAddFile(config, reinterpret_cast<const FcChar8*>(fontPath.get())))
             g_error("Could not load font at %s!", fontPath.get());
 
@@ -244,10 +292,12 @@ static gchar* dumpFramesAsText(WebKitWebFrame* frame)
         result = g_strdup_printf("\n--------\nFrame: '%s'\n--------\n%s\n", frameName, innerText.data());
     }
 
-    if (gLayoutTestController->dumpChildFramesAsText()) {
+    if (gTestRunner->dumpChildFramesAsText()) {
         GSList* children = DumpRenderTreeSupportGtk::getFrameChildren(frame);
-        for (GSList* child = children; child; child = g_slist_next(child))
-            appendString(result, dumpFramesAsText(static_cast<WebKitWebFrame* >(child->data)));
+        for (GSList* child = children; child; child = g_slist_next(child)) {
+            GOwnPtr<gchar> childData(dumpFramesAsText(static_cast<WebKitWebFrame*>(child->data)));
+            appendString(result, childData.get());
+        }
         g_slist_free(children);
     }
 
@@ -278,8 +328,10 @@ static void dumpHistoryItem(WebKitWebHistoryItem* item, int indent, bool current
     gchar* uriScheme = g_uri_parse_scheme(uri);
     if (g_strcmp0(uriScheme, "file") == 0) {
         gchar* pos = g_strstr_len(uri, -1, "/LayoutTests/");
-        if (!pos)
+        if (!pos) {
+            g_free(uriScheme);
             return;
+        }
 
         GString* result = g_string_sized_new(strlen(uri));
         result = g_string_append(result, "(file test):");
@@ -291,9 +343,9 @@ static void dumpHistoryItem(WebKitWebHistoryItem* item, int indent, bool current
 
     g_free(uriScheme);
 
-    const gchar* target = webkit_web_history_item_get_target(item);
-    if (target && strlen(target) > 0)
-        printf(" (in frame \"%s\")", target);
+    GOwnPtr<gchar> target(webkit_web_history_item_get_target(item));
+    if (target.get() && strlen(target.get()) > 0)
+        printf(" (in frame \"%s\")", target.get());
     if (webkit_web_history_item_is_target_item(item))
         printf("  **nav target**");
     putchar('\n');
@@ -398,6 +450,7 @@ static void resetDefaultsToConsistentValues()
                  "javascript-can-open-windows-automatically", TRUE,
                  "enable-offline-web-application-cache", TRUE,
                  "enable-universal-access-from-file-uris", TRUE,
+                 "enable-file-access-from-file-uris", TRUE,
                  "enable-scripts", TRUE,
                  "enable-dom-paste", TRUE,
                  "default-font-family", "Times",
@@ -412,6 +465,7 @@ static void resetDefaultsToConsistentValues()
                  "enable-caret-browsing", FALSE,
                  "enable-page-cache", FALSE,
                  "auto-resize-window", TRUE,
+                 "auto-load-images", TRUE,
                  "enable-java-applet", FALSE,
                  "enable-plugins", TRUE,
                  "enable-hyperlink-auditing", FALSE,
@@ -450,15 +504,18 @@ static void resetDefaultsToConsistentValues()
     DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(false);
     DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(webView, true);
     DumpRenderTreeSupportGtk::setDefersLoading(webView, false);
+    DumpRenderTreeSupportGtk::setSerializeHTTPLoads(false);
 
     if (axController)
         axController->resetToConsistentState();
 
     DumpRenderTreeSupportGtk::clearOpener(mainFrame);
+    DumpRenderTreeSupportGtk::setTracksRepaints(mainFrame, false);
 
     DumpRenderTreeSupportGtk::resetGeolocationClientMock(webView);
 
-    DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(webView, true);
+    DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(webView, false);
+    DumpRenderTreeSupportGtk::setCSSRegionsEnabled(webView, true);
 }
 
 static bool useLongRunningServerMode(int argc, char *argv[])
@@ -488,7 +545,6 @@ static void initializeGlobalsFromCommandLineOptions(int argc, char *argv[])
 {
     struct option options[] = {
         {"notree", no_argument, &dumpTree, false},
-        {"pixel-tests", no_argument, &dumpPixels, true},
         {"tree", no_argument, &dumpTree, true},
         {"no-timeout", no_argument, &useTimeoutWatchdog, false},
         {NULL, 0, NULL, 0}
@@ -519,12 +575,12 @@ void dump()
         gchar* responseMimeType = webkit_web_frame_get_response_mime_type(mainFrame);
 
         if (g_str_equal(responseMimeType, "text/plain")) {
-            gLayoutTestController->setDumpAsText(true);
-            gLayoutTestController->setGeneratePixelResults(false);
+            gTestRunner->setDumpAsText(true);
+            gTestRunner->setGeneratePixelResults(false);
         }
         g_free(responseMimeType);
 
-        if (gLayoutTestController->dumpAsText())
+        if (gTestRunner->dumpAsText())
             result = dumpFramesAsText(mainFrame);
         else {
             // Widget resizing is done asynchronously in GTK+. We pump the main
@@ -541,11 +597,11 @@ void dump()
 
         if (!result) {
             const char* errorMessage;
-            if (gLayoutTestController->dumpAsText())
+            if (gTestRunner->dumpAsText())
                 errorMessage = "[documentElement innerText]";
-            else if (gLayoutTestController->dumpDOMAsWebArchive())
+            else if (gTestRunner->dumpDOMAsWebArchive())
                 errorMessage = "[[mainFrame DOMDocument] webArchive]";
-            else if (gLayoutTestController->dumpSourceAsWebArchive())
+            else if (gTestRunner->dumpSourceAsWebArchive())
                 errorMessage = "[[mainFrame dataSource] webArchive]";
             else
                 errorMessage = "[mainFrame renderTreeAsExternalRepresentation]";
@@ -553,10 +609,10 @@ void dump()
         } else {
             printf("%s", result);
             g_free(result);
-            if (!gLayoutTestController->dumpAsText() && !gLayoutTestController->dumpDOMAsWebArchive() && !gLayoutTestController->dumpSourceAsWebArchive())
+            if (!gTestRunner->dumpAsText() && !gTestRunner->dumpDOMAsWebArchive() && !gTestRunner->dumpSourceAsWebArchive())
                 dumpFrameScrollPosition(mainFrame);
 
-            if (gLayoutTestController->dumpBackForwardList())
+            if (gTestRunner->dumpBackForwardList())
                 dumpBackForwardListForAllWebViews();
         }
 
@@ -568,11 +624,13 @@ void dump()
         }
     }
 
-    if (dumpPixels
-     && gLayoutTestController->generatePixelResults()
-     && !gLayoutTestController->dumpDOMAsWebArchive()
-     && !gLayoutTestController->dumpSourceAsWebArchive())
-        dumpWebViewAsPixelsAndCompareWithExpected(gLayoutTestController->expectedPixelHash());
+    if (dumpPixelsForCurrentTest
+     && gTestRunner->generatePixelResults()
+     && !gTestRunner->dumpDOMAsWebArchive()
+     && !gTestRunner->dumpSourceAsWebArchive()) {
+        DumpRenderTreeSupportGtk::forceWebViewPaint(webView);
+        dumpWebViewAsPixelsAndCompareWithExpected(gTestRunner->expectedPixelHash());
+    }
 
     // FIXME: call displayWebView here when we support --paint
 
@@ -606,8 +664,12 @@ static void setDefaultsToConsistentStateValuesForTesting()
 #else
     GtkCssProvider* cssProvider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(cssProvider,
+                                    "@binding-set NoKeyboardNavigation {        "
+                                    "   unbind \"<shift>F10\";                  "
+                                    "}                                          "
                                     " * {                                       "
                                     "   -GtkScrolledWindow-scrollbar-spacing: 0;"
+                                    "   gtk-key-bindings: NoKeyboardNavigation; "
                                     "}                                          ",
                                     -1, 0);
     gtk_style_context_add_provider_for_screen(gdk_display_get_default_screen(gdk_display_get_default()),
@@ -625,18 +687,13 @@ static void sendPixelResultsEOF()
     fflush(stderr);
 }
 
-static void runTest(const string& testPathOrURL)
+static void runTest(const string& inputLine)
 {
-    ASSERT(!testPathOrURL.empty());
+    ASSERT(!inputLine.empty());
 
-    // Look for "'" as a separator between the path or URL, and the pixel dump hash that follows.
-    string testURL(testPathOrURL);
-    string expectedPixelHash;
-    size_t separatorPos = testURL.find("'");
-    if (separatorPos != string::npos) {
-        testURL = string(testPathOrURL, 0, separatorPos);
-        expectedPixelHash = string(testPathOrURL, separatorPos + 1);
-    }
+    TestCommand command = parseInputLine(inputLine);
+    string& testURL = command.pathOrURL;
+    dumpPixelsForCurrentTest = command.shouldDumpPixels;
 
     // Convert the path into a full file URL if it does not look
     // like an HTTP/S URL (doesn't start with http:// or https://).
@@ -650,22 +707,22 @@ static void runTest(const string& testPathOrURL)
 
     resetDefaultsToConsistentValues();
 
-    gLayoutTestController = LayoutTestController::create(testURL, expectedPixelHash);
+    gTestRunner = TestRunner::create(testURL, command.expectedPixelHash);
     topLoadingFrame = 0;
     done = false;
 
-    gLayoutTestController->setIconDatabaseEnabled(false);
+    gTestRunner->setIconDatabaseEnabled(false);
 
     if (shouldLogFrameLoadDelegates(testURL))
-        gLayoutTestController->setDumpFrameLoadCallbacks(true);
+        gTestRunner->setDumpFrameLoadCallbacks(true);
 
     if (shouldEnableDeveloperExtras(testURL)) {
-        gLayoutTestController->setDeveloperExtrasEnabled(true);
+        gTestRunner->setDeveloperExtrasEnabled(true);
         if (shouldOpenWebInspector(testURL))
-            gLayoutTestController->showWebInspector();
+            gTestRunner->showWebInspector();
         if (shouldDumpAsText(testURL)) {
-            gLayoutTestController->setDumpAsText(true);
-            gLayoutTestController->setGeneratePixelResults(false);
+            gTestRunner->setDumpAsText(true);
+            gTestRunner->setGeneratePixelResults(false);
         }
     }
 
@@ -675,8 +732,8 @@ static void runTest(const string& testPathOrURL)
     bool isSVGW3CTest = (testURL.find("svg/W3C-SVG-1.1") != string::npos);
     GtkAllocation size;
     size.x = size.y = 0;
-    size.width = isSVGW3CTest ? 480 : LayoutTestController::maxViewWidth;
-    size.height = isSVGW3CTest ? 360 : LayoutTestController::maxViewHeight;
+    size.width = isSVGW3CTest ? 480 : TestRunner::maxViewWidth;
+    size.height = isSVGW3CTest ? 360 : TestRunner::maxViewHeight;
     gtk_window_resize(GTK_WINDOW(window), size.width, size.height);
     gtk_widget_size_allocate(container, &size);
 
@@ -697,12 +754,12 @@ static void runTest(const string& testPathOrURL)
 
     // If developer extras enabled Web Inspector may have been open by the test.
     if (shouldEnableDeveloperExtras(testURL)) {
-        gLayoutTestController->closeWebInspector();
-        gLayoutTestController->setDeveloperExtrasEnabled(false);
+        gTestRunner->closeWebInspector();
+        gTestRunner->setDeveloperExtrasEnabled(false);
     }
 
     // Also check if we still have opened webViews and free them.
-    if (gLayoutTestController->closeRemainingWindowsWhenComplete() || webViewList) {
+    if (gTestRunner->closeRemainingWindowsWhenComplete() || webViewList) {
         while (webViewList) {
             g_object_unref(WEBKIT_WEB_VIEW(webViewList->data));
             webViewList = g_slist_next(webViewList);
@@ -716,7 +773,7 @@ static void runTest(const string& testPathOrURL)
     // A blank load seems to be necessary to reset state after certain tests.
     webkit_web_view_open(webView, "about:blank");
 
-    gLayoutTestController.clear();
+    gTestRunner.clear();
 
     // terminate the (possibly empty) pixels block after all the state reset
     sendPixelResultsEOF();
@@ -733,7 +790,7 @@ void webViewLoadStarted(WebKitWebView* view, WebKitWebFrame* frame, void*)
 static gboolean processWork(void* data)
 {
     // if we finish all the commands, we're ready to dump state
-    if (WorkQueue::shared()->processWork() && !gLayoutTestController->waitToDump())
+    if (WorkQueue::shared()->processWork() && !gTestRunner->waitToDump())
         dump();
 
     return FALSE;
@@ -771,7 +828,7 @@ static void webViewLoadFinished(WebKitWebView* view, WebKitWebFrame* frame, void
     // so we can use it here in the DRT to provide the correct dump.
     if (frame != topLoadingFrame)
         return;
-    if (gLayoutTestController->dumpProgressFinishedCallback())
+    if (gTestRunner->dumpProgressFinishedCallback())
         printf("postProgressFinishedNotification\n");
 }
 
@@ -782,7 +839,7 @@ static gboolean webViewLoadError(WebKitWebView*, WebKitWebFrame*, gchar*, gpoint
 
 static void webViewDocumentLoadFinished(WebKitWebView* view, WebKitWebFrame* frame, void*)
 {
-    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+    if (!done && gTestRunner->dumpFrameLoadCallbacks()) {
         char* frameName = getFrameNameSuitableForTestResult(view, frame);
         printf("%s - didFinishDocumentLoadForFrame\n", frameName);
         g_free(frameName);
@@ -798,7 +855,7 @@ static void webViewDocumentLoadFinished(WebKitWebView* view, WebKitWebFrame* fra
 
 static void webViewOnloadEvent(WebKitWebView* view, WebKitWebFrame* frame, void*)
 {
-    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+    if (!done && gTestRunner->dumpFrameLoadCallbacks()) {
         char* frameName = getFrameNameSuitableForTestResult(view, frame);
         printf("%s - didHandleOnloadEventsForFrame\n", frameName);
         g_free(frameName);
@@ -815,9 +872,9 @@ static void addControllerToWindow(JSContextRef context, JSObjectRef windowObject
 static void webViewWindowObjectCleared(WebKitWebView* view, WebKitWebFrame* frame, JSGlobalContextRef context, JSObjectRef windowObject, gpointer data)
 {
     JSValueRef exception = 0;
-    ASSERT(gLayoutTestController);
+    ASSERT(gTestRunner);
 
-    gLayoutTestController->makeWindowObject(context, windowObject, &exception);
+    gTestRunner->makeWindowObject(context, windowObject, &exception);
     ASSERT(!exception);
 
     gcController->makeWindowObject(context, windowObject, &exception);
@@ -884,7 +941,7 @@ static gboolean webViewScriptConfirm(WebKitWebView* view, WebKitWebFrame* frame,
 
 static void webViewTitleChanged(WebKitWebView* view, WebKitWebFrame* frame, const gchar* title, gpointer data)
 {
-    if (gLayoutTestController->dumpTitleChanges() && !done)
+    if (gTestRunner->dumpTitleChanges() && !done)
         printf("TITLE CHANGED: %s\n", title ? title : "");
 }
 
@@ -894,7 +951,7 @@ static bool webViewNavigationPolicyDecisionRequested(WebKitWebView* view, WebKit
                                                      WebKitWebPolicyDecision* policyDecision)
 {
     // Use the default handler if we're not waiting for policy,
-    // i.e., LayoutTestController::waitForPolicyDelegate
+    // i.e., TestRunner::waitForPolicyDelegate
     if (!waitForPolicy)
         return FALSE;
 
@@ -929,7 +986,7 @@ static bool webViewNavigationPolicyDecisionRequested(WebKitWebView* view, WebKit
     g_free(typeDescription);
 
     webkit_web_policy_decision_ignore(policyDecision);
-    gLayoutTestController->notifyDone();
+    gTestRunner->notifyDone();
 
     return TRUE;
 }
@@ -938,7 +995,7 @@ static void webViewStatusBarTextChanged(WebKitWebView* view, const gchar* messag
 {
     // Are we doing anything wrong? One test that does not call
     // dumpStatusCallbacks gets true here
-    if (gLayoutTestController->dumpStatusCallbacks())
+    if (gTestRunner->dumpStatusCallbacks())
         printf("UI DELEGATE STATUS CALLBACK: setStatusText:%s\n", message);
 }
 
@@ -959,7 +1016,7 @@ static void databaseQuotaExceeded(WebKitWebView* view, WebKitWebFrame* frame, We
     ASSERT(database);
 
     WebKitSecurityOrigin* origin = webkit_web_database_get_security_origin(database);
-    if (gLayoutTestController->dumpDatabaseCallbacks()) {
+    if (gTestRunner->dumpDatabaseCallbacks()) {
         printf("UI DELEGATE DATABASE CALLBACK: exceededDatabaseQuotaForSecurityOrigin:{%s, %s, %i} database:%s\n",
             webkit_security_origin_get_protocol(origin),
             webkit_security_origin_get_host(origin),
@@ -972,9 +1029,9 @@ static void databaseQuotaExceeded(WebKitWebView* view, WebKitWebFrame* frame, We
 static bool
 geolocationPolicyDecisionRequested(WebKitWebView*, WebKitWebFrame*, WebKitGeolocationPolicyDecision* decision)
 {
-    if (!gLayoutTestController->isGeolocationPermissionSet())
+    if (!gTestRunner->isGeolocationPermissionSet())
         return FALSE;
-    if (gLayoutTestController->geolocationPermission())
+    if (gTestRunner->geolocationPermission())
         webkit_geolocation_policy_allow(decision);
     else
         webkit_geolocation_policy_deny(decision);
@@ -1014,7 +1071,7 @@ static void topLoadingFrameLoadFinished()
 {
     topLoadingFrame = 0;
     WorkQueue::shared()->setFrozen(true); // first complete load freezes the queue for the rest of this test
-    if (gLayoutTestController->waitToDump())
+    if (gTestRunner->waitToDump())
         return;
 
     if (WorkQueue::shared()->count())
@@ -1027,7 +1084,7 @@ static void webFrameLoadStatusNotified(WebKitWebFrame* frame, gpointer user_data
 {
     WebKitLoadStatus loadStatus = webkit_web_frame_get_load_status(frame);
 
-    if (gLayoutTestController->dumpFrameLoadCallbacks()) {
+    if (gTestRunner->dumpFrameLoadCallbacks()) {
         GOwnPtr<char> frameName(getFrameNameSuitableForTestResult(webkit_web_frame_get_web_view(frame), frame));
 
         switch (loadStatus) {
@@ -1070,7 +1127,8 @@ static CString pathFromSoupURI(SoupURI* uri)
         return CString(uriString.get());
     }
 
-    GOwnPtr<gchar> pathDirname(g_path_get_basename(g_path_get_dirname(uri->path)));
+    GOwnPtr<gchar> parentPath(g_path_get_dirname(uri->path));
+    GOwnPtr<gchar> pathDirname(g_path_get_basename(parentPath.get()));
     GOwnPtr<gchar> pathBasename(g_path_get_basename(uri->path));
     GOwnPtr<gchar> urlPath(g_strdup_printf("%s/%s", pathDirname.get(), pathBasename.get()));
     return CString(urlPath.get());
@@ -1193,13 +1251,13 @@ static void willSendRequestCallback(WebKitWebView* webView, WebKitWebFrame* webF
 {
 
 
-    if (!done && gLayoutTestController->willSendRequestReturnsNull()) {
-        // As requested by the LayoutTestController, don't perform the request.
+    if (!done && gTestRunner->willSendRequestReturnsNull()) {
+        // As requested by the TestRunner, don't perform the request.
         webkit_network_request_set_uri(request, "about:blank");
         return;
     }
 
-    if (!done && gLayoutTestController->dumpResourceLoadCallbacks())
+    if (!done && gTestRunner->dumpResourceLoadCallbacks())
         printf("%s - willSendRequest %s redirectResponse %s\n",
                convertNetworkRequestToURLPath(request).data(),
                descriptionSuitableForTestResult(request).data(),
@@ -1223,7 +1281,7 @@ static void willSendRequestCallback(WebKitWebView* webView, WebKitWebFrame* webF
         soup_uri_free(uri);
 
     if (soupMessage) {
-        const set<string>& clearHeaders = gLayoutTestController->willSendRequestClearHeaders();
+        const set<string>& clearHeaders = gTestRunner->willSendRequestClearHeaders();
         for (set<string>::const_iterator header = clearHeaders.begin(); header != clearHeaders.end(); ++header)
             soup_message_headers_remove(soupMessage->request_headers, header->c_str());
     }
@@ -1232,7 +1290,7 @@ static void willSendRequestCallback(WebKitWebView* webView, WebKitWebFrame* webF
 
 static void didReceiveResponse(WebKitWebView* webView, WebKitWebFrame*, WebKitWebResource* webResource, WebKitNetworkResponse* response)
 {
-    if (!done && gLayoutTestController->dumpResourceLoadCallbacks()) {
+    if (!done && gTestRunner->dumpResourceLoadCallbacks()) {
         CString responseDescription(descriptionSuitableForTestResult(response));
         CString path(convertWebResourceToURLPath(webResource));
         printf("%s - didReceiveResponse %s\n", path.data(), responseDescription.data());
@@ -1244,13 +1302,13 @@ static void didReceiveResponse(WebKitWebView* webView, WebKitWebFrame*, WebKitWe
 
 static void didFinishLoading(WebKitWebView* webView, WebKitWebFrame* webFrame, WebKitWebResource* webResource)
 {
-    if (!done && gLayoutTestController->dumpResourceLoadCallbacks())
+    if (!done && gTestRunner->dumpResourceLoadCallbacks())
         printf("%s - didFinishLoading\n", descriptionSuitableForTestResult(webView, webFrame, webResource).data());
 }
 
 static void didFailLoadingWithError(WebKitWebView* webView, WebKitWebFrame* webFrame, WebKitWebResource* webResource, GError* webError)
 {
-    if (!done && gLayoutTestController->dumpResourceLoadCallbacks()) {
+    if (!done && gTestRunner->dumpResourceLoadCallbacks()) {
         CString webErrorString(descriptionSuitableForTestResult(webError, webResource));
         printf("%s - didFailLoadingWithError: %s\n", descriptionSuitableForTestResult(webView, webFrame, webResource).data(),
                webErrorString.data());
@@ -1259,8 +1317,15 @@ static void didFailLoadingWithError(WebKitWebView* webView, WebKitWebFrame* webF
 
 static void didRunInsecureContent(WebKitWebFrame*, WebKitSecurityOrigin*, const char* url)
 {
-    if (!done && gLayoutTestController->dumpFrameLoadCallbacks())
+    if (!done && gTestRunner->dumpFrameLoadCallbacks())
         printf("didRunInsecureContent\n");
+}
+
+static gboolean webViewRunFileChooser(WebKitWebView*, WebKitFileChooserRequest*)
+{
+    // We return TRUE to not propagate the event further so the
+    // default file chooser dialog is not shown.
+    return TRUE;
 }
 
 static WebKitWebView* createWebView()
@@ -1297,6 +1362,7 @@ static WebKitWebView* createWebView()
                      "signal::resource-response-received", didReceiveResponse, 0,
                      "signal::resource-load-finished", didFinishLoading, 0,
                      "signal::resource-load-failed", didFailLoadingWithError, 0,
+                     "signal::run-file-chooser", webViewRunFileChooser, 0,
                      NULL);
     connectEditingCallbacks(view);
 
@@ -1322,11 +1388,11 @@ static WebKitWebView* createWebView()
 
 static WebKitWebView* webViewCreate(WebKitWebView* view, WebKitWebFrame* frame)
 {
-    if (!gLayoutTestController->canOpenWindows())
+    if (!gTestRunner->canOpenWindows())
         return 0;
 
     // Make sure that waitUntilDone has been called.
-    ASSERT(gLayoutTestController->waitToDump());
+    ASSERT(gTestRunner->waitToDump());
 
     WebKitWebView* newWebView = createWebView();
     g_object_ref_sink(G_OBJECT(newWebView));
@@ -1377,7 +1443,7 @@ int main(int argc, char* argv[])
         printSeparators = true;
         runTestingServerLoop();
     } else {
-        printSeparators = (optind < argc-1 || (dumpPixels && dumpTree));
+        printSeparators = (optind < argc-1 || (dumpPixelsForCurrentTest && dumpTree));
         for (int i = optind; i != argc; ++i)
             runTest(argv[i]);
     }

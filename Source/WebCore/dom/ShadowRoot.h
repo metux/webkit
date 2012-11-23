@@ -27,6 +27,7 @@
 #ifndef ShadowRoot_h
 #define ShadowRoot_h
 
+#include "ContainerNode.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "Element.h"
@@ -38,10 +39,8 @@ namespace WebCore {
 
 class Document;
 class DOMSelection;
-class HTMLContentElement;
-class HTMLContentSelector;
 class InsertionPoint;
-class ShadowTree;
+class ElementShadow;
 
 class ShadowRoot : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
     friend class WTF::DoublyLinkedListNode<ShadowRoot>;
@@ -52,33 +51,29 @@ public:
     // if a shadow root is dynamically created. So we prohibit multiple shadow subtrees
     // in several elements for a while.
     // See https://bugs.webkit.org/show_bug.cgi?id=77503 and related bugs.
-    enum ShadowRootCreationPurpose {
-        CreatingUserAgentShadowRoot,
-        CreatingAuthorShadowRoot,
+    enum ShadowRootType {
+        UserAgentShadowRoot,
+        AuthorShadowRoot
     };
-    static PassRefPtr<ShadowRoot> create(Element*, ShadowRootCreationPurpose, ExceptionCode& = ASSERT_NO_EXCEPTION);
+    static PassRefPtr<ShadowRoot> create(Element*, ShadowRootType, ExceptionCode& = ASSERT_NO_EXCEPTION);
 
     void recalcShadowTreeStyle(StyleChange);
 
-    void setNeedsReattachHostChildrenAndShadow();
-    void clearNeedsReattachHostChildrenAndShadow();
-    bool needsReattachHostChildrenAndShadow();
-
     InsertionPoint* insertionPointFor(Node*) const;
-    void hostChildrenChanged();
 
-    virtual bool applyAuthorSheets() const;
-    void setApplyAuthorSheets(bool);
+    virtual bool applyAuthorStyles() const OVERRIDE;
+    void setApplyAuthorStyles(bool);
+    virtual bool resetStyleInheritance() const OVERRIDE;
+    void setResetStyleInheritance(bool);
 
-    Element* host() const { return shadowHost(); }
-    ShadowTree* tree() const;
+    Element* host() const;
+    void setHost(Element*);
+    ElementShadow* owner() const;
 
     String innerHTML() const;
     void setInnerHTML(const String&, ExceptionCode&);
 
     Element* activeElement() const;
-
-    DOMSelection* selection();
 
     ShadowRoot* youngerShadowRoot() const { return prev(); }
     ShadowRoot* olderShadowRoot() const { return next(); }
@@ -94,19 +89,38 @@ public:
     InsertionPoint* assignedTo() const;
     void setAssignedTo(InsertionPoint*);
 
-private:
-    ShadowRoot(Document*);
-    virtual ~ShadowRoot();
+#ifndef NDEBUG
+    ShadowRootType type() const { return m_type; }
+#endif
 
+private:
+    explicit ShadowRoot(Document*);
+    virtual ~ShadowRoot();
     virtual String nodeName() const;
     virtual PassRefPtr<Node> cloneNode(bool deep);
     virtual bool childTypeAllowed(NodeType) const;
+    virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
 
     ShadowRoot* m_prev;
     ShadowRoot* m_next;
-    bool m_applyAuthorSheets : 1;
+    bool m_applyAuthorStyles : 1;
+    bool m_resetStyleInheritance : 1;
     InsertionPoint* m_insertionPointAssignedTo;
+
+#ifndef NDEBUG
+    ShadowRootType m_type;
+#endif
 };
+
+inline Element* ShadowRoot::host() const
+{
+    return toElement(parentOrHostNode());
+}
+
+inline void ShadowRoot::setHost(Element* host)
+{
+    setParentOrHostNode(host);
+}
 
 inline InsertionPoint* ShadowRoot::assignedTo() const
 {

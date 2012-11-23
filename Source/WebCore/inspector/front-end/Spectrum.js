@@ -70,7 +70,7 @@ WebInspector.Spectrum = function()
     this._displayElement = displayContainer.createChild("span", "source-code spectrum-display-value");
 
     WebInspector.Spectrum.draggable(this._sliderElement, hueDrag.bind(this));
-    WebInspector.Spectrum.draggable(this._draggerElement, colorDrag.bind(this));
+    WebInspector.Spectrum.draggable(this._draggerElement, colorDrag.bind(this), colorDragStart.bind(this));
 
     function hueDrag(element, dragX, dragY)
     {
@@ -79,8 +79,22 @@ WebInspector.Spectrum = function()
         this._onchange();
     }
 
-    function colorDrag(element, dragX, dragY)
+    var initialHelperOffset;
+
+    function colorDragStart(element, dragX, dragY)
     {
+        initialHelperOffset = { x: this._dragHelperElement.offsetLeft, y: this._dragHelperElement.offsetTop };
+    }
+
+    function colorDrag(element, dragX, dragY, event)
+    {
+        if (event.shiftKey) {
+            if (Math.abs(dragX - initialHelperOffset.x) >= Math.abs(dragY - initialHelperOffset.y))
+                dragY = initialHelperOffset.y;
+            else
+                dragX = initialHelperOffset.x;
+        }
+
         this.hsv[1] = dragX / this.dragWidth;
         this.hsv[2] = (this.dragHeight - dragY) / this.dragHeight;
 
@@ -94,7 +108,7 @@ WebInspector.Spectrum = function()
         this._onchange();
     }
 
-    this._hideProxy = this.hide.bind(this);
+    this._hideProxy = this.hide.bind(this, true);
 };
 
 WebInspector.Spectrum.Events = {
@@ -171,7 +185,7 @@ WebInspector.Spectrum.rgbaToHSVA = function(r, g, b, a)
     return [h, s, v, a];
 };
 
-//FIXME: migrate to WebInspector.elementDragStart
+//FIXME: migrate to WebInspector.installDragHandle
 /**
  * @param {Function=} onmove
  * @param {Function=} onstart
@@ -198,7 +212,7 @@ WebInspector.Spectrum.draggable = function(element, onmove, onstart, onstop) {
             var dragY = Math.max(0, Math.min(e.pageY - offset.top + scrollOffset.top, maxHeight));
 
             if (onmove)
-                onmove(element, dragX, dragY);
+                onmove(element, dragX, dragY, e);
         }
     }
 
@@ -247,6 +261,9 @@ WebInspector.Spectrum.draggable = function(element, onmove, onstart, onstop) {
 };
 
 WebInspector.Spectrum.prototype = {
+    /**
+     * @type {WebInspector.Color}
+     */
     set color(color)
     {
         var rgba = (color.rgba || color.rgb).slice(0);
@@ -275,7 +292,7 @@ WebInspector.Spectrum.prototype = {
 
     get outputColorFormat()
     {
-        var cf = WebInspector.StylesSidebarPane.ColorFormat;
+        var cf = WebInspector.Color.Format;
         var format = this._originalFormat;
 
         if (this.hsv[3] === 1) {
@@ -364,7 +381,7 @@ WebInspector.Spectrum.prototype = {
     toggle: function(element, color, format)
     {
         if (this.visible)
-            this.hide();
+            this.hide(true);
         else
             this.show(element, color, format);
 
@@ -378,7 +395,7 @@ WebInspector.Spectrum.prototype = {
                 return false;
 
             // Reopen the picker for another anchor element.
-            this.hide();
+            this.hide(true);
         }
 
         this.reposition(element);
@@ -409,14 +426,17 @@ WebInspector.Spectrum.prototype = {
         WebInspector.setCurrentFocusElement(this._containerElement);
     },
 
-    hide: function()
+    /**
+     * @param {boolean} commitEdit
+     */
+    hide: function(commitEdit)
     {
         this._popover.hide();
 
         document.removeEventListener("mousedown", this._hideProxy, false);
         window.removeEventListener("blur", this._hideProxy, false);
 
-        this.dispatchEventToListeners(WebInspector.Spectrum.Events.Hidden);
+        this.dispatchEventToListeners(WebInspector.Spectrum.Events.Hidden, !!commitEdit);
 
         WebInspector.setCurrentFocusElement(this._previousFocusElement);
         delete this._previousFocusElement;
@@ -426,8 +446,13 @@ WebInspector.Spectrum.prototype = {
 
     _onKeyDown: function(event)
     {
-        if (event.keyIdentifier === "Enter" || event.keyIdentifier === "U+001B") { // Escape key
-            this.hide();
+        if (event.keyIdentifier === "Enter") {
+            this.hide(true);
+            event.consume(true);
+            return;
+        }
+        if (event.keyIdentifier === "U+001B") { // Escape key
+            this.hide(false);
             event.consume(true);
         }
     }

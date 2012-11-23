@@ -35,6 +35,7 @@
 #if ENABLE(CONTEXT_MENUS)
 #include "InjectedBundlePageContextMenuClient.h"
 #endif
+#include "InjectedBundlePageDiagnosticLoggingClient.h"
 #include "InjectedBundlePageEditorClient.h"
 #include "InjectedBundlePageFormClient.h"
 #include "InjectedBundlePageFullScreenClient.h"
@@ -48,10 +49,14 @@
 #include "SandboxExtension.h"
 #include "ShareableBitmap.h"
 #include "WebUndoStep.h"
+#include <WebCore/DictationAlternative.h>
 #include <WebCore/DragData.h>
 #include <WebCore/Editor.h>
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IntRect.h>
+#if ENABLE(PAGE_VISIBILITY_API)
+#include <WebCore/PageVisibilityState.h>
+#endif
 #include <WebCore/PlatformScreen.h>
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/WebCoreKeyboardUIMode.h>
@@ -100,6 +105,10 @@ namespace WebCore {
     class GraphicsContext;
     class Frame;
     class FrameView;
+    class HTMLPlugInElement;
+#if ENABLE(WEB_INTENTS)
+    class Intent;
+#endif
     class KeyboardEvent;
     class Page;
     class PrintContext;
@@ -118,6 +127,7 @@ class NotificationPermissionRequestManager;
 class PageOverlay;
 class PluginView;
 class SessionState;
+class WebColorChooser;
 class WebContextMenu;
 class WebContextMenuItemData;
 class WebEvent;
@@ -125,6 +135,7 @@ class WebFrame;
 class WebFullScreenManager;
 class WebImage;
 class WebInspector;
+class WebInspectorClient;
 class WebKeyboardEvent;
 class WebMouseEvent;
 class WebNotificationClient;
@@ -137,6 +148,10 @@ struct EditorState;
 struct PrintInfo;
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
+
+#if ENABLE(WEB_INTENTS)
+struct IntentData;
+#endif
 
 #if ENABLE(GESTURE_EVENTS)
 class WebGestureEvent;
@@ -209,7 +224,14 @@ public:
     bool isInRedo() const { return m_isInRedo; }
 
     void setActivePopupMenu(WebPopupMenu*);
-    
+
+#if ENABLE(INPUT_TYPE_COLOR)
+    WebColorChooser* activeColorChooser() const { return m_activeColorChooser; }
+    void setActiveColorChooser(WebColorChooser*);
+    void didChooseColor(const WebCore::Color&);
+    void didEndColorChooser();
+#endif
+
     WebOpenPanelResultListener* activeOpenPanelResultListener() const { return m_activeOpenPanelResultListener.get(); }
     void setActiveOpenPanelResultListener(PassRefPtr<WebOpenPanelResultListener>);
 
@@ -230,6 +252,7 @@ public:
 #if ENABLE(FULLSCREEN_API)
     void initializeInjectedBundleFullScreenClient(WKBundlePageFullScreenClient*);
 #endif
+    void initializeInjectedBundleDiagnosticLoggingClient(WKBundlePageDiagnosticLoggingClient*);
 
 #if ENABLE(CONTEXT_MENUS)
     InjectedBundlePageContextMenuClient& injectedBundleContextMenuClient() { return m_contextMenuClient; }
@@ -240,6 +263,7 @@ public:
     InjectedBundlePagePolicyClient& injectedBundlePolicyClient() { return m_policyClient; }
     InjectedBundlePageResourceLoadClient& injectedBundleResourceLoadClient() { return m_resourceLoadClient; }
     InjectedBundlePageUIClient& injectedBundleUIClient() { return m_uiClient; }
+    InjectedBundlePageDiagnosticLoggingClient& injectedBundleDiagnosticLoggingClient() { return m_logDiagnosticMessageClient; }
 #if ENABLE(FULLSCREEN_API)
     InjectedBundlePageFullScreenClient& injectedBundleFullScreenClient() { return m_fullScreenClient; }
 #endif
@@ -253,7 +277,7 @@ public:
     WebCore::Frame* mainFrame() const; // May return 0.
     WebCore::FrameView* mainFrameView() const; // May return 0.
 
-    PassRefPtr<Plugin> createPlugin(WebFrame*, const Plugin::Parameters&);
+    PassRefPtr<Plugin> createPlugin(WebFrame*, WebCore::HTMLPlugInElement*, const Plugin::Parameters&);
 
     EditorState editorState() const;
 
@@ -285,7 +309,7 @@ public:
     bool useFixedLayout() const { return m_useFixedLayout; }
     void setFixedLayoutSize(const WebCore::IntSize&);
 
-    void setPaginationMode(uint32_t /* WebCore::Page::Pagination::Mode */);
+    void setPaginationMode(uint32_t /* WebCore::Pagination::Mode */);
     void setPaginationBehavesLikeColumns(bool);
     void setPageLength(double);
     void setGapBetweenPages(double);
@@ -302,10 +326,10 @@ public:
     void exitAcceleratedCompositingMode();
 #endif
 
-#if PLATFORM(MAC)
     void addPluginView(PluginView*);
     void removePluginView(PluginView*);
 
+#if PLATFORM(MAC)
     LayerHostingMode layerHostingMode() const { return m_layerHostingMode; }
     void setLayerHostingMode(LayerHostingMode);
 
@@ -325,9 +349,7 @@ public:
     WebCore::IntPoint screenToWindow(const WebCore::IntPoint&);
     WebCore::IntRect windowToScreen(const WebCore::IntRect&);
 
-    PassRefPtr<WebImage> snapshotInViewCoordinates(const WebCore::IntRect&, ImageOptions);
-    PassRefPtr<WebImage> snapshotInDocumentCoordinates(const WebCore::IntRect&, ImageOptions);
-    PassRefPtr<WebImage> scaledSnapshotInDocumentCoordinates(const WebCore::IntRect&, double scaleFactor, ImageOptions);
+    PassRefPtr<WebImage> scaledSnapshotWithOptions(const WebCore::IntRect&, double scaleFactor, SnapshotOptions);
 
     static const WebEvent* currentEvent();
 
@@ -386,6 +408,10 @@ public:
 
     SandboxExtensionTracker& sandboxExtensionTracker() { return m_sandboxExtensionTracker; }
 
+#if PLATFORM(EFL)
+    void setThemePath(const String&);
+#endif
+
 #if PLATFORM(QT)
     void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, uint64_t selectionStart, uint64_t selectionEnd, uint64_t replacementRangeStart, uint64_t replacementRangeEnd);
     void confirmComposition(const String& text, int64_t selectionStart, int64_t selectionLength);
@@ -415,7 +441,7 @@ public:
     void shouldDelayWindowOrderingEvent(const WebKit::WebMouseEvent&, bool& result);
     void acceptsFirstMouse(int eventNumber, const WebKit::WebMouseEvent&, bool& result);
     bool performNonEditingBehaviorForSelector(const String&);
-
+    void insertDictatedText(const String& text, uint64_t replacementRangeStart, uint64_t replacementRangeEnd, const Vector<WebCore::DictationAlternative>& dictationAlternativeLocations, bool& handled, EditorState& newState);
 #elif PLATFORM(WIN)
     void confirmComposition(const String& compositionString);
     void setComposition(const WTF::String& compositionString, const WTF::Vector<WebCore::CompositionUnderline>& underlines, uint64_t cursorPosition);
@@ -428,6 +454,10 @@ public:
 
 #elif PLATFORM(GTK)
     void updateAccessibilityTree();
+    bool handleMousePressedEvent(const WebCore::PlatformMouseEvent&);
+#if USE(TEXTURE_MAPPER_GL)
+    void setAcceleratedCompositingWindowId(int64_t nativeWindowHandle);
+#endif
 #endif
 
     void setCompositionForTesting(const String& compositionString, uint64_t from, uint64_t length);
@@ -448,8 +478,14 @@ public:
     bool isSmartInsertDeleteEnabled() const { return m_isSmartInsertDeleteEnabled; }
 #endif
 
+#if ENABLE(WEB_INTENTS)
+    void deliverCoreIntentToFrame(uint64_t frameID, WebCore::Intent*);
+#endif
+
     void replaceSelectionWithText(WebCore::Frame*, const String&);
     void clearSelection();
+
+#if ENABLE(DRAG_SUPPORT)
 #if PLATFORM(WIN)
     void performDragControllerAction(uint64_t action, WebCore::IntPoint clientPosition, WebCore::IntPoint globalPosition, uint64_t draggingSourceOperationMask, const WebCore::DragDataMap&, uint32_t flags);
 #elif PLATFORM(QT) || PLATFORM(GTK)
@@ -461,6 +497,7 @@ public:
 
     void willPerformLoadDragDestinationAction();
     void mayPerformUploadDragDestinationAction();
+#endif // ENABLE(DRAG_SUPPORT)
 
     void beginPrinting(uint64_t frameID, const PrintInfo&);
     void endPrinting();
@@ -497,8 +534,7 @@ public:
 
     void unmarkAllMisspellings();
     void unmarkAllBadGrammar();
-
-#if PLATFORM(MAC) && !defined(BUILDING_ON_SNOW_LEOPARD)
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     void handleAlternativeTextUIResult(const String&);
 #endif
 
@@ -506,7 +542,6 @@ public:
     void simulateMouseDown(int button, WebCore::IntPoint, int clickCount, WKEventModifiers, double time);
     void simulateMouseUp(int button, WebCore::IntPoint, int clickCount, WKEventModifiers, double time);
     void simulateMouseMotion(WebCore::IntPoint, double time);
-    String viewportConfigurationAsText(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight);
 
 #if ENABLE(CONTEXT_MENUS)
     void contextMenuShowing() { m_isShowingContextMenu = true; }
@@ -516,6 +551,7 @@ public:
     void registerApplicationScheme(const String& scheme);
     void applicationSchemeReply(const QtNetworkReplyData&);
     void receivedApplicationSchemeRequest(const QNetworkRequest&, QtNetworkReply*);
+    void setUserScripts(const Vector<String>&);
 #endif
     void wheelEvent(const WebWheelEvent&);
 #if ENABLE(GESTURE_EVENTS)
@@ -530,6 +566,20 @@ public:
 #if ENABLE(PAGE_VISIBILITY_API)
     void setVisibilityState(int visibilityState, bool isInitialState);
 #endif
+
+#if PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
+    uint64_t nativeWindowHandle() { return m_nativeWindowHandle; }
+#endif
+
+    bool asynchronousPluginInitializationEnabled() const { return m_asynchronousPluginInitializationEnabled; }
+    void setAsynchronousPluginInitializationEnabled(bool enabled) { m_asynchronousPluginInitializationEnabled = enabled; }
+    bool asynchronousPluginInitializationEnabledForAllPlugins() const { return m_asynchronousPluginInitializationEnabledForAllPlugins; }
+    void setAsynchronousPluginInitializationEnabledForAllPlugins(bool enabled) { m_asynchronousPluginInitializationEnabledForAllPlugins = enabled; }
+    bool artificialPluginInitializationDelayEnabled() const { return m_artificialPluginInitializationDelayEnabled; }
+    void setArtificialPluginInitializationDelayEnabled(bool enabled) { m_artificialPluginInitializationDelayEnabled = enabled; }
+
+    bool scrollingPerformanceLoggingEnabled() const { return m_scrollingPerformanceLoggingEnabled; }
+    void setScrollingPerformanceLoggingEnabled(bool);
 
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
@@ -594,6 +644,10 @@ private:
     void contextMenuHidden() { m_isShowingContextMenu = false; }
 #endif
 
+#if ENABLE(WEB_INTENTS)
+    void deliverIntentToFrame(uint64_t frameID, const IntentData&);
+#endif
+
     static void scroll(WebCore::Page*, WebCore::ScrollDirection, WebCore::ScrollGranularity);
     static void logicalScroll(WebCore::Page*, WebCore::ScrollLogicalDirection, WebCore::ScrollGranularity);
 
@@ -611,6 +665,9 @@ private:
     void viewWillEndLiveResize();
 
     void getContentsAsString(uint64_t callbackID);
+#if ENABLE(MHTML)
+    void getContentsAsMHTMLData(uint64_t callbackID, bool useBinaryEncoding);
+#endif
     void getMainResourceDataOfFrame(uint64_t frameID, uint64_t callbackID);
     void getResourceDataFromFrame(uint64_t frameID, const String& resourceURL, uint64_t callbackID);
     void getRenderTreeExternalRepresentation(uint64_t callbackID);
@@ -661,6 +718,10 @@ private:
 #if PLATFORM(GTK)
     void failedToShowPopupMenu();
 #endif
+#if PLATFORM(QT)
+    void hidePopupMenu();
+    void selectedIndex(int32_t newIndex);
+#endif
 
     void didChooseFilesForOpenPanel(const Vector<String>&);
     void didCancelForOpenPanel();
@@ -674,11 +735,13 @@ private:
 
     void advanceToNextMisspelling(bool startBeforeSelection);
     void changeSpellingToWord(const String& word);
-#if PLATFORM(MAC)
+#if USE(APPKIT)
     void uppercaseWord();
     void lowercaseWord();
     void capitalizeWord();
+#endif
 
+#if PLATFORM(MAC)
     void setSmartInsertDeleteEnabled(bool isSmartInsertDeleteEnabled) { m_isSmartInsertDeleteEnabled = isSmartInsertDeleteEnabled; }
 #endif
 
@@ -686,6 +749,7 @@ private:
     void didSelectItemFromActiveContextMenu(const WebContextMenuItemData&);
 #endif
 
+    void changeSelectedIndex(int32_t index);
     void setCanStartMediaTimerFired();
 
     static bool platformCanHandleRequest(const WebCore::ResourceRequest&);
@@ -700,6 +764,9 @@ private:
 
     WebCore::IntSize m_viewSize;
     OwnPtr<DrawingArea> m_drawingArea;
+
+    HashSet<PluginView*> m_pluginViews;
+
     bool m_useFixedLayout;
 
     bool m_drawsBackground;
@@ -709,6 +776,12 @@ private:
     bool m_isClosed;
 
     bool m_tabToLinks;
+    
+    bool m_asynchronousPluginInitializationEnabled;
+    bool m_asynchronousPluginInitializationEnabledForAllPlugins;
+    bool m_artificialPluginInitializationDelayEnabled;
+
+    bool m_scrollingPerformanceLoggingEnabled;
 
 #if PLATFORM(MAC)
     // Whether the containing window is visible or not.
@@ -726,9 +799,6 @@ private:
     // The accessibility position of the view.
     WebCore::IntPoint m_accessibilityPosition;
     
-    // All plug-in views on this web page.
-    HashSet<PluginView*> m_pluginViews;
-
     // The layer hosting mode.
     LayerHostingMode m_layerHostingMode;
 
@@ -743,6 +813,11 @@ private:
     RefPtr<WebCore::Node> m_gestureTargetNode;
 #elif PLATFORM(GTK)
     WebPageAccessibilityObject* m_accessibilityObject;
+
+#if USE(TEXTURE_MAPPER_GL)
+    // Our view's window in the UI process.
+    uint64_t m_nativeWindowHandle;
+#endif
 #endif
     
     WebCore::RunLoop::Timer<WebPage> m_setCanStartMediaTimer;
@@ -763,6 +838,7 @@ private:
 #if ENABLE(FULLSCREEN_API)
     InjectedBundlePageFullScreenClient m_fullScreenClient;
 #endif
+    InjectedBundlePageDiagnosticLoggingClient m_logDiagnosticMessageClient;
 
 #if USE(TILED_BACKING_STORE)
     WebCore::IntSize m_viewportSize;
@@ -785,6 +861,9 @@ private:
     RefPtr<WebPopupMenu> m_activePopupMenu;
 #if ENABLE(CONTEXT_MENUS)
     RefPtr<WebContextMenu> m_contextMenu;
+#endif
+#if ENABLE(INPUT_TYPE_COLOR)
+    WebColorChooser* m_activeColorChooser;
 #endif
     RefPtr<WebOpenPanelResultListener> m_activeOpenPanelResultListener;
     RefPtr<NotificationPermissionRequestManager> m_notificationPermissionRequestManager;
@@ -828,6 +907,10 @@ private:
 #if PLATFORM(QT)
     HashMap<String, QtNetworkReply*> m_applicationSchemeReplies;
 #endif
+#if ENABLE(PAGE_VISIBILITY_API)
+    WebCore::PageVisibilityState m_visibilityState;
+#endif
+    WebInspectorClient* m_inspectorClient;
 };
 
 } // namespace WebKit

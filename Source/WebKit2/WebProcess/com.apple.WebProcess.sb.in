@@ -93,7 +93,7 @@
 (allow file*
     (subpath "/private/var/db/mds/system"))
 
-#if !defined(BUILDING_ON_LION)
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
 (if (positive? (string-length (param "DARWIN_USER_CACHE_DIR")))
     (allow file* (subpath (param "DARWIN_USER_CACHE_DIR"))))
 #else
@@ -182,13 +182,6 @@
        ;; Local mDNSResponder for DNS, arbitrary outbound TCP
        (literal "/private/var/run/mDNSResponder")
        (remote tcp))
-
-;; FIXME: Once <rdar://problem/8900275> has been fixed, these rules can be removed.
-(allow mach-lookup (global-name "com.apple.pubsub.ipc"))
-(allow network-outbound (regex #"^/private/tmp/launch-[^/]+/Render"))
-(allow file-read*
-       (home-literal "/Library/Preferences/com.apple.Safari.RSS.plist")
-       (home-literal "/Library/Preferences/com.apple.Syndication.plist"))
 
 ;; FIXME should be removed when <rdar://problem/9347205> + related radar in Safari is fixed
 (allow mach-lookup

@@ -49,8 +49,6 @@ WebInspector.NetworkManager = function()
 }
 
 WebInspector.NetworkManager.EventTypes = {
-    ResourceTrackingEnabled: "ResourceTrackingEnabled",
-    ResourceTrackingDisabled: "ResourceTrackingDisabled",
     RequestStarted: "RequestStarted",
     RequestUpdated: "RequestUpdated",
     RequestFinished: "RequestFinished",
@@ -94,24 +92,6 @@ WebInspector.NetworkManager._MIMETypes = {
 }
 
 WebInspector.NetworkManager.prototype = {
-    enableResourceTracking: function()
-    {
-        function callback(error)
-        {
-            this.dispatchEventToListeners(WebInspector.NetworkManager.EventTypes.ResourceTrackingEnabled);
-        }
-        NetworkAgent.enable(callback.bind(this));
-    },
-
-    disableResourceTracking: function()
-    {
-        function callback(error)
-        {
-            this.dispatchEventToListeners(WebInspector.NetworkManager.EventTypes.ResourceTrackingDisabled);
-        }
-        NetworkAgent.disable(callback.bind(this));
-    },
-
     /**
      * @param {string} url
      * @return {WebInspector.NetworkRequest}
@@ -152,13 +132,28 @@ WebInspector.NetworkDispatcher = function(manager)
 
 WebInspector.NetworkDispatcher.prototype = {
     /**
+     * @param {NetworkAgent.Headers} headersMap
+     * @return {Array.<Object>}
+     */
+    _headersMapToHeadersArray: function(headersMap)
+    {
+        var result = [];
+        for (var name in headersMap) {
+            var values = headersMap[name].split("\n");
+            for (var i = 0; i < values.length; ++i)
+                result.push({ name: name, value: values[i] });
+        }
+        return result;
+    },
+
+    /**
      * @param {WebInspector.NetworkRequest} networkRequest
      * @param {NetworkAgent.Request} request
      */
     _updateNetworkRequestWithRequest: function(networkRequest, request)
     {
         networkRequest.requestMethod = request.method;
-        networkRequest.requestHeaders = request.headers;
+        networkRequest.requestHeaders = this._headersMapToHeadersArray(request.headers);
         networkRequest.requestFormData = request.postData;
     },
 
@@ -176,11 +171,11 @@ WebInspector.NetworkDispatcher.prototype = {
         networkRequest.mimeType = response.mimeType;
         networkRequest.statusCode = response.status;
         networkRequest.statusText = response.statusText;
-        networkRequest.responseHeaders = response.headers;
+        networkRequest.responseHeaders = this._headersMapToHeadersArray(response.headers);
         if (response.headersText)
             networkRequest.responseHeadersText = response.headersText;
         if (response.requestHeaders)
-            networkRequest.requestHeaders = response.requestHeaders;
+            networkRequest.requestHeaders = this._headersMapToHeadersArray(response.requestHeaders);
         if (response.requestHeadersText)
             networkRequest.requestHeadersText = response.requestHeadersText;
 
@@ -202,7 +197,7 @@ WebInspector.NetworkDispatcher.prototype = {
                 1,
                 [],
                 null,
-                networkRequest));
+                networkRequest.requestId));
         }
     },
 
@@ -218,7 +213,7 @@ WebInspector.NetworkDispatcher.prototype = {
         // Also, if a URL like http://localhost/wiki/load.php?debug=true&lang=en produces text/css and gets reloaded,
         // it is 304 Not Modified and its guessed mime-type is text/php, which is wrong.
         // Don't check for mime-types in 304-resources.
-        if (networkRequest.hasErrorStatusCode() || networkRequest.statusCode === 304)
+        if (networkRequest.hasErrorStatusCode() || networkRequest.statusCode === 304 || networkRequest.statusCode === 204)
             return true;
 
         if (typeof networkRequest.type === "undefined"
@@ -426,7 +421,7 @@ WebInspector.NetworkDispatcher.prototype = {
             return;
 
         networkRequest.requestMethod = "GET";
-        networkRequest.requestHeaders = request.headers;
+        networkRequest.requestHeaders = this._headersMapToHeadersArray(request.headers);
         networkRequest.webSocketRequestKey3 = request.requestKey3;
         networkRequest.startTime = time;
 
@@ -446,7 +441,7 @@ WebInspector.NetworkDispatcher.prototype = {
 
         networkRequest.statusCode = response.status;
         networkRequest.statusText = response.statusText;
-        networkRequest.responseHeaders = response.headers;
+        networkRequest.responseHeaders = this._headersMapToHeadersArray(response.headers);
         networkRequest.webSocketChallengeResponse = response.challengeResponse;
         networkRequest.responseReceivedTime = time;
 

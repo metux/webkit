@@ -28,6 +28,7 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "PlatformString.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -41,6 +42,7 @@ class IDBDatabase;
 class IDBFactory;
 class IDBIndex;
 class IDBKey;
+class IDBKeyPath;
 class IDBObjectStore;
 class IDBTransaction;
 class SerializedScriptValue;
@@ -49,11 +51,18 @@ class IDBAny : public RefCounted<IDBAny> {
 public:
     static PassRefPtr<IDBAny> createInvalid();
     static PassRefPtr<IDBAny> createNull();
+    static PassRefPtr<IDBAny> createString(const String&);
     template<typename T>
     static PassRefPtr<IDBAny> create(T* idbObject)
     {
         RefPtr<IDBAny> any = IDBAny::createInvalid();
         any->set(idbObject);
+        return any.release();
+    }
+    static PassRefPtr<IDBAny> create(const IDBKeyPath& keyPath)
+    {
+        RefPtr<IDBAny> any = IDBAny::createInvalid();
+        any->set(keyPath);
         return any.release();
     }
     template<typename T>
@@ -77,7 +86,8 @@ public:
         IDBKeyType,
         IDBObjectStoreType,
         IDBTransactionType,
-        SerializedScriptValueType
+        SerializedScriptValueType,
+        StringType,
     };
 
     Type type() const { return m_type; }
@@ -92,6 +102,7 @@ public:
     PassRefPtr<IDBObjectStore> idbObjectStore();
     PassRefPtr<IDBTransaction> idbTransaction();
     PassRefPtr<SerializedScriptValue> serializedScriptValue();
+    const String& string();
 
     // Set can only be called once.
     void setNull();
@@ -105,6 +116,8 @@ public:
     void set(PassRefPtr<IDBObjectStore>);
     void set(PassRefPtr<IDBTransaction>);
     void set(PassRefPtr<SerializedScriptValue>);
+    void set(const IDBKeyPath&);
+    void set(const String&);
 
 private:
     IDBAny();
@@ -122,6 +135,7 @@ private:
     RefPtr<IDBObjectStore> m_idbObjectStore;
     RefPtr<IDBTransaction> m_idbTransaction;
     RefPtr<SerializedScriptValue> m_serializedScriptValue;
+    String m_string;
 };
 
 } // namespace WebCore

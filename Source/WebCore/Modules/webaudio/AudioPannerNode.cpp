@@ -56,8 +56,8 @@ AudioPannerNode::AudioPannerNode(AudioContext* context, float sampleRate)
     addInput(adoptPtr(new AudioNodeInput(this)));
     addOutput(adoptPtr(new AudioNodeOutput(this, 2)));
     
-    m_distanceGain = AudioGain::create("distanceGain", 1.0, 0.0, 1.0);
-    m_coneGain = AudioGain::create("coneGain", 1.0, 0.0, 1.0);
+    m_distanceGain = AudioGain::create(context, "distanceGain", 1.0, 0.0, 1.0);
+    m_coneGain = AudioGain::create(context, "coneGain", 1.0, 0.0, 1.0);
 
     m_position = FloatPoint3D(0, 0, 0);
     m_orientation = FloatPoint3D(1, 0, 0);
@@ -165,6 +165,20 @@ void AudioPannerNode::setPanningModel(unsigned short model, ExceptionCode& ec)
     case SOUNDFIELD:
         // FIXME: Implement sound field model. See // https://bugs.webkit.org/show_bug.cgi?id=77367.
         // For now, fall through to throw an exception.
+    default:
+        ec = NOT_SUPPORTED_ERR;
+        break;
+    }
+}
+
+void AudioPannerNode::setDistanceModel(unsigned short model, ExceptionCode& ec)
+{
+    switch (model) {
+    case DistanceEffect::ModelLinear:
+    case DistanceEffect::ModelInverse:
+    case DistanceEffect::ModelExponential:
+        m_distanceEffect.setModel(static_cast<DistanceEffect::ModelType>(model), true);
+        break;
     default:
         ec = NOT_SUPPORTED_ERR;
         break;

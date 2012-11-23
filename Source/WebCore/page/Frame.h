@@ -66,6 +66,7 @@ namespace WebCore {
     class FrameDestructionObserver;
     class FrameView;
     class HTMLTableCellElement;
+    class MemoryObjectInfo;
     class RegularExpression;
     class RenderPart;
     class TiledBackingStore;
@@ -117,30 +118,22 @@ namespace WebCore {
         void dispatchVisibilityStateChangeEvent();
 #endif
 
+        void reportMemoryUsage(MemoryObjectInfo*) const;
+
     // ======== All public functions below this point are candidates to move out of Frame into another class. ========
 
-        bool isDisconnected() const;
-        void setIsDisconnected(bool);
-        bool excludeFromTextSearch() const;
-        void setExcludeFromTextSearch(bool);
         bool inScope(TreeScope*) const;
 
         void injectUserScripts(UserScriptInjectionTime);
         
         String layerTreeAsText(bool showDebugInfo = false) const;
 
-        // Unlike most accessors in this class, domWindow() always creates a new DOMWindow if m_domWindow is null.
-        // Callers that don't need a new DOMWindow to be created should use existingDOMWindow().
-        DOMWindow* domWindow() const;
-        DOMWindow* existingDOMWindow() { return m_domWindow.get(); }
-        void setDOMWindow(DOMWindow*);
-        void clearDOMWindow();
-
         static Frame* frameForWidget(const Widget*);
 
         Settings* settings() const; // can be NULL
 
         void setPrinting(bool printing, const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkRatio, AdjustViewSizeOrNot);
+        bool shouldUsePrintingLayout() const;
         FloatSize resizePageRectsKeepingRatio(const FloatSize& originalSize, const FloatSize& expectedSize);
 
         bool inViewSourceMode() const;
@@ -199,7 +192,6 @@ namespace WebCore {
 
         // Should only be called on the main frame of a page.
         void notifyChromeClientWheelEventHandlerCountChanged() const;
-        void notifyChromeClientTouchEventHandlerCountChanged() const;
 
     // ========
 
@@ -214,8 +206,6 @@ namespace WebCore {
         mutable FrameTree m_treeNode;
         mutable FrameLoader m_loader;
         mutable NavigationScheduler m_navigationScheduler;
-
-        mutable RefPtr<DOMWindow> m_domWindow;
 
         HTMLFrameOwnerElement* m_ownerElement;
         RefPtr<FrameView> m_view;
@@ -236,8 +226,6 @@ namespace WebCore {
 #endif
 
         bool m_inViewSourceMode;
-        bool m_isDisconnected;
-        bool m_excludeFromTextSearch;
 
 #if USE(TILED_BACKING_STORE)
     // FIXME: The tiled backing store belongs in FrameView, not Frame.
@@ -309,26 +297,6 @@ namespace WebCore {
     inline HTMLFrameOwnerElement* Frame::ownerElement() const
     {
         return m_ownerElement;
-    }
-
-    inline bool Frame::isDisconnected() const
-    {
-        return m_isDisconnected;
-    }
-
-    inline void Frame::setIsDisconnected(bool isDisconnected)
-    {
-        m_isDisconnected = isDisconnected;
-    }
-
-    inline bool Frame::excludeFromTextSearch() const
-    {
-        return m_excludeFromTextSearch;
-    }
-
-    inline void Frame::setExcludeFromTextSearch(bool exclude)
-    {
-        m_excludeFromTextSearch = exclude;
     }
 
     inline bool Frame::inViewSourceMode() const

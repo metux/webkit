@@ -101,6 +101,7 @@ public:
 
     // TestRunner only SPI
     void setShouldTrackVisitedLinks(bool);
+    void setAlwaysAcceptCookies(bool);
     void removeAllVisitedLinks();
     void activateMacFontAscentHack();
     void overrideBoolPreferenceForTestRunner(WebPageGroupProxy*, const String& preference, bool enabled);
@@ -108,6 +109,7 @@ public:
     void setAllowUniversalAccessFromFileURLs(WebPageGroupProxy*, bool);
     void setAllowFileAccessFromFileURLs(WebPageGroupProxy*, bool);
     void setFrameFlatteningEnabled(WebPageGroupProxy*, bool);
+    void setPluginsEnabled(WebPageGroupProxy*, bool);
     void setGeoLocationPermission(WebPageGroupProxy*, bool);
     void setJavaScriptCanAccessClipboard(WebPageGroupProxy*, bool);
     void setPrivateBrowsingEnabled(WebPageGroupProxy*, bool);
@@ -121,6 +123,7 @@ public:
     int pageNumberForElementById(WebFrame*, const String&, double, double);
     String pageSizeAndMarginsInPixels(WebFrame*, int, int, int, int, int, int, int);
     bool isPageBoxVisible(WebFrame*, int);
+    void setUserStyleSheetLocation(WebPageGroupProxy*, const String&);
 
     // UserContent API
     void addUserScript(WebPageGroupProxy*, InjectedBundleScriptWorld*, const String& source, const String& url, ImmutableArray* whitelist, ImmutableArray* blacklist, WebCore::UserScriptInjectionTime, WebCore::UserContentInjectedFrames);
@@ -149,6 +152,7 @@ public:
     void willDestroyPage(WebPage*);
     void didInitializePageGroup(WebPageGroupProxy*);
     void didReceiveMessage(const String&, APIObject*);
+    void didReceiveMessageToPage(WebPage*, const String&, APIObject*);
 
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 
@@ -156,7 +160,7 @@ public:
 
     static bool isProcessingUserGesture();
 
-    void setPageVisibilityState(WebPageGroupProxy*, int state, bool isInitialState);
+    void setPageVisibilityState(WebPage*, int state, bool isInitialState);
 
 private:
     InjectedBundle(const String&);

@@ -26,10 +26,6 @@
 #include "Image.h"
 #include "TextureMapperLayer.h"
 
-#if ENABLE(WEBGL)
-#include "GraphicsContext3D.h"
-#endif
-
 namespace WebCore {
 
 class TextureMapperLayer;
@@ -64,6 +60,7 @@ public:
     virtual void setPreserves3D(bool b);
     virtual void setMasksToBounds(bool b);
     virtual void setDrawsContent(bool b);
+    virtual void setContentsVisible(bool);
     virtual void setContentsOpaque(bool b);
     virtual void setBackfaceVisibility(bool b);
     virtual void setOpacity(float opacity);
@@ -90,6 +87,8 @@ public:
     bool needsDisplay() const { return m_needsDisplay; }
     IntRect needsDisplayRect() const { return enclosingIntRect(m_needsDisplayRect); }
 
+    virtual void setDebugBorder(const Color&, float width);
+
 #if ENABLE(CSS_FILTERS)
     virtual bool setFilters(const FilterOperations&);
 #endif
@@ -101,15 +100,14 @@ private:
     virtual void willBeDestroyed();
 
     OwnPtr<TextureMapperLayer> m_layer;
-    RefPtr<TextureMapperBackingStore> m_compositedImage;
-    RefPtr<Image> m_image;
-    bool m_syncQueued;
+    RefPtr<TextureMapperTiledBackingStore> m_compositedImage;
+    NativeImagePtr m_compositedNativeImagePtr;
     int m_changeMask;
     bool m_needsDisplay;
     bool m_fixedToViewport;
     TextureMapperPlatformLayer* m_contentsLayer;
     FloatRect m_needsDisplayRect;
-    TextureMapperAnimations m_animations;
+    GraphicsLayerAnimations m_animations;
     void animationStartedTimerFired(Timer<GraphicsLayerTextureMapper>*);
     Timer<GraphicsLayerTextureMapper> m_animationStartedTimer;
 };

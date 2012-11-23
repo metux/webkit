@@ -89,6 +89,7 @@ PassRefPtr<Document> XSLTProcessor::createDocumentFromSource(const String& sourc
 
         if (Document* oldDocument = frame->document()) {
             result->setTransformSourceDocument(oldDocument);
+            result->takeDOMWindowFrom(oldDocument);
             result->setSecurityOrigin(oldDocument->securityOrigin());
             result->setCookieURL(oldDocument->cookieURL());
             result->setFirstPartyForCookies(oldDocument->firstPartyForCookies());
@@ -105,32 +106,6 @@ PassRefPtr<Document> XSLTProcessor::createDocumentFromSource(const String& sourc
     result->setContent(documentSource);
 
     return result.release();
-}
-
-static inline RefPtr<DocumentFragment> createFragmentFromSource(const String& sourceString, const String& sourceMIMEType, Document* outputDoc)
-{
-    RefPtr<DocumentFragment> fragment = outputDoc->createDocumentFragment();
-
-    if (sourceMIMEType == "text/html") {
-        // As far as I can tell, there isn't a spec for how transformToFragment
-        // is supposed to work.  Based on the documentation I can find, it looks
-        // like we want to start parsing the fragment in the InBody insertion
-        // mode.  Unfortunately, that's an implementation detail of the parser.
-        // We achieve that effect here by passing in a fake body element as
-        // context for the fragment.
-        RefPtr<HTMLBodyElement> fakeBody = HTMLBodyElement::create(outputDoc);
-        fragment->parseHTML(sourceString, fakeBody.get());
-    } else if (sourceMIMEType == "text/plain")
-        fragment->parserAddChild(Text::create(outputDoc, sourceString));
-    else {
-        bool successfulParse = fragment->parseXML(sourceString, 0);
-        if (!successfulParse)
-            return 0;
-    }
-
-    // FIXME: Do we need to mess with URLs here?
-
-    return fragment;
 }
 
 PassRefPtr<Document> XSLTProcessor::transformToDocument(Node* sourceNode)
@@ -155,7 +130,7 @@ PassRefPtr<DocumentFragment> XSLTProcessor::transformToFragment(Node* sourceNode
 
     if (!transformToString(sourceNode, resultMIMEType, resultString, resultEncoding))
         return 0;
-    return createFragmentFromSource(resultString, resultMIMEType, outputDoc);
+    return createFragmentForTransformToFragment(resultString, resultMIMEType, outputDoc);
 }
 
 void XSLTProcessor::setParameter(const String& /*namespaceURI*/, const String& localName, const String& value)

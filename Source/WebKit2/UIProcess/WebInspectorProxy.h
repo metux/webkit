@@ -48,6 +48,15 @@ OBJC_CLASS WKWebInspectorWKView;
 #include <WebCore/WindowMessageListener.h>
 #endif
 
+#if PLATFORM(GTK)
+#include "WebInspectorClientGtk.h"
+#endif
+
+#if PLATFORM(EFL)
+#include <Ecore_Evas.h>
+#include <Evas.h>
+#endif
+
 namespace WebKit {
 
 class WebFrameProxy;
@@ -89,8 +98,11 @@ public:
     void createInspectorWindow();
     void updateInspectorWindowTitle() const;
     void inspectedViewFrameDidChange();
-#elif PLATFORM(GTK)
-    void windowDestroyed();
+#endif
+
+#if PLATFORM(GTK)
+    GtkWidget* inspectorView() const { return m_inspectorView; };
+    void initializeInspectorClientGtk(const WKInspectorClientGtk*);
 #endif
 
     void showConsole();
@@ -128,6 +140,7 @@ public:
     void remoteFrontendConnected();
     void remoteFrontendDisconnected();
     void dispatchMessageFromRemoteFrontend(const String& message);
+    int remoteInspectionPageID() const { return m_remoteInspectionPageId; }
 #endif
 
 private:
@@ -176,14 +189,18 @@ private:
     virtual void windowReceivedMessage(HWND, UINT message, WPARAM, LPARAM);
 #endif
 
-    static const unsigned minimumWindowWidth = 500;
-    static const unsigned minimumWindowHeight = 400;
+#if PLATFORM(GTK)
+    void createInspectorWindow();
+#endif
 
-    static const unsigned initialWindowWidth = 750;
-    static const unsigned initialWindowHeight = 650;
+    static const unsigned minimumWindowWidth;
+    static const unsigned minimumWindowHeight;
+
+    static const unsigned initialWindowWidth;
+    static const unsigned initialWindowHeight;
 
     // Keep this in sync with the value in InspectorFrontendClientLocal.
-    static const unsigned minimumAttachedHeight = 250;
+    static const unsigned minimumAttachedHeight;
 
     WebPageProxy* m_page;
 
@@ -202,8 +219,12 @@ private:
     HWND m_inspectorWindow;
     RefPtr<WebView> m_inspectorView;
 #elif PLATFORM(GTK)
+    WebInspectorClientGtk m_client;
     GtkWidget* m_inspectorView;
     GtkWidget* m_inspectorWindow;
+#elif PLATFORM(EFL)
+    Evas_Object* m_inspectorView;
+    Ecore_Evas* m_inspectorWindow;
 #endif
 #if ENABLE(INSPECTOR_SERVER)
     int m_remoteInspectionPageId;

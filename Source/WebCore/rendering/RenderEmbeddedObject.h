@@ -28,6 +28,7 @@
 namespace WebCore {
 
 class MouseEvent;
+class TextRun;
 
 // Renderer for embeds and objects, often, but not always, rendered via plug-ins.
 // For example, <embed src="foo.html"> does not invoke a plug-in.
@@ -36,17 +37,20 @@ public:
     RenderEmbeddedObject(Element*);
     virtual ~RenderEmbeddedObject();
 
-    bool pluginCrashedOrWasMissing() const;
-    
-    void setShowsMissingPluginIndicator();
-    void setShowsCrashedPluginIndicator();
-    bool showsMissingPluginIndicator() const { return m_showsMissingPluginIndicator; }
+    enum PluginUnavailabilityReason {
+        PluginMissing,
+        PluginCrashed,
+        PluginBlockedByContentSecurityPolicy,
+        InsecurePluginVersion
+    };
+    void setPluginUnavailabilityReason(PluginUnavailabilityReason);
+    bool showsUnavailablePluginIndicator() const;
 
     // FIXME: This belongs on HTMLObjectElement.
     bool hasFallbackContent() const { return m_hasFallbackContent; }
     void setHasFallbackContent(bool hasFallbackContent) { m_hasFallbackContent = hasFallbackContent; }
 
-    void handleMissingPluginIndicatorEvent(Event*);
+    void handleUnavailablePluginIndicatorEvent(Event*);
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual bool allowsAcceleratedCompositing() const;
@@ -67,26 +71,28 @@ private:
     virtual void layout();
     virtual void viewCleared();
 
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     virtual bool scroll(ScrollDirection, ScrollGranularity, float multiplier, Node** stopNode);
     virtual bool logicalScroll(ScrollLogicalDirection, ScrollGranularity, float multiplier, Node** stopNode);
 
-    void setMissingPluginIndicatorIsPressed(bool);
-    bool isInMissingPluginIndicator(MouseEvent*) const;
-    bool isInMissingPluginIndicator(const LayoutPoint&) const;
+    void setUnavailablePluginIndicatorIsPressed(bool);
+    bool isInUnavailablePluginIndicator(MouseEvent*) const;
+    bool isInUnavailablePluginIndicator(const LayoutPoint&) const;
     bool getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, Path&, FloatRect& replacementTextRect, Font&, TextRun&, float& textWidth) const;
 
-    String m_replacementText;
     bool m_hasFallbackContent; // FIXME: This belongs on HTMLObjectElement.
-    bool m_showsMissingPluginIndicator;
-    bool m_missingPluginIndicatorIsPressed;
-    bool m_mouseDownWasInMissingPluginIndicator;
+
+    bool m_showsUnavailablePluginIndicator;
+    PluginUnavailabilityReason m_pluginUnavailabilityReason;
+    String m_unavailablePluginReplacementText;
+    bool m_unavailablePluginIndicatorIsPressed;
+    bool m_mouseDownWasInUnavailablePluginIndicator;
 };
 
 inline RenderEmbeddedObject* toRenderEmbeddedObject(RenderObject* object)
 {
-    ASSERT(!object || !strcmp(object->renderName(), "RenderEmbeddedObject"));
+    ASSERT(!object || object->isEmbeddedObject());
     return static_cast<RenderEmbeddedObject*>(object);
 }
 

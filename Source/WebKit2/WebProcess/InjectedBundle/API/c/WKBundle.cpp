@@ -91,6 +91,11 @@ size_t WKBundleGetJavaScriptObjectsCount(WKBundleRef bundleRef)
     return toImpl(bundleRef)->javaScriptObjectsCount();
 }
 
+void WKBundleSetAlwaysAcceptCookies(WKBundleRef bundleRef, bool accept)
+{
+    toImpl(bundleRef)->setAlwaysAcceptCookies(accept);
+}
+
 void WKBundleAddUserScript(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKBundleScriptWorldRef scriptWorldRef, WKStringRef sourceRef, WKURLRef urlRef, WKArrayRef whitelistRef, WKArrayRef blacklistRef, WKUserScriptInjectionTime injectionTimeRef, WKUserContentInjectedFrames injectedFramesRef)
 {
     toImpl(bundleRef)->addUserScript(toImpl(pageGroupRef), toImpl(scriptWorldRef), toWTFString(sourceRef), toWTFString(urlRef), toImpl(whitelistRef), toImpl(blacklistRef), toUserScriptInjectionTime(injectionTimeRef), toUserContentInjectedFrames(injectedFramesRef));
@@ -144,6 +149,11 @@ void WKBundleSetAllowFileAccessFromFileURLs(WKBundleRef bundleRef, WKBundlePageG
 void WKBundleSetFrameFlatteningEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
 {
     toImpl(bundleRef)->setFrameFlatteningEnabled(toImpl(pageGroupRef), enabled);
+}
+
+void WKBundleSetPluginsEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
+{
+    toImpl(bundleRef)->setPluginsEnabled(toImpl(pageGroupRef), enabled);
 }
 
 void WKBundleSetGeolocationPermission(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
@@ -241,7 +251,12 @@ bool WKBundleIsProcessingUserGesture(WKBundleRef)
     return InjectedBundle::isProcessingUserGesture();
 }
 
-void WKBundleSetPageVisibilityState(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, int state, bool isInitialState)
+void WKBundleSetPageVisibilityState(WKBundleRef bundleRef, WKBundlePageRef pageRef, int state, bool isInitialState)
 {
-    toImpl(bundleRef)->setPageVisibilityState(toImpl(pageGroupRef), state, isInitialState);
+    toImpl(bundleRef)->setPageVisibilityState(toImpl(pageRef), state, isInitialState);
+}
+
+void WKBundleSetUserStyleSheetLocation(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKStringRef location)
+{
+    toImpl(bundleRef)->setUserStyleSheetLocation(toImpl(pageGroupRef), toImpl(location)->string());
 }

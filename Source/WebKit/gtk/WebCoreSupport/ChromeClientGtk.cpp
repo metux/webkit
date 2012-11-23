@@ -55,6 +55,7 @@
 #include "WebKitDOMBinding.h"
 #include "WebKitDOMHTMLElementPrivate.h"
 #include "WindowFeatures.h"
+#include "webkitfilechooserrequestprivate.h"
 #include "webkitgeolocationpolicydecision.h"
 #include "webkitgeolocationpolicydecisionprivate.h"
 #include "webkitnetworkrequest.h"
@@ -85,6 +86,7 @@ ChromeClient::ChromeClient(WebKitWebView* webView)
     , m_adjustmentWatcher(webView)
     , m_closeSoonTimer(0)
     , m_displayTimer(this, &ChromeClient::paint)
+    , m_forcePaint(false)
     , m_lastDisplayTime(0)
     , m_repaintSoonSourceId(0)
 {
@@ -140,15 +142,16 @@ void ChromeClient::setWindowRect(const FloatRect& rect)
     }
 }
 
-FloatRect ChromeClient::pageRect()
+static IntRect getWebViewRect(WebKitWebView* webView)
 {
     GtkAllocation allocation;
-#if GTK_CHECK_VERSION(2, 18, 0)
-    gtk_widget_get_allocation(GTK_WIDGET(m_webView), &allocation);
-#else
-    allocation = GTK_WIDGET(m_webView)->allocation;
-#endif
+    gtk_widget_get_allocation(GTK_WIDGET(webView), &allocation);
     return IntRect(allocation.x, allocation.y, allocation.width, allocation.height);
+}
+
+FloatRect ChromeClient::pageRect()
+{
+    return getWebViewRect(m_webView);
 }
 
 void ChromeClient::focus()
@@ -384,13 +387,6 @@ IntRect ChromeClient::windowResizerRect() const
     return IntRect();
 }
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER) 
-void ChromeClient::registerProtocolHandler(const String& scheme, const String& baseURL, const String& url, const String& title) 
-{ 
-    notImplemented(); 
-} 
-#endif 
-
 static gboolean repaintEverythingSoonTimeout(ChromeClient* client)
 {
     client->paint(0);
@@ -424,10 +420,20 @@ static void clearEverywhereInBackingStore(WebKitWebView* webView, cairo_t* cr)
 
 void ChromeClient::widgetSizeChanged(const IntSize& oldWidgetSize, IntSize newSize)
 {
-    WidgetBackingStore* backingStore = m_webView->priv->backingStore.get();
+#if USE(ACCELERATED_COMPOSITING)
+    AcceleratedCompositingContext* compositingContext = m_webView->priv->acceleratedCompositingContext.get();
+    if (compositingContext->enabled()) {
+        m_webView->priv->acceleratedCompositingContext->resizeRootLayer(newSize);
+        return;
+    }
+#endif
 
     // Grow the backing store by at least 1.5 times the current size. This prevents
     // lots of unnecessary allocations during an opaque resize.
+    WidgetBackingStore* backingStore = m_webView->priv->backingStore.get();
+    if (backingStore && oldWidgetSize == newSize)
+        return;
+
     if (backingStore) {
         const IntSize& oldSize = backingStore->size();
         if (newSize.width() > oldSize.width())
@@ -513,6 +519,7 @@ static void paintWebView(WebKitWebView* webView, Frame* frame, Region dirtyRegio
 
     RefPtr<cairo_t> backingStoreContext = adoptRef(cairo_create(webView->priv->backingStore->cairoSurface()));
     GraphicsContext gc(backingStoreContext.get());
+    gc.applyDeviceScaleFactor(frame->page()->deviceScaleFactor());
     for (size_t i = 0; i < rects.size(); i++) {
         const IntRect& rect = rects[i];
 
@@ -530,20 +537,6 @@ static void paintWebView(WebKitWebView* webView, Frame* frame, Region dirtyRegio
     gc.restore();
 }
 
-void ChromeClient::invalidateWidgetRect(const IntRect& rect)
-{
-#if USE(ACCELERATED_COMPOSITING)
-    AcceleratedCompositingContext* acContext = m_webView->priv->acceleratedCompositingContext.get();
-    if (acContext->enabled()) {
-        acContext->scheduleRootLayerRepaint(rect);
-        return;
-    }
-#endif
-    gtk_widget_queue_draw_area(GTK_WIDGET(m_webView),
-                               rect.x(), rect.y(),
-                               rect.width(), rect.height());
-}
-
 void ChromeClient::performAllPendingScrolls()
 {
     if (!m_webView->priv->backingStore)
@@ -553,7 +546,7 @@ void ChromeClient::performAllPendingScrolls()
     for (size_t i = 0; i < m_rectsToScroll.size(); i++) {
         IntRect& scrollRect = m_rectsToScroll[i];
         m_webView->priv->backingStore->scroll(scrollRect, m_scrollOffsets[i]);
-        invalidateWidgetRect(scrollRect);
+        gtk_widget_queue_draw_area(GTK_WIDGET(m_webView), scrollRect.x(), scrollRect.y(), scrollRect.width(), scrollRect.height());
     }
 
     m_rectsToScroll.clear();
@@ -566,7 +559,7 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     double timeSinceLastDisplay = currentTime() - m_lastDisplayTime;
     double timeUntilNextDisplay = minimumFrameInterval - timeSinceLastDisplay;
 
-    if (timeUntilNextDisplay > 0) {
+    if (timeUntilNextDisplay > 0 && !m_forcePaint) {
         m_displayTimer.startOneShot(timeUntilNextDisplay);
         return;
     }
@@ -589,12 +582,7 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     }
 
     const IntRect& rect = m_dirtyRegion.bounds();
-    invalidateWidgetRect(rect);
-
-#if USE(ACCELERATED_COMPOSITING)
-    m_webView->priv->acceleratedCompositingContext->syncLayersNow();
-    m_webView->priv->acceleratedCompositingContext->renderLayersToWindow(rect);
-#endif
+    gtk_widget_queue_draw_area(GTK_WIDGET(m_webView), rect.x(), rect.y(), rect.width(), rect.height());
 
     m_dirtyRegion = Region();
     m_lastDisplayTime = currentTime();
@@ -608,12 +596,32 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
         m_webView->priv->imFilter.setCursorRect(frame->selection()->absoluteCaretBounds());
 }
 
+void ChromeClient::forcePaint()
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (m_webView->priv->acceleratedCompositingContext->enabled())
+        return;
+#endif
+
+    m_forcePaint = true;
+    paint(0);
+    m_forcePaint = false;
+}
+
 void ChromeClient::invalidateRootView(const IntRect&, bool immediate)
 {
 }
 
 void ChromeClient::invalidateContentsAndRootView(const IntRect& updateRect, bool immediate)
 {
+#if USE(ACCELERATED_COMPOSITING)
+    AcceleratedCompositingContext* acContext = m_webView->priv->acceleratedCompositingContext.get();
+    if (acContext->enabled()) {
+        acContext->setNonCompositedContentsNeedDisplay(updateRect);
+        return;
+    }
+#endif
+
     if (updateRect.isEmpty())
         return;
     m_dirtyRegion.unite(updateRect);
@@ -622,12 +630,34 @@ void ChromeClient::invalidateContentsAndRootView(const IntRect& updateRect, bool
 
 void ChromeClient::invalidateContentsForSlowScroll(const IntRect& updateRect, bool immediate)
 {
-    invalidateContentsAndRootView(updateRect, immediate);
     m_adjustmentWatcher.updateAdjustmentsFromScrollbarsLater();
+
+#if USE(ACCELERATED_COMPOSITING)
+    AcceleratedCompositingContext* acContext = m_webView->priv->acceleratedCompositingContext.get();
+    if (acContext->enabled()) {
+        acContext->setNonCompositedContentsNeedDisplay(updateRect);
+        return;
+    }
+#endif
+
+    invalidateContentsAndRootView(updateRect, immediate);
 }
 
 void ChromeClient::scroll(const IntSize& delta, const IntRect& rectToScroll, const IntRect& clipRect)
 {
+    m_adjustmentWatcher.updateAdjustmentsFromScrollbarsLater();
+
+#if USE(ACCELERATED_COMPOSITING)
+    AcceleratedCompositingContext* compositingContext = m_webView->priv->acceleratedCompositingContext.get();
+    if (compositingContext->enabled()) {
+        ASSERT(!rectToScroll.isEmpty());
+        ASSERT(!delta.isEmpty());
+
+        compositingContext->scrollNonCompositedContents(rectToScroll, delta);
+        return;
+    }
+#endif
+
     m_rectsToScroll.append(rectToScroll);
     m_scrollOffsets.append(delta);
 
@@ -654,8 +684,6 @@ void ChromeClient::scroll(const IntSize& delta, const IntRect& rectToScroll, con
 
     m_dirtyRegion.unite(scrollRepaintRegion);
     m_displayTimer.startOneShot(0);
-
-    m_adjustmentWatcher.updateAdjustmentsFromScrollbarsLater();
 }
 
 IntRect ChromeClient::rootViewToScreen(const IntRect& rect) const
@@ -806,40 +834,8 @@ void ChromeClient::reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t)
 
 void ChromeClient::runOpenPanel(Frame*, PassRefPtr<FileChooser> prpFileChooser)
 {
-    RefPtr<FileChooser> chooser = prpFileChooser;
-
-    GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(m_webView));
-    if (!widgetIsOnscreenToplevelWindow(toplevel))
-        toplevel = 0;
-
-    GtkWidget* dialog = gtk_file_chooser_dialog_new(_("Upload File"),
-                                                    toplevel ? GTK_WINDOW(toplevel) : 0,
-                                                    GTK_FILE_CHOOSER_ACTION_OPEN,
-                                                    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-                                                    GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
-                                                    NULL);
-
-    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), chooser->settings().allowsMultipleFiles);
-
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
-        if (gtk_file_chooser_get_select_multiple(GTK_FILE_CHOOSER(dialog))) {
-            GOwnPtr<GSList> filenames(gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog)));
-            Vector<String> names;
-            for (GSList* item = filenames.get() ; item ; item = item->next) {
-                if (!item->data)
-                    continue;
-                names.append(filenameToString(static_cast<char*>(item->data)));
-                g_free(item->data);
-            }
-            chooser->chooseFiles(names);
-        } else {
-            gchar* filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-            if (filename)
-                chooser->chooseFile(filenameToString(filename));
-            g_free(filename);
-        }
-    }
-    gtk_widget_destroy(dialog);
+    GRefPtr<WebKitFileChooserRequest> request = adoptGRef(webkit_file_chooser_request_create(prpFileChooser));
+    webkitWebViewRunFileChooserRequest(m_webView, request.get());
 }
 
 void ChromeClient::loadIconForFiles(const Vector<WTF::String>& filenames, WebCore::FileIconLoader* loader)
@@ -967,10 +963,15 @@ void ChromeClient::enterFullScreenForElement(WebCore::Element* element)
     element->document()->webkitDidEnterFullScreenForElement(element);
 }
 
-void ChromeClient::exitFullScreenForElement(WebCore::Element* element)
+void ChromeClient::exitFullScreenForElement(WebCore::Element*)
 {
+    // The element passed into this function is not reliable, i.e. it could
+    // be null. In addition the parameter may be disappearing in the future.
+    // So we use the reference to the element we saved above.
+    ASSERT(m_fullScreenElement);
+
     gboolean returnValue;
-    GRefPtr<WebKitDOMHTMLElement> kitElement(adoptGRef(kit(reinterpret_cast<HTMLElement*>(element))));
+    GRefPtr<WebKitDOMHTMLElement> kitElement(adoptGRef(kit(reinterpret_cast<HTMLElement*>(m_fullScreenElement.get()))));
     g_signal_emit_by_name(m_webView, "leaving-fullscreen", kitElement.get(), &returnValue);
     if (returnValue)
         return;
@@ -979,10 +980,10 @@ void ChromeClient::exitFullScreenForElement(WebCore::Element* element)
     ASSERT(widgetIsOnscreenToplevelWindow(window));
     g_signal_handlers_disconnect_by_func(window, reinterpret_cast<void*>(onFullscreenGtkKeyPressEvent), this);
 
-    element->document()->webkitWillExitFullScreenForElement(element);
+    m_fullScreenElement->document()->webkitWillExitFullScreenForElement(m_fullScreenElement.get());
     gtk_window_unfullscreen(GTK_WINDOW(window));
     m_adjustmentWatcher.enableAllScrollbars();
-    element->document()->webkitDidExitFullScreenForElement(element);
+    m_fullScreenElement->document()->webkitDidExitFullScreenForElement(m_fullScreenElement.get());
     m_fullScreenElement.clear();
 }
 #endif
@@ -990,17 +991,32 @@ void ChromeClient::exitFullScreenForElement(WebCore::Element* element)
 #if USE(ACCELERATED_COMPOSITING)
 void ChromeClient::attachRootGraphicsLayer(Frame* frame, GraphicsLayer* rootLayer)
 {
-    m_webView->priv->acceleratedCompositingContext->attachRootGraphicsLayer(rootLayer);
+    AcceleratedCompositingContext* context = m_webView->priv->acceleratedCompositingContext.get();
+    bool turningOffCompositing = !rootLayer && context->enabled();
+    bool turningOnCompositing = rootLayer && !context->enabled();
+
+    context->setRootCompositingLayer(rootLayer);
+
+    if (turningOnCompositing) {
+        m_displayTimer.stop();
+        m_webView->priv->backingStore = WebCore::WidgetBackingStore::create(GTK_WIDGET(m_webView), IntSize(1, 1));
+    }
+
+    if (turningOffCompositing) {
+        m_webView->priv->backingStore = WebCore::WidgetBackingStore::create(GTK_WIDGET(m_webView), getWebViewRect(m_webView).size());
+        RefPtr<cairo_t> cr = adoptRef(cairo_create(m_webView->priv->backingStore->cairoSurface()));
+        clearEverywhereInBackingStore(m_webView, cr.get());
+    }
 }
 
 void ChromeClient::setNeedsOneShotDrawingSynchronization()
 {
-    m_webView->priv->acceleratedCompositingContext->markForSync();
+    m_webView->priv->acceleratedCompositingContext->scheduleLayerFlush();
 }
 
 void ChromeClient::scheduleCompositingLayerSync()
 {
-    m_webView->priv->acceleratedCompositingContext->markForSync();
+    m_webView->priv->acceleratedCompositingContext->scheduleLayerFlush();
 }
 
 ChromeClient::CompositingTriggerFlags ChromeClient::allowedCompositingTriggers() const

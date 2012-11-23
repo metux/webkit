@@ -38,12 +38,12 @@ namespace WebCore {
         enum Type {
             JSEventListenerType, 
             ImageEventListenerType, 
-            InspectorDOMStorageResourceType,
             ObjCEventListenerType,
             CPPEventListenerType,
             ConditionEventListenerType,
             GObjectEventListenerType,
-            NativeEventListenerType
+            NativeEventListenerType,
+            SVGTRefTargetEventListenerType
         };
 
         virtual ~EventListener() { }
@@ -59,7 +59,7 @@ namespace WebCore {
         Type type() const { return m_type; }
 
     protected:
-        EventListener(Type type)
+        explicit EventListener(Type type)
             : m_type(type)
         {
         }

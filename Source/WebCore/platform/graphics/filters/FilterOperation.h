@@ -33,7 +33,11 @@
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
-#include <wtf/text/AtomicString.h>
+#include <wtf/text/WTFString.h>
+
+#if PLATFORM(BLACKBERRY)
+#include <wtf/ThreadSafeRefCounted.h>
+#endif
 
 // Annoyingly, wingdi.h #defines this.
 #ifdef PASSTHROUGH
@@ -44,7 +48,11 @@ namespace WebCore {
 
 // CSS Filters
 
+#if PLATFORM(BLACKBERRY)
+class FilterOperation : public ThreadSafeRefCounted<FilterOperation> {
+#else
 class FilterOperation : public RefCounted<FilterOperation> {
+#endif
 public:
     enum OperationType {
         REFERENCE, // url(#somefilter)
@@ -82,8 +90,6 @@ public:
     // True if the the value of one pixel can affect the value of another pixel under this operation, such as blur.
     virtual bool movesPixels() const { return false; }
 
-    virtual PassRefPtr<FilterOperation> clone() const = 0;
-
 protected:
     FilterOperation(OperationType type)
         : m_type(type)
@@ -98,11 +104,6 @@ public:
     static PassRefPtr<DefaultFilterOperation> create(OperationType type)
     {
         return adoptRef(new DefaultFilterOperation(type));
-    }
-
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        return adoptRef(new DefaultFilterOperation(m_type));
     }
 
 private:
@@ -127,11 +128,6 @@ public:
         return adoptRef(new PassthroughFilterOperation());
     }
 
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        return adoptRef(new PassthroughFilterOperation());
-    }
-
 private:
 
     virtual bool operator==(const FilterOperation& o) const
@@ -147,21 +143,19 @@ private:
 
 class ReferenceFilterOperation : public FilterOperation {
 public:
-    static PassRefPtr<ReferenceFilterOperation> create(const AtomicString& reference, OperationType type)
+    static PassRefPtr<ReferenceFilterOperation> create(const String& url, const String& fragment, OperationType type)
     {
-        return adoptRef(new ReferenceFilterOperation(reference, type));
-    }
-
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        // AtomicString is thread-hostile, so we can't be cloned.
-        return 0;
+        return adoptRef(new ReferenceFilterOperation(url, fragment, type));
     }
 
     virtual bool affectsOpacity() const { return true; }
     virtual bool movesPixels() const { return true; }
 
-    const AtomicString& reference() const { return m_reference; }
+    const String& url() const { return m_url; }
+    const String& fragment() const { return m_fragment; }
+
+    void* data() const { return m_data; }
+    void setData(void* data) { m_data = data; }
 
 private:
 
@@ -170,16 +164,20 @@ private:
         if (!isSameType(o))
             return false;
         const ReferenceFilterOperation* other = static_cast<const ReferenceFilterOperation*>(&o);
-        return m_reference == other->m_reference;
+        return m_url == other->m_url;
     }
 
-    ReferenceFilterOperation(const AtomicString& reference, OperationType type)
+    ReferenceFilterOperation(const String& url, const String& fragment, OperationType type)
         : FilterOperation(type)
-        , m_reference(reference)
+        , m_url(url)
+        , m_fragment(fragment)
+        , m_data(0)
     {
     }
 
-    AtomicString m_reference;
+    String m_url;
+    String m_fragment;
+    void* m_data;
 };
 
 // GRAYSCALE, SEPIA, SATURATE and HUE_ROTATE are variations on a basic color matrix effect.
@@ -189,11 +187,6 @@ public:
     static PassRefPtr<BasicColorMatrixFilterOperation> create(double amount, OperationType type)
     {
         return adoptRef(new BasicColorMatrixFilterOperation(amount, type));
-    }
-
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        return adoptRef(new BasicColorMatrixFilterOperation(m_amount, m_type));
     }
 
     double amount() const { return m_amount; }
@@ -228,11 +221,6 @@ public:
         return adoptRef(new BasicComponentTransferFilterOperation(amount, type));
     }
 
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        return adoptRef(new BasicComponentTransferFilterOperation(m_amount, m_type));
-    }
-
     double amount() const { return m_amount; }
 
     virtual bool affectsOpacity() const { return m_type == OPACITY; }
@@ -264,11 +252,6 @@ public:
     static PassRefPtr<GammaFilterOperation> create(double amplitude, double exponent, double offset, OperationType type)
     {
         return adoptRef(new GammaFilterOperation(amplitude, exponent, offset, type));
-    }
-
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        return adoptRef(new GammaFilterOperation(m_amplitude, m_exponent, m_offset, m_type));
     }
 
     double amplitude() const { return m_amplitude; }
@@ -306,11 +289,6 @@ public:
         return adoptRef(new BlurFilterOperation(stdDeviation, type));
     }
 
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        return adoptRef(new BlurFilterOperation(m_stdDeviation, m_type));
-    }
-
     Length stdDeviation() const { return m_stdDeviation; }
 
     virtual bool affectsOpacity() const { return true; }
@@ -341,11 +319,6 @@ public:
     static PassRefPtr<DropShadowFilterOperation> create(const IntPoint& location, int stdDeviation, Color color, OperationType type)
     {
         return adoptRef(new DropShadowFilterOperation(location, stdDeviation, color, type));
-    }
-
-    virtual PassRefPtr<FilterOperation> clone() const
-    {
-        return adoptRef(new DropShadowFilterOperation(m_location, m_stdDeviation, m_color, m_type));
     }
 
     int x() const { return m_location.x(); }

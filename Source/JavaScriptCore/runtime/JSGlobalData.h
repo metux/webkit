@@ -35,9 +35,11 @@
 #include "Heap.h"
 #include "Intrinsic.h"
 #include "JITStubs.h"
+#include "JSLock.h"
 #include "JSValue.h"
 #include "LLIntData.h"
 #include "NumericStrings.h"
+#include "PrivateName.h"
 #include "SmallStrings.h"
 #include "Strong.h"
 #include "Terminator.h"
@@ -46,8 +48,8 @@
 #include <wtf/BumpPointerAllocator.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
-#include <wtf/RefCounted.h>
 #include <wtf/SimpleStats.h>
+#include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/WTFThreadData.h>
 #if ENABLE(REGEXP_TRACING)
@@ -70,6 +72,7 @@ namespace JSC {
     class LLIntOffsetsExtractor;
     class NativeExecutable;
     class ParserArena;
+    class Profiler;
     class RegExpCache;
     class Stringifier;
     class Structure;
@@ -123,8 +126,42 @@ namespace JSC {
         size_t m_storageOffset;
         size_t m_lengthOffset;
     };
-    
-    class JSGlobalData : public RefCounted<JSGlobalData> {
+
+#if ENABLE(DFG_JIT)
+    class ConservativeRoots;
+
+#if COMPILER(MSVC)
+#pragma warning(push)
+#pragma warning(disable: 4200) // Disable "zero-sized array in struct/union" warning
+#endif
+    struct ScratchBuffer {
+        ScratchBuffer()
+            : m_activeLength(0)
+        {
+        }
+
+        static ScratchBuffer* create(size_t size)
+        {
+            ScratchBuffer* result = new (fastMalloc(ScratchBuffer::allocationSize(size))) ScratchBuffer;
+
+            return result;
+        }
+
+        static size_t allocationSize(size_t bufferSize) { return sizeof(size_t) + bufferSize; }
+        void setActiveLength(size_t activeLength) { m_activeLength = activeLength; }
+        size_t activeLength() const { return m_activeLength; };
+        size_t* activeLengthPtr() { return &m_activeLength; };
+        void* dataBuffer() { return m_buffer; }
+
+        size_t m_activeLength;
+        void* m_buffer[0];
+    };
+#if COMPILER(MSVC)
+#pragma warning(pop)
+#endif
+#endif
+
+    class JSGlobalData : public ThreadSafeRefCounted<JSGlobalData> {
     public:
         // WebCore has a one-to-one mapping of threads to JSGlobalDatas;
         // either create() or createLeaked() should only be called once
@@ -145,13 +182,17 @@ namespace JSC {
         static bool sharedInstanceExists();
         JS_EXPORT_PRIVATE static JSGlobalData& sharedInstance();
 
-        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapSize = SmallHeap);
-        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapSize = SmallHeap);
-        static PassRefPtr<JSGlobalData> createContextGroup(ThreadStackType, HeapSize = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapType = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapType = SmallHeap);
+        static PassRefPtr<JSGlobalData> createContextGroup(ThreadStackType, HeapType = SmallHeap);
         JS_EXPORT_PRIVATE ~JSGlobalData();
 
         void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
 
+    private:
+        JSLock m_apiLock;
+
+    public:
         Heap heap; // The heap is our first data member to ensure that it's destructed after all the objects that reference it.
 
         GlobalDataType globalDataType;
@@ -171,6 +212,7 @@ namespace JSC {
         const HashTable* numberPrototypeTable;
         const HashTable* objectConstructorTable;
         const HashTable* objectPrototypeTable;
+        const HashTable* privateNamePrototypeTable;
         const HashTable* regExpTable;
         const HashTable* regExpConstructorTable;
         const HashTable* regExpPrototypeTable;
@@ -227,6 +269,11 @@ namespace JSC {
             return m_inDefineOwnProperty;
         }
 
+        Profiler* enabledProfiler()
+        {
+            return m_enabledProfiler;
+        }
+
 #if ENABLE(ASSEMBLER)
         ExecutableAllocator executableAllocator;
 #endif
@@ -246,6 +293,8 @@ namespace JSC {
 #else
         bool canUseRegExpJIT() { return m_canUseAssembler; }
 #endif
+
+        PrivateName m_inheritorIDKey;
 
         OwnPtr<ParserArena> parserArena;
         OwnPtr<Keywords> keywords;
@@ -278,10 +327,10 @@ namespace JSC {
 #if ENABLE(DFG_JIT)
         uint32_t osrExitIndex;
         void* osrExitJumpDestination;
-        Vector<void*> scratchBuffers;
+        Vector<ScratchBuffer*> scratchBuffers;
         size_t sizeOfLastScratchBuffer;
         
-        void* scratchBufferForSize(size_t size)
+        ScratchBuffer* scratchBufferForSize(size_t size)
         {
             if (!size)
                 return 0;
@@ -292,12 +341,16 @@ namespace JSC {
                 // total memory usage is somewhere around
                 // max(scratch buffer size) * 4.
                 sizeOfLastScratchBuffer = size * 2;
-                
-                scratchBuffers.append(fastMalloc(sizeOfLastScratchBuffer));
+
+                scratchBuffers.append(ScratchBuffer::create(sizeOfLastScratchBuffer));
             }
-            
-            return scratchBuffers.last();
+
+            ScratchBuffer* result = scratchBuffers.last();
+            result->setActiveLength(0);
+            return result;
         }
+
+        void gatherConservativeRoots(ConservativeRoots&);
 #endif
 
         HashMap<OpaqueJSClass*, OwnPtr<OpaqueJSClassContextData> > opaqueJSClassData;
@@ -314,6 +367,7 @@ namespace JSC {
 
         int maxReentryDepth;
 
+        Profiler* m_enabledProfiler;
         RegExpCache* m_regExpCache;
         BumpPointerAllocator m_regExpAllocator;
 
@@ -351,6 +405,13 @@ namespace JSC {
         unsigned m_timeoutCount;
 #endif
 
+        unsigned m_newStringsSinceLastHashConst;
+
+        static const unsigned s_minNumberOfNewStringsToHashConst = 100;
+
+        bool haveEnoughNewStringsToHashConst() { return m_newStringsSinceLastHashConst > s_minNumberOfNewStringsToHashConst; }
+        void resetNewStringsSinceLastHashConst() { m_newStringsSinceLastHashConst = 0; }
+
 #define registerTypedArrayFunction(type, capitalizedType) \
         void registerTypedArrayDescriptor(const capitalizedType##Array*, const TypedArrayDescriptor& descriptor) \
         { \
@@ -370,10 +431,12 @@ namespace JSC {
         registerTypedArrayFunction(float64, Float64);
 #undef registerTypedArrayFunction
 
+        JSLock& apiLock() { return m_apiLock; }
+
     private:
         friend class LLIntOffsetsExtractor;
         
-        JSGlobalData(GlobalDataType, ThreadStackType, HeapSize);
+        JSGlobalData(GlobalDataType, ThreadStackType, HeapType);
         static JSGlobalData*& sharedInstanceInternal();
         void createNativeThunk();
 #if ENABLE(ASSEMBLER) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))

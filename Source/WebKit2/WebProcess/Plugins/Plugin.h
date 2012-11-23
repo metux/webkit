@@ -83,6 +83,10 @@ public:
     // Sets the active plug-in controller and initializes the plug-in.
     bool initialize(PluginController*, const Parameters&);
 
+    // Forces synchronous initialization of a plugin previously initialized asynchronously.
+    virtual void waitForAsynchronousInitialization() = 0;
+    virtual bool isBeingAsynchronouslyInitialized() const = 0;
+
     // Destroys the plug-in.
     void destroyPlugin();
 
@@ -120,6 +124,9 @@ public:
     
     // Returns whether the plug-in is transparent or not.
     virtual bool isTransparent() = 0;
+
+    // Returns whether we should send wheel events to this plug-in.
+    virtual bool wantsWheelEvents() = 0;
 
     // Tells the plug-in that its geometry has changed. The clip rect is in plug-in coordinates, and the affine transform can be used
     // to convert from root view coordinates to plug-in coordinates.

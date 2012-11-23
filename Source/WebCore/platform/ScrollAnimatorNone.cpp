@@ -34,17 +34,21 @@
 
 #include "ScrollAnimatorNone.h"
 
-#include "ActivePlatformGestureAnimation.h"
 #include "FloatPoint.h"
 #include "NotImplemented.h"
 #include <wtf/OwnArrayPtr.h>
 #include "PlatformGestureEvent.h"
 #include "ScrollableArea.h"
 #include "ScrollbarTheme.h"
-#include "TouchpadFlingPlatformGestureCurve.h"
 #include <algorithm>
 #include <wtf/CurrentTime.h>
 #include <wtf/PassOwnPtr.h>
+
+#if ENABLE(GESTURE_ANIMATION)
+#include "ActivePlatformGestureAnimation.h"
+#include "TouchpadFlingPlatformGestureCurve.h"
+#endif
+
 
 #if PLATFORM(CHROMIUM)
 #include "TraceEvent.h"
@@ -401,9 +405,11 @@ ScrollAnimatorNone::~ScrollAnimatorNone()
 
 void ScrollAnimatorNone::fireUpAnAnimation(FloatPoint fp)
 {
+#if ENABLE(GESTURE_ANIMATION)
     if (m_gestureAnimation)
         m_gestureAnimation.clear();
     m_gestureAnimation = ActivePlatformGestureAnimation::create(TouchpadFlingPlatformGestureCurve::create(fp), this);
+#endif
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
     startNextTimer(0);
 #else
@@ -417,7 +423,7 @@ bool ScrollAnimatorNone::scroll(ScrollbarOrientation orientation, ScrollGranular
         return ScrollAnimator::scroll(orientation, granularity, step, multiplier);
 
 #if PLATFORM(CHROMIUM)
-    TRACE_EVENT("ScrollAnimatorNone::scroll", this, 0);
+    TRACE_EVENT0("webkit", "ScrollAnimatorNone::scroll");
 #endif
 
     // FIXME: get the type passed in. MouseWheel could also be by line, but should still have different
@@ -434,13 +440,10 @@ bool ScrollAnimatorNone::scroll(ScrollbarOrientation orientation, ScrollGranular
         parameters = Parameters(true, 15 * kTickTime, 10 * kTickTime, Cubic, 5 * kTickTime, Cubic, 5 * kTickTime, Linear, 1);
         break;
     case ScrollByPixel:
-#if PLATFORM(CHROMIUM)
-        // FIXME: plumb a flag specifying precise deltas.
-        return ScrollAnimator::scroll(orientation, granularity, step, multiplier);
-#else
         parameters = Parameters(true, 11 * kTickTime, 2 * kTickTime, Cubic, 3 * kTickTime, Cubic, 3 * kTickTime, Quadratic, 1.25);
         break;
-#endif
+    case ScrollByPrecisePixel:
+        return ScrollAnimator::scroll(orientation, granularity, step, multiplier);
     case ScrollByPixelVelocity:
         // FIXME: Generalize the scroll interface to support a richer set of parameters.
         if (m_firstVelocitySet) {
@@ -494,7 +497,9 @@ void ScrollAnimatorNone::scrollToOffsetWithoutAnimation(const FloatPoint& offset
 void ScrollAnimatorNone::cancelAnimations()
 {
     m_animationActive = false;
+#if ENABLE(GESTURE_ANIMATION)
     m_gestureAnimation.clear();
+#endif
 }
 
 void ScrollAnimatorNone::serviceScrollAnimations()
@@ -535,7 +540,7 @@ void ScrollAnimatorNone::animationTimerFired(Timer<ScrollAnimatorNone>* timer)
 void ScrollAnimatorNone::animationTimerFired()
 {
 #if PLATFORM(CHROMIUM)
-    TRACE_EVENT("ScrollAnimatorNone::animationTimerFired", this, 0);
+    TRACE_EVENT0("webkit", "ScrollAnimatorNone::animationTimerFired");
 #endif
 
     double currentTime = WTF::monotonicallyIncreasingTime();
@@ -548,12 +553,14 @@ void ScrollAnimatorNone::animationTimerFired()
     if (m_verticalData.m_startTime && m_verticalData.animateScroll(currentTime))
         continueAnimation = true;
 
+#if ENABLE(GESTURE_ANIMATION)
     if (m_gestureAnimation) {
         if (m_gestureAnimation->animate(currentTime))
             continueAnimation = true;
         else
             m_gestureAnimation.clear();
     }
+#endif
 
     if (continueAnimation)
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
@@ -565,7 +572,7 @@ void ScrollAnimatorNone::animationTimerFired()
 #endif
 
 #if PLATFORM(CHROMIUM)
-    TRACE_EVENT("ScrollAnimatorNone::notifyPositionChanged", this, 0);
+    TRACE_EVENT0("webkit", "ScrollAnimatorNone::notifyPositionChanged");
 #endif
     notifyPositionChanged();
 

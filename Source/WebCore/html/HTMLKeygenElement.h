@@ -41,7 +41,7 @@ private:
 
     virtual bool canStartSelection() const { return false; }
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
 
     virtual bool appendFormData(FormDataList&, bool);
     virtual const AtomicString& formControlType() const;
@@ -51,6 +51,7 @@ private:
     virtual bool supportLabels() const OVERRIDE { return true; }
 
     virtual void reset();
+    virtual bool shouldSaveAndRestoreFormControlState() const OVERRIDE;
 
     HTMLSelectElement* shadowSelect() const;
 };

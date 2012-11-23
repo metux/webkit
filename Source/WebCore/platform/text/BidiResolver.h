@@ -402,7 +402,9 @@ void BidiResolver<Iterator, Run>::raiseExplicitEmbeddingLevel(WTF::Unicode::Dire
 template <class Iterator, class Run>
 bool BidiResolver<Iterator, Run>::commitExplicitEmbedding()
 {
-    // This gets called from bidiFirst when setting up our start position.
+    // When we're "inIsolate()" we're resolving the parent context which
+    // ignores (skips over) the isolated content, including embedding levels.
+    // We should never accrue embedding levels while skipping over isolated content.
     ASSERT(!inIsolate() || m_currentExplicitEmbeddingSequence.isEmpty());
 
     using namespace WTF::Unicode;

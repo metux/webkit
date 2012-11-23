@@ -23,6 +23,12 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
+#ifdef BUILDING_WITH_CMAKE
+#include "cmakeconfig.h"
+#endif
+#endif
+
 #include <wtf/Platform.h>
 #include <wtf/ExportMacros.h>
 #if USE(JSC)
@@ -37,14 +43,16 @@
 
 #elif defined(WIN32) || defined(_WIN32)
 
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 
 #endif
 
 #include <stdint.h>
 
 #if !PLATFORM(CHROMIUM) || (PLATFORM(GTK) && defined(BUILDING_WEBKIT2__))
-#include <WebKit2/WebKit2.h>
+#include <WebKit2/WebKit2_C.h>
 #endif
 
 #ifdef __clang__

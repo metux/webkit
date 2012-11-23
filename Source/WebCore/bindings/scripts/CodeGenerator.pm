@@ -354,6 +354,23 @@ sub SkipIncludeHeader
     return 0;
 }
 
+sub IsArrayType
+{
+    my $object = shift;
+    my $type = shift;
+    # FIXME: Add proper support for T[], T[]?, sequence<T>.
+    return $type =~ m/\[\]$/;
+}
+
+sub IsConstructorTemplate
+{
+    my $object = shift;
+    my $dataNode = shift;
+    my $template = shift;
+
+    return $dataNode->extendedAttributes->{"ConstructorTemplate"} && $dataNode->extendedAttributes->{"ConstructorTemplate"} eq $template;
+}
+
 sub IsNumericType
 {
     my $object = shift;
@@ -409,6 +426,17 @@ sub IsSVGTypeWithWritablePropertiesNeedingTearOff
     return 0;
 }
 
+sub IsTypedArrayType
+{
+    my $object = shift;
+    my $type = shift;
+    return 1 if (($type eq "ArrayBuffer") or ($type eq "ArrayBufferView"));
+    return 1 if (($type eq "Uint8Array") or ($type eq "Uint8ClampedArray") or ($type eq "Uint16Array") or ($type eq "Uint32Array"));
+    return 1 if (($type eq "Int8Array") or ($type eq "Int16Array") or ($type eq "Int32Array"));
+    return 1 if (($type eq "Float32Array") or ($type eq "Float64Array"));
+    return 0;
+}
+
 sub GetSVGTypeNeedingTearOff
 {
     my $object = shift;
@@ -449,13 +477,29 @@ sub IsSVGAnimatedType
     return 0;
 }
 
-sub GetArrayType
+sub GetSequenceType
 {
     my $object = shift;
     my $type = shift;
 
     return $1 if $type =~ /^sequence<([\w\d_\s]+)>.*/;
     return "";
+}
+
+sub GetArrayType
+{
+    my $object = shift;
+    my $type = shift;
+
+    return $1 if $type =~ /^([\w\d_\s]+)\[\]/;
+    return "";
+}
+
+sub AssertNotSequenceType
+{
+    my $object = shift;
+    my $type = shift;
+    die "Sequences must not be used as the type of an attribute, constant or exception field." if $object->GetSequenceType($type);
 }
 
 # Uppercase the first letter while respecting WebKit style guidelines.
@@ -690,6 +734,24 @@ sub GetVisibleInterfaceName
     my $dataNode = shift;
     my $interfaceName = $dataNode->extendedAttributes->{"InterfaceName"};
     return $interfaceName ? $interfaceName : $dataNode->name;
+}
+
+sub IsStrictSubtype
+{
+    my $object = shift;
+    my $dataNode = shift;
+    my $interfaceName = shift;
+    my $found = 0;
+
+    $object->ForAllParents($dataNode, sub {
+        my $interface = shift;
+        if ($object->StripModule($interface->name) eq $interfaceName) {
+            $found = 1;
+        }
+        return "prune" if $found;
+    }, 0, 1);
+
+    return $found;
 }
 
 1;

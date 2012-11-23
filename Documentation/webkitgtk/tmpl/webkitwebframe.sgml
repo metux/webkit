@@ -187,6 +187,15 @@ WebKitWebFrame
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_web_frame_get_dom_document ##### -->
+<para>
+
+</para>
+
+@frame: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_web_frame_get_global_context ##### -->
 <para>
 

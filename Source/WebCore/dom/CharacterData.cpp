@@ -26,13 +26,15 @@
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "InspectorInstrumentation.h"
+#include "MemoryInstrumentation.h"
 #include "MutationEvent.h"
 #include "MutationObserverInterestGroup.h"
 #include "MutationRecord.h"
 #include "NodeRenderingContext.h"
 #include "RenderText.h"
+#include "StyleInheritedData.h"
 #include "TextBreakIterator.h"
-#include "WebKitMutationObserver.h"
+#include "UndoManager.h"
 
 using namespace std;
 
@@ -43,6 +45,8 @@ void CharacterData::setData(const String& data, ExceptionCode&)
     const String& nonNullData = !data.isNull() ? data : emptyString();
     if (m_data == nonNullData)
         return;
+
+    RefPtr<CharacterData> protect = this;
 
     unsigned oldLength = length();
 
@@ -70,7 +74,7 @@ unsigned CharacterData::parserAppendData(const UChar* data, unsigned dataLength,
     // see <https://bugs.webkit.org/show_bug.cgi?id=29092>. 
     // We need at least two characters look-ahead to account for UTF-16 surrogates.
     if (end < dataLength) {
-        TextBreakIterator* it = characterBreakIterator(data, (end + 2 > dataLength) ? dataLength : end + 2);
+        NonSharedCharacterBreakIterator it(data, (end + 2 > dataLength) ? dataLength : end + 2);
         if (!isTextBreak(it, end))
             end = textBreakPreceding(it, end);
     }
@@ -88,6 +92,13 @@ unsigned CharacterData::parserAppendData(const UChar* data, unsigned dataLength,
         parentNode()->childrenChanged();
     
     return end;
+}
+
+void CharacterData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    Node::reportMemoryUsage(memoryObjectInfo);
+    info.addInstrumentedMember(m_data);
 }
 
 void CharacterData::appendData(const String& data, ExceptionCode&)
@@ -174,11 +185,21 @@ void CharacterData::setNodeValue(const String& nodeValue, ExceptionCode& ec)
 
 void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength)
 {
-    if (document()->frame())
-        document()->frame()->selection()->textWillBeReplaced(this, offsetOfReplacedData, oldLength, newLength);
+#if ENABLE(UNDO_MANAGER)
+    if (UndoManager::isRecordingAutomaticTransaction(this)) {
+        const String& replacingData = newData.substring(offsetOfReplacedData, newLength);
+        const String& replacedData = m_data.substring(offsetOfReplacedData, oldLength);
+        UndoManager::addTransactionStep(DataReplacingDOMTransactionStep::create(this, offsetOfReplacedData, oldLength, replacingData, replacedData));
+    }
+#endif
     String oldData = m_data;
     m_data = newData;
+
     updateRenderer(offsetOfReplacedData, oldLength);
+
+    if (document()->frame())
+        document()->frame()->selection()->textWasReplaced(this, offsetOfReplacedData, oldLength, newLength);
+
     document()->incDOMTreeVersion();
     dispatchModifiedEvent(oldData);
 }
@@ -197,14 +218,16 @@ void CharacterData::dispatchModifiedEvent(const String& oldData)
     if (OwnPtr<MutationObserverInterestGroup> mutationRecipients = MutationObserverInterestGroup::createForCharacterDataMutation(this))
         mutationRecipients->enqueueMutationRecord(MutationRecord::createCharacterData(this, oldData));
 #endif
-    if (parentNode())
-        parentNode()->childrenChanged();
-    if (document()->hasListenerType(Document::DOMCHARACTERDATAMODIFIED_LISTENER))
-        dispatchEvent(MutationEvent::create(eventNames().DOMCharacterDataModifiedEvent, true, 0, oldData, m_data));
-    dispatchSubtreeModifiedEvent();
+    if (!isInShadowTree()) {
+        if (parentNode())
+            parentNode()->childrenChanged();
+        if (document()->hasListenerType(Document::DOMCHARACTERDATAMODIFIED_LISTENER))
+            dispatchScopedEvent(MutationEvent::create(eventNames().DOMCharacterDataModifiedEvent, true, 0, oldData, m_data));
+        dispatchSubtreeModifiedEvent();
 #if ENABLE(INSPECTOR)
-    InspectorInstrumentation::characterDataModified(document(), this);
+        InspectorInstrumentation::characterDataModified(document(), this);
 #endif
+    }
 }
 
 void CharacterData::checkCharDataOperation(unsigned offset, ExceptionCode& ec)

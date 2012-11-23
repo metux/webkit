@@ -40,6 +40,7 @@
 #include "RenderBox.h"
 #include "RenderTheme.h"
 #include "RootInlineBox.h"
+#include "UndoManager.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/Vector.h>
 
@@ -59,6 +60,8 @@ static NodeCallbackQueue* s_postAttachCallbackQueue;
 
 static size_t s_attachDepth;
 static bool s_shouldReEnableMemoryCacheCallsAfterAttach;
+
+ChildNodesLazySnapshot* ChildNodesLazySnapshot::latestSnapshot = 0;
 
 static void collectTargetNodes(Node* node, NodeVector& nodes)
 {
@@ -186,6 +189,7 @@ void ContainerNode::insertBeforeCommon(Node* nextChild, Node* newChild)
     ASSERT(!newChild->parentNode()); // Use insertBefore if you need to handle reparenting (and want DOM mutation events).
     ASSERT(!newChild->nextSibling());
     ASSERT(!newChild->previousSibling());
+    ASSERT(!newChild->isShadowRoot());
 
     forbidEventDispatch();
     Node* prev = nextChild->previousSibling();
@@ -199,7 +203,7 @@ void ContainerNode::insertBeforeCommon(Node* nextChild, Node* newChild)
         ASSERT(m_firstChild == nextChild);
         m_firstChild = newChild;
     }
-    newChild->setParent(this);
+    newChild->setParentOrHostNode(this);
     newChild->setPreviousSibling(prev);
     newChild->setNextSibling(nextChild);
     allowEventDispatch();
@@ -270,8 +274,18 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
     if (next && (next->previousSibling() == newChild || next == newChild)) // nothing to do
         return true;
 
+    // Does this one more time because removeChild() fires a MutationEvent.
+    checkReplaceChild(newChild.get(), oldChild, ec);
+    if (ec)
+        return false;
+
     NodeVector targets;
     collectChildrenAndRemoveFromOldParent(newChild.get(), targets, ec);
+    if (ec)
+        return false;
+
+    // Does this yet another check because collectChildrenAndRemoveFromOldParent() fires a MutationEvent.
+    checkReplaceChild(newChild.get(), oldChild, ec);
     if (ec)
         return false;
 
@@ -307,21 +321,6 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
     return true;
 }
 
-void ContainerNode::willRemove()
-{
-    RefPtr<Node> protect(this);
-
-    NodeVector children;
-    getChildNodes(this, children);
-    for (size_t i = 0; i < children.size(); ++i) {
-        if (children[i]->parentNode() != this) // Check for child being removed from subtree while removing.
-            continue;
-        children[i]->willRemove();
-    }
-
-    Node::willRemove();
-}
-
 static void willRemoveChild(Node* child)
 {
 #if ENABLE(MUTATION_OBSERVERS)
@@ -329,18 +328,22 @@ static void willRemoveChild(Node* child)
     ChildListMutationScope(child->parentNode()).willRemoveChild(child);
     child->notifyMutationObserversNodeWillDetach();
 #endif
+#if ENABLE(UNDO_MANAGER)
+    if (UndoManager::isRecordingAutomaticTransaction(child->parentNode()))
+        UndoManager::addTransactionStep(NodeRemovingDOMTransactionStep::create(child->parentNode(), child));
+#endif
 
     dispatchChildRemovalEvents(child);
     child->document()->nodeWillBeRemoved(child); // e.g. mutation event listener can create a new range.
-    child->willRemove();
+    ChildFrameDisconnector(child).disconnect();
 }
 
 static void willRemoveChildren(ContainerNode* container)
 {
-    container->document()->nodeChildrenWillBeRemoved(container);
-
     NodeVector children;
     getChildNodes(container, children);
+
+    container->document()->nodeChildrenWillBeRemoved(container);
 
 #if ENABLE(MUTATION_OBSERVERS)
     ChildListMutationScope mutation(container);
@@ -353,11 +356,20 @@ static void willRemoveChildren(ContainerNode* container)
         mutation.willRemoveChild(child);
         child->notifyMutationObserversNodeWillDetach();
 #endif
+#if ENABLE(UNDO_MANAGER)
+        if (UndoManager::isRecordingAutomaticTransaction(container))
+            UndoManager::addTransactionStep(NodeRemovingDOMTransactionStep::create(container, child));
+#endif
 
         // fire removed from document mutation events.
         dispatchChildRemovalEvents(child);
-        child->willRemove();
+        ChildFrameDisconnector(child).disconnect();
     }
+}
+
+void ContainerNode::disconnectDescendantFrames()
+{
+    ChildFrameDisconnector(this).disconnect();
 }
 
 bool ContainerNode::removeChild(Node* oldChild, ExceptionCode& ec)
@@ -438,7 +450,7 @@ void ContainerNode::removeBetween(Node* previousChild, Node* nextChild, Node* ol
 
     oldChild->setPreviousSibling(0);
     oldChild->setNextSibling(0);
-    oldChild->setParent(0);
+    oldChild->setParentOrHostNode(0);
 
     document()->adoptIfNeeded(oldChild);
 
@@ -491,7 +503,7 @@ void ContainerNode::removeChildren()
         // this discrepancy between removeChild() and its optimized version removeChildren().
         n->setPreviousSibling(0);
         n->setNextSibling(0);
-        n->setParent(0);
+        n->setParentOrHostNode(0);
         document()->adoptIfNeeded(n.get());
 
         m_firstChild = next;
@@ -593,10 +605,8 @@ void ContainerNode::parserAddChild(PassRefPtr<Node> newChild)
     
     allowEventDispatch();
 
-    // FIXME: Why doesn't this use notify(newChild.get()) instead?
-    if (inDocument())
-        ChildNodeInsertionNotifier(this).notifyInsertedIntoDocument(newChild.get());
     childrenChanged(true, last, 0, 1);
+    ChildNodeInsertionNotifier(this).notify(newChild.get());
 }
 
 void ContainerNode::suspendPostAttachCallbacks()
@@ -691,27 +701,21 @@ void ContainerNode::childrenChanged(bool changedByParser, Node*, Node*, int chil
     document()->incDOMTreeVersion();
     if (!changedByParser && childCountDelta)
         document()->updateRangesAfterChildrenChanged(this);
-    invalidateNodeListsCacheAfterChildrenChanged();
+    invalidateNodeListCachesInAncestors();
 }
 
 void ContainerNode::cloneChildNodes(ContainerNode *clone)
 {
-    // disable the delete button so it's elements are not serialized into the markup
-    bool isEditorEnabled = false;
-    if (document()->frame() && document()->frame()->editor()->canEdit()) {
-        FrameSelection* selection = document()->frame()->selection();
-        Element* root = selection ? selection->rootEditableElement() : 0;
-        isEditorEnabled = root && isDescendantOf(root);
+    HTMLElement* deleteButtonContainerElement = 0;
+    if (Frame* frame = document()->frame())
+        deleteButtonContainerElement = frame->editor()->deleteButtonController()->containerElement();
 
-        if (isEditorEnabled)
-            document()->frame()->editor()->deleteButtonController()->disable();
-    }
-    
     ExceptionCode ec = 0;
-    for (Node* n = firstChild(); n && !ec; n = n->nextSibling())
+    for (Node* n = firstChild(); n && !ec; n = n->nextSibling()) {
+        if (n == deleteButtonContainerElement)
+            continue;
         clone->appendChild(n->cloneNode(true), ec);
-    if (isEditorEnabled && document()->frame())
-        document()->frame()->editor()->deleteButtonController()->enable();
+    }
 }
 
 bool ContainerNode::getUpperLeftCorner(FloatPoint& point) const
@@ -982,6 +986,11 @@ static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, bool sh
 
 #if ENABLE(MUTATION_OBSERVERS)
     ChildListMutationScope(parent).childAdded(child);
+#endif
+
+#if ENABLE(UNDO_MANAGER)
+    if (UndoManager::isRecordingAutomaticTransaction(parent))
+        UndoManager::addTransactionStep(NodeInsertingDOMTransactionStep::create(parent, child));
 #endif
 
     parent->childrenChanged(false, child->previousSibling(), child->nextSibling(), 1);

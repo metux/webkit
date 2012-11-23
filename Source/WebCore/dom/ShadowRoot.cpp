@@ -27,17 +27,20 @@
 #include "config.h"
 #include "ShadowRoot.h"
 
+#include "ContentDistributor.h"
 #include "DOMSelection.h"
 #include "DOMWindow.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "Element.h"
+#include "ElementShadow.h"
 #include "HTMLContentElement.h"
-#include "HTMLContentSelector.h"
+#include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "HTMLTextAreaElement.h"
 #include "InsertionPoint.h"
 #include "NodeRareData.h"
-#include "ShadowTree.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SVGNames.h"
 #include "StyleResolver.h"
 #include "markup.h"
@@ -49,7 +52,8 @@ ShadowRoot::ShadowRoot(Document* document)
     , TreeScope(this)
     , m_prev(0)
     , m_next(0)
-    , m_applyAuthorSheets(false)
+    , m_applyAuthorStyles(false)
+    , m_resetStyleInheritance(false)
     , m_insertionPointAssignedTo(0)
 {
     ASSERT(document);
@@ -74,16 +78,17 @@ ShadowRoot::~ShadowRoot()
 
 static bool allowsAuthorShadowRoot(Element* element)
 {
-    // FIXME: MEDIA recreates shadow root dynamically.
-    // https://bugs.webkit.org/show_bug.cgi?id=77936
-    if (element->hasTagName(HTMLNames::videoTag) || element->hasTagName(HTMLNames::audioTag))
-        return false;
+#if ENABLE(SHADOW_DOM)
+    if (RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
+        return true;
+#endif
 
-    // FIXME: ValidationMessage recreates shadow root dynamically.
-    // https://bugs.webkit.org/show_bug.cgi?id=77937
-    // Especially, INPUT recreates shadow root dynamically.
-    // https://bugs.webkit.org/show_bug.cgi?id=77930
-    if (element->isFormControlElement())
+    // FIXME: The elements in Shadow DOM of an input element assumes that they have renderer if the input
+    // element has a renderer. However, this does not hold until input elemnet is AuthorShadowDOM-ready.
+    // So we would like to prohibit having a AuthorShadowDOM for a while. The same thing happens to
+    // textarea element also.
+    // https://bugs.webkit.org/show_bug.cgi?id=92608
+    if (isHTMLInputElement(element) || isHTMLTextAreaElement(element))
         return false;
 
     // FIXME: We disable multiple shadow subtrees for SVG for while, because there will be problems to support it.
@@ -98,10 +103,10 @@ static bool allowsAuthorShadowRoot(Element* element)
 
 PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ExceptionCode& ec)
 {
-    return create(element, CreatingAuthorShadowRoot, ec);
+    return create(element, AuthorShadowRoot, ec);
 }
 
-PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPurpose purpose, ExceptionCode& ec)
+PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootType type, ExceptionCode& ec)
 {
     if (!element) {
         ec = HIERARCHY_REQUEST_ERR;
@@ -110,19 +115,22 @@ PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPu
 
     // Since some elements recreates shadow root dynamically, multiple shadow subtrees won't work well in that element.
     // Until they are fixed, we disable adding author shadow root for them.
-    if (purpose == CreatingAuthorShadowRoot && !allowsAuthorShadowRoot(element)) {
+    if (type == AuthorShadowRoot && !allowsAuthorShadowRoot(element)) {
         ec = HIERARCHY_REQUEST_ERR;
         return 0;
     }
 
     RefPtr<ShadowRoot> shadowRoot = adoptRef(new ShadowRoot(element->document()));
+#ifndef NDEBUG
+    shadowRoot->m_type = type;
+#endif
 
     ec = 0;
-    element->ensureShadowTree()->addShadowRoot(element, shadowRoot, ec);
+    element->ensureShadow()->addShadowRoot(element, shadowRoot, type, ec);
     if (ec)
         return 0;
     ASSERT(element == shadowRoot->host());
-    ASSERT(element->hasShadowRoot());
+    ASSERT(element->shadow());
     return shadowRoot.release();
 }
 
@@ -144,16 +152,8 @@ String ShadowRoot::innerHTML() const
 
 void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
 {
-    RefPtr<DocumentFragment> fragment = createFragmentFromSource(markup, host(), ec);
-    if (fragment)
+    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, host(), AllowScriptingContent, ec))
         replaceChildrenWithFragment(this, fragment.release(), ec);
-}
-
-DOMSelection* ShadowRoot::selection()
-{
-    if (document() && document()->domWindow())
-        return document()->domWindow()->getSelection();
-    return 0;
 }
 
 bool ShadowRoot::childTypeAllowed(NodeType type) const
@@ -171,10 +171,10 @@ bool ShadowRoot::childTypeAllowed(NodeType type) const
     }
 }
 
-ShadowTree* ShadowRoot::tree() const
+ElementShadow* ShadowRoot::owner() const
 {
     if (host())
-        return host()->shadowTree();
+        return host()->shadow();
     return 0;
 }
 
@@ -188,22 +188,46 @@ bool ShadowRoot::hasInsertionPoint() const
     return false;
 }
 
-bool ShadowRoot::applyAuthorSheets() const
+bool ShadowRoot::applyAuthorStyles() const
 {
-    return m_applyAuthorSheets;
+    return m_applyAuthorStyles;
 }
 
-void ShadowRoot::setApplyAuthorSheets(bool value)
+void ShadowRoot::setApplyAuthorStyles(bool value)
 {
-    m_applyAuthorSheets = value;
+    if (m_applyAuthorStyles != value) {
+        m_applyAuthorStyles = value;
+        host()->setNeedsStyleRecalc();
+    }
+}
+
+bool ShadowRoot::resetStyleInheritance() const
+{
+    return m_resetStyleInheritance;
+}
+
+void ShadowRoot::setResetStyleInheritance(bool value)
+{
+    if (value != m_resetStyleInheritance) {
+        m_resetStyleInheritance = value;
+        if (attached() && owner())
+            owner()->recalcStyle(Force);
+    }
 }
 
 void ShadowRoot::attach()
 {
     StyleResolver* styleResolver = document()->styleResolver();
     styleResolver->pushParentShadowRoot(this);
-    DocumentFragment::attach();
+    attachChildrenIfNeeded();
+    attachAsNode();
     styleResolver->popParentShadowRoot(this);
+}
+
+void ShadowRoot::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+{
+    ContainerNode::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    owner()->invalidateDistribution();
 }
 
 }

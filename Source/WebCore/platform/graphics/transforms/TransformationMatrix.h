@@ -27,8 +27,8 @@
 #define TransformationMatrix_h
 
 #include "FloatPoint.h"
+#include "FractionalLayoutRect.h"
 #include "IntPoint.h"
-#include "LayoutTypes.h"
 #include <string.h> //for memcpy
 #include <wtf/FastAllocBase.h>
 
@@ -50,7 +50,7 @@ typedef struct CGAffineTransform CGAffineTransform;
 #include <wx/graphics.h>
 #endif
 
-#if PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS)) || (PLATFORM(WX) && OS(WINDOWS))
+#if PLATFORM(WIN) || (PLATFORM(GTK) && OS(WINDOWS)) || (PLATFORM(QT) && OS(WINDOWS)) || (PLATFORM(WX) && OS(WINDOWS))
 #if COMPILER(MINGW) && !COMPILER(MINGW64)
 typedef struct _XFORM XFORM;
 #else
@@ -73,6 +73,7 @@ public:
     typedef double Matrix4[4][4];
 
     TransformationMatrix() { makeIdentity(); }
+    TransformationMatrix(const AffineTransform& t);
     TransformationMatrix(const TransformationMatrix& t) { *this = t; }
     TransformationMatrix(double a, double b, double c, double d, double e, double f) { setMatrix(a, b, c, d, e, f); }
     TransformationMatrix(double m11, double m12, double m13, double m14,
@@ -166,7 +167,7 @@ public:
     FloatQuad projectQuad(const FloatQuad&) const;
     // Projects the four corners of the quad and takes a bounding box,
     // while sanitizing values created when the w component is negative.
-    LayoutRect clampedBoundsOfProjectedQuad(const FloatQuad&) const;
+    FractionalLayoutRect clampedBoundsOfProjectedQuad(const FloatQuad&) const;
 
     double m11() const { return m_matrix[0][0]; }
     void setM11(double f) { m_matrix[0][0] = f; }
@@ -340,7 +341,7 @@ public:
     operator wxGraphicsMatrix() const;
 #endif
 
-#if PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS)) || (PLATFORM(WX) && OS(WINDOWS))
+#if PLATFORM(WIN) || (PLATFORM(GTK) && OS(WINDOWS)) || (PLATFORM(QT) && OS(WINDOWS)) || (PLATFORM(WX) && OS(WINDOWS))
     operator XFORM() const;
 #endif
 

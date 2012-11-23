@@ -33,8 +33,10 @@
 namespace WebCore {
 
 class ContainerNode;
+class DOMSelection;
 class Element;
 class HTMLMapElement;
+class IdTargetObserverRegistry;
 class Node;
 
 // A class which inherits both Node and TreeScope must call clearRareData() in its destructor
@@ -54,13 +56,13 @@ public:
     void addElementById(const AtomicString& elementId, Element*);
     void removeElementById(const AtomicString& elementId, Element*);
 
+    Node* ancestorInThisScope(Node*) const;
+
     void addImageMap(HTMLMapElement*);
     void removeImageMap(HTMLMapElement*);
     HTMLMapElement* getImageMap(const String& url) const;
 
-    void addNodeListCache() { ++m_numNodeListCaches; }
-    void removeNodeListCache() { ASSERT(m_numNodeListCaches > 0); --m_numNodeListCaches; }
-    bool hasNodeListCaches() const { return m_numNodeListCaches; }
+    DOMSelection* getSelection() const;
 
     // Find first anchor with the given name.
     // First searches for an element with the given ID, but if that fails, then looks
@@ -69,15 +71,18 @@ public:
     // quirks mode for historical compatibility reasons.
     Element* findAnchor(const String& name);
 
-    virtual bool applyAuthorSheets() const;
+    virtual bool applyAuthorStyles() const;
+    virtual bool resetStyleInheritance() const;
 
     // Used by the basic DOM mutation methods (e.g., appendChild()).
     void adoptIfNeeded(Node*);
 
     ContainerNode* rootNode() const { return m_rootNode; }
 
+    IdTargetObserverRegistry& idTargetObserverRegistry() const { return *m_idTargetObserverRegistry.get(); }
+
 protected:
-    TreeScope(ContainerNode*);
+    explicit TreeScope(ContainerNode*);
     virtual ~TreeScope();
 
     void destroyTreeScopeData();
@@ -89,7 +94,9 @@ private:
     DocumentOrderedMap m_elementsById;
     DocumentOrderedMap m_imageMapsByName;
 
-    unsigned m_numNodeListCaches;
+    OwnPtr<IdTargetObserverRegistry> m_idTargetObserverRegistry;
+
+    mutable RefPtr<DOMSelection> m_selection;
 };
 
 inline bool TreeScope::hasElementWithId(AtomicStringImpl* id) const
@@ -102,6 +109,8 @@ inline bool TreeScope::containsMultipleElementsWithId(const AtomicString& id) co
 {
     return m_elementsById.containsMultiple(id.impl());
 }
+
+TreeScope* commonTreeScope(Node*, Node*);
 
 } // namespace WebCore
 

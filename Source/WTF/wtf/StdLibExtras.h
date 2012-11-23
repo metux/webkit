@@ -102,12 +102,18 @@ TypePtr reinterpret_cast_ptr(const void* ptr)
     return reinterpret_cast<TypePtr>(ptr);
 }
 #else
+template<typename Type>
+bool isPointerTypeAlignmentOkay(Type*)
+{
+    return true;
+}
 #define reinterpret_cast_ptr reinterpret_cast
 #endif
 
 namespace WTF {
 
 static const size_t KB = 1024;
+static const size_t MB = 1024 * 1024;
 
 inline bool isPointerAligned(void* p)
 {
@@ -304,6 +310,7 @@ inline void* operator new(size_t, NotNullTag, void* location)
 }
 
 using WTF::KB;
+using WTF::MB;
 using WTF::isPointerAligned;
 using WTF::is8ByteAligned;
 using WTF::binarySearch;

@@ -30,6 +30,7 @@
 #include "ChildProcess.h"
 #include "DrawingArea.h"
 #include "EventDispatcher.h"
+#include "PluginInfoStore.h"
 #include "ResourceCachesToClear.h"
 #include "SandboxExtension.h"
 #include "SharedMemory.h"
@@ -49,11 +50,21 @@
 #endif
 
 #if PLATFORM(QT)
+QT_BEGIN_NAMESPACE
 class QNetworkAccessManager;
+QT_END_NAMESPACE
 #endif
 
 #if PLATFORM(MAC)
 #include <dispatch/dispatch.h>
+#endif
+
+#if ENABLE(BATTERY_STATUS)
+#include "WebBatteryManager.h"
+#endif
+
+#if ENABLE(NETWORK_INFO)
+#include "WebNetworkInfoManager.h"
 #endif
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
@@ -67,6 +78,9 @@ class QNetworkAccessManager;
 namespace WebCore {
     class IntSize;
     class PageGroup;
+#if ENABLE(WEB_INTENTS)
+    class PlatformMessagePortChannel;
+#endif
     class ResourceRequest;
     class ResourceResponse;
 }
@@ -81,7 +95,7 @@ struct WebPageGroupData;
 struct WebPreferencesStore;
 struct WebProcessCreationParameters;
 
-#if PLATFORM(MAC)
+#if USE(SECURITY_FRAMEWORK)
 class SecItemResponseData;
 class SecKeychainItemResponseData;
 #endif
@@ -101,7 +115,13 @@ public:
     void createWebPage(uint64_t pageID, const WebPageCreationParameters&);
     void removeWebPage(uint64_t pageID);
     WebPage* focusedWebPage() const;
-    
+
+#if ENABLE(WEB_INTENTS) 
+    uint64_t addMessagePortChannel(PassRefPtr<WebCore::PlatformMessagePortChannel>);
+    WebCore::PlatformMessagePortChannel* messagePortChannel(uint64_t);
+    void removeMessagePortChannel(uint64_t);
+#endif
+
     InjectedBundle* injectedBundle() const { return m_injectedBundle.get(); }
 
     bool isSeparateProcess() const;
@@ -114,6 +134,7 @@ public:
 #endif
 #endif
     
+    void setShouldTrackVisitedLinks(bool);
     void addVisitedLink(WebCore::LinkHash);
     bool isLinkVisited(WebCore::LinkHash) const;
 
@@ -140,6 +161,14 @@ public:
 
     // Geolocation
     WebGeolocationManager& geolocationManager() { return m_geolocationManager; }
+
+#if ENABLE(BATTERY_STATUS)
+    WebBatteryManager& batteryManager() { return m_batteryManager; }
+#endif
+
+#if ENABLE(NETWORK_INFO)
+    WebNetworkInfoManager& networkInfoManager() { return m_networkInfoManager; }
+#endif
     
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebNotificationManager& notificationManager() { return m_notificationManager; }
@@ -166,7 +195,6 @@ private:
     void initializeWebProcess(const WebProcessCreationParameters&, CoreIPC::ArgumentDecoder*);
     void platformInitializeWebProcess(const WebProcessCreationParameters&, CoreIPC::ArgumentDecoder*);
     void platformTerminate();
-    void setShouldTrackVisitedLinks(bool);
     void registerURLSchemeAsEmptyDocument(const String&);
     void registerURLSchemeAsSecure(const String&) const;
     void setDomainRelaxationForbiddenForURLScheme(const String&) const;
@@ -215,8 +243,9 @@ private:
     
     void getWebCoreStatistics(uint64_t callbackID);
     void garbageCollectJavaScriptObjects();
+    void setJavaScriptGarbageCollectorTimerEnabled(bool flag);
 
-#if PLATFORM(MAC)
+#if USE(SECURITY_FRAMEWORK)
     void secItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecItemResponseData&);
     void secKeychainItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecKeychainItemResponseData&);
 #endif
@@ -243,6 +272,8 @@ private:
     void didReceiveWebProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     void didReceiveWebProcessMessageOnConnectionWorkQueue(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, bool& didHandleMessage);
 
+    void didGetPlugins(CoreIPC::Connection*, uint64_t requestID, const Vector<WebCore::PluginInfo>&);
+
     RefPtr<WebConnectionToUIProcess> m_connection;
 
     HashMap<uint64_t, RefPtr<WebPage> > m_pageMap;
@@ -257,6 +288,7 @@ private:
 
     // FIXME: The visited link table should not be per process.
     VisitedLinkTable m_visitedLinkTable;
+    bool m_shouldTrackVisitedLinks;
 
     bool m_hasSetCacheModel;
     CacheModel m_cacheModel;
@@ -277,10 +309,20 @@ private:
 
     HashMap<uint64_t, WebFrame*> m_frameMap;
 
+#if ENABLE(WEB_INTENTS)
+    HashMap<uint64_t, RefPtr<WebCore::PlatformMessagePortChannel> > m_messagePortChannels;
+#endif
+
     HashSet<String, CaseFoldingHash> m_mimeTypesWithCustomRepresentations;
 
     TextCheckerState m_textCheckerState;
     WebGeolocationManager m_geolocationManager;
+#if ENABLE(BATTERY_STATUS)
+    WebBatteryManager m_batteryManager;
+#endif
+#if ENABLE(NETWORK_INFO)
+    WebNetworkInfoManager m_networkInfoManager;
+#endif
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebNotificationManager m_notificationManager;
 #endif

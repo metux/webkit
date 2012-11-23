@@ -59,6 +59,11 @@
 #include "WaveShaperNode.h"
 #include "WaveTable.h"
 
+#if ENABLE(MEDIA_STREAM)
+#include "MediaStream.h"
+#include "MediaStreamAudioSourceNode.h"
+#endif
+
 #if ENABLE(VIDEO)
 #include "HTMLMediaElement.h"
 #include "MediaElementAudioSourceNode.h"
@@ -196,7 +201,7 @@ void AudioContext::constructCommon()
 AudioContext::~AudioContext()
 {
 #if DEBUG_AUDIONODE_REFERENCES
-    printf("%p: AudioContext::~AudioContext()\n", this);
+    fprintf(stderr, "%p: AudioContext::~AudioContext()\n", this);
 #endif
     // AudioNodes keep a reference to their context, so there should be no way to be in the destructor if there are still AudioNodes around.
     ASSERT(!m_nodesToDelete.size());
@@ -378,6 +383,37 @@ PassRefPtr<MediaElementAudioSourceNode> AudioContext::createMediaElementSource(H
     RefPtr<MediaElementAudioSourceNode> node = MediaElementAudioSourceNode::create(this, mediaElement);
 
     mediaElement->setAudioSourceNode(node.get());
+
+    refNode(node.get()); // context keeps reference until node is disconnected
+    return node;
+}
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+PassRefPtr<MediaStreamAudioSourceNode> AudioContext::createMediaStreamSource(MediaStream* mediaStream, ExceptionCode& ec)
+{
+    ASSERT(mediaStream);
+    if (!mediaStream) {
+        ec = INVALID_STATE_ERR;
+        return 0;
+    }
+
+    ASSERT(isMainThread());
+    lazyInitialize();
+
+    AudioSourceProvider* provider = 0;
+
+    if (mediaStream->isLocal() && mediaStream->audioTracks()->length())
+        provider = destination()->localAudioInputProvider();
+    else {
+        // FIXME: get a provider for non-local MediaStreams (like from a remote peer).
+        provider = 0;
+    }
+
+    RefPtr<MediaStreamAudioSourceNode> node = MediaStreamAudioSourceNode::create(this, mediaStream, provider);
+
+    // FIXME: Only stereo streams are supported right now. We should be able to accept multi-channel streams.
+    node->setFormat(2, sampleRate());
 
     refNode(node.get()); // context keeps reference until node is disconnected
     return node;
@@ -659,10 +695,10 @@ bool AudioContext::isGraphOwner() const
     return currentThread() == m_graphOwnerThread;
 }
 
-void AudioContext::addDeferredFinishDeref(AudioNode* node, AudioNode::RefType refType)
+void AudioContext::addDeferredFinishDeref(AudioNode* node)
 {
     ASSERT(isAudioThread());
-    m_deferredFinishDerefList.append(AudioContext::RefInfo(node, refType));
+    m_deferredFinishDerefList.append(node);
 }
 
 void AudioContext::handlePreRenderTasks()
@@ -673,8 +709,8 @@ void AudioContext::handlePreRenderTasks()
     // It's OK if the tryLock() fails, we'll just take slightly longer to pick up the changes.
     bool mustReleaseLock;
     if (tryLock(mustReleaseLock)) {
-        // Fixup the state of any dirty AudioNodeInputs and AudioNodeOutputs.
-        handleDirtyAudioNodeInputs();
+        // Fixup the state of any dirty AudioSummingJunctions and AudioNodeOutputs.
+        handleDirtyAudioSummingJunctions();
         handleDirtyAudioNodeOutputs();
 
         updateAutomaticPullNodes();
@@ -703,8 +739,8 @@ void AudioContext::handlePostRenderTasks()
         // Ref-counted objects held by certain AudioNodes may not be thread-safe.
         scheduleNodeDeletion();
 
-        // Fixup the state of any dirty AudioNodeInputs and AudioNodeOutputs.
-        handleDirtyAudioNodeInputs();
+        // Fixup the state of any dirty AudioSummingJunctions and AudioNodeOutputs.
+        handleDirtyAudioSummingJunctions();
         handleDirtyAudioNodeOutputs();
 
         updateAutomaticPullNodes();
@@ -718,9 +754,8 @@ void AudioContext::handleDeferredFinishDerefs()
 {
     ASSERT(isAudioThread() && isGraphOwner());
     for (unsigned i = 0; i < m_deferredFinishDerefList.size(); ++i) {
-        AudioNode* node = m_deferredFinishDerefList[i].m_node;
-        AudioNode::RefType refType = m_deferredFinishDerefList[i].m_refType;
-        node->finishDeref(refType);
+        AudioNode* node = m_deferredFinishDerefList[i];
+        node->finishDeref(AudioNode::RefTypeConnection);
     }
     
     m_deferredFinishDerefList.clear();
@@ -778,10 +813,10 @@ void AudioContext::deleteMarkedNodes()
         AudioNode* node = m_nodesToDelete[n - 1];
         m_nodesToDelete.removeLast();
 
-        // Before deleting the node, clear out any AudioNodeInputs from m_dirtyAudioNodeInputs.
+        // Before deleting the node, clear out any AudioNodeInputs from m_dirtySummingJunctions.
         unsigned numberOfInputs = node->numberOfInputs();
         for (unsigned i = 0; i < numberOfInputs; ++i)
-            m_dirtyAudioNodeInputs.remove(node->input(i));
+            m_dirtySummingJunctions.remove(node->input(i));
 
         // Before deleting the node, clear out any AudioNodeOutputs from m_dirtyAudioNodeOutputs.
         unsigned numberOfOutputs = node->numberOfOutputs();
@@ -795,10 +830,17 @@ void AudioContext::deleteMarkedNodes()
     m_isDeletionScheduled = false;
 }
 
-void AudioContext::markAudioNodeInputDirty(AudioNodeInput* input)
+void AudioContext::markSummingJunctionDirty(AudioSummingJunction* summingJunction)
 {
     ASSERT(isGraphOwner());    
-    m_dirtyAudioNodeInputs.add(input);
+    m_dirtySummingJunctions.add(summingJunction);
+}
+
+void AudioContext::removeMarkedSummingJunction(AudioSummingJunction* summingJunction)
+{
+    ASSERT(isMainThread());
+    AutoLocker locker(this);
+    m_dirtySummingJunctions.remove(summingJunction);
 }
 
 void AudioContext::markAudioNodeOutputDirty(AudioNodeOutput* output)
@@ -807,14 +849,14 @@ void AudioContext::markAudioNodeOutputDirty(AudioNodeOutput* output)
     m_dirtyAudioNodeOutputs.add(output);
 }
 
-void AudioContext::handleDirtyAudioNodeInputs()
+void AudioContext::handleDirtyAudioSummingJunctions()
 {
     ASSERT(isGraphOwner());    
 
-    for (HashSet<AudioNodeInput*>::iterator i = m_dirtyAudioNodeInputs.begin(); i != m_dirtyAudioNodeInputs.end(); ++i)
+    for (HashSet<AudioSummingJunction*>::iterator i = m_dirtySummingJunctions.begin(); i != m_dirtySummingJunctions.end(); ++i)
         (*i)->updateRenderingState();
 
-    m_dirtyAudioNodeInputs.clear();
+    m_dirtySummingJunctions.clear();
 }
 
 void AudioContext::handleDirtyAudioNodeOutputs()

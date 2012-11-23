@@ -22,6 +22,7 @@
 #define SVGImageElement_h
 
 #if ENABLE(SVG)
+#include "ImageLoaderClient.h"
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGAnimatedPreserveAspectRatio.h"
@@ -38,24 +39,25 @@ class SVGImageElement : public SVGStyledTransformableElement,
                         public SVGTests,
                         public SVGLangSpace,
                         public SVGExternalResourcesRequired,
-                        public SVGURIReference {
+                        public SVGURIReference,
+                        public ImageLoaderClientBase<SVGImageElement> {
 public:
     static PassRefPtr<SVGImageElement> create(const QualifiedName&, Document*);
 
 private:
     SVGImageElement(const QualifiedName&, Document*);
-    
+
     virtual bool isValid() const { return SVGTests::isValid(); }
     virtual bool supportsFocus() const { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
 
     virtual void attach();
-    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
 
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
  

@@ -6,6 +6,7 @@
  * Copyright (C) 2009 Brent Fulgham <bfulgham@webkit.org>
  * Copyright (C) 2010, 2011 Igalia S.L.
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
+ * Copyright (C) 2012, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -191,7 +192,7 @@ void GraphicsContext::platformDestroy()
     delete m_data;
 }
 
-AffineTransform GraphicsContext::getCTM() const
+AffineTransform GraphicsContext::getCTM(IncludeDeviceScale) const
 {
     if (paintingDisabled())
         return AffineTransform();
@@ -230,6 +231,8 @@ void GraphicsContext::drawRect(const IntRect& rect)
 {
     if (paintingDisabled())
         return;
+
+    ASSERT(!rect.isEmpty());
 
     cairo_t* cr = platformContext()->cr();
     cairo_save(cr);
@@ -478,7 +481,7 @@ void GraphicsContext::clipConvexPolygon(size_t numPoints, const FloatPoint* poin
 
 void GraphicsContext::fillPath(const Path& path)
 {
-    if (paintingDisabled())
+    if (paintingDisabled() || path.isEmpty())
         return;
 
     cairo_t* cr = platformContext()->cr();
@@ -488,7 +491,7 @@ void GraphicsContext::fillPath(const Path& path)
 
 void GraphicsContext::strokePath(const Path& path)
 {
-    if (paintingDisabled())
+    if (paintingDisabled() || path.isEmpty())
         return;
 
     cairo_t* cr = platformContext()->cr();
@@ -526,8 +529,16 @@ void GraphicsContext::clip(const FloatRect& rect)
     cairo_rectangle(cr, rect.x(), rect.y(), rect.width(), rect.height());
     cairo_fill_rule_t savedFillRule = cairo_get_fill_rule(cr);
     cairo_set_fill_rule(cr, CAIRO_FILL_RULE_WINDING);
+    // The rectangular clip function is traditionally not expected to
+    // antialias. If we don't force antialiased clipping here,
+    // edge fringe artifacts may occur at the layer edges
+    // when a transformation is applied to the GraphicsContext
+    // while drawing the transformed layer.
+    cairo_antialias_t savedAntialiasRule = cairo_get_antialias(cr);
+    cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
     cairo_clip(cr);
     cairo_set_fill_rule(cr, savedFillRule);
+    cairo_set_antialias(cr, savedAntialiasRule);
     m_data->clip(rect);
 }
 
@@ -537,7 +548,8 @@ void GraphicsContext::clipPath(const Path& path, WindRule clipRule)
         return;
 
     cairo_t* cr = platformContext()->cr();
-    setPathOnCairoContext(cr, path.platformPath()->context());
+    if (!path.isNull())
+        setPathOnCairoContext(cr, path.platformPath()->context());
     cairo_set_fill_rule(cr, clipRule == RULE_EVENODD ? CAIRO_FILL_RULE_EVEN_ODD : CAIRO_FILL_RULE_WINDING);
     cairo_clip(cr);
 }
@@ -1006,8 +1018,11 @@ void GraphicsContext::clip(const Path& path)
         return;
 
     cairo_t* cr = platformContext()->cr();
-    OwnPtr<cairo_path_t> pathCopy = adoptPtr(cairo_copy_path(path.platformPath()->context()));
-    cairo_append_path(cr, pathCopy.get());
+    OwnPtr<cairo_path_t> pathCopy;
+    if (!path.isNull()) {
+        pathCopy = adoptPtr(cairo_copy_path(path.platformPath()->context()));
+        cairo_append_path(cr, pathCopy.get());
+    }
     cairo_fill_rule_t savedFillRule = cairo_get_fill_rule(cr);
     cairo_set_fill_rule(cr, CAIRO_FILL_RULE_WINDING);
     cairo_clip(cr);
@@ -1141,18 +1156,18 @@ InterpolationQuality GraphicsContext::imageInterpolationQuality() const
 #if ENABLE(3D_RENDERING) && USE(TEXTURE_MAPPER)
 TransformationMatrix GraphicsContext::get3DTransform() const
 {
-    notImplemented();
-    return TransformationMatrix();
+    // FIXME: Can we approximate the transformation better than this?
+    return getCTM().toTransformationMatrix();
 }
 
 void GraphicsContext::concat3DTransform(const TransformationMatrix& transform)
 {
-    notImplemented();
+    concatCTM(transform.toAffineTransform());
 }
 
 void GraphicsContext::set3DTransform(const TransformationMatrix& transform)
 {
-    notImplemented();
+    setCTM(transform.toAffineTransform());
 }
 #endif
 

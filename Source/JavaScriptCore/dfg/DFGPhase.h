@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,6 +49,8 @@ public:
         endPhase();
     }
     
+    const char* name() const { return m_name; }
+    
     // Each phase must have a run() method.
     
 protected:
@@ -65,18 +67,32 @@ private:
     // Call these hooks when starting and finishing.
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
     void beginPhase();
-    void endPhase();
-#else // DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+#else
     void beginPhase() { }
+#endif
+#if DFG_ENABLE(PER_PHASE_VALIDATION)
+    void endPhase();
+#else
     void endPhase() { }
-#endif // DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+#endif
 };
 
 template<typename PhaseType>
-void runPhase(Graph& graph)
+bool runAndLog(PhaseType& phase)
+{
+    bool result = phase.run();
+#if DFG_ENABLE(DEBUG_VERBOSE)
+    if (result)
+        dataLog("Phase %s changed the IR.\n", phase.name());
+#endif
+    return result;
+}
+
+template<typename PhaseType>
+bool runPhase(Graph& graph)
 {
     PhaseType phase(graph);
-    phase.run();
+    return runAndLog(phase);
 }
 
 } } // namespace JSC::DFG

@@ -43,7 +43,6 @@ WebInspector.JavaScriptBreakpointsSidebarPane = function(breakpointManager, show
     this.emptyElement.textContent = WebInspector.UIString("No Breakpoints");
 
     this.bodyElement.appendChild(this.emptyElement);
-    this.bodyElement.addEventListener("contextmenu", this._contextMenu.bind(this), false);
 
     this._items = new Map();
     this._breakpointManager.addEventListener(WebInspector.BreakpointManager.Events.BreakpointAdded, this._breakpointAdded, this);
@@ -169,16 +168,34 @@ WebInspector.JavaScriptBreakpointsSidebarPane.prototype = {
     {
         var contextMenu = new WebInspector.ContextMenu();
         contextMenu.appendItem(WebInspector.UIString("Remove Breakpoint"), breakpoint.remove.bind(breakpoint));
-        var removeAllTitle = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Remove all JavaScript breakpoints" : "Remove All JavaScript Breakpoints");
+        var removeAllTitle = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Remove all breakpoints" : "Remove All Breakpoints");
         contextMenu.appendItem(removeAllTitle, this._breakpointManager.removeAllBreakpoints.bind(this._breakpointManager));
-        contextMenu.show(event);
-    },
+        
+        var breakpointActive = WebInspector.debuggerModel.breakpointsActive();
+        var breakpointActiveTitle = WebInspector.UIString(breakpointActive ? "Deactivate All Breakpoints" : "Activate All Breakpoints");
+        contextMenu.appendItem(breakpointActiveTitle, WebInspector.debuggerModel.setBreakpointsActive.bind(WebInspector.debuggerModel, !breakpointActive));
 
-    _contextMenu: function(event)
-    {
-        var contextMenu = new WebInspector.ContextMenu();
-        var removeAllTitle = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Remove all JavaScript breakpoints" : "Remove All JavaScript Breakpoints");
-        contextMenu.appendItem(removeAllTitle, this._breakpointManager.removeAllBreakpoints.bind(this._breakpointManager));
+        function enabledBreakpointCount(breakpoints)
+        {
+            var count = 0;
+            for (var i = 0; i < breakpoints.length; ++i) {
+                if (breakpoints[i].checkbox.checked)
+                    count++;
+            }
+            return count;
+        }
+        var breakpoints = this._items.values();
+        if (breakpoints.length > 1) {
+            var enableBreakpointCount = enabledBreakpointCount(breakpoints);
+            var enableTitle = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Enable all breakpoints" : "Enable All Breakpoints");
+            var disableTitle = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Disable all breakpoints" : "Disable All Breakpoints");
+
+            contextMenu.appendSeparator();
+
+            contextMenu.appendItem(enableTitle, this._breakpointManager.toggleAllBreakpoints.bind(this._breakpointManager, true), !(enableBreakpointCount != breakpoints.length));
+            contextMenu.appendItem(disableTitle, this._breakpointManager.toggleAllBreakpoints.bind(this._breakpointManager, false), !(enableBreakpointCount > 1));
+        }
+
         contextMenu.show(event);
     },
 
@@ -228,59 +245,6 @@ WebInspector.JavaScriptBreakpointsSidebarPane.prototype = {
 }
 
 WebInspector.JavaScriptBreakpointsSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
-
-/**
- * @constructor
- * @extends {WebInspector.SidebarPane}
- */
-WebInspector.NativeBreakpointsSidebarPane = function(title)
-{
-    WebInspector.SidebarPane.call(this, title);
-
-    this.listElement = document.createElement("ol");
-    this.listElement.className = "breakpoint-list";
-
-    this.emptyElement = document.createElement("div");
-    this.emptyElement.className = "info";
-    this.emptyElement.textContent = WebInspector.UIString("No Breakpoints");
-
-    this.bodyElement.appendChild(this.emptyElement);
-}
-
-WebInspector.NativeBreakpointsSidebarPane.prototype = {
-    _addListElement: function(element, beforeElement)
-    {
-        if (beforeElement)
-            this.listElement.insertBefore(element, beforeElement);
-        else {
-            if (!this.listElement.firstChild) {
-                this.bodyElement.removeChild(this.emptyElement);
-                this.bodyElement.appendChild(this.listElement);
-            }
-            this.listElement.appendChild(element);
-        }
-    },
-
-    _removeListElement: function(element)
-    {
-        this.listElement.removeChild(element);
-        if (!this.listElement.firstChild) {
-            this.bodyElement.removeChild(this.listElement);
-            this.bodyElement.appendChild(this.emptyElement);
-        }
-    },
-
-    _reset: function()
-    {
-        this.listElement.removeChildren();
-        if (this.listElement.parentElement) {
-            this.bodyElement.removeChild(this.listElement);
-            this.bodyElement.appendChild(this.emptyElement);
-        }
-    }
-}
-
-WebInspector.NativeBreakpointsSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
 
 /**
  * @constructor
@@ -486,7 +450,7 @@ WebInspector.EventListenerBreakpointsSidebarPane = function()
     this._createCategory(WebInspector.UIString("Clipboard"), true, ["copy", "cut", "paste", "beforecopy", "beforecut", "beforepaste"]);
     this._createCategory(WebInspector.UIString("DOM Mutation"), true, ["DOMActivate", "DOMFocusIn", "DOMFocusOut", "DOMAttrModified", "DOMCharacterDataModified", "DOMNodeInserted", "DOMNodeInsertedIntoDocument", "DOMNodeRemoved", "DOMNodeRemovedFromDocument", "DOMSubtreeModified", "DOMContentLoaded"]);
     this._createCategory(WebInspector.UIString("Device"), true, ["deviceorientation", "devicemotion"]);
-    this._createCategory(WebInspector.UIString("Keyboard"), true, ["keydown", "keyup", "keypress", "textInput"]);
+    this._createCategory(WebInspector.UIString("Keyboard"), true, ["keydown", "keyup", "keypress", "input"]);
     this._createCategory(WebInspector.UIString("Load"), true, ["load", "unload", "abort", "error"]);
     this._createCategory(WebInspector.UIString("Mouse"), true, ["click", "dblclick", "mousedown", "mouseup", "mouseover", "mousemove", "mouseout", "mousewheel"]);
     this._createCategory(WebInspector.UIString("Timer"), false, ["setTimer", "clearTimer", "timerFired"]);

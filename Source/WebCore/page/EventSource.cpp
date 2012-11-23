@@ -88,7 +88,7 @@ PassRefPtr<EventSource> EventSource::create(ScriptExecutionContext* context, con
         return 0;
     }
 
-    if (!context->contentSecurityPolicy()->allowConnectFromSource(fullURL)) {
+    if (!context->contentSecurityPolicy()->allowConnectToSource(fullURL)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return 0;
@@ -315,6 +315,11 @@ void EventSource::parseEventStream()
 
         parseEventStreamLine(bufPos, fieldLength, lineLength);
         bufPos += lineLength + 1;
+
+        // EventSource.close() might've been called by one of the message event handlers.
+        // Per spec, no further messages should be fired after that.
+        if (m_state == CLOSED)
+            break;
     }
 
     if (bufPos == bufSize)

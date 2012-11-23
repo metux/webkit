@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
 #include "InjectedBundleNavigationAction.h"
 #include "InjectedBundleUserMessageCoders.h"
 #include "LayerTreeHost.h"
+#include "WebColorChooser.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebFrame.h"
 #include "WebFrameLoaderClient.h"
@@ -45,6 +46,7 @@
 #include "WebProcess.h"
 #include "WebSearchPopupMenu.h"
 #include <WebCore/AXObjectCache.h>
+#include <WebCore/ColorChooser.h>
 #include <WebCore/DatabaseTracker.h>
 #include <WebCore/FileChooser.h>
 #include <WebCore/FileIconLoader.h>
@@ -438,7 +440,7 @@ void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) con
     if (frame->page()->mainFrame() != frame)
         return;
 
-#if PLATFORM(QT)
+#if PLATFORM(QT) || (PLATFORM(EFL) && USE(TILED_BACKING_STORE))
     if (m_page->useFixedLayout()) {
         // The below method updates the size().
         m_page->resizeToContentsIfNeeded();
@@ -468,20 +470,25 @@ void WebChromeClient::scrollRectIntoView(const IntRect&) const
     notImplemented();
 }
 
-bool WebChromeClient::shouldMissingPluginMessageBeButton() const
+bool WebChromeClient::shouldUnavailablePluginMessageBeButton(RenderEmbeddedObject::PluginUnavailabilityReason pluginUnavailabilityReason) const
 {
-    // FIXME: <rdar://problem/8794397> We should only return true when there is a 
-    // missingPluginButtonClicked callback defined on the Page UI client.
-    return true;
+    if (pluginUnavailabilityReason == RenderEmbeddedObject::PluginMissing || pluginUnavailabilityReason == RenderEmbeddedObject::InsecurePluginVersion) {
+        // FIXME: <rdar://problem/8794397> We should only return true when there is a
+        // missingPluginButtonClicked callback defined on the Page UI client.
+        return true;
+    }
+
+    return false;
 }
     
-void WebChromeClient::missingPluginButtonClicked(Element* element) const
+void WebChromeClient::unavailablePluginButtonClicked(Element* element, RenderEmbeddedObject::PluginUnavailabilityReason pluginUnavailabilityReason) const
 {
-    ASSERT(element->hasTagName(objectTag) || element->hasTagName(embedTag));
+    ASSERT(element->hasTagName(objectTag) || element->hasTagName(embedTag) || element->hasTagName(appletTag));
+    ASSERT(pluginUnavailabilityReason == RenderEmbeddedObject::PluginMissing || pluginUnavailabilityReason == RenderEmbeddedObject::InsecurePluginVersion);
 
     HTMLPlugInImageElement* pluginElement = static_cast<HTMLPlugInImageElement*>(element);
 
-    m_page->send(Messages::WebPageProxy::MissingPluginButtonClicked(pluginElement->serviceType(), pluginElement->url(), pluginElement->getAttribute(pluginspageAttr)));
+    m_page->send(Messages::WebPageProxy::UnavailablePluginButtonClicked(pluginUnavailabilityReason, pluginElement->serviceType(), pluginElement->url(), pluginElement->getAttribute(pluginspageAttr)));
 }
 
 void WebChromeClient::scrollbarsModeDidChange() const
@@ -590,6 +597,16 @@ bool WebChromeClient::paintCustomOverhangArea(GraphicsContext* context, const In
     return true;
 }
 
+#if ENABLE(INPUT_TYPE_COLOR)
+PassOwnPtr<ColorChooser> WebChromeClient::createColorChooser(ColorChooserClient* client, const Color& initialColor)
+{
+    if (m_page->activeColorChooser())
+        return nullptr;
+
+    return adoptPtr(new WebColorChooser(m_page, client, initialColor));
+}
+#endif
+
 void WebChromeClient::runOpenPanel(Frame* frame, PassRefPtr<FileChooser> prpFileChooser)
 {
     if (m_page->activeOpenPanelResultListener())
@@ -617,6 +634,15 @@ void WebChromeClient::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
 {
     m_page->send(Messages::WebPageProxy::SetCursorHiddenUntilMouseMoves(hiddenUntilMouseMoves));
 }
+
+#if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
+void WebChromeClient::scheduleAnimation()
+{
+#if USE(COORDINATED_GRAPHICS)
+    m_page->drawingArea()->layerTreeHost()->scheduleAnimation();
+#endif
+}
+#endif
 
 void WebChromeClient::formStateDidChange(const Node*)
 {
@@ -677,6 +703,15 @@ void WebChromeClient::scheduleCompositingLayerSync()
         m_page->drawingArea()->scheduleCompositingLayerSync();
 }
 
+#endif
+
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+WebCore::GraphicsDeviceAdapter* WebChromeClient::graphicsDeviceAdapter() const
+{
+    if (!m_page->drawingArea())
+        return 0;
+    return m_page->drawingArea()->layerTreeHost()->graphicsDeviceAdapter();
+}
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
@@ -745,6 +780,14 @@ bool WebChromeClient::shouldRubberBandInDirection(WebCore::ScrollDirection direc
 void WebChromeClient::numWheelEventHandlersChanged(unsigned count)
 {
     m_page->numWheelEventHandlersChanged(count);
+}
+
+void WebChromeClient::logDiagnosticMessage(const String& message, const String& description, const String& success)
+{
+    if (!m_page->corePage()->settings()->diagnosticLoggingEnabled())
+        return;
+
+    m_page->injectedBundleDiagnosticLoggingClient().logDiagnosticMessage(m_page, message, description, success);
 }
 
 } // namespace WebKit

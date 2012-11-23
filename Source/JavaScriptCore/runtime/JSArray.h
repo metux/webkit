@@ -164,11 +164,11 @@ namespace JSC {
         //   - called 'completeInitialization' after all properties have been initialized.
         static JSArray* tryCreateUninitialized(JSGlobalData&, Structure*, unsigned initialLength);
 
-        JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&, bool throwException);
+        JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool throwException);
 
-        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
         JS_EXPORT_PRIVATE static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
+        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
         static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
         // This is similar to the JSObject::putDirect* methods:
         //  - the prototype chain is not consulted
@@ -281,14 +281,11 @@ namespace JSC {
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
-        static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+        static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
 
-        static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
+        static bool deleteProperty(JSCell*, ExecState*, PropertyName);
         static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
         static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
-
-        JS_EXPORT_PRIVATE void* subclassData() const;
-        JS_EXPORT_PRIVATE void setSubclassData(void*);
 
     private:
         static size_t storageSize(unsigned vectorLength);
@@ -304,7 +301,6 @@ namespace JSC {
         void allocateSparseMap(JSGlobalData&);
         void deallocateSparseMap();
 
-        bool getOwnPropertySlotSlowCase(ExecState*, unsigned propertyName, PropertySlot&);
         void putByIndexBeyondVectorLength(ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
         JS_EXPORT_PRIVATE bool putDirectIndexBeyondVectorLength(ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
 
@@ -357,16 +353,6 @@ namespace JSC {
     inline bool isJSArray(JSCell* cell) { return cell->classInfo() == &JSArray::s_info; }
     inline bool isJSArray(JSValue v) { return v.isCell() && isJSArray(v.asCell()); }
 
-    // Rule from ECMA 15.2 about what an array index is.
-    // Must exactly match string form of an unsigned integer, and be less than 2^32 - 1.
-    inline unsigned Identifier::toArrayIndex(bool& ok) const
-    {
-        unsigned i = toUInt32(ok);
-        if (ok && i >= 0xFFFFFFFFU)
-            ok = false;
-        return i;
-    }
-
 // The definition of MAX_STORAGE_VECTOR_LENGTH is dependant on the definition storageSize
 // function below - the MAX_STORAGE_VECTOR_LENGTH limit is defined such that the storage
 // size calculation cannot overflow.  (sizeof(ArrayStorage) - sizeof(WriteBarrier<Unknown>)) +
@@ -390,7 +376,42 @@ namespace JSC {
     
         return size;
     }
+
+    inline JSArray* constructArray(ExecState* exec, Structure* arrayStructure, const ArgList& values)
+    {
+        JSGlobalData& globalData = exec->globalData();
+        unsigned length = values.size();
+        JSArray* array = JSArray::tryCreateUninitialized(globalData, arrayStructure, length);
+
+        // FIXME: we should probably throw an out of memory error here, but
+        // when making this change we should check that all clients of this
+        // function will correctly handle an exception being thrown from here.
+        if (!array)
+            CRASH();
+
+        for (unsigned i = 0; i < length; ++i)
+            array->initializeIndex(globalData, i, values.at(i));
+        array->completeInitialization(length);
+        return array;
+    }
     
-    } // namespace JSC
+    inline JSArray* constructArray(ExecState* exec, Structure* arrayStructure, const JSValue* values, unsigned length)
+    {
+        JSGlobalData& globalData = exec->globalData();
+        JSArray* array = JSArray::tryCreateUninitialized(globalData, arrayStructure, length);
+
+        // FIXME: we should probably throw an out of memory error here, but
+        // when making this change we should check that all clients of this
+        // function will correctly handle an exception being thrown from here.
+        if (!array)
+            CRASH();
+
+        for (unsigned i = 0; i < length; ++i)
+            array->initializeIndex(globalData, i, values[i]);
+        array->completeInitialization(length);
+        return array;
+    }
+
+} // namespace JSC
 
 #endif // JSArray_h

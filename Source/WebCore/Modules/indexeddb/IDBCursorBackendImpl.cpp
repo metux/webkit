@@ -37,14 +37,14 @@
 #include "IDBObjectStoreBackendImpl.h"
 #include "IDBRequest.h"
 #include "IDBTracing.h"
-#include "IDBTransactionBackendInterface.h"
+#include "IDBTransactionBackendImpl.h"
 #include "SerializedScriptValue.h"
 
 namespace WebCore {
 
-IDBCursorBackendImpl::IDBCursorBackendImpl(PassRefPtr<IDBBackingStore::Cursor> cursor, IDBCursor::Direction direction, CursorType cursorType, IDBTransactionBackendInterface* transaction, IDBObjectStoreBackendInterface* objectStore)
+IDBCursorBackendImpl::IDBCursorBackendImpl(PassRefPtr<IDBBackingStore::Cursor> cursor, CursorType cursorType, IDBTransactionBackendInterface::TaskType taskType, IDBTransactionBackendImpl* transaction, IDBObjectStoreBackendImpl* objectStore)
     : m_cursor(cursor)
-    , m_direction(direction)
+    , m_taskType(taskType)
     , m_cursorType(cursorType)
     , m_transaction(transaction)
     , m_objectStore(objectStore)
@@ -63,64 +63,11 @@ IDBCursorBackendImpl::~IDBCursorBackendImpl()
     m_objectStore.clear();
 }
 
-unsigned short IDBCursorBackendImpl::direction() const
-{
-    IDB_TRACE("IDBCursorBackendImpl::direction");
-    return m_direction;
-}
-
-PassRefPtr<IDBKey> IDBCursorBackendImpl::key() const
-{
-    IDB_TRACE("IDBCursorBackendImpl::key");
-    return m_cursor->key();
-}
-
-PassRefPtr<IDBKey> IDBCursorBackendImpl::primaryKey() const
-{
-    IDB_TRACE("IDBCursorBackendImpl::primaryKey");
-    return m_cursor->primaryKey();
-}
-
-PassRefPtr<SerializedScriptValue> IDBCursorBackendImpl::value() const
-{
-    IDB_TRACE("IDBCursorBackendImpl::value");
-    if (m_cursorType == IndexKeyCursor)
-      return SerializedScriptValue::nullValue();
-    return SerializedScriptValue::createFromWire(m_cursor->value());
-}
-
-void IDBCursorBackendImpl::update(PassRefPtr<SerializedScriptValue> value, PassRefPtr<IDBCallbacks> callbacks, ExceptionCode& ec)
-{
-    IDB_TRACE("IDBCursorBackendImpl::update");
-    if (!m_cursor || m_cursorType == IndexKeyCursor) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
-        return;
-    }
-
-    m_objectStore->put(value, m_cursor->primaryKey(), IDBObjectStoreBackendInterface::CursorUpdate, callbacks, m_transaction.get(), ec);
-}
-
 void IDBCursorBackendImpl::continueFunction(PassRefPtr<IDBKey> prpKey, PassRefPtr<IDBCallbacks> prpCallbacks, ExceptionCode& ec)
 {
     IDB_TRACE("IDBCursorBackendImpl::continue");
-    RefPtr<IDBKey> key = prpKey;
 
-    if (m_cursor && key) {
-        ASSERT(m_cursor->key());
-        if (m_direction == IDBCursor::NEXT || m_direction == IDBCursor::NEXT_NO_DUPLICATE) {
-            if (!m_cursor->key()->isLessThan(key.get())) {
-                ec = IDBDatabaseException::DATA_ERR;
-                return;
-            }
-        } else {
-            if (!key->isLessThan(m_cursor->key().get())) {
-                ec = IDBDatabaseException::DATA_ERR;
-                return;
-            }
-        }
-    }
-
-    if (!m_transaction->scheduleTask(createCallbackTask(&IDBCursorBackendImpl::continueFunctionInternal, this, key, prpCallbacks)))
+    if (!m_transaction->scheduleTask(m_taskType, createCallbackTask(&IDBCursorBackendImpl::continueFunctionInternal, this, prpKey, prpCallbacks)))
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
@@ -142,7 +89,7 @@ void IDBCursorBackendImpl::advanceInternal(ScriptExecutionContext*, PassRefPtr<I
         return;
     }
 
-    callbacks->onSuccessWithContinuation();
+    callbacks->onSuccess(cursor->key(), cursor->primaryKey(), cursor->value());
 }
 
 void IDBCursorBackendImpl::continueFunctionInternal(ScriptExecutionContext*, PassRefPtr<IDBCursorBackendImpl> prpCursor, PassRefPtr<IDBKey> prpKey, PassRefPtr<IDBCallbacks> callbacks)
@@ -157,24 +104,29 @@ void IDBCursorBackendImpl::continueFunctionInternal(ScriptExecutionContext*, Pas
         return;
     }
 
-    callbacks->onSuccessWithContinuation();
+    callbacks->onSuccess(cursor->key(), cursor->primaryKey(), cursor->value());
 }
 
 void IDBCursorBackendImpl::deleteFunction(PassRefPtr<IDBCallbacks> prpCallbacks, ExceptionCode& ec)
 {
     IDB_TRACE("IDBCursorBackendImpl::delete");
+    ASSERT(m_transaction->mode() != IDBTransaction::READ_ONLY);
+
     if (!m_cursor || m_cursorType == IndexKeyCursor) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return;
     }
 
-    m_objectStore->deleteFunction(m_cursor->primaryKey(), prpCallbacks, m_transaction.get(), ec);
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(m_cursor->primaryKey(), ec);
+    ASSERT(!ec);
+
+    m_objectStore->deleteFunction(keyRange.release(), prpCallbacks, m_transaction.get(), ec);
 }
 
 void IDBCursorBackendImpl::prefetchContinue(int numberToFetch, PassRefPtr<IDBCallbacks> prpCallbacks, ExceptionCode& ec)
 {
     IDB_TRACE("IDBCursorBackendImpl::prefetchContinue");
-    if (!m_transaction->scheduleTask(createCallbackTask(&IDBCursorBackendImpl::prefetchContinueInternal, this, numberToFetch, prpCallbacks)))
+    if (!m_transaction->scheduleTask(m_taskType, createCallbackTask(&IDBCursorBackendImpl::prefetchContinueInternal, this, numberToFetch, prpCallbacks)))
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
@@ -190,7 +142,7 @@ void IDBCursorBackendImpl::prefetchContinueInternal(ScriptExecutionContext*, Pas
     if (cursor->m_cursor)
         cursor->m_savedCursor = cursor->m_cursor->clone();
 
-    const size_t kMaxSizeEstimate = 10 * 1024 * 1024;
+    const size_t maxSizeEstimate = 10 * 1024 * 1024;
     size_t sizeEstimate = 0;
 
     for (int i = 0; i < numberToFetch; ++i) {
@@ -212,7 +164,7 @@ void IDBCursorBackendImpl::prefetchContinueInternal(ScriptExecutionContext*, Pas
         if (cursor->m_cursorType != IDBCursorBackendInterface::IndexKeyCursor)
             sizeEstimate += cursor->m_cursor->value().length() * sizeof(UChar);
 
-        if (sizeEstimate > kMaxSizeEstimate)
+        if (sizeEstimate > maxSizeEstimate)
             break;
     }
 
@@ -248,6 +200,8 @@ void IDBCursorBackendImpl::close()
     m_closed = true;
     if (m_cursor)
         m_cursor->close();
+    m_cursor.clear();
+    m_savedCursor.clear();
 }
 
 } // namespace WebCore

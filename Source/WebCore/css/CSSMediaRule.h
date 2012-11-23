@@ -50,6 +50,10 @@ public:
     unsigned length() const;
     CSSRule* item(unsigned index) const;
 
+    void reattach(StyleRuleMedia*);
+
+    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+
 private:
     CSSMediaRule(StyleRuleMedia*, CSSStyleSheet*);
     

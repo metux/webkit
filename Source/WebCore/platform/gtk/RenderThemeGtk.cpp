@@ -28,6 +28,7 @@
 #include "CSSValueKeywords.h"
 #include "FileList.h"
 #include "FileSystem.h"
+#include "FontDescription.h"
 #include <wtf/gobject/GOwnPtr.h>
 #include "Gradient.h"
 #include "GraphicsContext.h"
@@ -48,7 +49,7 @@
 #include <gtk/gtk.h>
 #include <wtf/text/CString.h>
 
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
 #include "RenderProgress.h"
 #endif
 
@@ -64,7 +65,9 @@ using namespace HTMLNames;
 static HTMLMediaElement* getMediaElementFromRenderObject(RenderObject* o)
 {
     Node* node = o->node();
-    Node* mediaNode = node ? node->shadowAncestorNode() : 0;
+    Node* mediaNode = node ? node->shadowHost() : 0;
+    if (!mediaNode)
+        mediaNode = node;
     if (!mediaNode || !mediaNode->isElementNode() || !static_cast<Element*>(mediaNode)->isMediaElement())
         return 0;
 
@@ -238,10 +241,11 @@ bool RenderThemeGtk::paintTextArea(RenderObject* o, const PaintInfo& i, const In
 static void paintGdkPixbuf(GraphicsContext* context, const GdkPixbuf* icon, const IntRect& iconRect)
 {
     IntSize iconSize(gdk_pixbuf_get_width(icon), gdk_pixbuf_get_height(icon));
+    GRefPtr<GdkPixbuf> scaledIcon;
     if (iconRect.size() != iconSize) {
         // We could use cairo_scale() here but cairo/pixman downscale quality is quite bad.
-        GRefPtr<GdkPixbuf> scaledIcon = gdk_pixbuf_scale_simple(icon, iconRect.width(), iconRect.height(),
-                                                                GDK_INTERP_BILINEAR);
+        scaledIcon = adoptGRef(gdk_pixbuf_scale_simple(icon, iconRect.width(), iconRect.height(),
+                                                       GDK_INTERP_BILINEAR));
         icon = scaledIcon.get();
     }
 
@@ -312,7 +316,9 @@ void RenderThemeGtk::adjustSearchFieldResultsDecorationStyle(StyleResolver*, Ren
 static IntRect centerRectVerticallyInParentInputElement(RenderObject* renderObject, const IntRect& rect)
 {
     // Get the renderer of <input> element.
-    Node* input = renderObject->node()->shadowAncestorNode();
+    Node* input = renderObject->node()->shadowHost();
+    if (!input)
+        input = renderObject->node();
     if (!input->renderer()->isBox())
         return IntRect();
 
@@ -640,7 +646,7 @@ bool RenderThemeGtk::paintMediaCurrentTime(RenderObject* renderObject, const Pai
 }
 #endif
 
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
 void RenderThemeGtk::adjustProgressBarStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     style->setBoxShadow(nullptr);
@@ -709,5 +715,19 @@ String RenderThemeGtk::fileListNameForWidth(const FileList* fileList, const Font
 
     return StringTruncator::centerTruncate(string, width, font, StringTruncator::EnableRoundingHacks);
 }
+
+#if ENABLE(DATALIST_ELEMENT)
+IntSize RenderThemeGtk::sliderTickSize() const
+{
+    // FIXME: We need to set this to the size of one tick mark.
+    return IntSize(0, 0);
+}
+
+int RenderThemeGtk::sliderTickOffsetFromTrackCenter() const
+{
+    // FIXME: We need to set this to the position of the tick marks.
+    return 0;
+}
+#endif
 
 }

@@ -47,6 +47,7 @@ END_REGISTER_ANIMATED_PROPERTIES
 inline SVGScriptElement::SVGScriptElement(const QualifiedName& tagName, Document* document, bool wasInsertedByParser, bool alreadyStarted)
     : SVGElement(tagName, document)
     , ScriptElement(this, wasInsertedByParser, alreadyStarted)
+    , m_svgLoadEventTimer(this, &SVGElement::svgLoadEventTimerFired)
 {
     ASSERT(hasTagName(SVGNames::scriptTag));
     registerAnimatedPropertiesForSVGScriptElement();
@@ -69,26 +70,26 @@ bool SVGScriptElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGScriptElement::parseAttribute(Attribute* attr)
+void SVGScriptElement::parseAttribute(const Attribute& attribute)
 {
-    if (!isSupportedAttribute(attr->name())) {
-        SVGElement::parseAttribute(attr);
+    if (!isSupportedAttribute(attribute.name())) {
+        SVGElement::parseAttribute(attribute);
         return;
     }
 
-    if (attr->name() == SVGNames::typeAttr) {
-        setType(attr->value());
+    if (attribute.name() == SVGNames::typeAttr) {
+        setType(attribute.value());
         return;
     }
 
-    if (attr->name() == HTMLNames::onerrorAttr) {
-        setAttributeEventListener(eventNames().errorEvent, createAttributeEventListener(this, attr));
+    if (attribute.name() == HTMLNames::onerrorAttr) {
+        setAttributeEventListener(eventNames().errorEvent, createAttributeEventListener(this, attribute));
         return;
     }
 
-    if (SVGURIReference::parseAttribute(attr))
+    if (SVGURIReference::parseAttribute(attribute))
         return;
-    if (SVGExternalResourcesRequired::parseAttribute(attr))
+    if (SVGExternalResourcesRequired::parseAttribute(attribute))
         return;
 
     ASSERT_NOT_REACHED();
@@ -117,7 +118,7 @@ void SVGScriptElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-Node::InsertionNotificationRequest SVGScriptElement::insertedInto(Node* rootParent)
+Node::InsertionNotificationRequest SVGScriptElement::insertedInto(ContainerNode* rootParent)
 {
     SVGElement::insertedInto(rootParent);
     ScriptElement::insertedInto(rootParent);
@@ -132,9 +133,9 @@ void SVGScriptElement::childrenChanged(bool changedByParser, Node* beforeChange,
     ScriptElement::childrenChanged();
 }
 
-bool SVGScriptElement::isURLAttribute(Attribute* attr) const
+bool SVGScriptElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == sourceAttributeValue();
+    return attribute.name() == sourceAttributeValue();
 }
 
 void SVGScriptElement::finishParsingChildren()

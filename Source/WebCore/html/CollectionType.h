@@ -49,6 +49,7 @@ enum CollectionType {
     NodeChildren, // first-level children (IE)
     TableTBodies, // all <tbody> elements in this table
     TSectionRows, // all row elements in this table section
+    TableRows,
     TRCells,      // all cells in this row
     SelectOptions,
     SelectedOptions,
@@ -59,14 +60,25 @@ enum CollectionType {
     ItemProperties, // Microdata item properties in the document
 #endif
 
-    OtherCollection
+    FormControls,
+    NodeListCollectionType
 };
 
 static const CollectionType FirstUnnamedDocumentCachedType = DocImages;
-static const unsigned NumUnnamedDocumentCachedTypes = WindowNamedItems - DocImages + 1;
+static const unsigned NumUnnamedDocumentCachedTypes = WindowNamedItems - DocImages;
 
 static const CollectionType FirstNodeCollectionType = NodeChildren;
-static const unsigned NumNodeCollectionTypes = OtherCollection - NodeChildren + 1;
+static const unsigned NumNodeCollectionTypes = FormControls - NodeChildren + 1;
+
+inline bool isUnnamedDocumentCachedType(CollectionType type)
+{
+    return static_cast<unsigned>(type) < NumUnnamedDocumentCachedTypes;
+}
+
+inline bool isNodeCollectionType(CollectionType type)
+{
+    return type >= FirstNodeCollectionType;
+}
 
 } // namespace
 

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2012 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -46,10 +46,10 @@ void deleteIdentifierTable(IdentifierTable* table)
     delete table;
 }
 
-struct IdentifierCStringTranslator {
+struct IdentifierASCIIStringTranslator {
     static unsigned hash(const LChar* c)
     {
-        return StringHasher::computeHash<LChar>(c);
+        return StringHasher::computeHashAndMaskTop8Bits<LChar>(c);
     }
 
     static bool equal(StringImpl* r, const LChar* s)
@@ -60,19 +60,15 @@ struct IdentifierCStringTranslator {
     static void translate(StringImpl*& location, const LChar* c, unsigned hash)
     {
         size_t length = strlen(reinterpret_cast<const char*>(c));
-        LChar* d;
-        StringImpl* r = StringImpl::createUninitialized(length, d).leakRef();
-        for (size_t i = 0; i != length; i++)
-            d[i] = c[i];
-        r->setHash(hash);
-        location = r;
+        location = StringImpl::createFromLiteral(reinterpret_cast<const char*>(c), length).leakRef();
+        location->setHash(hash);
     }
 };
 
 struct IdentifierLCharFromUCharTranslator {
     static unsigned hash(const CharBuffer<UChar>& buf)
     {
-        return StringHasher::computeHash<UChar>(buf.s, buf.length);
+        return StringHasher::computeHashAndMaskTop8Bits<UChar>(buf.s, buf.length);
     }
     
     static bool equal(StringImpl* str, const CharBuffer<UChar>& buf)
@@ -96,10 +92,8 @@ struct IdentifierLCharFromUCharTranslator {
 
 PassRefPtr<StringImpl> Identifier::add(JSGlobalData* globalData, const char* c)
 {
-    if (!c)
-        return 0;
-    if (!c[0])
-        return StringImpl::empty();
+    ASSERT(c);
+    ASSERT(c[0]);
     if (!c[1])
         return add(globalData, globalData->smallStrings.singleCharacterStringRep(c[0]));
 
@@ -110,7 +104,7 @@ PassRefPtr<StringImpl> Identifier::add(JSGlobalData* globalData, const char* c)
     if (iter != literalIdentifierTable.end())
         return iter->second;
 
-    HashSet<StringImpl*>::AddResult addResult = identifierTable.add<const LChar*, IdentifierCStringTranslator>(reinterpret_cast<const LChar*>(c));
+    HashSet<StringImpl*>::AddResult addResult = identifierTable.add<const LChar*, IdentifierASCIIStringTranslator>(reinterpret_cast<const LChar*>(c));
 
     // If the string is newly-translated, then we need to adopt it.
     // The boolean in the pair tells us if that is so.
@@ -143,56 +137,6 @@ PassRefPtr<StringImpl> Identifier::add8(JSGlobalData* globalData, const UChar* s
     // If the string is newly-translated, then we need to adopt it.
     // The boolean in the pair tells us if that is so.
     return addResult.isNewEntry ? adoptRef(*addResult.iterator) : *addResult.iterator;
-}
-
-template <typename CharType>
-ALWAYS_INLINE uint32_t Identifier::toUInt32FromCharacters(const CharType* characters, unsigned length, bool& ok)
-{
-    // Get the first character, turning it into a digit.
-    uint32_t value = characters[0] - '0';
-    if (value > 9)
-        return 0;
-    
-    // Check for leading zeros. If the first characher is 0, then the
-    // length of the string must be one - e.g. "042" is not equal to "42".
-    if (!value && length > 1)
-        return 0;
-    
-    while (--length) {
-        // Multiply value by 10, checking for overflow out of 32 bits.
-        if (value > 0xFFFFFFFFU / 10)
-            return 0;
-        value *= 10;
-        
-        // Get the next character, turning it into a digit.
-        uint32_t newValue = *(++characters) - '0';
-        if (newValue > 9)
-            return 0;
-        
-        // Add in the old value, checking for overflow out of 32 bits.
-        newValue += value;
-        if (newValue < value)
-            return 0;
-        value = newValue;
-    }
-    
-    ok = true;
-    return value;
-}
-
-uint32_t Identifier::toUInt32(const UString& string, bool& ok)
-{
-    ok = false;
-
-    unsigned length = string.length();
-
-    // An empty string is not a number.
-    if (!length)
-        return 0;
-
-    if (string.is8Bit())
-        return toUInt32FromCharacters(string.characters8(), length, ok);
-    return toUInt32FromCharacters(string.characters16(), length, ok);
 }
 
 PassRefPtr<StringImpl> Identifier::addSlowCase(JSGlobalData* globalData, StringImpl* r)

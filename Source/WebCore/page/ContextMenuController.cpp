@@ -68,6 +68,7 @@
 #include "UserTypingGestureIndicator.h"
 #include "WindowFeatures.h"
 #include "markup.h"
+#include <wtf/unicode/CharacterNames.h>
 #include <wtf/unicode/Unicode.h>
 
 #if PLATFORM(GTK)
@@ -436,7 +437,7 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         frame->editor()->showColorPanel();
         break;
 #endif
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
+#if USE(APPKIT)
     case ContextMenuItemTagMakeUpperCase:
         frame->editor()->uppercaseWord();
         break;
@@ -446,6 +447,13 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
     case ContextMenuItemTagCapitalize:
         frame->editor()->capitalizeWord();
         break;
+#endif
+#if PLATFORM(MAC)
+    case ContextMenuItemTagChangeBack:
+        frame->editor()->changeBackToReplacedString(m_hitTestResult.replacedString());
+        break;
+#endif
+#if USE(AUTOMATIC_TEXT_REPLACEMENT)
     case ContextMenuItemTagShowSubstitutions:
         frame->editor()->showSubstitutionsPanel();
         break;
@@ -467,9 +475,6 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
     case ContextMenuItemTagCorrectSpellingAutomatically:
         frame->editor()->toggleAutomaticSpellingCorrection();
         break;
-    case ContextMenuItemTagChangeBack:
-        frame->editor()->changeBackToReplacedString(m_hitTestResult.replacedString());
-        break;
 #endif
 #if ENABLE(INSPECTOR)
     case ContextMenuItemTagInspectElement:
@@ -477,6 +482,9 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
             page->inspectorController()->inspect(m_hitTestResult.innerNonSharedNode());
         break;
 #endif
+    case ContextMenuItemTagDictationAlternative:
+        frame->editor()->applyDictationAlternativelternative(item->title());
+        break;
     default:
         break;
     }
@@ -536,19 +544,19 @@ void ContextMenuController::createAndAppendSpellingAndGrammarSubMenu(ContextMenu
         contextMenuItemTagCheckSpellingWhileTyping());
     ContextMenuItem grammarWithSpelling(CheckableActionType, ContextMenuItemTagCheckGrammarWithSpelling, 
         contextMenuItemTagCheckGrammarWithSpelling());
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
+#if PLATFORM(MAC)
     ContextMenuItem correctSpelling(CheckableActionType, ContextMenuItemTagCorrectSpellingAutomatically, 
         contextMenuItemTagCorrectSpellingAutomatically());
 #endif
 
     appendItem(showSpellingPanel, &spellingAndGrammarMenu);
     appendItem(checkSpelling, &spellingAndGrammarMenu);
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
+#if PLATFORM(MAC)
     appendItem(*separatorItem(), &spellingAndGrammarMenu);
 #endif
     appendItem(checkAsYouType, &spellingAndGrammarMenu);
     appendItem(grammarWithSpelling, &spellingAndGrammarMenu);
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
+#if PLATFORM(MAC)
     appendItem(correctSpelling, &spellingAndGrammarMenu);
 #endif
 
@@ -641,7 +649,7 @@ void ContextMenuController::createAndAppendTextDirectionSubMenu(ContextMenuItem&
 
 #endif
 
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
+#if PLATFORM(MAC)
 
 void ContextMenuController::createAndAppendSubstitutionsSubMenu(ContextMenuItem& substitutionsMenuItem)
 {
@@ -696,7 +704,7 @@ static bool selectionContainsPossibleWord(Frame* frame)
 }
 
 #if PLATFORM(MAC)
-#if defined(BUILDING_ON_LEOPARD) || defined(BUILDING_ON_SNOW_LEOPARD)
+#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
 #define INCLUDE_SPOTLIGHT_CONTEXT_MENU_ITEM 1
 #else
 #define INCLUDE_SPOTLIGHT_CONTEXT_MENU_ITEM 0
@@ -892,50 +900,65 @@ void ContextMenuController::populate()
     } else { // Make an editing context menu
         FrameSelection* selection = frame->selection();
         bool inPasswordField = selection->isInPasswordField();
-        bool spellCheckingEnabled = frame->editor()->isSpellCheckingEnabledFor(node);
-
-        if (!inPasswordField && spellCheckingEnabled) {
-            // Consider adding spelling-related or grammar-related context menu items (never both, since a single selected range
-            // is never considered a misspelling and bad grammar at the same time)
-            bool misspelling;
-            bool badGrammar;
-            Vector<String> guesses = frame->editor()->guessesForMisspelledOrUngrammaticalSelection(misspelling, badGrammar);
-            if (misspelling || badGrammar) {
-                size_t size = guesses.size();
-                if (size == 0) {
-                    // If there's bad grammar but no suggestions (e.g., repeated word), just leave off the suggestions
-                    // list and trailing separator rather than adding a "No Guesses Found" item (matches AppKit)
-                    if (misspelling) {
-                        appendItem(NoGuessesItem, m_contextMenu.get());
+        if (!inPasswordField) {
+            bool haveContextMenuItemsForMisspellingOrGrammer = false;
+            bool spellCheckingEnabled = frame->editor()->isSpellCheckingEnabledFor(node);
+            if (spellCheckingEnabled) {
+                // Consider adding spelling-related or grammar-related context menu items (never both, since a single selected range
+                // is never considered a misspelling and bad grammar at the same time)
+                bool misspelling;
+                bool badGrammar;
+                Vector<String> guesses = frame->editor()->guessesForMisspelledOrUngrammaticalSelection(misspelling, badGrammar);
+                if (misspelling || badGrammar) {
+                    size_t size = guesses.size();
+                    if (!size) {
+                        // If there's bad grammar but no suggestions (e.g., repeated word), just leave off the suggestions
+                        // list and trailing separator rather than adding a "No Guesses Found" item (matches AppKit)
+                        if (misspelling) {
+                            appendItem(NoGuessesItem, m_contextMenu.get());
+                            appendItem(*separatorItem(), m_contextMenu.get());
+                        }
+                    } else {
+                        for (unsigned i = 0; i < size; i++) {
+                            const String &guess = guesses[i];
+                            if (!guess.isEmpty()) {
+                                ContextMenuItem item(ActionType, ContextMenuItemTagSpellingGuess, guess);
+                                appendItem(item, m_contextMenu.get());
+                            }
+                        }
                         appendItem(*separatorItem(), m_contextMenu.get());
                     }
+                    if (misspelling) {
+                        appendItem(IgnoreSpellingItem, m_contextMenu.get());
+                        appendItem(LearnSpellingItem, m_contextMenu.get());
+                    } else
+                        appendItem(IgnoreGrammarItem, m_contextMenu.get());
+                    appendItem(*separatorItem(), m_contextMenu.get());
+                    haveContextMenuItemsForMisspellingOrGrammer = true;
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
                 } else {
-                    for (unsigned i = 0; i < size; i++) {
-                        const String &guess = guesses[i];
-                        if (!guess.isEmpty()) {
-                            ContextMenuItem item(ActionType, ContextMenuItemTagSpellingGuess, guess);
-                            appendItem(item, m_contextMenu.get());
-                        }
+                    // If the string was autocorrected, generate a contextual menu item allowing it to be changed back.
+                    String replacedString = m_hitTestResult.replacedString();
+                    if (!replacedString.isEmpty()) {
+                        ContextMenuItem item(ActionType, ContextMenuItemTagChangeBack, contextMenuItemTagChangeBack(replacedString));
+                        appendItem(item, m_contextMenu.get());
+                        appendItem(*separatorItem(), m_contextMenu.get());
+                        haveContextMenuItemsForMisspellingOrGrammer = true;
                     }
-                    appendItem(*separatorItem(), m_contextMenu.get());                    
+#endif
                 }
-                
-                if (misspelling) {
-                    appendItem(IgnoreSpellingItem, m_contextMenu.get());
-                    appendItem(LearnSpellingItem, m_contextMenu.get());
-                } else
-                    appendItem(IgnoreGrammarItem, m_contextMenu.get());
-                appendItem(*separatorItem(), m_contextMenu.get());
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
-            } else {
-                // If the string was autocorrected, generate a contextual menu item allowing it to be changed back.
-                String replacedString = m_hitTestResult.replacedString();
-                if (!replacedString.isEmpty()) {
-                    ContextMenuItem item(ActionType, ContextMenuItemTagChangeBack, contextMenuItemTagChangeBack(replacedString));
-                    appendItem(item, m_contextMenu.get());
+            }
+
+            if (!haveContextMenuItemsForMisspellingOrGrammer) {
+                // Spelling and grammar checking is mutually exclusive with dictation alternatives.
+                Vector<String> dictationAlternatives = m_hitTestResult.dictationAlternatives();
+                if (!dictationAlternatives.isEmpty()) {
+                    for (size_t i = 0; i < dictationAlternatives.size(); ++i) {
+                        ContextMenuItem item(ActionType, ContextMenuItemTagDictationAlternative, dictationAlternatives[i]);
+                        appendItem(item, m_contextMenu.get());
+                    }
                     appendItem(*separatorItem(), m_contextMenu.get());
                 }
-#endif
             }
         }
 
@@ -993,7 +1016,7 @@ void ContextMenuController::populate()
             createAndAppendSpellingAndGrammarSubMenu(SpellingAndGrammarMenuItem);
             appendItem(SpellingAndGrammarMenuItem, m_contextMenu.get());
 #endif
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
+#if PLATFORM(MAC)
             ContextMenuItem substitutionsMenuItem(SubmenuType, ContextMenuItemTagSubstitutionsMenu, 
                 contextMenuItemTagSubstitutionsMenu());
             createAndAppendSubstitutionsSubMenu(substitutionsMenuItem);
@@ -1208,13 +1231,11 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
         case ContextMenuItemTagTransformationsMenu:
             break;
         case ContextMenuItemTagShowSubstitutions:
-#ifndef BUILDING_ON_LEOPARD
             if (frame->editor()->substitutionsPanelIsShowing())
                 item.setTitle(contextMenuItemTagShowSubstitutions(false));
             else
                 item.setTitle(contextMenuItemTagShowSubstitutions(true));
             shouldEnable = frame->editor()->canEdit();
-#endif
             break;
         case ContextMenuItemTagMakeUpperCase:
         case ContextMenuItemTagMakeLowerCase:
@@ -1223,34 +1244,22 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
             shouldEnable = frame->editor()->canEdit();
             break;
         case ContextMenuItemTagCorrectSpellingAutomatically:
-#ifndef BUILDING_ON_LEOPARD
             shouldCheck = frame->editor()->isAutomaticSpellingCorrectionEnabled();
-#endif
             break;
         case ContextMenuItemTagSmartCopyPaste:
-#ifndef BUILDING_ON_LEOPARD
             shouldCheck = frame->editor()->smartInsertDeleteEnabled();
-#endif
             break;
         case ContextMenuItemTagSmartQuotes:
-#ifndef BUILDING_ON_LEOPARD
             shouldCheck = frame->editor()->isAutomaticQuoteSubstitutionEnabled();
-#endif
             break;
         case ContextMenuItemTagSmartDashes:
-#ifndef BUILDING_ON_LEOPARD
             shouldCheck = frame->editor()->isAutomaticDashSubstitutionEnabled();
-#endif
             break;
         case ContextMenuItemTagSmartLinks:
-#ifndef BUILDING_ON_LEOPARD
             shouldCheck = frame->editor()->isAutomaticLinkDetectionEnabled();
-#endif
             break;
         case ContextMenuItemTagTextReplacement:
-#ifndef BUILDING_ON_LEOPARD
             shouldCheck = frame->editor()->isAutomaticTextReplacementEnabled();
-#endif
             break;
         case ContextMenuItemTagStopSpeaking:
             shouldEnable = client() && client()->isSpeaking();
@@ -1348,6 +1357,7 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
         case ContextMenuItemCustomTagNoAction:
         case ContextMenuItemLastCustomTag:
         case ContextMenuItemBaseApplicationTag:
+        case ContextMenuItemTagDictationAlternative:
             break;
         case ContextMenuItemTagMediaPlayPause:
             if (m_hitTestResult.mediaPlaying())

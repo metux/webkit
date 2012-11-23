@@ -20,15 +20,17 @@
 #ifndef TextureMapperLayer_h
 #define TextureMapperLayer_h
 
+#if USE(ACCELERATED_COMPOSITING)
+
 #include "FilterOperations.h"
 #include "FloatRect.h"
 #include "GraphicsContext.h"
 #include "GraphicsLayer.h"
+#include "GraphicsLayerAnimation.h"
+#include "GraphicsLayerTransform.h"
 #include "Image.h"
 #include "IntPointHash.h"
-#include "LayerTransform.h"
 #include "TextureMapper.h"
-#include "TextureMapperAnimation.h"
 #include "TextureMapperBackingStore.h"
 #include "Timer.h"
 #include "TransformOperations.h"
@@ -56,7 +58,7 @@ public:
     { }
 };
 
-class TextureMapperLayer : public TextureMapperAnimationClient {
+class TextureMapperLayer : public GraphicsLayerAnimation::Client {
 
 public:
     // This set of flags help us defer which properties of the layer have been
@@ -81,16 +83,17 @@ public:
         Preserves3DChange =         (1L << 12),
         MasksToBoundsChange =       (1L << 13),
         DrawsContentChange =        (1L << 14),
-        ContentsOpaqueChange =      (1L << 15),
+        ContentsVisibleChange =     (1L << 15),
+        ContentsOpaqueChange =      (1L << 16),
 
-        BackfaceVisibilityChange =  (1L << 16),
-        ChildrenTransformChange =   (1L << 17),
-        DisplayChange =             (1L << 18),
-        BackgroundColorChange =     (1L << 19),
+        BackfaceVisibilityChange =  (1L << 17),
+        ChildrenTransformChange =   (1L << 18),
+        DisplayChange =             (1L << 19),
+        BackgroundColorChange =     (1L << 20),
 
-        ReplicaLayerChange =        (1L << 20),
-        AnimationChange =           (1L << 21),
-        FilterChange =              (1L << 22)
+        ReplicaLayerChange =        (1L << 21),
+        AnimationChange =           (1L << 22),
+        FilterChange =              (1L << 23)
     };
 
     enum SyncOptions {
@@ -106,13 +109,13 @@ public:
         , m_centerZ(0)
         , m_shouldUpdateBackingStoreFromLayer(true)
         , m_textureMapper(0)
+        , m_debugBorderWidth(0)
     { }
 
     virtual ~TextureMapperLayer();
 
     void syncCompositingState(GraphicsLayerTextureMapper*, int syncOptions = 0);
     void syncCompositingState(GraphicsLayerTextureMapper*, TextureMapper*, int syncOptions = 0);
-    void syncAnimationsRecursively();
     IntSize size() const { return IntSize(m_size.width(), m_size.height()); }
     void setTransform(const TransformationMatrix&);
     void setOpacity(float value) { m_opacity = value; }
@@ -126,8 +129,9 @@ public:
     PassRefPtr<TextureMapperBackingStore> backingStore() { return m_backingStore; }
     void clearBackingStoresRecursive();
 
-    void setScrollPositionDeltaIfNeeded(const IntPoint&);
-    void setFixedToViewport(bool fixed) { m_fixedToViewport = fixed; }
+    void setScrollPositionDeltaIfNeeded(const FloatSize&);
+
+    void setDebugBorder(const Color&, float width);
 
 private:
     TextureMapperLayer* rootLayer();
@@ -146,13 +150,20 @@ private:
     static void sortByZOrder(Vector<TextureMapperLayer* >& array, int first, int last);
 
     PassRefPtr<BitmapTexture> texture() { return m_backingStore ? m_backingStore->texture() : 0; }
+    FloatPoint adjustedPosition() const { return m_state.pos + m_scrollPositionDelta; }
     bool isAncestorFixedToViewport() const;
 
     void paintRecursive(const TextureMapperPaintOptions&);
     void paintSelf(const TextureMapperPaintOptions&);
     void paintSelfAndChildren(const TextureMapperPaintOptions&);
     void paintSelfAndChildrenWithReplica(const TextureMapperPaintOptions&);
-    void updateBackingStore(TextureMapper*, GraphicsLayer*);
+    void updateBackingStore(TextureMapper*, GraphicsLayerTextureMapper*);
+
+    void drawRepaintCounter(GraphicsContext*, GraphicsLayer*);
+
+    // GraphicsLayerAnimation::Client
+    void setAnimatedTransform(const TransformationMatrix& matrix) { setTransform(matrix); }
+    void setAnimatedOpacity(float opacity) { setOpacity(opacity); }
 
     void syncAnimations();
     bool isVisible() const;
@@ -165,7 +176,7 @@ private:
     ContentsLayerCount countPotentialLayersWithContents() const;
     bool shouldPaintToIntermediateSurface() const;
 
-    LayerTransform m_transform;
+    GraphicsLayerTransform m_transform;
 
     inline FloatRect layerRect() const
     {
@@ -202,6 +213,7 @@ private:
         bool preserves3D : 1;
         bool masksToBounds : 1;
         bool drawsContent : 1;
+        bool contentsVisible : 1;
         bool contentsOpaque : 1;
         bool backfaceVisibility : 1;
         bool visible : 1;
@@ -215,6 +227,7 @@ private:
             , preserves3D(false)
             , masksToBounds(false)
             , drawsContent(false)
+            , contentsVisible(true)
             , contentsOpaque(false)
             , backfaceVisibility(false)
             , visible(true)
@@ -227,13 +240,17 @@ private:
 
     State m_state;
     TextureMapper* m_textureMapper;
-    TextureMapperAnimations m_animations;
-    IntPoint m_scrollPositionDelta;
+    GraphicsLayerAnimations m_animations;
+    FloatSize m_scrollPositionDelta;
     bool m_fixedToViewport;
+    Color m_debugBorderColor;
+    float m_debugBorderWidth;
 };
 
 
 TextureMapperLayer* toTextureMapperLayer(GraphicsLayer*);
 
 }
+#endif
+
 #endif // TextureMapperLayer_h

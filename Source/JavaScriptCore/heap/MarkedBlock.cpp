@@ -26,37 +26,26 @@
 #include "config.h"
 #include "MarkedBlock.h"
 
+#include "IncrementalSweeper.h"
 #include "JSCell.h"
 #include "JSObject.h"
 #include "ScopeChain.h"
 
 namespace JSC {
 
-MarkedBlock* MarkedBlock::create(Heap* heap, size_t cellSize, bool cellsNeedDestruction)
+MarkedBlock* MarkedBlock::create(const PageAllocationAligned& allocation, Heap* heap, size_t cellSize, bool cellsNeedDestruction, bool onlyContainsStructures)
 {
-    PageAllocationAligned allocation = PageAllocationAligned::allocate(blockSize, blockSize, OSAllocator::JSGCHeapPages);
-    if (!static_cast<bool>(allocation))
-        CRASH();
-    return new (NotNull, allocation.base()) MarkedBlock(allocation, heap, cellSize, cellsNeedDestruction);
+    return new (NotNull, allocation.base()) MarkedBlock(allocation, heap, cellSize, cellsNeedDestruction, onlyContainsStructures);
 }
 
-MarkedBlock* MarkedBlock::recycle(MarkedBlock* block, Heap* heap, size_t cellSize, bool cellsNeedDestruction)
-{
-    return new (NotNull, block) MarkedBlock(block->m_allocation, heap, cellSize, cellsNeedDestruction);
-}
-
-void MarkedBlock::destroy(MarkedBlock* block)
-{
-    block->m_allocation.deallocate();
-}
-
-MarkedBlock::MarkedBlock(PageAllocationAligned& allocation, Heap* heap, size_t cellSize, bool cellsNeedDestruction)
-    : HeapBlock(allocation)
+MarkedBlock::MarkedBlock(const PageAllocationAligned& allocation, Heap* heap, size_t cellSize, bool cellsNeedDestruction, bool onlyContainsStructures)
+    : HeapBlock<MarkedBlock>(allocation)
     , m_atomsPerCell((cellSize + atomSize - 1) / atomSize)
     , m_endAtom(atomsPerBlock - m_atomsPerCell + 1)
     , m_cellsNeedDestruction(cellsNeedDestruction)
+    , m_onlyContainsStructures(onlyContainsStructures)
     , m_state(New) // All cells start out unmarked.
-    , m_heap(heap)
+    , m_weakSet(heap)
 {
     ASSERT(heap);
     HEAP_LOG_BLOCK_STATE_TRANSITION(this);
@@ -71,8 +60,8 @@ inline void MarkedBlock::callDestructor(JSCell* cell)
 #if ENABLE(SIMPLE_HEAP_PROFILING)
     m_heap->m_destroyedTypeCounts.countVPtr(vptr);
 #endif
-    cell->methodTable()->destroy(cell);
 
+    cell->methodTable()->destroy(cell);
     cell->zap();
 }
 
@@ -114,6 +103,8 @@ MarkedBlock::FreeList MarkedBlock::sweep(SweepMode sweepMode)
 {
     HEAP_LOG_BLOCK_STATE_TRANSITION(this);
 
+    m_weakSet.sweep();
+
     if (sweepMode == SweepOnly && !m_cellsNeedDestruction)
         return FreeList();
 
@@ -137,10 +128,12 @@ MarkedBlock::FreeList MarkedBlock::sweepHelper(SweepMode sweepMode)
         ASSERT_NOT_REACHED();
         return FreeList();
     case Marked:
+        ASSERT(!m_onlyContainsStructures || heap()->isSafeToSweepStructures());
         return sweepMode == SweepToFreeList
             ? specializedSweep<Marked, SweepToFreeList, destructorCallNeeded>()
             : specializedSweep<Marked, SweepOnly, destructorCallNeeded>();
     case Zapped:
+        ASSERT(!m_onlyContainsStructures || heap()->isSafeToSweepStructures());
         return sweepMode == SweepToFreeList
             ? specializedSweep<Zapped, SweepToFreeList, destructorCallNeeded>()
             : specializedSweep<Zapped, SweepOnly, destructorCallNeeded>();

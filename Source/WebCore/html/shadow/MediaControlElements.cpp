@@ -32,21 +32,27 @@
 
 #include "MediaControlElements.h"
 
+#include "CSSStyleDeclaration.h"
 #include "CSSValueKeywords.h"
 #include "DOMTokenList.h"
 #include "EventNames.h"
 #include "FloatConversion.h"
+#include "FloatPoint.h"
 #include "Frame.h"
+#include "HTMLDivElement.h"
 #include "HTMLMediaElement.h"
 #include "HTMLNames.h"
 #include "HTMLVideoElement.h"
+#include "LayoutRepainter.h"
 #include "LocalizedStrings.h"
 #include "MediaControls.h"
 #include "MouseEvent.h"
 #include "Page.h"
 #include "RenderDeprecatedFlexibleBox.h"
+#include "RenderInline.h"
 #include "RenderMedia.h"
 #include "RenderSlider.h"
+#include "RenderText.h"
 #include "RenderTheme.h"
 #include "RenderVideo.h"
 #include "RenderView.h"
@@ -68,7 +74,11 @@ static const float cScanMaximumRate = 8;
 
 HTMLMediaElement* toParentMediaElement(Node* node)
 {
-    Node* mediaNode = node ? node->shadowAncestorNode() : 0;
+    if (!node)
+        return 0;
+    Node* mediaNode = node->shadowHost();
+    if (!mediaNode)
+        mediaNode = node;
     if (!mediaNode || !mediaNode->isElementNode() || !static_cast<Element*>(mediaNode)->isMediaElement())
         return 0;
 
@@ -256,7 +266,6 @@ void MediaControlPanelElement::makeTransparent()
     setInlineStyleProperty(CSSPropertyOpacity, 0.0, CSSPrimitiveValue::CSS_NUMBER);
 
     m_opaque = false;
-
     startTimer();
 }
 
@@ -322,6 +331,36 @@ const AtomicString& MediaControlTimelineContainerElement::shadowPseudoId() const
 
 // ----------------------------
 
+class RenderMediaVolumeSliderContainer : public RenderBlock {
+public:
+    RenderMediaVolumeSliderContainer(Node*);
+
+private:
+    virtual void layout();
+};
+
+RenderMediaVolumeSliderContainer::RenderMediaVolumeSliderContainer(Node* node)
+    : RenderBlock(node)
+{
+}
+
+void RenderMediaVolumeSliderContainer::layout()
+{
+    RenderBlock::layout();
+
+    if (style()->display() == NONE || !nextSibling() || !nextSibling()->isBox())
+        return;
+
+    RenderBox* buttonBox = toRenderBox(nextSibling());
+    int absoluteOffsetTop = buttonBox->localToAbsolute(FloatPoint(0, -size().height())).y();
+
+    LayoutStateDisabler layoutStateDisabler(view());
+
+    // If the slider would be rendered outside the page, it should be moved below the controls.
+    if (UNLIKELY(absoluteOffsetTop < 0))
+        setY(buttonBox->offsetTop() + theme()->volumeSliderOffsetFromMuteButton(buttonBox, pixelSnappedSize()).y());
+}
+
 inline MediaControlVolumeSliderContainerElement::MediaControlVolumeSliderContainerElement(Document* document)
     : MediaControlElement(document)
 {
@@ -332,6 +371,11 @@ PassRefPtr<MediaControlVolumeSliderContainerElement> MediaControlVolumeSliderCon
     RefPtr<MediaControlVolumeSliderContainerElement> element = adoptRef(new MediaControlVolumeSliderContainerElement(document));
     element->hide();
     return element.release();
+}
+
+RenderObject* MediaControlVolumeSliderContainerElement::createRenderer(RenderArena* arena, RenderStyle*)
+{
+    return new (arena) RenderMediaVolumeSliderContainer(this);
 }
 
 void MediaControlVolumeSliderContainerElement::defaultEventHandler(Event* event)
@@ -349,7 +393,6 @@ void MediaControlVolumeSliderContainerElement::defaultEventHandler(Event* event)
 
     hide();
 }
-
 
 MediaControlElementType MediaControlVolumeSliderContainerElement::displayType() const
 {
@@ -569,6 +612,46 @@ void MediaControlPlayButtonElement::updateDisplayType()
 const AtomicString& MediaControlPlayButtonElement::shadowPseudoId() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-play-button"));
+    return id;
+}
+
+// ----------------------------
+
+inline MediaControlOverlayPlayButtonElement::MediaControlOverlayPlayButtonElement(Document* document)
+    : MediaControlInputElement(document, MediaOverlayPlayButton)
+{
+}
+
+PassRefPtr<MediaControlOverlayPlayButtonElement> MediaControlOverlayPlayButtonElement::create(Document* document)
+{
+    RefPtr<MediaControlOverlayPlayButtonElement> button = adoptRef(new MediaControlOverlayPlayButtonElement(document));
+    button->createShadowSubtree();
+    button->setType("button");
+    return button.release();
+}
+
+void MediaControlOverlayPlayButtonElement::defaultEventHandler(Event* event)
+{
+    if (event->type() == eventNames().clickEvent && mediaController()->canPlay()) {
+        mediaController()->play();
+        updateDisplayType();
+        event->setDefaultHandled();
+    }
+    HTMLInputElement::defaultEventHandler(event);
+}
+
+void MediaControlOverlayPlayButtonElement::updateDisplayType()
+{
+    if (mediaController()->canPlay()) {
+        show();
+        setDisplayType(MediaOverlayPlayButton);
+    } else
+        hide();
+}
+
+const AtomicString& MediaControlOverlayPlayButtonElement::shadowPseudoId() const
+{
+    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-overlay-play-button"));
     return id;
 }
 
@@ -836,8 +919,7 @@ void MediaControlTimelineElement::defaultEventHandler(Event* event)
         return;
 
     float time = narrowPrecisionToFloat(value().toDouble());
-    if (time != mediaController()->currentTime()) {
-        // FIXME: This is fired 3 times on every click. We should not be doing that <http:/webkit.org/b/58160>.
+    if (event->type() == eventNames().inputEvent && time != mediaController()->currentTime()) {
         ExceptionCode ec;
         mediaController()->setCurrentTime(time, ec);
     }
@@ -847,7 +929,15 @@ void MediaControlTimelineElement::defaultEventHandler(Event* event)
         m_controls->updateTimeDisplay();
 }
 
-void MediaControlTimelineElement::setPosition(float currentTime) 
+bool MediaControlTimelineElement::willRespondToMouseClickEvents()
+{
+    if (!attached())
+        return false;
+
+    return true;
+}
+
+void MediaControlTimelineElement::setPosition(float currentTime)
 {
     setValue(String::number(currentTime));
 }
@@ -868,6 +958,7 @@ const AtomicString& MediaControlTimelineElement::shadowPseudoId() const
 
 inline MediaControlVolumeSliderElement::MediaControlVolumeSliderElement(Document* document)
     : MediaControlInputElement(document, MediaVolumeSlider)
+    , m_clearMutedOnUserInteraction(false)
 {
 }
 
@@ -901,12 +992,35 @@ void MediaControlVolumeSliderElement::defaultEventHandler(Event* event)
         mediaController()->setVolume(volume, ec);
         ASSERT(!ec);
     }
+    if (m_clearMutedOnUserInteraction)
+        mediaController()->setMuted(false);
+}
+
+bool MediaControlVolumeSliderElement::willRespondToMouseMoveEvents()
+{
+    if (!attached())
+        return false;
+
+    return MediaControlInputElement::willRespondToMouseMoveEvents();
+}
+
+bool MediaControlVolumeSliderElement::willRespondToMouseClickEvents()
+{
+    if (!attached())
+        return false;
+
+    return MediaControlInputElement::willRespondToMouseClickEvents();
 }
 
 void MediaControlVolumeSliderElement::setVolume(float volume)
 {
     if (value().toFloat() != volume)
         setValue(String::number(volume));
+}
+
+void MediaControlVolumeSliderElement::setClearMutedOnUserInteraction(bool clearMute)
+{
+    m_clearMutedOnUserInteraction = clearMute;
 }
 
 const AtomicString& MediaControlVolumeSliderElement::shadowPseudoId() const
@@ -940,9 +1054,8 @@ const AtomicString& MediaControlFullscreenVolumeSliderElement::shadowPseudoId() 
 
 // ----------------------------
 
-inline MediaControlFullscreenButtonElement::MediaControlFullscreenButtonElement(Document* document, MediaControls* controls)
+inline MediaControlFullscreenButtonElement::MediaControlFullscreenButtonElement(Document* document, MediaControls*)
     : MediaControlInputElement(document, MediaEnterFullscreenButton)
-    , m_controls(controls)
 {
 }
 
@@ -970,7 +1083,7 @@ void MediaControlFullscreenButtonElement::defaultEventHandler(Event* event)
             if (document()->webkitIsFullScreen() && document()->webkitCurrentFullScreenElement() == toParentMediaElement(this))
                 document()->webkitCancelFullScreen();
             else
-                document()->requestFullScreenForElement(toParentMediaElement(this), 0, Document::ExemptIFrameAllowFulScreenRequirement);
+                document()->requestFullScreenForElement(toParentMediaElement(this), 0, Document::ExemptIFrameAllowFullScreenRequirement);
         } else
 #endif
             mediaController()->enterFullscreen();
@@ -1151,7 +1264,7 @@ const AtomicString& MediaControlCurrentTimeDisplayElement::shadowPseudoId() cons
 class RenderTextTrackContainerElement : public RenderBlock {
 public:
     RenderTextTrackContainerElement(Node*);
-    
+
 private:
     virtual void layout();
 };
@@ -1245,26 +1358,18 @@ void MediaControlTextTrackContainerElement::updateDisplay()
     // 10. For each text track cue cue in cues that has not yet had
     // corresponding CSS boxes added to output, in text track cue order, run the
     // following substeps:
-
-    // Simple renderer for now.
     for (size_t i = 0; i < activeCues.size(); ++i) {
         TextTrackCue* cue = activeCues[i].data();
 
         ASSERT(cue->isActive());
-        if (!cue->track() || cue->track()->mode() != TextTrack::SHOWING)
+        if (!cue->track() || !cue->track()->isRendered())
             continue;
 
-        RefPtr<HTMLDivElement> displayTree = cue->getDisplayTree();
+        RefPtr<TextTrackCueBox> displayBox = cue->getDisplayTree();
 
-        // Append only new display trees.
-        if (displayTree->hasChildNodes() && !contains(displayTree.get()))
-            appendChild(displayTree, ASSERT_NO_EXCEPTION, true);
-
-        // Note: the display tree of a cue is removed when the active flag of the cue is unset.
-
-        // FIXME(BUG 79751): Render the TextTrackCue when snap-to-lines is set.
-
-        // FIXME(BUG 84296): Implement overlapping detection for cue boxes when snap-to-lines is not set.
+        if (displayBox->hasChildNodes() && !contains(static_cast<Node*>(displayBox.get())))
+            // Note: the display tree of a cue is removed when the active flag of the cue is unset.
+            appendChild(displayBox, ASSERT_NO_EXCEPTION, false);
     }
 
     // 11. Return output.

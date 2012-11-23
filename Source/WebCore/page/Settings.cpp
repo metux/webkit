@@ -129,17 +129,24 @@ Settings::Settings(Page* page)
     , m_minimumLogicalFontSize(0)
     , m_defaultFontSize(0)
     , m_defaultFixedFontSize(0)
-    , m_defaultDeviceScaleFactor(1)
     , m_validationMessageTimerMagnification(50)
     , m_minimumAccelerated2dCanvasSize(257 * 256)
     , m_layoutFallbackWidth(980)
-    , m_devicePixelRatio(1.0)
     , m_maximumDecodedImageSize(numeric_limits<size_t>::max())
-    , m_deviceWidth(480)
-    , m_deviceHeight(854)
+    , m_deviceWidth(0)
+    , m_deviceHeight(0)
     , m_sessionStorageQuota(StorageMap::noQuota)
     , m_editingBehaviorType(editingBehaviorTypeForPlatform())
     , m_maximumHTMLParserDOMTreeDepth(defaultMaximumHTMLParserDOMTreeDepth)
+#if ENABLE(TEXT_AUTOSIZING)
+    , m_textAutosizingFontScaleFactor(1)
+#if HACK_FORCE_TEXT_AUTOSIZING_ON_DESKTOP
+    , m_textAutosizingWindowSizeOverride(320, 480)
+    , m_textAutosizingEnabled(true)
+#else
+    , m_textAutosizingEnabled(false)
+#endif
+#endif
     , m_isSpatialNavigationEnabled(false)
     , m_isJavaEnabled(false)
     , m_isJavaEnabledForLocalFiles(true)
@@ -174,11 +181,14 @@ Settings::Settings(Page* page)
     , m_showsToolTipOverTruncatedText(false)
     , m_forceFTPDirectoryListings(false)
     , m_developerExtrasEnabled(false)
+    , m_javaScriptExperimentsEnabled(false)
     , m_authorAndUserStylesEnabled(true)
     , m_needsSiteSpecificQuirks(false)
     , m_fontRenderingMode(0)
     , m_frameFlatteningEnabled(false)
+#if ENABLE(WEB_ARCHIVE)
     , m_webArchiveDebugModeEnabled(false)
+#endif
     , m_localFileContentSniffingEnabled(false)
     , m_inApplicationChromeMode(false)
     , m_offlineWebApplicationCacheEnabled(false)
@@ -189,8 +199,14 @@ Settings::Settings(Page* page)
     , m_acceleratedDrawingEnabled(false)
     , m_acceleratedFiltersEnabled(false)
     , m_isCSSCustomFilterEnabled(false)
+#if ENABLE(CSS_REGIONS)
     , m_cssRegionsEnabled(false)
+#endif
+#if ENABLE(CSS_VARIABLES)
+    , m_cssVariablesEnabled(false)
+#endif
     , m_regionBasedColumnsEnabled(false)
+    , m_cssGridLayoutEnabled(false)
     // FIXME: This should really be disabled by default as it makes platforms that don't support the feature download files
     // they can't use by. Leaving enabled for now to not change existing behavior.
     , m_downloadableBinaryFontsEnabled(true)
@@ -227,6 +243,7 @@ Settings::Settings(Page* page)
     , m_unifiedTextCheckerEnabled(false)
 #endif
     , m_memoryInfoEnabled(false)
+    , m_quantizedMemoryInfoEnabled(false)
     , m_interactiveFormValidation(false)
     , m_usePreHTML5ParserQuirks(false)
     , m_hyperlinkAuditingEnabled(false)
@@ -239,9 +256,6 @@ Settings::Settings(Page* page)
 #if ENABLE(SMOOTH_SCROLLING)
     , m_scrollAnimatorEnabled(true)
 #endif
-#if ENABLE(WEB_SOCKETS)
-    , m_useHixie76WebSocketProtocol(false)
-#endif
     , m_mediaPlaybackRequiresUserGesture(false)
     , m_mediaPlaybackAllowsInline(true)
     , m_passwordEchoEnabled(false)
@@ -253,18 +267,25 @@ Settings::Settings(Page* page)
     , m_shouldDisplayCaptions(false)
     , m_shouldDisplayTextDescriptions(false)
 #endif
-    , m_perTileDrawingEnabled(false)
-    , m_partialSwapEnabled(false)
     , m_scrollingCoordinatorEnabled(false)
     , m_notificationsEnabled(true)
     , m_needsIsLoadingInAPISenseQuirk(false)
 #if ENABLE(TOUCH_EVENTS)
     , m_touchEventEmulationEnabled(false)
 #endif
-    , m_threadedAnimationEnabled(false)
     , m_shouldRespectImageOrientation(false)
     , m_wantsBalancedSetDefersLoadingBehavior(false)
     , m_requestAnimationFrameEnabled(true)
+    , m_deviceSupportsTouch(false)
+    , m_deviceSupportsMouse(true)
+    , m_needsDidFinishLoadOrderQuirk(false)
+    , m_fixedPositionCreatesStackingContext(false)
+    , m_syncXHRInDocumentsEnabled(true)
+    , m_cookieEnabled(true)
+    , m_windowFocusRestricted(true)
+    , m_diagnosticLoggingEnabled(false)
+    , m_thirdPartyStorageBlockingEnabled(false)
+    , m_scrollingPerformanceLoggingEnabled(false)
     , m_loadsImagesAutomaticallyTimer(this, &Settings::loadsImagesAutomaticallyTimerFired)
     , m_incrementalRenderingSuppressionTimeoutInSeconds(defaultIncrementalRenderingSuppressionTimeoutInSeconds)
 {
@@ -393,10 +414,32 @@ void Settings::setDefaultFixedFontSize(int defaultFontSize)
     m_page->setNeedsRecalcStyleInAllFrames();
 }
 
-void Settings::setDefaultDeviceScaleFactor(int defaultDeviceScaleFactor)
+#if ENABLE(TEXT_AUTOSIZING)
+void Settings::setTextAutosizingEnabled(bool textAutosizingEnabled)
 {
-    m_defaultDeviceScaleFactor = defaultDeviceScaleFactor;
+    if (m_textAutosizingEnabled == textAutosizingEnabled)
+        return;
+
+    m_textAutosizingEnabled = textAutosizingEnabled;
+    m_page->setNeedsRecalcStyleInAllFrames();
 }
+
+void Settings::setTextAutosizingWindowSizeOverride(const IntSize& textAutosizingWindowSizeOverride)
+{
+    if (m_textAutosizingWindowSizeOverride == textAutosizingWindowSizeOverride)
+        return;
+
+    m_textAutosizingWindowSizeOverride = textAutosizingWindowSizeOverride;
+    m_page->setNeedsRecalcStyleInAllFrames();
+}
+
+void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
+{
+    m_textAutosizingFontScaleFactor = fontScaleFactor;
+    m_page->setNeedsRecalcStyleInAllFrames();
+}
+
+#endif
 
 void Settings::setLoadsImagesAutomatically(bool loadsImagesAutomatically)
 {
@@ -664,6 +707,11 @@ void Settings::setDeveloperExtrasEnabled(bool developerExtrasEnabled)
     m_developerExtrasEnabled = developerExtrasEnabled;
 }
 
+void Settings::setJavaScriptExperimentsEnabled(bool javaScriptExperimentsEnabled)
+{
+    m_javaScriptExperimentsEnabled = javaScriptExperimentsEnabled;
+}
+
 void Settings::setAuthorAndUserStylesEnabled(bool authorAndUserStylesEnabled)
 {
     if (m_authorAndUserStylesEnabled == authorAndUserStylesEnabled)
@@ -890,6 +938,14 @@ void Settings::setTiledBackingStoreEnabled(bool enabled)
     if (m_page->mainFrame())
         m_page->mainFrame()->setTiledBackingStoreEnabled(enabled);
 #endif
+}
+
+void Settings::setScrollingPerformanceLoggingEnabled(bool enabled)
+{
+    m_scrollingPerformanceLoggingEnabled = enabled;
+
+    if (m_page->mainFrame() && m_page->mainFrame()->view())
+        m_page->mainFrame()->view()->setScrollingPerformanceLoggingEnabled(enabled);
 }
 
 void Settings::setMockScrollbarsEnabled(bool flag)

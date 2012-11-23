@@ -27,11 +27,15 @@
 #define JSDictionary_h
 
 #include "MessagePort.h"
+#include <heap/Strong.h>
+#include <heap/StrongInlines.h>
 #include <interpreter/CallFrame.h>
 #include <wtf/Forward.h>
 
 namespace WebCore {
 
+class ArrayValue;
+class Dictionary;
 class DOMWindow;
 class EventTarget;
 class Node;
@@ -44,8 +48,9 @@ class JSDictionary {
 public:
     JSDictionary(JSC::ExecState* exec, JSC::JSObject* initializerObject)
         : m_exec(exec)
-        , m_initializerObject(initializerObject)
     {
+        if (exec && initializerObject)
+            m_initializerObject = JSC::Strong<JSC::JSObject>(exec->globalData(), initializerObject);
     }
 
     // Returns false if any exceptions were thrown, regardless of whether the property was found.
@@ -57,8 +62,10 @@ public:
     // Returns true if the property was found in the dictionary, and the value could be converted to the desired type.
     template <typename Result>
     bool get(const char* propertyName, Result&) const;
+    bool getWithUndefinedOrNullCheck(const String& propertyName, String& value) const;
 
     JSC::ExecState* execState() const { return m_exec; }
+    JSC::JSObject* initializerObject() const { return m_initializerObject.get(); }
     bool isValid() const { return m_exec && m_initializerObject; }
 
 private:
@@ -86,8 +93,10 @@ private:
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned short& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned long long& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, double& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, Dictionary& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, String& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, ScriptValue& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, Vector<String>& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<SerializedScriptValue>& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<DOMWindow>& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<EventTarget>& result);
@@ -97,12 +106,13 @@ private:
 #if ENABLE(VIDEO_TRACK)
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<TrackBase>& result);
 #endif
-#if ENABLE(MUTATION_OBSERVERS)
+#if ENABLE(MUTATION_OBSERVERS) || ENABLE(WEB_INTENTS)
     static void convertValue(JSC::ExecState*, JSC::JSValue, HashSet<AtomicString>& result);
 #endif
+    static void convertValue(JSC::ExecState*, JSC::JSValue, ArrayValue& result);
 
     JSC::ExecState* m_exec;
-    JSC::JSObject* m_initializerObject;
+    JSC::Strong<JSC::JSObject> m_initializerObject;
 };
 
 template <typename T, typename Result>

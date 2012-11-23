@@ -87,22 +87,14 @@ void HTMLVideoElement::attach()
 #endif
 }
 
-void HTMLVideoElement::detach()
+void HTMLVideoElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    HTMLMediaElement::detach();
-    
-    if (!shouldDisplayPosterImage() && m_imageLoader)
-        m_imageLoader.clear();
-}
-
-void HTMLVideoElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
-{
-    if (attr->name() == widthAttr)
-        addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
-    else if (attr->name() == heightAttr)
-        addHTMLLengthToStyle(style, CSSPropertyHeight, attr->value());
+    if (attribute.name() == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
+    else if (attribute.name() == heightAttr)
+        addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
     else
-        HTMLMediaElement::collectStyleForAttribute(attr, style);
+        HTMLMediaElement::collectStyleForAttribute(attribute, style);
 }
 
 bool HTMLVideoElement::isPresentationAttribute(const QualifiedName& name) const
@@ -112,11 +104,9 @@ bool HTMLVideoElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLMediaElement::isPresentationAttribute(name);
 }
 
-void HTMLVideoElement::parseAttribute(Attribute* attr)
+void HTMLVideoElement::parseAttribute(const Attribute& attribute)
 {
-    const QualifiedName& attrName = attr->name();
-
-    if (attrName == posterAttr) {
+    if (attribute.name() == posterAttr) {
         // Force a poster recalc by setting m_displayMode to Unknown directly before calling updateDisplayState.
         HTMLMediaElement::setDisplayMode(Unknown);
         updateDisplayState();
@@ -133,7 +123,7 @@ void HTMLVideoElement::parseAttribute(Attribute* attr)
         }
 #endif
     } else
-        HTMLMediaElement::parseAttribute(attr);
+        HTMLMediaElement::parseAttribute(attribute);
 }
 
 bool HTMLVideoElement::supportsFullscreen() const
@@ -142,14 +132,18 @@ bool HTMLVideoElement::supportsFullscreen() const
     if (!page) 
         return false;
 
-    if (!player() || !player()->supportsFullscreen() || !player()->hasVideo())
+    if (!player() || !player()->supportsFullscreen())
         return false;
 
-    // Check with the platform client.
 #if ENABLE(FULLSCREEN_API)
+    // If the full screen API is enabled and is supported for the current element
+    // do not require that the player has a video track to enter full screen.
     if (page->chrome()->client()->supportsFullScreenForElement(this, false))
         return true;
 #endif
+
+    if (!player()->hasVideo())
+        return false;
 
     return page->chrome()->client()->supportsFullscreenForNode(this);
 }
@@ -182,10 +176,9 @@ unsigned HTMLVideoElement::height() const
     return ok ? h : 0;
 }
     
-bool HTMLVideoElement::isURLAttribute(Attribute* attribute) const
+bool HTMLVideoElement::isURLAttribute(const Attribute& attribute) const
 {
-    return HTMLMediaElement::isURLAttribute(attribute)
-        || attribute->name() == posterAttr;
+    return attribute.name() == posterAttr || HTMLMediaElement::isURLAttribute(attribute);
 }
 
 const QualifiedName& HTMLVideoElement::imageSourceAttributeName() const

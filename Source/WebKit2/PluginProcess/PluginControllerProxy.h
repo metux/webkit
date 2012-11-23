@@ -33,6 +33,7 @@
 #include "PluginController.h"
 #include "PluginControllerProxyMessages.h"
 #include "ShareableBitmap.h"
+#include "WebProcessConnectionMessages.h"
 #include <WebCore/RunLoop.h>
 #include <wtf/Noncopyable.h>
 
@@ -62,11 +63,18 @@ public:
     void didReceivePluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     void didReceiveSyncPluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
 
+    bool wantsWheelEvents() const;
+
 #if PLATFORM(MAC)
     uint32_t remoteLayerClientID() const;
 #endif
 
     PluginController* asPluginController() { return this; }
+
+    bool isInitializing() const { return m_isInitializing; }
+    
+    void setInitializationReply(PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply>);
+    PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> takeInitializationReply();
 
 private:
     PluginControllerProxy(WebProcessConnection*, const PluginCreationParameters&);
@@ -88,6 +96,8 @@ private:
     virtual bool isAcceleratedCompositingEnabled();
     virtual void pluginProcessCrashed();
     virtual void willSendEventToPlugin();
+    virtual void didInitializePlugin() OVERRIDE;
+    virtual void didFailToInitializePlugin() OVERRIDE;
 
 #if PLATFORM(MAC)
     virtual void pluginFocusOrWindowFocusChanged(bool);
@@ -155,6 +165,9 @@ private:
     String m_userAgent;
     bool m_isPrivateBrowsingEnabled;
     bool m_isAcceleratedCompositingEnabled;
+    bool m_isInitializing;
+
+    RefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> m_initializationReply;
 
     RefPtr<Plugin> m_plugin;
 

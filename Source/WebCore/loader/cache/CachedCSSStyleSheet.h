@@ -32,8 +32,9 @@
 namespace WebCore {
 
     class CachedResourceClient;
+    class MemoryObjectInfo;
     class SharedBuffer;
-    class StyleSheetInternal;
+    class StyleSheetContents;
     class TextResourceDecoder;
     struct CSSParserContext;
 
@@ -46,8 +47,6 @@ namespace WebCore {
 
         virtual void didAddClient(CachedResourceClient*);
         
-        virtual void allClientsRemoved();
-
         virtual void setEncoding(const String&);
         virtual String encoding() const;
         virtual void data(PassRefPtr<SharedBuffer> data, bool allDataReceived);
@@ -57,9 +56,11 @@ namespace WebCore {
 
         void checkNotify();
 
-        PassRefPtr<StyleSheetInternal> restoreParsedStyleSheet(const CSSParserContext&);
-        void saveParsedStyleSheet(PassRefPtr<StyleSheetInternal>);
+        PassRefPtr<StyleSheetContents> restoreParsedStyleSheet(const CSSParserContext&);
+        void saveParsedStyleSheet(PassRefPtr<StyleSheetContents>);
     
+        virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
     private:
         bool canUseSheet(bool enforceMIMEType, bool* hasValidMIMEType) const;
         virtual PurgePriority purgePriority() const { return PurgeLast; }
@@ -68,7 +69,7 @@ namespace WebCore {
         RefPtr<TextResourceDecoder> m_decoder;
         String m_decodedSheetText;
 
-        RefPtr<StyleSheetInternal> m_parsedStyleSheetCache;
+        RefPtr<StyleSheetContents> m_parsedStyleSheetCache;
     };
 
 }

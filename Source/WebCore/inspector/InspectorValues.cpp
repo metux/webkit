@@ -29,9 +29,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "InspectorValues.h"
 
 #include <wtf/DecimalNumber.h>
@@ -628,7 +625,7 @@ void InspectorBasicValue::writeJSON(StringBuilder* output) const
         else
             output->append(falseString, 5);
     } else if (type() == TypeNumber) {
-        NumberToUStringBuffer buffer;
+        NumberToLStringBuffer buffer;
         if (!isfinite(m_doubleValue)) {
             output->append(nullString, 4);
             return;
@@ -797,5 +794,3 @@ PassRefPtr<InspectorValue> InspectorArrayBase::get(size_t index)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

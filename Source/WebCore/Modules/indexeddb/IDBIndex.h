@@ -28,7 +28,10 @@
 
 #include "IDBCursor.h"
 #include "IDBIndexBackendInterface.h"
+#include "IDBKeyPath.h"
 #include "IDBKeyRange.h"
+#include "IDBMetadata.h"
+#include "IDBObjectStore.h"
 #include "IDBRequest.h"
 #include "PlatformString.h"
 #include <wtf/Forward.h>
@@ -41,23 +44,26 @@ class IDBObjectStore;
 
 class IDBIndex : public RefCounted<IDBIndex> {
 public:
-    static PassRefPtr<IDBIndex> create(PassRefPtr<IDBIndexBackendInterface> backend, IDBObjectStore* objectStore, IDBTransaction* transaction)
+    static PassRefPtr<IDBIndex> create(const IDBIndexMetadata& metadata, PassRefPtr<IDBIndexBackendInterface> backend, IDBObjectStore* objectStore, IDBTransaction* transaction)
     {
-        return adoptRef(new IDBIndex(backend, objectStore, transaction));
+        return adoptRef(new IDBIndex(metadata, backend, objectStore, transaction));
     }
     ~IDBIndex();
 
     // Implement the IDL
-    String name() const { return m_backend->name(); }
-    IDBObjectStore* objectStore() const { return m_objectStore.get(); }
-    String keyPath() const { return m_backend->keyPath(); }
-    bool unique() const { return m_backend->unique(); }
-    bool multiEntry() const { return m_backend->multiEntry(); }
+    const String name() const { return m_metadata.name; }
+    PassRefPtr<IDBObjectStore> objectStore() const { return m_objectStore; }
+    PassRefPtr<IDBAny> keyPathAny() const { return IDBAny::create(m_metadata.keyPath); }
+    const IDBKeyPath keyPath() const { return m_metadata.keyPath; }
+    bool unique() const { return m_metadata.unique; }
+    bool multiEntry() const { return m_metadata.multiEntry; }
 
     // FIXME: Try to modify the code generator so this is unneeded.
     PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext* context, ExceptionCode& ec) { return openCursor(context, static_cast<IDBKeyRange*>(0), ec); }
-    PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec) { return openCursor(context, keyRange, IDBCursor::NEXT, ec); }
-    PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec) { return openCursor(context, key, IDBCursor::NEXT, ec); }
+    PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec) { return openCursor(context, keyRange, IDBCursor::directionNext(), ec); }
+    PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec) { return openCursor(context, key, IDBCursor::directionNext(), ec); }
+    PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext*, PassRefPtr<IDBKeyRange>, const String& direction, ExceptionCode&);
+    PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext*, PassRefPtr<IDBKey>, const String& direction, ExceptionCode&);
     PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext*, PassRefPtr<IDBKeyRange>, unsigned short direction, ExceptionCode&);
     PassRefPtr<IDBRequest> openCursor(ScriptExecutionContext*, PassRefPtr<IDBKey>, unsigned short direction, ExceptionCode&);
     PassRefPtr<IDBRequest> count(ScriptExecutionContext* context, ExceptionCode& ec) { return count(context, static_cast<IDBKeyRange*>(0), ec); }
@@ -65,8 +71,10 @@ public:
     PassRefPtr<IDBRequest> count(ScriptExecutionContext*, PassRefPtr<IDBKey>, ExceptionCode&);
 
     PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext* context, ExceptionCode& ec) { return openKeyCursor(context, static_cast<IDBKeyRange*>(0), ec); } 
-    PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec) { return openKeyCursor(context, keyRange, IDBCursor::NEXT, ec); }
-    PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec) { return openKeyCursor(context, key, IDBCursor::NEXT, ec); }
+    PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec) { return openKeyCursor(context, keyRange, IDBCursor::directionNext(), ec); }
+    PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec) { return openKeyCursor(context, key, IDBCursor::directionNext(), ec); }
+    PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext*, PassRefPtr<IDBKeyRange>, const String& direction, ExceptionCode&);
+    PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext*, PassRefPtr<IDBKey>, const String& direction, ExceptionCode&);
     PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext*, PassRefPtr<IDBKeyRange>, unsigned short direction, ExceptionCode&);
     PassRefPtr<IDBRequest> openKeyCursor(ScriptExecutionContext*, PassRefPtr<IDBKey>, unsigned short direction, ExceptionCode&);
 
@@ -75,12 +83,16 @@ public:
     PassRefPtr<IDBRequest> getKey(ScriptExecutionContext*, PassRefPtr<IDBKeyRange>, ExceptionCode&);
     PassRefPtr<IDBRequest> getKey(ScriptExecutionContext*, PassRefPtr<IDBKey>, ExceptionCode&);
 
-private:
-    IDBIndex(PassRefPtr<IDBIndexBackendInterface>, IDBObjectStore*, IDBTransaction*);
+    void markDeleted() { m_deleted = true; }
 
+private:
+    IDBIndex(const IDBIndexMetadata&, PassRefPtr<IDBIndexBackendInterface>, IDBObjectStore*, IDBTransaction*);
+
+    IDBIndexMetadata m_metadata;
     RefPtr<IDBIndexBackendInterface> m_backend;
     RefPtr<IDBObjectStore> m_objectStore;
     RefPtr<IDBTransaction> m_transaction;
+    bool m_deleted;
 };
 
 } // namespace WebCore

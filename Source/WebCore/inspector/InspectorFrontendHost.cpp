@@ -60,7 +60,7 @@ namespace WebCore {
 #if ENABLE(CONTEXT_MENUS)
 class FrontendMenuProvider : public ContextMenuProvider {
 public:
-    static PassRefPtr<FrontendMenuProvider> create(InspectorFrontendHost* frontendHost, ScriptObject webInspector, const Vector<ContextMenuItem*>& items)
+    static PassRefPtr<FrontendMenuProvider> create(InspectorFrontendHost* frontendHost, ScriptObject webInspector, const Vector<ContextMenuItem>& items)
     {
         return adoptRef(new FrontendMenuProvider(frontendHost, webInspector, items));
     }
@@ -72,7 +72,7 @@ public:
     }
     
 private:
-    FrontendMenuProvider(InspectorFrontendHost* frontendHost, ScriptObject webInspector,  const Vector<ContextMenuItem*>& items)
+    FrontendMenuProvider(InspectorFrontendHost* frontendHost, ScriptObject webInspector, const Vector<ContextMenuItem>& items)
         : m_frontendHost(frontendHost)
         , m_webInspector(webInspector)
         , m_items(items)
@@ -87,7 +87,7 @@ private:
     virtual void populateContextMenu(ContextMenu* menu)
     {
         for (size_t i = 0; i < m_items.size(); ++i)
-            menu->appendItem(*m_items[i]);
+            menu->appendItem(m_items[i]);
     }
     
     virtual void contextMenuItemSelected(ContextMenuItem* item)
@@ -110,13 +110,12 @@ private:
 
             m_frontendHost->m_menuProvider = 0;
         }
-        deleteAllValues(m_items);
         m_items.clear();
     }
 
     InspectorFrontendHost* m_frontendHost;
     ScriptObject m_webInspector;
-    Vector<ContextMenuItem*> m_items;
+    Vector<ContextMenuItem> m_items;
 };
 #endif
 
@@ -223,7 +222,7 @@ String InspectorFrontendHost::hiddenPanels()
 
 void InspectorFrontendHost::copyText(const String& text)
 {
-    Pasteboard::generalPasteboard()->writePlainText(text);
+    Pasteboard::generalPasteboard()->writePlainText(text, Pasteboard::CannotSmartReplace);
 }
 
 void InspectorFrontendHost::openInNewTab(const String& url)
@@ -251,6 +250,17 @@ void InspectorFrontendHost::append(const String& url, const String& content)
         m_client->append(url, content);
 }
 
+bool InspectorFrontendHost::canInspectWorkers()
+{
+#if ENABLE(WORKERS)
+    if (m_client)
+        return m_client->canInspectWorkers();
+    return false;
+#else
+    return false;
+#endif
+}
+
 void InspectorFrontendHost::sendMessageToBackend(const String& message)
 {
     if (m_client)
@@ -258,7 +268,7 @@ void InspectorFrontendHost::sendMessageToBackend(const String& message)
 }
 
 #if ENABLE(CONTEXT_MENUS)
-void InspectorFrontendHost::showContextMenu(Event* event, const Vector<ContextMenuItem*>& items)
+void InspectorFrontendHost::showContextMenu(Event* event, const Vector<ContextMenuItem>& items)
 {
     ASSERT(m_frontendPage);
     ScriptState* frontendScriptState = scriptStateFromPage(debuggerWorld(), m_frontendPage);

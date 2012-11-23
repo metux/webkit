@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,10 @@
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 #include <wtf/text/CString.h>
+
+#if PLATFORM(MAC)
+#include <WebKit2/WKPagePrivateMac.h>
+#endif
 
 #if OS(WINDOWS)
 #include <direct.h> // For _getcwd.
@@ -127,11 +131,17 @@ static void sizeWebViewForCurrentTest(const char* pathOrURL)
     else
         TestController::shared().mainWebView()->resizeTo(normalWidth, normalHeight);
 }
+static bool shouldLogFrameLoadDelegates(const char* pathOrURL)
+{
+    return strstr(pathOrURL, "loading/");
+}
 
+#if ENABLE(INSPECTOR)
 static bool shouldOpenWebInspector(const char* pathOrURL)
 {
     return strstr(pathOrURL, "inspector/") || strstr(pathOrURL, "inspector\\");
 }
+#endif
 
 void TestInvocation::invoke()
 {
@@ -139,6 +149,10 @@ void TestInvocation::invoke()
 
     WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("BeginTest"));
     WKRetainPtr<WKMutableDictionaryRef> beginTestMessageBody = adoptWK(WKMutableDictionaryCreate());
+
+    WKRetainPtr<WKStringRef> dumpFrameLoadDelegatesKey = adoptWK(WKStringCreateWithUTF8CString("DumpFrameLoadDelegates"));
+    WKRetainPtr<WKBooleanRef> dumpFrameLoadDelegatesValue = adoptWK(WKBooleanCreate(shouldLogFrameLoadDelegates(m_pathOrURL.c_str())));
+    WKDictionaryAddItem(beginTestMessageBody.get(), dumpFrameLoadDelegatesKey.get(), dumpFrameLoadDelegatesValue.get());
 
     WKRetainPtr<WKStringRef> dumpPixelsKey = adoptWK(WKStringCreateWithUTF8CString("DumpPixels"));
     WKRetainPtr<WKBooleanRef> dumpPixelsValue = adoptWK(WKBooleanCreate(m_dumpPixels));
@@ -150,14 +164,15 @@ void TestInvocation::invoke()
 
     WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), beginTestMessageBody.get());
 
+    const char* errorMessage = 0;
     TestController::shared().runUntil(m_gotInitialResponse, TestController::ShortTimeout);
     if (!m_gotInitialResponse) {
-        dump("Timed out waiting for initial response from web process\n");
-        return;
+        errorMessage = "Timed out waiting for initial response from web process\n";
+        goto end;
     }
     if (m_error) {
-        dump("FAIL\n");
-        return;
+        errorMessage = "FAIL\n";
+        goto end;
     }
 
 #if ENABLE(INSPECTOR)
@@ -168,24 +183,51 @@ void TestInvocation::invoke()
     WKPageLoadURL(TestController::shared().mainWebView()->page(), m_url.get());
 
     TestController::shared().runUntil(m_gotFinalMessage, TestController::shared().useWaitToDumpWatchdogTimer() ? TestController::LongTimeout : TestController::NoTimeout);
-    if (!m_gotFinalMessage)
-        dump("Timed out waiting for final message from web process\n");
-    else if (m_error)
-        dump("FAIL\n");
+    if (!m_gotFinalMessage) {
+        errorMessage = "Timed out waiting for final message from web process\n";
+        goto end;
+    }
+    if (m_error) {
+        errorMessage = "FAIL\n";
+        goto end;
+    }
 
+end:
 #if ENABLE(INSPECTOR)
-    WKInspectorClose(WKPageGetInspector(TestController::shared().mainWebView()->page()));
+    if (m_gotInitialResponse)
+        WKInspectorClose(WKPageGetInspector(TestController::shared().mainWebView()->page()));
 #endif // ENABLE(INSPECTOR)
+
+    if (errorMessage || !TestController::shared().resetStateToConsistentValues())
+        dumpWebProcessUnresponsiveness(errorMessage);
 }
 
-void TestInvocation::dump(const char* stringToDump, bool singleEOF)
+void TestInvocation::dumpWebProcessUnresponsiveness(const char* textToStdout)
+{
+    const char* errorMessageToStderr = 0;
+#if PLATFORM(MAC)
+    char buffer[64];
+    pid_t pid = WKPageGetProcessIdentifier(TestController::shared().mainWebView()->page());
+    sprintf(buffer, "#PROCESS UNRESPONSIVE - WebProcess (pid %ld)\n", static_cast<long>(pid));
+    errorMessageToStderr = buffer;
+#else
+    errorMessageToStderr = "#PROCESS UNRESPONSIVE - WebProcess";
+#endif
+
+    dump(textToStdout, errorMessageToStderr, true);
+}
+
+void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bool seenError)
 {
     printf("Content-Type: text/plain\n");
-    printf("%s", stringToDump);
+    if (textToStdout)
+        fputs(textToStdout, stdout);
+    if (textToStderr)
+        fputs(textToStderr, stderr);
 
     fputs("#EOF\n", stdout);
     fputs("#EOF\n", stderr);
-    if (!singleEOF)
+    if (seenError)
         fputs("#EOF\n", stdout);
     fflush(stdout);
     fflush(stderr);
@@ -244,7 +286,7 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         WKArrayRef repaintRects = static_cast<WKArrayRef>(WKDictionaryGetItemForKey(messageBodyDictionary, repaintRectsKey.get()));        
 
         // Dump text.
-        dump(toWTFString(textOutput).utf8().data(), true);
+        dump(toWTFString(textOutput).utf8().data());
 
         // Dump pixels (if necessary).
         if (m_dumpPixels && pixelResult)

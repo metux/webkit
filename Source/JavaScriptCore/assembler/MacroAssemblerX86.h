@@ -51,6 +51,7 @@ public:
     using MacroAssemblerX86Common::loadDouble;
     using MacroAssemblerX86Common::storeDouble;
     using MacroAssemblerX86Common::convertInt32ToDouble;
+    using MacroAssemblerX86Common::branchTest8;
 
     void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
@@ -60,6 +61,11 @@ public:
     void add32(TrustedImm32 imm, AbsoluteAddress address)
     {
         m_assembler.addl_im(imm.m_value, address.m_ptr);
+    }
+    
+    void add32(AbsoluteAddress address, RegisterID dest)
+    {
+        m_assembler.addl_mr(address.m_ptr, dest);
     }
     
     void add64(TrustedImm32 imm, AbsoluteAddress address)
@@ -77,7 +83,7 @@ public:
     {
         m_assembler.orl_im(imm.m_value, address.m_ptr);
     }
-
+    
     void sub32(TrustedImm32 imm, AbsoluteAddress address)
     {
         m_assembler.subl_im(imm.m_value, address.m_ptr);
@@ -86,6 +92,13 @@ public:
     void load32(const void* address, RegisterID dest)
     {
         m_assembler.movl_mr(address, dest);
+    }
+
+    ConvertibleLoadLabel convertibleLoadPtr(Address address, RegisterID dest)
+    {
+        ConvertibleLoadLabel result = ConvertibleLoadLabel(this);
+        m_assembler.movl_mr(address.offset, address.base, dest);
+        return result;
     }
 
     void addDouble(AbsoluteAddress address, FPRegisterID dest)
@@ -162,12 +175,24 @@ public:
 
     DataLabelPtr moveWithPatch(TrustedImmPtr initialValue, RegisterID dest)
     {
+        padBeforePatch();
         m_assembler.movl_i32r(initialValue.asIntptr(), dest);
         return DataLabelPtr(this);
+    }
+    
+    Jump branchTest8(ResultCondition cond, AbsoluteAddress address, TrustedImm32 mask = TrustedImm32(-1))
+    {
+        ASSERT(mask.m_value >= -128 && mask.m_value <= 255);
+        if (mask.m_value == -1)
+            m_assembler.cmpb_im(0, address.m_ptr);
+        else
+            m_assembler.testb_im(mask.m_value, address.m_ptr);
+        return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
     Jump branchPtrWithPatch(RelationalCondition cond, RegisterID left, DataLabelPtr& dataLabel, TrustedImmPtr initialRightValue = TrustedImmPtr(0))
     {
+        padBeforePatch();
         m_assembler.cmpl_ir_force32(initialRightValue.asIntptr(), left);
         dataLabel = DataLabelPtr(this);
         return Jump(m_assembler.jCC(x86Condition(cond)));
@@ -175,6 +200,7 @@ public:
 
     Jump branchPtrWithPatch(RelationalCondition cond, Address left, DataLabelPtr& dataLabel, TrustedImmPtr initialRightValue = TrustedImmPtr(0))
     {
+        padBeforePatch();
         m_assembler.cmpl_im_force32(initialRightValue.asIntptr(), left.offset, left.base);
         dataLabel = DataLabelPtr(this);
         return Jump(m_assembler.jCC(x86Condition(cond)));
@@ -182,6 +208,7 @@ public:
 
     DataLabelPtr storePtrWithPatch(TrustedImmPtr initialValue, ImplicitAddress address)
     {
+        padBeforePatch();
         m_assembler.movl_i32m(initialValue.asIntptr(), address.offset, address.base);
         return DataLabelPtr(this);
     }

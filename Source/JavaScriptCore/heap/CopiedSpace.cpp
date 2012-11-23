@@ -38,6 +38,19 @@ CopiedSpace::CopiedSpace(Heap* heap)
     , m_inCopyingPhase(false)
     , m_numberOfLoanedBlocks(0)
 {
+    m_toSpaceLock.Init();
+}
+
+CopiedSpace::~CopiedSpace()
+{
+    while (!m_toSpace->isEmpty())
+        m_heap->blockAllocator().deallocate(CopiedBlock::destroy(m_toSpace->removeHead()));
+
+    while (!m_fromSpace->isEmpty())
+        m_heap->blockAllocator().deallocate(CopiedBlock::destroy(m_fromSpace->removeHead()));
+
+    while (!m_oversizeBlocks.isEmpty())
+        CopiedBlock::destroy(m_oversizeBlocks.removeHead()).deallocate();
 }
 
 void CopiedSpace::init()
@@ -45,8 +58,7 @@ void CopiedSpace::init()
     m_toSpace = &m_blocks1;
     m_fromSpace = &m_blocks2;
     
-    if (!addNewBlock())
-        CRASH();
+    allocateBlock();
 }   
 
 CheckedBoolean CopiedSpace::tryAllocateSlowCase(size_t bytes, void** outPtr)
@@ -54,14 +66,12 @@ CheckedBoolean CopiedSpace::tryAllocateSlowCase(size_t bytes, void** outPtr)
     if (isOversize(bytes))
         return tryAllocateOversize(bytes, outPtr);
     
+    ASSERT(m_heap->globalData()->apiLock().currentThreadIsHoldingLock());
     m_heap->didAllocate(m_allocator.currentCapacity());
 
-    if (!addNewBlock()) {
-        *outPtr = 0;
-        return false;
-    }
-    *outPtr = m_allocator.allocate(bytes);
-    ASSERT(*outPtr);
+    allocateBlock();
+
+    *outPtr = m_allocator.forceAllocate(bytes);
     return true;
 }
 
@@ -77,11 +87,15 @@ CheckedBoolean CopiedSpace::tryAllocateOversize(size_t bytes, void** outPtr)
         return false;
     }
 
-    CopiedBlock* block = new (NotNull, allocation.base()) CopiedBlock(allocation);
+    CopiedBlock* block = CopiedBlock::create(allocation);
     m_oversizeBlocks.push(block);
-    m_oversizeFilter.add(reinterpret_cast<Bits>(block));
+    m_blockFilter.add(reinterpret_cast<Bits>(block));
+    m_blockSet.add(block);
     
-    *outPtr = allocateFromBlock(block, bytes);
+    CopiedAllocator allocator;
+    allocator.setCurrentBlock(block);
+    *outPtr = allocator.forceAllocate(bytes);
+    allocator.resetCurrentBlock();
 
     m_heap->didAllocate(blockSize);
 
@@ -95,17 +109,12 @@ CheckedBoolean CopiedSpace::tryReallocate(void** ptr, size_t oldSize, size_t new
     
     void* oldPtr = *ptr;
     ASSERT(!m_heap->globalData()->isInitializingObject());
-
+    
     if (isOversize(oldSize) || isOversize(newSize))
         return tryReallocateOversize(ptr, oldSize, newSize);
-
-    if (m_allocator.wasLastAllocation(oldPtr, oldSize)) {
-        size_t delta = newSize - oldSize;
-        if (m_allocator.fitsInCurrentBlock(delta)) {
-            (void)m_allocator.allocate(delta);
-            return true;
-        }
-    }
+    
+    if (m_allocator.tryReallocate(oldPtr, oldSize, newSize))
+        return true;
 
     void* result = 0;
     if (!tryAllocate(newSize, &result)) {
@@ -135,7 +144,8 @@ CheckedBoolean CopiedSpace::tryReallocateOversize(void** ptr, size_t oldSize, si
     if (isOversize(oldSize)) {
         CopiedBlock* oldBlock = oversizeBlockFor(oldPtr);
         m_oversizeBlocks.remove(oldBlock);
-        oldBlock->m_allocation.deallocate();
+        m_blockSet.remove(oldBlock);
+        CopiedBlock::destroy(oldBlock).deallocate();
     }
     
     *ptr = newPtr;
@@ -144,20 +154,23 @@ CheckedBoolean CopiedSpace::tryReallocateOversize(void** ptr, size_t oldSize, si
 
 void CopiedSpace::doneFillingBlock(CopiedBlock* block)
 {
-    ASSERT(block);
-    ASSERT(block->m_offset < reinterpret_cast<char*>(block) + HeapBlock::s_blockSize);
     ASSERT(m_inCopyingPhase);
+    
+    if (!block)
+        return;
 
-    if (block->m_offset == block->payload()) {
+    if (!block->dataSize()) {
         recycleBlock(block);
         return;
     }
 
+    block->zeroFillWilderness();
+
     {
-        MutexLocker locker(m_toSpaceLock);
+        SpinLockHolder locker(&m_toSpaceLock);
         m_toSpace->push(block);
-        m_toSpaceSet.add(block);
-        m_toSpaceFilter.add(reinterpret_cast<Bits>(block));
+        m_blockSet.add(block);
+        m_blockFilter.add(reinterpret_cast<Bits>(block));
     }
 
     {
@@ -180,86 +193,51 @@ void CopiedSpace::doneCopying()
     ASSERT(m_inCopyingPhase);
     m_inCopyingPhase = false;
     while (!m_fromSpace->isEmpty()) {
-        CopiedBlock* block = static_cast<CopiedBlock*>(m_fromSpace->removeHead());
+        CopiedBlock* block = m_fromSpace->removeHead();
         if (block->m_isPinned) {
             block->m_isPinned = false;
+            // We don't add the block to the blockSet because it was never removed.
+            ASSERT(m_blockSet.contains(block));
+            m_blockFilter.add(reinterpret_cast<Bits>(block));
             m_toSpace->push(block);
             continue;
         }
 
-        m_toSpaceSet.remove(block);
-        m_heap->blockAllocator().deallocate(block);
+        m_blockSet.remove(block);
+        m_heap->blockAllocator().deallocate(CopiedBlock::destroy(block));
     }
 
-    CopiedBlock* curr = static_cast<CopiedBlock*>(m_oversizeBlocks.head());
+    CopiedBlock* curr = m_oversizeBlocks.head();
     while (curr) {
-        CopiedBlock* next = static_cast<CopiedBlock*>(curr->next());
+        CopiedBlock* next = curr->next();
         if (!curr->m_isPinned) {
             m_oversizeBlocks.remove(curr);
-            curr->m_allocation.deallocate();
-        } else
+            m_blockSet.remove(curr);
+            CopiedBlock::destroy(curr).deallocate();
+        } else {
+            m_blockFilter.add(reinterpret_cast<Bits>(curr));
             curr->m_isPinned = false;
+        }
         curr = next;
     }
 
-    if (!m_toSpace->head()) {
-        if (!addNewBlock())
-            CRASH();
-    } else
-        m_allocator.resetCurrentBlock(static_cast<CopiedBlock*>(m_toSpace->head()));
-}
-
-CheckedBoolean CopiedSpace::getFreshBlock(AllocationEffort allocationEffort, CopiedBlock** outBlock)
-{
-    CopiedBlock* block = 0;
-    if (HeapBlock* heapBlock = m_heap->blockAllocator().allocate())
-        block = new (NotNull, heapBlock) CopiedBlock(heapBlock->m_allocation);
-    else if (allocationEffort == AllocationMustSucceed) {
-        if (!allocateNewBlock(&block)) {
-            *outBlock = 0;
-            ASSERT_NOT_REACHED();
-            return false;
-        }
-    } else {
-        ASSERT(allocationEffort == AllocationCanFail);
-        if (m_heap->shouldCollect())
-            m_heap->collect(Heap::DoNotSweep);
-        
-        if (!getFreshBlock(AllocationMustSucceed, &block)) {
-            *outBlock = 0;
-            ASSERT_NOT_REACHED();
-            return false;
-        }
-    }
-    ASSERT(block);
-    ASSERT(is8ByteAligned(block->m_offset));
-    *outBlock = block;
-    return true;
-}
-
-void CopiedSpace::freeAllBlocks()
-{
-    while (!m_toSpace->isEmpty())
-        m_heap->blockAllocator().deallocate(m_toSpace->removeHead());
-
-    while (!m_fromSpace->isEmpty())
-        m_heap->blockAllocator().deallocate(m_fromSpace->removeHead());
-
-    while (!m_oversizeBlocks.isEmpty())
-        m_oversizeBlocks.removeHead()->m_allocation.deallocate();
+    if (!m_toSpace->head())
+        allocateBlock();
+    else
+        m_allocator.setCurrentBlock(m_toSpace->head());
 }
 
 size_t CopiedSpace::size()
 {
     size_t calculatedSize = 0;
 
-    for (CopiedBlock* block = static_cast<CopiedBlock*>(m_toSpace->head()); block; block = static_cast<CopiedBlock*>(block->next()))
+    for (CopiedBlock* block = m_toSpace->head(); block; block = block->next())
         calculatedSize += block->size();
 
-    for (CopiedBlock* block = static_cast<CopiedBlock*>(m_fromSpace->head()); block; block = static_cast<CopiedBlock*>(block->next()))
+    for (CopiedBlock* block = m_fromSpace->head(); block; block = block->next())
         calculatedSize += block->size();
 
-    for (CopiedBlock* block = static_cast<CopiedBlock*>(m_oversizeBlocks.head()); block; block = static_cast<CopiedBlock*>(block->next()))
+    for (CopiedBlock* block = m_oversizeBlocks.head(); block; block = block->next())
         calculatedSize += block->size();
 
     return calculatedSize;
@@ -269,22 +247,22 @@ size_t CopiedSpace::capacity()
 {
     size_t calculatedCapacity = 0;
 
-    for (CopiedBlock* block = static_cast<CopiedBlock*>(m_toSpace->head()); block; block = static_cast<CopiedBlock*>(block->next()))
+    for (CopiedBlock* block = m_toSpace->head(); block; block = block->next())
         calculatedCapacity += block->capacity();
 
-    for (CopiedBlock* block = static_cast<CopiedBlock*>(m_fromSpace->head()); block; block = static_cast<CopiedBlock*>(block->next()))
+    for (CopiedBlock* block = m_fromSpace->head(); block; block = block->next())
         calculatedCapacity += block->capacity();
 
-    for (CopiedBlock* block = static_cast<CopiedBlock*>(m_oversizeBlocks.head()); block; block = static_cast<CopiedBlock*>(block->next()))
+    for (CopiedBlock* block = m_oversizeBlocks.head(); block; block = block->next())
         calculatedCapacity += block->capacity();
 
     return calculatedCapacity;
 }
 
-static bool isBlockListPagedOut(double deadline, DoublyLinkedList<HeapBlock>* list)
+static bool isBlockListPagedOut(double deadline, DoublyLinkedList<CopiedBlock>* list)
 {
     unsigned itersSinceLastTimeCheck = 0;
-    HeapBlock* current = list->head();
+    CopiedBlock* current = list->head();
     while (current) {
         current = current->next();
         ++itersSinceLastTimeCheck;

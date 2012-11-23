@@ -201,7 +201,19 @@ Length::Length(PassRefPtr<CalculationValue> calc)
 {
     m_intValue = calcHandles().insert(calc);
 }
-    
+        
+Length Length::blendMixedTypes(const Length& from, double progress) const
+{
+    if (progress <= 0.0)
+        return from;
+        
+    if (progress >= 1.0)
+        return *this;
+        
+    OwnPtr<CalcExpressionNode> blend = adoptPtr(new CalcExpressionBlendLength(from, *this, progress));
+    return Length(CalculationValue::create(blend.release(), CalculationRangeAll));
+}
+          
 PassRefPtr<CalculationValue> Length::calculationValue() const
 {
     ASSERT(isCalculated());
@@ -232,7 +244,12 @@ float Length::nonNanCalculatedValue(int maxValue) const
     return result;
 }
 
-class SameSizeAsLength {
+bool Length::isCalculatedEqual(const Length& o) const
+{
+    return isCalculated() && (calculationValue() == o.calculationValue() || *calculationValue() == *o.calculationValue());
+}
+
+struct SameSizeAsLength {
     int32_t value;
     int32_t metaData;
 };

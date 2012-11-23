@@ -38,11 +38,7 @@ enum IncludeBorderColorOrNot { DoNotIncludeBorderColor, IncludeBorderColor };
 class RenderTableCell : public RenderBlock {
 public:
     explicit RenderTableCell(Node*);
-
-    // FIXME: need to implement cellIndex
-    int cellIndex() const { return 0; }
-    void setCellIndex(int) { }
-
+    
     unsigned colSpan() const;
     unsigned rowSpan() const;
 
@@ -116,13 +112,13 @@ public:
     virtual LayoutUnit paddingLeft() const OVERRIDE;
     virtual LayoutUnit paddingRight() const OVERRIDE;
     
-    // FIXME: For now we just assume the cell has the same block flow direction as the table.  It's likely we'll
+    // FIXME: For now we just assume the cell has the same block flow direction as the table. It's likely we'll
     // create an extra anonymous RenderBlock to handle mixing directionality anyway, in which case we can lock
     // the block flow directionality of the cells to the table's directionality.
     virtual LayoutUnit paddingBefore() const OVERRIDE;
     virtual LayoutUnit paddingAfter() const OVERRIDE;
 
-    void setOverrideHeightFromRowHeight(LayoutUnit);
+    void setOverrideLogicalContentHeightFromRowHeight(LayoutUnit);
 
     virtual void scrollbarsChanged(bool horizontalScrollbarChanged, bool verticalScrollbarChanged);
 
@@ -135,6 +131,40 @@ public:
         return createAnonymousWithParentRenderer(parent);
     }
 
+    // This function is used to unify which table part's style we use for computing direction and
+    // writing mode. Writing modes are not allowed on row group and row but direction is.
+    // This means we can safely use the same style in all cases to simplify our code.
+    // FIXME: Eventually this function should replaced by style() once we support direction
+    // on all table parts and writing-mode on cells.
+    const RenderStyle* styleForCellFlow() const
+    {
+        return section()->style();
+    }
+
+    const BorderValue& borderAdjoiningTableStart() const
+    {
+        ASSERT(isFirstOrLastCellInRow());
+        if (section()->hasSameDirectionAsTable())
+            return style()->borderStart();
+
+        return style()->borderEnd();
+    }
+
+    const BorderValue& borderAdjoiningTableEnd() const
+    {
+        ASSERT(isFirstOrLastCellInRow());
+        if (section()->hasSameDirectionAsTable())
+            return style()->borderEnd();
+
+        return style()->borderStart();
+    }
+
+#ifndef NDEBUG
+    bool isFirstOrLastCellInRow() const
+    {
+        return !table()->cellAfter(this) || !table()->cellBefore(this);
+    }
+#endif
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
@@ -152,7 +182,7 @@ private:
 
     virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox*) const OVERRIDE;
 
-    virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&) const;
+    virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const;
     virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
     virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
 
@@ -171,10 +201,10 @@ private:
     CollapsedBorderValue collapsedBeforeBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;
     CollapsedBorderValue collapsedAfterBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;
 
-    CollapsedBorderValue cachedCollapsedLeftBorder(RenderStyle*) const;
-    CollapsedBorderValue cachedCollapsedRightBorder(RenderStyle*) const;
-    CollapsedBorderValue cachedCollapsedTopBorder(RenderStyle*) const;
-    CollapsedBorderValue cachedCollapsedBottomBorder(RenderStyle*) const;
+    CollapsedBorderValue cachedCollapsedLeftBorder(const RenderStyle*) const;
+    CollapsedBorderValue cachedCollapsedRightBorder(const RenderStyle*) const;
+    CollapsedBorderValue cachedCollapsedTopBorder(const RenderStyle*) const;
+    CollapsedBorderValue cachedCollapsedBottomBorder(const RenderStyle*) const;
 
     CollapsedBorderValue computeCollapsedStartBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;
     CollapsedBorderValue computeCollapsedEndBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;

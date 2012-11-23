@@ -410,6 +410,15 @@ WebKitWebView
 @arg2: 
 @arg3: 
 
+<!-- ##### SIGNAL WebKitWebView::run-file-chooser ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@Returns: 
+
 <!-- ##### SIGNAL WebKitWebView::script-alert ##### -->
 <para>
 
@@ -1354,6 +1363,15 @@ WebKitWebView
 
 
 <!-- ##### FUNCTION webkit_web_view_get_window_features ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_snapshot ##### -->
 <para>
 
 </para>

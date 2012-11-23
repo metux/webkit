@@ -26,8 +26,13 @@
 
 #include "GraphicsLayerTextureMapper.h"
 #include "ImageBuffer.h"
-
+#include "NotImplemented.h"
 #include <wtf/MathExtras.h>
+
+#if USE(CAIRO)
+#include "CairoUtilities.h"
+#include <wtf/text/CString.h>
+#endif
 
 namespace WebCore {
 
@@ -73,7 +78,7 @@ void TextureMapperLayer::computeTransformsRecursive()
         parentTransform = m_effectTarget->m_transform.combined();
     m_transform.combineTransforms(parentTransform);
 
-    m_state.visible = m_state.backfaceVisibility || m_transform.combined().inverse().m33() >= 0;
+    m_state.visible = m_state.backfaceVisibility || !m_transform.combined().isBackFaceVisible();
 
     if (m_parent && m_parent->m_state.preserves3D)
         m_centerZ = m_transform.combined().mapPoint(FloatPoint3D(m_size.width() / 2, m_size.height() / 2, 0)).z();
@@ -90,7 +95,7 @@ void TextureMapperLayer::computeTransformsRecursive()
         sortByZOrder(m_children, 0, m_children.size());
 }
 
-void TextureMapperLayer::updateBackingStore(TextureMapper* textureMapper, GraphicsLayer* layer)
+void TextureMapperLayer::updateBackingStore(TextureMapper* textureMapper, GraphicsLayerTextureMapper* layer)
 {
     if (!layer || !textureMapper)
         return;
@@ -98,12 +103,14 @@ void TextureMapperLayer::updateBackingStore(TextureMapper* textureMapper, Graphi
     if (!m_shouldUpdateBackingStoreFromLayer)
         return;
 
-    if (!m_state.drawsContent || m_size.isEmpty()) {
+    if (!m_state.drawsContent || !m_state.contentsVisible || m_size.isEmpty()) {
         m_backingStore.clear();
         return;
     }
 
-    IntRect dirtyRect = enclosingIntRect(m_state.needsDisplay ? layerRect() : m_state.needsDisplayRect);
+    IntRect dirtyRect = enclosingIntRect(layerRect());
+    if (!m_state.needsDisplay)
+        dirtyRect.intersect(enclosingIntRect(m_state.needsDisplayRect));
     if (dirtyRect.isEmpty())
         return;
 
@@ -122,16 +129,20 @@ void TextureMapperLayer::updateBackingStore(TextureMapper* textureMapper, Graphi
     context->translate(-dirtyRect.x(), -dirtyRect.y());
     layer->paintGraphicsLayerContents(*context, dirtyRect);
 
-    RefPtr<Image> image;
+    if (layer->showRepaintCounter()) {
+        layer->incrementRepaintCount();
+        drawRepaintCounter(context, layer);
+    }
 
-#if PLATFORM(QT)
-    image = imageBuffer->copyImage(DontCopyBackingStore);
-#else
-    // FIXME: support DontCopyBackingStore in non-Qt ports that use TextureMapper.
-    image = imageBuffer->copyImage(CopyBackingStore);
-#endif
+    RefPtr<Image> image = imageBuffer->copyImage(DontCopyBackingStore);
+    TextureMapperTiledBackingStore* backingStore = static_cast<TextureMapperTiledBackingStore*>(m_backingStore.get());
+    backingStore->updateContents(textureMapper, image.get(), m_size, dirtyRect);
 
-    static_cast<TextureMapperTiledBackingStore*>(m_backingStore.get())->updateContents(textureMapper, image.get(), m_size, dirtyRect);
+    backingStore->setShowDebugBorders(layer->showDebugBorders());
+    backingStore->setDebugBorder(m_debugBorderColor, m_debugBorderWidth);
+
+    m_state.needsDisplay = false;
+    m_state.needsDisplayRect = IntRect();
 }
 
 void TextureMapperLayer::paint()
@@ -146,6 +157,9 @@ void TextureMapperLayer::paint()
 
 void TextureMapperLayer::paintSelf(const TextureMapperPaintOptions& options)
 {
+    if (!m_state.visible || !m_state.contentsVisible)
+        return;
+
     // We apply the following transform to compensate for painting into a surface, and then apply the offset so that the painting fits in the target rect.
     TransformationMatrix transform;
     transform.translate(options.offset.width(), options.offset.height());
@@ -208,6 +222,20 @@ IntRect TextureMapperLayer::intermediateSurfaceRect(const TransformationMatrix& 
             rect.unite(m_children[i]->intermediateSurfaceRect(matrix));
     }
 
+#if ENABLE(CSS_FILTERS)
+    if (m_state.filters.hasOutsets()) {
+        int leftOutset;
+        int topOutset;
+        int bottomOutset;
+        int rightOutset;
+        m_state.filters.getOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
+        IntRect unfilteredTargetRect(rect);
+        rect.move(std::max(0, -leftOutset), std::max(0, -topOutset));
+        rect.expand(leftOutset + rightOutset, topOutset + bottomOutset);
+        rect.unite(unfilteredTargetRect);
+    }
+#endif
+
     if (m_state.replicaLayer)
         rect.unite(m_state.replicaLayer->intermediateSurfaceRect(matrix));
 
@@ -264,7 +292,11 @@ bool TextureMapperLayer::isVisible() const
 {
     if (m_size.isEmpty() && (m_state.masksToBounds || m_state.maskLayer || m_children.isEmpty()))
         return false;
-    if (!m_state.visible || m_opacity < 0.01)
+    if (!m_state.visible && m_children.isEmpty())
+        return false;
+    if (!m_state.contentsVisible && m_children.isEmpty())
+        return false;
+    if (m_opacity < 0.01)
         return false;
     return true;
 }
@@ -288,22 +320,28 @@ void TextureMapperLayer::paintSelfAndChildrenWithReplica(const TextureMapperPain
 }
 
 #if ENABLE(CSS_FILTERS)
+static bool shouldKeepContentTexture(const FilterOperations& filters)
+{
+    for (int i = 0; i < filters.size(); ++i) {
+        switch (filters.operations().at(i)->getOperationType()) {
+        // The drop-shadow filter requires the content texture, because it needs to composite it
+        // on top of the blurred shadow color.
+        case FilterOperation::DROP_SHADOW:
+            return true;
+        default:
+            break;
+        }
+    }
+
+    return false;
+}
+
 static PassRefPtr<BitmapTexture> applyFilters(const FilterOperations& filters, TextureMapper* textureMapper, BitmapTexture* source, IntRect& targetRect)
 {
     if (!filters.size())
         return source;
 
-    RefPtr<BitmapTexture> filterSurface(source);
-    int leftOutset, topOutset, bottomOutset, rightOutset;
-    if (filters.hasOutsets()) {
-        filters.getOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
-        IntRect unfilteredTargetRect(targetRect);
-        targetRect.move(std::max(0, -leftOutset), std::max(0, -topOutset));
-        targetRect.expand(leftOutset + rightOutset, topOutset + bottomOutset);
-        targetRect.unite(unfilteredTargetRect);
-        filterSurface = textureMapper->acquireTextureFromPool(targetRect.size());
-    }
-
+    RefPtr<BitmapTexture> filterSurface = shouldKeepContentTexture(filters) ? textureMapper->acquireTextureFromPool(source->size()) : source;
     return filterSurface->applyFilters(*source, filters);
 }
 #endif
@@ -318,9 +356,6 @@ void TextureMapperLayer::paintRecursive(const TextureMapperPaintOptions& options
 
     TextureMapperPaintOptions paintOptions(options);
     paintOptions.mask = maskTexture.get();
-    IntRect surfaceRect;
-
-    RefPtr<BitmapTexture> surface;
 
     if (!shouldPaintToIntermediateSurface()) {
         paintOptions.opacity = opacity;
@@ -330,8 +365,9 @@ void TextureMapperLayer::paintRecursive(const TextureMapperPaintOptions& options
 
     // Prepare a surface to paint into.
     // We paint into the surface ignoring the opacity/transform of the current layer.
-    surfaceRect = intermediateSurfaceRect();
-    surface = options.textureMapper->acquireTextureFromPool(surfaceRect.size());
+    IntRect surfaceRect = intermediateSurfaceRect();
+    RefPtr<BitmapTexture> surface = options.textureMapper->acquireTextureFromPool(surfaceRect.size());
+    paintOptions.surface = surface;
     options.textureMapper->bindSurface(surface.get());
     paintOptions.opacity = 1;
 
@@ -377,6 +413,8 @@ void TextureMapperLayer::syncCompositingStateSelf(GraphicsLayerTextureMapper* gr
 
     if (changeMask == NoChanges && graphicsLayer->m_animations.isEmpty())
         return;
+
+    graphicsLayer->updateDebugIndicators();
 
     if (changeMask & ParentChange) {
         TextureMapperLayer* newParent = toTextureMapperLayer(graphicsLayer->parent());
@@ -436,6 +474,7 @@ void TextureMapperLayer::syncCompositingStateSelf(GraphicsLayerTextureMapper* gr
     m_state.preserves3D = graphicsLayer->preserves3D();
     m_state.masksToBounds = graphicsLayer->masksToBounds();
     m_state.drawsContent = graphicsLayer->drawsContent();
+    m_state.contentsVisible = graphicsLayer->contentsAreVisible();
     m_state.contentsOpaque = graphicsLayer->contentsOpaque();
     m_state.backfaceVisibility = graphicsLayer->backfaceVisibility();
     m_state.childrenTransform = graphicsLayer->childrenTransform();
@@ -451,7 +490,7 @@ void TextureMapperLayer::syncCompositingStateSelf(GraphicsLayerTextureMapper* gr
         m_state.needsDisplayRect.unite(graphicsLayer->needsDisplayRect());
     m_contentsLayer = graphicsLayer->contentsLayer();
 
-    m_transform.setPosition(m_state.pos);
+    m_transform.setPosition(adjustedPosition());
     m_transform.setAnchorPoint(m_state.anchorPoint);
     m_transform.setSize(m_state.size);
     m_transform.setFlattening(!m_state.preserves3D);
@@ -478,14 +517,6 @@ void TextureMapperLayer::syncAnimations()
         setTransform(m_state.transform);
     if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity))
         setOpacity(m_state.opacity);
-}
-
-void TextureMapperLayer::syncAnimationsRecursively()
-{
-    syncAnimations();
-
-    for (int i = m_children.size() - 1; i >= 0; --i)
-        m_children[i]->syncAnimationsRecursively();
 }
 
 void TextureMapperLayer::syncCompositingState(GraphicsLayerTextureMapper* graphicsLayer, TextureMapper* textureMapper, int options)
@@ -539,18 +570,61 @@ bool TextureMapperLayer::isAncestorFixedToViewport() const
     return false;
 }
 
-void TextureMapperLayer::setScrollPositionDeltaIfNeeded(const IntPoint& delta)
+void TextureMapperLayer::setScrollPositionDeltaIfNeeded(const FloatSize& delta)
 {
     // delta is the difference between the scroll offset in the ui process and the scroll offset
     // in the web process. We add this delta to the position of fixed layers, to make
     // sure that they do not move while scrolling. We need to reset this delta to fixed layers
     // that have an ancestor which is also a fixed layer, because the delta will be added to the ancestor.
     if (isAncestorFixedToViewport())
-        m_scrollPositionDelta = IntPoint();
+        m_scrollPositionDelta = FloatSize();
     else
         m_scrollPositionDelta = delta;
-    m_transform.setPosition(m_state.pos + m_scrollPositionDelta);
+    m_transform.setPosition(adjustedPosition());
 }
+
+void TextureMapperLayer::setDebugBorder(const Color& color, float width)
+{
+    // The default values for GraphicsLayer debug borders are a little
+    // hard to see (some less than one pixel wide), so we double their size here.
+    m_debugBorderColor = color;
+    m_debugBorderWidth = width * 2;
+}
+
+#if USE(CAIRO)
+void TextureMapperLayer::drawRepaintCounter(GraphicsContext* context, GraphicsLayer* layer)
+{
+
+    cairo_t* cr = context->platformContext()->cr();
+    cairo_save(cr);
+
+    CString repaintCount = String::format("%i", layer->repaintCount()).utf8();
+    cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+    cairo_set_font_size(cr, 18);
+
+    cairo_text_extents_t repaintTextExtents;
+    cairo_text_extents(cr, repaintCount.data(), &repaintTextExtents);
+
+    static const int repaintCountBorderWidth = 10;
+    setSourceRGBAFromColor(cr, layer->showDebugBorders() ? m_debugBorderColor : Color(0, 255, 0, 127));
+    cairo_rectangle(cr, 0, 0,
+                    repaintTextExtents.width + (repaintCountBorderWidth * 2),
+                    repaintTextExtents.height + (repaintCountBorderWidth * 2));
+    cairo_fill(cr);
+
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_move_to(cr, repaintCountBorderWidth, repaintTextExtents.height + repaintCountBorderWidth);
+    cairo_show_text(cr, repaintCount.data());
+
+    cairo_restore(cr);
+}
+#else
+void TextureMapperLayer::drawRepaintCounter(GraphicsContext* context, GraphicsLayer* layer)
+{
+    notImplemented();
+}
+
+#endif
 
 }
 #endif

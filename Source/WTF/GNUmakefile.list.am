@@ -12,6 +12,7 @@ wtf_sources += \
     Source/WTF/wtf/Assertions.cpp \
     Source/WTF/wtf/Assertions.h \
     Source/WTF/wtf/Atomics.h \
+    Source/WTF/wtf/BitArray.h \
     Source/WTF/wtf/BitVector.cpp \
     Source/WTF/wtf/BitVector.h \
     Source/WTF/wtf/Bitmap.h \
@@ -42,6 +43,7 @@ wtf_sources += \
     Source/WTF/wtf/Encoder.h \
     Source/WTF/wtf/ExportMacros.h \
     Source/WTF/wtf/FastAllocBase.h \
+    Source/WTF/wtf/FastBitVector.h \
     Source/WTF/wtf/FastMalloc.cpp \
     Source/WTF/wtf/FastMalloc.h \
     Source/WTF/wtf/FixedArray.h \
@@ -50,6 +52,8 @@ wtf_sources += \
     Source/WTF/wtf/Forward.h \
     Source/WTF/wtf/Functional.h \
     Source/WTF/wtf/GetPtr.h \
+    Source/WTF/wtf/GregorianDateTime.cpp \
+    Source/WTF/wtf/GregorianDateTime.h \
     Source/WTF/wtf/HashCountedSet.h \
     Source/WTF/wtf/HashFunctions.h \
     Source/WTF/wtf/HashIterators.h \
@@ -73,6 +77,8 @@ wtf_sources += \
     Source/WTF/wtf/MainThread.h \
     Source/WTF/wtf/MallocZoneSupport.h \
     Source/WTF/wtf/MathExtras.h \
+    Source/WTF/wtf/MediaTime.h \
+    Source/WTF/wtf/MediaTime.cpp \
     Source/WTF/wtf/MessageQueue.h \
     Source/WTF/wtf/MetaAllocator.cpp \
     Source/WTF/wtf/MetaAllocator.h \
@@ -83,6 +89,8 @@ wtf_sources += \
     Source/WTF/wtf/NullPtr.h \
     Source/WTF/wtf/NumberOfCores.cpp \
     Source/WTF/wtf/NumberOfCores.h \
+    Source/WTF/wtf/RAMSize.cpp \
+    Source/WTF/wtf/RAMSize.h \
     Source/WTF/wtf/OSAllocator.h \
     Source/WTF/wtf/OSRandomSource.cpp \
     Source/WTF/wtf/OSRandomSource.h \
@@ -129,6 +137,7 @@ wtf_sources += \
     Source/WTF/wtf/StackBounds.h \
     Source/WTF/wtf/StaticConstructors.h \
     Source/WTF/wtf/StdLibExtras.h \
+    Source/WTF/wtf/StreamBuffer.h \
     Source/WTF/wtf/StringExtras.h \
     Source/WTF/wtf/StringHasher.h \
     Source/WTF/wtf/TCPackedCache.h \
@@ -194,6 +203,8 @@ wtf_sources += \
     Source/WTF/wtf/text/AtomicString.h \
     Source/WTF/wtf/text/AtomicStringHash.h \
     Source/WTF/wtf/text/AtomicStringImpl.h \
+    Source/WTF/wtf/text/Base64.cpp \
+    Source/WTF/wtf/text/Base64.h \
     Source/WTF/wtf/text/CString.cpp \
     Source/WTF/wtf/text/CString.h \
     Source/WTF/wtf/text/StringBuffer.h \
@@ -222,7 +233,8 @@ wtf_sources += \
     Source/WTF/wtf/OSAllocatorWin.cpp \
     Source/WTF/wtf/ThreadFunctionInvocation.h \
     Source/WTF/wtf/ThreadingWin.cpp \
-    Source/WTF/wtf/ThreadSpecificWin.cpp
+    Source/WTF/wtf/ThreadSpecificWin.cpp \
+    Source/WTF/wtf/win/OwnPtrWin.cpp
 else
 wtf_sources += \
     Source/WTF/wtf/OSAllocatorPosix.cpp

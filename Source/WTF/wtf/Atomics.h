@@ -72,7 +72,7 @@
 #elif OS(ANDROID)
 #include <sys/atomics.h>
 #elif COMPILER(GCC)
-#if (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2))
+#if ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2))) && !defined(__LSB_VERSION__)
 #include <ext/atomicity.h>
 #else
 #include <bits/atomicity.h>
@@ -106,9 +106,11 @@ inline int atomicIncrement(int volatile* addend) { return static_cast<int>(atomi
 inline int atomicDecrement(int volatile* addend) { return static_cast<int>(atomic_sub_value(reinterpret_cast<unsigned volatile*>(addend), 1)) - 1; }
 
 #elif OS(ANDROID)
+#define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
 
-inline int atomicIncrement(int volatile* addend) { return __atomic_inc(addend); }
-inline int atomicDecrement(int volatile* addend) { return __atomic_dec(addend); }
+// Note, __atomic_{inc, dec}() return the previous value of addend's content.
+inline int atomicIncrement(int volatile* addend) { return __atomic_inc(addend) + 1; }
+inline int atomicDecrement(int volatile* addend) { return __atomic_dec(addend) - 1; }
 
 #elif COMPILER(GCC) && !CPU(SPARC64) // sizeof(_Atomic_word) != sizeof(int) on sparc64 gcc
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
@@ -118,6 +120,21 @@ inline int atomicDecrement(int volatile* addend) { return __gnu_cxx::__exchange_
 
 #endif
 
+#if OS(WINDOWS)
+inline bool weakCompareAndSwap(volatile unsigned* location, unsigned expected, unsigned newValue)
+{
+#if OS(WINCE)
+    return InterlockedCompareExchange(reinterpret_cast<LONG*>(const_cast<unsigned*>(location)), static_cast<LONG>(newValue), static_cast<LONG>(expected)) == static_cast<LONG>(expected);
+#else
+    return InterlockedCompareExchange(reinterpret_cast<LONG volatile*>(location), static_cast<LONG>(newValue), static_cast<LONG>(expected)) == static_cast<LONG>(expected);
+#endif
+}
+
+inline bool weakCompareAndSwap(void*volatile* location, void* expected, void* newValue)
+{
+    return InterlockedCompareExchangePointer(location, newValue, expected) == expected;
+}
+#else // OS(WINDOWS) --> not windows
 #if COMPILER(GCC) && !COMPILER(CLANG) // Work around a gcc bug 
 inline bool weakCompareAndSwap(volatile unsigned* location, unsigned expected, unsigned newValue) 
 #else
@@ -184,11 +201,31 @@ inline bool weakCompareAndSwap(void*volatile* location, void* expected, void* ne
     return 0;
 #endif // ENABLE(COMPARE_AND_SWAP)
 }
+#endif // OS(WINDOWS) (end of the not-windows case)
 
 inline bool weakCompareAndSwapUIntPtr(volatile uintptr_t* location, uintptr_t expected, uintptr_t newValue)
 {
     return weakCompareAndSwap(reinterpret_cast<void*volatile*>(location), reinterpret_cast<void*>(expected), reinterpret_cast<void*>(newValue));
 }
+
+#if CPU(ARM_THUMB2)
+
+inline void memoryBarrierAfterLock()
+{
+    asm volatile("dmb" ::: "memory");
+}
+
+inline void memoryBarrierBeforeUnlock()
+{
+    asm volatile("dmb" ::: "memory");
+}
+
+#else
+
+inline void memoryBarrierAfterLock() { }
+inline void memoryBarrierBeforeUnlock() { }
+
+#endif
 
 } // namespace WTF
 

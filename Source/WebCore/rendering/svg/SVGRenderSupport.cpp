@@ -28,6 +28,7 @@
 #include "SVGRenderSupport.h"
 
 #include "NodeRenderStyle.h"
+#include "RenderGeometryMap.h"
 #include "RenderLayer.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGResourceClipper.h"
@@ -70,7 +71,7 @@ void SVGRenderSupport::computeFloatRectForRepaint(const RenderObject* object, Re
     object->parent()->computeFloatRectForRepaint(repaintContainer, repaintRect, fixed);
 }
 
-void SVGRenderSupport::mapLocalToContainer(const RenderObject* object, RenderBoxModelObject* repaintContainer, TransformState& transformState, bool* wasFixed)
+void SVGRenderSupport::mapLocalToContainer(const RenderObject* object, RenderBoxModelObject* repaintContainer, TransformState& transformState, bool snapOffsetForTransforms, bool* wasFixed)
 {
     transformState.applyTransform(object->localToParentTransform());
 
@@ -81,8 +82,28 @@ void SVGRenderSupport::mapLocalToContainer(const RenderObject* object, RenderBox
     // RenderSVGRoot's mapLocalToContainer method expects CSS box coordinates.
     if (parent->isSVGRoot())
         transformState.applyTransform(toRenderSVGRoot(parent)->localToBorderBoxTransform());
-    
-    parent->mapLocalToContainer(repaintContainer, false, true, transformState, RenderObject::DoNotApplyContainerFlip, wasFixed);
+
+    MapLocalToContainerFlags mode = UseTransforms;
+    if (snapOffsetForTransforms)
+        mode |= SnapOffsetForTransforms;
+    parent->mapLocalToContainer(repaintContainer, transformState, mode, wasFixed);
+}
+
+const RenderObject* SVGRenderSupport::pushMappingToContainer(const RenderObject* object, const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap)
+{
+    ASSERT_UNUSED(ancestorToStopAt, ancestorToStopAt != object);
+
+    RenderObject* parent = object->parent();
+
+    // At the SVG/HTML boundary (aka RenderSVGRoot), we apply the localToBorderBoxTransform 
+    // to map an element from SVG viewport coordinates to CSS box coordinates.
+    // RenderSVGRoot's mapLocalToContainer method expects CSS box coordinates.
+    if (parent->isSVGRoot())
+        geometryMap.push(object, TransformationMatrix(toRenderSVGRoot(parent)->localToBorderBoxTransform()));
+    else
+        geometryMap.push(object, LayoutSize());
+
+    return parent;
 }
 
 // Update a bounding box taking into account the validity of the other bounding box.
@@ -103,6 +124,13 @@ static inline void updateObjectBoundingBox(FloatRect& objectBoundingBox, bool& o
 
 void SVGRenderSupport::computeContainerBoundingBoxes(const RenderObject* container, FloatRect& objectBoundingBox, bool& objectBoundingBoxValid, FloatRect& strokeBoundingBox, FloatRect& repaintBoundingBox)
 {
+    objectBoundingBox = FloatRect();
+    objectBoundingBoxValid = false;
+    strokeBoundingBox = FloatRect();
+
+    // When computing the strokeBoundingBox, we use the repaintRects of the container's children so that the container's stroke includes
+    // the resources applied to the children (such as clips and filters). This allows filters applied to containers to correctly bound
+    // the children, and also improves inlining of SVG content, as the stroke bound is used in that situation also.
     for (RenderObject* current = container->firstChild(); current; current = current->nextSibling()) {
         if (current->isSVGHiddenContainer())
             continue;
@@ -110,14 +138,14 @@ void SVGRenderSupport::computeContainerBoundingBoxes(const RenderObject* contain
         const AffineTransform& transform = current->localToParentTransform();
         if (transform.isIdentity()) {
             updateObjectBoundingBox(objectBoundingBox, objectBoundingBoxValid, current, current->objectBoundingBox());
-            strokeBoundingBox.unite(current->strokeBoundingBox());
-            repaintBoundingBox.unite(current->repaintRectInLocalCoordinates());
+            strokeBoundingBox.unite(current->repaintRectInLocalCoordinates());
         } else {
             updateObjectBoundingBox(objectBoundingBox, objectBoundingBoxValid, current, transform.mapRect(current->objectBoundingBox()));
-            strokeBoundingBox.unite(transform.mapRect(current->strokeBoundingBox()));
-            repaintBoundingBox.unite(transform.mapRect(current->repaintRectInLocalCoordinates()));
+            strokeBoundingBox.unite(transform.mapRect(current->repaintRectInLocalCoordinates()));
         }
     }
+
+    repaintBoundingBox = strokeBoundingBox;
 }
 
 bool SVGRenderSupport::paintInfoIntersectsRepaintRect(const FloatRect& localRepaintRect, const AffineTransform& localTransform, const PaintInfo& paintInfo)
@@ -182,6 +210,7 @@ void SVGRenderSupport::layoutChildren(RenderObject* start, bool selfNeedsLayout)
 
     for (RenderObject* child = start->firstChild(); child; child = child->nextSibling()) {
         bool needsLayout = selfNeedsLayout;
+        bool childEverHadLayout = child->everHadLayout();
 
         if (transformChanged) {
             // If the transform changed we need to update the text metrics (note: this also happens for layoutSizeChanged=true).
@@ -197,23 +226,29 @@ void SVGRenderSupport::layoutChildren(RenderObject* start, bool selfNeedsLayout)
                     // When the layout size changed and when using relative values tell the RenderSVGShape to update its shape object
                     if (child->isSVGShape())
                         toRenderSVGShape(child)->setNeedsShapeUpdate();
-                    else if (child->isSVGText())
+                    else if (child->isSVGText()) {
+                        toRenderSVGText(child)->setNeedsTextMetricsUpdate();
                         toRenderSVGText(child)->setNeedsPositioningValuesUpdate();
+                    }
 
                     needsLayout = true;
                 }
             }
         }
 
-        if (needsLayout) {
+        if (needsLayout)
             child->setNeedsLayout(true, MarkOnlyThis);
+
+        if (child->needsLayout()) {
             child->layout();
-        } else {
-            if (child->needsLayout())
-                child->layout();
-            else if (layoutSizeChanged)
-                notlayoutedObjects.add(child);
-        }
+            // Renderers are responsible for repainting themselves when changing, except
+            // for the initial paint to avoid potential double-painting caused by non-sensical "old" bounds.
+            // We could handle this in the individual objects, but for now it's easier to have
+            // parent containers call repaint().  (RenderBlock::layout* has similar logic.)
+            if (!childEverHadLayout)
+                child->repaint();
+        } else if (layoutSizeChanged)
+            notlayoutedObjects.add(child);
 
         ASSERT(!child->needsLayout());
     }

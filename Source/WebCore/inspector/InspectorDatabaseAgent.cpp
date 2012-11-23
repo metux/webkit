@@ -215,7 +215,7 @@ public:
 
     virtual ~TransactionSuccessCallback() { }
 
-    virtual void handleEvent() { }
+    virtual bool handleEvent() { return false; }
 
 private:
     TransactionSuccessCallback() { }
@@ -288,7 +288,7 @@ void InspectorDatabaseAgent::disable(ErrorString*)
 
 void InspectorDatabaseAgent::restore()
 {
-    m_enabled =  m_state->getBoolean(DatabaseAgentState::databaseAgentEnabled);
+    m_enabled = m_state->getBoolean(DatabaseAgentState::databaseAgentEnabled);
 }
 
 void InspectorDatabaseAgent::getDatabaseTableNames(ErrorString* error, const String& databaseId, RefPtr<TypeBuilder::Array<String> >& names)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
 #include "AccessibilityController.h"
 #include "EventSendingController.h"
 #include "GCController.h"
-#include "LayoutTestController.h"
+#include "TestRunner.h"
 #include "TextInputController.h"
 #include <WebKit2/WKBase.h>
 #include <WebKit2/WKRetainPtr.h>
@@ -57,7 +57,7 @@ public:
     WKBundleRef bundle() const { return m_bundle; }
     WKBundlePageGroupRef pageGroup() const { return m_pageGroup; }
 
-    LayoutTestController* layoutTestController() { return m_layoutTestController.get(); }
+    TestRunner* testRunner() { return m_testRunner.get(); }
     GCController* gcController() { return m_gcController.get(); }
     EventSendingController* eventSendingController() { return m_eventSendingController.get(); }
     TextInputController* textInputController() { return m_textInputController.get(); }
@@ -97,23 +97,27 @@ private:
     static void willDestroyPage(WKBundleRef, WKBundlePageRef, const void* clientInfo);
     static void didInitializePageGroup(WKBundleRef, WKBundlePageGroupRef, const void* clientInfo);
     static void didReceiveMessage(WKBundleRef, WKStringRef messageName, WKTypeRef messageBody, const void* clientInfo);
+    static void didReceiveMessageToPage(WKBundleRef, WKBundlePageRef, WKStringRef messageName, WKTypeRef messageBody, const void* clientInfo);
 
     void didCreatePage(WKBundlePageRef);
     void willDestroyPage(WKBundlePageRef);
     void didInitializePageGroup(WKBundlePageGroupRef);
     void didReceiveMessage(WKStringRef messageName, WKTypeRef messageBody);
+    void didReceiveMessageToPage(WKBundlePageRef, WKStringRef messageName, WKTypeRef messageBody);
 
     void platformInitialize(WKTypeRef initializationUserData);
     void resetLocalSettings();
 
-    void beginTesting();
+    void beginTesting(WKDictionaryRef initialSettings);
+
+    bool booleanForKey(WKDictionaryRef, const char* key);
 
     WKBundleRef m_bundle;
     WKBundlePageGroupRef m_pageGroup;
     Vector<OwnPtr<InjectedBundlePage> > m_pages;
 
     RefPtr<AccessibilityController> m_accessibilityController;
-    RefPtr<LayoutTestController> m_layoutTestController;
+    RefPtr<TestRunner> m_testRunner;
     RefPtr<GCController> m_gcController;
     RefPtr<EventSendingController> m_eventSendingController;
     RefPtr<TextInputController> m_textInputController;

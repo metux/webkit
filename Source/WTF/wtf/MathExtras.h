@@ -43,13 +43,6 @@
 #include <machine/ieee.h>
 #endif
 
-#if COMPILER(MSVC)
-#if OS(WINCE)
-#include <stdlib.h>
-#endif
-#include <limits>
-#endif
-
 #if OS(QNX)
 // FIXME: Look into a way to have cmath import its functions into both the standard and global
 // namespace. For now, we include math.h since the QNX cmath header only imports its functions
@@ -145,6 +138,21 @@ inline double trunc(double num) { return num > 0 ? floor(num) : ceil(num); }
 inline long long abs(long num) { return labs(num); }
 #endif
 
+#if OS(ANDROID) || COMPILER(MSVC)
+// ANDROID and MSVC's math.h does not currently supply log2 or log2f.
+inline double log2(double num)
+{
+    // This constant is roughly M_LN2, which is not provided by default on Windows and Android.
+    return log(num) / 0.693147180559945309417232121458176568;
+}
+
+inline float log2f(float num)
+{
+    // This constant is roughly M_LN2, which is not provided by default on Windows and Android.
+    return logf(num) / 0.693147180559945309417232121458176568f;
+}
+#endif
+
 #if COMPILER(MSVC)
 // The 64bit version of abs() is already defined in stdlib.h which comes with VC10
 #if COMPILER(MSVC9_OR_LOWER)
@@ -160,19 +168,6 @@ inline float nextafterf(float x, float y) { return x > y ? x - FLT_EPSILON : x +
 
 inline double copysign(double x, double y) { return _copysign(x, y); }
 inline int isfinite(double x) { return _finite(x); }
-
-// MSVC's math.h does not currently supply log2 or log2f.
-inline double log2(double num)
-{
-    // This constant is roughly M_LN2, which is not provided by default on Windows.
-    return log(num) / 0.693147180559945309417232121458176568;
-}
-
-inline float log2f(float num)
-{
-    // This constant is roughly M_LN2, which is not provided by default on Windows.
-    return logf(num) / 0.693147180559945309417232121458176568f;
-}
 
 // Work around a bug in Win, where atan2(+-infinity, +-infinity) yields NaN instead of specific values.
 inline double wtf_atan2(double x, double y)
@@ -206,6 +201,22 @@ inline double wtf_pow(double x, double y) { return y == 0 ? 1 : pow(x, y); }
 #define atan2(x, y) wtf_atan2(x, y)
 #define fmod(x, y) wtf_fmod(x, y)
 #define pow(x, y) wtf_pow(x, y)
+
+// MSVC's math functions do not bring lrint.
+inline long int lrint(double flt)
+{
+    int intgr;
+#if CPU(X86)
+    __asm {
+        fld flt
+        fistp intgr
+    };
+#else
+#pragma message("Falling back to casting for lrint(), causes rounding inaccuracy in halfway case.")
+    intgr = static_cast<int>(flt);
+#endif
+    return intgr;
+}
 
 #endif // COMPILER(MSVC)
 
@@ -279,10 +290,37 @@ inline bool isWithinIntRange(float x)
 
 #if !COMPILER(MSVC) && !COMPILER(RVCT) && !OS(SOLARIS)
 using std::isfinite;
+#if !COMPILER_QUIRK(GCC11_GLOBAL_ISINF_ISNAN)
 using std::isinf;
 using std::isnan;
+#endif
 using std::signbit;
 #endif
+
+#if COMPILER_QUIRK(GCC11_GLOBAL_ISINF_ISNAN)
+// A workaround to avoid conflicting declarations of isinf and isnan when compiling with GCC in C++11 mode.
+namespace std {
+    inline bool wtf_isinf(float f) { return std::isinf(f); }
+    inline bool wtf_isinf(double d) { return std::isinf(d); }
+    inline bool wtf_isnan(float f) { return std::isnan(f); }
+    inline bool wtf_isnan(double d) { return std::isnan(d); }
+};
+
+using std::wtf_isinf;
+using std::wtf_isnan;
+
+#define isinf(x) wtf_isinf(x)
+#define isnan(x) wtf_isnan(x)
+#endif
+
+#ifndef UINT64_C
+#if COMPILER(MSVC)
+#define UINT64_C(c) c ## ui64
+#else
+#define UINT64_C(c) c ## ull
+#endif
+#endif
+
 
 // decompose 'number' to its sign, exponent, and mantissa components.
 // The result is interpreted as:

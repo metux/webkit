@@ -37,6 +37,7 @@
 #define LayoutTypes_h
 
 #include "FloatRect.h"
+#include "FractionalLayoutBoxExtent.h"
 #include "FractionalLayoutRect.h"
 #include "FractionalLayoutUnit.h"
 #include "IntRect.h"
@@ -49,6 +50,7 @@ typedef FractionalLayoutUnit LayoutUnit;
 typedef FractionalLayoutPoint LayoutPoint;
 typedef FractionalLayoutSize LayoutSize;
 typedef FractionalLayoutRect LayoutRect;
+typedef FractionalLayoutBoxExtent LayoutBoxExtent;
 
 #define MAX_LAYOUT_UNIT LayoutUnit::max()
 #define MIN_LAYOUT_UNIT LayoutUnit::min()
@@ -89,17 +91,12 @@ inline LayoutPoint roundedLayoutPoint(const FloatPoint& p)
 
 inline LayoutPoint flooredLayoutPoint(const FloatPoint& p)
 {
-    return LayoutPoint(p.x(), p.y());
+    return flooredFractionalLayoutPoint(p);
 }
 
 inline LayoutPoint flooredLayoutPoint(const FloatSize& s)
 {
-    return LayoutPoint(s.width(), s.height());
-}
-
-inline LayoutSize flooredLayoutSize(const FloatPoint& p)
-{
-    return LayoutSize(p.x(), p.y());
+    return flooredLayoutPoint(FloatPoint(s));
 }
 
 inline int roundToInt(LayoutUnit value)
@@ -109,13 +106,13 @@ inline int roundToInt(LayoutUnit value)
 
 inline int floorToInt(LayoutUnit value)
 {
-    return value.toInt();
+    return value.floor();
 }
 
 inline LayoutUnit roundedLayoutUnit(float value)
 {
 #if ENABLE(SUBPIXEL_LAYOUT)
-    return FractionalLayoutUnit(value);
+    return FractionalLayoutUnit::fromFloatRound(value);
 #else
     return static_cast<int>(lroundf(value));
 #endif
@@ -124,7 +121,7 @@ inline LayoutUnit roundedLayoutUnit(float value)
 inline LayoutUnit ceiledLayoutUnit(float value)
 {
 #if ENABLE(SUBPIXEL_LAYOUT)
-    return FractionalLayoutUnit(value);
+    return FractionalLayoutUnit::fromFloatCeil(value);
 #else
     return ceilf(value);
 #endif
@@ -147,12 +144,12 @@ inline LayoutPoint toLayoutPoint(const LayoutSize& p)
 
 inline LayoutUnit layoutMod(const LayoutUnit& numerator, const LayoutUnit& denominator)
 {
-    return numerator.toInt() % denominator.toInt();
+    return numerator % denominator;
 }
 
-inline LayoutUnit clampToLayoutUnit(double value)
+inline IntSize pixelSnappedIntSize(const FractionalLayoutSize& s, const FractionalLayoutPoint& p)
 {
-    return clampTo<FractionalLayoutUnit>(value, FractionalLayoutUnit::min(), FractionalLayoutUnit::max());
+    return IntSize(snapSizeToPixel(s.width(), p.x()), snapSizeToPixel(s.height(), p.y()));
 }
 
 inline IntRect pixelSnappedIntRect(LayoutPoint location, LayoutSize size)
@@ -162,7 +159,7 @@ inline IntRect pixelSnappedIntRect(LayoutPoint location, LayoutSize size)
 
 inline bool isIntegerValue(const LayoutUnit value)
 {
-    return value.floor() == value;
+    return value.toInt() == value;
 }
 
 } // namespace WebCore

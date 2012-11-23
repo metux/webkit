@@ -27,6 +27,7 @@
 #include "SVGParsingError.h"
 #include "SVGPropertyInfo.h"
 #include "StyledElement.h"
+#include "Timer.h"
 #include <wtf/HashMap.h>
 
 namespace WebCore {
@@ -72,6 +73,9 @@ public:
     virtual void animatedPropertyTypeForAttribute(const QualifiedName&, Vector<AnimatedPropertyType>&);
 
     void sendSVGLoadEventIfPossible(bool sendParentLoadEvents = false);
+    void sendSVGLoadEventIfPossibleAsynchronously();
+    void svgLoadEventTimerFired(Timer<SVGElement>*);
+    virtual Timer<SVGElement>* svgLoadEventTimer();
 
     virtual AffineTransform* supplementalTransform() { return 0; }
 
@@ -91,7 +95,7 @@ public:
 
     virtual void updateAnimatedSVGAttribute(const QualifiedName&) const;
  
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer();
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
 
     static void synchronizeRequiredFeatures(void* contextElement);
     static void synchronizeRequiredExtensions(void* contextElement);
@@ -113,21 +117,24 @@ public:
 
     virtual bool haveLoadedRequiredResources();
 
+    virtual bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture) OVERRIDE;
+    virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) OVERRIDE;
+
 protected:
     SVGElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
 
     virtual void finishParsingChildren();
-    virtual void attributeChanged(Attribute*) OVERRIDE;
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
+    virtual void attributeChanged(const Attribute&) OVERRIDE;
+    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
     
-    virtual void removedFrom(Node*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
 
-    SVGElementRareData* rareSVGData() const;
-    SVGElementRareData* ensureRareSVGData();
+    SVGElementRareData* svgRareData() const;
+    SVGElementRareData* ensureSVGRareData();
 
-    void reportAttributeParsingError(SVGParsingError, Attribute*);
+    void reportAttributeParsingError(SVGParsingError, const Attribute&);
 
 private:
     friend class SVGElementInstance;

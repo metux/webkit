@@ -31,20 +31,21 @@
 #include "ClassNodeList.h"
 
 #include "Document.h"
+#include "NodeRareData.h"
 #include "StyledElement.h"
 
 namespace WebCore {
 
 ClassNodeList::ClassNodeList(PassRefPtr<Node> rootNode, const String& classNames)
-    : DynamicSubtreeNodeList(rootNode)
-    , m_classNames(classNames, node()->document()->inQuirksMode())
+    : DynamicSubtreeNodeList(rootNode, ClassNodeListType, InvalidateOnClassAttrChange)
+    , m_classNames(classNames, document()->inQuirksMode())
     , m_originalClassNames(classNames)
 {
 }
 
 ClassNodeList::~ClassNodeList()
 {
-    rootNode()->removeCachedClassNodeList(this, m_originalClassNames);
+    ownerNode()->nodeLists()->removeCacheWithName(this, DynamicNodeList::ClassNodeListType, m_originalClassNames);
 } 
 
 bool ClassNodeList::nodeMatches(Element* testNode) const
@@ -53,8 +54,11 @@ bool ClassNodeList::nodeMatches(Element* testNode) const
         return false;
     if (!m_classNames.size())
         return false;
-    ASSERT(testNode->isStyledElement());
-    return static_cast<StyledElement*>(testNode)->classNames().containsAll(m_classNames);
+    // FIXME: DOM4 allows getElementsByClassName to return non StyledElement.
+    // https://bugs.webkit.org/show_bug.cgi?id=94718
+    if (!testNode->isStyledElement())
+        return false;
+    return testNode->classNames().containsAll(m_classNames);
 }
 
 } // namespace WebCore

@@ -31,6 +31,7 @@
 #define RenderRegion_h
 
 #include "RenderReplaced.h"
+#include "StyleInheritedData.h"
 
 namespace WebCore {
 
@@ -46,13 +47,13 @@ public:
     virtual bool isRenderRegion() const { return true; }
 
     virtual void paintReplaced(PaintInfo&, const LayoutPoint&);
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
     void setRegionRect(const LayoutRect& rect) { m_regionRect = rect; }
     LayoutRect regionRect() const { return m_regionRect; }
-    LayoutRect regionOverflowRect() const;
+    LayoutRect regionOversetRect() const;
 
     void attachRegion();
     void detachRegion();
@@ -82,29 +83,44 @@ public:
     bool isFirstRegion() const;
     bool isLastRegion() const;
 
-    void clearBoxStyleInRegion(const RenderBox*);
+    void clearObjectStyleInRegion(const RenderObject*);
 
     enum RegionState {
         RegionUndefined,
         RegionEmpty,
         RegionFit,
-        RegionOverflow
+        RegionOverset
     };
 
     RegionState regionState() const { return isValid() ? m_regionState : RegionUndefined; }
     void setRegionState(RegionState regionState) { m_regionState = regionState; }
-    void setDispatchRegionLayoutUpdateEvent(bool value) { m_dispatchRegionLayoutUpdateEvent = value; }
-    bool shouldDispatchRegionLayoutUpdateEvent() { return m_dispatchRegionLayoutUpdateEvent; }
+    
+    virtual LayoutUnit logicalWidthForFlowThreadContent() const;
+    virtual LayoutUnit logicalHeightForFlowThreadContent() const;
+
+protected:
+    void setRegionObjectsRegionStyle();
+    void restoreRegionObjectsOriginalStyle();
+    
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 
-    PassRefPtr<RenderStyle> renderBoxRegionStyle(const RenderBox*);
-    PassRefPtr<RenderStyle> computeStyleInRegion(const RenderBox*);
-    void setRegionBoxesRegionStyle();
-    void restoreRegionBoxesOriginalStyle();
+    virtual void insertedIntoTree() OVERRIDE;
+    virtual void willBeRemovedFromTree() OVERRIDE;
 
+    virtual void installFlowThread();
+
+    PassRefPtr<RenderStyle> computeStyleInRegion(const RenderObject*);
+    void computeChildrenStyleInRegion(const RenderObject*);
+    void setObjectStyleInRegion(RenderObject*, PassRefPtr<RenderStyle>, bool objectRegionStyleCached);
+    void printRegionObjectsStyles();
+
+    void checkRegionStyle();
+
+protected:
     RenderFlowThread* m_flowThread;
 
+private:
     // If this RenderRegion is displayed as part of another named flow,
     // we need to create a dependency tree, so that layout of the
     // regions is always done before the regions themselves.
@@ -118,13 +134,22 @@ private:
     typedef HashMap<const RenderBox*, OwnPtr<RenderBoxRegionInfo> > RenderBoxRegionInfoMap;
     RenderBoxRegionInfoMap m_renderBoxRegionInfo;
 
-    typedef HashMap<const RenderBox*, RefPtr<RenderStyle> > RenderBoxRegionStyleMap;
-    RenderBoxRegionStyleMap m_renderBoxRegionStyle;
+    struct ObjectRegionStyleInfo {
+        // Used to store the original style of the object in region
+        // so that the original style is properly restored after paint.
+        // Also used to store computed style of the object in region between
+        // region paintings, so that the style in region is computed only
+        // when necessary.
+        RefPtr<RenderStyle> style;
+        // True if the computed style in region is cached.
+        bool cached;
+    };
+    typedef HashMap<const RenderObject*, ObjectRegionStyleInfo > RenderObjectRegionStyleMap;
+    RenderObjectRegionStyleMap m_renderObjectRegionStyle;
 
     bool m_isValid;
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
-    bool m_dispatchRegionLayoutUpdateEvent;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)

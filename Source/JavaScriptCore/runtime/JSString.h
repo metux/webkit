@@ -67,6 +67,8 @@ namespace JSC {
         friend class JSGlobalData;
         friend class SpecializedThunkJIT;
         friend class JSRopeString;
+        friend class MarkStack;
+        friend class SlotVisitor;
         friend struct ThunkHelpers;
 
         typedef JSCell Base;
@@ -76,12 +78,14 @@ namespace JSC {
     private:
         JSString(JSGlobalData& globalData, PassRefPtr<StringImpl> value)
             : JSCell(globalData, globalData.stringStructure.get())
+            , m_flags(0)
             , m_value(value)
         {
         }
 
         JSString(JSGlobalData& globalData)
             : JSCell(globalData, globalData.stringStructure.get())
+            , m_flags(0)
         {
         }
 
@@ -90,7 +94,8 @@ namespace JSC {
             ASSERT(!m_value.isNull());
             Base::finishCreation(globalData);
             m_length = length;
-            m_is8Bit = m_value.impl()->is8Bit();
+            setIs8Bit(m_value.impl()->is8Bit());
+            globalData.m_newStringsSinceLastHashConst++;
         }
 
         void finishCreation(JSGlobalData& globalData, size_t length, size_t cost)
@@ -98,8 +103,9 @@ namespace JSC {
             ASSERT(!m_value.isNull());
             Base::finishCreation(globalData);
             m_length = length;
-            m_is8Bit = m_value.impl()->is8Bit();
+            setIs8Bit(m_value.impl()->is8Bit());
             Heap::heap(this)->reportExtraMemoryCost(cost);
+            globalData.m_newStringsSinceLastHashConst++;
         }
 
     protected:
@@ -107,7 +113,8 @@ namespace JSC {
         {
             Base::finishCreation(globalData);
             m_length = 0;
-            m_is8Bit = true;
+            setIs8Bit(true);
+            globalData.m_newStringsSinceLastHashConst++;
         }
         
     public:
@@ -134,14 +141,14 @@ namespace JSC {
         unsigned length() { return m_length; }
 
         JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
-        JS_EXPORT_PRIVATE bool toBoolean(ExecState*) const;
+        JS_EXPORT_PRIVATE bool toBoolean() const;
         bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;
         JSObject* toObject(ExecState*, JSGlobalObject*) const;
         double toNumber(ExecState*) const;
         
-        bool getStringPropertySlot(ExecState*, const Identifier& propertyName, PropertySlot&);
+        bool getStringPropertySlot(ExecState*, PropertyName, PropertySlot&);
         bool getStringPropertySlot(ExecState*, unsigned propertyName, PropertySlot&);
-        bool getStringPropertyDescriptor(ExecState*, const Identifier& propertyName, PropertyDescriptor&);
+        bool getStringPropertyDescriptor(ExecState*, PropertyName, PropertyDescriptor&);
 
         bool canGetIndex(unsigned i) { return i < m_length; }
         JSString* getIndex(ExecState*, unsigned);
@@ -160,10 +167,30 @@ namespace JSC {
 
     protected:
         bool isRope() const { return m_value.isNull(); }
-        bool is8Bit() const { return m_is8Bit; }
+        bool is8Bit() const { return m_flags & Is8Bit; }
+        void setIs8Bit(bool flag)
+        {
+            if (flag)
+                m_flags |= Is8Bit;
+            else
+                m_flags &= ~Is8Bit;
+        }
+        bool shouldTryHashConst();
+        bool isHashConstSingleton() const { return m_flags & IsHashConstSingleton; }
+        void clearHashConstSingleton() { m_flags &= ~IsHashConstSingleton; }
+        void setHashConstSingleton() { m_flags |= IsHashConstSingleton; }
+        bool tryHashConstLock();
+        void releaseHashConstLock();
+
+        unsigned m_flags;
+        
+        enum {
+            HashConstLock = 1u << 2,
+            IsHashConstSingleton = 1u << 1,
+            Is8Bit = 1u
+        };
 
         // A string is represented either by a UString or a rope of fibers.
-        bool m_is8Bit : 1;
         unsigned m_length;
         mutable UString m_value;
 
@@ -173,7 +200,7 @@ namespace JSC {
         static JSObject* toThisObject(JSCell*, ExecState*);
 
         // Actually getPropertySlot, not getOwnPropertySlot (see JSCell).
-        static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
+        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
         static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
 
         UString& string() { ASSERT(!isRope()); return m_value; }
@@ -200,9 +227,7 @@ namespace JSC {
             {
                 if (m_index == JSRopeString::s_maxInternalRopeLength)
                     expand();
-                m_jsString->m_fibers[m_index++].set(m_globalData, m_jsString, jsString);
-                m_jsString->m_length += jsString->m_length;
-                m_jsString->m_is8Bit = m_jsString->m_is8Bit && jsString->m_is8Bit;
+                m_jsString->append(m_globalData, m_index++, jsString);
             }
 
             JSRopeString* release()
@@ -232,7 +257,7 @@ namespace JSC {
         {
             Base::finishCreation(globalData);
             m_length = s1->length() + s2->length();
-            m_is8Bit = (s1->is8Bit() && s2->is8Bit());
+            setIs8Bit(s1->is8Bit() && s2->is8Bit());
             m_fibers[0].set(globalData, this, s1);
             m_fibers[1].set(globalData, this, s2);
         }
@@ -241,7 +266,7 @@ namespace JSC {
         {
             Base::finishCreation(globalData);
             m_length = s1->length() + s2->length() + s3->length();
-            m_is8Bit = (s1->is8Bit() && s2->is8Bit() &&  s3->is8Bit());
+            setIs8Bit(s1->is8Bit() && s2->is8Bit() &&  s3->is8Bit());
             m_fibers[0].set(globalData, this, s1);
             m_fibers[1].set(globalData, this, s2);
             m_fibers[2].set(globalData, this, s3);
@@ -250,6 +275,13 @@ namespace JSC {
         void finishCreation(JSGlobalData& globalData)
         {
             JSString::finishCreation(globalData);
+        }
+
+        void append(JSGlobalData& globalData, size_t index, JSString* jsString)
+        {
+            m_fibers[index].set(globalData, this, jsString);
+            m_length += jsString->m_length;
+            setIs8Bit(is8Bit() && jsString->is8Bit());
         }
 
         static JSRopeString* createNull(JSGlobalData& globalData)
@@ -439,16 +471,16 @@ namespace JSC {
     inline JSString* jsNontrivialString(ExecState* exec, const char* s) { return jsNontrivialString(&exec->globalData(), s); }
     inline JSString* jsOwnedString(ExecState* exec, const UString& s) { return jsOwnedString(&exec->globalData(), s); } 
 
-    ALWAYS_INLINE bool JSString::getStringPropertySlot(ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+    ALWAYS_INLINE bool JSString::getStringPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot)
     {
         if (propertyName == exec->propertyNames().length) {
             slot.setValue(jsNumber(m_length));
             return true;
         }
 
-        bool isStrictUInt32;
-        unsigned i = propertyName.toUInt32(isStrictUInt32);
-        if (isStrictUInt32 && i < m_length) {
+        unsigned i = propertyName.asIndex();
+        if (i < m_length) {
+            ASSERT(i != PropertyName::NotAnIndex); // No need for an explicit check, the above test would always fail!
             slot.setValue(getIndex(exec, i));
             return true;
         }
@@ -468,23 +500,23 @@ namespace JSC {
 
     inline bool isJSString(JSValue v) { return v.isCell() && v.asCell()->classInfo() == &JSString::s_info; }
 
-    inline bool JSCell::toBoolean(ExecState* exec) const
+    inline bool JSCell::toBoolean() const
     {
         if (isString()) 
-            return static_cast<const JSString*>(this)->toBoolean(exec);
+            return static_cast<const JSString*>(this)->toBoolean();
         return !structure()->typeInfo().masqueradesAsUndefined();
     }
 
     // --- JSValue inlines ----------------------------
     
-    inline bool JSValue::toBoolean(ExecState* exec) const
+    inline bool JSValue::toBoolean() const
     {
         if (isInt32())
             return asInt32();
         if (isDouble())
             return asDouble() > 0.0 || asDouble() < 0.0; // false for NaN
         if (isCell())
-            return asCell()->toBoolean(exec);
+            return asCell()->toBoolean();
         return isTrue(); // false, null, and undefined all convert to false.
     }
 

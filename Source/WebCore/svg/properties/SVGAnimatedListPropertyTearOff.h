@@ -66,8 +66,7 @@ public:
 
     void detachListWrappers(unsigned newListSize)
     {
-        if (m_baseVal)
-            static_cast<ListProperty*>(m_baseVal.get())->detachListWrappers(newListSize);
+        ListProperty::detachListWrappersAndResize(&m_wrappers, newListSize);
     }
 
     PropertyType& currentAnimatedValue()
@@ -116,9 +115,6 @@ public:
 
         m_animatedWrappers.clear();
         m_isAnimating = false;
-
-        ASSERT(contextElement());
-        contextElement()->svgAttributeChanged(attributeName());
     }
 
     void synchronizeWrappersIfNeeded()
@@ -149,9 +145,6 @@ public:
         ASSERT(m_animVal);
         ASSERT(m_values.size() == m_wrappers.size());
         synchronizeWrappersIfNeeded();
-
-        ASSERT(contextElement());
-        contextElement()->svgAttributeChanged(attributeName());
     }
 
     static PassRefPtr<SVGAnimatedListPropertyTearOff<PropertyType> > create(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, PropertyType& values)

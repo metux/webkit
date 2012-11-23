@@ -164,8 +164,6 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_orientation(0)
 #endif
     , m_inViewSourceMode(false)
-    , m_isDisconnected(false)
-    , m_excludeFromTextSearch(false)
     , m_activeDOMObjectsAndAnimationsSuspendedCount(0)
 {
     ASSERT(page);
@@ -262,12 +260,12 @@ void Frame::setView(PassRefPtr<FrameView> view)
     if (m_view)
         m_view->detachCustomScrollbars();
 
-    // Detach the document now, so any onUnload handlers get run - if
-    // we wait until the view is destroyed, then things won't be
-    // hooked up enough for some JavaScript calls to work.
+    // Prepare for destruction now, so any unload event handlers get run and the DOMWindow is
+    // notified. If we wait until the view is destroyed, then things won't be hooked up enough for
+    // these calls to work.
     if (!view && m_doc && m_doc->attached() && !m_doc->inPageCache()) {
         // FIXME: We don't call willRemove here. Why is that OK?
-        m_doc->detach();
+        m_doc->prepareForDestruction();
     }
     
     if (m_view)
@@ -290,13 +288,16 @@ void Frame::setView(PassRefPtr<FrameView> view)
 
 void Frame::setDocument(PassRefPtr<Document> newDoc)
 {
-    ASSERT(!newDoc || newDoc->frame());
+    ASSERT(!newDoc || newDoc->frame() == this);
     if (m_doc && m_doc->attached() && !m_doc->inPageCache()) {
         // FIXME: We don't call willRemove here. Why is that OK?
         m_doc->detach();
     }
 
     m_doc = newDoc;
+    ASSERT(!m_doc || m_doc->domWindow());
+    ASSERT(!m_doc || m_doc->domWindow()->frame() == this);
+
     selection()->updateSecureKeyboardEntryIfActive();
 
     if (m_doc && !m_doc->attached())
@@ -310,7 +311,10 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
 
     if (m_page && m_page->mainFrame() == this) {
         notifyChromeClientWheelEventHandlerCountChanged();
-        notifyChromeClientTouchEventHandlerCountChanged();
+#if ENABLE(TOUCH_EVENTS)
+        if (m_doc && m_doc->touchEventHandlerCount())
+            m_page->chrome()->client()->needTouchEvents(true);
+#endif
     }
 
     // Suspend document if this frame was created in suspended state.
@@ -522,9 +526,9 @@ void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSiz
     view()->adjustMediaTypeForPrinting(printing);
 
     m_doc->styleResolverChanged(RecalcStyleImmediately);
-    if (printing)
+    if (shouldUsePrintingLayout()) {
         view()->forceLayoutForPagination(pageSize, originalPageSize, maximumShrinkRatio, shouldAdjustViewSize);
-    else {
+    } else {
         view()->forceLayout();
         if (shouldAdjustViewSize == AdjustViewSize)
             view()->adjustViewSize();
@@ -535,6 +539,13 @@ void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSiz
         child->setPrinting(printing, FloatSize(), FloatSize(), 0, shouldAdjustViewSize);
 }
 
+bool Frame::shouldUsePrintingLayout() const
+{
+    // Only top frame being printed should be fit to page size.
+    // Subframes should be constrained by parents only.
+    return m_doc->printing() && (!tree()->parent() || !tree()->parent()->m_doc->printing());
+}
+
 FloatSize Frame::resizePageRectsKeepingRatio(const FloatSize& originalSize, const FloatSize& expectedSize)
 {
     FloatSize resultSize;
@@ -542,10 +553,12 @@ FloatSize Frame::resizePageRectsKeepingRatio(const FloatSize& originalSize, cons
         return FloatSize();
 
     if (contentRenderer()->style()->isHorizontalWritingMode()) {
+        ASSERT(fabs(originalSize.width()) > numeric_limits<float>::epsilon());
         float ratio = originalSize.height() / originalSize.width();
         resultSize.setWidth(floorf(expectedSize.width()));
         resultSize.setHeight(floorf(resultSize.width() * ratio));
     } else {
+        ASSERT(fabs(originalSize.height()) > numeric_limits<float>::epsilon());
         float ratio = originalSize.width() / originalSize.height();
         resultSize.setHeight(floorf(expectedSize.height()));
         resultSize.setWidth(floorf(resultSize.height() * ratio));
@@ -589,15 +602,6 @@ void Frame::injectUserScriptsForWorld(DOMWrapperWorld* world, const UserScriptVe
         if (script->injectionTime() == injectionTime && UserContentURLPattern::matchesPatterns(doc->url(), script->whitelist(), script->blacklist()))
             m_script.evaluateInWorld(ScriptSourceCode(script->source(), script->url()), world);
     }
-}
-
-void Frame::clearDOMWindow()
-{
-    if (m_domWindow) {
-        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
-        m_domWindow->clear();
-    }
-    m_domWindow = 0;
 }
 
 RenderView* Frame::contentRenderer() const
@@ -659,15 +663,6 @@ void Frame::clearTimers()
     clearTimers(m_view.get(), document());
 }
 
-void Frame::setDOMWindow(DOMWindow* domWindow)
-{
-    if (m_domWindow) {
-        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
-        m_domWindow->clear();
-    }
-    m_domWindow = domWindow;
-}
-
 #if ENABLE(PAGE_VISIBILITY_API)
 void Frame::dispatchVisibilityStateChangeEvent()
 {
@@ -678,12 +673,11 @@ void Frame::dispatchVisibilityStateChangeEvent()
 }
 #endif
 
-DOMWindow* Frame::domWindow() const
+void Frame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    if (!m_domWindow)
-        m_domWindow = DOMWindow::create(const_cast<Frame*>(this));
-
-    return m_domWindow.get();
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    info.addInstrumentedMember(m_doc.get());
+    info.addInstrumentedMember(m_loader);
 }
 
 void Frame::willDetachPage()
@@ -1024,54 +1018,41 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
     m_page->chrome()->client()->numWheelEventHandlersChanged(count);
 }
 
-void Frame::notifyChromeClientTouchEventHandlerCountChanged() const
-{
-    // Ensure that this method is being called on the main frame of the page.
-    ASSERT(m_page && m_page->mainFrame() == this);
-
-    unsigned count = 0;
-    for (const Frame* frame = this; frame; frame = frame->tree()->traverseNext()) {
-        if (frame->document())
-            count += frame->document()->touchEventHandlerCount();
-    }
-
-    m_page->chrome()->client()->numTouchEventHandlersChanged(count);
-}
-
 #if !PLATFORM(MAC) && !PLATFORM(WIN)
 struct ScopedFramePaintingState {
-    ScopedFramePaintingState(Frame* theFrame, RenderObject* theRenderer)
-        : frame(theFrame)
-        , renderer(theRenderer)
+    ScopedFramePaintingState(Frame* frame, Node* node)
+        : frame(frame)
+        , node(node)
         , paintBehavior(frame->view()->paintBehavior())
         , backgroundColor(frame->view()->baseBackgroundColor())
     {
+        ASSERT(!node || node->renderer());
+        if (node)
+            node->renderer()->updateDragState(true);
     }
 
     ~ScopedFramePaintingState()
     {
-        if (renderer)
-            renderer->updateDragState(false);
+        if (node && node->renderer())
+            node->renderer()->updateDragState(false);
         frame->view()->setPaintBehavior(paintBehavior);
         frame->view()->setBaseBackgroundColor(backgroundColor);
         frame->view()->setNodeToDraw(0);
     }
 
     Frame* frame;
-    RenderObject* renderer;
+    Node* node;
     PaintBehavior paintBehavior;
     Color backgroundColor;
 };
 
 DragImageRef Frame::nodeImage(Node* node)
 {
-    RenderObject* renderer = node->renderer();
-    if (!renderer)
+    if (!node->renderer())
         return 0;
 
-    const ScopedFramePaintingState state(this, renderer);
+    const ScopedFramePaintingState state(this, node);
 
-    renderer->updateDragState(true);
     m_view->setPaintBehavior(state.paintBehavior | PaintBehaviorFlattenCompositingLayers);
 
     // When generating the drag image for an element, ignore the document background.
@@ -1079,10 +1060,21 @@ DragImageRef Frame::nodeImage(Node* node)
     m_doc->updateLayout();
     m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
 
+    // Document::updateLayout may have blown away the original RenderObject.
+    RenderObject* renderer = node->renderer();
+    if (!renderer)
+      return 0;
+
     LayoutRect topLevelRect;
     IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), 1, ColorSpaceDeviceRGB));
+    float deviceScaleFactor = 1;
+    if (m_page)
+        deviceScaleFactor = m_page->deviceScaleFactor();
+    paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
+    paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
+
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor, ColorSpaceDeviceRGB));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
@@ -1105,7 +1097,13 @@ DragImageRef Frame::dragImageForSelection()
 
     IntRect paintingRect = enclosingIntRect(selection()->bounds());
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), 1, ColorSpaceDeviceRGB));
+    float deviceScaleFactor = 1;
+    if (m_page)
+        deviceScaleFactor = m_page->deviceScaleFactor();
+    paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
+    paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
+
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor, ColorSpaceDeviceRGB));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());

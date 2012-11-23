@@ -182,9 +182,6 @@ Color::Color(const char* name)
 
 String Color::serialized() const
 {
-    DEFINE_STATIC_LOCAL(const String, commaSpace, (", "));
-    DEFINE_STATIC_LOCAL(const String, rgbaParen, ("rgba("));
-
     if (!hasAlpha()) {
         StringBuilder builder;
         builder.reserveCapacity(7);
@@ -195,21 +192,23 @@ String Color::serialized() const
         return builder.toString();
     }
 
-    Vector<UChar> result;
+    Vector<LChar> result;
     result.reserveInitialCapacity(28);
+    const char commaSpace[] = ", ";
+    const char rgbaParen[] = "rgba(";
 
-    append(result, rgbaParen);
+    result.append(rgbaParen, 5);
     appendNumber(result, red());
-    append(result, commaSpace);
+    result.append(commaSpace, 2);
     appendNumber(result, green());
-    append(result, commaSpace);
+    result.append(commaSpace, 2);
     appendNumber(result, blue());
-    append(result, commaSpace);
+    result.append(commaSpace, 2);
 
     if (!alpha())
         result.append('0');
     else {
-        NumberToUStringBuffer buffer;
+        NumberToLStringBuffer buffer;
         unsigned length = DecimalNumber(alpha() / 255.0).toStringDecimal(buffer, WTF::NumberToStringBufferLength);
         result.append(buffer, length);
     }
@@ -397,17 +396,18 @@ void Color::getHSL(double& hue, double& saturation, double& lightness) const
 
 Color colorFromPremultipliedARGB(unsigned pixelColor)
 {
-    RGBA32 rgba;
+    Color color;
 
     if (unsigned alpha = (pixelColor & 0xFF000000) >> 24) {
-        rgba = makeRGBA(((pixelColor & 0x00FF0000) >> 16) * 255 / alpha,
+        color = Color::createUnCheked(
+                        ((pixelColor & 0x00FF0000) >> 16) * 255 / alpha,
                         ((pixelColor & 0x0000FF00) >> 8) * 255 / alpha,
                          (pixelColor & 0x000000FF) * 255 / alpha,
                           alpha);
     } else
-        rgba = pixelColor;
+        color = Color(pixelColor);
 
-    return Color(rgba);
+    return color;
 }
 
 unsigned premultipliedARGBFromColor(const Color& color)

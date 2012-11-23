@@ -406,13 +406,11 @@ extern "C" WTF_EXPORT_PRIVATE const int jscore_fastmalloc_introspection = 0;
 #else // FORCE_SYSTEM_MALLOC
 
 #include "AlwaysInline.h"
-#include "Assertions.h"
 #include "TCPackedCache.h"
 #include "TCPageMap.h"
 #include "TCSpinLock.h"
 #include "TCSystemAlloc.h"
 #include <algorithm>
-#include <limits>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -1566,7 +1564,7 @@ void TCMalloc_PageHeap::initializeScavenger()
 
 ALWAYS_INLINE bool TCMalloc_PageHeap::isScavengerSuspended()
 {
-    ASSERT(IsHeld(pageheap_lock));
+    ASSERT(pageheap_lock.IsHeld());
     return !m_scavengeQueueTimer;
 }
 
@@ -1574,7 +1572,7 @@ ALWAYS_INLINE void TCMalloc_PageHeap::scheduleScavenger()
 {
     // We need to use WT_EXECUTEONLYONCE here and reschedule the timer, because
     // Windows will fire the timer event even when the function is already running.
-    ASSERT(IsHeld(pageheap_lock));
+    ASSERT(pageheap_lock.IsHeld());
     CreateTimerQueueTimer(&m_scavengeQueueTimer, 0, scavengerTimerFired, this, kScavengeDelayInSeconds * 1000, 0, WT_EXECUTEONLYONCE);
 }
 
@@ -1587,7 +1585,7 @@ ALWAYS_INLINE void TCMalloc_PageHeap::rescheduleScavenger()
 
 ALWAYS_INLINE void TCMalloc_PageHeap::suspendScavenger()
 {
-    ASSERT(IsHeld(pageheap_lock));
+    ASSERT(pageheap_lock.IsHeld());
     HANDLE scavengeQueueTimer = m_scavengeQueueTimer;
     m_scavengeQueueTimer = 0;
     DeleteTimerQueueTimer(0, scavengeQueueTimer, 0);
@@ -4656,10 +4654,10 @@ extern "C" {
 malloc_introspection_t jscore_fastmalloc_introspection = { &FastMallocZone::enumerate, &FastMallocZone::goodSize, &FastMallocZone::check, &FastMallocZone::print,
     &FastMallocZone::log, &FastMallocZone::forceLock, &FastMallocZone::forceUnlock, &FastMallocZone::statistics
 
-#if !defined(BUILDING_ON_LEOPARD) || OS(IOS)
+#if OS(IOS) || __MAC_OS_X_VERSION_MAX_ALLOWED >= 1060
     , 0 // zone_locked will not be called on the zone unless it advertises itself as version five or higher.
 #endif
-#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD) || OS(IOS)
+#if OS(IOS) || __MAC_OS_X_VERSION_MAX_ALLOWED >= 1070
     , 0, 0, 0, 0 // These members will not be used unless the zone advertises itself as version seven or higher.
 #endif
 

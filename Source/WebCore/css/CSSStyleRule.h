@@ -48,6 +48,10 @@ public:
     // FIXME: Not CSSOM. Remove.
     StyleRule* styleRule() const { return m_styleRule.get(); }
 
+    void reattach(StyleRule*);
+
+    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+
 private:
     CSSStyleRule(StyleRule*, CSSStyleSheet*);
 

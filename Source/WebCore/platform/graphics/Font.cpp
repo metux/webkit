@@ -93,7 +93,7 @@ Font::Font(const Font& other)
     , m_letterSpacing(other.m_letterSpacing)
     , m_wordSpacing(other.m_wordSpacing)
     , m_isPlatformFont(other.m_isPlatformFont)
-    , m_needsTranscoding(fontTranscoder().needsTranscoding(other.m_fontDescription))
+    , m_needsTranscoding(other.m_needsTranscoding)
 {
 }
 
@@ -257,11 +257,6 @@ Font::CodePath Font::codePath(const TextRun& run) const
 #if ENABLE(SVG_FONTS)
     if (run.renderingContext())
         return Simple;
-#endif
-
-#if PLATFORM(QT) && !HAVE(QRAWFONT)
-    if (run.expansion() || run.rtl() || isSmallCaps() || wordSpacing() || letterSpacing())
-        return Complex;
 #endif
 
     if (m_fontDescription.featureSettings() && m_fontDescription.featureSettings()->size() > 0)

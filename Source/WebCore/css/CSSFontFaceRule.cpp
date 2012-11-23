@@ -22,6 +22,7 @@
 #include "config.h"
 #include "CSSFontFaceRule.h"
 
+#include "MemoryInstrumentation.h"
 #include "StylePropertySet.h"
 #include "StyleRule.h"
 
@@ -42,7 +43,7 @@ CSSFontFaceRule::~CSSFontFaceRule()
 CSSStyleDeclaration* CSSFontFaceRule::style() const
 {
     if (!m_propertiesCSSOMWrapper)
-        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_fontFaceRule->properties(), const_cast<CSSFontFaceRule*>(this));
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_fontFaceRule->mutableProperties(), const_cast<CSSFontFaceRule*>(this));
     return m_propertiesCSSOMWrapper.get();
 }
 
@@ -53,6 +54,22 @@ String CSSFontFaceRule::cssText() const
     result += m_fontFaceRule->properties()->asText();
     result += "}";
     return result;
+}
+
+void CSSFontFaceRule::reattach(StyleRuleFontFace* rule)
+{
+    ASSERT(rule);
+    m_fontFaceRule = rule;
+    if (m_propertiesCSSOMWrapper)
+        m_propertiesCSSOMWrapper->reattach(m_fontFaceRule->mutableProperties());
+}
+
+void CSSFontFaceRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
+    info.addInstrumentedMember(m_fontFaceRule);
+    info.addInstrumentedMember(m_propertiesCSSOMWrapper);
 }
 
 } // namespace WebCore

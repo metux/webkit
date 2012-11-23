@@ -31,9 +31,18 @@
 #ifndef FractionalLayoutRect_h
 #define FractionalLayoutRect_h
 
+#include "FractionalLayoutBoxExtent.h"
 #include "FractionalLayoutPoint.h"
 #include "IntRect.h"
 #include <wtf/Vector.h>
+
+#if PLATFORM(QT)
+#include <qglobal.h>
+QT_BEGIN_NAMESPACE
+class QRect;
+class QRectF;
+QT_END_NAMESPACE
+#endif
 
 namespace WebCore {
 
@@ -56,7 +65,7 @@ public:
     FractionalLayoutSize size() const { return m_size; }
 
     IntPoint pixelSnappedLocation() const { return roundedIntPoint(m_location); }
-    IntSize pixelSnappedSize() const { return pixelSnappedIntSize(m_size, m_location); }
+    IntSize pixelSnappedSize() const { return IntSize(snapSizeToPixel(m_size.width(), m_location.x()), snapSizeToPixel(m_size.height(), m_location.y())); }
 
     void setLocation(const FractionalLayoutPoint& location) { m_location = location; }
     void setSize(const FractionalLayoutSize& size) { m_size = size; }
@@ -72,8 +81,8 @@ public:
     int pixelSnappedY() const { return y().round(); }
     int pixelSnappedWidth() const { return snapSizeToPixel(width(), x()); }
     int pixelSnappedHeight() const { return snapSizeToPixel(height(), y()); }
-    int pixelSnappedMaxX() const { return pixelSnappedX() + pixelSnappedWidth(); }
-    int pixelSnappedMaxY() const { return pixelSnappedY() + pixelSnappedHeight(); }
+    int pixelSnappedMaxX() const { return (m_location.x() + m_size.width()).round(); }
+    int pixelSnappedMaxY() const { return (m_location.y() + m_size.height()).round(); }
 
     void setX(FractionalLayoutUnit x) { m_location.setX(x); }
     void setY(FractionalLayoutUnit y) { m_location.setY(y); }
@@ -91,6 +100,11 @@ public:
     void move(FractionalLayoutUnit dx, FractionalLayoutUnit dy) { m_location.move(dx, dy); } 
 
     void expand(const FractionalLayoutSize& size) { m_size += size; }
+    void expand(const FractionalLayoutBoxExtent& box)
+    {
+        m_location.move(-box.left(), -box.top());
+        m_size.expand(box.left() + box.right(), box.top() + box.bottom());
+    }
     void expand(FractionalLayoutUnit dw, FractionalLayoutUnit dh) { m_size.expand(dw, dh); }
     void contract(const FractionalLayoutSize& size) { m_size -= size; }
     void contract(FractionalLayoutUnit dw, FractionalLayoutUnit dh) { m_size.expand(-dw, -dh); }
@@ -153,6 +167,12 @@ public:
 
     static FractionalLayoutRect infiniteRect() {return FractionalLayoutRect(FractionalLayoutUnit::min() / 2, FractionalLayoutUnit::min() / 2, FractionalLayoutUnit::max(), FractionalLayoutUnit::max()); }
 
+#if PLATFORM(QT)
+    explicit FractionalLayoutRect(const QRect&);
+    explicit FractionalLayoutRect(const QRectF&);
+    operator QRectF() const;
+#endif
+
 private:
     FractionalLayoutPoint m_location;
     FractionalLayoutSize m_size;
@@ -184,9 +204,19 @@ inline bool operator!=(const FractionalLayoutRect& a, const FractionalLayoutRect
     return a.location() != b.location() || a.size() != b.size();
 }
 
+inline IntRect pixelSnappedIntRect(const FractionalLayoutRect& rect)
+{
+#if ENABLE(SUBPIXEL_LAYOUT)
+    IntPoint roundedLocation = roundedIntPoint(rect.location());
+    return IntRect(roundedLocation, IntSize((rect.x() + rect.width()).round() - roundedLocation.x(),
+                                            (rect.y() + rect.height()).round() - roundedLocation.y()));
+#else
+    return IntRect(rect);
+#endif
+}
+
 IntRect enclosingIntRect(const FractionalLayoutRect&);
 FractionalLayoutRect enclosingFractionalLayoutRect(const FloatRect&);
-IntRect pixelSnappedIntRect(const FractionalLayoutRect&);
 
 } // namespace WebCore
 

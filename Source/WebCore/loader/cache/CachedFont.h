@@ -70,6 +70,8 @@ public:
     SVGFontElement* getSVGFontById(const String&) const;
 #endif
 
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 private:
     FontCustomPlatformData* m_fontData;
     bool m_loadInitiated;
@@ -85,7 +87,7 @@ class CachedFontClient : public CachedResourceClient {
 public:
     virtual ~CachedFontClient() { }
     static CachedResourceClientType expectedType() { return FontType; }
-    virtual CachedResourceClientType resourceClientType() { return expectedType(); }
+    virtual CachedResourceClientType resourceClientType() const { return expectedType(); }
     virtual void fontLoaded(CachedFont*) { }
 };
 

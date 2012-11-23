@@ -35,6 +35,14 @@
 #include "FractionalLayoutSize.h"
 #include <wtf/MathExtras.h>
 
+#if PLATFORM(QT)
+#include <qglobal.h>
+QT_BEGIN_NAMESPACE
+class QPoint;
+class QPointF;
+QT_END_NAMESPACE
+#endif
+
 namespace WebCore {
 
 class FractionalLayoutPoint {
@@ -81,6 +89,12 @@ public:
     {
         return FractionalLayoutPoint(m_y, m_x);
     }
+
+#if PLATFORM(QT)
+    explicit FractionalLayoutPoint(const QPoint&);
+    explicit FractionalLayoutPoint(const QPointF&);
+    operator QPointF() const;
+#endif
 
 private:
     FractionalLayoutUnit m_x, m_y;
@@ -145,7 +159,7 @@ inline FractionalLayoutSize toSize(const FractionalLayoutPoint& a)
 
 inline IntPoint flooredIntPoint(const FractionalLayoutPoint& point)
 {
-    return IntPoint(point.x().toInt(), point.y().toInt());
+    return IntPoint(point.x().floor(), point.y().floor());
 }
 
 inline IntPoint roundedIntPoint(const FractionalLayoutPoint& point)
@@ -153,11 +167,25 @@ inline IntPoint roundedIntPoint(const FractionalLayoutPoint& point)
     return IntPoint(point.x().round(), point.y().round());
 }
 
+inline IntPoint roundedIntPoint(const FractionalLayoutSize& size)
+{
+    return IntPoint(size.width().round(), size.height().round());
+}
+
 inline IntPoint ceiledIntPoint(const FractionalLayoutPoint& point)
 {
     return IntPoint(point.x().ceil(), point.y().ceil());
 }
 
+inline FractionalLayoutPoint flooredFractionalLayoutPoint(const FloatPoint& p)
+{
+    return FractionalLayoutPoint(FractionalLayoutUnit::fromFloatFloor(p.x()), FractionalLayoutUnit::fromFloatFloor(p.y()));
+}
+
+inline FractionalLayoutPoint ceiledFractionalLayoutPoint(const FloatPoint& p)
+{
+    return FractionalLayoutPoint(FractionalLayoutUnit::fromFloatCeil(p.x()), FractionalLayoutUnit::fromFloatCeil(p.y()));
+}
 
 } // namespace WebCore
 

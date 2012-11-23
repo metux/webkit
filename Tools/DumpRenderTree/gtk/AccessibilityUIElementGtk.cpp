@@ -34,19 +34,40 @@
 #include <wtf/Assertions.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
+#include <wtf/text/WTFString.h>
+#include <wtf/unicode/CharacterNames.h>
+
+static inline gchar* replaceCharactersForResults(gchar* str)
+{
+    String uString = String::fromUTF8(str);
+
+    // The object replacement character is passed along to ATs so we need to be
+    // able to test for their presence and do so without causing test failures.
+    uString.replace(objectReplacementCharacter, "<obj>");
+
+    // The presence of newline characters in accessible text of a single object
+    // is appropriate, but it makes test results (especially the accessible tree)
+    // harder to read.
+    uString.replace("\n", "<\\n>");
+
+    return g_strdup(uString.utf8().data());
+}
 
 AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement element)
     : m_element(element)
 {
+    g_object_ref(m_element);
 }
 
 AccessibilityUIElement::AccessibilityUIElement(const AccessibilityUIElement& other)
     : m_element(other.m_element)
 {
+    g_object_ref(m_element);
 }
 
 AccessibilityUIElement::~AccessibilityUIElement()
 {
+    g_object_unref(m_element);
 }
 
 void AccessibilityUIElement::getLinkedUIElements(Vector<AccessibilityUIElement>& elements)
@@ -140,7 +161,8 @@ gchar* attributeSetToString(AtkAttributeSet* attributeSet)
     GString* str = g_string_new(0);
     for (GSList* attributes = attributeSet; attributes; attributes = attributes->next) {
         AtkAttribute* attribute = static_cast<AtkAttribute*>(attributes->data);
-        g_string_append(str, g_strconcat(attribute->name, ":", attribute->value, NULL));
+        GOwnPtr<gchar> attributeData(g_strconcat(attribute->name, ":", attribute->value, NULL));
+        g_string_append(str, attributeData.get());
         if (attributes->next)
             g_string_append(str, ", ");
     }
@@ -154,7 +176,8 @@ JSStringRef AccessibilityUIElement::allAttributes()
         return JSStringCreateWithCharacters(0, 0);
 
     ASSERT(ATK_IS_OBJECT(m_element));
-    return JSStringCreateWithUTF8CString(attributeSetToString(atk_object_get_attributes(ATK_OBJECT(m_element))));
+    GOwnPtr<gchar> attributeData(attributeSetToString(atk_object_get_attributes(ATK_OBJECT(m_element))));
+    return JSStringCreateWithUTF8CString(attributeData.get());
 }
 
 JSStringRef AccessibilityUIElement::attributesOfLinkedUIElements()
@@ -171,8 +194,27 @@ JSStringRef AccessibilityUIElement::attributesOfDocumentLinks()
 
 AccessibilityUIElement AccessibilityUIElement::titleUIElement()
 {
-    // FIXME: implement
-    return 0;
+
+    if (!m_element)
+        return 0;
+
+    AtkRelationSet* set = atk_object_ref_relation_set(ATK_OBJECT(m_element));
+    if (!set)
+        return 0;
+
+    AtkObject* target = 0;
+    int count = atk_relation_set_get_n_relations(set);
+    for (int i = 0; i < count; i++) {
+        AtkRelation* relation = atk_relation_set_get_relation(set, i);
+        if (atk_relation_get_relation_type(relation) == ATK_RELATION_LABELLED_BY) {
+            GPtrArray* targetList = atk_relation_get_target(relation);
+            if (targetList->len)
+                target = static_cast<AtkObject*>(g_ptr_array_index(targetList, 0));
+        }
+        g_object_unref(set);
+    }
+
+    return target ? AccessibilityUIElement(target) : 0;
 }
 
 AccessibilityUIElement AccessibilityUIElement::parentElement()
@@ -247,8 +289,14 @@ JSStringRef AccessibilityUIElement::description()
 
 JSStringRef AccessibilityUIElement::stringValue()
 {
-    // FIXME: implement
-    return JSStringCreateWithCharacters(0, 0);
+    if (!m_element || !ATK_IS_TEXT(m_element))
+        return JSStringCreateWithCharacters(0, 0);
+
+    gchar* text = atk_text_get_text(ATK_TEXT(m_element), 0, -1);
+    GOwnPtr<gchar> axValue(g_strdup_printf("AXValue: %s", replaceCharactersForResults(text)));
+    g_free(text);
+
+    return JSStringCreateWithUTF8CString(axValue.get());
 }
 
 JSStringRef AccessibilityUIElement::language()
@@ -328,13 +376,9 @@ double AccessibilityUIElement::intValue() const
         return 0.0f;
 
     atk_value_get_current_value(ATK_VALUE(m_element), &value);
-
-    if (G_VALUE_HOLDS_DOUBLE(&value))
-        return g_value_get_double(&value);
-    else if (G_VALUE_HOLDS_INT(&value))
-        return static_cast<double>(g_value_get_int(&value));
-    else
+    if (!G_VALUE_HOLDS_FLOAT(&value))
         return 0.0f;
+    return g_value_get_float(&value);
 }
 
 double AccessibilityUIElement::minValue()
@@ -345,13 +389,9 @@ double AccessibilityUIElement::minValue()
         return 0.0f;
 
     atk_value_get_minimum_value(ATK_VALUE(m_element), &value);
-
-    if (G_VALUE_HOLDS_DOUBLE(&value))
-        return g_value_get_double(&value);
-    else if (G_VALUE_HOLDS_INT(&value))
-        return static_cast<double>(g_value_get_int(&value));
-    else
+    if (!G_VALUE_HOLDS_FLOAT(&value))
         return 0.0f;
+    return g_value_get_float(&value);
 }
 
 double AccessibilityUIElement::maxValue()
@@ -362,18 +402,15 @@ double AccessibilityUIElement::maxValue()
         return 0.0f;
 
     atk_value_get_maximum_value(ATK_VALUE(m_element), &value);
-
-    if (G_VALUE_HOLDS_DOUBLE(&value))
-        return g_value_get_double(&value);
-    else if (G_VALUE_HOLDS_INT(&value))
-        return static_cast<double>(g_value_get_int(&value));
-    else
+    if (!G_VALUE_HOLDS_FLOAT(&value))
         return 0.0f;
+    return g_value_get_float(&value);
 }
 
 JSStringRef AccessibilityUIElement::valueDescription()
 {
-    // FIXME: implement
+    // FIXME: implement after it has been implemented in ATK.
+    // See: https://bugzilla.gnome.org/show_bug.cgi?id=684576
     return JSStringCreateWithCharacters(0, 0);
 }
 
@@ -644,22 +681,38 @@ bool AccessibilityUIElement::isAttributeSupported(JSStringRef attribute)
     return false;
 }
 
-void AccessibilityUIElement::increment()
+static void alterCurrentValue(PlatformUIElement element, int factor)
 {
-    if (!m_element)
+    if (!element)
         return;
 
-    ASSERT(ATK_IS_OBJECT(m_element));
-    DumpRenderTreeSupportGtk::incrementAccessibilityValue(ATK_OBJECT(m_element));
+    ASSERT(ATK_IS_VALUE(element));
+
+    GValue currentValue = G_VALUE_INIT;
+    atk_value_get_current_value(ATK_VALUE(element), &currentValue);
+
+    GValue increment = G_VALUE_INIT;
+    atk_value_get_minimum_increment(ATK_VALUE(element), &increment);
+
+    GValue newValue = G_VALUE_INIT;
+    g_value_init(&newValue, G_TYPE_FLOAT);
+
+    g_value_set_float(&newValue, g_value_get_float(&currentValue) + factor * g_value_get_float(&increment));
+    atk_value_set_current_value(ATK_VALUE(element), &newValue);
+
+    g_value_unset(&newValue);
+    g_value_unset(&increment);
+    g_value_unset(&currentValue);
+}
+
+void AccessibilityUIElement::increment()
+{
+    alterCurrentValue(m_element, 1);
 }
 
 void AccessibilityUIElement::decrement()
 {
-    if (!m_element)
-        return;
-
-    ASSERT(ATK_IS_OBJECT(m_element));
-    DumpRenderTreeSupportGtk::decrementAccessibilityValue(ATK_OBJECT(m_element));
+    alterCurrentValue(m_element, -1);
 }
 
 void AccessibilityUIElement::press()

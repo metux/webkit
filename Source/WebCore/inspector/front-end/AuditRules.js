@@ -107,7 +107,7 @@ WebInspector.AuditRules.GzipRule.prototype = {
 
     _isCompressed: function(request)
     {
-        var encodingHeader = request.responseHeaders["Content-Encoding"];
+        var encodingHeader = request.responseHeaderValue("Content-Encoding");
         if (!encodingHeader)
             return false;
 
@@ -517,12 +517,12 @@ WebInspector.AuditRules.CacheControlRule.prototype = {
 
     responseHeader: function(request, header)
     {
-        return request.responseHeaders[header];
+        return request.responseHeaderValue(header);
     },
 
     hasResponseHeader: function(request, header)
     {
-        return request.responseHeaders[header] !== undefined;
+        return request.responseHeaderValue(header) !== undefined;
     },
 
     isCompressible: function(request)
@@ -543,8 +543,8 @@ WebInspector.AuditRules.CacheControlRule.prototype = {
 
     responseHeaderMatch: function(request, header, regexp)
     {
-        return request.responseHeaders[header]
-            ? request.responseHeaders[header].match(new RegExp(regexp, "im"))
+        return request.responseHeaderValue(header)
+            ? request.responseHeaderValue(header).match(new RegExp(regexp, "im"))
             : undefined;
     },
 
@@ -786,9 +786,9 @@ WebInspector.AuditRules.ImageDimensionsRule.prototype = {
                 doneCallback();
 
             for (var i = 0; nodeIds && i < nodeIds.length; ++i) {
-                WebInspector.cssModel.getMatchedStylesAsync(nodeIds[i], undefined, false, false, matchedCallback);
+                WebInspector.cssModel.getMatchedStylesAsync(nodeIds[i], false, false, matchedCallback);
                 WebInspector.cssModel.getInlineStylesAsync(nodeIds[i], inlineCallback);
-                WebInspector.cssModel.getComputedStyleAsync(nodeIds[i], undefined, imageStylesReady.bind(null, nodeIds[i], targetResult, i === nodeIds.length - 1));
+                WebInspector.cssModel.getComputedStyleAsync(nodeIds[i], imageStylesReady.bind(null, nodeIds[i], targetResult, i === nodeIds.length - 1));
             }
         }
 

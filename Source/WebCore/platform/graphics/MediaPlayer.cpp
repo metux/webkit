@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -131,7 +131,7 @@ public:
     virtual PassRefPtr<TimeRanges> buffered() const { return TimeRanges::create(); }
 
     virtual unsigned totalBytes() const { return 0; }
-    virtual unsigned bytesLoaded() const { return 0; }
+    virtual bool didLoadingProgress() const { return false; }
 
     virtual void setSize(const IntSize&) { }
 
@@ -149,10 +149,13 @@ public:
     virtual bool hasSingleSecurityOrigin() const { return true; }
 
 #if ENABLE(MEDIA_SOURCE)
-    virtual MediaPlayer::AddIdStatus sourceAddId(const String& id, const String& type) { return MediaPlayer::NotSupported; }
-    virtual bool sourceRemoveId(const String& id) { return false; }
-    virtual bool sourceAppend(const unsigned char*, unsigned) { return false; }
-    virtual void sourceEndOfStream(MediaPlayer::EndOfStreamStatus status) { }
+    virtual MediaPlayer::AddIdStatus sourceAddId(const String& id, const String& type, const Vector<String>& codecs) { return MediaPlayer::NotSupported; }
+    virtual PassRefPtr<TimeRanges> sourceBuffered(const String&) { return TimeRanges::create(); }
+    virtual bool sourceRemoveId(const String&) { return false; }
+    virtual bool sourceAppend(const String&, const unsigned char*, unsigned) { return false; }
+    virtual bool sourceAbort(const String&) { return false; }
+    virtual void sourceEndOfStream(MediaPlayer::EndOfStreamStatus) { }
+    virtual bool sourceSetTimestampOffset(const String&, double) { return false; }
 #endif
 
 #if ENABLE(ENCRYPTED_MEDIA)
@@ -174,15 +177,14 @@ struct MediaPlayerFactory {
     WTF_MAKE_NONCOPYABLE(MediaPlayerFactory); WTF_MAKE_FAST_ALLOCATED;
 public:
     MediaPlayerFactory(CreateMediaEnginePlayer constructor, MediaEngineSupportedTypes getSupportedTypes, MediaEngineSupportsType supportsTypeAndCodecs,
-        MediaEngineGetSitesInMediaCache getSitesInMediaCache, MediaEngineClearMediaCache clearMediaCache, MediaEngineClearMediaCacheForSite clearMediaCacheForSite) 
+        MediaEngineGetSitesInMediaCache getSitesInMediaCache, MediaEngineClearMediaCache clearMediaCache, MediaEngineClearMediaCacheForSite clearMediaCacheForSite)
         : constructor(constructor)
         , getSupportedTypes(getSupportedTypes)
         , supportsTypeAndCodecs(supportsTypeAndCodecs)
         , getSitesInMediaCache(getSitesInMediaCache)
         , clearMediaCache(clearMediaCache)
         , clearMediaCacheForSite(clearMediaCacheForSite)
-
-    { 
+    {
     }
 
     CreateMediaEnginePlayer constructor;
@@ -194,7 +196,8 @@ public:
 };
 
 static void addMediaEngine(CreateMediaEnginePlayer, MediaEngineSupportedTypes, MediaEngineSupportsType, MediaEngineGetSitesInMediaCache, MediaEngineClearMediaCache, MediaEngineClearMediaCacheForSite);
-static MediaPlayerFactory* bestMediaEngineForTypeAndCodecs(const String& type, const String& codecs, const String& keySystem, MediaPlayerFactory* current = 0);
+
+static MediaPlayerFactory* bestMediaEngineForTypeAndCodecs(const String& type, const String& codecs, const String& keySystem, const KURL&, MediaPlayerFactory* current = 0);
 static MediaPlayerFactory* nextMediaEngine(MediaPlayerFactory* current);
 
 static Vector<MediaPlayerFactory*>& installedMediaEngines() 
@@ -206,7 +209,7 @@ static Vector<MediaPlayerFactory*>& installedMediaEngines()
         enginesQueried = true;
 
 #if USE(AVFOUNDATION)
-        if (Settings::isAVFoundationEnabled()) {
+        if (1 /* @@Settings::isAVFoundationEnabled() @@ */) {
 #if PLATFORM(MAC)
             MediaPlayerPrivateAVFoundationObjC::registerMediaEngine(addMediaEngine);
 #elif PLATFORM(WIN)
@@ -251,7 +254,7 @@ static const AtomicString& codecs()
     return codecs;
 }
 
-static MediaPlayerFactory* bestMediaEngineForTypeAndCodecs(const String& type, const String& codecs, const String& keySystem, MediaPlayerFactory* current)
+static MediaPlayerFactory* bestMediaEngineForTypeAndCodecs(const String& type, const String& codecs, const String& keySystem, const KURL& url, MediaPlayerFactory* current)
 {
     if (type.isEmpty())
         return 0;
@@ -278,11 +281,11 @@ static MediaPlayerFactory* bestMediaEngineForTypeAndCodecs(const String& type, c
             continue;
         }
 #if ENABLE(ENCRYPTED_MEDIA)
-        MediaPlayer::SupportsType engineSupport = engines[ndx]->supportsTypeAndCodecs(type, codecs, keySystem);
+        MediaPlayer::SupportsType engineSupport = engines[ndx]->supportsTypeAndCodecs(type, codecs, keySystem, url);
 #else
         UNUSED_PARAM(keySystem);
         ASSERT(keySystem.isEmpty());
-        MediaPlayer::SupportsType engineSupport = engines[ndx]->supportsTypeAndCodecs(type, codecs);
+        MediaPlayer::SupportsType engineSupport = engines[ndx]->supportsTypeAndCodecs(type, codecs, url);
 #endif
         if (engineSupport > supported) {
             supported = engineSupport;
@@ -325,6 +328,7 @@ MediaPlayer::MediaPlayer(MediaPlayerClient* client)
     , m_preservesPitch(true)
     , m_privateBrowsing(false)
     , m_shouldPrepareToRender(false)
+    , m_contentMIMETypeWasInferredFromExtension(false)
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     , m_playerProxy(0)
 #endif
@@ -347,43 +351,44 @@ MediaPlayer::~MediaPlayer()
 
 bool MediaPlayer::load(const KURL& url, const ContentType& contentType, const String& keySystem)
 {
-    String type = contentType.type().lower();
-    String typeCodecs = contentType.parameter(codecs());
-    String urlString = url.string();
+    m_contentMIMEType = contentType.type().lower();
+    m_contentTypeCodecs = contentType.parameter(codecs());
+    m_url = url;
+    m_keySystem = keySystem.lower();
+    m_contentMIMETypeWasInferredFromExtension = false;
 
     // If the MIME type is missing or is not meaningful, try to figure it out from the URL.
-    if (type.isEmpty() || type == applicationOctetStream() || type == textPlain()) {
-        if (protocolIs(urlString, "data"))
-            type = mimeTypeFromDataURL(urlString);
+    if (m_contentMIMEType.isEmpty() || m_contentMIMEType == applicationOctetStream() || m_contentMIMEType == textPlain()) {
+        if (protocolIs(m_url.string(), "data"))
+            m_contentMIMEType = mimeTypeFromDataURL(m_url.string());
         else {
             String lastPathComponent = url.lastPathComponent();
             size_t pos = lastPathComponent.reverseFind('.');
             if (pos != notFound) {
                 String extension = lastPathComponent.substring(pos + 1);
                 String mediaType = MIMETypeRegistry::getMediaMIMETypeForExtension(extension);
-                if (!mediaType.isEmpty())
-                    type = mediaType;
+                if (!mediaType.isEmpty()) {
+                    m_contentMIMEType = mediaType;
+                    m_contentMIMETypeWasInferredFromExtension = true;
+                }
             }
         }
     }
 
-    m_url = urlString;
-    m_contentMIMEType = type;
-    m_contentTypeCodecs = typeCodecs;
-    m_keySystem = keySystem.lower();
     loadWithNextMediaEngine(0);
     return m_currentMediaEngine;
 }
 
 void MediaPlayer::loadWithNextMediaEngine(MediaPlayerFactory* current)
 {
-    MediaPlayerFactory* engine;
+    MediaPlayerFactory* engine = 0;
 
-    // If no MIME type is specified, just use the next engine.
-    if (m_contentMIMEType.isEmpty())
+    if (!m_contentMIMEType.isEmpty())
+        engine = bestMediaEngineForTypeAndCodecs(m_contentMIMEType, m_contentTypeCodecs, m_keySystem, m_url, current);
+
+    // If no MIME type is specified or the type was inferred from the file extension, just use the next engine.
+    if (!engine && (m_contentMIMEType.isEmpty() || m_contentMIMETypeWasInferredFromExtension))
         engine = nextMediaEngine(current);
-    else
-        engine = bestMediaEngineForTypeAndCodecs(m_contentMIMEType, m_contentTypeCodecs, m_keySystem, current);
 
     // Don't delete and recreate the player unless it comes from a different engine.
     if (!engine) {
@@ -401,12 +406,13 @@ void MediaPlayer::loadWithNextMediaEngine(MediaPlayerFactory* current)
         m_private->setPrivateBrowsingMode(m_privateBrowsing);
         m_private->setPreload(m_preload);
         m_private->setPreservesPitch(preservesPitch());
+        m_private->setRate(m_rate);
         if (m_shouldPrepareToRender)
             m_private->prepareForRendering();
     }
 
     if (m_private)
-        m_private->load(m_url);
+        m_private->load(m_url.string());
     else {
         m_private = createNullMediaPlayer(this);
         if (m_mediaPlayerClient) {
@@ -414,7 +420,7 @@ void MediaPlayer::loadWithNextMediaEngine(MediaPlayerFactory* current)
             m_mediaPlayerClient->mediaPlayerResourceNotSupported(this);
         }
     }
-}    
+}
 
 bool MediaPlayer::hasAvailableVideoFrame() const
 {
@@ -459,9 +465,14 @@ void MediaPlayer::pause()
 
 #if ENABLE(MEDIA_SOURCE)
 
-MediaPlayer::AddIdStatus MediaPlayer::sourceAddId(const String& id, const String& type)
+MediaPlayer::AddIdStatus MediaPlayer::sourceAddId(const String& id, const String& type, const Vector<String>& codecs)
 {
-    return m_private->sourceAddId(id, type);
+    return m_private->sourceAddId(id, type, codecs);
+}
+
+PassRefPtr<TimeRanges> MediaPlayer::sourceBuffered(const String& id)
+{
+    return m_private->sourceBuffered(id);
 }
 
 bool MediaPlayer::sourceRemoveId(const String& id)
@@ -469,14 +480,24 @@ bool MediaPlayer::sourceRemoveId(const String& id)
     return m_private->sourceRemoveId(id);
 }
 
-bool MediaPlayer::sourceAppend(const unsigned char* data, unsigned length)
+bool MediaPlayer::sourceAppend(const String& id, const unsigned char* data, unsigned length)
 {
-    return m_private->sourceAppend(data, length);
+    return m_private->sourceAppend(id, data, length);
+}
+
+bool MediaPlayer::sourceAbort(const String& id)
+{
+    return m_private->sourceAbort(id);
 }
 
 void MediaPlayer::sourceEndOfStream(MediaPlayer::EndOfStreamStatus status)
 {
     return m_private->sourceEndOfStream(status);
+}
+
+bool MediaPlayer::sourceSetTimestampOffset(const String& id, double offset)
+{
+    return m_private->sourceSetTimestampOffset(id, offset);
 }
 #endif
 
@@ -599,6 +620,9 @@ float MediaPlayer::volume() const
 
 void MediaPlayer::setVolume(float volume)
 {
+    if (volume == m_volume)
+        return;
+
     m_volume = volume;
 
     if (m_private->supportsMuting() || !m_muted)
@@ -612,6 +636,9 @@ bool MediaPlayer::muted() const
 
 void MediaPlayer::setMuted(bool muted)
 {
+    if (muted == m_muted)
+        return;
+
     m_muted = muted;
 
     if (m_private->supportsMuting())
@@ -648,6 +675,9 @@ bool MediaPlayer::preservesPitch() const
 
 void MediaPlayer::setPreservesPitch(bool preservesPitch)
 {
+    if (preservesPitch == m_preservesPitch)
+        return;
+
     m_preservesPitch = preservesPitch;
     m_private->setPreservesPitch(preservesPitch);
 }
@@ -667,13 +697,16 @@ float MediaPlayer::maxTimeSeekable()
     return m_private->maxTimeSeekable();
 }
 
-unsigned MediaPlayer::bytesLoaded()
+bool MediaPlayer::didLoadingProgress()
 {
-    return m_private->bytesLoaded();
+    return m_private->didLoadingProgress();
 }
 
 void MediaPlayer::setSize(const IntSize& size)
-{ 
+{
+    if (size == m_size)
+        return;
+
     m_size = size;
     m_private->setSize(size);
 }
@@ -685,6 +718,9 @@ bool MediaPlayer::visible() const
 
 void MediaPlayer::setVisible(bool b)
 {
+    if (b == m_visible)
+        return;
+
     m_visible = b;
     m_private->setVisible(b);
 }
@@ -696,6 +732,9 @@ MediaPlayer::Preload MediaPlayer::preload() const
 
 void MediaPlayer::setPreload(MediaPlayer::Preload preload)
 {
+    if (preload == m_preload)
+        return;
+
     m_preload = preload;
     m_private->setPreload(preload);
 }
@@ -710,7 +749,7 @@ void MediaPlayer::paintCurrentFrameInContext(GraphicsContext* p, const IntRect& 
     m_private->paintCurrentFrameInContext(p, r);
 }
 
-MediaPlayer::SupportsType MediaPlayer::supportsType(const ContentType& contentType, const String& keySystem)
+MediaPlayer::SupportsType MediaPlayer::supportsType(const ContentType& contentType, const String& keySystem, const KURL& url, const MediaPlayerSupportsTypeClient* client)
 {
     String type = contentType.type().lower();
     // The codecs string is not lower-cased because MP4 values are case sensitive
@@ -723,15 +762,30 @@ MediaPlayer::SupportsType MediaPlayer::supportsType(const ContentType& contentTy
     if (type == applicationOctetStream())
         return IsNotSupported;
 
-    MediaPlayerFactory* engine = bestMediaEngineForTypeAndCodecs(type, typeCodecs, system);
+    MediaPlayerFactory* engine = bestMediaEngineForTypeAndCodecs(type, typeCodecs, system, url);
     if (!engine)
         return IsNotSupported;
 
+#if PLATFORM(MAC)
+    // YouTube will ask if the HTMLMediaElement canPlayType video/webm, then
+    // video/x-flv, then finally video/mp4, and will then load a URL of the first type
+    // in that list which returns "probably". When Perian is installed,
+    // MediaPlayerPrivateQTKit claims to support both video/webm and video/x-flv, but
+    // due to a bug in Perian, loading media in these formats will sometimes fail on
+    // slow connections. <https://bugs.webkit.org/show_bug.cgi?id=86409>
+    if (client && client->mediaPlayerNeedsSiteSpecificHacks()) {
+        String host = client->mediaPlayerDocumentHost();
+        if ((host.endsWith(".youtube.com", false) || equalIgnoringCase("youtube.com", host))
+            && (contentType.type().startsWith("video/webm", false) || contentType.type().startsWith("video/x-flv", false)))
+            return IsNotSupported;
+    }
+#endif
+
 #if ENABLE(ENCRYPTED_MEDIA)
-    return engine->supportsTypeAndCodecs(type, typeCodecs, system);
+    return engine->supportsTypeAndCodecs(type, typeCodecs, system, url);
 #else
     ASSERT(system.isEmpty());
-    return engine->supportsTypeAndCodecs(type, typeCodecs);
+    return engine->supportsTypeAndCodecs(type, typeCodecs, url);
 #endif
 }
 
@@ -770,14 +824,21 @@ void MediaPlayer::setControls(bool controls)
 #endif
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO) || USE(NATIVE_FULLSCREEN_VIDEO)
-bool MediaPlayer::enterFullscreen() const
+void MediaPlayer::enterFullscreen()
 {
-    return m_private->enterFullscreen();
+    m_private->enterFullscreen();
 }
 
 void MediaPlayer::exitFullscreen()
 {
     m_private->exitFullscreen();
+}
+#endif
+
+#if USE(NATIVE_FULLSCREEN_VIDEO)
+bool MediaPlayer::canEnterFullscreen() const
+{
+    return m_private->canEnterFullscreen();
 }
 #endif
 
@@ -796,6 +857,11 @@ bool MediaPlayer::supportsAcceleratedRendering() const
 bool MediaPlayer::hasSingleSecurityOrigin() const
 {
     return m_private->hasSingleSecurityOrigin();
+}
+
+bool MediaPlayer::didPassCORSAccessCheck() const
+{
+    return m_private->didPassCORSAccessCheck();
 }
 
 MediaPlayer::MovieLoadType MediaPlayer::movieLoadType() const
@@ -901,7 +967,7 @@ void MediaPlayer::networkStateChanged()
     if (m_private->networkState() >= FormatError
         && m_private->readyState() < HaveMetadata
         && installedMediaEngines().size() > 1) {
-        if (m_contentMIMEType.isEmpty() || bestMediaEngineForTypeAndCodecs(m_contentMIMEType, m_contentTypeCodecs, m_keySystem, m_currentMediaEngine)) {
+        if (m_contentMIMEType.isEmpty() || bestMediaEngineForTypeAndCodecs(m_contentMIMEType, m_contentTypeCodecs, m_keySystem, m_url, m_currentMediaEngine)) {
             m_reloadTimer.startOneShot(0);
             return;
         }
@@ -1026,6 +1092,24 @@ String MediaPlayer::userAgent() const
     
     return m_mediaPlayerClient->mediaPlayerUserAgent();
 }
+
+String MediaPlayer::engineDescription() const
+{
+    if (!m_private)
+        return String();
+
+    return m_private->engineDescription();
+}
+
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+GraphicsDeviceAdapter* MediaPlayer::graphicsDeviceAdapter() const
+{
+    if (!m_mediaPlayerClient)
+        return 0;
+    
+    return m_mediaPlayerClient->mediaPlayerGraphicsDeviceAdapter(this);
+}
+#endif
 
 }
 

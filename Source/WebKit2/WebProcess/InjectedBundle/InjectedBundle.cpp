@@ -36,6 +36,7 @@
 #include "WKBundleAPICast.h"
 #include "WebApplicationCacheManager.h"
 #include "WebContextMessageKinds.h"
+#include "WebCookieManager.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebDatabaseManager.h"
 #include "WebFrame.h"
@@ -111,7 +112,12 @@ WebConnection* InjectedBundle::webConnectionToUIProcess() const
 
 void InjectedBundle::setShouldTrackVisitedLinks(bool shouldTrackVisitedLinks)
 {
-    PageGroup::setShouldTrackVisitedLinks(shouldTrackVisitedLinks);
+    WebProcess::shared().setShouldTrackVisitedLinks(shouldTrackVisitedLinks);
+}
+
+void InjectedBundle::setAlwaysAcceptCookies(bool accept)
+{
+    WebCookieManager::shared().setHTTPCookieAcceptPolicy(accept ? HTTPCookieAcceptPolicyAlways : HTTPCookieAcceptPolicyOnlyFromMainDocumentDomain);
 }
 
 void InjectedBundle::removeAllVisitedLinks()
@@ -125,11 +131,36 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
 
     // FIXME: Need an explicit way to set "WebKitTabToLinksPreferenceKey" directly in WebPage.
 
+    if (preference == "WebKit2AsynchronousPluginInitializationEnabled") {
+        WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledKey(), enabled);
+        for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
+            webPage->setAsynchronousPluginInitializationEnabled(enabled);
+        }
+    }
+
+    if (preference == "WebKit2AsynchronousPluginInitializationEnabledForAllPlugins") {
+        WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledForAllPluginsKey(), enabled);
+        for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
+            webPage->setAsynchronousPluginInitializationEnabledForAllPlugins(enabled);
+        }
+    }
+
+    if (preference == "WebKit2ArtificialPluginInitializationDelayEnabled") {
+        WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::artificialPluginInitializationDelayEnabledKey(), enabled);
+        for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
+            webPage->setArtificialPluginInitializationDelayEnabled(enabled);
+        }
+    }
+
     // Map the names used in LayoutTests with the names used in WebCore::Settings and WebPreferencesStore.
 #define FOR_EACH_OVERRIDE_BOOL_PREFERENCE(macro) \
     macro(WebKitAcceleratedCompositingEnabled, AcceleratedCompositingEnabled, acceleratedCompositingEnabled) \
     macro(WebKitCSSCustomFilterEnabled, CSSCustomFilterEnabled, cssCustomFilterEnabled) \
     macro(WebKitCSSRegionsEnabled, CSSRegionsEnabled, cssRegionsEnabled) \
+    macro(WebKitCSSGridLayoutEnabled, CSSGridLayoutEnabled, cssGridLayoutEnabled) \
     macro(WebKitJavaEnabled, JavaEnabled, javaEnabled) \
     macro(WebKitJavaScriptEnabled, ScriptEnabled, javaScriptEnabled) \
     macro(WebKitLoadSiteIconsKey, LoadsSiteIconsIgnoringImageLoadingSetting, loadsSiteIconsIgnoringImageLoadingPreference) \
@@ -154,10 +185,6 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     }
 
     FOR_EACH_OVERRIDE_BOOL_PREFERENCE(OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES)
-
-#if ENABLE(WEB_SOCKETS)
-    OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES(WebKitHixie76WebSocketProtocolEnabled, UseHixie76WebSocketProtocol, hixie76WebSocketProtocolEnabled)
-#endif
 
 #undef OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES
 #undef FOR_EACH_OVERRIDE_BOOL_PREFERENCE
@@ -193,6 +220,13 @@ void InjectedBundle::setFrameFlatteningEnabled(WebPageGroupProxy* pageGroup, boo
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
     for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
         (*iter)->settings()->setFrameFlatteningEnabled(enabled);
+}
+
+void InjectedBundle::setPluginsEnabled(WebPageGroupProxy* pageGroup, bool enabled)
+{
+    const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
+    for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
+        (*iter)->settings()->setPluginsEnabled(enabled);
 }
 
 void InjectedBundle::setGeoLocationPermission(WebPageGroupProxy* pageGroup, bool enabled)
@@ -259,12 +293,16 @@ void InjectedBundle::resetOriginAccessWhitelists()
 
 void InjectedBundle::clearAllDatabases()
 {
+#if ENABLE(SQL_DATABASE)
     WebDatabaseManager::shared().deleteAllDatabases();
+#endif
 }
 
 void InjectedBundle::setDatabaseQuota(uint64_t quota)
 {
+#if ENABLE(SQL_DATABASE)
     WebDatabaseManager::shared().setQuotaForOrigin("file:///", quota);
+#endif
 }
 
 void InjectedBundle::clearApplicationCache()
@@ -401,7 +439,7 @@ void InjectedBundle::garbageCollectJavaScriptObjectsOnAlternateThreadForDebuggin
 
 size_t InjectedBundle::javaScriptObjectsCount()
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindow::commonJSGlobalData());
     return JSDOMWindow::commonJSGlobalData()->heap.objectCount();
 }
 
@@ -410,8 +448,8 @@ void InjectedBundle::reportException(JSContextRef context, JSValueRef exception)
     if (!context || !exception)
         return;
 
-    JSLock lock(JSC::SilenceAssertionsOnly);
     JSC::ExecState* execState = toJS(context);
+    JSLockHolder lock(execState);
 
     // Make sure the context has a DOMWindow global object, otherwise this context didn't originate from a Page.
     if (!toJSDOMWindow(execState->lexicalGlobalObject()))
@@ -440,6 +478,11 @@ void InjectedBundle::didReceiveMessage(const String& messageName, APIObject* mes
     m_client.didReceiveMessage(this, messageName, messageBody);
 }
 
+void InjectedBundle::didReceiveMessageToPage(WebPage* page, const String& messageName, APIObject* messageBody)
+{
+    m_client.didReceiveMessageToPage(this, page, messageName, messageBody);
+}
+
 void InjectedBundle::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
 {
     switch (messageID.get<InjectedBundleMessage::Kind>()) {
@@ -453,18 +496,42 @@ void InjectedBundle::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC:
             didReceiveMessage(messageName, messageBody.get());
             return;
         }
+
+        case InjectedBundleMessage::PostMessageToPage: {
+            uint64_t pageID = arguments->destinationID();
+            if (!pageID)
+                return;
+            
+            WebPage* page = WebProcess::shared().webPage(pageID);
+            if (!page)
+                return;
+
+            String messageName;
+            RefPtr<APIObject> messageBody;
+            InjectedBundleUserMessageDecoder messageDecoder(messageBody);
+            if (!arguments->decode(CoreIPC::Out(messageName, messageDecoder)))
+                return;
+
+            didReceiveMessageToPage(page, messageName, messageBody.get());
+            return;
+        }
     }
 
     ASSERT_NOT_REACHED();
 }
 
-void InjectedBundle::setPageVisibilityState(WebPageGroupProxy* pageGroup, int state, bool isInitialState)
+void InjectedBundle::setPageVisibilityState(WebPage* page, int state, bool isInitialState)
 {
 #if ENABLE(PAGE_VISIBILITY_API)
+    page->corePage()->setVisibilityState(static_cast<PageVisibilityState>(state), isInitialState);
+#endif
+}
+
+void InjectedBundle::setUserStyleSheetLocation(WebPageGroupProxy* pageGroup, const String& location)
+{
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
     for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
-        (*iter)->setVisibilityState(static_cast<PageVisibilityState>(state), isInitialState);
-#endif
+        (*iter)->settings()->setUserStyleSheetLocation(KURL(KURL(), location));
 }
 
 } // namespace WebKit

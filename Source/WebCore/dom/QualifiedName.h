@@ -21,6 +21,8 @@
 #ifndef QualifiedName_h
 #define QualifiedName_h
 
+#include "MemoryInstrumentation.h"
+
 #include <wtf/HashTraits.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/AtomicString.h>
@@ -48,6 +50,14 @@ public:
         const AtomicString m_namespace;
         mutable AtomicString m_localNameUpper;
 
+        void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+        {
+            MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+            info.addInstrumentedMember(m_prefix);
+            info.addInstrumentedMember(m_localName);
+            info.addInstrumentedMember(m_namespace);
+            info.addInstrumentedMember(m_localNameUpper);
+        }
     private:
         QualifiedNameImpl(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI)
             : m_prefix(prefix)
@@ -59,7 +69,6 @@ public:
     };
 
     QualifiedName(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI);
-    QualifiedName(const AtomicString& prefix, const char* localName, const AtomicString& namespaceURI);
     QualifiedName(WTF::HashTableDeletedValueType) : m_impl(hashTableDeletedValue()) { }
     bool isHashTableDeletedValue() const { return m_impl == hashTableDeletedValue(); }
     ~QualifiedName();
@@ -92,8 +101,12 @@ public:
     // Init routine for globals
     static void init();
     
+    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+    {
+        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+        info.addInstrumentedMember(m_impl);
+    }
 private:
-    void init(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI);
     void ref() const { m_impl->ref(); }
     void deref();
 
@@ -131,6 +144,9 @@ struct QualifiedNameHash {
 
     static const bool safeToCompareToEmptyOrDeleted = false;
 };
+
+void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength);
+void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength, const AtomicString& nameNamespace);
 
 }
 

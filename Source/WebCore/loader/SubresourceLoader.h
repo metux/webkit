@@ -46,6 +46,10 @@ public:
     static PassRefPtr<SubresourceLoader> create(Frame*, CachedResource*, const ResourceRequest&, const ResourceLoaderOptions&);
 
     void cancelIfNotFinishing();
+    virtual bool isSubresourceLoader();
+    CachedResource* cachedResource();
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
     SubresourceLoader(Frame*, CachedResource*, const ResourceLoaderOptions&);
@@ -72,7 +76,7 @@ private:
 #endif
     virtual void releaseResources();
 
-    bool errorLoadingResource();
+    bool checkForHTTPStatusCodeError();
     void sendDataToResource(const char*, int);
 
     enum SubresourceLoaderState {

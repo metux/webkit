@@ -84,10 +84,12 @@ static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& 
 
 static EncodedJSValue JSC_HOST_CALL functionPrint(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDebug(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionDescribe(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionGC(ExecState*);
 #ifndef NDEBUG
 static EncodedJSValue JSC_HOST_CALL functionReleaseExecutableMemory(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionDumpCallFrame(ExecState*);
 #endif
 static EncodedJSValue JSC_HOST_CALL functionVersion(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionRun(ExecState*);
@@ -113,17 +115,23 @@ struct Script {
     }
 };
 
-struct CommandLine {
-    CommandLine()
-        : interactive(false)
-        , dump(false)
+class CommandLine {
+public:
+    CommandLine(int argc, char** argv)
+        : m_interactive(false)
+        , m_dump(false)
+        , m_exitCode(false)
     {
+        parseArguments(argc, argv);
     }
 
-    bool interactive;
-    bool dump;
-    Vector<Script> scripts;
-    Vector<UString> arguments;
+    bool m_interactive;
+    bool m_dump;
+    bool m_exitCode;
+    Vector<Script> m_scripts;
+    Vector<UString> m_arguments;
+
+    void parseArguments(int, char**);
 };
 
 static const char interactivePrompt[] = "> ";
@@ -169,11 +177,14 @@ public:
     }
 
     static const ClassInfo s_info;
+    static const GlobalObjectMethodTable s_globalObjectMethodTable;
 
     static Structure* createStructure(JSGlobalData& globalData, JSValue prototype)
     {
         return Structure::create(globalData, 0, prototype, TypeInfo(GlobalObjectType, StructureFlags), &s_info);
     }
+
+    static bool javaScriptExperimentsEnabled(const JSGlobalObject*) { return true; }
 
 protected:
     void finishCreation(JSGlobalData& globalData, const Vector<UString>& arguments)
@@ -181,10 +192,12 @@ protected:
         Base::finishCreation(globalData);
         
         addFunction(globalData, "debug", functionDebug, 1);
+        addFunction(globalData, "describe", functionDescribe, 1);
         addFunction(globalData, "print", functionPrint, 1);
         addFunction(globalData, "quit", functionQuit, 0);
         addFunction(globalData, "gc", functionGC, 0);
 #ifndef NDEBUG
+        addFunction(globalData, "dumpCallFrame", functionDumpCallFrame, 0);
         addFunction(globalData, "releaseExecutableMemory", functionReleaseExecutableMemory, 0);
 #endif
         addFunction(globalData, "version", functionVersion, 1);
@@ -218,22 +231,24 @@ protected:
     void addFunction(JSGlobalData& globalData, const char* name, NativeFunction function, unsigned arguments)
     {
         Identifier identifier(globalExec(), name);
-        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier, function));
+        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier.ustring(), function));
     }
     
     void addConstructableFunction(JSGlobalData& globalData, const char* name, NativeFunction function, unsigned arguments)
     {
         Identifier identifier(globalExec(), name);
-        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier, function, NoIntrinsic, function));
+        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier.ustring(), function, NoIntrinsic, function));
     }
 };
 COMPILE_ASSERT(!IsInteger<GlobalObject>::value, WTF_IsInteger_GlobalObject_false);
 ASSERT_CLASS_FITS_IN_CELL(GlobalObject);
 
 const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, 0, ExecState::globalObjectTable, CREATE_METHOD_TABLE(GlobalObject) };
+const GlobalObjectMethodTable GlobalObject::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptExperimentsEnabled };
+
 
 GlobalObject::GlobalObject(JSGlobalData& globalData, Structure* structure)
-    : JSGlobalObject(globalData, structure)
+    : JSGlobalObject(globalData, structure, &s_globalObjectMethodTable)
 {
 }
 
@@ -270,9 +285,24 @@ EncodedJSValue JSC_HOST_CALL functionPrint(ExecState* exec)
     return JSValue::encode(jsUndefined());
 }
 
+#ifndef NDEBUG
+EncodedJSValue JSC_HOST_CALL functionDumpCallFrame(ExecState* exec)
+{
+    if (!exec->callerFrame()->hasHostCallFrameFlag())
+        exec->globalData().interpreter->dumpCallFrame(exec->callerFrame());
+    return JSValue::encode(jsUndefined());
+}
+#endif
+
 EncodedJSValue JSC_HOST_CALL functionDebug(ExecState* exec)
 {
     fprintf(stderr, "--> %s\n", exec->argument(0).toString(exec)->value(exec).utf8().data());
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL functionDescribe(ExecState* exec)
+{
+    fprintf(stderr, "--> %s\n", exec->argument(0).description());
     return JSValue::encode(jsUndefined());
 }
 
@@ -294,7 +324,7 @@ EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionGC(ExecState* exec)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
     exec->heap()->collectAllGarbage();
     return JSValue::encode(jsUndefined());
 }
@@ -302,7 +332,7 @@ EncodedJSValue JSC_HOST_CALL functionGC(ExecState* exec)
 #ifndef NDEBUG
 EncodedJSValue JSC_HOST_CALL functionReleaseExecutableMemory(ExecState* exec)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(exec);
     exec->globalData().releaseExecutableMemory();
     return JSValue::encode(jsUndefined());
 }
@@ -606,33 +636,42 @@ static NO_RETURN void printUsageStatement(bool help = false)
 #if HAVE(SIGNAL_H)
     fprintf(stderr, "  -s         Installs signal handlers that exit on a crash (Unix platforms only)\n");
 #endif
+    fprintf(stderr, "  -x         Output exit code before terminating\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  --options                  Dumps all JSC VM options and exits\n");
+    fprintf(stderr, "  --dumpOptions              Dumps all JSC VM options before continuing\n");
+    fprintf(stderr, "  --<jsc VM option>=<value>  Sets the specified JSC VM option\n");
+    fprintf(stderr, "\n");
 
     exit(help ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-static void parseArguments(int argc, char** argv, CommandLine& options)
+void CommandLine::parseArguments(int argc, char** argv)
 {
     int i = 1;
+    bool needToDumpOptions = false;
+    bool needToExit = false;
+
     for (; i < argc; ++i) {
         const char* arg = argv[i];
         if (!strcmp(arg, "-f")) {
             if (++i == argc)
                 printUsageStatement();
-            options.scripts.append(Script(true, argv[i]));
+            m_scripts.append(Script(true, argv[i]));
             continue;
         }
         if (!strcmp(arg, "-e")) {
             if (++i == argc)
                 printUsageStatement();
-            options.scripts.append(Script(false, argv[i]));
+            m_scripts.append(Script(false, argv[i]));
             continue;
         }
         if (!strcmp(arg, "-i")) {
-            options.interactive = true;
+            m_interactive = true;
             continue;
         }
         if (!strcmp(arg, "-d")) {
-            options.dump = true;
+            m_dump = true;
             continue;
         }
         if (!strcmp(arg, "-s")) {
@@ -644,37 +683,71 @@ static void parseArguments(int argc, char** argv, CommandLine& options)
 #endif
             continue;
         }
+        if (!strcmp(arg, "-x")) {
+            m_exitCode = true;
+            continue;
+        }
         if (!strcmp(arg, "--")) {
             ++i;
             break;
         }
         if (!strcmp(arg, "-h") || !strcmp(arg, "--help"))
             printUsageStatement(true);
-        options.scripts.append(Script(true, argv[i]));
+
+        if (!strcmp(arg, "--options")) {
+            needToDumpOptions = true;
+            needToExit = true;
+            continue;
+        }
+        if (!strcmp(arg, "--dumpOptions")) {
+            needToDumpOptions = true;
+            continue;
+        }
+
+        // See if the -- option is a JSC VM option.
+        // NOTE: At this point, we know that the arg starts with "--". Skip it.
+        if (JSC::Options::setOption(&arg[2])) {
+            // The arg was recognized as a VM option and has been parsed.
+            continue; // Just continue with the next arg. 
+        }
+
+        // This arg is not recognized by the VM nor by jsc. Pass it on to the
+        // script.
+        m_scripts.append(Script(true, argv[i]));
     }
 
-    if (options.scripts.isEmpty())
-        options.interactive = true;
+    if (m_scripts.isEmpty())
+        m_interactive = true;
 
     for (; i < argc; ++i)
-        options.arguments.append(argv[i]);
+        m_arguments.append(argv[i]);
+
+    if (needToDumpOptions)
+        JSC::Options::dumpAllOptions(stderr);
+    if (needToExit)
+        exit(EXIT_SUCCESS);
 }
 
 int jscmain(int argc, char** argv)
 {
-    JSLock lock(SilenceAssertionsOnly);
-
+    // Note that the options parsing can affect JSGlobalData creation, and thus
+    // comes first.
+    CommandLine options(argc, argv);
     RefPtr<JSGlobalData> globalData = JSGlobalData::create(ThreadStackTypeLarge, LargeHeap);
+    JSLockHolder lock(globalData.get());
+    int result;
 
-    CommandLine options;
-    parseArguments(argc, argv, options);
-
-    GlobalObject* globalObject = GlobalObject::create(*globalData, GlobalObject::createStructure(*globalData, jsNull()), options.arguments);
-    bool success = runWithScripts(globalObject, options.scripts, options.dump);
-    if (options.interactive && success)
+    GlobalObject* globalObject = GlobalObject::create(*globalData, GlobalObject::createStructure(*globalData, jsNull()), options.m_arguments);
+    bool success = runWithScripts(globalObject, options.m_scripts, options.m_dump);
+    if (options.m_interactive && success)
         runInteractive(globalObject);
 
-    return success ? 0 : 3;
+    result = success ? 0 : 3;
+
+    if (options.m_exitCode)
+        printf("jsc exiting %d\n", result);
+
+    return result;
 }
 
 static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& buffer)

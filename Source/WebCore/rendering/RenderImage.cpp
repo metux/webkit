@@ -29,6 +29,7 @@
 #include "RenderImage.h"
 
 #include "BitmapImage.h"
+#include "Font.h"
 #include "FontCache.h"
 #include "Frame.h"
 #include "FrameSelection.h"
@@ -137,11 +138,21 @@ void RenderImage::styleDidChange(StyleDifference diff, const RenderStyle* oldSty
             imageDimensionsChanged(true /* imageSizeChanged */);
         m_needsToSetSizeForAltText = false;
     }
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    if (diff == StyleDifferenceLayout
+        && (oldStyle->imageResolution() != style()->imageResolution()
+            || oldStyle->imageResolutionSnap() != style()->imageResolutionSnap()
+            || oldStyle->imageResolutionSource() != style()->imageResolutionSource()))
+        imageDimensionsChanged(true /* imageSizeChanged */);
+#endif
 }
 
 void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
 {
-    if (documentBeingDestroyed())
+    // FIXME (86669): Instead of the RenderImage determining whether its document is in the page
+    // cache, the RenderImage should remove itself as a client when its document is put into the
+    // page cache.
+    if (documentBeingDestroyed() || document()->inPageCache())
         return;
 
     if (hasBoxDecorations() || hasMask())
@@ -188,29 +199,42 @@ bool RenderImage::updateIntrinsicSizeIfNeeded(const IntSize& newSize, bool image
 
 void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* rect)
 {
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    double scale = style()->imageResolution();
+    if (style()->imageResolutionSnap() == ImageResolutionSnapPixels)
+        scale = roundForImpreciseConversion<int>(scale);
+    if (scale <= 0)
+        scale = 1;
+    bool intrinsicSizeChanged = updateIntrinsicSizeIfNeeded(m_imageResource->imageSize(style()->effectiveZoom() / scale), imageSizeChanged);
+#else
+    bool intrinsicSizeChanged = updateIntrinsicSizeIfNeeded(m_imageResource->imageSize(style()->effectiveZoom()), imageSizeChanged);
+#endif
+
+    // In the case of generated image content using :before/:after/content, we might not be
+    // in the render tree yet. In that case, we just need to update our intrinsic size.
+    // layout() will be called after we are inserted in the tree which will take care of
+    // what we are doing here.
+    if (!containingBlock())
+        return;
+
     bool shouldRepaint = true;
-    if (updateIntrinsicSizeIfNeeded(m_imageResource->imageSize(style()->effectiveZoom()), imageSizeChanged)) {
-        // In the case of generated image content using :before/:after, we might not be in the
-        // render tree yet.  In that case, we don't need to worry about check for layout, since we'll get a
-        // layout when we get added in to the render tree hierarchy later.
-        if (containingBlock()) {
-            // lets see if we need to relayout at all..
-            int oldwidth = width();
-            int oldheight = height();
-            if (!preferredLogicalWidthsDirty())
-                setPreferredLogicalWidthsDirty(true);
-            computeLogicalWidth();
-            computeLogicalHeight();
+    if (intrinsicSizeChanged) {
+        // lets see if we need to relayout at all..
+        LayoutUnit oldwidth = width();
+        LayoutUnit oldheight = height();
+        if (!preferredLogicalWidthsDirty())
+            setPreferredLogicalWidthsDirty(true);
+        computeLogicalWidth();
+        computeLogicalHeight();
 
-            if (imageSizeChanged || width() != oldwidth || height() != oldheight) {
-                shouldRepaint = false;
-                if (!selfNeedsLayout())
-                    setNeedsLayout(true);
-            }
-
-            setWidth(oldwidth);
-            setHeight(oldheight);
+        if (imageSizeChanged || width() != oldwidth || height() != oldheight) {
+            shouldRepaint = false;
+            if (!selfNeedsLayout())
+                setNeedsLayout(true);
         }
+
+        setWidth(oldwidth);
+        setHeight(oldheight);
     }
 
     if (shouldRepaint) {
@@ -423,11 +447,19 @@ void RenderImage::paintIntoRect(GraphicsContext* context, const LayoutRect& rect
     if (!img || img->isNull())
         return;
 
-    HTMLImageElement* imageElt = (node() && node()->hasTagName(imgTag)) ? static_cast<HTMLImageElement*>(node()) : 0;
+    HTMLImageElement* imageElt = hostImageElement();
     CompositeOperator compositeOperator = imageElt ? imageElt->compositeOperator() : CompositeSourceOver;
     Image* image = m_imageResource->image().get();
     bool useLowQualityScaling = shouldPaintAtLowQuality(context, image, image, alignedRect.size());
     context->drawImage(m_imageResource->image(alignedRect.width(), alignedRect.height()).get(), style()->colorSpace(), alignedRect, compositeOperator, shouldRespectImageOrientation(), useLowQualityScaling);
+}
+
+bool RenderImage::boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance bleedAvoidance, InlineFlowBox*) const
+{
+    if (!RenderBoxModelObject::boxShadowShouldBeAppliedToBackground(bleedAvoidance))
+        return false;
+
+    return !backgroundIsObscured();
 }
 
 bool RenderImage::backgroundIsObscured() const
@@ -463,22 +495,22 @@ int RenderImage::minimumReplacedHeight() const
 
 HTMLMapElement* RenderImage::imageMap() const
 {
-    HTMLImageElement* i = node() && node()->hasTagName(imgTag) ? static_cast<HTMLImageElement*>(node()) : 0;
+    HTMLImageElement* i = hostImageElement();
     return i ? i->treeScope()->getImageMap(i->fastGetAttribute(usemapAttr)) : 0;
 }
 
-bool RenderImage::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
+bool RenderImage::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
-    HitTestResult tempResult(result.point(), result.topPadding(), result.rightPadding(), result.bottomPadding(), result.leftPadding(), result.shadowContentFilterPolicy());
+    HitTestResult tempResult(result.hitTestPoint(), result.shadowContentFilterPolicy());
     bool inside = RenderReplaced::nodeAtPoint(request, tempResult, pointInContainer, accumulatedOffset, hitTestAction);
 
     if (tempResult.innerNode() && node()) {
         if (HTMLMapElement* map = imageMap()) {
             LayoutRect contentBox = contentBoxRect();
             float scaleFactor = 1 / style()->effectiveZoom();
-            LayoutPoint mapLocation(pointInContainer.x() - accumulatedOffset.x() - this->x() - contentBox.x(), pointInContainer.y() - accumulatedOffset.y() - this->y() - contentBox.y());
+            LayoutPoint mapLocation = pointInContainer.point() - toLayoutSize(accumulatedOffset) - locationOffset() - toLayoutSize(contentBox.location());
             mapLocation.scale(scaleFactor, scaleFactor);
-            
+
             if (map->mapMouseEvent(mapLocation, contentBox.size(), tempResult))
                 tempResult.setInnerNonSharedNode(node());
         }
@@ -498,8 +530,8 @@ void RenderImage::updateAltText()
 
     if (node()->hasTagName(inputTag))
         m_altText = static_cast<HTMLInputElement*>(node())->altText();
-    else if (node()->hasTagName(imgTag))
-        m_altText = static_cast<HTMLImageElement*>(node())->altText();
+    else if (HTMLImageElement* image = hostImageElement())
+        m_altText = image->altText();
 }
 
 void RenderImage::layout()
@@ -518,7 +550,7 @@ void RenderImage::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, dou
 
     // Our intrinsicSize is empty if we're rendering generated images with relative width/height. Figure out the right intrinsic size to use.
     if (intrinsicSize.isEmpty() && (m_imageResource->imageHasRelativeWidth() || m_imageResource->imageHasRelativeHeight())) {
-        RenderObject* containingBlock = isPositioned() ? container() : this->containingBlock();
+        RenderObject* containingBlock = isOutOfFlowPositioned() ? container() : this->containingBlock();
         if (containingBlock->isBox()) {
             RenderBox* box = toRenderBox(containingBlock);
             intrinsicSize.setWidth(box->availableLogicalWidth());
@@ -530,6 +562,24 @@ void RenderImage::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, dou
         intrinsicRatio = 1;
         return;
     }
+}
+
+HTMLImageElement* RenderImage::hostImageElement() const
+{
+    if (!node())
+        return 0;
+
+    if (isHTMLImageElement(node()))
+        return toHTMLImageElement(node());
+
+    if (node()->hasTagName(webkitInnerImageTag)) {
+        if (Node* ancestor = node()->shadowAncestorNode()) {
+            if (ancestor->hasTagName(imgTag))
+                return toHTMLImageElement(ancestor);
+        }
+    }
+
+    return 0;
 }
 
 bool RenderImage::needsPreferredWidthsRecalculation() const

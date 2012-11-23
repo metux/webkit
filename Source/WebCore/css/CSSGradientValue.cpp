@@ -33,6 +33,7 @@
 #include "Image.h"
 #include "IntSize.h"
 #include "IntSizeHash.h"
+#include "MemoryInstrumentation.h"
 #include "NodeRenderStyle.h"
 #include "PlatformString.h"
 #include "RenderObject.h"
@@ -41,6 +42,13 @@
 using namespace std;
 
 namespace WebCore {
+
+void CSSGradientColorStop::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_position);
+    info.addInstrumentedMember(m_color);
+}
 
 PassRefPtr<Image> CSSGradientValue::image(RenderObject* renderer, const IntSize& size)
 {
@@ -105,6 +113,34 @@ struct GradientStop {
     { }
 };
 
+PassRefPtr<CSSGradientValue> CSSGradientValue::gradientWithStylesResolved(StyleResolver* styleResolver)
+{
+    bool derived = false;
+    for (unsigned i = 0; i < m_stops.size(); i++)
+        if (styleResolver->colorFromPrimitiveValueIsDerivedFromElement(m_stops[i].m_color.get())) {
+            m_stops[i].m_colorIsDerivedFromElement = true;
+            derived = true;
+            break;
+        }
+
+    RefPtr<CSSGradientValue> result;
+    if (!derived)
+        result = this;
+    else if (isLinearGradient())
+        result = static_cast<CSSLinearGradientValue*>(this)->clone();
+    else if (isRadialGradient())
+        result = static_cast<CSSRadialGradientValue*>(this)->clone();
+    else {
+        ASSERT_NOT_REACHED();
+        return 0;
+    }
+
+    for (unsigned i = 0; i < result->m_stops.size(); i++)
+        result->m_stops[i].m_resolvedColor = styleResolver->colorFromPrimitiveValue(result->m_stops[i].m_color.get());
+
+    return result.release();
+}
+
 void CSSGradientValue::addStops(Gradient* gradient, RenderObject* renderer, RenderStyle* rootStyle, float maxLengthForRepeat)
 {
     RenderStyle* style = renderer->style();
@@ -112,10 +148,8 @@ void CSSGradientValue::addStops(Gradient* gradient, RenderObject* renderer, Rend
     if (m_deprecatedType) {
         sortStopsIfNeeded();
 
-        // We have to resolve colors.
         for (unsigned i = 0; i < m_stops.size(); i++) {
             const CSSGradientColorStop& stop = m_stops[i];
-            Color color = renderer->document()->styleResolver()->colorFromPrimitiveValue(stop.m_color.get());
 
             float offset;
             if (stop.m_position->isPercentage())
@@ -123,7 +157,7 @@ void CSSGradientValue::addStops(Gradient* gradient, RenderObject* renderer, Rend
             else
                 offset = stop.m_position->getFloatValue(CSSPrimitiveValue::CSS_NUMBER);
 
-            gradient->addColorStop(offset, color);
+            gradient->addColorStop(offset, stop.m_resolvedColor);
         }
 
         // The back end already sorted the stops.
@@ -148,7 +182,7 @@ void CSSGradientValue::addStops(Gradient* gradient, RenderObject* renderer, Rend
     for (size_t i = 0; i < numStops; ++i) {
         const CSSGradientColorStop& stop = m_stops[i];
 
-        stops[i].color = renderer->document()->styleResolver()->colorFromPrimitiveValue(stop.m_color.get());
+        stops[i].color = stop.m_resolvedColor;
 
         if (stop.m_position) {
             if (stop.m_position->isPercentage())
@@ -413,8 +447,7 @@ bool CSSGradientValue::isCacheable() const
     for (size_t i = 0; i < m_stops.size(); ++i) {
         const CSSGradientColorStop& stop = m_stops[i];
 
-        CSSPrimitiveValue* color = stop.m_color.get();
-        if (color->getIdent() == CSSValueCurrentcolor)
+        if (stop.m_colorIsDerivedFromElement)
             return false;
 
         if (!stop.m_position)
@@ -425,6 +458,17 @@ bool CSSGradientValue::isCacheable() const
     }
 
     return true;
+}
+
+void CSSGradientValue::reportBaseClassMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    CSSImageGeneratorValue::reportBaseClassMemoryUsage(memoryObjectInfo);
+    info.addInstrumentedMember(m_firstX);
+    info.addInstrumentedMember(m_firstY);
+    info.addInstrumentedMember(m_secondX);
+    info.addInstrumentedMember(m_secondY);
+    info.addInstrumentedVector(m_stops);
 }
 
 String CSSLinearGradientValue::customCssText() const
@@ -567,6 +611,13 @@ PassRefPtr<Gradient> CSSLinearGradientValue::createGradient(RenderObject* render
     addStops(gradient.get(), renderer, rootStyle, 1);
 
     return gradient.release();
+}
+
+void CSSLinearGradientValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    CSSGradientValue::reportBaseClassMemoryUsage(memoryObjectInfo);
+    info.addInstrumentedMember(m_angle);
 }
 
 String CSSRadialGradientValue::customCssText() const
@@ -864,6 +915,18 @@ PassRefPtr<Gradient> CSSRadialGradientValue::createGradient(RenderObject* render
     addStops(gradient.get(), renderer, rootStyle, maxExtent);
 
     return gradient.release();
+}
+
+void CSSRadialGradientValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    CSSGradientValue::reportBaseClassMemoryUsage(memoryObjectInfo);
+    info.addInstrumentedMember(m_firstRadius);
+    info.addInstrumentedMember(m_secondRadius);
+    info.addInstrumentedMember(m_shape);
+    info.addInstrumentedMember(m_sizingBehavior);
+    info.addInstrumentedMember(m_endHorizontalSize);
+    info.addInstrumentedMember(m_endVerticalSize);
 }
 
 } // namespace WebCore

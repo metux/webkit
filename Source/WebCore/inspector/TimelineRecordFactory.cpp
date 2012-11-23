@@ -161,10 +161,11 @@ PassRefPtr<InspectorObject> TimelineRecordFactory::createResourceFinishData(cons
     return data.release();
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createReceiveResourceData(const String& requestId)
+PassRefPtr<InspectorObject> TimelineRecordFactory::createReceiveResourceData(const String& requestId, int length)
 {
     RefPtr<InspectorObject> data = InspectorObject::create();
     data->setString("requestId", requestId);
+    data->setNumber("encodedDataLength", length);
     return data.release();
 }
     
@@ -175,6 +176,20 @@ PassRefPtr<InspectorObject> TimelineRecordFactory::createPaintData(const LayoutR
     data->setNumber("y", rect.y());
     data->setNumber("width", rect.width());
     data->setNumber("height", rect.height());
+    return data.release();
+}
+
+PassRefPtr<InspectorObject> TimelineRecordFactory::createDecodeImageData(const String& imageType)
+{
+    RefPtr<InspectorObject> data = InspectorObject::create();
+    data->setString("imageType", imageType);
+    return data.release();
+}
+
+PassRefPtr<InspectorObject> TimelineRecordFactory::createResizeImageData(bool shouldCache)
+{
+    RefPtr<InspectorObject> data = InspectorObject::create();
+    data->setBoolean("cached", shouldCache);
     return data.release();
 }
 

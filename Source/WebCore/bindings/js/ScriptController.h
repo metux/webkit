@@ -40,6 +40,7 @@ struct NPObject;
 
 namespace JSC {
     class JSGlobalObject;
+    class ExecState;
 
     namespace Bindings {
         class RootObject;
@@ -52,6 +53,7 @@ class HTMLPlugInElement;
 class Frame;
 class ScriptSourceCode;
 class ScriptValue;
+class SecurityOrigin;
 class Widget;
 
 typedef HashMap<void*, RefPtr<JSC::Bindings::RootObject> > RootObjectMap;
@@ -102,6 +104,7 @@ public:
 
     WTF::TextPosition eventHandlerPosition() const;
 
+    void enableEval();
     void disableEval();
 
     static bool processingUserGesture();
@@ -118,7 +121,7 @@ public:
 
     const String* sourceURL() const { return m_sourceURL; } // 0 if we are not evaluating any script
 
-    void clearWindowShell(bool goingIntoPageCache = false);
+    void clearWindowShell(DOMWindow* newDOMWindow, bool goingIntoPageCache);
     void updateDocument();
 
     void namedItemAdded(HTMLDocument*, const AtomicString&) { }
@@ -143,6 +146,7 @@ public:
 
 #if ENABLE(INSPECTOR)
     static void setCaptureCallStackForUncaughtExceptions(bool);
+    void collectIsolatedContexts(Vector<std::pair<JSC::ExecState*, SecurityOrigin*> >&);
 #endif
 
 #if PLATFORM(MAC)

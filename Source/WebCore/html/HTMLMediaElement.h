@@ -76,14 +76,17 @@ typedef Vector<CueIntervalTree::IntervalType> CueList;
 // But it can't be until the Chromium WebMediaPlayerClientImpl class is fixed so it
 // no longer depends on typecasting a MediaPlayerClient to an HTMLMediaElement.
 
-class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface
+class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, public MediaPlayerSupportsTypeClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface
 #if ENABLE(VIDEO_TRACK)
     , private TextTrackClient
 #endif
 {
 public:
     MediaPlayer* player() const { return m_player.get(); }
-    
+
+    void createShadowSubtree();
+    virtual void willAddAuthorShadowRoot() OVERRIDE;
+
     virtual bool isVideo() const = 0;
     virtual bool hasVideo() const { return false; }
     virtual bool hasAudio() const;
@@ -128,7 +131,7 @@ public:
 
     PassRefPtr<TimeRanges> buffered() const;
     void load(ExceptionCode&);
-    String canPlayType(const String& mimeType, const String& keySystem = String()) const;
+    String canPlayType(const String& mimeType, const String& keySystem = String(), const KURL& = KURL()) const;
 
 // ready state
     ReadyState readyState() const;
@@ -171,15 +174,7 @@ public:
 
 #if ENABLE(MEDIA_SOURCE)
 //  Media Source.
-    const KURL& webkitMediaSourceURL() const { return m_mediaSourceURL; }
-    void webkitSourceAddId(const String&, const String&, ExceptionCode&);
-    void webkitSourceRemoveId(const String&, ExceptionCode&);
-    void webkitSourceAppend(PassRefPtr<Uint8Array> data, ExceptionCode&);
-    enum EndOfStreamStatus { EOS_NO_ERROR, EOS_NETWORK_ERR, EOS_DECODE_ERR };
-    void webkitSourceEndOfStream(unsigned short, ExceptionCode&);
-    enum SourceState { SOURCE_CLOSED, SOURCE_OPEN, SOURCE_ENDED };
-    SourceState webkitSourceState() const;
-    void setSourceState(SourceState);
+    void setSourceState(const String&);
 #endif 
 
 #if ENABLE(ENCRYPTED_MEDIA)
@@ -285,9 +280,9 @@ public:
     bool closedCaptionsVisible() const;
     void setClosedCaptionsVisible(bool);
 
-    MediaControls* mediaControls();
+    MediaControls* mediaControls() const;
 
-    void sourceWillBeRemoved(HTMLSourceElement*);
+    void sourceWasRemoved(HTMLSourceElement*);
     void sourceWasAdded(HTMLSourceElement*);
 
     void privateBrowsingStateDidChange();
@@ -319,13 +314,15 @@ public:
 
     virtual bool dispatchEvent(PassRefPtr<Event>);
 
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+
 protected:
     HTMLMediaElement(const QualifiedName&, Document*, bool);
     virtual ~HTMLMediaElement();
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
     virtual void finishParsingChildren();
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual void attach();
 
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
@@ -362,8 +359,8 @@ private:
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
-    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
-    virtual void removedFrom(Node*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void didRecalcStyle(StyleChange);
     
     virtual void defaultEventHandler(Event*);
@@ -409,7 +406,6 @@ private:
 #if ENABLE(MEDIA_SOURCE)
     virtual void mediaPlayerSourceOpened();
     virtual String mediaPlayerSourceURL() const;
-    bool isValidSourceId(const String&, ExceptionCode&) const;
 #endif
 
 #if ENABLE(ENCRYPTED_MEDIA)
@@ -421,6 +417,25 @@ private:
 
     virtual String mediaPlayerReferrer() const OVERRIDE;
     virtual String mediaPlayerUserAgent() const OVERRIDE;
+    virtual CORSMode mediaPlayerCORSMode() const OVERRIDE;
+
+    virtual bool mediaPlayerNeedsSiteSpecificHacks() const OVERRIDE;
+    virtual String mediaPlayerDocumentHost() const OVERRIDE;
+
+    virtual void mediaPlayerExitFullscreen() OVERRIDE;
+    virtual bool mediaPlayerIsVideo() const OVERRIDE;
+    virtual LayoutRect mediaPlayerContentBoxRect() const OVERRIDE;
+    virtual void mediaPlayerSetSize(const IntSize&) OVERRIDE;
+    virtual void mediaPlayerPause() OVERRIDE;
+    virtual void mediaPlayerPlay() OVERRIDE;
+    virtual bool mediaPlayerIsPaused() const OVERRIDE;
+    virtual bool mediaPlayerIsLooping() const OVERRIDE;
+    virtual HostWindow* mediaPlayerHostWindow() OVERRIDE;
+    virtual IntRect mediaPlayerWindowClipRect() OVERRIDE;
+
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+    virtual GraphicsDeviceAdapter* mediaPlayerGraphicsDeviceAdapter(const MediaPlayer*) const OVERRIDE;
+#endif
 
     void loadTimerFired(Timer<HTMLMediaElement>*);
     void progressEventTimerFired(Timer<HTMLMediaElement>*);
@@ -498,7 +513,7 @@ private:
     void invalidateCachedTime();
     void refreshCachedTime() const;
 
-    bool hasMediaControls();
+    bool hasMediaControls() const;
     bool createMediaControls();
     void configureMediaControls();
 
@@ -579,8 +594,7 @@ private:
 
 #if ENABLE(MEDIA_SOURCE)
     KURL m_mediaSourceURL;
-    SourceState m_sourceState;
-    HashSet<String> m_sourceIDs;
+    RefPtr<MediaSource> m_mediaSource;
 #endif
 
     mutable float m_cachedTime;
@@ -678,6 +692,17 @@ struct ValueToString<TextTrackCue*> {
 };
 #endif
 #endif
+
+inline bool isMediaElement(Node* node)
+{
+    return node && node->isElementNode() && toElement(node)->isMediaElement();
+}
+
+inline HTMLMediaElement* toMediaElement(Node* node)
+{
+    ASSERT(!node || isMediaElement(node));
+    return static_cast<HTMLMediaElement*>(node);
+}
 
 } //namespace
 

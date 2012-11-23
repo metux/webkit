@@ -21,7 +21,9 @@
 #include "config.h"
 #include "RenderFileUploadControl.h"
 
+#include "ElementShadow.h"
 #include "FileList.h"
+#include "Font.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
@@ -32,7 +34,6 @@
 #include "RenderText.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 #include "TextRun.h"
 #include "VisiblePosition.h"
 #include <math.h>
@@ -58,6 +59,11 @@ RenderFileUploadControl::RenderFileUploadControl(HTMLInputElement* input)
 
 RenderFileUploadControl::~RenderFileUploadControl()
 {
+}
+
+bool RenderFileUploadControl::canBeReplacedWithInlineRunIn() const
+{
+    return false;
 }
 
 void RenderFileUploadControl::updateFromElement()
@@ -109,8 +115,8 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
     // Push a clip.
     GraphicsContextStateSaver stateSaver(*paintInfo.context, false);
     if (paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseChildBlockBackgrounds) {
-        IntRect clipRect = pixelSnappedIntRect(paintOffset.x() + borderLeft(), paintOffset.y() + borderTop(),
-                         width() - borderLeft() - borderRight(), height() - borderBottom() - borderTop() + buttonShadowHeight);
+        IntRect clipRect = enclosingIntRect(LayoutRect(paintOffset.x() + borderLeft(), paintOffset.y() + borderTop(),
+                         width() - borderLeft() - borderRight(), height() - borderBottom() - borderTop() + buttonShadowHeight));
         if (clipRect.isEmpty())
             return;
         stateSaver.save();
@@ -141,8 +147,7 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
         // We want to match the button's baseline
         RenderButton* buttonRenderer = toRenderButton(button->renderer());
         // FIXME: Make this work with transforms.
-        LayoutUnit textY = buttonRenderer->absoluteBoundingBoxRectIgnoringTransforms().y()
-            + buttonRenderer->baselinePosition(AlphabeticBaseline, true, HorizontalLine, PositionOnContainingLine);
+        LayoutUnit textY = paintOffset.y() + buttonRenderer->baselinePosition(AlphabeticBaseline, true, HorizontalLine, PositionOnContainingLine);
 
         paintInfo.context->setFillColor(style()->visitedDependentColor(CSSPropertyColor), style()->colorSpace());
         
@@ -190,7 +195,8 @@ void RenderFileUploadControl::computePreferredLogicalWidths()
         const String label = theme()->fileListDefaultLabel(node()->toInputElement()->multiple());
         float defaultLabelWidth = font.width(constructTextRun(this, font, label, style, TextRun::AllowTrailingExpansion));
         if (HTMLInputElement* button = uploadButton())
-            defaultLabelWidth += button->renderer()->maxPreferredLogicalWidth() + afterButtonSpacing;
+            if (RenderObject* buttonRenderer = button->renderer())
+                defaultLabelWidth += buttonRenderer->maxPreferredLogicalWidth() + afterButtonSpacing;
         m_maxPreferredLogicalWidth = static_cast<int>(ceilf(max(minDefaultLabelWidth, defaultLabelWidth)));
     }
 
@@ -223,9 +229,9 @@ HTMLInputElement* RenderFileUploadControl::uploadButton() const
 {
     HTMLInputElement* input = static_cast<HTMLInputElement*>(node());
 
-    ASSERT(input->hasShadowRoot());
+    ASSERT(input->shadow());
 
-    Node* buttonNode = input->shadowTree()->oldestShadowRoot()->firstChild();
+    Node* buttonNode = input->shadow()->oldestShadowRoot()->firstChild();
     return buttonNode && buttonNode->isHTMLElement() && buttonNode->hasTagName(inputTag) ? static_cast<HTMLInputElement*>(buttonNode) : 0;
 }
 

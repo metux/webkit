@@ -23,7 +23,6 @@
 #include "AlternativeTextClient.h"
 #include "BackForwardController.h"
 #include "BackForwardList.h"
-#include "Base64.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "ContextMenuClient.h"
@@ -77,6 +76,7 @@
 #include <wtf/HashMap.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/text/Base64.h>
 #include <wtf/text/StringHash.h>
 
 namespace WebCore {
@@ -167,6 +167,8 @@ Page::Page(PageClients& pageClients)
     , m_alternativeTextClient(pageClients.alternativeTextClient)
     , m_scriptedAnimationsSuspended(false)
 {
+    ASSERT(m_editorClient);
+
     if (!allPages) {
         allPages = new HashSet<Page*>;
         
@@ -641,10 +643,16 @@ void Page::setMediaVolume(float volume)
 
 void Page::setPageScaleFactor(float scale, const IntPoint& origin)
 {
-    if (scale == m_pageScaleFactor)
-        return;
-
     Document* document = mainFrame()->document();
+    FrameView* view = document->view();
+
+    if (scale == m_pageScaleFactor) {
+        if (view && view->scrollPosition() != origin) {
+            document->updateLayoutIgnorePendingStylesheets();
+            view->setScrollPosition(origin);
+        }
+        return;
+    }
 
     m_pageScaleFactor = scale;
 
@@ -657,12 +665,10 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin)
     mainFrame()->deviceOrPageScaleFactorChanged();
 #endif
 
-    if (FrameView* view = document->view()) {
-        if (view->scrollPosition() != origin) {
-          if (document->renderer() && document->renderer()->needsLayout() && view->didFirstLayout())
-              view->layout();
-          view->setScrollPosition(origin);
-        }
+    if (view && view->scrollPosition() != origin) {
+        if (document->renderer() && document->renderer()->needsLayout() && view->didFirstLayout())
+            view->layout();
+        view->setScrollPosition(origin);
     }
 }
 
@@ -703,13 +709,11 @@ unsigned Page::pageCount() const
         return 0;
 
     FrameView* frameView = mainFrame()->view();
-    if (!frameView->didFirstLayout())
-        return 0;
-
-    mainFrame()->view()->forceLayout();
+    if (frameView->needsLayout())
+        frameView->layout();
 
     RenderView* contentRenderer = mainFrame()->contentRenderer();
-    return contentRenderer->columnCount(contentRenderer->columnInfo());
+    return contentRenderer ? contentRenderer->columnCount(contentRenderer->columnInfo()) : 0;
 }
 
 void Page::didMoveOnscreen()
@@ -786,7 +790,7 @@ void Page::userStyleSheetLocationChanged()
         m_didLoadUserStyleSheet = true;
 
         Vector<char> styleSheetAsUTF8;
-        if (base64Decode(decodeURLEscapeSequences(url.string().substring(35)), styleSheetAsUTF8, IgnoreWhitespace))
+        if (base64Decode(decodeURLEscapeSequences(url.string().substring(35)), styleSheetAsUTF8, Base64IgnoreWhitespace))
             m_userStyleSheet = String::fromUTF8(styleSheetAsUTF8.data(), styleSheetAsUTF8.size());
     }
 
@@ -1150,6 +1154,26 @@ void Page::resumeActiveDOMObjectsAndAnimations()
 {
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
         frame->resumeActiveDOMObjectsAndAnimations();
+}
+
+bool Page::hasSeenAnyPlugin() const
+{
+    return !m_seenPlugins.isEmpty();
+}
+
+bool Page::hasSeenPlugin(const String& serviceType) const
+{
+    return m_seenPlugins.contains(serviceType);
+}
+
+void Page::sawPlugin(const String& serviceType)
+{
+    m_seenPlugins.add(serviceType);
+}
+
+void Page::resetSeenPlugins()
+{
+    m_seenPlugins.clear();
 }
 
 Page::PageClients::PageClients()

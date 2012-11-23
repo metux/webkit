@@ -35,7 +35,6 @@
  */
 WebInspector.ResourceTreeModel = function(networkManager)
 {
-    networkManager.addEventListener(WebInspector.NetworkManager.EventTypes.ResourceTrackingEnabled, this._onResourceTrackingEnabled, this);
     networkManager.addEventListener(WebInspector.NetworkManager.EventTypes.RequestUpdated, this._onRequestUpdated, this);
     networkManager.addEventListener(WebInspector.NetworkManager.EventTypes.RequestFinished, this._onRequestUpdated, this);
     networkManager.addEventListener(WebInspector.NetworkManager.EventTypes.RequestUpdateDropped, this._onRequestUpdateDropped, this);
@@ -60,7 +59,6 @@ WebInspector.ResourceTreeModel.EventTypes = {
     FrameDetached: "FrameDetached",
     MainFrameNavigated: "MainFrameNavigated",
     ResourceAdded: "ResourceAdded",
-    ResourceContentCommitted: "resource-content-committed",
     WillLoadCachedResources: "WillLoadCachedResources",
     CachedResourcesLoaded: "CachedResourcesLoaded",
     DOMContentLoaded: "DOMContentLoaded",
@@ -69,11 +67,6 @@ WebInspector.ResourceTreeModel.EventTypes = {
 }
 
 WebInspector.ResourceTreeModel.prototype = {
-    _onResourceTrackingEnabled: function()
-    {
-        this._fetchResourceTree();
-    },
-
     _fetchResourceTree: function()
     {
         this._frames = {};
@@ -93,9 +86,12 @@ WebInspector.ResourceTreeModel.prototype = {
         this._addFramesRecursively(null, mainFramePayload);
         this._dispatchInspectedURLChanged();
         this.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.CachedResourcesLoaded);
-        WebInspector.Resource.restoreRevisions();
-
         this._cachedResourcesProcessed = true;
+    },
+
+    cachedResourcesLoaded: function()
+    {
+        return this._cachedResourcesProcessed;
     },
 
     _dispatchInspectedURLChanged: function()
@@ -227,11 +223,12 @@ WebInspector.ResourceTreeModel.prototype = {
             return;
 
         var resource = new WebInspector.Resource(null, url, frame.url, frameId, event.data.loaderId, WebInspector.resourceTypes[event.data.resourceType], event.data.mimeType);
-        frame._addResource(resource);
+        frame.addResource(resource);
     },
 
     /**
      * @param {NetworkAgent.FrameId} frameId
+     * @return {WebInspector.ResourceTreeFrame}
      */
     frameForId: function(frameId)
     {
@@ -333,27 +330,20 @@ WebInspector.ResourceTreeModel.prototype = {
     {
         var framePayload = frameTreePayload.frame;
         var frame = new WebInspector.ResourceTreeFrame(this, parentFrame, framePayload);
+        this._addFrame(frame);
 
-        // Create frame resource.
         var frameResource = this._createResourceFromFramePayload(framePayload, framePayload.url, WebInspector.resourceTypes.Document, framePayload.mimeType);
-
         if (frame.isMainFrame())
             WebInspector.inspectedPageURL = frameResource.url;
-
-        this._addFrame(frame);
-        frame._addResource(frameResource);
+        frame.addResource(frameResource);
 
         for (var i = 0; frameTreePayload.childFrames && i < frameTreePayload.childFrames.length; ++i)
             this._addFramesRecursively(frame, frameTreePayload.childFrames[i]);
 
-        if (!frameTreePayload.resources)
-            return;
-
-        // Create frame subresources.
         for (var i = 0; i < frameTreePayload.resources.length; ++i) {
             var subresource = frameTreePayload.resources[i];
             var resource = this._createResourceFromFramePayload(framePayload, subresource.url, WebInspector.resourceTypes[subresource.type], subresource.mimeType);
-            frame._addResource(resource);
+            frame.addResource(resource);
         }
     },
 
@@ -484,7 +474,7 @@ WebInspector.ResourceTreeFrame.prototype = {
         this._resourcesMap = {};
         this._removeChildFrames();
         if (mainResource && mainResource.loaderId === this._loaderId)
-            this._addResource(mainResource);
+            this.addResource(mainResource);
     },
 
     /**
@@ -521,7 +511,7 @@ WebInspector.ResourceTreeFrame.prototype = {
     /**
      * @param {WebInspector.Resource} resource
      */
-    _addResource: function(resource)
+    addResource: function(resource)
     {
         if (this._resourcesMap[resource.url] === resource) {
             // Already in the tree, we just got an extra update.

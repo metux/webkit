@@ -58,10 +58,6 @@ module xml {
 
         readonly attribute unsigned short readyState;
 
-        // request
-        attribute [Conditional=XHR_RESPONSE_BLOB, V8EnabledAtRuntime] boolean asBlob
-            setter raises(DOMException);
-
         attribute boolean withCredentials
             setter raises(DOMException);
 
@@ -73,7 +69,9 @@ module xml {
 
         [Custom] void send()
             raises(DOMException);
-        [Custom] void send(in ArrayBuffer data)
+        [Custom] void send(in ArrayBuffer data) // FIXME: this should be eventually deprecated.
+            raises(DOMException);
+        [Custom] void send(in ArrayBufferView data)
             raises(DOMException);
         [Conditional=BLOB, Custom] void send(in Blob data)
             raises(DOMException);
@@ -96,8 +94,6 @@ module xml {
         readonly attribute [CustomGetter] DOMString responseText // The custom getter implements TreatReturnedNullStringAs=Null
             getter raises(DOMException);
         readonly attribute Document responseXML
-            getter raises(DOMException);
-        readonly attribute [Conditional=XHR_RESPONSE_BLOB, V8EnabledAtRuntime] Blob responseBlob
             getter raises(DOMException);
 
         attribute DOMString responseType

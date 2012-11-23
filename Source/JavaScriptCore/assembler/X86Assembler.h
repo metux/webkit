@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -247,6 +247,8 @@ private:
 public:
 
     X86Assembler()
+        : m_indexOfLastWatchpoint(INT_MIN)
+        , m_indexOfTailOfLastWatchpoint(INT_MIN)
     {
     }
 
@@ -302,6 +304,13 @@ public:
     {
         m_formatter.oneByteOp(OP_ADD_GvEv, dst, base, offset);
     }
+    
+#if !CPU(X86_64)
+    void addl_mr(const void* addr, RegisterID dst)
+    {
+        m_formatter.oneByteOp(OP_ADD_GvEv, dst, addr);
+    }
+#endif
 
     void addl_rm(RegisterID src, int offset, RegisterID base)
     {
@@ -334,6 +343,11 @@ public:
     void addq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_ADD_EvGv, src, dst);
+    }
+
+    void addq_mr(int offset, RegisterID base, RegisterID dst)
+    {
+        m_formatter.oneByteOp64(OP_ADD_GvEv, dst, base, offset);
     }
 
     void addq_ir(int imm, RegisterID dst)
@@ -440,6 +454,13 @@ public:
     {
         m_formatter.oneByteOp(OP_GROUP3_Ev, GROUP3_OP_NEG, dst);
     }
+
+#if CPU(X86_64)
+    void negq_r(RegisterID dst)
+    {
+        m_formatter.oneByteOp64(OP_GROUP3_Ev, GROUP3_OP_NEG, dst);
+    }
+#endif
 
     void negl_m(int offset, RegisterID base)
     {
@@ -798,6 +819,14 @@ public:
         m_formatter.oneByteOp(OP_GROUP1_EbIb, GROUP1_OP_CMP, base, index, scale, offset);
         m_formatter.immediate8(imm);
     }
+    
+#if CPU(X86)
+    void cmpb_im(int imm, const void* addr)
+    {
+        m_formatter.oneByteOp(OP_GROUP1_EbIb, GROUP1_OP_CMP, addr);
+        m_formatter.immediate8(imm);
+    }
+#endif
 
     void cmpl_im(int imm, int offset, RegisterID base, RegisterID index, int scale)
     {
@@ -948,6 +977,14 @@ public:
         m_formatter.immediate8(imm);
     }
 
+#if CPU(X86)
+    void testb_im(int imm, const void* addr)
+    {
+        m_formatter.oneByteOp(OP_GROUP3_EbIb, GROUP3_OP_TEST, addr);
+        m_formatter.immediate8(imm);
+    }
+#endif
+
     void testl_i32m(int imm, int offset, RegisterID base, RegisterID index, int scale)
     {
         m_formatter.oneByteOp(OP_GROUP3_EvIz, GROUP3_OP_TEST, base, index, scale, offset);
@@ -958,6 +995,11 @@ public:
     void testq_rr(RegisterID src, RegisterID dst)
     {
         m_formatter.oneByteOp64(OP_TEST_EvGv, src, dst);
+    }
+
+    void testq_rm(RegisterID src, int offset, RegisterID base)
+    {
+        m_formatter.oneByteOp64(OP_TEST_EvGv, src, base, offset);
     }
 
     void testq_i32r(int imm, RegisterID dst)
@@ -1702,10 +1744,30 @@ public:
     {
         return m_formatter.codeSize();
     }
+    
+    AssemblerLabel labelForWatchpoint()
+    {
+        AssemblerLabel result = m_formatter.label();
+        if (static_cast<int>(result.m_offset) != m_indexOfLastWatchpoint)
+            result = label();
+        m_indexOfLastWatchpoint = result.m_offset;
+        m_indexOfTailOfLastWatchpoint = result.m_offset + maxJumpReplacementSize();
+        return result;
+    }
+    
+    AssemblerLabel labelIgnoringWatchpoints()
+    {
+        return m_formatter.label();
+    }
 
     AssemblerLabel label()
     {
-        return m_formatter.label();
+        AssemblerLabel result = m_formatter.label();
+        while (UNLIKELY(static_cast<int>(result.m_offset) < m_indexOfTailOfLastWatchpoint)) {
+            nop();
+            result = m_formatter.label();
+        }
+        return result;
     }
 
     AssemblerLabel align(int alignment)
@@ -1767,7 +1829,7 @@ public:
     
     static void repatchCompact(void* where, int32_t value)
     {
-        ASSERT(value >= 0);
+        ASSERT(value >= std::numeric_limits<int8_t>::min());
         ASSERT(value <= std::numeric_limits<int8_t>::max());
         setInt8(where, value);
     }
@@ -1787,6 +1849,56 @@ public:
         return reinterpret_cast<void**>(where)[-1];
     }
 
+    static void replaceWithJump(void* instructionStart, void* to)
+    {
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
+        uint8_t* dstPtr = reinterpret_cast<uint8_t*>(to);
+        intptr_t distance = (intptr_t)(dstPtr - (ptr + 5));
+        ptr[0] = static_cast<uint8_t>(OP_JMP_rel32);
+        *reinterpret_cast<int32_t*>(ptr + 1) = static_cast<int32_t>(distance);
+    }
+    
+    static ptrdiff_t maxJumpReplacementSize()
+    {
+        return 5;
+    }
+    
+    static void replaceWithLoad(void* instructionStart)
+    {
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
+#if CPU(X86_64)
+        if ((*ptr & ~15) == PRE_REX)
+            ptr++;
+#endif
+        switch (*ptr) {
+        case OP_MOV_GvEv:
+            break;
+        case OP_LEA:
+            *ptr = OP_MOV_GvEv;
+            break;
+        default:
+            ASSERT_NOT_REACHED();
+        }
+    }
+    
+    static void replaceWithAddressComputation(void* instructionStart)
+    {
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
+#if CPU(X86_64)
+        if ((*ptr & ~15) == PRE_REX)
+            ptr++;
+#endif
+        switch (*ptr) {
+        case OP_MOV_GvEv:
+            *ptr = OP_LEA;
+            break;
+        case OP_LEA:
+            break;
+        default:
+            ASSERT_NOT_REACHED();
+        }
+    }
+    
     static unsigned getCallReturnOffset(AssemblerLabel call)
     {
         ASSERT(call.isSet());
@@ -1815,6 +1927,9 @@ public:
     {
         m_formatter.oneByteOp(OP_NOP);
     }
+
+    // This is a no-op on x86
+    ALWAYS_INLINE static void cacheFlush(void*, size_t) { }
 
 private:
 
@@ -2336,6 +2451,8 @@ private:
 
         AssemblerBuffer m_buffer;
     } m_formatter;
+    int m_indexOfLastWatchpoint;
+    int m_indexOfTailOfLastWatchpoint;
 };
 
 } // namespace JSC

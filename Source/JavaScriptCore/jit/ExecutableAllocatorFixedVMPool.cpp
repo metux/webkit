@@ -45,27 +45,23 @@ using namespace WTF;
 
 namespace JSC {
     
-#if CPU(ARM)
-static const size_t fixedPoolSize = 16 * 1024 * 1024;
-#elif CPU(X86_64)
-static const size_t fixedPoolSize = 1024 * 1024 * 1024;
-#else
-static const size_t fixedPoolSize = 32 * 1024 * 1024;
-#endif
+uintptr_t startOfFixedExecutableMemoryPool;
 
 class FixedVMPoolExecutableAllocator : public MetaAllocator {
 public:
     FixedVMPoolExecutableAllocator()
-        : MetaAllocator(32) // round up all allocations to 32 bytes
+        : MetaAllocator(jitAllocationGranule) // round up all allocations to 32 bytes
     {
-        m_reservation = PageReservation::reserveWithGuardPages(fixedPoolSize, OSAllocator::JSJITCodePages, EXECUTABLE_POOL_WRITABLE, true);
+        m_reservation = PageReservation::reserveWithGuardPages(fixedExecutableMemoryPoolSize, OSAllocator::JSJITCodePages, EXECUTABLE_POOL_WRITABLE, true);
 #if !(ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
         if (!m_reservation)
             CRASH();
 #endif
         if (m_reservation) {
-            ASSERT(m_reservation.size() == fixedPoolSize);
+            ASSERT(m_reservation.size() == fixedExecutableMemoryPoolSize);
             addFreshFreeSpace(m_reservation.base(), m_reservation.size());
+            
+            startOfFixedExecutableMemoryPool = reinterpret_cast<uintptr_t>(m_reservation.base());
         }
     }
     
@@ -78,12 +74,29 @@ protected:
     
     virtual void notifyNeedPage(void* page)
     {
+#if OS(DARWIN)
+        UNUSED_PARAM(page);
+#else
         m_reservation.commit(page, pageSize());
+#endif
     }
     
     virtual void notifyPageIsFree(void* page)
     {
+#if OS(DARWIN)
+        for (;;) {
+            int result = madvise(page, pageSize(), MADV_FREE);
+            if (!result)
+                return;
+            ASSERT(result == -1);
+            if (errno != EAGAIN) {
+                ASSERT_NOT_REACHED(); // In debug mode, this should be a hard failure.
+                break; // In release mode, we should just ignore the error - not returning memory to the OS is better than crashing, especially since we _will_ be able to reuse the memory internally anyway.
+            }
+        }
+#else
         m_reservation.decommit(page, pageSize());
+#endif
     }
 
 private:

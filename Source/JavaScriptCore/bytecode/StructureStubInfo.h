@@ -31,10 +31,14 @@
 #if ENABLE(JIT)
 
 #include "CodeOrigin.h"
+#include "DFGRegisterSet.h"
 #include "Instruction.h"
+#include "JITStubRoutine.h"
 #include "MacroAssembler.h"
 #include "Opcode.h"
 #include "Structure.h"
+#include "StructureStubClearingWatchpoint.h"
+#include <wtf/OwnPtr.h>
 
 namespace JSC {
 
@@ -102,20 +106,23 @@ namespace JSC {
             u.getByIdSelf.baseObjectStructure.set(globalData, owner, baseObjectStructure);
         }
 
-        void initGetByIdProto(JSGlobalData& globalData, JSCell* owner, Structure* baseObjectStructure, Structure* prototypeStructure)
+        void initGetByIdProto(JSGlobalData& globalData, JSCell* owner, Structure* baseObjectStructure, Structure* prototypeStructure, bool isDirect)
         {
             accessType = access_get_by_id_proto;
 
             u.getByIdProto.baseObjectStructure.set(globalData, owner, baseObjectStructure);
             u.getByIdProto.prototypeStructure.set(globalData, owner, prototypeStructure);
+            u.getByIdProto.isDirect = isDirect;
         }
 
-        void initGetByIdChain(JSGlobalData& globalData, JSCell* owner, Structure* baseObjectStructure, StructureChain* chain)
+        void initGetByIdChain(JSGlobalData& globalData, JSCell* owner, Structure* baseObjectStructure, StructureChain* chain, unsigned count, bool isDirect)
         {
             accessType = access_get_by_id_chain;
 
             u.getByIdChain.baseObjectStructure.set(globalData, owner, baseObjectStructure);
             u.getByIdChain.chain.set(globalData, owner, chain);
+            u.getByIdChain.count = count;
+            u.getByIdChain.isDirect = isDirect;
         }
 
         void initGetByIdSelfList(PolymorphicAccessStructureList* structureList, int listSize)
@@ -165,7 +172,8 @@ namespace JSC {
         {
             deref();
             accessType = access_unset;
-            stubRoutine = MacroAssemblerCodeRef();
+            stubRoutine.clear();
+            watchpoints.clear();
         }
 
         void deref();
@@ -180,6 +188,12 @@ namespace JSC {
         void setSeen()
         {
             seen = true;
+        }
+        
+        StructureStubClearingWatchpoint* addWatchpoint(CodeBlock* codeBlock)
+        {
+            return WatchpointsOnStructureStubInfo::ensureReferenceAndAddWatchpoint(
+                watchpoints, codeBlock, this);
         }
         
         unsigned bytecodeIndex;
@@ -199,16 +213,17 @@ namespace JSC {
                 int8_t valueTagGPR;
 #endif
                 int8_t valueGPR;
-                int8_t scratchGPR;
-                int16_t deltaCallToDone;
-                int16_t deltaCallToStructCheck;
-                int16_t deltaCallToSlowCase;
-                int16_t deltaCheckImmToCall;
+                DFG::RegisterSetPOD usedRegisters;
+                int32_t deltaCallToDone;
+                int32_t deltaCallToStorageLoad;
+                int32_t deltaCallToStructCheck;
+                int32_t deltaCallToSlowCase;
+                int32_t deltaCheckImmToCall;
 #if USE(JSVALUE64)
-                int16_t deltaCallToLoadOrStore;
+                int32_t deltaCallToLoadOrStore;
 #else
-                int16_t deltaCallToTagLoadOrStore;
-                int16_t deltaCallToPayloadLoadOrStore;
+                int32_t deltaCallToTagLoadOrStore;
+                int32_t deltaCallToPayloadLoadOrStore;
 #endif
             } dfg;
             struct {
@@ -216,6 +231,7 @@ namespace JSC {
                     struct {
                         int16_t structureToCompare;
                         int16_t structureCheck;
+                        int16_t propertyStorageLoad;
 #if USE(JSVALUE64)
                         int16_t displacementLabel;
 #else
@@ -227,6 +243,7 @@ namespace JSC {
                     } get;
                     struct {
                         int16_t structureToCompare;
+                        int16_t propertyStorageLoad;
 #if USE(JSVALUE64)
                         int16_t displacementLabel;
 #else
@@ -251,10 +268,13 @@ namespace JSC {
             struct {
                 WriteBarrierBase<Structure> baseObjectStructure;
                 WriteBarrierBase<Structure> prototypeStructure;
+                bool isDirect;
             } getByIdProto;
             struct {
                 WriteBarrierBase<Structure> baseObjectStructure;
                 WriteBarrierBase<StructureChain> chain;
+                unsigned count : 31;
+                bool isDirect : 1;
             } getByIdChain;
             struct {
                 PolymorphicAccessStructureList* structureList;
@@ -277,9 +297,10 @@ namespace JSC {
             } putByIdList;
         } u;
 
-        MacroAssemblerCodeRef stubRoutine;
+        RefPtr<JITStubRoutine> stubRoutine;
         CodeLocationCall callReturnLocation;
         CodeLocationLabel hotPathBegin;
+        RefPtr<WatchpointsOnStructureStubInfo> watchpoints;
     };
 
     inline void* getStructureStubInfoReturnLocation(StructureStubInfo* structureStubInfo)

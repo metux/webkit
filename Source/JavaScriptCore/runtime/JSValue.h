@@ -36,12 +36,12 @@
 namespace JSC {
 
     class ExecState;
-    class Identifier;
     class JSCell;
     class JSGlobalData;
     class JSGlobalObject;
     class JSObject;
     class JSString;
+    class PropertyName;
     class PropertySlot;
     class PutPropertySlot;
     class UString;
@@ -124,6 +124,18 @@ namespace JSC {
         friend class LLInt::Data;
 
     public:
+#if USE(JSVALUE32_64)
+        enum { Int32Tag =        0xffffffff };
+        enum { BooleanTag =      0xfffffffe };
+        enum { NullTag =         0xfffffffd };
+        enum { UndefinedTag =    0xfffffffc };
+        enum { CellTag =         0xfffffffb };
+        enum { EmptyValueTag =   0xfffffffa };
+        enum { DeletedValueTag = 0xfffffff9 };
+
+        enum { LowestTag =  DeletedValueTag };
+#endif
+
         static EncodedJSValue encode(JSValue);
         static JSValue decode(EncodedJSValue);
 
@@ -197,7 +209,7 @@ namespace JSC {
         JSValue toPrimitive(ExecState*, PreferredPrimitiveType = NoPreference) const;
         bool getPrimitiveNumber(ExecState*, double& number, JSValue&);
 
-        bool toBoolean(ExecState*) const;
+        bool toBoolean() const;
 
         // toNumber conversion is expected to be side effect free if an exception has
         // been set in the ExecState already.
@@ -219,12 +231,12 @@ namespace JSC {
         float toFloat(ExecState* exec) const { return static_cast<float>(toNumber(exec)); }
 
         // Object operations, with the toObject operation included.
-        JSValue get(ExecState*, const Identifier& propertyName) const;
-        JSValue get(ExecState*, const Identifier& propertyName, PropertySlot&) const;
+        JSValue get(ExecState*, PropertyName) const;
+        JSValue get(ExecState*, PropertyName, PropertySlot&) const;
         JSValue get(ExecState*, unsigned propertyName) const;
         JSValue get(ExecState*, unsigned propertyName, PropertySlot&) const;
-        void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
-        void putToPrimitive(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+        void put(ExecState*, PropertyName, JSValue, PutPropertySlot&);
+        void putToPrimitive(ExecState*, PropertyName, JSValue, PutPropertySlot&);
         void putByIndex(ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
 
         JSObject* toThisObject(ExecState*) const;
@@ -239,8 +251,10 @@ namespace JSC {
         bool isCell() const;
         JSCell* asCell() const;
         JS_EXPORT_PRIVATE bool isValidCallee();
+        
+        JSValue structureOrUndefined() const;
 
-        char* description();
+        JS_EXPORT_PRIVATE char* description() const;
 
         JS_EXPORT_PRIVATE JSObject* synthesizePrototype(ExecState*) const;
 
@@ -276,16 +290,6 @@ namespace JSC {
          * cell, integer and bool values the lower 32 bits (the 'payload') contain the pointer
          * integer or boolean value; in the case of all other tags the payload is 0.
          */
-        enum { Int32Tag =        0xffffffff };
-        enum { BooleanTag =      0xfffffffe };
-        enum { NullTag =         0xfffffffd };
-        enum { UndefinedTag =    0xfffffffc };
-        enum { CellTag =         0xfffffffb };
-        enum { EmptyValueTag =   0xfffffffa };
-        enum { DeletedValueTag = 0xfffffff9 };
-
-        enum { LowestTag =  DeletedValueTag };
-
         uint32_t tag() const;
         int32_t payload() const;
 #elif USE(JSVALUE64)

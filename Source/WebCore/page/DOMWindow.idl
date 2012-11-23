@@ -64,7 +64,7 @@ module window {
 
         readonly attribute [CheckSecurityForNode] Element frameElement;
 
-        [DoNotCheckSecurity] void focus();
+        [DoNotCheckSecurity, CallWith=ScriptExecutionContext] void focus();
         [DoNotCheckSecurity] void blur();
         [DoNotCheckSecurity, CallWith=ScriptExecutionContext] void close();
 
@@ -135,7 +135,7 @@ module window {
 
         attribute [Replaceable, DoNotCheckSecurityOnGetter, V8CustomSetter] DOMWindow opener;
         attribute [Replaceable, DoNotCheckSecurityOnGetter] DOMWindow parent;
-        attribute [Replaceable, DoNotCheckSecurityOnGetter, V8Unforgeable, V8ReadOnly] DOMWindow top;
+        readonly attribute [DoNotCheckSecurityOnGetter, V8Unforgeable] DOMWindow top;
 
         // DOM Level 2 AbstractView Interface
         readonly attribute Document document;
@@ -313,6 +313,8 @@ module window {
         attribute [Conditional=DEVICE_ORIENTATION,V8EnabledAtRuntime] EventListener ondevicemotion;
         attribute [Conditional=DEVICE_ORIENTATION,V8EnabledAtRuntime] EventListener ondeviceorientation;
 
+        attribute [Conditional=PROXIMITY_EVENTS] EventListener onwebkitdeviceproximity;
+
         // EventTarget interface
         [Custom] void addEventListener(in DOMString type,
                                       in EventListener listener,
@@ -369,6 +371,7 @@ module window {
         attribute DocumentConstructor Document;
         attribute NodeConstructor Node;
         attribute NodeListConstructor NodeList;
+        attribute [Conditional=MICRODATA] PropertyNodeListConstructor PropertyNodeList;
         attribute NamedNodeMapConstructor NamedNodeMap;
         attribute CharacterDataConstructor CharacterData;
         attribute AttrConstructor Attr;
@@ -387,7 +390,9 @@ module window {
         attribute EntityConstructor Entity;
         attribute EntityReferenceConstructor EntityReference;
         attribute ProcessingInstructionConstructor ProcessingInstruction;
-        attribute [Conditional=SHADOW_DOM, V8EnabledAtRuntime=shadowDOM] ShadowRootConstructor WebKitShadowRoot;
+        attribute [Conditional=SHADOW_DOM, V8EnabledPerContext=shadowDOM] ShadowRootConstructor WebKitShadowRoot;
+        attribute [Conditional=SHADOW_DOM, V8EnabledPerContext=shadowDOM] HTMLContentElementConstructor HTMLContentElement;
+        attribute [Conditional=SHADOW_DOM, V8EnabledPerContext=shadowDOM] HTMLShadowElementConstructor HTMLShadowElement;
 
         attribute DOMSelectionConstructor Selection;
         attribute DOMWindowConstructor Window;
@@ -404,7 +409,8 @@ module window {
         attribute HTMLButtonElementConstructor HTMLButtonElement;
         attribute HTMLCanvasElementConstructor HTMLCanvasElement;
         attribute HTMLDListElementConstructor HTMLDListElement;
-        attribute [Conditional=DATALIST] HTMLDataListElementConstructor HTMLDataListElement;
+        attribute [Conditional=DATALIST_ELEMENT] HTMLDataListElementConstructor HTMLDataListElement;
+        attribute [Conditional=DIALOG_ELEMENT, V8EnabledPerContext=dialogElement] HTMLDialogElementConstructor HTMLDialogElement;
         attribute HTMLDirectoryElementConstructor HTMLDirectoryElement;
         attribute HTMLDivElementConstructor HTMLDivElement;
         attribute HTMLEmbedElementConstructor HTMLEmbedElement;
@@ -429,7 +435,7 @@ module window {
         attribute HTMLMarqueeElementConstructor HTMLMarqueeElement;
         attribute HTMLMenuElementConstructor HTMLMenuElement;
         attribute HTMLMetaElementConstructor HTMLMetaElement;
-#if defined(ENABLE_METER_TAG) && ENABLE_METER_TAG
+#if defined(ENABLE_METER_ELEMENT) && ENABLE_METER_ELEMENT
         attribute HTMLMeterElementConstructor HTMLMeterElement;
 #endif
         attribute HTMLModElementConstructor HTMLModElement;
@@ -441,7 +447,7 @@ module window {
         attribute HTMLParagraphElementConstructor HTMLParagraphElement;
         attribute HTMLParamElementConstructor HTMLParamElement;
         attribute HTMLPreElementConstructor HTMLPreElement;
-#if defined(ENABLE_PROGRESS_TAG) && ENABLE_PROGRESS_TAG
+#if defined(ENABLE_PROGRESS_ELEMENT) && ENABLE_PROGRESS_ELEMENT
         attribute HTMLProgressElementConstructor HTMLProgressElement;
 #endif
         attribute HTMLQuoteElementConstructor HTMLQuoteElement;
@@ -485,6 +491,8 @@ module window {
         attribute [Conditional=VIDEO, V8EnabledAtRuntime] TimeRangesConstructor TimeRanges;
         attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLSourceElementConstructor HTMLSourceElement;
         attribute [Conditional=VIDEO, V8EnabledAtRuntime] MediaControllerConstructor MediaController;
+
+        attribute [Conditional=WEB_INTENTS_TAG] HTMLIntentElementConstructor HTMLIntentElement;
 
         attribute CanvasPatternConstructor CanvasPattern;
         attribute CanvasGradientConstructor CanvasGradient;
@@ -545,12 +553,13 @@ module window {
         attribute StorageEventConstructor StorageEvent;
         attribute [Conditional=INPUT_SPEECH] SpeechInputEventConstructor SpeechInputEvent;
         attribute [Conditional=WEBGL] WebGLContextEventConstructor WebGLContextEvent;
+        attribute [Conditional=PROXIMITY_EVENTS] DeviceProximityEventConstructor DeviceProximityEvent;
 
         attribute EventExceptionConstructor EventException;
 
         attribute WebKitCSSKeyframeRuleConstructor WebKitCSSKeyframeRule;
         attribute WebKitCSSKeyframesRuleConstructor WebKitCSSKeyframesRule;
-        attribute WebKitCSSRegionRuleConstructor WebKitCSSRegionRule;
+        attribute [Conditional=CSS_REGIONS] WebKitCSSRegionRuleConstructor WebKitCSSRegionRule;
 
         attribute WebKitCSSMatrixConstructor WebKitCSSMatrix; // Usable with the new operator
 
@@ -706,7 +715,8 @@ module window {
         attribute SVGUnitTypesConstructor SVGUnitTypes;
         attribute SVGUseElementConstructor SVGUseElement;
         attribute SVGViewElementConstructor SVGViewElement;
-//      attribute SVGViewSpecConstructor SVGViewSpec;
+        attribute SVGViewSpecConstructor SVGViewSpec;
+        attribute SVGZoomAndPanConstructor SVGZoomAndPan;
 
         attribute SVGAnimateColorElementConstructor SVGAnimateColorElement;
         attribute SVGAnimateElementConstructor SVGAnimateElement;
@@ -771,13 +781,14 @@ module window {
 
         attribute [Conditional=BLOB&LEGACY_WEBKIT_BLOB_BUILDER] WebKitBlobBuilderConstructor WebKitBlobBuilder;
 
-        attribute [Conditional=BLOB] DOMURLConstructor webkitURL;
+        attribute [Conditional=BLOB] DOMURLConstructor URL;
+        attribute [Conditional=BLOB] DOMURLConstructor webkitURL; // FIXME: deprecate this.
 
-#if defined(ENABLE_QUOTA) && ENABLE_QUOTA
-        readonly attribute [V8EnabledAtRuntime=Quota] StorageInfo webkitStorageInfo;
-#endif
+        attribute [Conditional=MUTATION_OBSERVERS] MutationObserverConstructor WebKitMutationObserver;
 
-        attribute [Conditional=MUTATION_OBSERVERS] WebKitMutationObserverConstructor WebKitMutationObserver;
+        attribute [Conditional=MEDIA_SOURCE, V8EnabledAtRuntime=mediaSource] MediaSourceConstructor MediaSource;
+        attribute [Conditional=MEDIA_SOURCE, V8EnabledAtRuntime=mediaSource] SourceBufferConstructor SourceBuffer;
+        attribute [Conditional=MEDIA_SOURCE, V8EnabledAtRuntime=mediaSource] SourceBufferListConstructor SourceBufferList;
 
 #endif // defined(LANGUAGE_JAVASCRIPT)
 

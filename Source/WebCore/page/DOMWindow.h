@@ -27,6 +27,7 @@
 #ifndef DOMWindow_h
 #define DOMWindow_h
 
+#include "ContextDestructionObserver.h"
 #include "EventTarget.h"
 #include "FrameDestructionObserver.h"
 #include "KURL.h"
@@ -54,6 +55,7 @@ namespace WebCore {
     class IDBFactory;
     class Location;
     class MediaQueryList;
+    class MessageEvent;
     class Navigator;
     class Node;
     class Page;
@@ -61,10 +63,10 @@ namespace WebCore {
     class PostMessageTimer;
     class ScheduledAction;
     class Screen;
+    class ScriptCallStack;
     class SecurityOrigin;
     class SerializedScriptValue;
     class Storage;
-    class StorageInfo;
     class StyleMedia;
     class WebKitPoint;
 
@@ -80,10 +82,24 @@ namespace WebCore {
 
     enum SetLocationLocking { LockHistoryBasedOnGestureState, LockHistoryAndBackForwardList };
 
-    class DOMWindow : public RefCounted<DOMWindow>, public EventTarget, public FrameDestructionObserver, public Supplementable<DOMWindow> {
+    // FIXME: DOMWindow shouldn't subclass FrameDestructionObserver and instead should get to Frame via its Document.
+    class DOMWindow : public RefCounted<DOMWindow>
+                    , public EventTarget
+                    , public ContextDestructionObserver
+                    , public FrameDestructionObserver
+                    , public Supplementable<DOMWindow> {
     public:
-        static PassRefPtr<DOMWindow> create(Frame* frame) { return adoptRef(new DOMWindow(frame)); }
+        static PassRefPtr<DOMWindow> create(Document* document) { return adoptRef(new DOMWindow(document)); }
         virtual ~DOMWindow();
+
+        // In some rare cases, we'll re-used a DOMWindow for a new Document. For example,
+        // when a script calls window.open("..."), the browser gives JavaScript a window
+        // synchronously but kicks off the load in the window asynchronously. Web sites
+        // expect that modifications that they make to the window object synchronously
+        // won't be blown away when the network load commits. To make that happen, we
+        // "securely transition" the existing DOMWindow to the Document that results from
+        // the network load. See also SecurityContext::isSecureTransitionTo.
+        void didSecureTransitionTo(Document*);
 
         virtual const AtomicString& interfaceName() const;
         virtual ScriptExecutionContext* scriptExecutionContext() const;
@@ -93,24 +109,18 @@ namespace WebCore {
         void registerProperty(DOMWindowProperty*);
         void unregisterProperty(DOMWindowProperty*);
 
-        void clear();
+        void resetUnlessSuspendedForPageCache();
         void suspendForPageCache();
         void resumeFromPageCache();
 
         PassRefPtr<MediaQueryList> matchMedia(const String&);
-
-        void setSecurityOrigin(SecurityOrigin*);
-        SecurityOrigin* securityOrigin() const { return m_securityOrigin.get(); }
-
-        void setURL(const KURL& url) { m_url = url; }
-        KURL url() const { return m_url; }
 
         unsigned pendingUnloadEventListeners() const;
 
         static bool dispatchAllPendingBeforeUnloadEvents();
         static void dispatchAllPendingUnloadEvents();
 
-        static void adjustWindowRect(const FloatRect& screen, FloatRect& window, const FloatRect& pendingChanges);
+        void adjustWindowRect(const FloatRect& screen, FloatRect& window, const FloatRect& pendingChanges) const;
 
         // FIXME: We can remove this function once V8 showModalDialog is changed to use DOMWindow.
         static void parseModalDialogFeatures(const String&, HashMap<String, String>&);
@@ -142,7 +152,7 @@ namespace WebCore {
 
         Element* frameElement() const;
 
-        void focus();
+        void focus(ScriptExecutionContext* = 0);
         void blur();
         void close(ScriptExecutionContext* = 0);
         void print();
@@ -233,6 +243,7 @@ namespace WebCore {
         // FIXME: remove this when we update the ObjC bindings (bug #28774).
         void postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort*, const String& targetOrigin, DOMWindow* source, ExceptionCode&);
         void postMessageTimerFired(PassOwnPtr<PostMessageTimer>);
+        void dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTargetOrigin, PassRefPtr<Event>, PassRefPtr<ScriptCallStack>);
 
         void scrollBy(int x, int y) const;
         void scrollTo(int x, int y) const;
@@ -351,15 +362,15 @@ namespace WebCore {
         DEFINE_ATTRIBUTE_EVENT_LISTENER(deviceorientation);
 #endif
 
+#if ENABLE(PROXIMITY_EVENTS)
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitdeviceproximity);
+#endif
+
         // HTML 5 key/value storage
         Storage* sessionStorage(ExceptionCode&) const;
         Storage* localStorage(ExceptionCode&) const;
         Storage* optionalSessionStorage() const { return m_sessionStorage.get(); }
         Storage* optionalLocalStorage() const { return m_localStorage.get(); }
-
-#if ENABLE(QUOTA)
-        StorageInfo* webkitStorageInfo() const;
-#endif
 
         DOMApplicationCache* applicationCache() const;
         DOMApplicationCache* optionalApplicationCache() const { return m_applicationCache.get(); }
@@ -390,8 +401,11 @@ namespace WebCore {
         // by the document that is currently active in m_frame.
         bool isCurrentlyDisplayedInFrame() const;
 
+        void willDetachDocumentFromFrame();
+        void willDestroyCachedFrame();
+
     private:
-        explicit DOMWindow(Frame*);
+        explicit DOMWindow(Document*);
 
         Page* page();
 
@@ -408,12 +422,10 @@ namespace WebCore {
             PrepareDialogFunction = 0, void* functionContext = 0);
         bool isInsecureScriptAccess(DOMWindow* activeWindow, const String& urlString);
 
-        void clearDOMWindowProperties();
+        void resetDOMWindowProperties();
         void disconnectDOMWindowProperties();
         void reconnectDOMWindowProperties();
-
-        RefPtr<SecurityOrigin> m_securityOrigin;
-        KURL m_url;
+        void willDestroyDocumentInFrame();
 
         bool m_shouldPrintWhenFinishedLoading;
         bool m_suspendedForPageCache;
@@ -421,7 +433,6 @@ namespace WebCore {
         HashSet<DOMWindowProperty*> m_properties;
 
         mutable RefPtr<Screen> m_screen;
-        mutable RefPtr<DOMSelection> m_selection;
         mutable RefPtr<History> m_history;
         mutable RefPtr<Crypto>  m_crypto;
         mutable RefPtr<BarInfo> m_locationbar;
@@ -446,14 +457,6 @@ namespace WebCore {
 
 #if ENABLE(WEB_TIMING)
         mutable RefPtr<Performance> m_performance;
-#endif
-
-#if ENABLE(BLOB)
-        mutable RefPtr<DOMURL> m_domURL;
-#endif
-
-#if ENABLE(QUOTA)
-        mutable RefPtr<StorageInfo> m_storageInfo;
 #endif
     };
 

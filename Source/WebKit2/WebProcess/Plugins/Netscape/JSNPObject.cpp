@@ -26,6 +26,8 @@
 #include "config.h"
 #include "JSNPObject.h"
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
+
 #include "JSNPMethod.h"
 #include "NPJSObject.h"
 #include "NPRuntimeObjectMap.h"
@@ -35,6 +37,7 @@
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/ObjectPrototype.h>
 #include <WebCore/IdentifierRep.h>
+#include <WebCore/JSDOMWindowBase.h>
 #include <wtf/Assertions.h>
 #include <wtf/text/WTFString.h>
 
@@ -43,9 +46,12 @@ using namespace WebCore;
 
 namespace WebKit {
 
-static NPIdentifier npIdentifierFromIdentifier(const Identifier& identifier)
+static NPIdentifier npIdentifierFromIdentifier(PropertyName propertyName)
 {
-    return static_cast<NPIdentifier>(IdentifierRep::get(identifier.ustring().utf8().data()));
+    UString name(propertyName.publicName());
+    if (name.isNull())
+        return 0;
+    return static_cast<NPIdentifier>(IdentifierRep::get(name.utf8().data()));
 }
 
 const ClassInfo JSNPObject::s_info = { "NPObject", &JSNonFinalObject::s_info, 0, 0, CREATE_METHOD_TABLE(JSNPObject) };
@@ -76,7 +82,7 @@ JSNPObject::~JSNPObject()
 
 void JSNPObject::destroy(JSCell* cell)
 {
-    jsCast<JSNPObject*>(cell)->JSNPObject::~JSNPObject();
+    static_cast<JSNPObject*>(cell)->JSNPObject::~JSNPObject();
 }
 
 void JSNPObject::invalidate()
@@ -91,7 +97,6 @@ void JSNPObject::invalidate()
 NPObject* JSNPObject::leakNPObject()
 {
     ASSERT(m_npObject);
-    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
 
     NPObject* object = m_npObject;
     m_npObject = 0;
@@ -121,7 +126,7 @@ JSValue JSNPObject::callMethod(ExecState* exec, NPIdentifier methodName)
     VOID_TO_NPVARIANT(result);
     
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
         returnValue = m_npObject->_class->invoke(m_npObject, methodName, arguments.data(), argumentCount, &result);
         NPRuntimeObjectMap::moveGlobalExceptionToExecState(exec);
     }
@@ -161,7 +166,7 @@ JSC::JSValue JSNPObject::callObject(JSC::ExecState* exec)
     VOID_TO_NPVARIANT(result);
 
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
         returnValue = m_npObject->_class->invokeDefault(m_npObject, arguments.data(), argumentCount, &result);
         NPRuntimeObjectMap::moveGlobalExceptionToExecState(exec);
     }
@@ -201,7 +206,7 @@ JSValue JSNPObject::callConstructor(ExecState* exec)
     VOID_TO_NPVARIANT(result);
     
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
         returnValue = m_npObject->_class->construct(m_npObject, arguments.data(), argumentCount, &result);
         NPRuntimeObjectMap::moveGlobalExceptionToExecState(exec);
     }
@@ -252,7 +257,7 @@ ConstructType JSNPObject::getConstructData(JSCell* cell, ConstructData& construc
     return ConstructTypeHost;
 }
 
-bool JSNPObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
+bool JSNPObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
     JSNPObject* thisObject = JSC::jsCast<JSNPObject*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
@@ -278,7 +283,7 @@ bool JSNPObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identif
     return false;
 }
 
-bool JSNPObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool JSNPObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
 {
     JSNPObject* thisObject = jsCast<JSNPObject*>(object);
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
@@ -308,7 +313,7 @@ bool JSNPObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, con
     return false;
 }
 
-void JSNPObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot&)
+void JSNPObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot&)
 {
     JSNPObject* thisObject = JSC::jsCast<JSNPObject*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
@@ -336,7 +341,7 @@ void JSNPObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyNa
     NPRuntimeObjectMap::PluginProtector protector(thisObject->m_objectMap);
 
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
         thisObject->m_npObject->_class->setProperty(thisObject->m_npObject, npIdentifier, &variant);
 
         NPRuntimeObjectMap::moveGlobalExceptionToExecState(exec);
@@ -347,7 +352,7 @@ void JSNPObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyNa
     releaseNPVariantValue(&variant);
 }
 
-bool JSNPObject::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName)
+bool JSNPObject::deleteProperty(JSCell* cell, ExecState* exec, PropertyName propertyName)
 {
     return jsCast<JSNPObject*>(cell)->deleteProperty(exec, npIdentifierFromIdentifier(propertyName));
 }
@@ -376,7 +381,7 @@ bool JSNPObject::deleteProperty(ExecState* exec, NPIdentifier propertyName)
     NPRuntimeObjectMap::PluginProtector protector(m_objectMap);
 
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
 
         // FIXME: Should we throw an exception if removeProperty returns false?
         if (!m_npObject->_class->removeProperty(m_npObject, propertyName))
@@ -409,7 +414,7 @@ void JSNPObject::getOwnPropertyNames(JSObject* object, ExecState* exec, Property
     NPRuntimeObjectMap::PluginProtector protector(thisObject->m_objectMap);
     
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
 
         // FIXME: Should we throw an exception if enumerate returns false?
         if (!thisObject->m_npObject->_class->enumerate(thisObject->m_npObject, &identifiers, &identifierCount))
@@ -436,7 +441,7 @@ void JSNPObject::getOwnPropertyNames(JSObject* object, ExecState* exec, Property
     npnMemFree(identifiers);
 }
 
-JSValue JSNPObject::propertyGetter(ExecState* exec, JSValue slotBase, const Identifier& propertyName)
+JSValue JSNPObject::propertyGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
 {
     JSNPObject* thisObj = static_cast<JSNPObject*>(asObject(slotBase));
     ASSERT_GC_OBJECT_INHERITS(thisObj, &s_info);
@@ -457,7 +462,7 @@ JSValue JSNPObject::propertyGetter(ExecState* exec, JSValue slotBase, const Iden
     
     bool returnValue;
     {
-        JSLock::DropAllLocks dropAllLocks(SilenceAssertionsOnly);
+        JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
         NPIdentifier npIdentifier = npIdentifierFromIdentifier(propertyName);
         returnValue = thisObj->m_npObject->_class->getProperty(thisObj->m_npObject, npIdentifier, &result);
         
@@ -472,7 +477,7 @@ JSValue JSNPObject::propertyGetter(ExecState* exec, JSValue slotBase, const Iden
     return propertyValue;
 }
 
-JSValue JSNPObject::methodGetter(ExecState* exec, JSValue slotBase, const Identifier& methodName)
+JSValue JSNPObject::methodGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
 {
     JSNPObject* thisObj = static_cast<JSNPObject*>(asObject(slotBase));
     ASSERT_GC_OBJECT_INHERITS(thisObj, &s_info);
@@ -480,8 +485,8 @@ JSValue JSNPObject::methodGetter(ExecState* exec, JSValue slotBase, const Identi
     if (!thisObj->m_npObject)
         return throwInvalidAccessError(exec);
 
-    NPIdentifier npIdentifier = npIdentifierFromIdentifier(methodName);
-    return JSNPMethod::create(exec, thisObj->globalObject(), methodName, npIdentifier);
+    NPIdentifier npIdentifier = npIdentifierFromIdentifier(propertyName);
+    return JSNPMethod::create(exec, thisObj->globalObject(), propertyName.publicName(), npIdentifier);
 }
 
 JSObject* JSNPObject::throwInvalidAccessError(ExecState* exec)
@@ -490,3 +495,5 @@ JSObject* JSNPObject::throwInvalidAccessError(ExecState* exec)
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

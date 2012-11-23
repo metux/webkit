@@ -267,26 +267,30 @@ private:
 
 } // namespace
 
-void InspectorProfilerAgent::getProfile(ErrorString*, const String& type, int rawUid, RefPtr<TypeBuilder::Profiler::Profile>& profileObject)
+void InspectorProfilerAgent::getProfile(ErrorString* errorString, const String& type, int rawUid, RefPtr<TypeBuilder::Profiler::Profile>& profileObject)
 {
     unsigned uid = static_cast<unsigned>(rawUid);
     if (type == CPUProfileType) {
         ProfilesMap::iterator it = m_profiles.find(uid);
-        if (it != m_profiles.end()) {
-            profileObject = TypeBuilder::Profiler::Profile::create();
-            profileObject->setHead(it->second->buildInspectorObjectForHead());
-            if (it->second->bottomUpHead())
-                profileObject->setBottomUpHead(it->second->buildInspectorObjectForBottomUpHead());
+        if (it == m_profiles.end()) {
+            *errorString = "Profile wasn't found";
+            return;
         }
+        profileObject = TypeBuilder::Profiler::Profile::create();
+        profileObject->setHead(it->second->buildInspectorObjectForHead());
+        if (it->second->bottomUpHead())
+            profileObject->setBottomUpHead(it->second->buildInspectorObjectForBottomUpHead());
     } else if (type == HeapProfileType) {
         HeapSnapshotsMap::iterator it = m_snapshots.find(uid);
-        if (it != m_snapshots.end()) {
-            RefPtr<ScriptHeapSnapshot> snapshot = it->second;
-            profileObject = TypeBuilder::Profiler::Profile::create();
-            if (m_frontend) {
-                OutputStream stream(m_frontend, uid);
-                snapshot->writeJSON(&stream);
-            }
+        if (it == m_snapshots.end()) {
+            *errorString = "Profile wasn't found";
+            return;
+        }
+        RefPtr<ScriptHeapSnapshot> snapshot = it->second;
+        profileObject = TypeBuilder::Profiler::Profile::create();
+        if (m_frontend) {
+            OutputStream stream(m_frontend, uid);
+            snapshot->writeJSON(&stream);
         }
     }
 }
@@ -317,7 +321,7 @@ void InspectorProfilerAgent::resetState()
 
 void InspectorProfilerAgent::resetFrontendProfiles()
 {
-    if (m_frontend
+    if (m_frontend && enabled()
         && m_profiles.begin() == m_profiles.end()
         && m_snapshots.begin() == m_snapshots.end())
         m_frontend->resetProfiles();
@@ -428,8 +432,14 @@ void InspectorProfilerAgent::toggleRecordButton(bool isProfiling)
         m_frontend->setRecordingProfile(isProfiling);
 }
 
-void InspectorProfilerAgent::getObjectByHeapObjectId(ErrorString* error, int id, const String* objectGroup, RefPtr<TypeBuilder::Runtime::RemoteObject>& result)
+void InspectorProfilerAgent::getObjectByHeapObjectId(ErrorString* error, const String& heapSnapshotObjectId, const String* objectGroup, RefPtr<TypeBuilder::Runtime::RemoteObject>& result)
 {
+    bool ok;
+    unsigned id = heapSnapshotObjectId.toUInt(&ok);
+    if (!ok) {
+        *error = "Invalid heap snapshot object id";
+        return;
+    }
     ScriptObject heapObject = ScriptProfiler::objectByHeapObjectId(id);
     if (heapObject.hasNoValue()) {
         *error = "Object is not available";
@@ -443,6 +453,22 @@ void InspectorProfilerAgent::getObjectByHeapObjectId(ErrorString* error, int id,
     result = injectedScript.wrapObject(heapObject, objectGroup ? *objectGroup : "");
     if (!result)
         *error = "Failed to wrap object";
+}
+
+void InspectorProfilerAgent::getHeapObjectId(ErrorString* errorString, const String& objectId, String* heapSnapshotObjectId)
+{
+    InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
+    if (injectedScript.hasNoValue()) {
+        *errorString = "Inspected context has gone";
+        return;
+    }
+    ScriptValue value = injectedScript.findObjectById(objectId);
+    if (value.hasNoValue() || value.isUndefined()) {
+        *errorString = "Object with given id not found";
+        return;
+    }
+    unsigned id = ScriptProfiler::getHeapObjectId(value);
+    *heapSnapshotObjectId = String::number(id);
 }
 
 } // namespace WebCore

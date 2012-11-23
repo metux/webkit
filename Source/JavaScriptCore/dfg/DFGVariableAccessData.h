@@ -29,7 +29,7 @@
 #include "DFGDoubleFormatState.h"
 #include "DFGNodeFlags.h"
 #include "Operands.h"
-#include "PredictedType.h"
+#include "SpeculatedType.h"
 #include "VirtualRegister.h"
 #include <wtf/Platform.h>
 #include <wtf/UnionFind.h>
@@ -37,26 +37,32 @@
 
 namespace JSC { namespace DFG {
 
+enum DoubleBallot { VoteValue, VoteDouble };
+
 class VariableAccessData : public UnionFind<VariableAccessData> {
 public:
-    enum Ballot { VoteValue, VoteDouble };
-
     VariableAccessData()
         : m_local(static_cast<VirtualRegister>(std::numeric_limits<int>::min()))
-        , m_prediction(PredictNone)
-        , m_argumentAwarePrediction(PredictNone)
+        , m_prediction(SpecNone)
+        , m_argumentAwarePrediction(SpecNone)
         , m_flags(0)
         , m_doubleFormatState(EmptyDoubleFormatState)
+        , m_isCaptured(false)
+        , m_isArgumentsAlias(false)
+        , m_structureCheckHoistingFailed(false)
     {
         clearVotes();
     }
     
-    VariableAccessData(VirtualRegister local)
+    VariableAccessData(VirtualRegister local, bool isCaptured)
         : m_local(local)
-        , m_prediction(PredictNone)
-        , m_argumentAwarePrediction(PredictNone)
+        , m_prediction(SpecNone)
+        , m_argumentAwarePrediction(SpecNone)
         , m_flags(0)
         , m_doubleFormatState(EmptyDoubleFormatState)
+        , m_isCaptured(isCaptured)
+        , m_isArgumentsAlias(false)
+        , m_structureCheckHoistingFailed(false)
     {
         clearVotes();
     }
@@ -72,52 +78,94 @@ public:
         return static_cast<int>(local());
     }
     
-    bool predict(PredictedType prediction)
+    bool mergeIsCaptured(bool isCaptured)
+    {
+        bool newIsCaptured = m_isCaptured | isCaptured;
+        if (newIsCaptured == m_isCaptured)
+            return false;
+        m_isCaptured = newIsCaptured;
+        return true;
+    }
+    
+    bool isCaptured()
+    {
+        return m_isCaptured;
+    }
+    
+    bool mergeStructureCheckHoistingFailed(bool failed)
+    {
+        bool newFailed = m_structureCheckHoistingFailed | failed;
+        if (newFailed == m_structureCheckHoistingFailed)
+            return false;
+        m_structureCheckHoistingFailed = newFailed;
+        return true;
+    }
+    
+    bool structureCheckHoistingFailed()
+    {
+        return m_structureCheckHoistingFailed;
+    }
+    
+    bool mergeIsArgumentsAlias(bool isArgumentsAlias)
+    {
+        bool newIsArgumentsAlias = m_isArgumentsAlias | isArgumentsAlias;
+        if (newIsArgumentsAlias == m_isArgumentsAlias)
+            return false;
+        m_isArgumentsAlias = newIsArgumentsAlias;
+        return true;
+    }
+    
+    bool isArgumentsAlias()
+    {
+        return m_isArgumentsAlias;
+    }
+    
+    bool predict(SpeculatedType prediction)
     {
         VariableAccessData* self = find();
-        bool result = mergePrediction(self->m_prediction, prediction);
+        bool result = mergeSpeculation(self->m_prediction, prediction);
         if (result)
-            mergePrediction(m_argumentAwarePrediction, m_prediction);
+            mergeSpeculation(m_argumentAwarePrediction, m_prediction);
         return result;
     }
     
-    PredictedType nonUnifiedPrediction()
+    SpeculatedType nonUnifiedPrediction()
     {
         return m_prediction;
     }
     
-    PredictedType prediction()
+    SpeculatedType prediction()
     {
         return find()->m_prediction;
     }
     
-    PredictedType argumentAwarePrediction()
+    SpeculatedType argumentAwarePrediction()
     {
         return find()->m_argumentAwarePrediction;
     }
     
-    bool mergeArgumentAwarePrediction(PredictedType prediction)
+    bool mergeArgumentAwarePrediction(SpeculatedType prediction)
     {
-        return mergePrediction(find()->m_argumentAwarePrediction, prediction);
+        return mergeSpeculation(find()->m_argumentAwarePrediction, prediction);
     }
     
     void clearVotes()
     {
         ASSERT(find() == this);
-        m_votes[VoteValue] = 0;
-        m_votes[VoteDouble] = 0;
+        m_votes[0] = 0;
+        m_votes[1] = 0;
     }
     
-    void vote(Ballot ballot)
+    void vote(unsigned ballot)
     {
-        ASSERT(static_cast<unsigned>(ballot) < 2);
+        ASSERT(ballot < 2);
         m_votes[ballot]++;
     }
     
-    double doubleVoteRatio()
+    double voteRatio()
     {
         ASSERT(find() == this);
-        return static_cast<double>(m_votes[VoteDouble]) / m_votes[VoteValue];
+        return static_cast<double>(m_votes[1]) / m_votes[0];
     }
     
     bool shouldUseDoubleFormatAccordingToVote()
@@ -129,12 +177,12 @@ public:
         
         // If the variable is not a number prediction, then this doesn't
         // make any sense.
-        if (!isNumberPrediction(prediction()))
+        if (!isNumberSpeculation(prediction()))
             return false;
         
         // If the variable is predicted to hold only doubles, then it's a
         // no-brainer: it should be formatted as a double.
-        if (isDoublePrediction(prediction()))
+        if (isDoubleSpeculation(prediction()))
             return true;
         
         // If the variable is known to be used as an integer, then be safe -
@@ -144,7 +192,7 @@ public:
         
         // If the variable has been voted to become a double, then make it a
         // double.
-        if (doubleVoteRatio() >= Options::doubleVoteRatioForDoubleFormat)
+        if (voteRatio() >= Options::doubleVoteRatioForDoubleFormat())
             return true;
         
         return false;
@@ -193,7 +241,7 @@ public:
         if (m_doubleFormatState != UsingDoubleFormat)
             return false;
         
-        return mergePrediction(m_prediction, PredictDouble);
+        return mergeSpeculation(m_prediction, SpecDouble);
     }
     
     NodeFlags flags() const { return m_flags; }
@@ -214,12 +262,16 @@ private:
     // usage for variable access nodes do be significant.
 
     VirtualRegister m_local;
-    PredictedType m_prediction;
-    PredictedType m_argumentAwarePrediction;
+    SpeculatedType m_prediction;
+    SpeculatedType m_argumentAwarePrediction;
     NodeFlags m_flags;
     
-    float m_votes[2];
+    float m_votes[2]; // Used primarily for double voting but may be reused for other purposes.
     DoubleFormatState m_doubleFormatState;
+    
+    bool m_isCaptured;
+    bool m_isArgumentsAlias;
+    bool m_structureCheckHoistingFailed;
 };
 
 } } // namespace JSC::DFG

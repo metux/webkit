@@ -32,6 +32,7 @@
 #include "IDBDatabase.h"
 #include "IDBFactory.h"
 #include "IDBIndex.h"
+#include "IDBKeyPath.h"
 #include "IDBObjectStore.h"
 #include "SerializedScriptValue.h"
 
@@ -46,6 +47,13 @@ PassRefPtr<IDBAny> IDBAny::createNull()
 {
     RefPtr<IDBAny> idbAny = adoptRef(new IDBAny());
     idbAny->setNull();
+    return idbAny.release();
+}
+
+PassRefPtr<IDBAny> IDBAny::createString(const String& value)
+{
+    RefPtr<IDBAny> idbAny = adoptRef(new IDBAny());
+    idbAny->set(value);
     return idbAny.release();
 }
 
@@ -116,6 +124,12 @@ PassRefPtr<SerializedScriptValue> IDBAny::serializedScriptValue()
 {
     ASSERT(m_type == SerializedScriptValueType);
     return m_serializedScriptValue;
+}
+
+const String& IDBAny::string()
+{
+    ASSERT(m_type == StringType);
+    return m_string;
 }
 
 void IDBAny::setNull()
@@ -192,6 +206,34 @@ void IDBAny::set(PassRefPtr<SerializedScriptValue> value)
     ASSERT(m_type == UndefinedType);
     m_type = SerializedScriptValueType;
     m_serializedScriptValue = value;
+}
+
+void IDBAny::set(const IDBKeyPath& value)
+{
+    ASSERT(m_type == UndefinedType);
+    switch (value.type()) {
+    case IDBKeyPath::NullType:
+        m_type = NullType;
+        break;
+    case IDBKeyPath::StringType:
+        m_type = StringType;
+        m_string = value.string();
+        break;
+    case IDBKeyPath::ArrayType:
+        RefPtr<DOMStringList> keyPaths = DOMStringList::create();
+        for (Vector<String>::const_iterator it = value.array().begin(); it != value.array().end(); ++it)
+            keyPaths->append(*it);
+        m_type = DOMStringListType;
+        m_domStringList = keyPaths.release();
+        break;
+    }
+}
+
+void IDBAny::set(const String& value)
+{
+    ASSERT(m_type == UndefinedType);
+    m_type = StringType;
+    m_string = value;
 }
 
 } // namespace WebCore

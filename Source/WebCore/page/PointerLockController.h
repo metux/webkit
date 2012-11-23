@@ -33,6 +33,7 @@
 namespace WebCore {
 
 class Element;
+class Document;
 class Page;
 class PlatformMouseEvent;
 class VoidCallback;
@@ -43,9 +44,11 @@ class PointerLockController {
 public:
     static PassOwnPtr<PointerLockController> create(Page*);
 
-    void requestPointerLock(Element* target, PassRefPtr<VoidCallback> successCallback, PassRefPtr<VoidCallback> failureCallback);
+    void requestPointerLock(Element* target);
     void requestPointerUnlock();
-    bool isLocked();
+    void elementRemoved(Element*);
+    void documentDetached(Document*);
+    Element* element() const;
 
     void didAcquirePointerLock();
     void didNotAcquirePointerLock();
@@ -54,10 +57,11 @@ public:
 
 private:
     explicit PointerLockController(Page*);
+    void enqueueEvent(const AtomicString& type, Element*);
+    void enqueueEvent(const AtomicString& type, Document*);
     Page* m_page;
     RefPtr<Element> m_element;
-    RefPtr<VoidCallback> m_successCallback;
-    RefPtr<VoidCallback> m_failureCallback;
+    RefPtr<Document> m_documentOfRemovedElementWhileWaitingForUnlock;
 };
 
 } // namespace WebCore

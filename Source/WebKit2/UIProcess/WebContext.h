@@ -48,18 +48,27 @@ namespace WebKit {
 
 class DownloadProxy;
 class WebApplicationCacheManagerProxy;
+#if ENABLE(BATTERY_STATUS)
+class WebBatteryManagerProxy;
+#endif
 class WebCookieManagerProxy;
 class WebDatabaseManagerProxy;
 class WebGeolocationManagerProxy;
 class WebIconDatabase;
 class WebKeyValueStorageManagerProxy;
 class WebMediaCacheManagerProxy;
+#if ENABLE(NETWORK_INFO)
+class WebNetworkInfoManagerProxy;
+#endif
 class WebNotificationManagerProxy;
 class WebPageGroup;
 class WebPageProxy;
 class WebResourceCacheManagerProxy;
 #if USE(SOUP)
 class WebSoupRequestManagerProxy;
+#endif
+#if ENABLE(VIBRATION)
+class WebVibrationProxy;
 #endif
 struct StatisticsData;
 struct WebProcessCreationParameters;
@@ -69,9 +78,6 @@ typedef GenericCallback<WKDictionaryRef> DictionaryCallback;
 class WebContext : public APIObject {
 public:
     static const Type APIType = TypeContext;
-
-    static WebContext* sharedProcessContext();
-    static WebContext* sharedThreadContext();
 
     static PassRefPtr<WebContext> create(const String& injectedBundlePath);
     virtual ~WebContext();
@@ -84,10 +90,12 @@ public:
     void initializeDownloadClient(const WKContextDownloadClient*);
 
     ProcessModel processModel() const { return m_processModel; }
-    WebProcessProxy* process() const { return m_process.get(); }
 
-    template<typename U> bool sendToAllProcesses(const U& message);
-    template<typename U> bool sendToAllProcessesRelaunchingThemIfNecessary(const U& message);
+    // FIXME (Multi-WebProcess): Remove. No code should assume that there is a shared process.
+    WebProcessProxy* deprecatedSharedProcess();
+
+    template<typename U> void sendToAllProcesses(const U& message);
+    template<typename U> void sendToAllProcessesRelaunchingThemIfNecessary(const U& message);
     
     void processDidFinishLaunching(WebProcessProxy*);
 
@@ -103,7 +111,6 @@ public:
     DownloadProxy* download(WebPageProxy* initiatingPage, const WebCore::ResourceRequest&);
 
     void setInjectedBundleInitializationUserData(PassRefPtr<APIObject> userData) { m_injectedBundleInitializationUserData = userData; }
-    APIObject* injectedBundleInitializationUserData() const { return m_injectedBundleInitializationUserData.get(); }
 
     void postMessageToInjectedBundle(const String&, APIObject*);
 
@@ -128,8 +135,8 @@ public:
     void addVisitedLink(const String&);
     void addVisitedLinkHash(WebCore::LinkHash);
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
+    void didReceiveMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void didReceiveSyncMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
 
     void setCacheModel(CacheModel);
     CacheModel cacheModel() const { return m_cacheModel; }
@@ -152,20 +159,33 @@ public:
     WebDownloadClient& downloadClient() { return m_downloadClient; }
     void downloadFinished(DownloadProxy*);
 
+    WebHistoryClient& historyClient() { return m_historyClient; }
+
     static HashSet<String, CaseFoldingHash> pdfAndPostScriptMIMETypes();
 
     WebApplicationCacheManagerProxy* applicationCacheManagerProxy() const { return m_applicationCacheManagerProxy.get(); }
+#if ENABLE(BATTERY_STATUS)
+    WebBatteryManagerProxy* batteryManagerProxy() const { return m_batteryManagerProxy.get(); }
+#endif
     WebCookieManagerProxy* cookieManagerProxy() const { return m_cookieManagerProxy.get(); }
+#if ENABLE(SQL_DATABASE)
     WebDatabaseManagerProxy* databaseManagerProxy() const { return m_databaseManagerProxy.get(); }
+#endif
     WebGeolocationManagerProxy* geolocationManagerProxy() const { return m_geolocationManagerProxy.get(); }
     WebIconDatabase* iconDatabase() const { return m_iconDatabase.get(); }
     WebKeyValueStorageManagerProxy* keyValueStorageManagerProxy() const { return m_keyValueStorageManagerProxy.get(); }
     WebMediaCacheManagerProxy* mediaCacheManagerProxy() const { return m_mediaCacheManagerProxy.get(); }
+#if ENABLE(NETWORK_INFO)
+    WebNetworkInfoManagerProxy* networkInfoManagerProxy() const { return m_networkInfoManagerProxy.get(); }
+#endif
     WebNotificationManagerProxy* notificationManagerProxy() const { return m_notificationManagerProxy.get(); }
     WebPluginSiteDataManager* pluginSiteDataManager() const { return m_pluginSiteDataManager.get(); }
     WebResourceCacheManagerProxy* resourceCacheManagerProxy() const { return m_resourceCacheManagerProxy.get(); }
 #if USE(SOUP)
     WebSoupRequestManagerProxy* soupRequestManagerProxy() const { return m_soupRequestManagerProxy.get(); }
+#endif
+#if ENABLE(VIBRATION)
+    WebVibrationProxy* vibrationProxy() const { return m_vibrationProxy.get(); }
 #endif
 
     struct Statistics {
@@ -180,7 +200,8 @@ public:
     String iconDatabasePath() const;
     void setLocalStorageDirectory(const String& dir) { m_overrideLocalStorageDirectory = dir; }
 
-    void ensureWebProcess();
+    void ensureSharedWebProcess();
+    PassRefPtr<WebProcessProxy> createNewWebProcess();
     void warmInitialProcess();
 
     bool shouldTerminate(WebProcessProxy*);
@@ -194,12 +215,15 @@ public:
     
     void getWebCoreStatistics(PassRefPtr<DictionaryCallback>);
     void garbageCollectJavaScriptObjects();
+    void setJavaScriptGarbageCollectorTimerEnabled(bool flag);
 
 #if PLATFORM(MAC)
     static bool omitPDFSupport();
 #endif
 
     void fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled);
+
+    void textCheckerStateChanged();
 
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
@@ -209,20 +233,6 @@ private:
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
     
-    // History client
-    void didNavigateWithNavigationData(uint64_t pageID, const WebNavigationDataStore& store, uint64_t frameID);
-    void didPerformClientRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
-    void didPerformServerRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
-    void didUpdateHistoryTitle(uint64_t pageID, const String& title, const String& url, uint64_t frameID);
-
-    // Plugins
-    void getPlugins(bool refresh, Vector<WebCore::PluginInfo>&);
-    void getPluginPath(const String& mimeType, const String& urlString, String& pluginPath);
-#if !ENABLE(PLUGIN_PROCESS)
-    void didGetSitesWithPluginData(const Vector<String>& sites, uint64_t callbackID);
-    void didClearPluginSiteData(uint64_t callbackID);
-#endif
-
 #if PLATFORM(MAC)
     void getPasteboardTypes(const String& pasteboardName, Vector<String>& pasteboardTypes);
     void getPasteboardPathnamesForType(const String& pasteboardName, const String& pasteboardType, Vector<String>& pathnames);
@@ -238,6 +248,12 @@ private:
     void setPasteboardPathnamesForType(const String& pasteboardName, const String& pasteboardType, const Vector<String>& pathnames);
     void setPasteboardStringForType(const String& pasteboardName, const String& pasteboardType, const String&);
     void setPasteboardBufferForType(const String& pasteboardName, const String& pasteboardType, const SharedMemory::Handle&, uint64_t size);
+#endif
+
+#if !PLATFORM(MAC)
+    // FIXME: This a dummy message, to avoid breaking the build for platforms that don't require
+    // any synchronous messages, and should be removed when <rdar://problem/8775115> is fixed.
+    void dummy(bool&);
 #endif
 
     void didGetWebCoreStatistics(const StatisticsData&, uint64_t callbackID);
@@ -259,8 +275,7 @@ private:
 
     ProcessModel m_processModel;
     
-    // FIXME: In the future, this should be one or more WebProcessProxies.
-    RefPtr<WebProcessProxy> m_process;
+    Vector<RefPtr<WebProcessProxy> > m_processes;
 
     RefPtr<WebPageGroup> m_defaultPageGroup;
 
@@ -293,17 +308,28 @@ private:
     double m_memorySamplerInterval;
 
     RefPtr<WebApplicationCacheManagerProxy> m_applicationCacheManagerProxy;
+#if ENABLE(BATTERY_STATUS)
+    RefPtr<WebBatteryManagerProxy> m_batteryManagerProxy;
+#endif
     RefPtr<WebCookieManagerProxy> m_cookieManagerProxy;
+#if ENABLE(SQL_DATABASE)
     RefPtr<WebDatabaseManagerProxy> m_databaseManagerProxy;
+#endif
     RefPtr<WebGeolocationManagerProxy> m_geolocationManagerProxy;
     RefPtr<WebIconDatabase> m_iconDatabase;
     RefPtr<WebKeyValueStorageManagerProxy> m_keyValueStorageManagerProxy;
     RefPtr<WebMediaCacheManagerProxy> m_mediaCacheManagerProxy;
+#if ENABLE(NETWORK_INFO)
+    RefPtr<WebNetworkInfoManagerProxy> m_networkInfoManagerProxy;
+#endif
     RefPtr<WebNotificationManagerProxy> m_notificationManagerProxy;
     RefPtr<WebPluginSiteDataManager> m_pluginSiteDataManager;
     RefPtr<WebResourceCacheManagerProxy> m_resourceCacheManagerProxy;
 #if USE(SOUP)
     RefPtr<WebSoupRequestManagerProxy> m_soupRequestManagerProxy;
+#endif
+#if ENABLE(VIBRATION)
+    RefPtr<WebVibrationProxy> m_vibrationProxy;
 #endif
 
 #if PLATFORM(WIN)
@@ -324,19 +350,20 @@ private:
     HashMap<uint64_t, RefPtr<DictionaryCallback> > m_dictionaryCallbacks;
 };
 
-template<typename U> inline bool WebContext::sendToAllProcesses(const U& message)
+template<typename U> inline void WebContext::sendToAllProcesses(const U& message)
 {
-    if (!m_process || !m_process->canSendMessage())
-        return false;
-
-    return m_process->send(message, 0);
+    size_t processCount = m_processes.size();
+    for (size_t i = 0; i < processCount; ++i) {
+        WebProcessProxy* process = m_processes[i].get();
+        if (process->canSendMessage())
+            process->send(message, 0);
+    }
 }
 
-template<typename U> bool WebContext::sendToAllProcessesRelaunchingThemIfNecessary(const U& message)
+template<typename U> void WebContext::sendToAllProcessesRelaunchingThemIfNecessary(const U& message)
 {
     relaunchProcessIfNecessary();
-
-    return m_process->send(message, 0);
+    sendToAllProcesses(message);
 }
 
 } // namespace WebKit

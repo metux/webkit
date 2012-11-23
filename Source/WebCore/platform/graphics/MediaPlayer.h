@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -98,9 +98,16 @@ class IntSize;
 class MediaPlayer;
 struct MediaPlayerFactory;
 class TimeRanges;
+class HostWindow;
+
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+struct GraphicsDeviceAdapter;
+#endif
 
 class MediaPlayerClient {
 public:
+    enum CORSMode { Unspecified, Anonymous, UseCredentials };
+
     virtual ~MediaPlayerClient() { }
 
     // Get the document which the media player is owned by
@@ -163,6 +170,10 @@ public:
     virtual void mediaPlayerRenderingModeChanged(MediaPlayer*) { }
 #endif
 
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+    virtual GraphicsDeviceAdapter* mediaPlayerGraphicsDeviceAdapter(const MediaPlayer*) const { return 0; }
+#endif
+
 #if ENABLE(MEDIA_SOURCE)
     virtual void mediaPlayerSourceOpened() { }
     virtual String mediaPlayerSourceURL() const { return "x-media-source-unsupported:"; }
@@ -178,6 +189,25 @@ public:
 
     virtual String mediaPlayerReferrer() const { return String(); }
     virtual String mediaPlayerUserAgent() const { return String(); }
+    virtual CORSMode mediaPlayerCORSMode() const { return Unspecified; }
+    virtual void mediaPlayerExitFullscreen() { }
+    virtual bool mediaPlayerIsVideo() const { return false; }
+    virtual LayoutRect mediaPlayerContentBoxRect() const { return LayoutRect(); }
+    virtual void mediaPlayerSetSize(const IntSize&) { }
+    virtual void mediaPlayerPause() { }
+    virtual void mediaPlayerPlay() { }
+    virtual bool mediaPlayerIsPaused() const { return true; }
+    virtual bool mediaPlayerIsLooping() const { return false; }
+    virtual HostWindow* mediaPlayerHostWindow() { return 0; }
+    virtual IntRect mediaPlayerWindowClipRect() { return IntRect(); }
+};
+
+class MediaPlayerSupportsTypeClient {
+public:
+    virtual ~MediaPlayerSupportsTypeClient() { }
+
+    virtual bool mediaPlayerNeedsSiteSpecificHacks() const { return false; }
+    virtual String mediaPlayerDocumentHost() const { return String(); }
 };
 
 class MediaPlayer {
@@ -192,7 +222,7 @@ public:
 
     // Media engine support.
     enum SupportsType { IsNotSupported, IsSupported, MayBeSupported };
-    static MediaPlayer::SupportsType supportsType(const ContentType&, const String& keySystem);
+    static MediaPlayer::SupportsType supportsType(const ContentType&, const String& keySystem, const KURL&, const MediaPlayerSupportsTypeClient*);
     static void getSupportedTypes(HashSet<String>&);
     static bool isAvailable();
     static void getSitesInMediaCache(Vector<String>&);
@@ -230,11 +260,14 @@ public:
 
 #if ENABLE(MEDIA_SOURCE)
     enum AddIdStatus { Ok, NotSupported, ReachedIdLimit };
-    AddIdStatus sourceAddId(const String& id, const String& type);
+    AddIdStatus sourceAddId(const String& id, const String& type, const Vector<String>& codecs);
     bool sourceRemoveId(const String& id);
-    bool sourceAppend(const unsigned char* data, unsigned length);
+    PassRefPtr<TimeRanges> sourceBuffered(const String& id);
+    bool sourceAppend(const String& id, const unsigned char* data, unsigned length);
+    bool sourceAbort(const String& id);
     enum EndOfStreamStatus { EosNoError, EosNetworkError, EosDecodeError };
     void sourceEndOfStream(EndOfStreamStatus);
+    bool sourceSetTimestampOffset(const String& id, double offset);
 #endif
 
 #if ENABLE(ENCRYPTED_MEDIA)
@@ -250,6 +283,7 @@ public:
     bool paused() const;
     bool seeking() const;
 
+    static float invalidTime() { return -1.0f;}
     float duration() const;
     float currentTime() const;
     void seek(float time);
@@ -268,7 +302,7 @@ public:
     PassRefPtr<TimeRanges> seekable();
     float maxTimeSeekable();
 
-    unsigned bytesLoaded();
+    bool didLoadingProgress();
 
     float volume() const;
     void setVolume(float);
@@ -327,8 +361,12 @@ public:
 #endif
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO) || USE(NATIVE_FULLSCREEN_VIDEO)
-    bool enterFullscreen() const;
+    void enterFullscreen();
     void exitFullscreen();
+#endif
+
+#if USE(NATIVE_FULLSCREEN_VIDEO)
+    bool canEnterFullscreen() const;
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -338,7 +376,13 @@ public:
     void acceleratedRenderingStateChanged();
 #endif
 
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+    GraphicsDeviceAdapter* graphicsDeviceAdapter() const;
+#endif
+
     bool hasSingleSecurityOrigin() const;
+
+    bool didPassCORSAccessCheck() const;
 
     float mediaTimeForTimeValue(float) const;
 
@@ -370,6 +414,8 @@ public:
     String referrer() const;
     String userAgent() const;
 
+    String engineDescription() const;
+
 private:
     MediaPlayer(MediaPlayerClient*);
     void loadWithNextMediaEngine(MediaPlayerFactory*);
@@ -381,7 +427,7 @@ private:
     Timer<MediaPlayer> m_reloadTimer;
     OwnPtr<MediaPlayerPrivateInterface> m_private;
     MediaPlayerFactory* m_currentMediaEngine;
-    String m_url;
+    KURL m_url;
     String m_contentMIMEType;
     String m_contentTypeCodecs;
     String m_keySystem;
@@ -395,6 +441,7 @@ private:
     bool m_preservesPitch;
     bool m_privateBrowsing;
     bool m_shouldPrepareToRender;
+    bool m_contentMIMETypeWasInferredFromExtension;
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     WebMediaPlayerProxy* m_playerProxy;    // not owned or used, passed to m_private
 #endif
@@ -403,17 +450,16 @@ private:
 typedef PassOwnPtr<MediaPlayerPrivateInterface> (*CreateMediaEnginePlayer)(MediaPlayer*);
 typedef void (*MediaEngineSupportedTypes)(HashSet<String>& types);
 #if ENABLE(ENCRYPTED_MEDIA)
-typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const String& type, const String& codecs, const String& keySystem);
+typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const String& type, const String& codecs, const String& keySystem, const KURL& url);
 #else
-typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const String& type, const String& codecs);
+typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const String& type, const String& codecs, const KURL& url);
 #endif
 typedef void (*MediaEngineGetSitesInMediaCache)(Vector<String>&);
 typedef void (*MediaEngineClearMediaCache)();
 typedef void (*MediaEngineClearMediaCacheForSite)(const String&);
 
-typedef void (*MediaEngineRegistrar)(CreateMediaEnginePlayer, MediaEngineSupportedTypes, MediaEngineSupportsType, 
-    MediaEngineGetSitesInMediaCache, MediaEngineClearMediaCache, MediaEngineClearMediaCacheForSite); 
-
+typedef void (*MediaEngineRegistrar)(CreateMediaEnginePlayer, MediaEngineSupportedTypes, MediaEngineSupportsType,
+    MediaEngineGetSitesInMediaCache, MediaEngineClearMediaCache, MediaEngineClearMediaCacheForSite);
 
 }
 

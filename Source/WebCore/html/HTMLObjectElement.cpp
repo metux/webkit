@@ -26,6 +26,8 @@
 
 #include "Attribute.h"
 #include "CSSValueKeywords.h"
+#include "Chrome.h"
+#include "ChromeClient.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "FormDataList.h"
@@ -71,7 +73,7 @@ PassRefPtr<HTMLObjectElement> HTMLObjectElement::create(const QualifiedName& tag
     return adoptRef(new HTMLObjectElement(tagName, document, form, createdByParser));
 }
 
-RenderWidget* HTMLObjectElement::renderWidgetForJSBindings()
+RenderWidget* HTMLObjectElement::renderWidgetForJSBindings() const
 {
     document()->updateLayoutIgnorePendingStylesheets();
     return renderPart(); // This will return 0 if the renderer is not a RenderPart.
@@ -84,20 +86,20 @@ bool HTMLObjectElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLPlugInImageElement::isPresentationAttribute(name);
 }
 
-void HTMLObjectElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLObjectElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == borderAttr)
-        applyBorderAttributeToStyle(attr, style);
+    if (attribute.name() == borderAttr)
+        applyBorderAttributeToStyle(attribute, style);
     else
-        HTMLPlugInImageElement::collectStyleForAttribute(attr, style);
+        HTMLPlugInImageElement::collectStyleForAttribute(attribute, style);
 }
 
-void HTMLObjectElement::parseAttribute(Attribute* attr)
+void HTMLObjectElement::parseAttribute(const Attribute& attribute)
 {
-    if (attr->name() == formAttr)
+    if (attribute.name() == formAttr)
         formAttributeChanged();
-    else if (attr->name() == typeAttr) {
-        m_serviceType = attr->value().lower();
+    else if (attribute.name() == typeAttr) {
+        m_serviceType = attribute.value().lower();
         size_t pos = m_serviceType.find(";");
         if (pos != notFound)
             m_serviceType = m_serviceType.left(pos);
@@ -105,8 +107,8 @@ void HTMLObjectElement::parseAttribute(Attribute* attr)
             setNeedsWidgetUpdate(true);
         if (!isImageType() && m_imageLoader)
             m_imageLoader.clear();
-    } else if (attr->name() == dataAttr) {
-        m_url = stripLeadingAndTrailingHTMLSpaces(attr->value());
+    } else if (attribute.name() == dataAttr) {
+        m_url = stripLeadingAndTrailingHTMLSpaces(attribute.value());
         if (renderer()) {
             setNeedsWidgetUpdate(true);
             if (isImageType()) {
@@ -115,16 +117,16 @@ void HTMLObjectElement::parseAttribute(Attribute* attr)
                 m_imageLoader->updateFromElementIgnoringPreviousError();
             }
         }
-    } else if (attr->name() == classidAttr) {
-        m_classId = attr->value();
+    } else if (attribute.name() == classidAttr) {
+        m_classId = attribute.value();
         if (renderer())
             setNeedsWidgetUpdate(true);
-    } else if (attr->name() == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attr));
-    else if (attr->name() == onbeforeloadAttr)
-        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attr));
+    } else if (attribute.name() == onloadAttr)
+        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attribute));
+    else if (attribute.name() == onbeforeloadAttr)
+        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attribute));
     else
-        HTMLPlugInImageElement::parseAttribute(attr);
+        HTMLPlugInImageElement::parseAttribute(attribute);
 }
 
 static void mapDataParamToSrc(Vector<String>* paramNames, Vector<String>* paramValues)
@@ -192,11 +194,11 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     // Turn the attributes of the <object> element into arrays, but don't override <param> values.
     if (hasAttributes()) {
         for (unsigned i = 0; i < attributeCount(); ++i) {
-            Attribute* it = attributeItem(i);
-            const AtomicString& name = it->name().localName();
+            const Attribute* attribute = attributeItem(i);
+            const AtomicString& name = attribute->name().localName();
             if (!uniqueParamNames.contains(name.impl())) {
                 paramNames.append(name.string());
-                paramValues.append(it->value().string());
+                paramValues.append(attribute->value().string());
             }
         }
     }
@@ -276,7 +278,7 @@ bool HTMLObjectElement::hasValidClassId()
 // moved down into HTMLPluginImageElement.cpp
 void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
 {
-    ASSERT(!renderEmbeddedObject()->pluginCrashedOrWasMissing());
+    ASSERT(!renderEmbeddedObject()->showsUnavailablePluginIndicator());
     ASSERT(needsWidgetUpdate());
     setNeedsWidgetUpdate(false);
     // FIXME: This should ASSERT isFinishedParsingChildren() instead.
@@ -328,14 +330,14 @@ bool HTMLObjectElement::rendererIsNeeded(const NodeRenderingContext& context)
     return HTMLPlugInImageElement::rendererIsNeeded(context);
 }
 
-Node::InsertionNotificationRequest HTMLObjectElement::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest HTMLObjectElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLPlugInImageElement::insertedInto(insertionPoint);
     FormAssociatedElement::insertedInto(insertionPoint);
     return InsertionDone;
 }
 
-void HTMLObjectElement::removedFrom(Node* insertionPoint)
+void HTMLObjectElement::removedFrom(ContainerNode* insertionPoint)
 {
     HTMLPlugInImageElement::removedFrom(insertionPoint);
     FormAssociatedElement::removedFrom(insertionPoint);
@@ -351,9 +353,9 @@ void HTMLObjectElement::childrenChanged(bool changedByParser, Node* beforeChange
     HTMLPlugInImageElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
 
-bool HTMLObjectElement::isURLAttribute(Attribute *attr) const
+bool HTMLObjectElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == dataAttr || (attr->name() == usemapAttr && attr->value().string()[0] != '#') || HTMLPlugInImageElement::isURLAttribute(attr);
+    return attribute.name() == dataAttr || (attribute.name() == usemapAttr && attribute.value().string()[0] != '#') || HTMLPlugInImageElement::isURLAttribute(attribute);
 }
 
 const QualifiedName& HTMLObjectElement::imageSourceAttributeName() const
@@ -392,9 +394,8 @@ static bool isRecognizedTagName(const QualifiedName& tagName)
 {
     DEFINE_STATIC_LOCAL(HashSet<AtomicStringImpl*>, tagList, ());
     if (tagList.isEmpty()) {
-        size_t tagCount = 0;
-        QualifiedName** tags = HTMLNames::getHTMLTags(&tagCount);
-        for (size_t i = 0; i < tagCount; i++) {
+        QualifiedName** tags = HTMLNames::getHTMLTags();
+        for (size_t i = 0; i < HTMLNames::HTMLTagsCount; i++) {
             if (*tags[i] == bgsoundTag
                 || *tags[i] == commandTag
                 || *tags[i] == detailsTag
@@ -499,12 +500,6 @@ bool HTMLObjectElement::appendFormData(FormDataList& encoding, bool)
         return false;
     encoding.appendData(name(), value);
     return true;
-}
-
-const AtomicString& HTMLObjectElement::formControlName() const
-{
-    const AtomicString& name = getNameAttribute();
-    return name.isNull() ? emptyAtom : name;
 }
 
 HTMLFormElement* HTMLObjectElement::virtualForm() const

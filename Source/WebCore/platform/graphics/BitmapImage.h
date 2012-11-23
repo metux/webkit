@@ -31,6 +31,7 @@
 #include "Image.h"
 #include "Color.h"
 #include "ImageOrientation.h"
+#include "ImageSource.h"
 #include "IntSize.h"
 
 #if PLATFORM(MAC)
@@ -112,7 +113,7 @@ public:
     {
         return adoptRef(new BitmapImage(observer));
     }
-    ~BitmapImage();
+    virtual ~BitmapImage();
     
     virtual bool isBitmapImage() const;
 
@@ -169,15 +170,16 @@ public:
 #endif
 
     virtual NativeImagePtr nativeImageForCurrentFrame();
-    bool frameHasAlphaAtIndex(size_t);
     virtual bool currentFrameHasAlpha();
 
     ImageOrientation currentFrameOrientation();
-    ImageOrientation frameOrientationAtIndex(size_t);
 
 #if !ASSERT_DISABLED
     virtual bool notSolidColor();
 #endif
+
+private:
+    void updateSize() const;
 
 protected:
     enum RepetitionCountStatus {
@@ -196,7 +198,9 @@ protected:
     virtual void drawFrameMatchingSourceSize(GraphicsContext*, const FloatRect& dstRect, const IntSize& srcSize, ColorSpace styleColorSpace, CompositeOperator);
 #endif
     virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator);
-    void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, RespectImageOrientationEnum);
+#if USE(CG)
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, RespectImageOrientationEnum);
+#endif
 
 #if (OS(WINCE) && !PLATFORM(QT))
     virtual void drawPattern(GraphicsContext*, const FloatRect& srcRect, const AffineTransform& patternTransform,
@@ -208,6 +212,8 @@ protected:
     NativeImagePtr frameAtIndex(size_t);
     bool frameIsCompleteAtIndex(size_t);
     float frameDurationAtIndex(size_t);
+    bool frameHasAlphaAtIndex(size_t);
+    ImageOrientation frameOrientationAtIndex(size_t);
 
     // Decodes and caches a frame. Never accessed except internally.
     void cacheFrame(size_t index);
@@ -254,7 +260,6 @@ protected:
     bool internalAdvanceAnimation(bool skippingFrames);
 
     // Handle platform-specific data
-    void initPlatformData();
     void invalidatePlatformData();
     
     // Checks to see if the image is a 1x1 solid color.  We optimize these images and just do a fill rect instead.
@@ -270,8 +275,8 @@ protected:
     mutable IntSize m_sizeRespectingOrientation;
     
     size_t m_currentFrame; // The index of the current frame of animation.
-    Vector<FrameData> m_frames; // An array of the cached frames of the animation. We have to ref frames to pin them in the cache.
-    
+    Vector<FrameData, 1> m_frames; // An array of the cached frames of the animation. We have to ref frames to pin them in the cache.
+
     Timer<BitmapImage>* m_frameTimer;
     int m_repetitionCount; // How many total animation loops we should do.  This will be cAnimationNone if this image type is incapable of animation.
     RepetitionCountStatus m_repetitionCountStatus;

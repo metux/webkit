@@ -35,16 +35,20 @@ public:
     virtual void loadHtml(const char* html, const char* baseURI);
     virtual void loadPlainText(const char* plainText);
     virtual void loadRequest(WebKitURIRequest*);
-    void replaceContent(const char* html, const char* contentURI, const char* baseURI);
+    void loadAlternateHTML(const char* html, const char* contentURI, const char* baseURI);
     void goBack();
     void goForward();
     void goToBackForwardListItem(WebKitBackForwardListItem*);
 
+    void quitMainLoop();
+    void quitMainLoopAfterProcessingPendingEvents();
     void wait(double seconds);
     void waitUntilLoadFinished();
     void waitUntilTitleChangedTo(const char* expectedTitle);
     void waitUntilTitleChanged();
-    void showInWindowAndWaitUntilMapped();
+    void showInWindowAndWaitUntilMapped(GtkWindowType = GTK_WINDOW_POPUP);
+    void resizeView(int width, int height);
+    const char* mainResourceData(size_t& mainResourceDataSize);
 
     void mouseMoveTo(int x, int y, unsigned int mouseModifiers = 0);
     void clickMouseButton(int x, int y, unsigned int button = 1, unsigned int mouseModifiers = 0);
@@ -66,6 +70,8 @@ public:
     CString m_expectedTitle;
     WebKitJavascriptResult* m_javascriptResult;
     GError** m_javascriptError;
+    GOwnPtr<char> m_resourceData;
+    size_t m_resourceDataSize;
 
 private:
     void doMouseButtonEvent(GdkEventType, int, int, unsigned int, unsigned int);

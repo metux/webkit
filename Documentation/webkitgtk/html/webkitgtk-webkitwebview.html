@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="ch02.html" title="Class Overview">
 <link rel="next" href="WebKitWebFrame.html" title="WebKitWebFrame">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -173,6 +173,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-zoom-out" title="webkit_web_view_zoom_out ()">webkit_web_view_zoom_out</a>            (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <a class="link" href="WebKitWebWindowFeatures.html" title="WebKitWebWindowFeatures"><span class="returnvalue">WebKitWebWindowFeatures</span></a> * <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-get-window-features" title="webkit_web_view_get_window_features ()">webkit_web_view_get_window_features</a>
                                                         (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+<a href="../cairo/cairo-cairo-surface-t.html#cairo-surface-t"><span class="returnvalue">cairo_surface_t</span></a> *   <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-get-snapshot" title="webkit_web_view_get_snapshot ()">webkit_web_view_get_snapshot</a>        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -258,6 +259,7 @@ WebKitWebView implements
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-resource-load-finished" title='The "resource-load-finished" signal'>resource-load-finished</a>"                         : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-resource-request-starting" title='The "resource-request-starting" signal'>resource-request-starting</a>"                      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-ACTION:CAPS"><code class="literal">Action</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-resource-response-received" title='The "resource-response-received" signal'>resource-response-received</a>"                     : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-run-file-chooser" title='The "run-file-chooser" signal'>run-file-chooser</a>"                               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-script-alert" title='The "script-alert" signal'>script-alert</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-script-confirm" title='The "script-confirm" signal'>script-confirm</a>"                                 : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-script-prompt" title='The "script-prompt" signal'>script-prompt</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
@@ -819,7 +821,8 @@ of WebKitWebSettings.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <span class="type">WebKitDOMDocument</span> currently loaded in the <em class="parameter"><code>web_view</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <span class="type">WebKitDOMDocument</span> currently loaded in
+the main frame of the <em class="parameter"><code>web_view</code></em> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if no document is loaded. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -830,9 +833,6 @@ of WebKitWebSettings.
 <div class="refsect2">
 <a name="webkit-web-view-get-editable"></a><h3>webkit_web_view_get_editable ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_web_view_get_editable        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
-<p>
-Returns whether the user is allowed to edit the document.
-</p>
 <p>
 Returns <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if <em class="parameter"><code>web_view</code></em> allows the user to edit the HTML document, <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> if
 it doesn't. You can change <em class="parameter"><code>web_view</code></em>'s document programmatically regardless of
@@ -2237,6 +2237,30 @@ property of the <a class="link" href="WebKitWebSettings.html" title="WebKitWebSe
 </table></div>
 <p class="since">Since 1.0.3</p>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-get-snapshot"></a><h3>webkit_web_view_get_snapshot ()</h3>
+<pre class="programlisting"><a href="../cairo/cairo-cairo-surface-t.html#cairo-surface-t"><span class="returnvalue">cairo_surface_t</span></a> *   webkit_web_view_get_snapshot        (<em class="parameter"><code><a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<p>
+Retrieves a snapshot with the visible contents of <em class="parameter"><code>webview</code></em>.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>a <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <em class="parameter"><code>cairo_surface_t</code></em>. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 1.10</p>
+</div>
 </div>
 <div class="refsect1">
 <a name="webkitgtk-webkitwebview.property-details"></a><h2>Property Details</h2>
@@ -3315,7 +3339,7 @@ Notice that if you return TRUE, meaning that you handled the
 signal, you are expected to be aware of the "Content-Disposition"
 header. A value of "attachment" usually indicates a download
 regardless of the MIME type, see also
-<code class="function">soup_message_headers_get_content_disposition()</code>. And you must call
+<a href="../libsoup-2.4/SoupMessageHeaders.html#soup-message-headers-get-content-disposition"><code class="function">soup_message_headers_get_content_disposition()</code></a>. And you must call
 <a class="link" href="WebKitWebPolicyDecision.html#webkit-web-policy-decision-ignore" title="webkit_web_policy_decision_ignore ()"><code class="function">webkit_web_policy_decision_ignore()</code></a>,
 <a class="link" href="WebKitWebPolicyDecision.html#webkit-web-policy-decision-use" title="webkit_web_policy_decision_use ()"><code class="function">webkit_web_policy_decision_use()</code></a>, or
 <a class="link" href="WebKitWebPolicyDecision.html#webkit-web-policy-decision-download" title="webkit_web_policy_decision_download ()"><code class="function">webkit_web_policy_decision_download()</code></a> on the <em class="parameter"><code>policy_decision</code></em>
@@ -3859,7 +3883,7 @@ Emitted when all the data for the resource was loaded
 Emitted when a request is about to be sent. You can modify the
 request while handling this signal. You can set the URI in the
 <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> object itself, and add/remove/replace
-headers using the <span class="type">SoupMessage</span> object it carries, if it is
+headers using the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> object it carries, if it is
 present. See <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-get-message" title="webkit_network_request_get_message ()"><code class="function">webkit_network_request_get_message()</code></a>. Setting the
 request URI to "about:blank" will effectively cause the request
 to load nothing, and can be used to disable the loading of
@@ -3867,7 +3891,7 @@ specific resources.
 </p>
 <p>
 Notice that information about an eventual redirect is available
-in <em class="parameter"><code>response</code></em>'s <span class="type">SoupMessage</span>, not in the <span class="type">SoupMessage</span> carried by
+in <em class="parameter"><code>response</code></em>'s <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>, not in the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> carried by
 the <em class="parameter"><code>request</code></em>. If <em class="parameter"><code>response</code></em> is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>, then this is not a
 redirected request.
 </p>
@@ -3945,6 +3969,57 @@ Emitted when the first byte of data arrives
 </tbody>
 </table></div>
 <p class="since">Since 1.7.5</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView-run-file-chooser"></a><h3>The <code class="literal">"run-file-chooser"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>            *web_view,
+                                                        <a class="link" href="WebKitFileChooserRequest.html" title="WebKitFileChooserRequest"><span class="type">WebKitFileChooserRequest</span></a> *request,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                  user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+This signal is emitted when the user interacts with a &lt;input
+type='file' /&gt; HTML element, requesting from WebKit to show
+a dialog to select one or more files to be uploaded. To let the
+application know the details of the file chooser, as well as to
+allow the client application to either cancel the request or
+perform an actual selection of files, the signal will pass an
+instance of the <a class="link" href="WebKitFileChooserRequest.html" title="WebKitFileChooserRequest"><span class="type">WebKitFileChooserRequest</span></a> in the <em class="parameter"><code>request</code></em>
+argument.
+</p>
+<p>
+The default signal handler will asynchronously run a regular
+<a href="../gtk3/GtkFileChooserDialog.html"><span class="type">GtkFileChooserDialog</span></a> for the user to interact with.
+</p>
+<p>
+If this signal is to be handled asynchronously, you must
+call <a href="../gobject/gobject-The-Base-Object-Type.html#g-object-ref"><code class="function">g_object_ref()</code></a> on the <em class="parameter"><code>request</code></em>, and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to indicate
+that the request is being handled. When you are ready to complete the
+request, call <a class="link" href="WebKitFileChooserRequest.html#webkit-file-chooser-request-select-files" title="webkit_file_chooser_request_select_files ()"><code class="function">webkit_file_chooser_request_select_files()</code></a>.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitFileChooserRequest.html" title="WebKitFileChooserRequest"><span class="type">WebKitFileChooserRequest</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
+</tr>
+</tbody>
+</table></div>
 </div>
 <hr>
 <div class="refsect2">
@@ -4545,6 +4620,6 @@ window object</td>
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

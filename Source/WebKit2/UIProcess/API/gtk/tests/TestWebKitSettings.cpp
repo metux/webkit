@@ -199,6 +199,11 @@ static void testWebKitSettings(Test*, gconstpointer)
     webkit_settings_set_enable_webgl(settings, TRUE);
     g_assert(webkit_settings_get_enable_webgl(settings));
 
+    // Allow Modal Dialogs is disabled by default.
+    g_assert(!webkit_settings_get_allow_modal_dialogs(settings));
+    webkit_settings_set_allow_modal_dialogs(settings, TRUE);
+    g_assert(webkit_settings_get_allow_modal_dialogs(settings));
+
     // Zoom text only is disabled by default.
     g_assert(!webkit_settings_get_zoom_text_only(settings));
     webkit_settings_set_zoom_text_only(settings, TRUE);
@@ -208,6 +213,31 @@ static void testWebKitSettings(Test*, gconstpointer)
     g_assert(!webkit_settings_get_javascript_can_access_clipboard(settings));
     webkit_settings_set_javascript_can_access_clipboard(settings, TRUE);
     g_assert(webkit_settings_get_javascript_can_access_clipboard(settings));
+
+    // By default, media playback doesn't require user gestures.
+    g_assert(!webkit_settings_get_media_playback_requires_user_gesture(settings));
+    webkit_settings_set_media_playback_requires_user_gesture(settings, TRUE);
+    g_assert(webkit_settings_get_media_playback_requires_user_gesture(settings));
+
+    // By default, inline media playback is allowed
+    g_assert(webkit_settings_get_media_playback_allows_inline(settings));
+    webkit_settings_set_media_playback_allows_inline(settings, FALSE);
+    g_assert(!webkit_settings_get_media_playback_allows_inline(settings));
+
+    // By default, debug indicators are disabled.
+    g_assert(!webkit_settings_get_draw_compositing_indicators(settings));
+    webkit_settings_set_draw_compositing_indicators(settings, TRUE);
+    g_assert(webkit_settings_get_draw_compositing_indicators(settings));
+
+    // By default, site specific quirks are disabled.
+    g_assert(!webkit_settings_get_enable_site_specific_quirks(settings));
+    webkit_settings_set_enable_site_specific_quirks(settings, TRUE);
+    g_assert(webkit_settings_get_enable_site_specific_quirks(settings));
+
+    // By default, page cache is enabled.
+    g_assert(webkit_settings_get_enable_page_cache(settings));
+    webkit_settings_set_enable_page_cache(settings, FALSE);
+    g_assert(!webkit_settings_get_enable_page_cache(settings));
 
     g_object_unref(G_OBJECT(settings));
 }

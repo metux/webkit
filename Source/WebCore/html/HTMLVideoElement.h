@@ -29,12 +29,13 @@
 #if ENABLE(VIDEO)
 
 #include "HTMLMediaElement.h"
+#include "ImageLoaderClient.h"
 
 namespace WebCore {
 
 class HTMLImageLoader;
 
-class HTMLVideoElement : public HTMLMediaElement {
+class HTMLVideoElement : public HTMLMediaElement, public ImageLoaderClientBase<HTMLVideoElement> {
 public:
     static PassRefPtr<HTMLVideoElement> create(const QualifiedName&, Document*, bool);
 
@@ -74,14 +75,13 @@ private:
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
 #endif
     virtual void attach();
-    virtual void detach();
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
     virtual bool isVideo() const { return true; }
     virtual bool hasVideo() const { return player() && player()->hasVideo(); }
     virtual bool supportsFullscreen() const;
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual const QualifiedName& imageSourceAttributeName() const;
 
     virtual bool hasAvailableVideoFrame() const;

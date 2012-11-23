@@ -108,6 +108,7 @@ bool ScrollableArea::scroll(ScrollDirection direction, ScrollGranularity granula
         step = scrollbar->totalSize();
         break;
     case ScrollByPixel:
+    case ScrollByPrecisePixel:
         step = scrollbar->pixelStep();
         break;
     case ScrollByPixelVelocity:
@@ -141,6 +142,7 @@ void ScrollableArea::notifyScrollPositionChanged(const IntPoint& position)
 
 void ScrollableArea::scrollPositionChanged(const IntPoint& position)
 {
+    IntPoint oldPosition = scrollPosition();
     // Tell the derived class to scroll its contents.
     setScrollOffset(position);
 
@@ -167,7 +169,8 @@ void ScrollableArea::scrollPositionChanged(const IntPoint& position)
             verticalScrollbar->invalidate();
     }
 
-    scrollAnimator()->notifyContentAreaScrolled();
+    if (scrollPosition() != oldPosition)
+        scrollAnimator()->notifyContentAreaScrolled();
 }
 
 bool ScrollableArea::handleWheelEvent(const PlatformWheelEvent& wheelEvent)

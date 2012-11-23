@@ -163,6 +163,7 @@
 <ANCHOR id="webkit-web-view-zoom-in" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-zoom-in">
 <ANCHOR id="webkit-web-view-zoom-out" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-zoom-out">
 <ANCHOR id="webkit-web-view-get-window-features" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-window-features">
+<ANCHOR id="webkit-web-view-get-snapshot" href="webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-snapshot">
 <ANCHOR id="webkitgtk-webkitwebview.property-details" href="webkitgtk/webkitgtk-webkitwebview.html#webkitgtk-webkitwebview.property-details">
 <ANCHOR id="WebKitWebView--copy-target-list" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView--copy-target-list">
 <ANCHOR id="WebKitWebView--custom-encoding" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView--custom-encoding">
@@ -224,6 +225,7 @@
 <ANCHOR id="WebKitWebView-resource-load-finished" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-load-finished">
 <ANCHOR id="WebKitWebView-resource-request-starting" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-request-starting">
 <ANCHOR id="WebKitWebView-resource-response-received" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-resource-response-received">
+<ANCHOR id="WebKitWebView-run-file-chooser" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-run-file-chooser">
 <ANCHOR id="WebKitWebView-script-alert" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-script-alert">
 <ANCHOR id="WebKitWebView-script-confirm" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-script-confirm">
 <ANCHOR id="WebKitWebView-script-prompt" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView-script-prompt">
@@ -262,6 +264,7 @@
 <ANCHOR id="WebKitWebFrame-struct" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-struct">
 <ANCHOR id="webkit-web-frame-find-frame" href="webkitgtk/WebKitWebFrame.html#webkit-web-frame-find-frame">
 <ANCHOR id="webkit-web-frame-get-data-source" href="webkitgtk/WebKitWebFrame.html#webkit-web-frame-get-data-source">
+<ANCHOR id="webkit-web-frame-get-dom-document" href="webkitgtk/WebKitWebFrame.html#webkit-web-frame-get-dom-document">
 <ANCHOR id="webkit-web-frame-get-global-context" href="webkitgtk/WebKitWebFrame.html#webkit-web-frame-get-global-context">
 <ANCHOR id="webkit-web-frame-get-horizontal-scrollbar-policy" href="webkitgtk/WebKitWebFrame.html#webkit-web-frame-get-horizontal-scrollbar-policy">
 <ANCHOR id="webkit-web-frame-get-load-status" href="webkitgtk/WebKitWebFrame.html#webkit-web-frame-get-load-status">
@@ -358,6 +361,8 @@
 <ANCHOR id="WebKitWebSettings--html5-local-storage-database-path" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--html5-local-storage-database-path">
 <ANCHOR id="WebKitWebSettings--javascript-can-access-clipboard" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--javascript-can-access-clipboard">
 <ANCHOR id="WebKitWebSettings--javascript-can-open-windows-automatically" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--javascript-can-open-windows-automatically">
+<ANCHOR id="WebKitWebSettings--media-playback-allows-inline" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--media-playback-allows-inline">
+<ANCHOR id="WebKitWebSettings--media-playback-requires-user-gesture" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--media-playback-requires-user-gesture">
 <ANCHOR id="WebKitWebSettings--minimum-font-size" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--minimum-font-size">
 <ANCHOR id="WebKitWebSettings--minimum-logical-font-size" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--minimum-logical-font-size">
 <ANCHOR id="WebKitWebSettings--monospace-font-family" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--monospace-font-family">
@@ -485,9 +490,11 @@
 <ANCHOR id="WebKitNetworkResponse-struct" href="webkitgtk/WebKitNetworkResponse.html#WebKitNetworkResponse-struct">
 <ANCHOR id="webkit-network-response-get-uri" href="webkitgtk/WebKitNetworkResponse.html#webkit-network-response-get-uri">
 <ANCHOR id="webkit-network-response-get-message" href="webkitgtk/WebKitNetworkResponse.html#webkit-network-response-get-message">
+<ANCHOR id="webkit-network-response-get-suggested-filename" href="webkitgtk/WebKitNetworkResponse.html#webkit-network-response-get-suggested-filename">
 <ANCHOR id="webkit-network-response-set-uri" href="webkitgtk/WebKitNetworkResponse.html#webkit-network-response-set-uri">
 <ANCHOR id="WebKitNetworkResponse.property-details" href="webkitgtk/WebKitNetworkResponse.html#WebKitNetworkResponse.property-details">
 <ANCHOR id="WebKitNetworkResponse--message" href="webkitgtk/WebKitNetworkResponse.html#WebKitNetworkResponse--message">
+<ANCHOR id="WebKitNetworkResponse--suggested-filename" href="webkitgtk/WebKitNetworkResponse.html#WebKitNetworkResponse--suggested-filename">
 <ANCHOR id="WebKitNetworkResponse--uri" href="webkitgtk/WebKitNetworkResponse.html#WebKitNetworkResponse--uri">
 <ANCHOR id="WebKitNetworkResponse.see-also" href="webkitgtk/WebKitNetworkResponse.html#WebKitNetworkResponse.see-also">
 <ANCHOR id="WebKitWebInspector" href="webkitgtk/WebKitWebInspector.html">
@@ -800,7 +807,26 @@
 <ANCHOR id="WebKitFaviconDatabase--path" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase--path">
 <ANCHOR id="WebKitFaviconDatabase.signal-details" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.signal-details">
 <ANCHOR id="WebKitFaviconDatabase-icon-loaded" href="webkitgtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase-icon-loaded">
+<ANCHOR id="WebKitFileChooserRequest" href="webkitgtk/WebKitFileChooserRequest.html">
+<ANCHOR id="WebKitFileChooserRequest.synopsis" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest.synopsis">
+<ANCHOR id="WebKitFileChooserRequest.object-hierarchy" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest.object-hierarchy">
+<ANCHOR id="WebKitFileChooserRequest.properties" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest.properties">
+<ANCHOR id="WebKitFileChooserRequest.description" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest.description">
+<ANCHOR id="WebKitFileChooserRequest.details" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest.details">
+<ANCHOR id="WebKitFileChooserRequest-struct" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest-struct">
+<ANCHOR id="webkit-file-chooser-request-get-select-multiple" href="webkitgtk/WebKitFileChooserRequest.html#webkit-file-chooser-request-get-select-multiple">
+<ANCHOR id="webkit-file-chooser-request-get-mime-types" href="webkitgtk/WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types">
+<ANCHOR id="webkit-file-chooser-request-get-mime-types-filter" href="webkitgtk/WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types-filter">
+<ANCHOR id="webkit-file-chooser-request-get-selected-files" href="webkitgtk/WebKitFileChooserRequest.html#webkit-file-chooser-request-get-selected-files">
+<ANCHOR id="webkit-file-chooser-request-select-files" href="webkitgtk/WebKitFileChooserRequest.html#webkit-file-chooser-request-select-files">
+<ANCHOR id="WebKitFileChooserRequest.property-details" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest.property-details">
+<ANCHOR id="WebKitFileChooserRequest--filter" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest--filter">
+<ANCHOR id="WebKitFileChooserRequest--mime-types" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest--mime-types">
+<ANCHOR id="WebKitFileChooserRequest--select-multiple" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest--select-multiple">
+<ANCHOR id="WebKitFileChooserRequest--selected-files" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest--selected-files">
+<ANCHOR id="WebKitFileChooserRequest.see-also" href="webkitgtk/WebKitFileChooserRequest.html#WebKitFileChooserRequest.see-also">
 <ANCHOR id="webkit-environment" href="webkitgtk/webkit-environment.html">
+<ANCHOR id="annotation-glossterm-array" href="webkitgtk/annotation-glossary.html#annotation-glossterm-array">
 <ANCHOR id="annotation-glossterm-allow-none" href="webkitgtk/annotation-glossary.html#annotation-glossterm-allow-none">
 <ANCHOR id="annotation-glossterm-element-type" href="webkitgtk/annotation-glossary.html#annotation-glossterm-element-type">
 <ANCHOR id="annotation-glossterm-transfer container" href="webkitgtk/annotation-glossary.html#annotation-glossterm-transfer container">

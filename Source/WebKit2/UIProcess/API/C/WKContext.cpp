@@ -61,16 +61,6 @@ WKContextRef WKContextCreateWithInjectedBundlePath(WKStringRef pathRef)
     return toAPI(context.release().leakRef());
 }
 
-WKContextRef WKContextGetSharedProcessContext()
-{
-    return toAPI(WebContext::sharedProcessContext());
-}
-
-WKContextRef WKContextGetSharedThreadContext()
-{
-    return toAPI(WebContext::sharedThreadContext());
-}
-
 void WKContextSetInjectedBundleClient(WKContextRef contextRef, const WKContextInjectedBundleClient* wkClient)
 {
     toImpl(contextRef)->initializeInjectedBundleClient(wkClient);
@@ -112,7 +102,7 @@ void WKContextGetGlobalStatistics(WKContextStatistics* statistics)
 
     statistics->wkViewCount = webContextStatistics.wkViewCount;
     statistics->wkPageCount = webContextStatistics.wkPageCount;
-    statistics->wkFrameCount = webContextStatistics.wkViewCount;
+    statistics->wkFrameCount = webContextStatistics.wkFrameCount;
 }
 
 void WKContextAddVisitedLink(WKContextRef contextRef, WKStringRef visitedURL)
@@ -170,14 +160,36 @@ WKApplicationCacheManagerRef WKContextGetApplicationCacheManager(WKContextRef co
     return toAPI(toImpl(contextRef)->applicationCacheManagerProxy());
 }
 
+WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef contextRef)
+{
+#if ENABLE(BATTERY_STATUS)
+    return toAPI(toImpl(contextRef)->batteryManagerProxy());
+#else
+    return 0;
+#endif
+}
+
 WKDatabaseManagerRef WKContextGetDatabaseManager(WKContextRef contextRef)
 {
+#if ENABLE(SQL_DATABASE)
     return toAPI(toImpl(contextRef)->databaseManagerProxy());
+#else
+    return 0;
+#endif
 }
 
 WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef contextRef)
 {
     return toAPI(toImpl(contextRef)->geolocationManagerProxy());
+}
+
+WKNetworkInfoManagerRef WKContextGetNetworkInfoManager(WKContextRef contextRef)
+{
+#if ENABLE(NETWORK_INFO)
+    return toAPI(toImpl(contextRef)->networkInfoManagerProxy());
+#else
+    return 0;
+#endif
 }
 
 WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef contextRef)
@@ -208,6 +220,15 @@ WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef contex
 WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef contextRef)
 {
     return toAPI(toImpl(contextRef)->resourceCacheManagerProxy());
+}
+
+WKVibrationRef WKContextGetVibration(WKContextRef contextRef)
+{
+#if ENABLE(VIBRATION)
+    return toAPI(toImpl(contextRef)->vibrationProxy());
+#else
+    return 0;
+#endif
 }
 
 void WKContextStartMemorySampler(WKContextRef contextRef, WKDoubleRef interval)
@@ -265,6 +286,10 @@ void WKContextGarbageCollectJavaScriptObjects(WKContextRef contextRef)
     toImpl(contextRef)->garbageCollectJavaScriptObjects();
 }
 
+void WKContextSetJavaScriptGarbageCollectorTimerEnabled(WKContextRef contextRef, bool enable)
+{
+    toImpl(contextRef)->setJavaScriptGarbageCollectorTimerEnabled(enable);
+}
 // Deprecated functions.
 void _WKContextSetAdditionalPluginsDirectory(WKContextRef context, WKStringRef pluginsDirectory)
 {

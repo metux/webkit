@@ -69,7 +69,6 @@ SimpleFontData::SimpleFontData(PassOwnPtr<AdditionalFontData> fontData, float fo
     m_fontData->initializeFontData(this, fontSize);
 }
 
-#if !(PLATFORM(QT) && !HAVE(QRAWFONT))
 // Estimates of avgCharWidth and maxCharWidth for platforms that don't support accessing these values from the font.
 void SimpleFontData::initCharWidths()
 {
@@ -130,7 +129,6 @@ void SimpleFontData::platformGlyphInit()
     m_missingGlyphData.fontData = this;
     m_missingGlyphData.glyph = 0;
 }
-#endif
 
 SimpleFontData::~SimpleFontData()
 {
@@ -146,6 +144,12 @@ SimpleFontData::~SimpleFontData()
 const SimpleFontData* SimpleFontData::fontDataForCharacter(UChar32) const
 {
     return this;
+}
+
+Glyph SimpleFontData::glyphForCharacter(UChar32 character) const
+{
+    GlyphPageTreeNode* node = GlyphPageTreeNode::getRootChild(this, character / GlyphPage::size);
+    return node->page() ? node->page()->glyphAt(character % GlyphPage::size) : 0;
 }
 
 bool SimpleFontData::isSegmented() const

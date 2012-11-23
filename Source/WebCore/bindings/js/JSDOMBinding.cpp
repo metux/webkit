@@ -21,7 +21,9 @@
 #include "config.h"
 #include "JSDOMBinding.h"
 
+#include "BindingSecurity.h"
 #include "DOMObjectHashTableMap.h"
+#include "DOMStringList.h"
 #include "ExceptionCode.h"
 #include "ExceptionHeaders.h"
 #include "ExceptionInterfaces.h"
@@ -49,7 +51,7 @@ const JSC::HashTable* getHashTableForGlobalData(JSGlobalData& globalData, const 
 JSValue jsStringSlowCase(ExecState* exec, JSStringCache& stringCache, StringImpl* stringImpl)
 {
     JSString* wrapper = jsString(exec, UString(stringImpl));
-    stringCache.add(stringImpl, PassWeak<JSString>(wrapper, currentWorld(exec)->stringWrapperOwner(), stringImpl));
+    weakAdd(stringCache, stringImpl, PassWeak<JSString>(wrapper, currentWorld(exec)->stringWrapperOwner(), stringImpl));
     return wrapper;
 }
 
@@ -74,13 +76,6 @@ JSValue jsStringOrUndefined(ExecState* exec, const String& s)
     return jsString(exec, s);
 }
 
-JSValue jsStringOrFalse(ExecState* exec, const String& s)
-{
-    if (s.isNull())
-        return jsBoolean(false);
-    return jsString(exec, s);
-}
-
 JSValue jsString(ExecState* exec, const KURL& url)
 {
     return jsString(exec, url.string());
@@ -100,20 +95,13 @@ JSValue jsStringOrUndefined(ExecState* exec, const KURL& url)
     return jsString(exec, url.string());
 }
 
-JSValue jsStringOrFalse(ExecState* exec, const KURL& url)
+AtomicStringImpl* findAtomicString(PropertyName propertyName)
 {
-    if (url.isNull())
-        return jsBoolean(false);
-    return jsString(exec, url.string());
-}
-
-AtomicStringImpl* findAtomicString(const Identifier& identifier)
-{
-    if (identifier.isNull())
+    StringImpl* impl = propertyName.publicName();
+    if (!impl)
         return 0;
-    StringImpl* impl = identifier.impl();
     ASSERT(impl->existingHash());
-    return AtomicString::find(impl->characters(), impl->length(), impl->existingHash());
+    return AtomicString::find(impl);
 }
 
 String valueToStringWithNullCheck(ExecState* exec, JSValue value)
@@ -146,6 +134,16 @@ double valueToDate(ExecState* exec, JSValue value)
     return static_cast<DateInstance*>(value.toObject(exec))->internalNumber();
 }
 
+JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<DOMStringList> stringList)
+{
+    JSC::MarkedArgumentBuffer list;
+    if (stringList) {
+        for (unsigned i = 0; i < stringList->length(); ++i)
+            list.append(jsString(exec, stringList->item(i)));
+    }
+    return JSC::constructArray(exec, globalObject, list);
+}
+
 void reportException(ExecState* exec, JSValue exception)
 {
     if (isTerminatedExecutionException(exception))
@@ -160,13 +158,12 @@ void reportException(ExecState* exec, JSValue exception)
     if (ExceptionBase* exceptionBase = toExceptionBase(exception))
         errorMessage = stringToUString(exceptionBase->message() + ": "  + exceptionBase->description());
 
-    ScriptExecutionContext* scriptExecutionContext = jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject())->scriptExecutionContext();
-
-    // scriptExecutionContext can be null when the relevant global object is a stale inner window object.
-    // It's harmless to return here without reporting the exception to the log and the debugger in this case.
-    if (!scriptExecutionContext)
-        return;
-
+    JSDOMGlobalObject* globalObject = jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject());
+    if (JSDOMWindow* window = jsDynamicCast<JSDOMWindow*>(globalObject)) {
+        if (!window->impl()->isCurrentlyDisplayedInFrame())
+            return;
+    }
+    ScriptExecutionContext* scriptExecutionContext = globalObject->scriptExecutionContext();
     scriptExecutionContext->reportException(ustringToString(errorMessage), lineNumber, ustringToString(exceptionSourceURL), 0);
 }
 
@@ -187,6 +184,11 @@ void setDOMException(ExecState* exec, ExceptionCode ec)
     if (!ec || exec->hadException())
         return;
 
+    if (ec == NATIVE_TYPE_ERR) {
+        throwTypeError(exec);
+        return;
+    }
+
     // FIXME: All callers to setDOMException need to pass in the right global object
     // for now, we're going to assume the lexicalGlobalObject.  Which is wrong in cases like this:
     // frames[0].document.createElement(null, null); // throws an exception which should have the subframes prototypes.
@@ -205,47 +207,46 @@ void setDOMException(ExecState* exec, ExceptionCode ec)
 
 #undef TRY_TO_CREATE_EXCEPTION
 
-DOMWindow* activeDOMWindow(ExecState* exec)
-{
-    return asJSDOMWindow(exec->lexicalGlobalObject())->impl();
-}
-
-DOMWindow* firstDOMWindow(ExecState* exec)
-{
-    return asJSDOMWindow(exec->dynamicGlobalObject())->impl();
-}
-
 bool shouldAllowAccessToNode(ExecState* exec, Node* node)
 {
-    return node && shouldAllowAccessToFrame(exec, node->document()->frame());
+    return BindingSecurity::shouldAllowAccessToNode(exec, node);
 }
 
-bool shouldAllowAccessToFrame(ExecState* exec, Frame* frame)
+bool shouldAllowAccessToFrame(ExecState* exec, Frame* target)
 {
-    if (!frame)
-        return false;
-    JSDOMWindow* window = toJSDOMWindow(frame, currentWorld(exec));
-    return window && window->allowsAccessFrom(exec);
+    return BindingSecurity::shouldAllowAccessToFrame(exec, target);
 }
 
 bool shouldAllowAccessToFrame(ExecState* exec, Frame* frame, String& message)
 {
     if (!frame)
         return false;
-    JSDOMWindow* window = toJSDOMWindow(frame, currentWorld(exec));
-    return window && window->allowsAccessFrom(exec, message);
+    bool result = BindingSecurity::shouldAllowAccessToFrame(exec, frame, DoNotReportSecurityError);
+    // FIXME: The following line of code should move somewhere that it can be shared with immediatelyReportUnsafeAccessTo.
+    message = frame->document()->domWindow()->crossDomainAccessErrorMessage(activeDOMWindow(exec));
+    return result;
+}
+
+bool shouldAllowAccessToDOMWindow(ExecState* exec, DOMWindow* target, String& message)
+{
+    if (!target)
+        return false;
+    bool result = BindingSecurity::shouldAllowAccessToDOMWindow(exec, target, DoNotReportSecurityError);
+    // FIXME: The following line of code should move somewhere that it can be shared with immediatelyReportUnsafeAccessTo.
+    message = target->crossDomainAccessErrorMessage(activeDOMWindow(exec));
+    return result;
 }
 
 void printErrorMessageForFrame(Frame* frame, const String& message)
 {
     if (!frame)
         return;
-    frame->domWindow()->printErrorMessage(message);
+    frame->document()->domWindow()->printErrorMessage(message);
 }
 
-JSValue objectToStringFunctionGetter(ExecState* exec, JSValue, const Identifier& propertyName)
+JSValue objectToStringFunctionGetter(ExecState* exec, JSValue, PropertyName propertyName)
 {
-    return JSFunction::create(exec, exec->lexicalGlobalObject(), 0, propertyName, objectProtoFuncToString);
+    return JSFunction::create(exec, exec->lexicalGlobalObject(), 0, propertyName.publicName(), objectProtoFuncToString);
 }
 
 Structure* getCachedDOMStructure(JSDOMGlobalObject* globalObject, const ClassInfo* classInfo)
@@ -259,29 +260,6 @@ Structure* cacheDOMStructure(JSDOMGlobalObject* globalObject, Structure* structu
     JSDOMStructureMap& structures = globalObject->structures();
     ASSERT(!structures.contains(classInfo));
     return structures.set(classInfo, WriteBarrier<Structure>(globalObject->globalData(), globalObject, structure)).iterator->second.get();
-}
-
-JSC::JSObject* toJSSequence(ExecState* exec, JSValue value, unsigned& length)
-{
-    JSObject* object = value.getObject();
-    if (!object) {
-        throwTypeError(exec);
-        return 0;
-    }
-    JSValue lengthValue = object->get(exec, exec->propertyNames().length);
-    if (exec->hadException())
-        return 0;
-
-    if (lengthValue.isUndefinedOrNull()) {
-        throwTypeError(exec);
-        return 0;
-    }
-
-    length = lengthValue.toUInt32(exec);
-    if (exec->hadException())
-        return 0;
-
-    return object;
 }
 
 } // namespace WebCore

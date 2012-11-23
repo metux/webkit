@@ -33,6 +33,7 @@
 
 #include "AccessibilityObject.h"
 #include "Document.h"
+#include "Font.h"
 #include "FrameView.h"
 #include <wtf/gobject/GOwnPtr.h>
 #include "HostWindow.h"
@@ -79,7 +80,7 @@ static gchar* textForRenderer(RenderObject* renderer)
         else {
             // List item's markers will be treated in an special way
             // later on this function, so ignore them here.
-            if (object->isReplaced() && !renderer->isListItem())
+            if (object->isReplaced() && !object->isListMarker())
                 g_string_append_unichar(resultText, objectReplacementCharacter);
 
             // We need to check children, if any, to consider when
@@ -286,7 +287,6 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
     }
 
     switch (style->textAlign()) {
-    case TAAUTO:
     case TASTART:
     case TAEND:
         break;
@@ -537,7 +537,9 @@ static gchar* webkitAccessibleTextGetText(AtkText* text, gint startOffset, gint 
 
     if (!ret.length()) {
         // This can happen at least with anonymous RenderBlocks (e.g. body text amongst paragraphs)
-        ret = String(textForObject(coreObject));
+        // In such instances, there may also be embedded objects. The object replacement character
+        // is something ATs want included and we have to account for the fact that it is multibyte.
+        ret = String::fromUTF8(textForObject(coreObject));
         if (!end)
             end = ret.length();
     }

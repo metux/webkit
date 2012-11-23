@@ -46,7 +46,7 @@ namespace WebCore {
 
 ScriptCachedFrameData::ScriptCachedFrameData(Frame* frame)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
 
     ScriptController* scriptController = frame->script();
     ScriptController::ShellMap& windowShells = scriptController->m_windowShells;
@@ -67,7 +67,7 @@ ScriptCachedFrameData::~ScriptCachedFrameData()
 
 void ScriptCachedFrameData::restore(Frame* frame)
 {
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
 
     ScriptController* scriptController = frame->script();
     ScriptController::ShellMap& windowShells = scriptController->m_windowShells;
@@ -80,7 +80,11 @@ void ScriptCachedFrameData::restore(Frame* frame)
         if (JSDOMWindow* window = m_windows.get(world).get())
             windowShell->setWindow(window->globalData(), window);
         else {
-            windowShell->setWindow(frame->domWindow());
+            DOMWindow* domWindow = frame->document()->domWindow();
+            if (windowShell->window()->impl() == domWindow)
+                continue;
+
+            windowShell->setWindow(domWindow);
 
             if (Page* page = frame->page()) {
                 scriptController->attachDebugger(windowShell, page->debugger());
@@ -95,7 +99,7 @@ void ScriptCachedFrameData::clear()
     if (m_windows.isEmpty())
         return;
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
     m_windows.clear();
     gcController().garbageCollectSoon();
 }

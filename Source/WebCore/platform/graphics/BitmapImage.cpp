@@ -64,7 +64,6 @@ BitmapImage::BitmapImage(ImageObserver* observer)
     , m_hasUniformFrameSize(true)
     , m_haveFrameCount(false)
 {
-    initPlatformData();
 }
 
 BitmapImage::~BitmapImage()
@@ -179,25 +178,26 @@ void BitmapImage::didDecodeProperties() const
         imageObserver()->decodedSizeChanged(this, deltaBytes);
 }
 
+void BitmapImage::updateSize() const
+{
+    if (!m_sizeAvailable || m_haveSize)
+        return;
+
+    m_size = m_source.size();
+    m_sizeRespectingOrientation = m_source.size(RespectImageOrientation);
+    m_haveSize = true;
+    didDecodeProperties();
+}
+
 IntSize BitmapImage::size() const
 {
-    if (m_sizeAvailable && !m_haveSize) {
-        m_size = m_source.size();
-        m_sizeRespectingOrientation = m_source.size(RespectImageOrientation);
-        m_haveSize = true;
-        didDecodeProperties();
-    }
+    updateSize();
     return m_size;
 }
 
 IntSize BitmapImage::sizeRespectingOrientation() const
 {
-    if (m_sizeAvailable && !m_haveSize) {
-        m_size = m_source.size();
-        m_sizeRespectingOrientation = m_source.size(RespectImageOrientation);
-        m_haveSize = true;
-        didDecodeProperties();
-    }
+    updateSize();
     return m_sizeRespectingOrientation;
 }
 
@@ -263,9 +263,12 @@ String BitmapImage::filenameExtension() const
 size_t BitmapImage::frameCount()
 {
     if (!m_haveFrameCount) {
-        m_haveFrameCount = true;
         m_frameCount = m_source.frameCount();
-        didDecodeProperties();
+        // If decoder is not initialized yet, m_source.frameCount() returns 0.
+        if (m_frameCount) {
+            didDecodeProperties();
+            m_haveFrameCount = true;
+        }
     }
     return m_frameCount;
 }
@@ -301,7 +304,7 @@ NativeImagePtr BitmapImage::frameAtIndex(size_t index)
 bool BitmapImage::frameIsCompleteAtIndex(size_t index)
 {
     if (!ensureFrameIsCached(index))
-        return true; // Why would an invalid index return true here?
+        return false;
     return m_frames[index].m_isComplete;
 }
 
@@ -319,9 +322,13 @@ NativeImagePtr BitmapImage::nativeImageForCurrentFrame()
 
 bool BitmapImage::frameHasAlphaAtIndex(size_t index)
 {
-    if (!ensureFrameIsCached(index))
-        return true; // Why does an invalid index mean alpha?
-    return m_frames[index].m_hasAlpha;
+    if (m_frames.size() <= index)
+        return true;
+
+    if (m_frames[index].m_haveMetadata)
+        return m_frames[index].m_hasAlpha;
+
+    return m_source.frameHasAlphaAtIndex(index);
 }
 
 bool BitmapImage::currentFrameHasAlpha()
@@ -336,9 +343,13 @@ ImageOrientation BitmapImage::currentFrameOrientation()
 
 ImageOrientation BitmapImage::frameOrientationAtIndex(size_t index)
 {
-    if (!ensureFrameIsCached(index))
+    if (m_frames.size() <= index)
         return DefaultImageOrientation;
-    return m_frames[index].m_orientation;
+
+    if (m_frames[index].m_haveMetadata)
+        return m_frames[index].m_orientation;
+
+    return m_source.orientationAtIndex(index);
 }
 
 #if !ASSERT_DISABLED
@@ -557,12 +568,5 @@ Color BitmapImage::solidColor() const
 {
     return m_solidColor;
 }
-
-#if !USE(CG)
-void BitmapImage::draw(GraphicsContext* ctx, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator op, RespectImageOrientationEnum)
-{
-    draw(ctx, dstRect, srcRect, styleColorSpace, op);
-}
-#endif
 
 }

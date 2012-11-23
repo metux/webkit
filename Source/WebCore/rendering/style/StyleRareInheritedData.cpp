@@ -23,12 +23,42 @@
 #include "StyleRareInheritedData.h"
 
 #include "CursorList.h"
+#include "MemoryInstrumentation.h"
 #include "QuotesData.h"
 #include "RenderStyle.h"
 #include "RenderStyleConstants.h"
 #include "ShadowData.h"
 
 namespace WebCore {
+
+struct SameSizeAsStyleRareInheritedData : public RefCounted<SameSizeAsStyleRareInheritedData> {
+    Color firstColor;
+    float firstFloat;
+    Color colors[5];
+    void* ownPtrs[1];
+    AtomicString atomicStrings[5];
+    void* refPtrs[2];
+    Length lengths[1];
+    float secondFloat;
+    unsigned m_bitfields[2];
+    short pagedMediaShorts[2];
+    unsigned unsigneds[1];
+    short hyphenationShorts[3];
+
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    float imageResolutionFloats;
+#endif
+
+#if ENABLE(TOUCH_EVENTS)
+    Color touchColors;
+#endif
+
+#if ENABLE(CSS_VARIABLES)
+    void* variableDataRefs[1];
+#endif
+};
+
+COMPILE_ASSERT(sizeof(StyleRareInheritedData) == sizeof(SameSizeAsStyleRareInheritedData), StyleRareInheritedData_should_bit_pack);
 
 StyleRareInheritedData::StyleRareInheritedData()
     : textStrokeWidth(RenderStyle::initialTextStrokeWidth())
@@ -52,20 +82,34 @@ StyleRareInheritedData::StyleRareInheritedData()
     , textEmphasisMark(TextEmphasisMarkNone)
     , textEmphasisPosition(TextEmphasisPositionOver)
     , m_lineBoxContain(RenderStyle::initialLineBoxContain())
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+    , m_imageOrientation(RenderStyle::initialImageOrientation())
+#endif
     , m_imageRendering(RenderStyle::initialImageRendering())
     , m_lineSnap(RenderStyle::initialLineSnap())
     , m_lineAlign(RenderStyle::initialLineAlign())
 #if ENABLE(OVERFLOW_SCROLLING)
     , useTouchOverflowScrolling(RenderStyle::initialUseTouchOverflowScrolling())
 #endif
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    , m_imageResolutionSource(RenderStyle::initialImageResolutionSource())
+    , m_imageResolutionSnap(RenderStyle::initialImageResolutionSnap())
+#endif
     , hyphenationLimitBefore(-1)
     , hyphenationLimitAfter(-1)
     , hyphenationLimitLines(-1)
     , m_lineGrid(RenderStyle::initialLineGrid())
+    , m_tabSize(RenderStyle::initialTabSize())
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    , m_imageResolution(RenderStyle::initialImageResolution())
+#endif
 #if ENABLE(TOUCH_EVENTS)
     , tapHighlightColor(RenderStyle::initialTapHighlightColor())
 #endif    
 {
+#if ENABLE(CSS_VARIABLES)
+    m_variables.init();
+#endif
 }
 
 StyleRareInheritedData::StyleRareInheritedData(const StyleRareInheritedData& o)
@@ -100,11 +144,18 @@ StyleRareInheritedData::StyleRareInheritedData(const StyleRareInheritedData& o)
     , textEmphasisMark(o.textEmphasisMark)
     , textEmphasisPosition(o.textEmphasisPosition)
     , m_lineBoxContain(o.m_lineBoxContain)
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+    , m_imageOrientation(o.m_imageOrientation)
+#endif
     , m_imageRendering(o.m_imageRendering)
     , m_lineSnap(o.m_lineSnap)
     , m_lineAlign(o.m_lineAlign)
 #if ENABLE(OVERFLOW_SCROLLING)
     , useTouchOverflowScrolling(o.useTouchOverflowScrolling)
+#endif
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    , m_imageResolutionSource(o.m_imageResolutionSource)
+    , m_imageResolutionSnap(o.m_imageResolutionSnap)
 #endif
     , hyphenationString(o.hyphenationString)
     , hyphenationLimitBefore(o.hyphenationLimitBefore)
@@ -113,8 +164,15 @@ StyleRareInheritedData::StyleRareInheritedData(const StyleRareInheritedData& o)
     , locale(o.locale)
     , textEmphasisCustomMark(o.textEmphasisCustomMark)
     , m_lineGrid(o.m_lineGrid)
+    , m_tabSize(o.m_tabSize)
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    , m_imageResolution(o.m_imageResolution)
+#endif
 #if ENABLE(TOUCH_EVENTS)
     , tapHighlightColor(o.tapHighlightColor)
+#endif
+#if ENABLE(CSS_VARIABLES)
+    , m_variables(o.m_variables)
 #endif
 {
 }
@@ -176,10 +234,22 @@ bool StyleRareInheritedData::operator==(const StyleRareInheritedData& o) const
         && hyphenationString == o.hyphenationString
         && locale == o.locale
         && textEmphasisCustomMark == o.textEmphasisCustomMark
-        && QuotesData::equal(quotes.get(), o.quotes.get())
+        && QuotesData::equals(quotes.get(), o.quotes.get())
+        && m_tabSize == o.m_tabSize
         && m_lineGrid == o.m_lineGrid
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+        && m_imageOrientation == o.m_imageOrientation
+#endif
         && m_imageRendering == o.m_imageRendering
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+        && m_imageResolutionSource == o.m_imageResolutionSource
+        && m_imageResolutionSnap == o.m_imageResolutionSnap
+        && m_imageResolution == o.m_imageResolution
+#endif
         && m_lineSnap == o.m_lineSnap
+#if ENABLE(CSS_VARIABLES)
+        && m_variables == o.m_variables
+#endif
         && m_lineAlign == o.m_lineAlign;
 }
 
@@ -190,6 +260,22 @@ bool StyleRareInheritedData::shadowDataEquivalent(const StyleRareInheritedData& 
     if (textShadow && o.textShadow && (*textShadow != *o.textShadow))
         return false;
     return true;
+}
+
+void StyleRareInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addMember(textShadow);
+    info.addInstrumentedMember(highlight);
+    info.addMember(cursorData);
+    info.addInstrumentedMember(hyphenationString);
+    info.addInstrumentedMember(locale);
+    info.addInstrumentedMember(textEmphasisCustomMark);
+    info.addMember(quotes);
+    info.addInstrumentedMember(m_lineGrid);
+#if ENABLE(CSS_VARIABLES)
+    info.addMember(m_variables);
+#endif
 }
 
 } // namespace WebCore

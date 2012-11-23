@@ -36,6 +36,7 @@
 #include "FrameView.h"
 #include "Image.h"
 #include "Logging.h"
+#include "MemoryInstrumentation.h"
 #include "ResourceHandle.h"
 #include "SecurityOrigin.h"
 #include "SecurityOriginHash.h"
@@ -235,6 +236,12 @@ void MemoryCache::pruneLiveResourcesToSize(unsigned targetSize)
             if (elapsedTime < cMinDelayBeforeLiveDecodedPrune)
                 return;
 
+            // Check to see if the current resource are likely to be used again soon.
+            if (current->likelyToBeUsedSoon()) {
+                current = prev;
+                continue;
+            }
+
             // Destroy our decoded data. This will remove us from 
             // m_liveDecodedResources, and possibly move us to a different LRU 
             // list in m_allResources.
@@ -396,8 +403,7 @@ void MemoryCache::evict(CachedResource* resource)
     } else
         ASSERT(m_resources.get(resource->url()) != resource);
 
-    if (resource->canDelete())
-        delete resource;
+    resource->deleteIfPossible();
 }
 
 static inline unsigned fastLog2(unsigned i)
@@ -707,6 +713,19 @@ MemoryCache::Statistics MemoryCache::getStatistics()
         }
     }
     return stats;
+}
+
+void MemoryCache::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::MemoryCacheStructures);
+    info.addHashMap(m_resources);
+    CachedResourceMap::const_iterator e = m_resources.end();
+    for (CachedResourceMap::const_iterator i = m_resources.begin(); i != e; ++i) {
+        info.addInstrumentedMember(i->first);
+        info.addInstrumentedMember(i->second);
+    }
+    info.addVector(m_allResources);
+    info.addMember(m_liveDecodedResources);
 }
 
 void MemoryCache::setDisabled(bool disabled)
