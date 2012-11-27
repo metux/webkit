@@ -67,31 +67,49 @@ build-stamp:
 		sed -i '2!b;/^#/ i\exec "/usr/share/misc/'$$file'" "$$@"' Source/autotools/$$file ; \
 	done
 
-	# FIXME: upstream is broken when running pot-update, is why we
-	# create the po directory manually here
-	set -e; for version in $(GTK_VERSIONS); do \
-		if [ ! -d build-$${version} ]; then \
-			mkdir build-$${version}; \
-			mkdir -p build-$${version}/Source/WebKit/gtk/po/; \
-		fi; \
-		cd build-$${version}; \
-		env -u AR_FLAGS \
-		CFLAGS="$(CFLAGS)" \
-		CXXFLAGS="$(CFLAGS)" \
-		CPPFLAGS="$(CPPFLAGS)" \
-		LDFLAGS="$(LDFLAGS)" \
-		CC="gcc" \
-		CXX="g++" \
-		../configure --prefix=/usr \
-			--disable-silent-rules \
-			--host=$(DEB_HOST_GNU_TYPE) \
-			--build=$(DEB_BUILD_GNU_TYPE) \
-			--with-gtk=$${version} \
-			--enable-gtk-doc \
-			--enable-introspection \
-			--enable-geolocation; \
-		cd ..; \
-	done
+ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
+	test -d build-2.0 || mkdir build-2.0
+	cd build-2.0; \
+	env -u AR_FLAGS \
+	CFLAGS="$(CFLAGS)" \
+	CXXFLAGS="$(CFLAGS)" \
+	CPPFLAGS="$(CPPFLAGS)" \
+	LDFLAGS="$(LDFLAGS)" \
+	CC="gcc" \
+	CXX="g++" \
+	../configure --prefix=/usr \
+		--disable-silent-rules \
+		--host=$(DEB_HOST_GNU_TYPE) \
+		--build=$(DEB_BUILD_GNU_TYPE) \
+		--with-gtk=2.0 \
+		--enable-gtk-doc \
+		--enable-introspection \
+		--enable-geolocation \
+		--disable-webkit2; \
+	cd ..
+endif
+
+ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
+	test -d build-3.0 || mkdir build-3.0
+	cd build-3.0; \
+	env -u AR_FLAGS \
+	CFLAGS="$(CFLAGS)" \
+	CXXFLAGS="$(CFLAGS)" \
+	CPPFLAGS="$(CPPFLAGS)" \
+	LDFLAGS="$(LDFLAGS)" \
+	CC="gcc" \
+	CXX="g++" \
+	../configure --prefix=/usr \
+		--disable-silent-rules \
+		--host=$(DEB_HOST_GNU_TYPE) \
+		--build=$(DEB_BUILD_GNU_TYPE) \
+		--with-gtk=3.0 \
+		--enable-gtk-doc \
+		--enable-introspection \
+		--enable-geolocation \
+		--enable-webkit2; \
+	cd ..
+endif
 
 	set -e; for version in $(GTK_VERSIONS); do \
 		$(MAKE) $(MAKEARGUMENTS) -C build-$${version}; \
