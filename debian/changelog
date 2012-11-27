@@ -1,3 +1,10 @@
+webkitgtk (1.10.1-1) UNRELEASED; urgency=low
+
+  * New stable release
+  - source package renamed following upstream
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 27 Nov 2012 14:29:13 -0200
+
 webkit (1.9.2-1) experimental; urgency=low
 
   * New development release
