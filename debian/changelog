@@ -6,6 +6,8 @@ webkitgtk (1.10.1-1) UNRELEASED; urgency=low
     Thibault <sthibault@debian.org>
   * Acknowledge NMU to change deb compression to xz, thanks to
     Ansgar Burchardt <ansgar@debian.org>
+  * Acknowledge NMU to use smaller debug format for ia64 as well,
+    thanks to Ansgar Burchardt <ansgar@debian.org>
 
  -- Gustavo Noronha Silva <kov@debian.org>  Tue, 27 Nov 2012 14:29:13 -0200
 
