@@ -12,6 +12,10 @@ webkitgtk (1.10.2-1) UNRELEASED; urgency=low
     thanks to Ansgar Burchardt <ansgar@debian.org>
   * debian/*.symbols:
   - updated
+  * debian/control:
+  - bump libsoup dependency to 2.40 accross the board,
+    following upstream's bump but using the first stable
+    release instead of the development one
   * debian/*webkit2*, debian/rules, debian/control:
   - new packages for the WebKit2GTK+ library
 
