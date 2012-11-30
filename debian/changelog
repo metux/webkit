@@ -12,8 +12,10 @@ webkitgtk (1.10.2-1) UNRELEASED; urgency=low
     thanks to Ansgar Burchardt <ansgar@debian.org>
   * debian/*.symbols:
   - updated
+  * debian/*webkit2*, debian/rules, debian/control:
+  - new packages for the WebKit2GTK+ library
 
- -- Gustavo Noronha Silva <kov@debian.org>  Tue, 27 Nov 2012 14:29:13 -0200
+ -- Gustavo Noronha Silva <kov@debian.org>  Fri, 30 Nov 2012 11:16:43 -0200
 
 webkit (1.9.2-1) experimental; urgency=low
 

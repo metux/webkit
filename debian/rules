@@ -145,6 +145,14 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html
 	install -m 644 build-3.0/Documentation/webkitgtk/html/* \
 		debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html/
+
+	[ ! -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec ] && install -d -m 755 debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec || true
+	build-3.0/libtool --mode=install install -m 755 build-3.0/Programs/MiniBrowser "$(CURDIR)"/debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
+	chrpath -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
+
+	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3-dev/html
+	install -m 644 build-3.0/Documentation/webkit2gtk/html/* \
+		debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3-dev/html/
 endif
 
 	touch $@
@@ -194,6 +202,10 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_install -plibwebkitgtk-3.0-dev --sourcedir=debian/tmp-3.0
 	dh_install -plibwebkitgtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
 	dh_install -pgir1.2-webkit-3.0 --sourcedir=debian/tmp-3.0
+	dh_install -plibwebkit2gtk-3.0-0 --sourcedir=debian/tmp-3.0
+	dh_install -plibwebkit2gtk-3-dev --sourcedir=debian/tmp-3.0
+	dh_install -plibwebkit2gtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
+	dh_install -pgir1.2-webkit2-3.0 --sourcedir=debian/tmp-3.0
 endif
 	dh_link -a
 ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
@@ -203,6 +215,7 @@ endif
 ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_strip -plibjavascriptcoregtk-3.0-0 --dbg-package=libjavascriptcoregtk-3.0-0-dbg
 	dh_strip -plibwebkitgtk-3.0-0 --dbg-package=libwebkitgtk-3.0-0-dbg
+	dh_strip -plibwebkit2gtk-3.0-0 --dbg-package=libwebkit2gtk-3.0-0-dbg
 endif
 	dh_compress -a
 	dh_fixperms -a
@@ -217,6 +230,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_makeshlibs -plibwebkitgtk-3.0-0 -V 'libwebkitgtk-3.0-0 (>= 1.3.9)' -- -c4
 	dh_girepository --package=gir1.2-javascriptcoregtk-3.0
 	dh_girepository --package=gir1.2-webkit-3.0
+	dh_girepository --package=gir1.2-webkit2-3.0
 endif
 	dh_installdeb -a
 	dh_shlibdeps -a
