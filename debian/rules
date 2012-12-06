@@ -9,11 +9,21 @@ DEB_BUILD_ARCH      ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
 DEB_HOST_ARCH_BITS  ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_BITS)
 
 GTK_VERSIONS = 2.0 3.0
+ENABLE_WEBKIT2 ?= no
 
 CFLAGS = $(shell dpkg-buildflags --get CFLAGS)
 CFLAGS += -Wall -Wl,--as-needed
 LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
 CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS)
+
+# This is used by the GTK+ 3.0 library only.
+EXTRA_CONFIGURE_ARGUMENTS =
+
+ifeq ($(ENABLE_WEBKIT2),yes)
+	EXTRA_CONFIGURE_ARGUMENTS = --enable-webkit2
+else
+	EXTRA_CONFIGURE_ARGUMENTS = --disable-webkit2
+endif
 
 # Sacrifice speed in order to make it more likely resource limits
 # won't be hit.
@@ -107,7 +117,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 		--enable-gtk-doc \
 		--enable-introspection \
 		--enable-geolocation \
-		--enable-webkit2; \
+		$(EXTRA_CONFIGURE_ARGUMENTS); \
 	cd ..
 endif
 
@@ -146,6 +156,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	install -m 644 build-3.0/Documentation/webkitgtk/html/* \
 		debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html/
 
+ifeq ($(ENABLE_WEBKIT2),yes)
 	[ ! -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec ] && install -d -m 755 debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec || true
 	build-3.0/libtool --mode=install install -m 755 build-3.0/Programs/MiniBrowser "$(CURDIR)"/debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
 	chrpath -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
@@ -153,6 +164,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3-dev/html
 	install -m 644 build-3.0/Documentation/webkit2gtk/html/* \
 		debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3-dev/html/
+endif
 endif
 
 	touch $@
@@ -168,6 +180,7 @@ ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 endif
 ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_install -plibwebkitgtk-3.0-common --sourcedir=debian/tmp-3.0
+endif
 endif
 	dh_link -i
 	dh_compress -i
@@ -202,10 +215,12 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_install -plibwebkitgtk-3.0-dev --sourcedir=debian/tmp-3.0
 	dh_install -plibwebkitgtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
 	dh_install -pgir1.2-webkit-3.0 --sourcedir=debian/tmp-3.0
+ifeq ($(ENABLE_WEBKIT2),yes)
 	dh_install -plibwebkit2gtk-3.0-0 --sourcedir=debian/tmp-3.0
 	dh_install -plibwebkit2gtk-3-dev --sourcedir=debian/tmp-3.0
 	dh_install -plibwebkit2gtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
 	dh_install -pgir1.2-webkit2-3.0 --sourcedir=debian/tmp-3.0
+endif
 endif
 	dh_link -a
 ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
@@ -215,7 +230,9 @@ endif
 ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_strip -plibjavascriptcoregtk-3.0-0 --dbg-package=libjavascriptcoregtk-3.0-0-dbg
 	dh_strip -plibwebkitgtk-3.0-0 --dbg-package=libwebkitgtk-3.0-0-dbg
+ifeq ($(ENABLE_WEBKIT2),yes)
 	dh_strip -plibwebkit2gtk-3.0-0 --dbg-package=libwebkit2gtk-3.0-0-dbg
+endif
 endif
 	dh_compress -a
 	dh_fixperms -a
@@ -230,7 +247,9 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_makeshlibs -plibwebkitgtk-3.0-0 -V 'libwebkitgtk-3.0-0 (>= 1.3.9)' -- -c4
 	dh_girepository --package=gir1.2-javascriptcoregtk-3.0
 	dh_girepository --package=gir1.2-webkit-3.0
+ifeq ($(ENABLE_WEBKIT2),yes)
 	dh_girepository --package=gir1.2-webkit2-3.0
+endif
 endif
 	dh_installdeb -a
 	dh_shlibdeps -a
