@@ -22,7 +22,7 @@ EXTRA_CONFIGURE_ARGUMENTS =
 ifeq ($(ENABLE_WEBKIT2),yes)
 	EXTRA_CONFIGURE_ARGUMENTS = --enable-webkit2
 else
-	EXTRA_CONFIGURE_ARGUMENTS = --disable-webkit2
+	EXTRA_CONFIGURE_ARGUMENTS = --disable-webkit2 --disable-plugin-process
 endif
 
 # Sacrifice speed in order to make it more likely resource limits
@@ -95,7 +95,7 @@ ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 		--enable-gtk-doc \
 		--enable-introspection \
 		--enable-geolocation \
-		--disable-webkit2; \
+		--disable-webkit2 --disable-plugin-process; \
 	cd ..
 endif
 
