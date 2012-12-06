@@ -1,4 +1,4 @@
-webkitgtk (1.10.2-1) UNRELEASED; urgency=low
+webkitgtk (1.10.2-1) experimental; urgency=low
 
   * New stable release
   - source package renamed following upstream
