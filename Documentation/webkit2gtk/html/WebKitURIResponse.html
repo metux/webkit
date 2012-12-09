@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitURIRequest.html" title="WebKitURIRequest">
 <link rel="next" href="WebKitWindowProperties.html" title="WebKitWindowProperties">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -44,7 +44,7 @@
 <pre class="synopsis">struct              <a class="link" href="WebKitURIResponse.html#WebKitURIResponse-struct" title="struct WebKitURIResponse">WebKitURIResponse</a>;
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-uri" title="webkit_uri_response_get_uri ()">webkit_uri_response_get_uri</a>         (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
 <a href="../glib/glib-Basic-Types.html#guint"><span class="returnvalue">guint</span></a>               <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-status-code" title="webkit_uri_response_get_status_code ()">webkit_uri_response_get_status_code</a> (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
-<a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-content-length" title="webkit_uri_response_get_content_length ()">webkit_uri_response_get_content_length</a>
+<span class="returnvalue">guint64</span>             <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-content-length" title="webkit_uri_response_get_content_length ()">webkit_uri_response_get_content_length</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-mime-type" title="webkit_uri_response_get_mime_type ()">webkit_uri_response_get_mime_type</a>   (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-https-status" title="webkit_uri_response_get_https_status ()">webkit_uri_response_get_https_status</a>
@@ -65,7 +65,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitURIResponse.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--content-length" title='The "content-length" property'>content-length</a>"           <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>               : Read
+  "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--content-length" title='The "content-length" property'>content-length</a>"           <span class="type">guint64</span>               : Read
   "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--mime-type" title='The "mime-type" property'>mime-type</a>"                <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--status-code" title='The "status-code" property'>status-code</a>"              <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a>                 : Read
   "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--suggested-filename" title='The "suggested-filename" property'>suggested-filename</a>"       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
@@ -111,8 +111,8 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint"><span class="returnvalue">guint</span></a>               webkit_uri_response_get_status_code (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);</pre>
 <p>
 Get the status code of the <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> as returned by
-the server. It will normally be a <a href="../libsoup-2.4/libsoup-2.4-soup-status.html#SoupKnownStatusCode"><span class="type">SoupKnownStatusCode</span></a>, for
-example <a href="../libsoup-2.4/libsoup-2.4-soup-status.html#SOUP-STATUS-OK:CAPS"><code class="literal">SOUP_STATUS_OK</code></a>, though the server can respond with any
+the server. It will normally be a <span class="type">SoupKnownStatusCode</span>, for
+example <code class="literal">SOUP_STATUS_OK</code>, though the server can respond with any
 unsigned integer.
 </p>
 <div class="variablelist"><table border="0">
@@ -134,7 +134,7 @@ unsigned integer.
 <hr>
 <div class="refsect2">
 <a name="webkit-uri-response-get-content-length"></a><h3>webkit_uri_response_get_content_length ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             webkit_uri_response_get_content_length
+<pre class="programlisting"><span class="returnvalue">guint64</span>             webkit_uri_response_get_content_length
                                                         (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);</pre>
 <p>
 Get the expected content length of the <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>. It can
@@ -246,7 +246,7 @@ the 'Content-Disposition' HTTP header is not present. <span class="annotation">[
 <a name="WebKitURIResponse.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitURIResponse--content-length"></a><h3>The <code class="literal">"content-length"</code> property</h3>
-<pre class="programlisting">  "content-length"           <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>               : Read</pre>
+<pre class="programlisting">  "content-length"           <span class="type">guint64</span>               : Read</pre>
 <p>
 The expected content length of the response.
 </p>
@@ -292,6 +292,6 @@ The URI for which the response was made.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>

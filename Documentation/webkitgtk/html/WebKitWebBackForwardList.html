@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebSettings.html" title="WebKitWebSettings">
 <link rel="next" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -107,16 +107,16 @@
 8
 9
 10</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Get the WebKitWebBackForwardList from the WebKitWebView </span><span class="comment">*/</span>
-WebKitWebBackForwardList *back_forward_list = webkit_web_view_get_back_forward_list (my_web_view);
-WebKitWebHistoryItem *item = webkit_web_back_forward_list_get_current_item (back_forward_list);
+        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Get the WebKitWebBackForwardList from the WebKitWebView */</span>
+WebKitWebBackForwardList <span class="gtkdoc opt">*</span>back_forward_list <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-back-forward-list">webkit_web_view_get_back_forward_list</a></span> <span class="gtkdoc opt">(</span>my_web_view<span class="gtkdoc opt">);</span>
+WebKitWebHistoryItem <span class="gtkdoc opt">*</span>item <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/WebKitWebBackForwardList.html#webkit-web-back-forward-list-get-current-item">webkit_web_back_forward_list_get_current_item</a></span> <span class="gtkdoc opt">(</span>back_forward_list<span class="gtkdoc opt">);</span>
 
-<span class="comment">/*</span><span class="comment"> Do something with a WebKitWebHistoryItem </span><span class="comment">*/</span>
-g_print(<span class="number">&quot;</span><span class="symbol">%p</span><span class="number">&quot;</span>, item);
+<span class="comment">/* Do something with a WebKitWebHistoryItem */</span>
+<span class="function"><a href="../glib/glib-Warnings-and-Assertions.html#g-print">g_print</a></span><span class="gtkdoc opt">(</span><span class="string">&quot;%p&quot;</span><span class="gtkdoc opt">,</span> item<span class="gtkdoc opt">);</span>
 
-<span class="comment">/*</span><span class="comment"> Control some parameters </span><span class="comment">*/</span>
-WebKitWebBackForwardList *back_forward_list = webkit_web_view_get_back_forward_list (my_web_view);
-webkit_web_back_forward_list_set_limit (back_forward_list, <span class="number">30</span>);</pre></td>
+<span class="comment">/* Control some parameters */</span>
+WebKitWebBackForwardList <span class="gtkdoc opt">*</span>back_forward_list <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-back-forward-list">webkit_web_view_get_back_forward_list</a></span> <span class="gtkdoc opt">(</span>my_web_view<span class="gtkdoc opt">);</span>
+<span class="function"><a href="../webkitgtk/WebKitWebBackForwardList.html#webkit-web-back-forward-list-set-limit">webkit_web_back_forward_list_set_limit</a></span> <span class="gtkdoc opt">(</span>back_forward_list<span class="gtkdoc opt">,</span> <span class="number">30</span><span class="gtkdoc opt">);</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -156,7 +156,7 @@ don't need to keep a reference once you've added it to the list.
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>history_item</code></em> :</span></p></td>
-<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> to add. <span class="annotation">[<acronym title="Override the parsed C type with given type."><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> to add. <span class="annotation">[<acronym title="Override the parsed C type with given type"><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -201,7 +201,7 @@ Checks if <em class="parameter"><code>web_history_item</code></em> is in the bac
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>history_item</code></em> :</span></p></td>
-<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> to check. <span class="annotation">[<acronym title="Override the parsed C type with given type."><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> to check. <span class="annotation">[<acronym title="Override the parsed C type with given type"><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 <tr>
@@ -230,7 +230,7 @@ Returns the item that precedes the current item
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> preceding the current item. <span class="annotation">[<acronym title="Override the parsed C type with given type."><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> preceding the current item. <span class="annotation">[<acronym title="Override the parsed C type with given type"><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -294,6 +294,9 @@ Returns a list of items that precede the current item, limited by <em class="par
 <pre class="programlisting"><a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="returnvalue">WebKitWebHistoryItem</span></a> * webkit_web_back_forward_list_get_current_item
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList"><span class="type">WebKitWebBackForwardList</span></a> *web_back_forward_list</code></em>);</pre>
 <p>
+Returns the current item.
+</p>
+<p>
 Returns a NULL value if the back forward list is empty
 </p>
 <div class="variablelist"><table border="0">
@@ -306,7 +309,7 @@ Returns a NULL value if the back forward list is empty
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a>. <span class="annotation">[<acronym title="Override the parsed C type with given type."><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>a <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a>. <span class="annotation">[<acronym title="Override the parsed C type with given type"><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -317,6 +320,9 @@ Returns a NULL value if the back forward list is empty
 <a name="webkit-web-back-forward-list-get-forward-item"></a><h3>webkit_web_back_forward_list_get_forward_item ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="returnvalue">WebKitWebHistoryItem</span></a> * webkit_web_back_forward_list_get_forward_item
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList"><span class="type">WebKitWebBackForwardList</span></a> *web_back_forward_list</code></em>);</pre>
+<p>
+Returns the item that succeeds the current item.
+</p>
 <p>
 Returns a NULL value if there nothing that succeeds the current item
 </p>
@@ -330,7 +336,7 @@ Returns a NULL value if there nothing that succeeds the current item
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a>. <span class="annotation">[<acronym title="Override the parsed C type with given type."><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>a <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a>. <span class="annotation">[<acronym title="Override the parsed C type with given type"><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -434,7 +440,7 @@ Returns the item at a given index relative to the current item.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> located at the specified index relative to the current item. <span class="annotation">[<acronym title="Override the parsed C type with given type."><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> located at the specified index relative to the current item. <span class="annotation">[<acronym title="Override the parsed C type with given type"><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -493,7 +499,7 @@ Go to the specified <em class="parameter"><code>web_history_item</code></em> in 
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>history_item</code></em> :</span></p></td>
-<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> to go to. <span class="annotation">[<acronym title="Override the parsed C type with given type."><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <a class="link" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem"><span class="type">WebKitWebHistoryItem</span></a> to go to. <span class="annotation">[<acronym title="Override the parsed C type with given type"><span class="acronym">type</span></acronym> WebKit.WebHistoryItem][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -562,6 +568,6 @@ added.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>

@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest">
 <link rel="next" href="WebKitWebInspector.html" title="WebKitWebInspector">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -43,7 +43,7 @@
 <a name="WebKitNetworkResponse.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">                    <a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse-struct" title="WebKitNetworkResponse">WebKitNetworkResponse</a>;
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-get-uri" title="webkit_network_response_get_uri ()">webkit_network_response_get_uri</a>     (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);
-<a href="../libsoup-2.4/SoupMessage.html"><span class="returnvalue">SoupMessage</span></a> *       <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-get-message" title="webkit_network_response_get_message ()">webkit_network_response_get_message</a> (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);
+<span class="returnvalue">SoupMessage</span> *       <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-get-message" title="webkit_network_response_get_message ()">webkit_network_response_get_message</a> (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);
 const <span class="returnvalue">char</span> *        <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-get-suggested-filename" title="webkit_network_response_get_suggested_filename ()">webkit_network_response_get_suggested_filename</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-set-uri" title="webkit_network_response_set_uri ()">webkit_network_response_set_uri</a>     (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>,
@@ -60,7 +60,7 @@ const <span class="returnvalue">char</span> *        <a class="link" href="WebKi
 <div class="refsect1">
 <a name="WebKitNetworkResponse.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse--message" title='The "message" property'>message</a>"                  <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>*          : Read / Write / Construct Only
+  "<a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse--message" title='The "message" property'>message</a>"                  <span class="type">SoupMessage</span>*          : Read / Write / Construct Only
   "<a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse--suggested-filename" title='The "suggested-filename" property'>suggested-filename</a>"       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse--uri" title='The "uri" property'>uri</a>"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
 </pre>
@@ -104,9 +104,9 @@ response.
 <hr>
 <div class="refsect2">
 <a name="webkit-network-response-get-message"></a><h3>webkit_network_response_get_message ()</h3>
-<pre class="programlisting"><a href="../libsoup-2.4/SoupMessage.html"><span class="returnvalue">SoupMessage</span></a> *       webkit_network_response_get_message (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);</pre>
+<pre class="programlisting"><span class="returnvalue">SoupMessage</span> *       webkit_network_response_get_message (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);</pre>
 <p>
-Obtains the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> that represents the given response. Notice
+Obtains the <span class="type">SoupMessage</span> that represents the given response. Notice
 that only the response side of the HTTP conversation is
 represented.
 </p>
@@ -120,7 +120,7 @@ represented.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the <span class="type">SoupMessage</span>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -162,7 +162,7 @@ header, but this is not always present, and this method will return
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
 <p>
 Sets the URI held and used by the given response. When the response
-has an associated <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>, its URI will also be set by this
+has an associated <span class="type">SoupMessage</span>, its URI will also be set by this
 call.
 </p>
 <div class="variablelist"><table border="0">
@@ -186,9 +186,9 @@ call.
 <a name="WebKitNetworkResponse.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitNetworkResponse--message"></a><h3>The <code class="literal">"message"</code> property</h3>
-<pre class="programlisting">  "message"                  <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>*          : Read / Write / Construct Only</pre>
+<pre class="programlisting">  "message"                  <span class="type">SoupMessage</span>*          : Read / Write / Construct Only</pre>
 <p>
-The <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> that backs the response.
+The <span class="type">SoupMessage</span> that backs the response.
 </p>
 <p class="since">Since 1.1.14</p>
 </div>
@@ -220,6 +220,6 @@ The URI to which the response will be made.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>
