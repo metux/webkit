@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWebContext.html" title="WebKitWebContext">
 <link rel="next" href="WebKitWebViewBase.html" title="WebKitWebViewBase">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -1412,53 +1412,53 @@ a string:
 45
 46
 47</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span>
-web_view_javascript_finished (GObject      *object,
-                              GAsyncResult *result,
-                              gpointer      user_data)
-{
-    WebKitJavascriptResult *js_result;
-    JSValueRef              value;
-    JSGlobalContextRef      context;
-    GError                 *error = <span class="number">NULL</span>;
+        <td class="listing_code"><pre class="programlisting"><span class="gtkdoc kwb">static void</span>
+<span class="function">web_view_javascript_finished</span> <span class="gtkdoc opt">(</span>GObject      <span class="gtkdoc opt">*</span>object<span class="gtkdoc opt">,</span>
+                              GAsyncResult <span class="gtkdoc opt">*</span>result<span class="gtkdoc opt">,</span>
+                              gpointer      user_data<span class="gtkdoc opt">)</span>
+<span class="gtkdoc opt">{</span>
+    WebKitJavascriptResult <span class="gtkdoc opt">*</span>js_result<span class="gtkdoc opt">;</span>
+    JSValueRef              value<span class="gtkdoc opt">;</span>
+    JSGlobalContextRef      context<span class="gtkdoc opt">;</span>
+    GError                 <span class="gtkdoc opt">*</span>error <span class="gtkdoc opt">=</span> NULL<span class="gtkdoc opt">;</span>
 
-    js_result = webkit_web_view_run_javascript_finish (WEBKIT_WEB_VIEW (object), result, &amp;error);
-    <span class="keyword">if</span> (!js_result) {
-        g_warning (<span class="number">&quot;Error running javascript: </span><span class="symbol">%s</span><span class="number">&quot;</span>, error-&gt;message);
-        g_error_free (error);
-        <span class="keyword">return</span>;
-    }
+    js_result <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-web-view-run-javascript-finish">webkit_web_view_run_javascript_finish</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span> <span class="gtkdoc opt">(</span>object<span class="gtkdoc opt">),</span> result<span class="gtkdoc opt">, &amp;</span>error<span class="gtkdoc opt">);</span>
+    <span class="keyword">if</span> <span class="gtkdoc opt">(!</span>js_result<span class="gtkdoc opt">) {</span>
+        <span class="function"><a href="../glib/glib-Message-Logging.html#g-warning">g_warning</a></span> <span class="gtkdoc opt">(</span><span class="string">&quot;Error running javascript: %s&quot;</span><span class="gtkdoc opt">,</span> error<span class="gtkdoc opt">-&gt;</span>message<span class="gtkdoc opt">);</span>
+        <span class="function"><a href="../glib/glib-Error-Reporting.html#g-error-free">g_error_free</a></span> <span class="gtkdoc opt">(</span>error<span class="gtkdoc opt">);</span>
+        <span class="keyword">return</span><span class="gtkdoc opt">;</span>
+    <span class="gtkdoc opt">}</span>
 
-    context = webkit_javascript_result_get_global_context (js_result);
-    value = webkit_javascript_result_get_value (js_result);
-    <span class="keyword">if</span> (JSValueIsString (context, value)) {
-        JSStringRef js_str_value;
-        gchar      *str_value;
-        gsize       str_length;
+    context <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-javascript-result-get-global-context">webkit_javascript_result_get_global_context</a></span> <span class="gtkdoc opt">(</span>js_result<span class="gtkdoc opt">);</span>
+    value <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-javascript-result-get-value">webkit_javascript_result_get_value</a></span> <span class="gtkdoc opt">(</span>js_result<span class="gtkdoc opt">);</span>
+    <span class="keyword">if</span> <span class="gtkdoc opt">(</span><span class="function">JSValueIsString</span> <span class="gtkdoc opt">(</span>context<span class="gtkdoc opt">,</span> value<span class="gtkdoc opt">)) {</span>
+        JSStringRef js_str_value<span class="gtkdoc opt">;</span>
+        gchar      <span class="gtkdoc opt">*</span>str_value<span class="gtkdoc opt">;</span>
+        gsize       str_length<span class="gtkdoc opt">;</span>
 
-        js_str_value = JSValueToStringCopy (context, value, <span class="number">NULL</span>);
-        str_length = JSStringGetMaximumUTF8CStringSize (js_str_value);
-        str_value = (gchar *)g_malloc (str_length);
-        JSStringGetUTF8CString (js_str_value, str_value, str_length);
-        JSStringRelease (js_str_value);
-        g_print (<span class="number">&quot;Script result: </span><span class="symbol">%s</span><span class="symbol">\n</span><span class="number">&quot;</span>, str_value);
-        g_free (str_value);
-    } <span class="keyword">else</span> {
-        g_warning (<span class="number">&quot;Error running javascript: unexpected return value&quot;</span>);
-    }
-    webkit_javascript_result_unref (js_result);
-}
+        js_str_value <span class="gtkdoc opt">=</span> <span class="function">JSValueToStringCopy</span> <span class="gtkdoc opt">(</span>context<span class="gtkdoc opt">,</span> value<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
+        str_length <span class="gtkdoc opt">=</span> <span class="function">JSStringGetMaximumUTF8CStringSize</span> <span class="gtkdoc opt">(</span>js_str_value<span class="gtkdoc opt">);</span>
+        str_value <span class="gtkdoc opt">= (</span>gchar <span class="gtkdoc opt">*)</span><span class="function"><a href="../glib/glib-Memory-Allocation.html#g-malloc">g_malloc</a></span> <span class="gtkdoc opt">(</span>str_length<span class="gtkdoc opt">);</span>
+        <span class="function">JSStringGetUTF8CString</span> <span class="gtkdoc opt">(</span>js_str_value<span class="gtkdoc opt">,</span> str_value<span class="gtkdoc opt">,</span> str_length<span class="gtkdoc opt">);</span>
+        <span class="function">JSStringRelease</span> <span class="gtkdoc opt">(</span>js_str_value<span class="gtkdoc opt">);</span>
+        <span class="function"><a href="../glib/glib-Warnings-and-Assertions.html#g-print">g_print</a></span> <span class="gtkdoc opt">(</span><span class="string">&quot;Script result: %s</span><span class="gtkdoc esc">\n</span><span class="string">&quot;</span><span class="gtkdoc opt">,</span> str_value<span class="gtkdoc opt">);</span>
+        <span class="function"><a href="../glib/glib-Memory-Allocation.html#g-free">g_free</a></span> <span class="gtkdoc opt">(</span>str_value<span class="gtkdoc opt">);</span>
+    <span class="gtkdoc opt">}</span> <span class="keyword">else</span> <span class="gtkdoc opt">{</span>
+        <span class="function"><a href="../glib/glib-Message-Logging.html#g-warning">g_warning</a></span> <span class="gtkdoc opt">(</span><span class="string">&quot;Error running javascript: unexpected return value&quot;</span><span class="gtkdoc opt">);</span>
+    <span class="gtkdoc opt">}</span>
+    <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-javascript-result-unref">webkit_javascript_result_unref</a></span> <span class="gtkdoc opt">(</span>js_result<span class="gtkdoc opt">);</span>
+<span class="gtkdoc opt">}</span>
 
-<span class="type">static</span> <span class="type">void</span>
-web_view_get_link_url (WebKitWebView *web_view,
-                       <span class="type">const</span> gchar   *link_id)
-{
-    gchar *script;
+<span class="gtkdoc kwb">static void</span>
+<span class="function">web_view_get_link_url</span> <span class="gtkdoc opt">(</span>WebKitWebView <span class="gtkdoc opt">*</span>web_view<span class="gtkdoc opt">,</span>
+                       <span class="gtkdoc kwb">const</span> gchar   <span class="gtkdoc opt">*</span>link_id<span class="gtkdoc opt">)</span>
+<span class="gtkdoc opt">{</span>
+    gchar <span class="gtkdoc opt">*</span>script<span class="gtkdoc opt">;</span>
 
-    script = g_strdup_printf (<span class="number">&quot;window.document.getElementById('</span><span class="symbol">%s</span><span class="number">').href;&quot;</span>, link_id);
-    webkit_web_view_run_javascript (web_view, script, <span class="number">NULL</span>, web_view_javascript_finished, <span class="number">NULL</span>);
-    g_free (script);
-}</pre></td>
+    script <span class="gtkdoc opt">=</span> <span class="function"><a href="../glib/glib-String-Utility-Functions.html#g-strdup-printf">g_strdup_printf</a></span> <span class="gtkdoc opt">(</span><span class="string">&quot;window.document.getElementById('%s').href;&quot;</span><span class="gtkdoc opt">,</span> link_id<span class="gtkdoc opt">);</span>
+    <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-web-view-run-javascript">webkit_web_view_run_javascript</a></span> <span class="gtkdoc opt">(</span>web_view<span class="gtkdoc opt">,</span> script<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">,</span> web_view_javascript_finished<span class="gtkdoc opt">,</span> NULL<span class="gtkdoc opt">);</span>
+    <span class="function"><a href="../glib/glib-Memory-Allocation.html#g-free">g_free</a></span> <span class="gtkdoc opt">(</span>script<span class="gtkdoc opt">);</span>
+<span class="gtkdoc opt">}</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -2100,7 +2100,7 @@ destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><spa
 <a name="WebKitWebView-context-menu"></a><h3>The <code class="literal">"context-menu"</code> signal</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>       *web_view,
                                                         <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a>   *context_menu,
-                                                        <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
+                                                        <a href="../gdk/gdk-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
                                                         <a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)            : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
@@ -2156,7 +2156,7 @@ during the signal emission.
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>event</code></em> :</span></p></td>
-<td>the <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</td>
+<td>the <a href="../gdk/gdk-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>hit_test_result</code></em> :</span></p></td>
@@ -2277,30 +2277,30 @@ specific type when making the decision. For example:
 22
 23
 24</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> gboolean
-decide_policy_cb (WebKitWebView *web_view,
-                  WebKitPolicyDecision *decision,
-                  WebKitPolicyDecisionType type)
-{
-    <span class="keyword">switch</span> (type) {
-    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION:
-        WebKitNavigationPolicyDecision *navigation_decision = WEBKIT_NAVIGATION_POLICY_DECISION (decision);
-        <span class="comment">/*</span><span class="comment"> Make a policy decision here. </span><span class="comment">*/</span>
-        <span class="keyword">break</span>;
-    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION:
-        WebKitNavigationPolicyDecision *navigation_decision = WEBKIT_NAVIGATION_POLICY_DECISION (decision);
-        <span class="comment">/*</span><span class="comment"> Make a policy decision here. </span><span class="comment">*/</span>
-        <span class="keyword">break</span>;
-    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_RESPONSE:
-        WebKitResponsePolicyDecision *response = WEBKIT_RESPONSE_POLICY_DECISION (decision);
-        <span class="comment">/*</span><span class="comment"> Make a policy decision here. </span><span class="comment">*/</span>
-        <span class="keyword">break</span>;
-    <span class="keyword">default</span>:
-        <span class="comment">/*</span><span class="comment"> Making no decision results in webkit_policy_decision_use(). </span><span class="comment">*/</span>
-        <span class="keyword">return</span> FALSE;
-    }
-    <span class="keyword">return</span> TRUE;
-}</pre></td>
+        <td class="listing_code"><pre class="programlisting"><span class="gtkdoc kwb">static</span> gboolean
+<span class="function">decide_policy_cb</span> <span class="gtkdoc opt">(</span>WebKitWebView <span class="gtkdoc opt">*</span>web_view<span class="gtkdoc opt">,</span>
+                  WebKitPolicyDecision <span class="gtkdoc opt">*</span>decision<span class="gtkdoc opt">,</span>
+                  WebKitPolicyDecisionType type<span class="gtkdoc opt">)</span>
+<span class="gtkdoc opt">{</span>
+    <span class="keyword">switch</span> <span class="gtkdoc opt">(</span>type<span class="gtkdoc opt">) {</span>
+    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION<span class="gtkdoc opt">:</span>
+        WebKitNavigationPolicyDecision <span class="gtkdoc opt">*</span>navigation_decision <span class="gtkdoc opt">=</span> <span class="function">WEBKIT_NAVIGATION_POLICY_DECISION</span> <span class="gtkdoc opt">(</span>decision<span class="gtkdoc opt">);</span>
+        <span class="comment">/* Make a policy decision here. */</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION<span class="gtkdoc opt">:</span>
+        WebKitNavigationPolicyDecision <span class="gtkdoc opt">*</span>navigation_decision <span class="gtkdoc opt">=</span> <span class="function">WEBKIT_NAVIGATION_POLICY_DECISION</span> <span class="gtkdoc opt">(</span>decision<span class="gtkdoc opt">);</span>
+        <span class="comment">/* Make a policy decision here. */</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="keyword">case</span> WEBKIT_POLICY_DECISION_TYPE_RESPONSE<span class="gtkdoc opt">:</span>
+        WebKitResponsePolicyDecision <span class="gtkdoc opt">*</span>response <span class="gtkdoc opt">=</span> <span class="function">WEBKIT_RESPONSE_POLICY_DECISION</span> <span class="gtkdoc opt">(</span>decision<span class="gtkdoc opt">);</span>
+        <span class="comment">/* Make a policy decision here. */</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="keyword">default</span><span class="gtkdoc opt">:</span>
+        <span class="comment">/* Making no decision results in webkit_policy_decision_use(). */</span>
+        <span class="keyword">return</span> FALSE<span class="gtkdoc opt">;</span>
+    <span class="gtkdoc opt">}</span>
+    <span class="keyword">return</span> TRUE<span class="gtkdoc opt">;</span>
+<span class="gtkdoc opt">}</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -2468,32 +2468,32 @@ load operation.
 24
 25
 26</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span> web_view_load_changed (WebKitWebView  *web_view,
-                                   WebKitLoadEvent load_event,
-                                   gpointer        user_data)
-{
-    <span class="keyword">switch</span> (load_event) {
-    <span class="keyword">case</span> WEBKIT_LOAD_STARTED:
-        <span class="comment">/*</span><span class="comment"> New load, we have now a provisional URI </span><span class="comment">*/</span>
-        provisional_uri = webkit_web_view_get_uri (web_view);
-        <span class="comment">/*</span><span class="comment"> Here we could start a spinner or update the</span>
-<span class="comment">         * location bar with the provisional URI </span><span class="comment">*/</span>
-        <span class="keyword">break</span>;
-    <span class="keyword">case</span> WEBKIT_LOAD_REDIRECTED:
-        redirected_uri = webkit_web_view_get_uri (web_view);
-        <span class="keyword">break</span>;
-    <span class="keyword">case</span> WEBKIT_LOAD_COMMITTED:
-        <span class="comment">/*</span><span class="comment"> The load is being performed. Current URI is</span>
+        <td class="listing_code"><pre class="programlisting"><span class="gtkdoc kwb">static void</span> <span class="function">web_view_load_changed</span> <span class="gtkdoc opt">(</span>WebKitWebView  <span class="gtkdoc opt">*</span>web_view<span class="gtkdoc opt">,</span>
+                                   WebKitLoadEvent load_event<span class="gtkdoc opt">,</span>
+                                   gpointer        user_data<span class="gtkdoc opt">)</span>
+<span class="gtkdoc opt">{</span>
+    <span class="keyword">switch</span> <span class="gtkdoc opt">(</span>load_event<span class="gtkdoc opt">) {</span>
+    <span class="keyword">case</span> WEBKIT_LOAD_STARTED<span class="gtkdoc opt">:</span>
+        <span class="comment">/* New load, we have now a provisional URI */</span>
+        provisional_uri <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-web-view-get-uri">webkit_web_view_get_uri</a></span> <span class="gtkdoc opt">(</span>web_view<span class="gtkdoc opt">);</span>
+        <span class="comment">/* Here we could start a spinner or update the</span>
+<span class="comment">         * location bar with the provisional URI */</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="keyword">case</span> WEBKIT_LOAD_REDIRECTED<span class="gtkdoc opt">:</span>
+        redirected_uri <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-web-view-get-uri">webkit_web_view_get_uri</a></span> <span class="gtkdoc opt">(</span>web_view<span class="gtkdoc opt">);</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="keyword">case</span> WEBKIT_LOAD_COMMITTED<span class="gtkdoc opt">:</span>
+        <span class="comment">/* The load is being performed. Current URI is</span>
 <span class="comment">         * the final one and it won't change unless a new</span>
 <span class="comment">         * load is requested or a navigation within the</span>
-<span class="comment">         * same page is performed </span><span class="comment">*/</span>
-        uri = webkit_web_view_get_uri (web_view);
-        <span class="keyword">break</span>;
-    <span class="keyword">case</span> WEBKIT_LOAD_FINISHED:
-        <span class="comment">/*</span><span class="comment"> Load finished, we can now stop the spinner </span><span class="comment">*/</span>
-        <span class="keyword">break</span>;
-    }
-}</pre></td>
+<span class="comment">         * same page is performed */</span>
+        uri <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkit2gtk/WebKitWebView.html#webkit-web-view-get-uri">webkit_web_view_get_uri</a></span> <span class="gtkdoc opt">(</span>web_view<span class="gtkdoc opt">);</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="keyword">case</span> WEBKIT_LOAD_FINISHED<span class="gtkdoc opt">:</span>
+        <span class="comment">/* Load finished, we can now stop the spinner */</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="gtkdoc opt">}</span>
+<span class="gtkdoc opt">}</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -2586,7 +2586,7 @@ element such as a link, image or a media element. To determine
 what type of element the mouse cursor is over, a Hit Test is performed
 on the current mouse coordinates and the result is passed in the
 <em class="parameter"><code>hit_test_result</code></em> argument. The <em class="parameter"><code>modifiers</code></em> argument is a bitmask of
-<a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
+<a href="../gdk/gdk-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
 The signal is emitted again when the mouse is moved out of the
 current element with a new <em class="parameter"><code>hit_test_result</code></em>.
 </p>
@@ -2604,7 +2604,7 @@ current element with a new <em class="parameter"><code>hit_test_result</code></e
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>modifiers</code></em> :</span></p></td>
-<td>a bitmask of <a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a>
+<td>a bitmask of <a href="../gdk/gdk-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a>
 </td>
 </tr>
 <tr>
@@ -2659,29 +2659,29 @@ allowing the user decide what to do with the request:
 21
 22
 23</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> gboolean permission_request_cb (WebKitWebView *web_view,
-                                       WebKitPermissionRequest *request,
-                                       GtkWindow *parent_window)
-{
-    GtkWidget *dialog = gtk_message_dialog_new (parent_window,
-                                                GTK_DIALOG_MODAL,
-                                                GTK_MESSAGE_QUESTION,
-                                                GTK_BUTTONS_YES_NO,
-                                                <span class="number">&quot;Allow Permission Request?&quot;</span>);
-    gtk_widget_show (dialog);
-    gint result = gtk_dialog_run (GTK_DIALOG (dialog));
-    <span class="keyword">switch</span> (result) {
-    <span class="keyword">case</span> GTK_RESPONSE_YES:
-        webkit_permission_request_allow (request);
-        <span class="keyword">break</span>;
-    <span class="keyword">default</span>:
-        webkit_permission_request_deny (request);
-        <span class="keyword">break</span>;
-    }
-    gtk_widget_destroy (dialog);
+        <td class="listing_code"><pre class="programlisting"><span class="gtkdoc kwb">static</span> gboolean <span class="function">permission_request_cb</span> <span class="gtkdoc opt">(</span>WebKitWebView <span class="gtkdoc opt">*</span>web_view<span class="gtkdoc opt">,</span>
+                                       WebKitPermissionRequest <span class="gtkdoc opt">*</span>request<span class="gtkdoc opt">,</span>
+                                       GtkWindow <span class="gtkdoc opt">*</span>parent_window<span class="gtkdoc opt">)</span>
+<span class="gtkdoc opt">{</span>
+    GtkWidget <span class="gtkdoc opt">*</span>dialog <span class="gtkdoc opt">=</span> <span class="function"><a href="../gtk3/GtkMessageDialog.html#gtk-message-dialog-new">gtk_message_dialog_new</a></span> <span class="gtkdoc opt">(</span>parent_window<span class="gtkdoc opt">,</span>
+                                                GTK_DIALOG_MODAL<span class="gtkdoc opt">,</span>
+                                                GTK_MESSAGE_QUESTION<span class="gtkdoc opt">,</span>
+                                                GTK_BUTTONS_YES_NO<span class="gtkdoc opt">,</span>
+                                                <span class="string">&quot;Allow Permission Request?&quot;</span><span class="gtkdoc opt">);</span>
+    <span class="function"><a href="../gtk3/GtkWidget.html#gtk-widget-show">gtk_widget_show</a></span> <span class="gtkdoc opt">(</span>dialog<span class="gtkdoc opt">);</span>
+    gint result <span class="gtkdoc opt">=</span> <span class="function"><a href="../gtk3/GtkDialog.html#gtk-dialog-run">gtk_dialog_run</a></span> <span class="gtkdoc opt">(</span><span class="function">GTK_DIALOG</span> <span class="gtkdoc opt">(</span>dialog<span class="gtkdoc opt">));</span>
+    <span class="keyword">switch</span> <span class="gtkdoc opt">(</span>result<span class="gtkdoc opt">) {</span>
+    <span class="keyword">case</span> GTK_RESPONSE_YES<span class="gtkdoc opt">:</span>
+        <span class="function"><a href="../webkit2gtk/WebKitPermissionRequest.html#webkit-permission-request-allow">webkit_permission_request_allow</a></span> <span class="gtkdoc opt">(</span>request<span class="gtkdoc opt">);</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="keyword">default</span><span class="gtkdoc opt">:</span>
+        <span class="function"><a href="../webkit2gtk/WebKitPermissionRequest.html#webkit-permission-request-deny">webkit_permission_request_deny</a></span> <span class="gtkdoc opt">(</span>request<span class="gtkdoc opt">);</span>
+        <span class="keyword">break</span><span class="gtkdoc opt">;</span>
+    <span class="gtkdoc opt">}</span>
+    <span class="function"><a href="../gtk3/GtkWidget.html#gtk-widget-destroy">gtk_widget_destroy</a></span> <span class="gtkdoc opt">(</span>dialog<span class="gtkdoc opt">);</span>
 
-    <span class="keyword">return</span> TRUE;
-}</pre></td>
+    <span class="keyword">return</span> TRUE<span class="gtkdoc opt">;</span>
+<span class="gtkdoc opt">}</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -3000,6 +3000,6 @@ form has not been submitted, <a class="link" href="WebKitFormSubmissionRequest.h
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.18</div>
 </body>
 </html>
