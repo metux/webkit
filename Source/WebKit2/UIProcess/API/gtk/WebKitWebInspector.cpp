@@ -29,6 +29,35 @@
 
 using namespace WebKit;
 
+/**
+ * SECTION: WebKitWebInspector
+ * @Short_description: Access to the WebKit inspector
+ * @Title: WebKitWebInspector
+ *
+ * The WebKit Inspector is a graphical tool to inspect and change the
+ * content of a #WebKitWebView. It also includes an interactive
+ * JavaScript debugger. Using this class one can get a #GtkWidget
+ * which can be embedded into an application to show the inspector.
+ *
+ * The inspector is available when the #WebKitSettings of the
+ * #WebKitWebView has set the #WebKitSettings:enable-developer-extras
+ * to true, otherwise no inspector is available.
+ *
+ * <informalexample><programlisting>
+ * /<!-- -->* Enable the developer extras *<!-- -->/
+ * WebKitSettings *setting = webkit_web_view_get_settings (WEBKIT_WEB_VIEW(my_webview));
+ * g_object_set (G_OBJECT(settings), "enable-developer-extras", TRUE, NULL);
+ *
+ * /<!-- -->* Load some data or reload to be able to inspect the page*<!-- -->/
+ * webkit_web_load_uri (WEBKIT_WEB_VIEW(my_webview), "http://www.gnome.org");
+ *
+ * /<!-- -->* Show the inspector *<!-- -->/
+ * WebKitWebInspector *inspector = webkit_web_view_get_inspector (WEBKIT_WEB_VIEW(my_webview));
+ * webkit_web_inspector_show (WEBKIT_WEB_INSPECTOR(inspector));
+ * </programlisting></informalexample>
+ *
+ */
+
 enum {
     OPEN_WINDOW,
     BRING_TO_FRONT,
@@ -47,14 +76,19 @@ enum {
 };
 
 struct _WebKitWebInspectorPrivate {
-    WKRetainPtr<WKInspectorRef> wkInspector;
+    ~_WebKitWebInspectorPrivate()
+    {
+        WKInspectorSetInspectorClientGtk(toAPI(webInspector.get()), 0);
+    }
+
+    RefPtr<WebInspectorProxy> webInspector;
     CString inspectedURI;
     unsigned attachedHeight;
 };
 
-static guint signals[LAST_SIGNAL] = { 0, };
+WEBKIT_DEFINE_TYPE(WebKitWebInspector, webkit_web_inspector, G_TYPE_OBJECT)
 
-G_DEFINE_TYPE(WebKitWebInspector, webkit_web_inspector, G_TYPE_OBJECT)
+static guint signals[LAST_SIGNAL] = { 0, };
 
 static void webkitWebInspectorGetProperty(GObject* object, guint propId, GValue* value, GParamSpec* paramSpec)
 {
@@ -72,28 +106,10 @@ static void webkitWebInspectorGetProperty(GObject* object, guint propId, GValue*
     }
 }
 
-static void webkitWebInspectorFinalize(GObject* object)
-{
-    WebKitWebInspectorPrivate* priv = WEBKIT_WEB_INSPECTOR(object)->priv;
-    WKInspectorSetInspectorClientGtk(priv->wkInspector.get(), 0);
-    priv->~WebKitWebInspectorPrivate();
-    G_OBJECT_CLASS(webkit_web_inspector_parent_class)->finalize(object);
-}
-
-static void webkit_web_inspector_init(WebKitWebInspector* inspector)
-{
-    WebKitWebInspectorPrivate* priv = G_TYPE_INSTANCE_GET_PRIVATE(inspector, WEBKIT_TYPE_WEB_INSPECTOR, WebKitWebInspectorPrivate);
-    inspector->priv = priv;
-    new (priv) WebKitWebInspectorPrivate();
-}
-
 static void webkit_web_inspector_class_init(WebKitWebInspectorClass* findClass)
 {
     GObjectClass* gObjectClass = G_OBJECT_CLASS(findClass);
-    gObjectClass->finalize = webkitWebInspectorFinalize;
     gObjectClass->get_property = webkitWebInspectorGetProperty;
-
-    g_type_class_add_private(findClass, sizeof(WebKitWebInspectorPrivate));
 
     /**
      * WebKitWebInspector:inspected-uri:
@@ -295,10 +311,10 @@ static void didChangeAttachedHeight(WKInspectorRef, unsigned height, const void*
     g_object_notify(G_OBJECT(inspector), "attached-height");
 }
 
-WebKitWebInspector* webkitWebInspectorCreate(WKInspectorRef wkInspector)
+WebKitWebInspector* webkitWebInspectorCreate(WebInspectorProxy* webInspector)
 {
     WebKitWebInspector* inspector = WEBKIT_WEB_INSPECTOR(g_object_new(WEBKIT_TYPE_WEB_INSPECTOR, NULL));
-    inspector->priv->wkInspector = wkInspector;
+    inspector->priv->webInspector = webInspector;
 
     WKInspectorClientGtk wkInspectorClientGtk = {
         kWKInspectorClientGtkCurrentVersion,
@@ -311,7 +327,7 @@ WebKitWebInspector* webkitWebInspectorCreate(WKInspectorRef wkInspector)
         detach,
         didChangeAttachedHeight
     };
-    WKInspectorSetInspectorClientGtk(wkInspector, &wkInspectorClientGtk);
+    WKInspectorSetInspectorClientGtk(toAPI(webInspector), &wkInspectorClientGtk);
 
     return inspector;
 }
@@ -330,7 +346,7 @@ WebKitWebViewBase* webkit_web_inspector_get_web_view(WebKitWebInspector* inspect
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_INSPECTOR(inspector), 0);
 
-    return WEBKIT_WEB_VIEW_BASE(toImpl(inspector->priv->wkInspector.get())->inspectorView());
+    return WEBKIT_WEB_VIEW_BASE(inspector->priv->webInspector->inspectorView());
 }
 
 /**
@@ -364,7 +380,7 @@ gboolean webkit_web_inspector_is_attached(WebKitWebInspector* inspector)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_INSPECTOR(inspector), FALSE);
 
-    return WKInspectorIsAttached(inspector->priv->wkInspector.get());
+    return inspector->priv->webInspector->isAttached();
 }
 
 /**
@@ -378,9 +394,9 @@ void webkit_web_inspector_attach(WebKitWebInspector* inspector)
 {
     g_return_if_fail(WEBKIT_IS_WEB_INSPECTOR(inspector));
 
-    if (WKInspectorIsAttached(inspector->priv->wkInspector.get()))
+    if (inspector->priv->webInspector->isAttached())
         return;
-    WKInspectorAttach(inspector->priv->wkInspector.get());
+    inspector->priv->webInspector->attach();
 }
 
 /**
@@ -394,9 +410,9 @@ void webkit_web_inspector_detach(WebKitWebInspector* inspector)
 {
     g_return_if_fail(WEBKIT_IS_WEB_INSPECTOR(inspector));
 
-    if (!WKInspectorIsAttached(inspector->priv->wkInspector.get()))
+    if (!inspector->priv->webInspector->isAttached())
         return;
-    WKInspectorDetach(inspector->priv->wkInspector.get());
+    inspector->priv->webInspector->detach();
 }
 
 /**
@@ -409,7 +425,7 @@ void webkit_web_inspector_show(WebKitWebInspector* inspector)
 {
     g_return_if_fail(WEBKIT_IS_WEB_INSPECTOR(inspector));
 
-    WKInspectorShow(inspector->priv->wkInspector.get());
+    inspector->priv->webInspector->show();
 }
 
 /**
@@ -422,7 +438,7 @@ void webkit_web_inspector_close(WebKitWebInspector* inspector)
 {
     g_return_if_fail(WEBKIT_IS_WEB_INSPECTOR(inspector));
 
-    WKInspectorClose(inspector->priv->wkInspector.get());
+    inspector->priv->webInspector->close();
 }
 
 /**
@@ -439,7 +455,7 @@ guint webkit_web_inspector_get_attached_height(WebKitWebInspector* inspector)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_INSPECTOR(inspector), 0);
 
-    if (!WKInspectorIsAttached(inspector->priv->wkInspector.get()))
+    if (!inspector->priv->webInspector->isAttached())
         return 0;
     return inspector->priv->attachedHeight;
 }

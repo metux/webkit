@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Samsung Electronics. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,7 +46,9 @@
 #include "Storage.h"
 #include "StorageArea.h"
 #include "VoidCallback.h"
+#include "WebCoreMemoryInstrumentation.h"
 
+#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -54,7 +57,21 @@ namespace DOMStorageAgentState {
 static const char domStorageAgentEnabled[] = "domStorageAgentEnabled";
 };
 
-InspectorDOMStorageAgent::InspectorDOMStorageAgent(InstrumentingAgents* instrumentingAgents, InspectorState* state)
+static bool hadException(ExceptionCode ec, ErrorString* errorString)
+{
+    switch (ec) {
+    case 0:
+        return false;
+    case SECURITY_ERR:
+        *errorString = "Security error";
+        return true;
+    default:
+        *errorString = "Unknown DOM storage error";
+        return true;
+    }
+}
+
+InspectorDOMStorageAgent::InspectorDOMStorageAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
     : InspectorBaseAgent<InspectorDOMStorageAgent>("DOMStorage", instrumentingAgents, state)
     , m_frontend(0)
     , m_enabled(false)
@@ -77,7 +94,7 @@ void InspectorDOMStorageAgent::clearFrontend()
 {
     DOMStorageResourcesMap::iterator domStorageEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != domStorageEnd; ++it)
-        it->second->unbind();
+        it->value->unbind();
     m_frontend = 0;
     disable(0);
 }
@@ -96,7 +113,7 @@ void InspectorDOMStorageAgent::enable(ErrorString*)
 
     DOMStorageResourcesMap::iterator resourcesEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != resourcesEnd; ++it)
-        it->second->bind(m_frontend);
+        it->value->bind(m_frontend);
 }
 
 void InspectorDOMStorageAgent::disable(ErrorString*)
@@ -107,27 +124,36 @@ void InspectorDOMStorageAgent::disable(ErrorString*)
     m_state->setBoolean(DOMStorageAgentState::domStorageAgentEnabled, m_enabled);
 }
 
-void InspectorDOMStorageAgent::getDOMStorageEntries(ErrorString*, const String& storageId, RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > >& entries)
+void InspectorDOMStorageAgent::getDOMStorageEntries(ErrorString* errorString, const String& storageId, RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > >& entries)
 {
-    // FIXME: consider initializing this array after 2 checks below. The checks should return error messages in this case.
-    entries = TypeBuilder::Array<TypeBuilder::Array<String> >::create();
-
     InspectorDOMStorageResource* storageResource = getDOMStorageResourceForId(storageId);
-    if (!storageResource)
+    if (!storageResource) {
+        *errorString = "Storage resource not found for the given storage identifier";
         return;
+    }
     Frame* frame = storageResource->frame();
-    if (!frame)
+    if (!frame) {
+        *errorString = "Frame not found";
         return;
-        
+    }
+
+    RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > > storageEntries = TypeBuilder::Array<TypeBuilder::Array<String> >::create();
+
+    ExceptionCode ec = 0;
     StorageArea* storageArea = storageResource->storageArea();
-    for (unsigned i = 0; i < storageArea->length(frame); ++i) {
-        String name(storageArea->key(i, frame));
-        String value(storageArea->getItem(name, frame));
+    for (unsigned i = 0; i < storageArea->length(ec, frame); ++i) {
+        String name(storageArea->key(i, ec, frame));
+        if (hadException(ec, errorString))
+            return;
+        String value(storageArea->getItem(name, ec, frame));
+        if (hadException(ec, errorString))
+            return;
         RefPtr<TypeBuilder::Array<String> > entry = TypeBuilder::Array<String>::create();
         entry->addItem(name);
         entry->addItem(value);
-        entries->addItem(entry);
+        storageEntries->addItem(entry);
     }
+    entries = storageEntries.release();
 }
 
 void InspectorDOMStorageAgent::setDOMStorageItem(ErrorString*, const String& storageId, const String& key, const String& value, bool* success)
@@ -145,8 +171,9 @@ void InspectorDOMStorageAgent::removeDOMStorageItem(ErrorString*, const String& 
 {
     InspectorDOMStorageResource* storageResource = getDOMStorageResourceForId(storageId);
     if (storageResource) {
-        storageResource->storageArea()->removeItem(key, storageResource->frame());
-        *success = true;
+        ExceptionCode exception = 0;
+        storageResource->storageArea()->removeItem(key, exception, storageResource->frame());
+        *success = !exception;
     } else
         *success = false;
 }
@@ -165,8 +192,8 @@ String InspectorDOMStorageAgent::storageId(SecurityOrigin* securityOrigin, bool 
     ASSERT(securityOrigin);
     DOMStorageResourcesMap::iterator domStorageEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != domStorageEnd; ++it) {
-        if (it->second->isSameOriginAndType(securityOrigin, isLocalStorage))
-            return it->first;
+        if (it->value->isSameOriginAndType(securityOrigin, isLocalStorage))
+            return it->key;
     }
     return String();
 }
@@ -176,14 +203,14 @@ InspectorDOMStorageResource* InspectorDOMStorageAgent::getDOMStorageResourceForI
     DOMStorageResourcesMap::iterator it = m_resources.find(storageId);
     if (it == m_resources.end())
         return 0;
-    return it->second.get();
+    return it->value.get();
 }
 
 void InspectorDOMStorageAgent::didUseDOMStorage(StorageArea* storageArea, bool isLocalStorage, Frame* frame)
 {
     DOMStorageResourcesMap::iterator domStorageEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != domStorageEnd; ++it) {
-        if (it->second->isSameOriginAndType(frame->document()->securityOrigin(), isLocalStorage))
+        if (it->value->isSameOriginAndType(frame->document()->securityOrigin(), isLocalStorage))
             return;
     }
 
@@ -196,7 +223,7 @@ void InspectorDOMStorageAgent::didUseDOMStorage(StorageArea* storageArea, bool i
         resource->bind(m_frontend);
 }
 
-void InspectorDOMStorageAgent::didDispatchDOMStorageEvent(const String&, const String&, const String&, StorageType storageType, SecurityOrigin* securityOrigin, Page*)
+void InspectorDOMStorageAgent::didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType storageType, SecurityOrigin* securityOrigin, Page*)
 {
     if (!m_frontend || !m_enabled)
         return;
@@ -206,7 +233,14 @@ void InspectorDOMStorageAgent::didDispatchDOMStorageEvent(const String&, const S
     if (id.isEmpty())
         return;
 
-    m_frontend->domstorage()->domStorageUpdated(id);
+    if (key.isNull())
+        m_frontend->domstorage()->domStorageItemsCleared(id);
+    else if (newValue.isNull())
+        m_frontend->domstorage()->domStorageItemRemoved(id, key);
+    else if (oldValue.isNull())
+        m_frontend->domstorage()->domStorageItemAdded(id, key, newValue);
+    else
+        m_frontend->domstorage()->domStorageItemUpdated(id, key, oldValue, newValue);
 }
 
 void InspectorDOMStorageAgent::clearResources()
@@ -214,14 +248,13 @@ void InspectorDOMStorageAgent::clearResources()
     m_resources.clear();
 }
 
-size_t InspectorDOMStorageAgent::memoryBytesUsedByStorageCache() const
+void InspectorDOMStorageAgent::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    size_t size = 0;
-    for (DOMStorageResourcesMap::const_iterator it = m_resources.begin(); it != m_resources.end(); ++it)
-        size += it->second->storageArea()->memoryBytesUsedByCache();
-    return size;
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorDOMStorageAgent);
+    InspectorBaseAgent<InspectorDOMStorageAgent>::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_resources, "resources");
+    info.addWeakPointer(m_frontend);
 }
-
 
 } // namespace WebCore
 

@@ -62,8 +62,10 @@
 #include "ScriptValue.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
+#include "WheelEvent.h"
 #include "npruntime_impl.h"
 #include <wtf/ASCIICType.h>
+#include <wtf/text/WTFString.h>
 
 #if OS(WINDOWS) && ENABLE(NETSCAPE_PLUGIN_API)
 #include "PluginMessageThrottlerWin.h"
@@ -74,14 +76,13 @@
 #include "JSDOMWindow.h"
 #include "c_instance.h"
 #include "runtime_root.h"
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSLock.h>
-#include <runtime/JSValue.h>
 
 using JSC::ExecState;
 using JSC::JSLock;
 using JSC::JSObject;
 using JSC::JSValue;
-using JSC::UString;
 #endif
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -169,6 +170,10 @@ void PluginView::handleEvent(Event* event)
         handleMouseEvent(static_cast<MouseEvent*>(event));
     else if (event->isKeyboardEvent())
         handleKeyboardEvent(static_cast<KeyboardEvent*>(event));
+#if defined(XP_MACOSX)
+    else if (event->type() == eventNames().mousewheelEvent)
+        handleWheelEvent(static_cast<WheelEvent*>(event));
+#endif
     else if (event->type() == eventNames().contextmenuEvent)
         event->setDefaultHandled(); // We don't know if the plug-in has handled mousedown event by displaying a context menu, so we never want WebKit to show a default one.
 #if defined(XP_UNIX) && ENABLE(NETSCAPE_PLUGIN_API)
@@ -440,7 +445,10 @@ void PluginView::performRequest(PluginRequest* request)
             // PluginView, so we protect it. <rdar://problem/6991251>
             RefPtr<PluginView> protect(this);
 
-            m_parentFrame->loader()->load(request->frameLoadRequest().resourceRequest(), targetFrameName, false);
+            FrameLoadRequest frameRequest(m_parentFrame.get(), request->frameLoadRequest().resourceRequest());
+            frameRequest.setFrameName(targetFrameName);
+            frameRequest.setShouldCheckNewWindowPolicy(true);
+            m_parentFrame->loader()->load(frameRequest);
 
             // FIXME: <rdar://problem/4807469> This should be sent when the document has finished loading
             if (request->sendNotification()) {
@@ -485,7 +493,7 @@ void PluginView::performRequest(PluginRequest* request)
 
 void PluginView::requestTimerFired(Timer<PluginView>* timer)
 {
-    ASSERT(timer == &m_requestTimer);
+    ASSERT_UNUSED(timer, timer == &m_requestTimer);
     ASSERT(m_requests.size() > 0);
     ASSERT(!m_isJavaScriptPaused);
 
@@ -548,8 +556,8 @@ static KURL makeURL(const KURL& baseURL, const char* relativeURLString)
     String urlString = relativeURLString;
 
     // Strip return characters.
-    urlString.replace('\n', "");
-    urlString.replace('\r', "");
+    urlString.replaceWithLiteral('\n', "");
+    urlString.replaceWithLiteral('\r', "");
 
     return KURL(baseURL, urlString);
 }
@@ -587,14 +595,14 @@ NPError PluginView::postURL(const char* url, const char* target, uint32_t len, c
     return handlePost(url, target, len, buf, file, 0, false, file);
 }
 
-NPError PluginView::newStream(NPMIMEType type, const char* target, NPStream** stream)
+NPError PluginView::newStream(NPMIMEType, const char* /* target */, NPStream**)
 {
     notImplemented();
     // Unsupported
     return NPERR_GENERIC_ERROR;
 }
 
-int32_t PluginView::write(NPStream* stream, int32_t len, void* buffer)
+int32_t PluginView::write(NPStream*, int32_t /* len */, void* /* buffer */)
 {
     notImplemented();
     // Unsupported
@@ -681,7 +689,7 @@ NPError PluginView::setValue(NPPVariable variable, void* value)
 
 void PluginView::invalidateTimerFired(Timer<PluginView>* timer)
 {
-    ASSERT(timer == &m_invalidateTimer);
+    ASSERT_UNUSED(timer, timer == &m_invalidateTimer);
 
     for (unsigned i = 0; i < m_invalidRects.size(); i++)
         invalidateRect(m_invalidRects[i]);
@@ -829,6 +837,9 @@ PluginView::PluginView(Frame* parentFrame, const IntSize& size, PluginPackage* p
     , m_instance(0)
 #if defined(XP_MACOSX)
     , m_isWindowed(false)
+    , m_updatedCocoaTextInputRequested(false)
+    , m_keyDownSent(false)
+    , m_disregardKeyUpCounter(0)
 #else
     , m_isWindowed(true)
 #endif
@@ -1133,12 +1144,8 @@ static inline HTTPHeaderMap parseRFC822HeaderFields(const Vector<char>& buffer, 
                     value = String(colon, eol - colon);
 
                 String oldValue = headerFields.get(lastKey);
-                if (!oldValue.isNull()) {
-                    String tmp = oldValue;
-                    tmp += ", ";
-                    tmp += value;
-                    value = tmp;
-                }
+                if (!oldValue.isNull())
+                    value = oldValue + ", " + value;
 
                 headerFields.set(lastKey, value);
             }
@@ -1256,11 +1263,27 @@ static const char* MozillaUserAgent = "Mozilla/5.0 ("
 #endif
         " en-US; rv:1.8.1) Gecko/20061010 Firefox/2.0";
 
+static const char* const ChromeUserAgent = "Mozilla/5.0 ("
+#if defined(XP_MACOSX)
+    "Macintosh; U; Intel Mac OS X;"
+#elif defined(XP_WIN)
+    "Windows; U; Windows NT 5.1;"
+#elif defined(XP_UNIX)
+    // The Gtk port uses X11 plugins in Mac.
+#if OS(DARWIN) && PLATFORM(GTK)
+    "X11; U; Intel Mac OS X;"
+#else
+    "X11; U; Linux i686;"
+#endif
+#endif
+    " AppleWebKit/534.34 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/534.34";
+
 const char* PluginView::userAgent()
 {
     if (m_plugin->quirks().contains(PluginQuirkWantsMozillaUserAgent))
         return MozillaUserAgent;
-
+    else if (m_plugin->quirks().contains(PluginQuirkWantsChromeUserAgent))
+        return ChromeUserAgent;
     if (m_userAgent.isNull())
         m_userAgent = m_parentFrame->loader()->userAgent(m_url).utf8();
 
@@ -1476,8 +1499,13 @@ NPError PluginView::setValueForURL(NPNURLVariable variable, const char* url, con
     return result;
 }
 
-NPError PluginView::getAuthenticationInfo(const char* protocol, const char* host, int32_t port, const char* scheme, const char* realm, char** username, uint32_t* ulen, char** password, uint32_t* plen)
+NPError PluginView::getAuthenticationInfo(const char* protocol, const char* host, int32_t port, const char* /* scheme */, const char* /* realm */, char**  /* username */, uint32_t* /* ulen */, char** /* password */, uint32_t* /* plen */)
 {
+#if LOG_DISABLED
+    UNUSED_PARAM(protocol);
+    UNUSED_PARAM(host);
+    UNUSED_PARAM(port);
+#endif
     LOG(Plugins, "PluginView::getAuthenticationInfo: protocol=%s, host=%s, port=%d", protocol, host, port);
     notImplemented();
     return NPERR_GENERIC_ERROR;

@@ -51,12 +51,13 @@ RenderSVGContainer::~RenderSVGContainer()
 
 void RenderSVGContainer::layout()
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     ASSERT(needsLayout());
 
     // RenderSVGRoot disables layoutState for the SVG rendering tree.
     ASSERT(!view()->layoutStateEnabled());
 
-    LayoutRepainter repainter(*this, checkForRepaintDuringLayout() || selfWillPaint());
+    LayoutRepainter repainter(*this, SVGRenderSupport::checkForSVGRepaintDuringLayout(this) || selfWillPaint());
 
     // Allow RenderSVGViewportContainer to update its viewport.
     calcViewport();

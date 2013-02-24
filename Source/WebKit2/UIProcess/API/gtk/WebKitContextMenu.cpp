@@ -20,40 +20,50 @@
 #include "config.h"
 #include "WebKitContextMenu.h"
 
+#include "ImmutableArray.h"
+#include "WebContextMenuItem.h"
 #include "WebKitContextMenuItemPrivate.h"
 #include "WebKitContextMenuPrivate.h"
 
 using namespace WebKit;
 using namespace WebCore;
 
+/**
+ * SECTION: WebKitContextMenu
+ * @Short_description: Represents the context menu in a #WebKitWebView
+ * @Title: WebKitContextMenu
+ *
+ * #WebKitContextMenu represents a context menu containing
+ * #WebKitContextMenuItem<!-- -->s in a #WebKitWebView.
+ *
+ * When a #WebKitWebView is about to display the context menu, it
+ * emits the #WebKitWebView::context-menu signal, which has the
+ * #WebKitContextMenu as an argument. You can modify it, adding new
+ * submenus that you can create with webkit_context_menu_new(), adding
+ * new #WebKitContextMenuItem<!-- -->s with
+ * webkit_context_menu_prepend(), webkit_context_menu_append() or
+ * webkit_context_menu_insert(), maybe after having removed the
+ * existing ones with webkit_context_menu_remove_all().
+ *
+ */
+
 struct _WebKitContextMenuPrivate {
     GList* items;
     WebKitContextMenuItem* parentItem;
 };
 
-G_DEFINE_TYPE(WebKitContextMenu, webkit_context_menu, G_TYPE_OBJECT)
+WEBKIT_DEFINE_TYPE(WebKitContextMenu, webkit_context_menu, G_TYPE_OBJECT)
 
-static void webkitContextMenuFinalize(GObject* object)
+static void webkitContextMenuDispose(GObject* object)
 {
-    WebKitContextMenu* menu = WEBKIT_CONTEXT_MENU(object);
-    webkit_context_menu_remove_all(menu);
-    menu->priv->~WebKitContextMenuPrivate();
-    G_OBJECT_CLASS(webkit_context_menu_parent_class)->finalize(object);
-}
-
-static void webkit_context_menu_init(WebKitContextMenu* menu)
-{
-    WebKitContextMenuPrivate* priv = G_TYPE_INSTANCE_GET_PRIVATE(menu, WEBKIT_TYPE_CONTEXT_MENU, WebKitContextMenuPrivate);
-    menu->priv = priv;
-    new (priv) WebKitContextMenuPrivate();
+    webkit_context_menu_remove_all(WEBKIT_CONTEXT_MENU(object));
+    G_OBJECT_CLASS(webkit_context_menu_parent_class)->dispose(object);
 }
 
 static void webkit_context_menu_class_init(WebKitContextMenuClass* listClass)
 {
     GObjectClass* gObjectClass = G_OBJECT_CLASS(listClass);
-    gObjectClass->finalize = webkitContextMenuFinalize;
-
-    g_type_class_add_private(listClass, sizeof(WebKitContextMenuPrivate));
+    gObjectClass->dispose = webkitContextMenuDispose;
 }
 
 void webkitContextMenuPopulate(WebKitContextMenu* menu, Vector<ContextMenuItem>& contextMenuItems)
@@ -64,12 +74,12 @@ void webkitContextMenuPopulate(WebKitContextMenu* menu, Vector<ContextMenuItem>&
     }
 }
 
-WebKitContextMenu* webkitContextMenuCreate(WKArrayRef wkItems)
+WebKitContextMenu* webkitContextMenuCreate(ImmutableArray* items)
 {
     WebKitContextMenu* menu = webkit_context_menu_new();
-    for (size_t i = 0; i < WKArrayGetSize(wkItems); ++i) {
-        WKContextMenuItemRef wkItem = static_cast<WKContextMenuItemRef>(WKArrayGetItemAtIndex(wkItems, i));
-        webkit_context_menu_prepend(menu, webkitContextMenuItemCreate(wkItem));
+    for (size_t i = 0; i < items->size(); ++i) {
+        WebContextMenuItem* item = static_cast<WebContextMenuItem*>(items->at(i));
+        webkit_context_menu_prepend(menu, webkitContextMenuItemCreate(item));
     }
     menu->priv->items = g_list_reverse(menu->priv->items);
 

@@ -37,16 +37,18 @@ void CallLinkInfo::unlink(JSGlobalData& globalData, RepatchBuffer& repatchBuffer
 {
     ASSERT(isLinked());
     
+    repatchBuffer.revertJumpReplacementToBranchPtrWithPatch(RepatchBuffer::startOfBranchPtrWithPatchOnRegister(hotPathBegin), static_cast<MacroAssembler::RegisterID>(calleeGPR), 0);
     if (isDFG) {
 #if ENABLE(DFG_JIT)
         repatchBuffer.relink(callReturnLocation, (callType == Construct ? globalData.getCTIStub(DFG::linkConstructThunkGenerator) : globalData.getCTIStub(DFG::linkCallThunkGenerator)).code());
 #else
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
 #endif
     } else
-        repatchBuffer.relink(callReturnLocation, callType == Construct ? globalData.jitStubs->ctiVirtualConstructLink() : globalData.jitStubs->ctiVirtualCallLink());
+        repatchBuffer.relink(callReturnLocation, callType == Construct ? globalData.getCTIStub(linkConstructGenerator).code() : globalData.getCTIStub(linkCallGenerator).code());
     hasSeenShouldRepatch = false;
     callee.clear();
+    stub.clear();
 
     // It will be on a list if the callee has a code block.
     if (isOnList())

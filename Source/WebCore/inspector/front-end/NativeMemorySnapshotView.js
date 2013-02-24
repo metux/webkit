@@ -31,36 +31,393 @@
 /**
  * @constructor
  * @extends {WebInspector.View}
+ * @param {WebInspector.NativeMemoryProfileHeader} profile
  */
 WebInspector.NativeMemorySnapshotView = function(profile)
 {
     WebInspector.View.call(this);
     this.registerRequiredCSS("nativeMemoryProfiler.css");
-    this._profile = profile;
-    this.element.addStyleClass("memory-chart-view");
 
-    var pieChart = new WebInspector.NativeMemoryPieChart(profile._memoryBlock);
-    pieChart.element.addStyleClass("fill");
-    pieChart.show(this.element);
+    this.element.addStyleClass("native-snapshot-view");
+    this._containmentDataGrid = new WebInspector.NativeSnapshotDataGrid(profile);
+    this._containmentDataGrid.show(this.element);
 }
 
 WebInspector.NativeMemorySnapshotView.prototype = {
-    dispose: function()
+    __proto__: WebInspector.View.prototype
+}
+
+
+/**
+ * @constructor
+ * @extends {WebInspector.DataGrid}
+ * @param {WebInspector.NativeMemoryProfileHeader} profile
+ */
+WebInspector.NativeSnapshotDataGrid = function(profile)
+{
+    var columns = {
+        name: { title: WebInspector.UIString("Object"), width: "200px", disclosure: true, sortable: true },
+        size: { title: WebInspector.UIString("Size"), sortable: true, sort: "descending" },
+    };
+    WebInspector.DataGrid.call(this, columns);
+    this._profile = profile;
+    this._totalNode = new WebInspector.NativeSnapshotNode(profile._memoryBlock, profile._memoryBlock);
+    if (WebInspector.settings.showNativeSnapshotUninstrumentedSize.get()) {
+        this.setRootNode(new WebInspector.DataGridNode(null, true));
+        this.rootNode().appendChild(this._totalNode)
+        this._totalNode.expand();
+    } else {
+        this.setRootNode(this._totalNode);
+        this._totalNode._populate();
+    }
+    this.addEventListener("sorting changed", this.sortingChanged.bind(this), this);
+}
+
+WebInspector.NativeSnapshotDataGrid.prototype = {
+    sortingChanged: function()
+    {
+        var expandedNodes = {};
+        this._totalNode._storeState(expandedNodes);
+        this._totalNode.removeChildren();
+        this._totalNode._populate();
+        this._totalNode._shouldRefreshChildren = true;
+        this._totalNode._restoreState(expandedNodes);
+    },
+
+    /**
+     * @param {MemoryAgent.MemoryBlock} nodeA
+     * @param {MemoryAgent.MemoryBlock} nodeB
+     */
+    _sortingFunction: function(nodeA, nodeB)
+    {
+        var sortColumnIdentifier = this.sortColumnIdentifier;
+        var sortAscending = this.sortOrder === "ascending";
+        var field1 = nodeA[sortColumnIdentifier];
+        var field2 = nodeB[sortColumnIdentifier];
+        var result = field1 < field2 ? -1 : (field1 > field2 ? 1 : 0);
+        if (!sortAscending)
+            result = -result;
+        return result;
+    },
+
+    __proto__: WebInspector.DataGrid.prototype
+}
+
+/**
+ * @constructor
+ * @extends {WebInspector.DataGridNode}
+ * @param {MemoryAgent.MemoryBlock} nodeData
+ * @param {MemoryAgent.MemoryBlock} rootMemoryBlock
+ */
+WebInspector.NativeSnapshotNode = function(nodeData, rootMemoryBlock)
+{
+    this._nodeData = nodeData;
+    this._rootMemoryBlock = rootMemoryBlock;
+    var viewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(nodeData);
+    var data = { name: viewProperties._description, size: this._nodeData.size };
+    var hasChildren = !!nodeData.children && nodeData.children.length !== 0;
+    WebInspector.DataGridNode.call(this, data, hasChildren);
+    this.addEventListener("populate", this._populate, this);
+}
+
+WebInspector.NativeSnapshotNode.prototype = {
+    /**
+     * @override
+     * @param {string} columnIdentifier
+     * @return {Element}
+     */
+    createCell: function(columnIdentifier)
+    {
+        var cell = columnIdentifier === "size" ?
+            this._createSizeCell(columnIdentifier) :
+            WebInspector.DataGridNode.prototype.createCell.call(this, columnIdentifier);
+        return cell;
+    },
+
+    /**
+     * @param {Object} expandedNodes
+     */
+    _storeState: function(expandedNodes)
+    {
+        if (!this.expanded)
+            return;
+        expandedNodes[this.uid()] = true;
+        for (var i in this.children)
+            this.children[i]._storeState(expandedNodes);
+    },
+
+    /**
+     * @param {Object} expandedNodes
+     */
+    _restoreState: function(expandedNodes)
+    {
+        if (!expandedNodes[this.uid()])
+            return;
+        this.expand();
+        for (var i in this.children)
+            this.children[i]._restoreState(expandedNodes);
+    },
+
+    /**
+     * @return {string}
+     */
+    uid: function()
+    {
+        if (!this._uid)
+            this._uid = (!this.parent || !this.parent.uid ? "" : this.parent.uid() || "") + "/" + this._nodeData.name;
+        return this._uid;
+    },
+
+    /**
+     * @param {string} columnIdentifier
+     * @return {Element}
+     */
+    _createSizeCell: function(columnIdentifier)
+    {
+        var node = this;
+        var viewProperties = null;
+        var dimmed = false;
+        while (!viewProperties || viewProperties._fillStyle === "inherit") {
+            viewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(node._nodeData);
+            if (viewProperties._fillStyle === "inherit")
+                dimmed = true;
+            node = node.parent;
+        }
+
+        var sizeKB = this._nodeData.size / 1024;
+        var totalSize = this._rootMemoryBlock.size;
+        var percentage = this._nodeData.size / totalSize  * 100;
+
+        var cell = document.createElement("td");
+        cell.className = columnIdentifier + "-column";
+
+        var textDiv = document.createElement("div");
+        textDiv.textContent = Number.withThousandsSeparator(sizeKB.toFixed(0)) + "\u2009" + WebInspector.UIString("KB");
+        textDiv.className = "size-text";
+        cell.appendChild(textDiv);
+
+        var barDiv = document.createElement("div");
+        barDiv.className = "size-bar";
+        barDiv.style.width = percentage + "%";
+        barDiv.style.backgroundColor = viewProperties._fillStyle;
+        // fillerDiv displaces percentage text out of the bar visible area if it doesn't fit.
+        var fillerDiv = document.createElement("div");
+        fillerDiv.className = "percent-text"
+        barDiv.appendChild(fillerDiv);
+        var percentDiv = document.createElement("div");
+        percentDiv.textContent = percentage.toFixed(1) + "%";
+        percentDiv.className = "percent-text"
+        barDiv.appendChild(percentDiv);
+
+        var barHolderDiv = document.createElement("div");
+        if (dimmed)
+            barHolderDiv.className = "dimmed";
+        barHolderDiv.appendChild(barDiv);
+        cell.appendChild(barHolderDiv);
+
+        return cell;
+    },
+
+    _populate: function() {
+        this.removeEventListener("populate", this._populate, this);
+        this._nodeData.children.sort(this.dataGrid._sortingFunction.bind(this.dataGrid));
+
+        for (var node in this._nodeData.children) {
+            var nodeData = this._nodeData.children[node];
+            if (WebInspector.settings.showNativeSnapshotUninstrumentedSize.get() || nodeData.name !== "Other")
+                this.appendChild(new WebInspector.NativeSnapshotNode(nodeData, this._rootMemoryBlock));
+        }
+    },
+
+    __proto__: WebInspector.DataGridNode.prototype
+}
+
+/**
+ * @constructor
+ * @extends {WebInspector.ProfileType}
+ */
+WebInspector.NativeSnapshotProfileType = function()
+{
+    WebInspector.ProfileType.call(this, WebInspector.NativeSnapshotProfileType.TypeId, WebInspector.UIString("Take Native Heap Snapshot"));
+    this._nextProfileUid = 1;
+}
+
+WebInspector.NativeSnapshotProfileType.TypeId = "NATIVE_SNAPSHOT";
+
+WebInspector.NativeSnapshotProfileType.prototype = {
+    get buttonTooltip()
+    {
+        return WebInspector.UIString("Capture native heap graph.");
+    },
+
+    /**
+     * @override
+     * @param {WebInspector.ProfilesPanel} profilesPanel
+     * @return {boolean}
+     */
+    buttonClicked: function(profilesPanel)
+    {
+        var profileHeader = new WebInspector.NativeSnapshotProfileHeader(this, WebInspector.UIString("Snapshot %d", this._nextProfileUid), this._nextProfileUid);
+        ++this._nextProfileUid;
+        profileHeader.isTemporary = true;
+        profilesPanel.addProfileHeader(profileHeader);
+        profileHeader.load(function() { });
+
+        /**
+         * @param {?string} error
+         * @param {?MemoryAgent.MemoryBlock} memoryBlock
+         * @param {Object=} graphMetaInformation
+         */
+        function didReceiveMemorySnapshot(error, memoryBlock, graphMetaInformation)
+        {
+            var metaInformation = /** @type{HeapSnapshotMetainfo} */(graphMetaInformation);
+            this.isTemporary = false;
+            this.sidebarElement.subtitle = Number.bytesToString(/** @type{number} */(memoryBlock.size));
+
+            var edgeFieldCount = metaInformation.edge_fields.length;
+            var nodeFieldCount = metaInformation.node_fields.length;
+            var nodeIdFieldOffset = metaInformation.node_fields.indexOf("id");
+            var toNodeIdFieldOffset = metaInformation.edge_fields.indexOf("to_node");
+
+            var baseToRealNodeIdMap = {};
+            for (var i = 0; i < this._baseToRealNodeId.length; i += 2)
+                baseToRealNodeIdMap[this._baseToRealNodeId[i]] = this._baseToRealNodeId[i + 1];
+
+            var nodeId2NodeIndex = {};
+            for (var i = nodeIdFieldOffset; i < this._nodes.length; i += nodeFieldCount)
+                nodeId2NodeIndex[this._nodes[i]] = i - nodeIdFieldOffset;
+
+            // Translate nodeId to nodeIndex.
+            var edges = this._edges;
+            for (var i = toNodeIdFieldOffset; i < edges.length; i += edgeFieldCount) {
+                if (edges[i] in baseToRealNodeIdMap)
+                    edges[i] = baseToRealNodeIdMap[edges[i]];
+                edges[i] = nodeId2NodeIndex[edges[i]];
+            }
+
+            var heapSnapshot = {
+                "snapshot": {
+                    "meta": metaInformation,
+                    node_count: this._nodes.length / nodeFieldCount,
+                    edge_count: this._edges.length / edgeFieldCount,
+                    root_index: this._nodes.length - nodeFieldCount
+                },
+                nodes: this._nodes,
+                edges: this._edges,
+                strings: this._strings
+            };
+
+            var chunk = JSON.stringify(heapSnapshot);
+            this.transferChunk(chunk);
+            this.finishHeapSnapshot();
+        }
+
+        MemoryAgent.getProcessMemoryDistribution(true, didReceiveMemorySnapshot.bind(profileHeader));
+        return false;
+    },
+
+    get treeItemTitle()
+    {
+        return WebInspector.UIString("NATIVE SNAPSHOT");
+    },
+
+    get description()
+    {
+        return WebInspector.UIString("Native memory snapshot profiles show native heap graph.");
+    },
+
+    /**
+     * @override
+     * @param {string=} title
+     * @return {WebInspector.ProfileHeader}
+     */
+    createTemporaryProfile: function(title)
+    {
+        title = title || WebInspector.UIString("Snapshotting\u2026");
+        return new WebInspector.NativeSnapshotProfileHeader(this, title);
+    },
+
+    /**
+     * @override
+     * @param {ProfilerAgent.ProfileHeader} profile
+     * @return {WebInspector.ProfileHeader}
+     */
+    createProfile: function(profile)
+    {
+        return new WebInspector.NativeSnapshotProfileHeader(this, profile.title, -1);
+    },
+
+    __proto__: WebInspector.ProfileType.prototype
+}
+
+
+/**
+ * @constructor
+ * @extends {WebInspector.HeapProfileHeader}
+ * @param {!WebInspector.NativeSnapshotProfileType} type
+ * @param {string} title
+ * @param {number=} uid
+ */
+WebInspector.NativeSnapshotProfileHeader = function(type, title, uid)
+{
+    WebInspector.HeapProfileHeader.call(this, type, title, uid, 0);
+    this._strings = [];
+    this._nodes = [];
+    this._edges = [];
+    this._baseToRealNodeId = [];
+}
+
+WebInspector.NativeSnapshotProfileHeader.prototype = {
+    /**
+     * @override
+     * @param {WebInspector.ProfilesPanel} profilesPanel
+     */
+    createView: function(profilesPanel)
+    {
+        return new WebInspector.NativeHeapSnapshotView(profilesPanel, this);
+    },
+
+    startSnapshotTransfer: function()
     {
     },
 
-    get statusBarItems()
+    snapshotConstructorName: function()
     {
-        return [];
+        return "NativeHeapSnapshot";
     },
 
+    addNativeSnapshotChunk: function(chunk)
+    {
+        this._strings = this._strings.concat(chunk.strings);
+        this._nodes = this._nodes.concat(chunk.nodes);
+        this._edges = this._edges.concat(chunk.edges);
+        this._baseToRealNodeId = this._baseToRealNodeId.concat(chunk.baseToRealNodeId);
+    },
+
+    __proto__: WebInspector.HeapProfileHeader.prototype
+}
+
+
+/**
+ * @constructor
+ * @extends {WebInspector.HeapSnapshotView}
+ */
+WebInspector.NativeHeapSnapshotView = function(parent, profile)
+{
+    this._profile = profile;
+    WebInspector.HeapSnapshotView.call(this, parent, profile);
+}
+
+
+WebInspector.NativeHeapSnapshotView.prototype = {
     get profile()
     {
         return this._profile;
-    }
-}
+    },
 
-WebInspector.NativeMemorySnapshotView.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.HeapSnapshotView.prototype
+};
+
 
 /**
  * @constructor
@@ -68,16 +425,16 @@ WebInspector.NativeMemorySnapshotView.prototype.__proto__ = WebInspector.View.pr
  */
 WebInspector.NativeMemoryProfileType = function()
 {
-    WebInspector.ProfileType.call(this, WebInspector.NativeMemoryProfileType.TypeId, WebInspector.UIString("Take Native Memory Snapshot"));
+    WebInspector.ProfileType.call(this, WebInspector.NativeMemoryProfileType.TypeId, WebInspector.UIString("Capture Native Memory Distribution"));
     this._nextProfileUid = 1;
 }
 
-WebInspector.NativeMemoryProfileType.TypeId = "NATIVE_MEMORY";
+WebInspector.NativeMemoryProfileType.TypeId = "NATIVE_MEMORY_DISTRIBUTION";
 
 WebInspector.NativeMemoryProfileType.prototype = {
     get buttonTooltip()
     {
-        return WebInspector.UIString("Take native memory snapshot.");
+        return WebInspector.UIString("Capture native memory distribution.");
     },
 
     /**
@@ -91,6 +448,10 @@ WebInspector.NativeMemoryProfileType.prototype = {
         ++this._nextProfileUid;
         profileHeader.isTemporary = true;
         profilesPanel.addProfileHeader(profileHeader);
+        /**
+         * @param {?string} error
+         * @param {?MemoryAgent.MemoryBlock} memoryBlock
+         */
         function didReceiveMemorySnapshot(error, memoryBlock)
         {
             if (memoryBlock.size && memoryBlock.children) {
@@ -111,8 +472,9 @@ WebInspector.NativeMemoryProfileType.prototype = {
             }
             profileHeader._memoryBlock = memoryBlock;
             profileHeader.isTemporary = false;
+            profileHeader.sidebarElement.subtitle = Number.bytesToString(/** @type{number} */(memoryBlock.size));
         }
-        MemoryAgent.getProcessMemoryDistribution(didReceiveMemorySnapshot.bind(this));
+        MemoryAgent.getProcessMemoryDistribution(false, didReceiveMemorySnapshot.bind(this));
         return false;
     },
 
@@ -145,15 +507,15 @@ WebInspector.NativeMemoryProfileType.prototype = {
     createProfile: function(profile)
     {
         return new WebInspector.NativeMemoryProfileHeader(this, profile.title, -1);
-    }
-}
+    },
 
-WebInspector.NativeMemoryProfileType.prototype.__proto__ = WebInspector.ProfileType.prototype;
+    __proto__: WebInspector.ProfileType.prototype
+}
 
 /**
  * @constructor
  * @extends {WebInspector.ProfileHeader}
- * @param {WebInspector.NativeMemoryProfileType} type
+ * @param {!WebInspector.NativeMemoryProfileType} type
  * @param {string} title
  * @param {number=} uid
  */
@@ -183,10 +545,10 @@ WebInspector.NativeMemoryProfileHeader.prototype = {
     createView: function(profilesPanel)
     {
         return new WebInspector.NativeMemorySnapshotView(this);
-    }
-}
+    },
 
-WebInspector.NativeMemoryProfileHeader.prototype.__proto__ = WebInspector.ProfileHeader.prototype;
+    __proto__: WebInspector.ProfileHeader.prototype
+}
 
 /**
  * @constructor
@@ -215,20 +577,20 @@ WebInspector.MemoryBlockViewProperties._initialize = function()
     {
         WebInspector.MemoryBlockViewProperties._standardBlocks[name] = new WebInspector.MemoryBlockViewProperties(fillStyle, name, WebInspector.UIString(description));
     }
-    addBlock("hsl(  0,  0%, 100%)", "ProcessPrivateMemory", "Total");
-    addBlock("hsl(  0,  0%,  80%)", "Other", "Other");
-    addBlock("hsl(300, 30%,  80%)", "DOM", "DOM tree structures");
-    addBlock("hsl( 90, 60%,  80%)", "JSHeapAllocated", "JavaScript heap");
-    addBlock("hsl( 90, 80%,  80%)", "JSHeapUsed", "Used JavaScript heap");
-    addBlock("hsl( 90, 30%,  80%)", "JSExternalResources", "JavaScript external resources");
-    addBlock("hsl( 90, 40%,  80%)", "JSExternalArrays", "JavaScript external arrays");
-    addBlock("hsl( 90, 50%,  80%)", "JSExternalStrings", "JavaScript external strings");
-    addBlock("hsl(210, 60%,  80%)", "InspectorData", "Inspector data");
-    addBlock("hsl( 30, 60%,  80%)", "MemoryCache", "Memory cache resources");
-    addBlock("hsl( 40, 60%,  80%)", "GlyphCache", "Glyph cache resources");
-    addBlock("hsl( 35, 60%,  80%)", "DOMStorageCache", "DOM storage cache");
-    addBlock("hsl( 60, 60%,  80%)", "RenderTreeAllocated", "Render tree");
-    addBlock("hsl( 60, 60%,  80%)", "RenderTreeUsed", "Render tree used");
+    addBlock("hsl(  0,  0%,  60%)", "ProcessPrivateMemory", "Total");
+    addBlock("hsl(  0,  0%,  80%)", "OwnersTypePlaceholder", "OwnersTypePlaceholder");
+    addBlock("hsl(  0,  0%,  60%)", "Other", "Other");
+    addBlock("hsl(220, 80%,  70%)", "Image", "Images");
+    addBlock("hsl(100, 60%,  50%)", "JSHeap", "JavaScript heap");
+    addBlock("hsl( 90, 40%,  80%)", "JSExternalResources", "JavaScript external resources");
+    addBlock("hsl( 90, 60%,  80%)", "CSS", "CSS");
+    addBlock("hsl(  0, 50%,  60%)", "DOM", "DOM");
+    addBlock("hsl(  0, 80%,  60%)", "WebInspector", "Inspector data");
+    addBlock("hsl( 36, 90%,  50%)", "Resources", "Resources");
+    addBlock("hsl( 40, 80%,  80%)", "GlyphCache", "Glyph cache resources");
+    addBlock("hsl( 35, 80%,  80%)", "DOMStorageCache", "DOM storage cache");
+    addBlock("hsl( 60, 80%,  60%)", "RenderTree", "Render tree");
+    addBlock("hsl( 20, 80%,  50%)", "MallocWaste", "Memory allocator waste");
 }
 
 WebInspector.MemoryBlockViewProperties._forMemoryBlock = function(memoryBlock)
@@ -237,141 +599,9 @@ WebInspector.MemoryBlockViewProperties._forMemoryBlock = function(memoryBlock)
     var result = WebInspector.MemoryBlockViewProperties._standardBlocks[memoryBlock.name];
     if (result)
         return result;
-    return new WebInspector.MemoryBlockViewProperties("rgba(20, 200, 20, 0.8)", memoryBlock.name, memoryBlock.name);
+    return new WebInspector.MemoryBlockViewProperties("inherit", memoryBlock.name, memoryBlock.name);
 }
 
-
-/**
- * @constructor
- * @extends {WebInspector.View}
- * @param {MemoryAgent.MemoryBlock} memorySnapshot
- */
-WebInspector.NativeMemoryPieChart = function(memorySnapshot)
-{
-    WebInspector.View.call(this);
-    this._memorySnapshot = memorySnapshot;
-    this.element = document.createElement("div");
-    this.element.addStyleClass("memory-pie-chart-container");
-    this._memoryBlockList = this.element.createChild("div", "memory-blocks-list");
-
-    this._canvasContainer = this.element.createChild("div", "memory-pie-chart");
-    this._canvas = this._canvasContainer.createChild("canvas");
-    this._addBlockLabels(memorySnapshot, true);
-}
-
-WebInspector.NativeMemoryPieChart.prototype = {
-    /**
-     * @override
-     */
-    onResize: function()
-    {
-        this._updateSize();
-        this._paint();
-    },
-
-    _updateSize: function()
-    {
-        var width = this._canvasContainer.clientWidth - 5;
-        var height = this._canvasContainer.clientHeight - 5;
-        this._canvas.width = width;
-        this._canvas.height = height;
-    },
-
-    _addBlockLabels: function(memoryBlock, includeChildren)
-    {
-        var viewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(memoryBlock);
-        var title = viewProperties._description + ": " + Number.bytesToString(memoryBlock.size);
-
-        var swatchElement = this._memoryBlockList.createChild("div", "item");
-        swatchElement.createChild("div", "swatch").style.backgroundColor = viewProperties._fillStyle;
-        swatchElement.createChild("span", "title").textContent = WebInspector.UIString(title);
-
-        if (!memoryBlock.children || !includeChildren)
-            return;
-        for (var i = 0; i < memoryBlock.children.length; i++)
-            this._addBlockLabels(memoryBlock.children[i], false);
-    },
-
-    _paint: function()
-    {
-        this._clear();
-        var width = this._canvas.width;
-        var height = this._canvas.height;
-
-        var x = width / 2;
-        var y = height / 2;
-        var radius = 200;
-
-        var ctx = this._canvas.getContext("2d");
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI*2, false);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(130, 130, 130, 0.8)";
-        ctx.stroke();
-        ctx.closePath();
-
-        var currentAngle = 0;
-        var memoryBlock = this._memorySnapshot;
-
-        function paintPercentAndLabel(fraction, title, midAngle)
-        {
-            ctx.beginPath();
-            ctx.font = "13px Arial";
-            ctx.fillStyle = "rgba(10, 10, 10, 0.8)";
-
-            var textX = x + (radius + 10) * Math.cos(midAngle);
-            var textY = y + (radius + 10) * Math.sin(midAngle);
-            var relativeOffset = -Math.cos(midAngle) / Math.sin(Math.PI / 12);
-            relativeOffset = Number.constrain(relativeOffset, -1, 1);
-            var metrics = ctx.measureText(title);
-            textX -= metrics.width * (relativeOffset + 1) / 2;
-            textY += 5;
-            ctx.fillText(title, textX, textY);
-
-            // Do not print percentage if the sector is too narrow.
-            if (fraction > 0.03) {
-                textX = x + radius * Math.cos(midAngle) / 2;
-                textY = y + radius * Math.sin(midAngle) / 2;
-                ctx.fillText((100 * fraction).toFixed(0) + "%", textX - 8, textY + 5);
-            }
-
-            ctx.closePath();
-        }
-
-        if (!memoryBlock.children)
-            return;
-        var total = memoryBlock.size;
-        for (var i = 0; i < memoryBlock.children.length; i++) {
-            var child = memoryBlock.children[i];
-            if (!child.size)
-                continue;
-            var viewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(child);
-            var angleSpan = Math.PI * 2 * (child.size / total);
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + radius * Math.cos(currentAngle), y + radius * Math.sin(currentAngle));
-            ctx.arc(x, y, radius, currentAngle, currentAngle + angleSpan, false);
-            ctx.lineWidth = 0.5;
-            ctx.lineTo(x, y);
-            ctx.fillStyle = viewProperties._fillStyle;
-            ctx.strokeStyle = "rgba(100, 100, 100, 0.8)";
-            ctx.fill();
-            ctx.stroke();
-            ctx.closePath();
-
-            paintPercentAndLabel(child.size / total, viewProperties._description, currentAngle + angleSpan / 2);
-
-            currentAngle += angleSpan;
-        }
-    },
-
-    _clear: function() {
-        var ctx = this._canvas.getContext("2d");
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    }
-}
-
-WebInspector.NativeMemoryPieChart.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -394,6 +624,11 @@ WebInspector.NativeMemoryBarChart = function()
 WebInspector.NativeMemoryBarChart.prototype = {
     _updateStats: function()
     {
+
+        /**
+         * @param {?string} error
+         * @param {?MemoryAgent.MemoryBlock} memoryBlock
+         */
         function didReceiveMemorySnapshot(error, memoryBlock)
         {
             if (memoryBlock.size && memoryBlock.children) {
@@ -415,7 +650,7 @@ WebInspector.NativeMemoryBarChart.prototype = {
             this._memorySnapshot = memoryBlock;
             this._updateView();
         }
-        MemoryAgent.getProcessMemoryDistribution(didReceiveMemorySnapshot.bind(this));
+        MemoryAgent.getProcessMemoryDistribution(false, didReceiveMemorySnapshot.bind(this));
     },
 
     /**
@@ -473,9 +708,13 @@ WebInspector.NativeMemoryBarChart.prototype = {
             }
             var unusedSize = 0;
             if (!!child.children) {
-                unusedSize = child.size;
-                for (var j = 0; j < child.children.length; ++j)
-                    unusedSize -= child.children[j].size;
+                var unusedName = name + ".Unused";
+                for (var j = 0; j < child.children.length; ++j) {
+                    if (child.children[j].name === unusedName) {
+                        unusedSize = child.children[j].size;
+                        break;
+                    }
+                }
             }
             var unusedLength = unusedSize * barLengthSizeRatio;
             var barLength = child.size * barLengthSizeRatio;
@@ -488,7 +727,7 @@ WebInspector.NativeMemoryBarChart.prototype = {
 
         var memoryBlockViewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(memoryBlock);
         this._totalDiv.textContent = memoryBlockViewProperties._description + ": " + (memoryBlock.size / MB).toFixed(1) + "\u2009MB";
-    }
-}
+    },
 
-WebInspector.NativeMemoryBarChart.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}

@@ -30,11 +30,12 @@
 #define AccessibilityRenderObject_h
 
 #include "AccessibilityNodeObject.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
     
+class AccessibilitySVGRoot;
 class AXObjectCache;
 class Element;
 class Frame;
@@ -66,44 +67,16 @@ public:
 
     virtual void init();
     
-    virtual bool isAnchor() const;
     virtual bool isAttachment() const;
-    virtual bool isHeading() const;
-    virtual bool isLink() const;
-    virtual bool isImageButton() const;
-    virtual bool isImage() const;
-    virtual bool isNativeImage() const;
-    virtual bool isPasswordField() const;
-    virtual bool isNativeTextControl() const;
-    virtual bool isSearchField() const;
-    virtual bool isWebArea() const;
     virtual bool isFileUploadButton() const;
-    virtual bool isInputImage() const;
-    virtual bool isProgressIndicator() const;
-    virtual bool isSlider() const;
-    virtual bool isMenuRelated() const;
-    virtual bool isMenu() const;
-    virtual bool isMenuBar() const;
-    virtual bool isMenuButton() const;
-    virtual bool isMenuItem() const;
-    virtual bool isControl() const;
-    virtual bool isFieldset() const;
-    virtual bool isGroup() const;
 
-    virtual bool isEnabled() const;
     virtual bool isSelected() const;
     virtual bool isFocused() const;
-    virtual bool isChecked() const;
-    virtual bool isHovered() const;
-    virtual bool isIndeterminate() const;
     virtual bool isLoaded() const;
-    virtual bool isMultiSelectable() const;
     virtual bool isOffScreen() const;
-    virtual bool isPressed() const;
     virtual bool isReadOnly() const;
     virtual bool isUnvisited() const;
     virtual bool isVisited() const;        
-    virtual bool isRequired() const;
     virtual bool isLinked() const;
     virtual bool hasBoldFont() const;
     virtual bool hasItalicFont() const;
@@ -121,17 +94,7 @@ public:
     
     // Provides common logic used by all elements when determining isIgnored.
     AccessibilityObjectInclusion accessibilityIsIgnoredBase() const;
-    virtual bool accessibilityIsIgnored() const;
     
-    virtual int headingLevel() const;
-    virtual AccessibilityButtonState checkboxOrRadioValue() const;
-    virtual String valueDescription() const;
-    virtual float valueForRange() const;
-    virtual float maxValueForRange() const;
-    virtual float minValueForRange() const;
-    virtual float stepValueForRange() const;
-    virtual AccessibilityObject* selectedRadioButton();
-    virtual AccessibilityObject* selectedTabItem();
     virtual int layoutCount() const;
     virtual double estimatedLoadingProgress() const;
     
@@ -156,12 +119,8 @@ public:
     // Should be called on the root accessibility object to kick off a hit test.
     virtual AccessibilityObject* accessibilityHitTest(const IntPoint&) const;
 
-    virtual Element* actionElement() const;
-    Element* mouseButtonListener() const;
     FrameView* frameViewIfRenderView() const;
     virtual Element* anchorElement() const;
-    AccessibilityObject* menuForMenuButton() const;
-    AccessibilityObject* menuButtonForMenu() const;
     
     virtual LayoutRect boundingBoxRect() const;
     virtual LayoutRect elementRect() const;
@@ -184,10 +143,6 @@ public:
     virtual PlainTextRange selectedTextRange() const;
     virtual VisibleSelection selection() const;
     virtual String stringValue() const;
-    virtual String ariaLabeledByAttribute() const;
-    virtual String title() const;
-    virtual String ariaDescribedByAttribute() const;
-    virtual String accessibilityDescription() const;
     virtual String helpText() const;
     virtual String textUnderElement() const;
     virtual String text() const;
@@ -199,7 +154,6 @@ public:
     virtual Widget* widgetForAttachmentView() const;
     virtual void getDocumentLinks(AccessibilityChildrenVector&);
     virtual FrameView* documentFrameView() const;
-    virtual unsigned hierarchicalLevel() const;
 
     virtual void clearChildren();
     virtual void updateChildrenIfNecessary();
@@ -208,19 +162,17 @@ public:
     virtual void setSelectedTextRange(const PlainTextRange&);
     virtual void setValue(const String&);
     virtual void setSelectedRows(AccessibilityChildrenVector&);
-    virtual void changeValueByPercent(float percentChange);
     virtual AccessibilityOrientation orientation() const;
-    virtual void increment();
-    virtual void decrement();
     
     virtual void detach();
-    virtual void contentChanged();
+    virtual void textChanged();
     virtual void addChildren();
     virtual bool canHaveChildren() const;
     virtual void selectedChildren(AccessibilityChildrenVector&);
     virtual void visibleChildren(AccessibilityChildrenVector&);
     virtual void tabChildren(AccessibilityChildrenVector&);
     virtual bool shouldFocusActiveDescendant() const;
+    bool shouldNotifyActiveDescendant() const;
     virtual AccessibilityObject* activeDescendant() const;
     virtual void handleActiveDescendantChanged();
     virtual void handleAriaExpandedChanged();
@@ -245,6 +197,7 @@ public:
     virtual VisiblePosition visiblePositionForIndex(int) const;
     virtual int indexForVisiblePosition(const VisiblePosition&) const;
 
+    virtual void lineBreaks(Vector<int>&) const;
     virtual PlainTextRange doAXRangeForLine(unsigned) const;
     virtual PlainTextRange doAXRangeForIndex(unsigned) const;
     
@@ -263,7 +216,6 @@ protected:
     RenderObject* m_renderer;
     
     void setRenderObject(RenderObject* renderer) { m_renderer = renderer; }
-    void ariaLabeledByElements(Vector<Element*>& elements) const;
     bool needsToUpdateChildren() const { return m_childrenDirty; }
     ScrollableArea* getScrollableAreaIfScrollable() const;
     void scrollTo(const IntPoint&) const;
@@ -271,12 +223,12 @@ protected:
     virtual bool isDetached() const { return !m_renderer; }
 
     virtual AccessibilityRole determineAccessibilityRole();
+    virtual bool computeAccessibilityIsIgnored() const;
 
 private:
     void ariaListboxSelectedChildren(AccessibilityChildrenVector&);
     void ariaListboxVisibleChildren(AccessibilityChildrenVector&);
     bool ariaIsHidden() const;
-    bool isDescendantOfBarrenParent() const;
     bool isAllowedChildOfTree() const;
     bool hasTextAlternative() const;
     String positionalDescriptionForMSAA() const;
@@ -285,29 +237,30 @@ private:
     bool nodeIsTextControl(const Node*) const;
     virtual void setNeedsToUpdateChildren() { m_childrenDirty = true; }
 
-    Element* menuElementForMenuButton() const;
-    Element* menuItemElementForMenu() const;
-
     bool isTabItemSelected() const;
-    void alterSliderValue(bool increase);
-    void changeValueByStep(bool increase);
-    bool isNativeCheckboxOrRadio() const;
     LayoutRect checkboxOrRadioRect() const;
     void addRadioButtonGroupMembers(AccessibilityChildrenVector& linkedUIElements) const;
     AccessibilityObject* internalLinkElement() const;
     AccessibilityObject* accessibilityImageMapHitTest(HTMLAreaElement*, const IntPoint&) const;
     AccessibilityObject* accessibilityParentForImageMap(HTMLMapElement*) const;
+    virtual AccessibilityObject* elementAccessibilityHitTest(const IntPoint&) const;
+
     bool renderObjectIsObservable(RenderObject*) const;
     RenderObject* renderParentObject() const;
     bool isDescendantOfElementType(const QualifiedName& tagName) const;
-    // This returns true if it's focusable but it's not content editable and it's not a control or ARIA control.
-    bool isGenericFocusableElement() const;
-    bool isARIARange() const;
-
+    
+    bool isSVGImage() const;
+    void detachRemoteSVGRoot();
+    AccessibilitySVGRoot* remoteSVGRootElement() const;
+    AccessibilityObject* remoteSVGElementHitTest(const IntPoint&) const;
+    void offsetBoundingBoxForRemoteSVGElement(LayoutRect&) const;
+    
+    void addHiddenChildren();
     void addTextFieldChildren();
     void addImageMapChildren();
     void addCanvasChildren();
     void addAttachmentChildren();
+    void addRemoteSVGChildren();
 #if PLATFORM(MAC)
     void updateAttachmentViewParents();
 #endif
@@ -317,11 +270,6 @@ private:
     bool elementAttributeValue(const QualifiedName&) const;
     void setElementAttributeValue(const QualifiedName&, bool);
     
-    String accessibilityDescriptionForElements(Vector<Element*> &elements) const;
-    void elementsFromAttribute(Vector<Element*>& elements, const QualifiedName&) const;
-    String ariaAccessibilityDescription() const;
-    String webAreaAccessibilityDescription() const;
-
     virtual ESpeak speakProperty() const;
     
     virtual const AtomicString& ariaLiveRegionStatus() const;
@@ -330,6 +278,52 @@ private:
     virtual bool ariaLiveRegionBusy() const;    
     
     bool inheritsPresentationalRole() const;
+
+#if ENABLE(MATHML)
+    // All math elements return true for isMathElement().
+    virtual bool isMathElement() const;
+    virtual bool isMathFraction() const;
+    virtual bool isMathFenced() const;
+    virtual bool isMathSubscriptSuperscript() const;
+    virtual bool isMathRow() const;
+    virtual bool isMathUnderOver() const;
+    virtual bool isMathRoot() const;
+    virtual bool isMathSquareRoot() const;
+    virtual bool isMathText() const;
+    virtual bool isMathNumber() const;
+    virtual bool isMathOperator() const;
+    virtual bool isMathFenceOperator() const;
+    virtual bool isMathSeparatorOperator() const;
+    virtual bool isMathIdentifier() const;
+    virtual bool isMathTable() const;
+    virtual bool isMathTableRow() const;
+    virtual bool isMathTableCell() const;
+    
+    // Generic components.
+    virtual AccessibilityObject* mathBaseObject();
+    
+    // Root components.
+    virtual AccessibilityObject* mathRadicandObject();
+    virtual AccessibilityObject* mathRootIndexObject();
+    
+    // Fraction components.
+    virtual AccessibilityObject* mathNumeratorObject();
+    virtual AccessibilityObject* mathDenominatorObject();
+
+    // Under over components.
+    virtual AccessibilityObject* mathUnderObject();
+    virtual AccessibilityObject* mathOverObject();
+    
+    // Subscript/superscript components.
+    virtual AccessibilityObject* mathSubscriptObject();
+    virtual AccessibilityObject* mathSuperscriptObject();
+    
+    // Fenced components.
+    virtual String mathFencedOpenString() const;
+    virtual String mathFencedCloseString() const;
+
+    bool isIgnoredElementWithinMathTree() const;
+#endif
 };
 
 inline AccessibilityRenderObject* toAccessibilityRenderObject(AccessibilityObject* object)

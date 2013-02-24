@@ -35,6 +35,7 @@
 namespace WTF {
 
 struct AtomicStringHash;
+class MemoryObjectInfo;
 
 class AtomicString {
 public:
@@ -47,6 +48,13 @@ public:
     AtomicString(const UChar* s, unsigned length) : m_string(add(s, length)) { }
     AtomicString(const UChar* s, unsigned length, unsigned existingHash) : m_string(add(s, length, existingHash)) { }
     AtomicString(const UChar* s) : m_string(add(s)) { }
+
+    template<size_t inlineCapacity>
+    explicit AtomicString(const Vector<UChar, inlineCapacity>& characters)
+        : m_string(add(characters.data(), characters.size()))
+    {
+    }
+
     ATOMICSTRING_CONVERSION AtomicString(StringImpl* imp) : m_string(add(imp)) { }
     AtomicString(AtomicStringImpl* imp) : m_string(imp) { }
     ATOMICSTRING_CONVERSION AtomicString(const String& s) : m_string(add(s.impl())) { }
@@ -57,6 +65,7 @@ public:
         : m_string(addFromLiteralData(characters, length))
     {
     }
+
     template<unsigned charactersCount>
     ALWAYS_INLINE AtomicString(const char (&characters)[charactersCount], ConstructFromLiteralTag)
         : m_string(addFromLiteralData(characters, charactersCount - 1))
@@ -86,8 +95,11 @@ public:
     const String& string() const { return m_string; };
 
     AtomicStringImpl* impl() const { return static_cast<AtomicStringImpl *>(m_string.impl()); }
-    
+
+    bool is8Bit() const { return m_string.is8Bit(); }
     const UChar* characters() const { return m_string.characters(); }
+    const LChar* characters8() const { return m_string.characters8(); }
+    const UChar* characters16() const { return m_string.characters16(); }
     unsigned length() const { return m_string.length(); }
     
     UChar operator[](unsigned int i) const { return m_string[i]; }
@@ -134,16 +146,19 @@ public:
     static void remove(StringImpl*);
     
 #if USE(CF)
-    AtomicString(CFStringRef s) :  m_string(add(String(s).impl())) { }
-    CFStringRef createCFString() const { return m_string.createCFString(); }
+    AtomicString(CFStringRef s) :  m_string(add(s)) { }
 #endif    
 #ifdef __OBJC__
-    AtomicString(NSString* s) : m_string(add(String(s).impl())) { }
+    AtomicString(NSString* s) : m_string(add((CFStringRef)s)) { }
     operator NSString*() const { return m_string; }
 #endif
 #if PLATFORM(QT)
     AtomicString(const QString& s) : m_string(add(String(s).impl())) { }
     operator QString() const { return m_string; }
+#endif
+#if PLATFORM(BLACKBERRY)
+    AtomicString(const BlackBerry::Platform::String& s) : m_string(add(String(s).impl())) { }
+    operator BlackBerry::Platform::String() const { return m_string; }
 #endif
 
     // AtomicString::fromUTF8 will return a null string if
@@ -154,14 +169,18 @@ public:
 #ifndef NDEBUG
     void show() const;
 #endif
+
 private:
+    // The explicit constructors with AtomicString::ConstructFromLiteral must be used for literals.
+    AtomicString(ASCIILiteral);
+
     String m_string;
     
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const LChar*);
     ALWAYS_INLINE static PassRefPtr<StringImpl> add(const char* s) { return add(reinterpret_cast<const LChar*>(s)); };
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const LChar*, unsigned length);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*, unsigned length);
-    ALWAYS_INLINE static PassRefPtr<StringImpl> add(const char* s, unsigned length) { return add(reinterpret_cast<const char*>(s), length); };
+    ALWAYS_INLINE static PassRefPtr<StringImpl> add(const char* s, unsigned length) { return add(reinterpret_cast<const LChar*>(s), length); };
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*, unsigned length, unsigned existingHash);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(StringImpl*, unsigned offset, unsigned length);
@@ -173,6 +192,10 @@ private:
     }
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addFromLiteralData(const char* characters, unsigned length);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addSlowCase(StringImpl*);
+#if USE(CF)
+    static PassRefPtr<StringImpl> add(CFStringRef);
+#endif
+
     WTF_EXPORT_STRING_API static AtomicString fromUTF8Internal(const char*, const char*);
 };
 

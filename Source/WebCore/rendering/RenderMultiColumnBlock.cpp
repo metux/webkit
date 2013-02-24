@@ -33,12 +33,13 @@ using namespace std;
 
 namespace WebCore {
 
-RenderMultiColumnBlock::RenderMultiColumnBlock(Node* node)
-    : RenderBlock(node)
+RenderMultiColumnBlock::RenderMultiColumnBlock(Element* element)
+    : RenderBlock(element)
     , m_flowThread(0)
     , m_columnCount(1)
-    , m_columnWidth(ZERO_LAYOUT_UNIT)
-    , m_columnHeight(ZERO_LAYOUT_UNIT)
+    , m_columnWidth(0)
+    , m_columnHeight(0)
+    , m_requiresBalancing(false)
 {
 }
 
@@ -68,9 +69,9 @@ void RenderMultiColumnBlock::computeColumnCountAndWidth()
     }
 }
 
-bool RenderMultiColumnBlock::recomputeLogicalWidth()
+bool RenderMultiColumnBlock::updateLogicalWidthAndColumnWidth()
 {
-    bool relayoutChildren = RenderBlock::recomputeLogicalWidth();
+    bool relayoutChildren = RenderBlock::updateLogicalWidthAndColumnWidth();
     LayoutUnit oldColumnWidth = m_columnWidth;
     computeColumnCountAndWidth();
     if (m_columnWidth != oldColumnWidth)
@@ -78,23 +79,20 @@ bool RenderMultiColumnBlock::recomputeLogicalWidth()
     return relayoutChildren;
 }
 
-void RenderMultiColumnBlock::checkForPaginationLogicalHeightChange(LayoutUnit& pageLogicalHeight, bool& pageLogicalHeightChanged, bool& hasSpecifiedPageLogicalHeight)
+void RenderMultiColumnBlock::checkForPaginationLogicalHeightChange(LayoutUnit& /*pageLogicalHeight*/, bool& /*pageLogicalHeightChanged*/, bool& /*hasSpecifiedPageLogicalHeight*/)
 {
-    // We need to go ahead and set our explicit page height if one exists, so that we can
-    // avoid doing multiple layout passes.
-    computeLogicalHeight();
+    // We don't actually update any of the variables. We just subclassed to adjust our column height.
+    updateLogicalHeight();
     LayoutUnit newContentLogicalHeight = contentLogicalHeight();
-    if (newContentLogicalHeight > ZERO_LAYOUT_UNIT) {
-        pageLogicalHeight = newContentLogicalHeight;
-        hasSpecifiedPageLogicalHeight = true;
+    m_requiresBalancing = !newContentLogicalHeight;
+    if (!m_requiresBalancing) {
+        // The regions will be invalidated when we lay them out and they change size to
+        // the new column height.
+        if (columnHeight() != newContentLogicalHeight)
+            setColumnHeight(newContentLogicalHeight);
     }
-    setLogicalHeight(ZERO_LAYOUT_UNIT);
+    setLogicalHeight(0);
 
-    if (columnHeight() != pageLogicalHeight && everHadLayout()) {
-        setColumnHeight(pageLogicalHeight);
-        pageLogicalHeightChanged = true;
-    }
-    
     // Set up our column sets.
     ensureColumnSets();
 }
@@ -105,11 +103,22 @@ bool RenderMultiColumnBlock::relayoutForPagination(bool, LayoutUnit, LayoutState
     return false;
 }
 
+static PassRefPtr<RenderStyle> createMultiColumnFlowThreadStyle(RenderStyle* parentStyle)
+{
+    RefPtr<RenderStyle> newStyle(RenderStyle::create());
+    newStyle->inheritFrom(parentStyle);
+    newStyle->setDisplay(BLOCK);
+    newStyle->setPosition(RelativePosition);
+    newStyle->setZIndex(0);
+    newStyle->font().update(0);
+    return newStyle.release();
+}
+
 void RenderMultiColumnBlock::addChild(RenderObject* newChild, RenderObject* beforeChild)
 {
     if (!m_flowThread) {
         m_flowThread = new (renderArena()) RenderMultiColumnFlowThread(document());
-        m_flowThread->setStyle(RenderStyle::createAnonymousStyleWithDisplay(style(), BLOCK));
+        m_flowThread->setStyle(createMultiColumnFlowThreadStyle(style()));
         RenderBlock::addChild(m_flowThread); // Always put the flow thread at the end.
     }
 
@@ -141,21 +150,29 @@ void RenderMultiColumnBlock::ensureColumnSets()
     // FIXME: For now just make one column set. This matches the old multi-column code.
     // Right now our goal is just feature parity with the old multi-column code so that we can switch over to the
     // new code as soon as possible.
-    if (flowThread() && !firstChild()->isRenderMultiColumnSet()) {
-        RenderMultiColumnSet* columnSet = new (renderArena()) RenderMultiColumnSet(document(), flowThread());
+    if (!flowThread())
+        return;
+
+    RenderMultiColumnSet* columnSet = firstChild()->isRenderMultiColumnSet() ? toRenderMultiColumnSet(firstChild()) : 0;
+    if (!columnSet) {
+        columnSet = RenderMultiColumnSet::createAnonymous(flowThread());
         columnSet->setStyle(RenderStyle::createAnonymousStyleWithDisplay(style(), BLOCK));
         RenderBlock::addChild(columnSet, firstChild());
     }
+    columnSet->setRequiresBalancing(requiresBalancing());
 }
 
 const char* RenderMultiColumnBlock::renderName() const
-{    
+{
     if (isFloating())
         return "RenderMultiColumnBlock (floating)";
     if (isOutOfFlowPositioned())
         return "RenderMultiColumnBlock (positioned)";
     if (isAnonymousBlock())
         return "RenderMultiColumnBlock (anonymous)";
+    // FIXME: Temporary hack while the new generated content system is being implemented.
+    if (isPseudoElement())
+        return "RenderMultiColumnBlock (generated)";
     if (isAnonymous())
         return "RenderMultiColumnBlock (generated)";
     if (isRelPositioned())

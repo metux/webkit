@@ -30,10 +30,10 @@
 #define InspectorDOMStorageAgent_h
 
 #include "InspectorBaseAgent.h"
-#include "PlatformString.h"
 #include "StorageArea.h"
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -51,7 +51,7 @@ typedef String ErrorString;
 
 class InspectorDOMStorageAgent : public InspectorBaseAgent<InspectorDOMStorageAgent>, public InspectorBackendDispatcher::DOMStorageCommandHandler {
 public:
-    static PassOwnPtr<InspectorDOMStorageAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state)
+    static PassOwnPtr<InspectorDOMStorageAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
     {
         return adoptPtr(new InspectorDOMStorageAgent(instrumentingAgents, state));
     }
@@ -78,11 +78,10 @@ public:
     void didUseDOMStorage(StorageArea*, bool isLocalStorage, Frame*);
     void didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType, SecurityOrigin*, Page*);
 
-    // Called from InspectorMemoryAgent
-    size_t memoryBytesUsedByStorageCache() const;
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
-    InspectorDOMStorageAgent(InstrumentingAgents*, InspectorState*);
+    InspectorDOMStorageAgent(InstrumentingAgents*, InspectorCompositeState*);
 
     InspectorDOMStorageResource* getDOMStorageResourceForId(const String& storageId);
 

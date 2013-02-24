@@ -31,11 +31,6 @@
 #include "WebBackForwardListItem.h"
 #include <string.h>
 
-#if ENABLE(WEB_INTENTS)
-#include "WebIntentData.h"
-#include "WebIntentServiceInfo.h"
-#endif
-
 using namespace WebCore;
 
 namespace WebKit {
@@ -136,6 +131,14 @@ void WebLoaderClient::didNewFirstVisuallyNonEmptyLayout(WebPageProxy* page, APIO
     m_client.didNewFirstVisuallyNonEmptyLayout(toAPI(page), toAPI(userData), m_client.clientInfo);
 }
 
+void WebLoaderClient::didLayout(WebPageProxy* page, LayoutMilestones milestones, APIObject* userData)
+{
+    if (!m_client.didLayout)
+        return;
+
+    m_client.didLayout(toAPI(page), toWKLayoutMilestones(milestones), toAPI(userData), m_client.clientInfo);
+}
+
 void WebLoaderClient::didRemoveFrameFromHierarchy(WebPageProxy* page, WebFrameProxy* frame, APIObject* userData)
 {
     if (!m_client.didRemoveFrameFromHierarchy)
@@ -167,26 +170,6 @@ void WebLoaderClient::didDetectXSSForFrame(WebPageProxy* page, WebFrameProxy* fr
 
     m_client.didDetectXSSForFrame(toAPI(page), toAPI(frame), toAPI(userData), m_client.clientInfo);
 }
-
-#if ENABLE(WEB_INTENTS)
-void WebLoaderClient::didReceiveIntentForFrame(WebPageProxy* page, WebFrameProxy* frame, WebIntentData* intentData, APIObject* userData)
-{
-    if (!m_client.didReceiveIntentForFrame)
-        return;
-
-    m_client.didReceiveIntentForFrame(toAPI(page), toAPI(frame), toAPI(intentData), toAPI(userData), m_client.clientInfo);
-}
-#endif
-
-#if ENABLE(WEB_INTENTS_TAG)
-void WebLoaderClient::registerIntentServiceForFrame(WebPageProxy* page, WebFrameProxy* frame, WebIntentServiceInfo* serviceInfo, APIObject* userData)
-{
-    if (!m_client.registerIntentServiceForFrame)
-        return;
-
-    m_client.registerIntentServiceForFrame(toAPI(page), toAPI(frame), toAPI(serviceInfo), toAPI(userData), m_client.clientInfo);
-}
-#endif
 
 bool WebLoaderClient::canAuthenticateAgainstProtectionSpaceInFrame(WebPageProxy* page, WebFrameProxy* frame, WebProtectionSpace* protectionSpace)
 {

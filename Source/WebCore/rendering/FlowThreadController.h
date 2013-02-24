@@ -37,12 +37,12 @@
 namespace WebCore {
 
 class RenderFlowThread;
-class RenderFlowThreadContainer;
 class RenderNamedFlowThread;
 
 typedef ListHashSet<RenderNamedFlowThread*> RenderNamedFlowThreadList;
 
 class FlowThreadController {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<FlowThreadController> create(RenderView*);
     ~FlowThreadController();
@@ -66,7 +66,22 @@ public:
 
     void registerNamedFlowContentNode(Node*, RenderNamedFlowThread*);
     void unregisterNamedFlowContentNode(Node*);
-    void removeFlowThread(RenderNamedFlowThread*);
+
+    bool hasFlowThreadsWithAutoLogicalHeightRegions() const { return m_flowThreadsWithAutoLogicalHeightRegions; }
+    void incrementFlowThreadsWithAutoLogicalHeightRegions() { ++m_flowThreadsWithAutoLogicalHeightRegions; }
+    void decrementFlowThreadsWithAutoLogicalHeightRegions() { ASSERT(m_flowThreadsWithAutoLogicalHeightRegions > 0); --m_flowThreadsWithAutoLogicalHeightRegions; }
+
+    bool hasRenderNamedFlowThreadsNeedingLayout() const;
+
+#ifndef NDEBUG
+    bool isAutoLogicalHeightRegionsCountConsistent() const;
+#endif
+
+    void resetRegionsOverrideLogicalContentHeight();
+    void markAutoLogicalHeightRegionsForLayout();
+
+    bool needsTwoPassLayoutForAutoHeightRegions() const { return m_needsTwoPassLayoutForAutoHeightRegions; }
+    void setNeedsTwoPassLayoutForAutoHeightRegions(bool needsTwoPassLayout) { m_needsTwoPassLayoutForAutoHeightRegions = needsTwoPassLayout; }
 
 protected:
     FlowThreadController(RenderView*);
@@ -74,8 +89,9 @@ protected:
 private:
     RenderView* m_view;
     RenderFlowThread* m_currentRenderFlowThread;
-    RenderFlowThreadContainer* m_flowThreadContainer;
     bool m_isRenderNamedFlowThreadOrderDirty;
+    bool m_needsTwoPassLayoutForAutoHeightRegions;
+    unsigned m_flowThreadsWithAutoLogicalHeightRegions;
     OwnPtr<RenderNamedFlowThreadList> m_renderNamedFlowThreadList;
     // maps a content node to its render flow thread.
     HashMap<Node*, RenderNamedFlowThread*> m_mapNamedFlowContentNodes;

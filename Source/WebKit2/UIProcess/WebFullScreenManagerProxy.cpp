@@ -43,6 +43,7 @@ WebFullScreenManagerProxy::WebFullScreenManagerProxy(WebPageProxy* page)
     : m_page(page)
     , m_webView(0)
 {
+    m_page->process()->addMessageReceiver(Messages::WebFullScreenManagerProxy::messageReceiverName(), m_page->pageID(), this);
 }
 
 WebFullScreenManagerProxy::~WebFullScreenManagerProxy()
@@ -52,16 +53,6 @@ WebFullScreenManagerProxy::~WebFullScreenManagerProxy()
 void WebFullScreenManagerProxy::setWebView(PlatformWebView* webView)
 {
     m_webView = webView;
-}
-
-void WebFullScreenManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
-{
-    didReceiveWebFullScreenManagerProxyMessage(connection, messageID, arguments);
-}
-
-void WebFullScreenManagerProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, OwnPtr<CoreIPC::ArgumentEncoder>& reply)
-{
-    didReceiveSyncWebFullScreenManagerProxyMessage(connection, messageID, arguments, reply);
 }
 
 void WebFullScreenManagerProxy::willEnterFullScreen()
@@ -96,7 +87,7 @@ void WebFullScreenManagerProxy::requestExitFullScreen()
 
 void WebFullScreenManagerProxy::supportsFullScreen(bool withKeyboard, bool& supports)
 {
-    supports = true;
+    supports = !withKeyboard;
 }
 
 } // namespace WebKit

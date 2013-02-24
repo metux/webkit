@@ -26,6 +26,7 @@
 
 #include "CachedScript.h"
 #include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
 #include "ContentSecurityPolicy.h"
 #include "CrossOriginAccessControl.h"
 #include "Document.h"
@@ -256,16 +257,18 @@ bool ScriptElement::requestScript(const String& sourceUrl)
 
     ASSERT(!m_cachedScript);
     if (!stripLeadingAndTrailingHTMLSpaces(sourceUrl).isEmpty()) {
-        ResourceRequest request = ResourceRequest(m_element->document()->completeURL(sourceUrl));
+        CachedResourceRequest request(ResourceRequest(m_element->document()->completeURL(sourceUrl)));
 
         String crossOriginMode = m_element->fastGetAttribute(HTMLNames::crossoriginAttr);
         if (!crossOriginMode.isNull()) {
             m_requestUsesAccessControl = true;
             StoredCredentials allowCredentials = equalIgnoringCase(crossOriginMode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials;
-            updateRequestForAccessControl(request, m_element->document()->securityOrigin(), allowCredentials);
+            updateRequestForAccessControl(request.mutableResourceRequest(), m_element->document()->securityOrigin(), allowCredentials);
         }
+        request.setCharset(scriptCharset());
+        request.setInitiator(element());
 
-        m_cachedScript = m_element->document()->cachedResourceLoader()->requestScript(request, scriptCharset());
+        m_cachedScript = m_element->document()->cachedResourceLoader()->requestScript(request);
         m_isExternalScript = true;
     }
 
@@ -289,6 +292,13 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
 
     if (!m_isExternalScript && !m_element->document()->contentSecurityPolicy()->allowInlineScript(m_element->document()->url(), m_startLineNumber))
         return;
+
+#if ENABLE(NOSNIFF)
+    if (m_isExternalScript && m_cachedScript && !m_cachedScript->mimeTypeAllowedByNosniff()) {
+        m_element->document()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Refused to execute script from '" + m_cachedScript->url().string() + "' because its MIME type ('" + m_cachedScript->mimeType() + "') is not executable, and strict MIME type checking is enabled.");
+        return;
+    }
+#endif
 
     RefPtr<Document> document = m_element->document();
     ASSERT(document);
@@ -328,15 +338,22 @@ void ScriptElement::execute(CachedScript* cachedScript)
 void ScriptElement::notifyFinished(CachedResource* resource)
 {
     ASSERT(!m_willBeParserExecuted);
+
+    // CachedResource possibly invokes this notifyFinished() more than
+    // once because ScriptElement doesn't unsubscribe itself from
+    // CachedResource here and does it in execute() instead.
+    // We use m_cachedScript to check if this function is already called.
     ASSERT_UNUSED(resource, resource == m_cachedScript);
+    if (!m_cachedScript)
+        return;
 
     if (m_requestUsesAccessControl
         && !m_element->document()->securityOrigin()->canRequest(m_cachedScript->response().url())
         && !m_cachedScript->passesAccessControlCheck(m_element->document()->securityOrigin())) {
 
         dispatchErrorEvent();
-        DEFINE_STATIC_LOCAL(String, consoleMessage, ("Cross-origin script load denied by Cross-Origin Resource Sharing policy."));
-        m_element->document()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, consoleMessage);
+        DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Cross-origin script load denied by Cross-Origin Resource Sharing policy.")));
+        m_element->document()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, consoleMessage);
         return;
     }
 

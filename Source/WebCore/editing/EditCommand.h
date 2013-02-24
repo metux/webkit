@@ -73,6 +73,11 @@ private:
     CompositeEditCommand* m_parent;
 };
 
+enum ShouldAssumeContentIsAlwaysEditable {
+    AssumeContentIsAlwaysEditable,
+    DoNotAssumeContentIsAlwaysEditable,
+};
+
 class SimpleEditCommand : public EditCommand {
 public:
     virtual void doUnapply() = 0;
@@ -96,7 +101,7 @@ private:
 inline SimpleEditCommand* toSimpleEditCommand(EditCommand* command)
 {
     ASSERT(command);
-    ASSERT(command->isSimpleEditCommand());
+    ASSERT_WITH_SECURITY_IMPLICATION(command->isSimpleEditCommand());
     return static_cast<SimpleEditCommand*>(command);
 }
 

@@ -54,15 +54,13 @@ using namespace WebCore;
 namespace JSC {
 namespace Bindings {
 
-using JSC::UString;
-
-static JSC::UString& globalExceptionString()
+static String& globalExceptionString()
 {
-    DEFINE_STATIC_LOCAL(JSC::UString, exceptionStr, ());
+    DEFINE_STATIC_LOCAL(String, exceptionStr, ());
     return exceptionStr;
 }
 
-void CInstance::setGlobalException(UString exception)
+void CInstance::setGlobalException(String exception)
 {
     globalExceptionString() = exception;
 }
@@ -77,7 +75,7 @@ void CInstance::moveGlobalExceptionToExecState(ExecState* exec)
         throwError(exec, createError(exec, globalExceptionString()));
     }
 
-    globalExceptionString() = UString();
+    globalExceptionString() = String();
 }
 
 CInstance::CInstance(NPObject* o, PassRefPtr<RootObject> rootObject)
@@ -113,14 +111,14 @@ class CRuntimeMethod : public RuntimeMethod {
 public:
     typedef RuntimeMethod Base;
 
-    static CRuntimeMethod* create(ExecState* exec, JSGlobalObject* globalObject, const UString& name, Bindings::MethodList& list)
+    static CRuntimeMethod* create(ExecState* exec, JSGlobalObject* globalObject, const String& name, Bindings::Method* method)
     {
         // FIXME: deprecatedGetDOMStructure uses the prototype off of the wrong global object
         // We need to pass in the right global object for "i".
         Structure* domStructure = WebCore::deprecatedGetDOMStructure<CRuntimeMethod>(exec);
-        CRuntimeMethod* method = new (NotNull, allocateCell<CRuntimeMethod>(*exec->heap())) CRuntimeMethod(globalObject, domStructure, list);
-        method->finishCreation(exec->globalData(), name);
-        return method;
+        CRuntimeMethod* runtimeMethod = new (NotNull, allocateCell<CRuntimeMethod>(*exec->heap())) CRuntimeMethod(globalObject, domStructure, method);
+        runtimeMethod->finishCreation(exec->globalData(), name);
+        return runtimeMethod;
     }
 
     static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
@@ -131,12 +129,12 @@ public:
     static const ClassInfo s_info;
 
 private:
-    CRuntimeMethod(JSGlobalObject* globalObject, Structure* structure, Bindings::MethodList& list)
-        : RuntimeMethod(globalObject, structure, list)
+    CRuntimeMethod(JSGlobalObject* globalObject, Structure* structure, Bindings::Method* method)
+        : RuntimeMethod(globalObject, structure, method)
     {
     }
 
-    void finishCreation(JSGlobalData& globalData, const UString& name)
+    void finishCreation(JSGlobalData& globalData, const String& name)
     {
         Base::finishCreation(globalData, name);
         ASSERT(inherits(&s_info));
@@ -148,8 +146,8 @@ const ClassInfo CRuntimeMethod::s_info = { "CRuntimeMethod", &RuntimeMethod::s_i
 
 JSValue CInstance::getMethod(ExecState* exec, PropertyName propertyName)
 {
-    MethodList methodList = getClass()->methodsNamed(propertyName, this);
-    return CRuntimeMethod::create(exec, exec->lexicalGlobalObject(), propertyName.publicName(), methodList);
+    Method* method = getClass()->methodNamed(propertyName, this);
+    return CRuntimeMethod::create(exec, exec->lexicalGlobalObject(), propertyName.publicName(), method);
 }
 
 JSValue CInstance::invokeMethod(ExecState* exec, RuntimeMethod* runtimeMethod)
@@ -157,13 +155,8 @@ JSValue CInstance::invokeMethod(ExecState* exec, RuntimeMethod* runtimeMethod)
     if (!asObject(runtimeMethod)->inherits(&CRuntimeMethod::s_info))
         return throwError(exec, createTypeError(exec, "Attempt to invoke non-plug-in method on plug-in object."));
 
-    const MethodList& methodList = *runtimeMethod->methods();
-
-    // Overloading methods are not allowed by NPObjects.  Should only be one
-    // name match for a particular method.
-    ASSERT(methodList.size() == 1);
-
-    CMethod* method = static_cast<CMethod*>(methodList[0]);
+    CMethod* method = static_cast<CMethod*>(runtimeMethod->method());
+    ASSERT(method);
 
     NPIdentifier ident = method->identifier();
     if (!_object->_class->hasMethod(_object, ident))

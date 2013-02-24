@@ -32,6 +32,8 @@
 #include "DFGGraph.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
+#include "DFGVariableAccessDataDump.h"
+#include "Operations.h"
 #include <wtf/HashMap.h>
 
 namespace JSC { namespace DFG {
@@ -47,6 +49,8 @@ public:
     
     bool run()
     {
+        ASSERT(m_graph.m_form == ThreadedCPS);
+        
         for (unsigned i = m_graph.m_variableAccessData.size(); i--;) {
             VariableAccessData* variable = &m_graph.m_variableAccessData[i];
             if (!variable->isRoot())
@@ -62,22 +66,22 @@ public:
             if (!block)
                 continue;
             for (unsigned indexInBlock = 0; indexInBlock < block->size(); ++indexInBlock) {
-                NodeIndex nodeIndex = block->at(indexInBlock);
-                Node& node = m_graph[nodeIndex];
-                if (!node.shouldGenerate())
+                Node* node = block->at(indexInBlock);
+                if (!node->shouldGenerate())
                     continue;
-                switch (node.op()) {
-                case CheckStructure: {
-                    Node& child = m_graph[node.child1()];
-                    if (child.op() != GetLocal)
+                switch (node->op()) {
+                case CheckStructure:
+                case StructureTransitionWatchpoint: {
+                    Node* child = node->child1().node();
+                    if (child->op() != GetLocal)
                         break;
-                    VariableAccessData* variable = child.variableAccessData();
+                    VariableAccessData* variable = child->variableAccessData();
                     variable->vote(VoteStructureCheck);
                     if (variable->isCaptured() || variable->structureCheckHoistingFailed())
                         break;
                     if (!isCellSpeculation(variable->prediction()))
                         break;
-                    noticeStructureCheck(variable, node.structureSet());
+                    noticeStructureCheck(variable, node->structureSet());
                     break;
                 }
                     
@@ -85,16 +89,15 @@ public:
                 case ForwardStructureTransitionWatchpoint:
                     // We currently rely on the fact that we're the only ones who would
                     // insert this node.
-                    ASSERT_NOT_REACHED();
+                    RELEASE_ASSERT_NOT_REACHED();
                     break;
                     
                 case GetByOffset:
                 case PutByOffset:
                 case PutStructure:
-                case StructureTransitionWatchpoint:
                 case AllocatePropertyStorage:
                 case ReallocatePropertyStorage:
-                case GetPropertyStorage:
+                case GetButterfly:
                 case GetByVal:
                 case PutByVal:
                 case PutByValAlias:
@@ -105,8 +108,67 @@ public:
                     // Don't count these uses.
                     break;
                     
+                case ArrayifyToStructure:
+                case Arrayify:
+                    if (node->arrayMode().conversion() == Array::RageConvert) {
+                        // Rage conversion changes structures. We should avoid tying to do
+                        // any kind of hoisting when rage conversion is in play.
+                        Node* child = node->child1().node();
+                        if (child->op() != GetLocal)
+                            break;
+                        VariableAccessData* variable = child->variableAccessData();
+                        variable->vote(VoteOther);
+                        if (variable->isCaptured() || variable->structureCheckHoistingFailed())
+                            break;
+                        if (!isCellSpeculation(variable->prediction()))
+                            break;
+                        noticeStructureCheck(variable, 0);
+                    }
+                    break;
+                    
+                case SetLocal: {
+                    // Find all uses of the source of the SetLocal. If any of them are a
+                    // kind of CheckStructure, then we should notice them to ensure that
+                    // we're not hoisting a check that would contravene checks that are
+                    // already being performed.
+                    VariableAccessData* variable = node->variableAccessData();
+                    if (variable->isCaptured() || variable->structureCheckHoistingFailed())
+                        break;
+                    if (!isCellSpeculation(variable->prediction()))
+                        break;
+                    Node* source = node->child1().node();
+                    for (unsigned subIndexInBlock = 0; subIndexInBlock < block->size(); ++subIndexInBlock) {
+                        Node* subNode = block->at(subIndexInBlock);
+                        if (!subNode->shouldGenerate())
+                            continue;
+                        switch (subNode->op()) {
+                        case CheckStructure: {
+                            if (subNode->child1() != source)
+                                break;
+                            
+                            noticeStructureCheck(variable, subNode->structureSet());
+                            break;
+                        }
+                        case StructureTransitionWatchpoint: {
+                            if (subNode->child1() != source)
+                                break;
+                            
+                            noticeStructureCheck(variable, subNode->structure());
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+                    }
+                    
+                    m_graph.voteChildren(node, VoteOther);
+                    break;
+                }
+                case GarbageValue:
+                    break;
+                    
                 default:
-                    m_graph.vote(node, VoteOther);
+                    m_graph.voteChildren(node, VoteOther);
                     break;
                 }
             }
@@ -125,258 +187,147 @@ public:
             if (iter == m_map.end())
                 continue;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("Zeroing the structure to hoist for %s because the ratio is %lf.\n",
-                    m_graph.nameOfVariableAccessData(variable), variable->voteRatio());
+            dataLog(
+                "Zeroing the structure to hoist for ", VariableAccessDataDump(m_graph, variable),
+                " because the ratio is ", variable->voteRatio(), ".\n");
 #endif
-            iter->second.m_structure = 0;
+            iter->value.m_structure = 0;
         }
-
-        // Identify the set of variables that are live across a structure clobber.
         
-        Operands<VariableAccessData*> live(
-            m_graph.m_blocks[0]->variablesAtTail.numberOfArguments(),
-            m_graph.m_blocks[0]->variablesAtTail.numberOfLocals());
+        // Disable structure check hoisting for variables that cross the OSR entry that
+        // we're currently taking, and where the value currently does not have the
+        // structure we want.
+        
         for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex) {
             BasicBlock* block = m_graph.m_blocks[blockIndex].get();
             if (!block)
                 continue;
-            ASSERT(live.numberOfArguments() == block->variablesAtTail.numberOfArguments());
-            ASSERT(live.numberOfLocals() == block->variablesAtTail.numberOfLocals());
-            for (unsigned i = live.size(); i--;) {
-                NodeIndex indexAtTail = block->variablesAtTail[i];
-                VariableAccessData* variable;
-                if (indexAtTail == NoNode)
-                    variable = 0;
-                else
-                    variable = m_graph[indexAtTail].variableAccessData();
-                live[i] = variable;
-            }
-            for (unsigned indexInBlock = block->size(); indexInBlock--;) {
-                NodeIndex nodeIndex = block->at(indexInBlock);
-                Node& node = m_graph[nodeIndex];
-                if (!node.shouldGenerate())
+            ASSERT(block->isReachable);
+            if (!block->isOSRTarget)
+                continue;
+            if (block->bytecodeBegin != m_graph.m_osrEntryBytecodeIndex)
+                continue;
+            for (size_t i = 0; i < m_graph.m_mustHandleValues.size(); ++i) {
+                int operand = m_graph.m_mustHandleValues.operandForIndex(i);
+                Node* node = block->variablesAtHead.operand(operand);
+                if (!node)
                     continue;
-                switch (node.op()) {
-                case GetLocal:
-                case Flush:
-                    // This is a birth.
-                    live.operand(node.local()) = node.variableAccessData();
-                    break;
-                    
-                case SetLocal:
-                case SetArgument:
-                    ASSERT(live.operand(node.local())); // Must be live.
-                    ASSERT(live.operand(node.local()) == node.variableAccessData()); // Must have the variable we expected.
-                    // This is a death.
-                    live.operand(node.local()) = 0;
-                    break;
-                    
-                // Use the CFA's notion of what clobbers the world.
-                case ValueAdd:
-                    if (m_graph.addShouldSpeculateInteger(node))
-                        break;
-                    if (Node::shouldSpeculateNumber(m_graph[node.child1()], m_graph[node.child2()]))
-                        break;
-                    clobber(live);
-                    break;
-                    
-                case CompareLess:
-                case CompareLessEq:
-                case CompareGreater:
-                case CompareGreaterEq:
-                case CompareEq: {
-                    Node& left = m_graph[node.child1()];
-                    Node& right = m_graph[node.child2()];
-                    if (Node::shouldSpeculateInteger(left, right))
-                        break;
-                    if (Node::shouldSpeculateNumber(left, right))
-                        break;
-                    if (node.op() == CompareEq) {
-                        if ((m_graph.isConstant(node.child1().index())
-                             && m_graph.valueOfJSConstant(node.child1().index()).isNull())
-                            || (m_graph.isConstant(node.child2().index())
-                                && m_graph.valueOfJSConstant(node.child2().index()).isNull()))
-                            break;
-                        
-                        if (Node::shouldSpeculateFinalObject(left, right))
-                            break;
-                        if (Node::shouldSpeculateArray(left, right))
-                            break;
-                        if (left.shouldSpeculateFinalObject() && right.shouldSpeculateFinalObjectOrOther())
-                            break;
-                        if (right.shouldSpeculateFinalObject() && left.shouldSpeculateFinalObjectOrOther())
-                            break;
-                        if (left.shouldSpeculateArray() && right.shouldSpeculateArrayOrOther())
-                            break;
-                        if (right.shouldSpeculateArray() && left.shouldSpeculateArrayOrOther())
-                            break;
-                    }
-                    clobber(live);
-                    break;
+                VariableAccessData* variable = node->variableAccessData();
+                HashMap<VariableAccessData*, CheckData>::iterator iter = m_map.find(variable);
+                if (iter == m_map.end())
+                    continue;
+                if (!iter->value.m_structure)
+                    continue;
+                JSValue value = m_graph.m_mustHandleValues[i];
+                if (!value || !value.isCell()) {
+#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+                    dataLog(
+                        "Zeroing the structure to hoist for ", VariableAccessDataDump(m_graph, variable),
+                        " because the OSR entry value is not a cell: ", value, ".\n");
+#endif
+                    iter->value.m_structure = 0;
+                    continue;
                 }
-                    
-                case GetByVal:
-                case PutByVal:
-                case PutByValAlias:
-                    if (m_graph.byValIsPure(node))
-                        break;
-                    clobber(live);
-                    break;
-                    
-                case GetMyArgumentsLengthSafe:
-                case GetMyArgumentByValSafe:
-                case GetById:
-                case GetByIdFlush:
-                case PutStructure:
-                case PhantomPutStructure:
-                case PutById:
-                case PutByIdDirect:
-                case Call:
-                case Construct:
-                case Resolve:
-                case ResolveBase:
-                case ResolveBaseStrictPut:
-                case ResolveGlobal:
-                    clobber(live);
-                    break;
-                    
-                default:
-                    ASSERT(node.op() != Phi);
-                    break;
+                if (value.asCell()->structure() != iter->value.m_structure) {
+#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+                    dataLog(
+                        "Zeroing the structure to hoist for ", VariableAccessDataDump(m_graph, variable),
+                        " because the OSR entry value has structure ",
+                        RawPointer(value.asCell()->structure()), " and we wanted ",
+                        RawPointer(iter->value.m_structure), ".\n");
+#endif
+                    iter->value.m_structure = 0;
+                    continue;
                 }
             }
         }
-        
+
         bool changed = false;
 
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         for (HashMap<VariableAccessData*, CheckData>::iterator it = m_map.begin();
              it != m_map.end(); ++it) {
-            if (!it->second.m_structure) {
-                dataLog("Not hoisting checks for %s because of heuristics.\n", m_graph.nameOfVariableAccessData(it->first));
+            if (!it->value.m_structure) {
+                dataLog(
+                    "Not hoisting checks for ", VariableAccessDataDump(m_graph, it->key),
+                    " because of heuristics.\n");
                 continue;
             }
-            if (it->second.m_isClobbered && !it->second.m_structure->transitionWatchpointSetIsStillValid()) {
-                dataLog("Not hoisting checks for %s because the structure is clobbered and has an invalid watchpoint set.\n", m_graph.nameOfVariableAccessData(it->first));
-                continue;
-            }
-            dataLog("Hoisting checks for %s\n", m_graph.nameOfVariableAccessData(it->first));
+            dataLog("Hoisting checks for ", VariableAccessDataDump(m_graph, it->key), "\n");
         }
 #endif // DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         
-        // Make changes:
-        // 1) If a variable's live range does not span a clobber, then inject structure
-        //    checks before the SetLocal.
-        // 2) If a variable's live range spans a clobber but is watchpointable, then
-        //    inject structure checks before the SetLocal and replace all other structure
-        //    checks on that variable with structure transition watchpoints.
+        // Place CheckStructure's at SetLocal sites.
         
-        InsertionSet<NodeIndex> insertionSet;
+        InsertionSet insertionSet(m_graph);
         for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex) {
             BasicBlock* block = m_graph.m_blocks[blockIndex].get();
             if (!block)
                 continue;
             for (unsigned indexInBlock = 0; indexInBlock < block->size(); ++indexInBlock) {
-                NodeIndex nodeIndex = block->at(indexInBlock);
-                Node& node = m_graph[nodeIndex];
+                Node* node = block->at(indexInBlock);
                 // Be careful not to use 'node' after appending to the graph. In those switch
                 // cases where we need to append, we first carefully extract everything we need
                 // from the node, before doing any appending.
-                if (!node.shouldGenerate())
+                if (!node->shouldGenerate())
                     continue;
-                switch (node.op()) {
+                switch (node->op()) {
                 case SetArgument: {
                     ASSERT(!blockIndex);
                     // Insert a GetLocal and a CheckStructure immediately following this
                     // SetArgument, if the variable was a candidate for structure hoisting.
                     // If the basic block previously only had the SetArgument as its
                     // variable-at-tail, then replace it with this GetLocal.
-                    VariableAccessData* variable = node.variableAccessData();
+                    VariableAccessData* variable = node->variableAccessData();
                     HashMap<VariableAccessData*, CheckData>::iterator iter = m_map.find(variable);
                     if (iter == m_map.end())
                         break;
-                    if (!iter->second.m_structure)
-                        break;
-                    if (iter->second.m_isClobbered && !iter->second.m_structure->transitionWatchpointSetIsStillValid())
+                    if (!iter->value.m_structure)
                         break;
                     
-                    node.ref();
+                    CodeOrigin codeOrigin = node->codeOrigin;
+                    
+                    Node* getLocal = insertionSet.insertNode(
+                        indexInBlock + 1, DontRefChildren, DontRefNode, variable->prediction(),
+                        GetLocal, codeOrigin, OpInfo(variable), node);
+                    insertionSet.insertNode(
+                        indexInBlock + 1, RefChildren, DontRefNode, SpecNone, CheckStructure,
+                        codeOrigin, OpInfo(m_graph.addStructureSet(iter->value.m_structure)),
+                        getLocal);
 
-                    CodeOrigin codeOrigin = node.codeOrigin;
+                    if (block->variablesAtTail.operand(variable->local()) == node)
+                        block->variablesAtTail.operand(variable->local()) = getLocal;
                     
-                    Node getLocal(GetLocal, codeOrigin, OpInfo(variable), nodeIndex);
-                    getLocal.predict(variable->prediction());
-                    getLocal.ref();
-                    NodeIndex getLocalIndex = m_graph.size();
-                    m_graph.append(getLocal);
-                    insertionSet.append(indexInBlock + 1, getLocalIndex);
-                    
-                    Node checkStructure(CheckStructure, codeOrigin, OpInfo(m_graph.addStructureSet(iter->second.m_structure)), getLocalIndex);
-                    checkStructure.ref();
-                    NodeIndex checkStructureIndex = m_graph.size();
-                    m_graph.append(checkStructure);
-                    insertionSet.append(indexInBlock + 1, checkStructureIndex);
-                    
-                    if (block->variablesAtTail.operand(variable->local()) == nodeIndex)
-                        block->variablesAtTail.operand(variable->local()) = getLocalIndex;
-                    
-                    m_graph.substituteGetLocal(*block, indexInBlock, variable, getLocalIndex);
+                    m_graph.substituteGetLocal(*block, indexInBlock, variable, getLocal);
                     
                     changed = true;
                     break;
                 }
                     
                 case SetLocal: {
-                    VariableAccessData* variable = node.variableAccessData();
+                    VariableAccessData* variable = node->variableAccessData();
                     HashMap<VariableAccessData*, CheckData>::iterator iter = m_map.find(variable);
                     if (iter == m_map.end())
                         break;
-                    if (!iter->second.m_structure)
-                        break;
-                    if (iter->second.m_isClobbered && !iter->second.m_structure->transitionWatchpointSetIsStillValid())
+                    if (!iter->value.m_structure)
                         break;
 
                     // First insert a dead SetLocal to tell OSR that the child's value should
                     // be dropped into this bytecode variable if the CheckStructure decides
                     // to exit.
                     
-                    CodeOrigin codeOrigin = node.codeOrigin;
-                    NodeIndex child1 = node.child1().index();
+                    CodeOrigin codeOrigin = node->codeOrigin;
+                    Node* child1 = node->child1().node();
                     
-                    Node setLocal(SetLocal, codeOrigin, OpInfo(variable), child1);
-                    NodeIndex setLocalIndex = m_graph.size();
-                    m_graph.append(setLocal);
-                    insertionSet.append(indexInBlock, setLocalIndex);
-                    m_graph[child1].ref();
+                    insertionSet.insertNode(
+                        indexInBlock, DontRefChildren, DontRefNode, SpecNone, SetLocal, codeOrigin,
+                        OpInfo(variable), child1);
+
                     // Use a ForwardCheckStructure to indicate that we should exit to the
                     // next bytecode instruction rather than reexecuting the current one.
-                    Node checkStructure(ForwardCheckStructure, codeOrigin, OpInfo(m_graph.addStructureSet(iter->second.m_structure)), child1);
-                    checkStructure.ref();
-                    NodeIndex checkStructureIndex = m_graph.size();
-                    m_graph.append(checkStructure);
-                    insertionSet.append(indexInBlock, checkStructureIndex);
-                    changed = true;
-                    break;
-                }
-                    
-                case CheckStructure: {
-                    Node& child = m_graph[node.child1()];
-                    if (child.op() != GetLocal)
-                        break;
-                    HashMap<VariableAccessData*, CheckData>::iterator iter = m_map.find(child.variableAccessData());
-                    if (iter == m_map.end())
-                        break;
-                    if (!iter->second.m_structure)
-                        break;
-                    if (!iter->second.m_isClobbered) {
-                        node.setOpAndDefaultFlags(Phantom);
-                        ASSERT(node.refCount() == 1);
-                        break;
-                    }
-                    if (!iter->second.m_structure->transitionWatchpointSetIsStillValid())
-                        break;
-                    ASSERT(iter->second.m_structure == node.structureSet().singletonStructure());
-                    node.convertToStructureTransitionWatchpoint();
+                    insertionSet.insertNode(
+                        indexInBlock, RefChildren, DontRefNode, SpecNone, ForwardCheckStructure,
+                        codeOrigin, OpInfo(m_graph.addStructureSet(iter->value.m_structure)), child1);
                     changed = true;
                     break;
                 }
@@ -385,7 +336,7 @@ public:
                     break;
                 }
             }
-            insertionSet.execute(*block);
+            insertionSet.execute(block);
         }
         
         return changed;
@@ -395,12 +346,12 @@ private:
     void noticeStructureCheck(VariableAccessData* variable, Structure* structure)
     {
         HashMap<VariableAccessData*, CheckData>::AddResult result =
-            m_map.add(variable, CheckData(structure, false));
+            m_map.add(variable, CheckData(structure));
         if (result.isNewEntry)
             return;
-        if (result.iterator->second.m_structure == structure)
+        if (result.iterator->value.m_structure == structure)
             return;
-        result.iterator->second.m_structure = 0;
+        result.iterator->value.m_structure = 0;
     }
     
     void noticeStructureCheck(VariableAccessData* variable, const StructureSet& set)
@@ -412,38 +363,16 @@ private:
         noticeStructureCheck(variable, set.singletonStructure());
     }
     
-    void noticeClobber(VariableAccessData* variable)
-    {
-        HashMap<VariableAccessData*, CheckData>::iterator iter =
-            m_map.find(variable);
-        if (iter == m_map.end())
-            return;
-        iter->second.m_isClobbered = true;
-    }
-    
-    void clobber(const Operands<VariableAccessData*>& live)
-    {
-        for (size_t i = live.size(); i--;) {
-            VariableAccessData* variable = live[i];
-            if (!variable)
-                continue;
-            noticeClobber(variable);
-        }
-    }
-    
     struct CheckData {
         Structure* m_structure;
-        bool m_isClobbered;
         
         CheckData()
             : m_structure(0)
-            , m_isClobbered(false)
         {
         }
         
-        CheckData(Structure* structure, bool isClobbered)
+        CheckData(Structure* structure)
             : m_structure(structure)
-            , m_isClobbered(isClobbered)
         {
         }
     };

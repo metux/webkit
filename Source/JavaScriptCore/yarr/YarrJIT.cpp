@@ -28,6 +28,7 @@
 
 #include <wtf/ASCIICType.h>
 #include "LinkBuffer.h"
+#include "Options.h"
 #include "Yarr.h"
 #include "YarrCanonicalizeUCS2.h"
 
@@ -39,7 +40,7 @@ namespace JSC { namespace Yarr {
 
 template<YarrJITCompileMode compileMode>
 class YarrGenerator : private MacroAssembler {
-    friend void jitCompile(JSGlobalData*, YarrCodeBlock& jitObject, const UString& pattern, unsigned& numSubpatterns, const char*& error, bool ignoreCase, bool multiline);
+    friend void jitCompile(JSGlobalData*, YarrCodeBlock& jitObject, const String& pattern, unsigned& numSubpatterns, const char*& error, bool ignoreCase, bool multiline);
 
 #if CPU(ARM)
     static const RegisterID input = ARMRegisters::r0;
@@ -745,7 +746,11 @@ class YarrGenerator : private MacroAssembler {
         const RegisterID character = regT0;
         int maxCharactersAtOnce = m_charSize == Char8 ? 4 : 2;
         unsigned ignoreCaseMask = 0;
+#if CPU(BIG_ENDIAN)
+        int allCharacters = ch << (m_charSize == Char8 ? 24 : 16);
+#else
         int allCharacters = ch;
+#endif
         int numberCharacters;
         int startTermPosition = term->inputPosition;
 
@@ -754,7 +759,11 @@ class YarrGenerator : private MacroAssembler {
         ASSERT(!m_pattern.m_ignoreCase || isASCIIAlpha(ch) || isCanonicallyUnique(ch));
 
         if (m_pattern.m_ignoreCase && isASCIIAlpha(ch))
+#if CPU(BIG_ENDIAN)
+            ignoreCaseMask |= 32 << (m_charSize == Char8 ? 24 : 16);
+#else
             ignoreCaseMask |= 32;
+#endif
 
         for (numberCharacters = 1; numberCharacters < maxCharactersAtOnce && nextOp->m_op == OpTerm; ++numberCharacters, nextOp = &m_ops[opIndex + numberCharacters]) {
             PatternTerm* nextTerm = nextOp->m_term;
@@ -767,7 +776,11 @@ class YarrGenerator : private MacroAssembler {
 
             nextOp->m_isDeadCode = true;
 
+#if CPU(BIG_ENDIAN)
+            int shiftAmount = (m_charSize == Char8 ? 24 : 16) - ((m_charSize == Char8 ? 8 : 16) * numberCharacters);
+#else
             int shiftAmount = (m_charSize == Char8 ? 8 : 16) * numberCharacters;
+#endif
 
             UChar currentCharacter = nextTerm->patternCharacter;
 
@@ -1242,7 +1255,7 @@ class YarrGenerator : private MacroAssembler {
 
         case PatternTerm::TypeParenthesesSubpattern:
         case PatternTerm::TypeParentheticalAssertion:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         case PatternTerm::TypeBackReference:
             m_shouldFallBack = true;
             break;
@@ -1308,7 +1321,7 @@ class YarrGenerator : private MacroAssembler {
 
         case PatternTerm::TypeParenthesesSubpattern:
         case PatternTerm::TypeParentheticalAssertion:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
 
         case PatternTerm::TypeDotStarEnclosure:
             backtrackDotStarEnclosure(opIndex);
@@ -2302,11 +2315,11 @@ class YarrGenerator : private MacroAssembler {
         m_ops.append(alternativeBeginOpCode);
         m_ops.last().m_previousOp = notFound;
         m_ops.last().m_term = term;
-        Vector<PatternAlternative*>& alternatives =  term->parentheses.disjunction->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives =  term->parentheses.disjunction->m_alternatives;
         for (unsigned i = 0; i < alternatives.size(); ++i) {
             size_t lastOpIndex = m_ops.size() - 1;
 
-            PatternAlternative* nestedAlternative = alternatives[i];
+            PatternAlternative* nestedAlternative = alternatives[i].get();
             opCompileAlternative(nestedAlternative);
 
             size_t thisOpIndex = m_ops.size();
@@ -2353,11 +2366,11 @@ class YarrGenerator : private MacroAssembler {
         m_ops.append(OpSimpleNestedAlternativeBegin);
         m_ops.last().m_previousOp = notFound;
         m_ops.last().m_term = term;
-        Vector<PatternAlternative*>& alternatives =  term->parentheses.disjunction->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives =  term->parentheses.disjunction->m_alternatives;
         for (unsigned i = 0; i < alternatives.size(); ++i) {
             size_t lastOpIndex = m_ops.size() - 1;
 
-            PatternAlternative* nestedAlternative = alternatives[i];
+            PatternAlternative* nestedAlternative = alternatives[i].get();
             opCompileAlternative(nestedAlternative);
 
             size_t thisOpIndex = m_ops.size();
@@ -2427,7 +2440,7 @@ class YarrGenerator : private MacroAssembler {
     // to return the failing result.
     void opCompileBody(PatternDisjunction* disjunction)
     {
-        Vector<PatternAlternative*>& alternatives =  disjunction->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives = disjunction->m_alternatives;
         size_t currentAlternativeIndex = 0;
 
         // Emit the 'once through' alternatives.
@@ -2437,7 +2450,7 @@ class YarrGenerator : private MacroAssembler {
 
             do {
                 size_t lastOpIndex = m_ops.size() - 1;
-                PatternAlternative* alternative = alternatives[currentAlternativeIndex];
+                PatternAlternative* alternative = alternatives[currentAlternativeIndex].get();
                 opCompileAlternative(alternative);
 
                 size_t thisOpIndex = m_ops.size();
@@ -2472,7 +2485,7 @@ class YarrGenerator : private MacroAssembler {
         m_ops.last().m_previousOp = notFound;
         do {
             size_t lastOpIndex = m_ops.size() - 1;
-            PatternAlternative* alternative = alternatives[currentAlternativeIndex];
+            PatternAlternative* alternative = alternatives[currentAlternativeIndex].get();
             ASSERT(!alternative->onceThrough());
             opCompileAlternative(alternative);
 

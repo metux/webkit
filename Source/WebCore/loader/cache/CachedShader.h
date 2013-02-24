@@ -36,7 +36,6 @@
 
 namespace WebCore {
 
-class MemoryObjectInfo;
 class TextResourceDecoder;
 
 class CachedShader : public CachedResource {
@@ -45,7 +44,7 @@ public:
     virtual ~CachedShader();
     
     const String& shaderString();
-    void data(PassRefPtr<SharedBuffer>, bool allDataReceived);
+    void data(PassRefPtr<ResourceBuffer>, bool allDataReceived);
     
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 

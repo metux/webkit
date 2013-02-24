@@ -35,12 +35,12 @@ namespace WebCore {
 void ChildNodeInsertionNotifier::notifyDescendantInsertedIntoDocument(ContainerNode* node)
 {
     ChildNodesLazySnapshot snapshot(node);
-    while (Node* child = snapshot.nextNode()) {
+    while (RefPtr<Node> child = snapshot.nextNode()) {
         // If we have been removed from the document during this loop, then
         // we don't want to tell the rest of our children that they've been
         // inserted into the document because they haven't.
         if (node->inDocument() && child->parentNode() == node)
-            notifyNodeInsertedIntoDocument(child);
+            notifyNodeInsertedIntoDocument(child.get());
     }
 
     if (!node->isElementNode())
@@ -48,8 +48,10 @@ void ChildNodeInsertionNotifier::notifyDescendantInsertedIntoDocument(ContainerN
 
     if (ElementShadow* shadow = toElement(node)->shadow()) {
         ShadowRootVector roots(shadow);
-        for (size_t i = 0; i < roots.size(); ++i)
-            notifyNodeInsertedIntoDocument(roots[i].get());
+        for (size_t i = 0; i < roots.size(); ++i) {
+            if (node->inDocument() && roots[i]->host() == node)
+                notifyNodeInsertedIntoDocument(roots[i].get());
+        }
     }
 }
 
@@ -67,12 +69,12 @@ void ChildNodeInsertionNotifier::notifyDescendantInsertedIntoTree(ContainerNode*
 void ChildNodeRemovalNotifier::notifyDescendantRemovedFromDocument(ContainerNode* node)
 {
     ChildNodesLazySnapshot snapshot(node);
-    while (Node* child = snapshot.nextNode()) {
+    while (RefPtr<Node> child = snapshot.nextNode()) {
         // If we have been added to the document during this loop, then we
         // don't want to tell the rest of our children that they've been
         // removed from the document because they haven't.
         if (!node->inDocument() && child->parentNode() == node)
-            notifyNodeRemovedFromDocument(child);
+            notifyNodeRemovedFromDocument(child.get());
     }
 
     if (!node->isElementNode())
@@ -83,8 +85,10 @@ void ChildNodeRemovalNotifier::notifyDescendantRemovedFromDocument(ContainerNode
 
     if (ElementShadow* shadow = toElement(node)->shadow()) {
         ShadowRootVector roots(shadow);
-        for (size_t i = 0; i < roots.size(); ++i)
-            notifyNodeRemovedFromDocument(roots[i].get());
+        for (size_t i = 0; i < roots.size(); ++i) {
+            if (!node->inDocument() && roots[i]->host() == node)
+                notifyNodeRemovedFromDocument(roots[i].get());
+        }
     }
 }
 
@@ -105,16 +109,41 @@ void ChildNodeRemovalNotifier::notifyDescendantRemovedFromTree(ContainerNode* no
     }
 }
 
-void ChildFrameDisconnector::collectDescendant(ElementShadow* shadow)
+void ChildFrameDisconnector::collectFrameOwners(ElementShadow* shadow)
 {
     for (ShadowRoot* root = shadow->youngestShadowRoot(); root; root = root->olderShadowRoot())
-        collectDescendant(root);
+        collectFrameOwners(root);
 }
 
-void ChildFrameDisconnector::Target::disconnect()
+#ifndef NDEBUG
+unsigned assertConnectedSubrameCountIsConsistent(Node* node)
 {
-    ASSERT(isValid());
-    toFrameOwnerElement(m_owner.get())->disconnectContentFrame();
+    unsigned count = 0;
+
+    if (node->isElementNode()) {
+        if (node->isFrameOwnerElement() && toFrameOwnerElement(node)->contentFrame())
+            count++;
+
+        if (ElementShadow* shadow = toElement(node)->shadow()) {
+            for (ShadowRoot* root = shadow->youngestShadowRoot(); root; root = root->olderShadowRoot())
+                count += assertConnectedSubrameCountIsConsistent(root);
+        }
+    }
+
+    for (Node* child = node->firstChild(); child; child = child->nextSibling())
+        count += assertConnectedSubrameCountIsConsistent(child);
+
+    // If we undercount there's possibly a security bug since we'd leave frames
+    // in subtrees outside the document.
+    ASSERT(node->connectedSubframeCount() >= count);
+
+    // If we overcount it's safe, but not optimal because it means we'll traverse
+    // through the document in ChildFrameDisconnector looking for frames that have
+    // already been disconnected.
+    ASSERT(node->connectedSubframeCount() == count);
+
+    return count;
 }
+#endif
 
 }

@@ -26,7 +26,7 @@
 #include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
-#include "ComposedShadowTreeWalker.h"
+#include "EventPathWalker.h"
 #include "HTMLNames.h"
 #include "RenderListItem.h"
 
@@ -57,32 +57,32 @@ bool HTMLLIElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLLIElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLLIElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
     if (attribute.name() == typeAttr) {
         if (attribute.value() == "a")
-            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueLowerAlpha);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyListStyleType, CSSValueLowerAlpha);
         else if (attribute.value() == "A")
-            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueUpperAlpha);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyListStyleType, CSSValueUpperAlpha);
         else if (attribute.value() == "i")
-            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueLowerRoman);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyListStyleType, CSSValueLowerRoman);
         else if (attribute.value() == "I")
-            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueUpperRoman);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyListStyleType, CSSValueUpperRoman);
         else if (attribute.value() == "1")
-            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueDecimal);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyListStyleType, CSSValueDecimal);
         else
-            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, attribute.value());
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyListStyleType, attribute.value());
     } else
-        HTMLElement::collectStyleForAttribute(attribute, style);
+        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
-void HTMLLIElement::parseAttribute(const Attribute& attribute)
+void HTMLLIElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == valueAttr) {
+    if (name == valueAttr) {
         if (renderer() && renderer()->isListItem())
-            parseValue(attribute.value());
+            parseValue(value);
     } else
-        HTMLElement::parseAttribute(attribute);
+        HTMLElement::parseAttribute(name, value);
 }
 
 void HTMLLIElement::attach()
@@ -96,13 +96,13 @@ void HTMLLIElement::attach()
 
         // Find the enclosing list node.
         Node* listNode = 0;
-        ComposedShadowTreeParentWalker walker(this);
+        EventPathWalker walker(this);
         while (!listNode) {
-            walker.parentIncludingInsertionPointAndShadowRoot();
-            if (!walker.get())
+            walker.moveToParent();
+            if (!walker.node())
                 break;
-            if (walker.get()->hasTagName(ulTag) || walker.get()->hasTagName(olTag))
-                listNode = walker.get();
+            if (walker.node()->hasTagName(ulTag) || walker.node()->hasTagName(olTag))
+                listNode = walker.node();
         }
 
         // If we are not in a list, tell the renderer so it can position us inside.

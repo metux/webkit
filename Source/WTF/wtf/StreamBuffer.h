@@ -32,9 +32,7 @@
 #define WTF_StreamBuffer_h
 
 #include <wtf/Deque.h>
-#include <wtf/FixedArray.h>
 #include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace WTF {
 
@@ -63,7 +61,7 @@ public:
         while (size) {
             if (!m_buffer.size() || m_buffer.last()->size() == BlockSize)
                 m_buffer.append(adoptPtr(new Block));
-            size_t appendSize = min(BlockSize - m_buffer.last()->size(), size);
+            size_t appendSize = std::min(BlockSize - m_buffer.last()->size(), size);
             m_buffer.last()->append(data, appendSize);
             data += appendSize;
             size -= appendSize;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,19 +27,14 @@
 #define WebNotificationManagerProxy_h
 
 #include "APIObject.h"
-#include "MessageID.h"
+#include "MessageReceiver.h"
+#include "WebContextSupplement.h"
 #include "WebNotificationProvider.h"
 #include <WebCore/NotificationClient.h>
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/StringHash.h>
-
-namespace CoreIPC {
-class ArgumentDecoder;
-class ArgumentEncoder;
-class Connection;
-}
 
 namespace WebKit {
 
@@ -48,34 +43,41 @@ class WebContext;
 class WebPageProxy;
 class WebSecurityOrigin;
 
-class WebNotificationManagerProxy : public APIObject {
+class WebNotificationManagerProxy : public APIObject, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
     static const Type APIType = TypeNotificationManager;
-    
+
+    static const char* supplementName();
+
     static PassRefPtr<WebNotificationManagerProxy> create(WebContext*);
-    
-    void invalidate();
-    void clearContext() { m_context = 0; }
 
     void initializeProvider(const WKNotificationProvider*);
     void populateCopyOfNotificationPermissions(HashMap<String, bool>&);
 
-    void show(WebPageProxy*, const String& title, const String& body, const String& iconURL, const String& tag, const String& originString, uint64_t notificationID);
+    void show(WebPageProxy*, const String& title, const String& body, const String& iconURL, const String& tag, const String& lang, const String& dir, const String& originString, uint64_t notificationID);
 
     void providerDidShowNotification(uint64_t notificationID);
     void providerDidClickNotification(uint64_t notificationID);
     void providerDidCloseNotifications(ImmutableArray* notificationIDs);
     void providerDidUpdateNotificationPolicy(const WebSecurityOrigin*, bool allowed);
     void providerDidRemoveNotificationPolicies(ImmutableArray* origins);
-    
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+
+    using APIObject::ref;
+    using APIObject::deref;
 
 private:
     explicit WebNotificationManagerProxy(WebContext*);
     
     virtual Type type() const { return APIType; }
-    
-    void didReceiveWebNotificationManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+
+    // WebContextSupplement
+    virtual void contextDestroyed() OVERRIDE;
+    virtual void processDidClose(WebProcessProxy*) OVERRIDE;
+    virtual void refWebContextSupplement() OVERRIDE;
+    virtual void derefWebContextSupplement() OVERRIDE;
+
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
     
     // Message handlers
     void cancel(uint64_t notificationID);
@@ -84,7 +86,6 @@ private:
 
     typedef HashMap<uint64_t, RefPtr<WebNotification> > WebNotificationMap;
     
-    WebContext* m_context;
     WebNotificationProvider m_provider;
     WebNotificationMap m_notifications;
 };

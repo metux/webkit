@@ -28,6 +28,7 @@
 
 #if ENABLE(NETWORK_INFO)
 
+#include "WebNetworkInfoManagerMessages.h"
 #include "WebNetworkInfoManagerProxyMessages.h"
 #include "WebPage.h"
 #include "WebProcess.h"
@@ -42,15 +43,11 @@ namespace WebKit {
 WebNetworkInfoManager::WebNetworkInfoManager(WebProcess* process)
     : m_process(process)
 {
+    m_process->addMessageReceiver(Messages::WebNetworkInfoManager::messageReceiverName(), this);
 }
 
 WebNetworkInfoManager::~WebNetworkInfoManager()
 {
-}
-
-void WebNetworkInfoManager::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
-{
-    didReceiveWebNetworkInfoManagerMessage(connection, messageID, arguments);
 }
 
 void WebNetworkInfoManager::registerWebPage(WebPage* page)

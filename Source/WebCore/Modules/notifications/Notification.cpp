@@ -109,7 +109,7 @@ Notification::Notification(ScriptExecutionContext* context, const String& title)
     , m_state(Idle)
     , m_taskTimer(adoptPtr(new Timer<Notification>(this, &Notification::taskTimerFired)))
 {
-    ASSERT(context->isDocument());
+    ASSERT_WITH_SECURITY_IMPLICATION(context->isDocument());
     m_notificationCenter = DOMWindowNotifications::webkitNotifications(static_cast<Document*>(context)->domWindow());
     
     ASSERT(m_notificationCenter->client());
@@ -138,13 +138,6 @@ PassRefPtr<Notification> Notification::create(const String& title, const String&
 #endif
 
 #if ENABLE(NOTIFICATIONS)
-static void getAndAddEventListener(const AtomicString& eventName, const char* property, const Dictionary& options, Notification* notification)
-{
-    RefPtr<EventListener> listener = options.getEventListener(property, notification);
-    if (listener)
-        notification->addEventListener(eventName, listener.release(), false);
-}
-
 PassRefPtr<Notification> Notification::create(ScriptExecutionContext* context, const String& title, const Dictionary& options)
 {
     RefPtr<Notification> notification(adoptRef(new Notification(context, title)));
@@ -153,10 +146,15 @@ PassRefPtr<Notification> Notification::create(ScriptExecutionContext* context, c
         notification->setBody(argument);
     if (options.get("tag", argument))
         notification->setTag(argument);
-    getAndAddEventListener(eventNames().showEvent, "onshow", options, notification.get());
-    getAndAddEventListener(eventNames().closeEvent, "onclose", options, notification.get());
-    getAndAddEventListener(eventNames().errorEvent, "onerror", options, notification.get());
-    getAndAddEventListener(eventNames().clickEvent, "onclick", options, notification.get());
+    if (options.get("lang", argument))
+        notification->setLang(argument);
+    if (options.get("dir", argument))
+        notification->setDir(argument);
+    if (options.get("icon", argument)) {
+        KURL iconURI = argument.isEmpty() ? KURL() : context->completeURL(argument);
+        if (!iconURI.isEmpty() && iconURI.isValid())
+            notification->setIconURL(iconURI);
+    }
 
     notification->suspendIfNeeded();
     return notification.release();
@@ -171,9 +169,19 @@ const AtomicString& Notification::interfaceName() const
 void Notification::show() 
 {
     // prevent double-showing
-    if (m_state == Idle && m_notificationCenter->client() && m_notificationCenter->client()->show(this)) {
-        m_state = Showing;
-        setPendingActivity(this);
+    if (m_state == Idle && m_notificationCenter->client()) {
+#if ENABLE(NOTIFICATIONS)
+        if (!static_cast<Document*>(scriptExecutionContext())->page())
+            return;
+        if (NotificationController::from(static_cast<Document*>(scriptExecutionContext())->page())->client()->checkPermission(scriptExecutionContext()) != NotificationClient::PermissionAllowed) {
+            dispatchErrorEvent();
+            return;
+        }
+#endif
+        if (m_notificationCenter->client()->show(this)) {
+            m_state = Showing;
+            setPendingActivity(this);
+        }
     }
 }
 
@@ -242,12 +250,7 @@ void Notification::dispatchErrorEvent()
 void Notification::taskTimerFired(Timer<Notification>* timer)
 {
     ASSERT(scriptExecutionContext()->isDocument());
-    ASSERT(static_cast<Document*>(scriptExecutionContext())->page());
     ASSERT_UNUSED(timer, timer == m_taskTimer.get());
-    if (NotificationController::from(static_cast<Document*>(scriptExecutionContext())->page())->client()->checkPermission(scriptExecutionContext()) != NotificationClient::PermissionAllowed) {
-        dispatchErrorEvent();
-        return;
-    }
     show();
 }
 #endif
@@ -256,16 +259,17 @@ void Notification::taskTimerFired(Timer<Notification>* timer)
 #if ENABLE(NOTIFICATIONS)
 const String& Notification::permission(ScriptExecutionContext* context)
 {
-    ASSERT(context->isDocument());
+    ASSERT_WITH_SECURITY_IMPLICATION(context->isDocument());
     ASSERT(static_cast<Document*>(context)->page());
     return permissionString(NotificationController::from(static_cast<Document*>(context)->page())->client()->checkPermission(context));
 }
 
 const String& Notification::permissionString(NotificationClient::Permission permission)
 {
-    DEFINE_STATIC_LOCAL(const String, allowedPermission, ("granted"));
-    DEFINE_STATIC_LOCAL(const String, deniedPermission, ("denied"));
-    DEFINE_STATIC_LOCAL(const String, defaultPermission, ("default"));
+    DEFINE_STATIC_LOCAL(const String, allowedPermission, (ASCIILiteral("granted")));
+    DEFINE_STATIC_LOCAL(const String, deniedPermission, (ASCIILiteral("denied")));
+    DEFINE_STATIC_LOCAL(const String, defaultPermission, (ASCIILiteral("default")));
+
     switch (permission) {
     case NotificationClient::PermissionAllowed:
         return allowedPermission;
@@ -281,7 +285,7 @@ const String& Notification::permissionString(NotificationClient::Permission perm
 
 void Notification::requestPermission(ScriptExecutionContext* context, PassRefPtr<NotificationPermissionCallback> callback)
 {
-    ASSERT(context->isDocument());
+    ASSERT_WITH_SECURITY_IMPLICATION(context->isDocument());
     ASSERT(static_cast<Document*>(context)->page());
     NotificationController::from(static_cast<Document*>(context)->page())->client()->requestPermission(context, callback);
 }

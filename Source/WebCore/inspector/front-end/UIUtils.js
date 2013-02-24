@@ -60,40 +60,68 @@ WebInspector._elementDragStart = function(elementDragStart, elementDrag, element
     if (elementDragStart && !elementDragStart(event))
         return;
 
-    // Install glass pane
-    if (WebInspector._elementDraggingGlassPane)
+    if (WebInspector._elementDraggingGlassPane) {
         WebInspector._elementDraggingGlassPane.dispose();
+        delete WebInspector._elementDraggingGlassPane;
+    }
 
-    WebInspector._elementDraggingGlassPane = new WebInspector.GlassPane();
+    var targetDocument = event.target.ownerDocument;
 
     WebInspector._elementDraggingEventListener = elementDrag;
     WebInspector._elementEndDraggingEventListener = elementDragEnd;
+    WebInspector._mouseOutWhileDraggingTargetDocument = targetDocument;
 
-    var targetDocument = event.target.ownerDocument;
-    targetDocument.addEventListener("mousemove", WebInspector._elementDraggingEventListener, true);
+    targetDocument.addEventListener("mousemove", WebInspector._elementDragMove, true);
     targetDocument.addEventListener("mouseup", WebInspector._elementDragEnd, true);
+    targetDocument.addEventListener("mouseout", WebInspector._mouseOutWhileDragging, true);
 
     targetDocument.body.style.cursor = cursor;
 
     event.preventDefault();
 }
 
-WebInspector._elementDragEnd = function(event)
+WebInspector._mouseOutWhileDragging = function()
+{
+    WebInspector._unregisterMouseOutWhileDragging();
+    WebInspector._elementDraggingGlassPane = new WebInspector.GlassPane();
+}
+
+WebInspector._unregisterMouseOutWhileDragging = function()
+{
+    if (!WebInspector._mouseOutWhileDraggingTargetDocument)
+        return;
+    WebInspector._mouseOutWhileDraggingTargetDocument.removeEventListener("mouseout", WebInspector._mouseOutWhileDragging, true);
+    delete WebInspector._mouseOutWhileDraggingTargetDocument;
+}
+
+WebInspector._elementDragMove = function(event)
+{
+    if (WebInspector._elementDraggingEventListener(event))
+        WebInspector._cancelDragEvents(event);
+}
+
+WebInspector._cancelDragEvents = function(event)
 {
     var targetDocument = event.target.ownerDocument;
-    targetDocument.removeEventListener("mousemove", WebInspector._elementDraggingEventListener, true);
+    targetDocument.removeEventListener("mousemove", WebInspector._elementDragMove, true);
     targetDocument.removeEventListener("mouseup", WebInspector._elementDragEnd, true);
+    WebInspector._unregisterMouseOutWhileDragging();
 
     targetDocument.body.style.removeProperty("cursor");
 
     if (WebInspector._elementDraggingGlassPane)
         WebInspector._elementDraggingGlassPane.dispose();
 
-    var elementDragEnd = WebInspector._elementEndDraggingEventListener;
-
     delete WebInspector._elementDraggingGlassPane;
     delete WebInspector._elementDraggingEventListener;
     delete WebInspector._elementEndDraggingEventListener;
+}
+
+WebInspector._elementDragEnd = function(event)
+{
+    var elementDragEnd = WebInspector._elementEndDraggingEventListener;
+
+    WebInspector._cancelDragEvents(event);
 
     event.preventDefault();
     if (elementDragEnd)
@@ -619,56 +647,59 @@ WebInspector.startEditing = function(element, config)
 }
 
 /**
+ * @param {number} seconds
  * @param {boolean=} higherResolution
+ * @return {string}
  */
 Number.secondsToString = function(seconds, higherResolution)
 {
+    if (!isFinite(seconds))
+        return "-";
+
     if (seconds === 0)
         return "0";
 
     var ms = seconds * 1000;
     if (higherResolution && ms < 1000)
-        return WebInspector.UIString("%.3fms", ms);
+        return WebInspector.UIString("%.3f\u2009ms", ms);
     else if (ms < 1000)
-        return WebInspector.UIString("%.0fms", ms);
+        return WebInspector.UIString("%.0f\u2009ms", ms);
 
     if (seconds < 60)
-        return WebInspector.UIString("%.2fs", seconds);
+        return WebInspector.UIString("%.2f\u2009s", seconds);
 
     var minutes = seconds / 60;
     if (minutes < 60)
-        return WebInspector.UIString("%.1fmin", minutes);
+        return WebInspector.UIString("%.1f\u2009min", minutes);
 
     var hours = minutes / 60;
     if (hours < 24)
-        return WebInspector.UIString("%.1fhrs", hours);
+        return WebInspector.UIString("%.1f\u2009hrs", hours);
 
     var days = hours / 24;
-    return WebInspector.UIString("%.1f days", days);
+    return WebInspector.UIString("%.1f\u2009days", days);
 }
 
 /**
- * @param {boolean=} higherResolution
+ * @param {number} bytes
+ * @return {string}
  */
-Number.bytesToString = function(bytes, higherResolution)
+Number.bytesToString = function(bytes)
 {
-    if (typeof higherResolution === "undefined")
-        higherResolution = true;
-
     if (bytes < 1024)
-        return WebInspector.UIString("%.0fB", bytes);
+        return WebInspector.UIString("%.0f\u2009B", bytes);
 
     var kilobytes = bytes / 1024;
-    if (higherResolution && kilobytes < 1024)
-        return WebInspector.UIString("%.2fKB", kilobytes);
-    else if (kilobytes < 1024)
-        return WebInspector.UIString("%.0fKB", kilobytes);
+    if (kilobytes < 100)
+        return WebInspector.UIString("%.1f\u2009KB", kilobytes);
+    if (kilobytes < 1024)
+        return WebInspector.UIString("%.0f\u2009KB", kilobytes);
 
     var megabytes = kilobytes / 1024;
-    if (higherResolution)
-        return WebInspector.UIString("%.2fMB", megabytes);
+    if (megabytes < 100)
+        return WebInspector.UIString("%.1f\u2009MB", megabytes);
     else
-        return WebInspector.UIString("%.0fMB", megabytes);
+        return WebInspector.UIString("%.0f\u2009MB", megabytes);
 }
 
 Number.withThousandsSeparator = function(num)
@@ -727,7 +758,9 @@ WebInspector.PlatformFlavor = {
     WindowsVista: "windows-vista",
     MacTiger: "mac-tiger",
     MacLeopard: "mac-leopard",
-    MacSnowLeopard: "mac-snowleopard"
+    MacSnowLeopard: "mac-snowleopard",
+    MacLion: "mac-lion",
+    MacMountainLion: "mac-mountain-lion"
 }
 
 WebInspector.platformFlavor = function()
@@ -751,8 +784,13 @@ WebInspector.platformFlavor = function()
                 case 5:
                     return WebInspector.PlatformFlavor.MacLeopard;
                 case 6:
-                default:
                     return WebInspector.PlatformFlavor.MacSnowLeopard;
+                case 7:
+                    return WebInspector.PlatformFlavor.MacLion;
+                case 8:
+                    return WebInspector.PlatformFlavor.MacMountainLion;
+                default:
+                    return "";
             }
         }
     }
@@ -1012,77 +1050,6 @@ WebInspector.revertDomChanges = function(domChanges)
             break;
         }
     }
-}
-
-/**
- * @param {string} imageURL
- * @param {boolean} showDimensions
- * @param {function(Element=)} userCallback
- * @param {Object=} precomputedDimensions
- */
-WebInspector.buildImagePreviewContents = function(imageURL, showDimensions, userCallback, precomputedDimensions)
-{
-    var resource = WebInspector.resourceTreeModel.resourceForURL(imageURL);
-    if (!resource) {
-        userCallback();
-        return;
-    }
-
-    var imageElement = document.createElement("img");
-    imageElement.addEventListener("load", buildContent, false);
-    imageElement.addEventListener("error", errorCallback, false);
-    resource.populateImageSource(imageElement);
-
-    function errorCallback()
-    {
-        // Drop the event parameter when invoking userCallback.
-        userCallback();
-    }
-
-    function buildContent()
-    {
-        var container = document.createElement("table");
-        container.className = "image-preview-container";
-        var naturalWidth = precomputedDimensions ? precomputedDimensions.naturalWidth : imageElement.naturalWidth;
-        var naturalHeight = precomputedDimensions ? precomputedDimensions.naturalHeight : imageElement.naturalHeight;
-        var offsetWidth = precomputedDimensions ? precomputedDimensions.offsetWidth : naturalWidth;
-        var offsetHeight = precomputedDimensions ? precomputedDimensions.offsetHeight : naturalHeight;
-        var description;
-        if (showDimensions) {
-            if (offsetHeight === naturalHeight && offsetWidth === naturalWidth)
-                description = WebInspector.UIString("%d \xd7 %d pixels", offsetWidth, offsetHeight);
-            else
-                description = WebInspector.UIString("%d \xd7 %d pixels (Natural: %d \xd7 %d pixels)", offsetWidth, offsetHeight, naturalWidth, naturalHeight);
-        }
-
-        container.createChild("tr").createChild("td", "image-container").appendChild(imageElement);
-        if (description)
-            container.createChild("tr").createChild("td").createChild("span", "description").textContent = description;
-        userCallback(container);
-    }
-}
-
-/**
- * @param {WebInspector.ContextMenu} contextMenu
- * @param {Node} contextNode
- * @param {Event} event
- */
-WebInspector.populateHrefContextMenu = function(contextMenu, contextNode, event)
-{
-    var anchorElement = event.target.enclosingNodeOrSelfWithClass("webkit-html-resource-link") || event.target.enclosingNodeOrSelfWithClass("webkit-html-external-link");
-    if (!anchorElement)
-        return false;
-
-    var resourceURL = WebInspector.resourceURLForRelatedNode(contextNode, anchorElement.href);
-    if (!resourceURL)
-        return false;
-
-    // Add resource-related actions.
-    contextMenu.appendItem(WebInspector.openLinkExternallyLabel(), WebInspector.openResource.bind(WebInspector, resourceURL, false));
-    if (WebInspector.resourceForURL(resourceURL))
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Open link in Resources panel" : "Open Link in Resources Panel"), WebInspector.openResource.bind(null, resourceURL, true));
-    contextMenu.appendItem(WebInspector.copyLinkAddressLabel(), InspectorFrontendHost.copyText.bind(InspectorFrontendHost, resourceURL));
-    return true;
 }
 
 WebInspector._coalescingLevel = 0;

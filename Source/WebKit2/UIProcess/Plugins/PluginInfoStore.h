@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,9 @@
 #ifndef PluginInfoStore_h
 #define PluginInfoStore_h
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
+
 #include "PluginModuleInfo.h"
-#include <wtf/ThreadingPrimitives.h>
 
 namespace WebCore {
     class KURL;
@@ -54,9 +55,8 @@ public:
     // Returns the info for the plug-in with the given path.
     PluginModuleInfo infoForPluginWithPath(const String& pluginPath) const;
 
-    // Return whether this plug-in should be blocked from being instantiated.
-    // Note that the plug-in will still be seen by e.g. navigator.plugins
-    static bool shouldBlockPlugin(const PluginModuleInfo&);
+    static PluginModuleLoadPolicy policyForPlugin(const PluginModuleInfo&);
+    static bool reactivateInactivePlugin(const PluginModuleInfo&);
 
 private:
     PluginModuleInfo findPluginForMIMEType(const String& mimeType) const;
@@ -88,10 +88,10 @@ private:
     Vector<String> m_additionalPluginsDirectories;
     Vector<PluginModuleInfo> m_plugins;
     bool m_pluginListIsUpToDate;
-
-    mutable Mutex m_pluginsLock;
 };
     
 } // namespace WebKit
+
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #endif // PluginInfoStore_h

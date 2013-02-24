@@ -31,6 +31,7 @@
 #include "JSString.h"
 #include "JSStringBuilder.h"
 #include "ObjectPrototype.h"
+#include "Operations.h"
 #include <math.h>
 #include <time.h>
 #include <wtf/MathExtras.h>
@@ -71,7 +72,6 @@ const ClassInfo DateConstructor::s_info = { "Function", &InternalFunction::s_inf
 @end
 */
 
-ASSERT_CLASS_FITS_IN_CELL(DateConstructor);
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(DateConstructor);
 
 DateConstructor::DateConstructor(JSGlobalObject* globalObject, Structure* structure)
@@ -125,14 +125,14 @@ JSObject* constructDate(ExecState* exec, JSGlobalObject* globalObject, const Arg
             args.at(5).toNumber(exec), 
             args.at(6).toNumber(exec)
         };
-        if (!isfinite(doubleArguments[0])
-            || !isfinite(doubleArguments[1])
-            || (numArgs >= 3 && !isfinite(doubleArguments[2]))
-            || (numArgs >= 4 && !isfinite(doubleArguments[3]))
-            || (numArgs >= 5 && !isfinite(doubleArguments[4]))
-            || (numArgs >= 6 && !isfinite(doubleArguments[5]))
-            || (numArgs >= 7 && !isfinite(doubleArguments[6])))
-            value = std::numeric_limits<double>::quiet_NaN();
+        if (!std::isfinite(doubleArguments[0])
+            || !std::isfinite(doubleArguments[1])
+            || (numArgs >= 3 && !std::isfinite(doubleArguments[2]))
+            || (numArgs >= 4 && !std::isfinite(doubleArguments[3]))
+            || (numArgs >= 5 && !std::isfinite(doubleArguments[4]))
+            || (numArgs >= 6 && !std::isfinite(doubleArguments[5]))
+            || (numArgs >= 7 && !std::isfinite(doubleArguments[6])))
+            value = QNaN;
         else {
             GregorianDateTime t;
             int year = JSC::toInt32(doubleArguments[0]);
@@ -199,13 +199,13 @@ static EncodedJSValue JSC_HOST_CALL dateUTC(ExecState* exec)
         exec->argument(6).toNumber(exec)
     };
     int n = exec->argumentCount();
-    if (isnan(doubleArguments[0])
-            || isnan(doubleArguments[1])
-            || (n >= 3 && isnan(doubleArguments[2]))
-            || (n >= 4 && isnan(doubleArguments[3]))
-            || (n >= 5 && isnan(doubleArguments[4]))
-            || (n >= 6 && isnan(doubleArguments[5]))
-            || (n >= 7 && isnan(doubleArguments[6])))
+    if (std::isnan(doubleArguments[0])
+        || std::isnan(doubleArguments[1])
+        || (n >= 3 && std::isnan(doubleArguments[2]))
+        || (n >= 4 && std::isnan(doubleArguments[3]))
+        || (n >= 5 && std::isnan(doubleArguments[4]))
+        || (n >= 6 && std::isnan(doubleArguments[5]))
+        || (n >= 7 && std::isnan(doubleArguments[6])))
         return JSValue::encode(jsNaN());
 
     GregorianDateTime t;

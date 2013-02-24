@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,6 +44,8 @@ public:
     
     enum { Size = 3 };
     
+    AdjacencyList() { }
+    
     AdjacencyList(Kind kind)
 #if !ASSERT_DISABLED
         : m_kind(kind)
@@ -55,7 +57,7 @@ public:
         }
     }
     
-    AdjacencyList(Kind kind, NodeIndex child1, NodeIndex child2, NodeIndex child3)
+    AdjacencyList(Kind kind, Node* child1, Node* child2, Node* child3)
 #if !ASSERT_DISABLED
         : m_kind(Fixed)
 #endif
@@ -116,7 +118,7 @@ public:
         child(2) = child3;
     }
     
-    void initialize(NodeIndex child1 = NoNode, NodeIndex child2 = NoNode, NodeIndex child3 = NoNode)
+    void initialize(Node* child1 = 0, Node* child2 = 0, Node* child3 = 0)
     {
         initialize(Edge(child1), Edge(child2), Edge(child3));
     }
@@ -160,6 +162,9 @@ public:
         m_words[1].m_encodedWord = numChildren;
     }
     
+#if !ASSERT_DISABLED
+    Kind kind() const { return m_kind; }
+#endif
 private:
     Edge m_words[Size];
 #if !ASSERT_DISABLED

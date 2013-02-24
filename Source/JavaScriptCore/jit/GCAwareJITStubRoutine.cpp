@@ -30,17 +30,18 @@
 
 #include "Heap.h"
 #include "JSGlobalData.h"
-#include "ScopeChain.h"
+#include "Operations.h"
 #include "SlotVisitor.h"
 #include "Structure.h"
 
 namespace JSC {
 
 GCAwareJITStubRoutine::GCAwareJITStubRoutine(
-    const MacroAssemblerCodeRef& code, JSGlobalData& globalData)
+    const MacroAssemblerCodeRef& code, JSGlobalData& globalData, bool isClosureCall)
     : JITStubRoutine(code)
     , m_mayBeExecuting(false)
     , m_isJettisoned(false)
+    , m_isClosureCall(isClosureCall)
 {
     globalData.heap.m_jitStubRoutines.add(this);
 }
@@ -59,7 +60,7 @@ void GCAwareJITStubRoutine::observeZeroRefCount()
         return;
     }
     
-    ASSERT(!m_refCount);
+    RELEASE_ASSERT(!m_refCount);
 
     m_isJettisoned = true;
 }

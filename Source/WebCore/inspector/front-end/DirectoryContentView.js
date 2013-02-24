@@ -84,12 +84,12 @@ WebInspector.DirectoryContentView.prototype = {
 
     _sort: function()
     {
-        var column = /** @type {string} */ this.sortColumnIdentifier;
+        var column = /** @type {string} */ (this.sortColumnIdentifier);
         this.sortNodes(WebInspector.DirectoryContentView.Node.comparator(column, this.sortOrder === "descending"), false);
-    }
-}
+    },
 
-WebInspector.DirectoryContentView.prototype.__proto__ = WebInspector.DataGrid.prototype;
+    __proto__: WebInspector.DataGrid.prototype
+}
 
 /**
  * @constructor
@@ -155,12 +155,12 @@ WebInspector.DirectoryContentView.Node.comparator = function(column, reverse)
 
     function nameCompare(x, y)
     {
-        return reverseFactor * x._entry.name.localeCompare(y._entry.name);
+        return reverseFactor * x._entry.name.compareTo(y._entry.name);
     }
 
     function typeCompare(x, y)
     {
-        return reverseFactor * (x._entry.mimeType || "").localeCompare(y._entry.mimeType || "");
+        return reverseFactor * (x._entry.mimeType || "").compareTo(y._entry.mimeType || "");
     }
 
     function sizeCompare(x, y)
@@ -193,7 +193,7 @@ WebInspector.DirectoryContentView.Node.prototype = {
             data[indexes.Size] = Number.bytesToString(metadata.size);
         data[indexes.ModificationTime] = new Date(metadata.modificationTime).toGMTString();
         this.data = data;
-    }
-}
+    },
 
-WebInspector.DirectoryContentView.Node.prototype.__proto__ = WebInspector.DataGridNode.prototype;
+    __proto__: WebInspector.DataGridNode.prototype
+}

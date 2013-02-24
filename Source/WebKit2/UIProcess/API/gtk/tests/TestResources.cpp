@@ -80,6 +80,11 @@ public:
     {
         test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(resource));
         test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(request));
+
+        // Ignore favicons.
+        if (g_str_has_suffix(webkit_uri_request_get_uri(request), "favicon.ico"))
+            return;
+
         test->resourceLoadStarted(resource, request);
         g_signal_connect(resource, "sent-request", G_CALLBACK(resourceSentRequestCallback), test);
         g_signal_connect(resource, "notify::response", G_CALLBACK(resourceReceivedResponseCallback), test);
@@ -88,13 +93,25 @@ public:
         g_signal_connect(resource, "failed", G_CALLBACK(resourceFailedCallback), test);
     }
 
+    void clearSubresources()
+    {
+        g_list_free_full(m_subresources, reinterpret_cast<GDestroyNotify>(g_object_unref));
+        m_subresources = 0;
+    }
+
     ResourcesTest()
         : WebViewTest()
         , m_resourcesLoaded(0)
         , m_resourcesToLoad(0)
         , m_resourceDataSize(0)
+        , m_subresources(0)
     {
         g_signal_connect(m_webView, "resource-load-started", G_CALLBACK(resourceLoadStartedCallback), this);
+    }
+
+    ~ResourcesTest()
+    {
+        clearSubresources();
     }
 
     virtual void resourceLoadStarted(WebKitWebResource* resource, WebKitURIRequest* request)
@@ -116,6 +133,8 @@ public:
     virtual void resourceFinished(WebKitWebResource* resource)
     {
         g_signal_handlers_disconnect_matched(resource, G_SIGNAL_MATCH_DATA, 0, 0, 0, 0, this);
+        if (webkit_web_view_get_main_resource(m_webView) != resource)
+            m_subresources = g_list_prepend(m_subresources, g_object_ref(resource));
         if (++m_resourcesLoaded == m_resourcesToLoad)
             g_main_loop_quit(m_mainLoop);
     }
@@ -129,7 +148,13 @@ public:
     {
         m_resourcesLoaded = 0;
         m_resourcesToLoad = resourcesCount;
+        clearSubresources();
         g_main_loop_run(m_mainLoop);
+    }
+
+    GList* subresources()
+    {
+        return m_subresources;
     }
 
     static void resourceGetDataCallback(GObject* object, GAsyncResult* result, gpointer userData)
@@ -172,13 +197,14 @@ public:
     size_t m_resourcesToLoad;
     GOwnPtr<char> m_resourceData;
     size_t m_resourceDataSize;
+    GList* m_subresources;
 };
 
 static void testWebViewResources(ResourcesTest* test, gconstpointer)
 {
     // Nothing loaded yet, there shoulnd't be resources.
     g_assert(!webkit_web_view_get_main_resource(test->m_webView));
-    g_assert(!webkit_web_view_get_subresources(test->m_webView));
+    g_assert(!test->subresources());
 
     // Load simple page without subresources.
     test->loadHtml("<html><body>Testing WebKitGTK+</body></html>", 0);
@@ -186,7 +212,7 @@ static void testWebViewResources(ResourcesTest* test, gconstpointer)
     WebKitWebResource* resource = webkit_web_view_get_main_resource(test->m_webView);
     g_assert(resource);
     g_assert_cmpstr(webkit_web_view_get_uri(test->m_webView), ==, webkit_web_resource_get_uri(resource));
-    g_assert(!webkit_web_view_get_subresources(test->m_webView));
+    g_assert(!test->subresources());
 
     // Load simple page with subresources.
     test->loadURI(kServer->getURIForPath("/").data());
@@ -195,9 +221,9 @@ static void testWebViewResources(ResourcesTest* test, gconstpointer)
     resource = webkit_web_view_get_main_resource(test->m_webView);
     g_assert(resource);
     g_assert_cmpstr(webkit_web_view_get_uri(test->m_webView), ==, webkit_web_resource_get_uri(resource));
-    GOwnPtr<GList> subresources(webkit_web_view_get_subresources(test->m_webView));
+    GList* subresources = test->subresources();
     g_assert(subresources);
-    g_assert_cmpint(g_list_length(subresources.get()), ==, 3);
+    g_assert_cmpint(g_list_length(subresources), ==, 3);
 
 #if 0
     // Load the same URI again.
@@ -500,28 +526,38 @@ static void testWebResourceGetData(ResourcesTest* test, gconstpointer)
     g_assert(resource);
     test->checkResourceData(resource);
 
-    GOwnPtr<GList> subresources(webkit_web_view_get_subresources(test->m_webView));
-    for (GList* item = subresources.get(); item; item = g_list_next(item))
+    GList* subresources = test->subresources();
+    for (GList* item = subresources; item; item = g_list_next(item))
         test->checkResourceData(WEBKIT_WEB_RESOURCE(item->data));
 }
 
 static void testWebViewResourcesHistoryCache(SingleResourceLoadTest* test, gconstpointer)
 {
-    test->loadURI(kServer->getURIForPath("/").data());
+    CString javascriptURI = kServer->getURIForPath("/javascript.html");
+    test->loadURI(javascriptURI.data());
     test->waitUntilResourceLoadFinished();
-    g_assert(webkit_web_view_get_main_resource(test->m_webView));
+    WebKitWebResource* resource = webkit_web_view_get_main_resource(test->m_webView);
+    g_assert(resource);
+    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, javascriptURI.data());
 
-    test->loadURI(kServer->getURIForPath("/javascript.html").data());
+    CString simpleStyleCSSURI = kServer->getURIForPath("/simple-style-css.html");
+    test->loadURI(simpleStyleCSSURI.data());
     test->waitUntilResourceLoadFinished();
-    g_assert(webkit_web_view_get_main_resource(test->m_webView));
+    resource = webkit_web_view_get_main_resource(test->m_webView);
+    g_assert(resource);
+    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, simpleStyleCSSURI.data());
 
     test->goBack();
     test->waitUntilResourceLoadFinished();
-    g_assert(webkit_web_view_get_main_resource(test->m_webView));
+    resource = webkit_web_view_get_main_resource(test->m_webView);
+    g_assert(resource);
+    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, javascriptURI.data());
 
     test->goForward();
     test->waitUntilResourceLoadFinished();
-    g_assert(webkit_web_view_get_main_resource(test->m_webView));
+    resource = webkit_web_view_get_main_resource(test->m_webView);
+    g_assert(resource);
+    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, simpleStyleCSSURI.data());
 }
 
 static void addCacheHTTPHeadersToResponse(SoupMessage* message)
@@ -567,6 +603,9 @@ static void serverCallback(SoupServer* server, SoupMessage* message, const char*
     } else if (g_str_equal(path, "/invalid-css.html")) {
         static const char* invalidCSSHtml = "<html><head><link rel='stylesheet' href='/invalid.css' type='text/css'></head><body></html>";
         soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, invalidCSSHtml, strlen(invalidCSSHtml));
+    } else if (g_str_equal(path, "/simple-style-css.html")) {
+        static const char* simpleStyleCSSHtml = "<html><head><link rel='stylesheet' href='/simple-style.css' type='text/css'></head><body></html>";
+        soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, simpleStyleCSSHtml, strlen(simpleStyleCSSHtml));
     } else if (g_str_equal(path, "/style.css")) {
         soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, kStyleCSS, strlen(kStyleCSS));
         addCacheHTTPHeadersToResponse(message);
@@ -594,6 +633,8 @@ static void serverCallback(SoupServer* server, SoupMessage* message, const char*
         soup_message_headers_append(message->response_headers, "Location", "/simple-style.css");
     } else if (g_str_equal(path, "/invalid.css"))
         soup_message_set_status(message, SOUP_STATUS_CANT_CONNECT);
+    else
+        soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
     soup_message_body_complete(message->response_body);
 }
 

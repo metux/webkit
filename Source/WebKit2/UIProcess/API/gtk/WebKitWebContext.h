@@ -28,6 +28,8 @@
 #include <webkit2/WebKitCookieManager.h>
 #include <webkit2/WebKitDefines.h>
 #include <webkit2/WebKitDownload.h>
+#include <webkit2/WebKitFaviconDatabase.h>
+#include <webkit2/WebKitSecurityManager.h>
 #include <webkit2/WebKitURISchemeRequest.h>
 
 G_BEGIN_DECLS
@@ -58,6 +60,18 @@ typedef enum {
     WEBKIT_CACHE_MODEL_WEB_BROWSER,
     WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER
 } WebKitCacheModel;
+
+/**
+ * WebKitTLSErrorsPolicy:
+ * @WEBKIT_TLS_ERRORS_POLICY_IGNORE: Ignore TLS errors.
+ * @WEBKIT_TLS_ERRORS_POLICY_FAIL: TLS errors make the load to finish with an error.
+ *
+ * Enum values used to denote the TLS errors policy.
+ */
+typedef enum {
+    WEBKIT_TLS_ERRORS_POLICY_IGNORE,
+    WEBKIT_TLS_ERRORS_POLICY_FAIL
+} WebKitTLSErrorsPolicy;
 
 /**
  * WebKitURISchemeRequestCallback:
@@ -113,6 +127,18 @@ webkit_web_context_download_uri                     (WebKitWebContext           
 WEBKIT_API WebKitCookieManager *
 webkit_web_context_get_cookie_manager               (WebKitWebContext              *context);
 
+WEBKIT_API WebKitFaviconDatabase *
+webkit_web_context_get_favicon_database             (WebKitWebContext              *context);
+
+WEBKIT_API void
+webkit_web_context_set_favicon_database_directory   (WebKitWebContext              *context,
+                                                     const gchar                   *path);
+WEBKIT_API const gchar *
+webkit_web_context_get_favicon_database_directory   (WebKitWebContext              *context);
+
+WEBKIT_API WebKitSecurityManager *
+webkit_web_context_get_security_manager             (WebKitWebContext              *context);
+
 WEBKIT_API void
 webkit_web_context_set_additional_plugins_directory (WebKitWebContext              *context,
                                                      const gchar                   *directory);
@@ -150,6 +176,21 @@ webkit_web_context_set_spell_checking_languages     (WebKitWebContext           
 WEBKIT_API void
 webkit_web_context_set_preferred_languages          (WebKitWebContext              *context,
                                                      const gchar * const           *languages);
+
+WEBKIT_API void
+webkit_web_context_set_tls_errors_policy            (WebKitWebContext              *context,
+                                                     WebKitTLSErrorsPolicy          policy);
+
+WEBKIT_API WebKitTLSErrorsPolicy
+webkit_web_context_get_tls_errors_policy            (WebKitWebContext              *context);
+
+WEBKIT_API void
+webkit_web_context_set_web_extensions_directory     (WebKitWebContext              *context,
+                                                     const gchar                   *directory);
+
+WEBKIT_API void
+webkit_web_context_prefetch_dns                     (WebKitWebContext              *context,
+                                                     const gchar                   *hostname);
 
 G_END_DECLS
 

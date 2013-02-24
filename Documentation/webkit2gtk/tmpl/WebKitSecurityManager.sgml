@@ -1,0 +1,142 @@
+<!-- ##### SECTION Title ##### -->
+WebKitSecurityManager
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitSecurityManager ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### FUNCTION webkit_security_manager_register_uri_scheme_as_local ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_uri_scheme_is_local ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_register_uri_scheme_as_no_access ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_uri_scheme_is_no_access ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_register_uri_scheme_as_display_isolated ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_uri_scheme_is_display_isolated ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_register_uri_scheme_as_secure ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_uri_scheme_is_secure ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_register_uri_scheme_as_cors_enabled ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_uri_scheme_is_cors_enabled ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_register_uri_scheme_as_empty_document ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+
+
+<!-- ##### FUNCTION webkit_security_manager_uri_scheme_is_empty_document ##### -->
+<para>
+
+</para>
+
+@security_manager: 
+@scheme: 
+@Returns: 
+
+

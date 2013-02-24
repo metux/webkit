@@ -39,6 +39,7 @@
 #include "JSHTMLImageElement.h"
 #include "JSImageData.h"
 #include "JSInt32Array.h"
+#include "JSOESElementIndexUint.h"
 #include "JSOESStandardDerivatives.h"
 #include "JSOESTextureFloat.h"
 #include "JSOESVertexArrayObject.h"
@@ -57,6 +58,7 @@
 #include "JSWebGLVertexArrayObjectOES.h"
 #include "JSWebKitCSSMatrix.h"
 #include "NotImplemented.h"
+#include "OESElementIndexUint.h"
 #include "OESStandardDerivatives.h"
 #include "OESTextureFloat.h"
 #include "OESVertexArrayObject.h"
@@ -98,7 +100,7 @@ static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, const WebG
         const Vector<bool>& value = info.getBoolArray();
         for (size_t ii = 0; ii < value.size(); ++ii)
             list.append(jsBoolean(value[ii]));
-        return constructArray(exec, globalObject, list);
+        return constructArray(exec, 0, globalObject, list);
     }
     case WebGLGetInfo::kTypeFloat:
         return jsNumber(info.getFloat());
@@ -107,7 +109,7 @@ static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, const WebG
     case WebGLGetInfo::kTypeNull:
         return jsNull();
     case WebGLGetInfo::kTypeString:
-        return jsString(exec, info.getString());
+        return jsStringWithCache(exec, info.getString());
     case WebGLGetInfo::kTypeUnsignedInt:
         return jsNumber(info.getUnsignedInt());
     case WebGLGetInfo::kTypeWebGLBuffer:
@@ -190,7 +192,7 @@ static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, WebGLExten
     if (!extension)
         return jsNull();
     switch (extension->getName()) {
-    case WebGLExtension::WebKitWebGLLoseContextName:
+    case WebGLExtension::WebGLLoseContextName:
         return toJS(exec, globalObject, static_cast<WebGLLoseContext*>(extension));
     case WebGLExtension::EXTTextureFilterAnisotropicName:
         return toJS(exec, globalObject, static_cast<EXTTextureFilterAnisotropic*>(extension));
@@ -200,13 +202,15 @@ static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, WebGLExten
         return toJS(exec, globalObject, static_cast<OESTextureFloat*>(extension));
     case WebGLExtension::OESVertexArrayObjectName:
         return toJS(exec, globalObject, static_cast<OESVertexArrayObject*>(extension));
+    case WebGLExtension::OESElementIndexUintName:
+        return toJS(exec, globalObject, static_cast<OESElementIndexUint*>(extension));
     case WebGLExtension::WebGLDebugRendererInfoName:
         return toJS(exec, globalObject, static_cast<WebGLDebugRendererInfo*>(extension));
     case WebGLExtension::WebGLDebugShadersName:
         return toJS(exec, globalObject, static_cast<WebGLDebugShaders*>(extension));
-    case WebGLExtension::WebKitWebGLCompressedTextureS3TCName:
+    case WebGLExtension::WebGLCompressedTextureS3TCName:
         return toJS(exec, globalObject, static_cast<WebGLCompressedTextureS3TC*>(extension));
-    case WebGLExtension::WebKitWebGLDepthTextureName:
+    case WebGLExtension::WebGLDepthTextureName:
         return toJS(exec, globalObject, static_cast<WebGLDepthTexture*>(extension));
     }
     ASSERT_NOT_REACHED();
@@ -245,7 +249,7 @@ JSValue JSWebGLRenderingContext::getAttachedShaders(ExecState* exec)
     MarkedArgumentBuffer list;
     for (size_t ii = 0; ii < shaders.size(); ++ii)
         list.append(toJS(exec, globalObject(), shaders[ii].get()));
-    return constructArray(exec, globalObject(), list);
+    return constructArray(exec, 0, globalObject(), list);
 }
 
 JSValue JSWebGLRenderingContext::getExtension(ExecState* exec)
@@ -254,7 +258,7 @@ JSValue JSWebGLRenderingContext::getExtension(ExecState* exec)
         return throwError(exec, createNotEnoughArgumentsError(exec));
 
     WebGLRenderingContext* context = static_cast<WebGLRenderingContext*>(impl());
-    const String& name = ustringToString(exec->argument(0).toString(exec)->value(exec));
+    const String name = exec->argument(0).toString(exec)->value(exec);
     if (exec->hadException())
         return jsUndefined();
     WebGLExtension* extension = context->getExtension(name);
@@ -363,8 +367,8 @@ JSValue JSWebGLRenderingContext::getSupportedExtensions(ExecState* exec)
     Vector<String> value = context->getSupportedExtensions();
     MarkedArgumentBuffer list;
     for (size_t ii = 0; ii < value.size(); ++ii)
-        list.append(jsString(exec, value[ii]));
-    return constructArray(exec, globalObject(), list);
+        list.append(jsStringWithCache(exec, value[ii]));
+    return constructArray(exec, 0, globalObject(), list);
 }
 
 JSValue JSWebGLRenderingContext::getTexParameter(ExecState* exec)
@@ -613,7 +617,7 @@ static JSC::JSValue dataFunctionMatrix(DataFunctionMatrixToCall f, JSC::ExecStat
     if (exec->hadException())    
         return jsUndefined();
         
-    bool transpose = exec->argument(1).toBoolean();
+    bool transpose = exec->argument(1).toBoolean(exec);
     if (exec->hadException())    
         return jsUndefined();
         

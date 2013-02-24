@@ -37,7 +37,6 @@
 
 namespace WebCore {
 class CSSParserValueList;
-class MemoryObjectInfo;
 
 class MediaQueryExp {
     WTF_MAKE_FAST_ALLOCATED;
@@ -53,7 +52,7 @@ public:
     {
         return (other.m_mediaFeature == m_mediaFeature)
             && ((!other.m_value && !m_value)
-                || (other.m_value && m_value && other.m_value->cssText() == m_value->cssText()));
+                || (other.m_value && m_value && other.m_value->equals(*m_value)));
     }
 
     bool isValid() const { return m_isValid; }

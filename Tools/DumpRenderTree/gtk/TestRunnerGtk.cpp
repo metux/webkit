@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Eric Seidel <eric@webkit.org>
  * Copyright (C) 2008 Nuanti Ltd.
  * Copyright (C) 2009 Jan Michael Alonzo <jmalonzo@gmail.com>
@@ -48,6 +48,7 @@
 #include <libsoup/soup.h>
 #include <webkit/webkit.h>
 #include <wtf/gobject/GOwnPtr.h>
+#include <wtf/text/WTFString.h>
 
 extern "C" {
 void webkit_web_inspector_execute_script(WebKitWebInspector* inspector, long callId, const gchar* script);
@@ -112,30 +113,6 @@ JSValueRef TestRunner::computedStyleIncludingVisitedInfo(JSContextRef context, J
     return DumpRenderTreeSupportGtk::computedStyleIncludingVisitedInfo(context, value);
 }
 
-JSRetainPtr<JSStringRef> TestRunner::layerTreeAsText() const
-{
-    // FIXME: implement
-    JSRetainPtr<JSStringRef> string(Adopt, JSStringCreateWithUTF8CString(""));
-    return string;
-}
-
-int TestRunner::numberOfPages(float pageWidth, float pageHeight)
-{
-    return DumpRenderTreeSupportGtk::numberOfPagesForFrame(mainFrame, pageWidth, pageHeight);
-}
-
-JSRetainPtr<JSStringRef> TestRunner::pageProperty(const char* propertyName, int pageNumber) const
-{
-    JSRetainPtr<JSStringRef> propertyValue(Adopt, JSStringCreateWithUTF8CString(DumpRenderTreeSupportGtk::pageProperty(mainFrame, propertyName, pageNumber).data()));
-    return propertyValue;
-}
-
-JSRetainPtr<JSStringRef> TestRunner::pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft) const
-{
-    JSRetainPtr<JSStringRef> propertyValue(Adopt, JSStringCreateWithUTF8CString(DumpRenderTreeSupportGtk::pageSizeAndMarginsInPixels(mainFrame, pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft).data()));
-    return propertyValue;
-}
-
 size_t TestRunner::webHistoryItemCount()
 {
     WebKitWebView* webView = webkit_web_frame_get_web_view(mainFrame);
@@ -148,11 +125,6 @@ size_t TestRunner::webHistoryItemCount()
     // considered in DRT tests
     return webkit_web_back_forward_list_get_back_length(list) +
             webkit_web_back_forward_list_get_forward_length(list);
-}
-
-unsigned TestRunner::workerThreadCount() const
-{
-    return DumpRenderTreeSupportGtk::workerThreadCount();
 }
 
 JSRetainPtr<JSStringRef> TestRunner::platformName() const
@@ -181,26 +153,43 @@ JSStringRef TestRunner::pathToLocalResource(JSContextRef context, JSStringRef ur
     return JSStringCreateWithUTF8CString(testURI.get());
 }
 
+static CString soupURIToStringPreservingPassword(SoupURI* soupURI)
+{
+    if (!soupURI->password) {
+        GOwnPtr<char> uriString(soup_uri_to_string(soupURI, FALSE));
+        return uriString.get();
+    }
+
+    // soup_uri_to_string does not insert the password into the string, so we need to create the
+    // URI string and then reinsert any credentials that were present in the SoupURI. All tests that
+    // use URL-embedded credentials use HTTP, so it's safe here.
+    GOwnPtr<char> password(soupURI->password);
+    GOwnPtr<char> user(soupURI->user);
+    soupURI->password = 0;
+    soupURI->user = 0;
+
+    GOwnPtr<char> uriString(soup_uri_to_string(soupURI, FALSE));
+    String absoluteURIWithoutCredentialString = String::fromUTF8(uriString.get());
+    String protocolAndCredential = String::format("http://%s:%s@", user ? user.get() : "", password.get());
+    return absoluteURIWithoutCredentialString.replace("http://", protocolAndCredential).utf8();
+}
+
 void TestRunner::queueLoad(JSStringRef url, JSStringRef target)
 {
-    gchar* relativeURL = JSStringCopyUTF8CString(url);
+    GOwnPtr<gchar> relativeURL(JSStringCopyUTF8CString(url));
     SoupURI* baseURI = soup_uri_new(webkit_web_frame_get_uri(mainFrame));
-
-    SoupURI* absoluteURI = soup_uri_new_with_base(baseURI, relativeURL);
+    SoupURI* absoluteURI = soup_uri_new_with_base(baseURI, relativeURL.get());
     soup_uri_free(baseURI);
-    g_free(relativeURL);
 
-    gchar* absoluteCString;
-    if (absoluteURI) {
-        absoluteCString = soup_uri_to_string(absoluteURI, FALSE);
-        soup_uri_free(absoluteURI);
-    } else
-        absoluteCString = JSStringCopyUTF8CString(url);
+    if (!absoluteURI) {
+        WorkQueue::shared()->queue(new LoadItem(url, target));
+        return;
+    }
 
-    JSRetainPtr<JSStringRef> absoluteURL(Adopt, JSStringCreateWithUTF8CString(absoluteCString));
-    g_free(absoluteCString);
-
+    CString absoluteURIString = soupURIToStringPreservingPassword(absoluteURI);
+    JSRetainPtr<JSStringRef> absoluteURL(Adopt, JSStringCreateWithUTF8CString(absoluteURIString.data()));
     WorkQueue::shared()->queue(new LoadItem(absoluteURL.get(), target));
+    soup_uri_free(absoluteURI);
 }
 
 void TestRunner::setAcceptsEditing(bool acceptsEditing)
@@ -393,15 +382,6 @@ void TestRunner::setXSSAuditorEnabled(bool flag)
     g_object_set(G_OBJECT(settings), "enable-xss-auditor", flag, NULL);
 }
 
-void TestRunner::setFrameFlatteningEnabled(bool flag)
-{
-    WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
-    ASSERT(view);
-
-    WebKitWebSettings* settings = webkit_web_view_get_settings(view);
-    g_object_set(G_OBJECT(settings), "enable-frame-flattening", flag, NULL);
-}
-
 void TestRunner::setSpatialNavigationEnabled(bool flag)
 {
     WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
@@ -439,22 +419,13 @@ void TestRunner::setAutofilled(JSContextRef context, JSValueRef nodeObject, bool
     DumpRenderTreeSupportGtk::setAutofilled(context, nodeObject, isAutofilled);
 }
 
-void TestRunner::disableImageLoading()
-{
-    WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
-    ASSERT(view);
-
-    WebKitWebSettings* settings = webkit_web_view_get_settings(view);
-    g_object_set(G_OBJECT(settings), "auto-load-images", FALSE, NULL);
-}
-
 void TestRunner::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma)
 {
     // FIXME: Implement for DeviceOrientation layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=30335.
 }
 
-void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
+void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool, double, bool, double, bool, double, bool, double)
 {
     WebKitWebView* view = WEBKIT_WEB_VIEW(g_slist_nth_data(webViewList, 0));
     if (!view)
@@ -464,7 +435,7 @@ void TestRunner::setMockGeolocationPosition(double latitude, double longitude, d
     DumpRenderTreeSupportGtk::setMockGeolocationPosition(view, latitude, longitude, accuracy);
 }
 
-void TestRunner::setMockGeolocationError(int code, JSStringRef message)
+void TestRunner::setMockGeolocationPositionUnavailableError(JSStringRef message)
 {
     WebKitWebView* view = WEBKIT_WEB_VIEW(g_slist_nth_data(webViewList, 0));
     if (!view)
@@ -472,7 +443,7 @@ void TestRunner::setMockGeolocationError(int code, JSStringRef message)
     ASSERT(view);
 
     GOwnPtr<gchar> cMessage(JSStringCopyUTF8CString(message));
-    DumpRenderTreeSupportGtk::setMockGeolocationError(view, code, cMessage.get());
+    DumpRenderTreeSupportGtk::setMockGeolocationPositionUnavailableError(view, cMessage.get());
 }
 
 void TestRunner::setGeolocationPermission(bool allow)
@@ -735,31 +706,6 @@ void TestRunner::setAppCacheMaximumSize(unsigned long long size)
     webkit_application_cache_set_maximum_size(size);
 }
 
-bool TestRunner::pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId)
-{    
-    gchar* name = JSStringCopyUTF8CString(animationName);
-    gchar* element = JSStringCopyUTF8CString(elementId);
-    bool returnValue = DumpRenderTreeSupportGtk::pauseAnimation(mainFrame, name, time, element);
-    g_free(name);
-    g_free(element);
-    return returnValue;
-}
-
-bool TestRunner::pauseTransitionAtTimeOnElementWithId(JSStringRef propertyName, double time, JSStringRef elementId)
-{    
-    gchar* name = JSStringCopyUTF8CString(propertyName);
-    gchar* element = JSStringCopyUTF8CString(elementId);
-    bool returnValue = DumpRenderTreeSupportGtk::pauseTransition(mainFrame, name, time, element);
-    g_free(name);
-    g_free(element);
-    return returnValue;
-}
-
-unsigned TestRunner::numberOfActiveAnimations() const
-{
-    return DumpRenderTreeSupportGtk::numberOfActiveAnimations(mainFrame);
-}
-
 static gboolean booleanFromValue(gchar* value)
 {
     return !g_ascii_strcasecmp(value, "true") || !g_ascii_strcasecmp(value, "1");
@@ -793,6 +739,8 @@ void TestRunner::overridePreference(JSStringRef key, JSStringRef value)
         propertyName = "enable-webgl";
     else if (g_str_equal(originalName.get(), "WebKitWebAudioEnabled"))
         propertyName = "enable-webaudio";
+    else if (g_str_equal(originalName.get(), "WebKitDisplayImagesKey"))
+        propertyName = "auto-load-images";
     else if (g_str_equal(originalName.get(), "WebKitTabToLinksPreferenceKey")) {
         DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(booleanFromValue(valueAsString.get()));
         return;
@@ -804,6 +752,9 @@ void TestRunner::overridePreference(JSStringRef key, JSStringRef value)
         return;
     } else if (g_str_equal(originalName.get(), "WebKitCSSRegionsEnabled")) {
         DumpRenderTreeSupportGtk::setCSSRegionsEnabled(webkit_web_frame_get_web_view(mainFrame), booleanFromValue(valueAsString.get()));
+        return;
+    } else if (g_str_equal(originalName.get(), "WebKitCSSCustomFilterEnabled")) {
+        DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled(webkit_web_frame_get_web_view(mainFrame), booleanFromValue(valueAsString.get()));
         return;
     } else {
         fprintf(stderr, "TestRunner::overridePreference tried to override "
@@ -833,7 +784,8 @@ void TestRunner::overridePreference(JSStringRef key, JSStringRef value)
 
 void TestRunner::addUserScript(JSStringRef source, bool runAtStart, bool allFrames)
 {
-    printf("TestRunner::addUserScript not implemented.\n");
+    GOwnPtr<gchar> sourceCode(JSStringCopyUTF8CString(source));
+    DumpRenderTreeSupportGtk::addUserScript(mainFrame, sourceCode.get(), runAtStart, allFrames);
 }
 
 void TestRunner::addUserStyleSheet(JSStringRef source, bool allFrames)
@@ -940,15 +892,21 @@ void TestRunner::setSerializeHTTPLoads(bool serialize)
     DumpRenderTreeSupportGtk::setSerializeHTTPLoads(serialize);
 }
 
-void TestRunner::setMinimumTimerInterval(double minimumTimerInterval)
-{
-    WebKitWebView* webView = webkit_web_frame_get_web_view(mainFrame);
-    DumpRenderTreeSupportGtk::setMinimumTimerInterval(webView, minimumTimerInterval);
-}
-
 void TestRunner::setTextDirection(JSStringRef direction)
 {
-    // FIXME: Implement.
+    GOwnPtr<gchar> writingDirection(JSStringCopyUTF8CString(direction));
+
+    WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
+    ASSERT(view);
+
+    if (g_str_equal(writingDirection.get(), "auto"))
+        gtk_widget_set_direction(GTK_WIDGET(view), GTK_TEXT_DIR_NONE);
+    else if (g_str_equal(writingDirection.get(), "ltr"))
+        gtk_widget_set_direction(GTK_WIDGET(view), GTK_TEXT_DIR_LTR);
+    else if (g_str_equal(writingDirection.get(), "rtl"))
+        gtk_widget_set_direction(GTK_WIDGET(view), GTK_TEXT_DIR_RTL);
+    else
+        fprintf(stderr, "TestRunner::setTextDirection called with unknown direction: '%s'.\n", writingDirection.get());
 }
 
 void TestRunner::addChromeInputField()
@@ -967,7 +925,23 @@ void TestRunner::setBackingScaleFactor(double)
 {
 }
 
-void TestRunner::simulateDesktopNotificationClick(JSStringRef title)
+void TestRunner::grantWebNotificationPermission(JSStringRef origin)
+{
+}
+
+void TestRunner::denyWebNotificationPermission(JSStringRef jsOrigin)
+{
+}
+
+void TestRunner::removeAllWebNotificationPermissions()
+{
+}
+
+void TestRunner::simulateWebNotificationClick(JSValueRef jsNotification)
+{
+}
+
+void TestRunner::simulateLegacyWebNotificationClick(JSStringRef title)
 {
 }
 
@@ -986,17 +960,11 @@ void TestRunner::setAutomaticLinkDetectionEnabled(bool)
     // FIXME: Implement this.
 }
 
-void TestRunner::sendWebIntentResponse(JSStringRef)
-{
-    // FIXME: Implement this.
-}
-
-void TestRunner::deliverWebIntent(JSStringRef, JSStringRef, JSStringRef)
-{
-    // FIXME: Implement this.
-}
-
 void TestRunner::setStorageDatabaseIdleInterval(double)
 {
     // FIXME: Implement this.
+}
+
+void TestRunner::closeIdleLocalStorageDatabases()
+{
 }

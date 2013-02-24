@@ -34,6 +34,7 @@
 #if USE(TEXTURE_MAPPER_GL)
 #include "GLContext.h"
 #include "RedirectedXCompositeWindow.h"
+#include "TextureMapperFPSCounter.h"
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -58,10 +59,8 @@ public:
 
     // GraphicsLayerClient
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time);
-    virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
+    virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& rectToPaint);
-    virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
-    virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
 
     void initialize();
 
@@ -77,8 +76,11 @@ private:
     unsigned int m_layerFlushTimerCallbackId;
 
 #if USE(CLUTTER)
-    WebCore::GraphicsLayer* m_rootGraphicsLayer;
     GtkWidget* m_rootLayerEmbedder;
+    OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
+    OwnPtr<WebCore::GraphicsLayer> m_nonCompositedContentLayer;
+
+    static gboolean layerFlushTimerFiredCallback(AcceleratedCompositingContext*);
 #elif USE(TEXTURE_MAPPER_GL)
     OwnPtr<WebCore::RedirectedXCompositeWindow> m_redirectedWindow;
     OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
@@ -87,6 +89,7 @@ private:
     double m_lastFlushTime;
     double m_redrawPendingTime;
     bool m_needsExtraFlush;
+    WebCore::TextureMapperFPSCounter m_fpsCounter;
 
     void layerFlushTimerFired();
     void stopAnyPendingLayerFlush();

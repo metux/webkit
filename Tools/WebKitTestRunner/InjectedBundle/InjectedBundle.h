@@ -33,15 +33,11 @@
 #include "TextInputController.h"
 #include <WebKit2/WKBase.h>
 #include <WebKit2/WKRetainPtr.h>
+#include <sstream>
+#include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
-
-#include <sstream>
-
-namespace WTF {
-class StringBuilder;
-}
 
 namespace WTR {
 
@@ -67,10 +63,10 @@ public:
     size_t pageCount() const { return m_pages.size(); }
     void closeOtherPages();
 
-    void dumpBackForwardListsForAllPages();
+    void dumpBackForwardListsForAllPages(StringBuilder&);
 
     void done();
-    WTF::StringBuilder* stringBuilder() { return m_stringBuilder.get(); }
+    void setAudioResult(WKDataRef audioData) { m_audioResult = audioData; }
     void setPixelResult(WKImageRef image) { m_pixelResult = image; }
     void setRepaintRects(WKArrayRef rects) { m_repaintRects = rects; }
 
@@ -82,12 +78,36 @@ public:
     bool shouldDumpPixels() const { return m_dumpPixels; }
     bool useWaitToDumpWatchdogTimer() const { return m_useWaitToDumpWatchdogTimer; }
     
+    void outputText(const String&);
     void postNewBeforeUnloadReturnValue(bool);
     void postAddChromeInputField();
     void postRemoveChromeInputField();
     void postFocusWebView();
     void postSetBackingScaleFactor(double);
     void postSetWindowIsKey(bool);
+    void postSimulateWebNotificationClick(uint64_t notificationID);
+
+    // Geolocation.
+    void setGeolocationPermission(bool);
+    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
+    void setMockGeolocationPositionUnavailableError(WKStringRef errorMessage);
+
+    // Policy delegate.
+    void setCustomPolicyDelegate(bool enabled, bool permissive);
+
+    // Page Visibility.
+    void setVisibilityState(WKPageVisibilityState, bool isInitialState);
+
+    // Work queue.
+    bool shouldProcessWorkQueue() const;
+    void processWorkQueue();
+    void queueBackNavigation(unsigned howFarBackward);
+    void queueForwardNavigation(unsigned howFarForward);
+    void queueLoad(WKStringRef url, WKStringRef target);
+    void queueLoadHTMLString(WKStringRef content, WKStringRef baseURL = 0, WKStringRef unreachableURL = 0);
+    void queueReload();
+    void queueLoadingScript(WKStringRef script);
+    void queueNonLoadingScript(WKStringRef script);
 
 private:
     InjectedBundle();
@@ -124,8 +144,6 @@ private:
 
     WKBundleFrameRef m_topLoadingFrame;
 
-    OwnPtr<WTF::StringBuilder> m_stringBuilder;
-    
     enum State {
         Idle,
         Testing,
@@ -135,7 +153,10 @@ private:
 
     bool m_dumpPixels;
     bool m_useWaitToDumpWatchdogTimer;
+    bool m_useWorkQueue;
+    int m_timeout;
 
+    WKRetainPtr<WKDataRef> m_audioResult;
     WKRetainPtr<WKImageRef> m_pixelResult;
     WKRetainPtr<WKArrayRef> m_repaintRects;
 };

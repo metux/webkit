@@ -31,14 +31,22 @@
 
 #include "CodeProfiling.h"
 #include <errno.h>
-#include <sys/mman.h>
 #include <unistd.h>
 #include <wtf/MetaAllocator.h>
 #include <wtf/PageReservation.h>
 #include <wtf/VMTags.h>
 
+#if OS(DARWIN)
+#include <sys/mman.h>
+#endif
+
 #if OS(LINUX)
 #include <stdio.h>
+#endif
+
+#if !PLATFORM(IOS) && PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1090
+// MADV_FREE_REUSABLE does not work for JIT memory on older OSes so use MADV_FREE in that case.
+#define WTF_USE_MADV_FREE_FOR_JIT_MEMORY 1
 #endif
 
 using namespace WTF;
@@ -48,14 +56,14 @@ namespace JSC {
 uintptr_t startOfFixedExecutableMemoryPool;
 
 class FixedVMPoolExecutableAllocator : public MetaAllocator {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     FixedVMPoolExecutableAllocator()
         : MetaAllocator(jitAllocationGranule) // round up all allocations to 32 bytes
     {
         m_reservation = PageReservation::reserveWithGuardPages(fixedExecutableMemoryPoolSize, OSAllocator::JSJITCodePages, EXECUTABLE_POOL_WRITABLE, true);
-#if !(ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
-        if (!m_reservation)
-            CRASH();
+#if !ENABLE(LLINT)
+        RELEASE_ASSERT(m_reservation);
 #endif
         if (m_reservation) {
             ASSERT(m_reservation.size() == fixedExecutableMemoryPoolSize);
@@ -74,7 +82,7 @@ protected:
     
     virtual void notifyNeedPage(void* page)
     {
-#if OS(DARWIN)
+#if USE(MADV_FREE_FOR_JIT_MEMORY)
         UNUSED_PARAM(page);
 #else
         m_reservation.commit(page, pageSize());
@@ -83,14 +91,14 @@ protected:
     
     virtual void notifyPageIsFree(void* page)
     {
-#if OS(DARWIN)
+#if USE(MADV_FREE_FOR_JIT_MEMORY)
         for (;;) {
             int result = madvise(page, pageSize(), MADV_FREE);
             if (!result)
                 return;
             ASSERT(result == -1);
             if (errno != EAGAIN) {
-                ASSERT_NOT_REACHED(); // In debug mode, this should be a hard failure.
+                RELEASE_ASSERT_NOT_REACHED(); // In debug mode, this should be a hard failure.
                 break; // In release mode, we should just ignore the error - not returning memory to the OS is better than crashing, especially since we _will_ be able to reuse the memory internally anyway.
             }
         }
@@ -156,8 +164,7 @@ PassRefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(JSGlobalData& g
             return result;
         releaseExecutableMemory(globalData);
         result = allocator->allocate(sizeInBytes, ownerUID);
-        if (!result)
-            CRASH();
+        RELEASE_ASSERT(result);
     }
     return result.release();
 }

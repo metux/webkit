@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007, 2008, 2010 Apple Inc.  All rights reserved.
  * Copyright (C) 2009 Joseph Pecoraro
+ * Copyright (C) 2013 Samsung Electronics. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,7 +48,7 @@ WebInspector.ResourcesPanel = function(database)
 
     WebInspector.settings.resourcesLastSelectedItem = WebInspector.settings.createSetting("resourcesLastSelectedItem", {});
 
-    this.createSplitViewWithSidebarTree();
+    this.createSidebarViewWithTree();
     this.sidebarElement.addStyleClass("outline-disclosure");
     this.sidebarElement.addStyleClass("filter-all");
     this.sidebarElement.addStyleClass("children");
@@ -117,7 +118,6 @@ WebInspector.ResourcesPanel = function(database)
 
     WebInspector.domStorageModel.storages().forEach(this._addDOMStorage.bind(this));
     WebInspector.domStorageModel.addEventListener(WebInspector.DOMStorageModel.Events.DOMStorageAdded, this._domStorageAdded, this);
-    WebInspector.domStorageModel.addEventListener(WebInspector.DOMStorageModel.Events.DOMStorageUpdated, this._domStorageUpdated, this);
 }
 
 WebInspector.ResourcesPanel.prototype = {
@@ -193,7 +193,7 @@ WebInspector.ResourcesPanel.prototype = {
         this.sessionStorageListTreeElement.removeChildren();
         this.cookieListTreeElement.removeChildren();
 
-        if (this.visibleView)
+        if (this.visibleView && !(this.visibleView instanceof WebInspector.StorageCategoryView))
             this.visibleView.detach();
 
         this.storageViewStatusBarItemsContainer.removeChildren();
@@ -297,7 +297,7 @@ WebInspector.ResourcesPanel.prototype = {
      */
     _databaseAdded: function(event)
     {
-        var database = /** @type {WebInspector.Database} */ event.data;
+        var database = /** @type {WebInspector.Database} */ (event.data);
         this._addDatabase(database);
     },
 
@@ -331,7 +331,7 @@ WebInspector.ResourcesPanel.prototype = {
      */
     _domStorageAdded: function(event)
     {
-        var domStorage = /** @type {WebInspector.DOMStorage}*/ event.data;
+        var domStorage = /** @type {WebInspector.DOMStorage}*/ (event.data);
         this._addDOMStorage(domStorage);
     },
 
@@ -469,7 +469,7 @@ WebInspector.ResourcesPanel.prototype = {
         var view;
         view = this._domStorageViews.get(domStorage);
         if (!view) {
-            view = new WebInspector.DOMStorageItemsView(domStorage);
+            view = new WebInspector.DOMStorageItemsView(domStorage, WebInspector.domStorageModel);
             this._domStorageViews.put(domStorage, view);
         }
 
@@ -570,17 +570,6 @@ WebInspector.ResourcesPanel.prototype = {
             }
         }
         database.getTableNames(tableNamesCallback);
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
-    _domStorageUpdated: function(event)
-    {
-        var storage = /** @type {WebInspector.DOMStorage}*/ event.data;
-        var view = this._domStorageViews.get(storage);
-        if (this.visibleView && view === this.visibleView)
-            view.update();
     },
 
     _populateApplicationCacheTree: function()
@@ -854,10 +843,10 @@ WebInspector.ResourcesPanel.prototype = {
             this._previousHoveredElement.hovered = false;
             delete this._previousHoveredElement;
         }
-    }
-}
+    },
 
-WebInspector.ResourcesPanel.prototype.__proto__ = WebInspector.Panel.prototype;
+    __proto__: WebInspector.Panel.prototype
+}
 
 /**
  * @constructor
@@ -944,8 +933,10 @@ WebInspector.BaseStorageTreeElement.prototype = {
         }
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
+        if (!selectedByUser)
+            return;
         var itemURL = this.itemURL;
         if (itemURL)
             WebInspector.settings.resourcesLastSelectedItem.set(itemURL);
@@ -982,10 +973,10 @@ WebInspector.BaseStorageTreeElement.prototype = {
     get searchMatchesCount()
     {
         return 0;
-    }
-}
+    },
 
-WebInspector.BaseStorageTreeElement.prototype.__proto__ = TreeElement.prototype;
+    __proto__: TreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1006,9 +997,9 @@ WebInspector.StorageCategoryTreeElement.prototype = {
         return "category://" + this._categoryName;
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCategoryView(this._categoryName);
     },
 
@@ -1027,10 +1018,10 @@ WebInspector.StorageCategoryTreeElement.prototype = {
     oncollapse: function()
     {
         WebInspector.settings[this._expandedSettingKey].set(false);
-    }
-}
+    },
 
-WebInspector.StorageCategoryTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1063,9 +1054,9 @@ WebInspector.FrameTreeElement.prototype = {
         return "frame://" + encodeURI(this.displayName);
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCategoryView(this.displayName);
 
         this.listItemElement.removeStyleClass("hovered");
@@ -1147,10 +1138,10 @@ WebInspector.FrameTreeElement.prototype = {
                 break;
         }
         parentTreeElement.insertChild(childTreeElement, i);
-    }
-}
+    },
 
-WebInspector.FrameTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1171,9 +1162,9 @@ WebInspector.FrameResourceTreeElement.prototype = {
         return this._resource.url;
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showResourceView(this._resource);
     },
 
@@ -1217,11 +1208,11 @@ WebInspector.FrameResourceTreeElement.prototype = {
 
     _handleContextMenuEvent: function(event)
     {
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendApplicableItems(this._resource);
         if (this._resource.request)
             contextMenu.appendApplicableItems(this._resource.request);
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     _setBubbleText: function(x)
@@ -1317,10 +1308,10 @@ WebInspector.FrameResourceTreeElement.prototype = {
             }
         }
         return this._sourceView;
-    }
-}
+    },
 
-WebInspector.FrameResourceTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1338,9 +1329,9 @@ WebInspector.DatabaseTreeElement.prototype = {
         return "database://" + encodeURI(this._database.name);
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showDatabase(this._database);
     },
 
@@ -1360,10 +1351,10 @@ WebInspector.DatabaseTreeElement.prototype = {
                 this.appendChild(new WebInspector.DatabaseTableTreeElement(this._storagePanel, this._database, tableNames[i]));
         }
         this._database.getTableNames(tableNamesCallback.bind(this));
-    }
-}
+    },
 
-WebInspector.DatabaseTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1382,13 +1373,14 @@ WebInspector.DatabaseTableTreeElement.prototype = {
         return "database://" + encodeURI(this._database.name) + "/" + encodeURI(this._tableName);
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showDatabase(this._database, this._tableName);
-    }
+    },
+
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
 }
-WebInspector.DatabaseTableTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
 
 /**
  * @constructor
@@ -1416,9 +1408,9 @@ WebInspector.IndexedDBTreeElement.prototype = {
 
     _handleContextMenuEvent: function(event)
     {
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendItem(WebInspector.UIString("Refresh IndexedDB"), this.refreshIndexedDB.bind(this));
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     _createIndexedDBModel: function()
@@ -1445,7 +1437,7 @@ WebInspector.IndexedDBTreeElement.prototype = {
      */
     _indexedDBAdded: function(event)
     {
-        var databaseId = /** @type {WebInspector.IndexedDBModel.DatabaseId} */ event.data;
+        var databaseId = /** @type {WebInspector.IndexedDBModel.DatabaseId} */ (event.data);
 
         var idbDatabaseTreeElement = new WebInspector.IDBDatabaseTreeElement(this._storagePanel, this._indexedDBModel, databaseId);
         this._idbDatabaseTreeElements.push(idbDatabaseTreeElement);
@@ -1459,7 +1451,7 @@ WebInspector.IndexedDBTreeElement.prototype = {
      */
     _indexedDBRemoved: function(event)
     {
-        var databaseId = /** @type {WebInspector.IndexedDBModel.DatabaseId} */ event.data;
+        var databaseId = /** @type {WebInspector.IndexedDBModel.DatabaseId} */ (event.data);
 
         var idbDatabaseTreeElement = this._idbDatabaseTreeElement(databaseId)
         if (!idbDatabaseTreeElement)
@@ -1475,7 +1467,7 @@ WebInspector.IndexedDBTreeElement.prototype = {
      */
     _indexedDBLoaded: function(event)
     {
-        var database = /** @type {WebInspector.IndexedDBModel.Database} */ event.data;
+        var database = /** @type {WebInspector.IndexedDBModel.Database} */ (event.data);
 
         var idbDatabaseTreeElement = this._idbDatabaseTreeElement(database.databaseId)
         if (!idbDatabaseTreeElement)
@@ -1500,10 +1492,10 @@ WebInspector.IndexedDBTreeElement.prototype = {
         if (index !== -1)
             return this._idbDatabaseTreeElements[i];
         return null;
-    }
-}
+    },
 
-WebInspector.IndexedDBTreeElement.prototype.__proto__ = WebInspector.StorageCategoryTreeElement.prototype;
+    __proto__: WebInspector.StorageCategoryTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1530,21 +1522,21 @@ WebInspector.FileSystemListTreeElement.prototype = {
 
     _handleContextMenuEvent: function(event)
     {
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendItem(WebInspector.UIString("Refresh FileSystem List"), this._refreshFileSystem.bind(this));
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     _fileSystemAdded: function(event)
     {
-        var fileSystem = /** @type {WebInspector.FileSystemModel.FileSystem} */ event.data;
+        var fileSystem = /** @type {WebInspector.FileSystemModel.FileSystem} */ (event.data);
         var fileSystemTreeElement = new WebInspector.FileSystemTreeElement(this._storagePanel, fileSystem);
         this.appendChild(fileSystemTreeElement);
     },
 
     _fileSystemRemoved: function(event)
     {
-        var fileSystem = /** @type {WebInspector.FileSystemModel.FileSystem} */ event.data;
+        var fileSystem = /** @type {WebInspector.FileSystemModel.FileSystem} */ (event.data);
         var fileSystemTreeElement = this._fileSystemTreeElementByName(fileSystem.name);
         if (!fileSystemTreeElement)
             return;
@@ -1555,7 +1547,7 @@ WebInspector.FileSystemListTreeElement.prototype = {
     _fileSystemTreeElementByName: function(fileSystemName)
     {
         for (var i = 0; i < this.children.length; ++i) {
-            var child = /** @type {WebInspector.FileSystemTreeElement} */ this.children[i];
+            var child = /** @type {WebInspector.FileSystemTreeElement} */ (this.children[i]);
             if (child.fileSystemName === fileSystemName)
                 return this.children[i];
         }
@@ -1571,10 +1563,10 @@ WebInspector.FileSystemListTreeElement.prototype = {
         }
 
         this._fileSystemModel.refreshFileSystemList();
-    }
-}
+    },
 
-WebInspector.FileSystemListTreeElement.prototype.__proto__ = WebInspector.StorageCategoryTreeElement.prototype;
+    __proto__: WebInspector.StorageCategoryTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1605,12 +1597,12 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
 
     _handleContextMenuEvent: function(event)
     {
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendItem(WebInspector.UIString("Refresh IndexedDB"), this._refreshIndexedDB.bind(this));
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
-    _refreshIndexedDB: function(event)
+    _refreshIndexedDB: function()
     {
         this._model.refreshDatabaseNames();
     },
@@ -1653,9 +1645,9 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
         this.tooltip = WebInspector.UIString("Version") + ": " + this._database.version;
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         if (!this._view)
             this._view = new WebInspector.IDBDatabaseView(this._database);
 
@@ -1677,10 +1669,10 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
     {
         for (var objectStoreName in this._idbObjectStoreTreeElements)
             this._objectStoreRemoved(objectStoreName);
-    }
-}
+    },
 
-WebInspector.IDBDatabaseTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1754,9 +1746,9 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
         this.tooltip = tooltipString
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         if (!this._view)
             this._view = new WebInspector.IDBDataView(this._model, this._databaseId, this._objectStore, null);
 
@@ -1780,10 +1772,10 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
             this._indexRemoved(indexName);
         if (this._view)
             this._view.clear();
-    }
-}
+    },
 
-WebInspector.IDBObjectStoreTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1834,9 +1826,9 @@ WebInspector.IDBIndexTreeElement.prototype = {
         this.tooltip = tooltipLines.join("\n");
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         if (!this._view)
             this._view = new WebInspector.IDBDataView(this._model, this._databaseId, this._objectStore, this._index);
 
@@ -1847,10 +1839,10 @@ WebInspector.IDBIndexTreeElement.prototype = {
     {
         if (this._view)
             this._view.clear();
-    }
-}
+    },
 
-WebInspector.IDBIndexTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -1868,13 +1860,14 @@ WebInspector.DOMStorageTreeElement.prototype = {
         return "storage://" + this._domStorage.domain + "/" + (this._domStorage.isLocalStorage ? "local" : "session");
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showDOMStorage(this._domStorage);
-    }
+    },
+
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
 }
-WebInspector.DOMStorageTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
 
 /**
  * @constructor
@@ -1892,13 +1885,14 @@ WebInspector.CookieTreeElement.prototype = {
         return "cookies://" + this._cookieDomain;
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCookies(this, this._cookieDomain);
-    }
+    },
+
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
 }
-WebInspector.CookieTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
 
 /**
  * @constructor
@@ -1923,13 +1917,14 @@ WebInspector.ApplicationCacheManifestTreeElement.prototype = {
         return this._manifestURL;
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCategoryView(this._manifestURL);
-    }
+    },
+
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
 }
-WebInspector.ApplicationCacheManifestTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
 
 /**
  * @constructor
@@ -1975,13 +1970,14 @@ WebInspector.ApplicationCacheFrameTreeElement.prototype = {
         this._refreshTitles();
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showApplicationCache(this._frameId);
-    }
+    },
+
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
 }
-WebInspector.ApplicationCacheFrameTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
 
 /**
  * @constructor
@@ -2007,21 +2003,21 @@ WebInspector.FileSystemTreeElement.prototype = {
         return "filesystem://" + this._fileSystem.name;
     },
 
-    onselect: function()
+    onselect: function(selectedByUser)
     {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
+        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._fileSystemView = new WebInspector.FileSystemView(this._fileSystem);
         this._storagePanel.showFileSystem(this._fileSystemView);
     },
 
     clear: function()
     {
-        if (this.fileSystemView && this._storagePanel.visibleView == this.fileSystemView)
+        if (this.fileSystemView && this._storagePanel.visibleView === this.fileSystemView)
             this._storagePanel.closeVisibleView();
-    }
-}
+    },
 
-WebInspector.FileSystemTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
+    __proto__: WebInspector.BaseStorageTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -2040,10 +2036,10 @@ WebInspector.StorageCategoryView.prototype = {
     setText: function(text)
     {
         this._emptyView.text = text;
-    }
-}
+    },
 
-WebInspector.StorageCategoryView.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -2074,7 +2070,7 @@ WebInspector.ResourcesSearchController.prototype = {
         if (this._lastTreeElement !== currentTreeElement || this._lastIndex === -1)
             return this._searchResult(currentTreeElement, 0);
 
-        if (this._lastIndex == currentTreeElement.searchMatchesCount - 1)
+        if (this._lastIndex === currentTreeElement.searchMatchesCount - 1)
             return this._searchResult(this._traverser.next(currentTreeElement), 0, this._currentMatchIndex % this._matchesCount + 1);
 
         return this._searchResult(currentTreeElement, this._lastIndex + 1, this._currentMatchIndex + 1);
@@ -2206,7 +2202,7 @@ WebInspector.SearchResultsTreeElementsTraverser.prototype = {
      */
     _traverseNext: function(treeElement)
     {
-        return /** @type {WebInspector.BaseStorageTreeElement} */ treeElement.traverseNextTreeElement(false, this._root, true);
+        return /** @type {WebInspector.BaseStorageTreeElement} */ (treeElement.traverseNextTreeElement(false, this._root, true));
     },
 
     /**
@@ -2215,7 +2211,7 @@ WebInspector.SearchResultsTreeElementsTraverser.prototype = {
      */
     _traversePrevious: function(treeElement)
     {
-        return /** @type {WebInspector.BaseStorageTreeElement} */ treeElement.traversePreviousTreeElement(false, true);
+        return /** @type {WebInspector.BaseStorageTreeElement} */ (treeElement.traversePreviousTreeElement(false, true));
     },
 
     /**

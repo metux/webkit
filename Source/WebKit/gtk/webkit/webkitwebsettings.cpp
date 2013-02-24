@@ -30,6 +30,7 @@
 #include "FileSystem.h"
 #include "KURL.h"
 #include "PluginDatabase.h"
+#include "UserAgentGtk.h"
 #include "webkitenumtypes.h"
 #include "webkitglobalsprivate.h"
 #include "webkitversion.h"
@@ -38,12 +39,6 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenate.h>
 #include <glib/gi18n-lib.h>
-
-#if OS(UNIX)
-#include <sys/utsname.h>
-#elif OS(WINDOWS)
-#include "SystemInfo.h"
-#endif
 
 /**
  * SECTION:webkitwebsettings
@@ -119,77 +114,16 @@ enum {
     PROP_ENABLE_FULLSCREEN,
     PROP_ENABLE_DNS_PREFETCHING,
     PROP_ENABLE_WEBGL,
+    PROP_ENABLE_MEDIA_STREAM,
     PROP_ENABLE_WEB_AUDIO,
     PROP_ENABLE_ACCELERATED_COMPOSITING,
     PROP_ENABLE_SMOOTH_SCROLLING,
     PROP_MEDIA_PLAYBACK_REQUIRES_USER_GESTURE,
-    PROP_MEDIA_PLAYBACK_ALLOWS_INLINE
+    PROP_MEDIA_PLAYBACK_ALLOWS_INLINE,
+    PROP_ENABLE_CSS_SHADERS,
+    PROP_ENABLE_RUNNING_OF_INSECURE_CONTENT,
+    PROP_ENABLE_DISPLAY_OF_INSECURE_CONTENT
 };
-
-// Create a default user agent string
-// This is a liberal interpretation of http://www.mozilla.org/build/revised-user-agent-strings.html
-// See also http://developer.apple.com/internet/safari/faq.html#anchor2
-static String webkitPlatform()
-{
-#if PLATFORM(X11)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("X11; ")));
-#elif OS(WINDOWS)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("")));
-#elif PLATFORM(MAC)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("Macintosh; ")));
-#elif defined(GDK_WINDOWING_DIRECTFB)
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("DirectFB; ")));
-#else
-    DEFINE_STATIC_LOCAL(const String, uaPlatform, (String("Unknown; ")));
-#endif
-
-    return uaPlatform;
-}
-
-static String webkitOSVersion()
-{
-   // FIXME: platform/version detection can be shared.
-#if OS(DARWIN)
-
-#if CPU(X86)
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String("Intel Mac OS X")));
-#else
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String("PPC Mac OS X")));
-#endif
-
-#elif OS(UNIX)
-    DEFINE_STATIC_LOCAL(String, uaOSVersion, (String()));
-
-    if (!uaOSVersion.isEmpty())
-        return uaOSVersion;
-
-    struct utsname name;
-    if (uname(&name) != -1)
-        uaOSVersion = makeString(name.sysname, ' ', name.machine);
-    else
-        uaOSVersion = String("Unknown");
-#elif OS(WINDOWS)
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (windowsVersionForUAString()));
-#else
-    DEFINE_STATIC_LOCAL(const String, uaOSVersion, (String("Unknown")));
-#endif
-
-    return uaOSVersion;
-}
-
-static String chromeUserAgent()
-{
-    // We mention Safari since many broken sites check for it (OmniWeb does this too)
-    // We re-use the WebKit version, though it doesn't seem to matter much in practice
-    // We claim to be Chrome as well, which prevents sites that look for Safari and assume
-    // that since we are not OS X, that we are the mobile version of Safari.
-
-    DEFINE_STATIC_LOCAL(const String, uaVersion, (makeString(String::number(WEBKIT_USER_AGENT_MAJOR_VERSION), '.', String::number(WEBKIT_USER_AGENT_MINOR_VERSION), '+')));
-    DEFINE_STATIC_LOCAL(const String, staticUA, (makeString("Mozilla/5.0 (", webkitPlatform(), webkitOSVersion(), ") AppleWebKit/", uaVersion) +
-                                                 makeString(" (KHTML, like Gecko) Chromium/23.0.1271.95 Chrome/23.0.1271.95 Safari/", uaVersion)));
-
-    return staticUA;
-}
 
 static void webkit_web_settings_finalize(GObject* object);
 
@@ -958,6 +892,25 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          _("Whether WebKit prefetches domain names"),
                                                          TRUE,
                                                          flags));
+    /**
+    * WebKitWebSettings:enable-media-stream:
+    *
+    * Enable or disable support for Media Stream on pages. Media Stream is
+    * an experimental proposal for allowing web pages to access local video and
+    * audio input devices.  The standard is currently a work-in-progress as part
+    * of the Web Applications 1.0 specification from WHATWG.
+    *
+    * See also http://www.w3.org/TR/mediacapture-streams/
+    *
+    * Since: 1.10.0
+    */
+    g_object_class_install_property(gobject_class,
+                                    PROP_ENABLE_MEDIA_STREAM,
+                                    g_param_spec_boolean("enable-media-stream",
+                                                         _("Enable Media Stream"),
+                                                         _("Whether Media Stream should be enabled"),
+                                                         FALSE,
+                                                         flags));
 
     /**
     * WebKitWebSettings:enable-smooth-scrolling
@@ -1011,6 +964,56 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          TRUE,
                                                          flags));
 
+    /**
+    * WebKitWebSettings:enable-css-shaders
+    *
+    * Enable or disable support for css shaders (css custom filters).
+    * Accelerated compositing needs to be enabled at compile time, but needs
+    * not be enabled at runtime.
+    *
+    * See also https://dvcs.w3.org/hg/FXTF/raw-file/tip/custom/index.html
+    *
+    * Since: 2.0
+    */
+    g_object_class_install_property(gobject_class,
+                                    PROP_ENABLE_CSS_SHADERS,
+                                    g_param_spec_boolean("enable-css-shaders",
+                                                         _("Enable CSS shaders"),
+                                                         _("Whether to enable css shaders"),
+                                                         FALSE,
+                                                         flags));
+
+    /**
+    * WebKitWebSettings:enable-display-of-insecure-content
+    *
+    * Whether pages loaded via HTTPS should load subresources such as
+    * images and frames from non-HTTPS URLs. 
+    *
+    * Since: 2.0
+    */
+    g_object_class_install_property(gobject_class,
+        PROP_ENABLE_DISPLAY_OF_INSECURE_CONTENT,
+        g_param_spec_boolean("enable-display-of-insecure-content",
+            _("Enable display of insecure content"),
+            _("Whether non-HTTPS resources can display on HTTPS pages."),
+            TRUE,
+            flags));
+
+    /**
+    * WebKitWebSettings:enable-running-of-insecure-content
+    *
+    * Whether pages loaded via HTTPS should run subresources such as
+    * CSS, scripts, and plugins from non-HTTPS URLs. 
+    *
+    * Since: 2.0
+    */
+    g_object_class_install_property(gobject_class,
+        PROP_ENABLE_RUNNING_OF_INSECURE_CONTENT,
+        g_param_spec_boolean("enable-running-of-insecure-content",
+            _("Enable running of insecure content"),
+            _("Whether non-HTTPS resources can run on HTTPS pages."),
+            TRUE,
+            flags));
 }
 
 static void webkit_web_settings_init(WebKitWebSettings* web_settings)
@@ -1125,7 +1128,7 @@ static void webkit_web_settings_set_property(GObject* object, guint prop_id, con
         break;
     case PROP_USER_AGENT:
         if (!g_value_get_string(value) || !strlen(g_value_get_string(value)))
-            priv->userAgent = chromeUserAgent().utf8();
+            priv->userAgent = standardUserAgent().utf8();
         else
             priv->userAgent = g_value_get_string(value);
         break;
@@ -1180,6 +1183,9 @@ static void webkit_web_settings_set_property(GObject* object, guint prop_id, con
     case PROP_ENABLE_WEBGL:
         priv->enableWebgl = g_value_get_boolean(value);
         break;
+    case PROP_ENABLE_MEDIA_STREAM:
+        priv->enableMediaStream = g_value_get_boolean(value);
+        break;
     case PROP_ENABLE_WEB_AUDIO:
         priv->enableWebAudio = g_value_get_boolean(value);
         break;
@@ -1189,11 +1195,20 @@ static void webkit_web_settings_set_property(GObject* object, guint prop_id, con
     case PROP_ENABLE_SMOOTH_SCROLLING:
         priv->enableSmoothScrolling = g_value_get_boolean(value);
         break;
+    case PROP_ENABLE_CSS_SHADERS:
+        priv->enableCSSShaders = g_value_get_boolean(value);
+        break;
     case PROP_MEDIA_PLAYBACK_REQUIRES_USER_GESTURE:
         priv->mediaPlaybackRequiresUserGesture = g_value_get_boolean(value);
         break;
     case PROP_MEDIA_PLAYBACK_ALLOWS_INLINE:
         priv->mediaPlaybackAllowsInline = g_value_get_boolean(value);
+        break;
+    case PROP_ENABLE_DISPLAY_OF_INSECURE_CONTENT:
+        priv->enableDisplayOfInsecureContent = g_value_get_boolean(value);
+        break;
+    case PROP_ENABLE_RUNNING_OF_INSECURE_CONTENT:
+        priv->enableRunningOfInsecureContent = g_value_get_boolean(value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -1354,6 +1369,9 @@ static void webkit_web_settings_get_property(GObject* object, guint prop_id, GVa
     case PROP_ENABLE_WEBGL:
         g_value_set_boolean(value, priv->enableWebgl);
         break;
+    case PROP_ENABLE_MEDIA_STREAM:
+        g_value_set_boolean(value, priv->enableMediaStream);
+        break;
     case PROP_ENABLE_WEB_AUDIO:
         g_value_set_boolean(value, priv->enableWebAudio);
         break;
@@ -1363,11 +1381,20 @@ static void webkit_web_settings_get_property(GObject* object, guint prop_id, GVa
     case PROP_ENABLE_SMOOTH_SCROLLING:
         g_value_set_boolean(value, priv->enableSmoothScrolling);
         break;
+    case PROP_ENABLE_CSS_SHADERS:
+        g_value_set_boolean(value, priv->enableCSSShaders);
+        break;
     case PROP_MEDIA_PLAYBACK_REQUIRES_USER_GESTURE:
         g_value_set_boolean(value, priv->mediaPlaybackRequiresUserGesture);
         break;
     case PROP_MEDIA_PLAYBACK_ALLOWS_INLINE:
         g_value_set_boolean(value, priv->mediaPlaybackAllowsInline);
+        break;
+    case PROP_ENABLE_DISPLAY_OF_INSECURE_CONTENT:
+        g_value_set_boolean(value, priv->enableDisplayOfInsecureContent);
+        break;
+    case PROP_ENABLE_RUNNING_OF_INSECURE_CONTENT:
+        g_value_set_boolean(value, priv->enableRunningOfInsecureContent);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -1559,7 +1586,7 @@ static String userAgentForURL(const KURL& url)
     // For Google domains, drop the browser's custom User Agent string, and use the
     // standard Chrome one, so they don't give us a broken experience.
     if (isGoogleDomain(url.host()))
-        return chromeUserAgent();
+        return standardUserAgent();
 
     return String();
 }

@@ -28,13 +28,13 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
+#include "PluginProcessConnectionManagerMessages.h"
 #include "PluginProcessCreationParameters.h"
 #include "PluginProcessManager.h"
 #include "PluginProcessMessages.h"
 #include "WebContext.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebPluginSiteDataManager.h"
-#include "WebProcessMessages.h"
 #include "WebProcessProxy.h"
 #include <WebCore/NotImplemented.h>
 #include <WebCore/RunLoop.h>
@@ -47,12 +47,15 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<PluginProcessProxy> PluginProcessProxy::create(PluginProcessManager* PluginProcessManager, const PluginModuleInfo& pluginInfo)
+static const double minimumLifetime = 30 * 60;
+static const double shutdownTimeout = 10 * 60;
+
+PassRefPtr<PluginProcessProxy> PluginProcessProxy::create(PluginProcessManager* PluginProcessManager, const PluginModuleInfo& pluginInfo, PluginProcess::Type processType)
 {
-    return adoptRef(new PluginProcessProxy(PluginProcessManager, pluginInfo));
+    return adoptRef(new PluginProcessProxy(PluginProcessManager, pluginInfo, processType));
 }
 
-PluginProcessProxy::PluginProcessProxy(PluginProcessManager* PluginProcessManager, const PluginModuleInfo& pluginInfo)
+PluginProcessProxy::PluginProcessProxy(PluginProcessManager* PluginProcessManager, const PluginModuleInfo& pluginInfo, PluginProcess::Type processType)
     : m_pluginProcessManager(PluginProcessManager)
     , m_pluginInfo(pluginInfo)
     , m_numPendingConnectionRequests(0)
@@ -61,22 +64,19 @@ PluginProcessProxy::PluginProcessProxy(PluginProcessManager* PluginProcessManage
     , m_fullscreenWindowIsShowing(false)
     , m_preFullscreenAppPresentationOptions(0)
 #endif
+    , m_processType(processType)
 {
-    ProcessLauncher::LaunchOptions launchOptions;
-    launchOptions.processType = ProcessLauncher::PluginProcess;
-#if PLATFORM(MAC)
-    launchOptions.architecture = pluginInfo.pluginArchitecture;
-    launchOptions.executableHeap = PluginProcessProxy::pluginNeedsExecutableHeap(pluginInfo);
-#if HAVE(XPC)
-    launchOptions.useXPC = false;
-#endif
-#endif
-
-    m_processLauncher = ProcessLauncher::create(this, launchOptions);
+    connect();
 }
 
 PluginProcessProxy::~PluginProcessProxy()
 {
+}
+
+void PluginProcessProxy::getLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions)
+{
+    launchOptions.processType = ProcessLauncher::PluginProcess;
+    platformGetLaunchOptions(launchOptions, m_pluginInfo);
 }
 
 // Asks the plug-in process to create a new connection to a web process. The connection identifier will be 
@@ -85,7 +85,7 @@ void PluginProcessProxy::getPluginProcessConnection(PassRefPtr<Messages::WebProc
 {
     m_pendingConnectionReplies.append(reply);
 
-    if (m_processLauncher->isLaunching()) {
+    if (isLaunching()) {
         m_numPendingConnectionRequests++;
         return;
     }
@@ -100,7 +100,7 @@ void PluginProcessProxy::getSitesWithData(WebPluginSiteDataManager* webPluginSit
     ASSERT(!m_pendingGetSitesReplies.contains(callbackID));
     m_pendingGetSitesReplies.set(callbackID, webPluginSiteDataManager);
 
-    if (m_processLauncher->isLaunching()) {
+    if (isLaunching()) {
         m_pendingGetSitesRequests.append(callbackID);
         return;
     }
@@ -114,7 +114,7 @@ void PluginProcessProxy::clearSiteData(WebPluginSiteDataManager* webPluginSiteDa
     ASSERT(!m_pendingClearSiteDataReplies.contains(callbackID));
     m_pendingClearSiteDataReplies.set(callbackID, webPluginSiteDataManager);
 
-    if (m_processLauncher->isLaunching()) {
+    if (isLaunching()) {
         ClearSiteDataRequest request;
         request.sites = sites;
         request.flags = flags;
@@ -126,11 +126,6 @@ void PluginProcessProxy::clearSiteData(WebPluginSiteDataManager* webPluginSiteDa
 
     // Ask the plug-in process to clear the site data.
     m_connection->send(Messages::PluginProcess::ClearSiteData(sites, flags, maxAgeInSeconds, callbackID), 0);
-}
-
-void PluginProcessProxy::terminate()
-{
-     m_processLauncher->terminateProcess();
 }
 
 void PluginProcessProxy::pluginProcessCrashedOrFailedToLaunch()
@@ -149,18 +144,18 @@ void PluginProcessProxy::pluginProcessCrashedOrFailedToLaunch()
     }
 
     while (!m_pendingGetSitesReplies.isEmpty())
-        didGetSitesWithData(Vector<String>(), m_pendingGetSitesReplies.begin()->first);
+        didGetSitesWithData(Vector<String>(), m_pendingGetSitesReplies.begin()->key);
 
     while (!m_pendingClearSiteDataReplies.isEmpty())
-        didClearSiteData(m_pendingClearSiteDataReplies.begin()->first);
+        didClearSiteData(m_pendingClearSiteDataReplies.begin()->key);
 
     // Tell the plug-in process manager to forget about this plug-in process proxy. This may cause us to be deleted.
     m_pluginProcessManager->removePluginProcessProxy(this);
 }
 
-void PluginProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void PluginProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
-    didReceivePluginProcessProxyMessage(connection, messageID, arguments);
+    didReceivePluginProcessProxyMessage(connection, decoder);
 }
 
 void PluginProcessProxy::didClose(CoreIPC::Connection*)
@@ -175,17 +170,13 @@ void PluginProcessProxy::didClose(CoreIPC::Connection*)
 
     const Vector<WebContext*>& contexts = WebContext::allContexts();
     for (size_t i = 0; i < contexts.size(); ++i)
-        contexts[i]->sendToAllProcesses(Messages::WebProcess::PluginProcessCrashed(m_pluginInfo.path));
+        contexts[i]->sendToAllProcesses(Messages::PluginProcessConnectionManager::PluginProcessCrashed(m_pluginInfo.path, m_processType));
 
     // This will cause us to be deleted.
     pluginProcessCrashedOrFailedToLaunch();
 }
 
-void PluginProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID)
-{
-}
-
-void PluginProcessProxy::syncMessageSendTimedOut(CoreIPC::Connection*)
+void PluginProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference, CoreIPC::StringReference)
 {
 }
 
@@ -202,15 +193,15 @@ void PluginProcessProxy::didFinishLaunching(ProcessLauncher*, CoreIPC::Connectio
 #if PLATFORM(MAC)
     m_connection->setShouldCloseConnectionOnMachExceptions();
 #elif PLATFORM(QT)
-    m_connection->setShouldCloseConnectionOnProcessTermination(m_processLauncher->processIdentifier());
+    m_connection->setShouldCloseConnectionOnProcessTermination(processIdentifier());
 #endif
 
     m_connection->open();
     
     PluginProcessCreationParameters parameters;
-
-    parameters.pluginPath = m_pluginInfo.path;
-
+    parameters.processType = m_processType;
+    parameters.minimumLifetime = minimumLifetime;
+    parameters.terminationTimeout = shutdownTimeout;
     platformInitializePluginProcess(parameters);
 
     // Initialize the plug-in host process.
@@ -231,6 +222,11 @@ void PluginProcessProxy::didFinishLaunching(ProcessLauncher*, CoreIPC::Connectio
         m_connection->send(Messages::PluginProcess::CreateWebProcessConnection(), 0);
     
     m_numPendingConnectionRequests = 0;
+
+#if PLATFORM(MAC)
+    if (WebContext::canEnableProcessSuppressionForGlobalChildProcesses())
+        setProcessSuppressionEnabled(true);
+#endif
 }
 
 void PluginProcessProxy::didCreateWebProcessConnection(const CoreIPC::Attachment& connectionIdentifier, bool supportsAsynchronousPluginInitialization)

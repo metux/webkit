@@ -30,6 +30,7 @@
 #include "Event.h"
 #include "EventHandler.h"
 #include "EventNames.h"
+#include "FeatureObserver.h"
 #include "Frame.h"
 #include "HTMLFieldSetElement.h"
 #include "HTMLFormElement.h"
@@ -51,7 +52,7 @@ HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Doc
     : LabelableElement(tagName, document)
     , m_disabled(false)
     , m_readOnly(false)
-    , m_required(false)
+    , m_isRequired(false)
     , m_valueMatchesRenderer(false)
     , m_ancestorDisabledState(AncestorDisabledStateUnknown)
     , m_dataListAncestorState(Unknown)
@@ -62,21 +63,19 @@ HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Doc
     , m_hasAutofocused(false)
 {
     setForm(form ? form : findFormAncestor());
-    setHasCustomCallbacks();
+    setHasCustomStyleCallbacks();
 }
 
 HTMLFormControlElement::~HTMLFormControlElement()
 {
 }
 
-void HTMLFormControlElement::willAddAuthorShadowRoot()
-{
-    ensureUserAgentShadowRoot();
-}
-
 String HTMLFormControlElement::formEnctype() const
 {
-    return FormSubmission::Attributes::parseEncodingType(fastGetAttribute(formenctypeAttr));
+    const AtomicString& formEnctypeAttr = fastGetAttribute(formenctypeAttr);
+    if (formEnctypeAttr.isNull())
+        return emptyString();
+    return FormSubmission::Attributes::parseEncodingType(formEnctypeAttr);
 }
 
 void HTMLFormControlElement::setFormEnctype(const String& value)
@@ -86,7 +85,10 @@ void HTMLFormControlElement::setFormEnctype(const String& value)
 
 String HTMLFormControlElement::formMethod() const
 {
-    return FormSubmission::Attributes::methodString(FormSubmission::Attributes::parseMethodType(fastGetAttribute(formmethodAttr)));
+    const AtomicString& formMethodAttr = fastGetAttribute(formmethodAttr);
+    if (formMethodAttr.isNull())
+        return emptyString();
+    return FormSubmission::Attributes::methodString(FormSubmission::Attributes::parseMethodType(formMethodAttr));
 }
 
 void HTMLFormControlElement::setFormMethod(const String& value)
@@ -120,37 +122,42 @@ void HTMLFormControlElement::ancestorDisabledStateWasChanged()
     disabledAttributeChanged();
 }
 
-void HTMLFormControlElement::parseAttribute(const Attribute& attribute)
+void HTMLFormControlElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == formAttr)
+    if (name == formAttr) {
         formAttributeChanged();
-    else if (attribute.name() == disabledAttr) {
+        FeatureObserver::observe(document(), FeatureObserver::FormAttribute);
+    } else if (name == disabledAttr) {
         bool oldDisabled = m_disabled;
-        m_disabled = !attribute.isNull();
+        m_disabled = !value.isNull();
         if (oldDisabled != m_disabled)
             disabledAttributeChanged();
-    } else if (attribute.name() == readonlyAttr) {
+    } else if (name == readonlyAttr) {
         bool oldReadOnly = m_readOnly;
-        m_readOnly = !attribute.isNull();
+        m_readOnly = !value.isNull();
         if (oldReadOnly != m_readOnly) {
             setNeedsWillValidateCheck();
             setNeedsStyleRecalc();
             if (renderer() && renderer()->style()->hasAppearance())
                 renderer()->theme()->stateChanged(renderer(), ReadOnlyState);
         }
-    } else if (attribute.name() == requiredAttr) {
-        bool oldRequired = m_required;
-        m_required = !attribute.isNull();
-        if (oldRequired != m_required)
+    } else if (name == requiredAttr) {
+        bool wasRequired = m_isRequired;
+        m_isRequired = !value.isNull();
+        if (wasRequired != m_isRequired)
             requiredAttributeChanged();
+        FeatureObserver::observe(document(), FeatureObserver::RequiredAttribute);
+    } else if (name == autofocusAttr) {
+        HTMLElement::parseAttribute(name, value);
+        FeatureObserver::observe(document(), FeatureObserver::AutoFocusAttribute);
     } else
-        HTMLElement::parseAttribute(attribute);
+        HTMLElement::parseAttribute(name, value);
 }
 
 void HTMLFormControlElement::disabledAttributeChanged()
 {
     setNeedsWillValidateCheck();
-    setNeedsStyleRecalc();
+    didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
     if (renderer() && renderer()->style()->hasAppearance())
         renderer()->theme()->stateChanged(renderer(), EnabledState);
 }
@@ -165,14 +172,17 @@ void HTMLFormControlElement::requiredAttributeChanged()
 
 static bool shouldAutofocus(HTMLFormControlElement* element)
 {
-    if (!element->autofocus())
+    if (!element->fastHasAttribute(autofocusAttr))
         return false;
     if (!element->renderer())
         return false;
     if (element->document()->ignoreAutofocus())
         return false;
-    if (element->document()->isSandboxed(SandboxAutomaticFeatures))
+    if (element->document()->isSandboxed(SandboxAutomaticFeatures)) {
+        // FIXME: This message should be moved off the console once a solution to https://bugs.webkit.org/show_bug.cgi?id=103274 exists.
+        element->document()->addConsoleMessage(HTMLMessageSource, ErrorMessageLevel, "Blocked autofocusing on a form control because the form's frame is sandboxed and the 'allow-scripts' permission is not set.");
         return false;
+    }
     if (element->hasAutofocused())
         return false;
 
@@ -200,9 +210,7 @@ static void focusPostAttach(Node* element, unsigned)
 
 void HTMLFormControlElement::attach()
 {
-    ASSERT(!attached());
-
-    suspendPostAttachCallbacks();
+    PostAttachCallbackDisabler disabler(this);
 
     HTMLElement::attach();
 
@@ -217,8 +225,6 @@ void HTMLFormControlElement::attach()
         ref();
         queuePostAttachCallback(focusPostAttach, this);
     }
-
-    resumePostAttachCallbacks();
 }
 
 void HTMLFormControlElement::didMoveToNewDocument(Document* oldDocument)
@@ -278,26 +284,15 @@ bool HTMLFormControlElement::disabled() const
     return m_ancestorDisabledState == AncestorDisabledStateDisabled;
 }
 
-void HTMLFormControlElement::setDisabled(bool b)
+bool HTMLFormControlElement::isRequired() const
 {
-    setAttribute(disabledAttr, b ? "" : 0);
-}
-
-bool HTMLFormControlElement::autofocus() const
-{
-    return hasAttribute(autofocusAttr);
-}
-
-bool HTMLFormControlElement::required() const
-{
-    return m_required;
+    return m_isRequired;
 }
 
 static void updateFromElementCallback(Node* node, unsigned)
 {
     ASSERT_ARG(node, node->isElementNode());
     ASSERT_ARG(node, static_cast<Element*>(node)->isFormControlElement());
-    ASSERT(node->renderer());
     if (RenderObject* renderer = node->renderer())
         renderer->updateFromElement();
 }
@@ -361,7 +356,7 @@ bool HTMLFormControlElement::recalcWillValidate() const
         if (m_dataListAncestorState == Unknown)
             m_dataListAncestorState = NotInsideDataList;
     }
-    return m_dataListAncestorState == NotInsideDataList && !disabled() && !m_readOnly;
+    return m_dataListAncestorState == NotInsideDataList && !isDisabledOrReadOnly();
 }
 
 bool HTMLFormControlElement::willValidate() const
@@ -402,40 +397,17 @@ void HTMLFormControlElement::updateVisibleValidationMessage()
     if (!page)
         return;
     String message;
-    if (renderer() && willValidate()) {
+    if (renderer() && willValidate())
         message = validationMessage().stripWhiteSpace();
-        // HTML5 specification doesn't ask UA to show the title attribute value
-        // with the validationMessage.  However, this behavior is same as Opera
-        // and the specification describes such behavior as an example.
-        const AtomicString& title = getAttribute(titleAttr);
-        if (!message.isEmpty() && !title.isEmpty()) {
-            message.append('\n');
-            message.append(title);
-        }
-    }
-    if (message.isEmpty()) {
-        hideVisibleValidationMessage();
-        return;
-    }
-    if (!m_validationMessage) {
+    if (!m_validationMessage)
         m_validationMessage = ValidationMessage::create(this);
-        m_validationMessage->setMessage(message);
-    } else {
-        // Call setMessage() even if m_validationMesage->message() == message
-        // because the existing message might be to be hidden.
-        m_validationMessage->setMessage(message);
-    }
+    m_validationMessage->updateValidationMessage(message);
 }
 
 void HTMLFormControlElement::hideVisibleValidationMessage()
 {
     if (m_validationMessage)
         m_validationMessage->requestToHideMessage();
-}
-
-String HTMLFormControlElement::visibleValidationMessage() const
-{
-    return m_validationMessage ? m_validationMessage->message() : String();
 }
 
 bool HTMLFormControlElement::checkValidity(Vector<RefPtr<FormAssociatedElement> >* unhandledInvalidControls)
@@ -469,7 +441,7 @@ void HTMLFormControlElement::setNeedsValidityCheck()
     m_isValid = newIsValid;
 
     // Updates only if this control already has a validtion message.
-    if (!visibleValidationMessage().isEmpty()) {
+    if (m_validationMessage && m_validationMessage->isVisible()) {
         // Calls updateVisibleValidationMessage() even if m_isValid is not
         // changed because a validation message can be chagned.
         updateVisibleValidationMessage();
@@ -480,16 +452,6 @@ void HTMLFormControlElement::setCustomValidity(const String& error)
 {
     FormAssociatedElement::setCustomValidity(error);
     setNeedsValidityCheck();
-}
-
-bool HTMLFormControlElement::shouldMatchReadOnlySelector() const
-{
-    return readOnly();
-}
-
-bool HTMLFormControlElement::shouldMatchReadWriteSelector() const
-{
-    return !readOnly();
 }
 
 bool HTMLFormControlElement::validationMessageShadowTreeContains(Node* node) const
@@ -520,6 +482,13 @@ HTMLFormControlElement* HTMLFormControlElement::enclosingFormControlElement(Node
             return static_cast<HTMLFormControlElement*>(node);
     }
     return 0;
+}
+
+void HTMLFormControlElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    LabelableElement::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_validationMessage, "validationMessage");
 }
 
 } // namespace Webcore

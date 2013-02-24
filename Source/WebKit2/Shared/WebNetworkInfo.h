@@ -40,8 +40,8 @@ public:
     static const Type APIType = TypeNetworkInfo;
 
     struct Data {
-        void encode(CoreIPC::ArgumentEncoder*) const;
-        static bool decode(CoreIPC::ArgumentDecoder*, Data&);
+        void encode(CoreIPC::ArgumentEncoder&) const;
+        static bool decode(CoreIPC::ArgumentDecoder&, Data&);
 
         double bandwidth;
         bool metered;

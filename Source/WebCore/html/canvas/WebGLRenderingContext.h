@@ -26,10 +26,11 @@
 #ifndef WebGLRenderingContext_h
 #define WebGLRenderingContext_h
 
+#include "ActiveDOMObject.h"
 #include "CanvasRenderingContext.h"
 #include "DrawingBuffer.h"
 #include "GraphicsContext3D.h"
-#include "PlatformString.h"
+#include "ImageBuffer.h"
 #include "Timer.h"
 #include "WebGLGetInfo.h"
 
@@ -37,6 +38,7 @@
 #include <wtf/Int32Array.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/Uint8Array.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -49,6 +51,7 @@ class IntSize;
 class OESStandardDerivatives;
 class OESTextureFloat;
 class OESVertexArrayObject;
+class OESElementIndexUint;
 class WebGLActiveInfo;
 class WebGLBuffer;
 class WebGLContextGroup;
@@ -73,7 +76,7 @@ class WebGLVertexArrayObjectOES;
 
 typedef int ExceptionCode;
 
-class WebGLRenderingContext : public CanvasRenderingContext {
+class WebGLRenderingContext : public CanvasRenderingContext, public ActiveDOMObject {
 public:
     static PassOwnPtr<WebGLRenderingContext> create(HTMLCanvasElement*, WebGLContextAttributes*);
     virtual ~WebGLRenderingContext();
@@ -315,6 +318,10 @@ public:
     
     unsigned getMaxVertexAttribs() const { return m_maxVertexAttribs; }
 
+    // ActiveDOMObject notifications
+    virtual bool hasPendingActivity() const;
+    virtual void stop();
+
   private:
     friend class WebGLFramebuffer;
     friend class WebGLObject;
@@ -322,6 +329,7 @@ public:
     friend class WebGLDebugShaders;
     friend class WebGLCompressedTextureS3TC;
     friend class WebGLRenderingContextErrorMessageCallback;
+    friend class WebGLVertexArrayObjectOES;
 
     WebGLRenderingContext(HTMLCanvasElement*, PassRefPtr<GraphicsContext3D>, GraphicsContext3D::Attributes);
     void initializeNewContext();
@@ -331,6 +339,7 @@ public:
     void addContextObject(WebGLContextObject*);
     void detachAndRemoveAllObjects();
 
+    void destroyGraphicsContext3D();
     void markContextChanged();
     void cleanupAfterGraphicsCall(bool changed)
     {
@@ -357,12 +366,12 @@ public:
     bool validateElementArraySize(GC3Dsizei count, GC3Denum type, GC3Dintptr offset);
 
     // Conservative but quick index validation
-    bool validateIndexArrayConservative(GC3Denum type, int& numElementsRequired);
+    bool validateIndexArrayConservative(GC3Denum type, unsigned& numElementsRequired);
 
     // Precise but slow index validation -- only done if conservative checks fail
-    bool validateIndexArrayPrecise(GC3Dsizei count, GC3Denum type, GC3Dintptr offset, int& numElementsRequired);
+    bool validateIndexArrayPrecise(GC3Dsizei count, GC3Denum type, GC3Dintptr offset, unsigned& numElementsRequired);
     // If numElements <= 0, we only check if each enabled vertex attribute is bound to a buffer.
-    bool validateRenderingState(int numElements);
+    bool validateRenderingState(unsigned numElements);
 
     bool validateWebGLObject(const char*, WebGLObject*);
 
@@ -370,7 +379,7 @@ public:
     void addCompressedTextureFormat(GC3Denum);
 
 #if ENABLE(VIDEO)
-    PassRefPtr<Image> videoFrameToImage(HTMLVideoElement*, ExceptionCode&);
+    PassRefPtr<Image> videoFrameToImage(HTMLVideoElement*, BackingStoreCopy, ExceptionCode&);
 #endif
 
     RefPtr<GraphicsContext3D> m_context;
@@ -504,6 +513,7 @@ public:
     OwnPtr<OESTextureFloat> m_oesTextureFloat;
     OwnPtr<OESStandardDerivatives> m_oesStandardDerivatives;
     OwnPtr<OESVertexArrayObject> m_oesVertexArrayObject;
+    OwnPtr<OESElementIndexUint> m_oesElementIndexUint;
     OwnPtr<WebGLLoseContext> m_webglLoseContext;
     OwnPtr<WebGLDebugRendererInfo> m_webglDebugRendererInfo;
     OwnPtr<WebGLDebugShaders> m_webglDebugShaders;
@@ -527,20 +537,12 @@ public:
     // Helper to restore state that clearing the framebuffer may destroy.
     void restoreStateAfterClear();
 
-    void texImage2DBase(GC3Denum target, GC3Dint level, GC3Denum internalformat,
-                        GC3Dsizei width, GC3Dsizei height, GC3Dint border,
-                        GC3Denum format, GC3Denum type, void* pixels, ExceptionCode&);
-    void texImage2DImpl(GC3Denum target, GC3Dint level, GC3Denum internalformat,
-                        GC3Denum format, GC3Denum type, Image*,
-                        bool flipY, bool premultiplyAlpha, ExceptionCode&);
-    void texSubImage2DBase(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset,
-                           GC3Dsizei width, GC3Dsizei height,
-                           GC3Denum format, GC3Denum type, void* pixels, ExceptionCode&);
-    void texSubImage2DImpl(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset,
-                           GC3Denum format, GC3Denum type,
-                           Image* image, bool flipY, bool premultiplyAlpha, ExceptionCode&);
+    void texImage2DBase(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, const void* pixels, ExceptionCode&);
+    void texImage2DImpl(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha, ExceptionCode&);
+    void texSubImage2DBase(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Denum type, const void* pixels, ExceptionCode&);
+    void texSubImage2DImpl(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha, ExceptionCode&);
 
-    void handleNPOTTextures(bool prepareToDraw);
+    void handleNPOTTextures(const char*, bool);
 
     void createFallbackBlackTextures1x1();
 
@@ -709,9 +711,14 @@ public:
     // a Safari or Chrome extension.
     bool allowPrivilegedExtensions() const;
 
+    enum ConsoleDisplayPreference {
+        DisplayInConsole,
+        DontDisplayInConsole
+    };
+
     // Wrapper for GraphicsContext3D::synthesizeGLError that sends a message
     // to the JavaScript console.
-    void synthesizeGLError(GC3Denum, const char* functionName, const char* description);
+    void synthesizeGLError(GC3Denum, const char* functionName, const char* description, ConsoleDisplayPreference = DisplayInConsole);
 
     String ensureNotNull(const String&) const;
 

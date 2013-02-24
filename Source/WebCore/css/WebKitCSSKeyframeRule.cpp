@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,10 +26,9 @@
 #include "config.h"
 #include "WebKitCSSKeyframeRule.h"
 
-#include "MemoryInstrumentation.h"
 #include "PropertySetCSSStyleDeclaration.h"
-#include "StylePropertySet.h"
 #include "WebKitCSSKeyframesRule.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -77,24 +76,26 @@ void StyleKeyframe::parseKeyString(const String& s, Vector<float>& keys)
 
 String StyleKeyframe::cssText() const
 {
-    String result = keyText();
-
-    result += " { ";
-    result += m_properties->asText();
-    result += "}";
-
-    return result;
+    StringBuilder result;
+    result.append(keyText());
+    result.appendLiteral(" { ");
+    String decls = m_properties->asText();
+    result.append(decls);
+    if (!decls.isEmpty())
+        result.append(' ');
+    result.append('}');
+    return result.toString();
 }
 
 void StyleKeyframe::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_properties);
-    info.addInstrumentedMember(m_key);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_properties, "properties");
+    info.addMember(m_key, "key");
 }
 
 WebKitCSSKeyframeRule::WebKitCSSKeyframeRule(StyleKeyframe* keyframe, WebKitCSSKeyframesRule* parent)
-    : CSSRule(0, CSSRule::WEBKIT_KEYFRAME_RULE)
+    : CSSRule(0)
     , m_keyframe(keyframe)
 {
     setParentRule(parent);
@@ -113,12 +114,18 @@ CSSStyleDeclaration* WebKitCSSKeyframeRule::style() const
     return m_propertiesCSSOMWrapper.get();
 }
 
-void WebKitCSSKeyframeRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void WebKitCSSKeyframeRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addInstrumentedMember(m_keyframe);
-    info.addInstrumentedMember(m_propertiesCSSOMWrapper);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_keyframe, "keyframe");
+    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
+}
+
+void WebKitCSSKeyframeRule::reattach(StyleRuleBase*)
+{
+    // No need to reattach, the underlying data is shareable on mutation.
+    ASSERT_NOT_REACHED();
 }
 
 } // namespace WebCore

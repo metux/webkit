@@ -77,6 +77,14 @@ WebKitWebView
 @webkitwebview: the object which received the signal.
 @Returns: 
 
+<!-- ##### SIGNAL WebKitWebView::insecure-content-detected ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+
 <!-- ##### SIGNAL WebKitWebView::leave-fullscreen ##### -->
 <para>
 
@@ -185,12 +193,27 @@ WebKitWebView
 
 </para>
 
+<!-- ##### ARG WebKitWebView:favicon ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebView:is-loading ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebView:title ##### -->
 <para>
 
 </para>
 
 <!-- ##### ARG WebKitWebView:uri ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebView:view-mode ##### -->
 <para>
 
 </para>
@@ -231,6 +254,22 @@ WebKitWebView
 
 @WEBKIT_SAVE_MODE_MHTML: 
 
+<!-- ##### ENUM WebKitViewMode ##### -->
+<para>
+
+</para>
+
+@WEBKIT_VIEW_MODE_WEB: 
+@WEBKIT_VIEW_MODE_SOURCE: 
+
+<!-- ##### ENUM WebKitInsecureContentEvent ##### -->
+<para>
+
+</para>
+
+@WEBKIT_INSECURE_CONTENT_RUN: 
+@WEBKIT_INSECURE_CONTENT_DISPLAYED: 
+
 <!-- ##### MACRO WEBKIT_EDITING_COMMAND_CUT ##### -->
 <para>
 
@@ -246,6 +285,27 @@ WebKitWebView
 
 
 <!-- ##### MACRO WEBKIT_EDITING_COMMAND_PASTE ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_SELECT_ALL ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_UNDO ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_REDO ##### -->
 <para>
 
 </para>
@@ -370,6 +430,15 @@ WebKitWebView
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_web_view_get_page_id ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_web_view_reload ##### -->
 <para>
 
@@ -392,6 +461,15 @@ WebKitWebView
 </para>
 
 @web_view: 
+
+
+<!-- ##### FUNCTION webkit_web_view_is_loading ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
 
 
 <!-- ##### FUNCTION webkit_web_view_get_estimated_load_progress ##### -->
@@ -440,6 +518,15 @@ WebKitWebView
 
 
 <!-- ##### FUNCTION webkit_web_view_get_uri ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_favicon ##### -->
 <para>
 
 </para>
@@ -575,6 +662,29 @@ WebKitWebView
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_web_view_run_javascript_from_gresource ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@resource: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_view_run_javascript_from_gresource_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_web_view_can_show_mime_type ##### -->
 <para>
 
@@ -629,6 +739,45 @@ WebKitWebView
 @web_view: 
 @result: 
 @error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_download_uri ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@uri: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_set_view_mode ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@view_mode: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_view_mode ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_tls_info ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@certificate: 
+@errors: 
 @Returns: 
 
 
@@ -734,15 +883,6 @@ WebKitWebView
 
 
 <!-- ##### FUNCTION webkit_web_view_get_main_resource ##### -->
-<para>
-
-</para>
-
-@web_view: 
-@Returns: 
-
-
-<!-- ##### FUNCTION webkit_web_view_get_subresources ##### -->
 <para>
 
 </para>

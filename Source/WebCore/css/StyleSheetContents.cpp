@@ -26,13 +26,16 @@
 #include "CSSStyleSheet.h"
 #include "CachedCSSStyleSheet.h"
 #include "Document.h"
-#include "MemoryInstrumentation.h"
+#include "MediaList.h"
 #include "Node.h"
 #include "SecurityOrigin.h"
 #include "StylePropertySet.h"
 #include "StyleRule.h"
 #include "StyleRuleImport.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/Deque.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
 
@@ -133,12 +136,19 @@ void StyleSheetContents::parserAppendRule(PassRefPtr<StyleRuleBase> rule)
         m_importRules.last()->requestStyleSheet();
         return;
     }
+
+#if ENABLE(RESOLUTION_MEDIA_QUERY)
+    // Add warning message to inspector if dpi/dpcm values are used for screen media.
+    if (rule->isMediaRule())
+        reportMediaQueryWarningIfNeeded(singleOwnerDocument(), static_cast<StyleRuleMedia*>(rule.get())->mediaQueries());
+#endif
+
     m_childRules.append(rule);
 }
 
 StyleRuleBase* StyleSheetContents::ruleAt(unsigned index) const
 {
-    ASSERT(index < ruleCount());
+    ASSERT_WITH_SECURITY_IMPLICATION(index < ruleCount());
     
     unsigned childVectorIndex = index;
     if (hasCharsetRule()) {
@@ -188,7 +198,7 @@ void StyleSheetContents::parserSetEncodingFromCharsetRule(const String& encoding
 bool StyleSheetContents::wrapperInsertRule(PassRefPtr<StyleRuleBase> rule, unsigned index)
 {
     ASSERT(m_isMutable);
-    ASSERT(index <= ruleCount());
+    ASSERT_WITH_SECURITY_IMPLICATION(index <= ruleCount());
     // Parser::parseRule doesn't currently allow @charset so we don't need to deal with it.
     ASSERT(!rule->isCharsetRule());
     
@@ -224,7 +234,7 @@ bool StyleSheetContents::wrapperInsertRule(PassRefPtr<StyleRuleBase> rule, unsig
 void StyleSheetContents::wrapperDeleteRule(unsigned index)
 {
     ASSERT(m_isMutable);
-    ASSERT(index < ruleCount());
+    ASSERT_WITH_SECURITY_IMPLICATION(index < ruleCount());
 
     unsigned childVectorIndex = index;
     if (hasCharsetRule()) {
@@ -251,7 +261,7 @@ void StyleSheetContents::parserAddNamespace(const AtomicString& prefix, const At
     PrefixNamespaceURIMap::AddResult result = m_namespaces.add(prefix, uri);
     if (result.isNewEntry)
         return;
-    result.iterator->second = uri;
+    result.iterator->value = uri;
 }
 
 const AtomicString& StyleSheetContents::determineNamespace(const AtomicString& prefix)
@@ -263,7 +273,7 @@ const AtomicString& StyleSheetContents::determineNamespace(const AtomicString& p
     PrefixNamespaceURIMap::const_iterator it = m_namespaces.find(prefix);
     if (it == m_namespaces.end())
         return nullAtom;
-    return it->second;
+    return it->value;
 }
 
 void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cachedStyleSheet, const SecurityOrigin* securityOrigin)
@@ -289,11 +299,10 @@ void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cached
     }
     if (m_parserContext.needsSiteSpecificQuirks && isStrictParserMode(m_parserContext.mode)) {
         // Work around <https://bugs.webkit.org/show_bug.cgi?id=28350>.
-        DEFINE_STATIC_LOCAL(const String, slashKHTMLFixesDotCss, ("/KHTMLFixes.css"));
-        DEFINE_STATIC_LOCAL(const String, mediaWikiKHTMLFixesStyleSheet, ("/* KHTML fix stylesheet */\n/* work around the horizontal scrollbars */\n#column-content { margin-left: 0; }\n\n"));
+        DEFINE_STATIC_LOCAL(const String, mediaWikiKHTMLFixesStyleSheet, (ASCIILiteral("/* KHTML fix stylesheet */\n/* work around the horizontal scrollbars */\n#column-content { margin-left: 0; }\n\n")));
         // There are two variants of KHTMLFixes.css. One is equal to mediaWikiKHTMLFixesStyleSheet,
         // while the other lacks the second trailing newline.
-        if (baseURL().string().endsWith(slashKHTMLFixesDotCss) && !sheetText.isNull() && mediaWikiKHTMLFixesStyleSheet.startsWith(sheetText)
+        if (baseURL().string().endsWith("/KHTMLFixes.css") && !sheetText.isNull() && mediaWikiKHTMLFixesStyleSheet.startsWith(sheetText)
             && sheetText.length() >= mediaWikiKHTMLFixesStyleSheet.length() - 1)
             clearRules();
     }
@@ -325,6 +334,8 @@ void StyleSheetContents::checkLoaded()
 {
     if (isLoading())
         return;
+
+    RefPtr<StyleSheetContents> protect(this);
 
     // Avoid |this| being deleted by scripts that run via
     // ScriptableDocumentParser::executeScriptsWaitingForStylesheets().
@@ -432,6 +443,12 @@ static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<Style
             if (childRulesHaveFailedOrCanceledSubresources(static_cast<const StyleRuleRegion*>(rule)->childRules()))
                 return true;
             break;
+#if ENABLE(SHADOW_DOM)
+        case StyleRuleBase::HostInternal:
+            if (childRulesHaveFailedOrCanceledSubresources(static_cast<const StyleRuleHost*>(rule)->childRules()))
+                return true;
+            break;
+#endif
         case StyleRuleBase::Import:
             ASSERT_NOT_REACHED();
         case StyleRuleBase::Page:
@@ -439,6 +456,15 @@ static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<Style
         case StyleRuleBase::Unknown:
         case StyleRuleBase::Charset:
         case StyleRuleBase::Keyframe:
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+        case StyleRuleBase::Supports:
+#endif
+#if ENABLE(CSS_DEVICE_ADAPTATION)
+        case StyleRuleBase::Viewport:
+#endif
+#if ENABLE(CSS_SHADERS)
+        case StyleRuleBase::Filter:
+#endif
             break;
         }
     }
@@ -483,15 +509,23 @@ void StyleSheetContents::removedFromMemoryCache()
     m_isInMemoryCache = false;
 }
 
+void StyleSheetContents::shrinkToFit()
+{
+    m_importRules.shrinkToFit();
+    m_childRules.shrinkToFit();
+}
+
 void StyleSheetContents::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_originalURL);
-    info.addInstrumentedMember(m_encodingFromCharsetRule);
-    info.addVector(m_importRules);
-    info.addInstrumentedVector(m_childRules);
-    info.addHashMap(m_namespaces);
-    info.addVector(m_clients);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_ownerRule, "ownerRule");
+    info.addMember(m_originalURL, "originalURL");
+    info.addMember(m_encodingFromCharsetRule, "encodingFromCharsetRule");
+    info.addMember(m_importRules, "importRules");
+    info.addMember(m_childRules, "childRules");
+    info.addMember(m_namespaces, "namespaces");
+    info.addMember(m_parserContext, "parserContext");
+    info.addMember(m_clients, "clients");
 }
 
 }

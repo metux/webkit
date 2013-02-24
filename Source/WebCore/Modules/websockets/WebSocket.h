@@ -56,6 +56,9 @@ public:
     static bool isAvailable();
     static const char* subProtocolSeperator();
     static PassRefPtr<WebSocket> create(ScriptExecutionContext*);
+    static PassRefPtr<WebSocket> create(ScriptExecutionContext*, const String& url, ExceptionCode&);
+    static PassRefPtr<WebSocket> create(ScriptExecutionContext*, const String& url, const String& protocol, ExceptionCode&);
+    static PassRefPtr<WebSocket> create(ScriptExecutionContext*, const String& url, const Vector<String>& protocols, ExceptionCode&);
     virtual ~WebSocket();
 
     enum State {
@@ -86,7 +89,7 @@ public:
     String extensions() const;
 
     String binaryType() const;
-    void setBinaryType(const String& binaryType, ExceptionCode&);
+    void setBinaryType(const String&);
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(open);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(message);

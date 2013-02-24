@@ -19,7 +19,7 @@
 #include "config.h"
 #include "GRefPtr.h"
 
-#if ENABLE(GLIB_SUPPORT)
+#if USE(GLIB)
 
 #include <glib.h>
 
@@ -62,6 +62,37 @@ template <> void derefGPtr(GMainLoop* ptr)
     if (ptr)
         g_main_loop_unref(ptr);
 }
+
+#if GLIB_CHECK_VERSION(2, 32, 0)
+template <> GBytes* refGPtr(GBytes* ptr)
+{
+    if (ptr)
+        g_bytes_ref(ptr);
+    return ptr;
+}
+
+template <> void derefGPtr(GBytes* ptr)
+{
+    if (ptr)
+        g_bytes_unref(ptr);
+}
+
+# else
+
+typedef struct _GBytes {
+    bool fake;
+} GBytes;
+
+template <> GBytes* refGPtr(GBytes* ptr)
+{
+    return ptr;
+}
+
+template <> void derefGPtr(GBytes* ptr)
+{
+}
+
+#endif
 
 #if GLIB_CHECK_VERSION(2, 24, 0)
 template <> GVariant* refGPtr(GVariant* ptr)
@@ -135,4 +166,4 @@ template <> void derefGPtr(GByteArray* ptr)
 
 } // namespace WTF
 
-#endif // ENABLE(GLIB_SUPPORT)
+#endif // USE(GLIB)

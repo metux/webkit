@@ -29,63 +29,21 @@
 #if ENABLE(PLUGIN_PROCESS)
 
 #include "ArgumentCoders.h"
+#include "ConnectionStack.h"
+#include "NPObjectMessageReceiverMessages.h"
 #include "NPRemoteObjectMap.h"
 #include "PluginControllerProxy.h"
 #include "PluginCreationParameters.h"
 #include "PluginProcess.h"
 #include "PluginProcessConnectionMessages.h"
 #include "PluginProxyMessages.h"
+#include "WebProcessConnectionMessages.h"
 #include <WebCore/RunLoop.h>
 #include <unistd.h>
 
 using namespace WebCore;
 
 namespace WebKit {
-
-class ConnectionStack {
-public:
-    CoreIPC::Connection* current()
-    {
-        return m_connectionStack.last();
-    }
-
-    class CurrentConnectionPusher {
-    public:
-        CurrentConnectionPusher(ConnectionStack& connectionStack, CoreIPC::Connection* connection)
-            : m_connectionStack(connectionStack)
-#if !ASSERT_DISABLED
-            , m_connection(connection)
-#endif
-        {
-            m_connectionStack.m_connectionStack.append(connection);
-        }
-
-        ~CurrentConnectionPusher()
-        {
-            ASSERT(m_connectionStack.current() == m_connection);
-            m_connectionStack.m_connectionStack.removeLast();
-        }
-
-    private:
-        ConnectionStack& m_connectionStack;
-#if !ASSERT_DISABLED
-        CoreIPC::Connection* m_connection;
-#endif
-    };
-
-private:
-    // It's OK for these to be weak pointers because we only push object on the stack
-    // from within didReceiveMessage and didReceiveSyncMessage and the Connection objects are
-    // already ref'd for the duration of those functions.
-    Vector<CoreIPC::Connection*, 4> m_connectionStack;
-};
-
-static ConnectionStack& connectionStack()
-{
-    DEFINE_STATIC_LOCAL(ConnectionStack, connectionStack, ());
-
-    return connectionStack;
-}
 
 PassRefPtr<WebProcessConnection> WebProcessConnection::create(CoreIPC::Connection::Identifier connectionIdentifier)
 {
@@ -151,57 +109,57 @@ void WebProcessConnection::removePluginControllerProxy(PluginControllerProxy* pl
 
 void WebProcessConnection::setGlobalException(const String& exceptionString)
 {
-    CoreIPC::Connection* connection = connectionStack().current();
+    CoreIPC::Connection* connection = ConnectionStack::shared().current();
     if (!connection)
         return;
 
     connection->sendSync(Messages::PluginProcessConnection::SetException(exceptionString), Messages::PluginProcessConnection::SetException::Reply(), 0);
 }
 
-void WebProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void WebProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
-    ConnectionStack::CurrentConnectionPusher currentConnection(connectionStack(), connection);
+    ConnectionStack::CurrentConnectionPusher currentConnection(ConnectionStack::shared(), connection);
 
-    if (messageID.is<CoreIPC::MessageClassWebProcessConnection>()) {
-        didReceiveWebProcessConnectionMessage(connection, messageID, arguments);
+    if (decoder.messageReceiverName() == Messages::WebProcessConnection::messageReceiverName()) {
+        didReceiveWebProcessConnectionMessage(connection, decoder);
         return;
     }
 
-    if (!arguments->destinationID()) {
+    if (!decoder.destinationID()) {
         ASSERT_NOT_REACHED();
         return;
     }
 
-    PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(arguments->destinationID());
+    PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(decoder.destinationID());
     if (!pluginControllerProxy)
         return;
 
     PluginController::PluginDestructionProtector protector(pluginControllerProxy->asPluginController());
-    pluginControllerProxy->didReceivePluginControllerProxyMessage(connection, messageID, arguments);
+    pluginControllerProxy->didReceivePluginControllerProxyMessage(connection, decoder);
 }
 
-void WebProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, OwnPtr<CoreIPC::ArgumentEncoder>& reply)
+void WebProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {
-    ConnectionStack::CurrentConnectionPusher currentConnection(connectionStack(), connection);
+    ConnectionStack::CurrentConnectionPusher currentConnection(ConnectionStack::shared(), connection);
 
-    uint64_t destinationID = arguments->destinationID();
+    uint64_t destinationID = decoder.destinationID();
 
     if (!destinationID) {
-        didReceiveSyncWebProcessConnectionMessage(connection, messageID, arguments, reply);
+        didReceiveSyncWebProcessConnectionMessage(connection, decoder, replyEncoder);
         return;
     }
 
-    if (messageID.is<CoreIPC::MessageClassNPObjectMessageReceiver>()) {
-        m_npRemoteObjectMap->didReceiveSyncMessage(connection, messageID, arguments, reply);
+    if (decoder.messageReceiverName() == Messages::NPObjectMessageReceiver::messageReceiverName()) {
+        m_npRemoteObjectMap->didReceiveSyncMessage(connection, decoder, replyEncoder);
         return;
     }
 
-    PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(arguments->destinationID());
+    PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(decoder.destinationID());
     if (!pluginControllerProxy)
         return;
 
     PluginController::PluginDestructionProtector protector(pluginControllerProxy->asPluginController());
-    pluginControllerProxy->didReceiveSyncPluginControllerProxyMessage(connection, messageID, arguments, reply);
+    pluginControllerProxy->didReceiveSyncPluginControllerProxyMessage(connection, decoder, replyEncoder);
 }
 
 void WebProcessConnection::didClose(CoreIPC::Connection*)
@@ -232,13 +190,9 @@ void WebProcessConnection::destroyPlugin(uint64_t pluginInstanceID, bool asynchr
     destroyPluginControllerProxy(pluginControllerProxy);
 }
 
-void WebProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID)
+void WebProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference, CoreIPC::StringReference)
 {
     // FIXME: Implement.
-}
-
-void WebProcessConnection::syncMessageSendTimedOut(CoreIPC::Connection*)
-{
 }
 
 void WebProcessConnection::createPluginInternal(const PluginCreationParameters& creationParameters, bool& result, bool& wantsWheelEvents, uint32_t& remoteLayerClientID)
@@ -260,6 +214,8 @@ void WebProcessConnection::createPluginInternal(const PluginCreationParameters& 
     wantsWheelEvents = pluginControllerProxyPtr->wantsWheelEvents();
 #if PLATFORM(MAC)
     remoteLayerClientID = pluginControllerProxyPtr->remoteLayerClientID();
+#else
+    UNUSED_PARAM(remoteLayerClientID);
 #endif
 }
 

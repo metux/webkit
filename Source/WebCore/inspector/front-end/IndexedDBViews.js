@@ -53,9 +53,13 @@ WebInspector.IDBDatabaseView = function(database)
     this._nameTreeElement.selectable = false;
     this._headersTreeOutline.appendChild(this._nameTreeElement);
 
-    this._versionTreeElement = new TreeElement("", null, false);
-    this._versionTreeElement.selectable = false;
-    this._headersTreeOutline.appendChild(this._versionTreeElement);
+    this._intVersionTreeElement = new TreeElement("", null, false);
+    this._intVersionTreeElement.selectable = false;
+    this._headersTreeOutline.appendChild(this._intVersionTreeElement);
+
+    this._stringVersionTreeElement = new TreeElement("", null, false);
+    this._stringVersionTreeElement.selectable = false;
+    this._headersTreeOutline.appendChild(this._stringVersionTreeElement);
 
     this.update(database);
 }
@@ -78,7 +82,8 @@ WebInspector.IDBDatabaseView.prototype = {
     {
         this._securityOriginTreeElement.title = this._formatHeader(WebInspector.UIString("Security origin"), this._database.databaseId.securityOrigin);
         this._nameTreeElement.title = this._formatHeader(WebInspector.UIString("Name"), this._database.databaseId.name);
-        this._versionTreeElement.title = this._formatHeader(WebInspector.UIString("Version"), this._database.version);
+        this._stringVersionTreeElement.title = this._formatHeader(WebInspector.UIString("String Version"), this._database.version);
+        this._intVersionTreeElement.title = this._formatHeader(WebInspector.UIString("Integer Version"), this._database.intVersion);
     },
 
     /**
@@ -89,9 +94,10 @@ WebInspector.IDBDatabaseView.prototype = {
         this._database = database;
         this._refreshDatabase();
     },
+
+    __proto__: WebInspector.View.prototype
 }
 
-WebInspector.IDBDatabaseView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -177,7 +183,7 @@ WebInspector.IDBDataView.prototype = {
             }
             keyColumnHeaderFragment.appendChild(document.createTextNode("]"));
         } else {
-            var keyPathString = /** @type {string} */ keyPath;
+            var keyPathString = /** @type {string} */ (keyPath);
             keyColumnHeaderFragment.appendChild(this._keyPathStringFragment(keyPathString));
         }
         keyColumnHeaderFragment.appendChild(document.createTextNode(")"));
@@ -328,8 +334,7 @@ WebInspector.IDBDataView.prototype = {
                 data["value"] = entries[i].value;
 
                 var primaryKey = JSON.stringify(this._isIndex ? entries[i].primaryKey : entries[i].key);
-                var valueTitle = this._objectStore.name + "[" + primaryKey + "]";
-                var node = new WebInspector.IDBDataGridNode(valueTitle, data);
+                var node = new WebInspector.IDBDataGridNode(data);
                 this._dataGrid.rootNode().appendChild(node);
             }
 
@@ -358,26 +363,24 @@ WebInspector.IDBDataView.prototype = {
     {
         this._dataGrid.rootNode().removeChildren();
         for (var i = 0; i < this._entries.length; ++i) {
-            var value = this._entries[i].value;
-            value.release();
+            this._entries[i].key.release();
+            this._entries[i].primaryKey.release();
+            this._entries[i].value.release();
         }
         this._entries = [];
-    }
-}
+    },
 
-WebInspector.IDBDataView.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
  * @extends {WebInspector.DataGridNode}
- * @param {string} valueTitle
  * @param {*} data
  */
-WebInspector.IDBDataGridNode = function(valueTitle, data)
+WebInspector.IDBDataGridNode = function(data)
 {
     WebInspector.DataGridNode.call(this, data, false);
-
-    this._valueTitle = valueTitle;
     this.selectable = false;
 }
 
@@ -392,13 +395,10 @@ WebInspector.IDBDataGridNode.prototype = {
 
         switch (columnIdentifier) {
         case "value":
-            cell.removeChildren();
-            this._formatValue(cell, value);
-            break;
         case "key":
         case "primaryKey":
             cell.removeChildren();
-            this._formatValue(cell, new WebInspector.LocalJSONObject(value));
+            this._formatValue(cell, value);
             break;
         default:
         }
@@ -427,7 +427,8 @@ WebInspector.IDBDataGridNode.prototype = {
             contents.addStyleClass("primitive-value");
             contents.appendChild(document.createTextNode(value.description));
         }
-    }
-};
+    },
 
-WebInspector.IDBDataGridNode.prototype.__proto__ = WebInspector.DataGridNode.prototype;
+    __proto__: WebInspector.DataGridNode.prototype
+}
+

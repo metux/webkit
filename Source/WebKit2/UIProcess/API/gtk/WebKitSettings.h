@@ -362,6 +362,24 @@ WEBKIT_API void
 webkit_settings_set_enable_page_cache                          (WebKitSettings *settings,
                                                                 gboolean        enabled);
 
+WEBKIT_API const gchar *
+webkit_settings_get_user_agent                                 (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_user_agent                                 (WebKitSettings *settings,
+                                                                const gchar    *user_agent);
+WEBKIT_API void
+webkit_settings_set_user_agent_with_application_details        (WebKitSettings *settings,
+                                                                const gchar    *application_name,
+                                                                const gchar    *application_version);
+
+WEBKIT_API gboolean
+webkit_settings_get_enable_smooth_scrolling                    (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_enable_smooth_scrolling                    (WebKitSettings *settings,
+                                                                gboolean        enabled);
+
 G_END_DECLS
 
 #endif /* WebKitSettings_h */

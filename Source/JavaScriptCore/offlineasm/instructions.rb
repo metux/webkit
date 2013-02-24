@@ -33,15 +33,19 @@ MACRO_INSTRUCTIONS =
      "andi",
      "lshifti",
      "lshiftp",
+     "lshiftq",
      "muli",
      "negi",
      "negp",
+     "negq",
      "noti",
      "ori",
      "rshifti",
      "urshifti",
      "rshiftp",
      "urshiftp",
+     "rshiftq",
+     "urshiftq",
      "subi",
      "xori",
      "loadi",
@@ -63,8 +67,8 @@ MACRO_INSTRUCTIONS =
      "ci2d",
      "fii2d", # usage: fii2d <gpr with least significant bits>, <gpr with most significant bits>, <fpr>
      "fd2ii", # usage: fd2ii <fpr>, <gpr with least significant bits>, <gpr with most significant bits>
-     "fp2d",
-     "fd2p",
+     "fq2d",
+     "fd2q",
      "bdeq",
      "bdneq",
      "bdgt",
@@ -84,8 +88,8 @@ MACRO_INSTRUCTIONS =
      "pop",
      "push",
      "move",
-     "sxi2p",
-     "zxi2p",
+     "sxi2q",
+     "zxi2q",
      "nop",
      "bieq",
      "bineq",
@@ -107,11 +111,9 @@ MACRO_INSTRUCTIONS =
      "bbgteq",
      "bblt",
      "bblteq",
-     "btio",
      "btis",
      "btiz",
      "btinz",
-     "btbo",
      "btbs",
      "btbz",
      "btbnz",
@@ -155,15 +157,12 @@ MACRO_INSTRUCTIONS =
      "cigteq",
      "cilt",
      "cilteq",
-     "tio",
      "tis",
      "tiz",
      "tinz",
-     "tbo",
      "tbs",
      "tbz",
      "tbnz",
-     "tpo",
      "tps",
      "tpz",
      "tpnz",
@@ -197,7 +196,6 @@ MACRO_INSTRUCTIONS =
      "cplt",
      "cplteq",
      "storep",
-     "btpo",
      "btps",
      "btpz",
      "btpnz",
@@ -205,6 +203,46 @@ MACRO_INSTRUCTIONS =
      "baddps",
      "baddpz",
      "baddpnz",
+     "tqs",
+     "tqz",
+     "tqnz",
+     "peekq",
+     "pokeq",
+     "bqeq",
+     "bqneq",
+     "bqa",
+     "bqaeq",
+     "bqb",
+     "bqbeq",
+     "bqgt",
+     "bqgteq",
+     "bqlt",
+     "bqlteq",
+     "addq",
+     "mulq",
+     "andq",
+     "orq",
+     "subq",
+     "xorq",
+     "loadq",
+     "cqeq",
+     "cqneq",
+     "cqa",
+     "cqaeq",
+     "cqb",
+     "cqbeq",
+     "cqgt",
+     "cqgteq",
+     "cqlt",
+     "cqlteq",
+     "storeq",
+     "btqs",
+     "btqz",
+     "btqnz",
+     "baddqo",
+     "baddqs",
+     "baddqz",
+     "baddqnz",
      "bo",
      "bs",
      "bz",
@@ -227,7 +265,33 @@ ARMv7_INSTRUCTIONS =
      "oris"
     ]
 
-INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARMv7_INSTRUCTIONS
+MIPS_INSTRUCTIONS =
+    [
+    "movz",
+    "movn",
+    "slt",
+    "sltu",
+    "pichdr",
+    "pichdrra"
+    ]
+
+CXX_INSTRUCTIONS =
+    [
+     "cloopCrash",           # no operands
+     "cloopCallJSFunction",  # operands: callee
+     "cloopCallNative",      # operands: callee
+     "cloopCallSlowPath",    # operands: callTarget, currentFrame, currentPC
+
+     # For debugging only:
+     # Takes no operands but simply emits whatever follows in // comments as
+     # a line of C++ code in the generated LLIntAssembly.h file. This can be
+     # used to insert instrumentation into the interpreter loop to inspect
+     # variables of interest. Do not leave these instructions in production
+     # code.
+     "cloopDo",              # no operands
+    ]
+
+INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARMv7_INSTRUCTIONS + MIPS_INSTRUCTIONS + CXX_INSTRUCTIONS
 
 INSTRUCTION_PATTERN = Regexp.new('\\A((' + INSTRUCTIONS.join(')|(') + '))\\Z')
 

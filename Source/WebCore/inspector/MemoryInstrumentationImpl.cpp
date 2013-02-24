@@ -34,44 +34,121 @@
 
 #include "MemoryInstrumentationImpl.h"
 
+#include "HeapGraphSerializer.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/Assertions.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationHashSet.h>
+#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/text/StringHash.h>
+
 namespace WebCore {
 
-MemoryInstrumentationImpl::MemoryInstrumentationImpl(VisitedObjects& visitedObjects)
-    : m_visitedObjects(visitedObjects)
+TypeNameToSizeMap MemoryInstrumentationClientImpl::sizesMap() const
 {
-    for (int i = 0; i < LastTypeEntry; ++i)
-        m_totalSizes[i] = 0;
-}
-
-void MemoryInstrumentationImpl::processDeferredInstrumentedPointers()
-{
-    while (!m_deferredInstrumentedPointers.isEmpty()) {
-        OwnPtr<InstrumentedPointerBase> pointer = m_deferredInstrumentedPointers.last().release();
-        m_deferredInstrumentedPointers.removeLast();
-        pointer->process(this);
+    // TypeToSizeMap uses const char* as the key.
+    // Thus it could happen that we have two different keys with equal string.
+    TypeNameToSizeMap sizesMap;
+    for (TypeToSizeMap::const_iterator i = m_totalSizes.begin(); i != m_totalSizes.end(); ++i) {
+        String objectType(i->key);
+        TypeNameToSizeMap::AddResult result = sizesMap.add(objectType, i->value);
+        if (!result.isNewEntry)
+            result.iterator->value += i->value;
     }
+
+    return sizesMap;
 }
 
-void MemoryInstrumentationImpl::countObjectSize(ObjectType objectType, size_t size)
+void MemoryInstrumentationClientImpl::countObjectSize(const void* object, MemoryObjectType objectType, size_t size)
 {
-    ASSERT(objectType >= 0 && objectType < LastTypeEntry);
-    m_totalSizes[objectType] += size;
+    ASSERT(objectType);
+
+    TypeToSizeMap::AddResult result = m_totalSizes.add(objectType, size);
+    if (!result.isNewEntry)
+        result.iterator->value += size;
+    ++m_totalCountedObjects;
+
+    if (!checkInstrumentedObjects())
+        return;
+
+    if (object)
+        m_countedObjects.add(object, size);
 }
 
-void MemoryInstrumentationImpl::deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase> pointer)
-{
-    m_deferredInstrumentedPointers.append(pointer);
-}
-
-bool MemoryInstrumentationImpl::visited(const void* object)
+bool MemoryInstrumentationClientImpl::visited(const void* object)
 {
     return !m_visitedObjects.add(object).isNewEntry;
 }
 
-size_t MemoryInstrumentationImpl::selfSize() const
+bool MemoryInstrumentationClientImpl::checkCountedObject(const void* object)
 {
-    return calculateContainerSize(m_visitedObjects) + calculateContainerSize(m_deferredInstrumentedPointers);
+    if (!checkInstrumentedObjects())
+        return true;
+    if (!m_allocatedObjects.contains(object)) {
+        ++m_totalObjectsNotInAllocatedSet;
+        return false;
+#if 0
+        printf("Found unknown object referenced by pointer: %p\n", object);
+        WTFReportBacktrace();
+#endif
+    }
+    return true;
 }
+
+void MemoryInstrumentationClientImpl::reportNode(const MemoryObjectInfo& node)
+{
+    if (m_graphSerializer)
+        m_graphSerializer->reportNode(node);
+}
+
+void MemoryInstrumentationClientImpl::reportEdge(const void* target, const char* name, MemberType memberType)
+{
+    if (m_graphSerializer)
+        m_graphSerializer->reportEdge(target, name, memberType);
+}
+
+void MemoryInstrumentationClientImpl::reportLeaf(const MemoryObjectInfo& target, const char* edgeName)
+{
+    if (m_graphSerializer)
+        m_graphSerializer->reportLeaf(target, edgeName);
+}
+
+void MemoryInstrumentationClientImpl::reportBaseAddress(const void* base, const void* real)
+{
+    if (m_graphSerializer)
+        m_graphSerializer->reportBaseAddress(base, real);
+}
+
+void MemoryInstrumentationClientImpl::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorMemoryAgent);
+    info.addMember(m_totalSizes, "totalSizes");
+    info.addMember(m_visitedObjects, "visitedObjects");
+    info.addMember(m_allocatedObjects, "allocatedObjects");
+    info.addMember(m_countedObjects, "countedObjects");
+    info.addMember(m_graphSerializer, "graphSerializer");
+}
+
+void MemoryInstrumentationImpl::processDeferredObjects()
+{
+    while (!m_deferredObjects.isEmpty()) {
+        OwnPtr<WrapperBase> pointer = m_deferredObjects.last().release();
+        m_deferredObjects.removeLast();
+        pointer->process(this);
+    }
+}
+
+void MemoryInstrumentationImpl::deferObject(PassOwnPtr<WrapperBase> pointer)
+{
+    m_deferredObjects.append(pointer);
+}
+
+void MemoryInstrumentationImpl::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorMemoryAgent);
+    info.addMember(m_deferredObjects, "deferredObjects");
+}
+
 
 } // namespace WebCore
 

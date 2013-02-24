@@ -34,6 +34,7 @@
 #include "WebPageProxy.h"
 #include "WebProcessProxy.h"
 #include <WebCore/Page.h>
+#include <wtf/UnusedParam.h>
 
 #ifdef __BLOCKS__
 #include <Block.h>
@@ -182,12 +183,25 @@ uint64_t WKPageGetRenderTreeSize(WKPageRef page)
     return toImpl(page)->renderTreeSize();
 }
 
-#if defined(ENABLE_INSPECTOR) && ENABLE_INSPECTOR
 WKInspectorRef WKPageGetInspector(WKPageRef pageRef)
 {
+#if defined(ENABLE_INSPECTOR) && ENABLE_INSPECTOR
     return toAPI(toImpl(pageRef)->inspector());
-}
+#else
+    UNUSED_PARAM(pageRef);
+    return 0;
 #endif
+}
+
+WKVibrationRef WKPageGetVibration(WKPageRef page)
+{
+#if ENABLE(VIBRATION)
+    return toAPI(toImpl(page)->vibration());
+#else
+    UNUSED_PARAM(page);
+    return 0;
+#endif
+}
 
 double WKPageGetEstimatedProgress(WKPageRef pageRef)
 {
@@ -330,6 +344,16 @@ WKSize WKPageFixedLayoutSize(WKPageRef pageRef)
     return toAPI(toImpl(pageRef)->fixedLayoutSize());
 }
 
+void WKPageListenForLayoutMilestones(WKPageRef pageRef, WKLayoutMilestones milestones)
+{
+    toImpl(pageRef)->listenForLayoutMilestones(toLayoutMilestones(milestones));
+}
+
+void WKPageSetVisibilityState(WKPageRef pageRef, WKPageVisibilityState state, bool isInitialState)
+{
+    toImpl(pageRef)->setVisibilityState(toPageVisibilityState(state), isInitialState);
+}
+
 bool WKPageHasHorizontalScrollbar(WKPageRef pageRef)
 {
     return toImpl(pageRef)->hasHorizontalScrollbar();
@@ -340,6 +364,16 @@ bool WKPageHasVerticalScrollbar(WKPageRef pageRef)
     return toImpl(pageRef)->hasVerticalScrollbar();
 }
 
+void WKPageSetSuppressScrollbarAnimations(WKPageRef pageRef, bool suppressAnimations)
+{
+    toImpl(pageRef)->setSuppressScrollbarAnimations(suppressAnimations);
+}
+
+bool WKPageAreScrollbarAnimationsSuppressed(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->areScrollbarAnimationsSuppressed();
+}
+
 bool WKPageIsPinnedToLeftSide(WKPageRef pageRef)
 {
     return toImpl(pageRef)->isPinnedToLeftSide();
@@ -348,6 +382,37 @@ bool WKPageIsPinnedToLeftSide(WKPageRef pageRef)
 bool WKPageIsPinnedToRightSide(WKPageRef pageRef)
 {
     return toImpl(pageRef)->isPinnedToRightSide();
+}
+
+bool WKPageIsPinnedToTopSide(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->isPinnedToTopSide();
+}
+
+bool WKPageIsPinnedToBottomSide(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->isPinnedToBottomSide();
+}
+
+
+bool WKPageRubberBandsAtBottom(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->rubberBandsAtBottom();
+}
+
+void WKPageSetRubberBandsAtBottom(WKPageRef pageRef, bool rubberBandsAtBottom)
+{
+    toImpl(pageRef)->setRubberBandsAtBottom(rubberBandsAtBottom);
+}
+
+bool WKPageRubberBandsAtTop(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->rubberBandsAtTop();
+}
+
+void WKPageSetRubberBandsAtTop(WKPageRef pageRef, bool rubberBandsAtTop)
+{
+    toImpl(pageRef)->setRubberBandsAtTop(rubberBandsAtTop);
 }
 
 void WKPageSetPaginationMode(WKPageRef pageRef, WKPaginationMode paginationMode)
@@ -454,6 +519,21 @@ void WKPageCenterSelectionInVisibleArea(WKPageRef pageRef)
     return toImpl(pageRef)->centerSelectionInVisibleArea();
 }
 
+void WKPageFindStringMatches(WKPageRef pageRef, WKStringRef string, WKFindOptions options, unsigned maxMatchCount)
+{
+    toImpl(pageRef)->findStringMatches(toImpl(string)->string(), toFindOptions(options), maxMatchCount);
+}
+
+void WKPageGetImageForFindMatch(WKPageRef pageRef, int32_t matchIndex)
+{
+    toImpl(pageRef)->getImageForFindMatch(matchIndex);
+}
+
+void WKPageSelectFindMatch(WKPageRef pageRef, int32_t matchIndex)
+{
+    toImpl(pageRef)->selectFindMatch(matchIndex);
+}
+
 void WKPageFindString(WKPageRef pageRef, WKStringRef string, WKFindOptions options, unsigned maxMatchCount)
 {
     toImpl(pageRef)->findString(toImpl(string)->string(), toFindOptions(options), maxMatchCount);
@@ -481,6 +561,11 @@ void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClient* wkClient
     toImpl(pageRef)->initializeFindClient(wkClient);
 }
 
+void WKPageSetPageFindMatchesClient(WKPageRef pageRef, const WKPageFindMatchesClient* wkClient)
+{
+    toImpl(pageRef)->initializeFindMatchesClient(wkClient);
+}
+
 void WKPageSetPageFormClient(WKPageRef pageRef, const WKPageFormClient* wkClient)
 {
     toImpl(pageRef)->initializeFormClient(wkClient);
@@ -494,11 +579,6 @@ void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClient* wkCl
 void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClient* wkClient)
 {
     toImpl(pageRef)->initializePolicyClient(wkClient);
-}
-
-void WKPageSetPageResourceLoadClient(WKPageRef pageRef, const WKPageResourceLoadClient* wkClient)
-{
-    toImpl(pageRef)->initializeResourceLoadClient(wkClient);
 }
 
 void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClient* wkClient)
@@ -582,10 +662,20 @@ void WKPageGetContentsAsString_b(WKPageRef pageRef, WKPageGetSourceForFrameBlock
 }
 #endif
 
+void WKPageGetSelectionAsWebArchiveData(WKPageRef pageRef, void* context, WKPageGetSelectionAsWebArchiveDataFunction callback)
+{
+    toImpl(pageRef)->getSelectionAsWebArchiveData(DataCallback::create(context, callback));
+}
+
 void WKPageGetContentsAsMHTMLData(WKPageRef pageRef, bool useBinaryEncoding, void* context, WKPageGetContentsAsMHTMLDataFunction callback)
 {
 #if ENABLE(MHTML)
     toImpl(pageRef)->getContentsAsMHTMLData(DataCallback::create(context, callback), useBinaryEncoding);
+#else
+    UNUSED_PARAM(pageRef);
+    UNUSED_PARAM(useBinaryEncoding);
+    UNUSED_PARAM(context);
+    UNUSED_PARAM(callback);
 #endif
 }
 
@@ -641,7 +731,7 @@ void WKPageExecuteCommand(WKPageRef pageRef, WKStringRef command)
     toImpl(pageRef)->executeEditCommand(toImpl(command)->string());
 }
 
-#if PLATFORM(MAC) || PLATFORM(WIN)
+#if PLATFORM(MAC)
 struct ComputedPagesContext {
     ComputedPagesContext(WKPageComputePagesForPrintingFunction callback, void* context)
         : callback(callback)
@@ -691,13 +781,6 @@ void WKPageEndPrinting(WKPageRef page)
 }
 #endif
 
-void WKPageDeliverIntentToFrame(WKPageRef page, WKFrameRef frame, WKIntentDataRef intent)
-{
-#if ENABLE(WEB_INTENTS)
-    toImpl(page)->deliverIntentToFrame(toImpl(frame), toImpl(intent));
-#endif
-}
-
 WKImageRef WKPageCreateSnapshotOfVisibleContent(WKPageRef)
 {
     return 0;
@@ -718,3 +801,17 @@ void WKPagePostMessageToInjectedBundle(WKPageRef pageRef, WKStringRef messageNam
     toImpl(pageRef)->postMessageToInjectedBundle(toImpl(messageNameRef)->string(), toImpl(messageBodyRef));
 }
 
+WKArrayRef WKPageCopyRelatedPages(WKPageRef pageRef)
+{
+    return toAPI(toImpl(pageRef)->relatedPages().leakRef());
+}
+
+void WKPageSetMayStartMediaWhenInWindow(WKPageRef pageRef, bool mayStartMedia)
+{
+    toImpl(pageRef)->setMayStartMediaWhenInWindow(mayStartMedia);
+}
+
+void WKPageSetInvalidMessageFunction(WKPageInvalidMessageFunction)
+{
+    // FIXME: Remove this function when doing so won't break WebKit nightlies.
+}

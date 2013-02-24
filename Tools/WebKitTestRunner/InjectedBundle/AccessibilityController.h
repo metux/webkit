@@ -48,6 +48,7 @@ public:
     PassRefPtr<AccessibilityUIElement> rootElement();
     PassRefPtr<AccessibilityUIElement> focusedElement();
     PassRefPtr<AccessibilityUIElement> elementAtPoint(int x, int y);
+    PassRefPtr<AccessibilityUIElement> accessibleElementById(JSStringRef idAttribute);
 
     bool addNotificationListener(JSValueRef functionCallback);
     bool removeNotificationListener();
@@ -67,7 +68,7 @@ private:
     RetainPtr<NotificationHandler> m_globalNotificationHandler;
 #endif
 
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(EFL)
     unsigned m_stateChangeListenerId;
     unsigned m_focusEventListenerId;
     unsigned m_activeDescendantChangedListenerId;

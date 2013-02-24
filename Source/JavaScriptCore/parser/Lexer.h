@@ -100,12 +100,12 @@ public:
 
     // Functions for use after parsing.
     bool sawError() const { return m_error; }
-    UString getErrorMessage() const { return m_lexErrorMessage; }
+    String getErrorMessage() const { return m_lexErrorMessage; }
     void clear();
     void setOffset(int offset)
     {
         m_error = 0;
-        m_lexErrorMessage = UString();
+        m_lexErrorMessage = String();
         m_code = m_codeStart + offset;
         m_buffer8.resize(0);
         m_buffer16.resize(0);
@@ -137,7 +137,7 @@ private:
     int parseFourDigitUnicodeHex();
     void shiftLineTerminator();
 
-    UString invalidCharacterMessage() const;
+    String invalidCharacterMessage() const;
     ALWAYS_INLINE const T* currentCharacter() const;
     ALWAYS_INLINE int currentOffset() const { return m_code - m_codeStart; }
     ALWAYS_INLINE void setOffsetFromCharOffset(const T* charOffset) { setOffset(charOffset - m_codeStart); }
@@ -146,6 +146,9 @@ private:
 
     ALWAYS_INLINE const Identifier* makeIdentifier(const LChar* characters, size_t length);
     ALWAYS_INLINE const Identifier* makeIdentifier(const UChar* characters, size_t length);
+    ALWAYS_INLINE const Identifier* makeLCharIdentifier(const LChar* characters, size_t length);
+    ALWAYS_INLINE const Identifier* makeLCharIdentifier(const UChar* characters, size_t length);
+    ALWAYS_INLINE const Identifier* makeRightSizedIdentifier(const UChar* characters, size_t length, UChar orAllChars);
     ALWAYS_INLINE const Identifier* makeIdentifierLCharFromUChar(const UChar* characters, size_t length);
 
     ALWAYS_INLINE bool lastTokenWasRestrKeyword() const;
@@ -181,7 +184,7 @@ private:
     bool m_isReparsing;
     bool m_atLineStart;
     bool m_error;
-    UString m_lexErrorMessage;
+    String m_lexErrorMessage;
 
     T m_current;
 
@@ -239,6 +242,21 @@ ALWAYS_INLINE const Identifier* Lexer<T>::makeIdentifier(const UChar* characters
 }
 
 template <>
+ALWAYS_INLINE const Identifier* Lexer<LChar>::makeRightSizedIdentifier(const UChar* characters, size_t length, UChar)
+{
+    return &m_arena->makeIdentifierLCharFromUChar(m_globalData, characters, length);
+}
+
+template <>
+ALWAYS_INLINE const Identifier* Lexer<UChar>::makeRightSizedIdentifier(const UChar* characters, size_t length, UChar orAllChars)
+{
+    if (!(orAllChars & ~0xff))
+        return &m_arena->makeIdentifierLCharFromUChar(m_globalData, characters, length);
+
+    return &m_arena->makeIdentifier(m_globalData, characters, length);
+}
+
+template <>
 ALWAYS_INLINE void Lexer<LChar>::setCodeStart(const StringImpl* sourceString)
 {
     ASSERT(sourceString->is8Bit());
@@ -254,6 +272,18 @@ ALWAYS_INLINE void Lexer<UChar>::setCodeStart(const StringImpl* sourceString)
 
 template <typename T>
 ALWAYS_INLINE const Identifier* Lexer<T>::makeIdentifierLCharFromUChar(const UChar* characters, size_t length)
+{
+    return &m_arena->makeIdentifierLCharFromUChar(m_globalData, characters, length);
+}
+
+template <typename T>
+ALWAYS_INLINE const Identifier* Lexer<T>::makeLCharIdentifier(const LChar* characters, size_t length)
+{
+    return &m_arena->makeIdentifier(m_globalData, characters, length);
+}
+
+template <typename T>
+ALWAYS_INLINE const Identifier* Lexer<T>::makeLCharIdentifier(const UChar* characters, size_t length)
 {
     return &m_arena->makeIdentifierLCharFromUChar(m_globalData, characters, length);
 }
@@ -293,7 +323,7 @@ ALWAYS_INLINE JSTokenType Lexer<T>::lexExpectIdentifier(JSTokenData* tokenData, 
     if (lexerFlags & LexexFlagsDontBuildKeywords)
         tokenData->ident = 0;
     else
-        tokenData->ident = makeIdentifier(start, ptr - start);
+        tokenData->ident = makeLCharIdentifier(start, ptr - start);
     tokenLocation->line = m_lineNumber;
     tokenLocation->startOffset = start - m_codeStart;
     tokenLocation->endOffset = currentOffset();

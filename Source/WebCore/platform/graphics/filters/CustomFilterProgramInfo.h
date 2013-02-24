@@ -31,6 +31,7 @@
 #define CustomFilterProgramInfo_h
 
 #if ENABLE(CSS_SHADERS)
+#include "CustomFilterConstants.h"
 #include "GraphicsTypes.h"
 
 #include <wtf/HashTraits.h>
@@ -38,21 +39,19 @@
 
 namespace WebCore {
 
+
 struct CustomFilterProgramMixSettings {
     CustomFilterProgramMixSettings()
-        : enabled(false)
-        , blendMode(BlendModeNormal)
-        , compositeOperator(CompositeSourceOver)
+        : blendMode(BlendModeNormal)
+        , compositeOperator(CompositeSourceAtop)
     {
     }
     
     bool operator==(const CustomFilterProgramMixSettings& o) const
     {
-        return (!enabled && !o.enabled)
-            || (blendMode == o.blendMode && compositeOperator == o.compositeOperator);
+        return blendMode == o.blendMode && compositeOperator == o.compositeOperator;
     }
     
-    bool enabled;
     BlendMode blendMode;
     CompositeOperator compositeOperator;
 };
@@ -62,7 +61,7 @@ struct CustomFilterProgramMixSettings {
 // Null strings are placeholders for the default shader.
 class CustomFilterProgramInfo {
 public:
-    CustomFilterProgramInfo(const String&, const String&, const CustomFilterProgramMixSettings&);
+    CustomFilterProgramInfo(const String&, const String&, CustomFilterProgramType, const CustomFilterProgramMixSettings&, CustomFilterMeshType);
 
     CustomFilterProgramInfo();
     bool isEmptyValue() const;
@@ -75,10 +74,15 @@ public:
 
     const String& vertexShaderString() const { return m_vertexShaderString; }
     const String& fragmentShaderString() const { return m_fragmentShaderString; }
+    CustomFilterProgramType programType() const { return m_programType; }
+    const CustomFilterProgramMixSettings& mixSettings() const { return m_mixSettings; }
+    CustomFilterMeshType meshType() const { return m_meshType; }
 private:
     String m_vertexShaderString;
     String m_fragmentShaderString;
+    CustomFilterProgramType m_programType;
     CustomFilterProgramMixSettings m_mixSettings;
+    CustomFilterMeshType m_meshType;
 };
 
 struct CustomFilterProgramInfoHash {

@@ -31,9 +31,10 @@
 #include "MemoryCache.h"
 #include "CachedPage.h"
 #include "DOMWindow.h"
-#include "DatabaseContext.h"
+#include "DatabaseManager.h"
 #include "DeviceMotionController.h"
 #include "DeviceOrientationController.h"
+#include "DeviceProximityController.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
@@ -142,7 +143,7 @@ static unsigned logCanCacheFrameDecision(Frame* frame, int indentLevel)
         rejectReasons |= 1 << HasUnloadListener;
     }
 #if ENABLE(SQL_DATABASE)
-    if (DatabaseContext::hasOpenDatabases(frame->document())) {
+    if (DatabaseManager::manager().hasOpenDatabases(frame->document())) {
         PCLOG("   -Frame has open database handles");
         rejectReasons |= 1 << HasDatabaseHandles;
     }
@@ -251,6 +252,12 @@ static void logCanCachePageDecision(Page* page)
         rejectReasons |= 1 << UsesDeviceOrientation;
     }
 #endif
+#if ENABLE(PROXIMITY_EVENTS)
+    if (DeviceProximityController::isActiveAt(page)) {
+        PCLOG("   -Page is using DeviceProximity");
+        rejectReasons |= 1 << UsesDeviceMotion;
+    }
+#endif
     FrameLoadType loadType = page->mainFrame()->loader()->loadType();
     if (loadType == FrameLoadTypeReload) {
         PCLOG("   -Load type is: Reload");
@@ -345,7 +352,7 @@ bool PageCache::canCachePageContainingThisFrame(Frame* frame)
         && (!document->url().protocolIs("https") || (!documentLoader->response().cacheControlContainsNoCache() && !documentLoader->response().cacheControlContainsNoStore()))
         && (!document->domWindow() || !document->domWindow()->hasEventListeners(eventNames().unloadEvent))
 #if ENABLE(SQL_DATABASE)
-        && !DatabaseContext::hasOpenDatabases(document)
+        && !DatabaseManager::manager().hasOpenDatabases(document)
 #endif
 #if ENABLE(SHARED_WORKERS)
         && !SharedWorkerRepository::hasSharedWorkers(document)
@@ -384,6 +391,9 @@ bool PageCache::canCache(Page* page) const
 #if ENABLE(DEVICE_ORIENTATION)
         && !DeviceMotionController::isActiveAt(page)
         && !DeviceOrientationController::isActiveAt(page)
+#endif
+#if ENABLE(PROXIMITY_EVENTS)
+        && !DeviceProximityController::isActiveAt(page)
 #endif
         && loadType != FrameLoadTypeReload
         && loadType != FrameLoadTypeReloadFromOrigin

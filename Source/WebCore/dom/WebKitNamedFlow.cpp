@@ -31,16 +31,16 @@
 #include "WebKitNamedFlow.h"
 
 #include "EventNames.h"
+#include "NamedFlowCollection.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderRegion.h"
 #include "ScriptExecutionContext.h"
 #include "StaticNodeList.h"
 #include "UIEvent.h"
-#include "WebKitNamedFlowCollection.h"
 
 namespace WebCore {
 
-WebKitNamedFlow::WebKitNamedFlow(PassRefPtr<WebKitNamedFlowCollection> manager, const AtomicString& flowThreadName)
+WebKitNamedFlow::WebKitNamedFlow(PassRefPtr<NamedFlowCollection> manager, const AtomicString& flowThreadName)
     : m_flowThreadName(flowThreadName)
     , m_flowManager(manager)
     , m_parentFlowThread(0)
@@ -53,7 +53,7 @@ WebKitNamedFlow::~WebKitNamedFlow()
     m_flowManager->discardNamedFlow(this);
 }
 
-PassRefPtr<WebKitNamedFlow> WebKitNamedFlow::create(PassRefPtr<WebKitNamedFlowCollection> manager, const AtomicString& flowThreadName)
+PassRefPtr<WebKitNamedFlow> WebKitNamedFlow::create(PassRefPtr<NamedFlowCollection> manager, const AtomicString& flowThreadName)
 {
     return adoptRef(new WebKitNamedFlow(manager, flowThreadName));
 }
@@ -117,8 +117,8 @@ PassRefPtr<NodeList> WebKitNamedFlow::getRegionsByContent(Node* contentNode)
         const RenderRegionList& regionList = m_parentFlowThread->renderRegionList();
         for (RenderRegionList::const_iterator iter = regionList.begin(); iter != regionList.end(); ++iter) {
             const RenderRegion* renderRegion = *iter;
-            // FIXME: Pseudo-elements are not included in the list
-            if (!renderRegion->isValid() || !renderRegion->node())
+            // FIXME: Pseudo-elements are not included in the list.
+            if (!renderRegion->node())
                 continue;
             if (m_parentFlowThread->objectInFlowRegion(contentNode->renderer(), renderRegion))
                 regionNodes.append(renderRegion->node());
@@ -143,8 +143,8 @@ PassRefPtr<NodeList> WebKitNamedFlow::getRegions()
     const RenderRegionList& regionList = m_parentFlowThread->renderRegionList();
     for (RenderRegionList::const_iterator iter = regionList.begin(); iter != regionList.end(); ++iter) {
         const RenderRegion* renderRegion = *iter;
-        // FIXME: Pseudo-elements are not included in the list
-        if (!renderRegion->isValid() || !renderRegion->node())
+        // FIXME: Pseudo-elements are not included in the list.
+        if (!renderRegion->node())
             continue;
         regionNodes.append(renderRegion->node());
     }
@@ -179,7 +179,7 @@ void WebKitNamedFlow::setRenderer(RenderNamedFlowThread* parentFlowThread)
     // The named flow can either go from a no_renderer->renderer or renderer->no_renderer state; anything else could indicate a bug.
     ASSERT((!m_parentFlowThread && parentFlowThread) || (m_parentFlowThread && !parentFlowThread));
 
-    // If parentFlowThread is 0, the flow thread will move in the "NULL" state"
+    // If parentFlowThread is 0, the flow thread will move in the "NULL" state.
     m_parentFlowThread = parentFlowThread;
 }
 
@@ -195,10 +195,13 @@ EventTargetData* WebKitNamedFlow::ensureEventTargetData()
 
 void WebKitNamedFlow::dispatchRegionLayoutUpdateEvent()
 {
-    ASSERT(!eventDispatchForbidden());
-    ASSERT(m_parentFlowThread);
+    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
 
-    RefPtr<Event> event = UIEvent::create(eventNames().webkitRegionLayoutUpdateEvent, false, false, m_parentFlowThread->document()->defaultView(), 0);
+    // If the flow is in the "NULL" state the event should not be dispatched any more.
+    if (flowState() == FlowStateNull)
+        return;
+
+    RefPtr<Event> event = UIEvent::create(eventNames().webkitregionlayoutupdateEvent, false, false, m_flowManager->document()->defaultView(), 0);
 
     dispatchEvent(event);
 }
@@ -213,7 +216,7 @@ ScriptExecutionContext* WebKitNamedFlow::scriptExecutionContext() const
     return m_flowManager->document();
 }
 
-Node* WebKitNamedFlow::base() const
+Node* WebKitNamedFlow::ownerNode() const
 {
     return m_flowManager->document();
 }

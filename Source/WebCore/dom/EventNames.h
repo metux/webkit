@@ -126,7 +126,6 @@ namespace WebCore {
     macro(DOMActivate) \
     macro(DOMFocusIn) \
     macro(DOMFocusOut) \
-    macro(DOMAttrModified) \
     macro(DOMCharacterDataModified) \
     macro(DOMNodeInserted) \
     macro(DOMNodeInsertedIntoDocument) \
@@ -183,6 +182,7 @@ namespace WebCore {
     macro(webkitAnimationIteration) \
     \
     macro(webkitTransitionEnd) \
+    macro(transitionend) \
     \
     macro(orientationchange) \
     \
@@ -210,9 +210,11 @@ namespace WebCore {
     macro(audioend) \
     macro(result) \
     macro(nomatch) \
-    macro(resultdeleted) \
     macro(start) \
     macro(end) \
+    macro(mark) \
+    macro(boundary) \
+    macro(resume) \
     \
     macro(webglcontextlost) \
     macro(webglcontextrestored) \
@@ -227,19 +229,33 @@ namespace WebCore {
     macro(removetrack) \
     macro(mute) \
     macro(unmute) \
+    macro(icechange) \
+    macro(icecandidate) \
+    macro(negotiationneeded) \
+    macro(datachannel) \
+    macro(gatheringchange) \
+    macro(tonechange) \
     \
     macro(show) \
     \
     macro(webkitpointerlockchange) \
     macro(webkitpointerlockerror) \
     \
-    macro(webkitRegionLayoutUpdate) \
+    macro(webkitregionlayoutupdate) \
     \
     macro(webkitnetworkinfochange) \
     \
     macro(webkitresourcetimingbufferfull) \
     \
     macro(webkitdeviceproximity) \
+    \
+    macro(autocomplete) \
+    macro(autocompleteerror) \
+    \
+    macro(webkitprerenderstart) \
+    macro(webkitprerenderstop) \
+    macro(webkitprerenderload) \
+    macro(webkitprerenderdomcontentloaded) \
     \
 
 // end of DOM_EVENT_NAMES_FOR_EACH

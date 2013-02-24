@@ -26,8 +26,13 @@
 #include "config.h"
 #include "Language.h"
 
-#include "PlatformString.h"
 #include <wtf/HashMap.h>
+#include <wtf/RetainPtr.h>
+#include <wtf/text/WTFString.h>
+
+#if PLATFORM(MAC)
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 namespace WebCore {
 
@@ -53,7 +58,7 @@ void languageDidChange()
 {
     ObserverMap::iterator end = observerMap().end();
     for (ObserverMap::iterator iter = observerMap().begin(); iter != end; ++iter)
-        iter->second(iter->first);
+        iter->value(iter->key);
 }
 
 String defaultLanguage()
@@ -69,6 +74,11 @@ static Vector<String>& preferredLanguagesOverride()
 {
     DEFINE_STATIC_LOCAL(Vector<String>, override, ());
     return override;
+}
+
+Vector<String> userPreferredLanguagesOverride()
+{
+    return preferredLanguagesOverride();
 }
 
 void overrideUserPreferredLanguages(const Vector<String>& override)
@@ -129,10 +139,8 @@ static String bestMatchingLanguage(const String& language, const Vector<String>&
     return emptyString();
 }
 
-String preferredLanguageFromList(const Vector<String>& languageList)
+String preferredLanguageFromList(const Vector<String>& languageList, const Vector<String> preferredLanguages)
 {
-    Vector<String> preferredLanguages = userPreferredLanguages();
-
     for (size_t i = 0; i < preferredLanguages.size(); ++i) {
         String bestMatch = bestMatchingLanguage(canonicalLanguageIdentifier(preferredLanguages[i]), languageList);
 
@@ -142,5 +150,14 @@ String preferredLanguageFromList(const Vector<String>& languageList)
 
     return emptyString();
 }
-    
+
+String displayNameForLanguageLocale(const String& localeName)
+{
+#if PLATFORM(MAC)
+    if (!localeName.isNull() && !localeName.isEmpty())
+        return CFLocaleCopyDisplayNameForPropertyValue(CFLocaleCopyCurrent(), kCFLocaleIdentifier, localeName.createCFString().get());
+#endif
+    return localeName;
+}
+
 }

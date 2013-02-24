@@ -31,13 +31,13 @@
 #include "InspectorStyleTextEditor.h"
 #include "InspectorTypeBuilder.h"
 #include "InspectorValues.h"
-#include "PlatformString.h"
 
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 class ParsedStyleSheet;
 
@@ -222,9 +222,10 @@ protected:
     virtual bool setStyleText(CSSStyleDeclaration*, const String&);
 
 private:
+    typedef Vector<RefPtr<CSSStyleRule> > CSSStyleRuleVector;
     friend class InspectorStyle;
 
-    static void collectFlatRules(PassRefPtr<CSSRuleList>, Vector<CSSStyleRule*>* result);
+    static void collectFlatRules(PassRefPtr<CSSRuleList>, CSSStyleRuleVector* result);
     bool ensureText() const;
     bool ensureSourceData();
     void ensureFlatRules() const;
@@ -234,6 +235,7 @@ private:
     bool resourceStyleSheetText(String* result) const;
     bool inlineStyleSheetText(String* result) const;
     PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > buildArrayForRuleList(CSSRuleList*);
+    PassRefPtr<TypeBuilder::CSS::SelectorList> buildObjectForSelectorList(CSSStyleRule*);
 
     InspectorPageAgent* m_pageAgent;
     String m_id;
@@ -243,7 +245,7 @@ private:
     bool m_isRevalidating;
     ParsedStyleSheet* m_parsedStyleSheet;
     InspectorStyleMap m_inspectorStyles;
-    mutable Vector<CSSStyleRule*> m_flatRules;
+    mutable CSSStyleRuleVector m_flatRules;
     Listener* m_listener;
 };
 

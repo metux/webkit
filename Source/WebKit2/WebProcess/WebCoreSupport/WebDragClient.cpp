@@ -51,12 +51,12 @@ DragDestinationAction WebDragClient::actionMaskForDrag(DragData*)
     return DragDestinationActionAny;
 }
 
-DragSourceAction WebDragClient::dragSourceActionMaskForPoint(const IntPoint& windowPoint)
+DragSourceAction WebDragClient::dragSourceActionMaskForPoint(const IntPoint& /*windowPoint*/)
 {
     return DragSourceActionAny;
 }
 
-#if !PLATFORM(MAC) && !PLATFORM(WIN) && !PLATFORM(QT) && !PLATFORM(GTK)
+#if !PLATFORM(MAC) && !PLATFORM(QT) && !PLATFORM(GTK)
 void WebDragClient::startDrag(DragImageRef, const IntPoint&, const IntPoint&, Clipboard*, Frame*, bool)
 {
 }

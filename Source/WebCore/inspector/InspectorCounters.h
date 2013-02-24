@@ -31,6 +31,9 @@
 #ifndef InspectorCounters_h
 #define InspectorCounters_h
 
+#include <wtf/FastAllocBase.h>
+#include <wtf/UnusedParam.h>
+
 #if !ASSERT_DISABLED
 #include <wtf/MainThread.h>
 #endif
@@ -51,6 +54,8 @@ public:
 #if ENABLE(INSPECTOR)
         ASSERT(isMainThread());
         ++s_counters[type];
+#else
+        UNUSED_PARAM(type);
 #endif
     }
 
@@ -59,6 +64,8 @@ public:
 #if ENABLE(INSPECTOR)
         ASSERT(isMainThread());
         --s_counters[type];
+#else
+        UNUSED_PARAM(type);
 #endif
     }
 
@@ -77,6 +84,7 @@ private:
 
 #if ENABLE(INSPECTOR)
 class ThreadLocalInspectorCounters {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     enum CounterType {
         JSEventListenerCounter,

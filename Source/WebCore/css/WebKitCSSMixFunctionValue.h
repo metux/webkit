@@ -36,7 +36,7 @@
 #include <wtf/PassRefPtr.h>
 
 namespace WebCore {
-    
+
 class WebKitCSSMixFunctionValue : public CSSValueList {
 public:
     static PassRefPtr<WebKitCSSMixFunctionValue> create()
@@ -47,6 +47,8 @@ public:
     String customCssText() const;
 
     PassRefPtr<WebKitCSSMixFunctionValue> cloneForCSSOM() const;
+
+    bool equals(const WebKitCSSMixFunctionValue&) const;
 
     void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 

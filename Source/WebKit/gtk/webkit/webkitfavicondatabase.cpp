@@ -21,8 +21,6 @@
 #include "config.h"
 #include "webkitfavicondatabase.h"
 
-#include "DatabaseDetails.h"
-#include "DatabaseTracker.h"
 #include "FileSystem.h"
 #include "GdkCairoUtilities.h"
 #include "IconDatabase.h"
@@ -80,7 +78,6 @@ static void webkitFaviconDatabaseClose(WebKitFaviconDatabase* database);
 class IconDatabaseClientGtk : public IconDatabaseClient {
 public:
     // IconDatabaseClient interface
-    virtual bool performImport() { return true; }
     virtual void didRemoveAllIcons() { };
 
     // Called when an icon is requested while the initial import is
@@ -614,18 +611,18 @@ static void webkitFaviconDatabaseImportFinished(WebKitFaviconDatabase* database)
     Vector<String> toDeleteURLs;
     PendingIconRequestMap::const_iterator end = database->priv->pendingIconRequests.end();
     for (PendingIconRequestMap::const_iterator iter = database->priv->pendingIconRequests.begin(); iter != end; ++iter) {
-        String iconURL = iconDatabase().synchronousIconURLForPageURL(iter->first);
+        String iconURL = iconDatabase().synchronousIconURLForPageURL(iter->key);
         if (!iconURL.isEmpty())
             continue;
 
-        PendingIconRequestVector* icons = iter->second;
+        PendingIconRequestVector* icons = iter->value;
         for (size_t i = 0; i < icons->size(); ++i) {
             PendingIconRequest* request = icons->at(i).get();
             if (request->asyncResult())
                 request->asyncResultComplete(0);
         }
 
-        toDeleteURLs.append(iter->first);
+        toDeleteURLs.append(iter->key);
     }
 
     for (size_t i = 0; i < toDeleteURLs.size(); ++i)

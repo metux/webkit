@@ -36,10 +36,10 @@ using namespace std;
 
 namespace WebCore {
 
-RenderTextControl::RenderTextControl(Node* node)
-    : RenderBlock(node)
+RenderTextControl::RenderTextControl(Element* element)
+    : RenderBlock(element)
 {
-    ASSERT(toTextFormControl(node));
+    ASSERT(isHTMLTextFormControlElement(element));
 }
 
 RenderTextControl::~RenderTextControl()
@@ -110,13 +110,18 @@ int RenderTextControl::textBlockWidth() const
 {
     Element* innerText = innerTextElement();
     ASSERT(innerText);
-    return width() - borderAndPaddingWidth() - innerText->renderBox()->paddingLeft() - innerText->renderBox()->paddingRight();
+
+    LayoutUnit unitWidth = width() - borderAndPaddingWidth();
+    if (innerText->renderer())
+        unitWidth -= innerText->renderBox()->paddingLeft() + innerText->renderBox()->paddingRight();
+
+    return unitWidth;
 }
 
 void RenderTextControl::updateFromElement()
 {
     Element* innerText = innerTextElement();
-    if (innerText)
+    if (innerText && innerText->renderer())
         updateUserModifyProperty(node(), innerText->renderer()->style());
 }
 
@@ -124,10 +129,8 @@ VisiblePosition RenderTextControl::visiblePositionForIndex(int index) const
 {
     if (index <= 0)
         return VisiblePosition(firstPositionInNode(innerTextElement()), DOWNSTREAM);
-    ExceptionCode ec = 0;
     RefPtr<Range> range = Range::create(document());
-    range->selectNodeContents(innerTextElement(), ec);
-    ASSERT(!ec);
+    range->selectNodeContents(innerTextElement(), ASSERT_NO_EXCEPTION);
     CharacterIterator it(range.get());
     it.advance(index - 1);
     return VisiblePosition(it.range()->endPosition(), UPSTREAM);
@@ -139,24 +142,28 @@ int RenderTextControl::scrollbarThickness() const
     return ScrollbarTheme::theme()->scrollbarThickness();
 }
 
-void RenderTextControl::computeLogicalHeight()
+void RenderTextControl::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues& computedValues) const
 {
     HTMLElement* innerText = innerTextElement();
     ASSERT(innerText);
-    RenderBox* innerTextBox = innerText->renderBox();
-    LayoutUnit nonContentHeight = innerTextBox->borderAndPaddingHeight() + innerTextBox->marginHeight();
-    setHeight(computeControlHeight(innerTextBox->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes), nonContentHeight) + borderAndPaddingHeight());
+    if (RenderBox* innerTextBox = innerText->renderBox()) {
+        LayoutUnit nonContentHeight = innerTextBox->borderAndPaddingHeight() + innerTextBox->marginHeight();
+        logicalHeight = computeControlHeight(innerTextBox->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes), nonContentHeight) + borderAndPaddingHeight();
 
-    // We are able to have a horizontal scrollbar if the overflow style is scroll, or if its auto and there's no word wrap.
-    if (style()->overflowX() == OSCROLL ||  (style()->overflowX() == OAUTO && innerText->renderer()->style()->wordWrap() == NormalWordWrap))
-        setHeight(height() + scrollbarThickness());
+        // We are able to have a horizontal scrollbar if the overflow style is scroll, or if its auto and there's no word wrap.
+        if (style()->overflowX() == OSCROLL ||  (style()->overflowX() == OAUTO && innerText->renderer()->style()->overflowWrap() == NormalOverflowWrap))
+            logicalHeight += scrollbarThickness();
+    }
 
-    RenderBlock::computeLogicalHeight();
+    RenderBox::computeLogicalHeight(logicalHeight, logicalTop, computedValues);
 }
 
 void RenderTextControl::hitInnerTextElement(HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset)
 {
     HTMLElement* innerText = innerTextElement();
+    if (!innerText->renderer())
+        return;
+
     LayoutPoint adjustedLocation = accumulatedOffset + location();
     LayoutPoint localPoint = pointInContainer - toLayoutSize(adjustedLocation + innerText->renderBox()->location());
     if (hasOverflowClip())
@@ -245,6 +252,17 @@ float RenderTextControl::scaleEmToUnits(int x) const
     return roundf(style()->font().size() * x / unitsPerEm);
 }
 
+void RenderTextControl::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const
+{
+    // Use average character width. Matches IE.
+    AtomicString family = style()->font().family().family();
+    maxLogicalWidth = preferredContentWidth(const_cast<RenderTextControl*>(this)->getAvgCharWidth(family));
+    if (RenderBox* innerTextRenderBox = innerTextElement()->renderBox())
+        maxLogicalWidth += innerTextRenderBox->paddingLeft() + innerTextRenderBox->paddingRight();
+    if (!style()->width().isPercent())
+        minLogicalWidth = maxLogicalWidth;
+}
+
 void RenderTextControl::computePreferredLogicalWidths()
 {
     ASSERT(preferredLogicalWidthsDirty());
@@ -253,25 +271,18 @@ void RenderTextControl::computePreferredLogicalWidths()
     m_maxPreferredLogicalWidth = 0;
 
     if (style()->width().isFixed() && style()->width().value() >= 0)
-        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = computeContentBoxLogicalWidth(style()->width().value());
-    else {
-        // Use average character width. Matches IE.
-        AtomicString family = style()->font().family().family();
-        RenderBox* innerTextRenderBox = innerTextElement()->renderBox();
-        m_maxPreferredLogicalWidth = preferredContentWidth(getAvgCharWidth(family)) + innerTextRenderBox->paddingLeft() + innerTextRenderBox->paddingRight();
-    }
+        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = adjustContentBoxLogicalWidthForBoxSizing(style()->width().value());
+    else
+        computeIntrinsicLogicalWidths(m_minPreferredLogicalWidth, m_maxPreferredLogicalWidth);
 
     if (style()->minWidth().isFixed() && style()->minWidth().value() > 0) {
-        m_maxPreferredLogicalWidth = max(m_maxPreferredLogicalWidth, computeContentBoxLogicalWidth(style()->minWidth().value()));
-        m_minPreferredLogicalWidth = max(m_minPreferredLogicalWidth, computeContentBoxLogicalWidth(style()->minWidth().value()));
-    } else if (style()->width().isPercent() || (style()->width().isAuto() && style()->height().isPercent()))
-        m_minPreferredLogicalWidth = 0;
-    else
-        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth;
+        m_maxPreferredLogicalWidth = max(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->minWidth().value()));
+        m_minPreferredLogicalWidth = max(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->minWidth().value()));
+    }
 
     if (style()->maxWidth().isFixed()) {
-        m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, computeContentBoxLogicalWidth(style()->maxWidth().value()));
-        m_minPreferredLogicalWidth = min(m_minPreferredLogicalWidth, computeContentBoxLogicalWidth(style()->maxWidth().value()));
+        m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->maxWidth().value()));
+        m_minPreferredLogicalWidth = min(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->maxWidth().value()));
     }
 
     LayoutUnit toAdd = borderAndPaddingWidth();
@@ -290,7 +301,7 @@ void RenderTextControl::addFocusRingRects(Vector<IntRect>& rects, const LayoutPo
 
 RenderObject* RenderTextControl::layoutSpecialExcludedChild(bool relayoutChildren)
 {
-    HTMLElement* placeholder = toTextFormControl(node())->placeholderElement();
+    HTMLElement* placeholder = toHTMLTextFormControlElement(node())->placeholderElement();
     RenderObject* placeholderRenderer = placeholder ? placeholder->renderer() : 0;
     if (!placeholderRenderer)
         return 0;

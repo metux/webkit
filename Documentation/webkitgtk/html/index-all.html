@@ -8,7 +8,7 @@
 <link rel="up" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="prev" href="webkit-environment.html" title="Environment">
 <link rel="next" href="index-deprecated.html" title="Index of deprecated symbols">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -127,6 +127,8 @@
 </dt>
 <dt>WebKitSecurityOrigin:web-database-usage, <a class="indexterm" href="WebKitSecurityOrigin.html#WebKitSecurityOrigin--web-database-usage">The "web-database-usage" property</a>
 </dt>
+<dt>WebKitSecurityPolicy, <a class="indexterm" href="webkitgtk-Global-functions.html#WebKitSecurityPolicy">enum WebKitSecurityPolicy</a>
+</dt>
 <dt>WebKitSoupAuthDialog, <a class="indexterm" href="WebKitSoupAuthDialog.html#WebKitSoupAuthDialog-struct">WebKitSoupAuthDialog</a>
 </dt>
 <dt>WebKitSoupAuthDialog::current-toplevel, <a class="indexterm" href="WebKitSoupAuthDialog.html#WebKitSoupAuthDialog-current-toplevel">The "current-toplevel" signal</a>
@@ -190,8 +192,6 @@
 <dt>WebKitWebFrame::insecure-content-run, <a class="indexterm" href="WebKitWebFrame.html#WebKitWebFrame-insecure-content-run">The "insecure-content-run" signal</a>
 </dt>
 <dt>WebKitWebFrame::load-committed, <a class="indexterm" href="WebKitWebFrame.html#WebKitWebFrame-load-committed">The "load-committed" signal</a>
-</dt>
-<dt>WebKitWebFrame::load-done, <a class="indexterm" href="WebKitWebFrame.html#WebKitWebFrame-load-done">The "load-done" signal</a>
 </dt>
 <dt>WebKitWebFrame::resource-content-length-received, <a class="indexterm" href="WebKitWebFrame.html#WebKitWebFrame-resource-content-length-received">The "resource-content-length-received" signal</a>
 </dt>
@@ -319,9 +319,13 @@
 </dt>
 <dt>WebKitWebSettings:enable-caret-browsing, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-caret-browsing">The "enable-caret-browsing" property</a>
 </dt>
+<dt>WebKitWebSettings:enable-css-shaders, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-css-shaders">The "enable-css-shaders" property</a>
+</dt>
 <dt>WebKitWebSettings:enable-default-context-menu, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-default-context-menu">The "enable-default-context-menu" property</a>
 </dt>
 <dt>WebKitWebSettings:enable-developer-extras, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-developer-extras">The "enable-developer-extras" property</a>
+</dt>
+<dt>WebKitWebSettings:enable-display-of-insecure-content, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-display-of-insecure-content">The "enable-display-of-insecure-content" property</a>
 </dt>
 <dt>WebKitWebSettings:enable-dns-prefetching, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-dns-prefetching">The "enable-dns-prefetching" property</a>
 </dt>
@@ -341,6 +345,8 @@
 </dt>
 <dt>WebKitWebSettings:enable-java-applet, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-java-applet">The "enable-java-applet" property</a>
 </dt>
+<dt>WebKitWebSettings:enable-media-stream, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-media-stream">The "enable-media-stream" property</a>
+</dt>
 <dt>WebKitWebSettings:enable-offline-web-application-cache, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-offline-web-application-cache">The "enable-offline-web-application-cache" property</a>
 </dt>
 <dt>WebKitWebSettings:enable-page-cache, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-page-cache">The "enable-page-cache" property</a>
@@ -348,6 +354,8 @@
 <dt>WebKitWebSettings:enable-plugins, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-plugins">The "enable-plugins" property</a>
 </dt>
 <dt>WebKitWebSettings:enable-private-browsing, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-private-browsing">The "enable-private-browsing" property</a>
+</dt>
+<dt>WebKitWebSettings:enable-running-of-insecure-content, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-running-of-insecure-content">The "enable-running-of-insecure-content" property</a>
 </dt>
 <dt>WebKitWebSettings:enable-scripts, <a class="indexterm" href="WebKitWebSettings.html#WebKitWebSettings--enable-scripts">The "enable-scripts" property</a>
 </dt>
@@ -671,6 +679,8 @@
 </dt>
 <dt>webkit_get_icon_database, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-get-icon-database">webkit_get_icon_database ()</a>
 </dt>
+<dt>webkit_get_security_policy_for_uri_scheme, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-get-security-policy-for-uri-scheme">webkit_get_security_policy_for_uri_scheme ()</a>
+</dt>
 <dt>webkit_get_text_checker, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-get-text-checker">webkit_get_text_checker ()</a>
 </dt>
 <dt>webkit_get_web_database_directory_path, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-get-web-database-directory-path">webkit_get_web_database_directory_path ()</a>
@@ -726,6 +736,8 @@
 <dt>webkit_set_cache_model, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-set-cache-model">webkit_set_cache_model ()</a>
 </dt>
 <dt>webkit_set_default_web_database_quota, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-set-default-web-database-quota">webkit_set_default_web_database_quota ()</a>
+</dt>
+<dt>webkit_set_security_policy_for_uri_scheme, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-set-security-policy-for-uri-scheme">webkit_set_security_policy_for_uri_scheme ()</a>
 </dt>
 <dt>webkit_set_text_checker, <a class="indexterm" href="webkitgtk-Global-functions.html#webkit-set-text-checker">webkit_set_text_checker ()</a>
 </dt>
@@ -1106,6 +1118,6 @@
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

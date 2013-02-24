@@ -75,21 +75,23 @@ private:
     virtual bool rendererIsNeeded(const NodeRenderingContext&) { return false; }
     virtual void attach();
     virtual void detach();
-    virtual void setRenderStyle(PassRefPtr<RenderStyle>);
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void accessKeyAction(bool);
 
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
 
-    virtual RenderStyle* nonRendererRenderStyle() const;
+    // <option> never has a renderer so we manually manage a cached style.
+    void updateNonRenderStyle();
+    virtual RenderStyle* nonRendererStyle() const OVERRIDE;
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
+
+    void didRecalcStyle(StyleChange) OVERRIDE;
 
     String collectOptionInnerText() const;
 
-    String m_value;
-    String m_label;
     bool m_disabled;
     bool m_isSelected;
     RefPtr<RenderStyle> m_style;

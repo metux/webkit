@@ -27,8 +27,9 @@
 #define KURL_h
 
 #include "KURLWTFURLImpl.h"
-#include "PlatformString.h"
+#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
+#include <wtf/text/WTFString.h>
 
 #if USE(CF)
 typedef const struct __CFURL* CFURLRef;
@@ -46,10 +47,6 @@ QT_END_NAMESPACE
 
 #if USE(GOOGLEURL)
 #include "KURLGooglePrivate.h"
-#endif
-
-#if USE(JSC)
-#include <runtime/UString.h>
 #endif
 
 namespace WebCore {
@@ -123,6 +120,7 @@ public:
     bool canSetHostOrPort() const { return isHierarchical(); }
 
     bool canSetPathname() const { return isHierarchical(); }
+    bool isHierarchical() const;
 
 #if USE(GOOGLEURL)
     const String& string() const { return m_url.string(); }
@@ -229,9 +227,11 @@ public:
     void print() const;
 #endif
 
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+    bool isSafeToSendToAnotherThread() const;
+
 private:
     void invalidate();
-    bool isHierarchical() const;
     static bool protocolIs(const String&, const char*);
 #if USE(GOOGLEURL)
     friend class KURLGooglePrivate;
@@ -291,6 +291,7 @@ bool portAllowed(const KURL&); // Blacklist ports that should never be used for 
 bool isValidProtocol(const String&);
 
 String mimeTypeFromDataURL(const String& url);
+String mimeTypeFromURL(const KURL&);
 
 // Unescapes the given string using URL escaping rules, given an optional
 // encoding (defaulting to UTF-8 otherwise). DANGER: If the URL has "%00"
@@ -350,6 +351,11 @@ inline bool KURL::isEmpty() const
 inline bool KURL::isValid() const
 {
     return m_isValid;
+}
+
+inline bool KURL::hasPath() const
+{
+    return m_pathEnd != m_portEnd;
 }
 
 inline bool KURL::hasPort() const

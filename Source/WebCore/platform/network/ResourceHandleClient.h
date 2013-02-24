@@ -35,6 +35,10 @@
 #include <CFNetwork/CFURLResponsePriv.h>
 #endif
 
+#if USE(SOUP)
+#include <glib.h>
+#endif
+
 #if PLATFORM(WIN) && USE(CFNETWORK)
 #include <ConditionalMacros.h>
 #endif
@@ -63,7 +67,19 @@ namespace WebCore {
     
     class ResourceHandleClient {
     public:
+#if USE(SOUP)
+        ResourceHandleClient(): m_buffer(0) { }
+
+        virtual ~ResourceHandleClient()
+        {
+            if (m_buffer) {
+                g_free(m_buffer);
+                m_buffer = 0;
+            }
+        }
+#else
         virtual ~ResourceHandleClient() { }
+#endif
 
         // request may be modified
         virtual void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse& /*redirectResponse*/) { }
@@ -77,12 +93,22 @@ namespace WebCore {
         virtual void wasBlocked(ResourceHandle*) { }
         virtual void cannotShowURL(ResourceHandle*) { }
 
-#if HAVE(NETWORK_CFDATA_ARRAY_CALLBACK)
+#if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
         virtual bool supportsDataArray() { return false; }
         virtual void didReceiveDataArray(ResourceHandle*, CFArrayRef) { }
 #endif
 
-        virtual void willCacheResponse(ResourceHandle*, CacheStoragePolicy&) { }
+#if USE(SOUP)
+        virtual char* getBuffer(int requestedLength, int* actualLength)
+        {
+            *actualLength = requestedLength;
+
+            if (!m_buffer)
+                m_buffer = static_cast<char*>(g_malloc(requestedLength));
+
+            return m_buffer;
+        }
+#endif
 
         virtual bool shouldUseCredentialStorage(ResourceHandle*) { return false; }
         virtual void didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge&) { }
@@ -108,6 +134,11 @@ namespace WebCore {
 #endif
 #if ENABLE(BLOB)
         virtual AsyncFileStream* createAsyncFileStream(FileStreamClient*) { return 0; }
+#endif
+
+#if USE(SOUP)
+private:
+        char* m_buffer;
 #endif
     };
 

@@ -30,10 +30,10 @@ namespace WebCore {
 
 class CachedCSSStyleSheet;
 class MediaQuerySet;
-class MemoryObjectInfo;
 class StyleSheetContents;
 
 class StyleRuleImport : public StyleRuleBase {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassRefPtr<StyleRuleImport> create(const String& href, PassRefPtr<MediaQuerySet>);
 

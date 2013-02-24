@@ -33,6 +33,7 @@
 
 #include "MathMLNames.h"
 #include "RenderObject.h"
+#include "RenderTableCell.h"
 
 namespace WebCore {
     
@@ -48,6 +49,34 @@ PassRefPtr<MathMLElement> MathMLElement::create(const QualifiedName& tagName, Do
     return adoptRef(new MathMLElement(tagName, document));
 }
 
+int MathMLElement::colSpan() const
+{
+    if (!hasTagName(mtdTag))
+        return 1;
+    const AtomicString& colSpanValue = fastGetAttribute(columnspanAttr);
+    return std::max(1, colSpanValue.toInt());
+}
+
+int MathMLElement::rowSpan() const
+{
+    if (!hasTagName(mtdTag))
+        return 1;
+    const AtomicString& rowSpanValue = fastGetAttribute(rowspanAttr);
+    return std::max(1, rowSpanValue.toInt());
+}
+
+void MathMLElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
+{
+    if (name == rowspanAttr) {
+        if (renderer() && renderer()->isTableCell() && hasTagName(mtdTag))
+            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+    } else if (name == columnspanAttr) {
+        if (renderer() && renderer()->isTableCell() && hasTagName(mtdTag))
+            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+    } else
+        StyledElement::parseAttribute(name, value);
+}
+
 bool MathMLElement::isPresentationAttribute(const QualifiedName& name) const
 {
     if (name == mathbackgroundAttr || name == mathsizeAttr || name == mathcolorAttr || name == fontsizeAttr || name == backgroundAttr || name == colorAttr || name == fontstyleAttr || name == fontweightAttr || name == fontfamilyAttr)
@@ -55,32 +84,32 @@ bool MathMLElement::isPresentationAttribute(const QualifiedName& name) const
     return StyledElement::isPresentationAttribute(name);
 }
 
-void MathMLElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
+void MathMLElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
     if (attribute.name() == mathbackgroundAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyBackgroundColor, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyBackgroundColor, attribute.value());
     else if (attribute.name() == mathsizeAttr) {
         // The following three values of mathsize are handled in WebCore/css/mathml.css
         if (attribute.value() != "normal" && attribute.value() != "small" && attribute.value() != "big")
-            addPropertyToAttributeStyle(style, CSSPropertyFontSize, attribute.value());
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyFontSize, attribute.value());
     } else if (attribute.name() == mathcolorAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyColor, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyColor, attribute.value());
     // FIXME: deprecated attributes that should loose in a conflict with a non deprecated attribute
     else if (attribute.name() == fontsizeAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyFontSize, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyFontSize, attribute.value());
     else if (attribute.name() == backgroundAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyBackgroundColor, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyBackgroundColor, attribute.value());
     else if (attribute.name() == colorAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyColor, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyColor, attribute.value());
     else if (attribute.name() == fontstyleAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyFontStyle, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyFontStyle, attribute.value());
     else if (attribute.name() == fontweightAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyFontWeight, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyFontWeight, attribute.value());
     else if (attribute.name() == fontfamilyAttr)
-        addPropertyToAttributeStyle(style, CSSPropertyFontFamily, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyFontFamily, attribute.value());
     else {
         ASSERT(!isPresentationAttribute(attribute.name()));
-        StyledElement::collectStyleForAttribute(attribute, style);
+        StyledElement::collectStyleForPresentationAttribute(attribute, style);
     }
 }
 

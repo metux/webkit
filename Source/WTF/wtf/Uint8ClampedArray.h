@@ -31,9 +31,7 @@
 #include <wtf/Platform.h>
 
 #include <wtf/Uint8Array.h>
-#if COMPILER(MSVC)
 #include <wtf/MathExtras.h>
-#endif
 
 namespace WTF {
 
@@ -52,8 +50,7 @@ public:
     // zero the allocated memory.
     inline void zeroFill();
 
-    // Can’t use "using" here due to a bug in the RVCT compiler.
-    bool set(TypedArrayBase<unsigned char>* array, unsigned offset) { return TypedArrayBase<unsigned char>::set(array, offset); }
+    using TypedArrayBase<unsigned char>::set;
     inline void set(unsigned index, double value);
 
     inline PassRefPtr<Uint8ClampedArray> subarray(int start) const;
@@ -101,7 +98,7 @@ void Uint8ClampedArray::set(unsigned index, double value)
 {
     if (index >= m_length)
         return;
-    if (isnan(value) || value < 0)
+    if (std::isnan(value) || value < 0)
         value = 0;
     else if (value > 255)
         value = 255;

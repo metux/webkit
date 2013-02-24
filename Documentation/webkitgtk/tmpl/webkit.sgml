@@ -222,3 +222,33 @@ Global functions
 @Returns: 
 
 
+<!-- ##### ENUM WebKitSecurityPolicy ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SECURITY_POLICY_LOCAL: 
+@WEBKIT_SECURITY_POLICY_NO_ACCESS_TO_OTHER_SCHEME: 
+@WEBKIT_SECURITY_POLICY_DISPLAY_ISOLATED: 
+@WEBKIT_SECURITY_POLICY_SECURE: 
+@WEBKIT_SECURITY_POLICY_CORS_ENABLED: 
+@WEBKIT_SECURITY_POLICY_EMPTY_DOCUMENT: 
+
+<!-- ##### FUNCTION webkit_set_security_policy_for_uri_scheme ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@policy: 
+
+
+<!-- ##### FUNCTION webkit_get_security_policy_for_uri_scheme ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@Returns: 
+
+

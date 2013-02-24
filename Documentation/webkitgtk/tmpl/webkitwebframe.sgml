@@ -69,14 +69,6 @@ WebKitWebFrame
 
 @webkitwebframe: the object which received the signal.
 
-<!-- ##### SIGNAL WebKitWebFrame::load-done ##### -->
-<para>
-
-</para>
-
-@webkitwebframe: the object which received the signal.
-@arg1: 
-
 <!-- ##### SIGNAL WebKitWebFrame::resource-content-length-received ##### -->
 <para>
 

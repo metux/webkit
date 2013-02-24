@@ -35,6 +35,7 @@
 
 namespace WebCore {
 
+class CSSStyleSheet;
 class Element;
 class FileList;
 class HTMLInputElement;
@@ -46,7 +47,7 @@ class RenderMeter;
 #if ENABLE(PROGRESS_ELEMENT)
 class RenderProgress;
 #endif
-class CSSStyleSheet;
+class RenderSnapshottedPlugIn;
 
 class RenderTheme : public RefCounted<RenderTheme> {
 protected:
@@ -85,23 +86,21 @@ public:
     // RenderThemeMac.cpp for Mac OS X.
 
     // These methods return the theme's extra style sheets rules, to let each platform
-    // adjust the default CSS rules in html.css, quirks.css, or mediaControls.css
+    // adjust the default CSS rules in html.css, quirks.css, mediaControls.css, or plugIns.css
     virtual String extraDefaultStyleSheet() { return String(); }
     virtual String extraQuirksStyleSheet() { return String(); }
+    virtual String extraPlugInsStyleSheet() { return String(); }
 #if ENABLE(VIDEO)
-    virtual String extraMediaControlsStyleSheet() { return String(); };
+    virtual String extraMediaControlsStyleSheet() { return String(); }
 #endif
 #if ENABLE(FULLSCREEN_API)
-    virtual String extraFullScreenStyleSheet() { return String(); };
-#endif
-#if ENABLE(CALENDAR_PICKER)
-    virtual CString extraCalendarPickerStyleSheet();
+    virtual String extraFullScreenStyleSheet() { return String(); }
 #endif
 
     // A method to obtain the baseline position for a "leaf" control.  This will only be used if a baseline
     // position cannot be determined by examining child content. Checkboxes and radio buttons are examples of
     // controls that need to do this.
-    virtual LayoutUnit baselinePosition(const RenderObject*) const;
+    virtual int baselinePosition(const RenderObject*) const;
 
     // A method for asking if a control is a container or not.  Leaf controls have to have some special behavior (like
     // the baseline position API above).
@@ -136,6 +135,11 @@ public:
 
     // A method asking if the platform is able to show datalist suggestions for a given input type.
     virtual bool supportsDataListUI(const AtomicString&) const { return false; }
+
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+    // A method asking if the platform is able to show a calendar picker for a given input type.
+    virtual bool supportsCalendarPicker(const AtomicString&) const { return false; }
+#endif
 
     // Text selection colors.
     Color activeSelectionBackgroundColor() const;
@@ -201,6 +205,7 @@ public:
     virtual bool usesVerticalVolumeSlider() const { return true; }
     virtual double mediaControlsFadeInDuration() { return 0.1; }
     virtual double mediaControlsFadeOutDuration() { return 0.3; }
+    virtual double timeWithoutMouseMovementBeforeHidingControls() { return 3.0; }
     virtual String formatMediaControlsTime(float time) const;
     virtual String formatMediaControlsCurrentTime(float currentTime, float duration) const;
     virtual String formatMediaControlsRemainingTime(float currentTime, float duration) const;
@@ -235,6 +240,8 @@ public:
 
     virtual String fileListDefaultLabel(bool multipleFilesAllowed) const;
     virtual String fileListNameForWidth(const FileList*, const Font&, int width, bool multipleFilesAllowed) const;
+
+    virtual bool shouldOpenPickerWithF4Key() const;
 
 protected:
     // The platform selection color.
@@ -331,7 +338,6 @@ protected:
     virtual bool paintMediaVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaRewindButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaReturnToRealtimeButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
-    virtual bool paintMediaToggleClosedCaptionsButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaControlsBackground(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaCurrentTime(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaTimeRemaining(RenderObject*, const PaintInfo&, const IntRect&) { return true; }

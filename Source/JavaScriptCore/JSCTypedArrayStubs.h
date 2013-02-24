@@ -26,8 +26,9 @@
 #ifndef JSCTypedArrayStubs_h
 #define JSCTypedArrayStubs_h
 
-#include "JSObject.h"
+#include "JSDestructibleObject.h"
 #include "ObjectPrototype.h"
+#include "Operations.h"
 #include <wtf/Float32Array.h>
 #include <wtf/Float64Array.h>
 #include <wtf/Forward.h>
@@ -42,9 +43,9 @@
 namespace JSC {
     
 #define TYPED_ARRAY(name, type) \
-class JS##name##Array : public JSNonFinalObject { \
+class JS##name##Array : public JSDestructibleObject { \
 public: \
-    typedef JSNonFinalObject Base; \
+    typedef JSDestructibleObject Base; \
     static JS##name##Array* create(JSC::Structure* structure, JSGlobalObject* globalObject, PassRefPtr<name##Array> impl) \
     { \
         JS##name##Array* ptr = new (NotNull, JSC::allocateCell<JS##name##Array>(globalObject->globalData().heap)) JS##name##Array(structure, globalObject, impl); \
@@ -74,7 +75,7 @@ public: \
 protected:\
     JS##name##Array(JSC::Structure*, JSGlobalObject*, PassRefPtr<name##Array>);\
     void finishCreation(JSC::JSGlobalData&);\
-    static const unsigned StructureFlags = JSC::OverridesGetPropertyNames | JSC::OverridesGetOwnPropertySlot | Base::StructureFlags;\
+    static const unsigned StructureFlags = JSC::OverridesGetPropertyNames | JSC::InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | JSC::OverridesGetOwnPropertySlot | Base::StructureFlags; \
     JSC::JSValue getByIndex(JSC::ExecState*, unsigned index);\
     void indexSetter(JSC::ExecState*, unsigned index, JSC::JSValue);\
 };\
@@ -173,7 +174,7 @@ JSValue JS##name##Array::getByIndex(ExecState*, unsigned index)\
 {\
     ASSERT_GC_OBJECT_INHERITS(this, &s_info);\
     type result = m_impl->item(index);\
-    if (isnan((double)result))\
+    if (std::isnan((double)result))\
         return jsNaN();\
     return JSValue(result);\
 }\
@@ -184,7 +185,10 @@ static EncodedJSValue JSC_HOST_CALL constructJS##name##Array(ExecState* callFram
     if (length < 0) \
         return JSValue::encode(jsUndefined()); \
     Structure* structure = JS##name##Array::createStructure(callFrame->globalData(), callFrame->lexicalGlobalObject(), callFrame->lexicalGlobalObject()->objectPrototype()); \
-    return JSValue::encode(JS##name##Array::create(structure, callFrame->lexicalGlobalObject(), name##Array::create(length)));\
+    RefPtr<name##Array> buffer = name##Array::create(length); \
+    if (!buffer) \
+        return throwVMError(callFrame, createRangeError(callFrame, "ArrayBuffer size is not a small enough positive integer.")); \
+    return JSValue::encode(JS##name##Array::create(structure, callFrame->lexicalGlobalObject(), buffer.release())); \
 }
 
 TYPED_ARRAY(Uint8, uint8_t);

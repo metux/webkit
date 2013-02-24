@@ -1,0 +1,37 @@
+<!-- ##### SECTION Title ##### -->
+WebKitWebPage
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitWebPage ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### FUNCTION webkit_web_page_get_dom_document ##### -->
+<para>
+
+</para>
+
+@web_page: 
+@Returns: 
+
+

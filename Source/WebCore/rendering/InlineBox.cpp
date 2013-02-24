@@ -29,6 +29,7 @@
 #include "RenderArena.h"
 #include "RenderBlock.h"
 #include "RootInlineBox.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 #ifndef NDEBUG
 #include <stdio.h>
@@ -159,7 +160,7 @@ float InlineBox::logicalHeight() const
     return result;
 }
 
-LayoutUnit InlineBox::baselinePosition(FontBaseline baselineType) const
+int InlineBox::baselinePosition(FontBaseline baselineType) const
 {
     return boxModelObject()->baselinePosition(baselineType, m_bitfields.firstLine(), isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine);
 }
@@ -243,12 +244,16 @@ void InlineBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, Layo
     }
 }
 
-bool InlineBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
+bool InlineBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
 {
     // Hit test all phases of replaced elements atomically, as though the replaced element established its
     // own stacking context.  (See Appendix E.2, section 6.4 on inline block/table elements in the CSS2.1
     // specification.)
-    return renderer()->hitTest(request, result, pointInContainer, accumulatedOffset);
+    LayoutPoint childPoint = accumulatedOffset;
+    if (parent()->renderer()->style()->isFlippedBlocksWritingMode()) // Faster than calling containingBlock().
+        childPoint = renderer()->containingBlock()->flipForWritingModeForChild(toRenderBox(renderer()), childPoint);
+    
+    return renderer()->hitTest(request, result, locationInContainer, childPoint);
 }
 
 const RootInlineBox* InlineBox::root() const
@@ -385,6 +390,17 @@ LayoutPoint InlineBox::flipForWritingMode(const LayoutPoint& point)
     if (!renderer()->style()->isFlippedBlocksWritingMode())
         return point;
     return root()->block()->flipForWritingMode(point);
+}
+
+void InlineBox::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Rendering);
+    info.addMember(m_next, "next");
+    info.addMember(m_prev, "prev");
+    info.addMember(m_parent, "parent");
+    info.addMember(m_renderer, "renderer");
+
+    info.setCustomAllocation(true);
 }
 
 } // namespace WebCore

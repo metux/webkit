@@ -37,7 +37,6 @@
 #include <wtf/Assertions.h>
 #include <wtf/MathExtras.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/dtoa.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -681,12 +680,10 @@ Decimal Decimal::floor() const
 
 Decimal Decimal::fromDouble(double doubleValue)
 {
-    if (isfinite(doubleValue)) {
-        NumberToStringBuffer buffer;
-        return fromString(numberToString(doubleValue, buffer));
-    }
+    if (std::isfinite(doubleValue))
+        return fromString(String::numberToStringECMAScript(doubleValue));
 
-    if (isinf(doubleValue))
+    if (std::isinf(doubleValue))
         return infinity(doubleValue < 0 ? Negative : Positive);
 
     return nan();
@@ -905,8 +902,8 @@ Decimal Decimal::nan()
 
 Decimal Decimal::remainder(const Decimal& rhs) const
 {
-    const Decimal quotient = (*this / rhs).round();
-    return quotient.isSpecial() ? quotient : *this - quotient * rhs;
+    const Decimal quotient = *this / rhs;
+    return quotient.isSpecial() ? quotient : *this - (quotient.isNegative() ? quotient.ceiling() : quotient.floor()) * rhs;
 }
 
 Decimal Decimal::round() const
@@ -1005,7 +1002,7 @@ String Decimal::toString() const
             return builder.toString();
         }
 
-        builder.append("0.");
+        builder.appendLiteral("0.");
         for (int i = adjustedExponent + 1; i < 0; ++i)
             builder.append('0');
 
@@ -1023,7 +1020,7 @@ String Decimal::toString() const
 
         if (adjustedExponent) {
             builder.append(adjustedExponent < 0 ? "e" : "e+");
-            builder.append(String::number(adjustedExponent));
+            builder.appendNumber(adjustedExponent);
         }
     }
     return builder.toString();

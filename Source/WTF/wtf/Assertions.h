@@ -168,19 +168,18 @@ WTF_EXPORT_PRIVATE void WTFInstallReportBacktraceOnCrashHook();
 */
 #ifndef CRASH
 #if COMPILER(CLANG)
-#define CRASH() do { \
-    WTFReportBacktrace(); \
-    WTFInvokeCrashHook(); \
-    *(int *)(uintptr_t)0xbbadbeef = 0; \
-    __builtin_trap(); \
-} while (0)
+#define CRASH() \
+    (WTFReportBacktrace(), \
+     WTFInvokeCrashHook(), \
+     (*(int *)(uintptr_t)0xbbadbeef = 0), \
+     __builtin_trap())
 #else
-#define CRASH() do { \
-    WTFReportBacktrace(); \
-    WTFInvokeCrashHook(); \
-    *(int *)(uintptr_t)0xbbadbeef = 0; \
-    ((void(*)())0)(); /* More reliable, but doesn't say BBADBEEF */ \
-} while (0)
+#define CRASH() \
+    (WTFReportBacktrace(), \
+     WTFInvokeCrashHook(), \
+     (*(int *)(uintptr_t)0xbbadbeef = 0), \
+     ((void(*)())0)() /* More reliable, but doesn't say BBADBEEF */ \
+    )
 #endif
 #endif
 
@@ -214,7 +213,7 @@ WTF_EXPORT_PRIVATE void WTFInstallReportBacktraceOnCrashHook();
   Expressions inside them are evaluated in debug builds only.
 */
 
-#if OS(WINCE) && !PLATFORM(TORCHMOBILE)
+#if OS(WINCE)
 /* FIXME: We include this here only to avoid a conflict with the ASSERT macro. */
 #include <windows.h>
 #undef min
@@ -244,19 +243,17 @@ inline void assertUnused(T& x) { (void)x; }
 
 #else
 
-#define ASSERT(assertion) do \
-    if (!(assertion)) { \
-        WTFReportAssertionFailure(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion); \
-        CRASH(); \
-    } \
-while (0)
+#define ASSERT(assertion) \
+    (!(assertion) ? \
+        (WTFReportAssertionFailure(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion), \
+         CRASH()) : \
+        (void)0)
 
-#define ASSERT_AT(assertion, file, line, function) do  \
-    if (!(assertion)) { \
-        WTFReportAssertionFailure(file, line, function, #assertion); \
-        CRASH(); \
-    } \
-while (0)
+#define ASSERT_AT(assertion, file, line, function) \
+    (!(assertion) ? \
+        (WTFReportAssertionFailure(file, line, function, #assertion), \
+         CRASH()) :                                                   \
+        (void)0)
 
 #define ASSERT_NOT_REACHED() do { \
     WTFReportAssertionFailure(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, 0); \
@@ -266,6 +263,28 @@ while (0)
 #define ASSERT_UNUSED(variable, assertion) ASSERT(assertion)
 
 #define NO_RETURN_DUE_TO_ASSERT NO_RETURN_DUE_TO_CRASH
+
+#endif
+
+/* ASSERT_WITH_SECURITY_IMPLICATION
+   
+   Failure of this assertion indicates a possible security vulnerability.
+   Class of vulnerabilities that it tests include bad casts, out of bounds
+   accesses, use-after-frees, etc. Please file a bug using the security
+   template - https://bugs.webkit.org/enter_bug.cgi?product=Security.
+
+*/
+#ifdef ADDRESS_SANITIZER
+
+#define ASSERT_WITH_SECURITY_IMPLICATION(assertion) \
+    (!(assertion) ? \
+        (WTFReportAssertionFailure(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion), \
+         CRASH()) : \
+        (void)0)
+
+#else
+
+#define ASSERT_WITH_SECURITY_IMPLICATION(assertion) ASSERT(assertion)
 
 #endif
 
@@ -391,6 +410,16 @@ static inline void UNREACHABLE_FOR_PLATFORM()
 #pragma clang diagnostic pop
 #else
 #define UNREACHABLE_FOR_PLATFORM() ASSERT_NOT_REACHED()
+#endif
+
+#if ASSERT_DISABLED
+#define RELEASE_ASSERT(assertion) (!(assertion) ? (CRASH()) : (void)0)
+#define RELEASE_ASSERT_WITH_MESSAGE(assertion, ...) RELEASE_ASSERT(assertion)
+#define RELEASE_ASSERT_NOT_REACHED() CRASH()
+#else
+#define RELEASE_ASSERT(assertion) ASSERT(assertion)
+#define RELEASE_ASSERT_WITH_MESSAGE(assertion, ...) ASSERT_WITH_MESSAGE(assertion, __VA_ARGS__)
+#define RELEASE_ASSERT_NOT_REACHED() ASSERT_NOT_REACHED()
 #endif
 
 #endif /* WTF_Assertions_h */

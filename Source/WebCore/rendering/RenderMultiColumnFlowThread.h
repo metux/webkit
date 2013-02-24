@@ -33,11 +33,14 @@ namespace WebCore {
 
 class RenderMultiColumnFlowThread : public RenderFlowThread {
 public:
-    RenderMultiColumnFlowThread(Node*);
+    RenderMultiColumnFlowThread(Document*);
     ~RenderMultiColumnFlowThread();
 
 private:
     virtual const char* renderName() const OVERRIDE;
+    virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
+    
+    virtual void layout() OVERRIDE;
 };
 
 } // namespace WebCore

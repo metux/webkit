@@ -23,6 +23,7 @@
 #define Heap_h
 
 #include "BlockAllocator.h"
+#include "CopyVisitor.h"
 #include "DFGCodeBlocks.h"
 #include "GCThreadSharedData.h"
 #include "HandleSet.h"
@@ -32,6 +33,7 @@
 #include "MarkedBlock.h"
 #include "MarkedBlockSet.h"
 #include "MarkedSpace.h"
+#include "Options.h"
 #include "SlotVisitor.h"
 #include "WeakHandleOwner.h"
 #include "WriteBarrierSupport.h"
@@ -54,16 +56,15 @@ namespace JSC {
     class JITStubRoutine;
     class JSCell;
     class JSGlobalData;
+    class JSStack;
     class JSValue;
     class LiveObjectIterator;
     class LLIntOffsetsExtractor;
     class MarkedArgumentBuffer;
-    class RegisterFile;
-    class UString;
     class WeakGCHandlePool;
     class SlotVisitor;
 
-    typedef std::pair<JSValue, UString> ValueStringPair;
+    typedef std::pair<JSValue, WTF::String> ValueStringPair;
     typedef HashCountedSet<JSCell*> ProtectCountSet;
     typedef HashCountedSet<const char*> TypeCountSet;
 
@@ -85,6 +86,7 @@ namespace JSC {
         // our scan to run faster. 
         static const unsigned s_timeCheckResolution = 16;
 
+        static bool isLive(const void*);
         static bool isMarked(const void*);
         static bool testAndSetMarked(const void*);
         static void setMarked(const void*);
@@ -111,9 +113,9 @@ namespace JSC {
         // true if an allocation or collection is in progress
         inline bool isBusy();
         
-        MarkedAllocator& firstAllocatorWithoutDestructors() { return m_objectSpace.firstAllocator(); }
         MarkedAllocator& allocatorForObjectWithoutDestructor(size_t bytes) { return m_objectSpace.allocatorFor(bytes); }
-        MarkedAllocator& allocatorForObjectWithDestructor(size_t bytes) { return m_objectSpace.destructorAllocatorFor(bytes); }
+        MarkedAllocator& allocatorForObjectWithNormalDestructor(size_t bytes) { return m_objectSpace.normalDestructorAllocatorFor(bytes); }
+        MarkedAllocator& allocatorForObjectWithImmortalStructureDestructor(size_t bytes) { return m_objectSpace.immortalStructureDestructorAllocatorFor(bytes); }
         CopiedAllocator& storageAllocator() { return m_storageSpace.allocator(); }
         CheckedBoolean tryAllocateStorage(size_t, void**);
         CheckedBoolean tryReallocateStorage(void**, size_t, size_t);
@@ -146,6 +148,7 @@ namespace JSC {
         JS_EXPORT_PRIVATE size_t protectedGlobalObjectCount();
         JS_EXPORT_PRIVATE PassOwnPtr<TypeCountSet> protectedObjectTypeCounts();
         JS_EXPORT_PRIVATE PassOwnPtr<TypeCountSet> objectTypeCounts();
+        void showStatistics();
 
         void pushTempSortVector(Vector<ValueStringPair>*);
         void popTempSortVector(Vector<ValueStringPair>*);
@@ -169,11 +172,13 @@ namespace JSC {
         void didAbandon(size_t);
 
         bool isPagedOut(double deadline);
-        bool isSafeToSweepStructures();
         void didStartVMShutdown();
+        
+        const JITStubRoutineSet& jitStubRoutines() { return m_jitStubRoutines; }
 
     private:
         friend class CodeBlock;
+        friend class CopiedBlock;
         friend class GCAwareJITStubRoutine;
         friend class JITStubRoutine;
         friend class LLIntOffsetsExtractor;
@@ -181,12 +186,17 @@ namespace JSC {
         friend class MarkedAllocator;
         friend class MarkedBlock;
         friend class CopiedSpace;
+        friend class CopyVisitor;
         friend class SlotVisitor;
+        friend class IncrementalSweeper;
+        friend class HeapStatistics;
+        friend class WeakSet;
         template<typename T> friend void* allocateCell(Heap&);
+        template<typename T> friend void* allocateCell(Heap&, size_t);
 
-        void* allocateWithDestructor(size_t);
-        void* allocateWithoutDestructor(size_t);
-        void* allocateStructure();
+        void* allocateWithImmortalStructureDestructor(size_t); // For use with special objects whose Structures never die.
+        void* allocateWithNormalDestructor(size_t); // For use with objects that inherit directly or indirectly from JSDestructibleObject.
+        void* allocateWithoutDestructor(size_t); // For use with objects without destructors.
 
         static const size_t minExtraCost = 256;
         static const size_t maxExtraCost = 1024 * 1024;
@@ -198,14 +208,17 @@ namespace JSC {
         JS_EXPORT_PRIVATE bool isValidAllocation(size_t);
         JS_EXPORT_PRIVATE void reportExtraMemoryCostSlowCase(size_t);
 
-        void markRoots(bool fullGC);
+        void markRoots();
         void markProtectedObjects(HeapRootVisitor&);
         void markTempSortVectors(HeapRootVisitor&);
+        void copyBackingStores();
         void harvestWeakReferences();
         void finalizeUnconditionalFinalizers();
         void deleteUnmarkedCompiledCode();
-        
-        RegisterFile& registerFile();
+        void zombifyDeadObjects();
+        void markDeadObjects();
+
+        JSStack& stack();
         BlockAllocator& blockAllocator();
 
         const HeapType m_heapType;
@@ -234,6 +247,7 @@ namespace JSC {
         
         GCThreadSharedData m_sharedData;
         SlotVisitor m_slotVisitor;
+        CopyVisitor m_copyVisitor;
 
         HandleSet m_handleSet;
         HandleStack m_handleStack;
@@ -251,15 +265,27 @@ namespace JSC {
         
         GCActivityCallback* m_activityCallback;
         IncrementalSweeper* m_sweeper;
+        Vector<MarkedBlock*> m_blockSnapshot;
+    };
+
+    struct MarkedBlockSnapshotFunctor : public MarkedBlock::VoidFunctor {
+        MarkedBlockSnapshotFunctor(Vector<MarkedBlock*>& blocks) 
+            : m_index(0) 
+            , m_blocks(blocks)
+        {
+        }
+    
+        void operator()(MarkedBlock* block) { m_blocks[m_index++] = block; }
+    
+        size_t m_index;
+        Vector<MarkedBlock*>& m_blocks;
     };
 
     inline bool Heap::shouldCollect()
     {
-#if ENABLE(GGC)
-        return m_objectSpace.nurseryWaterMark() >= m_minBytesPerCycle && m_isSafeToCollect && m_operationInProgress == NoOperation;
-#else
+        if (Options::gcMaxHeapSize())
+            return m_bytesAllocated > Options::gcMaxHeapSize() && m_isSafeToCollect && m_operationInProgress == NoOperation;
         return m_bytesAllocated > m_bytesAllocatedLimit && m_isSafeToCollect && m_operationInProgress == NoOperation;
-#endif
     }
 
     bool Heap::isBusy()
@@ -279,6 +305,11 @@ namespace JSC {
         return heap(v.asCell());
     }
 
+    inline bool Heap::isLive(const void* cell)
+    {
+        return MarkedBlock::blockFor(cell)->isLiveCell(cell);
+    }
+
     inline bool Heap::isMarked(const void* cell)
     {
         return MarkedBlock::blockFor(cell)->isMarked(cell);
@@ -296,36 +327,12 @@ namespace JSC {
 
     inline bool Heap::isWriteBarrierEnabled()
     {
-#if ENABLE(GGC) || ENABLE(WRITE_BARRIER_PROFILING)
+#if ENABLE(WRITE_BARRIER_PROFILING)
         return true;
 #else
         return false;
 #endif
     }
-
-#if ENABLE(GGC)
-    inline uint8_t* Heap::addressOfCardFor(JSCell* cell)
-    {
-        return MarkedBlock::blockFor(cell)->addressOfCardFor(cell);
-    }
-
-    inline void Heap::writeBarrier(const JSCell* owner, JSCell*)
-    {
-        WriteBarrierCounters::countWriteBarrier();
-        MarkedBlock* block = MarkedBlock::blockFor(owner);
-        if (block->isMarked(owner))
-            block->setDirtyObject(owner);
-    }
-
-    inline void Heap::writeBarrier(const JSCell* owner, JSValue value)
-    {
-        if (!value)
-            return;
-        if (!value.isCell())
-            return;
-        writeBarrier(owner, value.asCell());
-    }
-#else
 
     inline void Heap::writeBarrier(const JSCell*, JSCell*)
     {
@@ -336,7 +343,6 @@ namespace JSC {
     {
         WriteBarrierCounters::countWriteBarrier();
     }
-#endif
 
     inline void Heap::reportExtraMemoryCost(size_t cost)
     {
@@ -348,7 +354,7 @@ namespace JSC {
     {
         ProtectCountSet::iterator end = m_protectedValues.end();
         for (ProtectCountSet::iterator it = m_protectedValues.begin(); it != end; ++it)
-            functor(it->first);
+            functor(it->key);
         m_handleSet.forEachStrongHandle(functor, m_protectedValues);
 
         return functor.returnValue();
@@ -360,10 +366,16 @@ namespace JSC {
         return forEachProtectedCell(functor);
     }
 
-    inline void* Heap::allocateWithDestructor(size_t bytes)
+    inline void* Heap::allocateWithNormalDestructor(size_t bytes)
     {
         ASSERT(isValidAllocation(bytes));
-        return m_objectSpace.allocateWithDestructor(bytes);
+        return m_objectSpace.allocateWithNormalDestructor(bytes);
+    }
+    
+    inline void* Heap::allocateWithImmortalStructureDestructor(size_t bytes)
+    {
+        ASSERT(isValidAllocation(bytes));
+        return m_objectSpace.allocateWithImmortalStructureDestructor(bytes);
     }
     
     inline void* Heap::allocateWithoutDestructor(size_t bytes)
@@ -372,11 +384,6 @@ namespace JSC {
         return m_objectSpace.allocateWithoutDestructor(bytes);
     }
    
-    inline void* Heap::allocateStructure()
-    {
-        return m_objectSpace.allocateStructure();
-    }
- 
     inline CheckedBoolean Heap::tryAllocateStorage(size_t bytes, void** outPtr)
     {
         return m_storageSpace.tryAllocate(bytes, outPtr);

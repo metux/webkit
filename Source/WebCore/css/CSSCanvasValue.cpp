@@ -27,8 +27,9 @@
 #include "CSSCanvasValue.h"
 
 #include "ImageBuffer.h"
-#include "MemoryInstrumentation.h"
 #include "RenderObject.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -40,9 +41,11 @@ CSSCanvasValue::~CSSCanvasValue()
 
 String CSSCanvasValue::customCssText() const
 {
-    String result = "-webkit-canvas(";
-    result += m_name  + ")";
-    return result;
+    StringBuilder result;
+    result.appendLiteral("-webkit-canvas(");
+    result.append(m_name);
+    result.append(')');
+    return result.toString();
 }
 
 void CSSCanvasValue::canvasChanged(HTMLCanvasElement*, const FloatRect& changedRect)
@@ -50,14 +53,14 @@ void CSSCanvasValue::canvasChanged(HTMLCanvasElement*, const FloatRect& changedR
     IntRect imageChangeRect = enclosingIntRect(changedRect);
     RenderObjectSizeCountMap::const_iterator end = clients().end();
     for (RenderObjectSizeCountMap::const_iterator curr = clients().begin(); curr != end; ++curr)
-        const_cast<RenderObject*>(curr->first)->imageChanged(static_cast<WrappedImagePtr>(this), &imageChangeRect);
+        const_cast<RenderObject*>(curr->key)->imageChanged(static_cast<WrappedImagePtr>(this), &imageChangeRect);
 }
 
 void CSSCanvasValue::canvasResized(HTMLCanvasElement*)
 {
     RenderObjectSizeCountMap::const_iterator end = clients().end();
     for (RenderObjectSizeCountMap::const_iterator curr = clients().begin(); curr != end; ++curr)
-        const_cast<RenderObject*>(curr->first)->imageChanged(static_cast<WrappedImagePtr>(this));
+        const_cast<RenderObject*>(curr->key)->imageChanged(static_cast<WrappedImagePtr>(this));
 }
 
 void CSSCanvasValue::canvasDestroyed(HTMLCanvasElement* element)
@@ -93,12 +96,17 @@ PassRefPtr<Image> CSSCanvasValue::image(RenderObject* renderer, const IntSize& /
     return elt->copiedImage();
 }
 
+bool CSSCanvasValue::equals(const CSSCanvasValue& other) const
+{
+    return m_name == other.m_name;
+}
+
 void CSSCanvasValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     CSSImageGeneratorValue::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addInstrumentedMember(m_name);
-    info.addInstrumentedMember(m_element);
+    info.addMember(m_name, "name");
+    info.addMember(m_element, "element");
 }
 
 } // namespace WebCore

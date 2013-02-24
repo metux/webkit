@@ -73,11 +73,11 @@ WebInspector.ConcatenatedScriptsContentProvider.prototype = {
     },
 
     /**
-     * @return {?string}
+     * @return {string}
      */
     contentURL: function()
     {
-        return null;
+        return "";
     },
 
     /**
@@ -177,13 +177,14 @@ WebInspector.ConcatenatedScriptsContentProvider.prototype = {
         }
 
         return content;
-    }
-}
+    },
 
-WebInspector.ConcatenatedScriptsContentProvider.prototype.__proto__ = WebInspector.ContentProvider.prototype;
+    __proto__: WebInspector.ContentProvider.prototype
+}
 
 /**
  * @constructor
+ * @param {string} sourceURL
  * @implements {WebInspector.ContentProvider}
  */
 WebInspector.CompilerSourceMappingContentProvider = function(sourceURL)
@@ -193,7 +194,7 @@ WebInspector.CompilerSourceMappingContentProvider = function(sourceURL)
 
 WebInspector.CompilerSourceMappingContentProvider.prototype = {
     /**
-     * @return {?string}
+     * @return {string}
      */
     contentURL: function()
     {
@@ -232,30 +233,32 @@ WebInspector.CompilerSourceMappingContentProvider.prototype = {
     searchInContent: function(query, caseSensitive, isRegex, callback)
     {
         callback([]);
-    }
-}
+    },
 
-WebInspector.CompilerSourceMappingContentProvider.prototype.__proto__ = WebInspector.ContentProvider.prototype;
+    __proto__: WebInspector.ContentProvider.prototype
+}
 
 /**
  * @constructor
  * @implements {WebInspector.ContentProvider}
  * @param {WebInspector.ResourceType} contentType 
- * @param {string} content 
+ * @param {string} content
+ * @param {string=} mimeType
  */
-WebInspector.StaticContentProvider = function(contentType, content)
+WebInspector.StaticContentProvider = function(contentType, content, mimeType)
 {
     this._content = content;
     this._contentType = contentType;
+    this._mimeType = mimeType;
 }
 
 WebInspector.StaticContentProvider.prototype = {
     /**
-     * @return {?string}
+     * @return {string}
      */
     contentURL: function()
     {
-        return null;
+        return "";
     },
 
     /**
@@ -271,7 +274,7 @@ WebInspector.StaticContentProvider.prototype = {
      */
     requestContent: function(callback)
     {
-        callback(this._content, false, this._contentType.canonicalMimeType());
+        callback(this._content, false, this._mimeType || this._contentType.canonicalMimeType());
     },
 
     /**
@@ -284,26 +287,12 @@ WebInspector.StaticContentProvider.prototype = {
     {
         function performSearch()
         {
-            var regex = createSearchRegex(query, caseSensitive, isRegex);
-            
-            var result = [];
-            var lineEndings = this._content.lineEndings();
-            for (var i = 0; i < lineEndings.length; ++i) {
-                var lineStart = i > 0 ? lineEndings[i - 1] + 1 : 0;
-                var lineEnd = lineEndings[i];
-                var lineContent = this._content.substring(lineStart, lineEnd);
-                if (lineContent.length > 0 && lineContent.charAt(lineContent.length - 1) === "\r")
-                    lineContent = lineContent.substring(0, lineContent.length - 1)
-                
-                if (regex.exec(lineContent))
-                    result.push(new WebInspector.ContentProvider.SearchMatch(i, lineContent));
-            }
-            callback(result);
+            callback(WebInspector.ContentProvider.performSearchInContent(this._content, query, caseSensitive, isRegex));
         }
 
         // searchInContent should call back later.
         window.setTimeout(performSearch.bind(this), 0);
-    }
-}
+    },
 
-WebInspector.StaticContentProvider.prototype.__proto__ = WebInspector.ContentProvider.prototype;
+    __proto__: WebInspector.ContentProvider.prototype
+}

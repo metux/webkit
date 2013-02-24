@@ -36,8 +36,8 @@
 
 #include "InspectorInstrumentation.h"
 #include "InspectorValues.h"
-#include "PlatformString.h"
 #include "ScriptFunctionCall.h"
+#include <wtf/text/WTFString.h>
 
 using WebCore::TypeBuilder::Runtime::RemoteObject;
 
@@ -124,6 +124,7 @@ void InjectedScriptBase::makeEvalCall(ErrorString* errorString, ScriptFunctionCa
     }
     if (result->type() == InspectorValue::TypeString) {
         result->asString(errorString);
+        ASSERT(errorString->length());
         return;
     }
     RefPtr<InspectorObject> resultPair = result->asObject();

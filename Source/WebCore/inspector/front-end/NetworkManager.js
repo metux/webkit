@@ -42,10 +42,6 @@ WebInspector.NetworkManager = function()
     NetworkAgent.enable();
 
     WebInspector.settings.cacheDisabled.addChangeListener(this._cacheDisabledSettingChanged, this);
-
-    if (WebInspector.settings.userAgent.get())
-        this._userAgentSettingChanged();
-    WebInspector.settings.userAgent.addChangeListener(this._userAgentSettingChanged, this);
 }
 
 WebInspector.NetworkManager.EventTypes = {
@@ -62,7 +58,9 @@ WebInspector.NetworkManager._MIMETypes = {
     "application/xhtml+xml":       {"document": true},
     "text/css":                    {"stylesheet": true},
     "text/xsl":                    {"stylesheet": true},
+    "image/jpg":                   {"image": true},
     "image/jpeg":                  {"image": true},
+    "image/pjpeg":                 {"image": true},
     "image/png":                   {"image": true},
     "image/gif":                   {"image": true},
     "image/bmp":                   {"image": true},
@@ -106,17 +104,12 @@ WebInspector.NetworkManager.prototype = {
      */
     _cacheDisabledSettingChanged: function(event)
     {
-        var enabled = /** @type {boolean} */ event.data;
+        var enabled = /** @type {boolean} */ (event.data);
         NetworkAgent.setCacheDisabled(enabled);
     },
 
-    _userAgentSettingChanged: function()
-    {
-        NetworkAgent.setUserAgentOverride(WebInspector.settings.userAgent.get());
-    }
+    __proto__: WebInspector.Object.prototype
 }
-
-WebInspector.NetworkManager.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -422,7 +415,6 @@ WebInspector.NetworkDispatcher.prototype = {
 
         networkRequest.requestMethod = "GET";
         networkRequest.requestHeaders = this._headersMapToHeadersArray(request.headers);
-        networkRequest.webSocketRequestKey3 = request.requestKey3;
         networkRequest.startTime = time;
 
         this._updateNetworkRequest(networkRequest);
@@ -442,7 +434,6 @@ WebInspector.NetworkDispatcher.prototype = {
         networkRequest.statusCode = response.status;
         networkRequest.statusText = response.statusText;
         networkRequest.responseHeaders = this._headersMapToHeadersArray(response.headers);
-        networkRequest.webSocketChallengeResponse = response.challengeResponse;
         networkRequest.responseReceivedTime = time;
 
         this._updateNetworkRequest(networkRequest);

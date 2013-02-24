@@ -25,10 +25,9 @@
 #include "Lookup.h"
 #include "NumberObject.h"
 #include "NumberPrototype.h"
+#include "Operations.h"
 
 namespace JSC {
-
-ASSERT_CLASS_FITS_IN_CELL(NumberConstructor);
 
 static JSValue numberConstructorNaNValue(ExecState*, JSValue, PropertyName);
 static JSValue numberConstructorNegInfinity(ExecState*, JSValue, PropertyName);

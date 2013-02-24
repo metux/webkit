@@ -56,6 +56,7 @@ static inline int roundUpToMultipleOf32(int d)
 // Instead of creating and destroying the buffer for every operation,
 // we create a buffer which will be automatically purged via a timer.
 class ScratchBuffer {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     ScratchBuffer()
         : m_purgeTimer(this, &ScratchBuffer::timerFired)
@@ -410,6 +411,11 @@ IntRect ShadowBlur::calculateLayerBoundingRect(GraphicsContext* context, const F
         if (m_type == BlurShadow) {
             inflatedClip.inflateX(edgeSize.width());
             inflatedClip.inflateY(edgeSize.height());
+        } else {
+            // Enlarge the clipping area 1 pixel so that the fill does not
+            // bleed (due to antialiasing) even if the unaligned clip rect occurred
+            inflatedClip.inflateX(1);
+            inflatedClip.inflateY(1);
         }
         
         layerRect.intersect(inflatedClip);

@@ -53,6 +53,15 @@ WebKitURISchemeRequest
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_uri_scheme_request_get_web_view ##### -->
+<para>
+
+</para>
+
+@request: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_uri_scheme_request_finish ##### -->
 <para>
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2010, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Justin Haygood (jhaygood@reaktix.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,18 +65,10 @@
 
 #if OS(WINDOWS)
 #include <windows.h>
-#elif OS(DARWIN)
-#include <libkern/OSAtomic.h>
 #elif OS(QNX)
 #include <atomic.h>
 #elif OS(ANDROID)
 #include <sys/atomics.h>
-#elif COMPILER(GCC)
-#if ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2))) && !defined(__LSB_VERSION__)
-#include <ext/atomicity.h>
-#else
-#include <bits/atomicity.h>
-#endif
 #endif
 
 namespace WTF {
@@ -84,19 +76,22 @@ namespace WTF {
 #if OS(WINDOWS)
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
 
-#if COMPILER(MINGW) || COMPILER(MSVC7_OR_LOWER) || OS(WINCE)
+#if OS(WINCE)
 inline int atomicIncrement(int* addend) { return InterlockedIncrement(reinterpret_cast<long*>(addend)); }
 inline int atomicDecrement(int* addend) { return InterlockedDecrement(reinterpret_cast<long*>(addend)); }
+#elif COMPILER(MINGW) || COMPILER(MSVC7_OR_LOWER)
+inline int atomicIncrement(int* addend) { return InterlockedIncrement(reinterpret_cast<long*>(addend)); }
+inline int atomicDecrement(int* addend) { return InterlockedDecrement(reinterpret_cast<long*>(addend)); }
+
+inline int64_t atomicIncrement(int64_t* addend) { return InterlockedIncrement64(reinterpret_cast<long long*>(addend)); }
+inline int64_t atomicDecrement(int64_t* addend) { return InterlockedDecrement64(reinterpret_cast<long long*>(addend)); }
 #else
 inline int atomicIncrement(int volatile* addend) { return InterlockedIncrement(reinterpret_cast<long volatile*>(addend)); }
 inline int atomicDecrement(int volatile* addend) { return InterlockedDecrement(reinterpret_cast<long volatile*>(addend)); }
+
+inline int64_t atomicIncrement(int64_t volatile* addend) { return InterlockedIncrement64(reinterpret_cast<long long volatile*>(addend)); }
+inline int64_t atomicDecrement(int64_t volatile* addend) { return InterlockedDecrement64(reinterpret_cast<long long volatile*>(addend)); }
 #endif
-
-#elif OS(DARWIN)
-#define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
-
-inline int atomicIncrement(int volatile* addend) { return OSAtomicIncrement32Barrier(const_cast<int*>(addend)); }
-inline int atomicDecrement(int volatile* addend) { return OSAtomicDecrement32Barrier(const_cast<int*>(addend)); }
 
 #elif OS(QNX)
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
@@ -115,8 +110,11 @@ inline int atomicDecrement(int volatile* addend) { return __atomic_dec(addend) -
 #elif COMPILER(GCC) && !CPU(SPARC64) // sizeof(_Atomic_word) != sizeof(int) on sparc64 gcc
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
 
-inline int atomicIncrement(int volatile* addend) { return __gnu_cxx::__exchange_and_add(addend, 1) + 1; }
-inline int atomicDecrement(int volatile* addend) { return __gnu_cxx::__exchange_and_add(addend, -1) - 1; }
+inline int atomicIncrement(int volatile* addend) { return __sync_add_and_fetch(addend, 1); }
+inline int atomicDecrement(int volatile* addend) { return __sync_sub_and_fetch(addend, 1); }
+
+inline int64_t atomicIncrement(int64_t volatile* addend) { return __sync_add_and_fetch(addend, 1); }
+inline int64_t atomicDecrement(int64_t volatile* addend) { return __sync_sub_and_fetch(addend, 1); }
 
 #endif
 
@@ -142,8 +140,8 @@ inline bool weakCompareAndSwap(unsigned* location, unsigned expected, unsigned n
 #endif
 {
 #if ENABLE(COMPARE_AND_SWAP)
-    bool result;
 #if CPU(X86) || CPU(X86_64)
+    unsigned char result;
     asm volatile(
         "lock; cmpxchgl %3, %2\n\t"
         "sete %1"
@@ -153,6 +151,7 @@ inline bool weakCompareAndSwap(unsigned* location, unsigned expected, unsigned n
         );
 #elif CPU(ARM_THUMB2)
     unsigned tmp;
+    unsigned result;
     asm volatile(
         "movw %1, #1\n\t"
         "ldrex %2, %0\n\t"
@@ -160,7 +159,7 @@ inline bool weakCompareAndSwap(unsigned* location, unsigned expected, unsigned n
         "bne.n 0f\n\t"
         "strex %1, %4, %0\n\t"
         "0:"
-        : "+m"(*location), "=&r"(result), "=&r"(tmp)
+        : "+Q"(*location), "=&r"(result), "=&r"(tmp)
         : "r"(expected), "r"(newValue)
         : "memory");
     result = !result;
@@ -173,7 +172,7 @@ inline bool weakCompareAndSwap(unsigned* location, unsigned expected, unsigned n
     UNUSED_PARAM(expected);
     UNUSED_PARAM(newValue);
     CRASH();
-    return 0;
+    return false;
 #endif
 }
 

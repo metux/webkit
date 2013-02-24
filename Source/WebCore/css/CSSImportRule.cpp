@@ -27,16 +27,16 @@
 #include "CachedResourceLoader.h"
 #include "Document.h"
 #include "MediaList.h"
-#include "MemoryInstrumentation.h"
 #include "SecurityOrigin.h"
 #include "StyleRuleImport.h"
 #include "StyleSheetContents.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 CSSImportRule::CSSImportRule(StyleRuleImport* importRule, CSSStyleSheet* parent)
-    : CSSRule(parent, CSSRule::IMPORT_RULE)
+    : CSSRule(parent)
     , m_importRule(importRule)
 {
 }
@@ -69,21 +69,24 @@ String CSSImportRule::cssText() const
     result.append("\")");
 
     if (m_importRule->mediaQueries()) {
-        result.append(' ');
-        result.append(m_importRule->mediaQueries()->mediaText());
+        String mediaText = m_importRule->mediaQueries()->mediaText();
+        if (!mediaText.isEmpty()) {
+            result.append(' ');
+            result.append(mediaText);
+        }
     }
     result.append(';');
     
     return result.toString();
 }
 
-void CSSImportRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void CSSImportRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addInstrumentedMember(m_importRule);
-    info.addInstrumentedMember(m_mediaCSSOMWrapper);
-    info.addInstrumentedMember(m_styleSheetCSSOMWrapper);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_importRule, "importRule");
+    info.addMember(m_mediaCSSOMWrapper, "mediaCSSOMWrapper");
+    info.addMember(m_styleSheetCSSOMWrapper, "styleSheetCSSOMWrapper");
 }
 
 CSSStyleSheet* CSSImportRule::styleSheet() const
@@ -94,6 +97,12 @@ CSSStyleSheet* CSSImportRule::styleSheet() const
     if (!m_styleSheetCSSOMWrapper)
         m_styleSheetCSSOMWrapper = CSSStyleSheet::create(m_importRule->styleSheet(), const_cast<CSSImportRule*>(this));
     return m_styleSheetCSSOMWrapper.get(); 
+}
+
+void CSSImportRule::reattach(StyleRuleBase*)
+{
+    // FIXME: Implement when enabling caching for stylesheets with import rules.
+    ASSERT_NOT_REACHED();
 }
 
 } // namespace WebCore

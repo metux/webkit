@@ -26,8 +26,10 @@
 #ifndef SmallStrings_h
 #define SmallStrings_h
 
-#include "UString.h"
+#include "WriteBarrier.h"
+
 #include <wtf/FixedArray.h>
+#include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
 
 #define JSC_COMMON_STRINGS_EACH_NAME(macro) \
@@ -40,6 +42,10 @@
     macro(undefined) \
     macro(string) \
     macro(true)
+
+namespace WTF {
+class StringImpl;
+}
 
 namespace JSC {
 
@@ -57,10 +63,8 @@ namespace JSC {
         SmallStrings();
         ~SmallStrings();
 
-        JSString* emptyString(JSGlobalData* globalData)
+        JSString* emptyString()
         {
-            if (!m_emptyString)
-                createEmptyString(globalData);
             return m_emptyString;
         }
 
@@ -71,17 +75,18 @@ namespace JSC {
             return m_singleCharacterStrings[character];
         }
 
-        JS_EXPORT_PRIVATE StringImpl* singleCharacterStringRep(unsigned char character);
+        JS_EXPORT_PRIVATE WTF::StringImpl* singleCharacterStringRep(unsigned char character);
 
         void finalizeSmallStrings();
 
         JSString** singleCharacterStrings() { return &m_singleCharacterStrings[0]; }
 
+        void initializeCommonStrings(JSGlobalData&);
+        void visitStrongReferences(SlotVisitor&);
+
 #define JSC_COMMON_STRINGS_ACCESSOR_DEFINITION(name) \
-        JSString* name##String(JSGlobalData* globalData) const \
+        JSString* name##String() const \
         { \
-            if (!m_##name) \
-                initialize(globalData, m_##name, #name); \
             return m_##name; \
         }
         JSC_COMMON_STRINGS_EACH_NAME(JSC_COMMON_STRINGS_ACCESSOR_DEFINITION)
@@ -96,7 +101,7 @@ namespace JSC {
         void initialize(JSGlobalData* globalData, JSString*& string, const char* value) const;
 
         JSString* m_emptyString;
-#define JSC_COMMON_STRINGS_ATTRIBUTE_DECLARATION(name) mutable JSString* m_##name;
+#define JSC_COMMON_STRINGS_ATTRIBUTE_DECLARATION(name) JSString* m_##name;
         JSC_COMMON_STRINGS_EACH_NAME(JSC_COMMON_STRINGS_ATTRIBUTE_DECLARATION)
 #undef JSC_COMMON_STRINGS_ATTRIBUTE_DECLARATION
         JSString* m_singleCharacterStrings[singleCharacterStringCount];

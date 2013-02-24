@@ -32,13 +32,17 @@
 
 #include "ApplicationCacheHost.h"
 #include "AsyncFileStream.h"
+#include "AuthenticationChallenge.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "InspectorInstrumentation.h"
+#include "LoaderStrategy.h"
 #include "Page.h"
+#include "PlatformStrategies.h"
 #include "ProgressTracker.h"
+#include "ResourceBuffer.h"
 #include "ResourceError.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadScheduler.h"
@@ -48,7 +52,7 @@
 
 namespace WebCore {
 
-PassRefPtr<SharedBuffer> ResourceLoader::resourceData()
+PassRefPtr<ResourceBuffer> ResourceLoader::resourceData()
 {
     return m_resourceData;
 }
@@ -88,9 +92,13 @@ void ResourceLoader::releaseResources()
     // the resources to prevent a double dealloc of WebView <rdar://problem/4372628>
     m_reachedTerminalState = true;
 
+#if USE(PLATFORM_STRATEGIES)
+    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->remove(this);
+#endif
     m_identifier = 0;
-
+#if !USE(PLATFORM_STRATEGIES)
     resourceLoadScheduler()->remove(this);
+#endif
 
     if (m_handle) {
         // Clear out the ResourceHandle's client so that it doesn't try to call
@@ -147,7 +155,7 @@ void ResourceLoader::start()
     ASSERT(m_deferredRequest.isNull());
 
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-    if (m_documentLoader->scheduleArchiveLoad(this, m_request, m_request.url()))
+    if (m_documentLoader->scheduleArchiveLoad(this, m_request))
         return;
 #endif
 
@@ -182,28 +190,28 @@ FrameLoader* ResourceLoader::frameLoader() const
     return m_frame->loader();
 }
 
-void ResourceLoader::setShouldBufferData(DataBufferingPolicy shouldBufferData)
+void ResourceLoader::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPolicy)
 { 
-    m_options.shouldBufferData = shouldBufferData; 
+    m_options.dataBufferingPolicy = dataBufferingPolicy; 
 
     // Reset any already buffered data
-    if (!shouldBufferData)
+    if (dataBufferingPolicy == DoNotBufferData)
         m_resourceData = 0;
 }
     
 
 void ResourceLoader::addData(const char* data, int length, bool allAtOnce)
 {
-    if (m_options.shouldBufferData == DoNotBufferData)
+    if (m_options.dataBufferingPolicy == DoNotBufferData)
         return;
 
     if (allAtOnce) {
-        m_resourceData = SharedBuffer::create(data, length);
+        m_resourceData = ResourceBuffer::create(data, length);
         return;
     }
         
     if (!m_resourceData)
-        m_resourceData = SharedBuffer::create(data, length);
+        m_resourceData = ResourceBuffer::create(data, length);
     else
         m_resourceData->append(data, length);
 }
@@ -227,18 +235,35 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
 
     ASSERT(!m_reachedTerminalState);
 
+    // We need a resource identifier for all requests, even if FrameLoader is never going to see it (such as with CORS preflight requests).
+    bool createdResourceIdentifier = false;
+    if (!m_identifier) {
+        m_identifier = m_frame->page()->progress()->createUniqueIdentifier();
+        createdResourceIdentifier = true;
+    }
+
     if (m_options.sendLoadCallbacks == SendCallbacks) {
-        if (!m_identifier) {
-            m_identifier = m_frame->page()->progress()->createUniqueIdentifier();
+        if (createdResourceIdentifier)
             frameLoader()->notifier()->assignIdentifierToInitialRequest(m_identifier, documentLoader(), request);
-        }
 
         frameLoader()->notifier()->willSendRequest(this, request, redirectResponse);
     }
+#if ENABLE(INSPECTOR)
+    else
+        InspectorInstrumentation::willSendRequest(m_frame.get(), m_identifier, m_frame->loader()->documentLoader(), request, redirectResponse);
+#endif
 
-    if (!redirectResponse.isNull())
+    if (!redirectResponse.isNull()) {
+#if USE(PLATFORM_STRATEGIES)
+        platformStrategies()->loaderStrategy()->resourceLoadScheduler()->crossOriginRedirectReceived(this, request.url());
+#else
         resourceLoadScheduler()->crossOriginRedirectReceived(this, request.url());
+#endif
+    }
     m_request = request;
+
+    if (!redirectResponse.isNull() && !m_documentLoader->isCommitted())
+        frameLoader()->client()->dispatchDidReceiveServerRedirectForProvisionalLoad();
 }
 
 void ResourceLoader::didSendData(unsigned long long, unsigned long long)
@@ -284,11 +309,11 @@ void ResourceLoader::didReceiveData(const char* data, int length, long long enco
 
 void ResourceLoader::willStopBufferingData(const char* data, int length)
 {
-    if (m_options.shouldBufferData == DoNotBufferData)
+    if (m_options.dataBufferingPolicy == DoNotBufferData)
         return;
 
     ASSERT(!m_resourceData);
-    m_resourceData = SharedBuffer::create(data, length);
+    m_resourceData = ResourceBuffer::create(data, length);
 }
 
 void ResourceLoader::didFinishLoading(double finishTime)
@@ -470,6 +495,7 @@ bool ResourceLoader::shouldUseCredentialStorage()
 void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChallenge& challenge)
 {
     ASSERT(handle()->hasAuthenticationChallenge());
+
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
     RefPtr<ResourceLoader> protector(this);
@@ -482,9 +508,9 @@ void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChall
     }
     // Only these platforms provide a way to continue without credentials.
     // If we can't continue with credentials, we need to cancel the load altogether.
-#if PLATFORM(MAC) || USE(CFNETWORK) || USE(CURL)
-    handle()->receivedRequestToContinueWithoutCredential(challenge);
-    ASSERT(!handle()->hasAuthenticationChallenge());
+#if PLATFORM(MAC) || USE(CFNETWORK) || USE(CURL) || PLATFORM(GTK) || PLATFORM(EFL)
+    challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
+    ASSERT(!handle() || !handle()->hasAuthenticationChallenge());
 #else
     didFail(blockedError());
 #endif
@@ -511,20 +537,6 @@ void ResourceLoader::receivedCancellation(const AuthenticationChallenge&)
     cancel();
 }
 
-void ResourceLoader::willCacheResponse(ResourceHandle*, CacheStoragePolicy& policy)
-{
-    // <rdar://problem/7249553> - There are reports of crashes with this method being called
-    // with a null m_frame->settings(), which can only happen if the frame doesn't have a page.
-    // Sadly we have no reproducible cases of this.
-    // We think that any frame without a page shouldn't have any loads happening in it, yet
-    // there is at least one code path where that is not true.
-    ASSERT(m_frame->settings());
-    
-    // When in private browsing mode, prevent caching to disk
-    if (policy == StorageAllowed && m_frame->settings() && m_frame->settings()->privateBrowsingEnabled())
-        policy = StorageAllowedInMemoryOnly;    
-}
-
 #if ENABLE(BLOB)
 AsyncFileStream* ResourceLoader::createAsyncFileStream(FileStreamClient* client)
 {
@@ -535,15 +547,15 @@ AsyncFileStream* ResourceLoader::createAsyncFileStream(FileStreamClient* client)
 
 void ResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
-    info.addMember(m_handle.get());
-    info.addInstrumentedMember(m_frame);
-    info.addInstrumentedMember(m_documentLoader);
-    info.addMember(m_request);
-    info.addMember(m_originalRequest);
-    info.addInstrumentedMember(m_resourceData);
-    info.addMember(m_deferredRequest);
-    info.addMember(m_options);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Loader);
+    info.addMember(m_handle, "handle");
+    info.addMember(m_frame, "frame");
+    info.addMember(m_documentLoader, "documentLoader");
+    info.addMember(m_request, "request");
+    info.addMember(m_originalRequest, "originalRequest");
+    info.addMember(m_resourceData, "resourceData");
+    info.addMember(m_deferredRequest, "deferredRequest");
+    info.addMember(m_options, "options");
 }
 
 }

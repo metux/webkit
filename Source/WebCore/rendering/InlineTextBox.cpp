@@ -46,6 +46,7 @@
 #include "Settings.h"
 #include "SVGTextRunRenderingContext.h"
 #include "Text.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "break_lines.h"
 #include <wtf/AlwaysInline.h>
 #include <wtf/text/CString.h>
@@ -64,6 +65,15 @@ void InlineTextBox::destroy(RenderArena* arena)
     InlineBox::destroy(arena);
 }
 
+void InlineTextBox::markDirty(bool dirty)
+{
+    if (dirty) {
+        m_len = 0;
+        m_start = 0;
+    }
+    InlineBox::markDirty(dirty);
+}
+
 LayoutRect InlineTextBox::logicalOverflowRect() const
 {
     if (knownToHaveNoOverflow() || !gTextBoxesWithOverflow)
@@ -79,7 +89,7 @@ void InlineTextBox::setLogicalOverflowRect(const LayoutRect& rect)
     gTextBoxesWithOverflow->add(this, rect);
 }
 
-LayoutUnit InlineTextBox::baselinePosition(FontBaseline baselineType) const
+int InlineTextBox::baselinePosition(FontBaseline baselineType) const
 {
     if (!isText() || !parent())
         return 0;
@@ -164,13 +174,13 @@ RenderObject::SelectionState InlineTextBox::selectionState()
     return state;
 }
 
-static void adjustCharactersAndLengthForHyphen(BufferForAppendingHyphen& charactersWithHyphen, RenderStyle* style, const UChar*& characters, int& length)
+static void adjustCharactersAndLengthForHyphen(BufferForAppendingHyphen& charactersWithHyphen, RenderStyle* style, String& string, int& length)
 {
     const AtomicString& hyphenString = style->hyphenString();
     charactersWithHyphen.reserveCapacity(length + hyphenString.length());
-    charactersWithHyphen.append(characters, length);
+    charactersWithHyphen.append(string);
     charactersWithHyphen.append(hyphenString);
-    characters = charactersWithHyphen.characters();
+    string = charactersWithHyphen.toString();
     length += hyphenString.length();
 }
 
@@ -349,7 +359,7 @@ bool InlineTextBox::isLineBreak() const
     return renderer()->isBR() || (renderer()->style()->preserveNewline() && len() == 1 && (*textRenderer()->text())[start()] == '\n');
 }
 
-bool InlineTextBox::nodeAtPoint(const HitTestRequest&, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
+bool InlineTextBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
 {
     if (isLineBreak())
         return false;
@@ -357,9 +367,9 @@ bool InlineTextBox::nodeAtPoint(const HitTestRequest&, HitTestResult& result, co
     FloatPoint boxOrigin = locationIncludingFlipping();
     boxOrigin.moveBy(accumulatedOffset);
     FloatRect rect(boxOrigin, size());
-    if (m_truncation != cFullTruncation && visibleToHitTesting() && pointInContainer.intersects(rect)) {
-        renderer()->updateHitTestResult(result, flipForWritingMode(pointInContainer.point() - toLayoutSize(accumulatedOffset)));
-        if (!result.addNodeToRectBasedTestResult(renderer()->node(), pointInContainer, rect))
+    if (m_truncation != cFullTruncation && visibleToHitTesting() && locationInContainer.intersects(rect)) {
+        renderer()->updateHitTestResult(result, flipForWritingMode(locationInContainer.point() - toLayoutSize(accumulatedOffset)));
+        if (!result.addNodeToRectBasedTestResult(renderer()->node(), request, locationInContainer, rect))
             return true;
     }
     return false;
@@ -419,7 +429,8 @@ static void paintTextWithShadows(GraphicsContext* context, const Font& font, con
                     context->drawText(font, textRun, textOrigin + extraOffset,  0, endOffset);
                 else
                     context->drawEmphasisMarks(font, textRun, emphasisMark, textOrigin + extraOffset + IntSize(0, emphasisMarkOffset),  0, endOffset);
-            } if (startOffset < truncationPoint) {
+            }
+            if (startOffset < truncationPoint) {
                 if (emphasisMark.isEmpty())
                     context->drawText(font, textRun, textOrigin + extraOffset, startOffset, truncationPoint);
                 else
@@ -542,9 +553,9 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     Color textStrokeColor;
     Color emphasisMarkColor;
     float textStrokeWidth = styleToUse->textStrokeWidth();
-    const ShadowData* textShadow = paintInfo.forceBlackText ? 0 : styleToUse->textShadow();
+    const ShadowData* textShadow = paintInfo.forceBlackText() ? 0 : styleToUse->textShadow();
 
-    if (paintInfo.forceBlackText) {
+    if (paintInfo.forceBlackText()) {
         textFillColor = Color::black;
         textStrokeColor = Color::black;
         emphasisMarkColor = Color::black;
@@ -586,14 +597,14 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     const ShadowData* selectionShadow = textShadow;
     if (haveSelection) {
         // Check foreground color first.
-        Color foreground = paintInfo.forceBlackText ? Color::black : renderer()->selectionForegroundColor();
+        Color foreground = paintInfo.forceBlackText() ? Color::black : renderer()->selectionForegroundColor();
         if (foreground.isValid() && foreground != selectionFillColor) {
             if (!paintSelectedTextOnly)
                 paintSelectedTextSeparately = true;
             selectionFillColor = foreground;
         }
 
-        Color emphasisMarkForeground = paintInfo.forceBlackText ? Color::black : renderer()->selectionEmphasisMarkColor();
+        Color emphasisMarkForeground = paintInfo.forceBlackText() ? Color::black : renderer()->selectionEmphasisMarkColor();
         if (emphasisMarkForeground.isValid() && emphasisMarkForeground != selectionEmphasisMarkColor) {
             if (!paintSelectedTextOnly)
                 paintSelectedTextSeparately = true;
@@ -601,7 +612,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         }
 
         if (RenderStyle* pseudoStyle = renderer()->getCachedPseudoStyle(SELECTION)) {
-            const ShadowData* shadow = paintInfo.forceBlackText ? 0 : pseudoStyle->textShadow();
+            const ShadowData* shadow = paintInfo.forceBlackText() ? 0 : pseudoStyle->textShadow();
             if (shadow != selectionShadow) {
                 if (!paintSelectedTextOnly)
                     paintSelectedTextSeparately = true;
@@ -615,7 +626,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
                 selectionStrokeWidth = strokeWidth;
             }
 
-            Color stroke = paintInfo.forceBlackText ? Color::black : pseudoStyle->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
+            Color stroke = paintInfo.forceBlackText() ? Color::black : pseudoStyle->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
             if (stroke != selectionStrokeColor) {
                 if (!paintSelectedTextOnly)
                     paintSelectedTextSeparately = true;
@@ -666,17 +677,21 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     // 2. Now paint the foreground, including text and decorations like underline/overline (in quirks mode only).
     int length = m_len;
     int maximumLength;
-    const UChar* characters;
+    String string;
     if (!combinedText) {
-        characters = textRenderer()->text()->characters() + m_start;
+        string = textRenderer()->text();
+        if (static_cast<unsigned>(length) != string.length() || m_start) {
+            ASSERT_WITH_SECURITY_IMPLICATION(static_cast<unsigned>(m_start + length) <= string.length());
+            string = string.substringSharingImpl(m_start, length);
+        }
         maximumLength = textRenderer()->textLength() - m_start;
     } else {
-        combinedText->charactersToRender(m_start, characters, length);
+        combinedText->getStringToRender(m_start, string, length);
         maximumLength = length;
     }
 
     BufferForAppendingHyphen charactersWithHyphen;
-    TextRun textRun = constructTextRun(styleToUse, font, characters, length, maximumLength, hasHyphen() ? &charactersWithHyphen : 0);
+    TextRun textRun = constructTextRun(styleToUse, font, string, maximumLength, hasHyphen() ? &charactersWithHyphen : 0);
     if (hasHyphen())
         length = textRun.length();
 
@@ -753,10 +768,14 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     }
 
     // Paint decorations
-    int textDecorations = styleToUse->textDecorationsInEffect();
+    ETextDecoration textDecorations = styleToUse->textDecorationsInEffect();
     if (textDecorations != TDNONE && paintInfo.phase != PaintPhaseSelection) {
         updateGraphicsContext(context, textFillColor, textStrokeColor, textStrokeWidth, styleToUse->colorSpace());
-        paintDecoration(context, boxOrigin, textDecorations, textShadow);
+        if (combinedText)
+            context->concatCTM(rotation(boxRect, Clockwise));
+        paintDecoration(context, boxOrigin, textDecorations, styleToUse->textDecorationStyle(), textShadow);
+        if (combinedText)
+            context->concatCTM(rotation(boxRect, Counterclockwise));
     }
 
     if (paintInfo.phase == PaintPhaseForeground) {
@@ -843,11 +862,16 @@ void InlineTextBox::paintSelection(GraphicsContext* context, const FloatPoint& b
     // If the text is truncated, let the thing being painted in the truncation
     // draw its own highlight.
     int length = m_truncation != cNoTruncation ? m_truncation : m_len;
-    const UChar* characters = textRenderer()->text()->characters() + m_start;
+    String string = textRenderer()->text();
+
+    if (string.length() != static_cast<unsigned>(length) || m_start) {
+        ASSERT_WITH_SECURITY_IMPLICATION(static_cast<unsigned>(m_start + length) <= string.length());
+        string = string.substringSharingImpl(m_start, length);
+    }
 
     BufferForAppendingHyphen charactersWithHyphen;
     bool respectHyphen = ePos == length && hasHyphen();
-    TextRun textRun = constructTextRun(style, font, characters, length, textRenderer()->textLength() - m_start, respectHyphen ? &charactersWithHyphen : 0);
+    TextRun textRun = constructTextRun(style, font, string, textRenderer()->textLength() - m_start, respectHyphen ? &charactersWithHyphen : 0);
     if (respectHyphen)
         ePos = textRun.length();
 
@@ -907,8 +931,38 @@ void InlineTextBox::paintCustomHighlight(const LayoutPoint& paintOffset, const A
 
 #endif
 
-void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& boxOrigin, int deco, const ShadowData* shadow)
+static StrokeStyle textDecorationStyleToStrokeStyle(TextDecorationStyle decorationStyle)
 {
+    StrokeStyle strokeStyle = SolidStroke;
+    switch (decorationStyle) {
+    case TextDecorationStyleSolid:
+        strokeStyle = SolidStroke;
+        break;
+#if ENABLE(CSS3_TEXT)
+    case TextDecorationStyleDouble:
+        strokeStyle = DoubleStroke;
+        break;
+    case TextDecorationStyleDotted:
+        strokeStyle = DottedStroke;
+        break;
+    case TextDecorationStyleDashed:
+        strokeStyle = DashedStroke;
+        break;
+    case TextDecorationStyleWavy:
+        // FIXME: https://bugs.webkit.org/show_bug.cgi?id=92868 - Needs platform support.
+        strokeStyle = WavyStroke;
+        break;
+#endif // CSS3_TEXT
+    }
+
+    return strokeStyle;
+}
+
+void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& boxOrigin, ETextDecoration deco, TextDecorationStyle decorationStyle, const ShadowData* shadow)
+{
+    // FIXME: We should improve this rule and not always just assume 1.
+    const float textDecorationThickness = 1.f;
+
     if (m_truncation == cFullTruncation)
         return;
 
@@ -923,11 +977,13 @@ void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& 
     
     // Get the text decoration colors.
     Color underline, overline, linethrough;
-    renderer()->getTextDecorationColors(deco, underline, overline, linethrough, true, isFirstLineStyle());
+    renderer()->getTextDecorationColors(deco, underline, overline, linethrough, true);
+    if (isFirstLineStyle())
+        renderer()->getTextDecorationColors(deco, underline, overline, linethrough, true, true);
     
     // Use a special function for underlines to get the positioning exactly right.
     bool isPrinting = textRenderer()->document()->printing();
-    context->setStrokeThickness(1.0f); // FIXME: We should improve this rule and not always just assume 1.
+    context->setStrokeThickness(textDecorationThickness);
 
     bool linesAreOpaque = !isPrinting && (!(deco & UNDERLINE) || underline.alpha() == 255) && (!(deco & OVERLINE) || overline.alpha() == 255) && (!(deco & LINE_THROUGH) || linethrough.alpha() == 255);
 
@@ -956,7 +1012,7 @@ void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& 
 
     ColorSpace colorSpace = renderer()->style()->colorSpace();
     bool setShadow = false;
-    
+
     do {
         if (shadow) {
             if (!shadow->next()) {
@@ -971,21 +1027,35 @@ void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& 
             shadow = shadow->next();
         }
 
+#if ENABLE(CSS3_TEXT)
+        // Offset between lines - always non-zero, so lines never cross each other.
+        float doubleOffset = textDecorationThickness + 1.f;
+#endif // CSS3_TEXT
+        context->setStrokeStyle(textDecorationStyleToStrokeStyle(decorationStyle));
         if (deco & UNDERLINE) {
             context->setStrokeColor(underline, colorSpace);
-            context->setStrokeStyle(SolidStroke);
             // Leave one pixel of white between the baseline and the underline.
             context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + baseline + 1), width, isPrinting);
+#if ENABLE(CSS3_TEXT)
+            if (decorationStyle == TextDecorationStyleDouble)
+                context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + baseline + 1 + doubleOffset), width, isPrinting);
+#endif // CSS3_TEXT
         }
         if (deco & OVERLINE) {
             context->setStrokeColor(overline, colorSpace);
-            context->setStrokeStyle(SolidStroke);
             context->drawLineForText(localOrigin, width, isPrinting);
+#if ENABLE(CSS3_TEXT)
+            if (decorationStyle == TextDecorationStyleDouble)
+                context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() - doubleOffset), width, isPrinting);
+#endif // CSS3_TEXT
         }
         if (deco & LINE_THROUGH) {
             context->setStrokeColor(linethrough, colorSpace);
-            context->setStrokeStyle(SolidStroke);
             context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + 2 * baseline / 3), width, isPrinting);
+#if ENABLE(CSS3_TEXT)
+            if (decorationStyle == TextDecorationStyleDouble)
+                context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + doubleOffset + 2 * baseline / 3), width, isPrinting);
+#endif // CSS3_TEXT
         }
     } while (shadow);
 
@@ -1321,26 +1391,35 @@ TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, Bu
 
     RenderText* textRenderer = this->textRenderer();
     ASSERT(textRenderer);
-    ASSERT(textRenderer->characters());
+    ASSERT(textRenderer->text());
 
-    return constructTextRun(style, font, textRenderer->characters() + start(), len(), textRenderer->textLength() - start(), charactersWithHyphen);
+    String string = textRenderer->text();
+    unsigned startPos = start();
+    unsigned length = len();
+
+    if (string.length() != length || startPos)
+        string = string.substringSharingImpl(startPos, length);
+
+    return constructTextRun(style, font, string, textRenderer->textLength() - startPos, charactersWithHyphen);
 }
 
-TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, const UChar* characters, int length, int maximumLength, BufferForAppendingHyphen* charactersWithHyphen) const
+TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, String string, int maximumLength, BufferForAppendingHyphen* charactersWithHyphen) const
 {
     ASSERT(style);
 
     RenderText* textRenderer = this->textRenderer();
     ASSERT(textRenderer);
 
+    int length = string.length();
+
     if (charactersWithHyphen) {
-        adjustCharactersAndLengthForHyphen(*charactersWithHyphen, style, characters, length);
+        adjustCharactersAndLengthForHyphen(*charactersWithHyphen, style, string, length);
         maximumLength = length;
     }
 
     ASSERT(maximumLength >= length);
 
-    TextRun run(characters, length, textPos(), expansion(), expansionBehavior(), direction(), dirOverride() || style->rtlOrdering() == VisualOrder, !textRenderer->canUseSimpleFontCodePath());
+    TextRun run(string, textPos(), expansion(), expansionBehavior(), direction(), dirOverride() || style->rtlOrdering() == VisualOrder, !textRenderer->canUseSimpleFontCodePath());
     run.setTabSize(!style->collapseWhiteSpace(), style->tabSize());
     if (textRunNeedsRenderingContext(font))
         run.setRenderingContext(SVGTextRunRenderingContext::create(textRenderer));
@@ -1363,8 +1442,8 @@ void InlineTextBox::showBox(int printedCharacters) const
     const RenderText* obj = toRenderText(renderer());
     String value = obj->text();
     value = value.substring(start(), len());
-    value.replace('\\', "\\\\");
-    value.replace('\n', "\\n");
+    value.replaceWithLiteral('\\', "\\\\");
+    value.replaceWithLiteral('\n', "\\n");
     printedCharacters += fprintf(stderr, "%s\t%p", boxName(), this);
     for (; printedCharacters < showTreeCharacterOffset; printedCharacters++)
         fputc(' ', stderr);
@@ -1376,5 +1455,13 @@ void InlineTextBox::showBox(int printedCharacters) const
 }
 
 #endif
+
+void InlineTextBox::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Rendering);
+    InlineBox::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_prevTextBox, "prevTextBox");
+    info.addMember(m_nextTextBox, "nextTextBox");
+}
 
 } // namespace WebCore

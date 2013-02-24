@@ -32,13 +32,17 @@ namespace WTF {
 ThreadSpecific<WTFThreadData>* WTFThreadData::staticData;
 
 WTFThreadData::WTFThreadData()
-    : m_atomicStringTable(0)
+    : m_apiData(0)
+    , m_atomicStringTable(0)
     , m_atomicStringTableDestructor(0)
 #if USE(JSC)
     , m_defaultIdentifierTable(new JSC::IdentifierTable())
     , m_currentIdentifierTable(m_defaultIdentifierTable)
     , m_stackBounds(StackBounds::currentThreadStackBounds())
+#if ENABLE(STACK_STATS)
+    , m_stackStats()
 #endif
+#endif // USE(JSC)
 {
 }
 

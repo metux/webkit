@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="ch01.html" title="Class Overview">
 <link rel="next" href="WebKitWebView.html" title="WebKitWebView">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -35,7 +35,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitWebContext.top_of_page"></a>WebKitWebContext</span></h2>
-<p>WebKitWebContext</p>
+<p>WebKitWebContext — Manages aspects common to all <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s</p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -43,6 +43,7 @@
 <a name="WebKitWebContext.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">struct              <a class="link" href="WebKitWebContext.html#WebKitWebContext-struct" title="struct WebKitWebContext">WebKitWebContext</a>;
 enum                <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel">WebKitCacheModel</a>;
+enum                <a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy">WebKitTLSErrorsPolicy</a>;
 <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *  <a class="link" href="WebKitWebContext.html#webkit-web-context-get-default" title="webkit_web_context_get_default ()">webkit_web_context_get_default</a>      (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="returnvalue">WebKitCacheModel</span></a>    <a class="link" href="WebKitWebContext.html#webkit-web-context-get-cache-model" title="webkit_web_context_get_cache_model ()">webkit_web_context_get_cache_model</a>  (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()">webkit_web_context_set_cache_model</a>  (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
@@ -51,6 +52,15 @@ enum                <a class="link" href="WebKitWebContext.html#WebKitCacheModel
 <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="returnvalue">WebKitDownload</span></a> *    <a class="link" href="WebKitWebContext.html#webkit-web-context-download-uri" title="webkit_web_context_download_uri ()">webkit_web_context_download_uri</a>     (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
 <a class="link" href="WebKitCookieManager.html" title="WebKitCookieManager"><span class="returnvalue">WebKitCookieManager</span></a> * <a class="link" href="WebKitWebContext.html#webkit-web-context-get-cookie-manager" title="webkit_web_context_get_cookie_manager ()">webkit_web_context_get_cookie_manager</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+<a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="returnvalue">WebKitFaviconDatabase</span></a> * <a class="link" href="WebKitWebContext.html#webkit-web-context-get-favicon-database" title="webkit_web_context_get_favicon_database ()">webkit_web_context_get_favicon_database</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory" title="webkit_web_context_set_favicon_database_directory ()">webkit_web_context_set_favicon_database_directory</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebContext.html#webkit-web-context-get-favicon-database-directory" title="webkit_web_context_get_favicon_database_directory ()">webkit_web_context_get_favicon_database_directory</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+<a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="returnvalue">WebKitSecurityManager</span></a> * <a class="link" href="WebKitWebContext.html#webkit-web-context-get-security-manager" title="webkit_web_context_get_security_manager ()">webkit_web_context_get_security_manager</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-additional-plugins-directory" title="webkit_web_context_set_additional_plugins_directory ()">webkit_web_context_set_additional_plugins_directory</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
@@ -76,6 +86,16 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-preferred-languages" title="webkit_web_context_set_preferred_languages ()">webkit_web_context_set_preferred_languages</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> * const *languages</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-tls-errors-policy" title="webkit_web_context_set_tls_errors_policy ()">webkit_web_context_set_tls_errors_policy</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="type">WebKitTLSErrorsPolicy</span></a> policy</code></em>);
+<a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="returnvalue">WebKitTLSErrorsPolicy</span></a> <a class="link" href="WebKitWebContext.html#webkit-web-context-get-tls-errors-policy" title="webkit_web_context_get_tls_errors_policy ()">webkit_web_context_get_tls_errors_policy</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory" title="webkit_web_context_set_web_extensions_directory ()">webkit_web_context_set_web_extensions_directory</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *directory</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-prefetch-dns" title="webkit_web_context_prefetch_dns ()">webkit_web_context_prefetch_dns</a>     (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *hostname</code></em>);
 
 <span class="returnvalue">void</span>                (<a class="link" href="WebKitWebContext.html#WebKitURISchemeRequestCallback" title="WebKitURISchemeRequestCallback ()">*WebKitURISchemeRequestCallback</a>)   (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);
@@ -103,6 +123,27 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitWebContext.description"></a><h2>Description</h2>
 <p>
+The <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> manages all aspects common to all
+<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s.
+</p>
+<p>
+You can define the <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a> with
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()"><code class="function">webkit_web_context_set_cache_model()</code></a>, depending on the needs of
+your application. You can access the <a class="link" href="WebKitCookieManager.html" title="WebKitCookieManager"><span class="type">WebKitCookieManager</span></a> or the
+<a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="type">WebKitSecurityManager</span></a> to specify the behaviour of your application
+regarding cookies and security, using
+<a class="link" href="WebKitWebContext.html#webkit-web-context-get-cookie-manager" title="webkit_web_context_get_cookie_manager ()"><code class="function">webkit_web_context_get_cookie_manager()</code></a> and
+<a class="link" href="WebKitWebContext.html#webkit-web-context-get-security-manager" title="webkit_web_context_get_security_manager ()"><code class="function">webkit_web_context_get_security_manager()</code></a> for that.
+</p>
+<p>
+It is also possible to change your preferred language or enable
+spell checking, using <a class="link" href="WebKitWebContext.html#webkit-web-context-set-preferred-languages" title="webkit_web_context_set_preferred_languages ()"><code class="function">webkit_web_context_set_preferred_languages()</code></a>,
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-spell-checking-languages" title="webkit_web_context_set_spell_checking_languages ()"><code class="function">webkit_web_context_set_spell_checking_languages()</code></a> and
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-spell-checking-enabled" title="webkit_web_context_set_spell_checking_enabled ()"><code class="function">webkit_web_context_set_spell_checking_enabled()</code></a>.
+</p>
+<p>
+You can use <a class="link" href="WebKitWebContext.html#webkit-web-context-register-uri-scheme" title="webkit_web_context_register_uri_scheme ()"><code class="function">webkit_web_context_register_uri_scheme()</code></a> to register
+custom URI schemes, and manage several other settings.
 </p>
 </div>
 <div class="refsect1">
@@ -154,6 +195,33 @@ Enum values used for determining the <a class="link" href="WebKitWebContext.html
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitTLSErrorsPolicy"></a><h3>enum WebKitTLSErrorsPolicy</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_TLS_ERRORS_POLICY_IGNORE,
+    WEBKIT_TLS_ERRORS_POLICY_FAIL
+} WebKitTLSErrorsPolicy;
+</pre>
+<p>
+Enum values used to denote the TLS errors policy.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS"></a><span class="term"><code class="literal">WEBKIT_TLS_ERRORS_POLICY_IGNORE</code></span></p></td>
+<td>Ignore TLS errors.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS"></a><span class="term"><code class="literal">WEBKIT_TLS_ERRORS_POLICY_FAIL</code></span></p></td>
+<td>TLS errors make the load to finish with an error.
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-web-context-get-default"></a><h3>webkit_web_context_get_default ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *  webkit_web_context_get_default      (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
@@ -163,7 +231,7 @@ Gets the default web context
 <col align="left" valign="top">
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>(transfer none) a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr></tbody>
 </table></div>
@@ -259,7 +327,10 @@ See also <a class="link" href="WebKitWebContext.html#webkit-web-context-set-cach
 <pre class="programlisting"><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="returnvalue">WebKitDownload</span></a> *    webkit_web_context_download_uri     (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
 <p>
-Requests downloading of the specified URI string.
+Requests downloading of the specified URI string. The download operation
+will not be associated to any <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>, if you are interested in
+starting a download from a particular <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> use
+<a class="link" href="WebKitWebView.html#webkit-web-view-download-uri" title="webkit_web_view_download_uri ()"><code class="function">webkit_web_view_download_uri()</code></a> instead.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -301,6 +372,125 @@ Get the <a class="link" href="WebKitCookieManager.html" title="WebKitCookieManag
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the <a class="link" href="WebKitCookieManager.html" title="WebKitCookieManager"><span class="type">WebKitCookieManager</span></a> of <em class="parameter"><code>context</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-get-favicon-database"></a><h3>webkit_web_context_get_favicon_database ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="returnvalue">WebKitFaviconDatabase</span></a> * webkit_web_context_get_favicon_database
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="type">WebKitFaviconDatabase</span></a> associated with <em class="parameter"><code>context</code></em>.
+</p>
+<p>
+To initialize the database you need to call
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory" title="webkit_web_context_set_favicon_database_directory ()"><code class="function">webkit_web_context_set_favicon_database_directory()</code></a>.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the <a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="type">WebKitFaviconDatabase</span></a> of <em class="parameter"><code>context</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-set-favicon-database-directory"></a><h3>webkit_web_context_set_favicon_database_directory ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_context_set_favicon_database_directory
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);</pre>
+<p>
+Set the directory path to be used to store the favicons database
+for <em class="parameter"><code>context</code></em> on disk. Passing <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> as <em class="parameter"><code>path</code></em> means using the
+default directory for the platform (see <a href="../glib/glib-Miscellaneous-Utility-Functions.html#g-get-user-data-dir"><code class="function">g_get_user_data_dir()</code></a>).
+</p>
+<p>
+Calling this method also means enabling the favicons database for
+its use from the applications, so that's why it's expected to be
+called only once. Further calls for the same instance of
+<a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> won't cause any effect.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>path</code></em> :</span></p></td>
+<td>an absolute path to the icon database
+directory or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to use the defaults. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-get-favicon-database-directory"></a><h3>webkit_web_context_get_favicon_database_directory ()</h3>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_context_get_favicon_database_directory
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>
+Get the directory path being used to store the favicons database
+for <em class="parameter"><code>context</code></em>, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory" title="webkit_web_context_set_favicon_database_directory ()"><code class="function">webkit_web_context_set_favicon_database_directory()</code></a> hasn't been
+called yet.
+</p>
+<p>
+This function will always return the same path after having called
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory" title="webkit_web_context_set_favicon_database_directory ()"><code class="function">webkit_web_context_set_favicon_database_directory()</code></a> for the first
+time.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the path of the directory of the favicons
+database associated with <em class="parameter"><code>context</code></em>, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-get-security-manager"></a><h3>webkit_web_context_get_security_manager ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="returnvalue">WebKitSecurityManager</span></a> * webkit_web_context_get_security_manager
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="type">WebKitSecurityManager</span></a> of <em class="parameter"><code>context</code></em>.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the <a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="type">WebKitSecurityManager</span></a> of <em class="parameter"><code>context</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -551,6 +741,105 @@ the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span 
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-web-context-set-tls-errors-policy"></a><h3>webkit_web_context_set_tls_errors_policy ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_context_set_tls_errors_policy
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="type">WebKitTLSErrorsPolicy</span></a> policy</code></em>);</pre>
+<p>
+Set the TLS errors policy of <em class="parameter"><code>context</code></em> as <em class="parameter"><code>policy</code></em>
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>policy</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="type">WebKitTLSErrorsPolicy</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-get-tls-errors-policy"></a><h3>webkit_web_context_get_tls_errors_policy ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="returnvalue">WebKitTLSErrorsPolicy</span></a> webkit_web_context_get_tls_errors_policy
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>
+Get the TLS errors policy of <em class="parameter"><code>context</code></em>
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="type">WebKitTLSErrorsPolicy</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-set-web-extensions-directory"></a><h3>webkit_web_context_set_web_extensions_directory ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_context_set_web_extensions_directory
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *directory</code></em>);</pre>
+<p>
+Set the directory where WebKit will look for Web Extensions.
+This method must be called before loading anything in this context, otherwise
+it will not have any effect.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>directory</code></em> :</span></p></td>
+<td>the directory to add</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-prefetch-dns"></a><h3>webkit_web_context_prefetch_dns ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_context_prefetch_dns     (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *hostname</code></em>);</pre>
+<p>
+Resolve the domain name of the given <em class="parameter"><code>hostname</code></em> in advance, so that if a URI
+of <em class="parameter"><code>hostname</code></em> is requested the load will be performed more quickly.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>hostname</code></em> :</span></p></td>
+<td>a hostname to be resolved</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitURISchemeRequestCallback"></a><h3>WebKitURISchemeRequestCallback ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                (*WebKitURISchemeRequestCallback)   (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
@@ -621,31 +910,31 @@ the request is available.
 23
 24
 25</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="gtkdoc kwb">static void</span>
-<span class="function">about_uri_scheme_request_cb</span> <span class="gtkdoc opt">(</span>WebKitURISchemeRequest <span class="gtkdoc opt">*</span>request<span class="gtkdoc opt">,</span>
-                             gpointer                user_data<span class="gtkdoc opt">)</span>
-<span class="gtkdoc opt">{</span>
-    GInputStream <span class="gtkdoc opt">*</span>stream<span class="gtkdoc opt">;</span>
-    gsize         stream_length<span class="gtkdoc opt">;</span>
-    <span class="gtkdoc kwb">const</span> gchar  <span class="gtkdoc opt">*</span>path<span class="gtkdoc opt">;</span>
+        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span>
+about_uri_scheme_request_cb (WebKitURISchemeRequest *request,
+                             gpointer                user_data)
+{
+    GInputStream *stream;
+    gsize         stream_length;
+    <span class="type">const</span> gchar  *path;
 
-    path <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkit2gtk/WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-path">webkit_uri_scheme_request_get_path</a></span> <span class="gtkdoc opt">(</span>request<span class="gtkdoc opt">);</span>
-    <span class="keyword">if</span> <span class="gtkdoc opt">(!</span><span class="function"><a href="../glib/glib-String-Utility-Functions.html#g-strcmp0">g_strcmp0</a></span> <span class="gtkdoc opt">(</span>path<span class="gtkdoc opt">,</span> <span class="string">&quot;plugins&quot;</span><span class="gtkdoc opt">)) {</span>
-        <span class="comment">/* Create a GInputStream with the contents of plugins about page, and set its length to stream_length */</span>
-    <span class="gtkdoc opt">}</span> <span class="keyword">else if</span> <span class="gtkdoc opt">(!</span><span class="function"><a href="../glib/glib-String-Utility-Functions.html#g-strcmp0">g_strcmp0</a></span> <span class="gtkdoc opt">(</span>path<span class="gtkdoc opt">,</span> <span class="string">&quot;memory&quot;</span><span class="gtkdoc opt">)) {</span>
-        <span class="comment">/* Create a GInputStream with the contents of memory about page, and set its length to stream_length */</span>
-    <span class="gtkdoc opt">}</span> <span class="keyword">else if</span> <span class="gtkdoc opt">(!</span><span class="function"><a href="../glib/glib-String-Utility-Functions.html#g-strcmp0">g_strcmp0</a></span> <span class="gtkdoc opt">(</span>path<span class="gtkdoc opt">,</span> <span class="string">&quot;applications&quot;</span><span class="gtkdoc opt">)) {</span>
-        <span class="comment">/* Create a GInputStream with the contents of applications about page, and set its length to stream_length */</span>
-    <span class="gtkdoc opt">}</span> <span class="keyword">else</span> <span class="gtkdoc opt">{</span>
-        gchar <span class="gtkdoc opt">*</span>contents<span class="gtkdoc opt">;</span>
+    path = webkit_uri_scheme_request_get_path (request);
+    <span class="keyword">if</span> (!g_strcmp0 (path, <span class="number">&quot;plugins&quot;</span>)) {
+        <span class="comment">/*</span><span class="comment"> Create a GInputStream with the contents of plugins about page, and set its length to stream_length </span><span class="comment">*/</span>
+    } <span class="keyword">else</span> <span class="keyword">if</span> (!g_strcmp0 (path, <span class="number">&quot;memory&quot;</span>)) {
+        <span class="comment">/*</span><span class="comment"> Create a GInputStream with the contents of memory about page, and set its length to stream_length </span><span class="comment">*/</span>
+    } <span class="keyword">else</span> <span class="keyword">if</span> (!g_strcmp0 (path, <span class="number">&quot;applications&quot;</span>)) {
+        <span class="comment">/*</span><span class="comment"> Create a GInputStream with the contents of applications about page, and set its length to stream_length </span><span class="comment">*/</span>
+    } <span class="keyword">else</span> {
+        gchar *contents;
 
-        contents <span class="gtkdoc opt">=</span> <span class="function"><a href="../glib/glib-String-Utility-Functions.html#g-strdup-printf">g_strdup_printf</a></span> <span class="gtkdoc opt">(</span><span class="string">&quot;&lt;html&gt;&lt;body&gt;&lt;p&gt;Invalid about:%s page&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;</span><span class="gtkdoc opt">,</span> path<span class="gtkdoc opt">);</span>
-        stream_length <span class="gtkdoc opt">=</span> <span class="function">strlen</span> <span class="gtkdoc opt">(</span>contents<span class="gtkdoc opt">);</span>
-        stream <span class="gtkdoc opt">=</span> <span class="function"><a href="../gio/GMemoryInputStream.html#g-memory-input-stream-new-from-data">g_memory_input_stream_new_from_data</a></span> <span class="gtkdoc opt">(</span>contents<span class="gtkdoc opt">,</span> stream_length<span class="gtkdoc opt">,</span> g_free<span class="gtkdoc opt">);</span>
-    <span class="gtkdoc opt">}</span>
-    <span class="function"><a href="../webkit2gtk/WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish">webkit_uri_scheme_request_finish</a></span> <span class="gtkdoc opt">(</span>request<span class="gtkdoc opt">,</span> stream<span class="gtkdoc opt">,</span> stream_length<span class="gtkdoc opt">,</span> <span class="string">&quot;text/html&quot;</span><span class="gtkdoc opt">);</span>
-    <span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-unref">g_object_unref</a></span> <span class="gtkdoc opt">(</span>stream<span class="gtkdoc opt">);</span>
-<span class="gtkdoc opt">}</span></pre></td>
+        contents = g_strdup_printf (<span class="number">&quot;&lt;html&gt;&lt;body&gt;&lt;p&gt;Invalid about:</span><span class="symbol">%s</span><span class="number"> page&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;</span>, path);
+        stream_length = strlen (contents);
+        stream = g_memory_input_stream_new_from_data (contents, stream_length, g_free);
+    }
+    webkit_uri_scheme_request_finish (request, stream, stream_length, <span class="number">&quot;text/html&quot;</span>);
+    g_object_unref (stream);
+}</pre></td>
       </tr>
     </tbody>
   </table>
@@ -716,6 +1005,6 @@ This signal is emitted when a new download request is made.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

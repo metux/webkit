@@ -46,7 +46,6 @@
 #include "KURL.h"
 #include "NavigationAction.h"
 #include "NotImplemented.h"
-#include "PlatformString.h"
 #include "PopupMenuClient.h"
 #include "PopupMenuGtk.h"
 #include "RefPtrCairo.h"
@@ -72,9 +71,14 @@
 #include <gtk/gtk.h>
 #include <wtf/MathExtras.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 #if ENABLE(SQL_DATABASE)
-#include "DatabaseTracker.h"
+#include "DatabaseManager.h"
+#endif
+
+#if ENABLE(VIDEO) && USE(NATIVE_FULLSCREEN_VIDEO)
+#include "HTMLMediaElement.h"
 #endif
 
 using namespace WebCore;
@@ -138,7 +142,8 @@ void ChromeClient::setWindowRect(const FloatRect& rect)
     GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(m_webView));
     if (widgetIsOnscreenToplevelWindow(window)) {
         gtk_window_move(GTK_WINDOW(window), intrect.x(), intrect.y());
-        gtk_window_resize(GTK_WINDOW(window), intrect.width(), intrect.height());
+        if (!intrect.isEmpty())
+            gtk_window_resize(GTK_WINDOW(window), intrect.width(), intrect.height());
     }
 }
 
@@ -327,7 +332,7 @@ bool ChromeClient::runBeforeUnloadConfirmPanel(const WTF::String& message, WebCo
     return runJavaScriptConfirm(frame, message);
 }
 
-void ChromeClient::addMessageToConsole(WebCore::MessageSource source, WebCore::MessageType type, WebCore::MessageLevel level, const WTF::String& message, unsigned int lineNumber, const WTF::String& sourceId)
+void ChromeClient::addMessageToConsole(WebCore::MessageSource source, WebCore::MessageLevel level, const WTF::String& message, unsigned lineNumber, const WTF::String& sourceId)
 {
     gboolean retval;
     g_signal_emit_by_name(m_webView, "console-message", message.utf8().data(), lineNumber, sourceId.utf8().data(), &retval);
@@ -651,7 +656,7 @@ void ChromeClient::scroll(const IntSize& delta, const IntRect& rectToScroll, con
     AcceleratedCompositingContext* compositingContext = m_webView->priv->acceleratedCompositingContext.get();
     if (compositingContext->enabled()) {
         ASSERT(!rectToScroll.isEmpty());
-        ASSERT(!delta.isEmpty());
+        ASSERT(delta.width() || delta.height());
 
         compositingContext->scrollNonCompositedContents(rectToScroll, delta);
         return;
@@ -786,7 +791,7 @@ void ChromeClient::mouseDidMoveOverElement(const HitTestResult& hit, unsigned mo
     if (Node* node = hit.innerNonSharedNode()) {
         Frame* frame = node->document()->frame();
         FrameView* view = frame ? frame->view() : 0;
-        m_webView->priv->tooltipArea = view ? view->contentsToWindow(node->getPixelSnappedRect()) : IntRect();
+        m_webView->priv->tooltipArea = view ? view->contentsToWindow(node->pixelSnappedBoundingBox()) : IntRect();
     } else
         m_webView->priv->tooltipArea = IntRect();
 }
@@ -809,10 +814,10 @@ void ChromeClient::print(Frame* frame)
 }
 
 #if ENABLE(SQL_DATABASE)
-void ChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseName)
+void ChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseName, DatabaseDetails)
 {
     guint64 defaultQuota = webkit_get_default_web_database_quota();
-    DatabaseTracker::tracker().setQuota(frame->document()->securityOrigin(), defaultQuota);
+    DatabaseManager::manager().setQuota(frame->document()->securityOrigin(), defaultQuota);
 
     WebKitWebFrame* webFrame = kit(frame);
     WebKitSecurityOrigin* origin = webkit_web_frame_get_security_origin(webFrame);
@@ -896,8 +901,7 @@ PassRefPtr<WebCore::SearchPopupMenu> ChromeClient::createSearchPopupMenu(WebCore
     return adoptRef(new SearchPopupMenuGtk(client));
 }
 
-#if ENABLE(VIDEO)
-
+#if ENABLE(VIDEO) && USE(NATIVE_FULLSCREEN_VIDEO)
 bool ChromeClient::supportsFullscreenForNode(const Node* node)
 {
     return node->hasTagName(HTMLNames::videoTag);
@@ -905,12 +909,28 @@ bool ChromeClient::supportsFullscreenForNode(const Node* node)
 
 void ChromeClient::enterFullscreenForNode(Node* node)
 {
-    webViewEnterFullscreen(m_webView, node);
+    if (!node)
+        return;
+
+    HTMLElement* element = static_cast<HTMLElement*>(node);
+    if (element && element->isMediaElement()) {
+        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(element);
+        if (mediaElement->player() && mediaElement->player()->canEnterFullscreen())
+            mediaElement->player()->enterFullscreen();
+    }
 }
 
 void ChromeClient::exitFullscreenForNode(Node* node)
 {
-    webViewExitFullscreen(m_webView);
+    if (!node)
+        return;
+
+    HTMLElement* element = static_cast<HTMLElement*>(node);
+    if (element && element->isMediaElement()) {
+        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(element);
+        if (mediaElement->player())
+            mediaElement->player()->exitFullscreen();
+    }
 }
 #endif
 
@@ -949,6 +969,19 @@ void ChromeClient::enterFullScreenForElement(WebCore::Element* element)
     if (returnValue)
         return;
 
+#if ENABLE(VIDEO) && USE(NATIVE_FULLSCREEN_VIDEO)
+    if (element && element->isMediaElement()) {
+        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(element);
+        if (mediaElement->player() && mediaElement->player()->canEnterFullscreen()) {
+            element->document()->webkitWillEnterFullScreenForElement(element);
+            mediaElement->player()->enterFullscreen();
+            m_fullScreenElement = element;
+            element->document()->webkitDidEnterFullScreenForElement(element);
+        }
+        return;
+    }
+#endif
+
     GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(m_webView));
     if (!widgetIsOnscreenToplevelWindow(window))
         return;
@@ -975,6 +1008,19 @@ void ChromeClient::exitFullScreenForElement(WebCore::Element*)
     g_signal_emit_by_name(m_webView, "leaving-fullscreen", kitElement.get(), &returnValue);
     if (returnValue)
         return;
+
+#if ENABLE(VIDEO) && USE(NATIVE_FULLSCREEN_VIDEO)
+    if (m_fullScreenElement && m_fullScreenElement->isMediaElement()) {
+        m_fullScreenElement->document()->webkitWillExitFullScreenForElement(m_fullScreenElement.get());
+        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(m_fullScreenElement.get());
+        if (mediaElement->player()) {
+            mediaElement->player()->exitFullscreen();
+            m_fullScreenElement->document()->webkitDidExitFullScreenForElement(m_fullScreenElement.get());
+            m_fullScreenElement.clear();
+        }
+        return;
+    }
+#endif
 
     GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(m_webView));
     ASSERT(widgetIsOnscreenToplevelWindow(window));
@@ -1014,7 +1060,7 @@ void ChromeClient::setNeedsOneShotDrawingSynchronization()
     m_webView->priv->acceleratedCompositingContext->scheduleLayerFlush();
 }
 
-void ChromeClient::scheduleCompositingLayerSync()
+void ChromeClient::scheduleCompositingLayerFlush()
 {
     m_webView->priv->acceleratedCompositingContext->scheduleLayerFlush();
 }
@@ -1025,7 +1071,7 @@ ChromeClient::CompositingTriggerFlags ChromeClient::allowedCompositingTriggers()
         return false;
 #if USE(CLUTTER)
     // Currently, we only support CSS 3D Transforms.
-    return ThreeDTransformTrigger;
+    return ThreeDTransformTrigger | AnimationTrigger;
 #else
     return AllTriggers;
 #endif

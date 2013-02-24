@@ -25,7 +25,6 @@
 #include "config.h"
 #include "FormAssociatedElement.h"
 
-#include "ElementShadow.h"
 #include "FormController.h"
 #include "HTMLFormControlElement.h"
 #include "HTMLFormElement.h"
@@ -39,6 +38,7 @@ namespace WebCore {
 using namespace HTMLNames;
 
 class FormAttributeTargetObserver : IdTargetObserver {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<FormAttributeTargetObserver> create(const AtomicString& id, FormAssociatedElement*);
     virtual void idTargetChanged() OVERRIDE;
@@ -65,15 +65,6 @@ ValidityState* FormAssociatedElement::validity()
         m_validityState = ValidityState::create(this);
 
     return m_validityState.get();
-}
-
-ShadowRoot* FormAssociatedElement::ensureUserAgentShadowRoot()
-{
-    Element* element = toHTMLElement(this);
-    if (ShadowRoot* shadowRoot = element->userAgentShadowRoot())
-        return shadowRoot;
-
-    return ShadowRoot::create(element, ShadowRoot::UserAgentShadowRoot, ASSERT_NO_EXCEPTION).get();
 }
 
 void FormAssociatedElement::didMoveToNewDocument(Document* oldDocument)
@@ -188,6 +179,11 @@ bool FormAssociatedElement::customError() const
     return element->willValidate() && !m_customValidationMessage.isEmpty();
 }
 
+bool FormAssociatedElement::hasBadInput() const
+{
+    return false;
+}
+
 bool FormAssociatedElement::patternMismatch() const
 {
     return false;
@@ -221,7 +217,7 @@ bool FormAssociatedElement::typeMismatch() const
 bool FormAssociatedElement::valid() const
 {
     bool someError = typeMismatch() || stepMismatch() || rangeUnderflow() || rangeOverflow()
-        || tooLong() || patternMismatch() || valueMissing() || customError();
+        || tooLong() || patternMismatch() || valueMissing() || hasBadInput() || customError();
     return !someError;
 }
 

@@ -43,7 +43,6 @@ class Frame;
 class Node;
 class RenderObject;
 class RenderStyle;
-class WebKitAnimationList;
 
 class AnimationController {
 public:
@@ -57,7 +56,7 @@ public:
     // This is called when an accelerated animation or transition has actually started to animate.
     void notifyAnimationStarted(RenderObject*, double startTime);
 
-    bool pauseAnimationAtTime(RenderObject*, const String& name, double t); // To be used only for testing
+    bool pauseAnimationAtTime(RenderObject*, const AtomicString& name, double t); // To be used only for testing
     bool pauseTransitionAtTime(RenderObject*, const String& property, double t); // To be used only for testing
     unsigned numberOfActiveAnimations(Document*) const; // To be used only for testing
     
@@ -77,8 +76,6 @@ public:
     void endAnimationUpdate();
     
     static bool supportsAcceleratedAnimationOfProperty(CSSPropertyID);
-
-    PassRefPtr<WebKitAnimationList> animationsForRenderer(RenderObject*) const;
 
 private:
     OwnPtr<AnimationControllerPrivate> m_data;

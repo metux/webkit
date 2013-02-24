@@ -27,136 +27,62 @@
 #include "config.h"
 #include "ContentSelectorQuery.h"
 
-#include "CSSParser.h"
 #include "CSSSelectorList.h"
 #include "InsertionPoint.h"
+#include "SelectorChecker.h"
 #include "ShadowRoot.h"
+#include "SiblingTraversalStrategies.h"
 
 namespace WebCore {
 
-ContentSelectorQuery::ContentSelectorQuery(const InsertionPoint* insertionPoint)
+bool ContentSelectorDataList::checkContentSelector(const CSSSelector* selector, const Vector<RefPtr<Node> >& siblings, int nth)
+{
+    Element* element = toElement(siblings[nth].get());
+    SelectorChecker selectorChecker(element->document(), SelectorChecker::CollectingRules);
+    SelectorChecker::SelectorCheckingContext context(selector, element, SelectorChecker::VisitedMatchEnabled);
+    ShadowDOMSiblingTraversalStrategy strategy(siblings, nth);
+    PseudoId ignoreDynamicPseudo = NOPSEUDO;
+    return selectorChecker.match(context, ignoreDynamicPseudo, strategy) == SelectorChecker::SelectorMatches;
+}
+
+void ContentSelectorDataList::initialize(const CSSSelectorList& selectors)
+{
+    for (const CSSSelector* selector = selectors.first(); selector; selector = CSSSelectorList::next(selector))
+        m_selectors.append(selector);
+}
+
+bool ContentSelectorDataList::matches(const Vector<RefPtr<Node> >& siblings, int nth) const
+{
+    unsigned selectorCount = m_selectors.size();
+    for (unsigned i = 0; i < selectorCount; ++i) {
+        if (checkContentSelector(m_selectors[i], siblings, nth))
+            return true;
+    }
+    return false;
+}
+
+ContentSelectorQuery::ContentSelectorQuery(InsertionPoint* insertionPoint)
     : m_insertionPoint(insertionPoint)
-    , m_selectorChecker(insertionPoint->document(), !insertionPoint->document()->inQuirksMode())
 {
-    m_selectorChecker.setMode(SelectorChecker::CollectingRules);
-
-    if (insertionPoint->select().isNull() || insertionPoint->select().isEmpty()) {
-        m_isValidSelector = true;
-        return;
-    }
-
-    CSSParser parser(insertionPoint->document());
-    parser.parseSelector(insertionPoint->select(), m_selectorList);
-
-    m_isValidSelector = ContentSelectorQuery::validateSelectorList();
-    if (m_isValidSelector)
-        m_selectors.initialize(m_selectorList);
+    m_selectors.initialize(insertionPoint->selectorList());
 }
 
-bool ContentSelectorQuery::isValidSelector() const
+bool ContentSelectorQuery::matches(const Vector<RefPtr<Node> >& siblings, int nth) const
 {
-    return m_isValidSelector;
-}
-
-bool ContentSelectorQuery::matches(Node* node) const
-{
+    Node* node = siblings[nth].get();
     ASSERT(node);
-    if (!node)
-        return false;
 
-    ASSERT(node->parentNode() == m_insertionPoint->shadowRoot()->host());
-
-    if (m_insertionPoint->select().isNull() || m_insertionPoint->select().isEmpty())
+    switch (m_insertionPoint->matchTypeFor(node)) {
+    case InsertionPoint::AlwaysMatches:
         return true;
-
-    if (!m_isValidSelector)
+    case InsertionPoint::NeverMatches:
         return false;
-
-    if (!node->isElementNode())
-        return false;
-
-    return m_selectors.matches(m_selectorChecker, toElement(node));
-}
-
-static bool validateSubSelector(CSSSelector* selector)
-{
-    switch (selector->m_match) {
-    case CSSSelector::None:
-    case CSSSelector::Id:
-    case CSSSelector::Class:
-    case CSSSelector::Exact:
-    case CSSSelector::Set:
-    case CSSSelector::List:
-    case CSSSelector::Hyphen:
-    case CSSSelector::Contain:
-    case CSSSelector::Begin:
-    case CSSSelector::End:
-        return true;
-    case CSSSelector::PseudoElement:
-        return false;
-    case CSSSelector::PagePseudoClass:
-    case CSSSelector::PseudoClass:
-        break;
-    }
-
-    switch (selector->pseudoType()) {
-    case CSSSelector::PseudoEmpty:
-    case CSSSelector::PseudoLink:
-    case CSSSelector::PseudoVisited:
-    case CSSSelector::PseudoTarget:
-    case CSSSelector::PseudoEnabled:
-    case CSSSelector::PseudoDisabled:
-    case CSSSelector::PseudoChecked:
-    case CSSSelector::PseudoIndeterminate:
-    case CSSSelector::PseudoNthChild:
-    case CSSSelector::PseudoNthLastChild:
-    case CSSSelector::PseudoNthOfType:
-    case CSSSelector::PseudoNthLastOfType:
-    case CSSSelector::PseudoFirstChild:
-    case CSSSelector::PseudoLastChild:
-    case CSSSelector::PseudoFirstOfType:
-    case CSSSelector::PseudoLastOfType:
-    case CSSSelector::PseudoOnlyOfType:
-        return true;
+    case InsertionPoint::HasToMatchSelector:
+        return node->isElementNode() && m_selectors.matches(siblings, nth);
     default:
+        ASSERT_NOT_REACHED();
         return false;
     }
-}
-
-static bool validateSelector(CSSSelector* selector)
-{
-    ASSERT(selector);
-
-    if (!validateSubSelector(selector))
-        return false;
-
-    CSSSelector* prevSubSelector = selector;
-    CSSSelector* subSelector = selector->tagHistory();
-
-    while (subSelector) {
-        if (prevSubSelector->relation() != CSSSelector::SubSelector)
-            return false;
-        if (!validateSubSelector(subSelector))
-            return false;
-
-        prevSubSelector = subSelector;
-        subSelector = subSelector->tagHistory();
-    }
-
-    return true;
-}
-
-bool ContentSelectorQuery::validateSelectorList()
-{
-    if (!m_selectorList.first())
-        return false;
-
-    for (CSSSelector* selector = m_selectorList.first(); selector; selector = m_selectorList.next(selector)) {
-        if (!validateSelector(selector))
-            return false;
-    }
-
-    return true;
 }
 
 }

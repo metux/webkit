@@ -35,6 +35,7 @@
 #include "ShareableBitmap.h"
 #include "WebProcessConnectionMessages.h"
 #include <WebCore/RunLoop.h>
+#include <WebCore/SecurityOrigin.h>
 #include <wtf/Noncopyable.h>
 
 namespace CoreIPC {
@@ -60,8 +61,8 @@ public:
     bool initialize(const PluginCreationParameters&);
     void destroy();
 
-    void didReceivePluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncPluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
+    void didReceivePluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    void didReceiveSyncPluginControllerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
 
     bool wantsWheelEvents() const;
 
@@ -136,6 +137,9 @@ private:
     void handleMouseEnterEvent(const WebMouseEvent&, bool& handled);
     void handleMouseLeaveEvent(const WebMouseEvent&, bool& handled);
     void handleKeyboardEvent(const WebKeyboardEvent&, bool& handled);
+    void handleEditingCommand(const String&, const String&, bool&);
+    void isEditingCommandEnabled(const String&, bool&);
+    void handlesPageScaleFactor(bool&);
     void paintEntirePlugin();
     void snapshot(ShareableBitmap::Handle& backingStoreHandle);
     void setFocus(bool);
@@ -152,6 +156,7 @@ private:
     void updateLayerHostingContext(LayerHostingMode);
 #endif
 
+    void storageBlockingStateChanged(bool);
     void privateBrowsingStateChanged(bool);
     void getFormValue(bool& returnValue, String& formValue);
 
@@ -163,6 +168,7 @@ private:
     uint64_t m_pluginInstanceID;
 
     String m_userAgent;
+    bool m_storageBlockingEnabled;
     bool m_isPrivateBrowsingEnabled;
     bool m_isAcceleratedCompositingEnabled;
     bool m_isInitializing;

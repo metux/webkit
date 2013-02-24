@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,7 +55,7 @@ public:
 
 class TextTrack : public TrackBase {
 public:
-    static PassRefPtr<TextTrack> create(ScriptExecutionContext* context, TextTrackClient* client, const String& kind, const String& label, const String& language)
+    static PassRefPtr<TextTrack> create(ScriptExecutionContext* context, TextTrackClient* client, const AtomicString& kind, const AtomicString& label, const AtomicString& language)
     {
         return adoptRef(new TextTrack(context, client, kind, label, language, AddTrack));
     }
@@ -63,28 +64,28 @@ public:
     void setMediaElement(HTMLMediaElement* element) { m_mediaElement = element; }
     HTMLMediaElement* mediaElement() { return m_mediaElement; }
 
-    String kind() const { return m_kind; }
-    void setKind(const String&);
+    AtomicString kind() const { return m_kind; }
+    void setKind(const AtomicString&);
 
     static const AtomicString& subtitlesKeyword();
     static const AtomicString& captionsKeyword();
     static const AtomicString& descriptionsKeyword();
     static const AtomicString& chaptersKeyword();
     static const AtomicString& metadataKeyword();
-    static bool isValidKindKeyword(const String&);
+    static bool isValidKindKeyword(const AtomicString&);
 
-    String label() const { return m_label; }
-    void setLabel(const String& label) { m_label = label; }
+    AtomicString label() const { return m_label; }
+    void setLabel(const AtomicString& label) { m_label = label; }
 
-    String language() const { return m_language; }
-    void setLanguage(const String& language) { m_language = language; }
+    AtomicString language() const { return m_language; }
+    void setLanguage(const AtomicString& language) { m_language = language; }
 
-    enum Mode { DISABLED = 0, HIDDEN = 1, SHOWING = 2 };
-    Mode mode() const;
-    void setMode(unsigned short, ExceptionCode&);
+    static const AtomicString& disabledKeyword();
+    static const AtomicString& hiddenKeyword();
+    static const AtomicString& showingKeyword();
 
-    bool showingByDefault() const { return m_showingByDefault; }
-    void setShowingByDefault(bool showing) { m_showingByDefault = showing; }
+    AtomicString mode() const { return m_mode; }
+    virtual void setMode(const AtomicString&);
 
     enum ReadinessState { NotLoaded = 0, Loading = 1, Loaded = 2, FailedToLoad = 3 };
     ReadinessState readinessState() const { return m_readinessState; }
@@ -93,11 +94,12 @@ public:
     TextTrackCueList* cues();
     TextTrackCueList* activeCues() const;
 
-    virtual void clearClient() { m_client = 0; }
+    void clearClient() { m_client = 0; }
     TextTrackClient* client() { return m_client; }
 
-    void addCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
+    void addCue(PassRefPtr<TextTrackCue>);
     void removeCue(TextTrackCue*, ExceptionCode&);
+    bool hasCue(TextTrackCue*);
 
     void cueWillChange(TextTrackCue*);
     void cueDidChange(TextTrackCue*);
@@ -107,28 +109,40 @@ public:
     enum TextTrackType { TrackElement, AddTrack, InBand };
     TextTrackType trackType() const { return m_trackType; }
 
+    virtual bool isClosedCaptions() const { return false; }
+
     int trackIndex();
     void invalidateTrackIndex();
 
     bool isRendered();
+    int trackIndexRelativeToRenderedTracks();
+
+    bool hasBeenConfigured() const { return m_hasBeenConfigured; }
+    void setHasBeenConfigured(bool flag) { m_hasBeenConfigured = flag; }
+
+    virtual bool isDefault() const { return false; }
+    virtual void setIsDefault(bool) { }
+
+    void removeAllCues();
 
 protected:
-    TextTrack(ScriptExecutionContext*, TextTrackClient*, const String& kind, const String& label, const String& language, TextTrackType);
+    TextTrack(ScriptExecutionContext*, TextTrackClient*, const AtomicString& kind, const AtomicString& label, const AtomicString& language, TextTrackType);
 
     RefPtr<TextTrackCueList> m_cues;
 
 private:
     TextTrackCueList* ensureTextTrackCueList();
     HTMLMediaElement* m_mediaElement;
-    String m_kind;
-    String m_label;
-    String m_language;
-    Mode m_mode;
+    AtomicString m_kind;
+    AtomicString m_label;
+    AtomicString m_language;
+    AtomicString m_mode;
     TextTrackClient* m_client;
     TextTrackType m_trackType;
     ReadinessState m_readinessState;
-    bool m_showingByDefault;
     int m_trackIndex;
+    int m_renderedTrackIndex;
+    bool m_hasBeenConfigured;
 };
 
 } // namespace WebCore

@@ -3,6 +3,7 @@
  *  Copyright (C) 2003, 2004, 2005, 2006, 2008, 2009 Apple Inc. All rights reserved.
  *  Copyright (C) 2007 Samuel Weinig <sam@webkit.org>
  *  Copyright (C) 2009 Google, Inc. All rights reserved.
+ *  Copyright (C) 2012 Ericsson AB. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -32,29 +33,33 @@
 #include "Document.h"
 #include "Element.h"
 #include "MediaList.h"
+#include "ScriptWrappable.h"
 #include "StylePropertySet.h"
 #include "StyledElement.h"
+#include <heap/SlotVisitor.h>
 #include <heap/Weak.h>
 #include <runtime/Error.h>
 #include <runtime/FunctionPrototype.h>
 #include <runtime/JSArray.h>
 #include <runtime/Lookup.h>
 #include <runtime/ObjectPrototype.h>
+#include <runtime/Operations.h>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/NullPtr.h>
 #include <wtf/Vector.h>
+
+namespace JSC {
+
+class HashEntry;
+
+}
 
 namespace WebCore {
 
 class DOMStringList;
 
-enum ParameterDefaultPolicy {
-    DefaultIsUndefined,
-    DefaultIsNullString
-};
-
-#define MAYBE_MISSING_PARAMETER(exec, index, policy) (((policy) == DefaultIsNullString && (index) >= (exec)->argumentCount()) ? (JSValue()) : ((exec)->argument(index)))
-
+    class CachedScript;
     class Frame;
     class KURL;
 
@@ -129,10 +134,32 @@ enum ParameterDefaultPolicy {
         return JSC::jsCast<JSC::JSObject*>(asObject(getDOMStructure<WrapperClass>(exec, JSC::jsCast<JSDOMGlobalObject*>(globalObject))->storedPrototype()));
     }
 
-    // Overload these functions to provide a fast path for wrapper access.
     inline JSDOMWrapper* getInlineCachedWrapper(DOMWrapperWorld*, void*) { return 0; }
-    inline bool setInlineCachedWrapper(DOMWrapperWorld*, void*, JSDOMWrapper*) { return false; }
+    inline bool setInlineCachedWrapper(DOMWrapperWorld*, void*, JSDOMWrapper*, JSC::WeakHandleOwner*, void*) { return false; }
     inline bool clearInlineCachedWrapper(DOMWrapperWorld*, void*, JSDOMWrapper*) { return false; }
+
+    inline JSDOMWrapper* getInlineCachedWrapper(DOMWrapperWorld* world, ScriptWrappable* domObject)
+    {
+        if (!world->isNormal())
+            return 0;
+        return domObject->wrapper();
+    }
+
+    inline bool setInlineCachedWrapper(DOMWrapperWorld* world, ScriptWrappable* domObject, JSDOMWrapper* wrapper, JSC::WeakHandleOwner* wrapperOwner, void* context)
+    {
+        if (!world->isNormal())
+            return false;
+        domObject->setWrapper(*world->globalData(), wrapper, wrapperOwner, context);
+        return true;
+    }
+
+    inline bool clearInlineCachedWrapper(DOMWrapperWorld* world, ScriptWrappable* domObject, JSDOMWrapper* wrapper)
+    {
+        if (!world->isNormal())
+            return false;
+        domObject->clearWrapper(wrapper);
+        return true;
+    }
 
     template <typename DOMClass> inline JSDOMWrapper* getCachedWrapper(DOMWrapperWorld* world, DOMClass* domObject)
     {
@@ -143,9 +170,11 @@ enum ParameterDefaultPolicy {
 
     template <typename DOMClass> inline void cacheWrapper(DOMWrapperWorld* world, DOMClass* domObject, JSDOMWrapper* wrapper)
     {
-        if (setInlineCachedWrapper(world, domObject, wrapper))
+        JSC::WeakHandleOwner* owner = wrapperOwner(world, domObject);
+        void* context = wrapperContext(world, domObject);
+        if (setInlineCachedWrapper(world, domObject, wrapper, owner, context))
             return;
-        JSC::PassWeak<JSDOMWrapper> passWeak(wrapper, wrapperOwner(world, domObject), wrapperContext(world, domObject));
+        JSC::PassWeak<JSDOMWrapper> passWeak(wrapper, owner, context);
         weakAdd(world->m_wrappers, (void*)domObject, passWeak);
     }
 
@@ -182,8 +211,8 @@ enum ParameterDefaultPolicy {
         if (node->inDocument())
             return node->document();
 
-        while (node->parentOrHostNode())
-            node = node->parentOrHostNode();
+        while (node->parentOrShadowHostNode())
+            node = node->parentOrShadowHostNode();
         return node;
     }
 
@@ -225,20 +254,24 @@ enum ParameterDefaultPolicy {
         return mediaList;
     }
 
+    inline JSC::JSValue argumentOrNull(JSC::ExecState* exec, unsigned index)
+    {
+        return index >= exec->argumentCount() ? JSC::JSValue() : exec->argument(index);
+    }
+
     const JSC::HashTable* getHashTableForGlobalData(JSC::JSGlobalData&, const JSC::HashTable* staticTable);
 
-    void reportException(JSC::ExecState*, JSC::JSValue exception);
+    void reportException(JSC::ExecState*, JSC::JSValue exception, CachedScript* = 0);
     void reportCurrentException(JSC::ExecState*);
 
     // Convert a DOM implementation exception code into a JavaScript exception in the execution state.
     void setDOMException(JSC::ExecState*, ExceptionCode);
 
-    JSC::JSValue jsString(JSC::ExecState*, const String&); // empty if the string is null
-    JSC::JSValue jsStringSlowCase(JSC::ExecState*, JSStringCache&, StringImpl*);
+    JSC::JSValue jsStringWithCache(JSC::ExecState*, const String&);
     JSC::JSValue jsString(JSC::ExecState*, const KURL&); // empty if the URL is null
-    inline JSC::JSValue jsString(JSC::ExecState* exec, const AtomicString& s)
+    inline JSC::JSValue jsStringWithCache(JSC::ExecState* exec, const AtomicString& s)
     { 
-        return jsString(exec, s.string());
+        return jsStringWithCache(exec, s.string());
     }
         
     JSC::JSValue jsStringOrNull(JSC::ExecState*, const String&); // null if the string is null
@@ -252,11 +285,8 @@ enum ParameterDefaultPolicy {
     JSC::JSValue jsOwnedStringOrNull(JSC::ExecState*, const String&); 
 
     String propertyNameToString(JSC::PropertyName);
-    String ustringToString(const JSC::UString&);
-    JSC::UString stringToUString(const String&);
 
     AtomicString propertyNameToAtomicString(JSC::PropertyName);
-    AtomicString ustringToAtomicString(const JSC::UString&);
     AtomicStringImpl* findAtomicString(JSC::PropertyName);
 
     String valueToStringWithNullCheck(JSC::ExecState*, JSC::JSValue); // null if the value is null
@@ -265,7 +295,7 @@ enum ParameterDefaultPolicy {
     inline int32_t finiteInt32Value(JSC::JSValue value, JSC::ExecState* exec, bool& okay)
     {
         double number = value.toNumber(exec);
-        okay = isfinite(number);
+        okay = std::isfinite(number);
         return JSC::toInt32(number);
     }
 
@@ -317,7 +347,7 @@ enum ParameterDefaultPolicy {
     struct JSValueTraits<String> {
         static inline JSC::JSValue arrayJSValue(JSC::ExecState* exec, JSDOMGlobalObject*, const String& value)
         {
-            return jsString(exec, stringToUString(value));
+            return jsStringWithCache(exec, value);
         }
     };
 
@@ -347,7 +377,7 @@ enum ParameterDefaultPolicy {
         for (typename Vector<T, inlineCapacity>::const_iterator iter = iterator.begin(); iter != end; ++iter)
             list.append(TraitsType::arrayJSValue(exec, globalObject, *iter));
 
-        return JSC::constructArray(exec, globalObject, list);
+        return JSC::constructArray(exec, 0, globalObject, list);
     }
 
     JSC::JSValue jsArray(JSC::ExecState*, JSDOMGlobalObject*, PassRefPtr<DOMStringList>);
@@ -356,16 +386,16 @@ enum ParameterDefaultPolicy {
 
     template<>
     struct NativeValueTraits<String> {
-        static inline bool arrayNativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, String& indexedValue)
+        static inline bool nativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, String& indexedValue)
         {
-            indexedValue = ustringToString(jsValue.toString(exec)->value(exec));
+            indexedValue = jsValue.toString(exec)->value(exec);
             return true;
         }
     };
 
     template<>
-    struct NativeValueTraits<unsigned long> {
-        static inline bool arrayNativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, unsigned long& indexedValue)
+    struct NativeValueTraits<unsigned> {
+        static inline bool nativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, unsigned& indexedValue)
         {
             if (!jsValue.isNumber())
                 return false;
@@ -377,6 +407,35 @@ enum ParameterDefaultPolicy {
             return true;
         }
     };
+
+    template<>
+    struct NativeValueTraits<float> {
+        static inline bool nativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, float& indexedValue)
+        {
+            indexedValue = jsValue.toFloat(exec);
+            return !exec->hadException();
+        }
+    };
+
+    template <class T, class JST>
+    Vector<RefPtr<T> > toRefPtrNativeArray(JSC::ExecState* exec, JSC::JSValue value, T* (*toT)(JSC::JSValue value))
+    {
+        if (!isJSArray(value))
+            return Vector<RefPtr<T> >();
+
+        Vector<RefPtr<T> > result;
+        JSC::JSArray* array = asArray(value);
+        for (size_t i = 0; i < array->length(); ++i) {
+            JSC::JSValue element = array->getIndex(exec, i);
+            if (element.inherits(&JST::s_info))
+                result.append((*toT)(element));
+            else {
+                throwVMError(exec, createTypeError(exec, "Invalid Array element type"));
+                return Vector<RefPtr<T> >();
+            }
+        }
+        return result;
+    }
 
     template <class T>
     Vector<T> toNativeArray(JSC::ExecState* exec, JSC::JSValue value)
@@ -394,7 +453,25 @@ enum ParameterDefaultPolicy {
 
         for (unsigned i = 0; i < length; ++i) {
             T indexValue;
-            if (!TraitsType::arrayNativeValue(exec, object->get(exec, i), indexValue))
+            if (!TraitsType::nativeValue(exec, object->get(exec, i), indexValue))
+                return Vector<T>();
+            result.append(indexValue);
+        }
+        return result;
+    }
+
+    template <class T>
+    Vector<T> toNativeArguments(JSC::ExecState* exec, size_t startIndex = 0)
+    {
+        size_t length = exec->argumentCount();
+        ASSERT(startIndex <= length);
+
+        Vector<T> result;
+        typedef NativeValueTraits<T> TraitsType;
+
+        for (size_t i = startIndex; i < length; ++i) {
+            T indexValue;
+            if (!TraitsType::nativeValue(exec, exec->argument(i), indexValue))
                 return Vector<T>();
             result.append(indexValue);
         }
@@ -409,30 +486,25 @@ enum ParameterDefaultPolicy {
     void printErrorMessageForFrame(Frame*, const String& message);
     JSC::JSValue objectToStringFunctionGetter(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
 
-    inline JSC::JSValue jsString(JSC::ExecState* exec, const String& s)
+    inline JSC::JSValue jsStringWithCache(JSC::ExecState* exec, const String& s)
     {
         StringImpl* stringImpl = s.impl();
         if (!stringImpl || !stringImpl->length())
             return jsEmptyString(exec);
 
-        if (stringImpl->length() == 1 && stringImpl->characters()[0] <= 0xFF)
-            return jsString(exec, stringToUString(s));
+        if (stringImpl->length() == 1) {
+            UChar singleCharacter = (*stringImpl)[0u];
+            if (singleCharacter <= JSC::maxSingleCharacterString) {
+                JSC::JSGlobalData* globalData = &exec->globalData();
+                return globalData->smallStrings.singleCharacterString(globalData, static_cast<unsigned char>(singleCharacter));
+            }
+        }
 
         JSStringCache& stringCache = currentWorld(exec)->m_stringCache;
-        if (JSC::JSString* string = stringCache.get(stringImpl))
-            return string;
-
-        return jsStringSlowCase(exec, stringCache, stringImpl);
-    }
-
-    inline String ustringToString(const JSC::UString& u)
-    {
-        return u.impl();
-    }
-
-    inline JSC::UString stringToUString(const String& s)
-    {
-        return JSC::UString(s.impl());
+        JSStringCache::AddResult addResult = stringCache.add(stringImpl, nullptr);
+        if (addResult.isNewEntry)
+            addResult.iterator->value = JSC::jsString(exec, String(stringImpl));
+        return JSC::JSValue(addResult.iterator->value.get());
     }
 
     inline String propertyNameToString(JSC::PropertyName propertyName)
@@ -440,14 +512,24 @@ enum ParameterDefaultPolicy {
         return propertyName.publicName();
     }
 
-    inline AtomicString ustringToAtomicString(const JSC::UString& u)
-    {
-        return AtomicString(u.impl());
-    }
-
     inline AtomicString propertyNameToAtomicString(JSC::PropertyName propertyName)
     {
         return AtomicString(propertyName.publicName());
+    }
+
+    template <class ThisImp>
+    inline const JSC::HashEntry* getStaticValueSlotEntryWithoutCaching(JSC::ExecState* exec, JSC::PropertyName propertyName)
+    {
+        const JSC::HashEntry* entry = ThisImp::s_info.propHashTable(exec)->entry(exec, propertyName);
+        if (!entry) // not found, forward to parent
+            return getStaticValueSlotEntryWithoutCaching<typename ThisImp::Base>(exec, propertyName);
+        return entry;
+    }
+
+    template <>
+    inline const JSC::HashEntry* getStaticValueSlotEntryWithoutCaching<JSDOMWrapper>(JSC::ExecState*, JSC::PropertyName)
+    {
+        return 0;
     }
 
 } // namespace WebCore

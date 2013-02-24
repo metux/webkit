@@ -30,7 +30,7 @@ namespace WebCore {
 
 SVGTextMetricsBuilder::SVGTextMetricsBuilder()
     : m_text(0)
-    , m_run(0, 0)
+    , m_run(static_cast<const UChar*>(0), 0)
     , m_textPosition(0)
     , m_isComplexText(false)
     , m_totalWidth(0)
@@ -58,14 +58,12 @@ bool SVGTextMetricsBuilder::advance()
 
 void SVGTextMetricsBuilder::advanceSimpleText()
 {
-    unsigned metricsLength = m_simpleWidthIterator->advance(m_textPosition + 1);
+    GlyphBuffer glyphBuffer;
+    unsigned metricsLength = m_simpleWidthIterator->advance(m_textPosition + 1, &glyphBuffer);
     if (!metricsLength) {
         m_currentMetrics = SVGTextMetrics();
         return;
     }
-
-    if (currentCharacterStartsSurrogatePair())
-        ASSERT(metricsLength == 2);
 
     float currentWidth = m_simpleWidthIterator->runWidthSoFar() - m_totalWidth;
     m_totalWidth = m_simpleWidthIterator->runWidthSoFar();
@@ -148,7 +146,7 @@ void SVGTextMetricsBuilder::measureTextRenderer(RenderSVGInlineText* text, Measu
     int surrogatePairCharacters = 0;
 
     while (advance()) {
-        const UChar* currentCharacter = m_run.data(m_textPosition);
+        const UChar* currentCharacter = m_run.data16(m_textPosition);
         if (*currentCharacter == ' ' && !preserveWhiteSpace && (!data->lastCharacter || *data->lastCharacter == ' ')) {
             if (data->processRenderer)
                 textMetricsValues->append(SVGTextMetrics(SVGTextMetrics::SkippedSpaceMetrics));
@@ -161,7 +159,7 @@ void SVGTextMetricsBuilder::measureTextRenderer(RenderSVGInlineText* text, Measu
             if (data->allCharactersMap) {
                 const SVGCharacterDataMap::const_iterator it = data->allCharactersMap->find(data->valueListPosition + m_textPosition - data->skippedCharacters - surrogatePairCharacters + 1);
                 if (it != data->allCharactersMap->end())
-                    attributes->characterDataMap().set(m_textPosition + 1, it->second);
+                    attributes->characterDataMap().set(m_textPosition + 1, it->value);
             }
             textMetricsValues->append(m_currentMetrics);
         }

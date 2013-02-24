@@ -33,6 +33,45 @@
  */
 (function (InjectedScriptHost, inspectedWindow, injectedScriptId) {
 
+// Protect against Object overwritten by the user code.
+var Object = {}.constructor;
+
+/**
+ * @param {Arguments} array
+ * @param {number=} index
+ * @return {Array.<*>}
+ */
+function slice(array, index)
+{
+    var result = [];
+    for (var i = index || 0; i < array.length; ++i)
+        result.push(array[i]);
+    return result;
+}
+
+/**
+ * Please use this bind, not the one from Function.prototype
+ * @param {function(...)} func
+ * @param {Object} thisObject
+ * @param {...number} var_args
+ */
+function bind(func, thisObject, var_args)
+{
+    var args = slice(arguments, 2);
+
+    /**
+     * @param {...number} var_args
+     */
+    function bound(var_args)
+    {
+        return func.apply(thisObject, args.concat(slice(arguments)));
+    }
+    bound.toString = function() {
+        return "bound: " + func;
+    };
+    return bound;
+}
+
 /**
  * @constructor
  */
@@ -72,20 +111,49 @@ InjectedScript.prototype = {
      * @param {string} groupName
      * @param {boolean} canAccessInspectedWindow
      * @param {boolean} generatePreview
-     * @return {Object}
+     * @return {!RuntimeAgent.RemoteObject}
      */
     wrapObject: function(object, groupName, canAccessInspectedWindow, generatePreview)
     {
         if (canAccessInspectedWindow)
             return this._wrapObject(object, groupName, false, generatePreview);
+        return this._fallbackWrapper(object);
+    },
 
+    /**
+     * @param {*} object
+     * @return {!RuntimeAgent.RemoteObject}
+     */
+    _fallbackWrapper: function(object)
+    {
         var result = {};
         result.type = typeof object;
         if (this.isPrimitiveValue(object))
             result.value = object;
         else
             result.description = this._toString(object);
-        return result;
+        return /** @type {!RuntimeAgent.RemoteObject} */ (result);
+    },
+
+    /**
+     * @param {boolean} canAccessInspectedWindow
+     * @param {Object} table
+     * @param {Array.<string>|string|boolean} columns
+     * @return {!RuntimeAgent.RemoteObject}
+     */
+    wrapTable: function(canAccessInspectedWindow, table, columns)
+    {
+        if (!canAccessInspectedWindow)
+            return this._fallbackWrapper(table);
+        var columnNames = null;
+        if (typeof columns === "string")
+            columns = [columns];
+        if (InjectedScriptHost.type(columns) == "array") {
+            columnNames = [];
+            for (var i = 0; i < columns.length; ++i)
+                columnNames.push(String(columns[i]));
+        }
+        return this._wrapObject(table, "console", false, true, columnNames);
     },
 
     /**
@@ -130,12 +198,14 @@ InjectedScript.prototype = {
      * @param {string=} objectGroupName
      * @param {boolean=} forceValueType
      * @param {boolean=} generatePreview
-     * @return {InjectedScript.RemoteObject}
+     * @param {?Array.<string>=} columnNames
+     * @return {!RuntimeAgent.RemoteObject}
+     * @suppress {checkTypes}
      */
-    _wrapObject: function(object, objectGroupName, forceValueType, generatePreview)
+    _wrapObject: function(object, objectGroupName, forceValueType, generatePreview, columnNames)
     {
         try {
-            return new InjectedScript.RemoteObject(object, objectGroupName, forceValueType, generatePreview);
+            return new InjectedScript.RemoteObject(object, objectGroupName, forceValueType, generatePreview, columnNames);
         } catch (e) {
             try {
                 var description = injectedScript._describe(e);
@@ -170,7 +240,7 @@ InjectedScript.prototype = {
 
     /**
      * @param {string} objectId
-     * @return {*}
+     * @return {Object}
      */
     _parseObjectId: function(objectId)
     {
@@ -209,7 +279,7 @@ InjectedScript.prototype = {
     /**
      * @param {string} objectId
      * @param {boolean} ownProperties
-     * @return {Array.<Object>|boolean}
+     * @return {Array.<RuntimeAgent.PropertyDescriptor>|boolean}
      */
     getProperties: function(objectId, ownProperties)
     {
@@ -222,12 +292,6 @@ InjectedScript.prototype = {
         var descriptors = this._propertyDescriptors(object, ownProperties);
 
         // Go over properties, wrap object values.
-        if (descriptors.length === 0 && "arguments" in object) {
-            // Fill in JSC scope object.
-            for (var key in object)
-                descriptors.push({ name: key, value: object[key], writable: false, configurable: false, enumerable: true});
-        }
-
         for (var i = 0; i < descriptors.length; ++i) {
             var descriptor = descriptors[i];
             if ("get" in descriptor)
@@ -240,14 +304,39 @@ InjectedScript.prototype = {
                 descriptor.configurable = false;
             if (!("enumerable" in descriptor))
                 descriptor.enumerable = false;
-            
+        }
+        return descriptors;
+    },
+
+    /**
+     * @param {string} objectId
+     * @return {Array.<Object>|boolean}
+     */
+    getInternalProperties: function(objectId, ownProperties)
+    {
+        var parsedObjectId = this._parseObjectId(objectId);
+        var object = this._objectForId(parsedObjectId);
+        var objectGroupName = this._idToObjectGroupName[parsedObjectId.id];
+        if (!this._isDefined(object))
+            return false;
+        var descriptors = [];
+        var internalProperties = InjectedScriptHost.getInternalProperties(object);
+        if (internalProperties) {
+            for (var i = 0; i < internalProperties.length; i++) {
+                var property = internalProperties[i];
+                var descriptor = {
+                    name: property.name,
+                    value: this._wrapObject(property.value, objectGroupName)
+                };
+                descriptors.push(descriptor);
+            } 
         }
         return descriptors;
     },
 
     /**
      * @param {string} functionId
-     * @return {Object|string}
+     * @return {!DebuggerAgent.FunctionDetails|string}
      */
     getFunctionDetails: function(functionId)
     {
@@ -309,7 +398,10 @@ InjectedScript.prototype = {
                     if (!descriptor) {
                         // Not all bindings provide proper descriptors. Fall back to the writable, configurable property.
                         try {
-                            descriptors.push({ name: name, value: object[name], writable: false, configurable: false, enumerable: false});
+                            descriptor = { name: name, value: object[name], writable: false, configurable: false, enumerable: false};
+                            if (o === object) 
+                                descriptor.isOwn = true;
+                            descriptors.push(descriptor);
                         } catch (e) {
                             // Silent catch.
                         }
@@ -322,11 +414,13 @@ InjectedScript.prototype = {
                 }
 
                 descriptor.name = name;
-                descriptors.push(descriptor); 
+                if (o === object) 
+                    descriptor.isOwn = true;
+                descriptors.push(descriptor);
             }
             if (ownProperties) {
                 if (object.__proto__)
-                    descriptors.push({ name: "__proto__", value: object.__proto__, writable: true, configurable: true, enumerable: false});
+                    descriptors.push({ name: "__proto__", value: object.__proto__, writable: true, configurable: true, enumerable: false, isOwn: true});
                 break;
             }
         }
@@ -338,11 +432,12 @@ InjectedScript.prototype = {
      * @param {string} objectGroup
      * @param {boolean} injectCommandLineAPI
      * @param {boolean} returnByValue
+     * @param {boolean} generatePreview
      * @return {*}
      */
-    evaluate: function(expression, objectGroup, injectCommandLineAPI, returnByValue)
+    evaluate: function(expression, objectGroup, injectCommandLineAPI, returnByValue, generatePreview)
     {
-        return this._evaluateAndWrap(InjectedScriptHost.evaluate, InjectedScriptHost, expression, objectGroup, false, injectCommandLineAPI, returnByValue);
+        return this._evaluateAndWrap(InjectedScriptHost.evaluate, InjectedScriptHost, expression, objectGroup, false, injectCommandLineAPI, returnByValue, generatePreview);
     },
 
     /**
@@ -362,21 +457,13 @@ InjectedScript.prototype = {
             var resolvedArgs = [];
             args = InjectedScriptHost.evaluate(args);
             for (var i = 0; i < args.length; ++i) {
-                objectId = args[i].objectId;
-                if (objectId) {
-                    var parsedArgId = this._parseObjectId(objectId);
-                    if (!parsedArgId || parsedArgId.injectedScriptId !== injectedScriptId)
-                        return "Arguments should belong to the same JavaScript world as the target object.";
-
-                    var resolvedArg = this._objectForId(parsedArgId);
-                    if (!this._isDefined(resolvedArg))
-                        return "Could not find object with given id";
-
-                    resolvedArgs.push(resolvedArg);
-                } else if ("value" in args[i])
-                    resolvedArgs.push(args[i].value);
-                else
-                    resolvedArgs.push(undefined);
+                var resolvedCallArgument;
+                try {
+                    resolvedCallArgument = this._resolveCallArgument(args[i]);
+                } catch (e) {
+                    return String(e);
+                }
+                resolvedArgs.push(resolvedCallArgument)
             }
         }
 
@@ -392,6 +479,30 @@ InjectedScript.prototype = {
             return this._createThrownValue(e, objectGroup);
         }
     },
+    
+    /**
+     * Resolves a value from CallArgument description.
+     * @param {RuntimeAgent.CallArgument} callArgumentJson
+     * @return {*} resolved value
+     * @throw {string} error message
+     */
+    _resolveCallArgument: function(callArgumentJson) {
+        var objectId = callArgumentJson.objectId;
+        if (objectId) {
+            var parsedArgId = this._parseObjectId(objectId);
+            if (!parsedArgId || parsedArgId["injectedScriptId"] !== injectedScriptId)
+                throw "Arguments should belong to the same JavaScript world as the target object.";
+
+            var resolvedArg = this._objectForId(parsedArgId);
+            if (!this._isDefined(resolvedArg))
+                throw "Could not find object with given id";
+
+            return resolvedArg;
+        } else if ("value" in callArgumentJson)
+            return callArgumentJson.value;
+        else
+            return undefined;
+    },
 
     /**
      * @param {Function} evalFunction
@@ -400,13 +511,14 @@ InjectedScript.prototype = {
      * @param {boolean} isEvalOnCallFrame
      * @param {boolean} injectCommandLineAPI
      * @param {boolean} returnByValue
+     * @param {boolean} generatePreview
      * @return {*}
      */
-    _evaluateAndWrap: function(evalFunction, object, expression, objectGroup, isEvalOnCallFrame, injectCommandLineAPI, returnByValue)
+    _evaluateAndWrap: function(evalFunction, object, expression, objectGroup, isEvalOnCallFrame, injectCommandLineAPI, returnByValue, generatePreview)
     {
         try {
             return { wasThrown: false,
-                     result: this._wrapObject(this._evaluateOn(evalFunction, object, objectGroup, expression, isEvalOnCallFrame, injectCommandLineAPI), objectGroup, returnByValue, false) };
+                     result: this._wrapObject(this._evaluateOn(evalFunction, object, objectGroup, expression, isEvalOnCallFrame, injectCommandLineAPI), objectGroup, returnByValue, generatePreview) };
         } catch (e) {
             return this._createThrownValue(e, objectGroup);
         }
@@ -482,14 +594,15 @@ InjectedScript.prototype = {
      * @param {string} objectGroup
      * @param {boolean} injectCommandLineAPI
      * @param {boolean} returnByValue
+     * @param {boolean} generatePreview
      * @return {*}
      */
-    evaluateOnCallFrame: function(topCallFrame, callFrameId, expression, objectGroup, injectCommandLineAPI, returnByValue)
+    evaluateOnCallFrame: function(topCallFrame, callFrameId, expression, objectGroup, injectCommandLineAPI, returnByValue, generatePreview)
     {
         var callFrame = this._callFrameForId(topCallFrame, callFrameId);
         if (!callFrame)
             return "Could not find call frame with given id";
-        return this._evaluateAndWrap(callFrame.evaluate, callFrame, expression, objectGroup, true, injectCommandLineAPI, returnByValue);
+        return this._evaluateAndWrap(callFrame.evaluate, callFrame, expression, objectGroup, true, injectCommandLineAPI, returnByValue, generatePreview);
     },
 
     /**
@@ -506,6 +619,51 @@ InjectedScript.prototype = {
         if (result === false)
             result = "Restart frame is not supported"; 
         return result;
+    },
+
+    /**
+     * Either callFrameId or functionObjectId must be specified.
+     * @param {Object} topCallFrame
+     * @param {string|boolean} callFrameId or false
+     * @param {string|boolean} functionObjectId or false
+     * @param {number} scopeNumber
+     * @param {string} variableName
+     * @param {string} newValueJsonString RuntimeAgent.CallArgument structure serialized as string 
+     * @return {string|undefined} undefined if success or an error message 
+     */
+    setVariableValue: function(topCallFrame, callFrameId, functionObjectId, scopeNumber, variableName, newValueJsonString)
+    {   
+        var setter;
+        if (typeof callFrameId === "string") {
+            var callFrame = this._callFrameForId(topCallFrame, callFrameId);
+            if (!callFrame)
+                return "Could not find call frame with given id";
+            setter = callFrame.setVariableValue.bind(callFrame);    
+        } else {
+            var parsedFunctionId = this._parseObjectId(/** @type {string} */(functionObjectId));
+            var func = this._objectForId(parsedFunctionId);
+            if (typeof func !== "function")
+                return "Cannot resolve function by id.";
+            setter = InjectedScriptHost.setFunctionVariableValue.bind(InjectedScriptHost, func); 
+        }
+        var newValueJson;
+        try {
+            newValueJson = InjectedScriptHost.evaluate("(" + newValueJsonString + ")");
+        } catch (e) {
+            return "Failed to parse new value JSON " + newValueJsonString + " : " + e;
+        }
+        var resolvedValue;
+        try {
+            resolvedValue = this._resolveCallArgument(newValueJson);
+        } catch (e) {
+            return String(e);
+        }
+        try {
+            setter(scopeNumber, variableName, resolvedValue);
+        } catch (e) {
+            return "Failed to change variable value: " + e;
+        }
+        return undefined;
     },
 
     /**
@@ -551,7 +709,7 @@ InjectedScript.prototype = {
         var object = this.findObjectById(objectId);
         if (!object || this._subtype(object) !== "node")
             return null;
-        return object;
+        return /** @type {Node} */ (object);
     },
 
     /**
@@ -587,7 +745,7 @@ InjectedScript.prototype = {
      */
     _isDefined: function(object)
     {
-        return object || this._isHTMLAllCollection(object);
+        return !!object || this._isHTMLAllCollection(object);
     },
 
     /**
@@ -609,7 +767,6 @@ InjectedScript.prototype = {
         if (obj === null)
             return "null";
 
-        var type = typeof obj;
         if (this.isPrimitiveValue(obj))
             return null;
 
@@ -642,6 +799,8 @@ InjectedScript.prototype = {
         if (this.isPrimitiveValue(obj))
             return null;
 
+        obj = /** @type {Object} */ (obj);
+
         // Type is object, get subtype.
         var subtype = this._subtype(obj);
 
@@ -655,7 +814,9 @@ InjectedScript.prototype = {
             var description = obj.nodeName.toLowerCase();
             switch (obj.nodeType) {
             case 1 /* Node.ELEMENT_NODE */:
-                description =  "<" + description + ">";
+                description += obj.id ? "#" + obj.id : "";
+                var className = obj.className;
+                description += className ? "." + className : "";
                 break;
             case 10 /*Node.DOCUMENT_TYPE_NODE */:
                 description = "<!DOCTYPE " + description + ">";
@@ -708,8 +869,9 @@ var injectedScript = new InjectedScript();
  * @param {string=} objectGroupName
  * @param {boolean=} forceValueType
  * @param {boolean=} generatePreview
+ * @param {?Array.<string>=} columnNames
  */
-InjectedScript.RemoteObject = function(object, objectGroupName, forceValueType, generatePreview)
+InjectedScript.RemoteObject = function(object, objectGroupName, forceValueType, generatePreview, columnNames)
 {
     this.type = typeof object;
     if (injectedScript.isPrimitiveValue(object) || object === null || forceValueType) {
@@ -727,6 +889,8 @@ InjectedScript.RemoteObject = function(object, objectGroupName, forceValueType, 
         return;
     }
 
+    object = /** @type {Object} */ (object);
+
     this.objectId = injectedScript._bind(object, objectGroupName);
     var subtype = injectedScript._subtype(object);
     if (subtype)
@@ -735,36 +899,57 @@ InjectedScript.RemoteObject = function(object, objectGroupName, forceValueType, 
     this.description = injectedScript._describe(object);
 
     if (generatePreview && (this.type === "object" || injectedScript._isHTMLAllCollection(object)))
-        this._generatePreview(/** @type {!Object} */ object);
+        this.preview = this._generatePreview(object, undefined, columnNames);
 }
 
 InjectedScript.RemoteObject.prototype = {
     /**
-     * @param {!Object} object
+     * @param {Object} object
+     * @param {Array.<string>=} firstLevelKeys
+     * @param {?Array.<string>=} secondLevelKeys
+     * @return {Object} preview
      */
-    _generatePreview: function(object)
+    _generatePreview: function(object, firstLevelKeys, secondLevelKeys)
     {
         var preview = {};
-        var isArray = this.subtype === "array";
-        var elementsToDump = isArray ? 100 : 5;
-  
-        var propertyNames = Object.getOwnPropertyNames(object);
         preview.lossless = true;
         preview.overflow = false;
-        var properties = preview.properties = [];
+        preview.properties = [];
 
+        var isTableRowsRequest = secondLevelKeys === null || secondLevelKeys;
+        var firstLevelKeysCount = firstLevelKeys ? firstLevelKeys.length : 0;
+
+        var propertiesThreshold = {
+            properties: isTableRowsRequest ? 1000 : Math.max(5, firstLevelKeysCount),
+            indexes: isTableRowsRequest ? 1000 : Math.max(100, firstLevelKeysCount)
+        };
+        for (var o = object; injectedScript._isDefined(o); o = o.__proto__)
+            this._generateProtoPreview(o, preview, propertiesThreshold, firstLevelKeys, secondLevelKeys);
+        return preview;
+    },
+
+    /**
+     * @param {Object} object
+     * @param {Object} preview
+     * @param {Object} propertiesThreshold
+     * @param {Array.<string>=} firstLevelKeys
+     * @param {Array.<string>=} secondLevelKeys
+     */
+    _generateProtoPreview: function(object, preview, propertiesThreshold, firstLevelKeys, secondLevelKeys)
+    {
+        var propertyNames = firstLevelKeys ? firstLevelKeys : Object.keys(/** @type {!Object} */(object));
         try {
             for (var i = 0; i < propertyNames.length; ++i) {
-                if (properties.length >= elementsToDump) {
+                if (!propertiesThreshold.properties || !propertiesThreshold.indexes) {
                     preview.overflow = true;
                     preview.lossless = false;
                     break;
                 }
                 var name = propertyNames[i];
-                if (isArray && name === "length")
+                if (this.subtype === "array" && name === "length")
                     continue;
 
-                var descriptor = Object.getOwnPropertyDescriptor(object, name);
+                var descriptor = Object.getOwnPropertyDescriptor(/** @type {!Object} */(object), name);
                 if (!("value" in descriptor) || !descriptor.enumerable) {
                     preview.lossless = false;
                     continue;
@@ -772,7 +957,7 @@ InjectedScript.RemoteObject.prototype = {
 
                 var value = descriptor.value;
                 if (value === null) {
-                    properties.push({ name: name, type: "object", value: "null" });
+                    this._appendPropertyPreview(preview, { name: name, type: "object", value: "null" }, propertiesThreshold);
                     continue;
                 }
     
@@ -785,27 +970,51 @@ InjectedScript.RemoteObject.prototype = {
                             value = this._abbreviateString(value, maxLength, true);
                             preview.lossless = false;
                         }
-                        value = "\"" + value.replace(/\n/g, "\u21B5") + "\"";
+                        value = value.replace(/\n/g, "\u21B5");
                     }
-                    properties.push({ name: name, type: type, value: value + "" });
+                    this._appendPropertyPreview(preview, { name: name, type: type, value: value + "" }, propertiesThreshold);
                     continue;
                 }
-    
+
+                if (secondLevelKeys === null || secondLevelKeys) {
+                    var subPreview = this._generatePreview(value, secondLevelKeys || undefined);
+                    var property = { name: name, type: type, valuePreview: subPreview };
+                    this._appendPropertyPreview(preview, property, propertiesThreshold);
+                    if (!subPreview.lossless)
+                        preview.lossless = false;
+                    if (subPreview.overflow)
+                        preview.overflow = true;
+                    continue;
+                }
+
                 preview.lossless = false;
 
-                if (type === "function")
-                    continue;
-
                 var subtype = injectedScript._subtype(value);
-                var property = { name: name, type: type, value: this._abbreviateString(injectedScript._describe(value), maxLength, subtype === "regexp") };
+                var description = "";
+                if (type !== "function")
+                    description = this._abbreviateString(/** @type {string} */ (injectedScript._describe(value)), maxLength, subtype === "regexp");
+
+                var property = { name: name, type: type, value: description };
                 if (subtype)
                     property.subtype = subtype;
-                properties.push(property);
+                this._appendPropertyPreview(preview, property, propertiesThreshold);
             }
-            if (properties.length)
-                this.preview = preview;
         } catch (e) {
         }
+    },
+
+    /**
+     * @param {Object} preview
+     * @param {Object} property
+     * @param {Object} propertiesThreshold
+     */
+    _appendPropertyPreview: function(preview, property, propertiesThreshold)
+    {
+        if (isNaN(property.name))
+            propertiesThreshold.properties--;
+        else
+            propertiesThreshold.indexes--;
+        preview.properties.push(property);
     },
 
     /**
@@ -843,7 +1052,7 @@ InjectedScript.CallFrameProxy = function(ordinal, callFrame)
 InjectedScript.CallFrameProxy.prototype = {
     /**
      * @param {Object} callFrame
-     * @return {Array.<Object>}
+     * @return {!Array.<DebuggerAgent.Scope>}
      */
     _wrapScopeChain: function(callFrame)
     {
@@ -861,7 +1070,7 @@ InjectedScript.CallFrameProxy.prototype = {
  * @param {number} scopeTypeCode
  * @param {*} scopeObject
  * @param {string} groupId
- * @return {Object}
+ * @return {!DebuggerAgent.Scope}
  */
 InjectedScript.CallFrameProxy._createScopeJson = function(scopeTypeCode, scopeObject, groupId) {
     const GLOBAL_SCOPE = 0;
@@ -870,6 +1079,7 @@ InjectedScript.CallFrameProxy._createScopeJson = function(scopeTypeCode, scopeOb
     const CLOSURE_SCOPE = 3;
     const CATCH_SCOPE = 4;
 
+    /** @type {!Object.<number, string>} */
     var scopeTypeNames = {};
     scopeTypeNames[GLOBAL_SCOPE] = "global";
     scopeTypeNames[LOCAL_SCOPE] = "local";
@@ -912,7 +1122,7 @@ function CommandLineAPI(commandLineAPIImpl, callFrame)
         if (member in inspectedWindow || inScopeVariables(member))
             continue;
 
-        this[member] = commandLineAPIImpl[member].bind(commandLineAPIImpl);
+        this[member] = bind(commandLineAPIImpl[member], commandLineAPIImpl);
     }
 
     for (var i = 0; i < 5; ++i) {
@@ -920,12 +1130,13 @@ function CommandLineAPI(commandLineAPIImpl, callFrame)
         if (member in inspectedWindow || inScopeVariables(member))
             continue;
 
-        this.__defineGetter__("$" + i, commandLineAPIImpl._inspectedObject.bind(commandLineAPIImpl, i));
+        this.__defineGetter__("$" + i, bind(commandLineAPIImpl._inspectedObject, commandLineAPIImpl, i));
     }
 
     this.$_ = injectedScript._lastResult;
 }
 
+// NOTE: Please keep the list of API methods below snchronized to that in WebInspector.RuntimeModel!
 /**
  * @type {Array.<string>}
  * @const
@@ -943,16 +1154,52 @@ function CommandLineAPIImpl()
 }
 
 CommandLineAPIImpl.prototype = {
-    $: function()
+    /**
+     * @param {string} selector
+     * @param {Node=} start
+     */
+    $: function (selector, start)
     {
-        return document.getElementById.apply(document, arguments)
+        if (this._canQuerySelectorOnNode(start))
+            return start.querySelector(selector);
+
+        var result = inspectedWindow.document.querySelector(selector);
+        if (result)
+            return result;
+        if (selector && selector[0] !== "#") {
+            result = inspectedWindow.document.getElementById(selector);
+            if (result) {
+                inspectedWindow.console.warn("The console function $() has changed from $=getElementById(id) to $=querySelector(selector). You might try $(\"#%s\")", selector );
+                return null;
+            }
+        }
+        return result;
     },
 
-    $$: function()
+    /**
+     * @param {string} selector
+     * @param {Node=} start
+     */
+    $$: function (selector, start)
     {
-        return document.querySelectorAll.apply(document, arguments)
+        if (this._canQuerySelectorOnNode(start))
+            return start.querySelectorAll(selector);
+        return inspectedWindow.document.querySelectorAll(selector);
     },
 
+    /**
+     * @param {Node=} node
+     * @return {boolean}
+     */
+    _canQuerySelectorOnNode: function(node)
+    {
+        return !!node && InjectedScriptHost.type(node) === "node" && (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE);
+    },
+
+    /**
+     * @param {string} xpath
+     * @param {Node=} context
+     */
     $x: function(xpath, context)
     {
         var doc = (context && context.ownerDocument) || inspectedWindow.document;
@@ -975,12 +1222,12 @@ CommandLineAPIImpl.prototype = {
 
     dir: function()
     {
-        return console.dir.apply(console, arguments)
+        return inspectedWindow.console.dir.apply(inspectedWindow.console, arguments)
     },
 
     dirxml: function()
     {
-        return console.dirxml.apply(console, arguments)
+        return inspectedWindow.console.dirxml.apply(inspectedWindow.console, arguments)
     },
 
     keys: function(object)
@@ -998,12 +1245,12 @@ CommandLineAPIImpl.prototype = {
 
     profile: function()
     {
-        return console.profile.apply(console, arguments)
+        return inspectedWindow.console.profile.apply(inspectedWindow.console, arguments)
     },
 
     profileEnd: function()
     {
-        return console.profileEnd.apply(console, arguments)
+        return inspectedWindow.console.profileEnd.apply(inspectedWindow.console, arguments)
     },
 
     /**
@@ -1103,7 +1350,7 @@ CommandLineAPIImpl.prototype = {
      */
     _logEvent: function(event)
     {
-        console.log(event.type, event);
+        inspectedWindow.console.log(event.type, event);
     }
 }
 

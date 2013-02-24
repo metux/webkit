@@ -31,13 +31,14 @@
 #ifndef ScriptValue_h
 #define ScriptValue_h
 
-#include "PlatformString.h"
 #include "SerializedScriptValue.h"
 #include "ScriptState.h"
 #include <heap/Strong.h>
 #include <heap/StrongInlines.h>
-#include <runtime/JSValue.h>
+#include <runtime/JSCJSValue.h>
+#include <runtime/Operations.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -59,6 +60,8 @@ public:
     bool isObject() const;
     bool isFunction() const;
     bool hasNoValue() const { return !m_value; }
+
+    void clear() { m_value.clear(); }
 
     bool operator==(const ScriptValue& other) const { return m_value == other.m_value; }
 

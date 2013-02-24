@@ -52,9 +52,12 @@ public:
     void mouseMoveTo(int x, int y);
     void mouseScrollBy(int x, int y);
     void continuousMouseScrollBy(int x, int y, bool paged);
+    JSValueRef contextClick();
     void leapForward(int milliseconds);
+    void scheduleAsynchronousClick();
 
     void keyDown(JSStringRef key, JSValueRef modifierArray, int location);
+    void scheduleAsynchronousKeyDown(JSStringRef key);
 
     // Zoom functions.
     void textZoomIn();

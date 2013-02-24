@@ -28,12 +28,14 @@
 #define DocumentMarkerController_h
 
 #include "DocumentMarker.h"
-#include "LayoutTypes.h"
+#include "IntRect.h"
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
+class LayoutPoint;
+class LayoutRect;
 class Node;
 class Range;
 class RenderedDocumentMarker;

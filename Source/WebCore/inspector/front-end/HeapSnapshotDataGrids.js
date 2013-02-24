@@ -134,7 +134,7 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
     },
 
     /**
-     * @param {ProfilerAgent.HeapSnapshotObjectId} heapSnapshotObjectId
+     * @param {HeapProfilerAgent.HeapSnapshotObjectId} heapSnapshotObjectId
      */
     highlightObjectByHeapSnapshotId: function(heapSnapshotObjectId)
     {
@@ -252,10 +252,11 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
             return;
         if (!--this._recursiveSortingDepth)
             this.dispatchEventToListeners("sorting complete");
-    }
-};
+    },
 
-WebInspector.HeapSnapshotSortableDataGrid.prototype.__proto__ = WebInspector.DataGrid.prototype;
+    __proto__: WebInspector.DataGrid.prototype
+}
+
 
 
 /**
@@ -393,10 +394,10 @@ WebInspector.HeapSnapshotViewportDataGrid.prototype = {
             WebInspector.HeapSnapshotSortableDataGrid.prototype.highlightNode.call(this, this._nodeToHighlightAfterScroll);
             this._nodeToHighlightAfterScroll = null;
         }
-    }
-}
+    },
 
-WebInspector.HeapSnapshotViewportDataGrid.prototype.__proto__ = WebInspector.HeapSnapshotSortableDataGrid.prototype;
+    __proto__: WebInspector.HeapSnapshotSortableDataGrid.prototype
+}
 
 /**
  * @constructor
@@ -437,9 +438,8 @@ WebInspector.HeapSnapshotContainmentDataGrid = function(columns)
 }
 
 WebInspector.HeapSnapshotContainmentDataGrid.prototype = {
-    setDataSource: function(snapshotView, snapshot, nodeIndex)
+    setDataSource: function(snapshot, nodeIndex)
     {
-        this.snapshotView = snapshotView;
         this.snapshot = snapshot;
         var node = new WebInspector.HeapSnapshotNode(snapshot, nodeIndex || snapshot.rootNodeIndex);
         var fakeEdge = { node: node };
@@ -450,10 +450,11 @@ WebInspector.HeapSnapshotContainmentDataGrid.prototype = {
     sortingChanged: function()
     {
         this.rootNode().sort();
-    }
-};
+    },
 
-WebInspector.HeapSnapshotContainmentDataGrid.prototype.__proto__ = WebInspector.HeapSnapshotSortableDataGrid.prototype;
+    __proto__: WebInspector.HeapSnapshotSortableDataGrid.prototype
+}
+
 
 /**
  * @constructor
@@ -466,7 +467,7 @@ WebInspector.HeapSnapshotRetainmentDataGrid = function()
         object: { title: WebInspector.UIString("Object"), disclosure: true, sortable: true },
         shallowSize: { title: WebInspector.UIString("Shallow Size"), width: "120px", sortable: true },
         retainedSize: { title: WebInspector.UIString("Retained Size"), width: "120px", sortable: true },
-        distanceToWindow: { title: WebInspector.UIString("Distance"), width: "80px", sortable: true, sort: "ascending" }
+        distance: { title: WebInspector.UIString("Distance"), width: "80px", sortable: true, sort: "ascending" }
     };
     WebInspector.HeapSnapshotContainmentDataGrid.call(this, columns);
 }
@@ -479,7 +480,7 @@ WebInspector.HeapSnapshotRetainmentDataGrid.prototype = {
             count: ["_count", sortAscending, "_name", true],
             shallowSize: ["_shallowSize", sortAscending, "_name", true],
             retainedSize: ["_retainedSize", sortAscending, "_name", true],
-            distanceToWindow: ["_distanceToWindow", sortAscending, "_name", true]
+            distance: ["_distance", sortAscending, "_name", true]
         }[sortColumn];
     },
 
@@ -488,9 +489,10 @@ WebInspector.HeapSnapshotRetainmentDataGrid.prototype = {
         this.rootNode().removeChildren();
         this.resetSortingCache();
     },
+
+    __proto__: WebInspector.HeapSnapshotContainmentDataGrid.prototype
 }
 
-WebInspector.HeapSnapshotRetainmentDataGrid.prototype.__proto__ = WebInspector.HeapSnapshotContainmentDataGrid.prototype;
 
 /**
  * @constructor
@@ -500,7 +502,7 @@ WebInspector.HeapSnapshotConstructorsDataGrid = function()
 {
     var columns = {
         object: { title: WebInspector.UIString("Constructor"), disclosure: true, sortable: true },
-        distanceToWindow: { title: WebInspector.UIString("Distance"), width: "90px", sortable: true },
+        distance: { title: WebInspector.UIString("Distance"), width: "90px", sortable: true },
         count: { title: WebInspector.UIString("Objects Count"), width: "90px", sortable: true },
         shallowSize: { title: WebInspector.UIString("Shallow Size"), width: "120px", sortable: true },
         retainedSize: { title: WebInspector.UIString("Retained Size"), width: "120px", sort: "descending", sortable: true }
@@ -517,7 +519,7 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
     {
         return {
             object: ["_name", sortAscending, "_count", false],
-            distanceToWindow: ["_distanceToWindow", sortAscending, "_retainedSize", true],
+            distance: ["_distance", sortAscending, "_retainedSize", true],
             count: ["_count", sortAscending, "_name", true],
             shallowSize: ["_shallowSize", sortAscending, "_name", true],
             retainedSize: ["_retainedSize", sortAscending, "_name", true]
@@ -526,7 +528,7 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
 
     /**
      * @override
-     * @param {ProfilerAgent.HeapSnapshotObjectId} id
+     * @param {HeapProfilerAgent.HeapSnapshotObjectId} id
      */
     highlightObjectByHeapSnapshotId: function(id)
     {
@@ -549,9 +551,8 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
         this.snapshot.nodeClassName(parseInt(id, 10), didGetClassName.bind(this));
     },
 
-    setDataSource: function(snapshotView, snapshot)
+    setDataSource: function(snapshot)
     {
-        this.snapshotView = snapshotView;
         this.snapshot = snapshot;
         if (this._profileIndex === -1)
             this._populateChildren();
@@ -582,7 +583,7 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
         this.snapshot.aggregates(false, key, filter, this._aggregatesReceived.bind(this, key));
     },
 
-    _filterSelectIndexChanged: function(profiles, profileIndex)
+    filterSelectIndexChanged: function(profiles, profileIndex)
     {
         this._profileIndex = profileIndex;
 
@@ -597,9 +598,9 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
         this._populateChildren();
     },
 
-};
+    __proto__: WebInspector.HeapSnapshotViewportDataGrid.prototype
+}
 
-WebInspector.HeapSnapshotConstructorsDataGrid.prototype.__proto__ = WebInspector.HeapSnapshotViewportDataGrid.prototype;
 
 /**
  * @constructor
@@ -642,9 +643,8 @@ WebInspector.HeapSnapshotDiffDataGrid.prototype = {
         }[sortColumn];
     },
 
-    setDataSource: function(snapshotView, snapshot)
+    setDataSource: function(snapshot)
     {
-        this.snapshotView = snapshotView;
         this.snapshot = snapshot;
     },
 
@@ -682,10 +682,11 @@ WebInspector.HeapSnapshotDiffDataGrid.prototype = {
         // we first need to collect information about the nodes in the first snapshot and
         // then pass it to the second snapshot to calclulate the diff.
         this.baseSnapshot.aggregatesForDiff(aggregatesForDiffReceived.bind(this));
-    }
-};
+    },
 
-WebInspector.HeapSnapshotDiffDataGrid.prototype.__proto__ = WebInspector.HeapSnapshotViewportDataGrid.prototype;
+    __proto__: WebInspector.HeapSnapshotViewportDataGrid.prototype
+}
+
 
 /**
  * @constructor
@@ -712,9 +713,8 @@ WebInspector.HeapSnapshotDominatorsDataGrid.prototype = {
         return 25;
     },
 
-    setDataSource: function(snapshotView, snapshot)
+    setDataSource: function(snapshot)
     {
-        this.snapshotView = snapshotView;
         this.snapshot = snapshot;
 
         var fakeNode = { nodeIndex: this.snapshot.rootNodeIndex };
@@ -734,7 +734,7 @@ WebInspector.HeapSnapshotDominatorsDataGrid.prototype = {
 
     /**
      * @override
-     * @param {ProfilerAgent.HeapSnapshotObjectId} id
+     * @param {HeapProfilerAgent.HeapSnapshotObjectId} id
      */
     highlightObjectByHeapSnapshotId: function(id)
     {
@@ -769,7 +769,8 @@ WebInspector.HeapSnapshotDominatorsDataGrid.prototype = {
         }
 
         this.snapshot.dominatorIdsForNode(parseInt(id, 10), didGetDominators.bind(this));
-    }
-};
+    },
 
-WebInspector.HeapSnapshotDominatorsDataGrid.prototype.__proto__ = WebInspector.HeapSnapshotSortableDataGrid.prototype;
+    __proto__: WebInspector.HeapSnapshotSortableDataGrid.prototype
+}
+

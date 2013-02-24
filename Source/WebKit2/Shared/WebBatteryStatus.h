@@ -40,8 +40,8 @@ public:
     static const Type APIType = TypeBatteryStatus;
 
     struct Data {
-        void encode(CoreIPC::ArgumentEncoder*) const;
-        static bool decode(CoreIPC::ArgumentDecoder*, Data&);
+        void encode(CoreIPC::ArgumentEncoder&) const;
+        static bool decode(CoreIPC::ArgumentDecoder&, Data&);
 
         bool isCharging;
         double chargingTime;

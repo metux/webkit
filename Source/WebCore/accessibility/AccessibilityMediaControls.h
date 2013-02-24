@@ -44,7 +44,6 @@ public:
     virtual ~AccessibilityMediaControl() { }
 
     virtual AccessibilityRole roleValue() const;
-    virtual bool accessibilityIsIgnored() const;
 
     virtual String title() const;
     virtual String accessibilityDescription() const;
@@ -54,6 +53,8 @@ protected:
     explicit AccessibilityMediaControl(RenderObject*);
     MediaControlElementType controlType() const;
     String controlTypeName() const;
+    virtual void accessibilityText(Vector<AccessibilityText>&);
+    virtual bool computeAccessibilityIsIgnored() const;
 };
 
 
@@ -81,7 +82,6 @@ public:
     virtual ~AccessibilityMediaControlsContainer() { }
 
     virtual AccessibilityRole roleValue() const { return ToolbarRole; }
-    virtual bool accessibilityIsIgnored() const { return false; }
 
     virtual String helpText() const;
     virtual String accessibilityDescription() const;
@@ -90,6 +90,7 @@ private:
     explicit AccessibilityMediaControlsContainer(RenderObject*);
     bool controllingVideoElement() const;
     const String elementTypeName() const;
+    virtual bool computeAccessibilityIsIgnored() const { return false; }
 };
 
 
@@ -100,13 +101,14 @@ public:
     virtual ~AccessibilityMediaTimeDisplay() { }
 
     virtual AccessibilityRole roleValue() const { return StaticTextRole; }
-    virtual bool accessibilityIsIgnored() const;
 
     virtual String stringValue() const;
     virtual String accessibilityDescription() const;
 
 private:
     explicit AccessibilityMediaTimeDisplay(RenderObject*);
+    virtual bool isMediaControlLabel() const { return true; }
+    virtual bool computeAccessibilityIsIgnored() const;
 };
 
 

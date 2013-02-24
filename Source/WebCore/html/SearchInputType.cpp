@@ -33,6 +33,7 @@
 
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "InputTypeNames.h"
 #include "KeyboardEvent.h"
 #include "RenderSearchField.h"
 #include "ShadowRoot.h"
@@ -54,6 +55,12 @@ inline SearchInputType::SearchInputType(HTMLInputElement* element)
 PassOwnPtr<InputType> SearchInputType::create(HTMLInputElement* element)
 {
     return adoptPtr(new SearchInputType(element));
+}
+
+void SearchInputType::attach()
+{
+    TextFieldInputType::attach();
+    observeFeatureIfVisible(FeatureObserver::InputTypeSearch);
 }
 
 void SearchInputType::addSearchResult()
@@ -98,14 +105,13 @@ void SearchInputType::createShadowSubtree()
     ASSERT(container);
     ASSERT(textWrapper);
 
-    ExceptionCode ec = 0;
     RefPtr<SearchFieldResultsButtonElement> resultsButton = SearchFieldResultsButtonElement::create(element()->document());
     m_resultsButton = resultsButton.get();
-    container->insertBefore(m_resultsButton, textWrapper, ec);
+    container->insertBefore(m_resultsButton, textWrapper, IGNORE_EXCEPTION);
 
     RefPtr<SearchFieldCancelButtonElement> cancelButton = SearchFieldCancelButtonElement::create(element()->document());
     m_cancelButton = cancelButton.get();
-    container->insertBefore(m_cancelButton, textWrapper->nextSibling(), ec);
+    container->insertBefore(m_cancelButton, textWrapper->nextSibling(), IGNORE_EXCEPTION);
 }
 
 HTMLElement* SearchInputType::resultsButtonElement() const
@@ -120,7 +126,7 @@ HTMLElement* SearchInputType::cancelButtonElement() const
 
 void SearchInputType::handleKeydownEvent(KeyboardEvent* event)
 {
-    if (element()->disabled() || element()->readOnly()) {
+    if (element()->isDisabledOrReadOnly()) {
         TextFieldInputType::handleKeydownEvent(event);
         return;
     }
@@ -174,7 +180,7 @@ bool SearchInputType::searchEventsShouldBeDispatched() const
     return element()->hasAttribute(incrementalAttr);
 }
 
-void SearchInputType::subtreeHasChanged()
+void SearchInputType::didSetValueByUserEdit(ValueChangeState state)
 {
     if (m_cancelButton)
         toRenderSearchField(element()->renderer())->updateCancelButtonVisibility();
@@ -182,6 +188,8 @@ void SearchInputType::subtreeHasChanged()
     // If the incremental attribute is set, then dispatch the search event
     if (searchEventsShouldBeDispatched())
         startSearchEventTimer();
+
+    TextFieldInputType::didSetValueByUserEdit(state);
 }
 
 } // namespace WebCore

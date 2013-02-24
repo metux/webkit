@@ -93,7 +93,8 @@ public:
     class WindowProperties {
     public:
         WindowProperties()
-            : m_toolbarVisible(true)
+            : m_isNull(true)
+            , m_toolbarVisible(true)
             , m_statusbarVisible(true)
             , m_scrollbarsVisible(true)
             , m_menubarVisible(true)
@@ -105,7 +106,8 @@ public:
         }
 
         WindowProperties(WebKitWindowProperties* windowProperties)
-            : m_toolbarVisible(webkit_window_properties_get_toolbar_visible(windowProperties))
+            : m_isNull(false)
+            , m_toolbarVisible(webkit_window_properties_get_toolbar_visible(windowProperties))
             , m_statusbarVisible(webkit_window_properties_get_statusbar_visible(windowProperties))
             , m_scrollbarsVisible(webkit_window_properties_get_scrollbars_visible(windowProperties))
             , m_menubarVisible(webkit_window_properties_get_menubar_visible(windowProperties))
@@ -118,7 +120,8 @@ public:
 
         WindowProperties(GdkRectangle* geometry, bool toolbarVisible, bool statusbarVisible, bool scrollbarsVisible, bool menubarVisible,
                          bool locationbarVisible, bool resizable, bool fullscreen)
-            : m_geometry(*geometry)
+            : m_isNull(false)
+            , m_geometry(*geometry)
             , m_toolbarVisible(toolbarVisible)
             , m_statusbarVisible(statusbarVisible)
             , m_scrollbarsVisible(scrollbarsVisible)
@@ -129,10 +132,12 @@ public:
         {
         }
 
+        bool isNull() const { return m_isNull; }
+
         void assertEqual(const WindowProperties& other) const
         {
-            // FIXME: We should assert x and y are equal, but we are getting an incorrect
-            // value from WebCore (280 instead of 150).
+            g_assert_cmpint(m_geometry.x, ==, other.m_geometry.x);
+            g_assert_cmpint(m_geometry.y, ==, other.m_geometry.y);
             g_assert_cmpint(m_geometry.width, ==, other.m_geometry.width);
             g_assert_cmpint(m_geometry.height, ==, other.m_geometry.height);
             g_assert_cmpint(static_cast<int>(m_toolbarVisible), ==, static_cast<int>(other.m_toolbarVisible));
@@ -145,6 +150,8 @@ public:
         }
 
     private:
+        bool m_isNull;
+
         GdkRectangle m_geometry;
 
         bool m_toolbarVisible;
@@ -312,7 +319,8 @@ public:
 
         WebKitWindowProperties* windowProperties = webkit_web_view_get_window_properties(webView);
         g_assert(windowProperties);
-        WindowProperties(windowProperties).assertEqual(m_windowProperties);
+        if (!m_windowProperties.isNull())
+            WindowProperties(windowProperties).assertEqual(m_windowProperties);
 
         m_webViewEvents.append(ReadyToShow);
     }
@@ -464,7 +472,7 @@ static void testWebViewWindowProperties(UIClientTest* test, gconstpointer)
 
 static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
 {
-    test->showInWindowAndWaitUntilMapped();
+    test->showInWindowAndWaitUntilMapped(GTK_WINDOW_TOPLEVEL);
 
     const char* linksHoveredHTML =
         "<html><body>"
@@ -473,6 +481,7 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
         " <a style='position:absolute; left:1; top:20' href='http://www.webkitgtk.org/logo' title='WebKitGTK+ Logo'><img src='0xdeadbeef' width=5 height=5></img></a>"
         " <video style='position:absolute; left:1; top:30' width=10 height=10 controls='controls'><source src='movie.ogg' type='video/ogg' /></video>"
         " <input style='position:absolute; left:1; top:50' size='10'></input>"
+        " <div style='position:absolute; left:1; top:70; width:30; height:30; overflow:scroll'>&nbsp;</div>"
         "</body></html>";
 
     test->loadHtml(linksHoveredHTML, "file:///");
@@ -503,6 +512,7 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
     g_assert(webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert_cmpstr(webkit_hit_test_result_get_image_uri(hitTestResult), ==, "file:///0xdeadbeef");
     g_assert(test->m_mouseTargetModifiers & GDK_CONTROL_MASK);
 
@@ -512,6 +522,7 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
     g_assert(webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert_cmpstr(webkit_hit_test_result_get_link_uri(hitTestResult), ==, "http://www.webkitgtk.org/logo");
     g_assert_cmpstr(webkit_hit_test_result_get_image_uri(hitTestResult), ==, "file:///0xdeadbeef");
     g_assert_cmpstr(webkit_hit_test_result_get_link_title(hitTestResult), ==, "WebKitGTK+ Logo");
@@ -524,6 +535,7 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
     g_assert(!webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(webkit_hit_test_result_context_is_media(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert_cmpstr(webkit_hit_test_result_get_media_uri(hitTestResult), ==, "file:///movie.ogg");
     g_assert(!test->m_mouseTargetModifiers);
 
@@ -532,7 +544,17 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
     g_assert(!webkit_hit_test_result_context_is_link(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert(webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!test->m_mouseTargetModifiers);
+
+    // Move over scrollbar.
+    hitTestResult = test->moveMouseAndWaitUntilMouseTargetChanged(5, 95);
+    g_assert(!webkit_hit_test_result_context_is_link(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_image(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert(!test->m_mouseTargetModifiers);
 }
 
@@ -642,6 +664,17 @@ static void testWebViewRunJavaScript(WebViewTest* test, gconstpointer)
     g_assert(javascriptResult);
     g_assert(!error.get());
     g_assert(WebViewTest::javascriptResultIsUndefined(javascriptResult));
+
+    javascriptResult = test->runJavaScriptFromGResourceAndWaitUntilFinished("/org/webkit/webkit2gtk/tests/link-title.js", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "WebKitGTK+ Title");
+
+    javascriptResult = test->runJavaScriptFromGResourceAndWaitUntilFinished("/wrong/path/to/resource.js", &error.outPtr());
+    g_assert(!javascriptResult);
+    g_assert_error(error.get(), G_RESOURCE_ERROR, G_RESOURCE_ERROR_NOT_FOUND);
+    error.clear();
 
     javascriptResult = test->runJavaScriptAndWaitUntilFinished("foo();", &error.outPtr());
     g_assert(!javascriptResult);
@@ -846,6 +879,12 @@ static void testWebViewCanShowMIMEType(WebViewTest* test, gconstpointer)
     g_assert(!webkit_web_view_can_show_mime_type(test->m_webView, "application/pdf"));
     g_assert(!webkit_web_view_can_show_mime_type(test->m_webView, "application/zip"));
     g_assert(!webkit_web_view_can_show_mime_type(test->m_webView, "application/octet-stream"));
+
+    // Plugins are only supported when enabled.
+    webkit_web_context_set_additional_plugins_directory(webkit_web_view_get_context(test->m_webView), WEBKIT_TEST_PLUGIN_DIR);
+    g_assert(webkit_web_view_can_show_mime_type(test->m_webView, "application/x-webkit-test-netscape"));
+    webkit_settings_set_enable_plugins(webkit_web_view_get_settings(test->m_webView), FALSE);
+    g_assert(!webkit_web_view_can_show_mime_type(test->m_webView, "application/x-webkit-test-netscape"));
 }
 
 class FormClientTest: public WebViewTest {
@@ -1025,6 +1064,27 @@ static void testWebViewSave(SaveWebViewTest* test, gconstpointer)
     g_assert_cmpint(g_file_info_get_size(fileInfo.get()), ==, totalBytesFromStream);
 }
 
+static void testWebViewMode(WebViewTest* test, gconstpointer)
+{
+    static const char* indexHTML = "<html><body><p>Test Web View Mode</p></body></html>";
+
+    // Web mode.
+    g_assert_cmpuint(webkit_web_view_get_view_mode(test->m_webView), ==, WEBKIT_VIEW_MODE_WEB);
+    test->loadHtml(indexHTML, 0);
+    test->waitUntilLoadFinished();
+    WebKitJavascriptResult* javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.body.textContent;", 0);
+    GOwnPtr<char> valueString(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "Test Web View Mode");
+
+    // Source mode.
+    webkit_web_view_set_view_mode(test->m_webView, WEBKIT_VIEW_MODE_SOURCE);
+    test->loadHtml(indexHTML, 0);
+    test->waitUntilLoadFinished();
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.body.textContent;", 0);
+    valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, indexHTML);
+}
+
 void beforeAll()
 {
     WebViewTest::add("WebKitWebView", "default-context", testWebViewDefaultContext);
@@ -1044,6 +1104,7 @@ void beforeAll()
     WebViewTest::add("WebKitWebView", "can-show-mime-type", testWebViewCanShowMIMEType);
     FormClientTest::add("WebKitWebView", "submit-form", testWebViewSubmitForm);
     SaveWebViewTest::add("WebKitWebView", "save", testWebViewSave);
+    WebViewTest::add("WebKitWebView", "view-mode", testWebViewMode);
 }
 
 void afterAll()

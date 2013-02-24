@@ -27,11 +27,13 @@
 #include "config.h"
 #include "HTMLTreeBuilder.h"
 
+#include "AtomicHTMLToken.h"
 #include "Comment.h"
 #include "DocumentFragment.h"
 #include "DocumentType.h"
 #include "Element.h"
 #include "Frame.h"
+#include "FrameLoaderClient.h"
 #include "HTMLDocument.h"
 #include "HTMLElementFactory.h"
 #include "HTMLFormElement.h"
@@ -40,6 +42,7 @@
 #include "HTMLParserIdioms.h"
 #include "HTMLScriptElement.h"
 #include "HTMLStackItem.h"
+#include "HTMLTemplateElement.h"
 #include "HTMLToken.h"
 #include "HTMLTokenizer.h"
 #include "LocalizedStrings.h"
@@ -77,10 +80,15 @@ static inline bool isAllWhitespace(const String& string)
 
 static inline void executeTask(HTMLConstructionSiteTask& task)
 {
+#if ENABLE(TEMPLATE_ELEMENT)
+    if (task.parent->hasTagName(templateTag))
+        task.parent = toHTMLTemplateElement(task.parent.get())->content();
+#endif
+
     if (task.nextChild)
         task.parent->parserInsertBefore(task.child.get(), task.nextChild.get());
     else
-        task.parent->parserAddChild(task.child.get());
+        task.parent->parserAppendChild(task.child.get());
 
     // JavaScript run from beforeload (or DOM Mutation or event handlers)
     // might have removed the child, in which case we should not attach it.
@@ -138,7 +146,9 @@ HTMLConstructionSite::HTMLConstructionSite(Document* document, unsigned maximumD
     , m_isParsingFragment(false)
     , m_redirectAttachToFosterParent(false)
     , m_maximumDOMTreeDepth(maximumDOMTreeDepth)
+    , m_inQuirksMode(document->inQuirksMode())
 {
+    ASSERT(m_document->isHTMLDocument() || m_document->isXHTMLDocument());
 }
 
 HTMLConstructionSite::HTMLConstructionSite(DocumentFragment* fragment, FragmentScriptingPermission scriptingPermission, unsigned maximumDOMTreeDepth)
@@ -148,7 +158,9 @@ HTMLConstructionSite::HTMLConstructionSite(DocumentFragment* fragment, FragmentS
     , m_isParsingFragment(true)
     , m_redirectAttachToFosterParent(false)
     , m_maximumDOMTreeDepth(maximumDOMTreeDepth)
+    , m_inQuirksMode(fragment->document()->inQuirksMode())
 {
+    ASSERT(m_document->isHTMLDocument() || m_document->isXHTMLDocument());
 }
 
 HTMLConstructionSite::~HTMLConstructionSite()
@@ -197,11 +209,9 @@ void HTMLConstructionSite::mergeAttributesFromTokenIntoElement(AtomicHTMLToken* 
     if (token->attributes().isEmpty())
         return;
 
-    ElementAttributeData* elementAttributeData = element->mutableAttributeData();
-
     for (unsigned i = 0; i < token->attributes().size(); ++i) {
         const Attribute& tokenAttribute = token->attributes().at(i);
-        if (!elementAttributeData->getAttributeItem(tokenAttribute.name()))
+        if (!element->elementData() || !element->getAttributeItem(tokenAttribute.name()))
             element->setAttribute(tokenAttribute.name(), tokenAttribute.value());
     }
 }
@@ -221,11 +231,121 @@ void HTMLConstructionSite::insertHTMLBodyStartTagInBody(AtomicHTMLToken* token)
     mergeAttributesFromTokenIntoElement(token, m_openElements.bodyElement());
 }
 
+void HTMLConstructionSite::setDefaultCompatibilityMode()
+{
+    if (m_isParsingFragment)
+        return;
+    if (m_document->isSrcdocDocument())
+        return;
+    setCompatibilityMode(Document::QuirksMode);
+}
+
+void HTMLConstructionSite::setCompatibilityMode(Document::CompatibilityMode mode)
+{
+    m_inQuirksMode = (mode == Document::QuirksMode);
+    m_document->setCompatibilityMode(mode);
+}
+
+void HTMLConstructionSite::setCompatibilityModeFromDoctype(const String& name, const String& publicId, const String& systemId)
+{
+    // There are three possible compatibility modes:
+    // Quirks - quirks mode emulates WinIE and NS4. CSS parsing is also relaxed in this mode, e.g., unit types can
+    // be omitted from numbers.
+    // Limited Quirks - This mode is identical to no-quirks mode except for its treatment of line-height in the inline box model.  
+    // No Quirks - no quirks apply. Web pages will obey the specifications to the letter.
+
+    // Check for Quirks Mode.
+    if (name != "html"
+        || publicId.startsWith("+//Silmaril//dtd html Pro v0r11 19970101//", false)
+        || publicId.startsWith("-//AdvaSoft Ltd//DTD HTML 3.0 asWedit + extensions//", false)
+        || publicId.startsWith("-//AS//DTD HTML 3.0 asWedit + extensions//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 2.0 Level 1//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 2.0 Level 2//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 2.0 Strict Level 1//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 2.0 Strict Level 2//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 2.0 Strict//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 2.0//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 2.1E//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 3.0//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 3.2 Final//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 3.2//", false)
+        || publicId.startsWith("-//IETF//DTD HTML 3//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Level 0//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Level 1//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Level 2//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Level 3//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Strict Level 0//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Strict Level 1//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Strict Level 2//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Strict Level 3//", false)
+        || publicId.startsWith("-//IETF//DTD HTML Strict//", false)
+        || publicId.startsWith("-//IETF//DTD HTML//", false)
+        || publicId.startsWith("-//Metrius//DTD Metrius Presentational//", false)
+        || publicId.startsWith("-//Microsoft//DTD Internet Explorer 2.0 HTML Strict//", false)
+        || publicId.startsWith("-//Microsoft//DTD Internet Explorer 2.0 HTML//", false)
+        || publicId.startsWith("-//Microsoft//DTD Internet Explorer 2.0 Tables//", false)
+        || publicId.startsWith("-//Microsoft//DTD Internet Explorer 3.0 HTML Strict//", false)
+        || publicId.startsWith("-//Microsoft//DTD Internet Explorer 3.0 HTML//", false)
+        || publicId.startsWith("-//Microsoft//DTD Internet Explorer 3.0 Tables//", false)
+        || publicId.startsWith("-//Netscape Comm. Corp.//DTD HTML//", false)
+        || publicId.startsWith("-//Netscape Comm. Corp.//DTD Strict HTML//", false)
+        || publicId.startsWith("-//O'Reilly and Associates//DTD HTML 2.0//", false)
+        || publicId.startsWith("-//O'Reilly and Associates//DTD HTML Extended 1.0//", false)
+        || publicId.startsWith("-//O'Reilly and Associates//DTD HTML Extended Relaxed 1.0//", false)
+        || publicId.startsWith("-//SoftQuad Software//DTD HoTMetaL PRO 6.0::19990601::extensions to HTML 4.0//", false)
+        || publicId.startsWith("-//SoftQuad//DTD HoTMetaL PRO 4.0::19971010::extensions to HTML 4.0//", false)
+        || publicId.startsWith("-//Spyglass//DTD HTML 2.0 Extended//", false)
+        || publicId.startsWith("-//SQ//DTD HTML 2.0 HoTMetaL + extensions//", false)
+        || publicId.startsWith("-//Sun Microsystems Corp.//DTD HotJava HTML//", false)
+        || publicId.startsWith("-//Sun Microsystems Corp.//DTD HotJava Strict HTML//", false)
+        || publicId.startsWith("-//W3C//DTD HTML 3 1995-03-24//", false)
+        || publicId.startsWith("-//W3C//DTD HTML 3.2 Draft//", false)
+        || publicId.startsWith("-//W3C//DTD HTML 3.2 Final//", false)
+        || publicId.startsWith("-//W3C//DTD HTML 3.2//", false)
+        || publicId.startsWith("-//W3C//DTD HTML 3.2S Draft//", false)
+        || publicId.startsWith("-//W3C//DTD HTML 4.0 Frameset//", false)
+        || publicId.startsWith("-//W3C//DTD HTML 4.0 Transitional//", false)
+        || publicId.startsWith("-//W3C//DTD HTML Experimental 19960712//", false)
+        || publicId.startsWith("-//W3C//DTD HTML Experimental 970421//", false)
+        || publicId.startsWith("-//W3C//DTD W3 HTML//", false)
+        || publicId.startsWith("-//W3O//DTD W3 HTML 3.0//", false)
+        || equalIgnoringCase(publicId, "-//W3O//DTD W3 HTML Strict 3.0//EN//")
+        || publicId.startsWith("-//WebTechs//DTD Mozilla HTML 2.0//", false)
+        || publicId.startsWith("-//WebTechs//DTD Mozilla HTML//", false)
+        || equalIgnoringCase(publicId, "-/W3C/DTD HTML 4.0 Transitional/EN")
+        || equalIgnoringCase(publicId, "HTML")
+        || equalIgnoringCase(systemId, "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd")
+        || (systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Frameset//", false))
+        || (systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Transitional//", false))) {
+        setCompatibilityMode(Document::QuirksMode);
+        return;
+    }
+
+    // Check for Limited Quirks Mode.
+    if (publicId.startsWith("-//W3C//DTD XHTML 1.0 Frameset//", false)
+        || publicId.startsWith("-//W3C//DTD XHTML 1.0 Transitional//", false)
+        || (!systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Frameset//", false))
+        || (!systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Transitional//", false))) {
+        setCompatibilityMode(Document::LimitedQuirksMode);
+        return;
+    }
+
+    // Otherwise we are No Quirks Mode.
+    setCompatibilityMode(Document::NoQuirksMode);
+}
+
+void HTMLConstructionSite::finishedParsing()
+{
+    m_document->finishedParsing();
+}
+
 void HTMLConstructionSite::insertDoctype(AtomicHTMLToken* token)
 {
-    ASSERT(token->type() == HTMLTokenTypes::DOCTYPE);
+    ASSERT(token->type() == HTMLToken::DOCTYPE);
 
-    RefPtr<DocumentType> doctype = DocumentType::create(m_document, token->name(), String::adopt(token->publicIdentifier()), String::adopt(token->systemIdentifier()));
+    const String& publicId = String::adopt(token->publicIdentifier());
+    const String& systemId = String::adopt(token->systemIdentifier());
+    RefPtr<DocumentType> doctype = DocumentType::create(m_document, token->name(), publicId, systemId);
     attachLater(m_attachmentRoot, doctype.release());
 
     // DOCTYPE nodes are only processed when parsing fragments w/o contextElements, which
@@ -238,29 +358,27 @@ void HTMLConstructionSite::insertDoctype(AtomicHTMLToken* token)
         return;
 
     if (token->forceQuirks())
-        m_document->setCompatibilityMode(Document::QuirksMode);
+        setCompatibilityMode(Document::QuirksMode);
     else {
-        // We need to actually add the Doctype node to the DOM.
-        executeQueuedTasks();
-        m_document->setCompatibilityModeFromDoctype();
+        setCompatibilityModeFromDoctype(token->name(), publicId, systemId);
     }
 }
 
 void HTMLConstructionSite::insertComment(AtomicHTMLToken* token)
 {
-    ASSERT(token->type() == HTMLTokenTypes::Comment);
-    attachLater(currentNode(), Comment::create(currentNode()->document(), token->comment()));
+    ASSERT(token->type() == HTMLToken::Comment);
+    attachLater(currentNode(), Comment::create(ownerDocumentForCurrentNode(), token->comment()));
 }
 
 void HTMLConstructionSite::insertCommentOnDocument(AtomicHTMLToken* token)
 {
-    ASSERT(token->type() == HTMLTokenTypes::Comment);
+    ASSERT(token->type() == HTMLToken::Comment);
     attachLater(m_attachmentRoot, Comment::create(m_document, token->comment()));
 }
 
 void HTMLConstructionSite::insertCommentOnHTMLHtmlElement(AtomicHTMLToken* token)
 {
-    ASSERT(token->type() == HTMLTokenTypes::Comment);
+    ASSERT(token->type() == HTMLToken::Comment);
     ContainerNode* parent = m_openElements.rootNode();
     attachLater(parent, Comment::create(parent->document(), token->comment()));
 }
@@ -279,6 +397,8 @@ void HTMLConstructionSite::insertHTMLBodyElement(AtomicHTMLToken* token)
     RefPtr<Element> body = createHTMLElement(token);
     attachLater(currentNode(), body);
     m_openElements.pushHTMLBodyElement(HTMLStackItem::create(body.release(), token));
+    if (Frame* frame = m_document->frame())
+        frame->loader()->client()->dispatchWillInsertBody();
 }
 
 void HTMLConstructionSite::insertHTMLFormElement(AtomicHTMLToken* token, bool isDemoted)
@@ -300,7 +420,7 @@ void HTMLConstructionSite::insertHTMLElement(AtomicHTMLToken* token)
 
 void HTMLConstructionSite::insertSelfClosingHTMLElement(AtomicHTMLToken* token)
 {
-    ASSERT(token->type() == HTMLTokenTypes::StartTag);
+    ASSERT(token->type() == HTMLToken::StartTag);
     // Normally HTMLElementStack is responsible for calling finishParsingChildren,
     // but self-closing elements are never in the element stack so the stack
     // doesn't get a chance to tell them that we're done parsing their children.
@@ -327,8 +447,8 @@ void HTMLConstructionSite::insertScriptElement(AtomicHTMLToken* token)
     // those flags or effects thereof.
     const bool parserInserted = m_fragmentScriptingPermission != AllowScriptingContentAndDoNotMarkAlreadyStarted;
     const bool alreadyStarted = m_isParsingFragment && parserInserted;
-    RefPtr<HTMLScriptElement> element = HTMLScriptElement::create(scriptTag, currentNode()->document(), parserInserted, alreadyStarted);
-    if (m_fragmentScriptingPermission != DisallowScriptingContent)
+    RefPtr<HTMLScriptElement> element = HTMLScriptElement::create(scriptTag, ownerDocumentForCurrentNode(), parserInserted, alreadyStarted);
+    if (scriptingContentIsAllowed(m_fragmentScriptingPermission))
         element->parserSetAttributes(token->attributes(), m_fragmentScriptingPermission);
     attachLater(currentNode(), element);
     m_openElements.push(HTMLStackItem::create(element.release(), token));
@@ -336,7 +456,7 @@ void HTMLConstructionSite::insertScriptElement(AtomicHTMLToken* token)
 
 void HTMLConstructionSite::insertForeignElement(AtomicHTMLToken* token, const AtomicString& namespaceURI)
 {
-    ASSERT(token->type() == HTMLTokenTypes::StartTag);
+    ASSERT(token->type() == HTMLToken::StartTag);
     notImplemented(); // parseError when xmlns or xmlns:xlink are wrong.
 
     RefPtr<Element> element = createElement(token, namespaceURI);
@@ -353,6 +473,11 @@ void HTMLConstructionSite::insertTextNode(const String& characters, WhitespaceMo
     if (shouldFosterParent())
         findFosterSite(task);
 
+#if ENABLE(TEMPLATE_ELEMENT)
+    if (task.parent->hasTagName(templateTag))
+        task.parent = toHTMLTemplateElement(task.parent.get())->content();
+#endif
+
     // Strings composed entirely of whitespace are likely to be repeated.
     // Turn them into AtomicString so we share a single string for each.
     bool shouldUseAtomicString = whitespaceMode == AllWhitespace
@@ -368,7 +493,7 @@ void HTMLConstructionSite::insertTextNode(const String& characters, WhitespaceMo
         // FIXME: We're only supposed to append to this text node if it
         // was the last text node inserted by the parser.
         CharacterData* textNode = static_cast<CharacterData*>(previousChild);
-        currentPosition = textNode->parserAppendData(characters.characters(), characters.length(), Text::defaultLengthLimit);
+        currentPosition = textNode->parserAppendData(characters, 0, Text::defaultLengthLimit);
     }
 
     while (currentPosition < characters.length()) {
@@ -382,6 +507,7 @@ void HTMLConstructionSite::insertTextNode(const String& characters, WhitespaceMo
         currentPosition += textNode->length();
         ASSERT(currentPosition <= characters.length());
         task.child = textNode.release();
+
         executeTask(task);
     }
 }
@@ -389,9 +515,18 @@ void HTMLConstructionSite::insertTextNode(const String& characters, WhitespaceMo
 PassRefPtr<Element> HTMLConstructionSite::createElement(AtomicHTMLToken* token, const AtomicString& namespaceURI)
 {
     QualifiedName tagName(nullAtom, token->name(), namespaceURI);
-    RefPtr<Element> element = currentNode()->document()->createElement(tagName, true);
+    RefPtr<Element> element = ownerDocumentForCurrentNode()->createElement(tagName, true);
     element->parserSetAttributes(token->attributes(), m_fragmentScriptingPermission);
     return element.release();
+}
+
+inline Document* HTMLConstructionSite::ownerDocumentForCurrentNode()
+{
+#if ENABLE(TEMPLATE_ELEMENT)
+    if (currentNode()->hasTagName(templateTag))
+        return toHTMLTemplateElement(currentElement())->content()->document();
+#endif
+    return currentNode()->document();
 }
 
 PassRefPtr<Element> HTMLConstructionSite::createHTMLElement(AtomicHTMLToken* token)
@@ -400,7 +535,7 @@ PassRefPtr<Element> HTMLConstructionSite::createHTMLElement(AtomicHTMLToken* tok
     // FIXME: This can't use HTMLConstructionSite::createElement because we
     // have to pass the current form element.  We should rework form association
     // to occur after construction to allow better code sharing here.
-    RefPtr<Element> element = HTMLElementFactory::createHTMLElement(tagName, currentNode()->document(), form(), true);
+    RefPtr<Element> element = HTMLElementFactory::createHTMLElement(tagName, ownerDocumentForCurrentNode(), form(), true);
     element->parserSetAttributes(token->attributes(), m_fragmentScriptingPermission);
     ASSERT(element->isHTMLElement());
     return element.release();
@@ -462,8 +597,23 @@ void HTMLConstructionSite::generateImpliedEndTags()
         m_openElements.pop();
 }
 
+bool HTMLConstructionSite::inQuirksMode()
+{
+    return m_inQuirksMode;
+}
+
 void HTMLConstructionSite::findFosterSite(HTMLConstructionSiteTask& task)
 {
+#if ENABLE(TEMPLATE_ELEMENT)
+    // When a node is to be foster parented, the last template element with no table element is below it in the stack of open elements is the foster parent element (NOT the template's parent!)
+    HTMLElementStack::ElementRecord* lastTemplateElement = m_openElements.topmost(templateTag.localName());
+    if (lastTemplateElement && !m_openElements.inTableScope(tableTag)) {
+        task.parent = lastTemplateElement->element();
+        return;
+    }
+
+#endif
+
     HTMLElementStack::ElementRecord* lastTableElementRecord = m_openElements.topmost(tableTag.localName());
     if (lastTableElementRecord) {
         Element* lastTableElement = lastTableElementRecord->element();
@@ -495,6 +645,7 @@ void HTMLConstructionSite::fosterParent(PassRefPtr<Node> node)
     findFosterSite(task);
     task.child = node;
     ASSERT(task.parent);
+
     m_attachmentQueue.append(task);
 }
 

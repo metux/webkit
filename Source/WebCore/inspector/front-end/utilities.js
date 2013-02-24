@@ -94,9 +94,14 @@ String.prototype.escapeCharacters = function(chars)
     return result;
 }
 
+String.regexSpecialCharacters = function()
+{
+    return "^[]{}()\\.$*+?|-,";
+}
+
 String.prototype.escapeForRegExp = function()
 {
-    return this.escapeCharacters("^[]{}()\\.$*+?|");
+    return this.escapeCharacters(String.regexSpecialCharacters);
 }
 
 String.prototype.escapeHTML = function()
@@ -131,6 +136,28 @@ String.prototype.trimURL = function(baseURLDomain)
     if (baseURLDomain)
         result = result.replace(new RegExp("^" + baseURLDomain.escapeForRegExp(), "i"), "");
     return result;
+}
+
+/**
+ * @param {string} other
+ * @return {number}
+ */
+String.prototype.compareTo = function(other)
+{
+    if (this > other)
+        return 1;
+    if (this < other)
+        return -1;
+    return 0;
+}
+
+/**
+ * @param {string} href
+ * @return {string}
+ */
+function sanitizeHref(href)
+{
+    return href && href.trim().toLowerCase().startsWith("javascript:") ? "" : href;
 }
 
 String.prototype.removeURLFragment = function()
@@ -307,7 +334,7 @@ var sortRange = {
                 quickSortFirstK(array, comparator, pivotNewIndex + 1, right, k);
         }
 
-        if (leftBound === 0 && rightBound === (this.length - 1) && k === this.length)
+        if (leftBound === 0 && rightBound === (this.length - 1) && k >= this.length)
             this.sort(comparator);
         else
             quickSortFirstK(this, comparator, leftBound, rightBound, k);
@@ -400,6 +427,18 @@ Object.defineProperty(Array.prototype, "select",
     }
 });
 
+Object.defineProperty(Array.prototype, "peekLast",
+{
+    /**
+     * @this {Array.<*>}
+     * @return {*}
+     */
+    value: function()
+    {
+        return this[this.length - 1];
+    }
+});
+
 /**
  * @param {*} anObject
  * @param {Array.<*>} aList
@@ -417,12 +456,6 @@ function insertionIndexForObjectInListSortedByFunction(anObject, aList, aFunctio
             index--;
         return index;
     }
-}
-
-Array.convert = function(list)
-{
-    // Cast array-like object to an array.
-    return Array.prototype.slice.call(list);
 }
 
 /**
@@ -622,12 +655,12 @@ function createSearchRegex(query, caseSensitive, isRegex)
 /**
  * @param {string} query
  * @param {string=} flags
- * @return {RegExp}
+ * @return {!RegExp}
  */
 function createPlainTextSearchRegex(query, flags)
 {
     // This should be kept the same as the one in ContentSearchUtils.cpp.
-    var regexSpecialCharacters = "[](){}+-*.,?\\^$|";
+    var regexSpecialCharacters = String.regexSpecialCharacters();
     var regex = "";
     for (var i = 0; i < query.length; ++i) {
         var c = query.charAt(i);
@@ -675,6 +708,7 @@ function numberToStringWithSpacesPadding(value, symbolsCount)
 var Map = function()
 {
     this._map = {};
+    this._size = 0;
 }
 
 Map._lastObjectIdentifier = 0;
@@ -682,6 +716,7 @@ Map._lastObjectIdentifier = 0;
 Map.prototype = {
     /**
      * @param {Object} key
+     * @param {*=} value
      */
     put: function(key, value)
     {
@@ -690,6 +725,8 @@ Map.prototype = {
             objectIdentifier = ++Map._lastObjectIdentifier;
             key.__identifier = objectIdentifier;
         }
+        if (!this._map[objectIdentifier])
+            ++this._size;
         this._map[objectIdentifier] = [key, value];
     },
     
@@ -699,8 +736,11 @@ Map.prototype = {
     remove: function(key)
     {
         var result = this._map[key.__identifier];
+        if (!result)
+            return undefined;
+        --this._size;
         delete this._map[key.__identifier];
-        return result ? result[1] : undefined;
+        return result[1];
     },
 
     /**
@@ -721,9 +761,10 @@ Map.prototype = {
      */
     _list: function(index)
     {
-        var result = [];
+        var result = new Array(this._size);
+        var i = 0;
         for (var objectIdentifier in this._map)
-            result.push(this._map[objectIdentifier][index]);
+            result[i++] = this._map[objectIdentifier][index];
         return result;
     },
 
@@ -735,10 +776,16 @@ Map.prototype = {
         var entry = this._map[key.__identifier];
         return entry ? entry[1] : undefined;
     },
-    
+
+    size: function()
+    {
+        return this._size;
+    },
+
     clear: function()
     {
         this._map = {};
+        this._size = 0;
     }
 }
 /**
@@ -844,5 +891,6 @@ function importScript(scriptName)
     var xhr = new XMLHttpRequest();
     xhr.open("GET", scriptName, false);
     xhr.send(null);
-    window.eval(xhr.responseText + "\n//@ sourceURL=" + scriptName);
+    var sourceURL = WebInspector.ParsedURL.completeURL(window.location.href, scriptName); 
+    window.eval(xhr.responseText + "\n//@ sourceURL=" + sourceURL);
 }

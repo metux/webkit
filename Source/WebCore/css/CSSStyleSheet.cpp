@@ -32,12 +32,14 @@
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
 #include "MediaList.h"
-#include "MemoryInstrumentation.h"
 #include "Node.h"
 #include "SVGNames.h"
 #include "SecurityOrigin.h"
 #include "StyleRule.h"
 #include "StyleSheetContents.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -56,8 +58,8 @@ private:
 
     virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const OVERRIDE
     {
-        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-        info.addInstrumentedMember(m_styleSheet);
+        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+        info.addMember(m_styleSheet, "styleSheet");
     }
     
     CSSStyleSheet* m_styleSheet;
@@ -179,14 +181,15 @@ void CSSStyleSheet::reattachChildRuleCSSOMWrappers()
 
 void CSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_contents);
-    info.addInstrumentedMember(m_title);
-    info.addInstrumentedMember(m_mediaQueries);
-    info.addInstrumentedMember(m_ownerNode);
-    info.addInstrumentedMember(m_ownerRule);
-    info.addInstrumentedMember(m_mediaCSSOMWrapper);
-    info.addInstrumentedVector(m_childRuleCSSOMWrappers);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_contents, "contents");
+    info.addMember(m_title, "title");
+    info.addMember(m_mediaQueries, "mediaQueries");
+    info.addMember(m_ownerNode, "ownerNode");
+    info.addMember(m_ownerRule, "ownerRule");
+    info.addMember(m_mediaCSSOMWrapper, "mediaCSSOMWrapper");
+    info.addMember(m_childRuleCSSOMWrappers, "childRuleCSSOMWrappers");
+    info.addMember(m_ruleListCSSOMWrapper, "ruleListCSSOMWrapper");
 }
 
 void CSSStyleSheet::setDisabled(bool disabled)
@@ -201,6 +204,13 @@ void CSSStyleSheet::setDisabled(bool disabled)
 void CSSStyleSheet::setMediaQueries(PassRefPtr<MediaQuerySet> mediaQueries)
 {
     m_mediaQueries = mediaQueries;
+    if (m_mediaCSSOMWrapper && m_mediaQueries)
+        m_mediaCSSOMWrapper->reattach(m_mediaQueries.get());
+
+#if ENABLE(RESOLUTION_MEDIA_QUERY)
+    // Add warning message to inspector whenever dpi/dpcm values are used for "screen" media.
+    reportMediaQueryWarningIfNeeded(ownerDocument(), m_mediaQueries.get());
+#endif
 }
 
 unsigned CSSStyleSheet::length() const
@@ -253,7 +263,7 @@ PassRefPtr<CSSRuleList> CSSStyleSheet::rules()
     unsigned ruleCount = length();
     for (unsigned i = 0; i < ruleCount; ++i) {
         CSSRule* rule = item(i);
-        if (rule->isCharsetRule())
+        if (rule->type() == CSSRule::CHARSET_RULE)
             continue;
         nonCharsetRules->rules().append(rule);
     }
@@ -311,7 +321,14 @@ void CSSStyleSheet::deleteRule(unsigned index, ExceptionCode& ec)
 
 int CSSStyleSheet::addRule(const String& selector, const String& style, int index, ExceptionCode& ec)
 {
-    insertRule(selector + " { " + style + " }", index, ec);
+    StringBuilder text;
+    text.append(selector);
+    text.appendLiteral(" { ");
+    text.append(style);
+    if (!style.isEmpty())
+        text.append(' ');
+    text.append('}');
+    insertRule(text.toString(), index, ec);
     
     // As per Microsoft documentation, always return -1.
     return -1;

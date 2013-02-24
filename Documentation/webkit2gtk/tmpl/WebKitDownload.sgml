@@ -153,3 +153,12 @@ WebKitDownload
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_download_get_web_view ##### -->
+<para>
+
+</para>
+
+@download: 
+@Returns: 
+
+

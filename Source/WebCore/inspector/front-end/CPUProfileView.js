@@ -26,6 +26,7 @@
 /**
  * @constructor
  * @extends {WebInspector.View}
+ * @param {WebInspector.CPUProfileHeader} profile
  */
 WebInspector.CPUProfileView = function(profile)
 {
@@ -56,35 +57,42 @@ WebInspector.CPUProfileView = function(profile)
 
     this.viewSelectComboBox = new WebInspector.StatusBarComboBox(this._changeView.bind(this));
 
-    var heavyViewOption = document.createElement("option");
-    heavyViewOption.label = WebInspector.UIString("Heavy (Bottom Up)");
-    heavyViewOption.value = WebInspector.CPUProfileView._TypeHeavy;
-    var treeViewOption = document.createElement("option");
-    treeViewOption.label = WebInspector.UIString("Tree (Top Down)");
-    treeViewOption.value = WebInspector.CPUProfileView._TypeTree;
-
-    this.viewSelectComboBox.addOption(heavyViewOption);
-    this.viewSelectComboBox.addOption(treeViewOption);
+    var heavyViewOption = this.viewSelectComboBox.createOption(WebInspector.UIString("Heavy (Bottom Up)"), "", WebInspector.CPUProfileView._TypeHeavy);
+    var treeViewOption = this.viewSelectComboBox.createOption(WebInspector.UIString("Tree (Top Down)"), "", WebInspector.CPUProfileView._TypeTree);
     this.viewSelectComboBox.select(this._viewType.get() === WebInspector.CPUProfileView._TypeHeavy ? heavyViewOption : treeViewOption);
 
     this.percentButton = new WebInspector.StatusBarButton("", "percent-time-status-bar-item");
     this.percentButton.addEventListener("click", this._percentClicked, this);
 
     this.focusButton = new WebInspector.StatusBarButton(WebInspector.UIString("Focus selected function."), "focus-profile-node-status-bar-item");
-    this.focusButton.disabled = true;
+    this.focusButton.setEnabled(false);
     this.focusButton.addEventListener("click", this._focusClicked, this);
 
     this.excludeButton = new WebInspector.StatusBarButton(WebInspector.UIString("Exclude selected function."), "exclude-profile-node-status-bar-item");
-    this.excludeButton.disabled = true;
+    this.excludeButton.setEnabled(false);
     this.excludeButton.addEventListener("click", this._excludeClicked, this);
 
     this.resetButton = new WebInspector.StatusBarButton(WebInspector.UIString("Restore all functions."), "reset-profile-status-bar-item");
     this.resetButton.visible = false;
     this.resetButton.addEventListener("click", this._resetClicked, this);
 
+    this.profileHead = /** @type {?ProfilerAgent.CPUProfileNode} */ (null);
     this.profile = profile;
 
-    function profileCallback(error, profile)
+    this._linkifier = new WebInspector.Linkifier(new WebInspector.Linkifier.DefaultFormatter(30));
+
+    ProfilerAgent.getCPUProfile(this.profile.uid, this._getCPUProfileCallback.bind(this));
+}
+
+WebInspector.CPUProfileView._TypeTree = "Tree";
+WebInspector.CPUProfileView._TypeHeavy = "Heavy";
+
+WebInspector.CPUProfileView.prototype = {
+    /**
+     * @param {?Protocol.Error} error
+     * @param {ProfilerAgent.CPUProfile} profile
+     */
+    _getCPUProfileCallback: function(error, profile)
     {
         if (error)
             return;
@@ -93,53 +101,39 @@ WebInspector.CPUProfileView = function(profile)
             // Profiling was tentatively terminated with the "Clear all profiles." button.
             return;
         }
-        this.profile.head = profile.head;
+        this.profileHead = profile.head;
+
+        if (profile.idleTime)
+            this._injectIdleTimeNode(profile);
+
         this._assignParentsInProfile();
         this._changeView();
         this._updatePercentButton();
-    }
+    },
 
-    this._linkifier = new WebInspector.Linkifier(new WebInspector.Linkifier.DefaultFormatter(30));
-
-    ProfilerAgent.getProfile(this.profile.profileType().id, this.profile.uid, profileCallback.bind(this));
-}
-
-WebInspector.CPUProfileView._TypeTree = "Tree";
-WebInspector.CPUProfileView._TypeHeavy = "Heavy";
-
-WebInspector.CPUProfileView.prototype = {
     get statusBarItems()
     {
         return [this.viewSelectComboBox.element, this.percentButton.element, this.focusButton.element, this.excludeButton.element, this.resetButton.element];
     },
 
-    get bottomUpProfileDataGridTree()
+    /**
+     * @return {!WebInspector.ProfileDataGridTree}
+     */
+    _getBottomUpProfileDataGridTree: function()
     {
-        if (!this._bottomUpProfileDataGridTree) {
-            if (this.profile.bottomUpHead)
-                this._bottomUpProfileDataGridTree = new WebInspector.TopDownProfileDataGridTree(this, this.profile.bottomUpHead);
-            else
-                this._bottomUpProfileDataGridTree = new WebInspector.BottomUpProfileDataGridTree(this, this.profile.head);
-        }
+        if (!this._bottomUpProfileDataGridTree)
+            this._bottomUpProfileDataGridTree = new WebInspector.BottomUpProfileDataGridTree(this, this.profileHead);
         return this._bottomUpProfileDataGridTree;
     },
 
-    get topDownProfileDataGridTree()
+    /**
+     * @return {!WebInspector.ProfileDataGridTree}
+     */
+    _getTopDownProfileDataGridTree: function()
     {
         if (!this._topDownProfileDataGridTree)
-            this._topDownProfileDataGridTree = new WebInspector.TopDownProfileDataGridTree(this, this.profile.head);
+            this._topDownProfileDataGridTree = new WebInspector.TopDownProfileDataGridTree(this, this.profileHead);
         return this._topDownProfileDataGridTree;
-    },
-
-    get currentTree()
-    {
-        return this._currentTree;
-    },
-
-    set currentTree(tree)
-    {
-        this._currentTree = tree;
-        this.refresh();
     },
 
     willHide: function()
@@ -186,6 +180,7 @@ WebInspector.CPUProfileView.prototype = {
 
                 delete profileNode._searchMatchedSelfColumn;
                 delete profileNode._searchMatchedTotalColumn;
+                delete profileNode._searchMatchedAverageColumn;
                 delete profileNode._searchMatchedCallsColumn;
                 delete profileNode._searchMatchedFunctionColumn;
 
@@ -230,6 +225,8 @@ WebInspector.CPUProfileView.prototype = {
         // Make equalTo implicitly true if it wasn't specified there is no other operator.
         if (!isNaN(queryNumber) && !(greaterThan || lessThan))
             equalTo = true;
+
+        var matcher = new RegExp(query.escapeForRegExp(), "i");
 
         function matchesQuery(/*ProfileDataGridNode*/ profileDataGridNode)
         {
@@ -298,7 +295,7 @@ WebInspector.CPUProfileView.prototype = {
                     profileDataGridNode._searchMatchedCallsColumn = true;
             }
 
-            if (profileDataGridNode.functionName.hasSubstring(query, true) || profileDataGridNode.url.hasSubstring(query, true))
+            if (profileDataGridNode.functionName.match(matcher) || (profileDataGridNode.url && profileDataGridNode.url.match(matcher)))
                 profileDataGridNode._searchMatchedFunctionColumn = true;
 
             if (profileDataGridNode._searchMatchedSelfColumn ||
@@ -388,12 +385,12 @@ WebInspector.CPUProfileView.prototype = {
 
         switch (this.viewSelectComboBox.selectedOption().value) {
         case WebInspector.CPUProfileView._TypeTree:
-            this.profileDataGridTree = this.topDownProfileDataGridTree;
+            this.profileDataGridTree = this._getTopDownProfileDataGridTree();
             this._sortProfile();
             this._viewType.set(WebInspector.CPUProfileView._TypeTree);
             break;
         case WebInspector.CPUProfileView._TypeHeavy:
-            this.profileDataGridTree = this.bottomUpProfileDataGridTree;
+            this.profileDataGridTree = this._getBottomUpProfileDataGridTree();
             this._sortProfile();
             this._viewType.set(WebInspector.CPUProfileView._TypeHeavy);
         }
@@ -465,14 +462,14 @@ WebInspector.CPUProfileView.prototype = {
 
     _dataGridNodeSelected: function(node)
     {
-        this.focusButton.disabled = false;
-        this.excludeButton.disabled = false;
+        this.focusButton.setEnabled(true);
+        this.excludeButton.setEnabled(true);
     },
 
     _dataGridNodeDeselected: function(node)
     {
-        this.focusButton.disabled = true;
-        this.excludeButton.disabled = true;
+        this.focusButton.setEnabled(false);
+        this.excludeButton.setEnabled(false);
     },
 
     _sortProfile: function()
@@ -515,12 +512,12 @@ WebInspector.CPUProfileView.prototype = {
 
     _assignParentsInProfile: function()
     {
-        var head = this.profile.head;
+        var head = this.profileHead;
         head.parent = null;
         head.head = null;
         var nodesToTraverse = [ { parent: head, children: head.children } ];
         while (nodesToTraverse.length > 0) {
-            var pair = nodesToTraverse.shift();
+            var pair = nodesToTraverse.pop();
             var parent = pair.parent;
             var children = pair.children;
             var length = children.length;
@@ -531,10 +528,45 @@ WebInspector.CPUProfileView.prototype = {
                     nodesToTraverse.push({ parent: children[i], children: children[i].children });
             }
         }
-    }
-}
+    },
 
-WebInspector.CPUProfileView.prototype.__proto__ = WebInspector.View.prototype;
+    /**
+     * @param {ProfilerAgent.CPUProfile} profile
+     */
+    _injectIdleTimeNode: function(profile)
+    {
+        var idleTime = profile.idleTime;
+        var nodes = profile.head.children;
+
+        var programNode = {selfTime: 0};
+        for (var i = nodes.length - 1; i >= 0; --i) {
+            if (nodes[i].functionName === "(program)") {
+                programNode = nodes[i];
+                break;
+            }
+        }
+        var programTime = programNode.selfTime;
+        if (idleTime > programTime)
+            idleTime = programTime;
+        programTime = programTime - idleTime;
+        programNode.selfTime = programTime;
+        programNode.totalTime = programTime;
+        var idleNode = {
+            functionName: "(idle)",
+            url: null,
+            lineNumber: 0,
+            totalTime: idleTime,
+            selfTime: idleTime,
+            numberOfCalls: 0,
+            visible: true,
+            callUID: 0,
+            children: []
+        };
+        nodes.push(idleNode);
+    },
+
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -622,15 +654,15 @@ WebInspector.CPUProfileType.prototype = {
     createProfile: function(profile)
     {
         return new WebInspector.CPUProfileHeader(this, profile.title, profile.uid);
-    }
-}
+    },
 
-WebInspector.CPUProfileType.prototype.__proto__ = WebInspector.ProfileType.prototype;
+    __proto__: WebInspector.ProfileType.prototype
+}
 
 /**
  * @constructor
  * @extends {WebInspector.ProfileHeader}
- * @param {WebInspector.CPUProfileType} type
+ * @param {!WebInspector.CPUProfileType} type
  * @param {string} title
  * @param {number=} uid
  */
@@ -655,7 +687,7 @@ WebInspector.CPUProfileHeader.prototype = {
     createView: function(profilesPanel)
     {
         return new WebInspector.CPUProfileView(this);
-    }
-}
+    },
 
-WebInspector.CPUProfileHeader.prototype.__proto__ = WebInspector.ProfileHeader.prototype;
+    __proto__: WebInspector.ProfileHeader.prototype
+}

@@ -34,6 +34,14 @@
 #import <Foundation/Foundation.h>
 #endif
 
+#ifndef CF_RELEASES_ARGUMENT
+#define CF_RELEASES_ARGUMENT
+#endif
+
+#ifndef NS_RELEASES_ARGUMENT
+#define NS_RELEASES_ARGUMENT
+#endif
+
 namespace WTF {
 
     // Unlike most most of our smart pointers, RetainPtr can take either the pointer type or the pointed-to type,
@@ -76,14 +84,16 @@ namespace WTF {
         ~RetainPtr() { if (PtrType ptr = m_ptr) CFRelease(ptr); }
         
         template<typename U> RetainPtr(const RetainPtr<U>&);
-        
-        PtrType get() const { return m_ptr; }
 
         void clear();
         PtrType leakRef() WARN_UNUSED_RETURN;
 
+        PtrType get() const { return m_ptr; }
         PtrType operator->() const { return m_ptr; }
-        
+#if COMPILER_SUPPORTS(CXX_EXPLICIT_CONVERSIONS)
+        explicit operator PtrType() const { return m_ptr; }
+#endif
+
         bool operator!() const { return !m_ptr; }
     
         // This conversion operator allows implicit conversion to bool but not to other integer types.
@@ -255,13 +265,13 @@ namespace WTF {
         return a != b.get(); 
     }
 
-    template<typename T> inline RetainPtr<T> adoptCF(T) WARN_UNUSED_RETURN;
+    template<typename T> inline RetainPtr<T> adoptCF(T CF_RELEASES_ARGUMENT) WARN_UNUSED_RETURN;
     template<typename T> inline RetainPtr<T> adoptCF(T o)
     {
         return RetainPtr<T>(AdoptCF, o);
     }
 
-    template<typename T> inline RetainPtr<T> adoptNS(T) WARN_UNUSED_RETURN;
+    template<typename T> inline RetainPtr<T> adoptNS(T NS_RELEASES_ARGUMENT) WARN_UNUSED_RETURN;
     template<typename T> inline RetainPtr<T> adoptNS(T o)
     {
         return RetainPtr<T>(AdoptNS, o);
@@ -287,6 +297,32 @@ namespace WTF {
     
     template<typename P> struct DefaultHash<RetainPtr<P> > { typedef PtrHash<RetainPtr<P> > Hash; };
 
+    template <typename P>
+    struct RetainPtrObjectHashTraits : GenericHashTraits<RetainPtr<P> > {
+        static const bool emptyValueIsZero = true;
+        static const RetainPtr<P>& emptyValue()
+        {
+            static RetainPtr<P>& null = *(new RetainPtr<P>);
+            return null;
+        }
+        static const bool needsDestruction = true;
+        static void constructDeletedValue(RetainPtr<P>& slot) { new (&slot) RetainPtr<P>(HashTableDeletedValue); }
+        static bool isDeletedValue(const RetainPtr<P>& value) { return value.isHashTableDeletedValue(); }
+    };
+
+    template <typename P>
+    struct RetainPtrObjectHash {
+        static unsigned hash(const RetainPtr<P>& o)
+        {
+            ASSERT_WITH_MESSAGE(o.get(), "attempt to use null RetainPtr in HashTable");
+            return CFHash(o.get());
+        }
+        static bool equal(const RetainPtr<P>& a, const RetainPtr<P>& b)
+        {
+            return CFEqual(a.get(), b.get());
+        }
+        static const bool safeToCompareToEmptyOrDeleted = false;
+    };
 } // namespace WTF
 
 using WTF::AdoptCF;

@@ -29,9 +29,9 @@
  */
 
 #include "config.h"
+#if ENABLE(DETAILS_ELEMENT)
 #include "DetailsMarkerControl.h"
 
-#if ENABLE(DETAILS_ELEMENT)
 #include "HTMLNames.h"
 #include "HTMLSummaryElement.h"
 #include "RenderDetailsMarker.h"
@@ -57,7 +57,7 @@ bool DetailsMarkerControl::rendererIsNeeded(const NodeRenderingContext& context)
 
 const AtomicString& DetailsMarkerControl::shadowPseudoId() const
 {
-    DEFINE_STATIC_LOCAL(AtomicString, pseudId, ("-webkit-details-marker"));
+    DEFINE_STATIC_LOCAL(AtomicString, pseudId, ("-webkit-details-marker", AtomicString::ConstructFromLiteral));
     return pseudId;
 }
 

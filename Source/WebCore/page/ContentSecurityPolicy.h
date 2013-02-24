@@ -27,6 +27,7 @@
 #define ContentSecurityPolicy_h
 
 #include "KURL.h"
+#include "ScriptState.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
@@ -40,7 +41,6 @@ class OrdinalNumber;
 namespace WebCore {
 
 class CSPDirectiveList;
-class ScriptCallStack;
 class DOMStringList;
 class ScriptExecutionContext;
 class SecurityOrigin;
@@ -49,6 +49,7 @@ typedef int SandboxFlags;
 typedef Vector<OwnPtr<CSPDirectiveList> > CSPDirectiveListVector;
 
 class ContentSecurityPolicy {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<ContentSecurityPolicy> create(ScriptExecutionContext* scriptExecutionContext)
     {
@@ -59,8 +60,10 @@ public:
     void copyStateFrom(const ContentSecurityPolicy*);
 
     enum HeaderType {
-        ReportOnly,
-        EnforcePolicy
+        ReportStableDirectives,
+        EnforceStableDirectives,
+        ReportAllDirectives,
+        EnforceAllDirectives
     };
 
     enum ReportingStatus {
@@ -79,7 +82,7 @@ public:
     bool allowInlineEventHandlers(const String& contextURL, const WTF::OrdinalNumber& contextLine, ReportingStatus = SendReport) const;
     bool allowInlineScript(const String& contextURL, const WTF::OrdinalNumber& contextLine, ReportingStatus = SendReport) const;
     bool allowInlineStyle(const String& contextURL, const WTF::OrdinalNumber& contextLine, ReportingStatus = SendReport) const;
-    bool allowEval(PassRefPtr<ScriptCallStack>, ReportingStatus = SendReport) const;
+    bool allowEval(ScriptState* = 0, ReportingStatus = SendReport) const;
     bool allowScriptNonce(const String& nonce, const String& contextURL, const WTF::OrdinalNumber& contextLine, const KURL& = KURL()) const;
     bool allowPluginType(const String& type, const String& typeAttribute, const KURL&, ReportingStatus = SendReport) const;
 
@@ -98,23 +101,31 @@ public:
     bool isActive() const;
     void gatherReportURIs(DOMStringList&) const;
 
+    void reportDirectiveAsSourceExpression(const String& directiveName, const String& sourceExpression) const;
     void reportDuplicateDirective(const String&) const;
-    void reportIgnoredPathComponent(const String& directiveName, const String& completeSource, const String& path) const;
+    void reportInvalidDirectiveValueCharacter(const String& directiveName, const String& value) const;
+    void reportInvalidPathCharacter(const String& directiveName, const String& value, const char) const;
     void reportInvalidNonce(const String&) const;
     void reportInvalidPluginTypes(const String&) const;
+    void reportInvalidSandboxFlags(const String&) const;
     void reportInvalidSourceExpression(const String& directiveName, const String& source) const;
-    void reportUnrecognizedDirective(const String&) const;
-    void reportViolation(const String& directiveText, const String& consoleMessage, const KURL& blockedURL, const Vector<KURL>& reportURIs, const String& header, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), PassRefPtr<ScriptCallStack> = 0) const;
+    void reportUnsupportedDirective(const String&) const;
+    void reportViolation(const String& directiveText, const String& consoleMessage, const KURL& blockedURL, const Vector<KURL>& reportURIs, const String& header, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), ScriptState* = 0) const;
+
+    void reportBlockedScriptExecutionToInspector(const String& directiveText) const;
 
     const KURL& url() const;
     KURL completeURL(const String&) const;
     SecurityOrigin* securityOrigin() const;
     void enforceSandboxFlags(SandboxFlags) const;
+    String evalDisabledErrorMessage() const;
+
+    bool experimentalFeaturesEnabled() const;
 
 private:
     explicit ContentSecurityPolicy(ScriptExecutionContext*);
 
-    void logToConsole(const String& message, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), PassRefPtr<ScriptCallStack> = 0) const;
+    void logToConsole(const String& message, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), ScriptState* = 0) const;
 
     ScriptExecutionContext* m_scriptExecutionContext;
     bool m_overrideInlineStyleAllowed;

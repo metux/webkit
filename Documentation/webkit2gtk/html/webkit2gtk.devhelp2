@@ -5,7 +5,6 @@
     <sub name="Class Overview" link="ch01.html">
       <sub name="WebKitWebContext" link="WebKitWebContext.html"/>
       <sub name="WebKitWebView" link="WebKitWebView.html"/>
-      <sub name="WebKitWebViewBase" link="WebKitWebViewBase.html"/>
       <sub name="WebKitBackForwardList" link="WebKitBackForwardList.html"/>
       <sub name="WebKitBackForwardListItem" link="WebKitBackForwardListItem.html"/>
       <sub name="WebKitSettings" link="WebKitSettings.html"/>
@@ -22,6 +21,7 @@
       <sub name="WebKitPrintOperation" link="WebKitPrintOperation.html"/>
       <sub name="WebKitWebResource" link="WebKitWebResource.html"/>
       <sub name="WebKitError" link="webkit2gtk-WebKitError.html"/>
+      <sub name="WebKitFaviconDatabase" link="WebKitFaviconDatabase.html"/>
       <sub name="WebKitFileChooserRequest" link="WebKitFileChooserRequest.html"/>
       <sub name="WebKitFindController" link="WebKitFindController.html"/>
       <sub name="WebKitCookieManager" link="WebKitCookieManager.html"/>
@@ -32,6 +32,11 @@
       <sub name="WebKitContextMenu" link="WebKitContextMenu.html"/>
       <sub name="WebKitContextMenuItem" link="WebKitContextMenuItem.html"/>
       <sub name="WebKitFormSubmissionRequest" link="WebKitFormSubmissionRequest.html"/>
+      <sub name="WebKitSecurityManager" link="WebKitSecurityManager.html"/>
+    </sub>
+    <sub name="Web Extensions" link="ch02.html">
+      <sub name="WebKitWebExtension" link="WebKitWebExtension.html"/>
+      <sub name="WebKitWebPage" link="WebKitWebPage.html"/>
     </sub>
     <sub name="Index" link="index-all.html"/>
     <sub name="Annotation Glossary" link="annotation-glossary.html"/>
@@ -39,12 +44,17 @@
   <functions>
     <keyword type="struct" name="struct WebKitWebContext" link="WebKitWebContext.html#WebKitWebContext-struct"/>
     <keyword type="enum" name="enum WebKitCacheModel" link="WebKitWebContext.html#WebKitCacheModel"/>
+    <keyword type="enum" name="enum WebKitTLSErrorsPolicy" link="WebKitWebContext.html#WebKitTLSErrorsPolicy"/>
     <keyword type="function" name="webkit_web_context_get_default ()" link="WebKitWebContext.html#webkit-web-context-get-default"/>
     <keyword type="function" name="webkit_web_context_get_cache_model ()" link="WebKitWebContext.html#webkit-web-context-get-cache-model"/>
     <keyword type="function" name="webkit_web_context_set_cache_model ()" link="WebKitWebContext.html#webkit-web-context-set-cache-model"/>
     <keyword type="function" name="webkit_web_context_clear_cache ()" link="WebKitWebContext.html#webkit-web-context-clear-cache"/>
     <keyword type="function" name="webkit_web_context_download_uri ()" link="WebKitWebContext.html#webkit-web-context-download-uri"/>
     <keyword type="function" name="webkit_web_context_get_cookie_manager ()" link="WebKitWebContext.html#webkit-web-context-get-cookie-manager"/>
+    <keyword type="function" name="webkit_web_context_get_favicon_database ()" link="WebKitWebContext.html#webkit-web-context-get-favicon-database"/>
+    <keyword type="function" name="webkit_web_context_set_favicon_database_directory ()" link="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory"/>
+    <keyword type="function" name="webkit_web_context_get_favicon_database_directory ()" link="WebKitWebContext.html#webkit-web-context-get-favicon-database-directory"/>
+    <keyword type="function" name="webkit_web_context_get_security_manager ()" link="WebKitWebContext.html#webkit-web-context-get-security-manager"/>
     <keyword type="function" name="webkit_web_context_set_additional_plugins_directory ()" link="WebKitWebContext.html#webkit-web-context-set-additional-plugins-directory"/>
     <keyword type="function" name="webkit_web_context_get_plugins ()" link="WebKitWebContext.html#webkit-web-context-get-plugins"/>
     <keyword type="function" name="webkit_web_context_get_plugins_finish ()" link="WebKitWebContext.html#webkit-web-context-get-plugins-finish"/>
@@ -53,6 +63,10 @@
     <keyword type="function" name="webkit_web_context_get_spell_checking_languages ()" link="WebKitWebContext.html#webkit-web-context-get-spell-checking-languages"/>
     <keyword type="function" name="webkit_web_context_set_spell_checking_languages ()" link="WebKitWebContext.html#webkit-web-context-set-spell-checking-languages"/>
     <keyword type="function" name="webkit_web_context_set_preferred_languages ()" link="WebKitWebContext.html#webkit-web-context-set-preferred-languages"/>
+    <keyword type="function" name="webkit_web_context_set_tls_errors_policy ()" link="WebKitWebContext.html#webkit-web-context-set-tls-errors-policy"/>
+    <keyword type="function" name="webkit_web_context_get_tls_errors_policy ()" link="WebKitWebContext.html#webkit-web-context-get-tls-errors-policy"/>
+    <keyword type="function" name="webkit_web_context_set_web_extensions_directory ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory"/>
+    <keyword type="function" name="webkit_web_context_prefetch_dns ()" link="WebKitWebContext.html#webkit-web-context-prefetch-dns"/>
     <keyword type="function" name="WebKitURISchemeRequestCallback ()" link="WebKitWebContext.html#WebKitURISchemeRequestCallback"/>
     <keyword type="function" name="webkit_web_context_register_uri_scheme ()" link="WebKitWebContext.html#webkit-web-context-register-uri-scheme"/>
     <keyword type="signal" name="The &quot;download-started&quot; signal" link="WebKitWebContext.html#WebKitWebContext-download-started"/>
@@ -60,9 +74,14 @@
     <keyword type="enum" name="enum WebKitLoadEvent" link="WebKitWebView.html#WebKitLoadEvent"/>
     <keyword type="enum" name="enum WebKitPolicyDecisionType" link="WebKitWebView.html#WebKitPolicyDecisionType"/>
     <keyword type="enum" name="enum WebKitSaveMode" link="WebKitWebView.html#WebKitSaveMode"/>
+    <keyword type="enum" name="enum WebKitViewMode" link="WebKitWebView.html#WebKitViewMode"/>
+    <keyword type="enum" name="enum WebKitInsecureContentEvent" link="WebKitWebView.html#WebKitInsecureContentEvent"/>
     <keyword type="macro" name="WEBKIT_EDITING_COMMAND_CUT" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-CUT:CAPS"/>
     <keyword type="macro" name="WEBKIT_EDITING_COMMAND_COPY" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-COPY:CAPS"/>
     <keyword type="macro" name="WEBKIT_EDITING_COMMAND_PASTE" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-PASTE:CAPS"/>
+    <keyword type="macro" name="WEBKIT_EDITING_COMMAND_SELECT_ALL" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-SELECT-ALL:CAPS"/>
+    <keyword type="macro" name="WEBKIT_EDITING_COMMAND_UNDO" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-UNDO:CAPS"/>
+    <keyword type="macro" name="WEBKIT_EDITING_COMMAND_REDO" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-REDO:CAPS"/>
     <keyword type="function" name="webkit_web_view_new ()" link="WebKitWebView.html#webkit-web-view-new"/>
     <keyword type="function" name="webkit_web_view_new_with_context ()" link="WebKitWebView.html#webkit-web-view-new-with-context"/>
     <keyword type="function" name="webkit_web_view_get_context ()" link="WebKitWebView.html#webkit-web-view-get-context"/>
@@ -76,15 +95,18 @@
     <keyword type="function" name="webkit_web_view_can_go_forward ()" link="WebKitWebView.html#webkit-web-view-can-go-forward"/>
     <keyword type="function" name="webkit_web_view_go_forward ()" link="WebKitWebView.html#webkit-web-view-go-forward"/>
     <keyword type="function" name="webkit_web_view_get_title ()" link="WebKitWebView.html#webkit-web-view-get-title"/>
+    <keyword type="function" name="webkit_web_view_get_page_id ()" link="WebKitWebView.html#webkit-web-view-get-page-id"/>
     <keyword type="function" name="webkit_web_view_reload ()" link="WebKitWebView.html#webkit-web-view-reload"/>
     <keyword type="function" name="webkit_web_view_reload_bypass_cache ()" link="WebKitWebView.html#webkit-web-view-reload-bypass-cache"/>
     <keyword type="function" name="webkit_web_view_stop_loading ()" link="WebKitWebView.html#webkit-web-view-stop-loading"/>
+    <keyword type="function" name="webkit_web_view_is_loading ()" link="WebKitWebView.html#webkit-web-view-is-loading"/>
     <keyword type="function" name="webkit_web_view_get_estimated_load_progress ()" link="WebKitWebView.html#webkit-web-view-get-estimated-load-progress"/>
     <keyword type="function" name="webkit_web_view_get_custom_charset ()" link="WebKitWebView.html#webkit-web-view-get-custom-charset"/>
     <keyword type="function" name="webkit_web_view_set_custom_charset ()" link="WebKitWebView.html#webkit-web-view-set-custom-charset"/>
     <keyword type="function" name="webkit_web_view_get_back_forward_list ()" link="WebKitWebView.html#webkit-web-view-get-back-forward-list"/>
     <keyword type="function" name="webkit_web_view_go_to_back_forward_list_item ()" link="WebKitWebView.html#webkit-web-view-go-to-back-forward-list-item"/>
     <keyword type="function" name="webkit_web_view_get_uri ()" link="WebKitWebView.html#webkit-web-view-get-uri"/>
+    <keyword type="function" name="webkit_web_view_get_favicon ()" link="WebKitWebView.html#webkit-web-view-get-favicon"/>
     <keyword type="function" name="webkit_web_view_set_settings ()" link="WebKitWebView.html#webkit-web-view-set-settings"/>
     <keyword type="function" name="webkit_web_view_get_settings ()" link="WebKitWebView.html#webkit-web-view-get-settings"/>
     <keyword type="function" name="webkit_web_view_get_window_properties ()" link="WebKitWebView.html#webkit-web-view-get-window-properties"/>
@@ -98,11 +120,17 @@
     <keyword type="function" name="webkit_web_view_get_javascript_global_context ()" link="WebKitWebView.html#webkit-web-view-get-javascript-global-context"/>
     <keyword type="function" name="webkit_web_view_run_javascript ()" link="WebKitWebView.html#webkit-web-view-run-javascript"/>
     <keyword type="function" name="webkit_web_view_run_javascript_finish ()" link="WebKitWebView.html#webkit-web-view-run-javascript-finish"/>
+    <keyword type="function" name="webkit_web_view_run_javascript_from_gresource ()" link="WebKitWebView.html#webkit-web-view-run-javascript-from-gresource"/>
+    <keyword type="function" name="webkit_web_view_run_javascript_from_gresource_finish ()" link="WebKitWebView.html#webkit-web-view-run-javascript-from-gresource-finish"/>
     <keyword type="function" name="webkit_web_view_can_show_mime_type ()" link="WebKitWebView.html#webkit-web-view-can-show-mime-type"/>
     <keyword type="function" name="webkit_web_view_save ()" link="WebKitWebView.html#webkit-web-view-save"/>
     <keyword type="function" name="webkit_web_view_save_finish ()" link="WebKitWebView.html#webkit-web-view-save-finish"/>
     <keyword type="function" name="webkit_web_view_save_to_file ()" link="WebKitWebView.html#webkit-web-view-save-to-file"/>
     <keyword type="function" name="webkit_web_view_save_to_file_finish ()" link="WebKitWebView.html#webkit-web-view-save-to-file-finish"/>
+    <keyword type="function" name="webkit_web_view_download_uri ()" link="WebKitWebView.html#webkit-web-view-download-uri"/>
+    <keyword type="function" name="webkit_web_view_set_view_mode ()" link="WebKitWebView.html#webkit-web-view-set-view-mode"/>
+    <keyword type="function" name="webkit_web_view_get_view_mode ()" link="WebKitWebView.html#webkit-web-view-get-view-mode"/>
+    <keyword type="function" name="webkit_web_view_get_tls_info ()" link="WebKitWebView.html#webkit-web-view-get-tls-info"/>
     <keyword type="struct" name="WebKitJavascriptResult" link="WebKitWebView.html#WebKitJavascriptResult-struct"/>
     <keyword type="function" name="webkit_javascript_result_ref ()" link="WebKitWebView.html#webkit-javascript-result-ref"/>
     <keyword type="function" name="webkit_javascript_result_unref ()" link="WebKitWebView.html#webkit-javascript-result-unref"/>
@@ -116,10 +144,12 @@
     <keyword type="function" name="webkit_script_dialog_prompt_get_default_text ()" link="WebKitWebView.html#webkit-script-dialog-prompt-get-default-text"/>
     <keyword type="function" name="webkit_script_dialog_prompt_set_text ()" link="WebKitWebView.html#webkit-script-dialog-prompt-set-text"/>
     <keyword type="function" name="webkit_web_view_get_main_resource ()" link="WebKitWebView.html#webkit-web-view-get-main-resource"/>
-    <keyword type="function" name="webkit_web_view_get_subresources ()" link="WebKitWebView.html#webkit-web-view-get-subresources"/>
     <keyword type="property" name="The &quot;estimated-load-progress&quot; property" link="WebKitWebView.html#WebKitWebView--estimated-load-progress"/>
+    <keyword type="property" name="The &quot;favicon&quot; property" link="WebKitWebView.html#WebKitWebView--favicon"/>
+    <keyword type="property" name="The &quot;is-loading&quot; property" link="WebKitWebView.html#WebKitWebView--is-loading"/>
     <keyword type="property" name="The &quot;title&quot; property" link="WebKitWebView.html#WebKitWebView--title"/>
     <keyword type="property" name="The &quot;uri&quot; property" link="WebKitWebView.html#WebKitWebView--uri"/>
+    <keyword type="property" name="The &quot;view-mode&quot; property" link="WebKitWebView.html#WebKitWebView--view-mode"/>
     <keyword type="property" name="The &quot;web-context&quot; property" link="WebKitWebView.html#WebKitWebView--web-context"/>
     <keyword type="property" name="The &quot;zoom-level&quot; property" link="WebKitWebView.html#WebKitWebView--zoom-level"/>
     <keyword type="signal" name="The &quot;close&quot; signal" link="WebKitWebView.html#WebKitWebView-close"/>
@@ -128,6 +158,7 @@
     <keyword type="signal" name="The &quot;create&quot; signal" link="WebKitWebView.html#WebKitWebView-create"/>
     <keyword type="signal" name="The &quot;decide-policy&quot; signal" link="WebKitWebView.html#WebKitWebView-decide-policy"/>
     <keyword type="signal" name="The &quot;enter-fullscreen&quot; signal" link="WebKitWebView.html#WebKitWebView-enter-fullscreen"/>
+    <keyword type="signal" name="The &quot;insecure-content-detected&quot; signal" link="WebKitWebView.html#WebKitWebView-insecure-content-detected"/>
     <keyword type="signal" name="The &quot;leave-fullscreen&quot; signal" link="WebKitWebView.html#WebKitWebView-leave-fullscreen"/>
     <keyword type="signal" name="The &quot;load-changed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-changed"/>
     <keyword type="signal" name="The &quot;load-failed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-failed"/>
@@ -140,7 +171,6 @@
     <keyword type="signal" name="The &quot;run-file-chooser&quot; signal" link="WebKitWebView.html#WebKitWebView-run-file-chooser"/>
     <keyword type="signal" name="The &quot;script-dialog&quot; signal" link="WebKitWebView.html#WebKitWebView-script-dialog"/>
     <keyword type="signal" name="The &quot;submit-form&quot; signal" link="WebKitWebView.html#WebKitWebView-submit-form"/>
-    <keyword type="struct" name="struct WebKitWebViewBase" link="WebKitWebViewBase.html#WebKitWebViewBase-struct"/>
     <keyword type="struct" name="struct WebKitBackForwardList" link="WebKitBackForwardList.html#WebKitBackForwardList-struct"/>
     <keyword type="function" name="webkit_back_forward_list_get_length ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-length"/>
     <keyword type="function" name="webkit_back_forward_list_get_current_item ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-current-item"/>
@@ -241,6 +271,11 @@
     <keyword type="function" name="webkit_settings_set_enable_site_specific_quirks ()" link="WebKitSettings.html#webkit-settings-set-enable-site-specific-quirks"/>
     <keyword type="function" name="webkit_settings_get_enable_page_cache ()" link="WebKitSettings.html#webkit-settings-get-enable-page-cache"/>
     <keyword type="function" name="webkit_settings_set_enable_page_cache ()" link="WebKitSettings.html#webkit-settings-set-enable-page-cache"/>
+    <keyword type="function" name="webkit_settings_get_user_agent ()" link="WebKitSettings.html#webkit-settings-get-user-agent"/>
+    <keyword type="function" name="webkit_settings_set_user_agent ()" link="WebKitSettings.html#webkit-settings-set-user-agent"/>
+    <keyword type="function" name="webkit_settings_set_user_agent_with_application_details ()" link="WebKitSettings.html#webkit-settings-set-user-agent-with-application-details"/>
+    <keyword type="function" name="webkit_settings_get_enable_smooth_scrolling ()" link="WebKitSettings.html#webkit-settings-get-enable-smooth-scrolling"/>
+    <keyword type="function" name="webkit_settings_set_enable_smooth_scrolling ()" link="WebKitSettings.html#webkit-settings-set-enable-smooth-scrolling"/>
     <keyword type="property" name="The &quot;allow-modal-dialogs&quot; property" link="WebKitSettings.html#WebKitSettings--allow-modal-dialogs"/>
     <keyword type="property" name="The &quot;auto-load-images&quot; property" link="WebKitSettings.html#WebKitSettings--auto-load-images"/>
     <keyword type="property" name="The &quot;cursive-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--cursive-font-family"/>
@@ -265,6 +300,7 @@
     <keyword type="property" name="The &quot;enable-private-browsing&quot; property" link="WebKitSettings.html#WebKitSettings--enable-private-browsing"/>
     <keyword type="property" name="The &quot;enable-resizable-text-areas&quot; property" link="WebKitSettings.html#WebKitSettings--enable-resizable-text-areas"/>
     <keyword type="property" name="The &quot;enable-site-specific-quirks&quot; property" link="WebKitSettings.html#WebKitSettings--enable-site-specific-quirks"/>
+    <keyword type="property" name="The &quot;enable-smooth-scrolling&quot; property" link="WebKitSettings.html#WebKitSettings--enable-smooth-scrolling"/>
     <keyword type="property" name="The &quot;enable-tabs-to-links&quot; property" link="WebKitSettings.html#WebKitSettings--enable-tabs-to-links"/>
     <keyword type="property" name="The &quot;enable-webaudio&quot; property" link="WebKitSettings.html#WebKitSettings--enable-webaudio"/>
     <keyword type="property" name="The &quot;enable-webgl&quot; property" link="WebKitSettings.html#WebKitSettings--enable-webgl"/>
@@ -281,6 +317,7 @@
     <keyword type="property" name="The &quot;print-backgrounds&quot; property" link="WebKitSettings.html#WebKitSettings--print-backgrounds"/>
     <keyword type="property" name="The &quot;sans-serif-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--sans-serif-font-family"/>
     <keyword type="property" name="The &quot;serif-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--serif-font-family"/>
+    <keyword type="property" name="The &quot;user-agent&quot; property" link="WebKitSettings.html#WebKitSettings--user-agent"/>
     <keyword type="property" name="The &quot;zoom-text-only&quot; property" link="WebKitSettings.html#WebKitSettings--zoom-text-only"/>
     <keyword type="struct" name="struct WebKitURIRequest" link="WebKitURIRequest.html#WebKitURIRequest-struct"/>
     <keyword type="function" name="webkit_uri_request_new ()" link="WebKitURIRequest.html#webkit-uri-request-new"/>
@@ -291,7 +328,6 @@
     <keyword type="function" name="webkit_uri_response_get_status_code ()" link="WebKitURIResponse.html#webkit-uri-response-get-status-code"/>
     <keyword type="function" name="webkit_uri_response_get_content_length ()" link="WebKitURIResponse.html#webkit-uri-response-get-content-length"/>
     <keyword type="function" name="webkit_uri_response_get_mime_type ()" link="WebKitURIResponse.html#webkit-uri-response-get-mime-type"/>
-    <keyword type="function" name="webkit_uri_response_get_https_status ()" link="WebKitURIResponse.html#webkit-uri-response-get-https-status"/>
     <keyword type="function" name="webkit_uri_response_get_suggested_filename ()" link="WebKitURIResponse.html#webkit-uri-response-get-suggested-filename"/>
     <keyword type="property" name="The &quot;content-length&quot; property" link="WebKitURIResponse.html#WebKitURIResponse--content-length"/>
     <keyword type="property" name="The &quot;mime-type&quot; property" link="WebKitURIResponse.html#WebKitURIResponse--mime-type"/>
@@ -324,6 +360,7 @@
     <keyword type="function" name="webkit_download_get_estimated_progress ()" link="WebKitDownload.html#webkit-download-get-estimated-progress"/>
     <keyword type="function" name="webkit_download_get_elapsed_time ()" link="WebKitDownload.html#webkit-download-get-elapsed-time"/>
     <keyword type="function" name="webkit_download_get_received_data_length ()" link="WebKitDownload.html#webkit-download-get-received-data-length"/>
+    <keyword type="function" name="webkit_download_get_web_view ()" link="WebKitDownload.html#webkit-download-get-web-view"/>
     <keyword type="property" name="The &quot;destination&quot; property" link="WebKitDownload.html#WebKitDownload--destination"/>
     <keyword type="property" name="The &quot;estimated-progress&quot; property" link="WebKitDownload.html#WebKitDownload--estimated-progress"/>
     <keyword type="property" name="The &quot;response&quot; property" link="WebKitDownload.html#WebKitDownload--response"/>
@@ -369,6 +406,7 @@
     <keyword type="function" name="webkit_hit_test_result_get_link_label ()" link="WebKitHitTestResult.html#webkit-hit-test-result-get-link-label"/>
     <keyword type="function" name="webkit_hit_test_result_get_image_uri ()" link="WebKitHitTestResult.html#webkit-hit-test-result-get-image-uri"/>
     <keyword type="function" name="webkit_hit_test_result_get_media_uri ()" link="WebKitHitTestResult.html#webkit-hit-test-result-get-media-uri"/>
+    <keyword type="function" name="webkit_hit_test_result_context_is_scrollbar ()" link="WebKitHitTestResult.html#webkit-hit-test-result-context-is-scrollbar"/>
     <keyword type="property" name="The &quot;context&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--context"/>
     <keyword type="property" name="The &quot;image-uri&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--image-uri"/>
     <keyword type="property" name="The &quot;link-label&quot; property" link="WebKitHitTestResult.html#WebKitHitTestResult--link-label"/>
@@ -418,6 +456,14 @@
     <keyword type="function" name="webkit_download_error_quark ()" link="webkit2gtk-WebKitError.html#webkit-download-error-quark"/>
     <keyword type="function" name="webkit_print_error_quark ()" link="webkit2gtk-WebKitError.html#webkit-print-error-quark"/>
     <keyword type="function" name="webkit_javascript_error_quark ()" link="webkit2gtk-WebKitError.html#webkit-javascript-error-quark"/>
+    <keyword type="struct" name="struct WebKitFaviconDatabase" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-struct"/>
+    <keyword type="macro" name="WEBKIT_FAVICON_DATABASE_ERROR" link="WebKitFaviconDatabase.html#WEBKIT-FAVICON-DATABASE-ERROR:CAPS"/>
+    <keyword type="enum" name="enum WebKitFaviconDatabaseError" link="WebKitFaviconDatabase.html#WebKitFaviconDatabaseError"/>
+    <keyword type="function" name="webkit_favicon_database_get_favicon ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon"/>
+    <keyword type="function" name="webkit_favicon_database_get_favicon_finish ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-finish"/>
+    <keyword type="function" name="webkit_favicon_database_get_favicon_uri ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-uri"/>
+    <keyword type="function" name="webkit_favicon_database_clear ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-clear"/>
+    <keyword type="signal" name="The &quot;favicon-changed&quot; signal" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-favicon-changed"/>
     <keyword type="struct" name="struct WebKitFileChooserRequest" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest-struct"/>
     <keyword type="function" name="webkit_file_chooser_request_get_mime_types ()" link="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types"/>
     <keyword type="function" name="webkit_file_chooser_request_get_mime_types_filter ()" link="WebKitFileChooserRequest.html#webkit-file-chooser-request-get-mime-types-filter"/>
@@ -490,6 +536,7 @@
     <keyword type="function" name="webkit_uri_scheme_request_get_scheme ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-scheme"/>
     <keyword type="function" name="webkit_uri_scheme_request_get_uri ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-uri"/>
     <keyword type="function" name="webkit_uri_scheme_request_get_path ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-path"/>
+    <keyword type="function" name="webkit_uri_scheme_request_get_web_view ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-web-view"/>
     <keyword type="function" name="webkit_uri_scheme_request_finish ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish"/>
     <keyword type="function" name="webkit_get_major_version ()" link="webkit2gtk-WebKitVersion.html#webkit-get-major-version"/>
     <keyword type="function" name="webkit_get_minor_version ()" link="webkit2gtk-WebKitVersion.html#webkit-get-minor-version"/>
@@ -527,9 +574,30 @@
     <keyword type="struct" name="struct WebKitFormSubmissionRequest" link="WebKitFormSubmissionRequest.html#WebKitFormSubmissionRequest-struct"/>
     <keyword type="function" name="webkit_form_submission_request_get_text_fields ()" link="WebKitFormSubmissionRequest.html#webkit-form-submission-request-get-text-fields"/>
     <keyword type="function" name="webkit_form_submission_request_submit ()" link="WebKitFormSubmissionRequest.html#webkit-form-submission-request-submit"/>
+    <keyword type="struct" name="struct WebKitSecurityManager" link="WebKitSecurityManager.html#WebKitSecurityManager-struct"/>
+    <keyword type="function" name="webkit_security_manager_register_uri_scheme_as_local ()" link="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-local"/>
+    <keyword type="function" name="webkit_security_manager_uri_scheme_is_local ()" link="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-local"/>
+    <keyword type="function" name="webkit_security_manager_register_uri_scheme_as_no_access ()" link="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-no-access"/>
+    <keyword type="function" name="webkit_security_manager_uri_scheme_is_no_access ()" link="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-no-access"/>
+    <keyword type="function" name="webkit_security_manager_register_uri_scheme_as_display_isolated ()" link="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-display-isolated"/>
+    <keyword type="function" name="webkit_security_manager_uri_scheme_is_display_isolated ()" link="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-display-isolated"/>
+    <keyword type="function" name="webkit_security_manager_register_uri_scheme_as_secure ()" link="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-secure"/>
+    <keyword type="function" name="webkit_security_manager_uri_scheme_is_secure ()" link="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-secure"/>
+    <keyword type="function" name="webkit_security_manager_register_uri_scheme_as_cors_enabled ()" link="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-cors-enabled"/>
+    <keyword type="function" name="webkit_security_manager_uri_scheme_is_cors_enabled ()" link="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-cors-enabled"/>
+    <keyword type="function" name="webkit_security_manager_register_uri_scheme_as_empty_document ()" link="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-empty-document"/>
+    <keyword type="function" name="webkit_security_manager_uri_scheme_is_empty_document ()" link="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-empty-document"/>
+    <keyword type="struct" name="struct WebKitWebExtension" link="WebKitWebExtension.html#WebKitWebExtension-struct"/>
+    <keyword type="function" name="WebKitWebExtensionInitializeFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction"/>
+    <keyword type="function" name="webkit_web_extension_get_page ()" link="WebKitWebExtension.html#webkit-web-extension-get-page"/>
+    <keyword type="signal" name="The &quot;page-created&quot; signal" link="WebKitWebExtension.html#WebKitWebExtension-page-created"/>
+    <keyword type="struct" name="struct WebKitWebPage" link="WebKitWebPage.html#WebKitWebPage-struct"/>
+    <keyword type="function" name="webkit_web_page_get_dom_document ()" link="WebKitWebPage.html#webkit-web-page-get-dom-document"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS"/>
+    <keyword type="constant" name="WEBKIT_TLS_ERRORS_POLICY_IGNORE" link="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_TLS_ERRORS_POLICY_FAIL" link="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_STARTED" link="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_REDIRECTED" link="WebKitWebView.html#WEBKIT-LOAD-REDIRECTED:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_COMMITTED" link="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"/>
@@ -538,6 +606,10 @@
     <keyword type="constant" name="WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION" link="WebKitWebView.html#WEBKIT-POLICY-DECISION-TYPE-NEW-WINDOW-ACTION:CAPS"/>
     <keyword type="constant" name="WEBKIT_POLICY_DECISION_TYPE_RESPONSE" link="WebKitWebView.html#WEBKIT-POLICY-DECISION-TYPE-RESPONSE:CAPS"/>
     <keyword type="constant" name="WEBKIT_SAVE_MODE_MHTML" link="WebKitWebView.html#WEBKIT-SAVE-MODE-MHTML:CAPS"/>
+    <keyword type="constant" name="WEBKIT_VIEW_MODE_WEB" link="WebKitWebView.html#WEBKIT-VIEW-MODE-WEB:CAPS"/>
+    <keyword type="constant" name="WEBKIT_VIEW_MODE_SOURCE" link="WebKitWebView.html#WEBKIT-VIEW-MODE-SOURCE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_INSECURE_CONTENT_RUN" link="WebKitWebView.html#WEBKIT-INSECURE-CONTENT-RUN:CAPS"/>
+    <keyword type="constant" name="WEBKIT_INSECURE_CONTENT_DISPLAYED" link="WebKitWebView.html#WEBKIT-INSECURE-CONTENT-DISPLAYED:CAPS"/>
     <keyword type="constant" name="WEBKIT_SCRIPT_DIALOG_ALERT" link="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-ALERT:CAPS"/>
     <keyword type="constant" name="WEBKIT_SCRIPT_DIALOG_CONFIRM" link="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-CONFIRM:CAPS"/>
     <keyword type="constant" name="WEBKIT_SCRIPT_DIALOG_PROMPT" link="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-PROMPT:CAPS"/>
@@ -552,6 +624,7 @@
     <keyword type="constant" name="WEBKIT_HIT_TEST_RESULT_CONTEXT_IMAGE" link="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-IMAGE:CAPS"/>
     <keyword type="constant" name="WEBKIT_HIT_TEST_RESULT_CONTEXT_MEDIA" link="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-MEDIA:CAPS"/>
     <keyword type="constant" name="WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE" link="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-EDITABLE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_HIT_TEST_RESULT_CONTEXT_SCROLLBAR" link="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-SCROLLBAR:CAPS"/>
     <keyword type="constant" name="WEBKIT_PRINT_OPERATION_RESPONSE_PRINT" link="WebKitPrintOperation.html#WEBKIT-PRINT-OPERATION-RESPONSE-PRINT:CAPS"/>
     <keyword type="constant" name="WEBKIT_PRINT_OPERATION_RESPONSE_CANCEL" link="WebKitPrintOperation.html#WEBKIT-PRINT-OPERATION-RESPONSE-CANCEL:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_FAILED" link="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-FAILED:CAPS"/>
@@ -577,6 +650,9 @@
     <keyword type="constant" name="WEBKIT_PRINT_ERROR_PRINTER_NOT_FOUND" link="webkit2gtk-WebKitError.html#WEBKIT-PRINT-ERROR-PRINTER-NOT-FOUND:CAPS"/>
     <keyword type="constant" name="WEBKIT_PRINT_ERROR_INVALID_PAGE_RANGE" link="webkit2gtk-WebKitError.html#WEBKIT-PRINT-ERROR-INVALID-PAGE-RANGE:CAPS"/>
     <keyword type="constant" name="WEBKIT_JAVASCRIPT_ERROR_SCRIPT_FAILED" link="webkit2gtk-WebKitError.html#WEBKIT-JAVASCRIPT-ERROR-SCRIPT-FAILED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_FAVICON_DATABASE_ERROR_NOT_INITIALIZED" link="WebKitFaviconDatabase.html#WEBKIT-FAVICON-DATABASE-ERROR-NOT-INITIALIZED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_FAVICON_DATABASE_ERROR_FAVICON_NOT_FOUND" link="WebKitFaviconDatabase.html#WEBKIT-FAVICON-DATABASE-ERROR-FAVICON-NOT-FOUND:CAPS"/>
+    <keyword type="constant" name="WEBKIT_FAVICON_DATABASE_ERROR_FAVICON_UNKNOWN" link="WebKitFaviconDatabase.html#WEBKIT-FAVICON-DATABASE-ERROR-FAVICON-UNKNOWN:CAPS"/>
     <keyword type="constant" name="WEBKIT_FIND_OPTIONS_NONE" link="WebKitFindController.html#WEBKIT-FIND-OPTIONS-NONE:CAPS"/>
     <keyword type="constant" name="WEBKIT_FIND_OPTIONS_CASE_INSENSITIVE" link="WebKitFindController.html#WEBKIT-FIND-OPTIONS-CASE-INSENSITIVE:CAPS"/>
     <keyword type="constant" name="WEBKIT_FIND_OPTIONS_AT_WORD_STARTS" link="WebKitFindController.html#WEBKIT-FIND-OPTIONS-AT-WORD-STARTS:CAPS"/>

@@ -20,6 +20,8 @@
 #ifndef WebSoupRequestManager_h
 #define WebSoupRequestManager_h
 
+#include "DataReference.h"
+#include "MessageReceiver.h"
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
@@ -29,19 +31,12 @@
 typedef struct _GInputStream GInputStream;
 typedef struct _GSimpleAsyncResult GSimpleAsyncResult;
 
-namespace CoreIPC {
-class ArgumentDecoder;
-class Connection;
-class DataReference;
-class MessageID;
-}
-
 namespace WebKit {
 
 class WebProcess;
 struct WebSoupRequestAsyncData;
 
-class WebSoupRequestManager {
+class WebSoupRequestManager : private CoreIPC::MessageReceiver {
     WTF_MAKE_NONCOPYABLE(WebSoupRequestManager);
 public:
     explicit WebSoupRequestManager(WebProcess*);
@@ -50,12 +45,12 @@ public:
     void send(GSimpleAsyncResult*, GCancellable*);
     GInputStream* finish(GSimpleAsyncResult*);
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void registerURIScheme(const String& scheme);
 
 private:
-    void didReceiveWebSoupRequestManagerMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    // CoreIPC::MessageReceiver
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
 
-    void registerURIScheme(const String& scheme);
     void didHandleURIRequest(const CoreIPC::DataReference&, uint64_t contentLength, const String& mimeType, uint64_t requestID);
     void didReceiveURIRequestData(const CoreIPC::DataReference&, uint64_t requestID);
 

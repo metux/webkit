@@ -30,12 +30,14 @@
 #include "JSGlobalData.h"
 
 #include "ArgList.h"
-#include "Heap.h"
+#include "CodeCache.h"
 #include "CommonIdentifiers.h"
+#include "DFGLongLivedState.h"
 #include "DebuggerActivation.h"
 #include "FunctionConstructor.h"
 #include "GCActivityCallback.h"
 #include "GetterSetter.h"
+#include "Heap.h"
 #include "HostCallReturnValue.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
@@ -45,17 +47,20 @@
 #include "JSClassRef.h"
 #include "JSFunction.h"
 #include "JSLock.h"
+#include "JSNameScope.h"
 #include "JSNotAnObject.h"
 #include "JSPropertyNameIterator.h"
-#include "JSStaticScopeObject.h"
+#include "JSWithScope.h"
 #include "Lexer.h"
 #include "Lookup.h"
 #include "Nodes.h"
 #include "ParserArena.h"
 #include "RegExpCache.h"
 #include "RegExpObject.h"
+#include "SourceProviderCache.h"
 #include "StrictEvalActivation.h"
 #include "StrongInlines.h"
+#include "UnlinkedCodeBlock.h"
 #include <wtf/RetainPtr.h>
 #include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
@@ -96,15 +101,26 @@ extern const HashTable regExpPrototypeTable;
 extern const HashTable stringTable;
 extern const HashTable stringConstructorTable;
 
-#if ENABLE(ASSEMBLER) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
+// Note: Platform.h will enforce that ENABLE(ASSEMBLER) is true if either
+// ENABLE(JIT) or ENABLE(YARR_JIT) or both are enabled. The code below
+// just checks for ENABLE(JIT) or ENABLE(YARR_JIT) with this premise in mind.
+
+#if ENABLE(ASSEMBLER)
 static bool enableAssembler(ExecutableAllocator& executableAllocator)
 {
-    if (!executableAllocator.isValid() || !Options::useJIT())
+    if (!executableAllocator.isValid() || (!Options::useJIT() && !Options::useRegExpJIT()))
         return false;
 
 #if USE(CF)
-    RetainPtr<CFStringRef> canUseJITKey(AdoptCF, CFStringCreateWithCString(0 , "JavaScriptCoreUseJIT", kCFStringEncodingMacRoman));
-    RetainPtr<CFBooleanRef> canUseJIT(AdoptCF, (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey.get(), kCFPreferencesCurrentApplication));
+#if COMPILER(GCC) && !COMPILER(CLANG)
+    // FIXME: remove this once the EWS have been upgraded to LLVM.
+    // Work around a bug of GCC with strict-aliasing.
+    RetainPtr<CFStringRef> canUseJITKeyRetain(AdoptCF, CFStringCreateWithCString(0 , "JavaScriptCoreUseJIT", kCFStringEncodingMacRoman));
+    CFStringRef canUseJITKey = canUseJITKeyRetain.get();
+#else
+    CFStringRef canUseJITKey = CFSTR("JavaScriptCoreUseJIT");
+#endif // COMPILER(GCC) && !COMPILER(CLANG)
+    RetainPtr<CFBooleanRef> canUseJIT(AdoptCF, (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey, kCFPreferencesCurrentApplication));
     if (canUseJIT)
         return kCFBooleanTrue == canUseJIT.get();
 #endif
@@ -116,10 +132,14 @@ static bool enableAssembler(ExecutableAllocator& executableAllocator)
     return true;
 #endif
 }
-#endif
+#endif // ENABLE(!ASSEMBLER)
 
-JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType threadStackType, HeapType heapType)
-    : heap(this, heapType)
+JSGlobalData::JSGlobalData(GlobalDataType globalDataType, HeapType heapType)
+    :
+#if ENABLE(ASSEMBLER)
+      executableAllocator(*this),
+#endif
+      heap(this, heapType)
     , globalDataType(globalDataType)
     , clientData(0)
     , topCallFrame(CallFrame::noCaller())
@@ -145,9 +165,6 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , identifierTable(globalDataType == Default ? wtfThreadData().currentIdentifierTable() : createIdentifierTable())
     , propertyNames(new CommonIdentifiers(this))
     , emptyList(new MarkedArgumentBuffer)
-#if ENABLE(ASSEMBLER)
-    , executableAllocator(*this)
-#endif
     , parserArena(adoptPtr(new ParserArena))
     , keywords(adoptPtr(new Keywords(this)))
     , interpreter(0)
@@ -157,8 +174,7 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , sizeOfLastScratchBuffer(0)
 #endif
     , dynamicGlobalObject(0)
-    , cachedUTCOffset(std::numeric_limits<double>::quiet_NaN())
-    , maxReentryDepth(threadStackType == ThreadStackTypeSmall ? MaxSmallThreadReentryDepth : MaxLargeThreadReentryDepth)
+    , cachedUTCOffset(QNaN)
     , m_enabledProfiler(0)
     , m_regExpCache(new RegExpCache(this))
 #if ENABLE(REGEXP_TRACING)
@@ -171,57 +187,85 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , m_timeoutCount(512)
 #endif
     , m_newStringsSinceLastHashConst(0)
-#if ENABLE(ASSEMBLER) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
+    , m_apiData(0)
+#if ENABLE(ASSEMBLER)
     , m_canUseAssembler(enableAssembler(executableAllocator))
+#endif
+#if ENABLE(JIT)
+    , m_canUseJIT(m_canUseAssembler && Options::useJIT())
+#endif
+#if ENABLE(YARR_JIT)
+    , m_canUseRegExpJIT(m_canUseAssembler && Options::useRegExpJIT())
 #endif
 #if ENABLE(GC_VALIDATION)
     , m_initializingObjectClass(0)
 #endif
     , m_inDefineOwnProperty(false)
+    , m_codeCache(CodeCache::create())
 {
-    interpreter = new Interpreter;
+    interpreter = new Interpreter(*this);
 
     // Need to be careful to keep everything consistent here
     JSLockHolder lock(this);
     IdentifierTable* existingEntryIdentifierTable = wtfThreadData().setCurrentIdentifierTable(identifierTable);
     structureStructure.set(*this, Structure::createStructure(*this));
+    structureRareDataStructure.set(*this, StructureRareData::createStructure(*this, 0, jsNull()));
     debuggerActivationStructure.set(*this, DebuggerActivation::createStructure(*this, 0, jsNull()));
-    activationStructure.set(*this, JSActivation::createStructure(*this, 0, jsNull()));
     interruptedExecutionErrorStructure.set(*this, InterruptedExecutionError::createStructure(*this, 0, jsNull()));
     terminatedExecutionErrorStructure.set(*this, TerminatedExecutionError::createStructure(*this, 0, jsNull()));
-    staticScopeStructure.set(*this, JSStaticScopeObject::createStructure(*this, 0, jsNull()));
-    strictEvalActivationStructure.set(*this, StrictEvalActivation::createStructure(*this, 0, jsNull()));
     stringStructure.set(*this, JSString::createStructure(*this, 0, jsNull()));
     notAnObjectStructure.set(*this, JSNotAnObject::createStructure(*this, 0, jsNull()));
     propertyNameIteratorStructure.set(*this, JSPropertyNameIterator::createStructure(*this, 0, jsNull()));
     getterSetterStructure.set(*this, GetterSetter::createStructure(*this, 0, jsNull()));
     apiWrapperStructure.set(*this, JSAPIValueWrapper::createStructure(*this, 0, jsNull()));
-    scopeChainNodeStructure.set(*this, ScopeChainNode::createStructure(*this, 0, jsNull()));
+    JSScopeStructure.set(*this, JSScope::createStructure(*this, 0, jsNull()));
     executableStructure.set(*this, ExecutableBase::createStructure(*this, 0, jsNull()));
     nativeExecutableStructure.set(*this, NativeExecutable::createStructure(*this, 0, jsNull()));
     evalExecutableStructure.set(*this, EvalExecutable::createStructure(*this, 0, jsNull()));
     programExecutableStructure.set(*this, ProgramExecutable::createStructure(*this, 0, jsNull()));
     functionExecutableStructure.set(*this, FunctionExecutable::createStructure(*this, 0, jsNull()));
     regExpStructure.set(*this, RegExp::createStructure(*this, 0, jsNull()));
+    sharedSymbolTableStructure.set(*this, SharedSymbolTable::createStructure(*this, 0, jsNull()));
     structureChainStructure.set(*this, StructureChain::createStructure(*this, 0, jsNull()));
+    sparseArrayValueMapStructure.set(*this, SparseArrayValueMap::createStructure(*this, 0, jsNull()));
+    withScopeStructure.set(*this, JSWithScope::createStructure(*this, 0, jsNull()));
+    unlinkedFunctionExecutableStructure.set(*this, UnlinkedFunctionExecutable::createStructure(*this, 0, jsNull()));
+    unlinkedProgramCodeBlockStructure.set(*this, UnlinkedProgramCodeBlock::createStructure(*this, 0, jsNull()));
+    unlinkedEvalCodeBlockStructure.set(*this, UnlinkedEvalCodeBlock::createStructure(*this, 0, jsNull()));
+    unlinkedFunctionCodeBlockStructure.set(*this, UnlinkedFunctionCodeBlock::createStructure(*this, 0, jsNull()));
+    smallStrings.initializeCommonStrings(*this);
 
     wtfThreadData().setCurrentIdentifierTable(existingEntryIdentifierTable);
 
 #if ENABLE(JIT)
-    jitStubs = adoptPtr(new JITThunks(this));
+    jitStubs = adoptPtr(new JITThunks());
+    performPlatformSpecificJITAssertions(this);
 #endif
     
-    interpreter->initialize(&llintData, this->canUseJIT());
+    interpreter->initialize(this->canUseJIT());
     
+#if ENABLE(JIT)
     initializeHostCallReturnValue(); // This is needed to convince the linker not to drop host call return support.
+#endif
 
     heap.notifyIsSafeToCollect();
+
+    LLInt::Data::performAssertions(*this);
     
-    llintData.performAssertions(*this);
+    if (Options::enableProfiler())
+        m_perBytecodeProfiler = adoptPtr(new Profiler::Database(*this));
+
+#if ENABLE(DFG_JIT)
+    if (canUseJIT())
+        m_dfgState = adoptPtr(new DFG::LongLivedState());
+#endif
 }
 
 JSGlobalData::~JSGlobalData()
 {
+    // Clear this first to ensure that nobody tries to remove themselves from it.
+    m_perBytecodeProfiler.clear();
+    
     ASSERT(!m_apiLock.currentThreadIsHoldingLock());
     heap.didStartVMShutdown();
 
@@ -290,19 +334,19 @@ JSGlobalData::~JSGlobalData()
 #endif
 }
 
-PassRefPtr<JSGlobalData> JSGlobalData::createContextGroup(ThreadStackType type, HeapType heapType)
+PassRefPtr<JSGlobalData> JSGlobalData::createContextGroup(HeapType heapType)
 {
-    return adoptRef(new JSGlobalData(APIContextGroup, type, heapType));
+    return adoptRef(new JSGlobalData(APIContextGroup, heapType));
 }
 
-PassRefPtr<JSGlobalData> JSGlobalData::create(ThreadStackType type, HeapType heapType)
+PassRefPtr<JSGlobalData> JSGlobalData::create(HeapType heapType)
 {
-    return adoptRef(new JSGlobalData(Default, type, heapType));
+    return adoptRef(new JSGlobalData(Default, heapType));
 }
 
-PassRefPtr<JSGlobalData> JSGlobalData::createLeaked(ThreadStackType type, HeapType heapType)
+PassRefPtr<JSGlobalData> JSGlobalData::createLeaked(HeapType heapType)
 {
-    return create(type, heapType);
+    return create(heapType);
 }
 
 bool JSGlobalData::sharedInstanceExists()
@@ -315,7 +359,7 @@ JSGlobalData& JSGlobalData::sharedInstance()
     GlobalJSLock globalLock;
     JSGlobalData*& instance = sharedInstanceInternal();
     if (!instance) {
-        instance = adoptRef(new JSGlobalData(APIShared, ThreadStackTypeSmall, SmallHeap)).leakRef();
+        instance = adoptRef(new JSGlobalData(APIShared, SmallHeap)).leakRef();
         instance->makeUsableFromMultipleThreads();
     }
     return *instance;
@@ -360,10 +404,6 @@ static ThunkGenerator thunkGeneratorForIntrinsic(Intrinsic intrinsic)
 
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)
 {
-#if ENABLE(CLASSIC_INTERPRETER)
-    if (!canUseJIT())
-        return NativeExecutable::create(*this, function, constructor);
-#endif
     return jitStubs->hostFunctionStub(this, function, constructor);
 }
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, Intrinsic intrinsic)
@@ -371,12 +411,13 @@ NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, Intrins
     ASSERT(canUseJIT());
     return jitStubs->hostFunctionStub(this, function, intrinsic != NoIntrinsic ? thunkGeneratorForIntrinsic(intrinsic) : 0, intrinsic);
 }
-#else
+
+#else // !ENABLE(JIT)
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)
 {
     return NativeExecutable::create(*this, function, constructor);
 }
-#endif
+#endif // !ENABLE(JIT)
 
 JSGlobalData::ClientData::~ClientData()
 {
@@ -384,10 +425,10 @@ JSGlobalData::ClientData::~ClientData()
 
 void JSGlobalData::resetDateCache()
 {
-    cachedUTCOffset = std::numeric_limits<double>::quiet_NaN();
+    cachedUTCOffset = QNaN;
     dstOffsetCache.reset();
-    cachedDateString = UString();
-    cachedDateStringValue = std::numeric_limits<double>::quiet_NaN();
+    cachedDateString = String();
+    cachedDateStringValue = QNaN;
     dateInstanceCache.reset();
 }
 
@@ -401,12 +442,32 @@ void JSGlobalData::stopSampling()
     interpreter->stopSampling();
 }
 
+void JSGlobalData::discardAllCode()
+{
+    m_codeCache->clear();
+    heap.deleteAllCompiledCode();
+    heap.reportAbandonedObjectGraph();
+}
+
 void JSGlobalData::dumpSampleData(ExecState* exec)
 {
     interpreter->dumpSampleData(exec);
 #if ENABLE(ASSEMBLER)
     ExecutableAllocator::dumpProfile();
 #endif
+}
+
+SourceProviderCache* JSGlobalData::addSourceProviderCache(SourceProvider* sourceProvider)
+{
+    SourceProviderCacheMap::AddResult addResult = sourceProviderCacheMap.add(sourceProvider, 0);
+    if (addResult.isNewEntry)
+        addResult.iterator->value = adoptRef(new SourceProviderCache);
+    return addResult.iterator->value.get();
+}
+
+void JSGlobalData::clearSourceProviderCaches()
+{
+    sourceProviderCacheMap.clear();
 }
 
 struct StackPreservingRecompiler : public MarkedBlock::VoidFunctor {
@@ -447,7 +508,7 @@ void JSGlobalData::releaseExecutableMemory()
                 recompiler.currentlyExecutingFunctions.add(static_cast<FunctionExecutable*>(executable));
                 
         }
-        heap.objectSpace().forEachCell<StackPreservingRecompiler>(recompiler);
+        heap.objectSpace().forEachLiveCell<StackPreservingRecompiler>(recompiler);
     }
     m_regExpCache->invalidateCode();
     heap.collectAllGarbage();
@@ -483,17 +544,17 @@ void JSGlobalData::dumpRegExpTrace()
     RTTraceList::iterator iter = ++m_rtTraceList->begin();
     
     if (iter != m_rtTraceList->end()) {
-        dataLog("\nRegExp Tracing\n");
-        dataLog("                                                            match()    matches\n");
-        dataLog("Regular Expression                          JIT Address      calls      found\n");
-        dataLog("----------------------------------------+----------------+----------+----------\n");
+        dataLogF("\nRegExp Tracing\n");
+        dataLogF("                                                            match()    matches\n");
+        dataLogF("Regular Expression                          JIT Address      calls      found\n");
+        dataLogF("----------------------------------------+----------------+----------+----------\n");
     
         unsigned reCount = 0;
     
         for (; iter != m_rtTraceList->end(); ++iter, ++reCount)
             (*iter)->printTraceData();
 
-        dataLog("%d Regular Expressions\n", reCount);
+        dataLogF("%d Regular Expressions\n", reCount);
     }
     
     m_rtTraceList->clear();

@@ -30,8 +30,10 @@
 #include "Lexer.h"
 #include "Nodes.h"
 #include "ParserArena.h"
+#include "ParserError.h"
 #include "ParserTokens.h"
 #include "SourceProvider.h"
+#include "SourceProviderCache.h"
 #include "SourceProviderCacheItem.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
@@ -56,30 +58,8 @@ class Identifier;
 class JSGlobalData;
 class ProgramNode;
 class SourceCode;
-class UString;
 
-#define fail() do { if (!m_error) updateErrorMessage(); return 0; } while (0)
-#define failWithToken(tok) do { if (!m_error) updateErrorMessage(tok); return 0; } while (0)
-#define failWithMessage(msg) do { if (!m_error) updateErrorMessage(msg); return 0; } while (0)
-#define failWithNameAndMessage(before, name, after) do { if (!m_error) updateErrorWithNameAndMessage(before, name, after); return 0; } while (0)
-#define failIfFalse(cond) do { if (!(cond)) fail(); } while (0)
-#define failIfFalseWithMessage(cond, msg) do { if (!(cond)) failWithMessage(msg); } while (0)
-#define failIfFalseWithNameAndMessage(cond, before, name, msg) do { if (!(cond)) failWithNameAndMessage(before, name, msg); } while (0)
-#define failIfTrue(cond) do { if ((cond)) fail(); } while (0)
-#define failIfTrueWithMessage(cond, msg) do { if ((cond)) failWithMessage(msg); } while (0)
-#define failIfTrueWithNameAndMessage(cond, before, name, msg) do { if ((cond)) failWithNameAndMessage(before, name, msg); } while (0)
-#define failIfTrueIfStrict(cond) do { if ((cond) && strictMode()) fail(); } while (0)
-#define failIfTrueIfStrictWithMessage(cond, msg) do { if ((cond) && strictMode()) failWithMessage(msg); } while (0)
-#define failIfTrueIfStrictWithNameAndMessage(cond, before, name, after) do { if ((cond) && strictMode()) failWithNameAndMessage(before, name, after); } while (0)
-#define failIfFalseIfStrict(cond) do { if ((!(cond)) && strictMode()) fail(); } while (0)
-#define failIfFalseIfStrictWithMessage(cond, msg) do { if ((!(cond)) && strictMode()) failWithMessage(msg); } while (0)
-#define failIfFalseIfStrictWithNameAndMessage(cond, before, name, after) do { if ((!(cond)) && strictMode()) failWithNameAndMessage(before, name, after); } while (0)
-#define consumeOrFail(tokenType) do { if (!consume(tokenType)) failWithToken(tokenType); } while (0)
-#define consumeOrFailWithFlags(tokenType, flags) do { if (!consume(tokenType, flags)) failWithToken(tokenType); } while (0)
-#define matchOrFail(tokenType) do { if (!match(tokenType)) failWithToken(tokenType); } while (0)
-#define failIfStackOverflow() do { failIfFalseWithMessage(canRecurse(), "Code nested too deeply."); } while (0)
-
-    // Macros to make the more common TreeBuilder types a little less verbose
+// Macros to make the more common TreeBuilder types a little less verbose
 #define TreeStatement typename TreeBuilder::Statement
 #define TreeExpression typename TreeBuilder::Expression
 #define TreeFormalParameterList typename TreeBuilder::FormalParameterList
@@ -209,11 +189,16 @@ struct Scope {
     bool isFunction() { return m_isFunction; }
     bool isFunctionBoundary() { return m_isFunctionBoundary; }
 
+    void declareCallee(const Identifier* ident)
+    {
+        m_declaredVariables.add(ident->string().impl());
+    }
+
     bool declareVariable(const Identifier* ident)
     {
         bool isValidStrictMode = m_globalData->propertyNames->eval != *ident && m_globalData->propertyNames->arguments != *ident;
         m_isValidStrictMode = m_isValidStrictMode && isValidStrictMode;
-        m_declaredVariables.add(ident->ustring().impl());
+        m_declaredVariables.add(ident->string().impl());
         return isValidStrictMode;
     }
 
@@ -229,7 +214,7 @@ struct Scope {
     bool declareParameter(const Identifier* ident)
     {
         bool isArguments = m_globalData->propertyNames->arguments == *ident;
-        bool isValidStrictMode = m_declaredVariables.add(ident->ustring().impl()).isNewEntry && m_globalData->propertyNames->eval != *ident && !isArguments;
+        bool isValidStrictMode = m_declaredVariables.add(ident->string().impl()).isNewEntry && m_globalData->propertyNames->eval != *ident && !isArguments;
         m_isValidStrictMode = m_isValidStrictMode && isValidStrictMode;
         if (isArguments)
             m_shadowsArguments = true;
@@ -239,7 +224,7 @@ struct Scope {
     void useVariable(const Identifier* ident, bool isEval)
     {
         m_usesEval |= isEval;
-        m_usedVariables.add(ident->ustring().impl());
+        m_usedVariables.add(ident->string().impl());
     }
 
     void setNeedsFullActivation() { m_needsFullActivation = true; }
@@ -302,31 +287,28 @@ struct Scope {
                 continue;
             vector.append(*it);
         }
-        vector.shrinkToFit();
     }
 
-    void saveFunctionInfo(SourceProviderCacheItem* info)
+    void fillParametersForSourceProviderCache(SourceProviderCacheItemCreationParameters& parameters)
     {
         ASSERT(m_isFunction);
-        info->usesEval = m_usesEval;
-        info->strictMode = m_strictMode;
-        info->needsFullActivation = m_needsFullActivation;
-        copyCapturedVariablesToVector(m_writtenVariables, info->writtenVariables);
-        copyCapturedVariablesToVector(m_usedVariables, info->usedVariables);
+        parameters.usesEval = m_usesEval;
+        parameters.strictMode = m_strictMode;
+        parameters.needsFullActivation = m_needsFullActivation;
+        copyCapturedVariablesToVector(m_writtenVariables, parameters.writtenVariables);
+        copyCapturedVariablesToVector(m_usedVariables, parameters.usedVariables);
     }
 
-    void restoreFunctionInfo(const SourceProviderCacheItem* info)
+    void restoreFromSourceProviderCache(const SourceProviderCacheItem* info)
     {
         ASSERT(m_isFunction);
         m_usesEval = info->usesEval;
         m_strictMode = info->strictMode;
         m_needsFullActivation = info->needsFullActivation;
-        unsigned size = info->usedVariables.size();
-        for (unsigned i = 0; i < size; ++i)
-            m_usedVariables.add(info->usedVariables[i]);
-        size = info->writtenVariables.size();
-        for (unsigned i = 0; i < size; ++i)
-            m_writtenVariables.add(info->writtenVariables[i]);
+        for (unsigned i = 0; i < info->usedVariablesCount; ++i)
+            m_usedVariables.add(info->usedVariables()[i]);
+        for (unsigned i = 0; i < info->writtenVariablesCount; ++i)
+            m_writtenVariables.add(info->writtenVariables()[i]);
     }
 
 private:
@@ -383,11 +365,11 @@ class Parser {
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    Parser(JSGlobalData*, const SourceCode&, FunctionParameters*, JSParserStrictness, JSParserMode);
+    Parser(JSGlobalData*, const SourceCode&, FunctionParameters*, const Identifier&, JSParserStrictness, JSParserMode);
     ~Parser();
 
     template <class ParsedNode>
-    PassRefPtr<ParsedNode> parse(JSGlobalObject* lexicalGlobalObject, Debugger*, ExecState*, JSObject**);
+    PassRefPtr<ParsedNode> parse(ParserError&);
 
 private:
     struct AllowInOverride {
@@ -489,7 +471,7 @@ private:
     }
 
     Parser();
-    UString parseInner();
+    String parseInner();
 
     void didFinishParsing(SourceElements*, ParserArenaData<DeclarationStacks::VarStack>*, 
                           ParserArenaData<DeclarationStacks::FunctionStack>*, CodeFeatures,
@@ -529,9 +511,9 @@ private:
         return result;
     }
     
-    ALWAYS_INLINE UString getToken() {
+    ALWAYS_INLINE String getToken() {
         SourceProvider* sourceProvider = m_source->provider();
-        return UString(sourceProvider->getRange(tokenStart(), tokenEnd()).impl());
+        return sourceProvider->getRange(tokenStart(), tokenEnd());
     }
     
     ALWAYS_INLINE bool match(JSTokenType expected)
@@ -730,58 +712,40 @@ private:
         case LastUntaggedToken: 
             break;
         }
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         return "internal error";
     }
     
     ALWAYS_INLINE void updateErrorMessageSpecialCase(JSTokenType expectedToken) 
     {
-        String errorMessage;
         switch (expectedToken) {
         case RESERVED_IF_STRICT:
-            errorMessage = "Use of reserved word '";
-            errorMessage += getToken().impl();
-            errorMessage += "' in strict mode";
-            m_errorMessage = errorMessage.impl();
+            m_errorMessage = "Use of reserved word '" + getToken() + "' in strict mode";
             return;
         case RESERVED:
-            errorMessage = "Use of reserved word '";
-            errorMessage += getToken().impl();
-            errorMessage += "'";
-            m_errorMessage = errorMessage.impl();
+            m_errorMessage = "Use of reserved word '" + getToken() + '\'';
             return;
         case NUMBER: 
-            errorMessage = "Unexpected number '";
-            errorMessage += getToken().impl();
-            errorMessage += "'";
-            m_errorMessage = errorMessage.impl();
+            m_errorMessage = "Unexpected number '" + getToken() + '\'';
             return;
         case IDENT: 
-            errorMessage = "Expected an identifier but found '";
-            errorMessage += getToken().impl();
-            errorMessage += "' instead";
-            m_errorMessage = errorMessage.impl();
+            m_errorMessage = "Expected an identifier but found '" + getToken() + "' instead";
             return;
         case STRING: 
-            errorMessage = "Unexpected string ";
-            errorMessage += getToken().impl();
-            m_errorMessage = errorMessage.impl();
+            m_errorMessage = "Unexpected string " + getToken();
             return;
         case ERRORTOK: 
-            errorMessage = "Unrecognized token '";
-            errorMessage += getToken().impl();
-            errorMessage += "'";
-            m_errorMessage = errorMessage.impl();
+            m_errorMessage = "Unrecognized token '" + getToken() + '\'';
             return;
         case EOFTOK:  
-            m_errorMessage = "Unexpected EOF";
+            m_errorMessage = ASCIILiteral("Unexpected EOF");
             return;
         case RETURN:
-            m_errorMessage = "Return statements are only valid inside functions";
+            m_errorMessage = ASCIILiteral("Return statements are only valid inside functions");
             return;
         default:
-            ASSERT_NOT_REACHED();
-            m_errorMessage = "internal error";
+            RELEASE_ASSERT_NOT_REACHED();
+            m_errorMessage = ASCIILiteral("internal error");
             return;
         }
     }
@@ -793,7 +757,7 @@ private:
         if (!name) 
             updateErrorMessageSpecialCase(m_token.m_type);
         else 
-            m_errorMessage = UString(String::format("Unexpected token '%s'", name).impl());
+            m_errorMessage = String::format("Unexpected token '%s'", name);
     }
     
     NEVER_INLINE void updateErrorMessage(JSTokenType expectedToken) 
@@ -801,31 +765,25 @@ private:
         m_error = true;
         const char* name = getTokenName(expectedToken);
         if (name)
-            m_errorMessage = UString(String::format("Expected token '%s'", name).impl());
+            m_errorMessage = String::format("Expected token '%s'", name);
         else {
             if (!getTokenName(m_token.m_type))
                 updateErrorMessageSpecialCase(m_token.m_type);
             else
                 updateErrorMessageSpecialCase(expectedToken);
-        } 
+        }
     }
     
-    NEVER_INLINE void updateErrorWithNameAndMessage(const char* beforeMsg, UString name, const char* afterMsg) 
+    NEVER_INLINE void updateErrorWithNameAndMessage(const char* beforeMsg, String name, const char* afterMsg)
     {
         m_error = true;
-        String prefix(beforeMsg);
-        String postfix(afterMsg);
-        prefix += " '";
-        prefix += name.impl();
-        prefix += "' ";
-        prefix += postfix;
-        m_errorMessage = prefix.impl();
+        m_errorMessage = makeString(beforeMsg, " '", name, "' ", afterMsg);
     }
     
-    NEVER_INLINE void updateErrorMessage(const char* msg) 
+    NEVER_INLINE void updateErrorMessage(const char* msg)
     {   
         m_error = true;
-        m_errorMessage = UString(msg);
+        m_errorMessage = String(msg);
     }
     
     void startLoop() { currentScope()->startLoop(); }
@@ -923,7 +881,7 @@ private:
     
     bool canRecurse()
     {
-        return m_stack.recursionCheck();
+        return m_stack.isSafeToRecurse();
     }
     
     int lastTokenEnd() const
@@ -931,14 +889,15 @@ private:
         return m_lastTokenEnd;
     }
 
-    mutable const JSGlobalData* m_globalData;
+    JSGlobalData* m_globalData;
     const SourceCode* m_source;
     ParserArena* m_arena;
     OwnPtr<LexerType> m_lexer;
     
     StackBounds m_stack;
+    bool m_hasStackOverflow;
     bool m_error;
-    UString m_errorMessage;
+    String m_errorMessage;
     JSToken m_token;
     bool m_allowsIn;
     int m_lastLine;
@@ -949,7 +908,7 @@ private:
     int m_statementDepth;
     int m_nonTrivialExpressionCount;
     const Identifier* m_lastIdentifier;
-    SourceProviderCache* m_functionCache;
+    RefPtr<SourceProviderCache> m_functionCache;
     SourceElements* m_sourceElements;
     ParserArenaData<DeclarationStacks::VarStack>* m_varDeclarations;
     ParserArenaData<DeclarationStacks::FunctionStack>* m_funcDeclarations;
@@ -975,14 +934,13 @@ private:
     };
 };
 
+
 template <typename LexerType>
 template <class ParsedNode>
-PassRefPtr<ParsedNode> Parser<LexerType>::parse(JSGlobalObject* lexicalGlobalObject, Debugger* debugger, ExecState* debuggerExecState, JSObject** exception)
+PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
 {
-    ASSERT(lexicalGlobalObject);
-    ASSERT(exception && !*exception);
     int errLine;
-    UString errMsg;
+    String errMsg;
 
     if (ParsedNode::scopeIsFunction)
         m_lexer->setIsReparsing();
@@ -990,13 +948,13 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(JSGlobalObject* lexicalGlobalObj
     m_sourceElements = 0;
 
     errLine = -1;
-    errMsg = UString();
+    errMsg = String();
 
-    UString parseError = parseInner();
+    String parseError = parseInner();
 
     int lineNumber = m_lexer->lineNumber();
     bool lexError = m_lexer->sawError();
-    UString lexErrorMessage = lexError ? m_lexer->getErrorMessage() : UString();
+    String lexErrorMessage = lexError ? m_lexer->getErrorMessage() : String();
     ASSERT(lexErrorMessage.isNull() != lexError);
     m_lexer->clear();
 
@@ -1011,7 +969,7 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(JSGlobalObject* lexicalGlobalObj
         JSTokenLocation location;
         location.line = m_lexer->lastLineNumber();
         location.column = m_lexer->currentColumnNumber();
-        result = ParsedNode::create(&lexicalGlobalObject->globalData(),
+        result = ParsedNode::create(m_globalData,
                                     location,
                                     m_sourceElements,
                                     m_varDeclarations ? &m_varDeclarations->data : 0,
@@ -1021,23 +979,20 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(JSGlobalObject* lexicalGlobalObj
                                     m_features,
                                     m_numConstants);
         result->setLoc(m_source->firstLine(), m_lastLine, m_lexer->currentColumnNumber());
-    } else if (lexicalGlobalObject) {
+    } else {
         // We can never see a syntax error when reparsing a function, since we should have
         // reported the error when parsing the containing program or eval code. So if we're
         // parsing a function body node, we assume that what actually happened here is that
         // we ran out of stack while parsing. If we see an error while parsing eval or program
         // code we assume that it was a syntax error since running out of stack is much less
         // likely, and we are currently unable to distinguish between the two cases.
-        if (isFunctionBodyNode(static_cast<ParsedNode*>(0)))
-            *exception = createStackOverflowError(lexicalGlobalObject);
+        if (isFunctionBodyNode(static_cast<ParsedNode*>(0)) || m_hasStackOverflow)
+            error = ParserError::StackOverflow;
         else if (isEvalNode<ParsedNode>())
-            *exception = createSyntaxError(lexicalGlobalObject, errMsg);
+            error = ParserError(ParserError::EvalError, errMsg, errLine);
         else
-            *exception = addErrorInfo(lexicalGlobalObject->globalExec(), createSyntaxError(lexicalGlobalObject, errMsg), errLine, *m_source);
+            error = ParserError(ParserError::SyntaxError, errMsg, errLine);
     }
-
-    if (debugger && !ParsedNode::scopeIsFunction)
-        debugger->sourceParsed(debuggerExecState, m_source->provider(), errLine, errMsg);
 
     m_arena->reset();
 
@@ -1045,19 +1000,18 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(JSGlobalObject* lexicalGlobalObj
 }
 
 template <class ParsedNode>
-PassRefPtr<ParsedNode> parse(JSGlobalData* globalData, JSGlobalObject* lexicalGlobalObject, const SourceCode& source, FunctionParameters* parameters, JSParserStrictness strictness, JSParserMode parserMode, Debugger* debugger, ExecState* execState, JSObject** exception)
+PassRefPtr<ParsedNode> parse(JSGlobalData* globalData, const SourceCode& source, FunctionParameters* parameters, const Identifier& name, JSParserStrictness strictness, JSParserMode parserMode, ParserError& error)
 {
     SamplingRegion samplingRegion("Parsing");
 
-    ASSERT(source.provider()->data());
-
-    if (source.provider()->data()->is8Bit()) {
-        Parser< Lexer<LChar> > parser(globalData, source, parameters, strictness, parserMode);
-        return parser.parse<ParsedNode>(lexicalGlobalObject, debugger, execState, exception);
+    ASSERT(!source.provider()->source().isNull());
+    if (source.provider()->source().is8Bit()) {
+        Parser< Lexer<LChar> > parser(globalData, source, parameters, name, strictness, parserMode);
+        return parser.parse<ParsedNode>(error);
     }
-    Parser< Lexer<UChar> > parser(globalData, source, parameters, strictness, parserMode);
-    return parser.parse<ParsedNode>(lexicalGlobalObject, debugger, execState, exception);
+    Parser< Lexer<UChar> > parser(globalData, source, parameters, name, strictness, parserMode);
+    return parser.parse<ParsedNode>(error);
 }
 
-} // namespace 
+} // namespace
 #endif

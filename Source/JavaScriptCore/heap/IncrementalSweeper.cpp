@@ -31,27 +31,24 @@
 #include "JSObject.h"
 #include "JSString.h"
 #include "MarkedBlock.h"
-#include "ScopeChain.h"
+
 #include <wtf/HashSet.h>
 #include <wtf/WTFThreadData.h>
 
 namespace JSC {
 
+#if USE(CF) || PLATFORM(BLACKBERRY) || PLATFORM(QT)
+
+static const double sweepTimeSlice = .01; // seconds
+static const double sweepTimeTotal = .10;
+static const double sweepTimeMultiplier = 1.0 / sweepTimeTotal;
+
 #if USE(CF)
-
-static const CFTimeInterval sweepTimeSlice = .01; // seconds
-static const CFTimeInterval sweepTimeTotal = .10;
-static const CFTimeInterval sweepTimeMultiplier = 1.0 / sweepTimeTotal;
-
-void IncrementalSweeper::doWork()
-{
-    doSweep(WTF::monotonicallyIncreasingTime());
-}
     
 IncrementalSweeper::IncrementalSweeper(Heap* heap, CFRunLoopRef runLoop)
     : HeapTimer(heap->globalData(), runLoop)
     , m_currentBlockToSweepIndex(0)
-    , m_structuresCanBeSwept(false)
+    , m_blocksToSweep(heap->m_blockSnapshot)
 {
 }
 
@@ -70,12 +67,47 @@ void IncrementalSweeper::cancelTimer()
     CFRunLoopTimerSetNextFireDate(m_timer.get(), CFAbsoluteTimeGetCurrent() + s_decade);
 }
 
+#elif PLATFORM(BLACKBERRY) || PLATFORM(QT)
+   
+IncrementalSweeper::IncrementalSweeper(Heap* heap)
+    : HeapTimer(heap->globalData())
+    , m_currentBlockToSweepIndex(0)
+    , m_blocksToSweep(heap->m_blockSnapshot)
+{
+}
+
+IncrementalSweeper* IncrementalSweeper::create(Heap* heap)
+{
+    return new IncrementalSweeper(heap);
+}
+
+void IncrementalSweeper::scheduleTimer()
+{
+#if PLATFORM(QT)
+    m_timer.start(sweepTimeSlice * sweepTimeMultiplier * 1000, this);
+#else
+    m_timer.start(sweepTimeSlice * sweepTimeMultiplier);
+#endif
+}
+
+void IncrementalSweeper::cancelTimer()
+{
+    m_timer.stop();
+}
+
+#endif
+
+void IncrementalSweeper::doWork()
+{
+    doSweep(WTF::monotonicallyIncreasingTime());
+}
+
 void IncrementalSweeper::doSweep(double sweepBeginTime)
 {
     while (m_currentBlockToSweepIndex < m_blocksToSweep.size()) {
         sweepNextBlock();
 
-        CFTimeInterval elapsedTime = WTF::monotonicallyIncreasingTime() - sweepBeginTime;
+        double elapsedTime = WTF::monotonicallyIncreasingTime() - sweepBeginTime;
         if (elapsedTime < sweepTimeSlice)
             continue;
 
@@ -91,10 +123,6 @@ void IncrementalSweeper::sweepNextBlock()
 {
     while (m_currentBlockToSweepIndex < m_blocksToSweep.size()) {
         MarkedBlock* block = m_blocksToSweep[m_currentBlockToSweepIndex++];
-        if (block->onlyContainsStructures())
-            m_structuresCanBeSwept = true;
-        else
-            ASSERT(!m_structuresCanBeSwept);
 
         if (!block->needsSweeping())
             continue;
@@ -105,20 +133,16 @@ void IncrementalSweeper::sweepNextBlock()
     }
 }
 
-void IncrementalSweeper::startSweeping(const HashSet<MarkedBlock*>& blockSnapshot)
+void IncrementalSweeper::startSweeping(Vector<MarkedBlock*>& blockSnapshot)
 {
-    m_blocksToSweep.resize(blockSnapshot.size());
-    CopyFunctor functor(m_blocksToSweep);
-    m_globalData->heap.objectSpace().forEachBlock(functor);
+    m_blocksToSweep = blockSnapshot;
     m_currentBlockToSweepIndex = 0;
-    m_structuresCanBeSwept = false;
     scheduleTimer();
 }
 
 void IncrementalSweeper::willFinishSweeping()
 {
     m_currentBlockToSweepIndex = 0;
-    m_structuresCanBeSwept = true;
     m_blocksToSweep.clear();
     if (m_globalData)
         cancelTimer();
@@ -128,7 +152,6 @@ void IncrementalSweeper::willFinishSweeping()
 
 IncrementalSweeper::IncrementalSweeper(JSGlobalData* globalData)
     : HeapTimer(globalData)
-    , m_structuresCanBeSwept(false)
 {
 }
 
@@ -141,14 +164,12 @@ IncrementalSweeper* IncrementalSweeper::create(Heap* heap)
     return new IncrementalSweeper(heap->globalData());
 }
 
-void IncrementalSweeper::startSweeping(const HashSet<MarkedBlock*>&)
+void IncrementalSweeper::startSweeping(Vector<MarkedBlock*>&)
 {
-    m_structuresCanBeSwept = false;
 }
 
 void IncrementalSweeper::willFinishSweeping()
 {
-    m_structuresCanBeSwept = true;
 }
 
 void IncrementalSweeper::sweepNextBlock()
@@ -156,10 +177,5 @@ void IncrementalSweeper::sweepNextBlock()
 }
 
 #endif
-
-bool IncrementalSweeper::structuresCanBeSwept()
-{
-    return m_structuresCanBeSwept;
-}
 
 } // namespace JSC

@@ -32,6 +32,7 @@
 
 #include "CSSCalculationValue.h"
 #include "CSSPrimitiveValue.h"
+#include "CSSReflectionDirection.h"
 #include "ColorSpace.h"
 #include "CSSValueKeywords.h"
 #include "FontDescription.h"
@@ -46,14 +47,10 @@
 #include "RenderStyleConstants.h"
 #include "SVGRenderStyleDefs.h"
 #include "TextDirection.h"
-#include "TextOrientation.h"
 #include "TextRenderingMode.h"
 #include "ThemeTypes.h"
 #include "UnicodeBidi.h"
-
-#if ENABLE(CSS_SHADERS)
-#include "CustomFilterOperation.h"
-#endif
+#include "WritingMode.h"
 
 #include <wtf/MathExtras.h>
 
@@ -145,29 +142,71 @@ template<> inline CSSPrimitiveValue::operator LineClampValue() const
     return LineClampValue();
 }
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CSSReflectionDirection e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (e) {
+    case ReflectionAbove:
+        m_value.ident = CSSValueAbove;
+        break;
+    case ReflectionBelow:
+        m_value.ident = CSSValueBelow;
+        break;
+    case ReflectionLeft:
+        m_value.ident = CSSValueLeft;
+        break;
+    case ReflectionRight:
+        m_value.ident = CSSValueRight;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator CSSReflectionDirection() const
+{
+    switch (m_value.ident) {
+    case CSSValueAbove:
+        return ReflectionAbove;
+    case CSSValueBelow:
+        return ReflectionBelow;
+    case CSSValueLeft:
+        return ReflectionLeft;
+    case CSSValueRight:
+        return ReflectionRight;
+    }
+
+    ASSERT_NOT_REACHED();
+    return ReflectionBelow;
+}
+
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColumnSpan columnSpan)
     : CSSValue(PrimitiveClass)
 {
+    m_primitiveUnitType = CSS_IDENT;
     switch (columnSpan) {
     case ColumnSpanAll:
-        m_primitiveUnitType = CSS_IDENT;
         m_value.ident = CSSValueAll;
         break;
-    case ColumnSpanOne:
-        m_primitiveUnitType = CSS_NUMBER;
-        m_value.num = 1;
+    case ColumnSpanNone:
+        m_value.ident = CSSValueNone;
         break;
     }
 }
 
 template<> inline CSSPrimitiveValue::operator ColumnSpan() const
 {
-    if (m_primitiveUnitType == CSS_IDENT && m_value.ident == CSSValueAll)
-        return ColumnSpanAll;
+    // Map 1 to none for compatibility reasons.
     if (m_primitiveUnitType == CSS_NUMBER && m_value.num == 1)
-        return ColumnSpanOne;
+        return ColumnSpanNone;
+
+    switch (m_value.ident) {
+    case CSSValueAll:
+        return ColumnSpanAll;
+    case CSSValueNone:
+        return ColumnSpanNone;
+    }
+
     ASSERT_NOT_REACHED();
-    return ColumnSpanOne;
+    return ColumnSpanNone;
 }
 
 
@@ -778,6 +817,43 @@ template<> inline CSSPrimitiveValue::operator EBoxDecorationBreak() const
 }
 #endif
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BackgroundEdgeOrigin e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (e) {
+    case TopEdge:
+        m_value.ident = CSSValueTop;
+        break;
+    case RightEdge:
+        m_value.ident = CSSValueRight;
+        break;
+    case BottomEdge:
+        m_value.ident = CSSValueBottom;
+        break;
+    case LeftEdge:
+        m_value.ident = CSSValueLeft;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator BackgroundEdgeOrigin() const
+{
+    switch (m_value.ident) {
+    case CSSValueTop:
+        return TopEdge;
+    case CSSValueRight:
+        return RightEdge;
+    case CSSValueBottom:
+        return BottomEdge;
+    case CSSValueLeft:
+        return LeftEdge;
+    }
+
+    ASSERT_NOT_REACHED();
+    return TopEdge;
+}
+
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxSizing e)
     : CSSValue(PrimitiveClass)
 {
@@ -1146,14 +1222,12 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
         case INLINE_BOX:
             m_value.ident = CSSValueWebkitInlineBox;
             break;
-#if ENABLE(CSS3_FLEXBOX)
         case FLEX:
             m_value.ident = CSSValueWebkitFlex;
             break;
         case INLINE_FLEX:
             m_value.ident = CSSValueWebkitInlineFlex;
             break;
-#endif
         case GRID:
             m_value.ident = CSSValueWebkitGrid;
             break;
@@ -1202,8 +1276,6 @@ template<> inline CSSPrimitiveValue::operator EEmptyCell() const
     ASSERT_NOT_REACHED();
     return SHOW;
 }
-
-#if ENABLE(CSS3_FLEXBOX)
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EAlignItems e)
     : CSSValue(PrimitiveClass)
@@ -1383,8 +1455,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexWrap e)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (e) {
-    case FlexWrapNone:
-        m_value.ident = CSSValueNone;
+    case FlexNoWrap:
+        m_value.ident = CSSValueNowrap;
         break;
     case FlexWrap:
         m_value.ident = CSSValueWrap;
@@ -1398,8 +1470,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexWrap e)
 template<> inline CSSPrimitiveValue::operator EFlexWrap() const
 {
     switch (m_value.ident) {
-    case CSSValueNone:
-        return FlexWrapNone;
+    case CSSValueNowrap:
+        return FlexNoWrap;
     case CSSValueWrap:
         return FlexWrap;
     case CSSValueWrapReverse:
@@ -1407,10 +1479,8 @@ template<> inline CSSPrimitiveValue::operator EFlexWrap() const
     }
 
     ASSERT_NOT_REACHED();
-    return FlexWrapNone;
+    return FlexNoWrap;
 }
-
-#endif
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFloat e)
     : CSSValue(PrimitiveClass)
@@ -1445,31 +1515,46 @@ template<> inline CSSPrimitiveValue::operator EFloat() const
     return NoFloat;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EKHTMLLineBreak e)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineBreak e)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (e) {
-        case LBNORMAL:
-            m_value.ident = CSSValueNormal;
-            break;
-        case AFTER_WHITE_SPACE:
-            m_value.ident = CSSValueAfterWhiteSpace;
-            break;
+    case LineBreakAuto:
+        m_value.ident = CSSValueAuto;
+        break;
+    case LineBreakLoose:
+        m_value.ident = CSSValueLoose;
+        break;
+    case LineBreakNormal:
+        m_value.ident = CSSValueNormal;
+        break;
+    case LineBreakStrict:
+        m_value.ident = CSSValueStrict;
+        break;
+    case LineBreakAfterWhiteSpace:
+        m_value.ident = CSSValueAfterWhiteSpace;
+        break;
     }
 }
 
-template<> inline CSSPrimitiveValue::operator EKHTMLLineBreak() const
+template<> inline CSSPrimitiveValue::operator LineBreak() const
 {
     switch (m_value.ident) {
-        case CSSValueAfterWhiteSpace:
-            return AFTER_WHITE_SPACE;
-        case CSSValueNormal:
-            return LBNORMAL;
+    case CSSValueAuto:
+        return LineBreakAuto;
+    case CSSValueLoose:
+        return LineBreakLoose;
+    case CSSValueNormal:
+        return LineBreakNormal;
+    case CSSValueStrict:
+        return LineBreakStrict;
+    case CSSValueAfterWhiteSpace:
+        return LineBreakAfterWhiteSpace;
     }
 
     ASSERT_NOT_REACHED();
-    return LBNORMAL;
+    return LineBreakAuto;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EListStylePosition e)
@@ -2189,6 +2274,60 @@ template<> inline CSSPrimitiveValue::operator ETextAlign() const
     }
 }
 
+#if ENABLE(CSS3_TEXT)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextAlignLast e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (e) {
+    case TextAlignLastStart:
+        m_value.ident = CSSValueStart;
+        break;
+    case TextAlignLastEnd:
+        m_value.ident = CSSValueEnd;
+        break;
+    case TextAlignLastLeft:
+        m_value.ident = CSSValueLeft;
+        break;
+    case TextAlignLastRight:
+        m_value.ident = CSSValueRight;
+        break;
+    case TextAlignLastCenter:
+        m_value.ident = CSSValueCenter;
+        break;
+    case TextAlignLastJustify:
+        m_value.ident = CSSValueJustify;
+        break;
+    case TextAlignLastAuto:
+        m_value.ident = CSSValueAuto;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator TextAlignLast() const
+{
+    switch (m_value.ident) {
+    case CSSValueAuto:
+        return TextAlignLastAuto;
+    case CSSValueStart:
+        return TextAlignLastStart;
+    case CSSValueEnd:
+        return TextAlignLastEnd;
+    case CSSValueLeft:
+        return TextAlignLastLeft;
+    case CSSValueRight:
+        return TextAlignLastRight;
+    case CSSValueCenter:
+        return TextAlignLastCenter;
+    case CSSValueJustify:
+        return TextAlignLastJustify;
+    }
+
+    ASSERT_NOT_REACHED();
+    return TextAlignLastAuto;
+}
+#endif // CSS3_TEXT
+
 template<> inline CSSPrimitiveValue::operator ETextDecoration() const
 {
     switch (m_value.ident) {
@@ -2208,7 +2347,7 @@ template<> inline CSSPrimitiveValue::operator ETextDecoration() const
     return TDNONE;
 }
 
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
 template<> inline CSSPrimitiveValue::operator TextDecorationStyle() const
 {
     switch (m_value.ident) {
@@ -2227,7 +2366,7 @@ template<> inline CSSPrimitiveValue::operator TextDecorationStyle() const
     ASSERT_NOT_REACHED();
     return TextDecorationStyleSolid;
 }
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETextSecurity e)
     : CSSValue(PrimitiveClass)
@@ -2623,31 +2762,31 @@ template<> inline CSSPrimitiveValue::operator EWordBreak() const
     return NormalWordBreak;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EWordWrap e)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EOverflowWrap e)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (e) {
-        case NormalWordWrap:
+        case NormalOverflowWrap:
             m_value.ident = CSSValueNormal;
             break;
-        case BreakWordWrap:
+        case BreakOverflowWrap:
             m_value.ident = CSSValueBreakWord;
             break;
     }
 }
 
-template<> inline CSSPrimitiveValue::operator EWordWrap() const
+template<> inline CSSPrimitiveValue::operator EOverflowWrap() const
 {
     switch (m_value.ident) {
         case CSSValueBreakWord:
-            return BreakWordWrap;
+            return BreakOverflowWrap;
         case CSSValueNormal:
-            return NormalWordWrap;
+            return NormalOverflowWrap;
     }
 
     ASSERT_NOT_REACHED();
-    return NormalWordWrap;
+    return NormalOverflowWrap;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextDirection e)
@@ -2739,6 +2878,33 @@ template<> inline CSSPrimitiveValue::operator TextCombine() const
 
     ASSERT_NOT_REACHED();
     return TextCombineNone;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(RubyPosition position)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (position) {
+    case RubyPositionBefore:
+        m_value.ident = CSSValueBefore;
+        break;
+    case RubyPositionAfter:
+        m_value.ident = CSSValueAfter;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator RubyPosition() const
+{
+    switch (m_value.ident) {
+    case CSSValueBefore:
+        return RubyPositionBefore;
+    case CSSValueAfter:
+        return RubyPositionAfter;
+    }
+
+    ASSERT_NOT_REACHED();
+    return RubyPositionBefore;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextEmphasisPosition position)
@@ -2877,6 +3043,12 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextOrientation e)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (e) {
+    case TextOrientationSideways:
+        m_value.ident = CSSValueSideways;
+        break;
+    case TextOrientationSidewaysRight:
+        m_value.ident = CSSValueSidewaysRight;
+        break;
     case TextOrientationVerticalRight:
         m_value.ident = CSSValueVerticalRight;
         break;
@@ -2889,6 +3061,10 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextOrientation e)
 template<> inline CSSPrimitiveValue::operator TextOrientation() const
 {
     switch (m_value.ident) {
+    case CSSValueSideways:
+        return TextOrientationSideways;
+    case CSSValueSidewaysRight:
+        return TextOrientationSidewaysRight;
     case CSSValueVerticalRight:
         return TextOrientationVerticalRight;
     case CSSValueUpright:
@@ -3403,45 +3579,6 @@ template<> inline CSSPrimitiveValue::operator ESpeak() const
     ASSERT_NOT_REACHED();
     return SpeakNormal;
 }
-
-#if ENABLE(CSS_SHADERS)
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CustomFilterOperation::MeshBoxType meshBoxType)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_IDENT;
-    switch (meshBoxType) {
-    case CustomFilterOperation::FILTER_BOX:
-        m_value.ident = CSSValueFilterBox;
-        break;
-    case CustomFilterOperation::BORDER_BOX:
-        m_value.ident = CSSValueBorderBox;
-        break;
-    case CustomFilterOperation::PADDING_BOX:
-        m_value.ident = CSSValuePaddingBox;
-        break;
-    case CustomFilterOperation::CONTENT_BOX:
-        m_value.ident = CSSValueContentBox;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator CustomFilterOperation::MeshBoxType() const
-{
-    switch (m_value.ident) {
-    case CSSValueFilterBox:
-        return CustomFilterOperation::FILTER_BOX;
-    case CSSValueBorderBox:
-        return CustomFilterOperation::BORDER_BOX;
-    case CSSValuePaddingBox:
-        return CustomFilterOperation::PADDING_BOX;
-    case CSSValueContentBox:
-        return CustomFilterOperation::CONTENT_BOX;
-    }
-
-    ASSERT_NOT_REACHED();
-    return CustomFilterOperation::FILTER_BOX;
-}
-#endif // ENABLE(CSS_SHADERS)
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BlendMode blendMode)
     : CSSValue(PrimitiveClass)
@@ -3964,6 +4101,39 @@ template<> inline CSSPrimitiveValue::operator WrapThrough() const
     return WrapThroughWrap;
 }
 
+template<> inline CSSPrimitiveValue::operator GridAutoFlow() const
+{
+    switch (m_value.ident) {
+    case CSSValueNone:
+        return AutoFlowNone;
+    case CSSValueColumn:
+        return AutoFlowColumn;
+    case CSSValueRow:
+        return AutoFlowRow;
+    }
+
+    ASSERT_NOT_REACHED();
+    return AutoFlowNone;
+
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(GridAutoFlow flow)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (flow) {
+    case AutoFlowNone:
+        m_value.ident = CSSValueNone;
+        break;
+    case AutoFlowColumn:
+        m_value.ident = CSSValueColumn;
+        break;
+    case AutoFlowRow:
+        m_value.ident = CSSValueRow;
+        break;
+    }
+}
+
 enum LengthConversion {
     AnyConversion = ~0,
     FixedIntegerConversion = 1 << 0,
@@ -3977,6 +4147,9 @@ enum LengthConversion {
 
 template<int supported> Length CSSPrimitiveValue::convertToLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
 {
+#if ENABLE(CSS_VARIABLES)
+    ASSERT(!hasVariableReference());
+#endif
     if ((supported & (FixedIntegerConversion | FixedFloatConversion)) && isFontRelativeLength() && (!style || !rootStyle))
         return Length(Undefined);
     if ((supported & FixedIntegerConversion) && isLength())
@@ -4280,6 +4453,33 @@ template<> inline CSSPrimitiveValue::operator EVectorEffect() const
 
     ASSERT_NOT_REACHED();
     return VE_NONE;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EMaskType e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (e) {
+    case MT_LUMINANCE:
+        m_value.ident = CSSValueLuminance;
+        break;
+    case MT_ALPHA:
+        m_value.ident = CSSValueAlpha;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator EMaskType() const
+{
+    switch (m_value.ident) {
+    case CSSValueLuminance:
+        return MT_LUMINANCE;
+    case CSSValueAlpha:
+        return MT_ALPHA;
+    }
+
+    ASSERT_NOT_REACHED();
+    return MT_LUMINANCE;
 }
 
 #endif // ENABLE(SVG)

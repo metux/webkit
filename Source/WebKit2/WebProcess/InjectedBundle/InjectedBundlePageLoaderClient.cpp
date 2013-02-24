@@ -33,13 +33,6 @@
 #include "WebError.h"
 #include <wtf/text/WTFString.h>
 
-#if ENABLE(WEB_INTENTS)
-#include "InjectedBundleIntentRequest.h"
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-#include "WebIntentServiceInfo.h"
-#endif
-
 using namespace WebCore;
 
 namespace WebKit {
@@ -194,30 +187,6 @@ void InjectedBundlePageLoaderClient::didDetectXSSForFrame(WebPage* page, WebFram
     userData = adoptRef(toImpl(userDataToPass));
 }
 
-#if ENABLE(WEB_INTENTS)
-void InjectedBundlePageLoaderClient::didReceiveIntentForFrame(WebPage* page, WebFrame* frame, InjectedBundleIntentRequest* intentRequest, RefPtr<APIObject>& userData)
-{
-    if (!m_client.didReceiveIntentForFrame)
-        return;
-
-    WKTypeRef userDataToPass = 0;
-    m_client.didReceiveIntentForFrame(toAPI(page), toAPI(frame), toAPI(intentRequest), &userDataToPass, m_client.clientInfo);
-    userData = adoptRef(toImpl(userDataToPass));
-}
-#endif
-
-#if ENABLE(WEB_INTENTS_TAG)
-void InjectedBundlePageLoaderClient::registerIntentServiceForFrame(WebPage* page, WebFrame* frame, WebIntentServiceInfo* service, RefPtr<APIObject>& userData)
-{
-    if (!m_client.registerIntentServiceForFrame)
-        return;
-
-    WKTypeRef userDataToPass = 0;
-    m_client.registerIntentServiceForFrame(toAPI(page), toAPI(frame), toAPI(service), &userDataToPass, m_client.clientInfo);
-    userData = adoptRef(toImpl(userDataToPass));
-}
-#endif
-
 void InjectedBundlePageLoaderClient::didFirstLayoutForFrame(WebPage* page, WebFrame* frame, RefPtr<APIObject>& userData)
 {
     if (!m_client.didFirstLayoutForFrame)
@@ -254,7 +223,17 @@ void InjectedBundlePageLoaderClient::didNewFirstVisuallyNonEmptyLayout(WebPage* 
     WKTypeRef userDataToPass = 0;
     m_client.didNewFirstVisuallyNonEmptyLayout(toAPI(page), &userDataToPass, m_client.clientInfo);
     userData = adoptRef(toImpl(userDataToPass));
-}    
+}
+
+void InjectedBundlePageLoaderClient::didLayout(WebPage* page, LayoutMilestones milestones, RefPtr<APIObject>& userData)
+{
+    if (!m_client.didLayout)
+        return;
+
+    WKTypeRef userDataToPass = 0;
+    m_client.didLayout(toAPI(page), toWKLayoutMilestones(milestones), &userDataToPass, m_client.clientInfo);
+    userData = adoptRef(toImpl(userDataToPass));
+}
 
 void InjectedBundlePageLoaderClient::didClearWindowObjectForFrame(WebPage* page, WebFrame* frame, DOMWrapperWorld* world)
 {

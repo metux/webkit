@@ -29,6 +29,7 @@
 #include "WKBundle.h"
 #include "WKBundlePage.h"
 #include "WKContext.h"
+#include "WKIconDatabase.h"
 #include "WKPage.h"
 
 namespace WebKit {
@@ -43,7 +44,7 @@ template<> struct APIClientTraits<WKBundleClient> {
 };
 
 template<> struct APIClientTraits<WKBundlePageLoaderClient> {
-    static const size_t interfaceSizesByVersion[4];
+    static const size_t interfaceSizesByVersion[5];
 };
 
 template<> struct APIClientTraits<WKBundlePageResourceLoadClient> {
@@ -52,6 +53,10 @@ template<> struct APIClientTraits<WKBundlePageResourceLoadClient> {
 
 template<> struct APIClientTraits<WKBundlePageFullScreenClient> {
     static const size_t interfaceSizesByVersion[2];
+};
+
+template<> struct APIClientTraits<WKBundlePageUIClient> {
+    static const size_t interfaceSizesByVersion[3];
 };
 
 template<> struct APIClientTraits<WKPageContextMenuClient> {
@@ -63,14 +68,22 @@ template<> struct APIClientTraits<WKPageLoaderClient> {
 };
 
 template<> struct APIClientTraits<WKPageUIClient> {
-    static const size_t interfaceSizesByVersion[2];
+    static const size_t interfaceSizesByVersion[3];
 };
 
 template<> struct APIClientTraits<WKBundlePageFormClient> {
     static const size_t interfaceSizesByVersion[2];
 };
 
+template<> struct APIClientTraits<WKBundlePageEditorClient> {
+    static const size_t interfaceSizesByVersion[2];
+};
+
 template<> struct APIClientTraits<WKContextInjectedBundleClient> {
+    static const size_t interfaceSizesByVersion[2];
+};
+
+template<> struct APIClientTraits<WKIconDatabaseClient> {
     static const size_t interfaceSizesByVersion[2];
 };
 

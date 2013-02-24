@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,16 +29,11 @@
 #include "APIObject.h"
 #include "GenericCallback.h"
 #include "ImmutableArray.h"
-
+#include "MessageReceiver.h"
+#include "WebContextSupplement.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
-
-namespace CoreIPC {
-    class ArgumentDecoder;
-    class Connection;
-    class MessageID;
-}
 
 namespace WebKit {
 
@@ -47,34 +42,39 @@ class WebProcessProxy;
 
 typedef GenericCallback<WKArrayRef> ArrayCallback;
 
-class WebMediaCacheManagerProxy : public APIObject {
+class WebMediaCacheManagerProxy : public APIObject, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
     static const Type APIType = TypeMediaCacheManager;
 
+    static const char* supplementName();
+
     static PassRefPtr<WebMediaCacheManagerProxy> create(WebContext*);
     virtual ~WebMediaCacheManagerProxy();
-
-    void invalidate();
-    void clearContext() { m_webContext = 0; }
     
     void getHostnamesWithMediaCache(PassRefPtr<ArrayCallback>);
     void clearCacheForHostname(const String&);
     void clearCacheForAllHostnames();
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-
-    bool shouldTerminate(WebProcessProxy*) const;
+    using APIObject::ref;
+    using APIObject::deref;
 
 private:
-    WebMediaCacheManagerProxy(WebContext*);
+    explicit WebMediaCacheManagerProxy(WebContext*);
 
     virtual Type type() const { return APIType; }
 
     void didGetHostnamesWithMediaCache(const Vector<String>&, uint64_t callbackID);
-    
-    void didReceiveWebMediaCacheManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 
-    WebContext* m_webContext;
+    // WebContextSupplement
+    virtual void contextDestroyed() OVERRIDE;
+    virtual void processDidClose(WebProcessProxy*) OVERRIDE;
+    virtual bool shouldTerminate(WebProcessProxy*) const OVERRIDE;
+    virtual void refWebContextSupplement() OVERRIDE;
+    virtual void derefWebContextSupplement() OVERRIDE;
+
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+
     HashMap<uint64_t, RefPtr<ArrayCallback> > m_arrayCallbacks;
 };
 

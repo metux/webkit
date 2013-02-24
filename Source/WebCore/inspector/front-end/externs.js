@@ -62,6 +62,32 @@ window.getComputedStyle = function(element) {}
 /** @param {*} message */
 function postMessage(message) {}
 
+/** @type {*} */
+window.testRunner = null;
+
+/**
+ * @constructor
+ */
+function WebKitMutation(callback)
+{
+    this.type = "";
+    /** @type {Node} */ this.target = null;
+    /** @type {Array.<Node>} */ this.addedNodes = [];
+    /** @type {Array.<Node>} */ this.removedNodes = [];
+}
+
+/**
+ * @constructor
+ * @param {function(Array.<WebKitMutation>)} callback
+ */
+function WebKitMutationObserver(callback) {}
+/** 
+ * @param {Node} container
+ * @param {Object} options
+ */
+WebKitMutationObserver.prototype.observe = function(container, options) {}
+WebKitMutationObserver.prototype.disconnect = function() {}
+
 /**
  * @param {string} eventName
  * @param {Function} listener
@@ -103,6 +129,12 @@ Array.prototype.qselect = function(k, comparator) {}
  */
 Array.prototype.select = function(field) {}
 
+/**
+ * @this {Array.<*>}
+ * @return {*}
+ */
+Array.prototype.peekLast = function() {}
+
 DOMApplicationCache.prototype.UNCACHED = 0;
 DOMApplicationCache.prototype.IDLE = 1;
 DOMApplicationCache.prototype.CHECKING = 2;
@@ -110,7 +142,19 @@ DOMApplicationCache.prototype.DOWNLOADING = 3;
 DOMApplicationCache.prototype.UPDATEREADY = 4;
 DOMApplicationCache.prototype.OBSOLETE = 5;
 
+// File System API
+/**
+ * @constructor
+ */
+function DOMFileSystem() {}
 
+/**
+ * @type {DirectoryEntry}
+ */
+DOMFileSystem.prototype.root = null;
+
+/** @type {Node} */
+Range.prototype.startContainer;
 
 // Inspector Backend
 var InspectorBackend = {}
@@ -122,9 +166,7 @@ InspectorFrontendHostAPI.prototype.platform = function() {}
 InspectorFrontendHostAPI.prototype.port = function() {}
 InspectorFrontendHostAPI.prototype.bringToFront = function() {}
 InspectorFrontendHostAPI.prototype.closeWindow = function() {}
-InspectorFrontendHostAPI.prototype.requestAttachWindow = function() {}
-InspectorFrontendHostAPI.prototype.requestDetachWindow = function() {}
-InspectorFrontendHostAPI.prototype.requestSetDockSide = function() {}
+InspectorFrontendHostAPI.prototype.requestSetDockSide = function(dockSide) {}
 InspectorFrontendHostAPI.prototype.setAttachedWindowHeight = function(height) {}
 InspectorFrontendHostAPI.prototype.moveWindowBy = function(x, y) {}
 InspectorFrontendHostAPI.prototype.setInjectedScriptForOrigin = function(origin, script) {}
@@ -137,13 +179,18 @@ InspectorFrontendHostAPI.prototype.copyText = function(text) {}
 InspectorFrontendHostAPI.prototype.openInNewTab = function(url) {}
 InspectorFrontendHostAPI.prototype.canSave = function() {}
 InspectorFrontendHostAPI.prototype.save = function(url, content, forceSaveAs) {}
-InspectorFrontendHostAPI.prototype.canAppend = function() {}
+InspectorFrontendHostAPI.prototype.close = function(url) {}
 InspectorFrontendHostAPI.prototype.append = function(url, content) {}
 InspectorFrontendHostAPI.prototype.sendMessageToBackend = function(message) {}
 InspectorFrontendHostAPI.prototype.recordActionTaken = function(actionCode) {}
 InspectorFrontendHostAPI.prototype.recordPanelShown = function(panelCode) {}
 InspectorFrontendHostAPI.prototype.recordSettingChanged = function(settingCode) {}
 InspectorFrontendHostAPI.prototype.loadResourceSynchronously = function(url) {}
+InspectorFrontendHostAPI.prototype.supportsFileSystems = function() {}
+InspectorFrontendHostAPI.prototype.requestFileSystems = function() {}
+InspectorFrontendHostAPI.prototype.addFileSystem = function() {}
+InspectorFrontendHostAPI.prototype.removeFileSystem = function(fileSystemPath) {}
+InspectorFrontendHostAPI.prototype.isolatedFileSystem = function(fileSystemId, registeredName) {}
 InspectorFrontendHostAPI.prototype.setZoomFactor = function(zoom) {}
 InspectorFrontendHostAPI.prototype.canInspectWorkers = function() {}
 /** @type {InspectorFrontendHostAPI} */
@@ -176,6 +223,8 @@ SourceMapV3.Offset = function()
 // FIXME: remove everything below.
 var WebInspector = {}
 
+WebInspector.queryParamsObject = {}
+WebInspector.toggleSearchingForNode = function() {}
 WebInspector.panels = {};
 
 /**
@@ -209,6 +258,7 @@ WebInspector.evaluateInConsole = function(expression, showResultOnly) {}
 WebInspector.queryParamsObject = {}
 
 WebInspector.Events = {
+    InspectorLoaded: "InspectorLoaded",
     InspectorClosing: "InspectorClosing"
 }
 
@@ -232,6 +282,8 @@ function Request() {}
 function Resource() {}
 /** @constructor */
 function Timeline() {}
+
+var extensionServer;
 
 /** @type {string} */
 Location.prototype.origin = "";
@@ -262,8 +314,6 @@ WebInspector.showPanel = function(panel)
  */
 WebInspector.inspectedPageDomain;
 
-WebInspector.isCompactMode = function() { return false; }
-
 WebInspector.SourceJavaScriptTokenizer = {}
 WebInspector.SourceJavaScriptTokenizer.Keywords = {}
 
@@ -279,4 +329,5 @@ difflib.SequenceMatcher.prototype.get_opcodes = function() { return []; }
 /** @constructor */
 WebInspector.CodeMirrorTextEditor = function(url, delegate) { }
 
-WebInspector.ProfileURLRegExp = "";
+/** @type {boolean} */
+window.dispatchStandaloneTestRunnerMessages;

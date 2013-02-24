@@ -26,6 +26,7 @@
 #define StyleBuilder_h
 
 #include "CSSPropertyNames.h"
+#include "StyleResolver.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -33,18 +34,17 @@ namespace WebCore {
 
 class CSSValue;
 class StyleBuilder;
-class StyleResolver;
 
 class PropertyHandler {
 public:
-    typedef void (*InheritFunction)(StyleResolver*);
-    typedef void (*InitialFunction)(StyleResolver*);
-    typedef void (*ApplyFunction)(StyleResolver*, CSSValue*);
+    typedef void (*InheritFunction)(CSSPropertyID, StyleResolver::State&);
+    typedef void (*InitialFunction)(CSSPropertyID, StyleResolver::State&);
+    typedef void (*ApplyFunction)(CSSPropertyID, StyleResolver::State&, CSSValue*);
     PropertyHandler() : m_inherit(0), m_initial(0), m_apply(0) { }
     PropertyHandler(InheritFunction inherit, InitialFunction initial, ApplyFunction apply) : m_inherit(inherit), m_initial(initial), m_apply(apply) { }
-    void applyInheritValue(StyleResolver* styleResolver) const { ASSERT(m_inherit); (*m_inherit)(styleResolver); }
-    void applyInitialValue(StyleResolver* styleResolver) const { ASSERT(m_initial); (*m_initial)(styleResolver); }
-    void applyValue(StyleResolver* styleResolver, CSSValue* value) const { ASSERT(m_apply); (*m_apply)(styleResolver, value); }
+    void applyInheritValue(CSSPropertyID propertyID, StyleResolver::State& state) const { ASSERT(m_inherit); (*m_inherit)(propertyID, state); }
+    void applyInitialValue(CSSPropertyID propertyID, StyleResolver::State& state) const { ASSERT(m_initial); (*m_initial)(propertyID, state); }
+    void applyValue(CSSPropertyID propertyID, StyleResolver::State& state, CSSValue* value) const { ASSERT(m_apply); (*m_apply)(propertyID, state, value); }
     bool isValid() const { return m_inherit && m_initial && m_apply; }
     InheritFunction inheritFunction() const { return m_inherit; }
     InitialFunction initialFunction() { return m_initial; }
@@ -56,7 +56,7 @@ private:
 };
 
 class StyleBuilder {
-    WTF_MAKE_NONCOPYABLE(StyleBuilder);
+    WTF_MAKE_NONCOPYABLE(StyleBuilder); WTF_MAKE_FAST_ALLOCATED;
 public:
     static const StyleBuilder& sharedStyleBuilder();
 

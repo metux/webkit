@@ -31,6 +31,7 @@
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/StackBounds.h>
+#include <wtf/StackStats.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/Threading.h>
@@ -104,11 +105,25 @@ public:
         m_currentIdentifierTable = m_defaultIdentifierTable;
     }
 
-    const StackBounds& stack() const
+    const StackBounds& stack()
     {
+        // We need to always get a fresh StackBounds from the OS due to how fibers work.
+        // See https://bugs.webkit.org/show_bug.cgi?id=102411
+#if OS(WINDOWS)
+        m_stackBounds = StackBounds::currentThreadStackBounds();
+#endif
         return m_stackBounds;
     }
+
+#if ENABLE(STACK_STATS)
+    StackStats::PerThreadStats& stackStats()
+    {
+        return m_stackStats;
+    }
 #endif
+#endif // USE(JSC)
+
+    void* m_apiData;
 
 private:
     AtomicStringTable* m_atomicStringTable;
@@ -118,7 +133,10 @@ private:
     JSC::IdentifierTable* m_defaultIdentifierTable;
     JSC::IdentifierTable* m_currentIdentifierTable;
     StackBounds m_stackBounds;
+#if ENABLE(STACK_STATS)
+    StackStats::PerThreadStats m_stackStats;
 #endif
+#endif // USE(JSC)
 
     static WTF_EXPORTDATA ThreadSpecific<WTFThreadData>* staticData;
     friend WTFThreadData& wtfThreadData();

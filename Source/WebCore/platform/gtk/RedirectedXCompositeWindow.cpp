@@ -27,8 +27,8 @@
 #include "config.h"
 #include "RedirectedXCompositeWindow.h"
 
-#include "GLContextGLX.h"
-#include <GL/glx.h>
+#if USE(GLX)
+
 #include <X11/extensions/Xcomposite.h>
 #include <X11/extensions/Xdamage.h>
 #include <cairo-xlib.h>
@@ -59,7 +59,7 @@ static GdkFilterReturn filterXDamageEvent(GdkXEvent* gdkXEvent, GdkEvent* event,
     if (i == windowHashMap.end())
         return GDK_FILTER_CONTINUE;
 
-    i->second->callDamageNotifyCallback();
+    i->value->callDamageNotifyCallback();
     XDamageSubtract(GDK_DISPLAY_XDISPLAY(gdk_display_get_default()), damageEvent->damage, None, None);
     return GDK_FILTER_REMOVE;
 }
@@ -93,18 +93,18 @@ static bool supportsXDamageAndXComposite()
     return true;
 }
 
-PassOwnPtr<RedirectedXCompositeWindow> RedirectedXCompositeWindow::create(const IntSize& size)
+PassOwnPtr<RedirectedXCompositeWindow> RedirectedXCompositeWindow::create(const IntSize& size, GLContextNeeded needsContext)
 {
-    return supportsXDamageAndXComposite() ? adoptPtr(new RedirectedXCompositeWindow(size)) : nullptr;
+    return supportsXDamageAndXComposite() ? adoptPtr(new RedirectedXCompositeWindow(size, needsContext)) : nullptr;
 }
 
-RedirectedXCompositeWindow::RedirectedXCompositeWindow(const IntSize& size)
+RedirectedXCompositeWindow::RedirectedXCompositeWindow(const IntSize& size, GLContextNeeded needsContext)
     : m_size(size)
     , m_window(0)
     , m_parentWindow(0)
     , m_pixmap(0)
+    , m_needsContext(needsContext)
     , m_surface(0)
-    , m_pendingResizeSourceId(0)
     , m_needsNewPixmapAfterResize(false)
     , m_damage(0)
     , m_damageNotifyCallback(0)
@@ -178,12 +178,14 @@ void RedirectedXCompositeWindow::resize(const IntSize& size)
     XResizeWindow(display, m_window, size.width(), size.height());
 
     XFlush(display);
-    glXWaitX();
 
-    // This swap is based on code in Chromium. It tries to work-around a bug in the Intel drivers
-    // where a swap is necessary to ensure the front and back buffers are properly resized.
-    if (context() == GLContext::getCurrent())
-        context()->swapBuffers();
+    if (m_needsContext == CreateGLContext) {
+        context()->waitNative();
+        // This swap is based on code in Chromium. It tries to work-around a bug in the Intel drivers
+        // where a swap is necessary to ensure the front and back buffers are properly resized.
+        if (context() == GLContext::getCurrent())
+            context()->swapBuffers();
+    }
 
     m_size = size;
     m_needsNewPixmapAfterResize = true;
@@ -191,6 +193,8 @@ void RedirectedXCompositeWindow::resize(const IntSize& size)
 
 GLContext* RedirectedXCompositeWindow::context()
 {
+    ASSERT(m_needsContext == CreateGLContext);
+
     if (m_context)
         return m_context.get();
 
@@ -262,3 +266,5 @@ void RedirectedXCompositeWindow::callDamageNotifyCallback()
 }
 
 } // namespace WebCore
+
+#endif // USE(GLX)

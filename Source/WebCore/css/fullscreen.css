@@ -9,6 +9,7 @@
 
 :-webkit-full-screen-ancestor:not(iframe) {
     z-index: auto !important;
+    position: static !important;
     opacity: 1 !important;
     -webkit-transform: none !important;
     -webkit-mask: none !important;
@@ -26,7 +27,7 @@ video:-webkit-full-screen, audio:-webkit-full-screen {
     margin: 0 !important;
     height: 100% !important;
     width: 100% !important;
-    -webkit-box-flex: 1 !important;
+    -webkit-flex: 1 !important;
     display: block !important;
 }
 

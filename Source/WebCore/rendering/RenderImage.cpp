@@ -52,13 +52,20 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderImage::RenderImage(Node* node)
-    : RenderReplaced(node, IntSize())
+RenderImage::RenderImage(Element* element)
+    : RenderReplaced(element, IntSize())
     , m_needsToSetSizeForAltText(false)
     , m_didIncrementVisuallyNonEmptyPixelCount(false)
     , m_isGeneratedContent(false)
 {
     updateAltText();
+}
+
+RenderImage* RenderImage::createAnonymous(Document* document)
+{
+    RenderImage* image = new (document->renderArena()) RenderImage(0);
+    image->setDocumentForAnonymous(document);
+    return image;
 }
 
 RenderImage::~RenderImage()
@@ -165,7 +172,8 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
         return;
     
     if (!m_didIncrementVisuallyNonEmptyPixelCount) {
-        view()->frameView()->incrementVisuallyNonEmptyPixelCount(m_imageResource->imageSize(1.0f));
+        // At a zoom level of 1 the image is guaranteed to have an integer size.
+        view()->frameView()->incrementVisuallyNonEmptyPixelCount(flooredIntSize(m_imageResource->imageSize(1.0f)));
         m_didIncrementVisuallyNonEmptyPixelCount = true;
     }
 
@@ -173,7 +181,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
 
     // Set image dimensions, taking into account the size of the alt text.
     if (m_imageResource->errorOccurred()) {
-        if (!m_altText.isEmpty() && document()->isPendingStyleRecalc()) {
+        if (!m_altText.isEmpty() && document()->hasPendingStyleRecalc()) {
             ASSERT(node());
             if (node()) {
                 m_needsToSetSizeForAltText = true;
@@ -187,7 +195,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
     imageDimensionsChanged(imageSizeChanged, rect);
 }
 
-bool RenderImage::updateIntrinsicSizeIfNeeded(const IntSize& newSize, bool imageSizeChanged)
+bool RenderImage::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize, bool imageSizeChanged)
 {
     if (newSize == intrinsicSize() && !imageSizeChanged)
         return false;
@@ -219,22 +227,33 @@ void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* r
 
     bool shouldRepaint = true;
     if (intrinsicSizeChanged) {
-        // lets see if we need to relayout at all..
-        LayoutUnit oldwidth = width();
-        LayoutUnit oldheight = height();
         if (!preferredLogicalWidthsDirty())
             setPreferredLogicalWidthsDirty(true);
-        computeLogicalWidth();
-        computeLogicalHeight();
 
-        if (imageSizeChanged || width() != oldwidth || height() != oldheight) {
+        bool hasOverrideSize = hasOverrideHeight() || hasOverrideWidth();
+        if (!hasOverrideSize && !imageSizeChanged) {
+            LogicalExtentComputedValues computedValues;
+            computeLogicalWidthInRegion(computedValues);
+            LayoutUnit newWidth = computedValues.m_extent;
+            computeLogicalHeight(height(), 0, computedValues);
+            LayoutUnit newHeight = computedValues.m_extent;
+
+            imageSizeChanged = width() != newWidth || height() != newHeight;
+        }
+
+        // FIXME: We only need to recompute the containing block's preferred size
+        // if the containing block's size depends on the image's size (i.e., the container uses shrink-to-fit sizing).
+        // There's no easy way to detect that shrink-to-fit is needed, always force a layout.
+        bool containingBlockNeedsToRecomputePreferredSize =
+            style()->logicalWidth().isPercent()
+            || style()->logicalMaxWidth().isPercent()
+            || style()->logicalMinWidth().isPercent();
+
+        if (imageSizeChanged || hasOverrideSize || containingBlockNeedsToRecomputePreferredSize) {
             shouldRepaint = false;
             if (!selfNeedsLayout())
                 setNeedsLayout(true);
         }
-
-        setWidth(oldwidth);
-        setHeight(oldheight);
     }
 
     if (shouldRepaint) {
@@ -329,7 +348,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
                 if (centerY < 0)
                     centerY = 0;
                 imageOffset = LayoutSize(leftBorder + leftPad + centerX + 1, topBorder + topPad + centerY + 1);
-                context->drawImage(image.get(), style()->colorSpace(), IntRect(roundedIntPoint(paintOffset + imageOffset), imageSize), CompositeSourceOver, shouldRespectImageOrientation());
+                context->drawImage(image.get(), style()->colorSpace(), pixelSnappedIntRect(LayoutRect(paintOffset + imageOffset, imageSize)), CompositeSourceOver, shouldRespectImageOrientation());
                 errorPictureDrawn = true;
             }
 
@@ -447,7 +466,7 @@ void RenderImage::paintIntoRect(GraphicsContext* context, const LayoutRect& rect
     if (!img || img->isNull())
         return;
 
-    HTMLImageElement* imageElt = hostImageElement();
+    HTMLImageElement* imageElt = (node() && node()->hasTagName(imgTag)) ? static_cast<HTMLImageElement*>(node()) : 0;
     CompositeOperator compositeOperator = imageElt ? imageElt->compositeOperator() : CompositeSourceOver;
     Image* image = m_imageResource->image().get();
     bool useLowQualityScaling = shouldPaintAtLowQuality(context, image, image, alignedRect.size());
@@ -480,35 +499,34 @@ bool RenderImage::backgroundIsObscured() const
     if ((backgroundClip == BorderFillBox || backgroundClip == PaddingFillBox) && style()->hasPadding())
         return false;
 
-    // Check for bitmap image with alpha.
+    // Check for image with alpha.
     Image* image = m_imageResource->image().get();
-    if (!image || !image->isBitmapImage() || image->currentFrameHasAlpha())
+    if (!image)
         return false;
-        
-    return true;
+    return image->currentFrameKnownToBeOpaque();
 }
 
-int RenderImage::minimumReplacedHeight() const
+LayoutUnit RenderImage::minimumReplacedHeight() const
 {
-    return m_imageResource->errorOccurred() ? intrinsicSize().height() : 0;
+    return m_imageResource->errorOccurred() ? intrinsicSize().height() : LayoutUnit();
 }
 
 HTMLMapElement* RenderImage::imageMap() const
 {
-    HTMLImageElement* i = hostImageElement();
+    HTMLImageElement* i = node() && node()->hasTagName(imgTag) ? static_cast<HTMLImageElement*>(node()) : 0;
     return i ? i->treeScope()->getImageMap(i->fastGetAttribute(usemapAttr)) : 0;
 }
 
-bool RenderImage::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
+bool RenderImage::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
-    HitTestResult tempResult(result.hitTestPoint(), result.shadowContentFilterPolicy());
-    bool inside = RenderReplaced::nodeAtPoint(request, tempResult, pointInContainer, accumulatedOffset, hitTestAction);
+    HitTestResult tempResult(result.hitTestLocation());
+    bool inside = RenderReplaced::nodeAtPoint(request, tempResult, locationInContainer, accumulatedOffset, hitTestAction);
 
     if (tempResult.innerNode() && node()) {
         if (HTMLMapElement* map = imageMap()) {
             LayoutRect contentBox = contentBoxRect();
             float scaleFactor = 1 / style()->effectiveZoom();
-            LayoutPoint mapLocation = pointInContainer.point() - toLayoutSize(accumulatedOffset) - locationOffset() - toLayoutSize(contentBox.location());
+            LayoutPoint mapLocation = locationInContainer.point() - toLayoutSize(accumulatedOffset) - locationOffset() - toLayoutSize(contentBox.location());
             mapLocation.scale(scaleFactor, scaleFactor);
 
             if (map->mapMouseEvent(mapLocation, contentBox.size(), tempResult))
@@ -530,12 +548,13 @@ void RenderImage::updateAltText()
 
     if (node()->hasTagName(inputTag))
         m_altText = static_cast<HTMLInputElement*>(node())->altText();
-    else if (HTMLImageElement* image = hostImageElement())
-        m_altText = image->altText();
+    else if (node()->hasTagName(imgTag))
+        m_altText = static_cast<HTMLImageElement*>(node())->altText();
 }
 
 void RenderImage::layout()
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     RenderReplaced::layout();
 
     // Propagate container size to image resource.
@@ -554,7 +573,7 @@ void RenderImage::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, dou
         if (containingBlock->isBox()) {
             RenderBox* box = toRenderBox(containingBlock);
             intrinsicSize.setWidth(box->availableLogicalWidth());
-            intrinsicSize.setHeight(box->availableLogicalHeight());
+            intrinsicSize.setHeight(box->availableLogicalHeight(IncludeMarginBorderPadding));
         }
     }
     // Don't compute an intrinsic ratio to preserve historical WebKit behavior if we're painting alt text and/or a broken image.
@@ -562,24 +581,6 @@ void RenderImage::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, dou
         intrinsicRatio = 1;
         return;
     }
-}
-
-HTMLImageElement* RenderImage::hostImageElement() const
-{
-    if (!node())
-        return 0;
-
-    if (isHTMLImageElement(node()))
-        return toHTMLImageElement(node());
-
-    if (node()->hasTagName(webkitInnerImageTag)) {
-        if (Node* ancestor = node()->shadowAncestorNode()) {
-            if (ancestor->hasTagName(imgTag))
-                return toHTMLImageElement(ancestor);
-        }
-    }
-
-    return 0;
 }
 
 bool RenderImage::needsPreferredWidthsRecalculation() const

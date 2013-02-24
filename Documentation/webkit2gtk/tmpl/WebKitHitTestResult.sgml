@@ -66,6 +66,7 @@ WebKitHitTestResult
 @WEBKIT_HIT_TEST_RESULT_CONTEXT_IMAGE: 
 @WEBKIT_HIT_TEST_RESULT_CONTEXT_MEDIA: 
 @WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE: 
+@WEBKIT_HIT_TEST_RESULT_CONTEXT_SCROLLBAR: 
 
 <!-- ##### FUNCTION webkit_hit_test_result_get_context ##### -->
 <para>
@@ -149,6 +150,15 @@ WebKitHitTestResult
 
 
 <!-- ##### FUNCTION webkit_hit_test_result_get_media_uri ##### -->
+<para>
+
+</para>
+
+@hit_test_result: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_hit_test_result_context_is_scrollbar ##### -->
 <para>
 
 </para>

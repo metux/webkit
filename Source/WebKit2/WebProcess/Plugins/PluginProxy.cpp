@@ -55,12 +55,12 @@ static uint64_t generatePluginInstanceID()
     return ++uniquePluginInstanceID;
 }
 
-PassRefPtr<PluginProxy> PluginProxy::create(const String& pluginPath)
+PassRefPtr<PluginProxy> PluginProxy::create(const String& pluginPath, PluginProcess::Type processType)
 {
-    return adoptRef(new PluginProxy(pluginPath));
+    return adoptRef(new PluginProxy(pluginPath, processType));
 }
 
-PluginProxy::PluginProxy(const String& pluginPath)
+PluginProxy::PluginProxy(const String& pluginPath, PluginProcess::Type processType)
     : m_pluginPath(pluginPath)
     , m_pluginInstanceID(generatePluginInstanceID())
     , m_pluginBackingStoreContainsValidData(false)
@@ -69,6 +69,7 @@ PluginProxy::PluginProxy(const String& pluginPath)
     , m_wantsWheelEvents(false)
     , m_remoteLayerClientID(0)
     , m_waitingOnAsynchronousInitialization(false)
+    , m_processType(processType)
 {
 }
 
@@ -84,7 +85,7 @@ void PluginProxy::pluginProcessCrashed()
 bool PluginProxy::initialize(const Parameters& parameters)
 {
     ASSERT(!m_connection);
-    m_connection = WebProcess::shared().pluginProcessConnectionManager().getPluginProcessConnection(m_pluginPath);
+    m_connection = WebProcess::shared().pluginProcessConnectionManager().getPluginProcessConnection(m_pluginPath, m_processType);
     
     if (!m_connection)
         return false;
@@ -121,14 +122,6 @@ bool PluginProxy::initialize(const Parameters& parameters)
 bool PluginProxy::canInitializeAsynchronously() const
 {
     return controller()->asynchronousPluginInitializationEnabled() && (m_connection->supportsAsynchronousPluginInitialization() || controller()->asynchronousPluginInitializationEnabledForAllPlugins());
-}
-
-void PluginProxy::waitForAsynchronousInitialization()
-{
-    ASSERT(!m_isStarted);
-    ASSERT(m_waitingOnAsynchronousInitialization);
-
-    initializeSynchronously();
 }
 
 bool PluginProxy::initializeSynchronously()
@@ -239,6 +232,9 @@ PassRefPtr<ShareableBitmap> PluginProxy::snapshot()
 {
     ShareableBitmap::Handle snapshotStoreHandle;
     m_connection->connection()->sendSync(Messages::PluginControllerProxy::Snapshot(), Messages::PluginControllerProxy::Snapshot::Reply(snapshotStoreHandle), m_pluginInstanceID);
+
+    if (snapshotStoreHandle.isNull())
+        return 0;
 
     RefPtr<ShareableBitmap> snapshotBuffer = ShareableBitmap::create(snapshotStoreHandle);
     return snapshotBuffer.release();
@@ -411,6 +407,33 @@ void PluginProxy::setFocus(bool hasFocus)
     m_connection->connection()->send(Messages::PluginControllerProxy::SetFocus(hasFocus), m_pluginInstanceID);
 }
 
+bool PluginProxy::handleEditingCommand(const String& commandName, const String& argument)
+{
+    bool handled = false;
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleEditingCommand(commandName, argument), Messages::PluginControllerProxy::HandleEditingCommand::Reply(handled), m_pluginInstanceID))
+        return false;
+    
+    return handled;
+}
+    
+bool PluginProxy::isEditingCommandEnabled(const String& commandName)
+{
+    bool enabled = false;
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::IsEditingCommandEnabled(commandName), Messages::PluginControllerProxy::IsEditingCommandEnabled::Reply(enabled), m_pluginInstanceID))
+        return false;
+    
+    return enabled;
+}
+    
+bool PluginProxy::handlesPageScaleFactor()
+{
+    bool handled = false;
+    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandlesPageScaleFactor(), Messages::PluginControllerProxy::HandlesPageScaleFactor::Reply(handled), m_pluginInstanceID))
+        return false;
+    
+    return handled;
+}
+
 NPObject* PluginProxy::pluginScriptableNPObject()
 {
     // Sending the synchronous Messages::PluginControllerProxy::GetPluginScriptableNPObject message can cause us to dispatch an
@@ -455,9 +478,14 @@ void PluginProxy::sendComplexTextInput(const String& textInput)
 }
 #endif
 
-void PluginProxy::contentsScaleFactorChanged(float scaleFactor)
+void PluginProxy::contentsScaleFactorChanged(float)
 {
     geometryDidChange();
+}
+
+void PluginProxy::storageBlockingStateChanged(bool isStorageBlockingEnabled)
+{
+    m_connection->connection()->send(Messages::PluginControllerProxy::StorageBlockingStateChanged(isStorageBlockingEnabled), m_pluginInstanceID);
 }
 
 void PluginProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)
@@ -636,6 +664,11 @@ void PluginProxy::update(const IntRect& paintedRect)
     // Ask the controller to invalidate the rect for us.
     m_waitingForPaintInResponseToUpdate = true;
     controller()->invalidate(paintedRect);
+}
+
+IntPoint PluginProxy::convertToRootView(const IntPoint& point) const
+{
+    return m_pluginToRootViewTransform.mapPoint(point);
 }
 
 } // namespace WebKit

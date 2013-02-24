@@ -26,11 +26,11 @@
 #include "Length.h"
 
 #include "CalculationValue.h"
-#include "PlatformString.h"
 #include <wtf/ASCIICType.h>
 #include <wtf/Assertions.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/text/StringBuffer.h>
+#include <wtf/text/WTFString.h>
 
 using namespace WTF;
 
@@ -151,6 +151,7 @@ PassOwnArrayPtr<Length> newLengthArray(const String& string, int& len)
 }
         
 class CalculationValueHandleMap {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     CalculationValueHandleMap() 
         : m_index(1) 
@@ -239,7 +240,7 @@ float Length::nonNanCalculatedValue(int maxValue) const
 {
     ASSERT(isCalculated());
     float result = calculationValue()->evaluate(maxValue);
-    if (isnan(result))
+    if (std::isnan(result))
         return 0;
     return result;
 }

@@ -37,34 +37,34 @@
 using namespace WebKit;
 using namespace WebCore;
 
+/**
+ * SECTION: WebKitContextMenuItem
+ * @Short_description: One item of the #WebKitContextMenu
+ * @Title: WebKitContextMenuItem
+ *
+ * The #WebKitContextMenu is composed of #WebKitContextMenuItem<!--
+ * -->s. These items can be created from a #GtkAction, from a
+ * #WebKitContextMenuAction or from a #WebKitContextMenuAction and a
+ * label. These #WebKitContextMenuAction<!-- -->s denote stock actions
+ * for the items. You can also create separators and submenus.
+ *
+ */
+
 struct _WebKitContextMenuItemPrivate {
+    ~_WebKitContextMenuItemPrivate()
+    {
+        if (subMenu)
+            webkitContextMenuSetParentItem(subMenu.get(), 0);
+    }
+
     OwnPtr<ContextMenuItem> menuItem;
     GRefPtr<WebKitContextMenu> subMenu;
 };
 
-G_DEFINE_TYPE(WebKitContextMenuItem, webkit_context_menu_item, G_TYPE_INITIALLY_UNOWNED)
-
-static void webkitContextMenuItemFinalize(GObject* object)
-{
-    WebKitContextMenuItemPrivate* priv = WEBKIT_CONTEXT_MENU_ITEM(object)->priv;
-    if (priv->subMenu)
-        webkitContextMenuSetParentItem(priv->subMenu.get(), 0);
-    priv->~WebKitContextMenuItemPrivate();
-    G_OBJECT_CLASS(webkit_context_menu_item_parent_class)->finalize(object);
-}
-
-static void webkit_context_menu_item_init(WebKitContextMenuItem* item)
-{
-    WebKitContextMenuItemPrivate* priv = G_TYPE_INSTANCE_GET_PRIVATE(item, WEBKIT_TYPE_CONTEXT_MENU_ITEM, WebKitContextMenuItemPrivate);
-    item->priv = priv;
-    new (priv) WebKitContextMenuItemPrivate();
-}
+WEBKIT_DEFINE_TYPE(WebKitContextMenuItem, webkit_context_menu_item, G_TYPE_INITIALLY_UNOWNED)
 
 static void webkit_context_menu_item_class_init(WebKitContextMenuItemClass* itemClass)
 {
-    GObjectClass* gObjectClass = G_OBJECT_CLASS(itemClass);
-    gObjectClass->finalize = webkitContextMenuItemFinalize;
-    g_type_class_add_private(itemClass, sizeof(WebKitContextMenuItemPrivate));
 }
 
 static bool checkAndWarnIfMenuHasParentItem(WebKitContextMenu* menu)
@@ -91,10 +91,10 @@ static void webkitContextMenuItemSetSubMenu(WebKitContextMenuItem* item, GRefPtr
         webkitContextMenuSetParentItem(subMenu.get(), item);
 }
 
-WebKitContextMenuItem* webkitContextMenuItemCreate(WKContextMenuItemRef wkItem)
+WebKitContextMenuItem* webkitContextMenuItemCreate(WebContextMenuItem* webItem)
 {
     WebKitContextMenuItem* item = WEBKIT_CONTEXT_MENU_ITEM(g_object_new(WEBKIT_TYPE_CONTEXT_MENU_ITEM, NULL));
-    WebContextMenuItemData* itemData = toImpl(wkItem)->data();
+    WebContextMenuItemData* itemData = webItem->data();
     item->priv->menuItem = WTF::adoptPtr(new ContextMenuItem(itemData->type(), itemData->action(), itemData->title(), itemData->enabled(), itemData->checked()));
     const Vector<WebContextMenuItemData>& subMenu = itemData->submenu();
     if (!subMenu.size())
@@ -104,7 +104,7 @@ WebKitContextMenuItem* webkitContextMenuItemCreate(WKContextMenuItemRef wkItem)
     subMenuItems->reserveCapacity(subMenu.size());
     for (size_t i = 0; i < subMenu.size(); ++i)
         subMenuItems->append(WebContextMenuItem::create(subMenu[i]).get());
-    webkitContextMenuItemSetSubMenu(item, adoptGRef(webkitContextMenuCreate(toAPI(subMenuItems.get()))));
+    webkitContextMenuItemSetSubMenu(item, adoptGRef(webkitContextMenuCreate(subMenuItems.get())));
 
     return item;
 }

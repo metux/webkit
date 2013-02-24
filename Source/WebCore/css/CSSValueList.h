@@ -50,6 +50,7 @@ public:
 
     size_t length() const { return m_values.size(); }
     CSSValue* item(size_t index) { return index < m_values.size() ? m_values[index].get() : 0; }
+    const CSSValue* item(size_t index) const { return index < m_values.size() ? m_values[index].get() : 0; }
     CSSValue* itemWithoutBoundsCheck(size_t index) { return m_values[index].get(); }
 
     void append(PassRefPtr<CSSValue> value) { m_values.append(value); }
@@ -59,6 +60,8 @@ public:
     PassRefPtr<CSSValueList> copy();
 
     String customCssText() const;
+    bool equals(const CSSValueList&) const;
+    bool equals(const CSSValue&) const;
 #if ENABLE(CSS_VARIABLES)
     String customSerializeResolvingVariables(const HashMap<AtomicString, String>&) const;
 #endif
@@ -79,7 +82,7 @@ private:
     explicit CSSValueList(ValueListSeparator);
     explicit CSSValueList(CSSParserValueList*);
 
-    Vector<RefPtr<CSSValue> > m_values;
+    Vector<RefPtr<CSSValue>, 4> m_values;
 };
 
 // Objects of this class are intended to be stack-allocated and scoped to a single function.
@@ -87,7 +90,7 @@ private:
 class CSSValueListInspector {
 public:
     CSSValueListInspector(CSSValue* value) : m_list((value && value->isValueList()) ? static_cast<CSSValueList*>(value) : 0) { }
-    CSSValue* item(size_t index) const { ASSERT(index < length()); return m_list->itemWithoutBoundsCheck(index); }
+    CSSValue* item(size_t index) const { ASSERT_WITH_SECURITY_IMPLICATION(index < length()); return m_list->itemWithoutBoundsCheck(index); }
     CSSValue* first() const { return item(0); }
     CSSValue* second() const { return item(1); }
     size_t length() const { return m_list ? m_list->length() : 0; }

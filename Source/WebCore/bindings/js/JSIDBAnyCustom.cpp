@@ -37,7 +37,6 @@
 #include "IDBDatabase.h"
 #include "IDBFactory.h"
 #include "IDBIndex.h"
-#include "IDBKey.h"
 #include "IDBObjectStore.h"
 #include "JSDOMStringList.h"
 #include "JSIDBCursor.h"
@@ -45,7 +44,6 @@
 #include "JSIDBDatabase.h"
 #include "JSIDBFactory.h"
 #include "JSIDBIndex.h"
-#include "JSIDBKey.h"
 #include "JSIDBObjectStore.h"
 #include "JSIDBTransaction.h"
 #include "SerializedScriptValue.h"
@@ -64,8 +62,6 @@ JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, IDBAny* idbAny)
         return jsUndefined();
     case IDBAny::NullType:
         return jsNull();
-    case IDBAny::StringType:
-        return jsString(exec, idbAny->string());
     case IDBAny::DOMStringListType:
         return toJS(exec, globalObject, idbAny->domStringList());
     case IDBAny::IDBCursorType:
@@ -78,14 +74,16 @@ JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, IDBAny* idbAny)
         return toJS(exec, globalObject, idbAny->idbFactory());
     case IDBAny::IDBIndexType:
         return toJS(exec, globalObject, idbAny->idbIndex());
-    case IDBAny::IDBKeyType:
-        return toJS(exec, globalObject, idbAny->idbKey());
     case IDBAny::IDBObjectStoreType:
         return toJS(exec, globalObject, idbAny->idbObjectStore());
     case IDBAny::IDBTransactionType:
         return toJS(exec, globalObject, idbAny->idbTransaction());
-    case IDBAny::SerializedScriptValueType:
-        return idbAny->serializedScriptValue()->deserialize(exec, globalObject);
+    case IDBAny::ScriptValueType:
+        return idbAny->scriptValue().jsValue();
+    case IDBAny::IntegerType:
+        return jsNumber(idbAny->integer());
+    case IDBAny::StringType:
+        return jsStringWithCache(exec, idbAny->string());
     }
 
     ASSERT_NOT_REACHED();

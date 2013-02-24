@@ -249,6 +249,12 @@ WebInspector.SearchController.prototype = {
         WebInspector.inspectorView.setFooterElement(this._element);
         this._updateReplaceVisibility();
         this._updateFilterVisibility();
+        if (WebInspector.currentFocusElement() !== this._searchInputElement) {
+            var selection = window.getSelection();
+            if (selection.rangeCount)
+                this._searchInputElement.value = selection.toString().replace(/\r?\n.*/, "");
+        }
+        this._performSearch(this._searchInputElement.value, true, false);
         this._searchInputElement.focus();
         this._searchInputElement.select();
         this._searchIsVisible = true;
@@ -276,7 +282,7 @@ WebInspector.SearchController.prototype = {
     
     _updateFilterVisibility: function()
     {
-        if (typeof WebInspector.inspectorView.currentPanel().performFilter === "function")
+        if (WebInspector.inspectorView.currentPanel().canFilter())
             this._filterCheckboxContainer.removeStyleClass("hidden");
         else
             this._filterCheckboxContainer.addStyleClass("hidden");
@@ -431,8 +437,7 @@ WebInspector.SearchController.prototype = {
      */
     _performFilter: function(query)
     {
-        if (typeof WebInspector.inspectorView.currentPanel().performFilter === "function")
-            WebInspector.inspectorView.currentPanel().performFilter(query);
+        WebInspector.inspectorView.currentPanel().performFilter(query);
     },
   
     _onFilterInput: function(event)

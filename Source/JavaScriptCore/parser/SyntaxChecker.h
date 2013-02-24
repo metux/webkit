@@ -144,13 +144,14 @@ public:
     ExpressionType createNull(const JSTokenLocation&) { return NullExpr; }
     ExpressionType createBracketAccess(const JSTokenLocation&, ExpressionType, ExpressionType, bool, int, int, int) { return BracketExpr; }
     ExpressionType createDotAccess(const JSTokenLocation&, ExpressionType, const Identifier*, int, int, int) { return DotExpr; }
-    ExpressionType createRegExp(const JSTokenLocation&, const Identifier& pattern, const Identifier&, int) { return Yarr::checkSyntax(pattern.ustring()) ? 0 : RegExpExpr; }
+    ExpressionType createRegExp(const JSTokenLocation&, const Identifier& pattern, const Identifier&, int) { return Yarr::checkSyntax(pattern.string()) ? 0 : RegExpExpr; }
     ExpressionType createNewExpr(const JSTokenLocation&, ExpressionType, int, int, int, int) { return NewExpr; }
     ExpressionType createNewExpr(const JSTokenLocation&, ExpressionType, int, int) { return NewExpr; }
     ExpressionType createConditionalExpr(const JSTokenLocation&, ExpressionType, ExpressionType, ExpressionType) { return ConditionalExpr; }
     ExpressionType createAssignResolve(const JSTokenLocation&, const Identifier&, ExpressionType, int, int, int) { return AssignmentExpr; }
     ExpressionType createFunctionExpr(const JSTokenLocation&, const Identifier*, int, int, int, int, int, int) { return FunctionExpr; }
     int createFunctionBody(const JSTokenLocation&, bool) { return 1; }
+    void setFunctionStart(int, int) { }
     int createArguments() { return 1; }
     int createArguments(int) { return 1; }
     int createArgumentsList(const JSTokenLocation&, int) { return 1; }
@@ -245,7 +246,7 @@ public:
     void unaryTokenStackRemoveLast(int& stackDepth) { stackDepth = 0; }
     
     void assignmentStackAppend(int, int, int, int, int, Operator) { }
-    int createAssignment(const JSTokenLocation&, int, int, int, int, int) { ASSERT_NOT_REACHED(); return 1; }
+    int createAssignment(const JSTokenLocation&, int, int, int, int, int) { RELEASE_ASSERT_NOT_REACHED(); return 1; }
     const Identifier& getName(const Property& property) const { ASSERT(property.name); return *property.name; }
     PropertyNode::Type getType(const Property& property) const { return property.type; }
     bool isResolve(ExpressionType expr) const { return expr == ResolveExpr || expr == ResolveEvalExpr; }

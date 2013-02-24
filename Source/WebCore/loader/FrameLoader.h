@@ -38,6 +38,8 @@
 #include "HistoryController.h"
 #include "IconController.h"
 #include "IconURL.h"
+#include "LayoutMilestones.h"
+#include "MixedContentChecker.h"
 #include "PolicyChecker.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadNotifier.h"
@@ -61,7 +63,6 @@ class FormState;
 class FormSubmission;
 class FrameLoaderClient;
 class FrameNetworkingContext;
-class MemoryObjectInfo;
 class NavigationAction;
 class NetworkingContext;
 class Page;
@@ -93,6 +94,7 @@ public:
     ResourceLoadNotifier* notifier() const { return &m_notifer; }
     SubframeLoader* subframeLoader() const { return &m_subframeLoader; }
     IconController* icon() const { return &m_icon; }
+    MixedContentChecker* mixedContentChecker() const { return &m_mixedContentChecker; }
 
     void prepareForHistoryNavigation();
     void setupForReplace();
@@ -102,9 +104,8 @@ public:
     void loadFrameRequest(const FrameLoadRequest&, bool lockHistory, bool lockBackForwardList,  // Called by submitForm, calls loadPostRequest and loadURL.
         PassRefPtr<Event>, PassRefPtr<FormState>, ShouldSendReferrer);
 
-    void load(const ResourceRequest&, bool lockHistory);                                        // Called by WebFrame, calls load(ResourceRequest, SubstituteData).
-    void load(const ResourceRequest&, const SubstituteData&, bool lockHistory);                 // Called both by WebFrame and internally, calls load(DocumentLoader*).
-    void load(const ResourceRequest&, const String& frameName, bool lockHistory);               // Called by WebPluginController.
+    void load(const FrameLoadRequest&);
+
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
     void loadArchive(PassRefPtr<Archive>);
 #endif
@@ -121,6 +122,8 @@ public:
     void open(CachedFrameBase&);
     void loadItem(HistoryItem*, FrameLoadType);
     HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
+
+    void retryAfterFailedCacheOnlyMainResourceLoad();
 
     static void reportLocalLoadFailed(Frame*, const String& url);
 
@@ -175,12 +178,8 @@ public:
 
     CachePolicy subresourceCachePolicy() const;
 
+    void didLayout(LayoutMilestones);
     void didFirstLayout();
-
-    // FIXME: didFirstVisuallyNonEmptyLayout() and didNewFirstVisuallyNonEmptyLayout() should be merged.
-    // The only reason for both to exist is to experiment with different heuristics for the time being.
-    void didFirstVisuallyNonEmptyLayout();
-    void didNewFirstVisuallyNonEmptyLayout();
 
     void loadedResourceFromMemoryCache(CachedResource*);
     void tellClientAboutPastMemoryCacheLoads();
@@ -217,11 +216,6 @@ public:
     void forceSandboxFlags(SandboxFlags flags) { m_forcedSandboxFlags |= flags; }
     SandboxFlags effectiveSandboxFlags() const;
 
-    // Mixed content related functions.
-    static bool isMixedContent(SecurityOrigin* context, const KURL&);
-    bool checkIfDisplayInsecureContent(SecurityOrigin* context, const KURL&);
-    bool checkIfRunInsecureContent(SecurityOrigin* context, const KURL&);
-
     bool checkIfFormActionAllowedByCSP(const KURL&) const;
 
     Frame* opener();
@@ -253,7 +247,7 @@ public:
 
     void applyUserAgent(ResourceRequest&);
 
-    bool shouldInterruptLoadForXFrameOptions(const String&, const KURL&);
+    bool shouldInterruptLoadForXFrameOptions(const String&, const KURL&, unsigned long requestIdentifier);
 
     void completed();
     bool allAncestorsAreComplete() const; // including this
@@ -290,12 +284,17 @@ public:
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
+    enum FormSubmissionCacheLoadPolicy {
+        MayAttemptCacheOnlyLoadForFormSubmissionItem,
+        MayNotAttemptCacheOnlyLoadForFormSubmissionItem
+    };
+
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
     void checkTimerFired(Timer<FrameLoader>*);
     
     void loadSameDocumentItem(HistoryItem*);
-    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType);
+    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType, FormSubmissionCacheLoadPolicy);
     
     void loadProvisionalItemFromCachedPage();
 
@@ -360,7 +359,7 @@ private:
     void detachChildren();
     void closeAndRemoveChild(Frame*);
 
-    void loadInSameDocument(const KURL&, SerializedScriptValue* stateObject, bool isNewNavigation);
+    void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation);
 
     void prepareForLoadStart();
     void provisionalLoadStarted();
@@ -378,12 +377,19 @@ private:
     Frame* m_frame;
     FrameLoaderClient* m_client;
 
+    // FIXME: These should be OwnPtr<T> to reduce build times and simplify
+    // header dependencies unless performance testing proves otherwise.
+    // Some of these could be lazily created for memory savings on devices.
     mutable PolicyChecker m_policyChecker;
     mutable HistoryController m_history;
     mutable ResourceLoadNotifier m_notifer;
     mutable SubframeLoader m_subframeLoader;
     mutable FrameLoaderStateMachine m_stateMachine;
     mutable IconController m_icon;
+    mutable MixedContentChecker m_mixedContentChecker;
+
+    class FrameProgressTracker;
+    OwnPtr<FrameProgressTracker> m_progressTracker;
 
     FrameState m_state;
     FrameLoadType m_loadType;

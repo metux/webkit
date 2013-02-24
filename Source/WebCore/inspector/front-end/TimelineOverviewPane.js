@@ -31,7 +31,6 @@
 /**
  * @constructor
  * @extends {WebInspector.View}
- * @implements {WebInspector.TimelinePresentationModel.Filter}
  * @param {WebInspector.TimelineModel} model
  */
 WebInspector.TimelineOverviewPane = function(model)
@@ -274,14 +273,6 @@ WebInspector.TimelineOverviewPane.prototype = {
         this._update();
     },
 
-    /**
-     * @param {WebInspector.TimelinePresentationModel.Record} record
-     */
-    accept: function(record)
-    {
-        return record.lastChildEndTime >= this._windowStartTime && record.startTime <= this._windowEndTime;
-    },
-
     windowStartTime: function()
     {
         return this._windowStartTime || this._model.minimumRecordTime();
@@ -342,11 +333,11 @@ WebInspector.TimelineOverviewPane.prototype = {
     },
 
     /**
-     * @param {boolean} value
+     * @param {number} value
      */
-    setShowShortEvents: function(value)
+    setMinimumRecordDuration: function(value)
     {
-        this._categoryStrips.setShowShortEvents(value);
+        this._categoryStrips.setMinimumRecordDuration(value);
     },
 
     _scheduleRefresh: function()
@@ -356,10 +347,10 @@ WebInspector.TimelineOverviewPane.prototype = {
         if (!this.isShowing())
             return;
         this._refreshTimeout = setTimeout(this._update.bind(this), 300);
-    }
-}
+    },
 
-WebInspector.TimelineOverviewPane.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -634,10 +625,10 @@ WebInspector.TimelineOverviewWindow.prototype = {
         left = Math.max(0, Math.min(max - delta, referencePoint + (left - referencePoint) * factor));
         right = Math.min(max, left + delta);
         this._setWindowPosition(left, right);
-    }
-}
+    },
 
-WebInspector.TimelineOverviewWindow.prototype.__proto__ = WebInspector.Object.prototype;
+    __proto__: WebInspector.Object.prototype
+}
 
 /**
  * @constructor
@@ -652,13 +643,13 @@ WebInspector.TimelineOverviewCalculator.prototype = {
      */
     computePosition: function(time)
     {
-        return (time - this.minimumBoundary) / this.boundarySpan * this._workingArea + this.paddingLeft;
+        return (time - this._minimumBoundary) / this.boundarySpan() * this._workingArea + this.paddingLeft;
     },
 
     computeBarGraphPercentages: function(record)
     {
-        var start = (WebInspector.TimelineModel.startTimeInSeconds(record) - this.minimumBoundary) / this.boundarySpan * 100;
-        var end = (WebInspector.TimelineModel.endTimeInSeconds(record) - this.minimumBoundary) / this.boundarySpan * 100;
+        var start = (WebInspector.TimelineModel.startTimeInSeconds(record) - this._minimumBoundary) / this.boundarySpan() * 100;
+        var end = (WebInspector.TimelineModel.endTimeInSeconds(record) - this._minimumBoundary) / this.boundarySpan() * 100;
         return {start: start, end: end};
     },
 
@@ -668,9 +659,8 @@ WebInspector.TimelineOverviewCalculator.prototype = {
      */
     setWindow: function(minimum, maximum)
     {
-        this.minimumBoundary = minimum >= 0 ? minimum : undefined;
-        this.maximumBoundary = maximum >= 0 ? maximum : undefined;
-        this.boundarySpan = this.maximumBoundary - this.minimumBoundary;
+        this._minimumBoundary = minimum >= 0 ? minimum : undefined;
+        this._maximumBoundary = maximum >= 0 ? maximum : undefined;
     },
 
     /**
@@ -691,6 +681,21 @@ WebInspector.TimelineOverviewCalculator.prototype = {
     formatTime: function(value)
     {
         return Number.secondsToString(value);
+    },
+
+    maximumBoundary: function()
+    {
+        return this._maximumBoundary;
+    },
+
+    minimumBoundary: function()
+    {
+        return this._minimumBoundary;
+    },
+
+    boundarySpan: function()
+    {
+        return this._maximumBoundary - this._minimumBoundary;
     }
 }
 
@@ -879,6 +884,7 @@ WebInspector.TimelineCategoryStrips = function(model)
     this._model = model;
     this.element = document.createElement("canvas");
     this._context = this.element.getContext("2d");
+    this._minimumRecordDuration = 0;
 
     this._fillStyles = {};
     var categories = WebInspector.TimelinePresentationModel.categories();
@@ -921,8 +927,7 @@ WebInspector.TimelineCategoryStrips.prototype = {
 
         function appendRecord(record)
         {
-            var isLong = WebInspector.TimelineModel.durationInSeconds(record) > WebInspector.TimelinePresentationModel.shortRecordThreshold;
-            if (!(this._showShortEvents || isLong))
+            if (!!this._minimumRecordDuration && (WebInspector.TimelineModel.durationInSeconds(record) < this._minimumRecordDuration))
                 return;
             if (record.type === WebInspector.TimelineModel.RecordType.BeginFrame)
                 return;
@@ -935,7 +940,8 @@ WebInspector.TimelineCategoryStrips.prototype = {
             // This bar may be merged with previous -- so just adjust the previous bar.
             const barsMergeThreshold = 2;
             if (bar && bar.category === category && bar.end + barsMergeThreshold >= recordStart) {
-                bar.end = recordEnd;
+                if (recordEnd > bar.end)
+                    bar.end = recordEnd;
                 return;
             }
             if (bar)
@@ -950,11 +956,11 @@ WebInspector.TimelineCategoryStrips.prototype = {
     },
 
     /**
-     * @param {boolean} value
+     * @param {number} value
      */
-    setShowShortEvents: function(value)
+    setMinimumRecordDuration: function(value)
     {
-        this._showShortEvents = value;
+        this._minimumRecordDuration = value;
         this.update();
     },
 
@@ -1214,7 +1220,28 @@ WebInspector.TimelineFrameOverview.prototype = {
             startTime: firstBar >= this._barTimes.length ? Infinity : this._barTimes[firstBar].startTime,
             endTime: rightOffset + snapToRightTolerancePixels > windowSpan ? Infinity : this._barTimes[lastBar].endTime
         }
-    }
+    },
+
+    __proto__: WebInspector.View.prototype
 }
 
-WebInspector.TimelineFrameOverview.prototype.__proto__ = WebInspector.View.prototype;
+/**
+ * @param {WebInspector.TimelineOverviewPane} pane
+ * @constructor
+ * @implements {WebInspector.TimelinePresentationModel.Filter}
+ */
+WebInspector.TimelineWindowFilter = function(pane)
+{
+    this._pane = pane;
+}
+
+WebInspector.TimelineWindowFilter.prototype = {
+    /**
+     * @param {!WebInspector.TimelinePresentationModel.Record} record
+     * @return {boolean}
+     */
+    accept: function(record)
+    {
+        return record.lastChildEndTime >= this._pane._windowStartTime && record.startTime <= this._pane._windowEndTime;
+    }
+}

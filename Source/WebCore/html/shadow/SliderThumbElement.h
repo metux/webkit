@@ -66,8 +66,8 @@ private:
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual PassRefPtr<Element> cloneElementWithoutAttributesAndChildren();
     virtual bool isEnabledFormControl() const;
-    virtual bool shouldMatchReadOnlySelector() const OVERRIDE;
-    virtual bool shouldMatchReadWriteSelector() const OVERRIDE;
+    virtual bool matchesReadOnlyPseudoClass() const OVERRIDE;
+    virtual bool matchesReadWritePseudoClass() const OVERRIDE;
     virtual Node* focusDelegate();
     void startDragging();
     void stopDragging();
@@ -93,7 +93,7 @@ inline PassRefPtr<Element> SliderThumbElement::cloneElementWithoutAttributesAndC
 
 inline SliderThumbElement* toSliderThumbElement(Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<SliderThumbElement*>(node);
 }
 
@@ -106,29 +106,12 @@ HTMLElement* sliderTrackElementOf(Node*);
 
 class RenderSliderThumb : public RenderBlock {
 public:
-    RenderSliderThumb(Node*);
+    RenderSliderThumb(SliderThumbElement*);
     void updateAppearance(RenderStyle* parentStyle);
 
 private:
     virtual bool isSliderThumb() const;
-    virtual void layout();
 };
-
-// --------------------------------
-
-class TrackLimiterElement : public HTMLDivElement {
-public:
-    static PassRefPtr<TrackLimiterElement> create(Document*);
-
-private:
-    TrackLimiterElement(Document*);
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual const AtomicString& shadowPseudoId() const;
-};
-
-// This always return a valid pointer.
-// An assertion fails if the specified node is not a range input.
-TrackLimiterElement* trackLimiterElementOf(Node*);
 
 // --------------------------------
 

@@ -28,7 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-InspectorFrontendAPI = {
+var InspectorFrontendAPI = {
     _pendingCommands: [],
 
     isDebuggingEnabled: function()
@@ -74,9 +74,15 @@ InspectorFrontendAPI = {
             WebInspector.CPUProfileType.instance.stopRecordingProfile();
     },
 
-    setAttachedWindow: function(attached)
+    setAttachedWindow: function(side)
     {
-        WebInspector.attached = attached;
+      
+    },
+
+    setDockSide: function(side)
+    {
+        if (WebInspector.dockController)
+            WebInspector.dockController.setDockSide(side);
     },
 
     showConsole: function()
@@ -101,7 +107,22 @@ InspectorFrontendAPI = {
 
     enterInspectElementMode: function()
     {
-        WebInspector.panel("elements").toggleSearchingForNode();
+        WebInspector.toggleSearchingForNode();
+    },
+
+    fileSystemsLoaded: function(fileSystems)
+    {
+        WebInspector.isolatedFileSystemDispatcher.fileSystemsLoaded(fileSystems);
+    },
+
+    fileSystemRemoved: function(fileSystemPath)
+    {
+        WebInspector.isolatedFileSystemDispatcher.fileSystemRemoved(fileSystemPath);
+    },
+
+    fileSystemAdded: function(errorMessage, fileSystem)
+    {
+        WebInspector.isolatedFileSystemDispatcher.fileSystemAdded(errorMessage, fileSystem);
     },
 
     savedURL: function(url)
@@ -144,7 +165,7 @@ InspectorFrontendAPI = {
      */
     loadTimelineFromURL: function(url) 
     {
-        WebInspector.showPanel("timeline").loadFromURL(url);
+        /** @type {WebInspector.TimelinePanel} */ (WebInspector.showPanel("timeline")).loadFromURL(url);
     },
 
     loadCompleted: function()
@@ -155,10 +176,30 @@ InspectorFrontendAPI = {
         InspectorFrontendAPI._pendingCommands = [];
         if (window.opener)
             window.opener.postMessage(["loadCompleted"], "*");
+    },
+
+    contextMenuItemSelected: function(id)
+    {
+        WebInspector.contextMenuItemSelected(id);
+    },
+
+    contextMenuCleared: function()
+    {
+        WebInspector.contextMenuCleared();
+    },
+
+    dispatchMessageAsync: function(messageObject)
+    {
+        WebInspector.dispatch(messageObject);
+    },
+
+    dispatchMessage: function(messageObject)
+    {
+        InspectorBackend.dispatch(messageObject);
     }
 }
 
-if (window.opener) {
+if (window.opener && window.dispatchStandaloneTestRunnerMessages) {
     function onMessageFromOpener(event)
     {
         if (event.source === window.opener)

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,12 +32,14 @@
 #include "TestController.h"
 #include <climits>
 #include <cstdio>
-#include <WebKit2/WKDictionary.h>
 #include <WebKit2/WKContextPrivate.h>
+#include <WebKit2/WKData.h>
+#include <WebKit2/WKDictionary.h>
 #include <WebKit2/WKInspector.h>
 #include <WebKit2/WKRetainPtr.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/text/CString.h>
 
 #if PLATFORM(MAC)
@@ -100,10 +103,12 @@ TestInvocation::TestInvocation(const std::string& pathOrURL)
     : m_url(AdoptWK, createWKURL(pathOrURL.c_str()))
     , m_pathOrURL(pathOrURL)
     , m_dumpPixels(false)
+    , m_timeout(0)
     , m_gotInitialResponse(false)
     , m_gotFinalMessage(false)
     , m_gotRepaint(false)
     , m_error(false)
+    , m_webProcessIsUnresponsive(false)
 {
 }
 
@@ -115,6 +120,11 @@ void TestInvocation::setIsPixelTest(const std::string& expectedPixelHash)
 {
     m_dumpPixels = true;
     m_expectedPixelHash = expectedPixelHash;
+}
+
+void TestInvocation::setCustomTimeout(int timeout)
+{
+    m_timeout = timeout;
 }
 
 static const unsigned w3cSVGWidth = 480;
@@ -143,9 +153,61 @@ static bool shouldOpenWebInspector(const char* pathOrURL)
 }
 #endif
 
+#if PLATFORM(MAC)
+static bool shouldUseTiledDrawing(const char* pathOrURL)
+{
+    return strstr(pathOrURL, "tiled-drawing/") || strstr(pathOrURL, "tiled-drawing\\");
+}
+#endif
+
+static void updateTiledDrawingForCurrentTest(const char* pathOrURL)
+{
+#if PLATFORM(MAC)
+    WKRetainPtr<WKMutableDictionaryRef> viewOptions = adoptWK(WKMutableDictionaryCreate());
+    WKRetainPtr<WKStringRef> useTiledDrawingKey = adoptWK(WKStringCreateWithUTF8CString("TiledDrawing"));
+    WKRetainPtr<WKBooleanRef> useTiledDrawingValue = adoptWK(WKBooleanCreate(shouldUseTiledDrawing(pathOrURL)));
+    WKDictionaryAddItem(viewOptions.get(), useTiledDrawingKey.get(), useTiledDrawingValue.get());
+
+    TestController::shared().ensureViewSupportsOptions(viewOptions.get());
+#else
+    UNUSED_PARAM(pathOrURL);
+#endif
+}
+
+static bool shouldUseFixedLayout(const char* pathOrURL)
+{
+#if ENABLE(CSS_DEVICE_ADAPTATION)
+    if (strstr(pathOrURL, "device-adapt/") || strstr(pathOrURL, "device-adapt\\"))
+        return true;
+#endif
+
+#if USE(TILED_BACKING_STORE) && PLATFORM(EFL)
+    if (strstr(pathOrURL, "sticky/") || strstr(pathOrURL, "sticky\\"))
+        return true;
+#endif
+    return false;
+
+    UNUSED_PARAM(pathOrURL);
+}
+
+static void updateLayoutType(const char* pathOrURL)
+{
+    WKRetainPtr<WKMutableDictionaryRef> viewOptions = adoptWK(WKMutableDictionaryCreate());
+    WKRetainPtr<WKStringRef> useFixedLayoutKey = adoptWK(WKStringCreateWithUTF8CString("UseFixedLayout"));
+    WKRetainPtr<WKBooleanRef> useFixedLayoutValue = adoptWK(WKBooleanCreate(shouldUseFixedLayout(pathOrURL)));
+    WKDictionaryAddItem(viewOptions.get(), useFixedLayoutKey.get(), useFixedLayoutValue.get());
+
+    TestController::shared().ensureViewSupportsOptions(viewOptions.get());
+}
+
 void TestInvocation::invoke()
 {
+    TestController::TimeoutDuration timeoutToUse = TestController::LongTimeout;
     sizeWebViewForCurrentTest(m_pathOrURL.c_str());
+    updateLayoutType(m_pathOrURL.c_str());
+    updateTiledDrawingForCurrentTest(m_pathOrURL.c_str());
+
+    m_textOutput.clear();
 
     WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("BeginTest"));
     WKRetainPtr<WKMutableDictionaryRef> beginTestMessageBody = adoptWK(WKMutableDictionaryCreate());
@@ -162,18 +224,20 @@ void TestInvocation::invoke()
     WKRetainPtr<WKBooleanRef> useWaitToDumpWatchdogTimerValue = adoptWK(WKBooleanCreate(TestController::shared().useWaitToDumpWatchdogTimer()));
     WKDictionaryAddItem(beginTestMessageBody.get(), useWaitToDumpWatchdogTimerKey.get(), useWaitToDumpWatchdogTimerValue.get());
 
+    WKRetainPtr<WKStringRef> timeoutKey = adoptWK(WKStringCreateWithUTF8CString("Timeout"));
+    WKRetainPtr<WKUInt64Ref> timeoutValue = adoptWK(WKUInt64Create(m_timeout));
+    WKDictionaryAddItem(beginTestMessageBody.get(), timeoutKey.get(), timeoutValue.get());
+
     WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), beginTestMessageBody.get());
 
-    const char* errorMessage = 0;
     TestController::shared().runUntil(m_gotInitialResponse, TestController::ShortTimeout);
     if (!m_gotInitialResponse) {
-        errorMessage = "Timed out waiting for initial response from web process\n";
+        m_errorMessage = "Timed out waiting for initial response from web process\n";
+        m_webProcessIsUnresponsive = true;
         goto end;
     }
-    if (m_error) {
-        errorMessage = "FAIL\n";
+    if (m_error)
         goto end;
-    }
 
 #if ENABLE(INSPECTOR)
     if (shouldOpenWebInspector(m_pathOrURL.c_str()))
@@ -182,15 +246,22 @@ void TestInvocation::invoke()
 
     WKPageLoadURL(TestController::shared().mainWebView()->page(), m_url.get());
 
-    TestController::shared().runUntil(m_gotFinalMessage, TestController::shared().useWaitToDumpWatchdogTimer() ? TestController::LongTimeout : TestController::NoTimeout);
+    if (TestController::shared().useWaitToDumpWatchdogTimer()) {
+        if (m_timeout > 0)
+            timeoutToUse = TestController::CustomTimeout;
+    } else
+        timeoutToUse = TestController::NoTimeout;
+    TestController::shared().runUntil(m_gotFinalMessage, timeoutToUse);
+
     if (!m_gotFinalMessage) {
-        errorMessage = "Timed out waiting for final message from web process\n";
+        m_errorMessage = "Timed out waiting for final message from web process\n";
+        m_webProcessIsUnresponsive = true;
         goto end;
     }
-    if (m_error) {
-        errorMessage = "FAIL\n";
+    if (m_error)
         goto end;
-    }
+
+    dumpResults();
 
 end:
 #if ENABLE(INSPECTOR)
@@ -198,11 +269,15 @@ end:
         WKInspectorClose(WKPageGetInspector(TestController::shared().mainWebView()->page()));
 #endif // ENABLE(INSPECTOR)
 
-    if (errorMessage || !TestController::shared().resetStateToConsistentValues())
-        dumpWebProcessUnresponsiveness(errorMessage);
+    if (m_webProcessIsUnresponsive)
+        dumpWebProcessUnresponsiveness();
+    else if (!TestController::shared().resetStateToConsistentValues()) {
+        m_errorMessage = "Timed out loading about:blank before the next test";
+        dumpWebProcessUnresponsiveness();
+    }
 }
 
-void TestInvocation::dumpWebProcessUnresponsiveness(const char* textToStdout)
+void TestInvocation::dumpWebProcessUnresponsiveness()
 {
     const char* errorMessageToStderr = 0;
 #if PLATFORM(MAC)
@@ -214,7 +289,7 @@ void TestInvocation::dumpWebProcessUnresponsiveness(const char* textToStdout)
     errorMessageToStderr = "#PROCESS UNRESPONSIVE - WebProcess";
 #endif
 
-    dump(textToStdout, errorMessageToStderr, true);
+    dump(m_errorMessage.c_str(), errorMessageToStderr, true);
 }
 
 void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bool seenError)
@@ -231,6 +306,46 @@ void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bo
         fputs("#EOF\n", stdout);
     fflush(stdout);
     fflush(stderr);
+}
+
+void TestInvocation::dumpResults()
+{
+    if (m_textOutput.length() || !m_audioResult)
+        dump(m_textOutput.toString().utf8().data());
+    else
+        dumpAudio(m_audioResult.get());
+
+    if (m_dumpPixels && m_pixelResult)
+        dumpPixelsAndCompareWithExpected(m_pixelResult.get(), m_repaintRects.get());
+
+    fputs("#EOF\n", stdout);
+    fflush(stdout);
+    fflush(stderr);
+}
+
+void TestInvocation::dumpAudio(WKDataRef audioData)
+{
+    size_t length = WKDataGetSize(audioData);
+    if (!length)
+        return;
+
+    const unsigned char* data = WKDataGetBytes(audioData);
+
+    printf("Content-Type: audio/wav\n");
+    printf("Content-Length: %lu\n", static_cast<unsigned long>(length));
+
+    const size_t bytesToWriteInOneChunk = 1 << 15;
+    size_t dataRemainingToWrite = length;
+    while (dataRemainingToWrite) {
+        size_t bytesToWriteInThisChunk = std::min(dataRemainingToWrite, bytesToWriteInOneChunk);
+        size_t bytesWritten = fwrite(data, 1, bytesToWriteInThisChunk, stdout);
+        if (bytesWritten != bytesToWriteInThisChunk)
+            break;
+        dataRemainingToWrite -= bytesWritten;
+        data += bytesWritten;
+    }
+    printf("#EOF\n");
+    fprintf(stderr, "#EOF\n");
 }
 
 bool TestInvocation::compareActualHashToExpectedAndDumpResults(const char actualHash[33])
@@ -255,6 +370,7 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         m_gotInitialResponse = true;
         m_gotFinalMessage = true;
         m_error = true;
+        m_errorMessage = "FAIL\n";
         TestController::shared().notifyDone();
         return;
     }
@@ -275,32 +391,28 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
         WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
 
-        WKRetainPtr<WKStringRef> textOutputKey(AdoptWK, WKStringCreateWithUTF8CString("TextOutput"));
-        WKStringRef textOutput = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, textOutputKey.get()));
-
         WKRetainPtr<WKStringRef> pixelResultKey = adoptWK(WKStringCreateWithUTF8CString("PixelResult"));
-        WKImageRef pixelResult = static_cast<WKImageRef>(WKDictionaryGetItemForKey(messageBodyDictionary, pixelResultKey.get()));
-        ASSERT(!pixelResult || m_dumpPixels);
-        
+        m_pixelResult = static_cast<WKImageRef>(WKDictionaryGetItemForKey(messageBodyDictionary, pixelResultKey.get()));
+        ASSERT(!m_pixelResult || m_dumpPixels);
+
         WKRetainPtr<WKStringRef> repaintRectsKey = adoptWK(WKStringCreateWithUTF8CString("RepaintRects"));
-        WKArrayRef repaintRects = static_cast<WKArrayRef>(WKDictionaryGetItemForKey(messageBodyDictionary, repaintRectsKey.get()));        
+        m_repaintRects = static_cast<WKArrayRef>(WKDictionaryGetItemForKey(messageBodyDictionary, repaintRectsKey.get()));
 
-        // Dump text.
-        dump(toWTFString(textOutput).utf8().data());
+        WKRetainPtr<WKStringRef> audioResultKey =  adoptWK(WKStringCreateWithUTF8CString("AudioResult"));
+        m_audioResult = static_cast<WKDataRef>(WKDictionaryGetItemForKey(messageBodyDictionary, audioResultKey.get()));
 
-        // Dump pixels (if necessary).
-        if (m_dumpPixels && pixelResult)
-            dumpPixelsAndCompareWithExpected(pixelResult, repaintRects);
-
-        fputs("#EOF\n", stdout);
-        fflush(stdout);
-        fflush(stderr);
-        
         m_gotFinalMessage = true;
         TestController::shared().notifyDone();
         return;
     }
-    
+
+    if (WKStringIsEqualToUTF8CString(messageName, "TextOutput")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef textOutput = static_cast<WKStringRef>(messageBody);
+        m_textOutput.append(toWTFString(textOutput));
+        return;
+    }
+
     if (WKStringIsEqualToUTF8CString(messageName, "BeforeUnloadReturnValue")) {
         ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
         WKBooleanRef beforeUnloadReturnValue = static_cast<WKBooleanRef>(messageBody);
@@ -339,6 +451,204 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         return;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SimulateWebNotificationClick")) {
+        ASSERT(WKGetTypeID(messageBody) == WKUInt64GetTypeID());
+        uint64_t notificationID = WKUInt64GetValue(static_cast<WKUInt64Ref>(messageBody));
+        TestController::shared().simulateWebNotificationClick(notificationID);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetGeolocationPermission")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef enabledWK = static_cast<WKBooleanRef>(messageBody);
+        TestController::shared().setGeolocationPermission(WKBooleanGetValue(enabledWK));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetMockGeolocationPosition")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+
+        WKRetainPtr<WKStringRef> latitudeKeyWK(AdoptWK, WKStringCreateWithUTF8CString("latitude"));
+        WKDoubleRef latitudeWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, latitudeKeyWK.get()));
+        double latitude = WKDoubleGetValue(latitudeWK);
+
+        WKRetainPtr<WKStringRef> longitudeKeyWK(AdoptWK, WKStringCreateWithUTF8CString("longitude"));
+        WKDoubleRef longitudeWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, longitudeKeyWK.get()));
+        double longitude = WKDoubleGetValue(longitudeWK);
+
+        WKRetainPtr<WKStringRef> accuracyKeyWK(AdoptWK, WKStringCreateWithUTF8CString("accuracy"));
+        WKDoubleRef accuracyWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, accuracyKeyWK.get()));
+        double accuracy = WKDoubleGetValue(accuracyWK);
+
+        WKRetainPtr<WKStringRef> providesAltitudeKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesAltitude"));
+        WKBooleanRef providesAltitudeWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesAltitudeKeyWK.get()));
+        bool providesAltitude = WKBooleanGetValue(providesAltitudeWK);
+
+        WKRetainPtr<WKStringRef> altitudeKeyWK(AdoptWK, WKStringCreateWithUTF8CString("altitude"));
+        WKDoubleRef altitudeWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, altitudeKeyWK.get()));
+        double altitude = WKDoubleGetValue(altitudeWK);
+
+        WKRetainPtr<WKStringRef> providesAltitudeAccuracyKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesAltitudeAccuracy"));
+        WKBooleanRef providesAltitudeAccuracyWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesAltitudeAccuracyKeyWK.get()));
+        bool providesAltitudeAccuracy = WKBooleanGetValue(providesAltitudeAccuracyWK);
+
+        WKRetainPtr<WKStringRef> altitudeAccuracyKeyWK(AdoptWK, WKStringCreateWithUTF8CString("altitudeAccuracy"));
+        WKDoubleRef altitudeAccuracyWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, altitudeAccuracyKeyWK.get()));
+        double altitudeAccuracy = WKDoubleGetValue(altitudeAccuracyWK);
+
+        WKRetainPtr<WKStringRef> providesHeadingKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesHeading"));
+        WKBooleanRef providesHeadingWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesHeadingKeyWK.get()));
+        bool providesHeading = WKBooleanGetValue(providesHeadingWK);
+
+        WKRetainPtr<WKStringRef> headingKeyWK(AdoptWK, WKStringCreateWithUTF8CString("heading"));
+        WKDoubleRef headingWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, headingKeyWK.get()));
+        double heading = WKDoubleGetValue(headingWK);
+
+        WKRetainPtr<WKStringRef> providesSpeedKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesSpeed"));
+        WKBooleanRef providesSpeedWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesSpeedKeyWK.get()));
+        bool providesSpeed = WKBooleanGetValue(providesSpeedWK);
+
+        WKRetainPtr<WKStringRef> speedKeyWK(AdoptWK, WKStringCreateWithUTF8CString("speed"));
+        WKDoubleRef speedWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, speedKeyWK.get()));
+        double speed = WKDoubleGetValue(speedWK);
+
+        TestController::shared().setMockGeolocationPosition(latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetMockGeolocationPositionUnavailableError")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef errorMessage = static_cast<WKStringRef>(messageBody);
+        TestController::shared().setMockGeolocationPositionUnavailableError(errorMessage);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetCustomPolicyDelegate")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+
+        WKRetainPtr<WKStringRef> enabledKeyWK(AdoptWK, WKStringCreateWithUTF8CString("enabled"));
+        WKBooleanRef enabledWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, enabledKeyWK.get()));
+        bool enabled = WKBooleanGetValue(enabledWK);
+
+        WKRetainPtr<WKStringRef> permissiveKeyWK(AdoptWK, WKStringCreateWithUTF8CString("permissive"));
+        WKBooleanRef permissiveWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, permissiveKeyWK.get()));
+        bool permissive = WKBooleanGetValue(permissiveWK);
+
+        TestController::shared().setCustomPolicyDelegate(enabled, permissive);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetVisibilityState")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+
+        WKRetainPtr<WKStringRef> visibilityStateKeyWK(AdoptWK, WKStringCreateWithUTF8CString("visibilityState"));
+        WKUInt64Ref visibilityStateWK = static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, visibilityStateKeyWK.get()));
+        WKPageVisibilityState visibilityState = static_cast<WKPageVisibilityState>(WKUInt64GetValue(visibilityStateWK));
+
+        WKRetainPtr<WKStringRef> isInitialKeyWK(AdoptWK, WKStringCreateWithUTF8CString("isInitialState"));
+        WKBooleanRef isInitialWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, isInitialKeyWK.get()));
+        bool isInitialState = WKBooleanGetValue(isInitialWK);
+
+        TestController::shared().setVisibilityState(visibilityState, isInitialState);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "ProcessWorkQueue")) {
+        if (TestController::shared().workQueueManager().processWorkQueue()) {
+            WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("WorkQueueProcessedCallback"));
+            WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), 0);
+        }
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "QueueBackNavigation")) {
+        ASSERT(WKGetTypeID(messageBody) == WKUInt64GetTypeID());
+        uint64_t stepCount = WKUInt64GetValue(static_cast<WKUInt64Ref>(messageBody));
+        TestController::shared().workQueueManager().queueBackNavigation(stepCount);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "QueueForwardNavigation")) {
+        ASSERT(WKGetTypeID(messageBody) == WKUInt64GetTypeID());
+        uint64_t stepCount = WKUInt64GetValue(static_cast<WKUInt64Ref>(messageBody));
+        TestController::shared().workQueueManager().queueForwardNavigation(stepCount);
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "QueueLoad")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        WKDictionaryRef loadDataDictionary = static_cast<WKDictionaryRef>(messageBody);
+
+        WKRetainPtr<WKStringRef> urlKey(AdoptWK, WKStringCreateWithUTF8CString("url"));
+        WKStringRef urlWK = static_cast<WKStringRef>(WKDictionaryGetItemForKey(loadDataDictionary, urlKey.get()));
+
+        WKRetainPtr<WKStringRef> targetKey(AdoptWK, WKStringCreateWithUTF8CString("target"));
+        WKStringRef targetWK = static_cast<WKStringRef>(WKDictionaryGetItemForKey(loadDataDictionary, targetKey.get()));
+
+        TestController::shared().workQueueManager().queueLoad(toWTFString(urlWK), toWTFString(targetWK));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "QueueLoadHTMLString")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        WKDictionaryRef loadDataDictionary = static_cast<WKDictionaryRef>(messageBody);
+
+        WKRetainPtr<WKStringRef> contentKey(AdoptWK, WKStringCreateWithUTF8CString("content"));
+        WKStringRef contentWK = static_cast<WKStringRef>(WKDictionaryGetItemForKey(loadDataDictionary, contentKey.get()));
+
+        WKRetainPtr<WKStringRef> baseURLKey(AdoptWK, WKStringCreateWithUTF8CString("baseURL"));
+        WKStringRef baseURLWK = static_cast<WKStringRef>(WKDictionaryGetItemForKey(loadDataDictionary, baseURLKey.get()));
+
+        WKRetainPtr<WKStringRef> unreachableURLKey(AdoptWK, WKStringCreateWithUTF8CString("unreachableURL"));
+        WKStringRef unreachableURLWK = static_cast<WKStringRef>(WKDictionaryGetItemForKey(loadDataDictionary, unreachableURLKey.get()));
+
+        TestController::shared().workQueueManager().queueLoadHTMLString(toWTFString(contentWK), baseURLWK ? toWTFString(baseURLWK) : String(), unreachableURLWK ? toWTFString(unreachableURLWK) : String());
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "QueueReload")) {
+        TestController::shared().workQueueManager().queueReload();
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "QueueLoadingScript")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef script = static_cast<WKStringRef>(messageBody);
+        TestController::shared().workQueueManager().queueLoadingScript(toWTFString(script));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "QueueNonLoadingScript")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef script = static_cast<WKStringRef>(messageBody);
+        TestController::shared().workQueueManager().queueNonLoadingScript(toWTFString(script));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetHandlesAuthenticationChallenge")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef value = static_cast<WKBooleanRef>(messageBody);
+        TestController::shared().setHandlesAuthenticationChallenges(WKBooleanGetValue(value));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetAuthenticationUsername")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef username = static_cast<WKStringRef>(messageBody);
+        TestController::shared().setAuthenticationUsername(toWTFString(username));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetAuthenticationPassword")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef password = static_cast<WKStringRef>(messageBody);
+        TestController::shared().setAuthenticationPassword(toWTFString(password));
+        return;
+    }
+
     ASSERT_NOT_REACHED();
 }
 
@@ -351,8 +661,19 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
         return 0;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "IsWorkQueueEmpty")) {
+        bool isEmpty = TestController::shared().workQueueManager().isWorkQueueEmpty();
+        WKRetainPtr<WKTypeRef> result(AdoptWK, WKBooleanCreate(isEmpty));
+        return result;
+    }
+
     ASSERT_NOT_REACHED();
     return 0;
+}
+
+void TestInvocation::outputText(const WTF::String& text)
+{
+    m_textOutput.append(text);
 }
 
 } // namespace WTR

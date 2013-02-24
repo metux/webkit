@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitResponsePolicyDecision.html" title="WebKitResponsePolicyDecision">
 <link rel="next" href="WebKitPrintOperation.html" title="WebKitPrintOperation">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -60,6 +60,8 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitHitTestResult.html#webkit-hit-test-result-get-image-uri" title="webkit_hit_test_result_get_image_uri ()">webkit_hit_test_result_get_image_uri</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitHitTestResult.html#webkit-hit-test-result-get-media-uri" title="webkit_hit_test_result_get_media_uri ()">webkit_hit_test_result_get_media_uri</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitHitTestResult.html#webkit-hit-test-result-context-is-scrollbar" title="webkit_hit_test_result_context_is_scrollbar ()">webkit_hit_test_result_context_is_scrollbar</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result</code></em>);
 </pre>
 </div>
@@ -118,11 +120,12 @@ signal is emitted with a <a class="link" href="WebKitHitTestResult.html" title="
 <div class="refsect2">
 <a name="WebKitHitTestResultContext"></a><h3>enum WebKitHitTestResultContext</h3>
 <pre class="programlisting">typedef enum {
-    WEBKIT_HIT_TEST_RESULT_CONTEXT_DOCUMENT = 1 &lt;&lt; 1,
-    WEBKIT_HIT_TEST_RESULT_CONTEXT_LINK     = 1 &lt;&lt; 2,
-    WEBKIT_HIT_TEST_RESULT_CONTEXT_IMAGE    = 1 &lt;&lt; 3,
-    WEBKIT_HIT_TEST_RESULT_CONTEXT_MEDIA    = 1 &lt;&lt; 4,
-    WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE = 1 &lt;&lt; 5
+    WEBKIT_HIT_TEST_RESULT_CONTEXT_DOCUMENT  = 1 &lt;&lt; 1,
+    WEBKIT_HIT_TEST_RESULT_CONTEXT_LINK      = 1 &lt;&lt; 2,
+    WEBKIT_HIT_TEST_RESULT_CONTEXT_IMAGE     = 1 &lt;&lt; 3,
+    WEBKIT_HIT_TEST_RESULT_CONTEXT_MEDIA     = 1 &lt;&lt; 4,
+    WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE  = 1 &lt;&lt; 5,
+    WEBKIT_HIT_TEST_RESULT_CONTEXT_SCROLLBAR = 1 &lt;&lt; 6
 } WebKitHitTestResultContext;
 </pre>
 <p>
@@ -154,6 +157,11 @@ Enum values with flags representing the context of a <a class="link" href="WebKi
 <tr>
 <td><p><a name="WEBKIT-HIT-TEST-RESULT-CONTEXT-EDITABLE:CAPS"></a><span class="term"><code class="literal">WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE</code></span></p></td>
 <td>an editable element
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-HIT-TEST-RESULT-CONTEXT-SCROLLBAR:CAPS"></a><span class="term"><code class="literal">WEBKIT_HIT_TEST_RESULT_CONTEXT_SCROLLBAR</code></span></p></td>
+<td>a scrollbar element.
 </td>
 </tr>
 </tbody>
@@ -406,6 +414,32 @@ or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">N
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-hit-test-result-context-is-scrollbar"></a><h3>webkit_hit_test_result_context_is_scrollbar ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_hit_test_result_context_is_scrollbar
+                                                        (<em class="parameter"><code><a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result</code></em>);</pre>
+<p>
+Gets whether <a class="link" href="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-SCROLLBAR:CAPS"><code class="literal">WEBKIT_HIT_TEST_RESULT_CONTEXT_SCROLLBAR</code></a> flag is present in
+<a class="link" href="WebKitHitTestResult.html#WebKitHitTestResult--context" title='The "context" property'><span class="type">"context"</span></a>.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>hit_test_result</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if there's a scrollbar element at the coordinates of the <em class="parameter"><code>hit_test_result</code></em>,
+or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise</td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitHitTestResult.property-details"></a><h2>Property Details</h2>
@@ -476,6 +510,6 @@ is present in <a class="link" href="WebKitHitTestResult.html#WebKitHitTestResult
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

@@ -38,7 +38,6 @@ class FormData;
 class HTMLFormControlElement;
 class HTMLImageElement;
 class HTMLInputElement;
-class HTMLFormCollection;
 class TextEncoding;
 
 class HTMLFormElement : public HTMLElement {
@@ -73,11 +72,6 @@ public:
     void submitFromJavaScript();
     void reset();
 
-    // Used to indicate a malformed state to keep from applying the bottom margin of the form.
-    // FIXME: Would probably be better to call this wasUnclosed; that's more specific.
-    void setMalformed(bool malformed) { m_wasMalformed = malformed; }
-    bool isMalformed() const { return m_wasMalformed; }
-
     void setDemoted(bool demoted) { m_wasDemoted = demoted; }
 
     void submitImplicitly(Event*, bool fromImplicitSubmissionTrigger);
@@ -104,6 +98,21 @@ public:
 
     bool checkValidity();
 
+#if ENABLE(REQUEST_AUTOCOMPLETE)
+    enum AutocompleteResult {
+        AutocompleteResultSuccess,
+        AutocompleteResultErrorDisabled,
+        AutocompleteResultErrorCancel,
+        AutocompleteResultErrorInvalid,
+    };
+
+    void requestAutocomplete();
+    void finishRequestAutocomplete(AutocompleteResult);
+
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(autocomplete);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(autocompleteerror);
+#endif
+
     HTMLFormControlElement* elementForAlias(const AtomicString&);
     void addElementAlias(HTMLFormControlElement*, const AtomicString& alias);
 
@@ -124,7 +133,7 @@ private:
 
     virtual void handleLocalEvents(Event*);
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     virtual void documentDidResumeFromPageCache();
@@ -132,6 +141,8 @@ private:
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
     virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return true; }
+
+    virtual void copyNonAttributePropertiesFromElement(const Element&) OVERRIDE;
 
     void submit(Event*, bool activateSubmitButton, bool processingUserGesture, FormSubmissionTrigger);
 
@@ -164,8 +175,14 @@ private:
 
     bool m_isInResetFunction;
 
-    bool m_wasMalformed;
     bool m_wasDemoted;
+
+#if ENABLE(REQUEST_AUTOCOMPLETE)
+    void requestAutocompleteTimerFired(Timer<HTMLFormElement>*);
+
+    Vector<RefPtr<Event> > m_pendingAutocompleteEvents;
+    Timer<HTMLFormElement> m_requestAutocompleteTimer;
+#endif
 };
 
 } // namespace WebCore

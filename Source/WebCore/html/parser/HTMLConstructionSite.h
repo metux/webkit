@@ -79,6 +79,9 @@ public:
     void detach();
     void executeQueuedTasks();
 
+    void setDefaultCompatibilityMode();
+    void finishedParsing();
+
     void insertDoctype(AtomicHTMLToken*);
     void insertComment(AtomicHTMLToken*);
     void insertCommentOnDocument(AtomicHTMLToken*);
@@ -108,15 +111,18 @@ public:
     void generateImpliedEndTags();
     void generateImpliedEndTagsWithExclusion(const AtomicString& tagName);
 
+    bool inQuirksMode();
+
     bool isEmpty() const { return !m_openElements.stackDepth(); }
     HTMLElementStack::ElementRecord* currentElementRecord() const { return m_openElements.topRecord(); }
     Element* currentElement() const { return m_openElements.top(); }
     ContainerNode* currentNode() const { return m_openElements.topNode(); }
     HTMLStackItem* currentStackItem() const { return m_openElements.topStackItem(); }
     HTMLStackItem* oneBelowTop() const { return m_openElements.oneBelowTop(); }
-
+    Document* ownerDocumentForCurrentNode();
     HTMLElementStack* openElements() const { return &m_openElements; }
     HTMLFormattingElementList* activeFormattingElements() const { return &m_activeFormattingElements; }
+    bool currentIsRootNode() { return m_openElements.topNode() == m_openElements.rootNode(); }
 
     Element* head() const { return m_head->element(); }
     HTMLStackItem* headStackItem() const { return m_head.get(); }
@@ -149,6 +155,9 @@ private:
     // In the common case, this queue will have only one task because most
     // tokens produce only one DOM mutation.
     typedef Vector<HTMLConstructionSiteTask, 1> AttachmentQueue;
+
+    void setCompatibilityMode(Document::CompatibilityMode);
+    void setCompatibilityModeFromDoctype(const String& name, const String& publicId, const String& systemId);
 
     void attachLater(ContainerNode* parent, PassRefPtr<Node> child, bool selfClosing = false);
 
@@ -184,6 +193,8 @@ private:
     bool m_redirectAttachToFosterParent;
 
     unsigned m_maximumDOMTreeDepth;
+
+    bool m_inQuirksMode;
 };
 
 } // namespace WebCore

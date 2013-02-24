@@ -39,14 +39,18 @@ namespace WebKit {
 
 extern WTFLogChannel LogContextMenu;
 extern WTFLogChannel LogIconDatabase;
+extern WTFLogChannel LogInspectorServer;
 extern WTFLogChannel LogKeyHandling;
+extern WTFLogChannel LogPlugins;
 extern WTFLogChannel LogSessionState;
 extern WTFLogChannel LogTextInput;
 extern WTFLogChannel LogView;
+extern WTFLogChannel LogNetwork;
+extern WTFLogChannel LogNetworkScheduling;
 
 void initializeLogChannel(WTFLogChannel*);
 void initializeLogChannelsIfNecessary(void);
-#if PLATFORM(GTK) || PLATFORM(QT)
+#if PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL)
 WTFLogChannel* getChannelFromName(const String& channelName);
 #endif
 

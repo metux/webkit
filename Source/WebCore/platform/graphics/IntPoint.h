@@ -29,10 +29,6 @@
 #include "IntSize.h"
 #include <wtf/MathExtras.h>
 
-#if PLATFORM(QT)
-#include <QDataStream>
-#endif
-
 #if USE(CG) || USE(SKIA_ON_MAC_CHROMIUM)
 typedef struct CGPoint CGPoint;
 #endif
@@ -214,12 +210,7 @@ inline bool operator!=(const IntPoint& a, const IntPoint& b)
     return a.x() != b.x() || a.y() != b.y();
 }
 
-inline IntPoint toPoint(const IntSize& size)
-{
-    return IntPoint(size.width(), size.height());
-}
-
-inline IntSize toSize(const IntPoint& a)
+inline IntSize toIntSize(const IntPoint& a)
 {
     return IntSize(a.x(), a.y());
 }
@@ -228,23 +219,6 @@ inline int IntPoint::distanceSquaredToPoint(const IntPoint& point) const
 {
     return ((*this) - point).diagonalLengthSquared();
 }
-
-#if PLATFORM(QT)
-inline QDataStream& operator<<(QDataStream& stream, const IntPoint& point)
-{
-    stream << point.x() << point.y();
-    return stream;
-}
-
-inline QDataStream& operator>>(QDataStream& stream, IntPoint& point)
-{
-    int x, y;
-    stream >> x >> y;
-    point.setX(x);
-    point.setY(y);
-    return stream;
-}
-#endif
 
 } // namespace WebCore
 

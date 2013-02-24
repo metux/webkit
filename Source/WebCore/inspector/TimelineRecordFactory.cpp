@@ -37,6 +37,7 @@
 #include "Event.h"
 #include "InspectorValues.h"
 #include "IntRect.h"
+#include "LayoutRect.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "ScriptCallStack.h"
@@ -169,16 +170,6 @@ PassRefPtr<InspectorObject> TimelineRecordFactory::createReceiveResourceData(con
     return data.release();
 }
     
-PassRefPtr<InspectorObject> TimelineRecordFactory::createPaintData(const LayoutRect& rect)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setNumber("x", rect.x());
-    data->setNumber("y", rect.y());
-    data->setNumber("width", rect.width());
-    data->setNumber("height", rect.height());
-    return data.release();
-}
-
 PassRefPtr<InspectorObject> TimelineRecordFactory::createDecodeImageData(const String& imageType)
 {
     RefPtr<InspectorObject> data = InspectorObject::create();
@@ -206,6 +197,14 @@ PassRefPtr<InspectorObject> TimelineRecordFactory::createAnimationFrameData(int 
     RefPtr<InspectorObject> data = InspectorObject::create();
     data->setNumber("id", callbackId);
     return data.release();
+}
+
+void TimelineRecordFactory::addRectData(InspectorObject* data, const LayoutRect& rect)
+{
+    data->setNumber("x", rect.x());
+    data->setNumber("y", rect.y());
+    data->setNumber("width", rect.width());
+    data->setNumber("height", rect.height());
 }
 
 } // namespace WebCore

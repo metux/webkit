@@ -35,12 +35,12 @@
 #include "HTMLParserIdioms.h"
 #include "KeyboardEvent.h"
 #include "MouseEvent.h"
-#include "Page.h"
 #include "PingLoader.h"
 #include "RenderImage.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -114,10 +114,13 @@ bool HTMLAnchorElement::isKeyboardFocusable(KeyboardEvent* event) const
     if (!document()->frame()->eventHandler()->tabsToLinks(event))
         return false;
 
+    if (isInCanvasSubtree())
+        return true;
+
     return hasNonEmptyBoundingBox();
 }
 
-static void appendServerMapMousePosition(String& url, Event* event)
+static void appendServerMapMousePosition(StringBuilder& url, Event* event)
 {
     if (!event->isMouseEvent())
         return;
@@ -132,18 +135,18 @@ static void appendServerMapMousePosition(String& url, Event* event)
     if (!imageElement || !imageElement->isServerMap())
         return;
 
-    RenderImage* renderer = toRenderImage(imageElement->renderer());
-    if (!renderer)
+    if (!imageElement->renderer() || !imageElement->renderer()->isRenderImage())
         return;
+    RenderImage* renderer = toRenderImage(imageElement->renderer());
 
     // FIXME: This should probably pass true for useTransforms.
     FloatPoint absolutePosition = renderer->absoluteToLocal(FloatPoint(static_cast<MouseEvent*>(event)->pageX(), static_cast<MouseEvent*>(event)->pageY()));
     int x = absolutePosition.x();
     int y = absolutePosition.y();
-    url += "?";
-    url += String::number(x);
-    url += ",";
-    url += String::number(y);
+    url.append('?');
+    url.appendNumber(x);
+    url.append(',');
+    url.appendNumber(y);
 }
 
 void HTMLAnchorElement::defaultEventHandler(Event* event)
@@ -210,39 +213,32 @@ void HTMLAnchorElement::setActive(bool down, bool pause)
     ContainerNode::setActive(down, pause);
 }
 
-void HTMLAnchorElement::parseAttribute(const Attribute& attribute)
+void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == hrefAttr) {
+    if (name == hrefAttr) {
         bool wasLink = isLink();
-        setIsLink(!attribute.isNull());
+        setIsLink(!value.isNull());
         if (wasLink != isLink())
-            setNeedsStyleRecalc();
+            didAffectSelector(AffectedSelectorLink | AffectedSelectorVisited | AffectedSelectorEnabled);
         if (isLink()) {
-            String parsedURL = stripLeadingAndTrailingHTMLSpaces(attribute.value());
+            String parsedURL = stripLeadingAndTrailingHTMLSpaces(value);
             if (document()->isDNSPrefetchEnabled()) {
                 if (protocolIs(parsedURL, "http") || protocolIs(parsedURL, "https") || parsedURL.startsWith("//"))
                     prefetchDNS(document()->completeURL(parsedURL).host());
             }
-            if (document()->page() && !document()->page()->javaScriptURLsAreAllowed() && protocolIsJavaScript(parsedURL)) {
-                clearIsLink();
-                // FIXME: This is horribly factored.
-                if (Attribute* hrefAttribute = getAttributeItem(hrefAttr))
-                    hrefAttribute->setValue(nullAtom);
-            }
         }
         invalidateCachedVisitedLinkHash();
-    } else if (attribute.name() == nameAttr || attribute.name() == titleAttr) {
+    } else if (name == nameAttr || name == titleAttr) {
         // Do nothing.
-    } else if (attribute.name() == relAttr)
-        setRel(attribute.value());
+    } else if (name == relAttr)
+        setRel(value);
     else
-        HTMLElement::parseAttribute(attribute);
+        HTMLElement::parseAttribute(name, value);
 }
 
 void HTMLAnchorElement::accessKeyAction(bool sendMouseEvents)
 {
-    // send the mouse button events if the caller specified sendMouseEvents
-    dispatchSimulatedClick(0, sendMouseEvents);
+    dispatchSimulatedClick(0, sendMouseEvents ? SendMouseUpDownEvents : SendNoEvents);
 }
 
 bool HTMLAnchorElement::isURLAttribute(const Attribute& attribute) const
@@ -466,7 +462,7 @@ void HTMLAnchorElement::setSearch(const String& value)
     KURL url = href();
     String newSearch = (value[0] == '?') ? value.substring(1) : value;
     // Make sure that '#' in the query does not leak to the hash.
-    url.setQuery(newSearch.replace('#', "%23"));
+    url.setQuery(newSearch.replaceWithLiteral('#', "%23"));
 
     setHref(url.string());
 }
@@ -504,14 +500,16 @@ void HTMLAnchorElement::handleClick(Event* event)
     if (!frame)
         return;
 
-    String url = stripLeadingAndTrailingHTMLSpaces(fastGetAttribute(hrefAttr));
+    StringBuilder url;
+    url.append(stripLeadingAndTrailingHTMLSpaces(fastGetAttribute(hrefAttr)));
     appendServerMapMousePosition(url, event);
-    KURL kurl = document()->completeURL(url);
+    KURL kurl = document()->completeURL(url.toString());
 
 #if ENABLE(DOWNLOAD_ATTRIBUTE)
     if (hasAttribute(downloadAttr)) {
         ResourceRequest request(kurl);
 
+        // FIXME: Why are we not calling addExtraFieldsToMainResourceRequest() if this check fails? It sets many important header fields.
         if (!hasRel(RelationNoReferrer)) {
             String referrer = SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), kurl, frame->loader()->outgoingReferrer());
             if (!referrer.isEmpty())

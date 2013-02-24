@@ -29,17 +29,18 @@
 #include "CallFrame.h"
 #include "CodeBlock.h"
 #include "Interpreter.h"
+#include "JSCJSValue.h"
 #include "JSGlobalData.h"
-#include "JSValue.h"
+#include "Operations.h"
 
-#if ENABLE(JIT)
+#if ENABLE(JIT) || ENABLE(LLINT)
 
 namespace JSC {
 
 ExceptionHandler genericThrow(JSGlobalData* globalData, ExecState* callFrame, JSValue exceptionValue, unsigned vPCIndex)
 {
-    ASSERT(exceptionValue);
-
+    RELEASE_ASSERT(exceptionValue);
+    
     globalData->exception = JSValue();
     HandlerInfo* handler = globalData->interpreter->throwException(callFrame, exceptionValue, vPCIndex); // This may update callFrame & exceptionValue!
     globalData->exception = exceptionValue;
@@ -47,16 +48,16 @@ ExceptionHandler genericThrow(JSGlobalData* globalData, ExecState* callFrame, JS
     void* catchRoutine;
     Instruction* catchPCForInterpreter = 0;
     if (handler) {
-        catchRoutine = handler->nativeCode.executableAddress();
         catchPCForInterpreter = &callFrame->codeBlock()->instructions()[handler->target];
+        catchRoutine = ExecutableBase::catchRoutineFor(handler, catchPCForInterpreter);
     } else
-        catchRoutine = FunctionPtr(ctiOpThrowNotCaught).value();
+        catchRoutine = FunctionPtr(LLInt::getCodePtr(ctiOpThrowNotCaught)).value();
     
     globalData->callFrameForThrow = callFrame;
     globalData->targetMachinePCForThrow = catchRoutine;
     globalData->targetInterpreterPCForThrow = catchPCForInterpreter;
     
-    ASSERT(catchRoutine);
+    RELEASE_ASSERT(catchRoutine);
     ExceptionHandler exceptionHandler = { catchRoutine, callFrame };
     return exceptionHandler;
 }

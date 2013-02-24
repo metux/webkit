@@ -64,6 +64,15 @@
 <ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PLAY-PAUSE:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PLAY-PAUSE:CAPS">
 <ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-MEDIA-MUTE:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-MUTE:CAPS">
 <ANCHOR id="webkit-context-menu-item-get-action" href="webkitgtk/webkitgtk-Global-functions.html#webkit-context-menu-item-get-action">
+<ANCHOR id="WebKitSecurityPolicy" href="webkitgtk/webkitgtk-Global-functions.html#WebKitSecurityPolicy">
+<ANCHOR id="WEBKIT-SECURITY-POLICY-LOCAL:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-SECURITY-POLICY-LOCAL:CAPS">
+<ANCHOR id="WEBKIT-SECURITY-POLICY-NO-ACCESS-TO-OTHER-SCHEME:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-SECURITY-POLICY-NO-ACCESS-TO-OTHER-SCHEME:CAPS">
+<ANCHOR id="WEBKIT-SECURITY-POLICY-DISPLAY-ISOLATED:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-SECURITY-POLICY-DISPLAY-ISOLATED:CAPS">
+<ANCHOR id="WEBKIT-SECURITY-POLICY-SECURE:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-SECURITY-POLICY-SECURE:CAPS">
+<ANCHOR id="WEBKIT-SECURITY-POLICY-CORS-ENABLED:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-SECURITY-POLICY-CORS-ENABLED:CAPS">
+<ANCHOR id="WEBKIT-SECURITY-POLICY-EMPTY-DOCUMENT:CAPS" href="webkitgtk/webkitgtk-Global-functions.html#WEBKIT-SECURITY-POLICY-EMPTY-DOCUMENT:CAPS">
+<ANCHOR id="webkit-set-security-policy-for-uri-scheme" href="webkitgtk/webkitgtk-Global-functions.html#webkit-set-security-policy-for-uri-scheme">
+<ANCHOR id="webkit-get-security-policy-for-uri-scheme" href="webkitgtk/webkitgtk-Global-functions.html#webkit-get-security-policy-for-uri-scheme">
 <ANCHOR id="webkitgtk-webkitwebview" href="webkitgtk/webkitgtk-webkitwebview.html">
 <ANCHOR id="webkitgtk-webkitwebview.synopsis" href="webkitgtk/webkitgtk-webkitwebview.html#webkitgtk-webkitwebview.synopsis">
 <ANCHOR id="WebKitWebView" href="webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView">
@@ -298,7 +307,6 @@
 <ANCHOR id="WebKitWebFrame-hovering-over-link" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-hovering-over-link">
 <ANCHOR id="WebKitWebFrame-insecure-content-run" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-insecure-content-run">
 <ANCHOR id="WebKitWebFrame-load-committed" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-load-committed">
-<ANCHOR id="WebKitWebFrame-load-done" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-load-done">
 <ANCHOR id="WebKitWebFrame-resource-content-length-received" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-content-length-received">
 <ANCHOR id="WebKitWebFrame-resource-load-failed" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-load-failed">
 <ANCHOR id="WebKitWebFrame-resource-load-finished" href="webkitgtk/WebKitWebFrame.html#WebKitWebFrame-resource-load-finished">
@@ -332,8 +340,10 @@
 <ANCHOR id="WebKitWebSettings--editing-behavior" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--editing-behavior">
 <ANCHOR id="WebKitWebSettings--enable-accelerated-compositing" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-accelerated-compositing">
 <ANCHOR id="WebKitWebSettings--enable-caret-browsing" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-caret-browsing">
+<ANCHOR id="WebKitWebSettings--enable-css-shaders" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-css-shaders">
 <ANCHOR id="WebKitWebSettings--enable-default-context-menu" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-default-context-menu">
 <ANCHOR id="WebKitWebSettings--enable-developer-extras" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-developer-extras">
+<ANCHOR id="WebKitWebSettings--enable-display-of-insecure-content" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-display-of-insecure-content">
 <ANCHOR id="WebKitWebSettings--enable-dns-prefetching" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-dns-prefetching">
 <ANCHOR id="WebKitWebSettings--enable-dom-paste" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-dom-paste">
 <ANCHOR id="WebKitWebSettings--enable-file-access-from-file-uris" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-file-access-from-file-uris">
@@ -343,10 +353,12 @@
 <ANCHOR id="WebKitWebSettings--enable-html5-local-storage" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-html5-local-storage">
 <ANCHOR id="WebKitWebSettings--enable-hyperlink-auditing" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-hyperlink-auditing">
 <ANCHOR id="WebKitWebSettings--enable-java-applet" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-java-applet">
+<ANCHOR id="WebKitWebSettings--enable-media-stream" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-media-stream">
 <ANCHOR id="WebKitWebSettings--enable-offline-web-application-cache" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-offline-web-application-cache">
 <ANCHOR id="WebKitWebSettings--enable-page-cache" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-page-cache">
 <ANCHOR id="WebKitWebSettings--enable-plugins" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-plugins">
 <ANCHOR id="WebKitWebSettings--enable-private-browsing" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-private-browsing">
+<ANCHOR id="WebKitWebSettings--enable-running-of-insecure-content" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-running-of-insecure-content">
 <ANCHOR id="WebKitWebSettings--enable-scripts" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-scripts">
 <ANCHOR id="WebKitWebSettings--enable-site-specific-quirks" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-site-specific-quirks">
 <ANCHOR id="WebKitWebSettings--enable-smooth-scrolling" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-smooth-scrolling">

@@ -32,9 +32,11 @@
 #include "MediaPlayerProxy.h"
 #endif
 
-#include "Document.h"
+#include "InbandTextTrackPrivate.h"
 #include "IntRect.h"
 #include "KURL.h"
+#include "LayoutRect.h"
+#include "Timer.h"
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
 #include <wtf/OwnPtr.h>
@@ -43,7 +45,7 @@
 #include <wtf/text/StringHash.h>
 
 #if USE(ACCELERATED_COMPOSITING)
-#include "GraphicsLayer.h"
+#include "PlatformLayer.h"
 #endif
 
 OBJC_CLASS AVPlayer;
@@ -56,8 +58,11 @@ class QTMovieVisualContext;
 namespace WebCore {
 
 class AudioSourceProvider;
+class Document;
 class GStreamerGWorld;
 class MediaPlayerPrivateInterface;
+class MediaSource;
+class TextTrackRepresentation;
 
 // Structure that will hold every native
 // types supported by the current media player.
@@ -90,6 +95,7 @@ struct PlatformMedia {
 
 extern const PlatformMedia NoPlatformMedia;
 
+class CachedResourceLoader;
 class ContentType;
 class FrameView;
 class GraphicsContext;
@@ -181,16 +187,23 @@ public:
 
 #if ENABLE(ENCRYPTED_MEDIA)
     enum MediaKeyErrorCode { UnknownError = 1, ClientError, ServiceError, OutputError, HardwareChangeError, DomainError };
-    virtual void mediaPlayerKeyAdded(MediaPlayer*, const String& keySystem, const String& sessionId) { }
-    virtual void mediaPlayerKeyError(MediaPlayer*, const String& keySystem, const String& sessionId, MediaKeyErrorCode errorCode, unsigned short systemCode) { }
-    virtual void mediaPlayerKeyMessage(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength) { }
-    virtual void mediaPlayerKeyNeeded(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength) { }
+    virtual void mediaPlayerKeyAdded(MediaPlayer*, const String& /* keySystem */, const String& /* sessionId */) { }
+    virtual void mediaPlayerKeyError(MediaPlayer*, const String& /* keySystem */, const String& /* sessionId */, MediaKeyErrorCode, unsigned short /* systemCode */) { }
+    virtual void mediaPlayerKeyMessage(MediaPlayer*, const String& /* keySystem */, const String& /* sessionId */, const unsigned char* /* message */, unsigned /* messageLength */, const KURL& /* defaultURL */) { }
+    virtual bool mediaPlayerKeyNeeded(MediaPlayer*, const String& /* keySystem */, const String& /* sessionId */, const unsigned char* /* initData */, unsigned /* initDataLength */) { return false; }
 #endif
 
+#if ENABLE(ENCRYPTED_MEDIA_V2)
+    virtual bool mediaPlayerKeyNeeded(MediaPlayer*, Uint8Array*) { return false; }
+#endif
+    
     virtual String mediaPlayerReferrer() const { return String(); }
     virtual String mediaPlayerUserAgent() const { return String(); }
     virtual CORSMode mediaPlayerCORSMode() const { return Unspecified; }
+    virtual void mediaPlayerEnterFullscreen() { }
     virtual void mediaPlayerExitFullscreen() { }
+    virtual bool mediaPlayerIsFullscreen() const { return false; }
+    virtual bool mediaPlayerIsFullscreenPermitted() const { return false; }
     virtual bool mediaPlayerIsVideo() const { return false; }
     virtual LayoutRect mediaPlayerContentBoxRect() const { return LayoutRect(); }
     virtual void mediaPlayerSetSize(const IntSize&) { }
@@ -200,6 +213,15 @@ public:
     virtual bool mediaPlayerIsLooping() const { return false; }
     virtual HostWindow* mediaPlayerHostWindow() { return 0; }
     virtual IntRect mediaPlayerWindowClipRect() { return IntRect(); }
+    virtual CachedResourceLoader* mediaPlayerCachedResourceLoader() { return 0; }
+
+#if ENABLE(VIDEO_TRACK)
+    virtual void mediaPlayerDidAddTrack(PassRefPtr<InbandTextTrackPrivate>) { }
+    virtual void mediaPlayerDidRemoveTrack(PassRefPtr<InbandTextTrackPrivate>) { }
+
+    virtual void textTrackRepresentationBoundsChanged(const IntRect&) { }
+    virtual void paintTextTrackRepresentation(GraphicsContext*, const IntRect&) { }
+#endif
 };
 
 class MediaPlayerSupportsTypeClient {
@@ -264,6 +286,7 @@ public:
     bool sourceRemoveId(const String& id);
     PassRefPtr<TimeRanges> sourceBuffered(const String& id);
     bool sourceAppend(const String& id, const unsigned char* data, unsigned length);
+    void sourceSetDuration(double);
     bool sourceAbort(const String& id);
     enum EndOfStreamStatus { EosNoError, EosNetworkError, EosDecodeError };
     void sourceEndOfStream(EndOfStreamStatus);
@@ -407,14 +430,30 @@ public:
 #if ENABLE(ENCRYPTED_MEDIA)
     void keyAdded(const String& keySystem, const String& sessionId);
     void keyError(const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode, unsigned short systemCode);
-    void keyMessage(const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength);
-    void keyNeeded(const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength);
+    void keyMessage(const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength, const KURL& defaultURL);
+    bool keyNeeded(const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength);
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA_V2)
+    bool keyNeeded(Uint8Array* initData);
 #endif
 
     String referrer() const;
     String userAgent() const;
 
     String engineDescription() const;
+
+    CachedResourceLoader* cachedResourceLoader();
+
+#if ENABLE(VIDEO_TRACK)
+    void addTextTrack(PassRefPtr<InbandTextTrackPrivate>);
+    void removeTextTrack(PassRefPtr<InbandTextTrackPrivate>);
+
+    bool requiresTextTrackRepresentation() const;
+    void setTextTrackRepresentation(TextTrackRepresentation*);
+#endif
+
+    static void requeryMediaEngines();
 
 private:
     MediaPlayer(MediaPlayerClient*);
@@ -449,7 +488,7 @@ private:
 
 typedef PassOwnPtr<MediaPlayerPrivateInterface> (*CreateMediaEnginePlayer)(MediaPlayer*);
 typedef void (*MediaEngineSupportedTypes)(HashSet<String>& types);
-#if ENABLE(ENCRYPTED_MEDIA)
+#if ENABLE(ENCRYPTED_MEDIA) || ENABLE(ENCRYPTED_MEDIA_V2)
 typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const String& type, const String& codecs, const String& keySystem, const KURL& url);
 #else
 typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const String& type, const String& codecs, const KURL& url);

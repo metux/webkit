@@ -32,15 +32,15 @@ class HTMLMeterElement;
 
 class RenderMeter : public RenderBlock {
 public:
-    RenderMeter(HTMLElement*);
+    explicit RenderMeter(HTMLElement*);
     virtual ~RenderMeter();
 
     HTMLMeterElement* meterElement() const;
     virtual void updateFromElement();
 
 private:    
-    virtual void computeLogicalWidth();
-    virtual void computeLogicalHeight();
+    virtual void updateLogicalWidth() OVERRIDE;
+    virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
 
     virtual const char* renderName() const { return "RenderMeter"; }
     virtual bool isMeter() const { return true; }
@@ -51,7 +51,7 @@ private:
 
 inline RenderMeter* toRenderMeter(RenderObject* object)
 {
-    ASSERT(!object || object->isMeter());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isMeter());
     return static_cast<RenderMeter*>(object);
 }
 

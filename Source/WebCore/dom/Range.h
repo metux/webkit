@@ -29,7 +29,6 @@
 #include "FloatRect.h"
 #include "FragmentScriptingPermission.h"
 #include "IntRect.h"
-#include "Node.h"
 #include "RangeBoundaryPoint.h"
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
@@ -43,6 +42,7 @@ class ContainerNode;
 class Document;
 class DocumentFragment;
 class FloatQuad;
+class Node;
 class NodeWithIndex;
 class Text;
 
@@ -63,7 +63,7 @@ public:
     int startOffset(ExceptionCode&) const;
     Node* endContainer(ExceptionCode&) const;
     int endOffset(ExceptionCode&) const;
-    bool collapsed(ExceptionCode& = ASSERT_NO_EXCEPTION) const;
+    bool collapsed(ExceptionCode&) const;
 
     Node* commonAncestorContainer(ExceptionCode&) const;
     static Node* commonAncestorContainer(Node* containerA, Node* containerB);

@@ -26,13 +26,29 @@
 #ifndef GCThreadSharedData_h
 #define GCThreadSharedData_h
 
+#include "ListableHandler.h"
 #include "MarkStack.h"
+#include "MarkedBlock.h"
+#include "UnconditionalFinalizer.h"
+#include "WeakReferenceHarvester.h"
+#include <wtf/HashSet.h>
+#include <wtf/TCSpinLock.h>
+#include <wtf/Threading.h>
 #include <wtf/Vector.h>
 
 namespace JSC {
 
+class GCThread;
 class JSGlobalData;
 class CopiedSpace;
+class CopyVisitor;
+
+enum GCPhase {
+    NoPhase,
+    Mark,
+    Copy,
+    Exit
+};
 
 class GCThreadSharedData {
 public:
@@ -41,6 +57,11 @@ public:
     
     void reset();
 
+    void didStartMarking();
+    void didFinishMarking();
+    void didStartCopying();
+    void didFinishCopying();
+
 #if ENABLE(PARALLEL_GC)
     void resetChildren();
     size_t childVisitCount();
@@ -48,24 +69,21 @@ public:
 #endif
     
 private:
-    friend class MarkStack;
+    friend class GCThread;
     friend class SlotVisitor;
+    friend class CopyVisitor;
 
-#if ENABLE(PARALLEL_GC)
-    void markingThreadMain(SlotVisitor*);
-    static void markingThreadStartFunc(void* heap);
-#endif
+    void getNextBlocksToCopy(size_t&, size_t&);
+    void startNextPhase(GCPhase);
+    void endCurrentPhase();
 
     JSGlobalData* m_globalData;
     CopiedSpace* m_copiedSpace;
     
-    MarkStackSegmentAllocator m_segmentAllocator;
-    
     bool m_shouldHashConst;
 
-    Vector<ThreadIdentifier> m_markingThreads;
-    Vector<MarkStack*> m_markingThreadsMarkStack;
-    
+    Vector<GCThread*> m_gcThreads;
+
     Mutex m_markingLock;
     ThreadCondition m_markingCondition;
     MarkStackArray m_sharedMarkStack;
@@ -75,9 +93,29 @@ private:
     Mutex m_opaqueRootsLock;
     HashSet<void*> m_opaqueRoots;
 
+    SpinLock m_copyLock;
+    Vector<CopiedBlock*> m_blocksToCopy;
+    size_t m_copyIndex;
+    static const size_t s_blockFragmentLength = 32;
+
+    Mutex m_phaseLock;
+    ThreadCondition m_phaseCondition;
+    ThreadCondition m_activityCondition;
+    unsigned m_numberOfActiveGCThreads;
+    bool m_gcThreadsShouldWait;
+    GCPhase m_currentPhase;
+
     ListableHandler<WeakReferenceHarvester>::List m_weakReferenceHarvesters;
     ListableHandler<UnconditionalFinalizer>::List m_unconditionalFinalizers;
 };
+
+inline void GCThreadSharedData::getNextBlocksToCopy(size_t& start, size_t& end)
+{
+    SpinLockHolder locker(&m_copyLock);
+    start = m_copyIndex;
+    end = std::min(m_blocksToCopy.size(), m_copyIndex + s_blockFragmentLength);
+    m_copyIndex = end;
+}
 
 } // namespace JSC
 

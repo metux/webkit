@@ -166,6 +166,11 @@ void PluginTest::NPN_InvalidateRect(NPRect* invalidRect)
     browser->invalidaterect(m_npp, invalidRect);
 }
 
+bool PluginTest::NPN_Invoke(NPObject *npobj, NPIdentifier methodName, const NPVariant *args, uint32_t argCount, NPVariant *result)
+{
+    return browser->invoke(m_npp, npobj, methodName, args, argCount, result);
+}
+
 void* PluginTest::NPN_MemAlloc(uint32_t size)
 {
     return browser->memalloc(size);
@@ -218,6 +223,11 @@ bool PluginTest::NPN_RemoveProperty(NPObject* npObject, NPIdentifier propertyNam
     return browser->removeproperty(m_npp, npObject, propertyName);
 }
 
+void PluginTest::NPN_ReleaseVariantValue(NPVariant* variant)
+{
+    browser->releasevariantvalue(variant);
+}
+
 #ifdef XP_MACOSX
 bool PluginTest::NPN_ConvertPoint(double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double *destX, double *destY, NPCoordinateSpace destSpace)
 {
@@ -250,6 +260,11 @@ void PluginTest::log(const char* format, ...)
     va_start(args, format);
     pluginLogWithArguments(m_npp, format, args);
     va_end(args);
+}
+
+NPNetscapeFuncs* PluginTest::netscapeFuncs()
+{
+    return browser;
 }
 
 void PluginTest::waitUntilDone()

@@ -30,8 +30,8 @@
 #if ENABLE(CONTEXT_MENUS)
 
 #include "PlatformMenuDescription.h"
-#include "PlatformString.h"
 #include <wtf/OwnPtr.h>
+#include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
@@ -164,6 +164,7 @@ namespace WebCore {
         ContextMenuItemTagMediaPlayPause,
         ContextMenuItemTagMediaMute,
         ContextMenuItemTagDictationAlternative,
+        ContextMenuItemTagOpenLinkInThisWindow,
         ContextMenuItemBaseCustomTag = 5000,
         ContextMenuItemCustomTagNoAction = 5998,
         ContextMenuItemLastCustomTag = 5999,

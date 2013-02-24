@@ -32,11 +32,14 @@
 #include "CSSPrimitiveValue.h"
 #include "CachedImage.h"
 #include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
+#include "CachedResourceRequestInitiators.h"
 #include "Document.h"
-#include "MemoryInstrumentation.h"
 #include "Page.h"
 #include "StyleCachedImageSet.h"
 #include "StylePendingImage.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
 
@@ -49,6 +52,8 @@ CSSImageSetValue::CSSImageSetValue()
 
 CSSImageSetValue::~CSSImageSetValue()
 {
+    if (m_imageSet && m_imageSet->isCachedImageSet())
+        static_cast<StyleCachedImageSet*>(m_imageSet.get())->clearImageSetValue();
 }
 
 void CSSImageSetValue::fillImageSet()
@@ -57,13 +62,13 @@ void CSSImageSetValue::fillImageSet()
     size_t i = 0;
     while (i < length) {
         CSSValue* imageValue = item(i);
-        ASSERT(imageValue->isImageValue());
+        ASSERT_WITH_SECURITY_IMPLICATION(imageValue->isImageValue());
         String imageURL = static_cast<CSSImageValue*>(imageValue)->url();
 
         ++i;
-        ASSERT(i < length);
+        ASSERT_WITH_SECURITY_IMPLICATION(i < length);
         CSSValue* scaleFactorValue = item(i);
-        ASSERT(scaleFactorValue->isPrimitiveValue());
+        ASSERT_WITH_SECURITY_IMPLICATION(scaleFactorValue->isPrimitiveValue());
         float scaleFactor = static_cast<CSSPrimitiveValue*>(scaleFactorValue)->getFloatValue();
 
         ImageWithScale image;
@@ -107,7 +112,8 @@ StyleCachedImageSet* CSSImageSetValue::cachedImageSet(CachedResourceLoader* load
         // All forms of scale should be included: Page::pageScaleFactor(), Frame::pageZoomFactor(),
         // and any CSS transforms. https://bugs.webkit.org/show_bug.cgi?id=81698
         ImageWithScale image = bestImageForScaleFactor();
-        ResourceRequest request(loader->document()->completeURL(image.imageURL));
+        CachedResourceRequest request(ResourceRequest(document->completeURL(image.imageURL)));
+        request.setInitiator(cachedResourceRequestInitiators().css);
         if (CachedResourceHandle<CachedImage> cachedImage = loader->requestImage(request)) {
             m_imageSet = StyleCachedImageSet::create(cachedImage.get(), image.scaleFactor, this);
             m_accessedBestFitImage = true;
@@ -138,7 +144,32 @@ StyleImage* CSSImageSetValue::cachedOrPendingImageSet(Document* document)
 
 String CSSImageSetValue::customCssText() const
 {
-    return "-webkit-image-set(" + CSSValueList::customCssText() + ")";
+    StringBuilder result;
+    result.append("-webkit-image-set(");
+
+    size_t length = this->length();
+    size_t i = 0;
+    while (i < length) {
+        if (i > 0)
+            result.append(", ");
+
+        const CSSValue* imageValue = item(i);
+        result.append(imageValue->cssText());
+        result.append(' ');
+
+        ++i;
+        ASSERT_WITH_SECURITY_IMPLICATION(i < length);
+        const CSSValue* scaleFactorValue = item(i);
+        result.append(scaleFactorValue->cssText());
+        // FIXME: Eventually the scale factor should contain it's own unit http://wkb.ug/100120.
+        // For now 'x' is hard-coded in the parser, so we hard-code it here too.
+        result.append('x');
+
+        ++i;
+    }
+
+    result.append(")");
+    return result.toString();
 }
 
 bool CSSImageSetValue::hasFailedOrCanceledSubresources() const
@@ -166,15 +197,15 @@ PassRefPtr<CSSImageSetValue> CSSImageSetValue::cloneForCSSOM() const
 
 void CSSImageSetValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     CSSValueList::reportDescendantMemoryUsage(memoryObjectInfo);
-    info.addInstrumentedVector(m_imagesInSet);
+    info.addMember(m_imagesInSet, "imagesInSet");
 }
 
 void CSSImageSetValue::ImageWithScale::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(imageURL);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(imageURL, "imageURL");
 }
 
 } // namespace WebCore

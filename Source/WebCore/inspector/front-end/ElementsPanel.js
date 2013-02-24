@@ -28,6 +28,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+importScript("CSSNamedFlowCollectionsView.js");
+importScript("CSSNamedFlowView.js");
 importScript("EventListenersSidebarPane.js");
 importScript("MetricsSidebarPane.js");
 importScript("PropertiesSidebarPane.js");
@@ -46,10 +48,14 @@ WebInspector.ElementsPanel = function()
     this.setHideOnDetach();
 
     const initialSidebarWidth = 325;
-    const minimalContentWidthPercent = 34;
-    this.createSplitView(this.element, WebInspector.SplitView.SidebarPosition.Right, initialSidebarWidth);
-    this.splitView.minimalSidebarWidth = Preferences.minElementsSidebarWidth;
-    this.splitView.minimalMainWidthPercent = minimalContentWidthPercent;
+    const minimumContentWidthPercent = 34;
+    const initialSidebarHeight = 325;
+    const minimumContentHeightPercent = 34;
+    this.createSidebarView(this.element, WebInspector.SidebarView.SidebarPosition.End, initialSidebarWidth, initialSidebarHeight);
+    this.splitView.setMinimumSidebarWidth(Preferences.minElementsSidebarWidth);
+    this.splitView.setMinimumMainWidthPercent(minimumContentWidthPercent);
+    this.splitView.setMinimumSidebarHeight(Preferences.minElementsSidebarHeight);
+    this.splitView.setMinimumMainHeightPercent(minimumContentHeightPercent);
 
     this.contentElement = this.splitView.mainElement;
     this.contentElement.id = "elements-content";
@@ -60,6 +66,7 @@ WebInspector.ElementsPanel = function()
     WebInspector.settings.domWordWrap.addChangeListener(this._domWordWrapSettingChanged.bind(this));
 
     this.contentElement.addEventListener("contextmenu", this._contextMenuEventFired.bind(this), true);
+    this.splitView.sidebarElement.addEventListener("contextmenu", this._sidebarContextMenuEventFired.bind(this), false);
 
     this.treeOutline = new WebInspector.ElementsTreeOutline(true, true, false, this._populateContextMenu.bind(this), this._setPseudoClassForNodeId.bind(this));
     this.treeOutline.wireToDomAgent();
@@ -76,31 +83,26 @@ WebInspector.ElementsPanel = function()
     this.sidebarPanes.styles = new WebInspector.StylesSidebarPane(this.sidebarPanes.computedStyle, this._setPseudoClassForNodeId.bind(this));
     this.sidebarPanes.metrics = new WebInspector.MetricsSidebarPane();
     this.sidebarPanes.properties = new WebInspector.PropertiesSidebarPane();
-    this.sidebarPanes.domBreakpoints = WebInspector.domBreakpointsSidebarPane;
+    this.sidebarPanes.domBreakpoints = WebInspector.domBreakpointsSidebarPane.createProxy(this);
     this.sidebarPanes.eventListeners = new WebInspector.EventListenersSidebarPane();
 
-    this.sidebarPanes.styles.onexpand = this.updateStyles.bind(this);
-    this.sidebarPanes.metrics.onexpand = this.updateMetrics.bind(this);
-    this.sidebarPanes.properties.onexpand = this.updateProperties.bind(this);
-    this.sidebarPanes.eventListeners.onexpand = this.updateEventListeners.bind(this);
-
-    this.sidebarPanes.styles.expanded = true;
+    this.sidebarPanes.styles.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateStyles.bind(this, false));
+    this.sidebarPanes.metrics.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateMetrics.bind(this));
+    this.sidebarPanes.properties.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateProperties.bind(this));
+    this.sidebarPanes.eventListeners.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateEventListeners.bind(this));
 
     this.sidebarPanes.styles.addEventListener("style edited", this._stylesPaneEdited, this);
     this.sidebarPanes.styles.addEventListener("style property toggled", this._stylesPaneEdited, this);
     this.sidebarPanes.metrics.addEventListener("metrics edited", this._metricsPaneEdited, this);
 
-    for (var pane in this.sidebarPanes) {
-        this.sidebarElement.appendChild(this.sidebarPanes[pane].element);
-        if (this.sidebarPanes[pane].onattach)
-            this.sidebarPanes[pane].onattach();
-    }
-
-    this._registerShortcuts();
+    WebInspector.dockController.addEventListener(WebInspector.DockController.Events.DockSideChanged, this._dockSideChanged.bind(this));
+    this._dockSideChanged();
 
     this._popoverHelper = new WebInspector.PopoverHelper(this.element, this._getPopoverAnchor.bind(this), this._showPopover.bind(this));
     this._popoverHelper.setTimeout(0);
 
+    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.AttrModified, this._updateBreadcrumbIfNeeded, this);
+    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.AttrRemoved, this._updateBreadcrumbIfNeeded, this);
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.NodeRemoved, this._nodeRemoved, this);
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.DocumentUpdated, this._documentUpdatedEvent, this);
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.InspectElementRequested, this._inspectElementRequested, this);
@@ -139,8 +141,6 @@ WebInspector.ElementsPanel.prototype = {
 
         if (!this.treeOutline.rootDOMNode)
             WebInspector.domAgent.requestDocument();
-
-        this.sidebarElement.insertBefore(this.sidebarPanes.domBreakpoints.element, this.sidebarPanes.eventListeners.element);
     },
 
     willHide: function()
@@ -151,11 +151,6 @@ WebInspector.ElementsPanel.prototype = {
 
         // Detach heavy component on hide
         this.contentElement.removeChild(this.treeOutline.element);
-
-        for (var pane in this.sidebarPanes) {
-            if (this.sidebarPanes[pane].willHide)
-                this.sidebarPanes[pane].willHide();
-        }
 
         WebInspector.Panel.prototype.willHide.call(this);
     },
@@ -196,6 +191,13 @@ WebInspector.ElementsPanel.prototype = {
         WebInspector.cssModel.forcePseudoState(node.id, node.getUserProperty(WebInspector.ElementsTreeOutline.PseudoStateDecorator.PropertyName));
         this._metricsPaneEdited();
         this._stylesPaneEdited();
+
+        WebInspector.notifications.dispatchEventToListeners(WebInspector.UserMetrics.UserAction, {
+            action: WebInspector.UserMetrics.UserActionNames.ForcedElementState,
+            selector: node.appropriateSelectorFor(false),
+            enabled: enable,
+            state: pseudoClass
+        });
     },
 
     _selectedNodeChanged: function()
@@ -249,7 +251,7 @@ WebInspector.ElementsPanel.prototype = {
             return;
         }
 
-        this.sidebarPanes.domBreakpoints.restoreBreakpoints();
+        WebInspector.domBreakpointsSidebarPane.restoreBreakpoints();
 
         /**
          * @this {WebInspector.ElementsPanel}
@@ -334,13 +336,25 @@ WebInspector.ElementsPanel.prototype = {
             WebInspector.settings.domWordWrap.set(!WebInspector.settings.domWordWrap.get());
         }
 
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         var populated = this.treeOutline.populateContextMenu(contextMenu, event);
-        if (populated)
+
+        if (WebInspector.experimentsSettings.cssRegions.isEnabled()) {
             contextMenu.appendSeparator();
+            contextMenu.appendItem(WebInspector.UIString("CSS Named Flows..."), this._showNamedFlowCollections.bind(this));
+        }
+
+        contextMenu.appendSeparator();
         contextMenu.appendCheckboxItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Word wrap" : "Word Wrap"), toggleWordWrap.bind(this), WebInspector.settings.domWordWrap.get());
 
-        contextMenu.show(event);
+        contextMenu.show();
+    },
+
+    _showNamedFlowCollections: function()
+    {
+        if (!WebInspector.cssNamedFlowCollectionsView)
+            WebInspector.cssNamedFlowCollectionsView = new WebInspector.CSSNamedFlowCollectionsView();
+        WebInspector.cssNamedFlowCollectionsView.showInDrawer();
     },
 
     _domWordWrapSettingChanged: function(event)
@@ -371,7 +385,7 @@ WebInspector.ElementsPanel.prototype = {
     {
         // Add debbuging-related actions
         contextMenu.appendSeparator();
-        var pane = this.sidebarPanes.domBreakpoints;
+        var pane = WebInspector.domBreakpointsSidebarPane;
         pane.populateNodeContextMenu(node, contextMenu);
     },
 
@@ -399,7 +413,7 @@ WebInspector.ElementsPanel.prototype = {
             return;
         }
         
-        var node = /** @type {WebInspector.DOMNode} */ treeElement.representedObject;
+        var node = /** @type {WebInspector.DOMNode} */ (treeElement.representedObject);
 
         if (!node.nodeName() || node.nodeName().toLowerCase() !== "img") {
             callback();
@@ -433,9 +447,9 @@ WebInspector.ElementsPanel.prototype = {
     {
         var listItem = anchor.enclosingNodeOrSelfWithNodeName("li");
         if (listItem && listItem.treeElement)
-            this._loadDimensionsForNode(listItem.treeElement, WebInspector.buildImagePreviewContents.bind(WebInspector, anchor.href, true, showPopover));
+            this._loadDimensionsForNode(listItem.treeElement, WebInspector.DOMPresentationUtils.buildImagePreviewContents.bind(WebInspector.DOMPresentationUtils, anchor.href, true, showPopover));
         else
-            WebInspector.buildImagePreviewContents(anchor.href, true, showPopover);
+            WebInspector.DOMPresentationUtils.buildImagePreviewContents(anchor.href, true, showPopover);
 
         /**
          * @param {Element=} contents
@@ -502,6 +516,9 @@ WebInspector.ElementsPanel.prototype = {
         if (treeElement) {
             treeElement.highlightSearchResults(this._searchQuery);
             treeElement.reveal();
+            var matches = treeElement.listItemElement.getElementsByClassName("webkit-search-result");
+            if (matches.length)
+                matches[0].scrollIntoViewIfNeeded();
         }
     },
 
@@ -582,6 +599,24 @@ WebInspector.ElementsPanel.prototype = {
         this._mouseOutOfCrumbsTimeout = setTimeout(this.updateBreadcrumbSizes.bind(this), 1000);
     },
 
+    _updateBreadcrumbIfNeeded: function(event)
+    {
+        var name = event.data.name;
+        if (name !== "class" && name !== "id")
+            return;
+
+        var node = /** @type {WebInspector.DOMNode} */ (event.data.node);
+        var crumbs = this.crumbsElement;
+        var crumb = crumbs.firstChild;
+        while (crumb) {
+            if (crumb.representedObject === node) {
+                this.updateBreadcrumb(true);
+                break;
+            }
+            crumb = crumb.nextSibling;
+        }
+    },
+
     /**
      * @param {boolean=} forceUpdate
      */
@@ -593,17 +628,8 @@ WebInspector.ElementsPanel.prototype = {
         var crumbs = this.crumbsElement;
 
         var handled = false;
-        var foundRoot = false;
         var crumb = crumbs.firstChild;
         while (crumb) {
-            if (crumb.representedObject === this.treeOutline.rootDOMNode)
-                foundRoot = true;
-
-            if (foundRoot)
-                crumb.addStyleClass("dimmed");
-            else
-                crumb.removeStyleClass("dimmed");
-
             if (crumb.representedObject === this.selectedDOMNode()) {
                 crumb.addStyleClass("selected");
                 handled = true;
@@ -651,13 +677,9 @@ WebInspector.ElementsPanel.prototype = {
             event.preventDefault();
         }
 
-        foundRoot = false;
         for (var current = this.selectedDOMNode(); current; current = current.parentNode) {
             if (current.nodeType() === Node.DOCUMENT_NODE)
                 continue;
-
-            if (current === this.treeOutline.rootDOMNode)
-                foundRoot = true;
 
             crumb = document.createElement("span");
             crumb.className = "crumb";
@@ -693,8 +715,6 @@ WebInspector.ElementsPanel.prototype = {
                 crumb.title = crumbTitle;
             }
 
-            if (foundRoot)
-                crumb.addStyleClass("dimmed");
             if (current === this.selectedDOMNode())
                 crumb.addStyleClass("selected");
             if (!crumbs.childNodes.length)
@@ -912,18 +932,6 @@ WebInspector.ElementsPanel.prototype = {
                 coalesceCollapsedCrumbs();
         }
 
-        function compactDimmed(crumb)
-        {
-            if (crumb.hasStyleClass("dimmed"))
-                compact(crumb);
-        }
-
-        function collapseDimmed(crumb)
-        {
-            if (crumb.hasStyleClass("dimmed"))
-                collapse(crumb, false);
-        }
-
         if (!focusedCrumb) {
             // When not focused on a crumb we can be biased and collapse less important
             // crumbs that the user might not care much about.
@@ -934,14 +942,6 @@ WebInspector.ElementsPanel.prototype = {
 
             // Collapse child crumbs.
             if (makeCrumbsSmaller(collapse, ChildSide))
-                return;
-
-            // Compact dimmed ancestor crumbs.
-            if (makeCrumbsSmaller(compactDimmed, AncestorSide))
-                return;
-
-            // Collapse dimmed ancestor crumbs.
-            if (makeCrumbsSmaller(collapseDimmed, AncestorSide))
                 return;
         }
 
@@ -965,11 +965,14 @@ WebInspector.ElementsPanel.prototype = {
         collapse(selectedCrumb, true);
     },
 
+    /**
+     * @param {boolean=} forceUpdate
+     */
     updateStyles: function(forceUpdate)
     {
         var stylesSidebarPane = this.sidebarPanes.styles;
         var computedStylePane = this.sidebarPanes.computedStyle;
-        if ((!stylesSidebarPane.expanded && !computedStylePane.expanded) || !stylesSidebarPane.needsUpdate)
+        if ((!stylesSidebarPane.isShowing() && !computedStylePane.isShowing()) || !stylesSidebarPane.needsUpdate)
             return;
 
         stylesSidebarPane.update(this.selectedDOMNode(), forceUpdate);
@@ -979,7 +982,7 @@ WebInspector.ElementsPanel.prototype = {
     updateMetrics: function()
     {
         var metricsSidebarPane = this.sidebarPanes.metrics;
-        if (!metricsSidebarPane.expanded || !metricsSidebarPane.needsUpdate)
+        if (!metricsSidebarPane.isShowing() || !metricsSidebarPane.needsUpdate)
             return;
 
         metricsSidebarPane.update(this.selectedDOMNode());
@@ -989,7 +992,7 @@ WebInspector.ElementsPanel.prototype = {
     updateProperties: function()
     {
         var propertiesSidebarPane = this.sidebarPanes.properties;
-        if (!propertiesSidebarPane.expanded || !propertiesSidebarPane.needsUpdate)
+        if (!propertiesSidebarPane.isShowing() || !propertiesSidebarPane.needsUpdate)
             return;
 
         propertiesSidebarPane.update(this.selectedDOMNode());
@@ -999,32 +1002,11 @@ WebInspector.ElementsPanel.prototype = {
     updateEventListeners: function()
     {
         var eventListenersSidebarPane = this.sidebarPanes.eventListeners;
-        if (!eventListenersSidebarPane.expanded || !eventListenersSidebarPane.needsUpdate)
+        if (!eventListenersSidebarPane.isShowing() || !eventListenersSidebarPane.needsUpdate)
             return;
 
         eventListenersSidebarPane.update(this.selectedDOMNode());
         eventListenersSidebarPane.needsUpdate = false;
-    },
-
-    _registerShortcuts: function()
-    {
-        var shortcut = WebInspector.KeyboardShortcut;
-        var section = WebInspector.shortcutsScreen.section(WebInspector.UIString("Elements Panel"));
-        var keys = [
-            shortcut.shortcutToString(shortcut.Keys.Up),
-            shortcut.shortcutToString(shortcut.Keys.Down)
-        ];
-        section.addRelatedKeys(keys, WebInspector.UIString("Navigate elements"));
-
-        keys = [
-            shortcut.shortcutToString(shortcut.Keys.Right),
-            shortcut.shortcutToString(shortcut.Keys.Left)
-        ];
-        section.addRelatedKeys(keys, WebInspector.UIString("Expand/collapse"));
-        section.addKey(shortcut.shortcutToString(shortcut.Keys.Enter), WebInspector.UIString("Edit attribute"));
-        section.addKey(shortcut.shortcutToString(shortcut.Keys.F2), WebInspector.UIString("Toggle edit as HTML"));
-
-        this.sidebarPanes.styles.registerShortcuts();
     },
 
     handleShortcut: function(event)
@@ -1077,7 +1059,94 @@ WebInspector.ElementsPanel.prototype = {
 
         WebInspector.domAgent.highlightDOMNodeForTwoSeconds(nodeId);
         this.selectDOMNode(node, true);
-    }
-}
+    },
 
-WebInspector.ElementsPanel.prototype.__proto__ = WebInspector.Panel.prototype;
+    /** 
+     * @param {WebInspector.ContextMenu} contextMenu
+     * @param {Object} target
+     */
+    appendApplicableItems: function(event, contextMenu, target)
+    {
+        if (!(target instanceof WebInspector.RemoteObject))
+            return;
+        var remoteObject = /** @type {WebInspector.RemoteObject} */ (target);
+        if (remoteObject.subtype !== "node")
+            return;
+
+        function selectNode(nodeId)
+        {
+            if (nodeId)
+                WebInspector.domAgent.inspectElement(nodeId);
+        }
+  
+        function revealElement()
+        {
+            remoteObject.pushNodeToFrontend(selectNode);
+        }
+
+        contextMenu.appendItem(WebInspector.UIString("Reveal in Elements Panel"), revealElement.bind(this));
+    },
+
+    _sidebarContextMenuEventFired: function(event)
+    {
+        var contextMenu = new WebInspector.ContextMenu(event);
+        contextMenu.show();
+    },
+
+    _dockSideChanged: function()
+    {
+        var dockSide = WebInspector.dockController.dockSide();
+        this._setVerticalSplit(dockSide !== WebInspector.DockController.State.DockedToRight);
+    },
+
+    /**
+     * @param {boolean} vertical
+     */
+    _setVerticalSplit: function(vertical)
+    {
+        if (this.sidebarPaneView && vertical === this.splitView.isVertical())
+            return;
+
+        if (this.sidebarPaneView)
+            this.sidebarPaneView.detach();
+
+        this.splitView.setVertical(vertical);
+
+        if (vertical) {
+            this.sidebarPaneView = new WebInspector.SidebarPaneStack();
+            for (var pane in this.sidebarPanes)
+                this.sidebarPaneView.addPane(this.sidebarPanes[pane]);
+        } else {
+            this.sidebarPaneView = new WebInspector.SplitView(true, this.name + "PanelSplitSidebarRatio", 0.5);
+
+            var group1 = new WebInspector.SidebarTabbedPane();
+            group1.show(this.sidebarPaneView.firstElement());
+            group1.addPane(this.sidebarPanes.computedStyle);
+            group1.addPane(this.sidebarPanes.styles);
+            group1.addPane(this.sidebarPanes.metrics);
+
+            var group2 = new WebInspector.SidebarTabbedPane();
+            group2.show(this.sidebarPaneView.secondElement());
+            group2.addPane(this.sidebarPanes.properties);
+            group2.addPane(this.sidebarPanes.domBreakpoints);
+            group2.addPane(this.sidebarPanes.eventListeners);
+
+            this.sidebarPaneView.extensionPaneContainer = group2;
+        }
+        this.sidebarPaneView.show(this.splitView.sidebarElement);
+        this.sidebarPanes.styles.expand();
+    },
+
+    /**
+     * @param {string} id
+     * @param {WebInspector.SidebarPane} pane
+     */
+    addExtensionSidebarPane: function(id, pane)
+    {
+        this.sidebarPanes[id] = pane;
+        var container = this.sidebarPaneView.extensionPaneContainer || this.sidebarPaneView;
+        container.addPane(pane);
+    },
+
+    __proto__: WebInspector.Panel.prototype
+}

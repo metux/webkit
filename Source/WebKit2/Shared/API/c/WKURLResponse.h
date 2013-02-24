@@ -40,6 +40,12 @@ WK_EXPORT WKStringRef WKURLResponseCopyMIMEType(WKURLResponseRef);
 
 WK_EXPORT int32_t WKURLResponseHTTPStatusCode(WKURLResponseRef);
 
+WK_EXPORT WKStringRef WKURLResponseCopySuggestedFilename(WKURLResponseRef);
+
+WK_EXPORT bool WKURLResponseIsAttachment(WKURLResponseRef);
+
+WK_EXPORT uint32_t WKURLResponseGetExpectedContentLength(WKURLResponseRef);
+
 #ifdef __cplusplus
 }
 #endif

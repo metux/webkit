@@ -30,22 +30,20 @@
 #if ENABLE(INSPECTOR)
 
 #include "APIObject.h"
-#include "Connection.h"
+#include "MessageReceiver.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
+#include "WKGeometry.h"
 #include <wtf/RetainPtr.h>
 
+OBJC_CLASS NSButton;
 OBJC_CLASS NSWindow;
 OBJC_CLASS WKWebInspectorProxyObjCAdapter;
 OBJC_CLASS WKWebInspectorWKView;
-#endif
-
-#if PLATFORM(WIN)
-#include <WebCore/WindowMessageListener.h>
 #endif
 
 #if PLATFORM(GTK)
@@ -64,15 +62,7 @@ class WebPageGroup;
 class WebPageProxy;
 struct WebPageCreationParameters;
 
-#if PLATFORM(WIN)
-class WebView;
-#endif
-
-class WebInspectorProxy : public APIObject
-#if PLATFORM(WIN)
-    , public WebCore::WindowMessageListener
-#endif
-{
+class WebInspectorProxy : public APIObject, public CoreIPC::MessageReceiver {
 public:
     static const Type APIType = TypeInspector;
 
@@ -98,6 +88,9 @@ public:
     void createInspectorWindow();
     void updateInspectorWindowTitle() const;
     void inspectedViewFrameDidChange();
+
+    void setInspectorWindowFrame(WKRect&);
+    WKRect inspectorWindowFrame();
 #endif
 
 #if PLATFORM(GTK)
@@ -123,12 +116,6 @@ public:
     bool isProfilingPage() const { return m_isProfilingPage; }
     void togglePageProfiling();
 
-#if ENABLE(INSPECTOR)
-    // Implemented in generated WebInspectorProxyMessageReceiver.cpp
-    void didReceiveWebInspectorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncWebInspectorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
-#endif
-
     static bool isInspectorPage(WebPageProxy*);
 
     // Implemented the platform WebInspectorProxy file
@@ -144,15 +131,20 @@ public:
 #endif
 
 private:
-    WebInspectorProxy(WebPageProxy* page);
+    explicit WebInspectorProxy(WebPageProxy*);
 
     virtual Type type() const { return APIType; }
+
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
 
     WebPageProxy* platformCreateInspectorPage();
     void platformOpen();
     void platformDidClose();
     void platformBringToFront();
     bool platformIsFront();
+    void platformAttachAvailabilityChanged(bool);
     void platformInspectedURLChanged(const String&);
     unsigned platformInspectedWindowHeight();
     void platformAttach();
@@ -164,6 +156,7 @@ private:
     void didLoadInspectorPage();
     void didClose();
     void bringToFront();
+    void attachAvailabilityChanged(bool);
     void inspectedURLChanged(const String&);
 
 #if ENABLE(INSPECTOR_SERVER)
@@ -175,21 +168,7 @@ private:
 
     static WebPageGroup* inspectorPageGroup();
 
-#if PLATFORM(WIN)
-    static bool registerInspectorViewWindowClass();
-    static LRESULT CALLBACK InspectorViewWndProc(HWND, UINT, WPARAM, LPARAM);
-    LRESULT wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-
-    LRESULT onSizeEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-    LRESULT onMinMaxInfoEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-    LRESULT onSetFocusEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-    LRESULT onCloseEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-
-    void onWebViewWindowPosChangingEvent(WPARAM, LPARAM);
-    virtual void windowReceivedMessage(HWND, UINT message, WPARAM, LPARAM);
-#endif
-
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(EFL)
     void createInspectorWindow();
 #endif
 
@@ -213,11 +192,9 @@ private:
 #if PLATFORM(MAC)
     RetainPtr<WKWebInspectorWKView> m_inspectorView;
     RetainPtr<NSWindow> m_inspectorWindow;
+    RetainPtr<NSButton> m_dockButton;
     RetainPtr<WKWebInspectorProxyObjCAdapter> m_inspectorProxyObjCAdapter;
     String m_urlString;
-#elif PLATFORM(WIN)
-    HWND m_inspectorWindow;
-    RefPtr<WebView> m_inspectorView;
 #elif PLATFORM(GTK)
     WebInspectorClientGtk m_client;
     GtkWidget* m_inspectorView;

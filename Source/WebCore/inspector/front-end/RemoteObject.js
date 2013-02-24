@@ -99,7 +99,7 @@ WebInspector.RemoteObject.resolveNode = function(node, objectGroup, callback)
 }
 
 /**
- * @param {RuntimeAgent.RemoteObject} payload
+ * @param {RuntimeAgent.RemoteObject=} payload
  * @return {WebInspector.RemoteObject}
  */
 WebInspector.RemoteObject.fromPayload = function(payload)
@@ -163,7 +163,7 @@ WebInspector.RemoteObject.prototype = {
     },
 
     /**
-     * @param {function(Array.<WebInspector.RemoteObjectProperty>)} callback
+     * @param {function(Array.<WebInspector.RemoteObjectProperty>, Array.<WebInspector.RemoteObjectProperty>=)} callback
      */
     getOwnProperties: function(callback)
     {
@@ -171,7 +171,7 @@ WebInspector.RemoteObject.prototype = {
     },
 
     /**
-     * @param {function(Array.<WebInspector.RemoteObjectProperty>)} callback
+     * @param {function(Array.<WebInspector.RemoteObjectProperty>, Array.<WebInspector.RemoteObjectProperty>=)} callback
      */
     getAllProperties: function(callback)
     {
@@ -180,7 +180,7 @@ WebInspector.RemoteObject.prototype = {
 
     /**
      * @param {boolean} ownProperties
-     * @param {function(Array.<RuntimeAgent.RemoteObject>)} callback
+     * @param {function(Array.<WebInspector.RemoteObjectProperty>, Array.<WebInspector.RemoteObjectProperty>=)} callback
      */
     _getProperties: function(ownProperties, callback)
     {
@@ -191,9 +191,10 @@ WebInspector.RemoteObject.prototype = {
 
         /**
          * @param {?Protocol.Error} error
-         * @param {Array.<WebInspector.RemoteObjectProperty>} properties
+         * @param {Array.<RuntimeAgent.PropertyDescriptor>} properties
+         * @param {Array.<RuntimeAgent.InternalPropertyDescriptor>=} internalProperties
          */
-        function remoteObjectBinder(error, properties)
+        function remoteObjectBinder(error, properties, internalProperties)
         {
             if (error) {
                 callback(null);
@@ -210,7 +211,15 @@ WebInspector.RemoteObject.prototype = {
                 } else
                     result.push(new WebInspector.RemoteObjectProperty(property.name, WebInspector.RemoteObject.fromPayload(property.value), property));
             }
-            callback(result);
+            var internalPropertiesResult;
+            if (internalProperties) {
+                internalPropertiesResult = [];
+                for (var i = 0; i < internalProperties.length; i++) {
+                    var property = internalProperties[i];
+                    internalPropertiesResult.push(new WebInspector.RemoteObjectProperty(property.name, WebInspector.RemoteObject.fromPayload(property.value)));
+                }
+            }
+            callback(result, internalPropertiesResult);
         }
         RuntimeAgent.getProperties(this._objectId, ownProperties, remoteObjectBinder);
     },
@@ -241,13 +250,14 @@ WebInspector.RemoteObject.prototype = {
                 return;
             }
 
-            function setPropertyValue(propertyName, propertyValue)
-            {
-                this[propertyName] = propertyValue;
-            }
+            var setPropertyValueFunction = "function(a, b) { this[a] = b; }";
+
+            // Special case for NaN, Infinity and -Infinity
+            if (result.type === "number" && typeof result.value !== "number")
+                setPropertyValueFunction = "function(a) { this[a] = " + result.description + "; }";
 
             delete result.description; // Optimize on traffic.
-            RuntimeAgent.callFunctionOn(this._objectId, setPropertyValue.toString(), [{ value:name }, result], true, undefined, propertySetCallback.bind(this));
+            RuntimeAgent.callFunctionOn(this._objectId, setPropertyValueFunction, [{ value:name }, result], true, undefined, undefined, propertySetCallback.bind(this));
             if (result._objectId)
                 RuntimeAgent.releaseObject(result._objectId);
         }
@@ -278,6 +288,16 @@ WebInspector.RemoteObject.prototype = {
             callback(0);
     },
 
+    highlightAsDOMNode: function()
+    {
+        WebInspector.domAgent.highlightDOMNode(undefined, undefined, this._objectId);
+    },
+
+    hideDOMNodeHighlight: function()
+    {
+        WebInspector.domAgent.hideDOMNodeHighlight();
+    },
+
     /**
      * @param {function(this:Object)} functionDeclaration
      * @param {Array.<RuntimeAgent.CallArgument>=} args
@@ -298,7 +318,7 @@ WebInspector.RemoteObject.prototype = {
             callback((error || wasThrown) ? null : WebInspector.RemoteObject.fromPayload(result));
         }
 
-        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), args, true, undefined, mycallback);
+        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), args, true, undefined, undefined, mycallback);
     },
 
     /**
@@ -318,11 +338,13 @@ WebInspector.RemoteObject.prototype = {
             callback((error || wasThrown) ? null : result.value);
         }
 
-        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), args, true, true, mycallback);
+        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), args, true, true, false, mycallback);
     },
 
     release: function()
     {
+        if (!this._objectId)
+            return;
         RuntimeAgent.releaseObject(this._objectId);
     },
 

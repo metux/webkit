@@ -43,6 +43,10 @@ typedef const struct __CFString * CFStringRef;
 @class NSString;
 #endif
 
+#if PLATFORM(BLACKBERRY)
+#include <BlackBerryPlatformString.h>
+#endif
+
 // FIXME: This is a temporary layering violation while we move string code to WTF.
 // Landing the file moves in one patch, will follow on with patches to change the namespaces.
 namespace JSC {
@@ -60,13 +64,72 @@ template<typename CharacterType> struct HashAndCharactersTranslator;
 struct HashAndUTF8CharactersTranslator;
 struct LCharBufferTranslator;
 struct CharBufferFromLiteralDataTranslator;
+class MemoryObjectInfo;
 struct SubstringTranslator;
 struct UCharBufferTranslator;
+template<typename> class RetainPtr;
 
 enum TextCaseSensitivity { TextCaseSensitive, TextCaseInsensitive };
 
 typedef bool (*CharacterMatchFunctionPtr)(UChar);
 typedef bool (*IsWhiteSpaceFunctionPtr)(UChar);
+
+// Define STRING_STATS to turn on run time statistics of string sizes and memory usage
+#undef STRING_STATS
+
+#ifdef STRING_STATS
+struct StringStats {
+    inline void add8BitString(unsigned length, bool isSubString = false)
+    {
+        ++m_totalNumberStrings;
+        ++m_number8BitStrings;
+        if (!isSubString)
+            m_total8BitData += length;
+    }
+
+    inline void add16BitString(unsigned length, bool isSubString = false)
+    {
+        ++m_totalNumberStrings;
+        ++m_number16BitStrings;
+        if (!isSubString)
+            m_total16BitData += length;
+    }
+
+    inline void addUpconvertedString(unsigned length)
+    {
+        ++m_numberUpconvertedStrings;
+        m_totalUpconvertedData += length;
+    }
+
+    void removeString(StringImpl*);
+    void printStats();
+
+    static const unsigned s_printStringStatsFrequency = 5000;
+    static unsigned s_stringRemovesTillPrintStats;
+
+    unsigned m_totalNumberStrings;
+    unsigned m_number8BitStrings;
+    unsigned m_number16BitStrings;
+    unsigned m_numberUpconvertedStrings;
+    unsigned long long m_total8BitData;
+    unsigned long long m_total16BitData;
+    unsigned long long m_totalUpconvertedData;
+};
+
+#define STRING_STATS_ADD_8BIT_STRING(length) StringImpl::stringStats().add8BitString(length)
+#define STRING_STATS_ADD_8BIT_STRING2(length, isSubString) StringImpl::stringStats().add8BitString(length, isSubString)
+#define STRING_STATS_ADD_16BIT_STRING(length) StringImpl::stringStats().add16BitString(length)
+#define STRING_STATS_ADD_16BIT_STRING2(length, isSubString) StringImpl::stringStats().add16BitString(length, isSubString)
+#define STRING_STATS_ADD_UPCONVERTED_STRING(length) StringImpl::stringStats().addUpconvertedString(length)
+#define STRING_STATS_REMOVE_STRING(string) StringImpl::stringStats().removeString(string)
+#else
+#define STRING_STATS_ADD_8BIT_STRING(length) ((void)0)
+#define STRING_STATS_ADD_8BIT_STRING2(length, isSubString) ((void)0)
+#define STRING_STATS_ADD_16BIT_STRING(length) ((void)0)
+#define STRING_STATS_ADD_16BIT_STRING2(length, isSubString) ((void)0)
+#define STRING_STATS_ADD_UPCONVERTED_STRING(length) ((void)0)
+#define STRING_STATS_REMOVE_STRING(string) ((void)0)
+#endif
 
 class StringImpl {
     WTF_MAKE_NONCOPYABLE(StringImpl); WTF_MAKE_FAST_ALLOCATED;
@@ -110,6 +173,8 @@ private:
         // Ensure that the hash is computed so that AtomicStringHash can call existingHash()
         // with impunity. The empty string is special because it is never entered into
         // AtomicString's HashKey, but still needs to compare correctly.
+        STRING_STATS_ADD_16BIT_STRING(m_length);
+
         hash();
     }
 
@@ -126,6 +191,8 @@ private:
         // Ensure that the hash is computed so that AtomicStringHash can call existingHash()
         // with impunity. The empty string is special because it is never entered into
         // AtomicString's HashKey, but still needs to compare correctly.
+        STRING_STATS_ADD_8BIT_STRING(m_length);
+
         hash();
     }
 
@@ -141,6 +208,8 @@ private:
     {
         ASSERT(m_data8);
         ASSERT(m_length);
+
+        STRING_STATS_ADD_8BIT_STRING(m_length);
     }
 
     // Create a normal 16-bit string with internal storage (BufferInternal)
@@ -153,6 +222,8 @@ private:
     {
         ASSERT(m_data16);
         ASSERT(m_length);
+
+        STRING_STATS_ADD_16BIT_STRING(m_length);
     }
 
     // Create a StringImpl adopting ownership of the provided buffer (BufferOwned)
@@ -165,6 +236,8 @@ private:
     {
         ASSERT(m_data8);
         ASSERT(m_length);
+
+        STRING_STATS_ADD_8BIT_STRING(m_length);
     }
 
     enum ConstructFromLiteralTag { ConstructFromLiteral };
@@ -178,6 +251,8 @@ private:
         ASSERT(m_data8);
         ASSERT(m_length);
         ASSERT(!characters[length]);
+
+        STRING_STATS_ADD_8BIT_STRING(0);
     }
 
     // Create a StringImpl adopting ownership of the provided buffer (BufferOwned)
@@ -190,6 +265,8 @@ private:
     {
         ASSERT(m_data16);
         ASSERT(m_length);
+
+        STRING_STATS_ADD_16BIT_STRING(m_length);
     }
 
     // Used to create new strings that are a substring of an existing 8-bit StringImpl (BufferSubstring)
@@ -204,6 +281,8 @@ private:
         ASSERT(m_data8);
         ASSERT(m_length);
         ASSERT(m_substringBuffer->bufferOwnership() != BufferSubstring);
+
+        STRING_STATS_ADD_8BIT_STRING2(m_length, true);
     }
 
     // Used to create new strings that are a substring of an existing 16-bit StringImpl (BufferSubstring)
@@ -218,6 +297,8 @@ private:
         ASSERT(m_data16);
         ASSERT(m_length);
         ASSERT(m_substringBuffer->bufferOwnership() != BufferSubstring);
+
+        STRING_STATS_ADD_16BIT_STRING2(m_length, true);
     }
 
     enum CreateEmptyUnique_T { CreateEmptyUnique };
@@ -238,6 +319,8 @@ private:
         if (!hash)
             hash = 1 << s_flagCount;
         m_hashAndFlags = hash | BufferInternal;
+
+        STRING_STATS_ADD_16BIT_STRING(m_length);
     }
 
 #if PLATFORM(QT)
@@ -260,6 +343,8 @@ private:
         // Now that we have a ref we can safely reference the string data
         m_data16 = reinterpret_cast_ptr<const UChar*>(qStringData->data());
         ASSERT(m_data16);
+
+        STRING_STATS_ADD_16BIT_STRING(m_length);
     }
 #endif
 
@@ -267,7 +352,14 @@ public:
     WTF_EXPORT_STRING_API ~StringImpl();
 
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const UChar*, unsigned length);
-    static PassRefPtr<StringImpl> create(const LChar*, unsigned length);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const LChar*, unsigned length);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create8BitIfPossible(const UChar*, unsigned length);
+    template<size_t inlineCapacity>
+    static PassRefPtr<StringImpl> create8BitIfPossible(const Vector<UChar, inlineCapacity>& vector)
+    {
+        return create8BitIfPossible(vector.data(), vector.size());
+    }
+
     ALWAYS_INLINE static PassRefPtr<StringImpl> create(const char* s, unsigned length) { return create(reinterpret_cast<const LChar*>(s), length); }
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const LChar*);
     ALWAYS_INLINE static PassRefPtr<StringImpl> create(const char* s) { return create(reinterpret_cast<const LChar*>(s)); }
@@ -373,6 +465,9 @@ public:
 
     unsigned length() const { return m_length; }
     bool is8Bit() const { return m_hashAndFlags & s_hashFlag8BitBuffer; }
+    bool hasInternalBuffer() const { return bufferOwnership() == BufferInternal; }
+    bool hasOwnedBuffer() const { return bufferOwnership() == BufferOwned; }
+    StringImpl* baseString() const { return bufferOwnership() == BufferSubstring ? m_substringBuffer : 0; }
 
     // FIXME: Remove all unnecessary usages of characters()
     ALWAYS_INLINE const LChar* characters8() const { ASSERT(is8Bit()); return m_data8; }
@@ -431,6 +526,10 @@ public:
         else
             m_hashAndFlags &= ~s_hashFlagIsAtomic;
     }
+
+#ifdef STRING_STATS
+    bool isSubString() const { return  bufferOwnership() == BufferSubstring; }
+#endif
 
 #if PLATFORM(QT)
     QStringData* qStringData() { return bufferOwnership() == BufferAdoptedQString ? m_qStringData : 0; }
@@ -528,6 +627,12 @@ public:
             memcpy(destination, source, numCharacters * sizeof(T));
     }
 
+    ALWAYS_INLINE static void copyChars(UChar* destination, const LChar* source, unsigned numCharacters)
+    {
+        for (unsigned i = 0; i < numCharacters; ++i)
+            destination[i] = source[i];
+    }
+
     // Some string features, like refcounting and the atomicity flag, are not
     // thread-safe. We achieve thread safety by isolation, giving each thread
     // its own copy of the string.
@@ -537,7 +642,7 @@ public:
 
     UChar operator[](unsigned i) const
     {
-        ASSERT(i < m_length);
+        ASSERT_WITH_SECURITY_IMPLICATION(i < m_length);
         if (is8Bit())
             return m_data8[i];
         return m_data16[i];
@@ -610,19 +715,32 @@ public:
 
     WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(UChar, UChar);
     WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(UChar, StringImpl*);
+    ALWAYS_INLINE PassRefPtr<StringImpl> replace(UChar pattern, const char* replacement, unsigned replacementLength) { return replace(pattern, reinterpret_cast<const LChar*>(replacement), replacementLength); }
+    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(UChar, const LChar*, unsigned replacementLength);
+    PassRefPtr<StringImpl> replace(UChar, const UChar*, unsigned replacementLength);
     WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(StringImpl*, StringImpl*);
     WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(unsigned index, unsigned len, StringImpl*);
 
     WTF_EXPORT_STRING_API WTF::Unicode::Direction defaultWritingDirection(bool* hasStrongDirectionality = 0);
 
 #if USE(CF)
-    CFStringRef createCFString();
+    RetainPtr<CFStringRef> createCFString();
 #endif
 #ifdef __OBJC__
     operator NSString*();
 #endif
 
+#ifdef STRING_STATS
+    ALWAYS_INLINE static StringStats& stringStats() { return m_stringStats; }
+#endif
+
 private:
+
+    bool isASCIILiteral() const
+    {
+        return is8Bit() && hasInternalBuffer() && reinterpret_cast<const void*>(m_data8) != reinterpret_cast<const void*>(this + 1);
+    }
+
     // This number must be at least 2 to avoid sharing empty, null as well as 1 character strings from SmallStrings.
     static const unsigned s_copyCharsInlineCutOff = 20;
 
@@ -650,6 +768,9 @@ private:
     static const unsigned s_hashFlagIsIdentifier = 1u << 2;
     static const unsigned s_hashMaskBufferOwnership = 1u | (1u << 1);
 
+#ifdef STRING_STATS
+    WTF_EXPORTDATA static StringStats m_stringStats;
+#endif
     unsigned m_refCount;
     unsigned m_length;
     union {
@@ -846,6 +967,12 @@ WTF_EXPORT_STRING_API bool equalIgnoringCase(const UChar*, const LChar*, unsigne
 inline bool equalIgnoringCase(const UChar* a, const char* b, unsigned length) { return equalIgnoringCase(a, reinterpret_cast<const LChar*>(b), length); }
 inline bool equalIgnoringCase(const LChar* a, const UChar* b, unsigned length) { return equalIgnoringCase(b, a, length); }
 inline bool equalIgnoringCase(const char* a, const UChar* b, unsigned length) { return equalIgnoringCase(b, reinterpret_cast<const LChar*>(a), length); }
+inline bool equalIgnoringCase(const char* a, const LChar* b, unsigned length) { return equalIgnoringCase(b, reinterpret_cast<const LChar*>(a), length); }
+inline bool equalIgnoringCase(const UChar* a, const UChar* b, int length)
+{
+    ASSERT(length >= 0);
+    return !Unicode::umemcasecmp(a, b, length);
+}
 
 WTF_EXPORT_STRING_API bool equalIgnoringNullity(StringImpl*, StringImpl*);
 
@@ -892,7 +1019,8 @@ inline size_t find(const UChar* characters, unsigned length, CharacterMatchFunct
     return notFound;
 }
 
-inline size_t reverseFind(const LChar* characters, unsigned length, LChar matchCharacter, unsigned index = UINT_MAX)
+template <typename CharacterType>
+inline size_t reverseFind(const CharacterType* characters, unsigned length, CharacterType matchCharacter, unsigned index = UINT_MAX)
 {
     if (!length)
         return notFound;
@@ -905,17 +1033,16 @@ inline size_t reverseFind(const LChar* characters, unsigned length, LChar matchC
     return index;
 }
 
-inline size_t reverseFind(const UChar* characters, unsigned length, UChar matchCharacter, unsigned index = UINT_MAX)
+ALWAYS_INLINE size_t reverseFind(const UChar* characters, unsigned length, LChar matchCharacter, unsigned index = UINT_MAX)
 {
-    if (!length)
+    return reverseFind(characters, length, static_cast<UChar>(matchCharacter), index);
+}
+
+inline size_t reverseFind(const LChar* characters, unsigned length, UChar matchCharacter, unsigned index = UINT_MAX)
+{
+    if (matchCharacter & ~0xFF)
         return notFound;
-    if (index >= length)
-        index = length - 1;
-    while (characters[index] != matchCharacter) {
-        if (!index--)
-            return notFound;
-    }
-    return index;
+    return reverseFind(characters, length, static_cast<LChar>(matchCharacter), index);
 }
 
 inline size_t StringImpl::find(LChar character, unsigned start)
@@ -953,9 +1080,9 @@ static inline int codePointCompare(unsigned l1, unsigned l2, const CharacterType
     const unsigned lmin = l1 < l2 ? l1 : l2;
     unsigned pos = 0;
     while (pos < lmin && *c1 == *c2) {
-        c1++;
-        c2++;
-        pos++;
+        ++c1;
+        ++c2;
+        ++pos;
     }
 
     if (pos < lmin)
@@ -1011,6 +1138,8 @@ static inline bool isSpaceOrNewline(UChar c)
 
 inline PassRefPtr<StringImpl> StringImpl::isolatedCopy() const
 {
+    if (isASCIILiteral())
+        return StringImpl::createFromLiteral(reinterpret_cast<const char*>(m_data8), m_length);
     if (is8Bit())
         return create(m_data8, m_length);
     return create(m_data16, m_length);

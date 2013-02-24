@@ -28,11 +28,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-module window {
-    interface [
-        Conditional=PAGE_POPUP
-    ] PagePopupController {
-        void setValueAndClosePopup(in long numberValue, in DOMString stringValue);
-        DOMString localizeNumberString(in DOMString numberString);
-    };
-}
+[
+    Conditional=PAGE_POPUP,
+    ImplementationLacksVTable
+] interface PagePopupController {
+    void setValueAndClosePopup(in long numberValue, in DOMString stringValue);
+    void setValue(DOMString value);
+    void closePopup();
+    DOMString localizeNumberString(in DOMString numberString);
+    [Conditional=CALENDAR_PICKER] DOMString formatMonth(in long year, in long zeroBaseMonth);
+    [Conditional=CALENDAR_PICKER] DOMString formatShortMonth(in long year, in long zeroBaseMonth);
+    void histogramEnumeration(DOMString name, long sample, long boundaryValue);
+};

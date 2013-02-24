@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Eric Seidel <eric@webkit.org>
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2012 Apple Inc. All rights reserved.
  * Copyright (C) Research In Motion Limited 2011. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,6 +28,7 @@
 #include "config.h"
 #include "EmptyClients.h"
 
+#include "DateTimeChooser.h"
 #include "DocumentLoader.h"
 #include "FileChooser.h"
 #include "FormState.h"
@@ -38,10 +39,6 @@
 #if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooser.h"
 #endif
-
-#if ENABLE(WEB_INTENTS) 
-#include "IntentRequest.h" 
-#endif 
 
 namespace WebCore {
 
@@ -103,6 +100,13 @@ PassOwnPtr<ColorChooser> EmptyChromeClient::createColorChooser(ColorChooserClien
 }
 #endif
 
+#if ENABLE(DATE_AND_TIME_INPUT_TYPES)
+PassRefPtr<DateTimeChooser> EmptyChromeClient::openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&)
+{
+    return PassRefPtr<DateTimeChooser>();
+}
+#endif
+
 void EmptyChromeClient::runOpenPanel(Frame*, PassRefPtr<FileChooser>)
 {
 }
@@ -138,6 +142,10 @@ PassRefPtr<Widget> EmptyFrameLoaderClient::createPlugin(const IntSize&, HTMLPlug
     return 0;
 }
 
+void EmptyFrameLoaderClient::recreatePlugin(Widget*)
+{
+}
+
 PassRefPtr<Widget> EmptyFrameLoaderClient::createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&)
 {
     return 0;
@@ -154,12 +162,6 @@ PassRefPtr<FrameNetworkingContext> EmptyFrameLoaderClient::createNetworkingConte
 {
     return PassRefPtr<FrameNetworkingContext>();
 }
-
-#if ENABLE(WEB_INTENTS)
-void EmptyFrameLoaderClient::dispatchIntent(PassRefPtr<IntentRequest>)
-{
-}
-#endif
 
 void EmptyTextCheckerClient::requestCheckingOfString(PassRefPtr<TextCheckingRequest>)
 {
@@ -180,6 +182,12 @@ PassOwnPtr<ContextMenu> EmptyContextMenuClient::customizeMenu(PassOwnPtr<Context
     return nullptr;
 }
 #endif
+#endif
+
+#if ENABLE(REQUEST_AUTOCOMPLETE)
+void EmptyFrameLoaderClient::didRequestAutocomplete(PassRefPtr<FormState>)
+{
+}
 #endif
 
 }

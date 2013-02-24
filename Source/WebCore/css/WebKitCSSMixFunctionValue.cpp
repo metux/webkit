@@ -30,7 +30,7 @@
 #include "config.h"
 #include "WebKitCSSMixFunctionValue.h"
 
-#include "MemoryInstrumentation.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 #if ENABLE(CSS_SHADERS)
 
@@ -56,9 +56,14 @@ PassRefPtr<WebKitCSSMixFunctionValue> WebKitCSSMixFunctionValue::cloneForCSSOM()
     return adoptRef(new WebKitCSSMixFunctionValue(*this));
 }
 
+bool WebKitCSSMixFunctionValue::equals(const WebKitCSSMixFunctionValue& other) const
+{
+    return CSSValueList::equals(other);
+}
+
 void WebKitCSSMixFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     CSSValueList::reportDescendantMemoryUsage(memoryObjectInfo);
 }
 

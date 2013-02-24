@@ -32,7 +32,7 @@
 #if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
 #include "CustomFilterGlobalContext.h"
 
-#include "CustomFilterCompiledProgram.h"
+#include "CustomFilterValidatedProgram.h"
 #include "GraphicsContext3D.h"
 
 namespace WebCore {
@@ -43,8 +43,31 @@ CustomFilterGlobalContext::CustomFilterGlobalContext()
 
 CustomFilterGlobalContext::~CustomFilterGlobalContext()
 {
-    for (CustomFilterCompiledProgramsMap::iterator iter = m_programs.begin(); iter != m_programs.end(); ++iter)
-        iter->second->detachFromGlobalContext();
+    for (CustomFilterValidatedProgramsMap::iterator iter = m_programs.begin(); iter != m_programs.end(); ++iter)
+        iter->value->detachFromGlobalContext();
+}
+
+ANGLEWebKitBridge* CustomFilterGlobalContext::webglShaderValidator()
+{
+    if (!m_webglShaderValidator)
+        m_webglShaderValidator = createShaderValidator(SH_WEBGL_SPEC);
+    return m_webglShaderValidator.get();
+}
+
+ANGLEWebKitBridge* CustomFilterGlobalContext::mixShaderValidator()
+{
+    if (!m_mixShaderValidator)
+        m_mixShaderValidator = createShaderValidator(SH_CSS_SHADERS_SPEC);
+    return m_mixShaderValidator.get();
+}
+
+PassOwnPtr<ANGLEWebKitBridge> CustomFilterGlobalContext::createShaderValidator(ShShaderSpec shaderSpec)
+{
+    OwnPtr<ANGLEWebKitBridge> validator = adoptPtr(new ANGLEWebKitBridge(SH_ESSL_OUTPUT, shaderSpec));
+    ShBuiltInResources resources;
+    ShInitBuiltInResources(&resources);
+    validator->setResources(resources);
+    return validator.release();
 }
 
 void CustomFilterGlobalContext::prepareContextIfNeeded(HostWindow* hostWindow)
@@ -55,6 +78,8 @@ void CustomFilterGlobalContext::prepareContextIfNeeded(HostWindow* hostWindow)
     GraphicsContext3D::Attributes attributes;
     attributes.preserveDrawingBuffer = true;
     attributes.premultipliedAlpha = false;
+    attributes.shareResources = true;
+    attributes.preferDiscreteGPU = true;
     m_context = GraphicsContext3D::create(attributes, hostWindow, GraphicsContext3D::RenderOffscreen);
     if (!m_context)
         return;
@@ -62,30 +87,27 @@ void CustomFilterGlobalContext::prepareContextIfNeeded(HostWindow* hostWindow)
     m_context->enable(GraphicsContext3D::DEPTH_TEST);
 }
 
-PassRefPtr<CustomFilterCompiledProgram> CustomFilterGlobalContext::getCompiledProgram(const CustomFilterProgramInfo& programInfo)
+PassRefPtr<CustomFilterValidatedProgram> CustomFilterGlobalContext::getValidatedProgram(const CustomFilterProgramInfo& programInfo)
 {
-    // Check that the context is already prepared.
-    ASSERT(m_context);
-
-    CustomFilterCompiledProgramsMap::iterator iter = m_programs.find(programInfo);
+    CustomFilterValidatedProgramsMap::iterator iter = m_programs.find(programInfo);
     if (iter != m_programs.end())
-        return iter->second;
+        return iter->value;
 
-    RefPtr<CustomFilterCompiledProgram> compiledProgram = CustomFilterCompiledProgram::create(this, programInfo);
-    m_programs.set(programInfo, compiledProgram.get());
-    return compiledProgram.release();
+    RefPtr<CustomFilterValidatedProgram> validatedProgram = CustomFilterValidatedProgram::create(this, programInfo);
+    m_programs.set(programInfo, validatedProgram.get());
+    return validatedProgram.release();
 }
 
-void CustomFilterGlobalContext::removeCompiledProgram(const CustomFilterCompiledProgram* program)
+void CustomFilterGlobalContext::removeValidatedProgram(const CustomFilterValidatedProgram* program)
 {
-    CustomFilterCompiledProgramsMap::iterator iter = m_programs.find(program->programInfo());
+    CustomFilterValidatedProgramsMap::iterator iter = m_programs.find(program->programInfo());
     ASSERT(iter != m_programs.end());
     m_programs.remove(iter);
 
 #ifndef NDEBUG
     // Check that there's no way we could have the same program under a different key.
     for (iter = m_programs.begin(); iter != m_programs.end(); ++iter)
-        ASSERT(iter->second != program);
+        ASSERT(iter->value != program);
 #endif
 }
 

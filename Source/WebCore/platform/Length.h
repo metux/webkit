@@ -24,7 +24,6 @@
 #define Length_h
 
 #include "AnimationUtilities.h"
-#include "LayoutTypes.h"
 #include <wtf/Assertions.h>
 #include <wtf/FastAllocBase.h>
 #include <wtf/Forward.h>
@@ -39,7 +38,7 @@ enum LengthType {
     Intrinsic, MinIntrinsic,
     MinContent, MaxContent, FillAvailable, FitContent,
     Calculated,
-    ViewportPercentageWidth, ViewportPercentageHeight, ViewportPercentageMin,
+    ViewportPercentageWidth, ViewportPercentageHeight, ViewportPercentageMin, ViewportPercentageMax,
     Undefined
 };
 
@@ -65,7 +64,7 @@ public:
         ASSERT(t != Calculated);
     }
     
-    Length(FractionalLayoutUnit v, LengthType t, bool q = false)
+    Length(LayoutUnit v, LengthType t, bool q = false)
         : m_floatValue(v.toFloat()), m_quirk(q), m_type(t), m_isFloat(true)
     {
         ASSERT(t != Calculated);
@@ -173,7 +172,7 @@ public:
         m_isFloat = true;    
     }
 
-    void setValue(LengthType t, FractionalLayoutUnit value)
+    void setValue(LengthType t, LayoutUnit value)
     {
         m_type = t;
         m_floatValue = value;
@@ -226,6 +225,8 @@ public:
     bool isSpecified() const { return type() == Fixed || type() == Percent || type() == Calculated || isViewportPercentage(); }
     bool isCalculated() const { return type() == Calculated; }
     bool isCalculatedEqual(const Length&) const;
+    bool isMinContent() const { return type() == MinContent; }
+    bool isMaxContent() const { return type() == MaxContent; }
 
     Length blend(const Length& from, double progress) const
     {
@@ -264,7 +265,7 @@ public:
     bool isViewportPercentage() const
     {
         LengthType lengthType = type();
-        return lengthType >= ViewportPercentageWidth && lengthType <= ViewportPercentageMin;
+        return lengthType >= ViewportPercentageWidth && lengthType <= ViewportPercentageMax;
     }
     float viewportPercentageLength() const
     {

@@ -21,19 +21,23 @@
 #include "config.h"
 #include "Heap.h"
 
-#include "CopiedSpace.h"
-#include "CopiedSpaceInlineMethods.h"
 #include "CodeBlock.h"
 #include "ConservativeRoots.h"
+#include "CopiedSpace.h"
+#include "CopiedSpaceInlines.h"
+#include "CopyVisitorInlines.h"
 #include "GCActivityCallback.h"
 #include "HeapRootVisitor.h"
+#include "HeapStatistics.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
 #include "JSGlobalData.h"
 #include "JSGlobalObject.h"
 #include "JSLock.h"
 #include "JSONObject.h"
+#include "Operations.h"
 #include "Tracing.h"
+#include "UnlinkedCodeBlock.h"
 #include "WeakSetInlines.h"
 #include <algorithm>
 #include <wtf/RAMSize.h>
@@ -73,7 +77,7 @@ struct GCTimer {
     }
     ~GCTimer()
     {
-        dataLog("%s: %.2lfms (avg. %.2lf, min. %.2lf, max. %.2lf)\n", m_name, m_time * 1000, m_time * 1000 / m_count, m_min*1000, m_max*1000);
+        dataLogF("%s: %.2lfms (avg. %.2lf, min. %.2lf, max. %.2lf)\n", m_name, m_time * 1000, m_time * 1000 / m_count, m_min*1000, m_max*1000);
     }
     double m_time;
     double m_min;
@@ -123,7 +127,7 @@ struct GCCounter {
     }
     ~GCCounter()
     {
-        dataLog("%s: %zu values (avg. %zu, min. %zu, max. %zu)\n", m_name, m_total, m_total / m_count, m_min, m_max);
+        dataLogF("%s: %zu values (avg. %zu, min. %zu, max. %zu)\n", m_name, m_total, m_total / m_count, m_min, m_max);
     }
     const char* m_name;
     size_t m_count;
@@ -175,6 +179,15 @@ static inline bool isValidThreadState(JSGlobalData* globalData)
 
     return true;
 }
+
+struct MarkObject : public MarkedBlock::VoidFunctor {
+    void operator()(JSCell* cell)
+    {
+        if (cell->isZapped())
+            return;
+        Heap::heap(cell)->setMarked(cell);
+    }
+};
 
 struct Count : public MarkedBlock::CountFunctor {
     void operator()(JSCell*) { count(1); }
@@ -242,6 +255,7 @@ Heap::Heap(JSGlobalData* globalData, HeapType heapType)
     , m_machineThreads(this)
     , m_sharedData(globalData)
     , m_slotVisitor(m_sharedData)
+    , m_copyVisitor(m_sharedData)
     , m_handleSet(globalData)
     , m_isSafeToCollect(false)
     , m_globalData(globalData)
@@ -266,8 +280,8 @@ bool Heap::isPagedOut(double deadline)
 // Run all pending finalizers now because we won't get another chance.
 void Heap::lastChanceToFinalize()
 {
-    ASSERT(!m_globalData->dynamicGlobalObject);
-    ASSERT(m_operationInProgress == NoOperation);
+    RELEASE_ASSERT(!m_globalData->dynamicGlobalObject);
+    RELEASE_ASSERT(m_operationInProgress == NoOperation);
 
     m_objectSpace.lastChanceToFinalize();
 
@@ -345,7 +359,7 @@ void Heap::markProtectedObjects(HeapRootVisitor& heapRootVisitor)
 {
     ProtectCountSet::iterator end = m_protectedValues.end();
     for (ProtectCountSet::iterator it = m_protectedValues.begin(); it != end; ++it)
-        heapRootVisitor.visit(&it->first);
+        heapRootVisitor.visit(&it->key);
 }
 
 void Heap::pushTempSortVector(Vector<ValueStringPair>* tempVector)
@@ -385,30 +399,29 @@ void Heap::finalizeUnconditionalFinalizers()
     m_slotVisitor.finalizeUnconditionalFinalizers();
 }
 
-inline RegisterFile& Heap::registerFile()
+inline JSStack& Heap::stack()
 {
-    return m_globalData->interpreter->registerFile();
+    return m_globalData->interpreter->stack();
 }
 
 void Heap::getConservativeRegisterRoots(HashSet<JSCell*>& roots)
 {
     ASSERT(isValidThreadState(m_globalData));
-    ConservativeRoots registerFileRoots(&m_objectSpace.blocks(), &m_storageSpace);
-    registerFile().gatherConservativeRoots(registerFileRoots);
-    size_t registerFileRootCount = registerFileRoots.size();
-    JSCell** registerRoots = registerFileRoots.roots();
-    for (size_t i = 0; i < registerFileRootCount; i++) {
+    ConservativeRoots stackRoots(&m_objectSpace.blocks(), &m_storageSpace);
+    stack().gatherConservativeRoots(stackRoots);
+    size_t stackRootCount = stackRoots.size();
+    JSCell** registerRoots = stackRoots.roots();
+    for (size_t i = 0; i < stackRootCount; i++) {
         setMarked(registerRoots[i]);
         roots.add(registerRoots[i]);
     }
 }
 
-void Heap::markRoots(bool fullGC)
+void Heap::markRoots()
 {
     SamplingRegion samplingRegion("Garbage Collection: Tracing");
 
-    COND_GCPHASE(fullGC, MarkFullRoots, MarkYoungRoots);
-    UNUSED_PARAM(fullGC);
+    GCPHASE(MarkRoots);
     ASSERT(isValidThreadState(m_globalData));
 
 #if ENABLE(OBJECT_MARK_LOGGING)
@@ -426,12 +439,12 @@ void Heap::markRoots(bool fullGC)
         m_machineThreads.gatherConservativeRoots(machineThreadRoots, &dummy);
     }
 
-    ConservativeRoots registerFileRoots(&m_objectSpace.blocks(), &m_storageSpace);
+    ConservativeRoots stackRoots(&m_objectSpace.blocks(), &m_storageSpace);
     m_dfgCodeBlocks.clearMarks();
     {
-        GCPHASE(GatherRegisterFileRoots);
-        registerFile().gatherConservativeRoots(
-            registerFileRoots, m_jitStubRoutines, m_dfgCodeBlocks);
+        GCPHASE(GatherStackRoots);
+        stack().gatherConservativeRoots(
+            stackRoots, m_jitStubRoutines, m_dfgCodeBlocks);
     }
 
 #if ENABLE(DFG_JIT)
@@ -442,43 +455,27 @@ void Heap::markRoots(bool fullGC)
     }
 #endif
 
-#if ENABLE(GGC)
-    MarkedBlock::DirtyCellVector dirtyCells;
-    if (!fullGC) {
-        GCPHASE(GatheringDirtyCells);
-        m_objectSpace.gatherDirtyCells(dirtyCells);
-    } else
-#endif
     {
         GCPHASE(clearMarks);
         m_objectSpace.clearMarks();
     }
 
-    m_storageSpace.startedCopying();
+    m_sharedData.didStartMarking();
     SlotVisitor& visitor = m_slotVisitor;
     visitor.setup();
     HeapRootVisitor heapRootVisitor(visitor);
 
     {
         ParallelModeEnabler enabler(visitor);
-#if ENABLE(GGC)
-        {
-            size_t dirtyCellCount = dirtyCells.size();
-            GCPHASE(VisitDirtyCells);
-            GCCOUNTER(DirtyCellCount, dirtyCellCount);
-            for (size_t i = 0; i < dirtyCellCount; i++) {
-                heapRootVisitor.visitChildren(dirtyCells[i]);
-                visitor.donateAndDrain();
-            }
-        }
-#endif
-    
+
         if (m_globalData->codeBlocksBeingCompiled.size()) {
             GCPHASE(VisitActiveCodeBlock);
             for (size_t i = 0; i < m_globalData->codeBlocksBeingCompiled.size(); i++)
                 m_globalData->codeBlocksBeingCompiled[i]->visitAggregate(visitor);
         }
-    
+
+        m_globalData->smallStrings.visitStrongReferences(visitor);
+
         {
             GCPHASE(VisitMachineRoots);
             MARK_LOG_ROOT(visitor, "C++ Stack");
@@ -486,9 +483,9 @@ void Heap::markRoots(bool fullGC)
             visitor.donateAndDrain();
         }
         {
-            GCPHASE(VisitRegisterFileRoots);
-            MARK_LOG_ROOT(visitor, "Register File");
-            visitor.append(registerFileRoots);
+            GCPHASE(VisitStackRoots);
+            MARK_LOG_ROOT(visitor, "Stack");
+            visitor.append(stackRoots);
             visitor.donateAndDrain();
         }
 #if ENABLE(DFG_JIT)
@@ -579,7 +576,7 @@ void Heap::markRoots(bool fullGC)
 
     GCCOUNTER(VisitedValueCount, visitor.visitCount());
 
-    visitor.doneCopying();
+    m_sharedData.didFinishMarking();
 #if ENABLE(OBJECT_MARK_LOGGING)
     size_t visitCount = visitor.visitCount();
 #if ENABLE(PARALLEL_GC)
@@ -593,7 +590,22 @@ void Heap::markRoots(bool fullGC)
     m_sharedData.resetChildren();
 #endif
     m_sharedData.reset();
-    m_storageSpace.doneCopying();
+}
+
+void Heap::copyBackingStores()
+{
+    m_storageSpace.startedCopying();
+    if (m_storageSpace.shouldDoCopyPhase()) {
+        m_sharedData.didStartCopying();
+        m_copyVisitor.startCopying();
+        m_copyVisitor.copyFromShared();
+        m_copyVisitor.doneCopying();
+        // We need to wait for everybody to finish and return their CopiedBlocks 
+        // before signaling that the phase is complete.
+        m_storageSpace.doneCopying();
+        m_sharedData.didFinishCopying();
+    } else 
+        m_storageSpace.doneCopying();
 }
 
 size_t Heap::objectCount()
@@ -618,7 +630,7 @@ size_t Heap::protectedGlobalObjectCount()
 
 size_t Heap::globalObjectCount()
 {
-    return m_objectSpace.forEachCell<CountIfGlobalObject>();
+    return m_objectSpace.forEachLiveCell<CountIfGlobalObject>();
 }
 
 size_t Heap::protectedObjectCount()
@@ -633,7 +645,7 @@ PassOwnPtr<TypeCountSet> Heap::protectedObjectTypeCounts()
 
 PassOwnPtr<TypeCountSet> Heap::objectTypeCounts()
 {
-    return m_objectSpace.forEachCell<RecordType>();
+    return m_objectSpace.forEachLiveCell<RecordType>();
 }
 
 void Heap::deleteAllCompiledCode()
@@ -687,11 +699,10 @@ void Heap::collect(SweepToggle sweepToggle)
     
     GCPHASE(Collect);
     ASSERT(globalData()->apiLock().currentThreadIsHoldingLock());
-    ASSERT(globalData()->identifierTable == wtfThreadData().currentIdentifierTable());
+    RELEASE_ASSERT(globalData()->identifierTable == wtfThreadData().currentIdentifierTable());
     ASSERT(m_isSafeToCollect);
     JAVASCRIPTCORE_GC_BEGIN();
-    if (m_operationInProgress != NoOperation)
-        CRASH();
+    RELEASE_ASSERT(m_operationInProgress == NoOperation);
     m_operationInProgress = Collection;
 
     m_activityCallback->willCollect();
@@ -702,19 +713,12 @@ void Heap::collect(SweepToggle sweepToggle)
         m_lastCodeDiscardTime = WTF::currentTime();
     }
 
-#if ENABLE(GGC)
-    bool fullGC = sweepToggle == DoSweep;
-    if (!fullGC)
-        fullGC = (capacity() > 4 * m_sizeAfterLastCollect);  
-#else
-    bool fullGC = true;
-#endif
     {
         GCPHASE(Canonicalize);
         m_objectSpace.canonicalizeCellLivenessData();
     }
 
-    markRoots(fullGC);
+    markRoots();
     
     {
         GCPHASE(ReapingWeakHandles);
@@ -722,6 +726,14 @@ void Heap::collect(SweepToggle sweepToggle)
     }
 
     JAVASCRIPTCORE_GC_MARKED();
+
+    {
+        m_blockSnapshot.resize(m_objectSpace.blocks().set().size());
+        MarkedBlockSnapshotFunctor functor(m_blockSnapshot);
+        m_objectSpace.forEachBlock(functor);
+    }
+
+    copyBackingStores();
 
     {
         GCPHASE(FinalizeUnconditionalFinalizers);
@@ -738,6 +750,11 @@ void Heap::collect(SweepToggle sweepToggle)
         deleteUnmarkedCompiledCode();
     }
 
+    {
+        GCPHASE(DeleteSourceProviderCaches);
+        m_globalData->clearSourceProviderCaches();
+    }
+
     if (sweepToggle == DoSweep) {
         SamplingRegion samplingRegion("Garbage Collection: Sweeping");
         GCPHASE(Sweeping);
@@ -745,7 +762,7 @@ void Heap::collect(SweepToggle sweepToggle)
         m_objectSpace.shrink();
     }
 
-    m_sweeper->startSweeping(m_objectSpace.blocks().set());
+    m_sweeper->startSweeping(m_blockSnapshot);
     m_bytesAbandoned = 0;
 
     {
@@ -754,22 +771,41 @@ void Heap::collect(SweepToggle sweepToggle)
     }
     
     size_t currentHeapSize = size();
-    if (fullGC) {
-        m_sizeAfterLastCollect = currentHeapSize;
+    if (Options::gcMaxHeapSize() && currentHeapSize > Options::gcMaxHeapSize())
+        HeapStatistics::exitWithFailure();
 
-        // To avoid pathological GC churn in very small and very large heaps, we set
-        // the new allocation limit based on the current size of the heap, with a
-        // fixed minimum.
-        size_t maxHeapSize = max(minHeapSize(m_heapType, m_ramSize), proportionalHeapSize(currentHeapSize, m_ramSize));
-        m_bytesAllocatedLimit = maxHeapSize - currentHeapSize;
-    }
+    m_sizeAfterLastCollect = currentHeapSize;
+
+    // To avoid pathological GC churn in very small and very large heaps, we set
+    // the new allocation limit based on the current size of the heap, with a
+    // fixed minimum.
+    size_t maxHeapSize = max(minHeapSize(m_heapType, m_ramSize), proportionalHeapSize(currentHeapSize, m_ramSize));
+    m_bytesAllocatedLimit = maxHeapSize - currentHeapSize;
+
     m_bytesAllocated = 0;
     double lastGCEndTime = WTF::currentTime();
     m_lastGCLength = lastGCEndTime - lastGCStartTime;
-    if (m_operationInProgress != Collection)
-        CRASH();
+
+    if (Options::recordGCPauseTimes())
+        HeapStatistics::recordGCPauseTime(lastGCStartTime, lastGCEndTime);
+    RELEASE_ASSERT(m_operationInProgress == Collection);
+
     m_operationInProgress = NoOperation;
     JAVASCRIPTCORE_GC_END();
+
+    if (Options::useZombieMode())
+        zombifyDeadObjects();
+
+    if (Options::objectsAreImmortal())
+        markDeadObjects();
+
+    if (Options::showObjectStatistics())
+        HeapStatistics::showObjectStatistics(this);
+}
+
+void Heap::markDeadObjects()
+{
+    m_objectSpace.forEachDeadCell<MarkObject>();
 }
 
 void Heap::setActivityCallback(GCActivityCallback* activityCallback)
@@ -798,12 +834,9 @@ void Heap::didAllocate(size_t bytes)
     m_bytesAllocated += bytes;
 }
 
-bool Heap::isValidAllocation(size_t bytes)
+bool Heap::isValidAllocation(size_t)
 {
     if (!isValidThreadState(m_globalData))
-        return false;
-
-    if (bytes > MarkedSpace::maxCellSize)
         return false;
 
     if (m_operationInProgress != NoOperation)
@@ -830,11 +863,6 @@ void Heap::addCompiledCode(ExecutableBase* executable)
     m_compiledCode.append(executable);
 }
 
-bool Heap::isSafeToSweepStructures()
-{
-    return !m_sweeper || m_sweeper->structuresCanBeSwept();
-}
-
 void Heap::didStartVMShutdown()
 {
     m_activityCallback->didStartVMShutdown();
@@ -842,6 +870,30 @@ void Heap::didStartVMShutdown()
     m_sweeper->didStartVMShutdown();
     m_sweeper = 0;
     lastChanceToFinalize();
+}
+
+class Zombify : public MarkedBlock::VoidFunctor {
+public:
+    void operator()(JSCell* cell)
+    {
+        void** current = reinterpret_cast<void**>(cell);
+
+        // We want to maintain zapped-ness because that's how we know if we've called 
+        // the destructor.
+        if (cell->isZapped())
+            current++;
+
+        void* limit = static_cast<void*>(reinterpret_cast<char*>(cell) + MarkedBlock::blockFor(cell)->cellSize());
+        for (; current < limit; current++)
+            *current = reinterpret_cast<void*>(0xbbadbeef);
+    }
+};
+
+void Heap::zombifyDeadObjects()
+{
+    // Sweep now because destructors will crash once we're zombified.
+    m_objectSpace.sweep();
+    m_objectSpace.forEachDeadCell<Zombify>();
 }
 
 } // namespace JSC

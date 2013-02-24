@@ -28,8 +28,9 @@
 
 #include "CSSParserValues.h"
 #include "CSSValueList.h"
-#include "MemoryInstrumentation.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/PassOwnPtr.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -41,20 +42,33 @@ CSSFunctionValue::CSSFunctionValue(CSSParserFunction* function)
         m_args = CSSValueList::createFromParserValueList(function->args.get());
 }
 
+CSSFunctionValue::CSSFunctionValue(String name, PassRefPtr<CSSValueList> args)
+    : CSSValue(FunctionClass)
+    , m_name(name)
+    , m_args(args)
+{
+}
+
 String CSSFunctionValue::customCssText() const
 {
-    String result = m_name; // Includes the '('
+    StringBuilder result;
+    result.append(m_name); // Includes the '('
     if (m_args)
-        result += m_args->cssText();
-    result += ")";
-    return result;
+        result.append(m_args->cssText());
+    result.append(')');
+    return result.toString();
+}
+
+bool CSSFunctionValue::equals(const CSSFunctionValue& other) const
+{
+    return m_name == other.m_name && compareCSSValuePtr(m_args, other.m_args);
 }
 
 void CSSFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_name);
-    info.addInstrumentedMember(m_args);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_name, "name");
+    info.addMember(m_args, "args");
 }
 
 }

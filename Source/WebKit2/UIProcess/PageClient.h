@@ -37,6 +37,8 @@
 #if PLATFORM(MAC)
 #include "PluginComplexTextInputState.h"
 
+OBJC_CLASS CALayer;
+
 #if USE(APPKIT)
 OBJC_CLASS WKView;
 OBJC_CLASS NSTextAlternatives;
@@ -66,10 +68,6 @@ class WebPopupMenuProxy;
 class WebColorChooserProxy;
 #endif
 
-#if PLATFORM(WIN)
-struct WindowGeometry;
-#endif
-
 #if PLATFORM(MAC)
 struct ColorSpaceData;
 #endif
@@ -87,6 +85,8 @@ public:
     // Tell the view to immediately display its invalid rect.
     virtual void displayView() = 0;
 
+    // Return true if scrollView() can copy bits in the view.
+    virtual bool canScrollView() = 0;
     // Tell the view to scroll scrollRect by scrollOffset.
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) = 0;
 
@@ -116,19 +116,25 @@ public:
 
 #if USE(TILED_BACKING_STORE)
     virtual void pageDidRequestScroll(const WebCore::IntPoint&) = 0;
+    virtual void didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect) = 0;
+    virtual void pageTransitionViewportReady() = 0;
 #endif
 #if PLATFORM(QT)
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
     virtual void didReceiveMessageFromNavigatorQtObject(const String&) = 0;
-    virtual void updateTextInputState() = 0;
     virtual void handleAuthenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password) = 0;
     virtual void handleCertificateVerificationRequest(const String& hostname, bool& ignoreErrors) = 0;
     virtual void handleProxyAuthenticationRequiredRequest(const String& hostname, uint16_t port, const String& prefilledUsername, String& username, String& password) = 0;
+    virtual void handleWillSetInputMethodState() = 0;
 #endif // PLATFORM(QT).
 
-#if PLATFORM(QT) || PLATFORM(EFL)
+#if PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
+    virtual void updateTextInputState() = 0;
+#endif // PLATFORM(QT) || PLATFORM(EFL) || PLATOFRM(GTK)
+
+#if PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
     virtual void handleDownloadRequest(DownloadProxy*) = 0;
-#endif // PLATFORM(QT) || PLATFORM(EFL)
+#endif // PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
 
 #if PLATFORM(QT) || PLATFORM(EFL)
     virtual void didChangeContentsSize(const WebCore::IntSize&) = 0;
@@ -157,9 +163,6 @@ public:
     virtual void setPromisedData(const String& pasteboardName, PassRefPtr<WebCore::SharedBuffer> imageBuffer, const String& filename, const String& extension, const String& title,
                                  const String& url, const String& visibleUrl, PassRefPtr<WebCore::SharedBuffer> archiveBuffer) = 0;
 #endif
-#if PLATFORM(WIN)
-    virtual void compositionSelectionChanged(bool) = 0;
-#endif
 #if PLATFORM(GTK)
     virtual void getEditorCommandsForKeyEvent(const NativeWebKeyboardEvent&, const AtomicString&, Vector<WTF::String>&) = 0;
 #endif
@@ -180,13 +183,10 @@ public:
     virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) = 0;
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassRefPtr<WebColorChooserProxy> createColorChooserProxy(WebPageProxy*, const WebCore::Color& initialColor) = 0;
+    virtual PassRefPtr<WebColorChooserProxy> createColorChooserProxy(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) = 0;
 #endif
 
     virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut, bool animate) = 0;
-#if PLATFORM(WIN)
-    virtual void didInstallOrUninstallPageOverlay(bool) = 0;
-#endif
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) = 0;
@@ -194,17 +194,11 @@ public:
     virtual void updateAcceleratedCompositingMode(const LayerTreeContext&) = 0;
 #endif
 
-#if PLATFORM(WIN)
-    virtual HWND nativeWindow() = 0;
-    virtual void setGestureReachedScrollingLimit(bool) = 0;
-    virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&) = 0;
-#endif
-
 #if PLATFORM(MAC)
     virtual void pluginFocusOrWindowFocusChanged(uint64_t pluginComplexTextInputIdentifier, bool pluginHasFocusAndWindowHasFocus) = 0;
     virtual void setPluginComplexTextInputState(uint64_t pluginComplexTextInputIdentifier, PluginComplexTextInputState) = 0;
     virtual CGContextRef containingWindowGraphicsContext() = 0;
-    virtual void didPerformDictionaryLookup(const String&, double scaleFactor, const DictionaryPopupInfo&) = 0;
+    virtual void didPerformDictionaryLookup(const AttributedString&, const DictionaryPopupInfo&) = 0;
     virtual void dismissDictionaryLookupPanel() = 0;
     virtual void showCorrectionPanel(WebCore::AlternativeTextType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) = 0;
     virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingAlternativeText) = 0;
@@ -213,9 +207,11 @@ public:
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) = 0;
 
     virtual ColorSpaceData colorSpace() = 0;
+    virtual void setAcceleratedCompositingRootLayer(CALayer *) = 0;
 
 #if USE(APPKIT)
     virtual WKView* wkView() const = 0;
+    virtual void intrinsicContentSizeDidChange(const WebCore::IntSize& intrinsicContentSize) = 0;
 #if USE(DICTATION_ALTERNATIVES)
     virtual uint64_t addDictationAlternatives(const RetainPtr<NSTextAlternatives>&) = 0;
     virtual void removeDictationAlternatives(uint64_t dictationContext) = 0;
@@ -225,8 +221,6 @@ public:
 #endif // USE(DICTATION_ALTERNATIVES)
 #endif // USE(APPKIT)
 #endif // PLATFORM(MAC)
-
-    virtual void didChangeScrollbarsForMainFrame() const = 0;
 
     // Custom representations.
     virtual void didCommitLoadForMainFrame(bool useCustomRepresentation) = 0;

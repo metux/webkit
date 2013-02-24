@@ -28,18 +28,19 @@
 
 #include "APIShims.h"
 #include "APICast.h"
-#include <runtime/Error.h>
-#include <runtime/JSGlobalObject.h>
-#include <runtime/JSLock.h>
-#include <runtime/ObjectPrototype.h>
+#include "Error.h"
+#include "JSGlobalObject.h"
+#include "JSLock.h"
+#include "ObjectPrototype.h"
+#include "Operations.h"
 #include <wtf/Vector.h>
 
 namespace JSC {
 
-const ClassInfo JSCallbackConstructor::s_info = { "CallbackConstructor", &JSNonFinalObject::s_info, 0, 0, CREATE_METHOD_TABLE(JSCallbackConstructor) };
+const ClassInfo JSCallbackConstructor::s_info = { "CallbackConstructor", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSCallbackConstructor) };
 
 JSCallbackConstructor::JSCallbackConstructor(JSGlobalObject* globalObject, Structure* structure, JSClassRef jsClass, JSObjectCallAsConstructorCallback callback)
-    : JSNonFinalObject(globalObject->globalData(), structure)
+    : JSDestructibleObject(globalObject->globalData(), structure)
     , m_class(jsClass)
     , m_callback(callback)
 {

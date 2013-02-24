@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,12 +33,13 @@
 #define EditingStyle_h
 
 #include "CSSPropertyNames.h"
-#include "PlatformString.h"
 #include "WritingDirection.h"
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/TriState.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -55,8 +57,6 @@ class RenderStyle;
 class StylePropertySet;
 class StyledElement;
 class VisibleSelection;
-
-enum TriState { FalseTriState, TrueTriState, MixedTriState };
 
 class EditingStyle : public RefCounted<EditingStyle> {
 public:
@@ -173,6 +173,15 @@ private:
 
 class StyleChange {
 public:
+    StyleChange()
+        : m_applyBold(false)
+        , m_applyItalic(false)
+        , m_applyUnderline(false)
+        , m_applyLineThrough(false)
+        , m_applySubscript(false)
+        , m_applySuperscript(false)
+    { }
+
     StyleChange(EditingStyle*, const Position&);
 
     String cssStyle() const { return m_cssStyle; }

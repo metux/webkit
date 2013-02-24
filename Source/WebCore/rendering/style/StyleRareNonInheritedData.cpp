@@ -23,7 +23,6 @@
 #include "StyleRareNonInheritedData.h"
 
 #include "ContentData.h"
-#include "MemoryInstrumentation.h"
 #include "RenderCounter.h"
 #include "RenderStyle.h"
 #include "ShadowData.h"
@@ -31,6 +30,10 @@
 #include "StyleTransformData.h"
 #include "StyleImage.h"
 #include "StyleResolver.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/MemoryObjectInfo.h>
 
 namespace WebCore {
 
@@ -42,12 +45,16 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_perspectiveOriginX(RenderStyle::initialPerspectiveOriginX())
     , m_perspectiveOriginY(RenderStyle::initialPerspectiveOriginY())
     , lineClamp(RenderStyle::initialLineClamp())
+#if ENABLE(DRAGGABLE_REGION)
+    , m_draggableRegionMode(DraggableRegionNone)
+#endif
     , m_mask(FillLayer(MaskFillLayer))
     , m_pageSize()
-    , m_wrapShapeInside(RenderStyle::initialWrapShapeInside())
-    , m_wrapShapeOutside(RenderStyle::initialWrapShapeOutside())
-    , m_wrapMargin(RenderStyle::initialWrapMargin())
-    , m_wrapPadding(RenderStyle::initialWrapPadding())
+    , m_shapeInside(RenderStyle::initialShapeInside())
+    , m_shapeOutside(RenderStyle::initialShapeOutside())
+    , m_shapeMargin(RenderStyle::initialShapeMargin())
+    , m_shapePadding(RenderStyle::initialShapePadding())
+    , m_clipPath(RenderStyle::initialClipPath())
     , m_visitedLinkBackgroundColor(RenderStyle::initialBackgroundColor())
     , m_order(RenderStyle::initialOrder())
     , m_flowThread(RenderStyle::initialFlowThread())
@@ -70,9 +77,9 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_appearance(RenderStyle::initialAppearance())
     , m_borderFit(RenderStyle::initialBorderFit())
     , m_textCombine(RenderStyle::initialTextCombine())
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
     , m_textDecorationStyle(RenderStyle::initialTextDecorationStyle())
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
     , m_wrapFlow(RenderStyle::initialWrapFlow())
     , m_wrapThrough(RenderStyle::initialWrapThrough())
 #if USE(ACCELERATED_COMPOSITING)
@@ -95,6 +102,9 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_perspectiveOriginX(o.m_perspectiveOriginX)
     , m_perspectiveOriginY(o.m_perspectiveOriginY)
     , lineClamp(o.lineClamp)
+#if ENABLE(DRAGGABLE_REGION)
+    , m_draggableRegionMode(o.m_draggableRegionMode)
+#endif
     , m_deprecatedFlexibleBox(o.m_deprecatedFlexibleBox)
     , m_flexibleBox(o.m_flexibleBox)
     , m_marquee(o.m_marquee)
@@ -114,10 +124,11 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_mask(o.m_mask)
     , m_maskBoxImage(o.m_maskBoxImage)
     , m_pageSize(o.m_pageSize)
-    , m_wrapShapeInside(o.m_wrapShapeInside)
-    , m_wrapShapeOutside(o.m_wrapShapeOutside)
-    , m_wrapMargin(o.m_wrapMargin)
-    , m_wrapPadding(o.m_wrapPadding)
+    , m_shapeInside(o.m_shapeInside)
+    , m_shapeOutside(o.m_shapeOutside)
+    , m_shapeMargin(o.m_shapeMargin)
+    , m_shapePadding(o.m_shapePadding)
+    , m_clipPath(o.m_clipPath)
     , m_visitedLinkBackgroundColor(o.m_visitedLinkBackgroundColor)
     , m_visitedLinkOutlineColor(o.m_visitedLinkOutlineColor)
     , m_visitedLinkBorderLeftColor(o.m_visitedLinkBorderLeftColor)
@@ -145,9 +156,9 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_appearance(o.m_appearance)
     , m_borderFit(o.m_borderFit)
     , m_textCombine(o.m_textCombine)
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
     , m_textDecorationStyle(o.m_textDecorationStyle)
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
     , m_wrapFlow(o.m_wrapFlow)
     , m_wrapThrough(o.m_wrapThrough)
 #if USE(ACCELERATED_COMPOSITING)
@@ -155,7 +166,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
 #endif
     , m_hasAspectRatio(o.m_hasAspectRatio)
 #if ENABLE(CSS_COMPOSITING)
-    , m_effectiveBlendMode(RenderStyle::initialBlendMode())
+    , m_effectiveBlendMode(o.m_effectiveBlendMode)
 #endif
 {
 }
@@ -173,8 +184,11 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_perspectiveOriginX == o.m_perspectiveOriginX
         && m_perspectiveOriginY == o.m_perspectiveOriginY
         && lineClamp == o.lineClamp
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
         && m_dashboardRegions == o.m_dashboardRegions
+#endif
+#if ENABLE(DRAGGABLE_REGION)
+        && m_draggableRegionMode == o.m_draggableRegionMode
 #endif
         && m_deprecatedFlexibleBox == o.m_deprecatedFlexibleBox
         && m_flexibleBox == o.m_flexibleBox
@@ -195,10 +209,11 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_mask == o.m_mask
         && m_maskBoxImage == o.m_maskBoxImage
         && m_pageSize == o.m_pageSize
-        && m_wrapShapeInside == o.m_wrapShapeInside
-        && m_wrapShapeOutside == o.m_wrapShapeOutside
-        && m_wrapMargin == o.m_wrapMargin
-        && m_wrapPadding == o.m_wrapPadding
+        && m_shapeInside == o.m_shapeInside
+        && m_shapeOutside == o.m_shapeOutside
+        && m_shapeMargin == o.m_shapeMargin
+        && m_shapePadding == o.m_shapePadding
+        && m_clipPath == o.m_clipPath
         && m_visitedLinkBackgroundColor == o.m_visitedLinkBackgroundColor
         && m_visitedLinkOutlineColor == o.m_visitedLinkOutlineColor
         && m_visitedLinkBorderLeftColor == o.m_visitedLinkBorderLeftColor
@@ -226,9 +241,9 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_appearance == o.m_appearance
         && m_borderFit == o.m_borderFit
         && m_textCombine == o.m_textCombine
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
         && m_textDecorationStyle == o.m_textDecorationStyle
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
         && m_wrapFlow == o.m_wrapFlow
         && m_wrapThrough == o.m_wrapThrough
 #if USE(ACCELERATED_COMPOSITING)
@@ -242,13 +257,15 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
 
 bool StyleRareNonInheritedData::contentDataEquivalent(const StyleRareNonInheritedData& o) const
 {
-    if (m_content.get() == o.m_content.get())
-        return true;
-        
-    if (m_content && o.m_content && *m_content == *o.m_content)
-        return true;
+    ContentData* a = m_content.get();
+    ContentData* b = o.m_content.get();
 
-    return false;
+    while (a && b && *a == *b) {
+        a = a->next();
+        b = b->next();
+    }
+
+    return !a && !b;
 }
 
 bool StyleRareNonInheritedData::counterDataEquivalent(const StyleRareNonInheritedData& o) const
@@ -301,30 +318,37 @@ bool StyleRareNonInheritedData::transitionDataEquivalent(const StyleRareNonInher
 
 void StyleRareNonInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
 #if ENABLE(DASHBOARD_SUPPORT)
-    info.addVector(m_dashboardRegions);
+    info.addMember(m_dashboardRegions, "dashboardRegions");
 #endif
-    info.addMember(m_deprecatedFlexibleBox);
-    info.addMember(m_flexibleBox);
-    info.addMember(m_marquee);
-    info.addMember(m_multiCol);
-    info.addMember(m_transform);
+    info.addMember(m_deprecatedFlexibleBox, "deprecatedFlexibleBox");
+    info.addMember(m_flexibleBox, "flexibleBox");
+    info.addMember(m_marquee, "marquee");
+    info.addMember(m_multiCol, "multiCol");
+    info.addMember(m_transform, "transform");
 #if ENABLE(CSS_FILTERS)
-    info.addMember(m_filter);
+    info.addMember(m_filter, "filter");
 #endif
-    info.addMember(m_grid);
-    info.addMember(m_gridItem);
-    info.addMember(m_content);
-    info.addMember(m_counterDirectives);
-    info.addMember(m_boxShadow);
-    info.addMember(m_boxReflect);
-    info.addMember(m_animations);
-    info.addMember(m_transitions);
-    info.addMember(m_wrapShapeInside);
-    info.addMember(m_wrapShapeOutside);
-    info.addInstrumentedMember(m_flowThread);
-    info.addInstrumentedMember(m_regionThread);
+    info.addMember(m_grid, "grid");
+    info.addMember(m_gridItem, "gridItem");
+    info.addMember(m_content, "content");
+    info.addMember(m_counterDirectives, "counterDirectives");
+    info.addMember(m_boxShadow, "boxShadow");
+    info.addMember(m_boxReflect, "boxReflect");
+    info.addMember(m_animations, "animations");
+    info.addMember(m_transitions, "transitions");
+    info.addMember(m_shapeInside, "shapeInside");
+    info.addMember(m_shapeOutside, "shapeOutside");
+    info.addMember(m_clipPath, "clipPath");
+    info.addMember(m_flowThread, "flowThread");
+    info.addMember(m_regionThread, "regionThread");
+
+    info.ignoreMember(m_perspectiveOriginX);
+    info.ignoreMember(m_perspectiveOriginY);
+    info.ignoreMember(m_pageSize);
+    info.ignoreMember(m_shapeMargin);
+    info.ignoreMember(m_shapePadding);
 }
 
 } // namespace WebCore

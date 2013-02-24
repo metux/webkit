@@ -74,7 +74,7 @@ namespace WebCore {
 class VGRect;
 #endif
 
-class FractionalLayoutRect;
+class LayoutRect;
 class IntRect;
 class IntPoint;
 
@@ -91,7 +91,7 @@ public:
     FloatRect(float x, float y, float width, float height)
         : m_location(FloatPoint(x, y)), m_size(FloatSize(width, height)) { }
     FloatRect(const IntRect&);
-    FloatRect(const FractionalLayoutRect&);
+    FloatRect(const LayoutRect&);
 
     static FloatRect narrowPrecision(double x, double y, double width, double height);
 
@@ -164,6 +164,7 @@ public:
     void unite(const FloatRect&);
     void uniteEvenIfEmpty(const FloatRect&);
     void uniteIfNonZero(const FloatRect&);
+    void extend(const FloatPoint&);
 
     // Note, this doesn't match what IntRect::contains(IntPoint&) does; the int version
     // is really checking for containment of 1x1 rect, but that doesn't make sense with floats.
@@ -199,8 +200,8 @@ public:
     operator CGRect() const;
 #endif
 
-#if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)) \
-        || (PLATFORM(CHROMIUM) && OS(DARWIN))
+#if (PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))) \
+        && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
     FloatRect(const NSRect&);
     operator NSRect() const;
 #endif

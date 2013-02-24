@@ -32,6 +32,7 @@
 #if USE(ICU_UNICODE) && !UCONFIG_NO_COLLATION
 
 #include <wtf/Assertions.h>
+#include <wtf/StringExtras.h>
 #include <wtf/Threading.h>
 #include <unicode/ucol.h>
 #include <string.h>
@@ -131,6 +132,9 @@ void Collator::createCollator() const
 
     ucol_setAttribute(m_collator, UCOL_CASE_FIRST, m_lowerFirst ? UCOL_LOWER_FIRST : UCOL_UPPER_FIRST, &status);
     ASSERT(U_SUCCESS(status));
+
+    ucol_setAttribute(m_collator, UCOL_NORMALIZATION_MODE, UCOL_ON, &status);
+    ASSERT(U_SUCCESS(status));
 }
 
 void Collator::releaseCollator()
@@ -144,6 +148,6 @@ void Collator::releaseCollator()
     }
 }
 
-}
+} // namespace WTF
 
-#endif
+#endif // USE(ICU_UNICODE) && !UCONFIG_NO_COLLATION

@@ -34,11 +34,13 @@
 #if ENABLE(INSPECTOR)
 
 #include "InspectorBaseAgent.h"
+#include "InspectorFrontend.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
+class InspectorClient;
 class InspectorDOMStorageAgent;
 class InspectorState;
 class InstrumentingAgents;
@@ -51,19 +53,30 @@ class InspectorMemoryAgent : public InspectorBaseAgent<InspectorMemoryAgent>, pu
 public:
     typedef Vector<OwnPtr<InspectorBaseAgentInterface> > InspectorAgents;
 
-    static PassOwnPtr<InspectorMemoryAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state, Page* page, InspectorDOMStorageAgent* domStorageAgent)
+    static PassOwnPtr<InspectorMemoryAgent> create(InstrumentingAgents* instrumentingAgents, InspectorClient* client, InspectorCompositeState* state, Page* page)
     {
-        return adoptPtr(new InspectorMemoryAgent(instrumentingAgents, state, page, domStorageAgent));
+        return adoptPtr(new InspectorMemoryAgent(instrumentingAgents, client, state, page));
     }
     virtual ~InspectorMemoryAgent();
 
-    virtual void getDOMNodeCount(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Memory::DOMGroup> >& domGroups, RefPtr<TypeBuilder::Memory::StringStatistics>& strings);
-    virtual void getProcessMemoryDistribution(ErrorString*, RefPtr<TypeBuilder::Memory::MemoryBlock>& processMemory);
+    virtual void getDOMCounters(ErrorString*, int* documents, int* nodes, int* jsEventListeners);
+    virtual void getProcessMemoryDistribution(ErrorString*, const bool* reportGraph, RefPtr<TypeBuilder::Memory::MemoryBlock>& out_processMemory, RefPtr<InspectorObject>& graphMetaInformation);
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
+    void getProcessMemoryDistributionMap(HashMap<String, size_t>* memoryInfo);
+
+    virtual void setFrontend(InspectorFrontend*);
+    virtual void clearFrontend();
 
 private:
-    InspectorMemoryAgent(InstrumentingAgents*, InspectorState*, Page*, InspectorDOMStorageAgent*);
+    InspectorMemoryAgent(InstrumentingAgents*, InspectorClient*, InspectorCompositeState*, Page*);
+
+    PassRefPtr<InspectorObject> getProcessMemoryDistributionImpl(bool reportGraph, HashMap<String, size_t>* memoryInfo);
+
+    InspectorClient* m_inspectorClient;
     Page* m_page;
-    InspectorDOMStorageAgent* m_domStorageAgent;
+    InspectorFrontend::Memory* m_frontend;
 };
 
 } // namespace WebCore

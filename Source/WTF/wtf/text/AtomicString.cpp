@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Patrick Gansterer <paroga@paroga.com>
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
@@ -30,23 +30,64 @@
 #include <wtf/WTFThreadData.h>
 #include <wtf/unicode/UTF8.h>
 
+#if USE(WEB_THREAD)
+#include <wtf/MainThread.h>
+#include <wtf/TCSpinLock.h>
+#endif
+
 namespace WTF {
 
 using namespace Unicode;
 
 COMPILE_ASSERT(sizeof(AtomicString) == sizeof(String), atomic_string_and_string_must_be_same_size);
 
-class AtomicStringTable {
+#if USE(WEB_THREAD)
+class AtomicStringTableLocker : public SpinLockHolder {
+    WTF_MAKE_NONCOPYABLE(AtomicStringTableLocker);
+
+    static SpinLock s_stringTableLock;
 public:
-    static AtomicStringTable* create()
+    AtomicStringTableLocker()
+        : SpinLockHolder(&s_stringTableLock)
     {
-        AtomicStringTable* table = new AtomicStringTable;
+    }
+};
 
-        WTFThreadData& data = wtfThreadData();
-        data.m_atomicStringTable = table;
+SpinLock AtomicStringTableLocker::s_stringTableLock = SPINLOCK_INITIALIZER;
+#else
+
+class AtomicStringTableLocker {
+    WTF_MAKE_NONCOPYABLE(AtomicStringTableLocker);
+public:
+    AtomicStringTableLocker() { }
+    ~AtomicStringTableLocker() { }
+};
+#endif // USE(WEB_THREAD)
+
+class AtomicStringTable {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    static AtomicStringTable* create(WTFThreadData& data)
+    {
+#if USE(WEB_THREAD)
+        // On iOS, one AtomicStringTable is shared between the main UI thread and the WebThread.
+        static AtomicStringTable* sharedStringTable = new AtomicStringTable;
+
+        bool currentThreadIsWebThread = isWebThread();
+        if (currentThreadIsWebThread || isUIThread())
+            data.m_atomicStringTable = sharedStringTable;
+        else
+            data.m_atomicStringTable = new AtomicStringTable;
+
+        // We do the following so that its destruction happens only
+        // once - on the main UI thread.
+        if (!currentThreadIsWebThread)
+            data.m_atomicStringTableDestructor = AtomicStringTable::destroy;
+#else
+        data.m_atomicStringTable = new AtomicStringTable;
         data.m_atomicStringTableDestructor = AtomicStringTable::destroy;
-
-        return table;
+#endif // USE(WEB_THREAD)
+        return data.m_atomicStringTable;
     }
 
     HashSet<StringImpl*>& table()
@@ -69,15 +110,18 @@ private:
 static inline HashSet<StringImpl*>& stringTable()
 {
     // Once possible we should make this non-lazy (constructed in WTFThreadData's constructor).
-    AtomicStringTable* table = wtfThreadData().atomicStringTable();
+    WTFThreadData& data = wtfThreadData();
+    AtomicStringTable* table = data.atomicStringTable();
     if (UNLIKELY(!table))
-        table = AtomicStringTable::create();
+        table = AtomicStringTable::create(data);
     return table->table();
 }
 
 template<typename T, typename HashTranslator>
 static inline PassRefPtr<StringImpl> addToStringTable(const T& value)
 {
+    AtomicStringTableLocker locker;
+
     HashSet<StringImpl*>::AddResult addResult = stringTable().add<T, HashTranslator>(value);
 
     // If the string is newly-translated, then we need to adopt it.
@@ -134,7 +178,7 @@ struct UCharBufferTranslator {
 
     static void translate(StringImpl*& location, const UCharBuffer& buf, unsigned hash)
     {
-        location = StringImpl::create(buf.s, buf.length).leakRef();
+        location = StringImpl::create8BitIfPossible(buf.s, buf.length).leakRef();
         location->setHash(hash);
         location->setIsAtomic(true);
     }
@@ -186,11 +230,26 @@ struct HashAndUTF8CharactersTranslator {
         if (buffer.utf16Length != string->length())
             return false;
 
-        const UChar* stringCharacters = string->characters();
-
         // If buffer contains only ASCII characters UTF-8 and UTF16 length are the same.
-        if (buffer.utf16Length != buffer.length)
+        if (buffer.utf16Length != buffer.length) {
+            const UChar* stringCharacters = string->characters();
+
             return equalUTF16WithUTF8(stringCharacters, stringCharacters + string->length(), buffer.characters, buffer.characters + buffer.length);
+        }
+
+        if (string->is8Bit()) {
+            const LChar* stringCharacters = string->characters8();
+
+            for (unsigned i = 0; i < buffer.length; ++i) {
+                ASSERT(isASCII(buffer.characters[i]));
+                if (stringCharacters[i] != buffer.characters[i])
+                    return false;
+            }
+
+            return true;
+        }
+
+        const UChar* stringCharacters = string->characters16();
 
         for (unsigned i = 0; i < buffer.length; ++i) {
             ASSERT(isASCII(buffer.characters[i]));
@@ -204,12 +263,17 @@ struct HashAndUTF8CharactersTranslator {
     static void translate(StringImpl*& location, const HashAndUTF8Characters& buffer, unsigned hash)
     {
         UChar* target;
-        location = StringImpl::createUninitialized(buffer.utf16Length, target).leakRef();
+        RefPtr<StringImpl> newString = StringImpl::createUninitialized(buffer.utf16Length, target);
 
+        bool isAllASCII;
         const char* source = buffer.characters;
-        if (convertUTF8ToUTF16(&source, source + buffer.length, &target, target + buffer.utf16Length) != conversionOK)
+        if (convertUTF8ToUTF16(&source, source + buffer.length, &target, target + buffer.utf16Length, &isAllASCII) != conversionOK)
             ASSERT_NOT_REACHED();
 
+        if (isAllASCII)
+            newString = StringImpl::create(buffer.characters, buffer.length);
+
+        location = newString.release().leakRef();
         location->setHash(hash);
         location->setIsAtomic(true);
     }
@@ -244,9 +308,9 @@ PassRefPtr<StringImpl> AtomicString::add(const UChar* s)
     if (!s)
         return 0;
 
-    int length = 0;
+    unsigned length = 0;
     while (s[length] != UChar(0))
-        length++;
+        ++length;
 
     if (!length)
         return StringImpl::empty();
@@ -365,6 +429,7 @@ PassRefPtr<StringImpl> AtomicString::addSlowCase(StringImpl* r)
     if (!r->length())
         return StringImpl::empty();
 
+    AtomicStringTableLocker locker;
     StringImpl* result = *stringTable().add(r).iterator;
     if (result == r)
         r->setIsAtomic(true);
@@ -386,6 +451,7 @@ AtomicStringImpl* AtomicString::find(const StringImpl* stringImpl)
     if (!stringImpl->length())
         return static_cast<AtomicStringImpl*>(StringImpl::empty());
 
+    AtomicStringTableLocker locker;
     HashSet<StringImpl*>::iterator iterator;
     if (stringImpl->is8Bit())
         iterator = findString<LChar>(stringImpl);
@@ -398,6 +464,7 @@ AtomicStringImpl* AtomicString::find(const StringImpl* stringImpl)
 
 void AtomicString::remove(StringImpl* r)
 {
+    AtomicStringTableLocker locker;
     stringTable().remove(r);
 }
 

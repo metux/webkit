@@ -32,10 +32,10 @@
 #include "EventTarget.h"
 #include "MediaStreamDescriptor.h"
 #include "MediaStreamSource.h"
-#include "PlatformString.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -43,28 +43,24 @@ class MediaStreamComponent;
 
 class MediaStreamTrack : public RefCounted<MediaStreamTrack>, public ActiveDOMObject, public EventTarget, public MediaStreamSource::Observer {
 public:
-    enum ReadyState {
-        LIVE = 0,
-        MUTED = 1,
-        ENDED = 2
-    };
-
-    static PassRefPtr<MediaStreamTrack> create(ScriptExecutionContext*, PassRefPtr<MediaStreamDescriptor>, MediaStreamComponent*);
+    static PassRefPtr<MediaStreamTrack> create(ScriptExecutionContext*, MediaStreamComponent*);
     virtual ~MediaStreamTrack();
 
     String kind() const;
+    String id() const;
     String label() const;
 
     bool enabled() const;
     void setEnabled(bool);
 
-    ReadyState readyState() const;
+    String readyState() const;
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mute);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(unmute);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(ended);
 
     MediaStreamComponent* component();
+    bool ended() const;
 
     // EventTarget
     virtual const AtomicString& interfaceName() const OVERRIDE;
@@ -77,7 +73,7 @@ public:
     using RefCounted<MediaStreamTrack>::deref;
 
 private:
-    MediaStreamTrack(ScriptExecutionContext*, PassRefPtr<MediaStreamDescriptor>, MediaStreamComponent*);
+    MediaStreamTrack(ScriptExecutionContext*, MediaStreamComponent*);
 
     // EventTarget
     virtual EventTargetData* eventTargetData() OVERRIDE;
@@ -90,7 +86,6 @@ private:
     virtual void sourceChangedState() OVERRIDE;
 
     bool m_stopped;
-    RefPtr<MediaStreamDescriptor> m_streamDescriptor;
     RefPtr<MediaStreamComponent> m_component;
 };
 

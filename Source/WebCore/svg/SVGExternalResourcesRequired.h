@@ -23,12 +23,12 @@
 
 #if ENABLE(SVG)
 #include "QualifiedName.h"
-#include "SVGElement.h"
 #include <wtf/HashSet.h>
 
 namespace WebCore {
 
 class Attribute;
+class SVGElement;
 
 // Notes on a SVG 1.1 spec discrepancy:
 // The SVG DOM defines the attribute externalResourcesRequired as being of type SVGAnimatedBoolean, whereas the 
@@ -39,7 +39,7 @@ class SVGExternalResourcesRequired {
 public:
     virtual ~SVGExternalResourcesRequired() { }
 
-    bool parseAttribute(const Attribute&);
+    bool parseAttribute(const QualifiedName&, const AtomicString&);
     bool isKnownAttribute(const QualifiedName&);
     void addSupportedAttributes(HashSet<QualifiedName>&);
     bool handleAttributeChange(SVGElement*, const QualifiedName&);

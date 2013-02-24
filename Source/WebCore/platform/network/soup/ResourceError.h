@@ -30,34 +30,41 @@
 #include <wtf/gobject/GRefPtr.h>
 
 typedef struct _GTlsCertificate GTlsCertificate;
+typedef struct _SoupRequest SoupRequest;
+typedef struct _SoupMessage SoupMessage;
 
 namespace WebCore {
 
 class ResourceError : public ResourceErrorBase
 {
 public:
-    ResourceError()
-        : m_tlsErrors(0)
-    {
-    }
-
     ResourceError(const String& domain, int errorCode, const String& failingURL, const String& localizedDescription)
         : ResourceErrorBase(domain, errorCode, failingURL, localizedDescription)
         , m_tlsErrors(0)
     {
     }
 
-    ResourceError(const String& domain, int errorCode, const String& failingURL, const String& localizedDescription, unsigned tlsErrors, GTlsCertificate* certificate)
-        : ResourceErrorBase(domain, errorCode, failingURL, localizedDescription)
-        , m_tlsErrors(tlsErrors)
-        , m_certificate(certificate)
+    ResourceError()
+        : m_tlsErrors(0)
     {
     }
 
+    static ResourceError httpError(SoupMessage*, GError*, SoupRequest*);
+    static ResourceError transportError(SoupRequest*, int statusCode, const String& reasonPhrase);
+    static ResourceError genericIOError(GError*, SoupRequest*);
+    static ResourceError tlsError(SoupRequest*, unsigned tlsErrors, GTlsCertificate*);
+    static ResourceError timeoutError(const String& failingURL);
+    static ResourceError authenticationError(SoupMessage*);
+
     unsigned tlsErrors() const { return m_tlsErrors; }
+    void setTLSErrors(unsigned tlsErrors) { m_tlsErrors = tlsErrors; }
     GTlsCertificate* certificate() const { return m_certificate.get(); }
+    void setCertificate(GTlsCertificate* certificate) { m_certificate = certificate; }
 
 private:
+    void platformCopy(ResourceError&) const;
+    static bool platformCompare(const ResourceError& a, const ResourceError& b);
+
     unsigned m_tlsErrors;
     GRefPtr<GTlsCertificate> m_certificate;
 };

@@ -38,8 +38,9 @@
 
 namespace WebCore {
 
-class AbstractDatabase;
+class DatabaseBackendBase;
 class OriginUsageRecord;
+class SecurityOrigin;
 
 class OriginQuotaManager {
     WTF_MAKE_NONCOPYABLE(OriginQuotaManager); WTF_MAKE_FAST_ALLOCATED;
@@ -56,7 +57,7 @@ public:
     void removeDatabase(SecurityOrigin*, const String& databaseIdentifier);
     void removeOrigin(SecurityOrigin*);
 
-    void markDatabase(AbstractDatabase*); // Mark dirtiness of a specific database.
+    void markDatabase(DatabaseBackendBase*); // Mark dirtiness of a specific database.
     unsigned long long diskUsage(SecurityOrigin*) const;
 
 private:
@@ -65,7 +66,7 @@ private:
     bool m_usageRecordGuardLocked;
 #endif
 
-    typedef HashMap<RefPtr<SecurityOrigin>, OriginUsageRecord*, SecurityOriginHash> OriginUsageMap;
+    typedef HashMap<RefPtr<SecurityOrigin>, OriginUsageRecord*> OriginUsageMap;
     OriginUsageMap m_usageMap;
 };
 

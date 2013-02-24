@@ -87,17 +87,6 @@ WebKitURIResponse
 @Returns: 
 
 
-<!-- ##### FUNCTION webkit_uri_response_get_https_status ##### -->
-<para>
-
-</para>
-
-@response: 
-@certificate: 
-@errors: 
-@Returns: 
-
-
 <!-- ##### FUNCTION webkit_uri_response_get_suggested_filename ##### -->
 <para>
 

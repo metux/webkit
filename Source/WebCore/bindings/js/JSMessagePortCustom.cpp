@@ -63,11 +63,6 @@ JSC::JSValue JSMessagePort::postMessage(JSC::ExecState* exec)
     return handlePostMessage(exec, impl());
 }
 
-JSC::JSValue JSMessagePort::webkitPostMessage(JSC::ExecState* exec)
-{
-    return handlePostMessage(exec, impl());
-}
-
 void fillMessagePortArray(JSC::ExecState* exec, JSC::JSValue value, MessagePortArray& portArray, ArrayBufferArray& arrayBuffers)
 {
     // Convert from the passed-in JS array-like object to a MessagePortArray.

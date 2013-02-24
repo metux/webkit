@@ -81,12 +81,22 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:enable-css-shaders ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:enable-default-context-menu ##### -->
 <para>
 
 </para>
 
 <!-- ##### ARG WebKitWebSettings:enable-developer-extras ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:enable-display-of-insecure-content ##### -->
 <para>
 
 </para>
@@ -136,6 +146,11 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:enable-media-stream ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:enable-offline-web-application-cache ##### -->
 <para>
 
@@ -152,6 +167,11 @@ WebKitWebSettings
 </para>
 
 <!-- ##### ARG WebKitWebSettings:enable-private-browsing ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:enable-running-of-insecure-content ##### -->
 <para>
 
 </para>

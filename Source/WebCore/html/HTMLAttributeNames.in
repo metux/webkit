@@ -10,6 +10,7 @@ accesskey
 action
 align
 alink
+allowfullscreen
 alt
 archive
 aria-activedescendant
@@ -165,6 +166,8 @@ novalidate
 nowrap
 object
 onabort
+onautocomplete
+onautocompleteerror
 onbeforecopy
 onbeforecut
 onbeforeload
@@ -240,6 +243,7 @@ ontouchstart
 ontouchmove
 ontouchend
 ontouchcancel
+ontransitionend
 onunload
 onvolumechange
 onwaiting
@@ -272,9 +276,11 @@ primary
 profile
 progress
 prompt
+pseudo
 readonly
 rel
 required
+reset-style-inheritance
 results
 rev
 reversed

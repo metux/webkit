@@ -31,10 +31,10 @@
 #define HistoryController_h
 
 #include "FrameLoaderTypes.h"
-#include "PlatformString.h"
 #include "SerializedScriptValue.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -52,6 +52,7 @@ public:
     ~HistoryController();
 
     void saveScrollPositionAndViewStateToItem(HistoryItem*);
+    void clearScrollPositionAndViewState();
     void restoreScrollPositionAndViewState();
 
     void updateBackForwardListForFragmentScroll();

@@ -32,15 +32,17 @@
 
 #if PLATFORM(MAC)
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 #define ENABLE_WEB_PROCESS_SANDBOX 1
-#endif
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
 #define ENABLE_PLUGIN_PROCESS 1
 #endif
 
+#define ENABLE_NETWORK_PROCESS 1
+
 #define ENABLE_MEMORY_SAMPLER 1
+
+#define ENABLE_CUSTOM_PROTOCOLS 1
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
@@ -53,7 +55,13 @@
 #endif
 #endif
 
-#endif // PLATFORM(MAC)
+#if ENABLE(PLUGIN_PROCESS)
+#define ENABLE_SHARED_WORKER_PROCESS 1
+#endif
+
+#else
+#define ENABLE_SHARED_WORKER_PROCESS 1
+#endif
 
 /* When C++ exceptions are disabled, the C++ library defines |try| and |catch|
 * to allow C++ code that expects exceptions to build. These definitions

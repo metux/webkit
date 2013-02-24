@@ -23,12 +23,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-module storage {
-
-    interface [
-        Conditional=INDEXED_DATABASE,
-        CustomToJSObject
-    ] IDBAny {
-        // This space is intentionally left blank.
-    };
-}
+[
+    Conditional=INDEXED_DATABASE,
+    CustomToJSObject,
+    V8NoWrapperCache,
+    JSNoStaticTables
+] interface IDBAny {
+    // This space is intentionally left blank.
+};

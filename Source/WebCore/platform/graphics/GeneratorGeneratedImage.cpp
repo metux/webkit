@@ -29,10 +29,11 @@
 #include "FloatRect.h"
 #include "GraphicsContext.h"
 #include "Length.h"
+#include "PlatformMemoryInstrumentation.h"
 
 namespace WebCore {
 
-void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp)
+void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode)
 {
     GraphicsContextStateSaver stateSaver(*destContext);
     destContext->setCompositeOperation(compositeOp);
@@ -45,7 +46,7 @@ void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect
 }
 
 void GeneratorGeneratedImage::drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
-                                 const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& destRect)
+    const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& destRect, BlendMode)
 {
     // Allow the generator to provide visually-equivalent tiling parameters for better performance.
     IntSize adjustedSize = m_size;
@@ -63,7 +64,7 @@ void GeneratorGeneratedImage::drawPattern(GraphicsContext* destContext, const Fl
     unsigned generatorHash = m_generator->hash();
 
     if (!m_cachedImageBuffer || m_cachedGeneratorHash != generatorHash || m_cachedAdjustedSize != adjustedSize || !destContext->isCompatibleWithBuffer(m_cachedImageBuffer.get())) {
-        m_cachedImageBuffer = destContext->createCompatibleBuffer(adjustedSize);
+        m_cachedImageBuffer = destContext->createCompatibleBuffer(adjustedSize, m_generator->hasAlpha());
         if (!m_cachedImageBuffer)
             return;
 
@@ -79,16 +80,19 @@ void GeneratorGeneratedImage::drawPattern(GraphicsContext* destContext, const Fl
     m_cacheTimer.restart();
 }
 
-void GeneratedImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio)
-{
-    Image::computeIntrinsicDimensions(intrinsicWidth, intrinsicHeight, intrinsicRatio);
-    intrinsicRatio = FloatSize();
-}
-
 void GeneratorGeneratedImage::invalidateCacheTimerFired(DeferrableOneShotTimer<GeneratorGeneratedImage>*)
 {
     m_cachedImageBuffer.clear();
     m_cachedAdjustedSize = IntSize();
+}
+
+void GeneratorGeneratedImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
+    GeneratedImage::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_generator, "generator");
+    info.addMember(m_cachedImageBuffer, "cachedImageBuffer");
+    info.addMember(m_cacheTimer, "cacheTimer");
 }
 
 }

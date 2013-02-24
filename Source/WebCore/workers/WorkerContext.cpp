@@ -76,7 +76,7 @@ public:
 
     virtual void performTask(ScriptExecutionContext *context)
     {
-        ASSERT(context->isWorkerContext());
+        ASSERT_WITH_SECURITY_IMPLICATION(context->isWorkerContext());
         WorkerContext* workerContext = static_cast<WorkerContext*>(context);
         // Notify parent that this context is closed. Parent is responsible for calling WorkerThread::stop().
         workerContext->thread()->workerReportingProxy().workerContextClosed();
@@ -148,9 +148,9 @@ String WorkerContext::userAgent(const KURL&) const
     return m_userAgent;
 }
 
-void WorkerContext::disableEval()
+void WorkerContext::disableEval(const String& errorMessage)
 {
-    m_script->disableEval();
+    m_script->disableEval(errorMessage);
 }
 
 WorkerLocation* WorkerContext::location() const
@@ -184,7 +184,7 @@ bool WorkerContext::hasPendingActivity() const
     ActiveDOMObjectsMap& activeObjects = activeDOMObjects();
     ActiveDOMObjectsMap::const_iterator activeObjectsEnd = activeObjects.end();
     for (ActiveDOMObjectsMap::const_iterator iter = activeObjects.begin(); iter != activeObjectsEnd; ++iter) {
-        if (iter->first->hasPendingActivity())
+        if (iter->key->hasPendingActivity())
             return true;
     }
 
@@ -279,23 +279,34 @@ void WorkerContext::logExceptionToConsole(const String& errorMessage, const Stri
     thread()->workerReportingProxy().postExceptionToWorkerObject(errorMessage, lineNumber, sourceURL);
 }
 
-void WorkerContext::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
+void WorkerContext::addConsoleMessage(MessageSource source, MessageLevel level, const String& message, unsigned long requestIdentifier)
 {
     if (!isContextThread()) {
-        postTask(AddConsoleMessageTask::create(source, type, level, message));
+        postTask(AddConsoleMessageTask::create(source, level, message));
         return;
     }
-    thread()->workerReportingProxy().postConsoleMessageToWorkerObject(source, type, level, message, lineNumber, sourceURL);
-    addMessageToWorkerConsole(source, type, level, message, sourceURL, lineNumber, callStack);
+    thread()->workerReportingProxy().postConsoleMessageToWorkerObject(source, level, message, 0, String());
+
+    addMessageToWorkerConsole(source, level, message, String(), 0, 0, 0, requestIdentifier);
 }
 
-void WorkerContext::addMessageToWorkerConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
+void WorkerContext::addMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack, ScriptState* state, unsigned long requestIdentifier)
+{
+    if (!isContextThread()) {
+        postTask(AddConsoleMessageTask::create(source, level, message));
+        return;
+    }
+    thread()->workerReportingProxy().postConsoleMessageToWorkerObject(source, level, message, lineNumber, sourceURL);
+    addMessageToWorkerConsole(source, level, message, sourceURL, lineNumber, callStack, state, requestIdentifier);
+}
+
+void WorkerContext::addMessageToWorkerConsole(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack, ScriptState* state, unsigned long requestIdentifier)
 {
     ASSERT(isContextThread());
     if (callStack)
-        InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, 0, callStack);
+        InspectorInstrumentation::addMessageToConsole(this, source, LogMessageType, level, message, callStack, requestIdentifier);
     else
-        InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, sourceURL, lineNumber);
+        InspectorInstrumentation::addMessageToConsole(this, source, LogMessageType, level, message, sourceURL, lineNumber, state, requestIdentifier);
 }
 
 bool WorkerContext::isContextThread() const

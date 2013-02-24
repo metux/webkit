@@ -90,7 +90,7 @@ private:
     
     virtual void setResizable(bool) OVERRIDE;
     
-    virtual void addMessageToConsole(WebCore::MessageSource, WebCore::MessageType, WebCore::MessageLevel, const String& message, unsigned int lineNumber, const String& sourceID) OVERRIDE;
+    virtual void addMessageToConsole(WebCore::MessageSource, WebCore::MessageLevel, const String& message, unsigned lineNumber, const String& sourceID) OVERRIDE;
     
     virtual bool canRunBeforeUnloadConfirmPanel() OVERRIDE;
     virtual bool runBeforeUnloadConfirmPanel(const String& message, WebCore::Frame*) OVERRIDE;
@@ -111,7 +111,7 @@ private:
     virtual void invalidateRootView(const WebCore::IntRect&, bool) OVERRIDE;
     virtual void invalidateContentsAndRootView(const WebCore::IntRect&, bool) OVERRIDE;
     virtual void invalidateContentsForSlowScroll(const WebCore::IntRect&, bool) OVERRIDE;
-    virtual void scroll(const WebCore::IntSize& scrollOffset, const WebCore::IntRect& scrollRect, const WebCore::IntRect& clipRect) OVERRIDE;
+    virtual void scroll(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& scrollRect, const WebCore::IntRect& clipRect) OVERRIDE;
 #if USE(TILED_BACKING_STORE)
     virtual void delegatedScrollRequested(const WebCore::IntPoint& scrollOffset) OVERRIDE;
 #endif
@@ -132,14 +132,14 @@ private:
     virtual void print(WebCore::Frame*) OVERRIDE;
     
 #if ENABLE(SQL_DATABASE)
-    virtual void exceededDatabaseQuota(WebCore::Frame*, const String& databaseName) OVERRIDE;
+    virtual void exceededDatabaseQuota(WebCore::Frame*, const String& databaseName, WebCore::DatabaseDetails) OVERRIDE;
 #endif
 
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded) OVERRIDE;
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t spaceNeeded) OVERRIDE;
 
 #if ENABLE(DASHBOARD_SUPPORT)
-    virtual void dashboardRegionsChanged() OVERRIDE;
+    virtual void annotatedRegionsChanged() OVERRIDE;
 #endif
 
     virtual void populateVisitedLinks() OVERRIDE;
@@ -177,9 +177,10 @@ private:
     virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const OVERRIDE;
 
 #if USE(ACCELERATED_COMPOSITING)
+    virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() const OVERRIDE;
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) OVERRIDE;
     virtual void setNeedsOneShotDrawingSynchronization() OVERRIDE;
-    virtual void scheduleCompositingLayerSync() OVERRIDE;
+    virtual void scheduleCompositingLayerFlush() OVERRIDE;
 
     virtual CompositingTriggerFlags allowedCompositingTriggers() const
     {
@@ -192,16 +193,8 @@ private:
     }
 #endif
 
-#if PLATFORM(WIN) && USE(AVFOUNDATION)
-    virtual WebCore::GraphicsDeviceAdapter* graphicsDeviceAdapter() const OVERRIDE;
-#endif
-
 #if ENABLE(TOUCH_EVENTS)
     virtual void needTouchEvents(bool) OVERRIDE;
-#endif
-
-#if PLATFORM(WIN)
-    virtual void setLastSetCursorToCurrentCursor() OVERRIDE;
 #endif
 
 #if ENABLE(FULLSCREEN_API)
@@ -223,6 +216,10 @@ private:
     virtual void numWheelEventHandlersChanged(unsigned) OVERRIDE;
 
     virtual void logDiagnosticMessage(const String& message, const String& description, const String& success) OVERRIDE;
+
+    virtual String plugInStartLabelTitle() const OVERRIDE;
+    virtual String plugInStartLabelSubtitle() const OVERRIDE;
+    virtual String plugInExtraStyleSheet() const OVERRIDE;
 
     String m_cachedToolTip;
     mutable RefPtr<WebFrame> m_cachedFrameSetLargestFrame;

@@ -32,6 +32,7 @@
 #define BindingState_h
 
 #include <runtime/JSObject.h>
+#include <runtime/Operations.h>
 
 namespace WebCore {
 
@@ -43,10 +44,6 @@ typedef JSC::ExecState BindingState;
 
 DOMWindow* activeDOMWindow(BindingState*);
 DOMWindow* firstDOMWindow(BindingState*);
-
-// FIXME: Implement these functions.
-inline Frame* activeFrame(BindingState*) { return 0; }
-inline Frame* firstFrame(BindingState*) { return 0; }
 
 }
 

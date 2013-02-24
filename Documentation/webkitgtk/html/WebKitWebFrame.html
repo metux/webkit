@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="webkitgtk-webkitwebview.html" title="WebKitWebView">
 <link rel="next" href="WebKitWebSettings.html" title="WebKitWebSettings">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -115,7 +115,6 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitWebFrame.html#WebKitWebFrame-hovering-over-link" title='The "hovering-over-link" signal'>hovering-over-link</a>"                             : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebFrame.html#WebKitWebFrame-insecure-content-run" title='The "insecure-content-run" signal'>insecure-content-run</a>"                           : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebFrame.html#WebKitWebFrame-load-committed" title='The "load-committed" signal'>load-committed</a>"                                 : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
-  "<a class="link" href="WebKitWebFrame.html#WebKitWebFrame-load-done" title='The "load-done" signal'>load-done</a>"                                      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebFrame.html#WebKitWebFrame-resource-content-length-received" title='The "resource-content-length-received" signal'>resource-content-length-received</a>"               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebFrame.html#WebKitWebFrame-resource-load-failed" title='The "resource-load-failed" signal'>resource-load-failed</a>"                           : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebFrame.html#WebKitWebFrame-resource-load-finished" title='The "resource-load-finished" signal'>resource-load-finished</a>"                         : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
@@ -144,9 +143,9 @@ be found by using <a class="link" href="WebKitWebFrame.html#webkit-web-frame-fin
         <td class="listing_lines" align="right"><pre>1
 2
 3</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Get the frame from the &lt;a class=&quot;link&quot; href=&quot;webkitgtk-webkitwebview.html#WebKitWebView&quot;&gt;WebKitWebView&lt;/a&gt; */</span>
-WebKitWebFrame <span class="gtkdoc opt">*</span>frame <span class="gtkdoc opt">=</span> <span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-main-frame">webkit_web_view_get_main_frame</a></span> <span class="gtkdoc opt">(</span><span class="function">WEBKIT_WEB_VIEW</span><span class="gtkdoc opt">(</span>my_view<span class="gtkdoc opt">));</span>
-<span class="function"><a href="../glib/glib-Warnings-and-Assertions.html#g-print">g_print</a></span> <span class="gtkdoc opt">(</span><span class="string">&quot;The URI of this frame is '%s'&quot;</span><span class="gtkdoc opt">,</span> <span class="function"><a href="../webkitgtk/WebKitWebFrame.html#webkit-web-frame-get-uri">webkit_web_frame_get_uri</a></span> <span class="gtkdoc opt">(</span>frame<span class="gtkdoc opt">));</span></pre></td>
+        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Get the frame from the &lt;a class=&quot;link&quot; href=&quot;webkitgtk-webkitwebview.html#WebKitWebView&quot;&gt;WebKitWebView&lt;/a&gt; </span><span class="comment">*/</span>
+WebKitWebFrame *frame = webkit_web_view_get_main_frame (WEBKIT_WEB_VIEW(my_view));
+g_print (<span class="number">&quot;The URI of this frame is '</span><span class="symbol">%s</span><span class="number">'&quot;</span>, webkit_web_frame_get_uri (frame));</pre></td>
       </tr>
     </tbody>
   </table>
@@ -991,34 +990,6 @@ Emitted when frame loading is done.
 </div>
 <hr>
 <div class="refsect2">
-<a name="WebKitWebFrame-load-done"></a><h3>The <code class="literal">"load-done"</code> signal</h3>
-<pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> *web_frame,
-                                                        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>        arg1,
-                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
-<div class="warning" style="margin-left: 0.5in; margin-right: 0.5in;">
-<h3 class="title">Warning</h3>
-<p><code class="literal">WebKitWebFrame::load-done</code> is deprecated and should not be used in newly-written code. Use the "load-status" property instead, and/or
-WebKitWebView::load-error to be notified of load errors</p>
-</div>
-<p>
-Emitted when frame loading is done.
-</p>
-<div class="variablelist"><table border="0">
-<col align="left" valign="top">
-<tbody>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
-<td>the object on which the signal is emitted</td>
-</tr>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
-<td>user data set when the signal handler was connected.</td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
 <a name="WebKitWebFrame-resource-content-length-received"></a><h3>The <code class="literal">"resource-content-length-received"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>    *web_frame,
                                                         <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *web_resource,
@@ -1126,7 +1097,7 @@ Emitted when all the data for the resource was loaded.
 Emitted when a request is about to be sent. You can modify the
 request while handling this signal. You can set the URI in the
 <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> object itself, and add/remove/replace
-headers using the <span class="type">SoupMessage</span> object it carries, if it is
+headers using the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> object it carries, if it is
 present. See <a class="link" href="WebKitNetworkRequest.html#webkit-network-request-get-message" title="webkit_network_request_get_message ()"><code class="function">webkit_network_request_get_message()</code></a>. Setting the
 request URI to "about:blank" will effectively cause the request
 to load nothing, and can be used to disable the loading of
@@ -1134,7 +1105,7 @@ specific resources.
 </p>
 <p>
 Notice that information about an eventual redirect is available
-in <em class="parameter"><code>response</code></em>'s <span class="type">SoupMessage</span>, not in the <span class="type">SoupMessage</span> carried by
+in <em class="parameter"><code>response</code></em>'s <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>, not in the <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> carried by
 the <em class="parameter"><code>request</code></em>. If <em class="parameter"><code>response</code></em> is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>, then this is not a
 redirected request.
 </p>
@@ -1284,6 +1255,6 @@ When a <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span c
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

@@ -48,16 +48,16 @@ namespace WebKit {
 
 static NPIdentifier npIdentifierFromIdentifier(PropertyName propertyName)
 {
-    UString name(propertyName.publicName());
+    String name(propertyName.publicName());
     if (name.isNull())
         return 0;
     return static_cast<NPIdentifier>(IdentifierRep::get(name.utf8().data()));
 }
 
-const ClassInfo JSNPObject::s_info = { "NPObject", &JSNonFinalObject::s_info, 0, 0, CREATE_METHOD_TABLE(JSNPObject) };
+const ClassInfo JSNPObject::s_info = { "NPObject", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSNPObject) };
 
 JSNPObject::JSNPObject(JSGlobalObject* globalObject, Structure* structure, NPRuntimeObjectMap* objectMap, NPObject* npObject)
-    : JSNonFinalObject(globalObject->globalData(), structure)
+    : JSDestructibleObject(globalObject->globalData(), structure)
     , m_objectMap(objectMap)
     , m_npObject(npObject)
 {
@@ -77,7 +77,8 @@ void JSNPObject::finishCreation(JSGlobalObject* globalObject)
 
 JSNPObject::~JSNPObject()
 {
-    ASSERT(!m_npObject);
+    if (m_npObject)
+        invalidate();
 }
 
 void JSNPObject::destroy(JSCell* cell)
@@ -268,6 +269,11 @@ bool JSNPObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName 
     
     NPIdentifier npIdentifier = npIdentifierFromIdentifier(propertyName);
 
+    // Calling NPClass::invoke will call into plug-in code, and there's no telling what the plug-in can do.
+    // (including destroying the plug-in). Because of this, we make sure to keep the plug-in alive until 
+    // the call has finished.
+    NPRuntimeObjectMap::PluginProtector protector(thisObject->m_objectMap);
+
     // First, check if the NPObject has a property with this name.
     if (thisObject->m_npObject->_class->hasProperty && thisObject->m_npObject->_class->hasProperty(thisObject->m_npObject, npIdentifier)) {
         slot.setCustom(thisObject, thisObject->propertyGetter);
@@ -293,6 +299,11 @@ bool JSNPObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, Pro
     }
 
     NPIdentifier npIdentifier = npIdentifierFromIdentifier(propertyName);
+
+    // Calling NPClass::invoke will call into plug-in code, and there's no telling what the plug-in can do.
+    // (including destroying the plug-in). Because of this, we make sure to keep the plug-in alive until 
+    // the call has finished.
+    NPRuntimeObjectMap::PluginProtector protector(thisObject->m_objectMap);
 
     // First, check if the NPObject has a property with this name.
     if (thisObject->m_npObject->_class->hasProperty && thisObject->m_npObject->_class->hasProperty(thisObject->m_npObject, npIdentifier)) {
@@ -393,7 +404,7 @@ bool JSNPObject::deleteProperty(ExecState* exec, NPIdentifier propertyName)
     return true;
 }
 
-void JSNPObject::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNameArray, EnumerationMode mode)
+void JSNPObject::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNameArray, EnumerationMode)
 {
     JSNPObject* thisObject = jsCast<JSNPObject*>(object);
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);

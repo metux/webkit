@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,59 +30,65 @@
 
 #include "ImmutableArray.h"
 #include "ImmutableDictionary.h"
-#include "WebDatabaseManagerMessages.h"
 #include "WebContext.h"
+#include "WebDatabaseManagerMessages.h"
+#include "WebDatabaseManagerProxyMessages.h"
 #include "WebSecurityOrigin.h"
 
 using namespace WebCore;
 
 namespace WebKit {
 
+const char* WebDatabaseManagerProxy::supplementName()
+{
+    return "WebDatabaseManagerProxy";
+}
+
 String WebDatabaseManagerProxy::originKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerOriginKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerOriginKey")));
     return key;
 }
 
 String WebDatabaseManagerProxy::originQuotaKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerOriginQuotaKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerOriginQuotaKey")));
     return key;
 }
 
 String WebDatabaseManagerProxy::originUsageKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerOriginUsageKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerOriginUsageKey")));
     return key;
 }
 
 String WebDatabaseManagerProxy::databaseDetailsKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerDatabaseDetailsKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerDatabaseDetailsKey")));
     return key;
 }
 
 String WebDatabaseManagerProxy::databaseDetailsNameKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerDatabaseDetailsNameKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerDatabaseDetailsNameKey")));
     return key;
 }
 
 String WebDatabaseManagerProxy::databaseDetailsDisplayNameKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerDatabaseDetailsDisplayNameKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerDatabaseDetailsDisplayNameKey")));
     return key;
 }
 
 String WebDatabaseManagerProxy::databaseDetailsExpectedUsageKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerDatabaseDetailsExpectedUsageKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerDatabaseDetailsExpectedUsageKey")));
     return key;
 }
 
 String WebDatabaseManagerProxy::databaseDetailsCurrentUsageKey()
 {
-    DEFINE_STATIC_LOCAL(String, key, ("WebDatabaseManagerDatabaseDetailsCurrentUsageKey"));
+    DEFINE_STATIC_LOCAL(String, key, (ASCIILiteral("WebDatabaseManagerDatabaseDetailsCurrentUsageKey")));
     return key;
 }
 
@@ -92,15 +98,28 @@ PassRefPtr<WebDatabaseManagerProxy> WebDatabaseManagerProxy::create(WebContext* 
 }
 
 WebDatabaseManagerProxy::WebDatabaseManagerProxy(WebContext* webContext)
-    : m_webContext(webContext)
+    : WebContextSupplement(webContext)
 {
+    WebContextSupplement::context()->addMessageReceiver(Messages::WebDatabaseManagerProxy::messageReceiverName(), this);
 }
 
 WebDatabaseManagerProxy::~WebDatabaseManagerProxy()
 {
 }
 
-void WebDatabaseManagerProxy::invalidate()
+void WebDatabaseManagerProxy::initializeClient(const WKDatabaseManagerClient* client)
+{
+    m_client.initialize(client);
+}
+
+// WebContextSupplement
+
+void WebDatabaseManagerProxy::contextDestroyed()
+{
+    invalidateCallbackMap(m_arrayCallbacks);
+}
+
+void WebDatabaseManagerProxy::processDidClose(WebProcessProxy*)
 {
     invalidateCallbackMap(m_arrayCallbacks);
 }
@@ -110,9 +129,14 @@ bool WebDatabaseManagerProxy::shouldTerminate(WebProcessProxy*) const
     return m_arrayCallbacks.isEmpty();
 }
 
-void WebDatabaseManagerProxy::initializeClient(const WKDatabaseManagerClient* client)
+void WebDatabaseManagerProxy::refWebContextSupplement()
 {
-    m_client.initialize(client);
+    APIObject::ref();
+}
+
+void WebDatabaseManagerProxy::derefWebContextSupplement()
+{
+    APIObject::deref();
 }
 
 void WebDatabaseManagerProxy::getDatabasesByOrigin(PassRefPtr<ArrayCallback> prpCallback)
@@ -121,8 +145,8 @@ void WebDatabaseManagerProxy::getDatabasesByOrigin(PassRefPtr<ArrayCallback> prp
     uint64_t callbackID = callback->callbackID();
     m_arrayCallbacks.set(callbackID, callback.release());
 
-    // FIXME (Multi-WebProcess): Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::GetDatabasesByOrigin(callbackID));
+    // FIXME (Multi-WebProcess): <rdar://problem/12239765> Databases shouldn't be stored in the web process.
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::GetDatabasesByOrigin(callbackID));
 }
 
 void WebDatabaseManagerProxy::didGetDatabasesByOrigin(const Vector<OriginAndDatabases>& originAndDatabasesVector, uint64_t callbackID)
@@ -174,8 +198,8 @@ void WebDatabaseManagerProxy::getDatabaseOrigins(PassRefPtr<ArrayCallback> prpCa
     uint64_t callbackID = callback->callbackID();
     m_arrayCallbacks.set(callbackID, callback.release());
 
-    // FIXME (Multi-WebProcess): Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::GetDatabaseOrigins(callbackID));
+    // FIXME (Multi-WebProcess): <rdar://problem/12239765> Databases shouldn't be stored in the web process.
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::GetDatabaseOrigins(callbackID));
 }
 
 void WebDatabaseManagerProxy::didGetDatabaseOrigins(const Vector<String>& originIdentifiers, uint64_t callbackID)
@@ -197,26 +221,26 @@ void WebDatabaseManagerProxy::didGetDatabaseOrigins(const Vector<String>& origin
 
 void WebDatabaseManagerProxy::deleteDatabaseWithNameForOrigin(const String& databaseIdentifier, WebSecurityOrigin* origin)
 {
-    // FIXME (Multi-WebProcess): Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteDatabaseWithNameForOrigin(databaseIdentifier, origin->databaseIdentifier()));
+    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteDatabaseWithNameForOrigin(databaseIdentifier, origin->databaseIdentifier()));
 }
 
 void WebDatabaseManagerProxy::deleteDatabasesForOrigin(WebSecurityOrigin* origin)
 {
-    // FIXME (Multi-WebProcess): Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteDatabasesForOrigin(origin->databaseIdentifier()));
+    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteDatabasesForOrigin(origin->databaseIdentifier()));
 }
 
 void WebDatabaseManagerProxy::deleteAllDatabases()
 {
-    // FIXME (Multi-WebProcess): Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteAllDatabases());
+    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteAllDatabases());
 }
 
 void WebDatabaseManagerProxy::setQuotaForOrigin(WebSecurityOrigin* origin, uint64_t quota)
 {
-    // FIXME (Multi-WebProcess): Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::SetQuotaForOrigin(origin->databaseIdentifier(), quota));
+    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::SetQuotaForOrigin(origin->databaseIdentifier(), quota));
 }
 
 void WebDatabaseManagerProxy::didModifyOrigin(const String& originIdentifier)

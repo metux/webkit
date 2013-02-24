@@ -74,12 +74,12 @@ public:
     JSDOMWindowShell* windowShell(DOMWrapperWorld* world)
     {
         ShellMap::iterator iter = m_windowShells.find(world);
-        return (iter != m_windowShells.end()) ? iter->second.get() : initScript(world);
+        return (iter != m_windowShells.end()) ? iter->value.get() : initScript(world);
     }
     JSDOMWindowShell* existingWindowShell(DOMWrapperWorld* world) const
     {
         ShellMap::const_iterator iter = m_windowShells.find(world);
-        return (iter != m_windowShells.end()) ? iter->second.get() : 0;
+        return (iter != m_windowShells.end()) ? iter->value.get() : 0;
     }
     JSDOMWindow* globalObject(DOMWrapperWorld* world)
     {
@@ -105,7 +105,7 @@ public:
     WTF::TextPosition eventHandlerPosition() const;
 
     void enableEval();
-    void disableEval();
+    void disableEval(const String& errorMessage);
 
     static bool processingUserGesture();
 
@@ -150,9 +150,6 @@ public:
 #endif
 
 #if PLATFORM(MAC)
-#if ENABLE(JAVA_BRIDGE)
-    static void initJavaJSBindings();
-#endif
     WebScriptObject* windowScriptObject();
 #endif
 
@@ -162,6 +159,9 @@ public:
     NPObject* createScriptObjectForPluginElement(HTMLPlugInElement*);
     NPObject* windowScriptNPObject();
 #endif
+
+    // FIXME: Stub for parity with V8 implementation. http://webkit.org/b/100815
+    bool shouldBypassMainWorldContentSecurityPolicy() { return false; }
 
 private:
     JSDOMWindowShell* initScript(DOMWrapperWorld* world);

@@ -26,17 +26,20 @@
 #include "config.h"
 #include "ResourceRequestBase.h"
 
-#include "MemoryInstrumentation.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "ResourceRequest.h"
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationVector.h>
 
 using namespace std;
 
 namespace WebCore {
 
-#if !PLATFORM(MAC) || USE(CFNETWORK)
+#if !USE(SOUP) && (!PLATFORM(MAC) || USE(CFNETWORK)) && !PLATFORM(QT)
 double ResourceRequestBase::s_defaultTimeoutInterval = INT_MAX;
 #else
 // Will use NSURLRequest default timeout unless set to a non-zero value with setDefaultTimeoutInterval().
+// For libsoup the timeout enabled with integer milliseconds. We set 0 as the default value to avoid integer overflow.
 double ResourceRequestBase::s_defaultTimeoutInterval = 0;
 #endif
 
@@ -307,12 +310,13 @@ void ResourceRequestBase::setResponseContentDispositionEncodingFallbackArray(con
     updateResourceRequest(); 
     
     m_responseContentDispositionEncodingFallbackArray.clear();
+    m_responseContentDispositionEncodingFallbackArray.reserveInitialCapacity(!encoding1.isNull() + !encoding2.isNull() + !encoding3.isNull());
     if (!encoding1.isNull())
-        m_responseContentDispositionEncodingFallbackArray.append(encoding1);
+        m_responseContentDispositionEncodingFallbackArray.uncheckedAppend(encoding1);
     if (!encoding2.isNull())
-        m_responseContentDispositionEncodingFallbackArray.append(encoding2);
+        m_responseContentDispositionEncodingFallbackArray.uncheckedAppend(encoding2);
     if (!encoding3.isNull())
-        m_responseContentDispositionEncodingFallbackArray.append(encoding3);
+        m_responseContentDispositionEncodingFallbackArray.uncheckedAppend(encoding3);
     
     if (url().protocolIsInHTTPFamily())
         m_platformRequestUpdated = false;
@@ -374,7 +378,7 @@ void ResourceRequestBase::addHTTPHeaderField(const AtomicString& name, const Str
     updateResourceRequest();
     HTTPHeaderMap::AddResult result = m_httpHeaderFields.add(name, value);
     if (!result.isNewEntry)
-        result.iterator->second += "," + value;
+        result.iterator->value = result.iterator->value + ',' + value;
 
     if (url().protocolIsInHTTPFamily())
         m_platformRequestUpdated = false;
@@ -384,7 +388,7 @@ void ResourceRequestBase::addHTTPHeaderFields(const HTTPHeaderMap& headerFields)
 {
     HTTPHeaderMap::const_iterator end = headerFields.end();
     for (HTTPHeaderMap::const_iterator it = headerFields.begin(); it != end; ++it)
-        addHTTPHeaderField(it->first, it->second);
+        addHTTPHeaderField(it->key, it->value);
 }
 
 bool equalIgnoringHeaderFields(const ResourceRequestBase& a, const ResourceRequestBase& b)
@@ -444,16 +448,15 @@ bool ResourceRequestBase::isConditional() const
             m_httpHeaderFields.contains("If-Unmodified-Since"));
 }
 
-void ResourceRequestBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void ResourceRequestBase::reportMemoryUsageBase(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
-    info.addInstrumentedMember(m_url);
-    info.addInstrumentedMember(m_firstPartyForCookies);
-    info.addInstrumentedMember(m_httpMethod);
-    info.addHashMap(m_httpHeaderFields);
-    info.addInstrumentedMapEntries(m_httpHeaderFields);
-    info.addInstrumentedVector(m_responseContentDispositionEncodingFallbackArray);
-    info.addInstrumentedMember(m_httpBody);
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Loader);
+    info.addMember(m_url, "url");
+    info.addMember(m_firstPartyForCookies, "firstPartyForCookies");
+    info.addMember(m_httpMethod, "httpMethod");
+    info.addMember(m_httpHeaderFields, "httpHeaderFields");
+    info.addMember(m_responseContentDispositionEncodingFallbackArray, "responseContentDispositionEncodingFallbackArray");
+    info.addMember(m_httpBody, "httpBody");
 }
 
 double ResourceRequestBase::defaultTimeoutInterval()

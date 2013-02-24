@@ -49,13 +49,13 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderTextControlSingleLine::RenderTextControlSingleLine(Node* node)
-    : RenderTextControl(node)
+RenderTextControlSingleLine::RenderTextControlSingleLine(Element* element)
+    : RenderTextControl(element)
     , m_shouldDrawCapsLockIndicator(false)
     , m_desiredInnerTextHeight(-1)
 {
-    ASSERT(node->isHTMLElement());
-    ASSERT(node->toInputElement());
+    ASSERT(element->isHTMLElement());
+    ASSERT(element->toInputElement());
 }
 
 RenderTextControlSingleLine::~RenderTextControlSingleLine()
@@ -96,6 +96,8 @@ LayoutUnit RenderTextControlSingleLine::computeHeightLimit() const
 
 void RenderTextControlSingleLine::layout()
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
+
     // FIXME: We should remove the height-related hacks in layout() and
     // styleDidChange(). We need them because
     // - Center the inner elements vertically if the input height is taller than
@@ -175,6 +177,7 @@ void RenderTextControlSingleLine::layout()
     if (RenderBox* placeholderBox = placeholderElement ? placeholderElement->renderBox() : 0) {
         placeholderBox->style()->setWidth(Length(innerTextRenderer->width() - placeholderBox->borderAndPaddingWidth(), Fixed));
         placeholderBox->style()->setHeight(Length(innerTextRenderer->height() - placeholderBox->borderAndPaddingHeight(), Fixed));
+        bool neededLayout = placeholderBox->needsLayout();
         bool placeholderBoxHadLayout = placeholderBox->everHadLayout();
         placeholderBox->layoutIfNeeded();
         LayoutPoint textOffset = innerTextRenderer->location();
@@ -189,12 +192,18 @@ void RenderTextControlSingleLine::layout()
             // logic should be shared with RenderBlock::layoutBlockChild.
             placeholderBox->repaint();
         }
+        // The placeholder gets layout last, after the parent text control and its other children,
+        // so in order to get the correct overflow from the placeholder we need to recompute it now.
+        if (neededLayout) {
+            m_overflow.clear();
+            computeOverflow(clientLogicalBottom());
+        }
     }
 }
 
-bool RenderTextControlSingleLine::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
+bool RenderTextControlSingleLine::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
-    if (!RenderTextControl::nodeAtPoint(request, result, pointInContainer, accumulatedOffset, hitTestAction))
+    if (!RenderTextControl::nodeAtPoint(request, result, locationInContainer, accumulatedOffset, hitTestAction))
         return false;
 
     // Say that we hit the inner text element if
@@ -203,7 +212,7 @@ bool RenderTextControlSingleLine::nodeAtPoint(const HitTestRequest& request, Hit
     //  - we hit regions not in any decoration buttons.
     HTMLElement* container = containerElement();
     if (result.innerNode()->isDescendantOf(innerTextElement()) || result.innerNode() == node() || (container && container == result.innerNode())) {
-        LayoutPoint pointInParent = pointInContainer.point();
+        LayoutPoint pointInParent = locationInContainer.point();
         if (container && innerBlockElement()) {
             if (innerBlockElement()->renderBox())
                 pointInParent -= toLayoutSize(innerBlockElement()->renderBox()->location());
@@ -281,7 +290,7 @@ float RenderTextControlSingleLine::getAvgCharWidth(AtomicString family)
     // of MS Shell Dlg, the default font for textareas in Firefox, Safari Win and
     // IE for some encodings (in IE, the default font is encoding specific).
     // 901 is the avgCharWidth value in the OS/2 table for MS Shell Dlg.
-    if (family == AtomicString("Lucida Grande"))
+    if (family == "Lucida Grande")
         return scaleEmToUnits(901);
 
     return RenderTextControl::getAvgCharWidth(family);
@@ -302,7 +311,7 @@ LayoutUnit RenderTextControlSingleLine::preferredContentWidth(float charWidth) c
     // of MS Shell Dlg, the default font for textareas in Firefox, Safari Win and
     // IE for some encodings (in IE, the default font is encoding specific).
     // 4027 is the (xMax - xMin) value in the "head" font table for MS Shell Dlg.
-    if (family == AtomicString("Lucida Grande"))
+    if (family == "Lucida Grande")
         maxCharWidth = scaleEmToUnits(4027);
     else if (hasValidAvgCharWidth(family))
         maxCharWidth = roundf(style()->font().primaryFont()->maxCharWidth());
@@ -342,7 +351,7 @@ PassRefPtr<RenderStyle> RenderTextControlSingleLine::createInnerTextStyle(const 
     adjustInnerTextStyle(startStyle, textBlockStyle.get());
 
     textBlockStyle->setWhiteSpace(PRE);
-    textBlockStyle->setWordWrap(NormalWordWrap);
+    textBlockStyle->setOverflowWrap(NormalOverflowWrap);
     textBlockStyle->setOverflowX(OHIDDEN);
     textBlockStyle->setOverflowY(OHIDDEN);
     textBlockStyle->setTextOverflow(textShouldBeTruncated() ? TextOverflowEllipsis : TextOverflowClip);
@@ -379,11 +388,11 @@ bool RenderTextControlSingleLine::textShouldBeTruncated() const
         && style()->textOverflow() == TextOverflowEllipsis;
 }
 
-void RenderTextControlSingleLine::autoscroll()
+void RenderTextControlSingleLine::autoscroll(const IntPoint& position)
 {
     RenderLayer* layer = innerTextElement()->renderBox()->layer();
     if (layer)
-        layer->autoscroll();
+        layer->autoscroll(position);
 }
 
 int RenderTextControlSingleLine::scrollWidth() const

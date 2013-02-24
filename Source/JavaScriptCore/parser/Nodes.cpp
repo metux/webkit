@@ -33,7 +33,7 @@
 #include "JIT.h"
 #include "JSFunction.h"
 #include "JSGlobalObject.h"
-#include "JSStaticScopeObject.h"
+#include "JSNameScope.h"
 #include "LabelScope.h"
 #include "Lexer.h"
 #include "Operations.h"
@@ -151,10 +151,29 @@ PassRefPtr<EvalNode> EvalNode::create(JSGlobalData* globalData, const JSTokenLoc
 
 // ------------------------------ FunctionBodyNode -----------------------------
 
-FunctionParameters::FunctionParameters(ParameterNode* firstParameter)
+PassRefPtr<FunctionParameters> FunctionParameters::create(ParameterNode* firstParameter)
 {
+    unsigned parameterCount = 0;
     for (ParameterNode* parameter = firstParameter; parameter; parameter = parameter->nextParam())
-        append(parameter->ident());
+        ++parameterCount;
+
+    size_t objectSize = sizeof(FunctionParameters) - sizeof(void*) + sizeof(StringImpl*) * parameterCount;
+    void* slot = fastMalloc(objectSize);
+    return adoptRef(new (slot) FunctionParameters(firstParameter, parameterCount));
+}
+
+FunctionParameters::FunctionParameters(ParameterNode* firstParameter, unsigned size)
+    : m_size(size)
+{
+    unsigned i = 0;
+    for (ParameterNode* parameter = firstParameter; parameter; parameter = parameter->nextParam())
+        new (&identifiers()[i++]) Identifier(parameter->ident());
+}
+
+FunctionParameters::~FunctionParameters()
+{
+    for (unsigned i = 0; i < m_size; ++i)
+        identifiers()[i].~Identifier();
 }
 
 inline FunctionBodyNode::FunctionBodyNode(JSGlobalData* globalData, const JSTokenLocation& location, bool inStrictContext)
@@ -167,17 +186,18 @@ inline FunctionBodyNode::FunctionBodyNode(JSGlobalData* globalData, const JSToke
 {
 }
 
-void FunctionBodyNode::finishParsing(const SourceCode& source, ParameterNode* firstParameter, const Identifier& ident)
+void FunctionBodyNode::finishParsing(const SourceCode& source, ParameterNode* firstParameter, const Identifier& ident, FunctionNameIsInScopeToggle functionNameIsInScopeToggle)
 {
     setSource(source);
-    finishParsing(FunctionParameters::create(firstParameter), ident);
+    finishParsing(FunctionParameters::create(firstParameter), ident, functionNameIsInScopeToggle);
 }
 
-void FunctionBodyNode::finishParsing(PassRefPtr<FunctionParameters> parameters, const Identifier& ident)
+void FunctionBodyNode::finishParsing(PassRefPtr<FunctionParameters> parameters, const Identifier& ident, FunctionNameIsInScopeToggle functionNameIsInScopeToggle)
 {
     ASSERT(!source().isNull());
     m_parameters = parameters;
     m_ident = ident;
+    m_functionNameIsInScopeToggle = functionNameIsInScopeToggle;
 }
 
 FunctionBodyNode* FunctionBodyNode::create(JSGlobalData* globalData, const JSTokenLocation& location, bool inStrictContext)

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,8 +28,9 @@
 #define Internals_h
 
 #include "ContextDestructionObserver.h"
+#include "ExceptionCodePlaceholder.h"
 #include "NodeList.h"
-#include "PlatformString.h"
+#include <wtf/ArrayBuffer.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
@@ -38,18 +40,23 @@ namespace WebCore {
 class ClientRect;
 class ClientRectList;
 class DOMStringList;
+class DOMWindow;
 class Document;
 class DocumentMarker;
 class Element;
 class Frame;
+class InspectorFrontendChannelDummy;
 class InternalSettings;
 class Node;
+class Page;
 class PagePopupController;
 class Range;
 class ScriptExecutionContext;
 class ShadowRoot;
 class WebKitPoint;
 class MallocStatistics;
+class SerializedScriptValue;
+class TypeConversions;
 
 typedef int ExceptionCode;
 
@@ -59,11 +66,14 @@ public:
     static PassRefPtr<Internals> create(Document*);
     virtual ~Internals();
 
+    static void resetToConsistentState(Page*);
+
     String elementRenderTreeAsText(Element*, ExceptionCode&);
 
     String address(Node*);
 
-    bool isPreloaded(Document*, const String& url);
+    bool isPreloaded(const String& url);
+    bool isLoadingFromMemoryCache(const String& url);
 
     size_t numberOfScopedHTMLStyleChildren(const Node*, ExceptionCode&) const;
 
@@ -73,20 +83,39 @@ public:
     typedef Node ShadowRootIfShadowDOMEnabledOrNode;
 #endif
     ShadowRootIfShadowDOMEnabledOrNode* ensureShadowRoot(Element* host, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* createShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* shadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* youngestShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* oldestShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* youngerShadowRoot(Node* shadow, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* olderShadowRoot(Node* shadow, ExceptionCode&);
+    String shadowRootType(const Node*, ExceptionCode&) const;
+    bool hasShadowInsertionPoint(const Node*, ExceptionCode&) const;
+    bool hasContentElement(const Node*, ExceptionCode&) const;
+    size_t countElementShadow(const Node*, ExceptionCode&) const;
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
     void setShadowPseudoId(Element*, const String&, ExceptionCode&);
 
-    PassRefPtr<Element> createContentElement(Document*, ExceptionCode&);
-    Element* getElementByIdInShadowRoot(Node* shadowRoot, const String& id, ExceptionCode&);
+    // CSS Animation testing.
+    unsigned numberOfActiveAnimations() const;
+    void suspendAnimations(Document*, ExceptionCode&) const;
+    void resumeAnimations(Document*, ExceptionCode&) const;
+    bool pauseAnimationAtTimeOnElement(const String& animationName, double pauseTime, Element*, ExceptionCode&);
+    bool pauseAnimationAtTimeOnPseudoElement(const String& animationName, double pauseTime, Element*, const String& pseudoId, ExceptionCode&);
+
+    // CSS Transition testing.
+    bool pauseTransitionAtTimeOnElement(const String& propertyName, double pauseTime, Element*, ExceptionCode&);
+    bool pauseTransitionAtTimeOnPseudoElement(const String& property, double pauseTime, Element*, const String& pseudoId, ExceptionCode&);
+
+    PassRefPtr<Element> createContentElement(ExceptionCode&);
     bool isValidContentSelect(Element* insertionPoint, ExceptionCode&);
     Node* treeScopeRootNode(Node*, ExceptionCode&);
     Node* parentTreeScope(Node*, ExceptionCode&);
+    bool hasSelectorForIdInShadow(Element* host, const String& idValue, ExceptionCode&);
+    bool hasSelectorForClassInShadow(Element* host, const String& className, ExceptionCode&);
+    bool hasSelectorForAttributeInShadow(Element* host, const String& attributeName, ExceptionCode&);
+    bool hasSelectorForPseudoClassInShadow(Element* host, const String& pseudoClass, ExceptionCode&);
 
     bool attached(Node*, ExceptionCode&);
 
@@ -101,13 +130,14 @@ public:
 #if ENABLE(INPUT_TYPE_COLOR)
     void selectColorInColorChooser(Element*, const String& colorValue);
 #endif
-    PassRefPtr<DOMStringList> formControlStateOfPreviousHistoryItem(ExceptionCode&);
-    void setFormControlStateOfPreviousHistoryItem(PassRefPtr<DOMStringList>, ExceptionCode&);
+    Vector<String> formControlStateOfPreviousHistoryItem(ExceptionCode&);
+    void setFormControlStateOfPreviousHistoryItem(const Vector<String>&, ExceptionCode&);
+    void setEnableMockPagePopup(bool, ExceptionCode&);
 #if ENABLE(PAGE_POPUP)
     PassRefPtr<PagePopupController> pagePopupController();
 #endif
 
-    PassRefPtr<ClientRect> absoluteCaretBounds(Document*, ExceptionCode&);
+    PassRefPtr<ClientRect> absoluteCaretBounds(ExceptionCode&);
 
     PassRefPtr<ClientRect> boundingBox(Element*, ExceptionCode&);
 
@@ -153,11 +183,11 @@ public:
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
 
-    void setShouldDisplayTrackKind(Document*, const String& kind, bool, ExceptionCode&);
-    bool shouldDisplayTrackKind(Document*, const String& kind, ExceptionCode&);
-
     unsigned wheelEventHandlerCount(Document*, ExceptionCode&);
     unsigned touchEventHandlerCount(Document*, ExceptionCode&);
+#if ENABLE(TOUCH_EVENT_TRACKING)
+    PassRefPtr<ClientRectList> touchEventTargetClientRects(Document*, ExceptionCode&);
+#endif
 
     PassRefPtr<NodeList> nodesFromRect(Document*, int x, int y, unsigned topPadding, unsigned rightPadding,
         unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, ExceptionCode&) const;
@@ -176,28 +206,55 @@ public:
     static const char* internalsId;
 
     InternalSettings* settings() const;
+    unsigned workerThreadCount() const;
 
     void setBatteryStatus(Document*, const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode&);
 
     void setNetworkInformation(Document*, const String& eventType, double bandwidth, bool metered, ExceptionCode&);
 
-    void suspendAnimations(Document*, ExceptionCode&) const;
-    void resumeAnimations(Document*, ExceptionCode&) const;
+    void setDeviceProximity(Document*, const String& eventType, double value, double min, double max, ExceptionCode&);
+
+    enum {
+        // Values need to be kept in sync with Internals.idl.
+        LAYER_TREE_INCLUDES_VISIBLE_RECTS = 1,
+        LAYER_TREE_INCLUDES_TILE_CACHES = 2,
+        LAYER_TREE_INCLUDES_REPAINT_RECTS = 4
+        
+    };
+    String layerTreeAsText(Document*, unsigned flags, ExceptionCode&) const;
+    String layerTreeAsText(Document*, ExceptionCode&) const;
+    String repaintRectsAsText(Document*, ExceptionCode&) const;
+    String scrollingStateTreeAsText(Document*, ExceptionCode&) const;
+    String mainThreadScrollingReasons(Document*, ExceptionCode&) const;
+    PassRefPtr<ClientRectList> nonFastScrollableRects(Document*, ExceptionCode&) const;
 
     void garbageCollectDocumentResources(Document*, ExceptionCode&) const;
 
     void allowRoundingHacks() const;
 
+    void insertAuthorCSS(Document*, const String&) const;
+    void insertUserCSS(Document*, const String&) const;
+
 #if ENABLE(INSPECTOR)
     unsigned numberOfLiveNodes() const;
     unsigned numberOfLiveDocuments() const;
     Vector<String> consoleMessageArgumentCounts(Document*) const;
+    PassRefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
+    void closeDummyInspectorFrontend();
+    void setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
+    void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
 #endif
 
     String counterValue(Element*);
 
     int pageNumber(Element*, float pageWidth = 800, float pageHeight = 600);
-    PassRefPtr<DOMStringList> iconURLs(Document*) const;
+    Vector<String> iconURLs(Document*) const;
+
+    int numberOfPages(float pageWidthInPixels = 800, float pageHeightInPixels = 600);
+    String pageProperty(String, int, ExceptionCode& = ASSERT_NO_EXCEPTION) const;
+    String pageSizeAndMarginsInPixels(int, int, int, int, int, int, int, ExceptionCode& = ASSERT_NO_EXCEPTION) const;
+
+    void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
 
 #if ENABLE(FULLSCREEN_API)
     void webkitWillEnterFullScreenForElement(Document*, Element*);
@@ -210,15 +267,38 @@ public:
     void removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(const String& scheme);
 
     PassRefPtr<MallocStatistics> mallocStatistics() const;
+    PassRefPtr<TypeConversions> typeConversions() const;
 
-    PassRefPtr<DOMStringList> getReferencedFilePaths() const;
+    Vector<String> getReferencedFilePaths() const;
 
+    void startTrackingRepaints(Document*, ExceptionCode&);
+    void stopTrackingRepaints(Document*, ExceptionCode&);
+
+    PassRefPtr<ArrayBuffer> serializeObject(PassRefPtr<SerializedScriptValue>) const;
+    PassRefPtr<SerializedScriptValue> deserializeBuffer(PassRefPtr<ArrayBuffer>) const;
+
+    void setUsesOverlayScrollbars(bool enabled);
+
+    String getCurrentCursorInfo(Document*, ExceptionCode&);
+
+#if ENABLE(ENCRYPTED_MEDIA_V2)
+    void initializeMockCDM();
+#endif
+
+#if ENABLE(SPEECH_SYNTHESIS)
+    void enableMockSpeechSynthesizer();
+#endif
+                    
 private:
     explicit Internals(Document*);
     Document* contextDocument() const;
     Frame* frame() const;
 
     DocumentMarker* markerAt(Node*, const String& markerType, unsigned index, ExceptionCode&);
+#if ENABLE(INSPECTOR)
+    RefPtr<DOMWindow> m_frontendWindow;
+    OwnPtr<InspectorFrontendChannelDummy> m_frontendChannel;
+#endif
 };
 
 } // namespace WebCore

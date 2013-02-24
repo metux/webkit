@@ -128,7 +128,17 @@ namespace WTF {
             return segmentFor(index)->at(subscriptFor(index));
         }
 
+        const T& at(size_t index) const
+        {
+            return const_cast<SegmentedVector<T, SegmentSize, InlineCapacity>*>(this)->at(index);
+        }
+
         T& operator[](size_t index)
+        {
+            return at(index);
+        }
+
+        const T& operator[](size_t index) const
         {
             return at(index);
         }
@@ -245,7 +255,7 @@ namespace WTF {
 
         void ensureSegment(size_t segmentIndex, size_t size)
         {
-            ASSERT(segmentIndex <= m_segments.size());
+            ASSERT_WITH_SECURITY_IMPLICATION(segmentIndex <= m_segments.size());
             if (segmentIndex == m_segments.size())
                 m_segments.append(new Segment);
             m_segments[segmentIndex]->grow(size);

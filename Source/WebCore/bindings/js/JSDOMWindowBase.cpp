@@ -38,6 +38,7 @@
 #include "Settings.h"
 #include "WebCoreJSClientData.h"
 #include <wtf/MainThread.h>
+#include <wtf/UnusedParam.h>
 
 using namespace JSC;
 
@@ -97,6 +98,7 @@ void JSDOMWindowBase::printErrorMessage(const String& message) const
 bool JSDOMWindowBase::supportsProfiling(const JSGlobalObject* object)
 {
 #if !ENABLE(JAVASCRIPT_DEBUGGER) || !ENABLE(INSPECTOR)
+    UNUSED_PARAM(object);
     return false;
 #else
     const JSDOMWindowBase* thisObject = static_cast<const JSDOMWindowBase*>(object);
@@ -115,6 +117,7 @@ bool JSDOMWindowBase::supportsProfiling(const JSGlobalObject* object)
 bool JSDOMWindowBase::supportsRichSourceInfo(const JSGlobalObject* object)
 {
 #if !ENABLE(JAVASCRIPT_DEBUGGER) || !ENABLE(INSPECTOR)
+    UNUSED_PARAM(object);
     return false;
 #else
     const JSDOMWindowBase* thisObject = static_cast<const JSDOMWindowBase*>(object);
@@ -169,11 +172,6 @@ void JSDOMWindowBase::willRemoveFromWindowShell()
     setCurrentEvent(0);
 }
 
-JSObject* JSDOMWindowBase::toThisObject(JSCell* cell, ExecState*)
-{
-    return jsCast<JSDOMWindowBase*>(cell)->shell();
-}
-
 JSDOMWindowShell* JSDOMWindowBase::shell() const
 {
     return m_shell;
@@ -186,7 +184,7 @@ JSGlobalData* JSDOMWindowBase::commonJSGlobalData()
     static JSGlobalData* globalData = 0;
     if (!globalData) {
         ScriptController::initializeThreading();
-        globalData = JSGlobalData::createLeaked(ThreadStackTypeLarge, LargeHeap).leakRef();
+        globalData = JSGlobalData::createLeaked(LargeHeap).leakRef();
         globalData->timeoutChecker.setTimeoutInterval(10000); // 10 seconds
 #ifndef NDEBUG
         globalData->exclusiveThread = currentThread();

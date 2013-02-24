@@ -26,6 +26,7 @@
 #include "JSFunction.h"
 #include "JSString.h"
 #include "ObjectPrototype.h"
+#include "Operations.h"
 
 namespace JSC {
 
@@ -47,7 +48,6 @@ const ClassInfo BooleanPrototype::s_info = { "Boolean", &BooleanObject::s_info, 
 @end
 */
 
-ASSERT_CLASS_FITS_IN_CELL(BooleanPrototype);
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(BooleanPrototype);
 
 BooleanPrototype::BooleanPrototype(ExecState* exec, Structure* structure)
@@ -77,21 +77,22 @@ bool BooleanPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exe
 
 EncodedJSValue JSC_HOST_CALL booleanProtoFuncToString(ExecState* exec)
 {
+    JSGlobalData* globalData = &exec->globalData();
     JSValue thisValue = exec->hostThisValue();
     if (thisValue == jsBoolean(false))
-        return JSValue::encode(jsNontrivialString(exec, "false"));
+        return JSValue::encode(globalData->smallStrings.falseString());
 
     if (thisValue == jsBoolean(true))
-        return JSValue::encode(jsNontrivialString(exec, "true"));
+        return JSValue::encode(globalData->smallStrings.trueString());
 
     if (!thisValue.inherits(&BooleanObject::s_info))
         return throwVMTypeError(exec);
 
     if (asBooleanObject(thisValue)->internalValue() == jsBoolean(false))
-        return JSValue::encode(jsNontrivialString(exec, "false"));
+        return JSValue::encode(globalData->smallStrings.falseString());
 
     ASSERT(asBooleanObject(thisValue)->internalValue() == jsBoolean(true));
-    return JSValue::encode(jsNontrivialString(exec, "true"));
+    return JSValue::encode(globalData->smallStrings.trueString());
 }
 
 EncodedJSValue JSC_HOST_CALL booleanProtoFuncValueOf(ExecState* exec)

@@ -28,8 +28,11 @@
 #if PLATFORM(QT)
 #include "ImageDecoderQt.h"
 #endif
+#if !PLATFORM(QT) || USE(LIBJPEG)
 #include "JPEGImageDecoder.h"
+#endif
 #include "PNGImageDecoder.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "SharedBuffer.h"
 #if USE(WEBP)
 #include "WEBPImageDecoder.h"
@@ -37,6 +40,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <wtf/MemoryInstrumentationVector.h>
 
 using namespace std;
 
@@ -224,14 +228,10 @@ void ImageFrame::setStatus(FrameStatus status)
     m_status = status;
 }
 
-int ImageFrame::width() const
+void ImageFrame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    return m_size.width();
-}
-
-int ImageFrame::height() const
-{
-    return m_size.height();
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
+    info.addMember(m_backingStore, "backingStore");
 }
 
 #endif
@@ -286,6 +286,14 @@ bool ImageDecoder::frameHasAlphaAtIndex(size_t index) const
     return true;
 }
 
+unsigned ImageDecoder::frameBytesAtIndex(size_t index) const
+{
+    if (m_frameBufferCache.size() <= index)
+        return 0;
+    // FIXME: Use the dimension of the requested frame.
+    return m_size.area() * sizeof(ImageFrame::PixelData);
+}
+
 void ImageDecoder::prepareScaleDataIfNecessary()
 {
     m_scaled = false;
@@ -327,6 +335,16 @@ int ImageDecoder::lowerBoundScaledY(int origY, int searchStart)
 int ImageDecoder::scaledY(int origY, int searchStart)
 {
     return getScaledValue<Exact>(m_scaledRows, origY, searchStart);
+}
+
+void ImageDecoder::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
+    info.addMember(m_data, "data");
+    info.addMember(m_frameBufferCache, "frameBufferCache");
+    info.addMember(m_colorProfile, "colorProfile");
+    info.addMember(m_scaledColumns, "scaledColumns");
+    info.addMember(m_scaledRows, "scaledRows");
 }
 
 }

@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
@@ -30,7 +31,10 @@
 #include "ContentDistributor.h"
 #include "Element.h"
 #include "ElementShadow.h"
+#include "HTMLContentElement.h"
+#include "HTMLShadowElement.h"
 #include "InsertionPoint.h"
+#include "PseudoElement.h"
 
 namespace WebCore {
 
@@ -41,31 +45,20 @@ static inline ElementShadow* shadowFor(const Node* node)
     return 0;
 }
 
-static inline ElementShadow* shadowOfParent(const Node* node)
+static inline bool nodeCanBeDistributed(const Node* node)
 {
-    if (!node)
-        return 0;
-    if (Node* parent = node->parentNode())
-        if (parent->isElementNode())
-            return toElement(parent)->shadow();
-    return 0;
-}
+    ASSERT(node);
+    Node* parent = parentNodeForDistribution(node);
+    if (!parent)
+        return false;
 
-inline void ComposedShadowTreeWalker::ParentTraversalDetails::didTraverseInsertionPoint(InsertionPoint* insertionPoint)
-{
-    if (!m_insertionPoint)
-        m_insertionPoint = insertionPoint;
-}
+    if (ShadowRoot* shadowRoot = parent->isShadowRoot() ? toShadowRoot(parent) : 0)
+        return ScopeContentDistribution::assignedTo(shadowRoot);
 
-inline void ComposedShadowTreeWalker::ParentTraversalDetails::didTraverseShadowRoot(const ShadowRoot* root)
-{
-    m_resetStyleInheritance  = m_resetStyleInheritance || root->resetStyleInheritance();
-}
+    if (parent->isElementNode() && toElement(parent)->shadow())
+        return true;
 
-inline void ComposedShadowTreeWalker::ParentTraversalDetails::didFindNode(ContainerNode* node)
-{
-    if (!m_outOfComposition)
-        m_node = node;
+    return false;
 }
 
 ComposedShadowTreeWalker ComposedShadowTreeWalker::fromFirstChild(const Node* node, Policy policy)
@@ -73,14 +66,6 @@ ComposedShadowTreeWalker ComposedShadowTreeWalker::fromFirstChild(const Node* no
     ComposedShadowTreeWalker walker(node, policy);
     walker.firstChild();
     return walker;
-}
-
-void ComposedShadowTreeWalker::findParent(const Node* node, ParentTraversalDetails* details)
-{
-    ComposedShadowTreeWalker walker(node, CrossUpperBoundary, CanStartFromShadowBoundary);
-    ContainerNode* found = toContainerNode(walker.traverseParent(walker.get(), details));
-    if (found)
-        details->didFindNode(found);
 }
 
 void ComposedShadowTreeWalker::firstChild()
@@ -140,11 +125,9 @@ Node* ComposedShadowTreeWalker::traverseSiblings(const Node* node, TraversalDire
 Node* ComposedShadowTreeWalker::traverseNode(const Node* node, TraversalDirection direction)
 {
     ASSERT(node);
-    if (!isInsertionPoint(node))
+    if (!isActiveInsertionPoint(node))
         return const_cast<Node*>(node);
     const InsertionPoint* insertionPoint = toInsertionPoint(node);
-    if (!insertionPoint->isActive())
-        return const_cast<Node*>(node);
     if (Node* found = traverseDistributedNodes(direction == TraversalDirectionForward ? insertionPoint->first() : insertionPoint->last(), insertionPoint, direction))
         return found;
     return traverseLightChildren(node, direction);
@@ -176,10 +159,11 @@ Node* ComposedShadowTreeWalker::traverseDistributedNodes(const Node* node, const
 Node* ComposedShadowTreeWalker::traverseSiblingOrBackToInsertionPoint(const Node* node, TraversalDirection direction)
 {
     ASSERT(node);
-    ElementShadow* shadow = shadowOfParent(node);
-    if (!shadow)
+
+    if (!nodeCanBeDistributed(node))
         return traverseSiblingInCurrentTree(node, direction);
-    InsertionPoint* insertionPoint = shadow->insertionPointFor(node);
+
+    InsertionPoint* insertionPoint = resolveReprojection(node);
     if (!insertionPoint)
         return traverseSiblingInCurrentTree(node, direction);
 
@@ -204,7 +188,7 @@ Node* ComposedShadowTreeWalker::traverseBackToYoungerShadowRoot(const Node* node
     if (node->parentNode() && node->parentNode()->isShadowRoot()) {
         ShadowRoot* parentShadowRoot = toShadowRoot(node->parentNode());
         if (!parentShadowRoot->isYoungest()) {
-            InsertionPoint* assignedInsertionPoint = parentShadowRoot->assignedTo();
+            InsertionPoint* assignedInsertionPoint = ScopeContentDistribution::assignedTo(parentShadowRoot);
             ASSERT(assignedInsertionPoint);
             return traverseSiblingInCurrentTree(assignedInsertionPoint, direction);
         }
@@ -223,7 +207,7 @@ inline Node* ComposedShadowTreeWalker::escapeFallbackContentElement(const Node* 
 inline Node* ComposedShadowTreeWalker::traverseNodeEscapingFallbackContents(const Node* node, ParentTraversalDetails* details) const
 {
     ASSERT(node);
-    if (!isInsertionPoint(node))
+    if (!node->isInsertionPoint())
         return const_cast<Node*>(node);
     const InsertionPoint* insertionPoint = toInsertionPoint(node);
     return insertionPoint->hasDistribution() ? 0 :
@@ -241,13 +225,16 @@ void ComposedShadowTreeWalker::parent()
 // https://bugs.webkit.org/show_bug.cgi?id=90415
 Node* ComposedShadowTreeWalker::traverseParent(const Node* node, ParentTraversalDetails* details) const
 {
+    if (node->isPseudoElement())
+        return node->parentOrShadowHostNode();
+
     if (!canCrossUpperBoundary() && node->isShadowRoot()) {
         ASSERT(toShadowRoot(node)->isYoungest());
         return 0;
     }
-    if (ElementShadow* shadow = shadowOfParent(node)) {
-        shadow->ensureDistribution();
-        if (InsertionPoint* insertionPoint = shadow->insertionPointFor(node)) {
+
+    if (nodeCanBeDistributed(node)) {
+        if (InsertionPoint* insertionPoint = resolveReprojection(node)) {
             if (details)
                 details->didTraverseInsertionPoint(insertionPoint);
             return traverseParent(insertionPoint, details);
@@ -270,6 +257,8 @@ inline Node* ComposedShadowTreeWalker::traverseParentInCurrentTree(const Node* n
 Node* ComposedShadowTreeWalker::traverseParentBackToYoungerShadowRootOrHost(const ShadowRoot* shadowRoot, ParentTraversalDetails* details) const
 {
     ASSERT(shadowRoot);
+    ASSERT(!ScopeContentDistribution::assignedTo(shadowRoot));
+
     if (shadowRoot->isYoungest()) {
         if (canCrossUpperBoundary()) {
             if (details)
@@ -278,12 +267,6 @@ Node* ComposedShadowTreeWalker::traverseParentBackToYoungerShadowRootOrHost(cons
         }
 
         return const_cast<ShadowRoot*>(shadowRoot);
-    }
-
-    if (InsertionPoint* assignedInsertionPoint = shadowRoot->assignedTo()) {
-        if (details)
-            details->didTraverseShadowRoot(shadowRoot);
-        return traverseParent(assignedInsertionPoint, details);
     }
 
     return 0;
@@ -327,31 +310,6 @@ void ComposedShadowTreeWalker::previous()
     } else
         parent();
     assertPostcondition();
-}
-
-ComposedShadowTreeParentWalker::ComposedShadowTreeParentWalker(const Node* node)
-    : m_node(node)
-{
-}
-
-void ComposedShadowTreeParentWalker::parentIncludingInsertionPointAndShadowRoot()
-{
-    ASSERT(m_node);
-    m_node = traverseParentIncludingInsertionPointAndShadowRoot(m_node);
-}
-
-Node* ComposedShadowTreeParentWalker::traverseParentIncludingInsertionPointAndShadowRoot(const Node* node) const
-{
-    if (ElementShadow* shadow = shadowOfParent(node)) {
-        if (InsertionPoint* insertionPoint = shadow->insertionPointFor(node))
-            return insertionPoint;
-    }
-    if (!node->isShadowRoot())
-        return node->parentNode();
-    const ShadowRoot* shadowRoot = toShadowRoot(node);
-    if (InsertionPoint* insertionPoint = shadowRoot->assignedTo())
-        return insertionPoint;
-    return shadowRoot->host();
 }
 
 } // namespace

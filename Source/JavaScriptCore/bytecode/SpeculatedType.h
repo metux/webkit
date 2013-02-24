@@ -29,7 +29,7 @@
 #ifndef SpeculatedType_h
 #define SpeculatedType_h
 
-#include "JSValue.h"
+#include "JSCJSValue.h"
 
 namespace JSC {
 
@@ -53,7 +53,7 @@ static const SpeculatedType SpecMyArguments       = 0x00002000; // It's definite
 static const SpeculatedType SpecForeignArguments  = 0x00004000; // It's definitely an Arguments object, and it's definitely not mine.
 static const SpeculatedType SpecArguments         = 0x00006000; // It's definitely an Arguments object.
 static const SpeculatedType SpecObjectOther       = 0x00008000; // It's definitely an object but not JSFinalObject, JSArray, or JSFunction.
-static const SpeculatedType SpecObjectMask        = 0x0000ffff; // Bitmask used for testing for any kind of object prediction.
+static const SpeculatedType SpecObject            = 0x0000ffff; // Bitmask used for testing for any kind of object prediction.
 static const SpeculatedType SpecString            = 0x00010000; // It's definitely a JSString.
 static const SpeculatedType SpecCellOther         = 0x00020000; // It's definitely a JSCell but not a subclass of JSObject and definitely not a JSString.
 static const SpeculatedType SpecCell              = 0x0003ffff; // It's definitely a JSCell.
@@ -61,6 +61,7 @@ static const SpeculatedType SpecInt32             = 0x00800000; // It's definite
 static const SpeculatedType SpecDoubleReal        = 0x01000000; // It's definitely a non-NaN double.
 static const SpeculatedType SpecDoubleNaN         = 0x02000000; // It's definitely a NaN.
 static const SpeculatedType SpecDouble            = 0x03000000; // It's either a non-NaN or a NaN double.
+static const SpeculatedType SpecRealNumber        = 0x01800000; // It's either an Int32 or a DoubleReal.
 static const SpeculatedType SpecNumber            = 0x03800000; // It's either an Int32 or a Double.
 static const SpeculatedType SpecBoolean           = 0x04000000; // It's definitely a Boolean.
 static const SpeculatedType SpecOther             = 0x08000000; // It's definitely none of the above.
@@ -84,7 +85,12 @@ inline bool isCellSpeculation(SpeculatedType value)
 
 inline bool isObjectSpeculation(SpeculatedType value)
 {
-    return !!(value & SpecObjectMask) && !(value & ~SpecObjectMask);
+    return !!(value & SpecObject) && !(value & ~SpecObject);
+}
+
+inline bool isObjectOrOtherSpeculation(SpeculatedType value)
+{
+    return !!(value & (SpecObject | SpecOther)) && !(value & ~(SpecObject | SpecOther));
 }
 
 inline bool isFinalObjectSpeculation(SpeculatedType value)
@@ -218,6 +224,16 @@ inline bool isInt32Speculation(SpeculatedType value)
     return value == SpecInt32;
 }
 
+inline bool isInt32SpeculationForArithmetic(SpeculatedType value)
+{
+    return !(value & SpecDouble);
+}
+
+inline bool isInt32SpeculationExpectingDefined(SpeculatedType value)
+{
+    return isInt32Speculation(value & ~SpecOther);
+}
+
 inline bool isDoubleRealSpeculation(SpeculatedType value)
 {
     return value == SpecDoubleReal;
@@ -228,9 +244,24 @@ inline bool isDoubleSpeculation(SpeculatedType value)
     return !!value && (value & SpecDouble) == value;
 }
 
+inline bool isDoubleSpeculationForArithmetic(SpeculatedType value)
+{
+    return !!(value & SpecDouble);
+}
+
+inline bool isRealNumberSpeculation(SpeculatedType value)
+{
+    return !!(value & SpecRealNumber) && !(value & ~SpecRealNumber);
+}
+
 inline bool isNumberSpeculation(SpeculatedType value)
 {
     return !!(value & SpecNumber) && !(value & ~SpecNumber);
+}
+
+inline bool isNumberSpeculationExpectingDefined(SpeculatedType value)
+{
+    return isNumberSpeculation(value & ~SpecOther);
 }
 
 inline bool isBooleanSpeculation(SpeculatedType value)
@@ -253,8 +284,11 @@ inline bool isEmptySpeculation(SpeculatedType value)
     return value == SpecEmpty;
 }
 
-const char* speculationToString(SpeculatedType value);
-const char* speculationToAbbreviatedString(SpeculatedType value);
+void dumpSpeculation(PrintStream&, SpeculatedType);
+void dumpSpeculationAbbreviated(PrintStream&, SpeculatedType);
+
+MAKE_PRINT_ADAPTOR(SpeculationDump, SpeculatedType, dumpSpeculation);
+MAKE_PRINT_ADAPTOR(AbbreviatedSpeculationDump, SpeculatedType, dumpSpeculationAbbreviated);
 
 // Merge two predictions. Note that currently this just does left | right. It may
 // seem tempting to do so directly, but you would be doing so at your own peril,
@@ -272,6 +306,11 @@ inline bool mergeSpeculation(T& left, SpeculatedType right)
     bool result = newSpeculation != static_cast<SpeculatedType>(left);
     left = newSpeculation;
     return result;
+}
+
+inline bool speculationChecked(SpeculatedType actual, SpeculatedType desired)
+{
+    return (actual | desired) == desired;
 }
 
 SpeculatedType speculationFromClassInfo(const ClassInfo*);

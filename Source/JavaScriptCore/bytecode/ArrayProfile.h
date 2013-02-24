@@ -33,18 +33,86 @@
 
 namespace JSC {
 
+class CodeBlock;
 class LLIntOffsetsExtractor;
 
+// This is a bitfield where each bit represents an IndexingType that we have seen.
+// There are 32 indexing types, so an unsigned is enough.
 typedef unsigned ArrayModes;
 
-static const unsigned IsNotArray = 1;
-static const unsigned IsJSArray  = 2;
+#define asArrayModes(type) \
+    (static_cast<unsigned>(1) << static_cast<unsigned>(type))
+
+#define ALL_NON_ARRAY_ARRAY_MODES                       \
+    (asArrayModes(NonArray)                             \
+    | asArrayModes(NonArrayWithInt32)                   \
+    | asArrayModes(NonArrayWithDouble)                  \
+    | asArrayModes(NonArrayWithContiguous)              \
+    | asArrayModes(NonArrayWithArrayStorage)            \
+    | asArrayModes(NonArrayWithSlowPutArrayStorage))
+
+#define ALL_ARRAY_ARRAY_MODES                           \
+    (asArrayModes(ArrayClass)                           \
+    | asArrayModes(ArrayWithUndecided)                  \
+    | asArrayModes(ArrayWithInt32)                      \
+    | asArrayModes(ArrayWithDouble)                     \
+    | asArrayModes(ArrayWithContiguous)                 \
+    | asArrayModes(ArrayWithArrayStorage)               \
+    | asArrayModes(ArrayWithSlowPutArrayStorage))
+
+#define ALL_ARRAY_MODES (ALL_NON_ARRAY_ARRAY_MODES | ALL_ARRAY_ARRAY_MODES)
 
 inline ArrayModes arrayModeFromStructure(Structure* structure)
 {
-    if (structure->classInfo() == &JSArray::s_info)
-        return IsJSArray;
-    return IsNotArray;
+    return asArrayModes(structure->indexingType());
+}
+
+void dumpArrayModes(PrintStream&, ArrayModes);
+MAKE_PRINT_ADAPTOR(ArrayModesDump, ArrayModes, dumpArrayModes);
+
+inline bool mergeArrayModes(ArrayModes& left, ArrayModes right)
+{
+    ArrayModes newModes = left | right;
+    if (newModes == left)
+        return false;
+    left = newModes;
+    return true;
+}
+
+// Checks if proven is a subset of expected.
+inline bool arrayModesAlreadyChecked(ArrayModes proven, ArrayModes expected)
+{
+    return (expected | proven) == expected;
+}
+
+inline bool arrayModesInclude(ArrayModes arrayModes, IndexingType shape)
+{
+    return !!(arrayModes & (asArrayModes(NonArray | shape) | asArrayModes(ArrayClass | shape)));
+}
+
+inline bool shouldUseSlowPutArrayStorage(ArrayModes arrayModes)
+{
+    return arrayModesInclude(arrayModes, SlowPutArrayStorageShape);
+}
+
+inline bool shouldUseFastArrayStorage(ArrayModes arrayModes)
+{
+    return arrayModesInclude(arrayModes, ArrayStorageShape);
+}
+
+inline bool shouldUseContiguous(ArrayModes arrayModes)
+{
+    return arrayModesInclude(arrayModes, ContiguousShape);
+}
+
+inline bool shouldUseDouble(ArrayModes arrayModes)
+{
+    return arrayModesInclude(arrayModes, DoubleShape);
+}
+
+inline bool shouldUseInt32(ArrayModes arrayModes)
+{
+    return arrayModesInclude(arrayModes, Int32Shape);
 }
 
 class ArrayProfile {
@@ -53,7 +121,10 @@ public:
         : m_bytecodeOffset(std::numeric_limits<unsigned>::max())
         , m_lastSeenStructure(0)
         , m_expectedStructure(0)
-        , m_structureIsPolymorphic(false)
+        , m_mayStoreToHole(false)
+        , m_outOfBounds(false)
+        , m_mayInterceptIndexedAccesses(false)
+        , m_usesOriginalArrayStructures(true)
         , m_observedArrayModes(0)
     {
     }
@@ -62,7 +133,10 @@ public:
         : m_bytecodeOffset(bytecodeOffset)
         , m_lastSeenStructure(0)
         , m_expectedStructure(0)
-        , m_structureIsPolymorphic(false)
+        , m_mayStoreToHole(false)
+        , m_outOfBounds(false)
+        , m_mayInterceptIndexedAccesses(false)
+        , m_usesOriginalArrayStructures(true)
         , m_observedArrayModes(0)
     {
     }
@@ -70,29 +144,54 @@ public:
     unsigned bytecodeOffset() const { return m_bytecodeOffset; }
     
     Structure** addressOfLastSeenStructure() { return &m_lastSeenStructure; }
+    ArrayModes* addressOfArrayModes() { return &m_observedArrayModes; }
+    bool* addressOfMayStoreToHole() { return &m_mayStoreToHole; }
+    bool* addressOfOutOfBounds() { return &m_outOfBounds; }
     
     void observeStructure(Structure* structure)
     {
         m_lastSeenStructure = structure;
     }
     
-    void computeUpdatedPrediction(OperationInProgress operation = NoOperation);
+    void computeUpdatedPrediction(CodeBlock*, OperationInProgress = NoOperation);
     
-    Structure* expectedStructure() const { return m_expectedStructure; }
-    bool structureIsPolymorphic() const { return m_structureIsPolymorphic; }
+    Structure* expectedStructure() const
+    {
+        if (structureIsPolymorphic())
+            return 0;
+        return m_expectedStructure;
+    }
+    bool structureIsPolymorphic() const
+    {
+        return m_expectedStructure == polymorphicStructure();
+    }
     bool hasDefiniteStructure() const
     {
         return !structureIsPolymorphic() && m_expectedStructure;
     }
     ArrayModes observedArrayModes() const { return m_observedArrayModes; }
+    ArrayModes updatedObservedArrayModes() const; // Computes the observed array modes without updating the profile.
+    bool mayInterceptIndexedAccesses() const { return m_mayInterceptIndexedAccesses; }
+    
+    bool mayStoreToHole() const { return m_mayStoreToHole; }
+    bool outOfBounds() const { return m_outOfBounds; }
+    
+    bool usesOriginalArrayStructures() const { return m_usesOriginalArrayStructures; }
+    
+    CString briefDescription(CodeBlock*);
     
 private:
     friend class LLIntOffsetsExtractor;
     
+    static Structure* polymorphicStructure() { return static_cast<Structure*>(reinterpret_cast<void*>(1)); }
+    
     unsigned m_bytecodeOffset;
     Structure* m_lastSeenStructure;
     Structure* m_expectedStructure;
-    bool m_structureIsPolymorphic;
+    bool m_mayStoreToHole; // This flag may become overloaded to indicate other special cases that were encountered during array access, as it depends on indexing type. Since we currently have basically just one indexing type (two variants of ArrayStorage), this flag for now just means exactly what its name implies.
+    bool m_outOfBounds;
+    bool m_mayInterceptIndexedAccesses;
+    bool m_usesOriginalArrayStructures;
     ArrayModes m_observedArrayModes;
 };
 

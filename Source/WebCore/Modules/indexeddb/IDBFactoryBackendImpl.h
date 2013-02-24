@@ -28,6 +28,8 @@
 #ifndef IDBFactoryBackendImpl_h
 #define IDBFactoryBackendImpl_h
 
+#include "IDBCallbacks.h"
+#include "IDBDatabaseCallbacks.h"
 #include "IDBFactoryBackendInterface.h"
 #include "SecurityOrigin.h"
 #include <wtf/HashMap.h>
@@ -41,7 +43,6 @@ class DOMStringList;
 
 class IDBBackingStore;
 class IDBDatabaseBackendImpl;
-class IDBTransactionCoordinator;
 
 class IDBFactoryBackendImpl : public IDBFactoryBackendInterface {
 public:
@@ -57,7 +58,8 @@ public:
     virtual void removeIDBBackingStore(const String& fileIdentifier);
 
     virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
-    virtual void open(const String& name, int64_t version, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
+    virtual void open(const String& name, int64_t version, int64_t transactionId, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
+
     virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
 
 protected:
@@ -70,8 +72,6 @@ private:
 
     typedef HashMap<String, IDBBackingStore*> IDBBackingStoreMap;
     IDBBackingStoreMap m_backingStoreMap;
-
-    RefPtr<IDBTransactionCoordinator> m_transactionCoordinator;
 
     // Only one instance of the factory should exist at any given time.
     static IDBFactoryBackendImpl* idbFactoryBackendImpl;

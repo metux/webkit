@@ -62,27 +62,43 @@ class TestRunner:
 
     SKIPPED = [
         SkippedTest("unittests/testdownload", "/webkit/download/not-found", "Test fails in GTK Linux 64-bit Release bot", 82329),
-        SkippedTest("unittests/testwebview", "/webkit/webview/icon-uri", "Test times out in GTK Linux 64-bit Release bot", 82328),
-        SkippedTest("unittests/testwebresource", "/webkit/webresource/sub_resource_loading", "Test fails in GTK Linux 64-bit Release bot", 82330),
         SkippedTest("unittests/testwebinspector", "/webkit/webinspector/close-and-inspect", "Test is flaky in GTK Linux 32-bit Release bot", 82869),
-        SkippedTest("WebKit2APITests/TestWebKitWebView", "/webkit2/WebKitWebView/mouse-target", "Test is flaky in GTK Linux 32-bit Release bot", 82866),
+        SkippedTest("unittests/testwebresource", "/webkit/webresource/loading", "Test fails", 104689),
+        SkippedTest("unittests/testwebresource", "/webkit/webresource/sub_resource_loading", "Test fails in GTK Linux 64-bit Release bot", 82330),
+        SkippedTest("unittests/testwebview", "/webkit/webview/icon-uri", "Test times out in GTK Linux 64-bit Release bot", 82328),
+        SkippedTest("unittests/testatk", "/webkit/atk/getTextInParagraphAndBodyModerate", "Test fails", 105538),
+        SkippedTest("WebKit2APITests/TestInspectorServer", SkippedTest.ENTIRE_SUITE, "Test times out", 105866),
         SkippedTest("WebKit2APITests/TestResources", "/webkit2/WebKitWebView/resources", "Test is flaky in GTK Linux 32-bit Release bot", 82868),
-        SkippedTest("WebKit2APITests/TestWebKitFindController", "/webkit2/WebKitFindController/hide", "Test  always fails in Xvfb", 89810),
-        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.WKConnection", "Tests fail and time out out", 84959),
-        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.RestoreSessionStateContainingFormData", "Session State is not implemented in GTK+ port", 84960),
-        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.SpacebarScrolling", "Test fails", 84961),
+        SkippedTest("WebKit2APITests/TestWebKitAccessibility", "/webkit2/WebKitAccessibility/atspi-basic-hierarchy", "Test fails", 100408),
+        SkippedTest("WebKit2APITests/TestWebKitFindController", "/webkit2/WebKitFindController/hide", "Test always fails in Xvfb", 89810),
+        SkippedTest("WebKit2APITests/TestWebKitWebContext", "/webkit2/WebKitWebContext/uri-scheme", "Test fails", 104779),
+        SkippedTest("WebKit2APITests/TestWebKitWebView", "/webkit2/WebKitWebView/mouse-target", "Test is flaky in GTK Linux 32-bit Release bot", 82866),
+        SkippedTest("WebKit2APITests/TestContextMenu", SkippedTest.ENTIRE_SUITE, "Fails", 0),
+        SkippedTest("WebKit2APITests/TestWebKitSettings", "/webkit2/WebKitSettings/user-agent", "Fails", 0),
+        SkippedTest("WebKit2APITests/TestWebKitFaviconDatabase", SkippedTest.ENTIRE_SUITE, "Fails", 0),
+        SkippedTest("WebKit2APITests/TestCookieManager", SkippedTest.ENTIRE_SUITE, "Fails", 0),
+        SkippedTest("TestWebKitAPI/TestWebKit2", SkippedTest.ENTIRE_SUITE, "Test times out", 0),
+        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.CanHandleRequest", "Test fails", 88453),
+        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.MouseMoveAfterCrash", "Test is flaky", 85066),
         SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.NewFirstVisuallyNonEmptyLayoutForImages", "Test is flaky", 85066),
         SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.NewFirstVisuallyNonEmptyLayoutFrames", "Test fails", 85037),
-        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.MouseMoveAfterCrash", "Test is flaky", 85066),
-        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.CanHandleRequest", "Test fails", 88453),
+        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.RestoreSessionStateContainingFormData", "Session State is not implemented in GTK+ port", 84960),
+        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.SpacebarScrolling", "Test fails", 84961),
+        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.WKConnection", "Tests fail and time out out", 84959),
         SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.WKPageGetScaleFactorNotZero", "Test fails and times out", 88455),
+        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.ForceRepaint", "Test times out", 105532),
+        SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.ReloadPageAfterCrash", "Test flakily times out", 110129),
     ]
 
     def __init__(self, options, tests=[]):
         self._options = options
-        self._programs_path = common.build_path("Programs")
+        self._build_type = "Debug" if self._options.debug else "Release"
+
+        self._programs_path = common.build_path_for_build_types((self._build_type,), "Programs")
         self._tests = self._get_tests(tests)
         self._skipped_tests = TestRunner.SKIPPED
+        if not sys.stdout.isatty():
+            self._tty_colors_pattern = re.compile("\033\[[0-9;]*m")
 
         # These SPI daemons need to be active for the accessibility tests to work.
         self._spi_registryd = None
@@ -117,7 +133,6 @@ class TestRunner:
         return None
 
     def _start_accessibility_daemons(self):
-        return False
         spi_bus_launcher_path = self._lookup_atspi2_binary('at-spi-bus-launcher')
         spi_registryd_path = self._lookup_atspi2_binary('at-spi2-registryd')
         if not spi_bus_launcher_path or not spi_registryd_path:
@@ -152,7 +167,7 @@ class TestRunner:
         self._test_env["WEBKIT_INSPECTOR_PATH"] = os.path.abspath(os.path.join(self._programs_path, 'resources', 'inspector'))
         self._test_env['GSETTINGS_BACKEND'] = 'memory'
         self._test_env["TEST_WEBKIT_API_WEBKIT2_RESOURCES_PATH"] = common.top_level_path("Tools", "TestWebKitAPI", "Tests", "WebKit2")
-        self._test_env["TEST_WEBKIT_API_WEBKIT2_INJECTED_BUNDLE_PATH"] = common.build_path("Libraries")
+        self._test_env["TEST_WEBKIT_API_WEBKIT2_INJECTED_BUNDLE_PATH"] = common.build_path_for_build_types((self._build_type,), "Libraries")
         self._test_env["WEBKIT_EXEC_PATH"] = self._programs_path
 
         try:
@@ -213,26 +228,64 @@ class TestRunner:
         def alarm_handler(signum, frame):
             raise TestTimeout
 
-        p = subprocess.Popen(command, stdout=subprocess.PIPE, env=self._test_env)
+        child_pid = [-1]
+        def parse_line(line, child_pid = child_pid):
+            if child_pid[0] == -1:
+                child_pid[0] = self._get_child_pid_from_test_output(line)
+
+            if sys.stdout.isatty():
+                sys.stdout.write(line)
+            else:
+                sys.stdout.write(self._tty_colors_pattern.sub('', line.replace('\r', '')))
+
+        def waitpid(pid):
+            while True:
+                try:
+                    return os.waitpid(pid, 0)
+                except (OSError, IOError) as e:
+                    if e.errno == errno.EINTR:
+                        continue
+                    raise
+
+        def return_code_from_exit_status(status):
+            if os.WIFSIGNALED(status):
+                return -os.WTERMSIG(status)
+            elif os.WIFEXITED(status):
+                return os.WEXITSTATUS(status)
+            else:
+                # Should never happen
+                raise RuntimeError("Unknown child exit status!")
+
+        pid, fd = os.forkpty()
+        if pid == 0:
+            os.execvpe(command[0], command, self._test_env)
+            sys.exit(0)
+
         if timeout > 0:
             signal(SIGALRM, alarm_handler)
             alarm(timeout)
 
-        stdout = ""
         try:
-            stdout = p.communicate()[0]
+            common.parse_output_lines(fd, parse_line)
             if timeout > 0:
                 alarm(0)
-            sys.stdout.write(stdout)
-            sys.stdout.flush()
         except TestTimeout:
-            self._kill_process(p.pid)
-            child_pid = self._get_child_pid_from_test_output(stdout)
-            if child_pid > 0:
-                self._kill_process(child_pid)
+            self._kill_process(pid)
+            if child_pid[0] > 0:
+                self._kill_process(child_pid[0])
             raise
 
-        return not p.returncode
+        try:
+            dummy, status = waitpid(pid)
+        except OSError as e:
+            if e.errno != errno.ECHILD:
+                raise
+            # This happens if SIGCLD is set to be ignored or waiting
+            # for child processes has otherwise been disabled for our
+            # process.  This child is dead, we can't get the status.
+            status = 0
+
+        return not return_code_from_exit_status(status)
 
     def _run_test_glib(self, test_program):
         tester_command = ['gtester']
@@ -293,19 +346,21 @@ class TestRunner:
 
         if failed_tests:
             names = [test.replace(self._programs_path, '', 1) for test in failed_tests]
-            sys.stdout.write("Tests failed: %s\n" % ", ".join(names))
+            sys.stdout.write("Tests failed (%d): %s\n" % (len(names), ", ".join(names)))
             sys.stdout.flush()
 
         if timed_out_tests:
             names = [test.replace(self._programs_path, '', 1) for test in timed_out_tests]
-            sys.stdout.write("Tests that timed out: %s\n" % ", ".join(names))
+            sys.stdout.write("Tests that timed out (%d): %s\n" % (len(names), ", ".join(names)))
             sys.stdout.flush()
 
         if self._skipped_tests and self._options.skipped_action == 'skip':
-            sys.stdout.write("Tests skipped:\n%s\n" % "\n".join([str(skipped) for skipped in self._skipped_tests]))
+            sys.stdout.write("Tests skipped (%d):\n%s\n" %
+                             (len(self._skipped_tests),
+                              "\n".join([str(skipped) for skipped in self._skipped_tests])))
             sys.stdout.flush()
 
-        return len(failed_tests)
+        return len(failed_tests) + len(timed_out_tests)
 
 if __name__ == "__main__":
     if not jhbuildutils.enter_jhbuild_environment_if_available("gtk"):

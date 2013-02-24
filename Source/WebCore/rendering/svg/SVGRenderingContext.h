@@ -27,7 +27,6 @@
 
 #if ENABLE(SVG)
 #include "ImageBuffer.h"
-#include "LayoutTypes.h"
 #include "PaintInfo.h"
 
 namespace WebCore {
@@ -112,6 +111,7 @@ private:
     RenderObject* m_object;
     PaintInfo* m_paintInfo;
     GraphicsContext* m_savedContext;
+    IntRect m_savedPaintRect;
 #if ENABLE(FILTERS)
     RenderSVGResourceFilter* m_filter;
 #endif

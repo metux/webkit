@@ -49,6 +49,12 @@
 
 namespace WebCore {
 
+void GraphicsContext3D::releaseShaderCompiler()
+{
+    makeContextCurrent();
+    notImplemented();
+}
+
 void GraphicsContext3D::readPixelsAndConvertToBGRAIfNecessary(int x, int y, int width, int height, unsigned char* pixels)
 {
     ::glReadPixels(x, y, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
@@ -56,20 +62,7 @@ void GraphicsContext3D::readPixelsAndConvertToBGRAIfNecessary(int x, int y, int 
 
 void GraphicsContext3D::validateAttributes()
 {
-    Extensions3D* extensions = getExtensions();
     validateDepthStencil("GL_EXT_packed_depth_stencil");
-    if (m_attrs.antialias) {
-        bool isValidVendor = true;
-        // Currently in Mac we only turn on antialias if vendor is NVIDIA,
-        // or if ATI and on 10.7.2 and above.
-        const char* vendor = reinterpret_cast<const char*>(::glGetString(GL_VENDOR));
-        if (!vendor || (!std::strstr(vendor, "NVIDIA") && !(std::strstr(vendor, "ATI") && systemAllowsMultisamplingOnATICards())))
-            isValidVendor = false;
-        if (!isValidVendor || !extensions->supports("GL_ANGLE_framebuffer_multisample") || isGLES2Compliant())
-            m_attrs.antialias = false;
-        else
-            extensions->ensureEnabled("GL_ANGLE_framebuffer_multisample");
-    }
 }
 
 bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
@@ -256,7 +249,7 @@ bool GraphicsContext3D::texImage2D(GC3Denum target, GC3Dint level, GC3Denum inte
         synthesizeGLError(INVALID_VALUE);
         return false;
     }
-    makeContextCurrent();
+
     GC3Denum openGLInternalFormat = internalformat;
     if (type == GL_FLOAT) {
         if (format == GL_RGBA)
@@ -265,7 +258,7 @@ bool GraphicsContext3D::texImage2D(GC3Denum target, GC3Dint level, GC3Denum inte
             openGLInternalFormat = GL_RGB32F_ARB;
     }
 
-    ::glTexImage2D(target, level, openGLInternalFormat, width, height, border, format, type, pixels);
+    texImage2DDirect(target, level, openGLInternalFormat, width, height, border, format, type, pixels);
     return true;
 }
 
@@ -279,26 +272,6 @@ void GraphicsContext3D::clearDepth(GC3Dclampf depth)
 {
     makeContextCurrent();
     ::glClearDepth(depth);
-}
-
-bool GraphicsContext3D::systemAllowsMultisamplingOnATICards() const
-{
-#if PLATFORM(MAC)
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-    return true;
-#else
-    ASSERT(isMainThread());
-    static SInt32 version;
-    if (!version) {
-        if (Gestalt(gestaltSystemVersion, &version) != noErr)
-            return false;
-    }
-    // See https://bugs.webkit.org/show_bug.cgi?id=77922 for more details
-    return version >= 0x1072;
-#endif // SNOW_LEOPARD and LION
-#else
-    return false;
-#endif // PLATFORM(MAC)
 }
 
 Extensions3D* GraphicsContext3D::getExtensions()

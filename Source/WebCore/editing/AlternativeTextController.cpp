@@ -33,6 +33,7 @@
 #include "EditCommand.h"
 #include "EditorClient.h"
 #include "Event.h"
+#include "ExceptionCodePlaceholder.h"
 #include "FloatQuad.h"
 #include "Frame.h"
 #include "FrameView.h"
@@ -452,7 +453,7 @@ void AlternativeTextController::respondToChangedSelection(const VisibleSelection
     // containing the original pre-correction word so that user can quickly revert the
     // undesired autocorrection. Here, we start correction panel timer once we confirm that
     // the new caret position is at the end of a word.
-    if (!currentSelection.isCaret() || currentSelection == oldSelection)
+    if (!currentSelection.isCaret() || currentSelection == oldSelection || !currentSelection.isContentEditable())
         return;
 
     VisiblePosition selectionPosition = currentSelection.start();
@@ -707,8 +708,7 @@ bool AlternativeTextController::insertDictatedText(const String& text, const Vec
     RefPtr<TextEvent> event = TextEvent::createForDictation(m_frame->document()->domWindow(), text, dictationAlternatives);
     event->setUnderlyingEvent(triggeringEvent);
 
-    ExceptionCode ec;
-    target->dispatchEvent(event, ec);
+    target->dispatchEvent(event, IGNORE_EXCEPTION);
     return event->defaultHandled();
 }
 

@@ -53,6 +53,10 @@
 #include "Text.h"
 #include "TextRun.h"
 
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+#include "HTMLMediaElement.h"
+#endif
+
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -113,6 +117,8 @@ static String unavailablePluginReplacementText(RenderEmbeddedObject::PluginUnava
         return blockedPluginByContentSecurityPolicyText();
     case RenderEmbeddedObject::InsecurePluginVersion:
         return insecurePluginVersionText();
+    case RenderEmbeddedObject::PluginInactive:
+        return inactivePluginText();
     }
 
     ASSERT_NOT_REACHED();
@@ -228,10 +234,15 @@ bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumul
 
 void RenderEmbeddedObject::layout()
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     ASSERT(needsLayout());
 
-    computeLogicalWidth();
-    computeLogicalHeight();
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    LayoutSize oldSize = contentBoxRect().size();
+#endif
+
+    updateLogicalWidth();
+    updateLogicalHeight();
 
     RenderPart::layout();
 
@@ -244,6 +255,31 @@ void RenderEmbeddedObject::layout()
         frameView()->addWidgetToUpdate(this);
 
     setNeedsLayout(false);
+
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    // This code copied from RenderMedia::layout().
+    RenderBox* controlsRenderer = toRenderBox(m_children.firstChild());
+    if (!controlsRenderer)
+        return;
+    
+    LayoutSize newSize = contentBoxRect().size();
+    if (newSize == oldSize && !controlsRenderer->needsLayout())
+        return;
+    
+    // When calling layout() on a child node, a parent must either push a LayoutStateMaintainter, or
+    // instantiate LayoutStateDisabler. Since using a LayoutStateMaintainer is slightly more efficient,
+    // and this method will be called many times per second during playback, use a LayoutStateMaintainer:
+    LayoutStateMaintainer statePusher(view(), this, locationOffset(), hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
+    
+    controlsRenderer->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
+    controlsRenderer->style()->setHeight(Length(newSize.height(), Fixed));
+    controlsRenderer->style()->setWidth(Length(newSize.width(), Fixed));
+    controlsRenderer->setNeedsLayout(true, MarkOnlyThis);
+    controlsRenderer->layout();
+    setChildNeedsLayout(false);
+    
+    statePusher.pop();
+#endif
 }
 
 void RenderEmbeddedObject::viewCleared()
@@ -265,16 +301,16 @@ void RenderEmbeddedObject::viewCleared()
     }
 }
 
-bool RenderEmbeddedObject::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
+bool RenderEmbeddedObject::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
-    if (!RenderPart::nodeAtPoint(request, result, pointInContainer, accumulatedOffset, hitTestAction))
+    if (!RenderPart::nodeAtPoint(request, result, locationInContainer, accumulatedOffset, hitTestAction))
         return false;
 
     if (!widget() || !widget()->isPluginViewBase())
         return true;
 
     PluginViewBase* view = static_cast<PluginViewBase*>(widget());
-    IntPoint roundedPoint = pointInContainer.roundedPoint();
+    IntPoint roundedPoint = locationInContainer.roundedPoint();
 
     if (Scrollbar* horizontalScrollbar = view->horizontalScrollbar()) {
         if (horizontalScrollbar->shouldParticipateInHitTesting() && horizontalScrollbar->frameRect().contains(roundedPoint)) {
@@ -322,7 +358,7 @@ bool RenderEmbeddedObject::isInUnavailablePluginIndicator(const LayoutPoint& poi
 
 bool RenderEmbeddedObject::isInUnavailablePluginIndicator(MouseEvent* event) const
 {
-    return isInUnavailablePluginIndicator(roundedLayoutPoint(absoluteToLocal(event->absoluteLocation(), false, true)));
+    return isInUnavailablePluginIndicator(roundedLayoutPoint(absoluteToLocal(event->absoluteLocation(), UseTransforms)));
 }
 
 static bool shouldUnavailablePluginMessageBeButton(Document* document, RenderEmbeddedObject::PluginUnavailabilityReason pluginUnavailabilityReason)
