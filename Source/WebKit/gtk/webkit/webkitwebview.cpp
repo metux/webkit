@@ -800,12 +800,6 @@ static gboolean webkit_web_view_scroll_event(GtkWidget* widget, GdkEventScroll* 
     if (!frame->view())
         return FALSE;
 
-#ifndef GTK_API_VERSION_2
-    /* Ignore Alt-scroll events in GTK3 so that GtkNotebook can use it to switch tabs */
-    if (event->state & GDK_MOD1_MASK)
-        return FALSE;
-#endif
-
     PlatformWheelEvent wheelEvent(event);
     return frame->eventHandler()->handleWheelEvent(wheelEvent);
 }
