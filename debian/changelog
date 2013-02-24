@@ -7,8 +7,11 @@ webkitgtk (1.10.2-2) experimental; urgency=low
   * debian/control:
   - added ruby to the Build-Dependencies, it is now required
     for building WebKit
+  * debian/rules:
+  - ensure configure is the last command run in a single shell invocation,
+    so the build fails early if configure fails
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sun, 24 Feb 2013 12:05:45 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 24 Feb 2013 16:51:07 -0300
 
 webkitgtk (1.10.2-1) experimental; urgency=low
 
