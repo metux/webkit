@@ -102,6 +102,7 @@ ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 		--enable-gtk-doc \
 		--enable-introspection \
 		--enable-geolocation \
+		--with-gstreamer=1.0 \
 		--disable-webkit2 --disable-plugin-process; \
 	cd ..
 endif

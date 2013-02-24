@@ -2,8 +2,10 @@ webkitgtk (1.10.2-2) experimental; urgency=low
 
   * Integrate patches and acknowledge NMUs; thanks to Ansgar Burchardt
     <ansgar@debian.org>, and Michael Gilbert <mgilbert@debian.org>
+  * debian/control, debian/rules:
+  - switch to building with GStreamer 1.0
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sat, 23 Feb 2013 21:35:53 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sat, 23 Feb 2013 21:45:29 -0300
 
 webkitgtk (1.10.2-1) experimental; urgency=low
 
