@@ -4,8 +4,11 @@ webkitgtk (1.10.2-2) experimental; urgency=low
     <ansgar@debian.org>, and Michael Gilbert <mgilbert@debian.org>
   * debian/control, debian/rules:
   - switch to building with GStreamer 1.0
+  * debian/control:
+  - added ruby to the Build-Dependencies, it is now required
+    for building WebKit
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sat, 23 Feb 2013 21:45:29 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 24 Feb 2013 12:05:45 -0300
 
 webkitgtk (1.10.2-1) experimental; urgency=low
 
