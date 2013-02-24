@@ -1,8 +1,10 @@
 webkitgtk (1.11.90-1) experimental; urgency=low
 
   * New development release
+  * debian/patches/03_avoid_unresolved_x_symbols.patch:
+  - patch to avoid linking issue
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sat, 23 Feb 2013 21:21:59 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 24 Feb 2013 16:59:45 -0300
 
 webkitgtk (1.10.2-1) experimental; urgency=low
 
