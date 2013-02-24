@@ -16,6 +16,15 @@ CFLAGS += -Wall -Wl,--as-needed
 LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
 CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS)
 
+COMMON_CONFIGURE_ARGUMENTS = \
+	--disable-silent-rules \
+	--host=$(DEB_HOST_GNU_TYPE) \
+	--build=$(DEB_BUILD_GNU_TYPE) \
+	--enable-gtk-doc \
+	--enable-introspection \
+	--enable-geolocation \
+	--with-gstreamer=1.0
+
 # This is used by the GTK+ 3.0 library only.
 EXTRA_CONFIGURE_ARGUMENTS =
 EXTRA_DH_ARGUMENTS =
@@ -95,14 +104,8 @@ ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	CC="gcc" \
 	CXX="g++" \
 	../configure --prefix=/usr \
-		--disable-silent-rules \
-		--host=$(DEB_HOST_GNU_TYPE) \
-		--build=$(DEB_BUILD_GNU_TYPE) \
 		--with-gtk=2.0 \
-		--enable-gtk-doc \
-		--enable-introspection \
-		--enable-geolocation \
-		--with-gstreamer=1.0 \
+		$(COMMON_CONFIGURE_ARGUMENTS) \
 		--disable-webkit2 --disable-plugin-process
 endif
 
@@ -117,13 +120,8 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	CC="gcc" \
 	CXX="g++" \
 	../configure --prefix=/usr \
-		--disable-silent-rules \
-		--host=$(DEB_HOST_GNU_TYPE) \
-		--build=$(DEB_BUILD_GNU_TYPE) \
 		--with-gtk=3.0 \
-		--enable-gtk-doc \
-		--enable-introspection \
-		--enable-geolocation \
+		$(COMMON_CONFIGURE_ARGUMENTS) \
 		$(EXTRA_CONFIGURE_ARGUMENTS)
 endif
 
