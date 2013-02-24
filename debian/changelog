@@ -1,3 +1,9 @@
+webkitgtk (1.11.90-1) experimental; urgency=low
+
+  * New development release
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Sat, 23 Feb 2013 21:21:59 -0300
+
 webkitgtk (1.10.2-1) experimental; urgency=low
 
   * New stable release
