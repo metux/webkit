@@ -24,11 +24,11 @@
 #include "GOwnPtrSoup.h"
 #include "HTTPParsers.h"
 #include "MIMETypeRegistry.h"
-#include "PlatformString.h"
 #include "SoupURIUtils.h"
 
 #include <libsoup/soup.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 using namespace std;
 
@@ -43,7 +43,7 @@ void ResourceRequest::updateSoupMessage(SoupMessage* soupMessage) const
     if (!headers.isEmpty()) {
         HTTPHeaderMap::const_iterator end = headers.end();
         for (HTTPHeaderMap::const_iterator it = headers.begin(); it != end; ++it)
-            soup_message_headers_append(soupHeaders, it->first.string().utf8().data(), it->second.utf8().data());
+            soup_message_headers_append(soupHeaders, it->key.string().utf8().data(), it->value.utf8().data());
     }
 
     String firstPartyString = firstPartyForCookies().string();
@@ -66,7 +66,7 @@ SoupMessage* ResourceRequest::toSoupMessage() const
     if (!headers.isEmpty()) {
         HTTPHeaderMap::const_iterator end = headers.end();
         for (HTTPHeaderMap::const_iterator it = headers.begin(); it != end; ++it)
-            soup_message_headers_append(soupHeaders, it->first.string().utf8().data(), it->second.utf8().data());
+            soup_message_headers_append(soupHeaders, it->key.string().utf8().data(), it->value.utf8().data());
     }
 
     String firstPartyString = firstPartyForCookies().string();
@@ -122,6 +122,33 @@ unsigned initializeMaximumHTTPConnectionCountPerHost()
     // given to it, so that it is able to look ahead, and schedule
     // them in a good way.
     return 10000;
+}
+
+SoupURI* ResourceRequest::soupURI() const
+{
+    // WebKit does not support fragment identifiers in data URLs, but soup does.
+    // Before passing the URL to soup, we should make sure to urlencode any '#'
+    // characters, so that soup does not interpret them as fragment identifiers.
+    // See http://wkbug.com/68089
+    if (m_url.protocolIsData()) {
+        String urlString = m_url.string();
+        urlString.replace("#", "%23");
+        return soup_uri_new(urlString.utf8().data());
+    }
+
+    KURL url = m_url;
+    url.removeFragmentIdentifier();
+    SoupURI* uri = soup_uri_new(url.string().utf8().data());
+
+    // Versions of libsoup prior to 2.42 have a soup_uri_new that will convert empty passwords that are not
+    // prefixed by a colon into null. Some parts of soup like the SoupAuthenticationManager will only be active
+    // when both the username and password are non-null. When we have credentials, empty usernames and passwords
+    // should be empty strings instead of null.
+    if (!url.user().isEmpty() || !url.pass().isEmpty()) {
+        soup_uri_set_user(uri, url.user().utf8().data());
+        soup_uri_set_password(uri, url.pass().utf8().data());
+    }
+    return uri;
 }
 
 }

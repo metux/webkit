@@ -28,6 +28,8 @@
 
 #if USE(WTFURL)
 
+#include "PlatformMemoryInstrumentation.h"
+#include <wtf/MemoryInstrumentationParsedURL.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -41,6 +43,17 @@ public:
     WTF::ParsedURL m_parsedURL;
     String m_invalidUrlString;
 
+    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+    {
+        MemoryClassInfo info(memoryObjectInfo, this);
+        info.addMember(m_parsedURL, "parsedURL");
+        info.addMember(m_invalidUrlString, "invalidUrlString");
+    }
+    bool isSafeToSendToAnotherThread() const
+    {
+        return m_invalidUrlString.isSafeToSendToAnotherThread()
+            && m_parsedURL.isSafeToSendToAnotherThread();
+    }
     PassRefPtr<KURLWTFURLImpl> copy() const;
 };
 

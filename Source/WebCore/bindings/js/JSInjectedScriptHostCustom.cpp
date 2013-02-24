@@ -67,6 +67,7 @@
 #include <runtime/JSArray.h>
 #include <runtime/JSFunction.h>
 #include <runtime/JSLock.h>
+#include <runtime/ObjectConstructor.h>
 #include <runtime/RegExpObject.h>
 
 using namespace JSC;
@@ -82,6 +83,9 @@ Node* InjectedScriptHost::scriptValueAsNode(ScriptValue value)
 
 ScriptValue InjectedScriptHost::nodeAsScriptValue(ScriptState* state, Node* node)
 {
+    if (!shouldAllowAccessToNode(state, node))
+        return ScriptValue(state->globalData(), jsNull());
+
     JSLockHolder lock(state);
     return ScriptValue(state->globalData(), toJS(state, deprecatedGlobalObjectForPrototype(state), node));
 }
@@ -109,8 +113,8 @@ JSValue JSInjectedScriptHost::internalConstructorName(ExecState* exec)
         return jsUndefined();
 
     JSObject* thisObject = exec->argument(0).toThisObject(exec);
-    UString result = thisObject->methodTable()->className(thisObject);
-    return jsString(exec, result);
+    String result = thisObject->methodTable()->className(thisObject);
+    return jsStringWithCache(exec, result);
 }
 
 JSValue JSInjectedScriptHost::isHTMLAllCollection(ExecState* exec)
@@ -170,7 +174,7 @@ JSValue JSInjectedScriptHost::functionDetails(ExecState* exec)
     int lineNumber = sourceCode->firstLine();
     if (lineNumber)
         lineNumber -= 1; // In the inspector protocol all positions are 0-based while in SourceCode they are 1-based
-    UString scriptId = UString::number(sourceCode->provider()->asID());
+    String scriptId = String::number(sourceCode->provider()->asID());
 
     JSObject* location = constructEmptyObject(exec);
     location->putDirect(exec->globalData(), Identifier(exec, "lineNumber"), jsNumber(lineNumber));
@@ -178,20 +182,26 @@ JSValue JSInjectedScriptHost::functionDetails(ExecState* exec)
 
     JSObject* result = constructEmptyObject(exec);
     result->putDirect(exec->globalData(), Identifier(exec, "location"), location);
-    UString name = function->name(exec);
+    String name = function->name(exec);
     if (!name.isEmpty())
-        result->putDirect(exec->globalData(), Identifier(exec, "name"), jsString(exec, name));
-    UString displayName = function->displayName(exec);
+        result->putDirect(exec->globalData(), Identifier(exec, "name"), jsStringWithCache(exec, name));
+    String displayName = function->displayName(exec);
     if (!displayName.isEmpty())
-        result->putDirect(exec->globalData(), Identifier(exec, "displayName"), jsString(exec, displayName));
+        result->putDirect(exec->globalData(), Identifier(exec, "displayName"), jsStringWithCache(exec, displayName));
     // FIXME: provide function scope data in "scopesRaw" property when JSC supports it.
     //     https://bugs.webkit.org/show_bug.cgi?id=87192
     return result;
 }
 
+JSValue JSInjectedScriptHost::getInternalProperties(ExecState*)
+{
+    // FIXME: implement this. https://bugs.webkit.org/show_bug.cgi?id=94533
+    return jsUndefined();
+}
+
 static JSArray* getJSListenerFunctions(ExecState* exec, Document* document, const EventListenerInfo& listenerInfo)
 {
-    JSArray* result = constructEmptyArray(exec);
+    JSArray* result = constructEmptyArray(exec, 0);
     size_t handlersCount = listenerInfo.eventListenerVector.size();
     for (size_t i = 0, outputIndex = 0; i < handlersCount; ++i) {
         const JSEventListener* jsListener = JSEventListener::cast(listenerInfo.eventListenerVector[i].listener.get());
@@ -260,7 +270,7 @@ JSValue JSInjectedScriptHost::databaseId(ExecState* exec)
 #if ENABLE(SQL_DATABASE)
     Database* database = toDatabase(exec->argument(0));
     if (database)
-        return jsString(exec, impl()->databaseIdImpl(database));
+        return jsStringWithCache(exec, impl()->databaseIdImpl(database));
 #endif
     return jsUndefined();
 }
@@ -271,7 +281,7 @@ JSValue JSInjectedScriptHost::storageId(ExecState* exec)
         return jsUndefined();
     Storage* storage = toStorage(exec->argument(0));
     if (storage)
-        return jsString(exec, impl()->storageIdImpl(storage));
+        return jsStringWithCache(exec, impl()->storageIdImpl(storage));
     return jsUndefined();
 }
 
@@ -295,6 +305,13 @@ JSValue JSInjectedScriptHost::evaluate(ExecState* exec)
     globalObject->setEvalEnabled(wasEvalEnabled);
 
     return result;
+}
+
+JSValue JSInjectedScriptHost::setFunctionVariableValue(JSC::ExecState* exec)
+{
+    // FIXME: implement this. https://bugs.webkit.org/show_bug.cgi?id=107830
+    throwError(exec, createTypeError(exec, "Variable value mutation is not supported"));
+    return jsUndefined();
 }
 
 } // namespace WebCore

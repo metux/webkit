@@ -23,13 +23,15 @@
 
 #include "CallFrame.h"
 #include "JSObject.h"
+#include "JSScope.h"
 #include "NumericStrings.h"
-#include "ScopeChain.h"
-#include <new> // for placement new
-#include <string.h> // for strlen
+#include "Operations.h"
+#include <new>
+#include <string.h>
 #include <wtf/Assertions.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/HashSet.h>
+#include <wtf/text/ASCIIFastPath.h>
 #include <wtf/text/StringHash.h>
 
 using WTF::ThreadSpecific;
@@ -49,7 +51,7 @@ void deleteIdentifierTable(IdentifierTable* table)
 struct IdentifierASCIIStringTranslator {
     static unsigned hash(const LChar* c)
     {
-        return StringHasher::computeHashAndMaskTop8Bits<LChar>(c);
+        return StringHasher::computeHashAndMaskTop8Bits(c);
     }
 
     static bool equal(StringImpl* r, const LChar* s)
@@ -68,7 +70,7 @@ struct IdentifierASCIIStringTranslator {
 struct IdentifierLCharFromUCharTranslator {
     static unsigned hash(const CharBuffer<UChar>& buf)
     {
-        return StringHasher::computeHashAndMaskTop8Bits<UChar>(buf.s, buf.length);
+        return StringHasher::computeHashAndMaskTop8Bits(buf.s, buf.length);
     }
     
     static bool equal(StringImpl* str, const CharBuffer<UChar>& buf)
@@ -80,11 +82,7 @@ struct IdentifierLCharFromUCharTranslator {
     {
         LChar* d;
         StringImpl* r = StringImpl::createUninitialized(buf.length, d).leakRef();
-        for (unsigned i = 0; i != buf.length; i++) {
-            UChar c = buf.s[i];
-            ASSERT(c <= 0xff);
-            d[i] = c;
-        }
+        WTF::copyLCharsFromUCharSource(d, buf.s, buf.length);
         r->setHash(hash);
         location = r; 
     }
@@ -102,7 +100,7 @@ PassRefPtr<StringImpl> Identifier::add(JSGlobalData* globalData, const char* c)
 
     const LiteralIdentifierTable::iterator& iter = literalIdentifierTable.find(c);
     if (iter != literalIdentifierTable.end())
-        return iter->second;
+        return iter->value;
 
     HashSet<StringImpl*>::AddResult addResult = identifierTable.add<const LChar*, IdentifierASCIIStringTranslator>(reinterpret_cast<const LChar*>(c));
 
@@ -131,7 +129,7 @@ PassRefPtr<StringImpl> Identifier::add8(JSGlobalData* globalData, const UChar* s
     
     if (!length)
         return StringImpl::empty();
-    CharBuffer<UChar> buf = {s, length}; 
+    CharBuffer<UChar> buf = { s, static_cast<unsigned>(length) };
     HashSet<StringImpl*>::AddResult addResult = globalData->identifierTable->add<CharBuffer<UChar>, IdentifierLCharFromUCharTranslator >(buf);
     
     // If the string is newly-translated, then we need to adopt it.
@@ -209,7 +207,7 @@ void Identifier::checkCurrentIdentifierTable(ExecState* exec)
 #else
 
 // These only exists so that our exports are the same for debug and release builds.
-// This would be an ASSERT_NOT_REACHED(), but we're in NDEBUG only code here!
+// This would be an RELEASE_ASSERT_NOT_REACHED(), but we're in NDEBUG only code here!
 NO_RETURN_DUE_TO_CRASH void Identifier::checkCurrentIdentifierTable(JSGlobalData*) { CRASH(); }
 NO_RETURN_DUE_TO_CRASH void Identifier::checkCurrentIdentifierTable(ExecState*) { CRASH(); }
 

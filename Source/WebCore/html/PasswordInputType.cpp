@@ -34,6 +34,7 @@
 
 #include "FormController.h"
 #include "HTMLInputElement.h"
+#include "InputTypeNames.h"
 #include <wtf/Assertions.h>
 #include <wtf/PassOwnPtr.h>
 
@@ -94,9 +95,9 @@ bool PasswordInputType::isPasswordField() const
     return true;
 }
 
-void PasswordInputType::handleFocusEvent()
+void PasswordInputType::handleFocusEvent(Node* oldFocusedNode, FocusDirection direction)
 {
-    BaseTextInputType::handleFocusEvent();
+    BaseTextInputType::handleFocusEvent(oldFocusedNode, direction);
     if (element()->document()->frame())
         element()->document()->setUseSecureKeyboardEntryWhenActive(true);
 }

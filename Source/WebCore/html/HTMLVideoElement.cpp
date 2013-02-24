@@ -24,7 +24,6 @@
  */
 
 #include "config.h"
-
 #if ENABLE(VIDEO)
 #include "HTMLVideoElement.h"
 
@@ -87,14 +86,14 @@ void HTMLVideoElement::attach()
 #endif
 }
 
-void HTMLVideoElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLVideoElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
     if (attribute.name() == widthAttr)
         addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
     else if (attribute.name() == heightAttr)
         addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
     else
-        HTMLMediaElement::collectStyleForAttribute(attribute, style);
+        HTMLMediaElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
 bool HTMLVideoElement::isPresentationAttribute(const QualifiedName& name) const
@@ -104,9 +103,9 @@ bool HTMLVideoElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLMediaElement::isPresentationAttribute(name);
 }
 
-void HTMLVideoElement::parseAttribute(const Attribute& attribute)
+void HTMLVideoElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == posterAttr) {
+    if (name == posterAttr) {
         // Force a poster recalc by setting m_displayMode to Unknown directly before calling updateDisplayState.
         HTMLMediaElement::setDisplayMode(Unknown);
         updateDisplayState();
@@ -116,14 +115,12 @@ void HTMLVideoElement::parseAttribute(const Attribute& attribute)
                 m_imageLoader = adoptPtr(new HTMLImageLoader(this));
             m_imageLoader->updateFromElementIgnoringPreviousError();
         } else {
-            if (m_imageLoader)
-                m_imageLoader.clear();
             if (renderer())
                 toRenderImage(renderer())->imageResource()->setCachedImage(0); 
         }
 #endif
     } else
-        HTMLMediaElement::parseAttribute(attribute);
+        HTMLMediaElement::parseAttribute(name, value);
 }
 
 bool HTMLVideoElement::supportsFullscreen() const

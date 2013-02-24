@@ -521,6 +521,21 @@ void PluginControllerProxy::handleKeyboardEvent(const WebKeyboardEvent& keyboard
     handled = m_plugin->handleKeyboardEvent(keyboardEvent);
 }
 
+void PluginControllerProxy::handleEditingCommand(const String& commandName, const String& argument, bool& handled)
+{
+    handled = m_plugin->handleEditingCommand(commandName, argument);
+}
+    
+void PluginControllerProxy::isEditingCommandEnabled(const String& commandName, bool& enabled)
+{
+    enabled = m_plugin->isEditingCommandEnabled(commandName);
+}
+    
+void PluginControllerProxy::handlesPageScaleFactor(bool& isHandled)
+{
+    isHandled = m_plugin->handlesPageScaleFactor();
+}
+
 void PluginControllerProxy::paintEntirePlugin()
 {
     if (m_pluginSize.isEmpty())
@@ -561,6 +576,14 @@ void PluginControllerProxy::getPluginScriptableNPObject(uint64_t& pluginScriptab
     
     pluginScriptableNPObjectID = m_connection->npRemoteObjectMap()->registerNPObject(pluginScriptableNPObject, m_plugin.get());
     releaseNPObject(pluginScriptableNPObject);
+}
+
+void PluginControllerProxy::storageBlockingStateChanged(bool isStorageBlockingEnabled)
+{
+    if (m_storageBlockingEnabled != isStorageBlockingEnabled) {
+        m_storageBlockingEnabled = isStorageBlockingEnabled;
+        m_plugin->storageBlockingStateChanged(m_storageBlockingEnabled);
+    }
 }
 
 void PluginControllerProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)

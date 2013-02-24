@@ -26,6 +26,7 @@
 #include "Interpreter.h"
 #include "JSFunction.h"
 #include "JSGlobalObject.h"
+#include "Operations.h"
 #include "Parser.h"
 #include "Protect.h"
 
@@ -59,7 +60,7 @@ inline Recompiler::~Recompiler()
     // JavaScript in the inspector.
     SourceProviderMap::const_iterator end = m_sourceProviders.end();
     for (SourceProviderMap::const_iterator iter = m_sourceProviders.begin(); iter != end; ++iter)
-        m_debugger->sourceParsed(iter->second, iter->first, -1, UString());
+        m_debugger->sourceParsed(iter->value, iter->key, -1, String());
 }
 
 inline void Recompiler::operator()(JSCell* cell)
@@ -78,9 +79,10 @@ inline void Recompiler::operator()(JSCell* cell)
     if (!m_functionExecutables.add(executable).isNewEntry)
         return;
 
-    ExecState* exec = function->scope()->globalObject->JSGlobalObject::globalExec();
+    ExecState* exec = function->scope()->globalObject()->JSGlobalObject::globalExec();
     executable->clearCodeIfNotCompiling();
-    if (m_debugger == function->scope()->globalObject->debugger())
+    executable->clearUnlinkedCodeForRecompilationIfNotCompiling();
+    if (m_debugger == function->scope()->globalObject()->debugger())
         m_sourceProviders.add(executable->source().provider(), exec);
 }
 
@@ -118,10 +120,10 @@ void Debugger::recompileAllJSFunctions(JSGlobalData* globalData)
         return;
 
     Recompiler recompiler(this);
-    globalData->heap.objectSpace().forEachCell(recompiler);
+    globalData->heap.objectSpace().forEachLiveCell(recompiler);
 }
 
-JSValue evaluateInGlobalCallFrame(const UString& script, JSValue& exception, JSGlobalObject* globalObject)
+JSValue evaluateInGlobalCallFrame(const String& script, JSValue& exception, JSGlobalObject* globalObject)
 {
     CallFrame* globalCallFrame = globalObject->globalExec();
     JSGlobalData& globalData = globalObject->globalData();
@@ -133,7 +135,7 @@ JSValue evaluateInGlobalCallFrame(const UString& script, JSValue& exception, JSG
         return exception;
     }
 
-    JSValue result = globalData.interpreter->execute(eval, globalCallFrame, globalObject, globalCallFrame->scopeChain());
+    JSValue result = globalData.interpreter->execute(eval, globalCallFrame, globalObject, globalCallFrame->scope());
     if (globalData.exception) {
         exception = globalData.exception;
         globalData.exception = JSValue();

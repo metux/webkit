@@ -47,10 +47,20 @@ class IntSize;
 class SharedBuffer;
 
 #if USE(CG)
-typedef CGImageSourceRef NativeImageSourcePtr;
-#else
+typedef CGImageSourceRef NativeImageDecoderPtr;
+#elif !PLATFORM(CHROMIUM)
 class ImageDecoder;
-typedef ImageDecoder* NativeImageSourcePtr;
+typedef ImageDecoder* NativeImageDecoderPtr;
+#endif
+
+#if PLATFORM(CHROMIUM)
+class DeferredImageDecoder;
+typedef DeferredImageDecoder NativeImageDecoder;
+typedef DeferredImageDecoder* NativeImageDecoderPtr;
+#elif USE(CG)
+#define NativeImageDecoder ImageDecoder
+#else
+typedef ImageDecoder NativeImageDecoder;
 #endif
 
 // Right now GIFs are the only recognized image format that supports animation.
@@ -146,15 +156,24 @@ public:
     bool frameIsCompleteAtIndex(size_t); // Whether or not the frame is completely decoded.
     ImageOrientation orientationAtIndex(size_t) const; // EXIF image orientation
 
+    // Return the number of bytes in the decoded frame. If the frame is not yet
+    // decoded then return 0.
+    unsigned frameBytesAtIndex(size_t) const;
+
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     static unsigned maxPixelsPerDecodedImage() { return s_maxPixelsPerDecodedImage; }
     static void setMaxPixelsPerDecodedImage(unsigned maxPixels) { s_maxPixelsPerDecodedImage = maxPixels; }
 #endif
 
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
 private:
-    NativeImageSourcePtr m_decoder;
+    NativeImageDecoderPtr m_decoder;
+
+#if !USE(CG)
     AlphaOption m_alphaOption;
     GammaAndColorProfileOption m_gammaAndColorProfileOption;
+#endif
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     static unsigned s_maxPixelsPerDecodedImage;
 #endif

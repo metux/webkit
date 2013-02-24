@@ -34,7 +34,11 @@
 #include "Element.h"
 #include "HTMLMapElement.h"
 #include "HTMLNames.h"
+#include "NodeTraversal.h"
 #include "TreeScope.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/MemoryInstrumentationHashCountedSet.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
 
 namespace WebCore {
 
@@ -53,6 +57,11 @@ inline bool keyMatchesMapName(AtomicStringImpl* key, Element* element)
 inline bool keyMatchesLowercasedMapName(AtomicStringImpl* key, Element* element)
 {
     return element->hasTagName(mapTag) && static_cast<HTMLMapElement*>(element)->getName().lower().impl() == key;
+}
+
+inline bool keyMatchesLabelForAttribute(AtomicStringImpl* key, Element* element)
+{
+    return element->hasTagName(labelTag) && element->getAttribute(forAttr).impl() == key;
 }
 
 void DocumentOrderedMap::clear()
@@ -98,7 +107,7 @@ void DocumentOrderedMap::remove(AtomicStringImpl* key, Element* element)
 
     m_map.checkConsistency();
     Map::iterator cachedItem = m_map.find(key);
-    if (cachedItem != m_map.end() && cachedItem->second == element)
+    if (cachedItem != m_map.end() && cachedItem->value == element)
         m_map.remove(cachedItem);
     else
         m_duplicateCounts.remove(key);
@@ -118,10 +127,7 @@ inline Element* DocumentOrderedMap::get(AtomicStringImpl* key, const TreeScope* 
 
     if (m_duplicateCounts.contains(key)) {
         // We know there's at least one node that matches; iterate to find the first one.
-        for (Node* node = scope->rootNode()->firstChild(); node; node = node->traverseNextNode()) {
-            if (!node->isElementNode())
-                continue;
-            element = static_cast<Element*>(node);
+        for (element = ElementTraversal::firstWithin(scope->rootNode()); element; element = ElementTraversal::next(element)) {
             if (!keyMatches(key, element))
                 continue;
             m_duplicateCounts.remove(key);
@@ -149,5 +155,16 @@ Element* DocumentOrderedMap::getElementByLowercasedMapName(AtomicStringImpl* key
     return get<keyMatchesLowercasedMapName>(key, scope);
 }
 
-} // namespace WebCore
+Element* DocumentOrderedMap::getElementByLabelForAttribute(AtomicStringImpl* key, const TreeScope* scope) const
+{
+    return get<keyMatchesLabelForAttribute>(key, scope);
+}
 
+void DocumentOrderedMap::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    info.addMember(m_map, "map");
+    info.addMember(m_duplicateCounts, "duplicateCounts");
+}
+
+} // namespace WebCore

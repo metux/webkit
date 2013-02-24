@@ -85,6 +85,16 @@ void InspectorDOMStorageResource::unbind()
     m_frontend = 0;
 }
 
+void InspectorDOMStorageResource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorDOMStorageResources);
+    info.addMember(m_storageArea, "storageArea");
+    info.addMember(m_frame, "frame");
+    info.addWeakPointer(m_frontend);
+    info.addMember(m_id, "id");
+    info.addPrivateBuffer(m_storageArea->memoryBytesUsedByCache(), 0, "StorageAreaCache", "cache");
+}
+
 } // namespace WebCore
 
 #endif // ENABLE(INSPECTOR)

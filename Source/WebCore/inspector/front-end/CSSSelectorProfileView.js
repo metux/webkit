@@ -74,10 +74,10 @@ WebInspector.CSSSelectorDataGridNode.prototype = {
         }
 
         return cell;
-    }
-}
+    },
 
-WebInspector.CSSSelectorDataGridNode.prototype.__proto__ = WebInspector.DataGridNode.prototype;
+    __proto__: WebInspector.DataGridNode.prototype
+}
 
 /**
  * @constructor
@@ -195,7 +195,7 @@ WebInspector.CSSSelectorProfileView.prototype = {
 
         function selectorComparator(a, b)
         {
-            var result = b.rawData.selector.localeCompare(a.rawData.selector);
+            var result = b.rawData.selector.compareTo(a.rawData.selector);
             return sortAscending ? -result : result;
         }
 
@@ -203,7 +203,7 @@ WebInspector.CSSSelectorProfileView.prototype = {
         {
             var aRawData = a.rawData;
             var bRawData = b.rawData;
-            var result = bRawData.url.localeCompare(aRawData.url);
+            var result = bRawData.url.compareTo(aRawData.url);
             if (!result)
                 result = bRawData.lineNumber - aRawData.lineNumber;
             return sortAscending ? -result : result;
@@ -259,10 +259,10 @@ WebInspector.CSSSelectorProfileView.prototype = {
         this.refreshShowAsPercents();
 
         event.consume(true);
-    }
-}
+    },
 
-WebInspector.CSSSelectorProfileView.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -364,16 +364,16 @@ WebInspector.CSSSelectorProfileType.prototype = {
     {
         title = title || WebInspector.UIString("Recording\u2026");
         return new WebInspector.CSSProfileHeader(this, title);
-    }
-}
+    },
 
-WebInspector.CSSSelectorProfileType.prototype.__proto__ = WebInspector.ProfileType.prototype;
+    __proto__: WebInspector.ProfileType.prototype
+}
 
 
 /**
  * @constructor
  * @extends {WebInspector.ProfileHeader}
- * @param {WebInspector.CSSSelectorProfileType} type
+ * @param {!WebInspector.CSSSelectorProfileType} type
  * @param {string} title
  * @param {number=} uid
  * @param {CSSAgent.SelectorProfile=} protocolData
@@ -399,9 +399,9 @@ WebInspector.CSSProfileHeader.prototype = {
      */
     createView: function(profilesPanel)
     {
-        var profile = /** @type {CSSAgent.SelectorProfile} */this._protocolData;
+        var profile = /** @type {CSSAgent.SelectorProfile} */ (this._protocolData);
         return new WebInspector.CSSSelectorProfileView(profile);
-    }
-}
+    },
 
-WebInspector.CSSProfileHeader.prototype.__proto__ = WebInspector.ProfileHeader.prototype;
+    __proto__: WebInspector.ProfileHeader.prototype
+}

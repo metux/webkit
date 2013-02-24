@@ -30,12 +30,12 @@
 
 /**
  * @constructor
- * @extends {WebInspector.SplitView}
+ * @extends {WebInspector.SidebarView}
  * @param {WebInspector.FileSystemModel.FileSystem} fileSystem
  */
 WebInspector.FileSystemView = function(fileSystem)
 {
-    WebInspector.SplitView.call(this, WebInspector.SplitView.SidebarPosition.Left, "FileSystemViewSidebarWidth");
+    WebInspector.SidebarView.call(this, WebInspector.SidebarView.SidebarPosition.Start, "FileSystemViewSidebarWidth");
     this.element.addStyleClass("file-system-view");
     this.element.addStyleClass("storage-view");
 
@@ -53,6 +53,10 @@ WebInspector.FileSystemView = function(fileSystem)
     this._refreshButton = new WebInspector.StatusBarButton(WebInspector.UIString("Refresh"), "refresh-storage-status-bar-item");
     this._refreshButton.visible = true;
     this._refreshButton.addEventListener("click", this._refresh, this);
+
+    this._deleteButton = new WebInspector.StatusBarButton(WebInspector.UIString("Delete"), "delete-storage-status-bar-item");
+    this._deleteButton.visible = true;
+    this._deleteButton.addEventListener("click", this._confirmDelete, this);
 }
 
 WebInspector.FileSystemView.prototype = {
@@ -61,7 +65,7 @@ WebInspector.FileSystemView.prototype = {
      */
     get statusBarItems()
     {
-        return [this._refreshButton.element];
+        return [this._refreshButton.element, this._deleteButton.element];
     },
 
     /**
@@ -88,10 +92,21 @@ WebInspector.FileSystemView.prototype = {
     _refresh: function()
     {
         this._directoryTree.children[0].refresh();
-    }
-}
+    },
 
-WebInspector.FileSystemView.prototype.__proto__ = WebInspector.SplitView.prototype;
+    _confirmDelete: function()
+    {
+        if (confirm(WebInspector.UIString("Are you sure you want to delete the selected entry?")))
+            this._delete();
+    },
+
+    _delete: function()
+    {
+        this._directoryTree.selectedTreeElement.deleteEntry();
+    },
+
+    __proto__: WebInspector.SidebarView.prototype
+}
 
 /**
  * @constructor
@@ -120,7 +135,7 @@ WebInspector.FileSystemView.EntryTreeElement.prototype = {
             if (this._entry.isDirectory)
                 this._view = new WebInspector.DirectoryContentView();
             else {
-                var file = /** @type {WebInspector.FileSystemModel.File} */ this._entry;
+                var file = /** @type {WebInspector.FileSystemModel.File} */ (this._entry);
                 this._view = new WebInspector.FileContentView(file);
             }
         }
@@ -162,7 +177,7 @@ WebInspector.FileSystemView.EntryTreeElement.prototype = {
         while (newEntryIndex < entries.length && oldChildIndex < oldChildren.length) {
             var newEntry = entries[newEntryIndex];
             var oldChild = oldChildren[oldChildIndex];
-            var order = newEntry.name.localeCompare(oldChild._entry.name);
+            var order = newEntry.name.compareTo(oldChild._entry.name);
 
             if (order === 0) {
                 if (oldChild._entry.isDirectory)
@@ -196,12 +211,23 @@ WebInspector.FileSystemView.EntryTreeElement.prototype = {
     {
         if (!this._entry.isDirectory) {
             if (this._view && this._view === this._fileSystemView.visibleView) {
-                var fileContentView = /** @type {WebInspector.FileContentView} */ this._view;
+                var fileContentView = /** @type {WebInspector.FileContentView} */ (this._view);
                 fileContentView.refresh();
             }
         } else
             this._entry.requestDirectoryContent(this._directoryContentReceived.bind(this));
-    }
-}
+    },
 
-WebInspector.FileSystemView.EntryTreeElement.prototype.__proto__ = TreeElement.prototype;
+    deleteEntry: function()
+    {
+        this._entry.deleteEntry(this._deletionCompleted.bind(this));
+    },
+
+    _deletionCompleted: function()
+    {
+        if (this._entry != this._entry.fileSystem.root)
+            this.parent.refresh();
+    },
+
+    __proto__: TreeElement.prototype
+}

@@ -38,7 +38,7 @@ public:
     VisiblePosition visiblePositionForIndex(int index) const;
 
 protected:
-    RenderTextControl(Node*);
+    RenderTextControl(Element*);
 
     // This convenience function should not be made public because innerTextElement may outlive the render tree.
     HTMLElement* innerTextElement() const;
@@ -62,13 +62,14 @@ protected:
     virtual RenderStyle* textBaseStyle() const = 0;
 
     virtual void updateFromElement();
-    virtual void computeLogicalHeight();
+    virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
     virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren);
 
 private:
     virtual const char* renderName() const { return "RenderTextControl"; }
     virtual bool isTextControl() const { return true; }
-    virtual void computePreferredLogicalWidths();
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const OVERRIDE;
+    virtual void computePreferredLogicalWidths() OVERRIDE;
     virtual void removeLeftoverAnonymousBlock(RenderBlock*) { }
     virtual bool avoidsFloats() const { return true; }
     virtual bool canHaveGeneratedChildren() const OVERRIDE { return false; }
@@ -79,19 +80,17 @@ private:
     virtual bool canBeProgramaticallyScrolled() const { return true; }
 
     virtual bool requiresForcedStyleRecalcPropagation() const { return true; }
-
-    static bool isSelectableElement(HTMLElement*, Node*);
 };
 
 inline RenderTextControl* toRenderTextControl(RenderObject* object)
 { 
-    ASSERT(!object || object->isTextControl());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTextControl());
     return static_cast<RenderTextControl*>(object);
 }
 
 inline const RenderTextControl* toRenderTextControl(const RenderObject* object)
 { 
-    ASSERT(!object || object->isTextControl());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTextControl());
     return static_cast<const RenderTextControl*>(object);
 }
 

@@ -75,13 +75,6 @@ ScriptController::ScriptController(Frame* frame)
     , m_windowScriptObject(0)
 #endif
 {
-#if PLATFORM(MAC) && ENABLE(JAVA_BRIDGE)
-    static bool initializedJavaJSBindings;
-    if (!initializedJavaJSBindings) {
-        initializedJavaJSBindings = true;
-        initJavaJSBindings();
-    }
-#endif
 }
 
 ScriptController::~ScriptController()
@@ -96,7 +89,7 @@ ScriptController::~ScriptController()
     // It's likely that destroying m_windowShells will create a lot of garbage.
     if (!m_windowShells.isEmpty()) {
         while (!m_windowShells.isEmpty())
-            destroyWindowShell(m_windowShells.begin()->first.get());
+            destroyWindowShell(m_windowShells.begin()->key.get());
         gcController().garbageCollectSoon();
     }
 }
@@ -122,7 +115,7 @@ JSDOMWindowShell* ScriptController::createWindowShell(DOMWrapperWorld* world)
 ScriptValue ScriptController::evaluateInWorld(const ScriptSourceCode& sourceCode, DOMWrapperWorld* world)
 {
     const SourceCode& jsSourceCode = sourceCode.jsSourceCode();
-    String sourceURL = ustringToString(jsSourceCode.provider()->url());
+    String sourceURL = jsSourceCode.provider()->url();
 
     // evaluate code. Returns the JS return value or 0
     // if there was none, an error occurred or the type couldn't be converted.
@@ -145,13 +138,13 @@ ScriptValue ScriptController::evaluateInWorld(const ScriptSourceCode& sourceCode
     JSValue evaluationException;
 
     exec->globalData().timeoutChecker.start();
-    JSValue returnValue = JSMainThreadExecState::evaluate(exec, exec->dynamicGlobalObject()->globalScopeChain(), jsSourceCode, shell, &evaluationException);
+    JSValue returnValue = JSMainThreadExecState::evaluate(exec, jsSourceCode, shell, &evaluationException);
     exec->globalData().timeoutChecker.stop();
 
     InspectorInstrumentation::didEvaluateScript(cookie);
 
     if (evaluationException) {
-        reportException(exec, evaluationException);
+        reportException(exec, evaluationException, sourceCode.cachedScript());
         m_sourceURL = savedSourceURL;
         return ScriptValue();
     }
@@ -183,7 +176,7 @@ void ScriptController::clearWindowShell(DOMWindow* newDOMWindow, bool goingIntoP
     JSLockHolder lock(JSDOMWindowBase::commonJSGlobalData());
 
     for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter) {
-        JSDOMWindowShell* windowShell = iter->second.get();
+        JSDOMWindowShell* windowShell = iter->value.get();
 
         if (windowShell->window()->impl() == newDOMWindow)
             continue;
@@ -222,7 +215,7 @@ JSDOMWindowShell* ScriptController::initScript(DOMWrapperWorld* world)
     windowShell->window()->updateDocument();
 
     if (m_frame->document())
-        windowShell->window()->setEvalEnabled(m_frame->document()->contentSecurityPolicy()->allowEval(0, ContentSecurityPolicy::SuppressReport));   
+        windowShell->window()->setEvalEnabled(m_frame->document()->contentSecurityPolicy()->allowEval(0, ContentSecurityPolicy::SuppressReport), m_frame->document()->contentSecurityPolicy()->evalDisabledErrorMessage());   
 
     if (Page* page = m_frame->page()) {
         attachDebugger(windowShell, page->debugger());
@@ -250,12 +243,12 @@ void ScriptController::enableEval()
     windowShell->window()->setEvalEnabled(true);
 }
 
-void ScriptController::disableEval()
+void ScriptController::disableEval(const String& errorMessage)
 {
     JSDOMWindowShell* windowShell = existingWindowShell(mainThreadNormalWorld());
     if (!windowShell)
         return;
-    windowShell->window()->setEvalEnabled(false);
+    windowShell->window()->setEvalEnabled(false, errorMessage);
 }
 
 bool ScriptController::processingUserGesture()
@@ -276,7 +269,7 @@ bool ScriptController::canAccessFromCurrentOrigin(Frame *frame)
 void ScriptController::attachDebugger(JSC::Debugger* debugger)
 {
     for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter)
-        attachDebugger(iter->second.get(), debugger);
+        attachDebugger(iter->value.get(), debugger);
 }
 
 void ScriptController::attachDebugger(JSDOMWindowShell* shell, JSC::Debugger* debugger)
@@ -293,12 +286,9 @@ void ScriptController::attachDebugger(JSDOMWindowShell* shell, JSC::Debugger* de
 
 void ScriptController::updateDocument()
 {
-    if (!m_frame->document())
-        return;
-
     for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter) {
-        JSLockHolder lock(iter->first->globalData());
-        iter->second->window()->updateDocument();
+        JSLockHolder lock(iter->key->globalData());
+        iter->value->window()->updateDocument();
     }
 }
 
@@ -335,7 +325,7 @@ PassRefPtr<Bindings::RootObject> ScriptController::createRootObject(void* native
 {
     RootObjectMap::iterator it = m_rootObjects.find(nativeHandle);
     if (it != m_rootObjects.end())
-        return it->second;
+        return it->value;
 
     RefPtr<Bindings::RootObject> rootObject = Bindings::RootObject::create(nativeHandle, globalObject(pluginWorld()));
 
@@ -351,8 +341,8 @@ void ScriptController::setCaptureCallStackForUncaughtExceptions(bool)
 void ScriptController::collectIsolatedContexts(Vector<std::pair<JSC::ExecState*, SecurityOrigin*> >& result)
 {
     for (ShellMap::iterator iter = m_windowShells.begin(); iter != m_windowShells.end(); ++iter) {
-        JSC::ExecState* exec = iter->second->window()->globalExec();
-        SecurityOrigin* origin = iter->second->window()->impl()->document()->securityOrigin();
+        JSC::ExecState* exec = iter->value->window()->globalExec();
+        SecurityOrigin* origin = iter->value->window()->impl()->document()->securityOrigin();
         result.append(std::pair<ScriptState*, SecurityOrigin*>(exec, origin));
     }
 }
@@ -440,7 +430,7 @@ void ScriptController::cleanupScriptObjectsForPlugin(void* nativeHandle)
     if (it == m_rootObjects.end())
         return;
 
-    it->second->invalidate();
+    it->value->invalidate();
     m_rootObjects.remove(it);
 }
 
@@ -450,7 +440,7 @@ void ScriptController::clearScriptObjects()
 
     RootObjectMap::const_iterator end = m_rootObjects.end();
     for (RootObjectMap::const_iterator it = m_rootObjects.begin(); it != end; ++it)
-        it->second->invalidate();
+        it->value->invalidate();
 
     m_rootObjects.clear();
 

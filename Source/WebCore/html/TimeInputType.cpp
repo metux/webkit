@@ -29,21 +29,22 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_TYPE_TIME)
 #include "TimeInputType.h"
 
 #include "DateComponents.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "InputTypeNames.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/DateMath.h>
 #include <wtf/MathExtras.h>
 #include <wtf/PassOwnPtr.h>
 
-#if ENABLE(INPUT_TYPE_TIME)
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
-#include "ElementShadow.h"
-#include "KeyboardEvent.h"
-#include "ShadowRoot.h"
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#include "DateTimeFieldsState.h"
+#include "PlatformLocale.h"
+#include <wtf/text/WTFString.h>
 #endif
 
 namespace WebCore {
@@ -54,9 +55,19 @@ static const int timeDefaultStep = 60;
 static const int timeDefaultStepBase = 0;
 static const int timeStepScaleFactor = 1000;
 
+TimeInputType::TimeInputType(HTMLInputElement*  element)
+    : BaseTimeInputType(element)
+{
+}
+
 PassOwnPtr<InputType> TimeInputType::create(HTMLInputElement* element)
 {
     return adoptPtr(new TimeInputType(element));
+}
+
+void TimeInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeTime);
 }
 
 const AtomicString& TimeInputType::formControlType() const
@@ -80,7 +91,7 @@ Decimal TimeInputType::defaultValueForStepUp() const
     DateComponents date;
     date.setMillisecondsSinceMidnight(current);
     double milliseconds = date.millisecondsSinceEpoch();
-    ASSERT(isfinite(milliseconds));
+    ASSERT(std::isfinite(milliseconds));
     return Decimal::fromDouble(milliseconds);
 }
 
@@ -113,186 +124,47 @@ bool TimeInputType::isTimeField() const
     return true;
 }
 
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 
-TimeInputType::DateTimeEditControlOwnerImpl::DateTimeEditControlOwnerImpl(TimeInputType& timeInputType)
-    : m_timeInputType(timeInputType)
+String TimeInputType::localizeValue(const String& proposedValue) const
 {
-}
-
-TimeInputType::DateTimeEditControlOwnerImpl::~DateTimeEditControlOwnerImpl()
-{
-}
-
-void TimeInputType::DateTimeEditControlOwnerImpl::editControlMouseFocus()
-{
-    m_timeInputType.element()->focus();
-}
-
-void TimeInputType::DateTimeEditControlOwnerImpl::editControlValueChanged()
-{
-    RefPtr<HTMLInputElement> input(m_timeInputType.element());
-    input->setValueInternal(m_timeInputType.serialize(Decimal::fromDouble(m_timeInputType.m_dateTimeEditElement->valueAsDouble())), DispatchNoEvent);
-    input->setNeedsStyleRecalc();
-    input->dispatchFormControlInputEvent();
-    input->dispatchFormControlChangeEvent();
-}
-
-void TimeInputType::DateTimeEditControlOwnerImpl::focusAndSelectEditControlOwner()
-{
-    RefPtr<HTMLInputElement> input(m_timeInputType.element());
-    input->focus();
-    input->select();
-}
-
-bool TimeInputType::DateTimeEditControlOwnerImpl::isEditControlOwnerDisabled() const
-{
-    return m_timeInputType.element()->readOnly();
-}
-
-bool TimeInputType::DateTimeEditControlOwnerImpl::isEditControlOwnerFocused() const
-{
-    return m_timeInputType.element()->focused();
-}
-
-bool TimeInputType::DateTimeEditControlOwnerImpl::isEditControlOwnerReadOnly() const
-{
-    return m_timeInputType.element()->disabled();
-}
-
-TimeInputType::TimeInputType(HTMLInputElement* element)
-    : BaseDateAndTimeInputType(element)
-    , m_dateTimeEditElement(0)
-    , m_dateTimeEditControlOwnerImpl(*this)
-{
-}
-
-TimeInputType::~TimeInputType()
-{
-    if (m_dateTimeEditElement)
-        m_dateTimeEditElement->removeEditControlOwner();
-}
-
-RenderObject* TimeInputType::createRenderer(RenderArena* arena, RenderStyle* style) const
-{
-    return InputType::createRenderer(arena, style);
-}
-
-void TimeInputType::createShadowSubtree()
-{
-    ASSERT(element()->shadow());
-
-    const StepRange stepRange(createStepRange(AnyIsDefaultStep));
-    RefPtr<DateTimeEditElement> dateTimeEditElement(DateTimeEditElement::create(element()->document(), m_dateTimeEditControlOwnerImpl, stepRange));
-    m_dateTimeEditElement = dateTimeEditElement.get();
-    element()->userAgentShadowRoot()->appendChild(m_dateTimeEditElement);
-    updateInnerTextValue();
-}
-
-void TimeInputType::destroyShadowSubtree()
-{
-    if (m_dateTimeEditElement) {
-        m_dateTimeEditElement->removeEditControlOwner();
-        m_dateTimeEditElement = 0;
-    }
-    BaseDateAndTimeInputType::destroyShadowSubtree();
-}
-
-void TimeInputType::forwardEvent(Event* event)
-{
-    if (m_dateTimeEditElement)
-        m_dateTimeEditElement->defaultEventHandler(event);
-}
-
-void TimeInputType::disabledAttributeChanged()
-{
-    if (m_dateTimeEditElement)
-        m_dateTimeEditElement->disabledStateChanged();
-}
-
-void TimeInputType::handleKeydownEvent(KeyboardEvent* event)
-{
-    forwardEvent(event);
-}
-
-void TimeInputType::handleDOMActivateEvent(Event* event)
-{
-    if (element()->disabled() || element()->readOnly() || !element()->renderer())
-        return;
-
-    if (m_dateTimeEditElement)
-        m_dateTimeEditElement->focus();
-
-    event->setDefaultHandled();
-}
-
-bool TimeInputType::isKeyboardFocusable(KeyboardEvent*) const
-{
-    return element()->isTextFormControlFocusable();
-}
-
-bool TimeInputType::isMouseFocusable() const
-{
-    return element()->isTextFormControlFocusable();
-}
-
-void TimeInputType::minOrMaxAttributeChanged()
-{
-    updateEditElementLayout();
-}
-
-void TimeInputType::readonlyAttributeChanged()
-{
-    if (m_dateTimeEditElement)
-        m_dateTimeEditElement->readOnlyStateChanged();
-}
-
-bool TimeInputType::isTextField() const
-{
-    return false;
-}
-
-void TimeInputType::setValue(const String& sanitizedValue, bool valueChanged, TextFieldEventBehavior eventBehavior)
-{
-    InputType::setValue(sanitizedValue, valueChanged, eventBehavior);
-    if (valueChanged)
-        updateInnerTextValue();
-}
-
-bool TimeInputType::shouldUseInputMethod() const
-{
-    return false;
-}
-
-void TimeInputType::stepAttributeChanged()
-{
-    updateEditElementLayout();
-}
-
-void TimeInputType::updateEditElementLayout()
-{
-    if (m_dateTimeEditElement)
-        m_dateTimeEditElement->layout(createStepRange(AnyIsDefaultStep));
-}
-
-void TimeInputType::updateInnerTextValue()
-{
-    if (!m_dateTimeEditElement)
-        return;
-
     DateComponents date;
-    if (parseToDateComponents(element()->value(), &date))
-        m_dateTimeEditElement->setValueAsDate(date);
-    else {
-        const StepRange stepRange(createStepRange(AnyIsDefaultStep));
-        setMillisecondToDateComponents(stepRange.minimum().toDouble(), &date);
-        m_dateTimeEditElement->setEmptyValue(date);
-    }
+    if (!parseToDateComponents(proposedValue, &date))
+        return proposedValue;
+
+    Locale::FormatType formatType = shouldHaveSecondField(date) ? Locale::FormatTypeMedium : Locale::FormatTypeShort;
+
+    String localized = element()->locale().formatDateTime(date, formatType);
+    return localized.isEmpty() ? proposedValue : localized;
 }
-#else
-TimeInputType::TimeInputType(HTMLInputElement* element)
-    : BaseDateAndTimeInputType(element)
+
+String TimeInputType::formatDateTimeFieldsState(const DateTimeFieldsState& dateTimeFieldsState) const
 {
+    if (!dateTimeFieldsState.hasHour() || !dateTimeFieldsState.hasMinute() || !dateTimeFieldsState.hasAMPM())
+        return emptyString();
+    if (dateTimeFieldsState.hasMillisecond() && dateTimeFieldsState.millisecond())
+        return String::format("%02u:%02u:%02u.%03u",
+                dateTimeFieldsState.hour23(),
+                dateTimeFieldsState.minute(),
+                dateTimeFieldsState.hasSecond() ? dateTimeFieldsState.second() : 0,
+                dateTimeFieldsState.millisecond());
+    if (dateTimeFieldsState.hasSecond() && dateTimeFieldsState.second())
+        return String::format("%02u:%02u:%02u",
+                dateTimeFieldsState.hour23(),
+                dateTimeFieldsState.minute(),
+                dateTimeFieldsState.second());
+    return String::format("%02u:%02u", dateTimeFieldsState.hour23(), dateTimeFieldsState.minute());
+}
+
+void TimeInputType::setupLayoutParameters(DateTimeEditElement::LayoutParameters& layoutParameters, const DateComponents& date) const
+{
+    if (shouldHaveSecondField(date)) {
+        layoutParameters.dateTimeFormat = layoutParameters.locale.timeFormat();
+        layoutParameters.fallbackDateTimeFormat = "HH:mm:ss";
+    } else {
+        layoutParameters.dateTimeFormat = layoutParameters.locale.shortTimeFormat();
+        layoutParameters.fallbackDateTimeFormat = "HH:mm";
+    }
 }
 #endif
 

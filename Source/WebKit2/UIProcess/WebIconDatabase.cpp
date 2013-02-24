@@ -29,6 +29,7 @@
 #include "DataReference.h"
 #include "Logging.h"
 #include "WebContext.h"
+#include "WebIconDatabaseMessages.h"
 #include "WebIconDatabaseProxyMessages.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/IconDatabase.h>
@@ -54,10 +55,12 @@ WebIconDatabase::WebIconDatabase(WebContext* context)
     , m_urlImportCompleted(false)
     , m_databaseCleanupDisabled(false)
 {
+    m_webContext->addMessageReceiver(Messages::WebIconDatabase::messageReceiverName(), this);
 }
 
 void WebIconDatabase::invalidate()
 {
+    setGlobalIconDatabase(0);
 }
 
 void WebIconDatabase::setDatabasePath(const String& path)
@@ -161,7 +164,7 @@ void WebIconDatabase::getLoadDecisionForIconURL(const String& iconURL, uint64_t 
         return;
 
     if (!m_iconDatabaseImpl || !m_iconDatabaseImpl->isOpen() || iconURL.isEmpty()) {
-        // FIXME (Multi-WebProcess): We need to know which connection to send this message to.
+        // FIXME (Multi-WebProcess): <rdar://problem/12240223> We need to know which connection to send this message to.
         m_webContext->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision(static_cast<int>(IconLoadNo), callbackID));
         return;
     }
@@ -176,8 +179,13 @@ void WebIconDatabase::getLoadDecisionForIconURL(const String& iconURL, uint64_t 
         return;    
     }
 
-    // FIXME (Multi-WebProcess): We need to know which connection to send this message to.
+    // FIXME (Multi-WebProcess): <rdar://problem/12240223> We need to know which connection to send this message to.
     m_webContext->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision((int)decision, callbackID));
+}
+
+void WebIconDatabase::didReceiveIconForPageURL(const String& pageURL)
+{
+    notifyIconDataReadyForPageURL(pageURL);
 }
 
 Image* WebIconDatabase::imageForPageURL(const String& pageURL, const WebCore::IntSize& iconSize)
@@ -203,6 +211,11 @@ bool WebIconDatabase::isOpen()
     return m_iconDatabaseImpl && m_iconDatabaseImpl->isOpen();
 }
 
+bool WebIconDatabase::isUrlImportCompleted()
+{
+    return m_urlImportCompleted;
+}
+
 void WebIconDatabase::removeAllIcons()
 {
     m_iconDatabaseImpl->removeAllIcons();   
@@ -224,11 +237,6 @@ void WebIconDatabase::initializeIconDatabaseClient(const WKIconDatabaseClient* c
 }
 
 // WebCore::IconDatabaseClient
-bool WebIconDatabase::performImport()
-{
-    // WebKit2 icon database doesn't currently support importing any old icon database formats.
-    return true;
-}
 
 void WebIconDatabase::didImportIconURLForPageURL(const String& pageURL)
 {
@@ -237,7 +245,7 @@ void WebIconDatabase::didImportIconURLForPageURL(const String& pageURL)
 
 void WebIconDatabase::didImportIconDataForPageURL(const String& pageURL)
 {
-    didChangeIconForPageURL(pageURL);
+    notifyIconDataReadyForPageURL(pageURL);
 }
 
 void WebIconDatabase::didChangeIconForPageURL(const String& pageURL)
@@ -263,14 +271,14 @@ void WebIconDatabase::didFinishURLImport()
     HashMap<uint64_t, String>::iterator end = m_pendingLoadDecisionURLMap.end();
     
     for (; i != end; ++i) {
-        LOG(IconDatabase, "WK2 UIProcess performing delayed callback on callback ID %i for page url %s", (int)i->first, i->second.ascii().data());
-        IconLoadDecision decision = m_iconDatabaseImpl->synchronousLoadDecisionForIconURL(i->second, 0);
+        LOG(IconDatabase, "WK2 UIProcess performing delayed callback on callback ID %i for page url %s", (int)i->key, i->value.ascii().data());
+        IconLoadDecision decision = m_iconDatabaseImpl->synchronousLoadDecisionForIconURL(i->value, 0);
 
         // Decisions should never be unknown after the inital import is complete
         ASSERT(decision != IconLoadUnknown);
 
-        // FIXME (Multi-WebProcess): We need to know which connection to send this message to.
-        m_webContext->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision(static_cast<int>(decision), i->first));
+        // FIXME (Multi-WebProcess): <rdar://problem/12240223> We need to know which connection to send this message to.
+        m_webContext->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision(static_cast<int>(decision), i->key));
     }
     
     m_pendingLoadDecisionURLMap.clear();
@@ -278,14 +286,10 @@ void WebIconDatabase::didFinishURLImport()
     m_urlImportCompleted = true;
 }
 
-void WebIconDatabase::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* decoder)
+void WebIconDatabase::notifyIconDataReadyForPageURL(const String& pageURL)
 {
-    didReceiveWebIconDatabaseMessage(connection, messageID, decoder);
-}
-
-void WebIconDatabase::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* decoder, OwnPtr<CoreIPC::ArgumentEncoder>& reply)
-{
-    didReceiveSyncWebIconDatabaseMessage(connection, messageID, decoder, reply);
+    m_iconDatabaseClient.iconDataReadyForPageURL(this, WebURL::create(pageURL).get());
+    didChangeIconForPageURL(pageURL);
 }
 
 } // namespace WebKit

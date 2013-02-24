@@ -72,11 +72,7 @@ bool ArrayValue::get(size_t index, Dictionary& value) const
     if (isUndefinedOrNull())
         return false;
 
-    JSArray* array = asArray(m_value);
-    if (!array->canGetIndex(index))
-        return false;
-
-    JSValue indexedValue = array->getIndex(index);
+    JSValue indexedValue = asArray(m_value)->getIndex(m_exec, index);
     if (indexedValue.isUndefinedOrNull() || !indexedValue.isObject())
         return false;
 

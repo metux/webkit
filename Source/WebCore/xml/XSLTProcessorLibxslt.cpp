@@ -101,7 +101,7 @@ void XSLTProcessor::parseErrorFunc(void* userData, xmlError* error)
         break;
     }
 
-    console->addMessage(XMLMessageSource, LogMessageType, level, error->message, error->file, error->line);
+    console->addMessage(XMLMessageSource, level, error->message, error->file, error->line);
 }
 
 // FIXME: There seems to be no way to control the ctxt pointer for loading here, thus we have globals.
@@ -225,8 +225,8 @@ static const char** xsltParamArrayFromParameterMap(XSLTProcessor::ParameterMap& 
     XSLTProcessor::ParameterMap::iterator end = parameters.end();
     unsigned index = 0;
     for (XSLTProcessor::ParameterMap::iterator it = parameters.begin(); it != end; ++it) {
-        parameterArray[index++] = fastStrDup(it->first.utf8().data());
-        parameterArray[index++] = fastStrDup(it->second.utf8().data());
+        parameterArray[index++] = fastStrDup(it->key.utf8().data());
+        parameterArray[index++] = fastStrDup(it->value.utf8().data());
     }
     parameterArray[index] = 0;
 

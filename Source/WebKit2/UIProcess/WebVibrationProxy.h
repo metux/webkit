@@ -29,45 +29,37 @@
 #if ENABLE(VIBRATION)
 
 #include "APIObject.h"
-#include "MessageID.h"
+#include "MessageReceiver.h"
 #include "WebVibrationProvider.h"
 #include <wtf/Forward.h>
 
-namespace CoreIPC {
-class ArgumentDecoder;
-class Connection;
-}
-
 namespace WebKit {
 
-class WebContext;
+class WebPageProxy;
 
-class WebVibrationProxy : public APIObject {
+class WebVibrationProxy : public APIObject, private CoreIPC::MessageReceiver {
 public:
     static const Type APIType = TypeVibration;
 
-    static PassRefPtr<WebVibrationProxy> create(WebContext*);
+    static PassRefPtr<WebVibrationProxy> create(WebPageProxy*);
     virtual ~WebVibrationProxy();
 
     void invalidate();
-    void clearContext() { m_context = 0; }
 
     void initializeProvider(const WKVibrationProvider*);
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-
 private:
-    explicit WebVibrationProxy(WebContext*);
+    explicit WebVibrationProxy(WebPageProxy*);
 
     virtual Type type() const { return APIType; }
 
-    // Implemented in generated WebVibrationProxyMessageReceiver.cpp
-    void didReceiveWebVibrationProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
 
-    void vibrate(uint64_t vibrationTime);
+    void vibrate(uint32_t vibrationTime);
     void cancelVibration();
 
-    WebContext* m_context;
+    WebPageProxy* m_page;
     WebVibrationProvider m_provider;
 };
 

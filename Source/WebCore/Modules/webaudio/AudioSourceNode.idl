@@ -26,9 +26,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-module audio {
-    interface [
-        Conditional=WEB_AUDIO
-    ] AudioSourceNode : AudioNode {
-    };
-}
+[
+    Conditional=WEB_AUDIO,
+    ImplementationLacksVTable
+] interface AudioSourceNode : AudioNode {
+};

@@ -28,6 +28,7 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
+#include "PluginProcess.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
@@ -37,31 +38,36 @@
 
 // Manages plug-in process connections for the given web process.
 
-namespace CoreIPC {
-    class Connection;
-}
-
 namespace WebKit {
 
 class PluginProcessConnection;
         
-class PluginProcessConnectionManager {
-    WTF_MAKE_NONCOPYABLE(PluginProcessConnectionManager);
+class PluginProcessConnectionManager : public CoreIPC::Connection::WorkQueueMessageReceiver {
 public:
-    PluginProcessConnectionManager();
+    static PassRefPtr<PluginProcessConnectionManager> create();
     ~PluginProcessConnectionManager();
 
-    PluginProcessConnection* getPluginProcessConnection(const String& pluginPath);
+    void initializeConnection(CoreIPC::Connection*);
+
+    PluginProcessConnection* getPluginProcessConnection(const String& pluginPath, PluginProcess::Type);
     void removePluginProcessConnection(PluginProcessConnection*);
 
-    // Called on the web process connection work queue.
-    void pluginProcessCrashed(const String& pluginPath);
+    void didReceivePluginProcessConnectionManagerMessageOnConnectionWorkQueue(CoreIPC::Connection*, OwnPtr<CoreIPC::MessageDecoder>&);
 
 private:
+    PluginProcessConnectionManager();
+
+    // CoreIPC::Connection::WorkQueueMessageReceiver.
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+
+    void pluginProcessCrashed(const String& pluginPath, uint32_t opaquePluginType);
+
+    RefPtr<WorkQueue> m_queue;
+
     Vector<RefPtr<PluginProcessConnection> > m_pluginProcessConnections;
 
     Mutex m_pathsAndConnectionsMutex;
-    HashMap<String, RefPtr<CoreIPC::Connection> > m_pathsAndConnections;
+    HashMap<std::pair<String, PluginProcess::Type>, RefPtr<CoreIPC::Connection> > m_pathsAndConnections;
 };
 
 }

@@ -36,7 +36,8 @@
 #include <GL/gl.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
-#include <WebCore/GLContextGLX.h>
+#include <WebCore/GLContext.h>
+#include <WebCore/GraphicsLayerTextureMapper.h>
 #include <WebCore/Page.h>
 #include <WebCore/Settings.h>
 
@@ -84,12 +85,12 @@ GLContext* LayerTreeHostGtk::glContext()
 
 void LayerTreeHostGtk::initialize()
 {
-    m_rootLayer = GraphicsLayer::create(this);
+    m_rootLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
     m_rootLayer->setDrawsContent(false);
     m_rootLayer->setSize(m_webPage->size());
 
     // The non-composited contents are a child of the root layer.
-    m_nonCompositedContentLayer = GraphicsLayer::create(this);
+    m_nonCompositedContentLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
     m_nonCompositedContentLayer->setDrawsContent(true);
     m_nonCompositedContentLayer->setContentsOpaque(m_webPage->drawsBackground() && !m_webPage->drawsTransparentBackground());
     m_nonCompositedContentLayer->setSize(m_webPage->size());
@@ -114,7 +115,9 @@ void LayerTreeHostGtk::initialize()
 
     // The creation of the TextureMapper needs an active OpenGL context.
     context->makeContextCurrent();
+
     m_textureMapper = TextureMapperGL::create();
+    static_cast<TextureMapperGL*>(m_textureMapper.get())->setEnableEdgeDistanceAntialiasing(true);
     toTextureMapperLayer(m_rootLayer.get())->setTextureMapper(m_textureMapper.get());
 
     if (m_webPage->hasPageOverlay())
@@ -165,7 +168,16 @@ void LayerTreeHostGtk::invalidate()
     m_isValid = false;
 }
 
-void LayerTreeHostGtk::setNonCompositedContentsNeedDisplay(const IntRect& rect)
+void LayerTreeHostGtk::setNonCompositedContentsNeedDisplay()
+{
+    m_nonCompositedContentLayer->setNeedsDisplay();
+    if (m_pageOverlayLayer)
+        m_pageOverlayLayer->setNeedsDisplay();
+
+    scheduleLayerFlush();
+}
+
+void LayerTreeHostGtk::setNonCompositedContentsNeedDisplayInRect(const IntRect& rect)
 {
     m_nonCompositedContentLayer->setNeedsDisplayInRect(rect);
     if (m_pageOverlayLayer)
@@ -174,9 +186,9 @@ void LayerTreeHostGtk::setNonCompositedContentsNeedDisplay(const IntRect& rect)
     scheduleLayerFlush();
 }
 
-void LayerTreeHostGtk::scrollNonCompositedContents(const IntRect& scrollRect, const IntSize& scrollOffset)
+void LayerTreeHostGtk::scrollNonCompositedContents(const IntRect& scrollRect)
 {
-    setNonCompositedContentsNeedDisplay(scrollRect);
+    setNonCompositedContentsNeedDisplayInRect(scrollRect);
 }
 
 void LayerTreeHostGtk::sizeDidChange(const IntSize& newSize)
@@ -205,7 +217,7 @@ void LayerTreeHostGtk::sizeDidChange(const IntSize& newSize)
     compositeLayersToContext(ForResize);
 }
 
-void LayerTreeHostGtk::deviceScaleFactorDidChange()
+void LayerTreeHostGtk::deviceOrPageScaleFactorChanged()
 {
     // Other layers learn of the scale factor change via WebPage::setDeviceScaleFactor.
     m_nonCompositedContentLayer->deviceOrPageScaleFactorChanged();
@@ -239,7 +251,7 @@ void LayerTreeHostGtk::notifyAnimationStarted(const WebCore::GraphicsLayer*, dou
 {
 }
 
-void LayerTreeHostGtk::notifySyncRequired(const WebCore::GraphicsLayer*)
+void LayerTreeHostGtk::notifyFlushRequired(const WebCore::GraphicsLayer*)
 {
 }
 
@@ -254,16 +266,6 @@ void LayerTreeHostGtk::paintContents(const GraphicsLayer* graphicsLayer, Graphic
         m_webPage->drawPageOverlay(graphicsContext, clipRect);
         return;
     }
-}
-
-bool LayerTreeHostGtk::showDebugBorders(const GraphicsLayer*) const
-{
-    return m_webPage->corePage()->settings()->showDebugBorders();
-}
-
-bool LayerTreeHostGtk::showRepaintCounter(const GraphicsLayer*) const
-{
-    return m_webPage->corePage()->settings()->showRepaintCounter();
 }
 
 gboolean LayerTreeHostGtk::layerFlushTimerFiredCallback(LayerTreeHostGtk* layerTreeHost)
@@ -285,12 +287,12 @@ void LayerTreeHostGtk::layerFlushTimerFired()
 
 bool LayerTreeHostGtk::flushPendingLayerChanges()
 {
-    m_rootLayer->syncCompositingStateForThisLayerOnly();
-    m_nonCompositedContentLayer->syncCompositingStateForThisLayerOnly();
+    m_rootLayer->flushCompositingStateForThisLayerOnly();
+    m_nonCompositedContentLayer->flushCompositingStateForThisLayerOnly();
     if (m_pageOverlayLayer)
-        m_pageOverlayLayer->syncCompositingStateForThisLayerOnly();
+        m_pageOverlayLayer->flushCompositingStateForThisLayerOnly();
 
-    return m_webPage->corePage()->mainFrame()->view()->syncCompositingStateIncludingSubframes();
+    return m_webPage->corePage()->mainFrame()->view()->flushCompositingStateIncludingSubframes();
 }
 
 void LayerTreeHostGtk::compositeLayersToContext(CompositePurpose purpose)
@@ -348,7 +350,7 @@ void LayerTreeHostGtk::createPageOverlayLayer()
 {
     ASSERT(!m_pageOverlayLayer);
 
-    m_pageOverlayLayer = GraphicsLayer::create(this);
+    m_pageOverlayLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
 #ifndef NDEBUG
     m_pageOverlayLayer->setName("LayerTreeHost page overlay content");
 #endif

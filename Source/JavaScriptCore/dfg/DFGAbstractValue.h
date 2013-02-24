@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "ArrayProfile.h"
 #include "DFGStructureAbstractValue.h"
 #include "JSCell.h"
 #include "SpeculatedType.h"
@@ -40,12 +41,14 @@ namespace JSC { namespace DFG {
 struct AbstractValue {
     AbstractValue()
         : m_type(SpecNone)
+        , m_arrayModes(0)
     {
     }
     
     void clear()
     {
         m_type = SpecNone;
+        m_arrayModes = 0;
         m_currentKnownStructure.clear();
         m_futurePossibleStructure.clear();
         m_value = JSValue();
@@ -54,7 +57,7 @@ struct AbstractValue {
     
     bool isClear() const
     {
-        bool result = m_type == SpecNone && m_currentKnownStructure.isClear() && m_futurePossibleStructure.isClear();
+        bool result = m_type == SpecNone && !m_arrayModes && m_currentKnownStructure.isClear() && m_futurePossibleStructure.isClear();
         if (result)
             ASSERT(!m_value);
         return result;
@@ -63,6 +66,7 @@ struct AbstractValue {
     void makeTop()
     {
         m_type = SpecTop;
+        m_arrayModes = ALL_ARRAY_MODES;
         m_currentKnownStructure.makeTop();
         m_futurePossibleStructure.makeTop();
         m_value = JSValue();
@@ -71,13 +75,16 @@ struct AbstractValue {
     
     void clobberStructures()
     {
-        if (m_type & SpecCell)
+        if (m_type & SpecCell) {
             m_currentKnownStructure.makeTop();
-        else
+            clobberArrayModes();
+        } else {
             ASSERT(m_currentKnownStructure.isClear());
+            ASSERT(!m_arrayModes);
+        }
         checkConsistency();
     }
-    
+        
     void clobberValue()
     {
         m_value = JSValue();
@@ -105,29 +112,17 @@ struct AbstractValue {
         return result;
     }
     
-    void setFuturePossibleStructure(Structure* structure)
-    {
-        if (structure->transitionWatchpointSetIsStillValid())
-            m_futurePossibleStructure = structure;
-        else
-            m_futurePossibleStructure.makeTop();
-    }
-    
-    void filterFuturePossibleStructure(Structure* structure)
-    {
-        if (structure->transitionWatchpointSetIsStillValid())
-            m_futurePossibleStructure.filter(StructureAbstractValue(structure));
-    }
-    
     void setMostSpecific(JSValue value)
     {
         if (!!value && value.isCell()) {
             Structure* structure = value.asCell()->structure();
             m_currentKnownStructure = structure;
             setFuturePossibleStructure(structure);
+            m_arrayModes = asArrayModes(structure->indexingType());
         } else {
             m_currentKnownStructure.clear();
             m_futurePossibleStructure.clear();
+            m_arrayModes = 0;
         }
         
         m_type = speculationFromValue(value);
@@ -140,10 +135,14 @@ struct AbstractValue {
     {
         if (!!value && value.isCell()) {
             m_currentKnownStructure.makeTop();
-            setFuturePossibleStructure(value.asCell()->structure());
+            Structure* structure = value.asCell()->structure();
+            setFuturePossibleStructure(structure);
+            m_arrayModes = asArrayModes(structure->indexingType());
+            clobberArrayModes();
         } else {
             m_currentKnownStructure.clear();
             m_futurePossibleStructure.clear();
+            m_arrayModes = 0;
         }
         
         m_type = speculationFromValue(value);
@@ -156,6 +155,7 @@ struct AbstractValue {
     {
         m_currentKnownStructure = structure;
         setFuturePossibleStructure(structure);
+        m_arrayModes = asArrayModes(structure->indexingType());
         m_type = speculationFromStructure(structure);
         m_value = JSValue();
         
@@ -167,9 +167,11 @@ struct AbstractValue {
         if (type & SpecCell) {
             m_currentKnownStructure.makeTop();
             m_futurePossibleStructure.makeTop();
+            m_arrayModes = ALL_ARRAY_MODES;
         } else {
             m_currentKnownStructure.clear();
             m_futurePossibleStructure.clear();
+            m_arrayModes = 0;
         }
         m_type = type;
         m_value = JSValue();
@@ -179,6 +181,7 @@ struct AbstractValue {
     bool operator==(const AbstractValue& other) const
     {
         return m_type == other.m_type
+            && m_arrayModes == other.m_arrayModes
             && m_currentKnownStructure == other.m_currentKnownStructure
             && m_futurePossibleStructure == other.m_futurePossibleStructure
             && m_value == other.m_value;
@@ -190,6 +193,9 @@ struct AbstractValue {
     
     bool merge(const AbstractValue& other)
     {
+        if (other.isClear())
+            return false;
+        
 #if !ASSERT_DISABLED
         AbstractValue oldMe = *this;
 #endif
@@ -199,6 +205,7 @@ struct AbstractValue {
             result = !other.isClear();
         } else {
             result |= mergeSpeculation(m_type, other.m_type);
+            result |= mergeArrayModes(m_arrayModes, other.m_arrayModes);
             result |= m_currentKnownStructure.addAll(other.m_currentKnownStructure);
             result |= m_futurePossibleStructure.addAll(other.m_futurePossibleStructure);
             if (m_value != other.m_value) {
@@ -218,6 +225,7 @@ struct AbstractValue {
         if (type & SpecCell) {
             m_currentKnownStructure.makeTop();
             m_futurePossibleStructure.makeTop();
+            m_arrayModes = ALL_ARRAY_MODES;
         }
         m_value = JSValue();
 
@@ -227,6 +235,7 @@ struct AbstractValue {
     void filter(const StructureSet& other)
     {
         m_type &= other.speculationFromStructures();
+        m_arrayModes &= other.arrayModesFromStructures();
         m_currentKnownStructure.filter(other);
         if (m_currentKnownStructure.isClear())
             m_futurePossibleStructure.clear();
@@ -241,7 +250,20 @@ struct AbstractValue {
         m_currentKnownStructure.filter(m_type);
         m_futurePossibleStructure.filter(m_type);
         
+        filterArrayModesByType();
         filterValueByType();
+        
+        checkConsistency();
+    }
+    
+    void filterArrayModes(ArrayModes arrayModes)
+    {
+        ASSERT(arrayModes);
+        
+        m_type &= SpecCell;
+        m_arrayModes &= arrayModes;
+        
+        // I could do more fancy filtering here. But it probably won't make any difference.
         
         checkConsistency();
     }
@@ -258,29 +280,26 @@ struct AbstractValue {
         // the new type (None) rather than the one passed (Array).
         m_currentKnownStructure.filter(m_type);
         m_futurePossibleStructure.filter(m_type);
-
+        
+        filterArrayModesByType();
         filterValueByType();
         
         checkConsistency();
     }
     
-    // We could go further, and ensure that if the futurePossibleStructure contravenes
-    // the value, then we could clear both of those things. But that's unlikely to help
-    // in any realistic scenario, so we don't do it. Simpler is better.
-    void filterValueByType()
+    bool filterByValue(JSValue value)
     {
-        if (!!m_type) {
-            // The type is still non-empty. This implies that regardless of what filtering
-            // was done, we either didn't have a value to begin with, or that value is still
-            // valid.
-            ASSERT(!m_value || validateType(m_value));
-            return;
-        }
+        if (!validate(value))
+            return false;
         
-        // The type has been rendered empty. That means that the value must now be invalid,
-        // as well.
-        ASSERT(!m_value || !validateType(m_value));
-        m_value = JSValue();
+        if (!!value && value.isCell())
+            filter(StructureSet(value.asCell()->structure()));
+        else
+            filter(speculationFromValue(value));
+        
+        m_value = value;
+        
+        return true;
     }
     
     bool validateType(JSValue value) const
@@ -319,10 +338,20 @@ struct AbstractValue {
             ASSERT(m_type & SpecCell);
             Structure* structure = value.asCell()->structure();
             return m_currentKnownStructure.contains(structure)
-                && m_futurePossibleStructure.contains(structure);
+                && m_futurePossibleStructure.contains(structure)
+                && (m_arrayModes & asArrayModes(structure->indexingType()));
         }
         
         return true;
+    }
+    
+    Structure* bestProvenStructure() const
+    {
+        if (m_currentKnownStructure.hasSingleton())
+            return m_currentKnownStructure.singleton();
+        if (m_futurePossibleStructure.hasSingleton())
+            return m_futurePossibleStructure.singleton();
+        return 0;
     }
     
     void checkConsistency() const
@@ -330,6 +359,7 @@ struct AbstractValue {
         if (!(m_type & SpecCell)) {
             ASSERT(m_currentKnownStructure.isClear());
             ASSERT(m_futurePossibleStructure.isClear());
+            ASSERT(!m_arrayModes);
         }
         
         if (isClear())
@@ -344,15 +374,14 @@ struct AbstractValue {
         // complexity of the code.
     }
     
-    void dump(FILE* out) const
+    void dump(PrintStream& out) const
     {
-        fprintf(out, "(%s, ", speculationToString(m_type));
-        m_currentKnownStructure.dump(out);
-        dataLog(", ");
-        m_futurePossibleStructure.dump(out);
+        out.print(
+            "(", SpeculationDump(m_type), ", ", ArrayModesDump(m_arrayModes), ", ",
+            m_currentKnownStructure, ", ", m_futurePossibleStructure);
         if (!!m_value)
-            fprintf(out, ", %s", m_value.description());
-        fprintf(out, ")");
+            out.print(", ", m_value);
+        out.print(")");
     }
     
     // A great way to think about the difference between m_currentKnownStructure and
@@ -389,6 +418,8 @@ struct AbstractValue {
     //    change x's structure and we have no way of proving otherwise, but
     //    x's m_futurePossibleStructure will be whatever structure we had checked
     //    when getting property 'f'.
+    
+    // NB. All fields in this struct must have trivial destructors.
 
     // This is a proven constraint on the structures that this value can have right
     // now. The structure of the current value must belong to this set. The set may
@@ -437,6 +468,13 @@ struct AbstractValue {
     // unified with the set of all objects with structure 0x12345.
     SpeculatedType m_type;
     
+    // This is a proven constraint on the possible indexing types that this value
+    // can have right now. It also implicitly constraints the set of structures
+    // that the value may have right now, since a structure has an immutable
+    // indexing type. This is subject to change upon reassignment, or any side
+    // effect that makes non-obvious changes to the heap.
+    ArrayModes m_arrayModes;
+    
     // This is a proven constraint on the possible values that this value can
     // have now or any time in the future, unless it is reassigned. Note that this
     // implies nothing about the structure. Oddly, JSValue() (i.e. the empty value)
@@ -444,6 +482,57 @@ struct AbstractValue {
     // BOTTOM then JSValue() means BOTTOM; if m_type is not BOTTOM then JSValue()
     // means TOP.
     JSValue m_value;
+
+private:
+    void clobberArrayModes()
+    {
+        // FIXME: We could make this try to predict the set of array modes that this object
+        // could have in the future. For now, just do the simple thing.
+        m_arrayModes = ALL_ARRAY_MODES;
+    }
+    
+    void setFuturePossibleStructure(Structure* structure)
+    {
+        if (structure->transitionWatchpointSetIsStillValid())
+            m_futurePossibleStructure = structure;
+        else
+            m_futurePossibleStructure.makeTop();
+    }
+    
+    void filterFuturePossibleStructure(Structure* structure)
+    {
+        if (structure->transitionWatchpointSetIsStillValid())
+            m_futurePossibleStructure.filter(StructureAbstractValue(structure));
+    }
+
+    // We could go further, and ensure that if the futurePossibleStructure contravenes
+    // the value, then we could clear both of those things. But that's unlikely to help
+    // in any realistic scenario, so we don't do it. Simpler is better.
+    void filterValueByType()
+    {
+        if (!!m_type) {
+            // The type is still non-empty. This implies that regardless of what filtering
+            // was done, we either didn't have a value to begin with, or that value is still
+            // valid.
+            ASSERT(!m_value || validateType(m_value));
+            return;
+        }
+        
+        // The type has been rendered empty. That means that the value must now be invalid,
+        // as well.
+        ASSERT(!m_value || !validateType(m_value));
+        m_value = JSValue();
+    }
+    
+    void filterArrayModesByType()
+    {
+        if (!(m_type & SpecCell))
+            m_arrayModes = 0;
+        else if (!(m_type & ~SpecArray))
+            m_arrayModes &= ALL_ARRAY_ARRAY_MODES;
+        else if (!(m_type & SpecArray))
+            m_arrayModes &= ALL_NON_ARRAY_ARRAY_MODES;
+    }
 };
 
 } } // namespace JSC::DFG

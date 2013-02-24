@@ -27,12 +27,10 @@
  * SUCH DAMAGE.
  */
 
-module css {
+[
+    Conditional=CSS_REGIONS,
+    V8EnabledAtRuntime=cssRegions,
+] interface WebKitCSSRegionRule : CSSRule {
+    readonly attribute CSSRuleList cssRules;
+};
 
-    interface [
-        Conditional=CSS_REGIONS,
-    ] WebKitCSSRegionRule : CSSRule {
-        readonly attribute CSSRuleList cssRules;
-    };
-
-}

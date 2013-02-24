@@ -32,9 +32,9 @@
 #define DrawingBuffer_h
 
 #include "GraphicsContext3D.h"
-#include "GraphicsLayer.h"
 #include "GraphicsTypes3D.h"
 #include "IntSize.h"
+#include "PlatformLayer.h"
 
 #include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
@@ -121,12 +121,15 @@ public:
     // graphics context to prevent freeing invalid resources.
     void discardResources();
 
+    void markContentsChanged() { m_contentsChanged = true; }
+
 #if USE(ACCELERATED_COMPOSITING)
     PlatformLayer* platformLayer();
     void prepareBackBuffer();
     bool requiresCopyFromBackToFrontBuffer() const;
     unsigned frontColorBuffer() const;
     void paintCompositedResultsToCanvas(ImageBuffer*);
+    void clearPlatformLayer();
 #endif
 
     GraphicsContext3D* graphicsContext3D() const { return m_context.get(); }
@@ -163,6 +166,9 @@ private:
     // For multisampling
     Platform3DObject m_multisampleFBO;
     Platform3DObject m_multisampleColorBuffer;
+
+    // True if our contents have been modified since the last presentation of this buffer.
+    bool m_contentsChanged;
 
 #if PLATFORM(CHROMIUM)
     OwnPtr<DrawingBufferPrivate> m_private;

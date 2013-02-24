@@ -31,7 +31,8 @@
 #define AccessibilityObject_h
 
 #include "FloatQuad.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
+#include "TextIterator.h"
 #include "VisiblePosition.h"
 #include "VisibleSelection.h"
 #include <wtf/Forward.h>
@@ -60,7 +61,7 @@ OBJC_CLASS WebAccessibilityObjectWrapper;
 
 typedef WebAccessibilityObjectWrapper AccessibilityObjectWrapper;
 
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
 typedef struct _AtkObject AtkObject;
 typedef struct _AtkObject AccessibilityObjectWrapper;
 #elif PLATFORM(CHROMIUM)
@@ -110,8 +111,9 @@ enum AccessibilityRole {
     ColumnRole,
     ColumnHeaderRole,
     ComboBoxRole,
-    DefinitionListTermRole,
-    DefinitionListDefinitionRole,
+    DefinitionRole,
+    DescriptionListTermRole,
+    DescriptionListDetailRole,
     DirectoryRole,
     DisclosureTriangleRole,
     DivRole,
@@ -150,6 +152,7 @@ enum AccessibilityRole {
     ListBoxOptionRole,
     ListItemRole,
     ListMarkerRole,
+    MathElementRole,
     MatteRole,
     MenuRole,
     MenuBarRole,
@@ -170,6 +173,7 @@ enum AccessibilityRole {
     RulerMarkerRole,
     ScrollAreaRole,
     ScrollBarRole,
+    SeamlessWebAreaRole,
     SheetRole,
     SliderRole,
     SliderThumbRole,
@@ -179,6 +183,7 @@ enum AccessibilityRole {
     SplitterRole,
     StaticTextRole,
     SystemWideRole,
+    SVGRootRole,
     TabGroupRole,
     TabListRole,
     TabPanelRole,            
@@ -200,6 +205,41 @@ enum AccessibilityRole {
     WindowRole,
 };
 
+enum AccessibilityTextSource {
+    AlternativeText,
+    ChildrenText,
+    SummaryText,
+    HelpText,
+    VisibleText,
+    TitleTagText,
+    PlaceholderText,
+    LabelByElementText,
+};
+    
+struct AccessibilityText {
+    String text;
+    AccessibilityTextSource textSource;
+    Vector<RefPtr<AccessibilityObject> > textElements;
+    
+    AccessibilityText(const String& t, const AccessibilityTextSource& s)
+    : text(t)
+    , textSource(s)
+    { }
+
+    AccessibilityText(const String& t, const AccessibilityTextSource& s, const Vector<RefPtr<AccessibilityObject> > elements)
+    : text(t)
+    , textSource(s)
+    , textElements(elements)
+    { }
+
+    AccessibilityText(const String& t, const AccessibilityTextSource& s, const RefPtr<AccessibilityObject> element)
+    : text(t)
+    , textSource(s)
+    {
+        textElements.append(element);
+    }
+};
+    
 enum AccessibilityOrientation {
     AccessibilityOrientationVertical,
     AccessibilityOrientationHorizontal,
@@ -316,6 +356,15 @@ protected:
     
 public:
     virtual ~AccessibilityObject();
+
+    // After constructing an AccessibilityObject, it must be given a
+    // unique ID, then added to AXObjectCache, and finally init() must
+    // be called last.
+    void setAXObjectID(AXID axObjectID) { m_id = axObjectID; }
+    virtual void init() { }
+
+    // When the corresponding WebCore object that this AccessibilityObject
+    // wraps is deleted, it must be detached.
     virtual void detach();
     virtual bool isDetached() const;
 
@@ -325,7 +374,8 @@ public:
     virtual bool isAccessibilityRenderObject() const { return false; }
     virtual bool isAccessibilityScrollbar() const { return false; }
     virtual bool isAccessibilityScrollView() const { return false; }
-    
+    virtual bool isAccessibilitySVGRoot() const { return false; }
+
     bool accessibilityObjectContainsText(String *) const;
     
     virtual bool isAnchor() const { return false; }
@@ -338,7 +388,8 @@ public:
     virtual bool isPasswordField() const { return false; }
     virtual bool isNativeTextControl() const { return false; }
     virtual bool isSearchField() const { return false; }
-    virtual bool isWebArea() const { return false; }
+    bool isWebArea() const { return roleValue() == WebAreaRole; }
+    bool isSeamlessWebArea() const { return roleValue() == SeamlessWebAreaRole; }
     virtual bool isCheckbox() const { return roleValue() == CheckBoxRole; }
     virtual bool isRadioButton() const { return roleValue() == RadioButtonRole; }
     virtual bool isListBox() const { return roleValue() == ListBoxRole; }
@@ -370,7 +421,8 @@ public:
     virtual bool isSpinButton() const { return roleValue() == SpinButtonRole; }
     virtual bool isSpinButtonPart() const { return false; }
     virtual bool isMockObject() const { return false; }
-    bool isTextControl() const { return roleValue() == TextAreaRole || roleValue() == TextFieldRole; }
+    virtual bool isMediaControlLabel() const { return false; }
+    bool isTextControl() const;
     bool isARIATextControl() const;
     bool isTabList() const { return roleValue() == TabListRole; }
     bool isTabItem() const { return roleValue() == TabRole; }
@@ -379,13 +431,15 @@ public:
     bool isTree() const { return roleValue() == TreeRole; }
     bool isTreeItem() const { return roleValue() == TreeItemRole; }
     bool isScrollbar() const { return roleValue() == ScrollBarRole; }
-    bool isButton() const { return roleValue() == ButtonRole; }
+    bool isButton() const;
     bool isListItem() const { return roleValue() == ListItemRole; }
     bool isCheckboxOrRadio() const { return isCheckbox() || isRadioButton(); }
     bool isScrollView() const { return roleValue() == ScrollAreaRole; }
     bool isCanvas() const { return roleValue() == CanvasRole; }
+    bool isPopUpButton() const { return roleValue() == PopUpButtonRole; }
     bool isBlockquote() const;
     bool isLandmark() const;
+    bool isColorWell() const { return roleValue() == ColorWellRole; }
     
     virtual bool isChecked() const { return false; }
     virtual bool isEnabled() const { return false; }
@@ -429,12 +483,9 @@ public:
     virtual bool canSetSelectedChildrenAttribute() const { return false; }
     virtual bool canSetExpandedAttribute() const { return false; }
     
-    // A programmatic way to set a name on an AccessibleObject.
-    virtual void setAccessibleName(const AtomicString&) { }
-    
     virtual Node* node() const { return 0; }
     virtual RenderObject* renderer() const { return 0; }
-    virtual bool accessibilityIsIgnored() const  { return true; }
+    virtual bool accessibilityIsIgnored() const;
 
     int blockquoteLevel() const;
     virtual int headingLevel() const { return 0; }
@@ -500,15 +551,34 @@ public:
     virtual bool isPresentationalChildOfAriaRole() const { return false; }
     virtual bool ariaRoleHasPresentationalChildren() const { return false; }
 
-    void setRoleValue(AccessibilityRole role) { m_role = role; }
-    virtual AccessibilityRole roleValue() const { return m_role; }
+    // Accessibility Text
+    virtual void accessibilityText(Vector<AccessibilityText>&) { };
+
+    // A programmatic way to set a name on an AccessibleObject.
+    virtual void setAccessibleName(const AtomicString&) { }
+
+    // Accessibility Text - (To be deprecated).
+    virtual String accessibilityDescription() const { return String(); }
+    virtual String title() const { return String(); }
+    virtual String helpText() const { return String(); }
+
+    // Methods for determining accessibility text.
+    virtual String stringValue() const { return String(); }
+    virtual String textUnderElement() const { return String(); }
+    virtual String text() const { return String(); }
+    virtual int textLength() const { return 0; }
     virtual String ariaLabeledByAttribute() const { return String(); }
     virtual String ariaDescribedByAttribute() const { return String(); }
-    virtual String accessibilityDescription() const { return String(); }
+    const AtomicString& placeholderValue() const;
+
+    // Only if isColorWell()
+    virtual void colorValue(int& r, int& g, int& b) const { r = 0; g = 0; b = 0; }
+
+    void setRoleValue(AccessibilityRole role) { m_role = role; }
+    virtual AccessibilityRole roleValue() const { return m_role; }
 
     virtual AXObjectCache* axObjectCache() const;
     AXID axObjectID() const { return m_id; }
-    void setAXObjectID(AXID axObjectID) { m_id = axObjectID; }
     
     static AccessibilityObject* anchorElementForNode(Node*);
     virtual Element* anchorElement() const { return 0; }
@@ -522,18 +592,13 @@ public:
     virtual IntPoint clickPoint();
     static IntRect boundingBoxForQuads(RenderObject*, const Vector<FloatQuad>&);
     
+    TextIteratorBehavior textIteratorBehaviorForTextRange() const;
     virtual PlainTextRange selectedTextRange() const { return PlainTextRange(); }
     unsigned selectionStart() const { return selectedTextRange().start; }
     unsigned selectionEnd() const { return selectedTextRange().length; }
     
     virtual KURL url() const { return KURL(); }
     virtual VisibleSelection selection() const { return VisibleSelection(); }
-    virtual String stringValue() const { return String(); }
-    virtual String title() const { return String(); }
-    virtual String helpText() const { return String(); }
-    virtual String textUnderElement() const { return String(); }
-    virtual String text() const { return String(); }
-    virtual int textLength() const { return 0; }
     virtual String selectedText() const { return String(); }
     virtual const AtomicString& accessKey() const { return nullAtom; }
     const String& actionVerb() const;
@@ -544,8 +609,8 @@ public:
     virtual FrameView* topDocumentFrameView() const { return 0; }
     virtual FrameView* documentFrameView() const;
     String language() const;
+    // 1-based, to match the aria-level spec.
     virtual unsigned hierarchicalLevel() const { return 0; }
-    const AtomicString& placeholderValue() const;
     
     virtual void setFocused(bool) { }
     virtual void setSelectedText(const String&) { }
@@ -564,10 +629,13 @@ public:
     virtual void decrement() { }
 
     virtual void childrenChanged() { }
-    virtual void contentChanged() { }
+    virtual void textChanged() { }
     virtual void updateAccessibilityRole() { }
     const AccessibilityChildrenVector& children();
     virtual void addChildren() { }
+    virtual void addChild(AccessibilityObject*) { }
+    virtual void insertChild(AccessibilityObject*, unsigned) { }
+    
     virtual bool canHaveChildren() const { return true; }
     virtual bool hasChildren() const { return m_haveChildren; }
     virtual void updateChildrenIfNecessary();
@@ -633,6 +701,7 @@ public:
     PlainTextRange plainTextRangeForVisiblePositionRange(const VisiblePositionRange&) const;
     virtual int index(const VisiblePosition&) const { return -1; }
 
+    virtual void lineBreaks(Vector<int>&) const { }
     virtual PlainTextRange doAXRangeForLine(unsigned) const { return PlainTextRange(); }
     PlainTextRange doAXRangeForPosition(const IntPoint&) const;
     virtual PlainTextRange doAXRangeForIndex(unsigned) const { return PlainTextRange(); }
@@ -679,8 +748,54 @@ public:
     // Scroll this object to a given point in global coordinates of the top-level window.
     virtual void scrollToGlobalPoint(const IntPoint&) const;
 
+    bool lastKnownIsIgnoredValue();
+    void setLastKnownIsIgnoredValue(bool);
+
+    // Fires a children changed notification on the parent if the isIgnored value changed.
+    void notifyIfIgnoredValueChanged();
+
+    // All math elements return true for isMathElement().
+    virtual bool isMathElement() const { return false; }
+    virtual bool isMathFraction() const { return false; }
+    virtual bool isMathFenced() const { return false; }
+    virtual bool isMathSubscriptSuperscript() const { return false; }
+    virtual bool isMathRow() const { return false; }
+    virtual bool isMathUnderOver() const { return false; }
+    virtual bool isMathRoot() const { return false; }
+    virtual bool isMathSquareRoot() const { return false; }
+    virtual bool isMathText() const { return false; }
+    virtual bool isMathNumber() const { return false; }
+    virtual bool isMathOperator() const { return false; }
+    virtual bool isMathFenceOperator() const { return false; }
+    virtual bool isMathSeparatorOperator() const { return false; }
+    virtual bool isMathIdentifier() const { return false; }
+    virtual bool isMathTable() const { return false; }
+    virtual bool isMathTableRow() const { return false; }
+    virtual bool isMathTableCell() const { return false; }
+    
+    // Root components.
+    virtual AccessibilityObject* mathRadicandObject() { return 0; }
+    virtual AccessibilityObject* mathRootIndexObject() { return 0; }
+    
+    // Under over components.
+    virtual AccessibilityObject* mathUnderObject() { return 0; }
+    virtual AccessibilityObject* mathOverObject() { return 0; }
+
+    // Fraction components.
+    virtual AccessibilityObject* mathNumeratorObject() { return 0; }
+    virtual AccessibilityObject* mathDenominatorObject() { return 0; }
+
+    // Subscript/superscript components.
+    virtual AccessibilityObject* mathBaseObject() { return 0; }
+    virtual AccessibilityObject* mathSubscriptObject() { return 0; }
+    virtual AccessibilityObject* mathSuperscriptObject() { return 0; }
+    
+    // Fenced components.
+    virtual String mathFencedOpenString() const { return String(); }
+    virtual String mathFencedCloseString() const { return String(); }
+    
 #if HAVE(ACCESSIBILITY)
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(EFL)
     AccessibilityObjectWrapper* wrapper() const;
     void setWrapper(AccessibilityObjectWrapper*);
 #elif !PLATFORM(CHROMIUM)
@@ -717,7 +832,10 @@ protected:
     AccessibilityChildrenVector m_children;
     mutable bool m_haveChildren;
     AccessibilityRole m_role;
-    
+    AccessibilityObjectInclusion m_lastKnownIsIgnoredValue;
+
+    virtual bool computeAccessibilityIsIgnored() const { return true; }
+
     // If this object itself scrolls, return its ScrollableArea.
     virtual ScrollableArea* getScrollableAreaIfScrollable() const { return 0; }
     virtual void scrollTo(const IntPoint&) const { }
@@ -726,8 +844,8 @@ protected:
     static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool objectMatchesSearchCriteriaWithResultLimit(AccessibilityObject*, AccessibilitySearchCriteria*, AccessibilityChildrenVector&);
     virtual AccessibilityRole buttonRoleType() const;
-    
-#if PLATFORM(GTK)
+
+#if PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
     bool allowsTextRanges() const;
     unsigned getLengthForTextRange() const;
 #else
@@ -739,7 +857,7 @@ protected:
     RetainPtr<WebAccessibilityObjectWrapper> m_wrapper;
 #elif PLATFORM(WIN) && !OS(WINCE)
     COMPtr<AccessibilityObjectWrapper> m_wrapper;
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
     AtkObject* m_wrapper;
 #elif PLATFORM(CHROMIUM)
     bool m_detached;

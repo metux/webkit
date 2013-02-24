@@ -34,7 +34,7 @@
 #include "IDBIndex.h"
 #include "IDBKeyPath.h"
 #include "IDBObjectStore.h"
-#include "SerializedScriptValue.h"
+#include "DOMStringList.h"
 
 namespace WebCore {
 
@@ -102,12 +102,6 @@ PassRefPtr<IDBIndex> IDBAny::idbIndex()
     return m_idbIndex;
 }
 
-PassRefPtr<IDBKey> IDBAny::idbKey()
-{
-    ASSERT(m_type == IDBKeyType);
-    return m_idbKey;
-}
-
 PassRefPtr<IDBObjectStore> IDBAny::idbObjectStore()
 {
     ASSERT(m_type == IDBObjectStoreType);
@@ -120,16 +114,22 @@ PassRefPtr<IDBTransaction> IDBAny::idbTransaction()
     return m_idbTransaction;
 }
 
-PassRefPtr<SerializedScriptValue> IDBAny::serializedScriptValue()
+ScriptValue IDBAny::scriptValue()
 {
-    ASSERT(m_type == SerializedScriptValueType);
-    return m_serializedScriptValue;
+    ASSERT(m_type == ScriptValueType);
+    return m_scriptValue;
 }
 
 const String& IDBAny::string()
 {
     ASSERT(m_type == StringType);
     return m_string;
+}
+
+int64_t IDBAny::integer()
+{
+    ASSERT(m_type == IntegerType);
+    return m_integer;
 }
 
 void IDBAny::setNull()
@@ -180,13 +180,6 @@ void IDBAny::set(PassRefPtr<IDBIndex> value)
     m_idbIndex = value;
 }
 
-void IDBAny::set(PassRefPtr<IDBKey> value)
-{
-    ASSERT(m_type == UndefinedType);
-    m_type = IDBKeyType;
-    m_idbKey = value;
-}
-
 void IDBAny::set(PassRefPtr<IDBTransaction> value)
 {
     ASSERT(m_type == UndefinedType);
@@ -201,11 +194,11 @@ void IDBAny::set(PassRefPtr<IDBObjectStore> value)
     m_idbObjectStore = value;
 }
 
-void IDBAny::set(PassRefPtr<SerializedScriptValue> value)
+void IDBAny::set(const ScriptValue& value)
 {
     ASSERT(m_type == UndefinedType);
-    m_type = SerializedScriptValueType;
-    m_serializedScriptValue = value;
+    m_type = ScriptValueType;
+    m_scriptValue = value;
 }
 
 void IDBAny::set(const IDBKeyPath& value)
@@ -234,6 +227,13 @@ void IDBAny::set(const String& value)
     ASSERT(m_type == UndefinedType);
     m_type = StringType;
     m_string = value;
+}
+
+void IDBAny::set(int64_t value)
+{
+    ASSERT(m_type == UndefinedType);
+    m_type = IntegerType;
+    m_integer = value;
 }
 
 } // namespace WebCore

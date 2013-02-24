@@ -30,11 +30,16 @@
 #include "GraphicsLayer.h"
 
 #include "FloatPoint.h"
+#include "FloatRect.h"
 #include "GraphicsContext.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "RotateTransformOperation.h"
 #include "TextStream.h"
+#include <wtf/HashMap.h>
+#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
 
 #ifndef NDEBUG
@@ -42,6 +47,13 @@
 #endif
 
 namespace WebCore {
+
+typedef HashMap<const GraphicsLayer*, Vector<FloatRect> > RepaintMap;
+static RepaintMap& repaintRectMap()
+{
+    DEFINE_STATIC_LOCAL(RepaintMap, map, ());
+    return map;
+}
 
 void KeyframeValueList::insert(const AnimationValue* value)
 {
@@ -68,7 +80,6 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_anchorPoint(0.5f, 0.5f, 0)
     , m_opacity(1)
     , m_zPosition(0)
-    , m_backgroundColorSet(false)
     , m_contentsOpaque(false)
     , m_preserves3D(false)
     , m_backfaceVisibility(true)
@@ -79,8 +90,9 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_acceleratesDrawing(false)
     , m_maintainsPixelAlignment(false)
     , m_appliesPageScale(false)
-    , m_usingTileCache(false)
-    , m_paintingPhase(GraphicsLayerPaintAll)
+    , m_showDebugBorder(false)
+    , m_showRepaintCounter(false)
+    , m_paintingPhase(GraphicsLayerPaintAllWithOverflowClip)
     , m_contentsOrientation(CompositingCoordinatesTopDown)
     , m_parent(0)
     , m_maskLayer(0)
@@ -96,6 +108,7 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
 
 GraphicsLayer::~GraphicsLayer()
 {
+    resetTrackedRepaints();
     ASSERT(!m_parent); // willBeDestroyed should have been called already.
 }
 
@@ -284,7 +297,7 @@ void GraphicsLayer::setReplicatedByLayer(GraphicsLayer* layer)
     m_replicaLayer = layer;
 }
 
-void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset)
+void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset, ShouldSetNeedsDisplay shouldSetNeedsDisplay)
 {
     if (offset == m_offsetFromRenderer)
         return;
@@ -292,19 +305,13 @@ void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset)
     m_offsetFromRenderer = offset;
 
     // If the compositing layer offset changes, we need to repaint.
-    setNeedsDisplay();
+    if (shouldSetNeedsDisplay == SetNeedsDisplay)
+        setNeedsDisplay();
 }
 
 void GraphicsLayer::setBackgroundColor(const Color& color)
 {
     m_backgroundColor = color;
-    m_backgroundColorSet = true;
-}
-
-void GraphicsLayer::clearBackgroundColor()
-{
-    m_backgroundColor = Color();
-    m_backgroundColorSet = false;
 }
 
 void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const IntRect& clip)
@@ -323,10 +330,11 @@ void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const I
 String GraphicsLayer::animationNameForTransition(AnimatedPropertyID property)
 {
     // | is not a valid identifier character in CSS, so this can never conflict with a keyframe identifier.
-    String id = "-|transition";
+    StringBuilder id;
+    id.appendLiteral("-|transition");
     id.append(static_cast<char>(property));
     id.append('-');
-    return id;
+    return id.toString();
 }
 
 void GraphicsLayer::suspendAnimations(double)
@@ -337,21 +345,39 @@ void GraphicsLayer::resumeAnimations()
 {
 }
 
+void GraphicsLayer::getDebugBorderInfo(Color& color, float& width) const
+{
+    if (drawsContent()) {
+        if (m_usingTiledLayer) {
+            color = Color(255, 128, 0, 128); // tiled layer: orange
+            width = 2;
+            return;
+        }
+
+        color = Color(0, 128, 32, 128); // normal layer: green
+        width = 2;
+        return;
+    }
+    
+    if (masksToBounds()) {
+        color = Color(128, 255, 255, 48); // masking layer: pale blue
+        width = 20;
+        return;
+    }
+        
+    color = Color(255, 255, 0, 192); // container: yellow
+    width = 2;
+}
+
 void GraphicsLayer::updateDebugIndicators()
 {
-    if (GraphicsLayer::showDebugBorders()) {
-        if (drawsContent()) {
-            if (m_usingTileCache) // tile cache layer: dark blue
-                setDebugBorder(Color(0, 0, 128, 128), 0.5);
-            else if (m_usingTiledLayer)
-                setDebugBorder(Color(255, 128, 0, 128), 2); // tiled layer: orange
-            else
-                setDebugBorder(Color(0, 128, 32, 128), 2); // normal layer: green
-        } else if (masksToBounds()) {
-            setDebugBorder(Color(128, 255, 255, 48), 20); // masking layer: pale blue
-        } else
-            setDebugBorder(Color(255, 255, 0, 192), 2); // container: yellow
-    }
+    if (!isShowingDebugBorder())
+        return;
+
+    Color borderColor;
+    float width = 0;
+    getDebugBorderInfo(borderColor, width);
+    setDebugBorder(borderColor, width);
 }
 
 void GraphicsLayer::setZPosition(float position)
@@ -383,15 +409,6 @@ void GraphicsLayer::distributeOpacity(float accumulatedOpacity)
             children()[i]->distributeOpacity(accumulatedOpacity);
     }
 }
-
-#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
-GraphicsLayer::GraphicsLayerFactory* GraphicsLayer::s_graphicsLayerFactory = 0;
-
-void GraphicsLayer::setGraphicsLayerFactory(GraphicsLayer::GraphicsLayerFactory factory)
-{
-    s_graphicsLayerFactory = factory;
-}
-#endif
 
 #if ENABLE(CSS_FILTERS)
 static inline const FilterOperations* filterOperationsAt(const KeyframeValueList& valueList, size_t index)
@@ -517,7 +534,29 @@ double GraphicsLayer::backingStoreMemoryEstimate() const
     return static_cast<double>(4 * size().width()) * size().height();
 }
 
-static void writeIndent(TextStream& ts, int indent)
+void GraphicsLayer::resetTrackedRepaints()
+{
+    repaintRectMap().remove(this);
+}
+
+void GraphicsLayer::addRepaintRect(const FloatRect& repaintRect)
+{
+    if (m_client->isTrackingRepaints()) {
+        FloatRect largestRepaintRect(FloatPoint(), m_size);
+        largestRepaintRect.intersect(repaintRect);
+        RepaintMap::iterator repaintIt = repaintRectMap().find(this);
+        if (repaintIt == repaintRectMap().end()) {
+            Vector<FloatRect> repaintRects;
+            repaintRects.append(largestRepaintRect);
+            repaintRectMap().set(this, repaintRects);
+        } else {
+            Vector<FloatRect>& repaintRects = repaintIt->value;
+            repaintRects.append(largestRepaintRect);
+        }
+    }
+}
+
+void GraphicsLayer::writeIndent(TextStream& ts, int indent)
 {
     for (int i = 0; i != indent; ++i)
         ts << "  ";
@@ -571,6 +610,11 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << "(usingTiledLayer " << m_usingTiledLayer << ")\n";
     }
 
+    if (m_contentsOpaque) {
+        writeIndent(ts, indent + 1);
+        ts << "(contentsOpaque " << m_contentsOpaque << ")\n";
+    }
+
     if (m_preserves3D) {
         writeIndent(ts, indent + 1);
         ts << "(preserves3D " << m_preserves3D << ")\n";
@@ -601,7 +645,7 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << ")\n";
     }
 
-    if (m_backgroundColorSet) {
+    if (m_backgroundColor.isValid()) {
         writeIndent(ts, indent + 1);
         ts << "(backgroundColor " << m_backgroundColor.nameForRenderTreeAsText() << ")\n";
     }
@@ -639,9 +683,29 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         writeIndent(ts, indent + 1);
         ts << "(replicated layer";
         if (behavior & LayerTreeAsTextDebug)
-            ts << " " << m_replicatedLayer;;
+            ts << " " << m_replicatedLayer;
         ts << ")\n";
     }
+
+    if (behavior & LayerTreeAsTextIncludeRepaintRects && repaintRectMap().contains(this) && !repaintRectMap().get(this).isEmpty()) {
+        writeIndent(ts, indent + 1);
+        ts << "(repaint rects\n";
+        for (size_t i = 0; i < repaintRectMap().get(this).size(); ++i) {
+            if (repaintRectMap().get(this)[i].isEmpty())
+                continue;
+            writeIndent(ts, indent + 2);
+            ts << "(rect ";
+            ts << repaintRectMap().get(this)[i].x() << " ";
+            ts << repaintRectMap().get(this)[i].y() << " ";
+            ts << repaintRectMap().get(this)[i].width() << " ";
+            ts << repaintRectMap().get(this)[i].height();
+            ts << ")\n";
+        }
+        writeIndent(ts, indent + 1);
+        ts << ")\n";
+    }
+    
+    dumpAdditionalProperties(ts, indent, behavior);
     
     if (m_children.size()) {
         writeIndent(ts, indent + 1);
@@ -663,6 +727,18 @@ String GraphicsLayer::layerTreeAsText(LayerTreeAsTextBehavior behavior) const
     return ts.release();
 }
 
+void GraphicsLayer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Layers);
+    info.addMember(m_children, "children");
+    info.addMember(m_parent, "parent");
+    info.addMember(m_maskLayer, "maskLayer");
+    info.addMember(m_replicaLayer, "replicaLayer");
+    info.addMember(m_replicatedLayer, "replicatedLayer");
+    info.ignoreMember(m_client);
+    info.addMember(m_name, "name");
+}
+
 } // namespace WebCore
 
 #ifndef NDEBUG
@@ -671,7 +747,7 @@ void showGraphicsLayerTree(const WebCore::GraphicsLayer* layer)
     if (!layer)
         return;
 
-    WTF::String output = layer->layerTreeAsText(LayerTreeAsTextDebug);
+    String output = layer->layerTreeAsText(LayerTreeAsTextDebug | LayerTreeAsTextIncludeVisibleRects | LayerTreeAsTextIncludeTileCaches);
     fprintf(stderr, "%s\n", output.utf8().data());
 }
 #endif

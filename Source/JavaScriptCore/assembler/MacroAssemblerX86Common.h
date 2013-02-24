@@ -97,7 +97,10 @@ public:
 #if ENABLE(JIT_CONSTANT_BLINDING)
     static bool shouldBlindForSpecificArch(uint32_t value) { return value >= 0x00ffffff; }
 #if CPU(X86_64)
+    static bool shouldBlindForSpecificArch(uint64_t value) { return value >= 0x00ffffff; }
+#if OS(DARWIN) // On 64-bit systems other than DARWIN uint64_t and uintptr_t are the same type so overload is prohibited.
     static bool shouldBlindForSpecificArch(uintptr_t value) { return value >= 0x00ffffff; }
+#endif
 #endif
 #endif
 
@@ -823,11 +826,15 @@ public:
             m_assembler.ucomisd_rr(right, left);
 
         if (cond == DoubleEqual) {
+            if (left == right)
+                return Jump(m_assembler.jnp());
             Jump isUnordered(m_assembler.jp());
             Jump result = Jump(m_assembler.je());
             isUnordered.link(this);
             return result;
         } else if (cond == DoubleNotEqualOrUnordered) {
+            if (left == right)
+                return Jump(m_assembler.jp());
             Jump isUnordered(m_assembler.jp());
             Jump isEqual(m_assembler.je());
             isUnordered.link(this);
@@ -991,6 +998,11 @@ public:
     void move(TrustedImmPtr imm, RegisterID dest)
     {
         m_assembler.movq_i64r(imm.asIntptr(), dest);
+    }
+
+    void move(TrustedImm64 imm, RegisterID dest)
+    {
+        m_assembler.movq_i64r(imm.m_value, dest);
     }
 
     void swap(RegisterID reg1, RegisterID reg2)

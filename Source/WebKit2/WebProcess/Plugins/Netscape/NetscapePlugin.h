@@ -55,7 +55,6 @@ public:
     static PassRefPtr<NetscapePlugin> fromNPP(NPP);
 
     // In-process NetscapePlugins don't support asynchronous initialization.
-    virtual void waitForAsynchronousInitialization() { }
     virtual bool isBeingAsynchronouslyInitialized() const { return false; }
 
 #if PLATFORM(MAC)
@@ -83,8 +82,6 @@ public:
     static unsigned buttonState();
 #endif
 
-#elif PLATFORM(WIN)
-    HWND containingWindow();
 #endif
 
     PluginQuirks quirks() const { return m_pluginModule->pluginQuirks(); }
@@ -147,6 +144,7 @@ private:
     NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule);
 
     void callSetWindow();
+    void callSetWindowInvisible();
     bool shouldLoadSrcURL();
     NetscapePluginStream* streamFromID(uint64_t streamID);
     void stopAllStreams();
@@ -154,6 +152,7 @@ private:
 
     const char* userAgent();
 
+    void platformPreInitialize();
     bool platformPostInitialize();
     void platformDestroy();
     bool platformInvalidate(const WebCore::IntRect&);
@@ -203,7 +202,19 @@ private:
     virtual bool handleContextMenuEvent(const WebMouseEvent&);
     virtual bool handleKeyboardEvent(const WebKeyboardEvent&);
     virtual void setFocus(bool);
+
+    virtual bool handleEditingCommand(const String& commandName, const String& argument) OVERRIDE;
+    virtual bool isEditingCommandEnabled(const String&) OVERRIDE;
+
+    virtual bool shouldAllowScripting() OVERRIDE;
+    virtual bool shouldAllowNavigationFromDrags() OVERRIDE;
+    
+    virtual bool handlesPageScaleFactor() OVERRIDE;
+
     virtual NPObject* pluginScriptableNPObject();
+    
+    virtual unsigned countFindMatches(const String&, WebCore::FindOptions, unsigned maxMatchCount) OVERRIDE;
+    virtual bool findString(const String&, WebCore::FindOptions, unsigned maxMatchCount) OVERRIDE;
 
 #if PLATFORM(MAC)
     virtual void windowFocusChanged(bool);
@@ -221,6 +232,7 @@ private:
 #endif
 
     virtual void contentsScaleFactorChanged(float);
+    virtual void storageBlockingStateChanged(bool);
     virtual void privateBrowsingStateChanged(bool);
     virtual bool getFormValue(String& formValue);
     virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity);
@@ -230,11 +242,17 @@ private:
     bool supportsSnapshotting() const;
 
     // Convert the given point from plug-in coordinates to root view coordinates.
-    WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const;
+    virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const OVERRIDE;
 
     // Convert the given point from root view coordinates to plug-in coordinates. Returns false if the point can't be
     // converted (if the transformation matrix isn't invertible).
     bool convertFromRootView(const WebCore::IntPoint& pointInRootViewCoordinates, WebCore::IntPoint& pointInPluginCoordinates);
+
+    virtual bool getResourceData(const unsigned char*& /* bytes */, unsigned& /* length */) const OVERRIDE { return false; }
+
+    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) OVERRIDE { return false; }
+
+    void updateNPNPrivateMode();
 
 #if PLUGIN_ARCHITECTURE(WIN)
     static BOOL WINAPI hookedTrackPopupMenu(HMENU, UINT uFlags, int x, int y, int nReserved, HWND, const RECT*);
@@ -308,9 +326,12 @@ private:
 
         WebCore::RunLoop::Timer<Timer> m_timer;
     };
-    typedef HashMap<unsigned, Timer*> TimerMap;
+    typedef HashMap<unsigned, OwnPtr<Timer> > TimerMap;
     TimerMap m_timers;
     unsigned m_nextTimerID;
+
+    bool m_privateBrowsingState;
+    bool m_storageBlockingState;
 
 #if PLUGIN_ARCHITECTURE(MAC)
     NPDrawingModel m_drawingModel;

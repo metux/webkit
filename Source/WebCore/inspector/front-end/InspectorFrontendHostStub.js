@@ -38,6 +38,7 @@ WebInspector.InspectorFrontendHostStub = function()
 {
     this._attachedWindowHeight = 0;
     this.isStub = true;
+    this._fileBuffers = {};
     WebInspector.documentCopyEventFired = this.documentCopy.bind(this);
 }
 
@@ -68,16 +69,9 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         this._windowVisible = false;
     },
 
-    requestAttachWindow: function()
+    requestSetDockSide: function(side)
     {
-    },
-
-    requestDetachWindow: function()
-    {
-    },
-
-    requestSetDockSide: function()
-    {
+        InspectorFrontendAPI.setDockSide(side);
     },
 
     setAttachedWindowHeight: function(height)
@@ -141,25 +135,43 @@ WebInspector.InspectorFrontendHostStub.prototype = {
 
     save: function(url, content, forceSaveAs)
     {
-        var builder = new WebKitBlobBuilder();
-        builder.append(content);
-        var blob = builder.getBlob("application/octet-stream");
+        if (this._fileBuffers[url])
+            throw new Error("Concurrent file modification denied.");
 
-        var fr = new FileReader();
-        fr.onload = function(e) {
-            // Force download
-            window.location = this.result;
-        }
-        fr.readAsDataURL(blob);
-    },
-
-    canAppend: function()
-    {
-        return false;
+        this._fileBuffers[url] = [content];
+        setTimeout(WebInspector.fileManager.savedURL.bind(WebInspector.fileManager, url), 0);
     },
 
     append: function(url, content)
     {
+        var buffer = this._fileBuffers[url];
+        if (!buffer)
+            throw new Error("File is not open for write yet.");
+
+        buffer.push(content);
+        setTimeout(WebInspector.fileManager.appendedToURL.bind(WebInspector.fileManager, url), 0);
+    },
+
+    close: function(url)
+    {
+        var content = this._fileBuffers[url];
+        delete this._fileBuffers[url];
+
+        if (!content)
+            return;
+
+        var lastSlashIndex = url.lastIndexOf("/");
+        var fileNameSuffix = (lastSlashIndex === -1) ? url : url.substring(lastSlashIndex + 1);
+
+        var blob = new Blob(content, { type: "application/octet-stream" });
+        var objectUrl = window.URL.createObjectURL(blob);
+        window.location = objectUrl + "#" + fileNameSuffix;
+
+        function cleanup()
+        {
+            window.URL.revokeObjectURL(objectUrl);
+        }
+        setTimeout(cleanup, 0);
     },
 
     sendMessageToBackend: function(message)
@@ -183,6 +195,28 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         return loadXHR(url);
     },
 
+    supportsFileSystems: function()
+    {
+        return false;
+    },
+
+    requestFileSystems: function()
+    {
+    },
+
+    addFileSystem: function()
+    {
+    },
+
+    removeFileSystem: function(fileSystemPath)
+    {
+    },
+
+    isolatedFileSystem: function(fileSystemId, registeredName)
+    {
+        return null;
+    },
+
     setZoomFactor: function(zoom)
     {
     },
@@ -190,6 +224,11 @@ WebInspector.InspectorFrontendHostStub.prototype = {
     canInspectWorkers: function()
     {
         return true;
+    },
+
+    isUnderTest: function()
+    {
+        return false;
     }
 }
 
@@ -217,6 +256,27 @@ WebInspector.ClipboardAccessDeniedScreen = function()
     }
 }
 
-WebInspector.ClipboardAccessDeniedScreen.prototype.__proto__ = WebInspector.HelpScreen.prototype;
+WebInspector.ClipboardAccessDeniedScreen.prototype = {
+    __proto__: WebInspector.HelpScreen.prototype
+}
 
+}
+
+/**
+ * @constructor
+ * @extends {WebInspector.HelpScreen}
+ */
+WebInspector.RemoteDebuggingTerminatedScreen = function(reason)
+{
+    WebInspector.HelpScreen.call(this, WebInspector.UIString("Detached from the target"));
+    var p = this.contentElement.createChild("p");
+    p.addStyleClass("help-section");
+    p.createChild("span").textContent = "Remote debugging has been terminated with reason: ";
+    p.createChild("span", "error-message").textContent = reason;
+    p.createChild("br");
+    p.createChild("span").textContent = "Please re-attach to the new target.";
+}
+
+WebInspector.RemoteDebuggingTerminatedScreen.prototype = {
+    __proto__: WebInspector.HelpScreen.prototype
 }

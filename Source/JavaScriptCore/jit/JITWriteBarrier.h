@@ -29,7 +29,8 @@
 #if ENABLE(JIT)
 
 #include "MacroAssembler.h"
-#include "MarkStack.h"
+#include "SlotVisitor.h"
+#include "UnusedPointer.h"
 #include "WriteBarrier.h"
 
 namespace JSC {
@@ -69,7 +70,7 @@ public:
     }
     
     void clear() { clear(0); }
-    void clearToMaxUnsigned() { clear(reinterpret_cast<void*>(-1)); }
+    void clearToUnusedPointer() { clear(reinterpret_cast<void*>(unusedPointer)); }
 
 protected:
     JITWriteBarrierBase()
@@ -90,8 +91,7 @@ protected:
         if (!m_location || m_location.executableAddress() == JITWriteBarrierFlag)
             return 0;
         void* result = static_cast<JSCell*>(MacroAssembler::readPointer(m_location));
-        // We use -1 to indicate a "safe" empty value in the instruction stream
-        if (result == (void*)-1)
+        if (result == reinterpret_cast<void*>(unusedPointer))
             return 0;
         return static_cast<JSCell*>(result);
     }
@@ -135,7 +135,7 @@ public:
     }
 };
 
-template<typename T> inline void MarkStack::append(JITWriteBarrier<T>* slot)
+template<typename T> inline void SlotVisitor::append(JITWriteBarrier<T>* slot)
 {
     internalAppend(slot->get());
 }

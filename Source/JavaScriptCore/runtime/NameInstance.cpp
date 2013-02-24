@@ -26,6 +26,9 @@
 #include "config.h"
 #include "NameInstance.h"
 
+#include "JSScope.h"
+#include "Operations.h"
+
 namespace JSC {
 
 const ClassInfo NameInstance::s_info = { "Name", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(NameInstance) };

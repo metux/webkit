@@ -49,7 +49,7 @@
     display: none;
 }
 
-#network-views.small #network-close-button  {
+#network-views.small #network-close-button {
     top: 4px;
 }
 
@@ -146,6 +146,10 @@
     font-weight: bold;
 }
 
+.resource-headers-view .outline-disclosure .parent .section * {
+    font-weight: normal;
+}
+
 .resource-headers-view .outline-disclosure .children li {
     white-space: nowrap;
 }
@@ -189,10 +193,6 @@
     white-space: pre-wrap;
     word-break: break-all;
     margin-top: 1px;
-}
-
-.resource-headers-view .outline-disclosure .raw-form-data {
-    white-space: pre-wrap;
 }
 
 .resource-cookies-view {

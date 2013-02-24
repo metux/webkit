@@ -34,6 +34,7 @@
 #include "JITExceptions.h"
 #include "LLIntCommon.h"
 #include "LowLevelInterpreter.h"
+#include "Operations.h"
 
 namespace JSC { namespace LLInt {
 
@@ -50,7 +51,7 @@ void interpreterThrowInCaller(ExecState* exec, ReturnAddressPtr pc)
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
 #if LLINT_SLOW_PATH_TRACING
-    dataLog("Throwing exception %s.\n", globalData->exception.description());
+    dataLog("Throwing exception ", globalData->exception, ".\n");
 #endif
     fixupPCforExceptionIfNeeded(exec);
     genericThrow(
@@ -60,7 +61,8 @@ void interpreterThrowInCaller(ExecState* exec, ReturnAddressPtr pc)
 
 Instruction* returnToThrowForThrownException(ExecState* exec)
 {
-    return exec->globalData().llintData.exceptionInstructions();
+    UNUSED_PARAM(exec);
+    return LLInt::exceptionInstructions();
 }
 
 Instruction* returnToThrow(ExecState* exec, Instruction* pc)
@@ -68,12 +70,12 @@ Instruction* returnToThrow(ExecState* exec, Instruction* pc)
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
 #if LLINT_SLOW_PATH_TRACING
-    dataLog("Throwing exception %s (returnToThrow).\n", globalData->exception.description());
+    dataLog("Throwing exception ", globalData->exception, " (returnToThrow).\n");
 #endif
     fixupPCforExceptionIfNeeded(exec);
     genericThrow(globalData, exec, globalData->exception, pc - exec->codeBlock()->instructions().begin());
     
-    return globalData->llintData.exceptionInstructions();
+    return LLInt::exceptionInstructions();
 }
 
 void* callToThrow(ExecState* exec, Instruction* pc)
@@ -81,12 +83,12 @@ void* callToThrow(ExecState* exec, Instruction* pc)
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
 #if LLINT_SLOW_PATH_TRACING
-    dataLog("Throwing exception %s (callToThrow).\n", globalData->exception.description());
+    dataLog("Throwing exception ", globalData->exception, " (callToThrow).\n");
 #endif
     fixupPCforExceptionIfNeeded(exec);
     genericThrow(globalData, exec, globalData->exception, pc - exec->codeBlock()->instructions().begin());
-    
-    return bitwise_cast<void*>(&llint_throw_during_call_trampoline);
+
+    return LLInt::getCodePtr(llint_throw_during_call_trampoline);
 }
 
 } } // namespace JSC::LLInt

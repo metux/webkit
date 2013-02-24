@@ -23,6 +23,7 @@
 #include "RegExpConstructor.h"
 
 #include "Error.h"
+#include "Operations.h"
 #include "RegExpMatchesArray.h"
 #include "RegExpPrototype.h"
 
@@ -52,8 +53,6 @@ static void setRegExpConstructorMultiline(ExecState*, JSObject*, JSValue);
 #include "RegExpConstructor.lut.h"
 
 namespace JSC {
-
-ASSERT_CLASS_FITS_IN_CELL(RegExpConstructor);
 
 const ClassInfo RegExpConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::regExpConstructorTable, CREATE_METHOD_TABLE(RegExpConstructor) };
 
@@ -92,7 +91,7 @@ RegExpConstructor::RegExpConstructor(JSGlobalObject* globalObject, Structure* st
 
 void RegExpConstructor::finishCreation(ExecState* exec, RegExpPrototype* regExpPrototype)
 {
-    Base::finishCreation(exec->globalData(), Identifier(exec, "RegExp").ustring());
+    Base::finishCreation(exec->globalData(), Identifier(exec, "RegExp").string());
     ASSERT(inherits(&s_info));
 
     // ECMA 15.10.5.1 RegExp.prototype
@@ -249,9 +248,9 @@ void setRegExpConstructorInput(ExecState* exec, JSObject* baseObject, JSValue va
     asRegExpConstructor(baseObject)->setInput(exec, value.toString(exec));
 }
 
-void setRegExpConstructorMultiline(ExecState*, JSObject* baseObject, JSValue value)
+void setRegExpConstructorMultiline(ExecState* exec, JSObject* baseObject, JSValue value)
 {
-    asRegExpConstructor(baseObject)->setMultiline(value.toBoolean());
+    asRegExpConstructor(baseObject)->setMultiline(value.toBoolean(exec));
 }
 
 // ECMA 15.10.4
@@ -262,7 +261,7 @@ JSObject* constructRegExp(ExecState* exec, JSGlobalObject* globalObject, const A
 
     if (arg0.inherits(&RegExpObject::s_info)) {
         if (!arg1.isUndefined())
-            return throwError(exec, createTypeError(exec, "Cannot supply flags when constructing one RegExp from another."));
+            return throwError(exec, createTypeError(exec, ASCIILiteral("Cannot supply flags when constructing one RegExp from another.")));
         // If called as a function, this just returns the first argument (see 15.10.3.1).
         if (callAsConstructor) {
             RegExp* regExp = static_cast<RegExpObject*>(asObject(arg0))->regExp();
@@ -271,7 +270,7 @@ JSObject* constructRegExp(ExecState* exec, JSGlobalObject* globalObject, const A
         return asObject(arg0);
     }
 
-    UString pattern = arg0.isUndefined() ? UString("") : arg0.toString(exec)->value(exec);
+    String pattern = arg0.isUndefined() ? String("") : arg0.toString(exec)->value(exec);
     if (exec->hadException())
         return 0;
 
@@ -281,7 +280,7 @@ JSObject* constructRegExp(ExecState* exec, JSGlobalObject* globalObject, const A
         if (exec->hadException())
             return 0;
         if (flags == InvalidFlags)
-            return throwError(exec, createSyntaxError(exec, "Invalid flags supplied to RegExp constructor."));
+            return throwError(exec, createSyntaxError(exec, ASCIILiteral("Invalid flags supplied to RegExp constructor.")));
     }
 
     RegExp* regExp = RegExp::create(exec->globalData(), pattern, flags);

@@ -26,13 +26,11 @@
 #ifndef CSSSelectorList_h
 #define CSSSelectorList_h
 
-#include "CSSParserValues.h"
 #include "CSSSelector.h"
 
 namespace WebCore {
 
 class CSSParserSelector;
-class MemoryObjectInfo;
 
 class CSSSelectorList {
     WTF_MAKE_FAST_ALLOCATED;
@@ -43,16 +41,17 @@ public:
     ~CSSSelectorList();
 
     void adopt(CSSSelectorList& list);
-    void adoptSelectorVector(CSSSelectorVector&);
+    void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectorVector);
 
-    CSSSelector* first() const { return m_selectorArray ? m_selectorArray : 0; }
-    static CSSSelector* next(CSSSelector*);
+    bool isValid() const { return !!m_selectorArray; }
+    const CSSSelector* first() const { return m_selectorArray; }
+    static const CSSSelector* next(const CSSSelector*);
     bool hasOneSelector() const { return m_selectorArray && !next(m_selectorArray); }
-    CSSSelector* selectorAt(size_t index) const { return &m_selectorArray[index]; }
+    const CSSSelector* selectorAt(size_t index) const { return &m_selectorArray[index]; }
 
     size_t indexOfNextSelectorAfter(size_t index) const
     {
-        CSSSelector* current = selectorAt(index);
+        const CSSSelector* current = selectorAt(index);
         current = next(current);
         if (!current)
             return notFound;
@@ -60,7 +59,11 @@ public:
     }
 
     bool selectorsNeedNamespaceResolution();
-    bool hasUnknownPseudoElements() const;
+    bool hasInvalidSelector() const;
+
+#if ENABLE(SHADOW_DOM)
+    bool hasShadowDistributedAt(size_t index) const;
+#endif
 
     String selectorsText() const;
 
@@ -75,7 +78,7 @@ private:
     CSSSelector* m_selectorArray;
 };
 
-inline CSSSelector* CSSSelectorList::next(CSSSelector* current)
+inline const CSSSelector* CSSSelectorList::next(const CSSSelector* current)
 {
     // Skip subparts of compound selectors.
     while (!current->isLastInTagHistory())

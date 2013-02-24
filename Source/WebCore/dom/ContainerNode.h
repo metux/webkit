@@ -41,7 +41,44 @@ namespace Private {
     void addChildNodesToDeletionQueue(GenericNode*& head, GenericNode*& tail, GenericNodeContainer*);
 };
 
+class NoEventDispatchAssertion {
+public:
+    NoEventDispatchAssertion()
+    {
+#ifndef NDEBUG
+        if (!isMainThread())
+            return;
+        s_count++;
+#endif
+    }
+
+    ~NoEventDispatchAssertion()
+    {
+#ifndef NDEBUG
+        if (!isMainThread())
+            return;
+        ASSERT(s_count);
+        s_count--;
+#endif
+    }
+
+#ifndef NDEBUG
+    static bool isEventDispatchForbidden()
+    {
+        if (!isMainThread())
+            return false;
+        return s_count;
+    }
+#endif
+
+private:
+#ifndef NDEBUG
+    static unsigned s_count;
+#endif
+};
+
 class ContainerNode : public Node {
+    friend class PostAttachCallbackDisabler;
 public:
     virtual ~ContainerNode();
 
@@ -60,23 +97,19 @@ public:
     // These methods are only used during parsing.
     // They don't send DOM mutation events or handle reparenting.
     // However, arbitrary code may be run by beforeload handlers.
-    void parserAddChild(PassRefPtr<Node>);
+    void parserAppendChild(PassRefPtr<Node>);
     void parserRemoveChild(Node*);
     void parserInsertBefore(PassRefPtr<Node> newChild, Node* refChild);
 
-    // FIXME: It's not good to have two functions with such similar names, especially public functions.
-    // How do removeChildren and removeAllChildren differ?
     void removeChildren();
-    void removeAllChildren();
-
     void takeAllChildrenFrom(ContainerNode*);
 
     void cloneChildNodes(ContainerNode* clone);
 
     virtual void attach() OVERRIDE;
     virtual void detach() OVERRIDE;
-    virtual LayoutRect getRect() const OVERRIDE;
-    virtual void setFocus(bool = true) OVERRIDE;
+    virtual LayoutRect boundingBox() const OVERRIDE;
+    virtual void setFocus(bool) OVERRIDE;
     virtual void setActive(bool active = true, bool pause = false) OVERRIDE;
     virtual void setHovered(bool = true) OVERRIDE;
     virtual void scheduleSetNeedsStyleRecalc(StyleChangeType = FullStyleChange) OVERRIDE;
@@ -88,34 +121,22 @@ public:
     // node that is of the type CDATA_SECTION_NODE, TEXT_NODE or COMMENT_NODE has changed its value.
     virtual void childrenChanged(bool createdByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
 
-    void attachAsNode();
     void attachChildren();
-    void attachChildrenIfNeeded();
     void attachChildrenLazily();
     void detachChildren();
     void detachChildrenIfNeeded();
 
     void disconnectDescendantFrames();
 
-    // More efficient versions of these two functions for the case where we are starting with a ContainerNode.
-    Node* traverseNextNode() const;
-    Node* traverseNextNode(const Node* stayWithin) const;
+    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const { return true; }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-    {
-        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
-        Node::reportMemoryUsage(memoryObjectInfo);
-        info.addInstrumentedMember(m_firstChild);
-        info.addInstrumentedMember(m_lastChild);
-    }
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 protected:
     ContainerNode(Document*, ConstructionType = CreateContainer);
 
     static void queuePostAttachCallback(NodeCallback, Node*, unsigned = 0);
     static bool postAttachCallbacksAreSuspended();
-    void suspendPostAttachCallbacks();
-    void resumePostAttachCallbacks();
 
     template<class GenericNode, class GenericNodeContainer>
     friend void appendChildToContainer(GenericNode* child, GenericNodeContainer*);
@@ -123,6 +144,7 @@ protected:
     template<class GenericNode, class GenericNodeContainer>
     friend void Private::addChildNodesToDeletionQueue(GenericNode*& head, GenericNode*& tail, GenericNodeContainer*);
 
+    void removeDetachedChildren();
     void setFirstChild(Node* child) { m_firstChild = child; }
     void setLastChild(Node* child) { m_lastChild = child; }
 
@@ -131,6 +153,8 @@ private:
     void insertBeforeCommon(Node* nextChild, Node* oldChild);
 
     static void dispatchPostAttachCallbacks();
+    void suspendPostAttachCallbacks();
+    void resumePostAttachCallbacks();
 
     bool getUpperLeftCorner(FloatPoint&) const;
     bool getLowerRightCorner(FloatPoint&) const;
@@ -139,15 +163,19 @@ private:
     Node* m_lastChild;
 };
 
+#ifndef NDEBUG
+bool childAttachedAllowedWhenAttachingChildren(ContainerNode*);
+#endif
+
 inline ContainerNode* toContainerNode(Node* node)
 {
-    ASSERT(!node || node->isContainerNode());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isContainerNode());
     return static_cast<ContainerNode*>(node);
 }
 
 inline const ContainerNode* toContainerNode(const Node* node)
 {
-    ASSERT(!node || node->isContainerNode());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isContainerNode());
     return static_cast<const ContainerNode*>(node);
 }
 
@@ -161,20 +189,10 @@ inline ContainerNode::ContainerNode(Document* document, ConstructionType type)
 {
 }
 
-inline void ContainerNode::attachAsNode()
-{
-    Node::attach();
-}
-
 inline void ContainerNode::attachChildren()
 {
-    for (Node* child = firstChild(); child; child = child->nextSibling())
-        child->attach();
-}
-
-inline void ContainerNode::attachChildrenIfNeeded()
-{
     for (Node* child = firstChild(); child; child = child->nextSibling()) {
+        ASSERT(!child->attached() || childAttachedAllowedWhenAttachingChildren(this));
         if (!child->attached())
             child->attach();
     }
@@ -238,55 +256,19 @@ inline Node* Node::highestAncestor() const
     return highest;
 }
 
-inline Node* Node::traverseNextSibling() const
+inline bool Node::needsShadowTreeWalker() const
 {
-    if (nextSibling())
-        return nextSibling();
-    return traverseNextAncestorSibling();
+    if (getFlag(NeedsShadowTreeWalkerFlag))
+        return true;
+    ContainerNode* parent = parentOrShadowHostNode();
+    return parent && parent->getFlag(NeedsShadowTreeWalkerFlag);
 }
 
-inline Node* Node::traverseNextNode() const
-{
-    if (firstChild())
-        return firstChild();
-    return traverseNextSibling();
-}
-
-inline Node* ContainerNode::traverseNextNode() const
-{
-    // More efficient than the Node::traverseNextNode above, because
-    // this does not need to do the isContainerNode check inside firstChild.
-    if (firstChild())
-        return firstChild();
-    return traverseNextSibling();
-}
-
-inline Node* Node::traverseNextSibling(const Node* stayWithin) const
-{
-    if (this == stayWithin)
-        return 0;
-    if (nextSibling())
-        return nextSibling();
-    return traverseNextAncestorSibling(stayWithin);
-}
-
-inline Node* Node::traverseNextNode(const Node* stayWithin) const
-{
-    if (firstChild())
-        return firstChild();
-    return traverseNextSibling(stayWithin);
-}
-
-inline Node* ContainerNode::traverseNextNode(const Node* stayWithin) const
-{
-    // More efficient than the Node::traverseNextNode above, because
-    // this does not need to do the isContainerNode check inside firstChild.
-    if (firstChild())
-        return firstChild();
-    return traverseNextSibling(stayWithin);
-}
-
-typedef Vector<RefPtr<Node>, 11> NodeVector;
+// This constant controls how much buffer is initially allocated
+// for a Node Vector that is used to store child Nodes of a given Node.
+// FIXME: Optimize the value.
+const int initialNodeVectorSize = 11;
+typedef Vector<RefPtr<Node>, initialNodeVectorSize> NodeVector;
 
 inline void getChildNodes(Node* node, NodeVector& nodes)
 {
@@ -313,18 +295,18 @@ public:
     }
 
     // Returns 0 if there is no next Node.
-    Node* nextNode()
+    PassRefPtr<Node> nextNode()
     {
         if (LIKELY(!hasSnapshot())) {
-            Node* node = m_currentNode;
-            if (m_currentNode)
-                m_currentNode = m_currentNode->nextSibling();
-            return node;
+            RefPtr<Node> node = m_currentNode;
+            if (node)
+                m_currentNode = node->nextSibling();
+            return node.release();
         }
-        Vector<RefPtr<Node> >* nodeVector = m_childNodes.get();
-        if (m_currentIndex >= nodeVector->size())
+        Vector<RefPtr<Node> >& nodeVector = *m_childNodes;
+        if (m_currentIndex >= nodeVector.size())
             return 0;
-        return (*nodeVector)[m_currentIndex++].get();
+        return nodeVector[m_currentIndex++];
     }
 
     void takeSnapshot()
@@ -332,7 +314,7 @@ public:
         if (hasSnapshot())
             return;
         m_childNodes = adoptPtr(new Vector<RefPtr<Node> >());
-        Node* node = m_currentNode;
+        Node* node = m_currentNode.get();
         while (node) {
             m_childNodes->append(node);
             node = node->nextSibling();
@@ -354,10 +336,28 @@ public:
 private:
     static ChildNodesLazySnapshot* latestSnapshot;
 
-    Node* m_currentNode;
+    RefPtr<Node> m_currentNode;
     unsigned m_currentIndex;
     OwnPtr<Vector<RefPtr<Node> > > m_childNodes; // Lazily instantiated.
     ChildNodesLazySnapshot* m_nextSnapshot;
+};
+
+class PostAttachCallbackDisabler {
+public:
+    PostAttachCallbackDisabler(ContainerNode* node)
+        : m_node(node)
+    {
+        ASSERT(m_node);
+        m_node->suspendPostAttachCallbacks();
+    }
+
+    ~PostAttachCallbackDisabler()
+    {
+        m_node->resumePostAttachCallbacks();
+    }
+
+private:
+    ContainerNode* m_node;
 };
 
 } // namespace WebCore

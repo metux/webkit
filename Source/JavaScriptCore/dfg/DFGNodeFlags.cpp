@@ -61,7 +61,7 @@ const char* nodeFlagsAsString(NodeFlags flags)
             ptr.strcat("Storage");
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             break;
         }
         hasPrinted = true;
@@ -110,6 +110,12 @@ const char* nodeFlagsAsString(NodeFlags flags)
             if (hasPrinted)
                 ptr.strcat("|");
             ptr.strcat("PureNum");
+            hasPrinted = true;
+        }
+        if (flags & NodeUsedAsOther) {
+            if (hasPrinted)
+                ptr.strcat("|");
+            ptr.strcat("UseAsOther");
             hasPrinted = true;
         }
     }

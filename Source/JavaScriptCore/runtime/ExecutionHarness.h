@@ -43,25 +43,29 @@ inline bool prepareForExecution(ExecState* exec, OwnPtr<CodeBlockType>& codeBloc
         // Start off in the low level interpreter.
         LLInt::getEntrypoint(exec->globalData(), codeBlock.get(), jitCode);
         codeBlock->setJITCode(jitCode, MacroAssemblerCodePtr());
+        if (exec->globalData().m_perBytecodeProfiler)
+            exec->globalData().m_perBytecodeProfiler->ensureBytecodesFor(codeBlock.get());
         return true;
     }
 #endif // ENABLE(LLINT)
     return jitCompileIfAppropriate(exec, codeBlock, jitCode, jitType, bytecodeIndex, JITCode::isBaselineCode(jitType) ? JITCompilationMustSucceed : JITCompilationCanFail);
 }
 
-inline bool prepareFunctionForExecution(ExecState* exec, OwnPtr<FunctionCodeBlock>& codeBlock, JITCode& jitCode, MacroAssemblerCodePtr& jitCodeWithArityCheck, SharedSymbolTable*& symbolTable, JITCode::JITType jitType, unsigned bytecodeIndex, CodeSpecializationKind kind)
+inline bool prepareFunctionForExecution(ExecState* exec, OwnPtr<FunctionCodeBlock>& codeBlock, JITCode& jitCode, MacroAssemblerCodePtr& jitCodeWithArityCheck, JITCode::JITType jitType, unsigned bytecodeIndex, CodeSpecializationKind kind)
 {
 #if ENABLE(LLINT)
     if (JITCode::isBaselineCode(jitType)) {
         // Start off in the low level interpreter.
         LLInt::getFunctionEntrypoint(exec->globalData(), kind, jitCode, jitCodeWithArityCheck);
         codeBlock->setJITCode(jitCode, jitCodeWithArityCheck);
+        if (exec->globalData().m_perBytecodeProfiler)
+            exec->globalData().m_perBytecodeProfiler->ensureBytecodesFor(codeBlock.get());
         return true;
     }
 #else
     UNUSED_PARAM(kind);
 #endif // ENABLE(LLINT)
-    return jitCompileFunctionIfAppropriate(exec, codeBlock, jitCode, jitCodeWithArityCheck, symbolTable, jitType, bytecodeIndex, JITCode::isBaselineCode(jitType) ? JITCompilationMustSucceed : JITCompilationCanFail);
+    return jitCompileFunctionIfAppropriate(exec, codeBlock, jitCode, jitCodeWithArityCheck, jitType, bytecodeIndex, JITCode::isBaselineCode(jitType) ? JITCompilationMustSucceed : JITCompilationCanFail);
 }
 
 } // namespace JSC

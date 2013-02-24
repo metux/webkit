@@ -67,10 +67,11 @@ void PluginPackage::freeLibrarySoon()
 void PluginPackage::freeLibraryTimerFired(Timer<PluginPackage>*)
 {
     ASSERT(m_module);
-    ASSERT(!m_loadCount);
-
-    unloadModule(m_module);
-    m_module = 0;
+    // Do nothing if the module got loaded again meanwhile
+    if (!m_loadCount) {
+        unloadModule(m_module);
+        m_module = 0;
+    }
 }
 
 
@@ -205,7 +206,9 @@ void PluginPackage::determineQuirks(const String& mimeType)
         }
 
 #if PLATFORM(QT)
-        // Flash will crash on repeated calls to SetWindow in windowed mode
+        // Flash will crash on repeated calls to SetWindow in windowed mode.
+        // Defer the setWindow, so we don't set it to the wrong size too early.
+        m_quirks.add(PluginQuirkDeferFirstSetWindowCall);
         m_quirks.add(PluginQuirkDontCallSetWindowMoreThanOnce);
 #endif
 
@@ -328,8 +331,10 @@ void PluginPackage::initializeBrowserFuncs()
     m_browserFuncs.getvalueforurl = NPN_GetValueForURL;
     m_browserFuncs.setvalueforurl = NPN_SetValueForURL;
     m_browserFuncs.getauthenticationinfo = NPN_GetAuthenticationInfo;
+
+    m_browserFuncs.popupcontextmenu = NPN_PopUpContextMenu;
 }
-#endif
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #if ENABLE(PLUGIN_PACKAGE_SIMPLE_HASH)
 unsigned PluginPackage::hash() const

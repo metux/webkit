@@ -49,7 +49,7 @@ namespace WebKit {
 
 NPRuntimeObjectMap::NPRuntimeObjectMap(PluginView* pluginView)
     : m_pluginView(pluginView)
-    , m_finalizationTimer(WebProcess::shared().runLoop(), this, &NPRuntimeObjectMap::invalidateQueuedObjects)
+    , m_finalizationTimer(RunLoop::main(), this, &NPRuntimeObjectMap::invalidateQueuedObjects)
 {
 }
 
@@ -154,7 +154,7 @@ void NPRuntimeObjectMap::convertJSValueToNPVariant(ExecState* exec, JSValue valu
     }
 
     if (value.isBoolean()) {
-        BOOLEAN_TO_NPVARIANT(value.toBoolean(), variant);
+        BOOLEAN_TO_NPVARIANT(value.toBoolean(exec), variant);
         return;
     }
 
@@ -178,7 +178,7 @@ void NPRuntimeObjectMap::convertJSValueToNPVariant(ExecState* exec, JSValue valu
     ASSERT_NOT_REACHED();
 }
 
-bool NPRuntimeObjectMap::evaluate(NPObject* npObject, const String&scriptString, NPVariant* result)
+bool NPRuntimeObjectMap::evaluate(NPObject* npObject, const String& scriptString, NPVariant* result)
 {
     Strong<JSGlobalObject> globalObject(this->globalObject()->globalData(), this->globalObject());
     if (!globalObject)
@@ -190,7 +190,7 @@ bool NPRuntimeObjectMap::evaluate(NPObject* npObject, const String&scriptString,
     JSValue thisValue = getOrCreateJSObject(globalObject.get(), npObject);
 
     globalObject->globalData().timeoutChecker.start();
-    JSValue resultValue = JSC::evaluate(exec, globalObject->globalScopeChain(), makeSource(UString(scriptString.impl())), thisValue);
+    JSValue resultValue = JSC::evaluate(exec, makeSource(scriptString), thisValue);
     globalObject->globalData().timeoutChecker.stop();
 
     convertJSValueToNPVariant(exec, resultValue, *result);
@@ -212,7 +212,7 @@ void NPRuntimeObjectMap::invalidate()
     Vector<NPObject*> objects;
 
     for (HashMap<NPObject*, JSC::Weak<JSNPObject> >::iterator ptr = m_jsNPObjects.begin(), end = m_jsNPObjects.end(); ptr != end; ++ptr) {
-        JSNPObject* jsNPObject = ptr->second.get();
+        JSNPObject* jsNPObject = ptr->value.get();
         if (!jsNPObject) // Skip zombies.
             continue;
         objects.append(jsNPObject->leakNPObject());
@@ -267,7 +267,7 @@ void NPRuntimeObjectMap::moveGlobalExceptionToExecState(ExecState* exec)
 
     {
         JSLockHolder lock(exec);
-        throwError(exec, createError(exec, stringToUString(globalExceptionString())));
+        throwError(exec, createError(exec, globalExceptionString()));
     }
     
     globalExceptionString() = String();

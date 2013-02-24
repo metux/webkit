@@ -24,7 +24,7 @@
 #define HTMLAreaElement_h
 
 #include "HTMLAnchorElement.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
 #include <wtf/OwnArrayPtr.h>
 
 namespace WebCore {
@@ -50,14 +50,14 @@ public:
 private:
     HTMLAreaElement(const QualifiedName&, Document*);
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool supportsFocus() const;
     virtual String target() const;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual bool isFocusable() const;
     virtual void updateFocusAppearance(bool /*restorePreviousSelection*/);
-    virtual void setFocus(bool);
+    virtual void setFocus(bool) OVERRIDE;
 
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const OVERRIDE;

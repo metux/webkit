@@ -27,12 +27,15 @@
 #include "CSSFontFaceSrcValue.h"
 #include "CachedFont.h"
 #include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
+#include "CachedResourceRequestInitiators.h"
 #include "Document.h"
 #include "FontCustomPlatformData.h"
-#include "MemoryInstrumentation.h"
 #include "Node.h"
 #include "SVGFontFaceElement.h"
 #include "StyleSheetContents.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -63,16 +66,19 @@ bool CSSFontFaceSrcValue::isSupportedFormat() const
 
 String CSSFontFaceSrcValue::customCssText() const
 {
-    String result;
+    StringBuilder result;
     if (isLocal())
-        result += "local(";
+        result.appendLiteral("local(");
     else
-        result += "url(";
-    result += m_resource;
-    result += ")";
-    if (!m_format.isEmpty())
-        result += " format(" + m_format + ")";
-    return result;
+        result.appendLiteral("url(");
+    result.append(m_resource);
+    result.append(')');
+    if (!m_format.isEmpty()) {
+        result.appendLiteral(" format(");
+        result.append(m_format);
+        result.append(')');
+    }
+    return result.toString();
 }
 
 void CSSFontFaceSrcValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const StyleSheetContents* styleSheet) const
@@ -91,22 +97,27 @@ bool CSSFontFaceSrcValue::hasFailedOrCanceledSubresources() const
 CachedFont* CSSFontFaceSrcValue::cachedFont(Document* document)
 {
     if (!m_cachedFont) {
-        ResourceRequest request(document->completeURL(m_resource));
+        CachedResourceRequest request(ResourceRequest(document->completeURL(m_resource)));
+        request.setInitiator(cachedResourceRequestInitiators().css);
         m_cachedFont = document->cachedResourceLoader()->requestFont(request);
     }
     return m_cachedFont.get();
 }
 
+bool CSSFontFaceSrcValue::equals(const CSSFontFaceSrcValue& other) const
+{
+    return m_isLocal == other.m_isLocal && m_format == other.m_format && m_resource == other.m_resource;
+}
+
 void CSSFontFaceSrcValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_resource);
-    info.addInstrumentedMember(m_format);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_resource, "resource");
+    info.addMember(m_format, "format");
     // FIXME: add m_cachedFont when MemoryCache is instrumented.
 #if ENABLE(SVG_FONTS)
-    info.addInstrumentedMember(m_svgFontFaceElement);
+    info.addMember(m_svgFontFaceElement, "svgFontFaceElement");
 #endif
 }
 
 }
-

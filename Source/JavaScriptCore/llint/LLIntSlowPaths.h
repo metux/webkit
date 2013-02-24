@@ -44,33 +44,50 @@ namespace LLInt {
 // warnings, or worse, a change in the ABI used to return these types.
 struct SlowPathReturnType {
     void* a;
-    void* b;
+    ExecState* b;
 };
 
-inline SlowPathReturnType encodeResult(void* a, void* b)
+inline SlowPathReturnType encodeResult(void* a, ExecState* b)
 {
     SlowPathReturnType result;
     result.a = a;
     result.b = b;
     return result;
 }
-#else
+
+inline void decodeResult(SlowPathReturnType result, void*& a, ExecState*& b)
+{
+    a = result.a;
+    b = result.b;
+}
+
+#else // USE(JSVALUE32_64)
 typedef int64_t SlowPathReturnType;
 
-inline SlowPathReturnType encodeResult(void* a, void* b)
+typedef union {
+    struct {
+        void* a;
+        ExecState* b;
+    } pair;
+    int64_t i;
+} SlowPathReturnTypeEncoding;
+
+inline SlowPathReturnType encodeResult(void* a, ExecState* b)
 {
-    union {
-        struct {
-            void* a;
-            void* b;
-        } pair;
-        int64_t i;
-    } u;
+    SlowPathReturnTypeEncoding u;
     u.pair.a = a;
     u.pair.b = b;
     return u.i;
 }
-#endif
+
+inline void decodeResult(SlowPathReturnType result, void*& a, ExecState*& b)
+{
+    SlowPathReturnTypeEncoding u;
+    u.i = result;
+    a = u.pair.a;
+    b = u.pair.b;
+}
+#endif // USE(JSVALUE32_64)
 
 extern "C" SlowPathReturnType llint_trace_operand(ExecState*, Instruction*, int fromWhere, int operand);
 extern "C" SlowPathReturnType llint_trace_value(ExecState*, Instruction*, int fromWhere, int operand);
@@ -95,7 +112,7 @@ LLINT_SLOW_PATH_HIDDEN_DECL(entry_osr_function_for_call_arityCheck);
 LLINT_SLOW_PATH_HIDDEN_DECL(entry_osr_function_for_construct_arityCheck);
 LLINT_SLOW_PATH_HIDDEN_DECL(loop_osr);
 LLINT_SLOW_PATH_HIDDEN_DECL(replace);
-LLINT_SLOW_PATH_HIDDEN_DECL(register_file_check);
+LLINT_SLOW_PATH_HIDDEN_DECL(stack_check);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_call_arityCheck);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_construct_arityCheck);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_create_activation);
@@ -104,6 +121,7 @@ LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_create_this);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_convert_this);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_new_object);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_new_array);
+LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_new_array_with_size);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_new_array_buffer);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_new_regexp);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_not);
@@ -139,15 +157,12 @@ LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_is_object);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_is_function);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_in);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve_skip);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve_global);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve_global_dynamic);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve_for_resolve_global_dynamic);
+LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_put_to_base);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve_base);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_ensure_property_exists);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve_with_base);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_resolve_with_this);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_put_global_var_check);
+LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_init_global_const_check);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_get_by_id);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_get_arguments_length);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_put_by_id);
@@ -185,11 +200,11 @@ LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_strcat);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_to_primitive);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_get_pnames);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_next_pname);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_push_scope);
+LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_push_with_scope);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_pop_scope);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_push_new_scope);
+LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_push_name_scope);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_throw);
-LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_throw_reference_error);
+LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_throw_static_error);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_debug);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_profile_will_call);
 LLINT_SLOW_PATH_HIDDEN_DECL(slow_path_profile_did_call);

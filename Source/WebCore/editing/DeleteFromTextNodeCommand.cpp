@@ -26,6 +26,7 @@
 #include "config.h"
 #include "DeleteFromTextNodeCommand.h"
 #include "Document.h"
+#include "ExceptionCodePlaceholder.h"
 
 #include "AXObjectCache.h"
 #include "Text.h"
@@ -47,7 +48,7 @@ void DeleteFromTextNodeCommand::doApply()
 {
     ASSERT(m_node);
 
-    if (!m_node->isContentEditable())
+    if (!m_node->isContentEditable(Node::UserSelectAllIsAlwaysNonEditable))
         return;
 
     ExceptionCode ec = 0;
@@ -68,9 +69,8 @@ void DeleteFromTextNodeCommand::doUnapply()
 
     if (!m_node->rendererIsEditable())
         return;
-        
-    ExceptionCode ec;
-    m_node->insertData(m_offset, m_text, ec);
+
+    m_node->insertData(m_offset, m_text, IGNORE_EXCEPTION);
 
     if (AXObjectCache::accessibilityEnabled())
         document()->axObjectCache()->nodeTextChangeNotification(m_node.get(), AXObjectCache::AXTextInserted, m_offset, m_text);

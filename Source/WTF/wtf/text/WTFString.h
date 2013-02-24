@@ -1,6 +1,6 @@
 /*
  * (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2012 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -32,15 +32,10 @@
 #include <objc/objc.h>
 #endif
 
-#if USE(CF)
-typedef const struct __CFString * CFStringRef;
-#endif
-
 #if PLATFORM(QT)
 QT_BEGIN_NAMESPACE
 class QString;
 QT_END_NAMESPACE
-#include <QDataStream>
 #endif
 
 #if PLATFORM(WX)
@@ -49,8 +44,8 @@ class wxString;
 
 #if PLATFORM(BLACKBERRY)
 namespace BlackBerry {
-namespace WebKit {
-    class WebString;
+namespace Platform {
+class String;
 }
 }
 #endif
@@ -58,13 +53,14 @@ namespace WebKit {
 namespace WTF {
 
 class CString;
+class MemoryObjectInfo;
 struct StringHash;
 
 // Declarations of string operations
 
-int charactersToIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
+WTF_EXPORT_STRING_API int charactersToIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_STRING_API int charactersToIntStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
-unsigned charactersToUIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
+WTF_EXPORT_STRING_API unsigned charactersToUIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_STRING_API unsigned charactersToUIntStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
 int64_t charactersToInt64Strict(const LChar*, size_t, bool* ok = 0, int base = 10);
 int64_t charactersToInt64Strict(const UChar*, size_t, bool* ok = 0, int base = 10);
@@ -96,10 +92,9 @@ WTF_EXPORT_STRING_API float charactersToFloat(const UChar*, size_t, size_t& pars
 
 class ASCIILiteral;
 
-enum FloatConversionFlags {
-    ShouldRoundSignificantFigures = 1 << 0,
-    ShouldRoundDecimalPlaces = 1 << 1,
-    ShouldTruncateTrailingZeros = 1 << 2
+enum TrailingZerosTruncatingPolicy {
+    KeepTrailingZeros,
+    TruncateTrailingZeros
 };
 
 template<bool isSpecialCharacter(UChar), typename CharacterType>
@@ -115,6 +110,12 @@ public:
 
     // Construct a string by copying the contents of a vector.  To avoid
     // copying, consider using String::adopt instead.
+    // This method will never create a null string. Vectors with size() == 0
+    // will return the empty string.
+    // NOTE: This is different from String(vector.data(), vector.size())
+    // which will sometimes return a null string when vector.data() is null
+    // which can only occur for vectors without inline capacity.
+    // See: https://bugs.webkit.org/show_bug.cgi?id=109792
     template<size_t inlineCapacity>
     explicit String(const Vector<UChar, inlineCapacity>&);
 
@@ -197,8 +198,13 @@ public:
         return m_impl->characters16();
     }
 
-    template <typename CharType>
-    inline const CharType* getCharacters() const;
+    // Return characters8() or characters16() depending on CharacterType.
+    template <typename CharacterType>
+    inline const CharacterType* getCharacters() const;
+
+    // Like getCharacters() and upconvert if CharacterType is UChar on a 8bit string.
+    template <typename CharacterType>
+    inline const CharacterType* getCharactersWithUpconvert() const;
 
     bool is8Bit() const { return m_impl->is8Bit(); }
 
@@ -211,7 +217,14 @@ public:
 
     WTF_EXPORT_STRING_API CString ascii() const;
     WTF_EXPORT_STRING_API CString latin1() const;
-    WTF_EXPORT_STRING_API CString utf8(bool strict = false) const;
+
+    typedef enum {
+        LenientConversion,
+        StrictConversion,
+        StrictConversionReplacingUnpairedSurrogatesWithFFFD,
+    } ConversionMode;
+
+    WTF_EXPORT_STRING_API CString utf8(ConversionMode = LenientConversion) const;
 
     UChar operator[](unsigned index) const
     {
@@ -220,15 +233,18 @@ public:
         return (*m_impl)[index];
     }
 
-    static String number(short);
-    WTF_EXPORT_STRING_API static String number(unsigned short);
     WTF_EXPORT_STRING_API static String number(int);
-    WTF_EXPORT_STRING_API static String number(unsigned);
+    WTF_EXPORT_STRING_API static String number(unsigned int);
     WTF_EXPORT_STRING_API static String number(long);
     WTF_EXPORT_STRING_API static String number(unsigned long);
     WTF_EXPORT_STRING_API static String number(long long);
     WTF_EXPORT_STRING_API static String number(unsigned long long);
-    WTF_EXPORT_STRING_API static String number(double, unsigned = ShouldRoundSignificantFigures | ShouldTruncateTrailingZeros, unsigned precision = 6);
+
+    WTF_EXPORT_STRING_API static String number(double, unsigned precision = 6, TrailingZerosTruncatingPolicy = TruncateTrailingZeros);
+
+    // Number to String conversion following the ECMAScript definition.
+    WTF_EXPORT_STRING_API static String numberToStringECMAScript(double);
+    WTF_EXPORT_STRING_API static String numberToStringFixedWidth(double, unsigned decimalPlaces);
 
     // Find a single character or string, also with match function & latin1 forms.
     size_t find(UChar c, unsigned start = 0) const
@@ -294,6 +310,7 @@ public:
     WTF_EXPORT_STRING_API void append(LChar);
     void append(char c) { append(static_cast<LChar>(c)); };
     WTF_EXPORT_STRING_API void append(UChar);
+    WTF_EXPORT_STRING_API void append(const LChar*, unsigned length);
     WTF_EXPORT_STRING_API void append(const UChar*, unsigned length);
     WTF_EXPORT_STRING_API void insert(const String&, unsigned pos);
     void insert(const UChar*, unsigned length, unsigned pos);
@@ -303,6 +320,15 @@ public:
     String& replace(const String& a, const String& b) { if (m_impl) m_impl = m_impl->replace(a.impl(), b.impl()); return *this; }
     String& replace(unsigned index, unsigned len, const String& b) { if (m_impl) m_impl = m_impl->replace(index, len, b.impl()); return *this; }
 
+    template<unsigned charactersCount>
+    ALWAYS_INLINE String& replaceWithLiteral(UChar a, const char (&characters)[charactersCount])
+    {
+        if (m_impl)
+            m_impl = m_impl->replace(a, characters, charactersCount - 1);
+
+        return *this;
+    }
+
     void makeLower() { if (m_impl) m_impl = m_impl->lower(); }
     void makeUpper() { if (m_impl) m_impl = m_impl->upper(); }
     void fill(UChar c) { if (m_impl) m_impl = m_impl->fill(c); }
@@ -311,7 +337,7 @@ public:
     WTF_EXPORT_STRING_API void remove(unsigned pos, int len = 1);
 
     WTF_EXPORT_STRING_API String substring(unsigned pos, unsigned len = UINT_MAX) const;
-    String substringSharingImpl(unsigned pos, unsigned len = UINT_MAX) const;
+    WTF_EXPORT_STRING_API String substringSharingImpl(unsigned pos, unsigned len = UINT_MAX) const;
     String left(unsigned len) const { return substring(0, len); }
     String right(unsigned len) const { return substring(length() - len, len); }
 
@@ -342,10 +368,16 @@ public:
     static String createUninitialized(unsigned length, UChar*& data) { return StringImpl::createUninitialized(length, data); }
     static String createUninitialized(unsigned length, LChar*& data) { return StringImpl::createUninitialized(length, data); }
 
-    WTF_EXPORT_STRING_API void split(const String& separator, Vector<String>& result) const;
     WTF_EXPORT_STRING_API void split(const String& separator, bool allowEmptyEntries, Vector<String>& result) const;
-    WTF_EXPORT_STRING_API void split(UChar separator, Vector<String>& result) const;
+    void split(const String& separator, Vector<String>& result) const
+    {
+        split(separator, false, result);
+    }
     WTF_EXPORT_STRING_API void split(UChar separator, bool allowEmptyEntries, Vector<String>& result) const;
+    void split(UChar separator, Vector<String>& result) const
+    {
+        split(separator, false, result);
+    }
 
     WTF_EXPORT_STRING_API int toIntStrict(bool* ok = 0, int base = 10) const;
     WTF_EXPORT_STRING_API unsigned toUIntStrict(bool* ok = 0, int base = 10) const;
@@ -368,6 +400,7 @@ public:
     bool percentage(int& percentage) const;
 
     WTF_EXPORT_STRING_API String isolatedCopy() const;
+    WTF_EXPORT_STRING_API bool isSafeToSendToAnotherThread() const;
 
     // Prevent Strings from being implicitly convertable to bool as it will be ambiguous on any platform that
     // allows implicit conversion to another pointer type (e.g., Mac allows implicit conversion to NSString*).
@@ -378,7 +411,7 @@ public:
 
 #if USE(CF)
     String(CFStringRef);
-    CFStringRef createCFString() const;
+    RetainPtr<CFStringRef> createCFString() const;
 #endif
 
 #ifdef __OBJC__
@@ -390,9 +423,9 @@ public:
 #endif
 
 #if PLATFORM(QT)
-    String(const QString&);
-    String(const QStringRef&);
-    operator QString() const;
+    WTF_EXPORT_STRING_API String(const QString&);
+    WTF_EXPORT_STRING_API String(const QStringRef&);
+    WTF_EXPORT_STRING_API operator QString() const;
 #endif
 
 #if PLATFORM(WX)
@@ -401,11 +434,18 @@ public:
 #endif
 
 #if PLATFORM(BLACKBERRY)
-    String(const BlackBerry::WebKit::WebString&);
-    operator BlackBerry::WebKit::WebString() const;
+    String(const BlackBerry::Platform::String&);
+    operator BlackBerry::Platform::String() const;
 #endif
 
     WTF_EXPORT_STRING_API static String make8BitFrom16BitSource(const UChar*, size_t);
+    template<size_t inlineCapacity>
+    static String make8BitFrom16BitSource(const Vector<UChar, inlineCapacity>& buffer)
+    {
+        return make8BitFrom16BitSource(buffer.data(), buffer.size());
+    }
+
+    WTF_EXPORT_STRING_API static String make16BitFrom8BitSource(const LChar*, size_t);
 
     // String::fromUTF8 will return a null string if
     // the input data contains invalid UTF-8 sequences.
@@ -413,6 +453,7 @@ public:
     WTF_EXPORT_STRING_API static String fromUTF8(const LChar*);
     static String fromUTF8(const char* s, size_t length) { return fromUTF8(reinterpret_cast<const LChar*>(s), length); };
     static String fromUTF8(const char* s) { return fromUTF8(reinterpret_cast<const LChar*>(s)); };
+    static String fromUTF8(const CString&);
 
     // Tries to convert the passed in string to UTF-8, but will fall back to Latin-1 if the string is not valid UTF-8.
     WTF_EXPORT_STRING_API static String fromUTF8WithLatin1Fallback(const LChar*, size_t);
@@ -440,16 +481,20 @@ public:
     WTF_EXPORT_STRING_API void show() const;
 #endif
 
+    // Workaround for a compiler bug. Use operator[] instead.
+    UChar characterAt(unsigned index) const
+    {
+        if (!m_impl || index >= m_impl->length())
+            return 0;
+        return (*m_impl)[index];
+    }
+
 private:
+    template <typename CharacterType>
+    void removeInternal(const CharacterType*, unsigned, int);
+
     RefPtr<StringImpl> m_impl;
 };
-
-#if PLATFORM(QT)
-QDataStream& operator<<(QDataStream& stream, const String& str);
-QDataStream& operator>>(QDataStream& stream, String& str);
-#endif
-
-inline String& operator+=(String& a, const String& b) { a.append(b); return a; }
 
 inline bool operator==(const String& a, const String& b) { return equal(a.impl(), b.impl()); }
 inline bool operator==(const String& a, const LChar* b) { return equal(a.impl(), b); }
@@ -496,7 +541,7 @@ inline void swap(String& a, String& b) { a.swap(b); }
 
 template<size_t inlineCapacity>
 String::String(const Vector<UChar, inlineCapacity>& vector)
-    : m_impl(vector.size() ? StringImpl::create(vector.data(), vector.size()) : 0)
+    : m_impl(vector.size() ? StringImpl::create(vector.data(), vector.size()) : StringImpl::empty())
 {
 }
 
@@ -512,6 +557,19 @@ inline const UChar* String::getCharacters<UChar>() const
 {
     ASSERT(!is8Bit());
     return characters16();
+}
+
+template<>
+inline const LChar* String::getCharactersWithUpconvert<LChar>() const
+{
+    ASSERT(is8Bit());
+    return characters8();
+}
+
+template<>
+inline const UChar* String::getCharactersWithUpconvert<UChar>() const
+{
+    return characters();
 }
 
 inline bool String::containsOnlyLatin1() const
@@ -555,7 +613,8 @@ inline bool codePointCompareLessThan(const String& a, const String& b)
     return codePointCompare(a.impl(), b.impl()) < 0;
 }
 
-inline void append(Vector<UChar>& vector, const String& string)
+template<size_t inlineCapacity>
+inline void append(Vector<UChar, inlineCapacity>& vector, const String& string)
 {
     vector.append(string.characters(), string.length());
 }
@@ -627,6 +686,7 @@ WTF_EXPORT_STRING_API const String& emptyString();
 }
 
 using WTF::CString;
+using WTF::KeepTrailingZeros;
 using WTF::String;
 using WTF::emptyString;
 using WTF::append;
@@ -650,7 +710,6 @@ using WTF::find;
 using WTF::isAllSpecialCharacters;
 using WTF::isSpaceOrNewline;
 using WTF::reverseFind;
-using WTF::ShouldRoundDecimalPlaces;
 using WTF::ASCIILiteral;
 
 #include <wtf/text/AtomicString.h>

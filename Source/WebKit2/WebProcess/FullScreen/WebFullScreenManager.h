@@ -32,9 +32,8 @@
 #include <wtf/RefPtr.h>
 
 namespace CoreIPC {
-class ArgumentDecoder;
 class Connection;
-class MessageID;
+class MessageDecoder;
 }
 
 namespace WebCore {
@@ -52,7 +51,7 @@ public:
     static PassRefPtr<WebFullScreenManager> create(WebPage*);
     virtual ~WebFullScreenManager();
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
     bool supportsFullScreen(bool withKeyboard);
     void enterFullScreenForElement(WebCore::Element*);
@@ -73,7 +72,7 @@ protected:
     void setAnimatingFullScreen(bool);
     void requestExitFullScreen();
 
-    void didReceiveWebFullScreenManagerMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void didReceiveWebFullScreenManagerMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
     WebCore::IntRect m_initialFrame;
     WebCore::IntRect m_finalFrame;

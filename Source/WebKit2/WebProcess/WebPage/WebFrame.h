@@ -40,24 +40,20 @@
 #include <wtf/RetainPtr.h>
 
 namespace WebCore {
-    class Frame;
-    class HTMLFrameOwnerElement;
-#if ENABLE(WEB_INTENTS)
-    class Intent;
-#endif
-    class KURL;
+class Frame;
+class HTMLFrameOwnerElement;
+class IntPoint;
+class IntRect;
+class KURL;
 }
 
 namespace WebKit {
 
+class InjectedBundleHitTestResult;
 class InjectedBundleNodeHandle;
 class InjectedBundleRangeHandle;
 class InjectedBundleScriptWorld;
 class WebPage;
-
-#if ENABLE(WEB_INTENTS)
-struct IntentData;
-#endif
 
 class WebFrame : public APIObject {
 public:
@@ -80,12 +76,7 @@ public:
     void didReceivePolicyDecision(uint64_t listenerID, WebCore::PolicyAction, uint64_t downloadID);
 
     void startDownload(const WebCore::ResourceRequest&);
-    void convertHandleToDownload(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
-
-#if ENABLE(WEB_INTENTS)
-    void deliverIntent(const IntentData&);
-    void deliverIntent(WebCore::Intent*);
-#endif
+    void convertMainResourceLoadToDownload(WebCore::MainResourceLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
 
     String source() const;
     String contentsAsString() const;
@@ -110,8 +101,11 @@ public:
     WebCore::IntSize scrollOffset() const;
     bool hasHorizontalScrollbar() const;
     bool hasVerticalScrollbar() const;
+    PassRefPtr<InjectedBundleHitTestResult> hitTest(const WebCore::IntPoint) const;
     bool getDocumentBackgroundColor(double* red, double* green, double* blue, double* alpha);
     bool containsAnyFormElements() const;
+    void stopLoading();
+    bool handlesPageScaleGesture() const;
 
     static WebFrame* frameForContext(JSContextRef);
 
@@ -121,11 +115,6 @@ public:
     static String counterValue(JSObjectRef element);
     static String markerText(JSObjectRef element);
 
-    unsigned numberOfActiveAnimations() const;
-    bool pauseAnimationOnElementWithId(const String& animationName, const String& elementID, double time);
-    bool pauseTransitionOnElementWithId(const String& propertyName, const String& elementID, double time);
-    void suspendAnimations();
-    void resumeAnimations();
     String layerTreeAsText() const;
     
     unsigned pendingUnloadCount() const;
@@ -149,7 +138,7 @@ public:
     void setLoadListener(LoadListener* loadListener) { m_loadListener = loadListener; }
     LoadListener* loadListener() const { return m_loadListener; }
     
-#if PLATFORM(MAC) || PLATFORM(WIN)
+#if PLATFORM(MAC)
     typedef bool (*FrameFilterFunction)(WKBundleFrameRef, WKBundleFrameRef subframe, void* context);
     RetainPtr<CFDataRef> webArchiveData(FrameFilterFunction, void* context);
 #endif

@@ -66,9 +66,10 @@
 #include "c_instance.h"
 #include "npruntime_impl.h"
 #include "runtime_root.h"
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSLock.h>
-#include <runtime/JSValue.h>
 #include <wtf/ASCIICType.h>
+#include <wtf/text/WTFString.h>
 
 #if !PLATFORM(WX)
 #include "BitmapInfo.h"
@@ -127,7 +128,6 @@ static inline HWND windowHandleForPageClient(PlatformPageClient client)
 using JSC::ExecState;
 using JSC::JSLock;
 using JSC::JSObject;
-using JSC::UString;
 
 using std::min;
 
@@ -640,9 +640,9 @@ void PluginView::paint(GraphicsContext* context, const IntRect& rect)
 
     ASSERT(parent()->isFrameView());
 
-    // In the GTK port we draw in an offscreen buffer and don't want to use the window
+    // In the GTK and Qt ports we draw in an offscreen buffer and don't want to use the window
     // coordinates.
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(QT)
     IntRect rectInWindow(rect);
     rectInWindow.intersect(frameRect());
 #else
@@ -831,9 +831,9 @@ void PluginView::setNPWindowRect(const IntRect& rect)
     m_npWindow.clipRect.right = r.width();
     m_npWindow.clipRect.bottom = r.height();
 #else
-    // In the GTK port we draw in an offscreen buffer and don't want to use the window
+    // In the GTK and Qt ports we draw in an offscreen buffer and don't want to use the window
     // coordinates.
-# if PLATFORM(GTK)
+# if PLATFORM(GTK) || PLATFORM(QT)
     IntPoint p = rect.location();
 # else
     IntPoint p = static_cast<FrameView*>(parent())->contentsToWindow(rect.location());

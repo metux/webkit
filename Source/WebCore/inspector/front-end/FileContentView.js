@@ -68,7 +68,7 @@ WebInspector.FileContentView.prototype = {
         if (this._content) {
             if (!this._content.updateMetadata(metadata))
                 return;
-            var sourceFrame = /** @type {WebInspector.SourceFrame} */ this._innerView;
+            var sourceFrame = /** @type {WebInspector.SourceFrame} */ (this._innerView);
             this._content.requestContent(sourceFrame.setContent.bind(sourceFrame));
         } else {
             this._innerView.detach();
@@ -85,10 +85,10 @@ WebInspector.FileContentView.prototype = {
 
         if (this._file.isTextFile)
             this._file.requestMetadata(this._metadataReceived.bind(this));
-    }
-}
+    },
 
-WebInspector.FileContentView.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -104,7 +104,7 @@ WebInspector.FileContentView.FileContentProvider = function(file, metadata)
 
 WebInspector.FileContentView.FileContentProvider.prototype = {
     /**
-     * @return {?string}
+     * @return {string}
      */
     contentURL: function()
     {
@@ -124,7 +124,7 @@ WebInspector.FileContentView.FileContentProvider.prototype = {
      */
     requestContent: function(callback)
     {
-        var size = /** @type {number} */ this._metadata.size;
+        var size = /** @type {number} */ (this._metadata.size);
         this._file.requestFileContent(true, 0, size, this._charset || "", this._fileContentReceived.bind(this, callback));
     },
 

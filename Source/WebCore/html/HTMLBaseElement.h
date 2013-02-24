@@ -31,12 +31,15 @@ class HTMLBaseElement : public HTMLElement {
 public:
     static PassRefPtr<HTMLBaseElement> create(const QualifiedName&, Document*);
 
+    KURL href() const;
+    void setHref(const AtomicString&);
+
 private:
     HTMLBaseElement(const QualifiedName&, Document*);
 
     virtual String target() const;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
 };

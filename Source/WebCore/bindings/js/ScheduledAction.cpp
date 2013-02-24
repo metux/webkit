@@ -32,8 +32,6 @@
 #include "JSDOMBinding.h"
 #include "JSDOMWindow.h"
 #include "JSMainThreadExecState.h"
-#include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
 #include "ScriptController.h"
 #include "ScriptExecutionContext.h"
 #include "ScriptSourceCode.h"
@@ -55,13 +53,12 @@ PassOwnPtr<ScheduledAction> ScheduledAction::create(ExecState* exec, DOMWrapperW
     JSValue v = exec->argument(0);
     CallData callData;
     if (getCallData(v, callData) == CallTypeNone) {
-        RefPtr<ScriptCallStack> callStack(createScriptCallStackForInspector(exec));
-        if (policy && !policy->allowEval(callStack.release()))
+        if (policy && !policy->allowEval(exec))
             return nullptr;
-        UString string = v.toString(exec)->value(exec);
+        String string = v.toString(exec)->value(exec);
         if (exec->hadException())
             return nullptr;
-        return adoptPtr(new ScheduledAction(ustringToString(string), isolatedWorld));
+        return adoptPtr(new ScheduledAction(string, isolatedWorld));
     }
 
     return adoptPtr(new ScheduledAction(exec, v, isolatedWorld));

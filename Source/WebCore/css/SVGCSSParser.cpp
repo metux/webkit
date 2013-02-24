@@ -26,7 +26,6 @@
 #include "CSSInheritedValue.h"
 #include "CSSInitialValue.h"
 #include "CSSParser.h"
-#include "CSSProperty.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
@@ -270,6 +269,11 @@ bool CSSParser::parseSVGValue(CSSPropertyID propId, bool important)
             return false;
         }
 
+    case CSSPropertyMaskType: // luminance | alpha | inherit
+        if (id == CSSValueLuminance || id == CSSValueAlpha)
+            valid_primitive = true;
+        break;
+
     /* shorthand properties */
     case CSSPropertyMarker:
     {
@@ -281,7 +285,7 @@ bool CSSParser::parseSVGValue(CSSPropertyID propId, bool important)
             rollbackLastProperties(1);
             return false;
         }
-        CSSValue* value = m_parsedProperties->last().value();
+        CSSValue* value = m_parsedProperties.last().value();
         addProperty(CSSPropertyMarkerMid, value, important);
         addProperty(CSSPropertyMarkerEnd, value, important);
         m_implicitShorthand = false;

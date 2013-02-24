@@ -51,6 +51,9 @@ public:
     // can be called from any thread).
     static void initializeMainRunLoop();
 
+    // Must be called before entering main run loop. If called, application style run loop will be used, handling events.
+    static void setUseApplicationRunLoopOnMainRunLoop();
+
     static RunLoop* current();
     static RunLoop* main();
 
@@ -102,7 +105,7 @@ public:
         gboolean m_isRepeating;
 #elif PLATFORM(EFL)
         static bool timerFired(void* data);
-        OwnPtr<Ecore_Timer> m_timer;
+        Ecore_Timer* m_timer;
         bool m_isRepeating;
 #endif
     };
@@ -167,7 +170,13 @@ private:
     Vector<GRefPtr<GMainLoop> > m_runLoopMainLoops;
 #elif PLATFORM(EFL)
     bool m_initEfl;
+
+    Mutex m_pipeLock;
     OwnPtr<Ecore_Pipe> m_pipe;
+
+    Mutex m_wakeUpEventRequestedLock;
+    bool m_wakeUpEventRequested;
+
     static void wakeUpEvent(void* data, void*, unsigned int);
 #endif
 };

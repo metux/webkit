@@ -31,6 +31,7 @@
 #include "NativeWebWheelEvent.h"
 #include "NotificationPermissionRequest.h"
 #include "WKAPICast.h"
+#include "WebColorPickerResultListenerProxy.h"
 #include "WebNumber.h"
 #include "WebOpenPanelResultListenerProxy.h"
 #include "WebPageProxy.h"
@@ -415,6 +416,64 @@ bool WebUIClient::shouldInterruptJavaScript(WebPageProxy* page)
         return false;
 
     return m_client.shouldInterruptJavaScript(toAPI(page), m_client.clientInfo);
+}
+
+#if ENABLE(INPUT_TYPE_COLOR)
+bool WebUIClient::showColorPicker(WebPageProxy* page, const String& initialColor, WebColorPickerResultListenerProxy* listener)
+{
+    if (!m_client.showColorPicker)
+        return false;
+
+    m_client.showColorPicker(toAPI(page), toAPI(initialColor.impl()), toAPI(listener), m_client.clientInfo);
+    return true;
+}
+
+bool WebUIClient::hideColorPicker(WebPageProxy* page)
+{
+    if (!m_client.hideColorPicker)
+        return false;
+
+    m_client.hideColorPicker(toAPI(page), m_client.clientInfo);
+    return true;
+}
+#endif
+
+static inline WKPluginLoadPolicy toWKPluginLoadPolicy(PluginModuleLoadPolicy pluginModuleLoadPolicy)
+{
+    switch (pluginModuleLoadPolicy) {
+    case PluginModuleLoadNormally:
+        return kWKPluginLoadPolicyLoadNormally;
+    case PluginModuleBlocked:
+        return kWKPluginLoadPolicyBlocked;
+    case PluginModuleInactive:
+        return kWKPluginLoadPolicyInactive;
+    }
+
+    ASSERT_NOT_REACHED();
+    return kWKPluginLoadPolicyBlocked;
+}
+
+static inline PluginModuleLoadPolicy toPluginModuleLoadPolicy(WKPluginLoadPolicy pluginLoadPolicy)
+{
+    switch (pluginLoadPolicy) {
+    case kWKPluginLoadPolicyLoadNormally:
+        return PluginModuleLoadNormally;
+    case kWKPluginLoadPolicyBlocked:
+        return PluginModuleBlocked;
+    case kWKPluginLoadPolicyInactive:
+        return PluginModuleInactive;
+    }
+
+    ASSERT_NOT_REACHED();
+    return PluginModuleBlocked;
+}
+
+PluginModuleLoadPolicy WebUIClient::pluginLoadPolicy(WebPageProxy* page, const String& identifier, const String& displayName, const String& documentURLString, PluginModuleLoadPolicy currentPluginLoadPolicy)
+{
+    if (!m_client.pluginLoadPolicy)
+        return currentPluginLoadPolicy;
+
+    return toPluginModuleLoadPolicy(m_client.pluginLoadPolicy(toAPI(page), toAPI(identifier.impl()), toAPI(displayName.impl()), toURLRef(documentURLString.impl()), toWKPluginLoadPolicy(currentPluginLoadPolicy), m_client.clientInfo));
 }
 
 } // namespace WebKit

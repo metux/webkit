@@ -33,8 +33,9 @@ namespace WebCore {
 
 String defaultLanguage();
 Vector<String> userPreferredLanguages();
+Vector<String> userPreferredLanguagesOverride();
 void overrideUserPreferredLanguages(const Vector<String>&);
-String preferredLanguageFromList(const Vector<String>&);
+String preferredLanguageFromList(const Vector<String>& languageList, const Vector<String> preferredLanguages);
 
 // The observer function will be called when system language changes.
 typedef void (*LanguageChangeObserverFunction)(void* context);
@@ -42,6 +43,8 @@ void addLanguageChangeObserver(void* context, LanguageChangeObserverFunction);
 void removeLanguageChangeObserver(void* context);
 
 Vector<String> platformUserPreferredLanguages();
+
+String displayNameForLanguageLocale(const String&);
 
 // Called from platform specific code when the user's preferred language(s) change.
 void languageDidChange();

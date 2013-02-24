@@ -64,6 +64,7 @@ public:
     void setNextTextBox(InlineTextBox* n) { m_nextTextBox = n; }
     void setPreviousTextBox(InlineTextBox* p) { m_prevTextBox = p; }
 
+    // FIXME: These accessors should ASSERT(!isDirty()). See https://bugs.webkit.org/show_bug.cgi?id=97264
     unsigned start() const { return m_start; }
     unsigned end() const { return m_len ? m_start + m_len - 1 : m_start; }
     unsigned len() const { return m_len; }
@@ -71,9 +72,11 @@ public:
     void setStart(unsigned start) { m_start = start; }
     void setLen(unsigned len) { m_len = len; }
 
-    void offsetRun(int d) { m_start += d; }
+    void offsetRun(int d) { ASSERT(!isDirty()); m_start += d; }
 
     unsigned short truncation() { return m_truncation; }
+
+    virtual void markDirty(bool dirty = true) OVERRIDE;
 
     using InlineBox::hasHyphen;
     using InlineBox::setHasHyphen;
@@ -82,7 +85,7 @@ public:
 
     static inline bool compareByStart(const InlineTextBox* first, const InlineTextBox* second) { return first->start() < second->start(); }
 
-    virtual LayoutUnit baselinePosition(FontBaseline) const;
+    virtual int baselinePosition(FontBaseline) const;
     virtual LayoutUnit lineHeight() const;
 
     bool getEmphasisMarkPosition(RenderStyle*, TextEmphasisPosition&) const;
@@ -98,13 +101,16 @@ public:
     virtual void showBox(int = 0) const;
     virtual const char* boxName() const;
 #endif
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 private:
     LayoutUnit selectionTop();
     LayoutUnit selectionBottom();
     LayoutUnit selectionHeight();
 
     TextRun constructTextRun(RenderStyle*, const Font&, BufferForAppendingHyphen* = 0) const;
-    TextRun constructTextRun(RenderStyle*, const Font&, const UChar*, int length, int maximumLength, BufferForAppendingHyphen* = 0) const;
+    TextRun constructTextRun(RenderStyle*, const Font&, String, int maximumLength, BufferForAppendingHyphen* = 0) const;
 
 public:
     virtual FloatRect calculateBoundaries() const { return FloatRect(x(), y(), width(), height()); }
@@ -115,7 +121,7 @@ public:
 
 protected:
     virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom);
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom) OVERRIDE;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom) OVERRIDE;
 
 public:
     RenderText* textRenderer() const;
@@ -180,7 +186,7 @@ protected:
 #endif
 
 private:
-    void paintDecoration(GraphicsContext*, const FloatPoint& boxOrigin, int decoration, const ShadowData*);
+    void paintDecoration(GraphicsContext*, const FloatPoint& boxOrigin, ETextDecoration, TextDecorationStyle, const ShadowData*);
     void paintSelection(GraphicsContext*, const FloatPoint& boxOrigin, RenderStyle*, const Font&, Color textColor);
     void paintDocumentMarker(GraphicsContext*, const FloatPoint& boxOrigin, DocumentMarker*, RenderStyle*, const Font&, bool grammar);
     void paintTextMatchMarker(GraphicsContext*, const FloatPoint& boxOrigin, DocumentMarker*, RenderStyle*, const Font&);

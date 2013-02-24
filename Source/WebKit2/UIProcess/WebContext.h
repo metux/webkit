@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,55 +27,64 @@
 #define WebContext_h
 
 #include "APIObject.h"
+#include "DownloadProxyMap.h"
 #include "GenericCallback.h"
+#include "ImmutableDictionary.h"
+#include "MessageReceiver.h"
+#include "MessageReceiverMap.h"
+#include "PlugInAutoStartProvider.h"
 #include "PluginInfoStore.h"
 #include "ProcessModel.h"
+#include "StatisticsRequest.h"
+#include "StorageManager.h"
 #include "VisitedLinkProvider.h"
-#include "WebContextInjectedBundleClient.h"
+#include "WebContextClient.h"
 #include "WebContextConnectionClient.h"
+#include "WebContextInjectedBundleClient.h"
 #include "WebDownloadClient.h"
 #include "WebHistoryClient.h"
 #include "WebProcessProxy.h"
 #include <WebCore/LinkHash.h>
 #include <wtf/Forward.h>
+#include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(NETWORK_PROCESS)
+#include "NetworkProcessProxy.h"
+#endif
+
 namespace WebKit {
 
 class DownloadProxy;
-class WebApplicationCacheManagerProxy;
-#if ENABLE(BATTERY_STATUS)
-class WebBatteryManagerProxy;
-#endif
-class WebCookieManagerProxy;
-class WebDatabaseManagerProxy;
-class WebGeolocationManagerProxy;
+class WebContextSupplement;
 class WebIconDatabase;
-class WebKeyValueStorageManagerProxy;
-class WebMediaCacheManagerProxy;
-#if ENABLE(NETWORK_INFO)
-class WebNetworkInfoManagerProxy;
-#endif
-class WebNotificationManagerProxy;
 class WebPageGroup;
 class WebPageProxy;
-class WebResourceCacheManagerProxy;
-#if USE(SOUP)
-class WebSoupRequestManagerProxy;
-#endif
-#if ENABLE(VIBRATION)
-class WebVibrationProxy;
-#endif
 struct StatisticsData;
 struct WebProcessCreationParameters;
     
 typedef GenericCallback<WKDictionaryRef> DictionaryCallback;
 
-class WebContext : public APIObject {
+#if ENABLE(BATTERY_STATUS)
+class WebBatteryManagerProxy;
+#endif
+#if ENABLE(NETWORK_INFO)
+class WebNetworkInfoManagerProxy;
+#endif
+#if ENABLE(NETWORK_PROCESS)
+struct NetworkProcessCreationParameters;
+#endif
+
+#if PLATFORM(MAC)
+extern NSString *SchemeForCustomProtocolRegisteredNotificationName;
+extern NSString *SchemeForCustomProtocolUnregisteredNotificationName;
+#endif
+
+class WebContext : public APIObject, private CoreIPC::MessageReceiver {
 public:
     static const Type APIType = TypeContext;
 
@@ -84,27 +93,57 @@ public:
 
     static const Vector<WebContext*>& allContexts();
 
+    template <typename T>
+    T* supplement()
+    {
+        return static_cast<T*>(m_supplements.get(T::supplementName()).get());
+    }
+
+    template <typename T>
+    void addSupplement()
+    {
+        m_supplements.add(T::supplementName(), T::create(this));
+    }
+
+    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver*);
+    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver*);
+    void removeMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID);
+
+    bool dispatchMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    bool dispatchSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
+
+    void initializeClient(const WKContextClient*);
     void initializeInjectedBundleClient(const WKContextInjectedBundleClient*);
     void initializeConnectionClient(const WKContextConnectionClient*);
     void initializeHistoryClient(const WKContextHistoryClient*);
     void initializeDownloadClient(const WKContextDownloadClient*);
 
+    void setProcessModel(ProcessModel); // Can only be called when there are no processes running.
     ProcessModel processModel() const { return m_processModel; }
 
-    // FIXME (Multi-WebProcess): Remove. No code should assume that there is a shared process.
-    WebProcessProxy* deprecatedSharedProcess();
+    void setMaximumNumberOfProcesses(unsigned); // Can only be called when there are no processes running.
+    unsigned maximumNumberOfProcesses() const { return m_webProcessCountLimit; }
+
+    // WebProcess or NetworkProcess as approporiate for current process model. The connection must be non-null.
+    CoreIPC::Connection* networkingProcessConnection();
 
     template<typename U> void sendToAllProcesses(const U& message);
     template<typename U> void sendToAllProcessesRelaunchingThemIfNecessary(const U& message);
-    
+
+    // Sends the message to WebProcess or NetworkProcess as approporiate for current process model.
+    template<typename U> void sendToNetworkingProcess(const U& message);
+    template<typename U> void sendToNetworkingProcessRelaunchingIfNecessary(const U& message);
+
+    void processWillOpenConnection(WebProcessProxy*);
+    void processWillCloseConnection(WebProcessProxy*);
     void processDidFinishLaunching(WebProcessProxy*);
 
     // Disconnect the process from the context.
     void disconnectProcess(WebProcessProxy*);
 
-    PassRefPtr<WebPageProxy> createWebPage(PageClient*, WebPageGroup*);
+    StorageManager& storageManager() const { return *m_storageManager; }
 
-    WebProcessProxy* relaunchProcessIfNecessary();
+    PassRefPtr<WebPageProxy> createWebPage(PageClient*, WebPageGroup*, WebPageProxy* relatedPage = 0);
 
     const String& injectedBundlePath() const { return m_injectedBundlePath; }
 
@@ -119,10 +158,12 @@ public:
     void didReceiveSynchronousMessageFromInjectedBundle(const String&, APIObject*, RefPtr<APIObject>& returnData);
 
     void populateVisitedLinks();
-    
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
     void setAdditionalPluginsDirectory(const String&);
 
     PluginInfoStore& pluginInfoStore() { return m_pluginInfoStore; }
+#endif
     String applicationCacheDirectory();
 
     void setAlwaysUsesComplexTextCodePath(bool);
@@ -131,12 +172,17 @@ public:
     void registerURLSchemeAsEmptyDocument(const String&);
     void registerURLSchemeAsSecure(const String&);
     void setDomainRelaxationForbiddenForURLScheme(const String&);
+    void registerURLSchemeAsLocal(const String&);
+    void registerURLSchemeAsNoAccess(const String&);
+    void registerURLSchemeAsDisplayIsolated(const String&);
+    void registerURLSchemeAsCORSEnabled(const String&);
 
     void addVisitedLink(const String&);
     void addVisitedLinkHash(WebCore::LinkHash);
 
-    void didReceiveMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
+    // MessageReceiver.
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
 
     void setCacheModel(CacheModel);
     CacheModel cacheModel() const { return m_cacheModel; }
@@ -146,46 +192,29 @@ public:
     void startMemorySampler(const double interval);
     void stopMemorySampler();
 
-#if PLATFORM(WIN)
-    void setShouldPaintNativeControls(bool);
-
+#if USE(SOUP)
     void setInitialHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy policy) { m_initialHTTPCookieAcceptPolicy = policy; }
 #endif
-
     void setEnhancedAccessibility(bool);
     
     // Downloads.
     DownloadProxy* createDownloadProxy();
     WebDownloadClient& downloadClient() { return m_downloadClient; }
-    void downloadFinished(DownloadProxy*);
 
     WebHistoryClient& historyClient() { return m_historyClient; }
+    WebContextClient& client() { return m_client; }
 
     static HashSet<String, CaseFoldingHash> pdfAndPostScriptMIMETypes();
 
-    WebApplicationCacheManagerProxy* applicationCacheManagerProxy() const { return m_applicationCacheManagerProxy.get(); }
 #if ENABLE(BATTERY_STATUS)
     WebBatteryManagerProxy* batteryManagerProxy() const { return m_batteryManagerProxy.get(); }
 #endif
-    WebCookieManagerProxy* cookieManagerProxy() const { return m_cookieManagerProxy.get(); }
-#if ENABLE(SQL_DATABASE)
-    WebDatabaseManagerProxy* databaseManagerProxy() const { return m_databaseManagerProxy.get(); }
-#endif
-    WebGeolocationManagerProxy* geolocationManagerProxy() const { return m_geolocationManagerProxy.get(); }
     WebIconDatabase* iconDatabase() const { return m_iconDatabase.get(); }
-    WebKeyValueStorageManagerProxy* keyValueStorageManagerProxy() const { return m_keyValueStorageManagerProxy.get(); }
-    WebMediaCacheManagerProxy* mediaCacheManagerProxy() const { return m_mediaCacheManagerProxy.get(); }
 #if ENABLE(NETWORK_INFO)
     WebNetworkInfoManagerProxy* networkInfoManagerProxy() const { return m_networkInfoManagerProxy.get(); }
 #endif
-    WebNotificationManagerProxy* notificationManagerProxy() const { return m_notificationManagerProxy.get(); }
+#if ENABLE(NETSCAPE_PLUGIN_API)
     WebPluginSiteDataManager* pluginSiteDataManager() const { return m_pluginSiteDataManager.get(); }
-    WebResourceCacheManagerProxy* resourceCacheManagerProxy() const { return m_resourceCacheManagerProxy.get(); }
-#if USE(SOUP)
-    WebSoupRequestManagerProxy* soupRequestManagerProxy() const { return m_soupRequestManagerProxy.get(); }
-#endif
-#if ENABLE(VIBRATION)
-    WebVibrationProxy* vibrationProxy() const { return m_vibrationProxy.get(); }
 #endif
 
     struct Statistics {
@@ -199,9 +228,13 @@ public:
     void setIconDatabasePath(const String&);
     String iconDatabasePath() const;
     void setLocalStorageDirectory(const String& dir) { m_overrideLocalStorageDirectory = dir; }
+    void setDiskCacheDirectory(const String& dir) { m_overrideDiskCacheDirectory = dir; }
+    void setCookieStorageDirectory(const String& dir) { m_overrideCookieStorageDirectory = dir; }
 
-    void ensureSharedWebProcess();
-    PassRefPtr<WebProcessProxy> createNewWebProcess();
+    void allowSpecificHTTPSCertificateForHost(const WebCertificateInfo*, const String& host);
+
+    WebProcessProxy* ensureSharedWebProcess();
+    WebProcessProxy* createNewWebProcessRespectingProcessCountLimit(); // Will return an existing one if limit is met.
     void warmInitialProcess();
 
     bool shouldTerminate(WebProcessProxy*);
@@ -212,8 +245,9 @@ public:
     // Defaults to false.
     void setHTTPPipeliningEnabled(bool);
     bool httpPipeliningEnabled() const;
+
+    void getStatistics(uint32_t statisticsMask, PassRefPtr<DictionaryCallback>);
     
-    void getWebCoreStatistics(PassRefPtr<DictionaryCallback>);
     void garbageCollectJavaScriptObjects();
     void setJavaScriptGarbageCollectorTimerEnabled(bool flag);
 
@@ -225,14 +259,58 @@ public:
 
     void textCheckerStateChanged();
 
+    PassRefPtr<ImmutableDictionary> plugInAutoStartOriginHashes() const;
+    void setPlugInAutoStartOriginHashes(ImmutableDictionary&);
+
+    // Network Process Management
+
+    void setUsesNetworkProcess(bool);
+    bool usesNetworkProcess() const;
+
+#if ENABLE(NETWORK_PROCESS)
+    void ensureNetworkProcess();
+    NetworkProcessProxy* networkProcess() { return m_networkProcess.get(); }
+    void networkProcessCrashed(NetworkProcessProxy*);
+
+    void getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>);
+#endif
+
+
+#if PLATFORM(MAC)
+    void setProcessSuppressionEnabled(bool);
+    bool processSuppressionEnabled() const { return m_processSuppressionEnabled; }
+    bool canEnableProcessSuppressionForNetworkProcess() const;
+    bool canEnableProcessSuppressionForWebProcess(const WebProcessProxy*) const;
+    static bool canEnableProcessSuppressionForGlobalChildProcesses();
+    void updateProcessSuppressionStateOfChildProcesses();
+#endif
+
+    static void willStartUsingPrivateBrowsing();
+    static void willStopUsingPrivateBrowsing();
+
+#if USE(SOUP)
+    void setIgnoreTLSErrors(bool);
+    bool ignoreTLSErrors() const { return m_ignoreTLSErrors; }
+#endif
+
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
+    void platformInitialize();
 
     virtual Type type() const { return APIType; }
 
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
-    
+
+    WebProcessProxy* createNewWebProcess();
+
+    void requestWebContentStatistics(StatisticsRequest*);
+    void requestNetworkingStatistics(StatisticsRequest*);
+
+#if ENABLE(NETWORK_PROCESS)
+    void platformInitializeNetworkProcess(NetworkProcessCreationParameters&);
+#endif
+
 #if PLATFORM(MAC)
     void getPasteboardTypes(const String& pasteboardName, Vector<String>& pasteboardTypes);
     void getPasteboardPathnamesForType(const String& pasteboardName, const String& pasteboardType, Vector<String>& pathnames);
@@ -256,11 +334,11 @@ private:
     void dummy(bool&);
 #endif
 
-    void didGetWebCoreStatistics(const StatisticsData&, uint64_t callbackID);
+    void didGetStatistics(const StatisticsData&, uint64_t callbackID);
         
     // Implemented in generated WebContextMessageReceiver.cpp
-    void didReceiveWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
+    void didReceiveWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    void didReceiveSyncWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
 
     static void languageChanged(void* context);
     void languageChanged();
@@ -273,9 +351,33 @@ private:
     String localStorageDirectory() const;
     String platformDefaultLocalStorageDirectory() const;
 
+    String diskCacheDirectory() const;
+    String platformDefaultDiskCacheDirectory() const;
+
+    String cookieStorageDirectory() const;
+    String platformDefaultCookieStorageDirectory() const;
+
+#if PLATFORM(MAC)
+    void processSuppressionEnabledChanged();
+    void registerNotificationObservers();
+    void unregisterNotificationObservers();
+#endif
+
+#if ENABLE(CUSTOM_PROTOCOLS)
+    void registerSchemeForCustomProtocol(const String&);
+    void unregisterSchemeForCustomProtocol(const String&);
+#endif
+
+    void addPlugInAutoStartOriginHash(const String& pageOrigin, unsigned plugInOriginHash);
+    void plugInDidReceiveUserInteraction(unsigned plugInOriginHash);
+
+    CoreIPC::MessageReceiverMap m_messageReceiverMap;
+
     ProcessModel m_processModel;
+    unsigned m_webProcessCountLimit; // The limit has no effect when process model is ProcessModelSharedSecondaryProcess.
     
     Vector<RefPtr<WebProcessProxy> > m_processes;
+    bool m_haveInitialEmptyProcess;
 
     RefPtr<WebPageGroup> m_defaultPageGroup;
 
@@ -283,72 +385,129 @@ private:
     String m_injectedBundlePath;
     WebContextInjectedBundleClient m_injectedBundleClient;
 
+    WebContextClient m_client;
     WebContextConnectionClient m_connectionClient;
-    
+    WebDownloadClient m_downloadClient;
     WebHistoryClient m_historyClient;
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
     PluginInfoStore m_pluginInfoStore;
+#endif
     VisitedLinkProvider m_visitedLinkProvider;
+    PlugInAutoStartProvider m_plugInAutoStartProvider;
         
     HashSet<String> m_schemesToRegisterAsEmptyDocument;
     HashSet<String> m_schemesToRegisterAsSecure;
     HashSet<String> m_schemesToSetDomainRelaxationForbiddenFor;
+    HashSet<String> m_schemesToRegisterAsLocal;
+    HashSet<String> m_schemesToRegisterAsNoAccess;
+    HashSet<String> m_schemesToRegisterAsDisplayIsolated;
+    HashSet<String> m_schemesToRegisterAsCORSEnabled;
 
     bool m_alwaysUsesComplexTextCodePath;
     bool m_shouldUseFontSmoothing;
 
-    Vector<pair<String, RefPtr<APIObject> > > m_pendingMessagesToPostToInjectedBundle;
+    // How many times an API call was used to enable the preference.
+    // The variable can be 0 when private browsing is used if it's enabled due to a persistent preference.
+    static unsigned m_privateBrowsingEnterCount;
+
+    // Messages that were posted before any pages were created.
+    // The client should use initialization messages instead, so that a restarted process would get the same state.
+    Vector<pair<String, RefPtr<APIObject> > > m_messagesToInjectedBundlePostedToEmptyContext;
 
     CacheModel m_cacheModel;
 
-    WebDownloadClient m_downloadClient;
-    HashMap<uint64_t, RefPtr<DownloadProxy> > m_downloads;
-    
     bool m_memorySamplerEnabled;
     double m_memorySamplerInterval;
 
-    RefPtr<WebApplicationCacheManagerProxy> m_applicationCacheManagerProxy;
 #if ENABLE(BATTERY_STATUS)
     RefPtr<WebBatteryManagerProxy> m_batteryManagerProxy;
 #endif
-    RefPtr<WebCookieManagerProxy> m_cookieManagerProxy;
-#if ENABLE(SQL_DATABASE)
-    RefPtr<WebDatabaseManagerProxy> m_databaseManagerProxy;
-#endif
-    RefPtr<WebGeolocationManagerProxy> m_geolocationManagerProxy;
     RefPtr<WebIconDatabase> m_iconDatabase;
-    RefPtr<WebKeyValueStorageManagerProxy> m_keyValueStorageManagerProxy;
-    RefPtr<WebMediaCacheManagerProxy> m_mediaCacheManagerProxy;
 #if ENABLE(NETWORK_INFO)
     RefPtr<WebNetworkInfoManagerProxy> m_networkInfoManagerProxy;
 #endif
-    RefPtr<WebNotificationManagerProxy> m_notificationManagerProxy;
+#if ENABLE(NETSCAPE_PLUGIN_API)
     RefPtr<WebPluginSiteDataManager> m_pluginSiteDataManager;
-    RefPtr<WebResourceCacheManagerProxy> m_resourceCacheManagerProxy;
-#if USE(SOUP)
-    RefPtr<WebSoupRequestManagerProxy> m_soupRequestManagerProxy;
-#endif
-#if ENABLE(VIBRATION)
-    RefPtr<WebVibrationProxy> m_vibrationProxy;
 #endif
 
-#if PLATFORM(WIN)
-    bool m_shouldPaintNativeControls;
+    RefPtr<StorageManager> m_storageManager;
+
+    typedef HashMap<const char*, RefPtr<WebContextSupplement>, PtrHash<const char*> > WebContextSupplementMap;
+    WebContextSupplementMap m_supplements;
+
+#if USE(SOUP)
     HTTPCookieAcceptPolicy m_initialHTTPCookieAcceptPolicy;
 #endif
 
 #if PLATFORM(MAC)
     RetainPtr<CFTypeRef> m_enhancedAccessibilityObserver;
+    RetainPtr<CFTypeRef> m_customSchemeRegisteredObserver;
+    RetainPtr<CFTypeRef> m_customSchemeUnregisteredObserver;
 #endif
 
     String m_overrideDatabaseDirectory;
     String m_overrideIconDatabasePath;
     String m_overrideLocalStorageDirectory;
+    String m_overrideDiskCacheDirectory;
+    String m_overrideCookieStorageDirectory;
 
     bool m_processTerminationEnabled;
+
+#if ENABLE(NETWORK_PROCESS)
+    bool m_usesNetworkProcess;
+    RefPtr<NetworkProcessProxy> m_networkProcess;
+#endif
     
     HashMap<uint64_t, RefPtr<DictionaryCallback> > m_dictionaryCallbacks;
+    HashMap<uint64_t, RefPtr<StatisticsRequest> > m_statisticsRequests;
+
+#if PLATFORM(MAC)
+    bool m_processSuppressionEnabled;
+#endif
+
+#if USE(SOUP)
+    bool m_ignoreTLSErrors;
+#endif
 };
+
+template<typename U> inline void WebContext::sendToNetworkingProcess(const U& message)
+{
+    switch (m_processModel) {
+    case ProcessModelSharedSecondaryProcess:
+        if (!m_processes.isEmpty() && m_processes[0]->canSendMessage())
+            m_processes[0]->send(message, 0);
+        return;
+    case ProcessModelMultipleSecondaryProcesses:
+#if ENABLE(NETWORK_PROCESS)
+        if (m_networkProcess->canSendMessage())
+            m_networkProcess->send(message, 0);
+        return;
+#else
+        break;
+#endif
+    }
+    ASSERT_NOT_REACHED();
+}
+
+template<typename U> void WebContext::sendToNetworkingProcessRelaunchingIfNecessary(const U& message)
+{
+    switch (m_processModel) {
+    case ProcessModelSharedSecondaryProcess:
+        ensureSharedWebProcess();
+        m_processes[0]->send(message, 0);
+        return;
+    case ProcessModelMultipleSecondaryProcesses:
+#if ENABLE(NETWORK_PROCESS)
+        ensureNetworkProcess();
+        m_networkProcess->send(message, 0);
+        return;
+#else
+        break;
+#endif
+    }
+    ASSERT_NOT_REACHED();
+}
 
 template<typename U> inline void WebContext::sendToAllProcesses(const U& message)
 {
@@ -362,7 +521,9 @@ template<typename U> inline void WebContext::sendToAllProcesses(const U& message
 
 template<typename U> void WebContext::sendToAllProcessesRelaunchingThemIfNecessary(const U& message)
 {
-    relaunchProcessIfNecessary();
+// FIXME (Multi-WebProcess): WebContext doesn't track processes that have exited, so it cannot relaunch these. Perhaps this functionality won't be needed in this mode.
+    if (m_processModel == ProcessModelSharedSecondaryProcess)
+        ensureSharedWebProcess();
     sendToAllProcesses(message);
 }
 

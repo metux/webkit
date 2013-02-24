@@ -35,6 +35,7 @@
 #include "Page.h"
 #include "PluginViewBase.h"
 #include "RenderEmbeddedObject.h"
+#include "RenderSnapshottedPlugIn.h"
 #include "RenderWidget.h"
 #include "Settings.h"
 #include "Widget.h"
@@ -55,6 +56,7 @@ HTMLPlugInElement::HTMLPlugInElement(const QualifiedName& tagName, Document* doc
     , m_NPObject(0)
 #endif
     , m_isCapturingMouseEvents(false)
+    , m_displayState(Playing)
 {
 }
 
@@ -68,6 +70,24 @@ HTMLPlugInElement::~HTMLPlugInElement()
         m_NPObject = 0;
     }
 #endif
+}
+
+bool HTMLPlugInElement::canProcessDrag() const
+{
+    const PluginViewBase* plugin = pluginWidget() && pluginWidget()->isPluginViewBase() ? static_cast<const PluginViewBase*>(pluginWidget()) : 0;
+    return plugin ? plugin->canProcessDrag() : false;
+}
+
+bool HTMLPlugInElement::willRespondToMouseClickEvents()
+{
+    if (disabled())
+        return false;
+    RenderObject* r = renderer();
+    if (!r)
+        return false;
+    if (!r->isEmbeddedObject() && !r->isWidget())
+        return false;
+    return true;
 }
 
 void HTMLPlugInElement::detach()
@@ -149,7 +169,7 @@ bool HTMLPlugInElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLFrameOwnerElement::isPresentationAttribute(name);
 }
 
-void HTMLPlugInElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLPlugInElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
     if (attribute.name() == widthAttr)
         addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
@@ -164,7 +184,7 @@ void HTMLPlugInElement::collectStyleForAttribute(const Attribute& attribute, Sty
     } else if (attribute.name() == alignAttr)
         applyAlignmentAttributeToStyle(attribute, style);
     else
-        HTMLFrameOwnerElement::collectStyleForAttribute(attribute, style);
+        HTMLFrameOwnerElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
 void HTMLPlugInElement::defaultEventHandler(Event* event)
@@ -176,8 +196,14 @@ void HTMLPlugInElement::defaultEventHandler(Event* event)
     // FIXME: Mouse down and scroll events are passed down to plug-in via custom code in EventHandler; these code paths should be united.
 
     RenderObject* r = renderer();
-    if (r && r->isEmbeddedObject() && toRenderEmbeddedObject(r)->showsUnavailablePluginIndicator()) {
-        toRenderEmbeddedObject(r)->handleUnavailablePluginIndicatorEvent(event);
+    if (r && r->isEmbeddedObject()) {
+        if (toRenderEmbeddedObject(r)->showsUnavailablePluginIndicator()) {
+            toRenderEmbeddedObject(r)->handleUnavailablePluginIndicatorEvent(event);
+            return;
+        }
+    } else if (r && r->isSnapshottedPlugIn() && displayState() < PlayingWithPendingMouseClick) {
+        toRenderSnapshottedPlugIn(r)->handleEvent(event);
+        HTMLFrameOwnerElement::defaultEventHandler(event);
         return;
     }
 

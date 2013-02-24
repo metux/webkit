@@ -30,21 +30,36 @@
 #include "APIShims.h"
 #include "JSCallbackObject.h"
 
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSGlobalObject.h>
 #include <runtime/JSONObject.h>
 #include <runtime/JSString.h>
 #include <runtime/LiteralParser.h>
 #include <runtime/Operations.h>
 #include <runtime/Protect.h>
-#include <runtime/UString.h>
-#include <runtime/JSValue.h>
 
 #include <wtf/Assertions.h>
 #include <wtf/text/StringHash.h>
+#include <wtf/text/WTFString.h>
 
 #include <algorithm> // for std::min
 
+#if PLATFORM(MAC)
+#include <mach-o/dyld.h>
+#endif
+
 using namespace JSC;
+
+#if PLATFORM(MAC)
+static bool evernoteHackNeeded()
+{
+    static const int32_t webkitLastVersionWithEvernoteHack = 35133959;
+    static bool hackNeeded = CFEqual(CFBundleGetIdentifier(CFBundleGetMainBundle()), CFSTR("com.evernote.Evernote"))
+        && NSVersionOfLinkTimeLibrary("JavaScriptCore") <= webkitLastVersionWithEvernoteHack;
+
+    return hackNeeded;
+}
+#endif
 
 ::JSType JSValueGetType(JSContextRef ctx, JSValueRef value)
 {
@@ -131,8 +146,8 @@ bool JSValueIsObjectOfClass(JSContextRef ctx, JSValueRef value, JSClassRef jsCla
     if (JSObject* o = jsValue.getObject()) {
         if (o->inherits(&JSCallbackObject<JSGlobalObject>::s_info))
             return jsCast<JSCallbackObject<JSGlobalObject>*>(o)->inherits(jsClass);
-        if (o->inherits(&JSCallbackObject<JSNonFinalObject>::s_info))
-            return jsCast<JSCallbackObject<JSNonFinalObject>*>(o)->inherits(jsClass);
+        if (o->inherits(&JSCallbackObject<JSDestructibleObject>::s_info))
+            return jsCast<JSCallbackObject<JSDestructibleObject>*>(o)->inherits(jsClass);
     }
     return false;
 }
@@ -175,7 +190,7 @@ bool JSValueIsInstanceOfConstructor(JSContextRef ctx, JSValueRef value, JSObject
     JSObject* jsConstructor = toJS(constructor);
     if (!jsConstructor->structure()->typeInfo().implementsHasInstance())
         return false;
-    bool result = jsConstructor->methodTable()->hasInstance(jsConstructor, exec, jsValue, jsConstructor->get(exec, exec->propertyNames().prototype)); // false if an exception is thrown
+    bool result = jsConstructor->hasInstance(exec, jsValue); // false if an exception is thrown
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -216,8 +231,8 @@ JSValueRef JSValueMakeNumber(JSContextRef ctx, double value)
     // Our JSValue representation relies on a standard bit pattern for NaN. NaNs
     // generated internally to JavaScriptCore naturally have that representation,
     // but an external NaN might not.
-    if (isnan(value))
-        value = std::numeric_limits<double>::quiet_NaN();
+    if (std::isnan(value))
+        value = QNaN;
 
     return toRef(exec, jsNumber(value));
 }
@@ -227,19 +242,20 @@ JSValueRef JSValueMakeString(JSContextRef ctx, JSStringRef string)
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
 
-    return toRef(exec, jsString(exec, string->ustring()));
+    return toRef(exec, jsString(exec, string->string()));
 }
 
 JSValueRef JSValueMakeFromJSONString(JSContextRef ctx, JSStringRef string)
 {
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
-    UString str = string->ustring();
-    if (str.is8Bit()) {
-        LiteralParser<LChar> parser(exec, str.characters8(), str.length(), StrictJSON);
+    String str = string->string();
+    unsigned length = str.length();
+    if (length && str.is8Bit()) {
+        LiteralParser<LChar> parser(exec, str.characters8(), length, StrictJSON);
         return toRef(exec, parser.tryLiteralParse());
     }
-    LiteralParser<UChar> parser(exec, str.characters16(), str.length(), StrictJSON);
+    LiteralParser<UChar> parser(exec, str.characters(), length, StrictJSON);
     return toRef(exec, parser.tryLiteralParse());
 }
 
@@ -248,7 +264,7 @@ JSStringRef JSValueCreateJSONString(JSContextRef ctx, JSValueRef apiValue, unsig
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
     JSValue value = toJS(exec, apiValue);
-    UString result = JSONStringify(exec, value, indent);
+    String result = JSONStringify(exec, value, indent);
     if (exception)
         *exception = 0;
     if (exec->hadException()) {
@@ -266,7 +282,7 @@ bool JSValueToBoolean(JSContextRef ctx, JSValueRef value)
     APIEntryShim entryShim(exec);
 
     JSValue jsValue = toJS(exec, value);
-    return jsValue.toBoolean();
+    return jsValue.toBoolean(exec);
 }
 
 double JSValueToNumber(JSContextRef ctx, JSValueRef value, JSValueRef* exception)
@@ -281,7 +297,7 @@ double JSValueToNumber(JSContextRef ctx, JSValueRef value, JSValueRef* exception
         if (exception)
             *exception = toRef(exec, exec->exception());
         exec->clearException();
-        number = std::numeric_limits<double>::quiet_NaN();
+        number = QNaN;
     }
     return number;
 }
@@ -331,6 +347,11 @@ void JSValueProtect(JSContextRef ctx, JSValueRef value)
 
 void JSValueUnprotect(JSContextRef ctx, JSValueRef value)
 {
+#if PLATFORM(MAC)
+    if ((!value || !ctx) && evernoteHackNeeded())
+        return;
+#endif
+
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
 

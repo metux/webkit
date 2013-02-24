@@ -38,7 +38,6 @@ OFFSET_MAGIC_NUMBERS = [ to32Bit(0xec577ac7), to32Bit(0x0ff5e755) ]
 # MissingMagicValuesException
 #
 # Thrown when magic values are missing from the binary.
-# This is usually an indication that the classic interpreter is enabled.
 #
 
 class MissingMagicValuesException < Exception
@@ -61,7 +60,7 @@ end
 
 #
 # offsetsAndConfigurationIndex(ast, file) ->
-#     {[offsets, index], ...}
+#     [[offsets, index], ...]
 #
 # Parses the offsets from a file and returns a list of offsets and the
 # index of the configuration that is valid in this build target.
@@ -106,7 +105,7 @@ def offsetsAndConfigurationIndex(file)
     
     fileBytes = []
     
-    File.open(file, "r") {
+    File.open(file, "rb") {
         | inp |
         loop {
             byte = inp.getbyte
@@ -155,16 +154,19 @@ def offsetsAndConfigurationIndex(file)
                     | data |
                     offsets << readInt(endianness, data)
                 }
-                if not result.has_key?(offsets)
-                    result[offsets] = index
-                end
+                result[index] = offsets
             }
         end
     }
     
     raise MissingMagicValuesException unless result.length >= 1
     
-    result
+    # result is {index1=>offsets1, index2=>offsets2} but we want to return
+    # [[offsets1, index1], [offsets2, index2]].
+    return result.map {
+        | pair |
+        pair.reverse
+    }
 end
 
 #

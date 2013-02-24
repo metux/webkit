@@ -36,11 +36,15 @@ public:
     explicit RenderSVGContainer(SVGStyledElement*);
     virtual ~RenderSVGContainer();
 
+    RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
+    RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
+
     const RenderObjectChildList* children() const { return &m_children; }
     RenderObjectChildList* children() { return &m_children; }
 
     virtual void paint(PaintInfo&, const LayoutPoint&);
     virtual void setNeedsBoundariesUpdate() { m_needsBoundariesUpdate = true; }
+    virtual bool needsBoundariesUpdate() OVERRIDE { return m_needsBoundariesUpdate; }
     virtual bool didTransformToRootUpdate() { return false; }
     bool isObjectBoundingBoxValid() const { return m_objectBoundingBoxValid; }
 
@@ -87,13 +91,13 @@ private:
   
 inline RenderSVGContainer* toRenderSVGContainer(RenderObject* object)
 {
-    ASSERT(!object || object->isSVGContainer());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGContainer());
     return static_cast<RenderSVGContainer*>(object);
 }
 
 inline const RenderSVGContainer* toRenderSVGContainer(const RenderObject* object)
 {
-    ASSERT(!object || object->isSVGContainer());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGContainer());
     return static_cast<const RenderSVGContainer*>(object);
 }
 

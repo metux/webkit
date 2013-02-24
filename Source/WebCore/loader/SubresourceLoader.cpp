@@ -33,12 +33,10 @@
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
-#include "FrameLoader.h"
 #include "Logging.h"
 #include "MemoryCache.h"
-#include "MemoryInstrumentation.h"
-#include "SecurityOrigin.h"
-#include "SecurityPolicy.h"
+#include "ResourceBuffer.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
@@ -62,7 +60,6 @@ SubresourceLoader::RequestCountTracker::~RequestCountTracker()
 SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, const ResourceLoaderOptions& options)
     : ResourceLoader(frame, options)
     , m_resource(resource)
-    , m_document(frame->document())
     , m_loadingMultipartContent(false)
     , m_state(Uninitialized)
     , m_requestCountTracker(adoptPtr(new RequestCountTracker(frame->document()->cachedResourceLoader(), resource)))
@@ -75,7 +72,6 @@ SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, con
 SubresourceLoader::~SubresourceLoader()
 {
     ASSERT(m_state != Initialized);
-    ASSERT(!m_document);
     ASSERT(reachedTerminalState());
 #ifndef NDEBUG
     subresourceLoaderCounter.decrement();
@@ -84,40 +80,8 @@ SubresourceLoader::~SubresourceLoader()
 
 PassRefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
 {
-    if (!frame)
-        return 0;
-
-    FrameLoader* frameLoader = frame->loader();
-    if (options.securityCheck == DoSecurityCheck && (frameLoader->state() == FrameStateProvisional || !frameLoader->activeDocumentLoader() || frameLoader->activeDocumentLoader()->isStopping()))
-        return 0;
-
-    ResourceRequest newRequest = request;
-
-    // Note: We skip the Content-Security-Policy check here because we check
-    // the Content-Security-Policy at the CachedResourceLoader layer so we can
-    // handle different resource types differently.
-
-    String outgoingReferrer;
-    String outgoingOrigin;
-    if (request.httpReferrer().isNull()) {
-        outgoingReferrer = frameLoader->outgoingReferrer();
-        outgoingOrigin = frameLoader->outgoingOrigin();
-    } else {
-        outgoingReferrer = request.httpReferrer();
-        outgoingOrigin = SecurityOrigin::createFromString(outgoingReferrer)->toString();
-    }
-
-    outgoingReferrer = SecurityPolicy::generateReferrerHeader(frame->document()->referrerPolicy(), request.url(), outgoingReferrer);
-    if (outgoingReferrer.isEmpty())
-        newRequest.clearHTTPReferrer();
-    else if (!request.httpReferrer())
-        newRequest.setHTTPReferrer(outgoingReferrer);
-    FrameLoader::addHTTPOriginIfNeeded(newRequest, outgoingOrigin);
-
-    frameLoader->addExtraFieldsToSubresourceRequest(newRequest);
-
     RefPtr<SubresourceLoader> subloader(adoptRef(new SubresourceLoader(frame, resource, options)));
-    if (!subloader->init(newRequest))
+    if (!subloader->init(request))
         return 0;
     return subloader.release();
 }
@@ -137,11 +101,11 @@ void SubresourceLoader::cancelIfNotFinishing()
 
 void SubresourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Loader);
     ResourceLoader::reportMemoryUsage(memoryObjectInfo);
-    info.addInstrumentedMember(m_resource);
-    info.addInstrumentedMember(m_document);
-    info.addMember(m_requestCountTracker);
+    info.addMember(m_resource, "resource");
+    info.addMember(m_documentLoader, "documentLoader");
+    info.addMember(m_requestCountTracker, "requestCountTracker");
 }
 
 bool SubresourceLoader::init(const ResourceRequest& request)
@@ -164,15 +128,27 @@ void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const Resou
 {
     // Store the previous URL because the call to ResourceLoader::willSendRequest will modify it.
     KURL previousURL = request().url();
-    
-    ResourceLoader::willSendRequest(newRequest, redirectResponse);
-    if (!previousURL.isNull() && !newRequest.isNull() && previousURL != newRequest.url()) {
-        if (!m_document->cachedResourceLoader()->canRequest(m_resource->type(), newRequest.url())) {
+    RefPtr<SubresourceLoader> protect(this);
+
+    ASSERT(!newRequest.isNull());
+    if (!previousURL.isNull() && previousURL != newRequest.url()) {
+        if (!m_documentLoader->cachedResourceLoader()->canRequest(m_resource->type(), newRequest.url())) {
+            cancel();
+            return;
+        }
+        if (m_resource->type() == CachedResource::ImageResource && m_documentLoader->cachedResourceLoader()->shouldDeferImageLoad(newRequest.url())) {
             cancel();
             return;
         }
         m_resource->willSendRequest(newRequest, redirectResponse);
     }
+
+    if (newRequest.isNull() || reachedTerminalState())
+        return;
+
+    ResourceLoader::willSendRequest(newRequest, redirectResponse);
+    if (newRequest.isNull())
+        cancel();
 }
 
 void SubresourceLoader::didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
@@ -195,6 +171,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         if (response.httpStatusCode() == 304) {
             // 304 Not modified / Use local copy
             // Existing resource is ok, just use it updating the expiration time.
+            m_resource->setResponse(response);
             memoryCache()->revalidationSucceeded(m_resource, response);
             if (!reachedTerminalState())
                 ResourceLoader::didReceiveResponse(response);
@@ -204,12 +181,14 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         memoryCache()->revalidationFailed(m_resource);
     }
 
-    m_resource->setResponse(response);
+    m_resource->responseReceived(response);
     if (reachedTerminalState())
         return;
     ResourceLoader::didReceiveResponse(response);
 
-    if (response.isMultipart()) {
+    // FIXME: Main resources have a different set of rules for multipart than images do.
+    // Hopefully we can merge those 2 paths.
+    if (response.isMultipart() && m_resource->type() != CachedResource::MainResource) {
         m_loadingMultipartContent = true;
 
         // We don't count multiParts in a CachedResourceLoader's request count
@@ -220,7 +199,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         }
     }
 
-    RefPtr<SharedBuffer> buffer = resourceData();
+    RefPtr<ResourceBuffer> buffer = resourceData();
     if (m_loadingMultipartContent && buffer && buffer->size()) {
         sendDataToResource(buffer->data(), buffer->size());
         clearResourceData();
@@ -235,18 +214,19 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 
 void SubresourceLoader::didReceiveData(const char* data, int length, long long encodedDataLength, bool allAtOnce)
 {
+    if (m_resource->response().httpStatusCode() >= 400 && !m_resource->shouldIgnoreHTTPStatusCodeErrors())
+        return;
     ASSERT(!m_resource->resourceToRevalidate());
     ASSERT(!m_resource->errorOccurred());
     ASSERT(m_state == Initialized);
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
     RefPtr<SubresourceLoader> protect(this);
-    ResourceLoader::didReceiveData(data, length, encodedDataLength, allAtOnce);
-
-    if (m_loadingMultipartContent)
-        return;
-
-    sendDataToResource(data, length);
+    addData(data, length, allAtOnce);
+    if (!m_loadingMultipartContent)
+        sendDataToResource(data, length);
+    if (shouldSendResourceLoadCallbacks() && m_frame)
+        frameLoader()->notifier()->didReceiveData(this, data, length, static_cast<int>(encodedDataLength));
 }
 
 bool SubresourceLoader::checkForHTTPStatusCodeError()
@@ -254,8 +234,8 @@ bool SubresourceLoader::checkForHTTPStatusCodeError()
     if (m_resource->response().httpStatusCode() < 400 || m_resource->shouldIgnoreHTTPStatusCodeErrors())
         return false;
 
-    m_resource->error(CachedResource::LoadError);
     m_state = Finishing;
+    m_resource->error(CachedResource::LoadError);
     cancel();
     return true;
 }
@@ -269,8 +249,8 @@ void SubresourceLoader::sendDataToResource(const char* data, int length)
     //     ResourceLoader::resourceData() will be null. However, unlike the multipart case, we don't want to tell the CachedResource 
     //     that all data has been received yet. 
     if (m_loadingMultipartContent || !resourceData()) { 
-        RefPtr<SharedBuffer> copiedData = SharedBuffer::create(data, length); 
-        m_resource->data(copiedData.release(), m_loadingMultipartContent); 
+        RefPtr<ResourceBuffer> copiedData = ResourceBuffer::create(data, length); 
+        m_resource->data(copiedData.release(), m_loadingMultipartContent);
     } else 
         m_resource->data(resourceData(), false);
 }
@@ -305,19 +285,21 @@ void SubresourceLoader::didFail(const ResourceError& error)
     if (m_state != Initialized)
         return;
     ASSERT(!reachedTerminalState());
-    ASSERT(!m_resource->resourceToRevalidate());
     LOG(ResourceLoading, "Failed to load '%s'.\n", m_resource->url().string().latin1().data());
 
     RefPtr<SubresourceLoader> protect(this);
     CachedResourceHandle<CachedResource> protectResource(m_resource);
     m_state = Finishing;
+    if (m_resource->resourceToRevalidate())
+        memoryCache()->revalidationFailed(m_resource);
+    m_resource->setResourceError(error);
     m_resource->error(CachedResource::LoadError);
     if (!m_resource->isPreloaded())
         memoryCache()->remove(m_resource);
     ResourceLoader::didFail(error);
 }
 
-void SubresourceLoader::willCancel(const ResourceError&)
+void SubresourceLoader::willCancel(const ResourceError& error)
 {
     if (m_state != Initialized)
         return;
@@ -328,6 +310,7 @@ void SubresourceLoader::willCancel(const ResourceError&)
     m_state = Finishing;
     if (m_resource->resourceToRevalidate())
         memoryCache()->revalidationFailed(m_resource);
+    m_resource->setResourceError(error);
     memoryCache()->remove(m_resource);
 }
 
@@ -336,13 +319,12 @@ void SubresourceLoader::releaseResources()
     ASSERT(!reachedTerminalState());
     if (m_state != Uninitialized) {
         m_requestCountTracker.clear();
-        m_document->cachedResourceLoader()->loadDone();
+        m_documentLoader->cachedResourceLoader()->loadDone(m_resource);
         if (reachedTerminalState())
             return;
         m_resource->stopLoading();
         m_documentLoader->removeSubresourceLoader(this);
     }
-    m_document = 0;
     ResourceLoader::releaseResources();
 }
 

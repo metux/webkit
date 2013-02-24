@@ -34,24 +34,21 @@
 
 #include "Page.h"
 #include "Supplementable.h"
-#include <wtf/text/AtomicString.h>
 
 #if ENABLE(LINK_PRERENDER)
 
 namespace WebCore {
 
 // static
-const AtomicString& PrerendererClient::supplementName()
+const char* PrerendererClient::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("PrerendererClient"));
-    return name;
+    return "PrerendererClient";
 }
 
 // static
 PrerendererClient* PrerendererClient::from(Page* page)
 {
     PrerendererClient* supplement = static_cast<PrerendererClient*>(Supplement<Page>::from(page, supplementName()));
-    ASSERT(supplement);
     return supplement;
 }
 

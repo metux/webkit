@@ -41,7 +41,7 @@ class FormDataList;
 
 // The class represents types of which UI contain text fields.
 // It supports not only the types for BaseTextInputType but also type=number.
-class TextFieldInputType : public InputType, private SpinButtonElement::SpinButtonOwner {
+class TextFieldInputType : public InputType, protected SpinButtonElement::SpinButtonOwner {
 protected:
     TextFieldInputType(HTMLInputElement*);
     virtual ~TextFieldInputType();
@@ -58,14 +58,24 @@ protected:
 #endif
 
 protected:
+    virtual void attach() OVERRIDE;
     virtual bool needsContainer() const;
     virtual bool shouldHaveSpinButton() const;
     virtual void createShadowSubtree() OVERRIDE;
     virtual void destroyShadowSubtree() OVERRIDE;
     virtual void disabledAttributeChanged() OVERRIDE;
     virtual void readonlyAttributeChanged() OVERRIDE;
+    virtual bool supportsReadOnly() const OVERRIDE;
     virtual void handleBlurEvent() OVERRIDE;
+    virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
     virtual void updateInnerTextValue() OVERRIDE;
+
+    virtual String convertFromVisibleValue(const String&) const;
+    enum ValueChangeState {
+        ValueChangeStateNone,
+        ValueChangeStateChanged
+    };
+    virtual void didSetValueByUserEdit(ValueChangeState);
 
 private:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
@@ -77,13 +87,12 @@ private:
     virtual bool shouldSubmitImplicitly(Event*) OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const OVERRIDE;
     virtual bool shouldUseInputMethod() const OVERRIDE;
-    virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
     virtual String sanitizeValue(const String&) const OVERRIDE;
     virtual bool shouldRespectListAttribute() OVERRIDE;
     virtual HTMLElement* placeholderElement() const OVERRIDE;
     virtual void updatePlaceholderText() OVERRIDE;
     virtual bool appendFormData(FormDataList&, bool multipart) const OVERRIDE;
-    virtual void attach() OVERRIDE;
+    virtual void subtreeHasChanged() OVERRIDE;
 
     // SpinButtonElement::SpinButtonOwner functions.
     virtual void focusAndSelectSpinButtonOwner() OVERRIDE;

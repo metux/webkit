@@ -43,12 +43,14 @@ public:
         Structure* domStructure = WebCore::deprecatedGetDOMStructure<RuntimeArray>(exec);
         RuntimeArray* runtimeArray = new (NotNull, allocateCell<RuntimeArray>(*exec->heap())) RuntimeArray(exec, domStructure);
         runtimeArray->finishCreation(exec->globalData(), array);
+        exec->globalData().heap.addFinalizer(runtimeArray, destroy);
         return runtimeArray;
     }
 
     typedef Bindings::Array BindingsArray;
     ~RuntimeArray();
     static void destroy(JSCell*);
+    static const bool needsDestruction = false;
 
     static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
@@ -73,13 +75,13 @@ public:
 
     static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
+        return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info, ArrayClass);
     }
 
 protected:
     void finishCreation(JSGlobalData&, Bindings::Array*);
 
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | JSArray::StructureFlags;
+    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | JSArray::StructureFlags;
 
 private:
     RuntimeArray(ExecState*, Structure*);
@@ -88,7 +90,7 @@ private:
 
     BindingsArray* m_array;
 };
-    
+
 } // namespace JSC
 
 #endif // RUNTIME_ARRAY_H_

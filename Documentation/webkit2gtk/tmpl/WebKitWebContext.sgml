@@ -43,6 +43,14 @@ WebKitWebContext
 @WEBKIT_CACHE_MODEL_WEB_BROWSER: 
 @WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER: 
 
+<!-- ##### ENUM WebKitTLSErrorsPolicy ##### -->
+<para>
+
+</para>
+
+@WEBKIT_TLS_ERRORS_POLICY_IGNORE: 
+@WEBKIT_TLS_ERRORS_POLICY_FAIL: 
+
 <!-- ##### FUNCTION webkit_web_context_get_default ##### -->
 <para>
 
@@ -89,6 +97,42 @@ WebKitWebContext
 
 
 <!-- ##### FUNCTION webkit_web_context_get_cookie_manager ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_favicon_database ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_favicon_database_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@path: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_favicon_database_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_security_manager ##### -->
 <para>
 
 </para>
@@ -171,6 +215,42 @@ WebKitWebContext
 
 @context: 
 @languages: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_tls_errors_policy ##### -->
+<para>
+
+</para>
+
+@context: 
+@policy: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_tls_errors_policy ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_web_extensions_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@directory: 
+
+
+<!-- ##### FUNCTION webkit_web_context_prefetch_dns ##### -->
+<para>
+
+</para>
+
+@context: 
+@hostname: 
 
 
 <!-- ##### USER_FUNCTION WebKitURISchemeRequestCallback ##### -->

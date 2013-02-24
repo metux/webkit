@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,12 +27,6 @@
 #define WebFrameLoaderClient_h
 
 #include <WebCore/FrameLoaderClient.h>
-
-namespace WebCore {
-#if ENABLE(WEB_INTENTS)
-class IntentRequest;
-#endif
-}
 
 namespace WebKit {
 
@@ -97,9 +91,7 @@ private:
     virtual void dispatchDidFinishDocumentLoad() OVERRIDE;
     virtual void dispatchDidFinishLoad() OVERRIDE;
 
-    virtual void dispatchDidFirstLayout() OVERRIDE;
-    virtual void dispatchDidFirstVisuallyNonEmptyLayout() OVERRIDE;
-    virtual void dispatchDidNewFirstVisuallyNonEmptyLayout() OVERRIDE;
+    virtual void dispatchDidLayout(WebCore::LayoutMilestones) OVERRIDE;
     virtual void dispatchDidLayout() OVERRIDE;
 
     virtual WebCore::Frame* dispatchCreatePage(const WebCore::NavigationAction&) OVERRIDE;
@@ -184,12 +176,13 @@ private:
     virtual void dispatchDidBecomeFrameset(bool) OVERRIDE;
 
     virtual bool canCachePage() const OVERRIDE;
-    virtual void download(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) OVERRIDE;
+    virtual void convertMainResourceLoadToDownload(WebCore::MainResourceLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) OVERRIDE;
     
     virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::KURL& url, const String& name, WebCore::HTMLFrameOwnerElement* ownerElement,
                                           const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) OVERRIDE;
     
     virtual PassRefPtr<WebCore::Widget> createPlugin(const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) OVERRIDE;
+    virtual void recreatePlugin(WebCore::Widget*) OVERRIDE;
     virtual void redirectDataToPlugin(WebCore::Widget* pluginWidget) OVERRIDE;
     
     virtual PassRefPtr<WebCore::Widget> createJavaAppletWidget(const WebCore::IntSize&, WebCore::HTMLAppletElement*, const WebCore::KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) OVERRIDE;
@@ -218,26 +211,14 @@ private:
 #if PLATFORM(MAC)
     virtual RemoteAXObjectRef accessibilityRemoteObject() OVERRIDE;
     
-#if ENABLE(MAC_JAVA_BRIDGE)
-    virtual jobject javaApplet(NSView*) OVERRIDE;
-#endif
     virtual NSCachedURLResponse* willCacheResponse(WebCore::DocumentLoader*, unsigned long identifier, NSCachedURLResponse*) const OVERRIDE;
-#endif
-#if PLATFORM(WIN) && USE(CFNETWORK)
-    // FIXME: Windows should use willCacheResponse - <https://bugs.webkit.org/show_bug.cgi?id=57257>.
-    virtual bool shouldCacheResponse(WebCore::DocumentLoader*, unsigned long identifier, const WebCore::ResourceResponse&, const unsigned char* data, unsigned long long length) OVERRIDE;
-#endif
-
-#if ENABLE(WEB_INTENTS)
-    virtual void dispatchIntent(PassRefPtr<WebCore::IntentRequest>) OVERRIDE;
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-    virtual void registerIntentService(const String& action, const String& type, const WebCore::KURL& href, const String& title, const String& disposition) OVERRIDE;
 #endif
 
     virtual bool shouldUsePluginDocument(const String& /*mimeType*/) const OVERRIDE;
 
     virtual void didChangeScrollOffset() OVERRIDE;
+
+    virtual bool allowScript(bool enabledPerSettings) OVERRIDE;
 
     virtual bool shouldForceUniversalAccessFromLocalURL(const WebCore::KURL&) OVERRIDE;
 
@@ -246,6 +227,7 @@ private:
     WebFrame* m_frame;
     RefPtr<PluginView> m_pluginView;
     bool m_hasSentResponseToPluginView;
+    bool m_didCompletePageTransitionAlready;
     bool m_frameHasCustomRepresentation;
     bool m_frameCameFromPageCache;
 };

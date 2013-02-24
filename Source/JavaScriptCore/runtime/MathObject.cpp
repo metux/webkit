@@ -32,7 +32,7 @@
 
 namespace JSC {
 
-ASSERT_CLASS_FITS_IN_CELL(MathObject);
+ASSERT_HAS_TRIVIAL_DESTRUCTOR(MathObject);
 
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncAbs(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncACos(ExecState*);
@@ -59,9 +59,7 @@ static EncodedJSValue JSC_HOST_CALL mathProtoFuncTan(ExecState*);
 
 namespace JSC {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(MathObject);
-
-const ClassInfo MathObject::s_info = { "Math", &JSNonFinalObject::s_info, 0, ExecState::mathTable, CREATE_METHOD_TABLE(MathObject) };
+const ClassInfo MathObject::s_info = { "Math", &Base::s_info, 0, ExecState::mathTable, CREATE_METHOD_TABLE(MathObject) };
 
 /* Source for MathObject.lut.h
 @begin mathTable
@@ -176,11 +174,11 @@ EncodedJSValue JSC_HOST_CALL mathProtoFuncMax(ExecState* exec)
     double result = -std::numeric_limits<double>::infinity();
     for (unsigned k = 0; k < argsCount; ++k) {
         double val = exec->argument(k).toNumber(exec);
-        if (isnan(val)) {
-            result = std::numeric_limits<double>::quiet_NaN();
+        if (std::isnan(val)) {
+            result = QNaN;
             break;
         }
-        if (val > result || (val == 0 && result == 0 && !signbit(val)))
+        if (val > result || (!val && !result && !std::signbit(val)))
             result = val;
     }
     return JSValue::encode(jsNumber(result));
@@ -192,11 +190,11 @@ EncodedJSValue JSC_HOST_CALL mathProtoFuncMin(ExecState* exec)
     double result = +std::numeric_limits<double>::infinity();
     for (unsigned k = 0; k < argsCount; ++k) {
         double val = exec->argument(k).toNumber(exec);
-        if (isnan(val)) {
-            result = std::numeric_limits<double>::quiet_NaN();
+        if (std::isnan(val)) {
+            result = QNaN;
             break;
         }
-        if (val < result || (val == 0 && result == 0 && signbit(val)))
+        if (val < result || (!val && !result && std::signbit(val)))
             result = val;
     }
     return JSValue::encode(jsNumber(result));
@@ -246,9 +244,9 @@ EncodedJSValue JSC_HOST_CALL mathProtoFuncPow(ExecState* exec)
     double arg = exec->argument(0).toNumber(exec);
     double arg2 = exec->argument(1).toNumber(exec);
 
-    if (isnan(arg2))
+    if (std::isnan(arg2))
         return JSValue::encode(jsNaN());
-    if (isinf(arg2) && fabs(arg) == 1)
+    if (std::isinf(arg2) && fabs(arg) == 1)
         return JSValue::encode(jsNaN());
     return JSValue::encode(jsNumber(mathPow(arg, arg2)));
 }

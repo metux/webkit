@@ -37,6 +37,10 @@
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/Settings.h>
 
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+#include "WebNotificationManager.h"
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -84,7 +88,8 @@ void NotificationPermissionRequestManager::startRequest(SecurityOrigin* origin, 
 {
     NotificationClient::Permission permission = permissionLevel(origin);
     if (permission != NotificationClient::PermissionNotAllowed) {
-        callback->handleEvent();
+        if (callback)
+            callback->handleEvent();
         return;
     }
     
@@ -121,10 +126,27 @@ NotificationClient::Permission NotificationPermissionRequestManager::permissionL
     if (!m_page->corePage()->settings()->notificationsEnabled())
         return NotificationClient::PermissionDenied;
     
-    return WebProcess::shared().notificationManager().policyForOrigin(securityOrigin);
+    return WebProcess::shared().supplement<WebNotificationManager>()->policyForOrigin(securityOrigin);
 #else
     UNUSED_PARAM(securityOrigin);
     return NotificationClient::PermissionDenied;
+#endif
+}
+
+void NotificationPermissionRequestManager::setPermissionLevelForTesting(const String& originString, bool allowed)
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    WebProcess::shared().supplement<WebNotificationManager>()->didUpdateNotificationDecision(originString, allowed);
+#else
+    UNUSED_PARAM(originString);
+    UNUSED_PARAM(allowed);
+#endif
+}
+
+void NotificationPermissionRequestManager::removeAllPermissionsForTesting()
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    WebProcess::shared().supplement<WebNotificationManager>()->removeAllPermissionsForTesting();
 #endif
 }
 
@@ -133,6 +155,11 @@ void NotificationPermissionRequestManager::didReceiveNotificationPermissionDecis
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     if (!isRequestIDValid(requestID))
         return;
+
+    RefPtr<WebCore::SecurityOrigin> origin = m_idToOriginMap.take(requestID);
+    m_originToIDMap.remove(origin);
+
+    WebProcess::shared().supplement<WebNotificationManager>()->didUpdateNotificationDecision(origin->toString(), allowed);
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
     RefPtr<VoidCallback> voidCallback = m_idToVoidCallbackMap.take(requestID);

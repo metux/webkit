@@ -38,17 +38,17 @@
 #include "NotImplemented.h"
 #include "Pattern.h"
 #include "PlatformContextCairo.h"
-#include "PlatformString.h"
 #include "RefPtrCairo.h"
 #include <cairo.h>
 #include <wtf/Vector.h>
 #include <wtf/text/Base64.h>
+#include <wtf/text/WTFString.h>
 
 using namespace std;
 
 namespace WebCore {
 
-ImageBufferData::ImageBufferData(const IntSize& size)
+ImageBufferData::ImageBufferData(const IntSize&)
     : m_surface(0)
     , m_platformContext(0)
 {
@@ -82,7 +82,7 @@ GraphicsContext* ImageBuffer::context() const
     return m_context.get();
 }
 
-PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior) const
+PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBehavior) const
 {
     if (copyBehavior == CopyBackingStore)
         return BitmapImage::create(copyCairoImageSurface(m_data.m_surface).leakRef());
@@ -91,17 +91,22 @@ PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior) const
     return BitmapImage::create(cairo_surface_reference(m_data.m_surface));
 }
 
+BackingStoreCopy ImageBuffer::fastCopyImageMode()
+{
+    return DontCopyBackingStore;
+}
+
 void ImageBuffer::clip(GraphicsContext* context, const FloatRect& maskRect) const
 {
     context->platformContext()->pushImageMask(m_data.m_surface, maskRect);
 }
 
 void ImageBuffer::draw(GraphicsContext* destinationContext, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect,
-                       CompositeOperator op , bool useLowQualityScale)
+    CompositeOperator op, BlendMode blendMode, bool useLowQualityScale)
 {
     BackingStoreCopy copyMode = destinationContext == context() ? CopyBackingStore : DontCopyBackingStore;
     RefPtr<Image> image = copyImage(copyMode);
-    destinationContext->drawImage(image.get(), styleColorSpace, destRect, srcRect, op, DoNotRespectImageOrientation, useLowQualityScale);
+    destinationContext->drawImage(image.get(), styleColorSpace, destRect, srcRect, op, blendMode, DoNotRespectImageOrientation, useLowQualityScale);
 }
 
 void ImageBuffer::drawPattern(GraphicsContext* context, const FloatRect& srcRect, const AffineTransform& patternTransform,
@@ -175,15 +180,26 @@ PassRefPtr<Uint8ClampedArray> getImageData(const IntRect& rect, const ImageBuffe
         for (int x = 0; x < numColumns; x++) {
             int basex = x * 4;
             unsigned* pixel = row + x + originx;
-            Color pixelColor;
-            if (multiplied == Unmultiplied)
-                pixelColor = colorFromPremultipliedARGB(*pixel);
-            else
-                pixelColor = Color(*pixel);
-            destRows[basex]     = pixelColor.red();
-            destRows[basex + 1] = pixelColor.green();
-            destRows[basex + 2] = pixelColor.blue();
-            destRows[basex + 3] = pixelColor.alpha();
+
+            // Avoid calling Color::colorFromPremultipliedARGB() because one
+            // function call per pixel is too expensive.
+            unsigned alpha = (*pixel & 0xFF000000) >> 24;
+            unsigned red = (*pixel & 0x00FF0000) >> 16;
+            unsigned green = (*pixel & 0x0000FF00) >> 8;
+            unsigned blue = (*pixel & 0x000000FF);
+
+            if (multiplied == Unmultiplied) {
+                if (alpha && alpha != 255) {
+                    red = red * 255 / alpha;
+                    green = green * 255 / alpha;
+                    blue = blue * 255 / alpha;
+                }
+            }
+
+            destRows[basex]     = red;
+            destRows[basex + 1] = green;
+            destRows[basex + 2] = blue;
+            destRows[basex + 3] = alpha;
         }
         destRows += destBytesPerRow;
     }
@@ -242,14 +258,23 @@ void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, c
         for (int x = 0; x < numColumns; x++) {
             int basex = x * 4;
             unsigned* pixel = row + x + destx;
-            Color pixelColor = Color::createUnCheked(srcRows[basex],
-                                                     srcRows[basex + 1],
-                                                     srcRows[basex + 2],
-                                                     srcRows[basex + 3]);
-            if (multiplied == Unmultiplied)
-                *pixel = premultipliedARGBFromColor(pixelColor);
-            else
-                *pixel = pixelColor.rgb();
+
+            // Avoid calling Color::premultipliedARGBFromColor() because one
+            // function call per pixel is too expensive.
+            unsigned red = srcRows[basex];
+            unsigned green = srcRows[basex + 1];
+            unsigned blue = srcRows[basex + 2];
+            unsigned alpha = srcRows[basex + 3];
+
+            if (multiplied == Unmultiplied) {
+                if (alpha && alpha != 255) {
+                    red = (red * alpha + 254) / 255;
+                    green = (green * alpha + 254) / 255;
+                    blue = (blue * alpha + 254) / 255;
+                }
+            }
+
+            *pixel = (alpha << 24) | red  << 16 | green  << 8 | blue;
         }
         srcRows += srcBytesPerRow;
     }
@@ -268,7 +293,7 @@ static cairo_status_t writeFunction(void* output, const unsigned char* data, uns
 
 static bool encodeImage(cairo_surface_t* image, const String& mimeType, Vector<char>* output)
 {
-    ASSERT(mimeType == "image/png"); // Only PNG output is supported for now.
+    ASSERT_UNUSED(mimeType, mimeType == "image/png"); // Only PNG output is supported for now.
 
     return cairo_surface_write_to_png_stream(image, writeFunction, output) == CAIRO_STATUS_SUCCESS;
 }

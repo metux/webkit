@@ -3,6 +3,7 @@
  *  Copyright (C) 2010 Joone Hur <joone@kldp.org>
  *  Copyright (C) 2009 Google Inc. All rights reserved.
  *  Copyright (C) 2011 Igalia S.L.
+ *  Copyright (C) 2012 Apple Inc. All Rights Reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -26,6 +27,7 @@
 #include "AXObjectCache.h"
 #include "AccessibilityObject.h"
 #include "AnimationController.h"
+#include "ApplicationCacheStorage.h"
 #include "CSSComputedStyleDeclaration.h"
 #include "Chrome.h"
 #include "ChromeClientGtk.h"
@@ -43,35 +45,36 @@
 #include "GeolocationPosition.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
+#include "JSCJSValue.h"
 #include "JSCSSStyleDeclaration.h"
 #include "JSDOMWindow.h"
 #include "JSDocument.h"
 #include "JSElement.h"
 #include "JSLock.h"
 #include "JSNodeList.h"
-#include "JSValue.h"
+#include "MemoryCache.h"
 #include "MutationObserver.h"
 #include "NodeList.h"
 #include "PageGroup.h"
-#include "PlatformString.h"
 #include "PrintContext.h"
 #include "RenderListItem.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
 #include "ResourceLoadScheduler.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
-#include "WorkerThread.h"
 #include "webkitglobalsprivate.h"
 #include "webkitwebframe.h"
 #include "webkitwebframeprivate.h"
 #include "webkitwebview.h"
 #include "webkitwebviewprivate.h"
 #include <JavaScriptCore/APICast.h>
+#include <wtf/text/WTFString.h>
 
 using namespace JSC;
 using namespace WebCore;
@@ -80,6 +83,8 @@ using namespace WebKit;
 bool DumpRenderTreeSupportGtk::s_drtRun = false;
 bool DumpRenderTreeSupportGtk::s_linksIncludedInTabChain = true;
 bool DumpRenderTreeSupportGtk::s_selectTrailingWhitespaceEnabled = false;
+DumpRenderTreeSupportGtk::FrameLoadEventCallback DumpRenderTreeSupportGtk::s_frameLoadEventCallback = 0;
+DumpRenderTreeSupportGtk::AuthenticationCallback DumpRenderTreeSupportGtk::s_authenticationCallback = 0;
 
 DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()
 {
@@ -188,66 +193,18 @@ CString DumpRenderTreeSupportGtk::dumpRenderTree(WebKitWebFrame* frame)
     return externalRepresentation(coreFrame).utf8();
 }
 
-/**
- * numberOfPagesForFrame
- * @frame: a #WebKitWebFrame
- * @pageWidth: width of a page
- * @pageHeight: height of a page
- *
- * Return value: The number of pages to be printed.
- */
-int DumpRenderTreeSupportGtk::numberOfPagesForFrame(WebKitWebFrame* frame, float pageWidth, float pageHeight)
+void DumpRenderTreeSupportGtk::addUserScript(WebKitWebFrame* frame, const char* sourceCode, bool runAtStart, bool allFrames)
 {
-    g_return_val_if_fail(WEBKIT_IS_WEB_FRAME(frame), 0);
+    g_return_if_fail(WEBKIT_IS_WEB_FRAME(frame));
 
     Frame* coreFrame = core(frame);
     if (!coreFrame)
-        return -1;
+        return;
 
-    return PrintContext::numberOfPages(coreFrame, FloatSize(pageWidth, pageHeight));
-}
-
-/**
- * pageProperty
- * @frame: a #WebKitWebFrame
- * @propertyName: name of a property
- * @pageNumber: number of a page 
- *
- * Return value: The value of the given property name.
- */
-CString DumpRenderTreeSupportGtk::pageProperty(WebKitWebFrame* frame, const char* propertyName, int pageNumber)
-{
-    g_return_val_if_fail(WEBKIT_IS_WEB_FRAME(frame), CString());
-
-    Frame* coreFrame = core(frame);
-    if (!coreFrame)
-        return CString();
-
-    return PrintContext::pageProperty(coreFrame, propertyName, pageNumber).utf8();
-}
-
-/**
- * pageSizeAndMarginsInPixels
- * @frame: a #WebKitWebFrame
- * @pageNumber: number of a page 
- * @width: width of a page
- * @height: height of a page
- * @marginTop: top margin of a page
- * @marginRight: right margin of a page
- * @marginBottom: bottom margin of a page
- * @marginLeft: left margin of a page
- *
- * Return value: The value of page size and margin.
- */
-CString DumpRenderTreeSupportGtk::pageSizeAndMarginsInPixels(WebKitWebFrame* frame, int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft)
-{
-    g_return_val_if_fail(WEBKIT_IS_WEB_FRAME(frame), CString());
-
-    Frame* coreFrame = core(frame);
-    if (!coreFrame)
-        return CString();
-
-    return PrintContext::pageSizeAndMarginsInPixels(coreFrame, pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft).utf8();
+    WebKitWebView* webView = getViewFromFrame(frame);
+    Page* page = core(webView);
+    page->group().addUserScriptToWorld(mainThreadNormalWorld(), sourceCode, KURL(), Vector<String>(), Vector<String>(),
+        runAtStart ? InjectAtDocumentStart : InjectAtDocumentEnd, allFrames ? InjectInAllFrames : InjectInTopFrameOnly);
 }
 
 /**
@@ -266,7 +223,7 @@ void DumpRenderTreeSupportGtk::addUserStyleSheet(WebKitWebFrame* frame, const ch
 
     WebKitWebView* webView = getViewFromFrame(frame);
     Page* page = core(webView);
-    page->group().addUserStyleSheetToWorld(mainThreadNormalWorld(), sourceCode, KURL(), nullptr, nullptr, allFrames ? InjectInAllFrames : InjectInTopFrameOnly); 
+    page->group().addUserStyleSheetToWorld(mainThreadNormalWorld(), sourceCode, KURL(), Vector<String>(), Vector<String>(), allFrames ? InjectInAllFrames : InjectInTopFrameOnly); 
 }
 
 /**
@@ -282,24 +239,6 @@ guint DumpRenderTreeSupportGtk::getPendingUnloadEventCount(WebKitWebFrame* frame
     return core(frame)->document()->domWindow()->pendingUnloadEventListeners();
 }
 
-bool DumpRenderTreeSupportGtk::pauseAnimation(WebKitWebFrame* frame, const char* name, double time, const char* element)
-{
-    ASSERT(core(frame));
-    Element* coreElement = core(frame)->document()->getElementById(AtomicString(element));
-    if (!coreElement || !coreElement->renderer())
-        return false;
-    return core(frame)->animation()->pauseAnimationAtTime(coreElement->renderer(), AtomicString(name), time);
-}
-
-bool DumpRenderTreeSupportGtk::pauseTransition(WebKitWebFrame* frame, const char* name, double time, const char* element)
-{
-    ASSERT(core(frame));
-    Element* coreElement = core(frame)->document()->getElementById(AtomicString(element));
-    if (!coreElement || !coreElement->renderer())
-        return false;
-    return core(frame)->animation()->pauseTransitionAtTime(coreElement->renderer(), AtomicString(name), time);
-}
-
 CString DumpRenderTreeSupportGtk::markerTextForListItem(WebKitWebFrame* frame, JSContextRef context, JSValueRef nodeObject)
 {
     JSC::ExecState* exec = toJS(context);
@@ -308,15 +247,6 @@ CString DumpRenderTreeSupportGtk::markerTextForListItem(WebKitWebFrame* frame, J
         return CString();
 
     return WebCore::markerTextForListItem(element).utf8();
-}
-
-unsigned int DumpRenderTreeSupportGtk::numberOfActiveAnimations(WebKitWebFrame* frame)
-{
-    Frame* coreFrame = core(frame);
-    if (!coreFrame)
-        return 0;
-
-    return coreFrame->animation()->numberOfActiveAnimations(coreFrame->document());
 }
 
 void DumpRenderTreeSupportGtk::clearMainFrameName(WebKitWebFrame* frame)
@@ -601,28 +531,9 @@ void DumpRenderTreeSupportGtk::clearOpener(WebKitWebFrame* frame)
         coreFrame->loader()->setOpener(0);
 }
 
-unsigned int DumpRenderTreeSupportGtk::workerThreadCount()
-{
-#if ENABLE(WORKERS)
-    return WebCore::WorkerThread::workerThreadCount();
-#else
-    return 0;
-#endif
-}
-
 bool DumpRenderTreeSupportGtk::findString(WebKitWebView* webView, const gchar* targetString, WebKitFindOptions findOptions)
 {
     return core(webView)->findString(String::fromUTF8(targetString), findOptions);
-}
-
-double DumpRenderTreeSupportGtk::defaultMinimumTimerInterval()
-{
-    return Settings::defaultMinDOMTimerInterval();
-}
-
-void DumpRenderTreeSupportGtk::setMinimumTimerInterval(WebKitWebView* webView, double interval)
-{
-    core(webView)->settings()->setMinDOMTimerInterval(interval);
 }
 
 CString DumpRenderTreeSupportGtk::accessibilityHelpText(AtkObject* axObject)
@@ -718,23 +629,11 @@ void DumpRenderTreeSupportGtk::setMockGeolocationPosition(WebKitWebView* webView
 #endif
 }
 
-void DumpRenderTreeSupportGtk::setMockGeolocationError(WebKitWebView* webView, int errorCode, const gchar* errorMessage)
+void DumpRenderTreeSupportGtk::setMockGeolocationPositionUnavailableError(WebKitWebView* webView, const gchar* errorMessage)
 {
 #if ENABLE(GEOLOCATION)
     GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
-
-    GeolocationError::ErrorCode code;
-    switch (errorCode) {
-    case PositionError::PERMISSION_DENIED:
-        code = GeolocationError::PermissionDenied;
-        break;
-    case PositionError::POSITION_UNAVAILABLE:
-    default:
-        code = GeolocationError::PositionUnavailable;
-        break;
-    }
-
-    mock->setError(GeolocationError::create(code, errorMessage));
+    mock->setPositionUnavailableError(errorMessage);
 #endif
 }
 
@@ -743,6 +642,8 @@ int DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests(WebKi
 #if ENABLE(GEOLOCATION)
     GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
     return mock->numberOfPendingPermissionRequests();
+#else
+    return 0;
 #endif
 }
 
@@ -758,7 +659,42 @@ void DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(WebKitWebView* webView, b
 
 void DumpRenderTreeSupportGtk::setCSSRegionsEnabled(WebKitWebView* webView, bool enabled)
 {
-    core(webView)->settings()->setCSSRegionsEnabled(enabled);
+    RuntimeEnabledFeatures::setCSSRegionsEnabled(enabled);
+}
+
+void DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled(WebKitWebView* webView, bool enabled)
+{
+#if ENABLE(CSS_SHADERS)
+    core(webView)->settings()->setCSSCustomFilterEnabled(enabled);
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setExperimentalContentSecurityPolicyFeaturesEnabled(bool enabled)
+{
+#if ENABLE(CSP_NEXT)
+    RuntimeEnabledFeatures::setExperimentalContentSecurityPolicyFeaturesEnabled(enabled);
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setSeamlessIFramesEnabled(bool enabled)
+{
+#if ENABLE(IFRAME_SEAMLESS)
+    RuntimeEnabledFeatures::setSeamlessIFramesEnabled(enabled);
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setShadowDOMEnabled(bool enabled)
+{
+#if ENABLE(SHADOW_DOM)
+    RuntimeEnabledFeatures::setShadowDOMEnabled(enabled);
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setStyleScopedEnabled(bool enabled)
+{
+#if ENABLE(STYLE_SCOPED)
+    RuntimeEnabledFeatures::setStyleScopedEnabled(enabled);
+#endif
 }
 
 bool DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(WebKitWebFrame* frame, JSStringRef id)
@@ -778,9 +714,6 @@ bool DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(WebKitWeb
         return false;
 
     HTMLInputElement* inputElement = static_cast<HTMLInputElement*>(coreNode);
-    if (!inputElement)
-        return false;
-
     return inputElement->isTextField() && !inputElement->isPasswordField() && inputElement->shouldAutocomplete();
 }
 
@@ -802,9 +735,7 @@ JSValueRef DumpRenderTreeSupportGtk::computedStyleIncludingVisitedInfo(JSContext
 
 void DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary()
 {
-#if ENABLE(MUTATION_OBSERVERS)
     MutationObserver::deliverAllMutations();
-#endif
 }
 
 void DumpRenderTreeSupportGtk::setDomainRelaxationForbiddenForURLScheme(bool forbidden, const char* urlScheme)
@@ -866,4 +797,25 @@ void DumpRenderTreeSupportGtk::resetTrackedRepaints(WebKitWebFrame* frame)
     Frame* coreFrame = core(frame);
     if (coreFrame && coreFrame->view())
         coreFrame->view()->resetTrackedRepaints();
+}
+
+void DumpRenderTreeSupportGtk::clearMemoryCache()
+{
+    memoryCache()->evictResources();
+}
+
+void DumpRenderTreeSupportGtk::clearApplicationCache()
+{
+    cacheStorage().empty();
+    cacheStorage().vacuumDatabaseFile();
+}
+
+void DumpRenderTreeSupportGtk::setFrameLoadEventCallback(FrameLoadEventCallback frameLoadEventCallback)
+{
+    s_frameLoadEventCallback = frameLoadEventCallback;
+}
+
+void DumpRenderTreeSupportGtk::setAuthenticationCallback(AuthenticationCallback authenticationCallback)
+{
+    s_authenticationCallback = authenticationCallback;
 }

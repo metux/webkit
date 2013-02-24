@@ -25,6 +25,8 @@
 #include "CSSStyleSheet.h"
 #include "CachedCSSStyleSheet.h"
 #include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
+#include "CachedResourceRequestInitiators.h"
 #include "Document.h"
 #include "SecurityOrigin.h"
 #include "StyleSheetContents.h"
@@ -115,11 +117,12 @@ void StyleRuleImport::requestStyleSheet()
         rootSheet = sheet;
     }
 
-    ResourceRequest request(absURL);
+    CachedResourceRequest request(ResourceRequest(absURL), m_parentStyleSheet->charset());
+    request.setInitiator(cachedResourceRequestInitiators().css);
     if (m_parentStyleSheet->isUserStyleSheet())
-        m_cachedSheet = cachedResourceLoader->requestUserCSSStyleSheet(request, m_parentStyleSheet->charset());
+        m_cachedSheet = cachedResourceLoader->requestUserCSSStyleSheet(request);
     else
-        m_cachedSheet = cachedResourceLoader->requestCSSStyleSheet(request, m_parentStyleSheet->charset());
+        m_cachedSheet = cachedResourceLoader->requestCSSStyleSheet(request);
     if (m_cachedSheet) {
         // if the import rule is issued dynamically, the sheet may be
         // removed from the pending sheet count, so let the doc know
@@ -133,10 +136,10 @@ void StyleRuleImport::requestStyleSheet()
 
 void StyleRuleImport::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_strHref);
-    info.addInstrumentedMember(m_mediaQueries);
-    info.addInstrumentedMember(m_styleSheet);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_strHref, "strHref");
+    info.addMember(m_mediaQueries, "mediaQueries");
+    info.addMember(m_styleSheet, "styleSheet");
 }
 
 } // namespace WebCore

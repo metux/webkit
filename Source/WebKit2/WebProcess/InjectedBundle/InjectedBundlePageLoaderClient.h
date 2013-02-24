@@ -30,6 +30,7 @@
 #include "SameDocumentNavigationType.h"
 #include "WKBundlePage.h"
 #include <JavaScriptCore/JSBase.h>
+#include <WebCore/LayoutMilestones.h>
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -46,12 +47,6 @@ class APIObject;
 class InjectedBundleBackForwardListItem;
 class WebPage;
 class WebFrame;
-#if ENABLE(WEB_INTENTS)
-class InjectedBundleIntentRequest;
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-class WebIntentServiceInfo;
-#endif
 
 class InjectedBundlePageLoaderClient : public APIClient<WKBundlePageLoaderClient, kWKBundlePageLoaderClientCurrentVersion> {
 public:
@@ -71,17 +66,11 @@ public:
     void didRunInsecureContentForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didDetectXSSForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
 
-#if ENABLE(WEB_INTENTS)
-    void didReceiveIntentForFrame(WebPage*, WebFrame*, InjectedBundleIntentRequest*, RefPtr<APIObject>& userData);
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-    void registerIntentServiceForFrame(WebPage*, WebFrame*, WebIntentServiceInfo*, RefPtr<APIObject>& userData);
-#endif
-
     void didFirstLayoutForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didFirstVisuallyNonEmptyLayoutForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didLayoutForFrame(WebPage*, WebFrame*);
     void didNewFirstVisuallyNonEmptyLayout(WebPage*, WTF::RefPtr<APIObject>& userData);
+    void didLayout(WebPage*, WebCore::LayoutMilestones, RefPtr<APIObject>& userData);
 
     void didClearWindowObjectForFrame(WebPage*, WebFrame*, WebCore::DOMWrapperWorld*);
     void didCancelClientRedirectForFrame(WebPage*, WebFrame*);

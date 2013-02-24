@@ -20,8 +20,12 @@
 #include "config.h"
 #include "WebKitURISchemeRequest.h"
 
+#include "WebData.h"
 #include "WebKitURISchemeRequestPrivate.h"
 #include "WebKitWebContextPrivate.h"
+#include "WebKitWebView.h"
+#include "WebPageProxy.h"
+#include "WebSoupRequestManagerProxy.h"
 #include <WebCore/GOwnPtrSoup.h>
 #include <libsoup/soup.h>
 #include <wtf/gobject/GRefPtr.h>
@@ -29,13 +33,28 @@
 
 using namespace WebKit;
 
-static const unsigned int gReadBufferSize = 8192;
+/**
+ * SECTION: WebKitURISchemeRequest
+ * @Short_description: Represents a URI scheme request
+ * @Title: WebKitURISchemeRequest
+ *
+ * If you register a particular URI scheme in a #WebKitWebContext,
+ * using webkit_web_context_register_uri_scheme(), you have to provide
+ * a #WebKitURISchemeRequestCallback. After that, when a URI request
+ * is made with that particular scheme, your callback will be
+ * called. There you will be able to access properties such as the
+ * scheme, the URI and path, and the #WebKitWebView that initiated the
+ * request, and also finish the request with
+ * webkit_uri_scheme_request_finish().
+ *
+ */
 
-G_DEFINE_TYPE(WebKitURISchemeRequest, webkit_uri_scheme_request, G_TYPE_OBJECT)
+static const unsigned int gReadBufferSize = 8192;
 
 struct _WebKitURISchemeRequestPrivate {
     WebKitWebContext* webContext;
-    WKRetainPtr<WKSoupRequestManagerRef> wkRequestManager;
+    RefPtr<WebSoupRequestManagerProxy> webRequestManager;
+    RefPtr<WebPageProxy> initiatingPage;
     uint64_t requestID;
     CString uri;
     GOwnPtr<SoupURI> soupURI;
@@ -48,32 +67,19 @@ struct _WebKitURISchemeRequestPrivate {
     CString mimeType;
 };
 
-static void webkit_uri_scheme_request_init(WebKitURISchemeRequest* request)
-{
-    WebKitURISchemeRequestPrivate* priv = G_TYPE_INSTANCE_GET_PRIVATE(request, WEBKIT_TYPE_URI_SCHEME_REQUEST, WebKitURISchemeRequestPrivate);
-    request->priv = priv;
-    new (priv) WebKitURISchemeRequestPrivate();
-}
-
-static void webkitURISchemeRequestFinalize(GObject* object)
-{
-    WEBKIT_URI_SCHEME_REQUEST(object)->priv->~WebKitURISchemeRequestPrivate();
-    G_OBJECT_CLASS(webkit_uri_scheme_request_parent_class)->finalize(object);
-}
+WEBKIT_DEFINE_TYPE(WebKitURISchemeRequest, webkit_uri_scheme_request, G_TYPE_OBJECT)
 
 static void webkit_uri_scheme_request_class_init(WebKitURISchemeRequestClass* requestClass)
 {
-    GObjectClass* objectClass = G_OBJECT_CLASS(requestClass);
-    objectClass->finalize = webkitURISchemeRequestFinalize;
-    g_type_class_add_private(requestClass, sizeof(WebKitURISchemeRequestPrivate));
 }
 
-WebKitURISchemeRequest* webkitURISchemeRequestCreate(WebKitWebContext* webContext, WKSoupRequestManagerRef wkRequestManager, WKURLRef wkURL, uint64_t requestID)
+WebKitURISchemeRequest* webkitURISchemeRequestCreate(WebKitWebContext* webContext, WebSoupRequestManagerProxy* webRequestManager, WebURL* webURL, WebPageProxy* initiatingPage, uint64_t requestID)
 {
     WebKitURISchemeRequest* request = WEBKIT_URI_SCHEME_REQUEST(g_object_new(WEBKIT_TYPE_URI_SCHEME_REQUEST, NULL));
     request->priv->webContext = webContext;
-    request->priv->wkRequestManager = wkRequestManager;
-    request->priv->uri = toImpl(wkURL)->string().utf8();
+    request->priv->webRequestManager = webRequestManager;
+    request->priv->uri = webURL->string().utf8();
+    request->priv->initiatingPage = initiatingPage;
     request->priv->requestID = requestID;
     return request;
 }
@@ -138,6 +144,21 @@ const char* webkit_uri_scheme_request_get_path(WebKitURISchemeRequest* request)
     return request->priv->soupURI->path;
 }
 
+/**
+ * webkit_uri_scheme_request_get_web_view:
+ * @request: a #WebKitURISchemeRequest
+ *
+ * Get the #WebKitWebView that initiated the request.
+ *
+ * Returns: (transfer none): the #WebKitWebView that initiated @request.
+ */
+WebKitWebView* webkit_uri_scheme_request_get_web_view(WebKitURISchemeRequest* request)
+{
+    g_return_val_if_fail(WEBKIT_IS_URI_SCHEME_REQUEST(request), 0);
+
+    return WEBKIT_WEB_VIEW(request->priv->initiatingPage->viewWidget());
+}
+
 static void webkitURISchemeRequestReadCallback(GInputStream* inputStream, GAsyncResult* result, WebKitURISchemeRequest* schemeRequest)
 {
     GRefPtr<WebKitURISchemeRequest> request = adoptGRef(schemeRequest);
@@ -149,14 +170,13 @@ static void webkitURISchemeRequestReadCallback(GInputStream* inputStream, GAsync
     }
 
     WebKitURISchemeRequestPrivate* priv = request->priv;
-    WKRetainPtr<WKDataRef> wkData(AdoptWK, WKDataCreate(bytesRead ? reinterpret_cast<const unsigned char*>(priv->readBuffer) : 0, bytesRead));
+    RefPtr<WebData> webData = WebData::create(reinterpret_cast<const unsigned char*>(priv->readBuffer), bytesRead);
     if (!priv->bytesRead) {
-        // First chunk read. In case of empty reply an empty WKDataRef is sent to the WebProcess.
-        WKRetainPtr<WKStringRef> wkMimeType = !priv->mimeType.isNull() ? adoptWK(WKStringCreateWithUTF8CString(priv->mimeType.data())) : 0;
-        WKSoupRequestManagerDidHandleURIRequest(priv->wkRequestManager.get(), wkData.get(), priv->streamLength, wkMimeType.get(), priv->requestID);
+        // First chunk read. In case of empty reply an empty WebData is sent to the WebProcess.
+        priv->webRequestManager->didHandleURIRequest(webData.get(), priv->streamLength, String::fromUTF8(priv->mimeType.data()), priv->requestID);
     } else if (bytesRead || (!bytesRead && !priv->streamLength)) {
-        // Subsequent chunk read. We only send an empty WKDataRef to the WebProcess when stream length is unknown.
-        WKSoupRequestManagerDidReceiveURIRequestData(priv->wkRequestManager.get(), wkData.get(), priv->requestID);
+        // Subsequent chunk read. We only send an empty WebData to the WebProcess when stream length is unknown.
+        priv->webRequestManager->didReceiveURIRequestData(webData.get(), priv->requestID);
     }
 
     if (!bytesRead) {

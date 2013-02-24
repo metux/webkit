@@ -34,7 +34,7 @@ class RenderTextFragment;
 // to date as the button changes.
 class RenderButton : public RenderDeprecatedFlexibleBox {
 public:
-    explicit RenderButton(Node*);
+    explicit RenderButton(Element*);
     virtual ~RenderButton();
 
     virtual const char* renderName() const { return "RenderButton"; }
@@ -49,8 +49,6 @@ public:
 
     void setupInnerStyle(RenderStyle*);
     virtual void updateFromElement();
-
-    virtual void updateBeforeAfterContent(PseudoId);
 
     virtual bool canHaveGeneratedChildren() const OVERRIDE;
     virtual bool hasControlClip() const { return true; }
@@ -78,13 +76,13 @@ private:
 
 inline RenderButton* toRenderButton(RenderObject* object)
 { 
-    ASSERT(!object || object->isRenderButton());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderButton());
     return static_cast<RenderButton*>(object);
 }
 
 inline const RenderButton* toRenderButton(const RenderObject* object)
 { 
-    ASSERT(!object || object->isRenderButton());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderButton());
     return static_cast<const RenderButton*>(object);
 }
 

@@ -33,7 +33,6 @@
 
 #if ENABLE(WORKERS)
 
-#include "PlatformString.h"
 #include "ThreadableLoader.h"
 #include "ThreadableLoaderClient.h"
 #include "ThreadableLoaderClientWrapper.h"
@@ -43,6 +42,7 @@
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Threading.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -118,6 +118,7 @@ namespace WebCore {
             virtual void didReceiveCachedMetadata(const char*, int dataLength);
             virtual void didFinishLoading(unsigned long identifier, double finishTime);
             virtual void didFail(const ResourceError&);
+            virtual void didFailAccessControlCheck(const ResourceError&);
             virtual void didFailRedirectCheck();
 
             // Only to be used on the main thread.

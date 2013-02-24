@@ -32,11 +32,11 @@
 #include "IntRect.h"
 #include "ImageSource.h"
 #include "PlatformScreen.h"
-#include "PlatformString.h"
 #include "SharedBuffer.h"
 #include <wtf/Assertions.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 #if USE(SKIA)
 #include "NativeImageSkia.h"
@@ -123,6 +123,7 @@ namespace WebCore {
         unsigned duration() const { return m_duration; }
         FrameDisposalMethod disposalMethod() const { return m_disposalMethod; }
         bool premultiplyAlpha() const { return m_premultiplyAlpha; }
+        void reportMemoryUsage(MemoryObjectInfo*) const;
 
         void setHasAlpha(bool alpha);
         void setColorProfile(const ColorProfile&);
@@ -145,42 +146,88 @@ namespace WebCore {
             return m_bytes + (y * width()) + x;
 #endif
         }
-    private:
-        int width() const;
-        int height() const;
+
+#if PLATFORM(CHROMIUM)
+        void setSkBitmap(const SkBitmap& bitmap)
+        {
+            m_bitmap = NativeImageSkia(bitmap, 1);
+        }
+
+        const SkBitmap& getSkBitmap() const
+        {
+            return m_bitmap.bitmap();
+        }
+
+        void setMemoryAllocator(SkBitmap::Allocator* allocator)
+        {
+            m_allocator = allocator;
+        }
+
+        SkBitmap::Allocator* allocator() const { return m_allocator; }
+#endif
+
+        // Use fix point multiplier instead of integer division or floating point math.
+        // This multipler produces exactly the same result for all values in range 0 - 255.
+        static const unsigned fixPointShift = 24;
+        static const unsigned fixPointMult = static_cast<unsigned>(1.0 / 255.0 * (1 << fixPointShift)) + 1;
+        // Multiplies unsigned value by fixpoint value and converts back to unsigned.
+        static unsigned fixPointUnsignedMultiply(unsigned fixed, unsigned v)
+        {
+            return  (fixed * v) >> fixPointShift;
+        }
 
         inline void setRGBA(PixelData* dest, unsigned r, unsigned g, unsigned b, unsigned a)
         {
-            if (m_premultiplyAlpha && !a)
-                *dest = 0;
-            else {
-                if (m_premultiplyAlpha && a < 255) {
-                    float alphaPercent = a / 255.0f;
-                    r = static_cast<unsigned>(r * alphaPercent);
-                    g = static_cast<unsigned>(g * alphaPercent);
-                    b = static_cast<unsigned>(b * alphaPercent);
+            if (m_premultiplyAlpha && a < 255) {
+                if (!a) {
+                    *dest = 0;
+                    return;
                 }
-#if USE(SKIA)
-                // we are sure to call the NoCheck version, since we may
-                // deliberately pass non-premultiplied values, and we don't want
-                // an assert.
-                *dest = SkPackARGB32NoCheck(a, r, g, b);
-#else
-                *dest = (a << 24 | r << 16 | g << 8 | b);
-#endif
+
+                unsigned alphaMult = a * fixPointMult;
+                r = fixPointUnsignedMultiply(r, alphaMult);
+                g = fixPointUnsignedMultiply(g, alphaMult);
+                b = fixPointUnsignedMultiply(b, alphaMult);
             }
+#if USE(SKIA)
+            // Call the "NoCheck" version since we may deliberately pass non-premultiplied
+            // values, and we don't want an assert.
+            *dest = SkPackARGB32NoCheck(a, r, g, b);
+#else
+            *dest = (a << 24 | r << 16 | g << 8 | b);
+#endif
+        }
+
+    private:
+        int width() const
+        {
+#if USE(SKIA)
+            return m_bitmap.bitmap().width();
+#else
+            return m_size.width();
+#endif
+        }
+
+        int height() const
+        {
+#if USE(SKIA)
+            return m_bitmap.bitmap().height();
+#else
+            return m_size.height();
+#endif
         }
 
 #if USE(SKIA)
         NativeImageSkia m_bitmap;
+        SkBitmap::Allocator* m_allocator;
 #else
         Vector<PixelData> m_backingStore;
         PixelData* m_bytes; // The memory is backed by m_backingStore.
         IntSize m_size;
-        bool m_hasAlpha;
         // FIXME: Do we need m_colorProfile anymore?
         ColorProfile m_colorProfile;
 #endif
+        bool m_hasAlpha;
         IntRect m_originalFrameRect; // This will always just be the entire
                                      // buffer except for GIF frames whose
                                      // original rect was smaller than the
@@ -279,21 +326,26 @@ namespace WebCore {
         // Make the best effort guess to check if the requested frame has alpha channel.
         virtual bool frameHasAlphaAtIndex(size_t) const;
 
+        // Number of bytes in the decoded frame requested. Return 0 if not yet decoded.
+        virtual unsigned frameBytesAtIndex(size_t) const;
+
         void setIgnoreGammaAndColorProfile(bool flag) { m_ignoreGammaAndColorProfile = flag; }
         bool ignoresGammaAndColorProfile() const { return m_ignoreGammaAndColorProfile; }
+
+        ImageOrientation orientation() const { return m_orientation; }
 
         enum { iccColorProfileHeaderLength = 128 };
 
         static bool rgbColorProfile(const char* profileData, unsigned profileLength)
         {
-            ASSERT(profileLength >= iccColorProfileHeaderLength);
+            ASSERT_UNUSED(profileLength, profileLength >= iccColorProfileHeaderLength);
 
             return !memcmp(&profileData[16], "RGB ", 4);
         }
 
         static bool inputDeviceColorProfile(const char* profileData, unsigned profileLength)
         {
-            ASSERT(profileLength >= iccColorProfileHeaderLength);
+            ASSERT_UNUSED(profileLength, profileLength >= iccColorProfileHeaderLength);
 
             return !memcmp(&profileData[12], "mntr", 4) || !memcmp(&profileData[12], "scnr", 4);
         }
@@ -356,6 +408,21 @@ namespace WebCore {
         void setMaxNumPixels(int m) { m_maxNumPixels = m; }
 #endif
 
+        // If the image has a cursor hot-spot, stores it in the argument
+        // and returns true. Otherwise returns false.
+        virtual bool hotSpot(IntPoint&) const { return false; }
+
+        virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
+#if USE(SKIA)
+        virtual void setMemoryAllocator(SkBitmap::Allocator* allocator)
+        {
+            // FIXME: this doesn't work for images with multiple frames.
+            if (m_frameBufferCache.isEmpty())
+                m_frameBufferCache.resize(1);
+            m_frameBufferCache[0].setMemoryAllocator(allocator);
+        }
+#endif
     protected:
         void prepareScaleDataIfNecessary();
         int upperBoundScaledX(int origX, int searchStart = 0);
@@ -373,6 +440,7 @@ namespace WebCore {
         Vector<int> m_scaledRows;
         bool m_premultiplyAlpha;
         bool m_ignoreGammaAndColorProfile;
+        ImageOrientation m_orientation;
 
     private:
         // Some code paths compute the size of the image as "width * height * 4"

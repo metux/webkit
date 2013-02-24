@@ -35,8 +35,6 @@ namespace WebCore {
     
 using namespace MathMLNames;
 
-static const int gSubsupScriptMargin = 1;
-
 RenderMathMLSubSup::RenderMathMLSubSup(Element* element) 
     : RenderMathMLBlock(element)
     , m_scripts(0)
@@ -45,7 +43,7 @@ RenderMathMLSubSup::RenderMathMLSubSup(Element* element)
     if (element->hasLocalName(MathMLNames::msubTag))
         m_kind = Sub;
     else if (element->hasLocalName(MathMLNames::msupTag))
-        m_kind = Sup;
+        m_kind = Super;
     else {
         ASSERT(element->hasLocalName(MathMLNames::msubsupTag));
         m_kind = SubSup;
@@ -63,67 +61,45 @@ RenderBoxModelObject* RenderMathMLSubSup::base() const
     return toRenderBoxModelObject(base);
 }
 
-void RenderMathMLSubSup::fixScriptsStyle()
+void RenderMathMLSubSup::fixAnonymousStyles()
 {
+    // Set the base wrapper's style so that baseHeight in layout() will be an unstretched height.
+    ASSERT(firstChild() && firstChild()->style()->refCount() == 1);
+    firstChild()->style()->setAlignSelf(AlignFlexStart);
+    
     ASSERT(m_scripts && m_scripts->style()->refCount() == 1);
     RenderStyle* scriptsStyle = m_scripts->style();
-    scriptsStyle->setVerticalAlign(TOP);
-    scriptsStyle->setMarginLeft(Length(gSubsupScriptMargin, Fixed));
-    scriptsStyle->setTextAlign(LEFT);
+    scriptsStyle->setFlexDirection(FlowColumn);
+    scriptsStyle->setJustifyContent(m_kind == Sub ? JustifyFlexEnd : m_kind == Super ? JustifyFlexStart : JustifySpaceBetween);
     // Set this wrapper's font-size for its line-height & baseline position, for its children.
     scriptsStyle->setFontSize(static_cast<int>(0.75 * style()->fontSize()));
 }
 
+// FIXME: Handle arbitrary addChild/removeChild correctly throughout MathML.
 void RenderMathMLSubSup::addChild(RenderObject* child, RenderObject* beforeChild)
 {
-    // Note: The RenderMathMLBlock only allows element children to be added.
-    Element* childElement = toElement(child->node());
-
-    if (childElement && !childElement->previousElementSibling()) {
-        // Position 1 is always the base of the msub/msup/msubsup.
-        RenderMathMLBlock* baseWrapper = createAnonymousMathMLBlock(INLINE_BLOCK);
-        RenderMathMLBlock::addChild(baseWrapper, firstChild());
-        baseWrapper->addChild(child);
-            
-        // Make sure we have a script block for rendering.
-        if (m_kind == SubSup && !m_scripts) {
-            m_scripts = createAnonymousMathMLBlock(INLINE_BLOCK);
-            fixScriptsStyle();
-            RenderMathMLBlock::addChild(m_scripts, beforeChild);
-        }
-    } else {
-        if (m_kind == SubSup) {
-            ASSERT(childElement);
-            if (!childElement)
-                return;
-
-            RenderMathMLBlock* script = m_scripts->createAnonymousMathMLBlock();
-
-            // The order is always backwards so the first script is the subscript and the superscript 
-            // is last. That means the superscript is the first to render vertically.
-            Element* previousSibling = childElement->previousElementSibling();
-            if (previousSibling && !previousSibling->previousElementSibling()) 
-                m_scripts->addChild(script);
-            else                 
-                m_scripts->addChild(script, m_scripts->firstChild());
-            
-            script->addChild(child);
-        } else
-            RenderMathMLBlock::addChild(child, beforeChild);
+    if (isEmpty()) {
+        RenderMathMLBlock* baseWrapper = createAnonymousMathMLBlock();
+        RenderMathMLBlock::addChild(baseWrapper);
+        
+        m_scripts = createAnonymousMathMLBlock();
+        RenderMathMLBlock::addChild(m_scripts);
+        
+        fixAnonymousStyles();
     }
+    
+    if (firstChild()->isEmpty())
+        firstChild()->addChild(child);
+    else
+        m_scripts->addChild(child, beforeChild && beforeChild->parent() == m_scripts ? beforeChild : 0);
 }
 
 void RenderMathMLSubSup::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderMathMLBlock::styleDidChange(diff, oldStyle);
     
-    if (m_scripts) {
-        fixScriptsStyle();
-        for (RenderObject* script = m_scripts->firstChild(); script; script = script->nextSibling()) {
-            ASSERT(script->isAnonymous() && script->style()->refCount() == 1);
-            script->style()->inheritFrom(m_scripts->style());
-        }
-    }
+    if (!isEmpty())
+        fixAnonymousStyles();
 }
 
 RenderMathMLOperator* RenderMathMLSubSup::unembellishedOperator()
@@ -136,53 +112,69 @@ RenderMathMLOperator* RenderMathMLSubSup::unembellishedOperator()
 
 void RenderMathMLSubSup::layout()
 {
-    RenderBlock::layout();
-    
-    if (m_kind != SubSup || !m_scripts)
-        return;
+    RenderMathMLBlock::layout();
+
     RenderMathMLBlock* baseWrapper = toRenderMathMLBlock(firstChild());
-    RenderMathMLBlock* superscriptWrapper = toRenderMathMLBlock(m_scripts->firstChild());
-    RenderMathMLBlock* subscriptWrapper = toRenderMathMLBlock(m_scripts->lastChild());
-    if (!baseWrapper || !superscriptWrapper || !subscriptWrapper || superscriptWrapper == subscriptWrapper)
+    if (!baseWrapper || !m_scripts)
         return;
-    
-    LayoutUnit baseWrapperBaseline = toRenderBox(firstChild())->firstLineBoxBaseline();
-    LayoutUnit baseBaseline = baseWrapperBaseline - baseWrapper->paddingBefore();
-    LayoutUnit baseExtendUnderBaseline = baseWrapper->logicalHeight() - baseWrapperBaseline;
-    LayoutUnit axis = style()->fontMetrics().xHeight() / 2;
-    LayoutUnit superscriptHeight = superscriptWrapper->logicalHeight() - superscriptWrapper->paddingAfter();
-    LayoutUnit subscriptHeight = subscriptWrapper->logicalHeight();
-    
-    // Our layout rules are: Don't let the superscript go below the "axis" (half x-height above the
+    RenderBox* base = baseWrapper->firstChildBox();
+    if (!base)
+        return;
+
+    // Our layout rules include: Don't let the superscript go below the "axis" (half x-height above the
     // baseline), or the subscript above the axis. Also, don't let the superscript's top edge be
     // below the base's top edge, or the subscript's bottom edge above the base's bottom edge.
     //
     // FIXME: Check any subscriptshift or superscriptshift attributes, and maybe use more sophisticated
     // heuristics from TeX or elsewhere. See https://bugs.webkit.org/show_bug.cgi?id=79274#c5.
-    
-    // Above we did scriptsStyle->setVerticalAlign(TOP) for mscripts' style, so the superscript's
-    // top edge will equal the top edge of the base's padding.
-    LayoutUnit basePaddingTop = superscriptHeight + axis - baseBaseline;
-    // If basePaddingTop is positive, it's indeed the base's padding-top that we need. If it's negative,
-    // then we should instead use its absolute value to pad the bottom of the superscript, to get the
-    // superscript's bottom edge down to the axis. First we compute how much more we need to shift the
-    // subscript down, once its top edge is at the axis.
-    LayoutUnit superPaddingBottom = max<LayoutUnit>(baseExtendUnderBaseline + axis - subscriptHeight, 0);
-    if (basePaddingTop < 0) {
-        superPaddingBottom += -basePaddingTop;
-        basePaddingTop = 0;
+
+    LayoutUnit baseHeight = base->logicalHeight();
+    LayoutUnit baseBaseline = base->firstLineBoxBaseline();
+    if (baseBaseline == -1)
+        baseBaseline = baseHeight;
+    LayoutUnit axis = style()->fontMetrics().xHeight() / 2;
+    int fontSize = style()->fontSize();
+
+    ASSERT(baseWrapper->style()->hasOneRef());
+    bool needsSecondLayout = false;
+
+    if (RenderBox* superscript = m_kind == Sub ? 0 : m_scripts->lastChildBox()) {
+        LayoutUnit superscriptHeight = superscript->logicalHeight();
+        LayoutUnit superscriptBaseline = superscript->firstLineBoxBaseline();
+        if (superscriptBaseline == -1)
+            superscriptBaseline = superscriptHeight;
+        LayoutUnit minBaseline = max<LayoutUnit>(fontSize / 3 + 1 + superscriptBaseline, superscriptHeight + axis);
+
+        Length newPadding = Length(max<LayoutUnit>(minBaseline - baseBaseline, 0), Fixed);
+        if (newPadding != baseWrapper->style()->paddingTop()) {
+            baseWrapper->style()->setPaddingTop(newPadding);
+            needsSecondLayout = true;
+        }
     }
-    
-    setChildNeedsLayout(true, MarkOnlyThis);
-    
-    baseWrapper->style()->setPaddingTop(Length(basePaddingTop, Fixed));
-    baseWrapper->setNeedsLayout(true, MarkOnlyThis);
-    
-    superscriptWrapper->style()->setPaddingBottom(Length(superPaddingBottom, Fixed));
-    superscriptWrapper->setNeedsLayout(true, MarkOnlyThis);
-    m_scripts->setNeedsLayout(true, MarkOnlyThis);
-    
-    RenderBlock::layout();
+
+    if (RenderBox* subscript = m_kind == Super ? 0 : m_scripts->firstChildBox()) {
+        LayoutUnit subscriptHeight = subscript->logicalHeight();
+        LayoutUnit subscriptBaseline = subscript->firstLineBoxBaseline();
+        if (subscriptBaseline == -1)
+            subscriptBaseline = subscriptHeight;
+        LayoutUnit baseExtendUnderBaseline = baseHeight - baseBaseline;
+        LayoutUnit subscriptUnderItsBaseline = subscriptHeight - subscriptBaseline;
+        LayoutUnit minExtendUnderBaseline = max<LayoutUnit>(fontSize / 5 + 1 + subscriptUnderItsBaseline, subscriptHeight - axis);
+
+        Length newPadding = Length(max<LayoutUnit>(minExtendUnderBaseline - baseExtendUnderBaseline, 0), Fixed);
+        if (newPadding != baseWrapper->style()->paddingBottom()) {
+            baseWrapper->style()->setPaddingBottom(newPadding);
+            needsSecondLayout = true;
+        }
+    }
+
+    if (!needsSecondLayout)
+        return;
+
+    setNeedsLayout(true, MarkOnlyThis);
+    baseWrapper->setChildNeedsLayout(true, MarkOnlyThis);
+
+    RenderMathMLBlock::layout();
 }
 
 }    

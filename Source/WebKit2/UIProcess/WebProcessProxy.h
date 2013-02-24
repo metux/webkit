@@ -26,6 +26,8 @@
 #ifndef WebProcessProxy_h
 #define WebProcessProxy_h
 
+#include "ChildProcessProxy.h"
+#include "MessageReceiverMap.h"
 #include "PlatformProcessIdentifier.h"
 #include "PluginInfoStore.h"
 #include "ProcessLauncher.h"
@@ -39,63 +41,50 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
+#if ENABLE(CUSTOM_PROTOCOLS)
+#include "CustomProtocolManagerProxy.h"
+#endif
+
 namespace WebCore {
-    class KURL;
+class KURL;
+struct PluginInfo;
 };
 
 namespace WebKit {
 
-#if USE(SECURITY_FRAMEWORK)
-class SecItemRequestData;
-class SecItemResponseData;
-#endif
-
+class DownloadProxyMap;
 class WebBackForwardListItem;
 class WebContext;
 class WebPageGroup;
 struct WebNavigationDataStore;
 
-class WebProcessProxy : public ThreadSafeRefCounted<WebProcessProxy>, CoreIPC::Connection::Client, ResponsivenessTimer::Client, ProcessLauncher::Client,  CoreIPC::Connection::QueueClient {
+class WebProcessProxy : public ChildProcessProxy, ResponsivenessTimer::Client {
 public:
-    typedef HashMap<uint64_t, RefPtr<WebFrameProxy> > WebFrameProxyMap;
     typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem> > WebBackForwardListItemMap;
+    typedef HashMap<uint64_t, RefPtr<WebFrameProxy> > WebFrameProxyMap;
+    typedef HashMap<uint64_t, WebPageProxy*> WebPageProxyMap;
 
     static PassRefPtr<WebProcessProxy> create(PassRefPtr<WebContext>);
     ~WebProcessProxy();
 
-    void terminate();
-
-    template<typename T> bool send(const T& message, uint64_t destinationID, unsigned messageSendFlags = 0);
-    template<typename U> bool sendSync(const U& message, const typename U::Reply& reply, uint64_t destinationID, double timeout = 1);
-    
-    CoreIPC::Connection* connection() const
-    { 
-        ASSERT(m_connection);
-        
-        return m_connection->connection(); 
+    static WebProcessProxy* fromConnection(CoreIPC::Connection* connection)
+    {
+        return static_cast<WebProcessProxy*>(ChildProcessProxy::fromConnection(connection));
     }
-    WebConnection* webConnection() const { return m_connection.get(); }
+
+    WebConnection* webConnection() const { return m_webConnection.get(); }
 
     WebContext* context() const { return m_context.get(); }
 
-    PlatformProcessIdentifier processIdentifier() const { return m_processLauncher->processIdentifier(); }
-
-    WebPageProxy* webPage(uint64_t pageID) const;
+    static WebPageProxy* webPage(uint64_t pageID);
     PassRefPtr<WebPageProxy> createWebPage(PageClient*, WebContext*, WebPageGroup*);
     void addExistingWebPage(WebPageProxy*, uint64_t pageID);
     void removeWebPage(uint64_t pageID);
-
-#if ENABLE(WEB_INTENTS)
-    void removeMessagePortChannel(uint64_t channelID);
-#endif
+    Vector<WebPageProxy*> pages() const;
 
     WebBackForwardListItem* webBackForwardItem(uint64_t itemID) const;
 
     ResponsivenessTimer* responsivenessTimer() { return &m_responsivenessTimer; }
-
-    bool isValid() const { return m_connection; }
-    bool isLaunching() const;
-    bool canSendMessage() const { return isValid() || isLaunching(); }
 
     WebFrameProxy* webFrame(uint64_t) const;
     bool canCreateFrame(uint64_t frameID) const;
@@ -115,20 +104,29 @@ public:
 
     static bool fullKeyboardAccessEnabled();
 
-    // FIXME: This variant of send is deprecated. All clients should move to an overload that take a message type.
-    template<typename E, typename T> bool deprecatedSend(E messageID, uint64_t destinationID, const T& arguments);
+    DownloadProxy* createDownloadProxy();
+
+    void pageVisibilityChanged(WebPageProxy*);
+    void pagePreferencesChanged(WebPageProxy*);
+
+#if PLATFORM(MAC)
+    bool allPagesAreProcessSuppressible() const;
+    static bool pageIsProcessSuppressible(WebPageProxy*);
+    void updateProcessSuppressionState();
+#endif
 
 private:
     explicit WebProcessProxy(PassRefPtr<WebContext>);
 
-    // Initializes the process launcher which will begin launching the process.
-    void connect();
+    // From ChildProcessProxy
+    virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) OVERRIDE;
+    void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&);
+    virtual void connectionWillOpen(CoreIPC::Connection*) OVERRIDE;
+    virtual void connectionWillClose(CoreIPC::Connection*) OVERRIDE;
 
     // Called when the web process has crashed or we know that it will terminate soon.
     // Will potentially cause the WebProcessProxy object to be freed.
     void disconnect();
-
-    bool sendMessage(CoreIPC::MessageID, PassOwnPtr<CoreIPC::ArgumentEncoder>, unsigned messageSendFlags);
 
     // CoreIPC message handlers.
     void addBackForwardItem(uint64_t itemID, const String& originalURLString, const String& urlString, const String& title, const CoreIPC::DataReference& backForwardData);
@@ -137,37 +135,28 @@ private:
     void shouldTerminate(bool& shouldTerminate);
 
     // Plugins
-    void getPlugins(CoreIPC::Connection*, uint64_t requestID, bool refresh);
-    void getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, bool& blocked);
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    void getPlugins(bool refresh, Vector<WebCore::PluginInfo>& plugins);
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 #if ENABLE(PLUGIN_PROCESS)
-    void getPluginProcessConnection(const String& pluginPath, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
-    void pluginSyncMessageSendTimedOut(const String& pluginPath);
-#else
+    void getPluginProcessConnection(const String& pluginPath, uint32_t processType, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
+#elif ENABLE(NETSCAPE_PLUGIN_API)
     void didGetSitesWithPluginData(const Vector<String>& sites, uint64_t callbackID);
     void didClearPluginSiteData(uint64_t callbackID);
 #endif
-
-    void handleGetPlugins(uint64_t requestID, bool refresh);
-    void sendDidGetPlugins(uint64_t requestID, PassOwnPtr<Vector<WebCore::PluginInfo> >);
-
-#if USE(SECURITY_FRAMEWORK)
-    void secItemRequest(CoreIPC::Connection*, uint64_t requestID, const SecItemRequestData&);
-    void secKeychainItemRequest(CoreIPC::Connection*, uint64_t requestID, const SecKeychainItemRequestData&);
+#if ENABLE(NETWORK_PROCESS)
+    void getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>);
+#endif
+#if ENABLE(SHARED_WORKER_PROCESS)
+    void getSharedWorkerProcessConnection(const String& url, const String& name, PassRefPtr<Messages::WebProcessProxy::GetSharedWorkerProcessConnection::DelayedReply>);
 #endif
 
     // CoreIPC::Connection::Client
     friend class WebConnectionToWebProcess;
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
-    virtual void didClose(CoreIPC::Connection*);
-    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
-    virtual void syncMessageSendTimedOut(CoreIPC::Connection*);
-#if PLATFORM(WIN)
-    virtual Vector<HWND> windowsToReceiveSentMessagesWhileWaitingForSyncReply();
-#endif
-
-    // CoreIPC::Connection::QueueClient
-    virtual void didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, bool& didHandleMessage);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
+    virtual void didClose(CoreIPC::Connection*) OVERRIDE;
+    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 
     // ResponsivenessTimer::Client
     void didBecomeUnresponsive(ResponsivenessTimer*) OVERRIDE;
@@ -175,9 +164,7 @@ private:
     void didBecomeResponsive(ResponsivenessTimer*) OVERRIDE;
 
     // ProcessLauncher::Client
-    virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier);
-
-    void didFinishLaunching(CoreIPC::Connection::Identifier);
+    virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier) OVERRIDE;
 
     // History client
     void didNavigateWithNavigationData(uint64_t pageID, const WebNavigationDataStore&, uint64_t frameID);
@@ -186,55 +173,32 @@ private:
     void didUpdateHistoryTitle(uint64_t pageID, const String& title, const String& url, uint64_t frameID);
 
     // Implemented in generated WebProcessProxyMessageReceiver.cpp
-    void didReceiveWebProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncWebProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder* arguments, OwnPtr<CoreIPC::ArgumentEncoder>& reply);
-    void didReceiveWebProcessProxyMessageOnConnectionWorkQueue(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder* arguments, bool& didHandleMessage);
+    void didReceiveWebProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    void didReceiveSyncWebProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
 
     ResponsivenessTimer m_responsivenessTimer;
     
-    // This is not a CoreIPC::Connection so that we can wrap the CoreIPC::Connection in
-    // an API object.
-    RefPtr<WebConnectionToWebProcess> m_connection;
-
-    Vector<std::pair<CoreIPC::Connection::OutgoingMessage, unsigned> > m_pendingMessages;
-    RefPtr<ProcessLauncher> m_processLauncher;
-
+    RefPtr<WebConnectionToWebProcess> m_webConnection;
     RefPtr<WebContext> m_context;
 
     bool m_mayHaveUniversalFileReadSandboxExtension; // True if a read extension for "/" was ever granted - we don't track whether WebProcess still has it.
     HashSet<String> m_localPathsWithAssumedReadAccess;
 
-    HashMap<uint64_t, WebPageProxy*> m_pageMap;
+    WebPageProxyMap m_pageMap;
     WebFrameProxyMap m_frameMap;
     WebBackForwardListItemMap m_backForwardListItemMap;
+
+    OwnPtr<DownloadProxyMap> m_downloadProxyMap;
+
+#if ENABLE(CUSTOM_PROTOCOLS)
+    CustomProtocolManagerProxy m_customProtocolManagerProxy;
+#endif
+
+#if PLATFORM(MAC)
+    HashSet<uint64_t> m_processSuppressiblePages;
+    bool m_processSuppressionEnabled;
+#endif
 };
-
-template<typename E, typename T>
-bool WebProcessProxy::deprecatedSend(E messageID, uint64_t destinationID, const T& arguments)
-{
-    OwnPtr<CoreIPC::ArgumentEncoder> argumentEncoder = CoreIPC::ArgumentEncoder::create(destinationID);
-    argumentEncoder->encode(arguments);
-
-    return sendMessage(CoreIPC::MessageID(messageID), argumentEncoder.release(), 0);
-}
-
-template<typename T>
-bool WebProcessProxy::send(const T& message, uint64_t destinationID, unsigned messageSendFlags)
-{
-    OwnPtr<CoreIPC::ArgumentEncoder> argumentEncoder = CoreIPC::ArgumentEncoder::create(destinationID);
-    argumentEncoder->encode(message);
-
-    return sendMessage(CoreIPC::MessageID(T::messageID), argumentEncoder.release(), messageSendFlags);
-}
-
-template<typename U> 
-bool WebProcessProxy::sendSync(const U& message, const typename U::Reply& reply, uint64_t destinationID, double timeout)
-{
-    if (!m_connection)
-        return false;
-
-    return connection()->sendSync(message, reply, destinationID, timeout);
-}
     
 } // namespace WebKit
 

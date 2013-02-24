@@ -145,7 +145,13 @@ public:
     ExpressionNode* makeRightShiftNode(const JSTokenLocation&, ExpressionNode* left, ExpressionNode* right, bool rightHasAssignments);
     ExpressionNode* makeURightShiftNode(const JSTokenLocation&, ExpressionNode* left, ExpressionNode* right, bool rightHasAssignments);
 
-    ExpressionNode* createLogicalNot(const JSTokenLocation& location, ExpressionNode* expr) { return new (m_globalData) LogicalNotNode(location, expr); }
+    ExpressionNode* createLogicalNot(const JSTokenLocation& location, ExpressionNode* expr)
+    {
+        if (expr->isNumber())
+            return createBoolean(location, !static_cast<NumberNode*>(expr)->value());
+
+        return new (m_globalData) LogicalNotNode(location, expr);
+    }
     ExpressionNode* createUnaryPlus(const JSTokenLocation& location, ExpressionNode* expr) { return new (m_globalData) UnaryPlusNode(location, expr); }
     ExpressionNode* createVoid(const JSTokenLocation& location, ExpressionNode* expr)
     {
@@ -220,7 +226,7 @@ public:
 
     ExpressionNode* createRegExp(const JSTokenLocation& location, const Identifier& pattern, const Identifier& flags, int start)
     {
-        if (Yarr::checkSyntax(pattern.ustring()))
+        if (Yarr::checkSyntax(pattern.string()))
             return 0;
         RegExpNode* node = new (m_globalData) RegExpNode(location, pattern, flags);
         int size = pattern.length() + 2; // + 2 for the two /'s
@@ -266,6 +272,11 @@ public:
     FunctionBodyNode* createFunctionBody(const JSTokenLocation& location, bool inStrictContext)
     {
         return FunctionBodyNode::create(m_globalData, location, inStrictContext);
+    }
+
+    void setFunctionStart(FunctionBodyNode* body, int functionStart)
+    {
+        body->setFunctionStart(functionStart);
     }
     
     template <bool> PropertyNode* createGetterOrSetterProperty(const JSTokenLocation& location, PropertyNode::Type type, const Identifier* name, ParameterNode* params, FunctionBodyNode* body, int openBracePos, int closeBracePos, int bodyStartLine, int bodyEndLine)
@@ -943,47 +954,12 @@ ExpressionNode* ASTBuilder::makeAssignNode(const JSTokenLocation& location, Expr
 
 ExpressionNode* ASTBuilder::makePrefixNode(const JSTokenLocation& location, ExpressionNode* expr, Operator op, int start, int divot, int end)
 {
-    if (!expr->isLocation())
-        return new (m_globalData) PrefixErrorNode(location, op, divot, divot - start, end - divot);
-
-    if (expr->isResolveNode()) {
-        ResolveNode* resolve = static_cast<ResolveNode*>(expr);
-        return new (m_globalData) PrefixResolveNode(location, resolve->identifier(), op, divot, divot - start, end - divot);
-    }
-    if (expr->isBracketAccessorNode()) {
-        BracketAccessorNode* bracket = static_cast<BracketAccessorNode*>(expr);
-        PrefixBracketNode* node = new (m_globalData) PrefixBracketNode(location, bracket->base(), bracket->subscript(), op, divot, divot - start, end - divot);
-        node->setSubexpressionInfo(bracket->divot(), bracket->startOffset());
-        return node;
-    }
-    ASSERT(expr->isDotAccessorNode());
-    DotAccessorNode* dot = static_cast<DotAccessorNode*>(expr);
-    PrefixDotNode* node = new (m_globalData) PrefixDotNode(location, dot->base(), dot->identifier(), op, divot, divot - start, end - divot);
-    node->setSubexpressionInfo(dot->divot(), dot->startOffset());
-    return node;
+    return new (m_globalData) PrefixNode(location, expr, op, divot, divot - start, end - divot);
 }
 
 ExpressionNode* ASTBuilder::makePostfixNode(const JSTokenLocation& location, ExpressionNode* expr, Operator op, int start, int divot, int end)
 {
-    if (!expr->isLocation())
-        return new (m_globalData) PostfixErrorNode(location, op, divot, divot - start, end - divot);
-
-    if (expr->isResolveNode()) {
-        ResolveNode* resolve = static_cast<ResolveNode*>(expr);
-        return new (m_globalData) PostfixResolveNode(location, resolve->identifier(), op, divot, divot - start, end - divot);
-    }
-    if (expr->isBracketAccessorNode()) {
-        BracketAccessorNode* bracket = static_cast<BracketAccessorNode*>(expr);
-        PostfixBracketNode* node = new (m_globalData) PostfixBracketNode(location, bracket->base(), bracket->subscript(), op, divot, divot - start, end - divot);
-        node->setSubexpressionInfo(bracket->divot(), bracket->endOffset());
-        return node;
-
-    }
-    ASSERT(expr->isDotAccessorNode());
-    DotAccessorNode* dot = static_cast<DotAccessorNode*>(expr);
-    PostfixDotNode* node = new (m_globalData) PostfixDotNode(location, dot->base(), dot->identifier(), op, divot, divot - start, end - divot);
-    node->setSubexpressionInfo(dot->divot(), dot->endOffset());
-    return node;
+    return new (m_globalData) PostfixNode(location, expr, op, divot, divot - start, end - divot);
 }
 
 }

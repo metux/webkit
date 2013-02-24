@@ -28,10 +28,12 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
-#include "PlatformString.h"
+#include "ScriptValue.h"
+#include "ScriptWrappable.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -41,13 +43,11 @@ class IDBCursorWithValue;
 class IDBDatabase;
 class IDBFactory;
 class IDBIndex;
-class IDBKey;
 class IDBKeyPath;
 class IDBObjectStore;
 class IDBTransaction;
-class SerializedScriptValue;
 
-class IDBAny : public RefCounted<IDBAny> {
+class IDBAny : public ScriptWrappable, public RefCounted<IDBAny> {
 public:
     static PassRefPtr<IDBAny> createInvalid();
     static PassRefPtr<IDBAny> createNull();
@@ -59,10 +59,11 @@ public:
         any->set(idbObject);
         return any.release();
     }
-    static PassRefPtr<IDBAny> create(const IDBKeyPath& keyPath)
+    template<typename T>
+    static PassRefPtr<IDBAny> create(const T& idbObject)
     {
         RefPtr<IDBAny> any = IDBAny::createInvalid();
-        any->set(keyPath);
+        any->set(idbObject);
         return any.release();
     }
     template<typename T>
@@ -70,6 +71,12 @@ public:
     {
         RefPtr<IDBAny> any = IDBAny::createInvalid();
         any->set(idbObject);
+        return any.release();
+    }
+    static PassRefPtr<IDBAny> create(int64_t value)
+    {
+        RefPtr<IDBAny> any = IDBAny::createInvalid();
+        any->set(value);
         return any.release();
     }
     ~IDBAny();
@@ -83,10 +90,10 @@ public:
         IDBDatabaseType,
         IDBFactoryType,
         IDBIndexType,
-        IDBKeyType,
         IDBObjectStoreType,
         IDBTransactionType,
-        SerializedScriptValueType,
+        ScriptValueType,
+        IntegerType,
         StringType,
     };
 
@@ -98,10 +105,10 @@ public:
     PassRefPtr<IDBDatabase> idbDatabase();
     PassRefPtr<IDBFactory> idbFactory();
     PassRefPtr<IDBIndex> idbIndex();
-    PassRefPtr<IDBKey> idbKey();
     PassRefPtr<IDBObjectStore> idbObjectStore();
     PassRefPtr<IDBTransaction> idbTransaction();
-    PassRefPtr<SerializedScriptValue> serializedScriptValue();
+    ScriptValue scriptValue();
+    int64_t integer();
     const String& string();
 
     // Set can only be called once.
@@ -112,12 +119,12 @@ public:
     void set(PassRefPtr<IDBDatabase>);
     void set(PassRefPtr<IDBFactory>);
     void set(PassRefPtr<IDBIndex>);
-    void set(PassRefPtr<IDBKey>);
     void set(PassRefPtr<IDBObjectStore>);
     void set(PassRefPtr<IDBTransaction>);
-    void set(PassRefPtr<SerializedScriptValue>);
     void set(const IDBKeyPath&);
     void set(const String&);
+    void set(const ScriptValue&);
+    void set(int64_t);
 
 private:
     IDBAny();
@@ -131,11 +138,11 @@ private:
     RefPtr<IDBDatabase> m_idbDatabase;
     RefPtr<IDBFactory> m_idbFactory;
     RefPtr<IDBIndex> m_idbIndex;
-    RefPtr<IDBKey> m_idbKey;
     RefPtr<IDBObjectStore> m_idbObjectStore;
     RefPtr<IDBTransaction> m_idbTransaction;
-    RefPtr<SerializedScriptValue> m_serializedScriptValue;
+    ScriptValue m_scriptValue;
     String m_string;
+    int64_t m_integer;
 };
 
 } // namespace WebCore

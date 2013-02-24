@@ -40,15 +40,15 @@
 namespace WebCore {
 
 class Document;
+class NamedFlowCollection;
 class Node;
 class NodeList;
 class RenderNamedFlowThread;
 class ScriptExecutionContext;
-class WebKitNamedFlowCollection;
 
 class WebKitNamedFlow : public RefCounted<WebKitNamedFlow>, public EventTarget {
 public:
-    static PassRefPtr<WebKitNamedFlow> create(PassRefPtr<WebKitNamedFlowCollection> manager, const AtomicString& flowThreadName);
+    static PassRefPtr<WebKitNamedFlow> create(PassRefPtr<NamedFlowCollection> manager, const AtomicString& flowThreadName);
 
     ~WebKitNamedFlow();
 
@@ -67,7 +67,7 @@ public:
 
     // This function is called from the JS binding code to determine if the NamedFlow object is reachable or not.
     // If the object has listeners, the object should only be discarded if the parent Document is not reachable.
-    Node* base() const;
+    Node* ownerNode() const;
 
     void setRenderer(RenderNamedFlowThread* parentFlowThread);
 
@@ -81,7 +81,7 @@ public:
     void dispatchRegionLayoutUpdateEvent();
 
 private:
-    WebKitNamedFlow(PassRefPtr<WebKitNamedFlowCollection>, const AtomicString&);
+    WebKitNamedFlow(PassRefPtr<NamedFlowCollection>, const AtomicString&);
 
     // EventTarget implementation.
     virtual void refEventTarget() { ref(); }
@@ -93,7 +93,7 @@ private:
     // The name of the flow thread as specified in CSS.
     AtomicString m_flowThreadName;
 
-    RefPtr<WebKitNamedFlowCollection> m_flowManager;
+    RefPtr<NamedFlowCollection> m_flowManager;
     RenderNamedFlowThread* m_parentFlowThread;
 
     EventTargetData m_eventTargetData;

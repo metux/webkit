@@ -47,59 +47,48 @@ static HashMap<const Widget*, RenderWidget*>& widgetRendererMap()
     return *staticWidgetRendererMap;
 }
 
-static unsigned widgetHierarchyUpdateSuspendCount;
+unsigned WidgetHierarchyUpdatesSuspensionScope::s_widgetHierarchyUpdateSuspendCount = 0;
 
-typedef HashMap<RefPtr<Widget>, FrameView*> WidgetToParentMap;
-
-static WidgetToParentMap& widgetNewParentMap()
+WidgetHierarchyUpdatesSuspensionScope::WidgetToParentMap& WidgetHierarchyUpdatesSuspensionScope::widgetNewParentMap()
 {
     DEFINE_STATIC_LOCAL(WidgetToParentMap, map, ());
     return map;
 }
 
-void RenderWidget::suspendWidgetHierarchyUpdates()
+void WidgetHierarchyUpdatesSuspensionScope::moveWidgets()
 {
-    widgetHierarchyUpdateSuspendCount++;
-}
-
-void RenderWidget::resumeWidgetHierarchyUpdates()
-{
-    ASSERT(widgetHierarchyUpdateSuspendCount);
-    if (widgetHierarchyUpdateSuspendCount == 1) {
-        WidgetToParentMap map = widgetNewParentMap();
-        widgetNewParentMap().clear();
-        WidgetToParentMap::iterator end = map.end();
-        for (WidgetToParentMap::iterator it = map.begin(); it != end; ++it) {
-            Widget* child = it->first.get();
-            ScrollView* currentParent = child->parent();
-            FrameView* newParent = it->second;
-            if (newParent != currentParent) {
-                if (currentParent)
-                    currentParent->removeChild(child);
-                if (newParent)
-                    newParent->addChild(child);
-            }
+    WidgetToParentMap map = widgetNewParentMap();
+    widgetNewParentMap().clear();
+    WidgetToParentMap::iterator end = map.end();
+    for (WidgetToParentMap::iterator it = map.begin(); it != end; ++it) {
+        Widget* child = it->key.get();
+        ScrollView* currentParent = child->parent();
+        FrameView* newParent = it->value;
+        if (newParent != currentParent) {
+            if (currentParent)
+                currentParent->removeChild(child);
+            if (newParent)
+                newParent->addChild(child);
         }
     }
-    widgetHierarchyUpdateSuspendCount--;
 }
 
 static void moveWidgetToParentSoon(Widget* child, FrameView* parent)
 {
-    if (!widgetHierarchyUpdateSuspendCount) {
+    if (!WidgetHierarchyUpdatesSuspensionScope::isSuspended()) {
         if (parent)
             parent->addChild(child);
         else
             child->removeFromParent();
         return;
     }
-    widgetNewParentMap().set(child, parent);
+    WidgetHierarchyUpdatesSuspensionScope::scheduleWidgetToMove(child, parent);
 }
 
-RenderWidget::RenderWidget(Node* node)
-    : RenderReplaced(node)
+RenderWidget::RenderWidget(Element* element)
+    : RenderReplaced(element)
     , m_widget(0)
-    , m_frameView(node->document()->view())
+    , m_frameView(element->document()->view())
     // Reference counting is used to prevent the widget from being
     // destroyed while inside the Widget code, which might not be
     // able to handle that.
@@ -130,7 +119,7 @@ void RenderWidget::destroy()
     // Grab the arena from node()->document()->renderArena() before clearing the node pointer.
     // Clear the node before deref-ing, as this may be deleted when deref is called.
     RenderArena* arena = renderArena();
-    setNode(0);
+    clearNode();
     deref(arena);
 }
 
@@ -222,6 +211,7 @@ void RenderWidget::setWidget(PassRefPtr<Widget> widget)
 
 void RenderWidget::layout()
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     ASSERT(needsLayout());
 
     setNeedsLayout(false);
@@ -278,7 +268,9 @@ void RenderWidget::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 
         // Push a clip if we have a border radius, since we want to round the foreground content that gets painted.
         paintInfo.context->save();
-        paintInfo.context->addRoundedRectClip(style()->getRoundedBorderFor(borderRect, view()));
+        RoundedRect roundedInnerRect = style()->getRoundedInnerBorderFor(borderRect,
+            paddingTop() + borderTop(), paddingBottom() + borderBottom(), paddingLeft() + borderLeft(), paddingRight() + borderRight(), true, true);
+        clipRoundedInnerRect(paintInfo.context, borderRect, roundedInnerRect);
     }
 
     if (m_widget) {
@@ -319,6 +311,9 @@ void RenderWidget::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
         // FIXME: selectionRect() is in absolute, not painting coordinates.
         paintInfo.context->fillRect(pixelSnappedIntRect(selectionRect()), selectionBackgroundColor(), style()->colorSpace());
     }
+
+    if (hasLayer() && layer()->canResize())
+        layer()->paintResizer(paintInfo.context, roundedIntPoint(adjustedPaintOffset), paintInfo.rect);
 }
 
 void RenderWidget::setOverlapTestResult(bool isOverlapped)
@@ -385,10 +380,10 @@ RenderWidget* RenderWidget::find(const Widget* widget)
     return widgetRendererMap().get(widget);
 }
 
-bool RenderWidget::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
+bool RenderWidget::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
 {
     bool hadResult = result.innerNode();
-    bool inside = RenderReplaced::nodeAtPoint(request, result, pointInContainer, accumulatedOffset, action);
+    bool inside = RenderReplaced::nodeAtPoint(request, result, locationInContainer, accumulatedOffset, action);
 
     // Check to see if we are really over the widget itself (and not just in the border/padding area).
     if ((inside || result.isRectBasedTest()) && !hadResult && result.innerNode() == node())

@@ -96,7 +96,7 @@ typedef pthread_t PlatformThread;
 static const int SigThreadSuspendResume = SIGUSR2;
 
 #if defined(SA_RESTART)
-static void pthreadSignalHandlerSuspendResume(int signo)
+static void pthreadSignalHandlerSuspendResume(int)
 {
     sigset_t signalSet;
     sigemptyset(&signalSet);
@@ -107,6 +107,7 @@ static void pthreadSignalHandlerSuspendResume(int signo)
 #endif
 
 class MachineThreads::Thread {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     Thread(const PlatformThread& platThread, void* base)
         : platformThread(platThread)
@@ -133,10 +134,13 @@ public:
 };
 
 MachineThreads::MachineThreads(Heap* heap)
-    : m_heap(heap)
-    , m_registeredThreads(0)
+    : m_registeredThreads(0)
     , m_threadSpecific(0)
+#if !ASSERT_DISABLED
+    , m_heap(heap)
+#endif
 {
+    UNUSED_PARAM(heap);
 }
 
 MachineThreads::~MachineThreads()

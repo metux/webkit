@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitFileChooserRequest.html" title="WebKitFileChooserRequest">
 <link rel="next" href="WebKitCookieManager.html" title="WebKitCookieManager">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -37,7 +37,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitFindController.top_of_page"></a>WebKitFindController</span></h2>
-<p>WebKitFindController</p>
+<p>WebKitFindController — Controls text search in a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a></p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -47,7 +47,7 @@
 enum                <a class="link" href="WebKitFindController.html#WebKitFindOptions" title="enum WebKitFindOptions">WebKitFindOptions</a>;
 <span class="returnvalue">void</span>                <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()">webkit_find_controller_search</a>       (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *search_text</code></em>,
-                                                         <em class="parameter"><code><span class="type">guint32</span> find_options</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint32"><span class="type">guint32</span></a> find_options</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> max_match_count</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitFindController.html#webkit-find-controller-search-finish" title="webkit_find_controller_search_finish ()">webkit_find_controller_search_finish</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>);
@@ -59,9 +59,9 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()">webkit_find_controller_count_matches</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *search_text</code></em>,
-                                                         <em class="parameter"><code><span class="type">guint32</span> find_options</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint32"><span class="type">guint32</span></a> find_options</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> max_match_count</code></em>);
-<span class="returnvalue">guint32</span>             <a class="link" href="WebKitFindController.html#webkit-find-controller-get-options" title="webkit_find_controller_get_options ()">webkit_find_controller_get_options</a>  (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>);
+<a href="../glib/glib-Basic-Types.html#guint32"><span class="returnvalue">guint32</span></a>             <a class="link" href="WebKitFindController.html#webkit-find-controller-get-options" title="webkit_find_controller_get_options ()">webkit_find_controller_get_options</a>  (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>);
 <a href="../glib/glib-Basic-Types.html#guint"><span class="returnvalue">guint</span></a>               <a class="link" href="WebKitFindController.html#webkit-find-controller-get-max-match-count" title="webkit_find_controller_get_max_match_count ()">webkit_find_controller_get_max_match_count</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>);
 <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="returnvalue">WebKitWebView</span></a> *     <a class="link" href="WebKitFindController.html#webkit-find-controller-get-web-view" title="webkit_find_controller_get_web_view ()">webkit_find_controller_get_web_view</a> (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>);
@@ -94,6 +94,15 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitFindController.description"></a><h2>Description</h2>
 <p>
+A <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> is used to search text in a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>. You
+can get a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>'s <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> with
+<a class="link" href="WebKitWebView.html#webkit-web-view-get-find-controller" title="webkit_web_view_get_find_controller ()"><code class="function">webkit_web_view_get_find_controller()</code></a>, and later use it to search
+for text using <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()"><code class="function">webkit_find_controller_search()</code></a>, or get the
+number of matches using <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()"><code class="function">webkit_find_controller_count_matches()</code></a>. The
+operations are asynchronous and trigger signals when ready, such as
+<a class="link" href="WebKitFindController.html#WebKitFindController-found-text" title='The "found-text" signal'><span class="type">"found-text"</span></a>,
+<a class="link" href="WebKitFindController.html#WebKitFindController-failed-to-find-text" title='The "failed-to-find-text" signal'><span class="type">"failed-to-find-text"</span></a> or
+<a class="link" href="WebKitFindController.html#WebKitFindController-counted-matches" title='The "counted-matches" signal'><span class="type">"counted-matches"</span></a>.
 </p>
 </div>
 <div class="refsect1">
@@ -165,7 +174,7 @@ Enum values used to specify search options.
 <a name="webkit-find-controller-search"></a><h3>webkit_find_controller_search ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_find_controller_search       (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *search_text</code></em>,
-                                                         <em class="parameter"><code><span class="type">guint32</span> find_options</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint32"><span class="type">guint32</span></a> find_options</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> max_match_count</code></em>);</pre>
 <p>
 Looks for <em class="parameter"><code>search_text</code></em> in the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> associated with
@@ -184,7 +193,7 @@ method.
 </p>
 <p>
 Note that if the number of matches is higher than <em class="parameter"><code>max_match_count</code></em>
-then <a class="link" href="WebKitFindController.html#WebKitFindController-found-text" title='The "found-text" signal'><span class="type">"found-text"</span></a> will report <code class="literal">G_MAXUINT</code> matches
+then <a class="link" href="WebKitFindController.html#WebKitFindController-found-text" title='The "found-text" signal'><span class="type">"found-text"</span></a> will report <a href="../glib/glib-Basic-Types.html#G-MAXUINT:CAPS"><code class="literal">G_MAXUINT</code></a> matches
 instead of the actual number.
 </p>
 <p>
@@ -310,7 +319,7 @@ for. This text is passed to either
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_find_controller_count_matches
                                                         (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *search_text</code></em>,
-                                                         <em class="parameter"><code><span class="type">guint32</span> find_options</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint32"><span class="type">guint32</span></a> find_options</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> max_match_count</code></em>);</pre>
 <p>
 Counts the number of matches for <em class="parameter"><code>search_text</code></em> found in the
@@ -344,7 +353,7 @@ matches will be provided by the
 <hr>
 <div class="refsect2">
 <a name="webkit-find-controller-get-options"></a><h3>webkit_find_controller_get_options ()</h3>
-<pre class="programlisting"><span class="returnvalue">guint32</span>             webkit_find_controller_get_options  (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint32"><span class="returnvalue">guint32</span></a>             webkit_find_controller_get_options  (<em class="parameter"><code><a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> *find_controller</code></em>);</pre>
 <p>
 Gets a bitmask containing the <a class="link" href="WebKitFindController.html#WebKitFindOptions" title="enum WebKitFindOptions"><span class="type">WebKitFindOptions</span></a> associated with
 the current search.
@@ -547,6 +556,6 @@ asynchronously after a call to <a class="link" href="WebKitFindController.html#w
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

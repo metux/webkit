@@ -28,10 +28,12 @@
 
 #include <WebCore/NotificationClient.h>
 #include <WebCore/NotificationPermissionCallback.h>
+#include <WebCore/SecurityOriginHash.h>
 #include <WebCore/VoidCallback.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 class Notification;    
@@ -55,8 +57,11 @@ public:
 #endif
     void cancelRequest(WebCore::SecurityOrigin*);
     
-    // Synchronous call to retrieve permission level for given security origin
     WebCore::NotificationClient::Permission permissionLevel(WebCore::SecurityOrigin*);
+
+    // For testing purposes only.
+    void setPermissionLevelForTesting(const String& originString, bool allowed);
+    void removeAllPermissionsForTesting();
     
     void didReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed);
     

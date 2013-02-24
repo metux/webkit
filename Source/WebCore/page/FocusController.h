@@ -27,7 +27,7 @@
 #define FocusController_h
 
 #include "FocusDirection.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
@@ -70,7 +70,7 @@ public:
     bool setInitialFocus(FocusDirection, KeyboardEvent*);
     bool advanceFocus(FocusDirection, KeyboardEvent*, bool initialFocus = false);
         
-    bool setFocusedNode(Node*, PassRefPtr<Frame>);
+    bool setFocusedNode(Node*, PassRefPtr<Frame>, FocusDirection = FocusDirectionNone);
 
     void setActive(bool);
     bool isActive() const { return m_isActive; }

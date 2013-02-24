@@ -45,15 +45,17 @@ typedef ListHashSet<Node*> NamedFlowContentNodes;
 
 class RenderNamedFlowThread : public RenderFlowThread {
 public:
-    RenderNamedFlowThread(Node*, PassRefPtr<WebKitNamedFlow>);
+    RenderNamedFlowThread(Document*, PassRefPtr<WebKitNamedFlow>);
     virtual ~RenderNamedFlowThread();
 
     const AtomicString& flowThreadName() const;
 
+    const RenderRegionList& invalidRenderRegionList() const { return m_invalidRegionList; }
+
     RenderObject* nextRendererForNode(Node*) const;
     RenderObject* previousRendererForNode(Node*) const;
 
-    void addFlowChild(RenderObject* newChild, RenderObject* beforeChild = 0);
+    void addFlowChild(RenderObject* newChild);
     void removeFlowChild(RenderObject*);
     bool hasChildren() const { return !m_flowThreadChildList.isEmpty(); }
 #ifndef NDEBUG
@@ -69,9 +71,12 @@ public:
     void unregisterNamedFlowContentNode(Node*);
     const NamedFlowContentNodes& contentNodes() const { return m_contentNodes; }
     bool hasContentNode(Node* contentNode) const { ASSERT(contentNode); return m_contentNodes.contains(contentNode); }
+    bool isMarkedForDestruction() const;
+    void getRanges(Vector<RefPtr<Range> >&, const RenderRegion*) const;
 
 protected:
-    virtual void willBeDestroyed() OVERRIDE;
+    void setMarkForDestruction();
+    void resetMarkForDestruction();
 
 private:
     virtual const char* renderName() const OVERRIDE;
@@ -83,8 +88,9 @@ private:
     void addDependencyOnFlowThread(RenderNamedFlowThread*);
     void removeDependencyOnFlowThread(RenderNamedFlowThread*);
     void checkInvalidRegions();
-    bool canBeDestroyed() const { return m_regionList.isEmpty() && m_contentNodes.isEmpty(); }
+    bool canBeDestroyed() const { return m_invalidRegionList.isEmpty() && m_regionList.isEmpty() && m_contentNodes.isEmpty(); }
     void regionLayoutUpdateEventTimerFired(Timer<RenderNamedFlowThread>*);
+    void clearContentNodes();
 
 private:
     // Observer flow threads have invalid regions that depend on the state of this thread
@@ -103,6 +109,8 @@ private:
 
     NamedFlowContentNodes m_contentNodes;
 
+    RenderRegionList m_invalidRegionList;
+
     // The DOM Object that represents a named flow.
     RefPtr<WebKitNamedFlow> m_namedFlow;
 
@@ -111,13 +119,13 @@ private:
 
 inline RenderNamedFlowThread* toRenderNamedFlowThread(RenderObject* object)
 {
-    ASSERT(!object || object->isRenderNamedFlowThread());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderNamedFlowThread());
     return static_cast<RenderNamedFlowThread*>(object);
 }
 
 inline const RenderNamedFlowThread* toRenderNamedFlowThread(const RenderObject* object)
 {
-    ASSERT(!object || object->isRenderNamedFlowThread());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderNamedFlowThread());
     return static_cast<const RenderNamedFlowThread*>(object);
 }
 

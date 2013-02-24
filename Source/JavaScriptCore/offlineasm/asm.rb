@@ -96,6 +96,12 @@ class Assembler
         result
     end
     
+    # Puts a C Statement in the output stream.
+    def putc(*line)
+        raise unless @state == :asm
+        @outp.puts(formatDump("    " + line.join(''), lastComment))
+    end
+    
     def formatDump(dumpStr, comment, commentColumns=$preferredCommentStartColumn)
         if comment.length > 0
             "%-#{commentColumns}s %s" % [dumpStr, comment]
@@ -151,7 +157,11 @@ class Assembler
         @numGlobalLabels += 1
         putsNewlineSpacerIfAppropriate(:global)
         @internalComment = $enableLabelCountComments ? "Global Label #{@numGlobalLabels}" : nil
-        @outp.puts(formatDump("OFFLINE_ASM_GLOBAL_LABEL(#{labelName})", lastComment))
+        if /\Allint_op_/.match(labelName)
+            @outp.puts(formatDump("OFFLINE_ASM_OPCODE_LABEL(op_#{$~.post_match})", lastComment))
+        else
+            @outp.puts(formatDump("OFFLINE_ASM_GLUE_LABEL(#{labelName})", lastComment))
+        end
         @newlineSpacerState = :none # After a global label, we can use another spacer.
     end
     
@@ -169,6 +179,18 @@ class Assembler
     
     def self.localLabelReference(labelName)
         "\" LOCAL_LABEL_STRING(#{labelName}) \""
+    end
+    
+    def self.cLabelReference(labelName)
+        if /\Allint_op_/.match(labelName)
+            "op_#{$~.post_match}"  # strip opcodes of their llint_ prefix.
+        else
+            "#{labelName}"
+        end
+    end
+    
+    def self.cLocalLabelReference(labelName)
+        "#{labelName}"
     end
     
     def codeOrigin(text)
@@ -207,7 +229,7 @@ $stderr.puts "offlineasm: Parsing #{asmFile} and #{offsetsFile} and creating ass
 begin
     configurationList = offsetsAndConfigurationIndex(offsetsFile)
 rescue MissingMagicValuesException
-    $stderr.puts "offlineasm: No magic values found. Skipping assembly file generation assuming the classic interpreter is enabled."
+    $stderr.puts "offlineasm: No magic values found. Skipping assembly file generation."
     exit 0
 end
 

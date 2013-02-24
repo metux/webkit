@@ -20,12 +20,24 @@
 #include "config.h"
 #include "WebKitURIResponse.h"
 
-#include "PlatformCertificateInfo.h"
-#include "WebCertificateInfo.h"
 #include "WebKitPrivate.h"
 #include "WebKitURIResponsePrivate.h"
 #include <glib/gi18n-lib.h>
 #include <wtf/text/CString.h>
+
+using namespace WebKit;
+using namespace WebCore;
+
+/**
+ * SECTION: WebKitURIResponse
+ * @Short_description: Represents a URI response
+ * @Title: WebKitURIResponse
+ *
+ * A #WebKitURIResponse contains information such as the URI, the
+ * status code, the content length, the mime type, the HTTP status or
+ * the suggested filename.
+ *
+ */
 
 enum {
     PROP_0,
@@ -37,23 +49,14 @@ enum {
     PROP_SUGGESTED_FILENAME
 };
 
-using namespace WebKit;
-using namespace WebCore;
-
-G_DEFINE_TYPE(WebKitURIResponse, webkit_uri_response, G_TYPE_OBJECT)
-
 struct _WebKitURIResponsePrivate {
-    WebCore::ResourceResponse resourceResponse;
+    ResourceResponse resourceResponse;
     CString uri;
     CString mimeType;
     CString suggestedFilename;
 };
 
-static void webkitURIResponseFinalize(GObject* object)
-{
-    WEBKIT_URI_RESPONSE(object)->priv->~WebKitURIResponsePrivate();
-    G_OBJECT_CLASS(webkit_uri_response_parent_class)->finalize(object);
-}
+WEBKIT_DEFINE_TYPE(WebKitURIResponse, webkit_uri_response, G_TYPE_OBJECT)
 
 static void webkitURIResponseGetProperty(GObject* object, guint propId, GValue* value, GParamSpec* paramSpec)
 {
@@ -83,8 +86,6 @@ static void webkitURIResponseGetProperty(GObject* object, guint propId, GValue* 
 static void webkit_uri_response_class_init(WebKitURIResponseClass* responseClass)
 {
     GObjectClass* objectClass = G_OBJECT_CLASS(responseClass);
-
-    objectClass->finalize = webkitURIResponseFinalize;
     objectClass->get_property = webkitURIResponseGetProperty;
 
     /**
@@ -150,15 +151,6 @@ static void webkit_uri_response_class_init(WebKitURIResponseClass* responseClass
                                                         _("The suggested filename for the URI response"),
                                                         0,
                                                         WEBKIT_PARAM_READABLE));
-
-    g_type_class_add_private(responseClass, sizeof(WebKitURIResponsePrivate));
-}
-
-static void webkit_uri_response_init(WebKitURIResponse* response)
-{
-    WebKitURIResponsePrivate* priv = G_TYPE_INSTANCE_GET_PRIVATE(response, WEBKIT_TYPE_URI_RESPONSE, WebKitURIResponsePrivate);
-    response->priv = priv;
-    new (priv) WebKitURIResponsePrivate();
 }
 
 /**
@@ -224,31 +216,6 @@ const gchar* webkit_uri_response_get_mime_type(WebKitURIResponse* response)
 }
 
 /**
- * webkit_uri_response_get_https_status:
- * @response: a #WebKitURIResponse
- * @certificate: (out) (transfer none): return location for a #GTlsCertificate
- * @errors: (out): return location for a #GTlsCertificateFlags the verification status of @certificate
- *
- * Retrieves the #GTlsCertificate associated with the @response connection,
- * and the #GTlsCertificateFlags showing what problems, if any, have been found
- * with that certificate.
- * If the response connection is not HTTPS, this function returns %FALSE.
- *
- * Returns: %TRUE if @response connection uses HTTPS or %FALSE otherwise.
- */
-gboolean webkit_uri_response_get_https_status(WebKitURIResponse* response, GTlsCertificate** certificate, GTlsCertificateFlags* errors)
-{
-    g_return_val_if_fail(WEBKIT_IS_URI_RESPONSE(response), FALSE);
-
-    if (certificate)
-        *certificate = response->priv->resourceResponse.soupMessageCertificate();
-    if (errors)
-        *errors = response->priv->resourceResponse.soupMessageTLSErrors();
-
-    return !!response->priv->resourceResponse.soupMessageCertificate();
-}
-
-/**
  * webkit_uri_response_get_suggested_filename:
  * @response: a #WebKitURIResponse
  *
@@ -282,9 +249,3 @@ const WebCore::ResourceResponse& webkitURIResponseGetResourceResponse(WebKitURIR
     return uriResponse->priv->resourceResponse;
 }
 
-void webkitURIResponseSetCertificateInfo(WebKitURIResponse* response, WKCertificateInfoRef wkCertificate)
-{
-    const PlatformCertificateInfo& certificateInfo = toImpl(wkCertificate)->platformCertificateInfo();
-    response->priv->resourceResponse.setSoupMessageCertificate(certificateInfo.certificate());
-    response->priv->resourceResponse.setSoupMessageTLSErrors(certificateInfo.tlsErrors());
-}

@@ -61,6 +61,9 @@ WebInspector.SourceFrame = function(contentProvider)
     this._shortcuts = {};
     this._shortcuts[WebInspector.KeyboardShortcut.makeKey("s", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta)] = this._commitEditing.bind(this);
     this.element.addEventListener("keydown", this._handleKeyDown.bind(this), false);
+
+    this._sourcePositionElement = document.createElement("div");
+    this._sourcePositionElement.className = "source-frame-cursor-position";
 }
 
 /**
@@ -113,7 +116,7 @@ WebInspector.SourceFrame.prototype = {
      */
     statusBarItems: function()
     {
-        return [];
+        return [this._sourcePositionElement];
     },
 
     defaultFocusedElement: function()
@@ -621,7 +624,29 @@ WebInspector.SourceFrame.prototype = {
      */
     selectionChanged: function(textRange)
     {
+        this._updateSourcePosition(textRange);
         this.dispatchEventToListeners(WebInspector.SourceFrame.Events.SelectionChanged, textRange);
+    },
+
+    /**
+     * @param {WebInspector.TextRange} textRange
+     */
+    _updateSourcePosition: function(textRange)
+    {
+        if (!textRange)
+            return;
+
+        if (textRange.isEmpty()) {
+            this._sourcePositionElement.textContent = WebInspector.UIString("Line %d, Column %d", textRange.endLine + 1, textRange.endColumn + 1);
+            return;
+        }
+        textRange = textRange.normalize();
+
+        var selectedText = this._textEditor.copyRange(textRange);
+        if (textRange.startLine === textRange.endLine)
+            this._sourcePositionElement.textContent = WebInspector.UIString("%d characters selected", selectedText.length);
+        else
+            this._sourcePositionElement.textContent = WebInspector.UIString("%d lines, %d characters selected", textRange.endLine - textRange.startLine + 1, selectedText.length);
     },
 
     /**
@@ -647,13 +672,11 @@ WebInspector.SourceFrame.prototype = {
 
         var content = this._textEditor.text();
         this.commitEditing(content);
-        if (this._url && WebInspector.fileManager.isURLSaved(this._url))
-            WebInspector.fileManager.save(this._url, content, false);
         return true;
-    }
-}
+    },
 
-WebInspector.SourceFrame.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 
 /**
@@ -695,7 +718,18 @@ WebInspector.TextEditorDelegateForSourceFrame.prototype = {
     populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
         this._sourceFrame.populateTextAreaContextMenu(contextMenu, lineNumber);
-    }
-}
+    },
 
-WebInspector.TextEditorDelegateForSourceFrame.prototype.__proto__ = WebInspector.TextEditorDelegate.prototype;
+    /**
+     * @param {string} hrefValue
+     * @param {boolean} isExternal
+     * @return {Element}
+     */
+    createLink: function(hrefValue, isExternal)
+    {
+        var targetLocation = WebInspector.ParsedURL.completeURL(this._sourceFrame._url, hrefValue);
+        return WebInspector.linkifyURLAsNode(targetLocation || hrefValue, hrefValue, undefined, isExternal);
+    },
+
+    __proto__: WebInspector.TextEditorDelegate.prototype
+}

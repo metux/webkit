@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebInspector.html" title="WebKitWebInspector">
 <link rel="next" href="WebKitWebDataSource.html" title="WebKitWebDataSource">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -44,13 +44,13 @@
 <pre class="synopsis">                    <a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase-struct" title="WebKitWebDatabase">WebKitWebDatabase</a>;
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-display-name" title="webkit_web_database_get_display_name ()">webkit_web_database_get_display_name</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
-<span class="returnvalue">guint64</span>             <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-expected-size" title="webkit_web_database_get_expected_size ()">webkit_web_database_get_expected_size</a>
+<a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-expected-size" title="webkit_web_database_get_expected_size ()">webkit_web_database_get_expected_size</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-filename" title="webkit_web_database_get_filename ()">webkit_web_database_get_filename</a>    (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-name" title="webkit_web_database_get_name ()">webkit_web_database_get_name</a>        (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
 <a class="link" href="WebKitSecurityOrigin.html" title="WebKitSecurityOrigin"><span class="returnvalue">WebKitSecurityOrigin</span></a> * <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-security-origin" title="webkit_web_database_get_security_origin ()">webkit_web_database_get_security_origin</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
-<span class="returnvalue">guint64</span>             <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-size" title="webkit_web_database_get_size ()">webkit_web_database_get_size</a>        (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
+<a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="WebKitWebDatabase.html#webkit-web-database-get-size" title="webkit_web_database_get_size ()">webkit_web_database_get_size</a>        (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebDatabase.html#webkit-web-database-remove" title="webkit_web_database_remove ()">webkit_web_database_remove</a>          (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);
 </pre>
 </div>
@@ -65,11 +65,11 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <a name="WebKitWebDatabase.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
   "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--display-name" title='The "display-name" property'>display-name</a>"             <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
-  "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--expected-size" title='The "expected-size" property'>expected-size</a>"            <span class="type">guint64</span>               : Read
+  "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--expected-size" title='The "expected-size" property'>expected-size</a>"            <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>               : Read
   "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--filename" title='The "filename" property'>filename</a>"                 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--name" title='The "name" property'>name</a>"                     <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct Only
   "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--security-origin" title='The "security-origin" property'>security-origin</a>"          <a class="link" href="WebKitSecurityOrigin.html" title="WebKitSecurityOrigin"><span class="type">WebKitSecurityOrigin</span></a>*  : Read / Write / Construct Only
-  "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--size" title='The "size" property'>size</a>"                     <span class="type">guint64</span>               : Read
+  "<a class="link" href="WebKitWebDatabase.html#WebKitWebDatabase--size" title='The "size" property'>size</a>"                     <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>               : Read
 </pre>
 </div>
 <div class="refsect1">
@@ -135,7 +135,7 @@ Returns the name of the <a class="link" href="WebKitWebDatabase.html" title="Web
 <hr>
 <div class="refsect2">
 <a name="webkit-web-database-get-expected-size"></a><h3>webkit_web_database_get_expected_size ()</h3>
-<pre class="programlisting"><span class="returnvalue">guint64</span>             webkit_web_database_get_expected_size
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             webkit_web_database_get_expected_size
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);</pre>
 <p>
 Returns the expected size of the <a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> in bytes as defined by the
@@ -232,7 +232,7 @@ Returns the security origin of the <a class="link" href="WebKitWebDatabase.html"
 <hr>
 <div class="refsect2">
 <a name="webkit-web-database-get-size"></a><h3>webkit_web_database_get_size ()</h3>
-<pre class="programlisting"><span class="returnvalue">guint64</span>             webkit_web_database_get_size        (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);</pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             webkit_web_database_get_size        (<em class="parameter"><code><a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> *webDatabase</code></em>);</pre>
 <p>
 Returns the actual size of the <a class="link" href="WebKitWebDatabase.html" title="WebKitWebDatabase"><span class="type">WebKitWebDatabase</span></a> space on disk in bytes.
 </p>
@@ -285,7 +285,7 @@ The display name of the Web Database database.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebDatabase--expected-size"></a><h3>The <code class="literal">"expected-size"</code> property</h3>
-<pre class="programlisting">  "expected-size"            <span class="type">guint64</span>               : Read</pre>
+<pre class="programlisting">  "expected-size"            <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>               : Read</pre>
 <p>
 The expected size of the database in bytes as defined by the web author.
 </p>
@@ -324,7 +324,7 @@ The security origin of the database.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebDatabase--size"></a><h3>The <code class="literal">"size"</code> property</h3>
-<pre class="programlisting">  "size"                     <span class="type">guint64</span>               : Read</pre>
+<pre class="programlisting">  "size"                     <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>               : Read</pre>
 <p>
 The current size of the database in bytes.
 </p>
@@ -335,6 +335,6 @@ The current size of the database in bytes.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

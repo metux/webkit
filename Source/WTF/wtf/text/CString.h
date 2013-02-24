@@ -37,7 +37,7 @@ namespace WTF {
 class CStringBuffer : public RefCounted<CStringBuffer> {
 public:
     const char* data() { return m_data; }
-    size_t length() { return m_length; }
+    size_t length() const { return m_length; }
 
 private:
     friend class CString;
@@ -72,6 +72,7 @@ public:
     }
 
     bool isNull() const { return !m_buffer; }
+    bool isSafeToSendToAnotherThread() const;
 
     CStringBuffer* buffer() const { return m_buffer.get(); }
 
@@ -83,6 +84,8 @@ private:
 
 WTF_EXPORT_PRIVATE bool operator==(const CString& a, const CString& b);
 inline bool operator!=(const CString& a, const CString& b) { return !(a == b); }
+WTF_EXPORT_PRIVATE bool operator==(const CString& a, const char* b);
+inline bool operator!=(const CString& a, const char* b) { return !(a == b); }
 
 } // namespace WTF
 

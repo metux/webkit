@@ -50,8 +50,10 @@ namespace JSC {
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
 
         static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+        static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
 
         static bool deleteProperty(JSCell*, ExecState*, PropertyName);
+        static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
         static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
         static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool shouldThrow);
 
@@ -66,7 +68,7 @@ namespace JSC {
 
     protected:
         JS_EXPORT_PRIVATE void finishCreation(JSGlobalData&, JSString*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | JSWrapperObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | JSWrapperObject::StructureFlags;
         JS_EXPORT_PRIVATE StringObject(JSGlobalData&, Structure*);
     };
 
@@ -77,6 +79,8 @@ namespace JSC {
         ASSERT(asObject(value)->inherits(&StringObject::s_info));
         return static_cast<StringObject*>(asObject(value));
     }
+
+    JS_EXPORT_PRIVATE StringObject* constructString(ExecState*, JSGlobalObject*, JSValue);
 
 } // namespace JSC
 

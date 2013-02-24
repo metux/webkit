@@ -28,12 +28,14 @@
     #define TEXMAP_OPENGL_ES_2
 #endif
 #endif
+#if PLATFORM(GTK) && USE(OPENGL_ES_2)
+#define TEXMAP_OPENGL_ES_2
+#endif
 
 #include "FilterOperations.h"
 #include "GraphicsContext.h"
 #include "IntRect.h"
 #include "IntSize.h"
-#include "TextureMapperPlatformLayer.h"
 #include "TransformationMatrix.h"
 #include <wtf/UnusedParam.h>
 
@@ -44,13 +46,21 @@
 
 namespace WebCore {
 
+class BitmapTexturePool;
+class CustomFilterProgram;
+class GraphicsLayer;
 class TextureMapper;
 
 // A 2D texture that can be the target of software or GL rendering.
-class BitmapTexture  : public RefCounted<BitmapTexture> {
+class BitmapTexture : public RefCounted<BitmapTexture> {
 public:
     enum Flag {
         SupportsAlpha = 0x01
+    };
+
+    enum UpdateContentsFlag {
+        UpdateCanModifyOriginalImageData,
+        UpdateCannotModifyOriginalImageData
     };
 
     typedef unsigned Flags;
@@ -64,13 +74,14 @@ public:
     virtual bool isBackedByOpenGL() const { return false; }
 
     virtual IntSize size() const = 0;
-    virtual void updateContents(Image*, const IntRect&, const IntPoint& offset) = 0;
-    virtual void updateContents(const void*, const IntRect& target, const IntPoint& offset, int bytesPerLine) = 0;
+    virtual void updateContents(Image*, const IntRect&, const IntPoint& offset, UpdateContentsFlag) = 0;
+    virtual void updateContents(TextureMapper*, GraphicsLayer*, const IntRect& target, const IntPoint& offset, UpdateContentsFlag);
+    virtual void updateContents(const void*, const IntRect& target, const IntPoint& offset, int bytesPerLine, UpdateContentsFlag) = 0;
     virtual bool isValid() const = 0;
     inline Flags flags() const { return m_flags; }
 
     virtual int bpp() const { return 32; }
-    virtual bool canReuseWith(const IntSize& contentsSize, Flags flags = 0) { return false; }
+    virtual bool canReuseWith(const IntSize& /* contentsSize */, Flags = 0) { return false; }
     void reset(const IntSize& size, Flags flags = 0)
     {
         m_flags = flags;
@@ -84,7 +95,7 @@ public:
     inline bool isOpaque() const { return !(m_flags & SupportsAlpha); }
 
 #if ENABLE(CSS_FILTERS)
-    virtual PassRefPtr<BitmapTexture> applyFilters(const BitmapTexture& contentTexture, const FilterOperations&) { return this; }
+    virtual PassRefPtr<BitmapTexture> applyFilters(TextureMapper*, const BitmapTexture& contentTexture, const FilterOperations&) { return this; }
 #endif
 
 protected:
@@ -97,8 +108,8 @@ private:
 // A "context" class used to encapsulate accelerated texture mapping functions: i.e. drawing a texture
 // onto the screen or into another texture with a specified transform, opacity and mask.
 class TextureMapper {
+    WTF_MAKE_FAST_ALLOCATED;
     friend class BitmapTexture;
-
 public:
     enum AccelerationMode { SoftwareMode, OpenGLMode };
     enum PaintFlag {
@@ -107,7 +118,7 @@ public:
     typedef unsigned PaintFlags;
 
     static PassOwnPtr<TextureMapper> create(AccelerationMode newMode = SoftwareMode);
-    virtual ~TextureMapper() { }
+    virtual ~TextureMapper();
 
     enum ExposedEdges {
         NoEdges = 0,
@@ -118,14 +129,16 @@ public:
         AllEdges = LeftEdge | RightEdge | TopEdge | BottomEdge,
     };
 
-    virtual void drawBorder(const Color&, float borderWidth, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix = TransformationMatrix()) = 0;
-    virtual void drawRepaintCounter(int value, int pointSize, const FloatPoint&, const TransformationMatrix& modelViewMatrix = TransformationMatrix()) = 0;
+    virtual void drawBorder(const Color&, float borderWidth, const FloatRect&, const TransformationMatrix&) = 0;
+    virtual void drawNumber(int number, const Color&, const FloatPoint&, const TransformationMatrix&) = 0;
+
     virtual void drawTexture(const BitmapTexture&, const FloatRect& target, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0f, const BitmapTexture* maskTexture = 0, unsigned exposedEdges = AllEdges) = 0;
+    virtual void drawSolidColor(const FloatRect&, const TransformationMatrix&, const Color&) = 0;
 
     // makes a surface the target for the following drawTexture calls.
     virtual void bindSurface(BitmapTexture* surface) = 0;
-    virtual void setGraphicsContext(GraphicsContext* context) { m_context = context; }
-    virtual GraphicsContext* graphicsContext() { return m_context; }
+    void setGraphicsContext(GraphicsContext* context) { m_context = context; }
+    GraphicsContext* graphicsContext() { return m_context; }
     virtual void beginClip(const TransformationMatrix&, const FloatRect&) = 0;
     virtual void endClip() = 0;
     virtual PassRefPtr<BitmapTexture> createTexture() = 0;
@@ -137,20 +150,21 @@ public:
     TextDrawingModeFlags textDrawingMode() const { return m_textDrawingMode; }
     AccelerationMode accelerationMode() const { return m_accelerationMode; }
 
-    virtual void beginPainting(PaintFlags flags = 0) { }
+    virtual void beginPainting(PaintFlags = 0) { }
     virtual void endPainting() { }
 
-    virtual IntSize maxTextureSize() const { return IntSize(INT_MAX, INT_MAX); }
+    virtual IntSize maxTextureSize() const = 0;
 
-    // A surface is released implicitly when dereferenced.
     virtual PassRefPtr<BitmapTexture> acquireTextureFromPool(const IntSize&);
 
+#if ENABLE(CSS_SHADERS)
+    virtual void removeCachedCustomFilterProgram(CustomFilterProgram*) { }
+#endif
+
 protected:
-    TextureMapper(AccelerationMode accelerationMode)
-        : m_interpolationQuality(InterpolationDefault)
-        , m_textDrawingMode(TextModeFill)
-        , m_accelerationMode(accelerationMode)
-    {}
+    explicit TextureMapper(AccelerationMode);
+
+    GraphicsContext* m_context;
 
 private:
 #if USE(TEXTURE_MAPPER_GL)
@@ -163,8 +177,7 @@ private:
 #endif
     InterpolationQuality m_interpolationQuality;
     TextDrawingModeFlags m_textDrawingMode;
-    Vector<RefPtr<BitmapTexture> > m_texturePool;
-    GraphicsContext* m_context;
+    OwnPtr<BitmapTexturePool> m_texturePool;
     AccelerationMode m_accelerationMode;
 };
 

@@ -146,6 +146,11 @@ WebKitSettings
 
 </para>
 
+<!-- ##### ARG WebKitSettings:enable-smooth-scrolling ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitSettings:enable-tabs-to-links ##### -->
 <para>
 
@@ -222,6 +227,11 @@ WebKitSettings
 </para>
 
 <!-- ##### ARG WebKitSettings:serif-font-family ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:user-agent ##### -->
 <para>
 
 </para>
@@ -980,6 +990,52 @@ WebKitSettings
 
 
 <!-- ##### FUNCTION webkit_settings_set_enable_page_cache ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_user_agent ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_user_agent ##### -->
+<para>
+
+</para>
+
+@settings: 
+@user_agent: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_user_agent_with_application_details ##### -->
+<para>
+
+</para>
+
+@settings: 
+@application_name: 
+@application_version: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_smooth_scrolling ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_smooth_scrolling ##### -->
 <para>
 
 </para>

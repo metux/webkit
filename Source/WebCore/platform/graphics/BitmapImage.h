@@ -75,6 +75,7 @@ public:
         , m_haveMetadata(false)
         , m_isComplete(false)
         , m_hasAlpha(true) 
+        , m_frameBytes(0)
     {
     }
 
@@ -87,12 +88,15 @@ public:
     // Returns whether there was cached image data to clear.
     bool clear(bool clearMetadata);
 
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
     NativeImagePtr m_frame;
     ImageOrientation m_orientation;
     float m_duration;
     bool m_haveMetadata : 1;
     bool m_isComplete : 1;
     bool m_hasAlpha : 1;
+    unsigned m_frameBytes;
 };
 
 // =================================================
@@ -169,14 +173,20 @@ public:
     virtual GdkPixbuf* getGdkPixbuf();
 #endif
 
+#if PLATFORM(EFL)
+    virtual Evas_Object* getEvasObject(Evas*);
+#endif
+
     virtual NativeImagePtr nativeImageForCurrentFrame();
-    virtual bool currentFrameHasAlpha();
+    virtual bool currentFrameKnownToBeOpaque() OVERRIDE;
 
     ImageOrientation currentFrameOrientation();
 
 #if !ASSERT_DISABLED
     virtual bool notSolidColor();
 #endif
+
+    void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
     void updateSize() const;
@@ -197,9 +207,9 @@ protected:
 #if PLATFORM(WIN)
     virtual void drawFrameMatchingSourceSize(GraphicsContext*, const FloatRect& dstRect, const IntSize& srcSize, ColorSpace styleColorSpace, CompositeOperator);
 #endif
-    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator);
-#if USE(CG)
-    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, RespectImageOrientationEnum);
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode);
+#if USE(CG) || PLATFORM(CHROMIUM) || USE(CAIRO)
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode, RespectImageOrientationEnum) OVERRIDE;
 #endif
 
 #if (OS(WINCE) && !PLATFORM(QT))
@@ -208,7 +218,7 @@ protected:
 #endif
 
     size_t currentFrame() const { return m_currentFrame; }
-    size_t frameCount();
+    virtual size_t frameCount();
     NativeImagePtr frameAtIndex(size_t);
     bool frameIsCompleteAtIndex(size_t);
     float frameDurationAtIndex(size_t);
@@ -234,8 +244,8 @@ protected:
 
     // Generally called by destroyDecodedData(), destroys whole-image metadata
     // and notifies observers that the memory footprint has (hopefully)
-    // decreased by |framesCleared| times the size (in bytes) of a frame.
-    void destroyMetadataAndNotify(int framesCleared);
+    // decreased by |frameBytesCleared|.
+    void destroyMetadataAndNotify(unsigned frameBytesCleared);
 
     // Whether or not size is available yet.    
     bool isSizeAvailable();

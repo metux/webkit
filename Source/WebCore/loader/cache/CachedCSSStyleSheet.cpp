@@ -32,10 +32,10 @@
 #include "CachedStyleSheetClient.h"
 #include "HTTPParsers.h"
 #include "MemoryCache.h"
-#include "MemoryInstrumentation.h"
-#include "SharedBuffer.h"
+#include "ResourceBuffer.h"
 #include "StyleSheetContents.h"
 #include "TextResourceDecoder.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/Vector.h>
 
@@ -90,11 +90,11 @@ const String CachedCSSStyleSheet::sheetText(bool enforceMIMEType, bool* hasValid
     
     // Don't cache the decoded text, regenerating is cheap and it can use quite a bit of memory
     String sheetText = m_decoder->decode(m_data->data(), m_data->size());
-    sheetText += m_decoder->flush();
+    sheetText.append(m_decoder->flush());
     return sheetText;
 }
 
-void CachedCSSStyleSheet::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
+void CachedCSSStyleSheet::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
 {
     if (!allDataReceived)
         return;
@@ -104,7 +104,7 @@ void CachedCSSStyleSheet::data(PassRefPtr<SharedBuffer> data, bool allDataReceiv
     // Decode the data to find out the encoding and keep the sheet text around during checkNotify()
     if (m_data) {
         m_decodedSheetText = m_decoder->decode(m_data->data(), m_data->size());
-        m_decodedSheetText += m_decoder->flush();
+        m_decodedSheetText.append(m_decoder->flush());
     }
     setLoading(false);
     checkNotify();
@@ -120,14 +120,6 @@ void CachedCSSStyleSheet::checkNotify()
     CachedResourceClientWalker<CachedStyleSheetClient> w(m_clients);
     while (CachedStyleSheetClient* c = w.next())
         c->setCSSStyleSheet(m_resourceRequest.url(), m_response.url(), m_decoder->encoding().name(), this);
-}
-
-void CachedCSSStyleSheet::error(CachedResource::Status status)
-{
-    setStatus(status);
-    ASSERT(errorOccurred());
-    setLoading(false);
-    checkNotify();
 }
 
 bool CachedCSSStyleSheet::canUseSheet(bool enforceMIMEType, bool* hasValidMIMEType) const
@@ -204,11 +196,11 @@ void CachedCSSStyleSheet::saveParsedStyleSheet(PassRefPtr<StyleSheetContents> sh
 
 void CachedCSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CachedResourceCSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceCSS);
     CachedResource::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_decoder);
-    info.addInstrumentedMember(m_parsedStyleSheetCache);
-    info.addInstrumentedMember(m_decodedSheetText);
+    info.addMember(m_decoder, "decoder");
+    info.addMember(m_parsedStyleSheetCache, "parsedStyleSheetCache");
+    info.addMember(m_decodedSheetText, "decodedSheetText");
 }
 
 }

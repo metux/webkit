@@ -36,15 +36,18 @@
 #include "FrameView.h"
 #include "Image.h"
 #include "Logging.h"
-#include "MemoryInstrumentation.h"
 #include "ResourceHandle.h"
 #include "SecurityOrigin.h"
 #include "SecurityOriginHash.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "WorkerContext.h"
 #include "WorkerLoaderProxy.h"
 #include "WorkerThread.h"
 #include <stdio.h>
 #include <wtf/CurrentTime.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/MemoryObjectInfo.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/CString.h>
 
@@ -236,12 +239,6 @@ void MemoryCache::pruneLiveResourcesToSize(unsigned targetSize)
             if (elapsedTime < cMinDelayBeforeLiveDecodedPrune)
                 return;
 
-            // Check to see if the current resource are likely to be used again soon.
-            if (current->likelyToBeUsedSoon()) {
-                current = prev;
-                continue;
-            }
-
             // Destroy our decoded data. This will remove us from 
             // m_liveDecodedResources, and possibly move us to a different LRU 
             // list in m_allResources.
@@ -312,23 +309,30 @@ void MemoryCache::pruneDeadResourcesToSize(unsigned targetSize)
         
         // First flush all the decoded data in this queue.
         while (current) {
-            CachedResource* prev = current->m_prevInAllResourcesList;
+            // Protect 'previous' so it can't get deleted during destroyDecodedData().
+            CachedResourceHandle<CachedResource> previous = current->m_prevInAllResourcesList;
+            ASSERT(!previous || previous->inCache());
             if (!current->hasClients() && !current->isPreloaded() && current->isLoaded()) {
                 // Destroy our decoded data. This will remove us from 
                 // m_liveDecodedResources, and possibly move us to a different 
                 // LRU list in m_allResources.
                 current->destroyDecodedData();
-                
+
                 if (targetSize && m_deadSize <= targetSize)
                     return;
             }
-            current = prev;
+            // Decoded data may reference other resources. Stop iterating if 'previous' somehow got
+            // kicked out of cache during destroyDecodedData().
+            if (previous && !previous->inCache())
+                break;
+            current = previous.get();
         }
 
         // Now evict objects from this queue.
         current = m_allResources[i].m_tail;
         while (current) {
-            CachedResource* prev = current->m_prevInAllResourcesList;
+            CachedResourceHandle<CachedResource> previous = current->m_prevInAllResourcesList;
+            ASSERT(!previous || previous->inCache());
             if (!current->hasClients() && !current->isPreloaded() && !current->isCacheValidator()) {
                 if (!makeResourcePurgeable(current))
                     evict(current);
@@ -336,7 +340,9 @@ void MemoryCache::pruneDeadResourcesToSize(unsigned targetSize)
                 if (targetSize && m_deadSize <= targetSize)
                     return;
             }
-            current = prev;
+            if (previous && !previous->inCache())
+                break;
+            current = previous.get();
         }
             
         // Shrink the vector back down so we don't waste time inspecting
@@ -540,7 +546,7 @@ void MemoryCache::removeResourcesWithOrigin(SecurityOrigin* origin)
 
     CachedResourceMap::iterator e = m_resources.end();
     for (CachedResourceMap::iterator it = m_resources.begin(); it != e; ++it) {
-        CachedResource* resource = it->second;
+        CachedResource* resource = it->value;
         RefPtr<SecurityOrigin> resourceOrigin = SecurityOrigin::createFromString(resource->url());
         if (!resourceOrigin)
             continue;
@@ -556,7 +562,7 @@ void MemoryCache::getOriginsWithCache(SecurityOriginSet& origins)
 {
     CachedResourceMap::iterator e = m_resources.end();
     for (CachedResourceMap::iterator it = m_resources.begin(); it != e; ++it)
-        origins.add(SecurityOrigin::createFromString(it->second->url()));
+        origins.add(SecurityOrigin::createFromString(it->value->url()));
 }
 
 void MemoryCache::removeFromLiveDecodedResourcesList(CachedResource* resource)
@@ -689,7 +695,7 @@ MemoryCache::Statistics MemoryCache::getStatistics()
     Statistics stats;
     CachedResourceMap::iterator e = m_resources.end();
     for (CachedResourceMap::iterator i = m_resources.begin(); i != e; ++i) {
-        CachedResource* resource = i->second;
+        CachedResource* resource = i->value;
         switch (resource->type()) {
         case CachedResource::ImageResource:
             stats.images.addResource(resource);
@@ -717,15 +723,11 @@ MemoryCache::Statistics MemoryCache::getStatistics()
 
 void MemoryCache::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::MemoryCacheStructures);
-    info.addHashMap(m_resources);
-    CachedResourceMap::const_iterator e = m_resources.end();
-    for (CachedResourceMap::const_iterator i = m_resources.begin(); i != e; ++i) {
-        info.addInstrumentedMember(i->first);
-        info.addInstrumentedMember(i->second);
-    }
-    info.addVector(m_allResources);
-    info.addMember(m_liveDecodedResources);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::MemoryCacheStructures);
+    memoryObjectInfo->setClassName("MemoryCache");
+    info.addMember(m_resources, "resources");
+    info.addMember(m_allResources, "allResources");
+    info.addMember(m_liveDecodedResources, "liveDecodedResources");
 }
 
 void MemoryCache::setDisabled(bool disabled)
@@ -738,7 +740,7 @@ void MemoryCache::setDisabled(bool disabled)
         CachedResourceMap::iterator i = m_resources.begin();
         if (i == m_resources.end())
             break;
-        evict(i->second);
+        evict(i->value);
     }
 }
 

@@ -28,6 +28,7 @@ CheckSecurityForNode
 Clamp
 Conditional=*
 Constructor
+ConstructorConditional=*
 ConstructorParameters=*
 ConstructorRaisesException
 ConstructorTemplate=Event|TypedArray
@@ -53,8 +54,10 @@ DoNotCheckSecurityOnGetter
 DoNotCheckSecurityOnSetter
 EventTarget
 ExtendsDOMGlobalObject
-GenerateIsReachable=ImplElementRoot|ImplBaseRoot
+GenerateIsReachable=ImplDocument|ImplElementRoot|ImplOwnerNodeRoot
 Immutable
+ImplementationLacksVTable
+ImplementationNamespace=*
 ImplementedAs=*
 IndexedGetter
 InitializedByEventConstructor
@@ -76,7 +79,7 @@ JSCustomPushEventHandlerScope
 JSCustomSetter
 JSCustomToJSObject
 JSCustomToNativeObject
-JSGenerateIsReachable=|Impl|ImplContext|ImplDocument|ImplElementRoot|ImplFrame|ImplBaseRoot
+JSGenerateIsReachable=|Impl|ImplContext|ImplDocument|ImplElementRoot|ImplFrame|ImplOwnerNodeRoot
 JSGenerateToJSObject
 JSGenerateToNativeObject
 JSInlineGetOwnPropertySlot
@@ -94,6 +97,7 @@ ObjCPolymorphic
 ObjCProtocol
 OmitConstructor
 Optional=|DefaultIsNullString|DefaultIsUndefined
+PassContext
 PassThisToCallback=*
 Reflect=*
 Replaceable
@@ -108,6 +112,7 @@ TreatReturnedNullStringAs=Null|Undefined
 TreatUndefinedAs=NullString
 TypedArray=*
 URL
+V8CacheAttributeForGC
 V8Custom
 V8CustomConstructor
 V8CustomGetter
@@ -118,6 +123,9 @@ V8DependentLifetime
 V8DoNotCheckSignature
 V8EnabledAtRuntime=*
 V8EnabledPerContext=*
-V8GenerateIsReachable=ImplElementRoot|ImplOwnerRoot|ImplOwnerNodeRoot|ImplBaseRoot
+V8GenerateIsReachable=ImplDocument|ImplElementRoot|ImplOwnerRoot|ImplOwnerNodeRoot
+V8NoWrapperCache
+V8MeasureAs=*
 V8ReadOnly
+V8SkipVTableValidation
 V8Unforgeable

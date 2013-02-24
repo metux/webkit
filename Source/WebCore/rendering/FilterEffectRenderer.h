@@ -34,6 +34,8 @@
 #include "FloatRect.h"
 #include "GraphicsContext.h"
 #include "ImageBuffer.h"
+#include "IntRectExtent.h"
+#include "LayoutRect.h"
 #include "SVGFilterBuilder.h"
 #include "SourceGraphic.h"
 
@@ -49,6 +51,7 @@ class CustomFilterProgram;
 class Document;
 class GraphicsContext;
 class RenderLayer;
+class RenderObject;
 
 class FilterEffectRendererHelper {
 public:
@@ -99,8 +102,8 @@ public:
     GraphicsContext* inputContext();
     ImageBuffer* output() const { return lastEffect()->asImageBuffer(); }
 
-    bool build(Document*, const FilterOperations&);
-    PassRefPtr<FilterEffect> buildReferenceFilter(Document*, PassRefPtr<FilterEffect> previousEffect, ReferenceFilterOperation*);
+    bool build(RenderObject* renderer, const FilterOperations&);
+    PassRefPtr<FilterEffect> buildReferenceFilter(RenderObject* renderer, PassRefPtr<FilterEffect> previousEffect, ReferenceFilterOperation*);
     bool updateBackingStoreRect(const FloatRect& filterRect);
     void allocateBackingStoreIfNeeded();
     void clearIntermediateResults();
@@ -138,11 +141,8 @@ private:
     FilterEffectList m_effects;
     RefPtr<SourceGraphic> m_sourceGraphic;
     
-    int m_topOutset;
-    int m_rightOutset;
-    int m_bottomOutset;
-    int m_leftOutset;
-    
+    IntRectExtent m_outsets;
+
     bool m_graphicsBufferAttached;
     bool m_hasFilterThatMovesPixels;
 #if ENABLE(CSS_SHADERS)

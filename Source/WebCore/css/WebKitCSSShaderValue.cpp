@@ -32,12 +32,14 @@
 #if ENABLE(CSS_SHADERS)
 #include "WebKitCSSShaderValue.h"
 
-#include "CachedResourceLoader.h"
 #include "CSSParser.h"
+#include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
+#include "CachedResourceRequestInitiators.h"
 #include "Document.h"
-#include "MemoryInstrumentation.h"
 #include "StyleCachedShader.h"
 #include "StylePendingShader.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -59,7 +61,8 @@ StyleCachedShader* WebKitCSSShaderValue::cachedShader(CachedResourceLoader* load
     if (!m_accessedShader) {
         m_accessedShader = true;
 
-        ResourceRequest request(loader->document()->completeURL(m_url));
+        CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(m_url)));
+        request.setInitiator(cachedResourceRequestInitiators().css);
         if (CachedResourceHandle<CachedShader> cachedShader = loader->requestShader(request))
             m_shader = StyleCachedShader::create(cachedShader.get());
     }
@@ -77,13 +80,28 @@ StyleShader* WebKitCSSShaderValue::cachedOrPendingShader()
 
 String WebKitCSSShaderValue::customCssText() const
 {
-    return "url(" + quoteCSSURLIfNeeded(m_url) + ")";
+    StringBuilder result;
+    result.appendLiteral("url(");
+    result.append(quoteCSSURLIfNeeded(m_url));
+    result.append(')');
+    if (!m_format.isEmpty()) {
+        result.appendLiteral(" format('");
+        result.append(m_format);
+        result.appendLiteral("')");
+    }
+    return result.toString();
+}
+
+bool WebKitCSSShaderValue::equals(const WebKitCSSShaderValue& other) const
+{
+    return m_url == other.m_url;
 }
 
 void WebKitCSSShaderValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_url);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_url, "url");
+    info.addMember(m_format, "format");
 }
     
 } // namespace WebCore

@@ -35,20 +35,30 @@
 #include <atk/atk.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
+#include <wtf/gobject/GOwnPtr.h>
 
-static bool loggingAccessibilityEvents = false;
-
-AccessibilityController::AccessibilityController()
+static AtkObject* childElementById(AtkObject* parent, const char* id)
 {
-}
+    if (!ATK_IS_OBJECT(parent))
+        return 0;
 
-AccessibilityController::~AccessibilityController()
-{
-}
+    AtkAttributeSet* attributeSet = atk_object_get_attributes(parent);
+    for (GSList* attributes = attributeSet; attributes; attributes = attributes->next) {
+        AtkAttribute* attribute = static_cast<AtkAttribute*>(attributes->data);
+        if (!strcmp(attribute->name, "html-id")) {
+            if (!strcmp(attribute->value, id))
+                return parent;
+            break;
+        }
+    }
 
-AccessibilityUIElement AccessibilityController::elementAtPoint(int x, int y)
-{
-    // FIXME: implement
+    int childCount = atk_object_get_n_accessible_children(parent);
+    for (int i = 0; i < childCount; i++) {
+        AtkObject* result = childElementById(atk_object_ref_accessible_child(parent, i), id);
+        if (ATK_IS_OBJECT(result))
+            return result;
+    }
+
     return 0;
 }
 
@@ -70,38 +80,20 @@ AccessibilityUIElement AccessibilityController::rootElement()
     return AccessibilityUIElement(accessible);
 }
 
-void AccessibilityController::setLogFocusEvents(bool)
+AccessibilityUIElement AccessibilityController::accessibleElementById(JSStringRef id)
 {
-}
+    AtkObject* root = DumpRenderTreeSupportGtk::getRootAccessibleElement(mainFrame);
+    if (!root)
+        return 0;
 
-void AccessibilityController::setLogScrollingStartEvents(bool)
-{
-}
+    size_t bufferSize = JSStringGetMaximumUTF8CStringSize(id);
+    GOwnPtr<gchar> idBuffer(static_cast<gchar*>(g_malloc(bufferSize)));
+    JSStringGetUTF8CString(id, idBuffer.get(), bufferSize);
 
-void AccessibilityController::setLogValueChangeEvents(bool)
-{
-}
+    AtkObject* result = childElementById(root, idBuffer.get());
+    if (ATK_IS_OBJECT(result))
+        return AccessibilityUIElement(result);
 
-void AccessibilityController::setLogAccessibilityEvents(bool logAccessibilityEvents)
-{
-    if (logAccessibilityEvents == loggingAccessibilityEvents)
-        return;
+    return 0;
 
-    if (!logAccessibilityEvents) {
-        disconnectAccessibilityCallbacks();
-        loggingAccessibilityEvents = false;
-        return;
-    }
-
-    connectAccessibilityCallbacks();
-    loggingAccessibilityEvents = true;
-}
-
-bool AccessibilityController::addNotificationListener(JSObjectRef)
-{
-    return false;
-}
-
-void AccessibilityController::removeNotificationListener()
-{
 }

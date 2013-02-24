@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2009, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,8 +56,6 @@ public:
     bool callShouldCloseOnWebView();
     JSStringRef copyDecodedHostName(JSStringRef name);
     JSStringRef copyEncodedHostName(JSStringRef name);
-    void deliverWebIntent(JSStringRef action, JSStringRef type, JSStringRef data);
-    void disableImageLoading();
     void dispatchPendingLoadRequests();
     void display();
     void displayInvalidatedRegion();
@@ -70,11 +68,8 @@ public:
     void keepWebHistory();
     JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
     void notifyDone();
-    int numberOfPages(float pageWidthInPixels, float pageHeightInPixels);
     int numberOfPendingGeolocationPermissionRequests();
     void overridePreference(JSStringRef key, JSStringRef value);
-    JSRetainPtr<JSStringRef> pageProperty(const char* propertyName, int pageNumber) const;
-    JSRetainPtr<JSStringRef> pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft) const;
     JSStringRef pathToLocalResource(JSContextRef, JSStringRef url);
     void queueBackNavigation(int howFarBackward);
     void queueForwardNavigation(int howFarForward);
@@ -85,7 +80,6 @@ public:
     void queueNonLoadingScript(JSStringRef script);
     void queueReload();
     void removeAllVisitedLinks();
-    void sendWebIntentResponse(JSStringRef response);
     void setAcceptsEditing(bool);
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
@@ -103,8 +97,8 @@ public:
     void setAutomaticLinkDetectionEnabled(bool flag);
     void setMainFrameIsFirstResponder(bool flag);
     void setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma);
-    void setMockGeolocationError(int code, JSStringRef message);
-    void setMockGeolocationPosition(double latitude, double longitude, double accuracy);
+    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
+    void setMockGeolocationPositionUnavailableError(JSStringRef message);
     void addMockSpeechInputResult(JSStringRef result, double confidence, JSStringRef language);
     void setMockSpeechInputDumpRect(bool flag);
     void setPersistentUserStyleSheetLocation(JSStringRef path);
@@ -120,7 +114,6 @@ public:
     void setValueForUser(JSContextRef, JSValueRef nodeObject, JSStringRef value);
     void setViewModeMediaFeature(JSStringRef);
     void setXSSAuditorEnabled(bool flag);
-    void setFrameFlatteningEnabled(bool);
     void setSpatialNavigationEnabled(bool);
     void setScrollbarPolicy(JSStringRef orientation, JSStringRef policy);
     void startSpeechInput(JSContextRef inputElement);
@@ -129,18 +122,20 @@ public:
 
     void waitForPolicyDelegate();
     size_t webHistoryItemCount();
-    unsigned workerThreadCount() const;
     int windowCount();
     
 #if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(WIN)
     JSRetainPtr<JSStringRef> platformName() const;
 #endif
 
-    void grantDesktopNotificationPermission(JSStringRef origin);
-    bool checkDesktopNotificationPermission(JSStringRef origin);
-    void ignoreDesktopNotificationPermissionRequests();
-    bool areDesktopNotificationPermissionRequestsIgnored() const { return m_areDesktopNotificationPermissionRequestsIgnored; }
-    void simulateDesktopNotificationClick(JSStringRef title);
+    // Legacy here refers to the old TestRunner API for handling web notifications, not the legacy web notification API.
+    void ignoreLegacyWebNotificationPermissionRequests();
+    // Legacy here refers to the old TestRunner API for handling web notifications, not the legacy web notification API.
+    void simulateLegacyWebNotificationClick(JSStringRef title);
+    void grantWebNotificationPermission(JSStringRef origin);
+    void denyWebNotificationPermission(JSStringRef origin);
+    void removeAllWebNotificationPermissions();
+    void simulateWebNotificationClick(JSValueRef notification);
 
     bool elementDoesAutoCompleteForElementWithId(JSStringRef id);
 
@@ -288,10 +283,6 @@ public:
 
     const std::string& encodedAudioData() const { return m_encodedAudioData; }
     void setEncodedAudioData(const std::string& encodedAudioData) { m_encodedAudioData = encodedAudioData; }
-    
-    bool pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId);
-    bool pauseTransitionAtTimeOnElementWithId(JSStringRef propertyName, double time, JSStringRef elementId);
-    unsigned numberOfActiveAnimations() const;
 
     void addOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
     void removeOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
@@ -336,8 +327,6 @@ public:
     // Simulate a request an embedding application could make, populating per-session credential storage.
     void authenticateSession(JSStringRef url, JSStringRef username, JSStringRef password);
 
-    JSRetainPtr<JSStringRef> layerTreeAsText() const;
-
     JSRetainPtr<JSStringRef> markerTextForListItem(JSContextRef, JSValueRef nodeObject) const;
 
     JSValueRef originsWithLocalStorage(JSContextRef);
@@ -353,8 +342,6 @@ public:
     static const unsigned maxViewWidth;
     static const unsigned maxViewHeight;
 
-    void setMinimumTimerInterval(double);
-
     void setTextDirection(JSStringRef);
     const std::string& titleTextDirection() const { return m_titleTextDirection; }
     void setTitleTextDirection(const std::string& direction) { m_titleTextDirection = direction; }
@@ -364,6 +351,9 @@ public:
     bool hasCustomFullScreenBehavior() const { return m_customFullScreenBehavior; }
 
     void setStorageDatabaseIdleInterval(double);
+    void closeIdleLocalStorageDatabases();
+
+    bool hasPendingWebNotificationClick() const { return m_hasPendingWebNotificationClick; }
 
 private:
     TestRunner(const std::string& testPathOrURL, const std::string& expectedPixelHash);
@@ -417,8 +407,10 @@ private:
     bool m_useDeferredFrameLoading;
     bool m_shouldPaintBrokenImage;
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
-    bool m_areDesktopNotificationPermissionRequestsIgnored;
+    // FIXME 81697: This variable most likely will be removed once we have migrated the tests from fast/notifications to http/tests/notifications.
+    bool m_areLegacyWebNotificationPermissionRequestsIgnored;
     bool m_customFullScreenBehavior;
+    bool m_hasPendingWebNotificationClick;
 
     std::string m_authenticationUsername;
     std::string m_authenticationPassword; 
@@ -430,9 +422,6 @@ private:
     
     // base64 encoded WAV audio data is stored here.
     std::string m_encodedAudioData;
-    
-    // origins which have been granted desktop notification access
-    std::vector<JSStringRef> m_desktopNotificationAllowedOrigins;
 
     std::map<std::string, std::string> m_URLsToRedirect;
     

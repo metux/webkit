@@ -29,16 +29,17 @@
 #include "APIShims.h"
 #include "APICast.h"
 #include "CodeBlock.h"
+#include "Error.h"
 #include "ExceptionHelpers.h"
-#include "JSFunction.h"
 #include "FunctionPrototype.h"
-#include <runtime/JSGlobalObject.h>
-#include <runtime/JSLock.h>
+#include "JSFunction.h"
+#include "JSGlobalObject.h"
+#include "JSLock.h"
+#include "Operations.h"
 #include <wtf/Vector.h>
 
 namespace JSC {
 
-ASSERT_CLASS_FITS_IN_CELL(JSCallbackFunction);
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSCallbackFunction);
 
 const ClassInfo JSCallbackFunction::s_info = { "CallbackFunction", &InternalFunction::s_info, 0, 0, CREATE_METHOD_TABLE(JSCallbackFunction) };
@@ -49,7 +50,7 @@ JSCallbackFunction::JSCallbackFunction(JSGlobalObject* globalObject, JSObjectCal
 {
 }
 
-void JSCallbackFunction::finishCreation(JSGlobalData& globalData, const UString& name)
+void JSCallbackFunction::finishCreation(JSGlobalData& globalData, const String& name)
 {
     Base::finishCreation(globalData, name);
     ASSERT(inherits(&s_info));

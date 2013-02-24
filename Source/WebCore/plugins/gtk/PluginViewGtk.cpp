@@ -62,8 +62,8 @@
 #include "JSDOMBinding.h"
 #include "npruntime_impl.h"
 #include "runtime_root.h"
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSLock.h>
-#include <runtime/JSValue.h>
 
 #ifdef GTK_API_VERSION_2
 #include <gdkconfig.h>
@@ -76,14 +76,13 @@
 #define Bool int // this got undefined somewhere
 #define Status int // ditto
 #include <X11/extensions/Xrender.h>
-#include <cairo/cairo-xlib.h>
+#include <cairo-xlib.h>
 #include <gdk/gdkx.h>
 
 using JSC::ExecState;
 using JSC::Interpreter;
 using JSC::JSLock;
 using JSC::JSObject;
-using JSC::UString;
 
 using std::min;
 
@@ -883,6 +882,13 @@ void PluginView::platformDestroy()
     if (m_drawable) {
         XFreePixmap(GDK_DISPLAY_XDISPLAY(gdk_display_get_default()), m_drawable);
         m_drawable = 0;
+    }
+
+    GtkWidget* widget = platformWidget();
+    if (widget) {
+        GtkWidget* parent = gtk_widget_get_parent(widget);
+        ASSERT(parent);
+        gtk_container_remove(GTK_CONTAINER(parent), widget);
     }
 }
 

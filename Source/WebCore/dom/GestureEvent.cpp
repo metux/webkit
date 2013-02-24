@@ -47,6 +47,7 @@ PassRefPtr<GestureEvent> GestureEvent::create(PassRefPtr<AbstractView> view, con
     case PlatformEvent::GestureScrollEnd:
         eventType = eventNames().gesturescrollendEvent; break;
     case PlatformEvent::GestureScrollUpdate:
+    case PlatformEvent::GestureScrollUpdateWithoutPropagation:
         eventType = eventNames().gesturescrollupdateEvent; break;
     case PlatformEvent::GestureTap:
         eventType = eventNames().gesturetapEvent; break;
@@ -58,6 +59,7 @@ PassRefPtr<GestureEvent> GestureEvent::create(PassRefPtr<AbstractView> view, con
     case PlatformEvent::GesturePinchBegin:
     case PlatformEvent::GesturePinchEnd:
     case PlatformEvent::GesturePinchUpdate:
+    case PlatformEvent::GestureTapDownCancel:
     default:
         return 0;
     }
@@ -120,7 +122,7 @@ bool GestureEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) co
     if (dispatcher->node()->disabled())
         return true;
 
-    dispatcher->dispatchEvent(event());
+    dispatcher->dispatch();
     ASSERT(!event()->defaultPrevented());
     return event()->defaultHandled() || event()->defaultPrevented();
 }

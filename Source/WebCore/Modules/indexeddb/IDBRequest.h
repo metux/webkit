@@ -33,6 +33,7 @@
 
 #include "ActiveDOMObject.h"
 #include "DOMError.h"
+#include "DOMRequestState.h"
 #include "DOMStringList.h"
 #include "Event.h"
 #include "EventListener.h"
@@ -42,6 +43,7 @@
 #include "IDBCallbacks.h"
 #include "IDBCursor.h"
 #include "IDBCursorBackendInterface.h"
+#include "ScriptWrappable.h"
 
 namespace WebCore {
 
@@ -49,10 +51,10 @@ class IDBTransaction;
 
 typedef int ExceptionCode;
 
-class IDBRequest : public IDBCallbacks, public EventTarget, public ActiveDOMObject {
+class IDBRequest : public ScriptWrappable, public IDBCallbacks, public EventTarget, public ActiveDOMObject {
 public:
     static PassRefPtr<IDBRequest> create(ScriptExecutionContext*, PassRefPtr<IDBAny> source, IDBTransaction*);
-    static PassRefPtr<IDBRequest> create(ScriptExecutionContext*, PassRefPtr<IDBAny> source, IDBTransactionBackendInterface::TaskType, IDBTransaction*);
+    static PassRefPtr<IDBRequest> create(ScriptExecutionContext*, PassRefPtr<IDBAny> source, IDBDatabaseBackendInterface::TaskType, IDBTransaction*);
     virtual ~IDBRequest();
 
     PassRefPtr<IDBAny> result(ExceptionCode&) const;
@@ -61,6 +63,7 @@ public:
     String webkitErrorMessage(ExceptionCode&) const;
     PassRefPtr<IDBAny> source() const;
     PassRefPtr<IDBTransaction> transaction() const;
+    void preventPropagation() { m_preventPropagation = true; }
 
     // Defined in the IDL
     enum ReadyState {
@@ -83,16 +86,14 @@ public:
     // IDBCallbacks
     virtual void onError(PassRefPtr<IDBDatabaseError>);
     virtual void onSuccess(PassRefPtr<DOMStringList>);
-    virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>);
     virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue>);
     virtual void onSuccess(PassRefPtr<IDBKey>);
-    virtual void onSuccess(PassRefPtr<IDBTransactionBackendInterface>);
     virtual void onSuccess(PassRefPtr<SerializedScriptValue>);
     virtual void onSuccess(PassRefPtr<SerializedScriptValue>, PassRefPtr<IDBKey>, const IDBKeyPath&);
+    virtual void onSuccess(int64_t);
+    virtual void onSuccess();
     virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue>);
     virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<SerializedScriptValue> >&) { ASSERT_NOT_REACHED(); } // Not implemented. Callback should not reach the renderer side.
-    virtual void onBlocked();
-    virtual void onBlocked(int64_t existingVersion) { ASSERT_NOT_REACHED(); }
 
     // ActiveDOMObject
     virtual bool hasPendingActivity() const OVERRIDE;
@@ -101,21 +102,25 @@ public:
     // EventTarget
     virtual const AtomicString& interfaceName() const;
     virtual ScriptExecutionContext* scriptExecutionContext() const;
-    virtual bool dispatchEvent(PassRefPtr<Event>);
-    bool dispatchEvent(PassRefPtr<Event> event, ExceptionCode& ec) { return EventTarget::dispatchEvent(event, ec); }
     virtual void uncaughtExceptionInEventHandler();
+
+    using EventTarget::dispatchEvent;
+    virtual bool dispatchEvent(PassRefPtr<Event>) OVERRIDE;
 
     void transactionDidFinishAndDispatch();
 
-    using ThreadSafeRefCounted<IDBCallbacks>::ref;
-    using ThreadSafeRefCounted<IDBCallbacks>::deref;
+    using RefCounted<IDBCallbacks>::ref;
+    using RefCounted<IDBCallbacks>::deref;
 
-    IDBTransactionBackendInterface::TaskType taskType() { return m_taskType; }
+    IDBDatabaseBackendInterface::TaskType taskType() { return m_taskType; }
+
+    DOMRequestState* requestState() { return &m_requestState; }
 
 protected:
-    IDBRequest(ScriptExecutionContext*, PassRefPtr<IDBAny> source, IDBTransactionBackendInterface::TaskType, IDBTransaction*);
+    IDBRequest(ScriptExecutionContext*, PassRefPtr<IDBAny> source, IDBDatabaseBackendInterface::TaskType, IDBTransaction*);
     void enqueueEvent(PassRefPtr<Event>);
     virtual bool shouldEnqueueEvent() const;
+    void onSuccessInternal(const ScriptValue&);
 
     RefPtr<IDBAny> m_result;
     unsigned short m_errorCode;
@@ -134,10 +139,10 @@ private:
     virtual EventTargetData* ensureEventTargetData();
 
     PassRefPtr<IDBCursor> getResultCursor();
-    void setResultCursor(PassRefPtr<IDBCursor>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue>);
+    void setResultCursor(PassRefPtr<IDBCursor>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, const ScriptValue&);
 
     RefPtr<IDBAny> m_source;
-    const IDBTransactionBackendInterface::TaskType m_taskType;
+    const IDBDatabaseBackendInterface::TaskType m_taskType;
 
     bool m_hasPendingActivity;
     Vector<RefPtr<Event> > m_enqueuedEvents;
@@ -149,10 +154,12 @@ private:
     RefPtr<IDBCursor> m_pendingCursor;
     RefPtr<IDBKey> m_cursorKey;
     RefPtr<IDBKey> m_cursorPrimaryKey;
-    RefPtr<SerializedScriptValue> m_cursorValue;
+    ScriptValue m_cursorValue;
     bool m_didFireUpgradeNeededEvent;
+    bool m_preventPropagation;
 
     EventTargetData m_eventTargetData;
+    DOMRequestState m_requestState;
 };
 
 } // namespace WebCore

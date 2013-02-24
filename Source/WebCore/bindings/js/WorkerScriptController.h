@@ -29,7 +29,7 @@
 #define WorkerScriptController_h
 
 #if ENABLE(WORKERS)
-
+#include <debugger/Debugger.h>
 #include <heap/Strong.h>
 #include <wtf/Forward.h>
 #include <wtf/Threading.h>
@@ -75,9 +75,12 @@ namespace WebCore {
         void forbidExecution();
         bool isExecutionForbidden() const;
 
-        void disableEval();
+        void disableEval(const String& errorMessage);
 
         JSC::JSGlobalData* globalData() { return m_globalData.get(); }
+
+        void attachDebugger(JSC::Debugger*);
+        void detachDebugger(JSC::Debugger*);
 
     private:
         void initScriptIfNeeded()

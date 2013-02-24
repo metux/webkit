@@ -48,6 +48,12 @@
 #include <WebCore/UndoStep.h>
 #include <WebCore/UserTypingGestureIndicator.h>
 
+#if PLATFORM(QT)
+#include <QClipboard>
+#include <QGuiApplication>
+#include <WebCore/Pasteboard.h>
+#endif
+
 using namespace WebCore;
 using namespace HTMLNames;
 
@@ -65,11 +71,13 @@ bool WebEditorClient::shouldDeleteRange(Range* range)
     return result;
 }
 
+#if ENABLE(DELETION_UI)
 bool WebEditorClient::shouldShowDeleteInterface(HTMLElement*)
 {
     notImplemented();
     return false;
 }
+#endif
 
 bool WebEditorClient::smartInsertDeleteEnabled()
 {
@@ -164,21 +172,21 @@ bool WebEditorClient::shouldMoveRangeAfterDelete(Range*, Range*)
 void WebEditorClient::didBeginEditing()
 {
     // FIXME: What good is a notification name, if it's always the same?
-    DEFINE_STATIC_LOCAL(String, WebViewDidBeginEditingNotification, ("WebViewDidBeginEditingNotification"));
+    DEFINE_STATIC_LOCAL(String, WebViewDidBeginEditingNotification, (ASCIILiteral("WebViewDidBeginEditingNotification")));
     m_page->injectedBundleEditorClient().didBeginEditing(m_page, WebViewDidBeginEditingNotification.impl());
     notImplemented();
 }
 
 void WebEditorClient::respondToChangedContents()
 {
-    DEFINE_STATIC_LOCAL(String, WebViewDidChangeNotification, ("WebViewDidChangeNotification"));
+    DEFINE_STATIC_LOCAL(String, WebViewDidChangeNotification, (ASCIILiteral("WebViewDidChangeNotification")));
     m_page->injectedBundleEditorClient().didChange(m_page, WebViewDidChangeNotification.impl());
     notImplemented();
 }
 
 void WebEditorClient::respondToChangedSelection(Frame* frame)
 {
-    DEFINE_STATIC_LOCAL(String, WebViewDidChangeSelectionNotification, ("WebViewDidChangeSelectionNotification"));
+    DEFINE_STATIC_LOCAL(String, WebViewDidChangeSelectionNotification, (ASCIILiteral("WebViewDidChangeSelectionNotification")));
     m_page->injectedBundleEditorClient().didChangeSelection(m_page, WebViewDidChangeSelectionNotification.impl());
     if (!frame)
         return;
@@ -187,29 +195,44 @@ void WebEditorClient::respondToChangedSelection(Frame* frame)
 
     m_page->send(Messages::WebPageProxy::EditorStateChanged(state));
 
-#if PLATFORM(WIN)
-    // FIXME: This should also go into the selection state.
-    if (!frame->editor()->hasComposition() || frame->editor()->ignoreCompositionSelectionChange())
-        return;
-
-    unsigned start;
-    unsigned end;
-    m_page->send(Messages::WebPageProxy::DidChangeCompositionSelection(frame->editor()->getCompositionSelection(start, end)));
-#elif PLATFORM(GTK)
-    setSelectionPrimaryClipboardIfNeeded(frame);
+#if PLATFORM(GTK) || PLATFORM(QT)
+    updateGlobalSelection(frame);
 #endif
 }
 
+#if PLATFORM(QT)
+// FIXME: Use this function for other X11-based platforms that need to manually update the global selection.
+void WebEditorClient::updateGlobalSelection(Frame* frame)
+{
+    if (supportsGlobalSelection() && frame->selection()->isRange()) {
+        bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
+        Pasteboard::generalPasteboard()->setSelectionMode(true);
+        Pasteboard::generalPasteboard()->writeSelection(frame->selection()->toNormalizedRange().get(), frame->editor()->canSmartCopyOrDelete(), frame);
+        Pasteboard::generalPasteboard()->setSelectionMode(oldSelectionMode);
+    }
+}
+#endif
+
 void WebEditorClient::didEndEditing()
 {
-    DEFINE_STATIC_LOCAL(String, WebViewDidEndEditingNotification, ("WebViewDidEndEditingNotification"));
+    DEFINE_STATIC_LOCAL(String, WebViewDidEndEditingNotification, (ASCIILiteral("WebViewDidEndEditingNotification")));
     m_page->injectedBundleEditorClient().didEndEditing(m_page, WebViewDidEndEditingNotification.impl());
     notImplemented();
 }
 
 void WebEditorClient::didWriteSelectionToPasteboard()
 {
-    notImplemented();
+    m_page->injectedBundleEditorClient().didWriteToPasteboard(m_page);
+}
+
+void WebEditorClient::willWriteSelectionToPasteboard(Range* range)
+{
+    m_page->injectedBundleEditorClient().willWriteToPasteboard(m_page, range);
+}
+
+void WebEditorClient::getClientPasteboardDataForRange(Range* range, Vector<String>& pasteboardTypes, Vector<RefPtr<SharedBuffer> >& pasteboardData)
+{
+    m_page->injectedBundleEditorClient().getPasteboardDataForRange(m_page, range, pasteboardTypes, pasteboardData);
 }
 
 void WebEditorClient::didSetSelectionTypesForPasteboard()
@@ -375,9 +398,10 @@ void WebEditorClient::textWillBeDeletedInTextField(Element* element)
 bool WebEditorClient::shouldEraseMarkersAfterChangeSelection(WebCore::TextCheckingType type) const
 {
     // This prevents erasing spelling markers on OS X Lion or later to match AppKit on these Mac OS X versions.
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#if PLATFORM(MAC)
     return type != TextCheckingTypeSpelling;
 #else
+    UNUSED_PARAM(type);
     return true;
 #endif
 }
@@ -449,7 +473,11 @@ void WebEditorClient::getGuessesForWord(const String& word, const String& contex
 
 void WebEditorClient::willSetInputMethodState()
 {
+#if PLATFORM(QT)
+    m_page->send(Messages::WebPageProxy::WillSetInputMethodState());
+#else
     notImplemented();
+#endif
 }
 
 void WebEditorClient::setInputMethodState(bool)
@@ -460,6 +488,18 @@ void WebEditorClient::setInputMethodState(bool)
 void WebEditorClient::requestCheckingOfString(WTF::PassRefPtr<WebCore::TextCheckingRequest>)
 {
     notImplemented();
+}
+
+bool WebEditorClient::supportsGlobalSelection()
+{
+#if PLATFORM(QT) && !defined(QT_NO_CLIPBOARD)
+    return qApp->clipboard()->supportsSelection();
+#elif PLATFORM(GTK) && PLATFORM(X11)
+    return true;
+#else
+    // FIXME: Return true on other X11 platforms when they support global selection.
+    return false;
+#endif
 }
 
 } // namespace WebKit

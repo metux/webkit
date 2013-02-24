@@ -27,17 +27,18 @@
 #ifndef HTMLTreeBuilder_h
 #define HTMLTreeBuilder_h
 
-#include "Element.h"
 #include "FragmentScriptingPermission.h"
 #include "HTMLConstructionSite.h"
 #include "HTMLElementStack.h"
 #include "HTMLFormattingElementList.h"
+#include "HTMLParserOptions.h"
 #include "HTMLTokenizer.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/TextPosition.h>
 #include <wtf/unicode/Unicode.h>
@@ -47,6 +48,7 @@ namespace WebCore {
 class AtomicHTMLToken;
 class Document;
 class DocumentFragment;
+class Element;
 class Frame;
 class HTMLToken;
 class HTMLDocument;
@@ -56,23 +58,27 @@ class HTMLDocumentParser;
 class HTMLTreeBuilder {
     WTF_MAKE_NONCOPYABLE(HTMLTreeBuilder); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<HTMLTreeBuilder> create(HTMLDocumentParser* parser, HTMLDocument* document, bool reportErrors, bool usePreHTML5ParserQuirks, unsigned maximumDOMTreeDepth)
+    static PassOwnPtr<HTMLTreeBuilder> create(HTMLDocumentParser* parser, HTMLDocument* document, bool reportErrors, const HTMLParserOptions& options)
     {
-        return adoptPtr(new HTMLTreeBuilder(parser, document, reportErrors, usePreHTML5ParserQuirks, maximumDOMTreeDepth));
+        return adoptPtr(new HTMLTreeBuilder(parser, document, reportErrors, options));
     }
-    static PassOwnPtr<HTMLTreeBuilder> create(HTMLDocumentParser* parser, DocumentFragment* fragment, Element* contextElement, FragmentScriptingPermission scriptingPermission, bool usePreHTML5ParserQuirks, unsigned maximumDOMTreeDepth)
+    static PassOwnPtr<HTMLTreeBuilder> create(HTMLDocumentParser* parser, DocumentFragment* fragment, Element* contextElement, FragmentScriptingPermission scriptingPermission, const HTMLParserOptions& options)
     {
-        return adoptPtr(new HTMLTreeBuilder(parser, fragment, contextElement, scriptingPermission, usePreHTML5ParserQuirks, maximumDOMTreeDepth));
+        return adoptPtr(new HTMLTreeBuilder(parser, fragment, contextElement, scriptingPermission, options));
     }
     ~HTMLTreeBuilder();
 
     bool isParsingFragment() const { return !!m_fragmentContext.fragment(); }
+#if ENABLE(TEMPLATE_ELEMENT)
+    bool isParsingTemplateContents() const { return m_tree.openElements()->hasTemplateInHTMLScope(); }
+    bool isParsingFragmentOrTemplateContents() const { return isParsingFragment() || isParsingTemplateContents(); }
+#else
+    bool isParsingFragmentOrTemplateContents() const { return isParsingFragment(); }
+#endif
 
     void detach();
 
-    // The token really should be passed as a const& since it's never modified.
-    void constructTreeFromToken(HTMLToken&);
-    void constructTreeFromAtomicToken(AtomicHTMLToken*);
+    void constructTree(AtomicHTMLToken*);
 
     bool hasParserBlockingScript() const { return !!m_scriptToProcess; }
     // Must be called to take the parser-blocking script before calling the parser again.
@@ -82,9 +88,6 @@ public:
     void finished();
 
     void setShouldSkipLeadingNewline(bool shouldSkip) { m_shouldSkipLeadingNewline = shouldSkip; }
-
-    static bool scriptEnabled(Frame*);
-    static bool pluginsEnabled(Frame*);
 
 private:
     class ExternalCharacterTokenBuffer;
@@ -97,6 +100,7 @@ private:
         InHeadMode,
         InHeadNoscriptMode,
         AfterHeadMode,
+        TemplateContentsMode,
         InBodyMode,
         TextMode,
         InTableMode,
@@ -115,8 +119,8 @@ private:
         AfterAfterFramesetMode,
     };
 
-    HTMLTreeBuilder(HTMLDocumentParser*, HTMLDocument*, bool reportErrors, bool usePreHTML5ParserQuirks, unsigned maximumDOMTreeDepth);
-    HTMLTreeBuilder(HTMLDocumentParser*, DocumentFragment*, Element* contextElement, FragmentScriptingPermission, bool usePreHTML5ParserQuirks, unsigned maximumDOMTreeDepth);
+    HTMLTreeBuilder(HTMLDocumentParser*, HTMLDocument*, bool reportErrors, const HTMLParserOptions&);
+    HTMLTreeBuilder(HTMLDocumentParser*, DocumentFragment*, Element* contextElement, FragmentScriptingPermission, const HTMLParserOptions&);
 
     void processToken(AtomicHTMLToken*);
 
@@ -181,14 +185,18 @@ private:
     template <bool shouldClose(const HTMLStackItem*)>
     void processCloseWhenNestedTag(AtomicHTMLToken*);
 
-    bool m_framesetOk;
-
     void parseError(AtomicHTMLToken*);
 
     InsertionMode insertionMode() const { return m_insertionMode; }
     void setInsertionMode(InsertionMode mode) { m_insertionMode = mode; }
 
     void resetInsertionModeAppropriately();
+
+#if ENABLE(TEMPLATE_ELEMENT)
+    void processTemplateStartTag(AtomicHTMLToken*);
+    void processTemplateEndTag(AtomicHTMLToken*);
+    bool popAllTemplatesForEndOfFile();
+#endif
 
     class FragmentParsingContext {
         WTF_MAKE_NONCOPYABLE(FragmentParsingContext);
@@ -209,9 +217,11 @@ private:
         FragmentScriptingPermission m_scriptingPermission;
     };
 
+    bool m_framesetOk;
+#ifndef NDEBUG
+    bool m_isAttached;
+#endif
     FragmentParsingContext m_fragmentContext;
-
-    Document* m_document;
     HTMLConstructionSite m_tree;
 
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/parsing.html#insertion-mode
@@ -219,6 +229,10 @@ private:
 
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/parsing.html#original-insertion-mode
     InsertionMode m_originalInsertionMode;
+
+#if ENABLE(TEMPLATE_ELEMENT)
+    Vector<InsertionMode> m_templateInsertionModes;
+#endif
 
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#pending-table-character-tokens
     StringBuilder m_pendingTableCharacters;
@@ -232,7 +246,7 @@ private:
     RefPtr<Element> m_scriptToProcess; // <script> tag which needs processing before resuming the parser.
     TextPosition m_scriptToProcessStartPosition; // Starting line number of the script tag needing processing.
 
-    bool m_usePreHTML5ParserQuirks;
+    HTMLParserOptions m_options;
 };
 
 }

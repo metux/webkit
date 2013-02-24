@@ -24,6 +24,7 @@
 
 #include "CSSRule.h"
 #include "CSSStyleSheet.h"
+#include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
 
@@ -53,8 +54,8 @@ void StaticCSSRuleList::deref()
 
 void StaticCSSRuleList::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedVector(m_rules);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_rules, "rules");
 }
 
 } // namespace WebCore

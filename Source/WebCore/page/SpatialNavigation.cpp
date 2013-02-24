@@ -92,7 +92,7 @@ FocusCandidate::FocusCandidate(Node* node, FocusDirection direction)
 
 bool isSpatialNavigationEnabled(const Frame* frame)
 {
-    return (frame && frame->settings() && frame->settings()->isSpatialNavigationEnabled());
+    return (frame && frame->settings() && frame->settings()->spatialNavigationEnabled());
 }
 
 static RectsAlignment alignmentForRects(FocusDirection direction, const LayoutRect& curRect, const LayoutRect& targetRect, const LayoutSize& viewSize)
@@ -485,7 +485,7 @@ bool canScrollInDirection(const Frame* frame, FocusDirection direction)
         return false;
     LayoutSize size = frame->view()->contentsSize();
     LayoutSize offset = frame->view()->scrollOffset();
-    LayoutRect rect = frame->view()->visibleContentRect(true);
+    LayoutRect rect = frame->view()->visibleContentRect(ScrollableArea::IncludeScrollbars);
 
     switch (direction) {
     case FocusDirectionLeft:
@@ -522,7 +522,7 @@ LayoutRect nodeRectInAbsoluteCoordinates(Node* node, bool ignoreBorder)
 
     if (node->isDocumentNode())
         return frameRectInAbsoluteCoordinates(static_cast<Document*>(node)->frame());
-    LayoutRect rect = rectToAbsoluteCoordinates(node->document()->frame(), node->getRect());
+    LayoutRect rect = rectToAbsoluteCoordinates(node->document()->frame(), node->boundingBox());
 
     // For authors that use border instead of outline in their CSS, we compensate by ignoring the border when calculating
     // the rect of the focused element.

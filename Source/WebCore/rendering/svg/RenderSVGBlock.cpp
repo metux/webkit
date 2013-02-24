@@ -31,8 +31,8 @@
 
 namespace WebCore {
 
-RenderSVGBlock::RenderSVGBlock(SVGElement* node) 
-    : RenderBlock(node)
+RenderSVGBlock::RenderSVGBlock(SVGElement* element)
+    : RenderBlock(element)
 {
 }
 
@@ -61,9 +61,9 @@ void RenderSVGBlock::setStyle(PassRefPtr<RenderStyle> style)
     RenderBlock::setStyle(useStyle.release());
 }
 
-void RenderSVGBlock::updateBoxModelInfoFromStyle()
+void RenderSVGBlock::updateFromStyle()
 {
-    RenderBlock::updateBoxModelInfoFromStyle();
+    RenderBlock::updateFromStyle();
 
     // RenderSVGlock, used by Render(SVGText|ForeignObject), is not allowed to call setHasOverflowClip(true).
     // RenderBlock assumes a layer to be present when the overflow clip functionality is requested. Both

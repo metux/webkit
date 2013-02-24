@@ -30,6 +30,7 @@
 #include <heap/Strong.h>
 #include <heap/StrongInlines.h>
 #include <interpreter/CallFrame.h>
+#include <runtime/Operations.h>
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -38,6 +39,8 @@ class ArrayValue;
 class Dictionary;
 class DOMWindow;
 class EventTarget;
+class MediaKeyError;
+class MediaStream;
 class Node;
 class ScriptValue;
 class SerializedScriptValue;
@@ -91,6 +94,7 @@ private:
     static void convertValue(JSC::ExecState*, JSC::JSValue, int& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned short& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned long& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned long long& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, double& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, Dictionary& result);
@@ -106,10 +110,15 @@ private:
 #if ENABLE(VIDEO_TRACK)
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<TrackBase>& result);
 #endif
-#if ENABLE(MUTATION_OBSERVERS) || ENABLE(WEB_INTENTS)
     static void convertValue(JSC::ExecState*, JSC::JSValue, HashSet<AtomicString>& result);
-#endif
     static void convertValue(JSC::ExecState*, JSC::JSValue, ArrayValue& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<Uint8Array>& result);
+#if ENABLE(ENCRYPTED_MEDIA)
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<MediaKeyError>& result);
+#endif
+#if ENABLE(MEDIA_STREAM)
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<MediaStream>& result);
+#endif
 
     JSC::ExecState* m_exec;
     JSC::Strong<JSC::JSObject> m_initializerObject;

@@ -34,42 +34,14 @@
 
 #include "RTCPeerConnectionHandler.h"
 
-#include "RTCPeerConnectionHandlerClient.h"
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
+class RTCPeerConnectionHandlerClient;
 
-// Dummy implementations below for ports that build with MEDIA_STREAM enabled by default.
-
-class RTCPeerConnectionHandlerDummy : public RTCPeerConnectionHandler {
-public:
-    RTCPeerConnectionHandlerDummy(RTCPeerConnectionHandlerClient*);
-    virtual ~RTCPeerConnectionHandlerDummy();
-
-    virtual bool initialize() OVERRIDE;
-
-private:
-    RTCPeerConnectionHandlerClient* m_client;
-};
-
-PassOwnPtr<RTCPeerConnectionHandler> RTCPeerConnectionHandler::create(RTCPeerConnectionHandlerClient* client)
+PassOwnPtr<RTCPeerConnectionHandler> RTCPeerConnectionHandler::create(RTCPeerConnectionHandlerClient*)
 {
-    return adoptPtr(new RTCPeerConnectionHandlerDummy(client));
-}
-
-RTCPeerConnectionHandlerDummy::RTCPeerConnectionHandlerDummy(RTCPeerConnectionHandlerClient* client)
-    : m_client(client)
-{
-    ASSERT(m_client);
-}
-
-RTCPeerConnectionHandlerDummy::~RTCPeerConnectionHandlerDummy()
-{
-}
-
-bool RTCPeerConnectionHandlerDummy::initialize()
-{
-    return false;
+    return nullptr;
 }
 
 } // namespace WebCore

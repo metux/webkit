@@ -63,6 +63,7 @@ public:
     IntSize fixedSize(const RenderObject*);
 
     bool isPending() const;
+    bool knownToBeOpaque(const RenderObject*) const;
 
     void loadSubimages(CachedResourceLoader*);
 

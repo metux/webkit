@@ -68,7 +68,7 @@ namespace WebCore {
         // (Only use these methods in the worker context thread.)
         virtual void postMessageToWorkerObject(PassRefPtr<SerializedScriptValue>, PassOwnPtr<MessagePortChannelArray>);
         virtual void postExceptionToWorkerObject(const String& errorMessage, int lineNumber, const String& sourceURL);
-        virtual void postConsoleMessageToWorkerObject(MessageSource, MessageType, MessageLevel, const String& message, int lineNumber, const String& sourceURL);
+        virtual void postConsoleMessageToWorkerObject(MessageSource, MessageLevel, const String& message, int lineNumber, const String& sourceURL);
 #if ENABLE(INSPECTOR)
         virtual void postMessageToPageInspector(const String&);
         virtual void updateInspectorStateCookie(const String&);
@@ -89,14 +89,15 @@ namespace WebCore {
         // Only use this method on the worker object thread.
         bool askedToTerminate() const { return m_askedToTerminate; }
 
+    protected:
+        virtual ~WorkerMessagingProxy();
+
     private:
         friend class MessageWorkerTask;
         friend class PostMessageToPageInspectorTask;
         friend class WorkerContextDestroyedTask;
         friend class WorkerExceptionTask;
         friend class WorkerThreadActivityReportTask;
-
-        virtual ~WorkerMessagingProxy();
 
         void workerContextDestroyedInternal();
         static void workerObjectDestroyedInternal(ScriptExecutionContext*, WorkerMessagingProxy*);

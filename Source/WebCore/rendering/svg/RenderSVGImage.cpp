@@ -79,9 +79,10 @@ bool RenderSVGImage::updateImageViewport()
 
 void RenderSVGImage::layout()
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     ASSERT(needsLayout());
 
-    LayoutRepainter repainter(*this, checkForRepaintDuringLayout() && selfNeedsLayout());
+    LayoutRepainter repainter(*this, SVGRenderSupport::checkForSVGRepaintDuringLayout(this) && selfNeedsLayout());
     updateImageViewport();
 
     bool transformOrBoundariesUpdate = m_needsTransformUpdate || m_needsBoundariesUpdate;
@@ -91,8 +92,12 @@ void RenderSVGImage::layout()
     }
 
     if (m_needsBoundariesUpdate) {
-        m_repaintBoundingBox = m_objectBoundingBox;
-        SVGRenderSupport::intersectRepaintRectWithResources(this, m_repaintBoundingBox);
+        m_repaintBoundingBoxExcludingShadow = m_objectBoundingBox;
+        SVGRenderSupport::intersectRepaintRectWithResources(this, m_repaintBoundingBoxExcludingShadow);
+
+        m_repaintBoundingBox = m_repaintBoundingBoxExcludingShadow;
+        SVGRenderSupport::intersectRepaintRectWithShadows(this, m_repaintBoundingBox);
+
         m_needsBoundariesUpdate = false;
     }
 
@@ -177,6 +182,11 @@ void RenderSVGImage::imageChanged(WrappedImagePtr, const IntRect*)
 
     // Eventually notify parent resources, that we've changed.
     RenderSVGResource::markForLayoutAndParentResourceInvalidation(this, false);
+
+    // Update the SVGImageCache sizeAndScales entry in case image loading finished after layout.
+    // (https://bugs.webkit.org/show_bug.cgi?id=99489)
+    m_objectBoundingBox = FloatRect();
+    updateImageViewport();
 
     repaint();
 }

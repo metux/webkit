@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 #include "config.h"
 #include "WebGeolocationManager.h"
 
+#include "WebGeolocationManagerMessages.h"
 #include "WebGeolocationManagerProxyMessages.h"
 #include "WebPage.h"
 #include "WebProcess.h"
@@ -39,18 +40,19 @@ using namespace WebCore;
 
 namespace WebKit {
 
+const char* WebGeolocationManager::supplementName()
+{
+    return "WebGeolocationManager";
+}
+
 WebGeolocationManager::WebGeolocationManager(WebProcess* process)
     : m_process(process)
 {
+    m_process->addMessageReceiver(Messages::WebGeolocationManager::messageReceiverName(), this);
 }
 
 WebGeolocationManager::~WebGeolocationManager()
 {
-}
-
-void WebGeolocationManager::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
-{
-    didReceiveWebGeolocationManagerMessage(connection, messageID, arguments);
 }
 
 void WebGeolocationManager::registerWebPage(WebPage* page)
@@ -74,7 +76,7 @@ void WebGeolocationManager::unregisterWebPage(WebPage* page)
 void WebGeolocationManager::didChangePosition(const WebGeolocationPosition::Data& data)
 {
 #if ENABLE(GEOLOCATION)
-    RefPtr<GeolocationPosition> position = GeolocationPosition::create(data.timestamp, data.latitude, data.longitude, data.accuracy);
+    RefPtr<GeolocationPosition> position = GeolocationPosition::create(data.timestamp, data.latitude, data.longitude, data.accuracy, data.canProvideAltitude, data.altitude, data.canProvideAltitudeAccuracy, data.altitudeAccuracy, data.canProvideHeading, data.heading, data.canProvideSpeed, data.speed);
 
     Vector<RefPtr<WebPage> > webPageCopy;
     copyToVector(m_pageSet, webPageCopy);
@@ -83,14 +85,16 @@ void WebGeolocationManager::didChangePosition(const WebGeolocationPosition::Data
         if (page->corePage())
             GeolocationController::from(page->corePage())->positionChanged(position.get());
     }
+#else
+    UNUSED_PARAM(data);
 #endif // ENABLE(GEOLOCATION)
 }
 
-void WebGeolocationManager::didFailToDeterminePosition()
+void WebGeolocationManager::didFailToDeterminePosition(const String& errorMessage)
 {
 #if ENABLE(GEOLOCATION)
     // FIXME: Add localized error string.
-    RefPtr<GeolocationError> error = GeolocationError::create(GeolocationError::PositionUnavailable, /* Localized error string */ String(""));
+    RefPtr<GeolocationError> error = GeolocationError::create(GeolocationError::PositionUnavailable, errorMessage);
 
     Vector<RefPtr<WebPage> > webPageCopy;
     copyToVector(m_pageSet, webPageCopy);
@@ -99,6 +103,8 @@ void WebGeolocationManager::didFailToDeterminePosition()
         if (page->corePage())
             GeolocationController::from(page->corePage())->errorOccurred(error.get());
     }
+#else
+    UNUSED_PARAM(errorMessage);
 #endif // ENABLE(GEOLOCATION)
 }
 

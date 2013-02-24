@@ -29,6 +29,22 @@
 
 using namespace WebKit;
 
+/**
+ * SECTION: WebKitCookieManager
+ * @Short_description: Defines how to handle cookies in a #WebKitWebContext
+ * @Title: WebKitCookieManager
+ *
+ * The #WebKitCookieManager defines how to handle cookies in a
+ * #WebKitWebContext. Get it from the context with
+ * webkit_web_context_get_cookie_manager(), and use it to set where to
+ * store cookies, with webkit_cookie_manager_set_persistent_storage(),
+ * to get the list of domains with cookies, with
+ * webkit_cookie_manager_get_domains_with_cookies(), or to set the
+ * acceptance policy, with webkit_cookie_manager_get_accept_policy()
+ * (among other actions).
+ *
+ */
+
 enum {
     CHANGED,
 
@@ -36,41 +52,28 @@ enum {
 };
 
 struct _WebKitCookieManagerPrivate {
-    WKRetainPtr<WKCookieManagerRef> wkCookieManager;
+    ~_WebKitCookieManagerPrivate()
+    {
+        webCookieManager->stopObservingCookieChanges();
+    }
+
+    RefPtr<WebCookieManagerProxy> webCookieManager;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
-G_DEFINE_TYPE(WebKitCookieManager, webkit_cookie_manager, G_TYPE_OBJECT)
+WEBKIT_DEFINE_TYPE(WebKitCookieManager, webkit_cookie_manager, G_TYPE_OBJECT)
 
 COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_PERSISTENT_STORAGE_TEXT, SoupCookiePersistentStorageText);
 COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE, SoupCookiePersistentStorageSQLite);
 
-COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS, kWKHTTPCookieAcceptPolicyAlways);
-COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_POLICY_ACCEPT_NEVER, kWKHTTPCookieAcceptPolicyNever);
-COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY, kWKHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain);
-
-static void webkit_cookie_manager_init(WebKitCookieManager* manager)
-{
-    WebKitCookieManagerPrivate* priv = G_TYPE_INSTANCE_GET_PRIVATE(manager, WEBKIT_TYPE_COOKIE_MANAGER, WebKitCookieManagerPrivate);
-    manager->priv = priv;
-    new (priv) WebKitCookieManagerPrivate();
-}
-
-static void webkitCookieManagerFinalize(GObject* object)
-{
-    WebKitCookieManagerPrivate* priv = WEBKIT_COOKIE_MANAGER(object)->priv;
-    WKCookieManagerStopObservingCookieChanges(priv->wkCookieManager.get());
-    priv->~WebKitCookieManagerPrivate();
-    G_OBJECT_CLASS(webkit_cookie_manager_parent_class)->finalize(object);
-}
+COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS, HTTPCookieAcceptPolicyAlways);
+COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_POLICY_ACCEPT_NEVER, HTTPCookieAcceptPolicyNever);
+COMPILE_ASSERT_MATCHING_ENUM(WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY, HTTPCookieAcceptPolicyOnlyFromMainDocumentDomain);
 
 static void webkit_cookie_manager_class_init(WebKitCookieManagerClass* findClass)
 {
     GObjectClass* gObjectClass = G_OBJECT_CLASS(findClass);
-    gObjectClass->finalize = webkitCookieManagerFinalize;
-
-    g_type_class_add_private(findClass, sizeof(WebKitCookieManagerPrivate));
 
     /**
      * WebKitCookieManager::changed:
@@ -92,18 +95,18 @@ static void cookiesDidChange(WKCookieManagerRef, const void* clientInfo)
     g_signal_emit(WEBKIT_COOKIE_MANAGER(clientInfo), signals[CHANGED], 0);
 }
 
-WebKitCookieManager* webkitCookieManagerCreate(WKCookieManagerRef wkCookieManager)
+WebKitCookieManager* webkitCookieManagerCreate(WebCookieManagerProxy* webCookieManager)
 {
     WebKitCookieManager* manager = WEBKIT_COOKIE_MANAGER(g_object_new(WEBKIT_TYPE_COOKIE_MANAGER, NULL));
-    manager->priv->wkCookieManager = wkCookieManager;
+    manager->priv->webCookieManager = webCookieManager;
 
     WKCookieManagerClient wkCookieManagerClient = {
         kWKCookieManagerClientCurrentVersion,
         manager, // clientInfo
         cookiesDidChange
     };
-    WKCookieManagerSetClient(wkCookieManager, &wkCookieManagerClient);
-    WKCookieManagerStartObservingCookieChanges(wkCookieManager);
+    WKCookieManagerSetClient(toAPI(webCookieManager), &wkCookieManagerClient);
+    manager->priv->webCookieManager->startObservingCookieChanges();
 
     return manager;
 }
@@ -127,9 +130,9 @@ void webkit_cookie_manager_set_persistent_storage(WebKitCookieManager* manager, 
     g_return_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager));
     g_return_if_fail(filename);
 
-    WKCookieManagerStopObservingCookieChanges(manager->priv->wkCookieManager.get());
-    toImpl(manager->priv->wkCookieManager.get())->setCookiePersistentStorage(String::fromUTF8(filename), storage);
-    WKCookieManagerStartObservingCookieChanges(manager->priv->wkCookieManager.get());
+    manager->priv->webCookieManager->stopObservingCookieChanges();
+    manager->priv->webCookieManager->setCookiePersistentStorage(String::fromUTF8(filename), storage);
+    manager->priv->webCookieManager->startObservingCookieChanges();
 }
 
 /**
@@ -143,7 +146,7 @@ void webkit_cookie_manager_set_accept_policy(WebKitCookieManager* manager, WebKi
 {
     g_return_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager));
 
-    WKCookieManagerSetHTTPCookieAcceptPolicy(manager->priv->wkCookieManager.get(), policy);
+    manager->priv->webCookieManager->setHTTPCookieAcceptPolicy(policy);
 }
 
 struct GetAcceptPolicyAsyncData {
@@ -186,7 +189,7 @@ void webkit_cookie_manager_get_accept_policy(WebKitCookieManager* manager, GCanc
     data->cancellable = cancellable;
     g_simple_async_result_set_op_res_gpointer(result, data, reinterpret_cast<GDestroyNotify>(destroyGetAcceptPolicyAsyncData));
 
-    WKCookieManagerGetHTTPCookieAcceptPolicy(manager->priv->wkCookieManager.get(), result, webkitCookieManagerGetAcceptPolicyCallback);
+    manager->priv->webCookieManager->getHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicyCallback::create(result, webkitCookieManagerGetAcceptPolicyCallback));
 }
 
 /**
@@ -228,10 +231,11 @@ static void webkitCookieManagerGetDomainsWithCookiesCallback(WKArrayRef wkDomain
     if (g_cancellable_set_error_if_cancelled(data->cancellable.get(), &error))
         g_simple_async_result_take_error(result.get(), error);
     else {
+        ImmutableArray* domains = toImpl(wkDomains);
         data->domains = adoptGRef(g_ptr_array_new_with_free_func(g_free));
-        for (size_t i = 0; i < WKArrayGetSize(wkDomains); ++i) {
-            WKStringRef wkDomain = static_cast<WKStringRef>(WKArrayGetItemAtIndex(wkDomains, i));
-            String domain = toImpl(wkDomain)->string();
+        for (size_t i = 0; i < domains->size(); ++i) {
+            WebString* domainString = static_cast<WebString*>(domains->at(i));
+            String domain = domainString->string();
             if (domain.isEmpty())
                 continue;
             g_ptr_array_add(data->domains.get(), g_strdup(domain.utf8().data()));
@@ -262,7 +266,7 @@ void webkit_cookie_manager_get_domains_with_cookies(WebKitCookieManager* manager
     GetDomainsWithCookiesAsyncData* data = createGetDomainsWithCookiesAsyncData();
     data->cancellable = cancellable;
     g_simple_async_result_set_op_res_gpointer(result, data, reinterpret_cast<GDestroyNotify>(destroyGetDomainsWithCookiesAsyncData));
-    WKCookieManagerGetHostnamesWithCookies(manager->priv->wkCookieManager.get(), result, webkitCookieManagerGetDomainsWithCookiesCallback);
+    manager->priv->webCookieManager->getHostnamesWithCookies(ArrayCallback::create(result, webkitCookieManagerGetDomainsWithCookiesCallback));
 }
 
 /**
@@ -305,8 +309,7 @@ void webkit_cookie_manager_delete_cookies_for_domain(WebKitCookieManager* manage
     g_return_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager));
     g_return_if_fail(domain);
 
-    WKRetainPtr<WKStringRef> wkDomain(AdoptWK, WKStringCreateWithUTF8CString(domain));
-    WKCookieManagerDeleteCookiesForHostname(manager->priv->wkCookieManager.get(), wkDomain.get());
+    manager->priv->webCookieManager->deleteCookiesForHostname(String::fromUTF8(domain));
 }
 
 /**
@@ -319,5 +322,5 @@ void webkit_cookie_manager_delete_all_cookies(WebKitCookieManager* manager)
 {
     g_return_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager));
 
-    WKCookieManagerDeleteAllCookies(manager->priv->wkCookieManager.get());
+    manager->priv->webCookieManager->deleteAllCookies();
 }

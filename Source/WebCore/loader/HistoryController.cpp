@@ -46,6 +46,7 @@
 #include "Page.h"
 #include "PageCache.h"
 #include "PageGroup.h"
+#include "ScrollingCoordinator.h"
 #include "Settings.h"
 #include <wtf/text/CString.h>
 
@@ -59,7 +60,7 @@ namespace WebCore {
 static inline void addVisitedLink(Page* page, const KURL& url)
 {
 #if USE(PLATFORM_STRATEGIES)
-    platformStrategies()->visitedLinkStrategy()->addVisitedLink(page, visitedLinkHash(url.string().characters(), url.string().length()));
+    platformStrategies()->visitedLinkStrategy()->addVisitedLink(page, visitedLinkHash(url.string()));
 #else
     page->group().addVisitedLink(url);
 #endif
@@ -86,10 +87,21 @@ void HistoryController::saveScrollPositionAndViewStateToItem(HistoryItem* item)
     else
         item->setScrollPoint(m_frame->view()->scrollPosition());
 
-    item->setPageScaleFactor(m_frame->frameScaleFactor());
-    
+    Page* page = m_frame->page();
+    if (page && page->mainFrame() == m_frame)
+        item->setPageScaleFactor(page->pageScaleFactor());
+
     // FIXME: It would be great to work out a way to put this code in WebCore instead of calling through to the client.
     m_frame->loader()->client()->saveViewStateToItem(item);
+}
+
+void HistoryController::clearScrollPositionAndViewState()
+{
+    if (!m_currentItem)
+        return;
+
+    m_currentItem->clearScrollPoint();
+    m_currentItem->setPageScaleFactor(0);
 }
 
 /*
@@ -121,10 +133,20 @@ void HistoryController::restoreScrollPositionAndViewState()
     // FIXME: It would be great to work out a way to put this code in WebCore instead of calling
     // through to the client. It's currently used only for the PDF view on Mac.
     m_frame->loader()->client()->restoreViewState();
-    
+
+    // FIXME: There is some scrolling related work that needs to happen whenever a page goes into the
+    // page cache and similar work that needs to occur when it comes out. This is where we do the work
+    // that needs to happen when we exit, and the work that needs to happen when we enter is in
+    // Document::setIsInPageCache(bool). It would be nice if there was more symmetry in these spots.
+    // https://bugs.webkit.org/show_bug.cgi?id=98698
     if (FrameView* view = m_frame->view()) {
+        Page* page = m_frame->page();
+        if (page && page->mainFrame() == m_frame) {
+            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+                scrollingCoordinator->frameViewRootLayerDidChange(view);
+        }
+
         if (!view->wasScrolledByUser()) {
-            Page* page = m_frame->page();
             if (page && page->mainFrame() == m_frame && m_currentItem->pageScaleFactor())
                 page->setPageScaleFactor(m_currentItem->pageScaleFactor(), m_currentItem->scrollPoint());
             else
@@ -163,7 +185,7 @@ void HistoryController::saveDocumentState()
     Document* document = m_frame->document();
     ASSERT(document);
     
-    if (item->isCurrentDocument(document)) {
+    if (item->isCurrentDocument(document) && document->attached()) {
         LOG(Loading, "WebCoreLoading %s: saving form state to %p", m_frame->tree()->uniqueName().string().utf8().data(), item);
         item->setDocumentState(document->formElementsState());
     }
@@ -177,6 +199,22 @@ void HistoryController::saveDocumentAndScrollState()
         frame->loader()->history()->saveDocumentState();
         frame->loader()->history()->saveScrollPositionAndViewStateToItem(frame->loader()->history()->currentItem());
     }
+}
+
+static inline bool isAssociatedToRequestedHistoryItem(const HistoryItem* current, Frame* frame, const HistoryItem* requested)
+{
+    if (requested == current)
+        return true;
+    if (requested)
+        return false;
+    while ((frame = frame->tree()->parent())) {
+        requested = frame->loader()->requestedHistoryItem();
+        if (!requested)
+            continue;
+        if (requested->isAncestorOf(current))
+            return true;
+    }
+    return false;
 }
 
 void HistoryController::restoreDocumentState()
@@ -201,7 +239,7 @@ void HistoryController::restoreDocumentState()
     
     if (!itemToRestore)
         return;
-    if (m_frame->loader()->requestedHistoryItem() == m_currentItem.get() && !m_frame->loader()->documentLoader()->isClientRedirect()) {
+    if (isAssociatedToRequestedHistoryItem(itemToRestore, m_frame, m_frame->loader()->requestedHistoryItem()) && !m_frame->loader()->documentLoader()->isClientRedirect()) {
         LOG(Loading, "WebCoreLoading %s: restoring form state from %p", m_frame->tree()->uniqueName().string().utf8().data(), itemToRestore);
         doc->setStateForNewFormElements(itemToRestore->documentState());
     }

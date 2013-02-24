@@ -26,13 +26,12 @@
 #ifndef StorageNamespaceImpl_h
 #define StorageNamespaceImpl_h
 
-#include "PlatformString.h"
 #include "SecurityOriginHash.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
-
 #include <wtf/HashMap.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -55,11 +54,12 @@ namespace WebCore {
         virtual void clearOriginForDeletion(SecurityOrigin*);
         virtual void clearAllOriginsForDeletion();
         virtual void sync();
-        
+        virtual void closeIdleLocalStorageDatabases();
+
     private:
         StorageNamespaceImpl(StorageType, const String& path, unsigned quota);
 
-        typedef HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageAreaImpl>, SecurityOriginHash> StorageAreaMap;
+        typedef HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageAreaImpl> > StorageAreaMap;
         StorageAreaMap m_storageAreaMap;
 
         StorageType m_storageType;

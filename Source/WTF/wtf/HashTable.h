@@ -286,8 +286,8 @@ namespace WTF {
 
     template<typename T, typename U> inline void hashTableSwap(KeyValuePair<T, U>& a, KeyValuePair<T, U>& b)
     {
-        swap(a.first, b.first);
-        swap(a.second, b.second);
+        swap(a.key, b.key);
+        swap(a.value, b.value);
     }
 
     template<typename T, bool useSwap> struct Mover;
@@ -350,15 +350,15 @@ namespace WTF {
 
             void dumpStats()
             {
-                dataLog("\nWTF::HashTable::Stats dump\n\n");
-                dataLog("%d accesses\n", numAccesses);
-                dataLog("%d total collisions, average %.2f probes per access\n", numCollisions, 1.0 * (numAccesses + numCollisions) / numAccesses);
-                dataLog("longest collision chain: %d\n", maxCollisions);
+                dataLogF("\nWTF::HashTable::Stats dump\n\n");
+                dataLogF("%d accesses\n", numAccesses);
+                dataLogF("%d total collisions, average %.2f probes per access\n", numCollisions, 1.0 * (numAccesses + numCollisions) / numAccesses);
+                dataLogF("longest collision chain: %d\n", maxCollisions);
                 for (int i = 1; i <= maxCollisions; i++) {
-                    dataLog("  %d lookups with exactly %d collisions (%.2f%% , %.2f%% with this many or more)\n", collisionGraph[i], i, 100.0 * (collisionGraph[i] - collisionGraph[i+1]) / numAccesses, 100.0 * collisionGraph[i] / numAccesses);
+                    dataLogF("  %d lookups with exactly %d collisions (%.2f%% , %.2f%% with this many or more)\n", collisionGraph[i], i, 100.0 * (collisionGraph[i] - collisionGraph[i+1]) / numAccesses, 100.0 * collisionGraph[i] / numAccesses);
                 }
-                dataLog("%d rehashes\n", numRehashes);
-                dataLog("%d reinserts\n", numReinserts);
+                dataLogF("%d rehashes\n", numRehashes);
+                dataLogF("%d reinserts\n", numReinserts);
             }
         };
 #endif
@@ -1246,7 +1246,7 @@ namespace WTF {
             ASSERT(entry == it.m_position);
             ++count;
 
-            ValueCheck<Key>::checkConsistency(it->first);
+            ValueCheck<Key>::checkConsistency(it->key);
         }
 
         ASSERT(count == m_keyCount);

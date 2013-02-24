@@ -6,14 +6,14 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="index.html" title="WebKit2GTK+ Reference Manual">
-<link rel="prev" href="WebKitFormSubmissionRequest.html" title="WebKitFormSubmissionRequest">
+<link rel="prev" href="WebKitWebPage.html" title="WebKitWebPage">
 <link rel="next" href="annotation-glossary.html" title="Annotation Glossary">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2"><tr valign="middle">
-<td><a accesskey="p" href="WebKitFormSubmissionRequest.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitWebPage.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
 <td> </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
@@ -67,6 +67,12 @@
 </dt>
 <dt>WebKitDownloadError, <a class="indexterm" href="webkit2gtk-WebKitError.html#WebKitDownloadError">enum WebKitDownloadError</a>
 </dt>
+<dt>WebKitFaviconDatabase, <a class="indexterm" href="WebKitFaviconDatabase.html#WebKitFaviconDatabase-struct">struct WebKitFaviconDatabase</a>
+</dt>
+<dt>WebKitFaviconDatabase::favicon-changed, <a class="indexterm" href="WebKitFaviconDatabase.html#WebKitFaviconDatabase-favicon-changed">The "favicon-changed" signal</a>
+</dt>
+<dt>WebKitFaviconDatabaseError, <a class="indexterm" href="WebKitFaviconDatabase.html#WebKitFaviconDatabaseError">enum WebKitFaviconDatabaseError</a>
+</dt>
 <dt>WebKitFileChooserRequest, <a class="indexterm" href="WebKitFileChooserRequest.html#WebKitFileChooserRequest-struct">struct WebKitFileChooserRequest</a>
 </dt>
 <dt>WebKitFileChooserRequest:filter, <a class="indexterm" href="WebKitFileChooserRequest.html#WebKitFileChooserRequest--filter">The "filter" property</a>
@@ -114,6 +120,8 @@
 <dt>WebKitHitTestResult:media-uri, <a class="indexterm" href="WebKitHitTestResult.html#WebKitHitTestResult--media-uri">The "media-uri" property</a>
 </dt>
 <dt>WebKitHitTestResultContext, <a class="indexterm" href="WebKitHitTestResult.html#WebKitHitTestResultContext">enum WebKitHitTestResultContext</a>
+</dt>
+<dt>WebKitInsecureContentEvent, <a class="indexterm" href="WebKitWebView.html#WebKitInsecureContentEvent">enum WebKitInsecureContentEvent</a>
 </dt>
 <dt>WebKitJavascriptError, <a class="indexterm" href="webkit2gtk-WebKitError.html#WebKitJavascriptError">enum WebKitJavascriptError</a>
 </dt>
@@ -179,6 +187,8 @@
 </dt>
 <dt>WebKitScriptDialogType, <a class="indexterm" href="WebKitWebView.html#WebKitScriptDialogType">enum WebKitScriptDialogType</a>
 </dt>
+<dt>WebKitSecurityManager, <a class="indexterm" href="WebKitSecurityManager.html#WebKitSecurityManager-struct">struct WebKitSecurityManager</a>
+</dt>
 <dt>WebKitSettings, <a class="indexterm" href="WebKitSettings.html#WebKitSettings-struct">struct WebKitSettings</a>
 </dt>
 <dt>WebKitSettings:allow-modal-dialogs, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--allow-modal-dialogs">The "allow-modal-dialogs" property</a>
@@ -229,6 +239,8 @@
 </dt>
 <dt>WebKitSettings:enable-site-specific-quirks, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-site-specific-quirks">The "enable-site-specific-quirks" property</a>
 </dt>
+<dt>WebKitSettings:enable-smooth-scrolling, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-smooth-scrolling">The "enable-smooth-scrolling" property</a>
+</dt>
 <dt>WebKitSettings:enable-tabs-to-links, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-tabs-to-links">The "enable-tabs-to-links" property</a>
 </dt>
 <dt>WebKitSettings:enable-webaudio, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-webaudio">The "enable-webaudio" property</a>
@@ -261,7 +273,11 @@
 </dt>
 <dt>WebKitSettings:serif-font-family, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--serif-font-family">The "serif-font-family" property</a>
 </dt>
+<dt>WebKitSettings:user-agent, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--user-agent">The "user-agent" property</a>
+</dt>
 <dt>WebKitSettings:zoom-text-only, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--zoom-text-only">The "zoom-text-only" property</a>
+</dt>
+<dt>WebKitTLSErrorsPolicy, <a class="indexterm" href="WebKitWebContext.html#WebKitTLSErrorsPolicy">enum WebKitTLSErrorsPolicy</a>
 </dt>
 <dt>WebKitURIRequest, <a class="indexterm" href="WebKitURIRequest.html#WebKitURIRequest-struct">struct WebKitURIRequest</a>
 </dt>
@@ -283,9 +299,17 @@
 </dt>
 <dt>WebKitURISchemeRequestCallback, <a class="indexterm" href="WebKitWebContext.html#WebKitURISchemeRequestCallback">WebKitURISchemeRequestCallback ()</a>
 </dt>
+<dt>WebKitViewMode, <a class="indexterm" href="WebKitWebView.html#WebKitViewMode">enum WebKitViewMode</a>
+</dt>
 <dt>WebKitWebContext, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext-struct">struct WebKitWebContext</a>
 </dt>
 <dt>WebKitWebContext::download-started, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext-download-started">The "download-started" signal</a>
+</dt>
+<dt>WebKitWebExtension, <a class="indexterm" href="WebKitWebExtension.html#WebKitWebExtension-struct">struct WebKitWebExtension</a>
+</dt>
+<dt>WebKitWebExtension::page-created, <a class="indexterm" href="WebKitWebExtension.html#WebKitWebExtension-page-created">The "page-created" signal</a>
+</dt>
+<dt>WebKitWebExtensionInitializeFunction, <a class="indexterm" href="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction">WebKitWebExtensionInitializeFunction ()</a>
 </dt>
 <dt>WebKitWebInspector, <a class="indexterm" href="WebKitWebInspector.html#WebKitWebInspector-struct">struct WebKitWebInspector</a>
 </dt>
@@ -302,6 +326,8 @@
 <dt>WebKitWebInspector:attached-height, <a class="indexterm" href="WebKitWebInspector.html#WebKitWebInspector--attached-height">The "attached-height" property</a>
 </dt>
 <dt>WebKitWebInspector:inspected-uri, <a class="indexterm" href="WebKitWebInspector.html#WebKitWebInspector--inspected-uri">The "inspected-uri" property</a>
+</dt>
+<dt>WebKitWebPage, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage-struct">struct WebKitWebPage</a>
 </dt>
 <dt>WebKitWebResource, <a class="indexterm" href="WebKitWebResource.html#WebKitWebResource-struct">struct WebKitWebResource</a>
 </dt>
@@ -331,6 +357,8 @@
 </dt>
 <dt>WebKitWebView::enter-fullscreen, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-enter-fullscreen">The "enter-fullscreen" signal</a>
 </dt>
+<dt>WebKitWebView::insecure-content-detected, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-insecure-content-detected">The "insecure-content-detected" signal</a>
+</dt>
 <dt>WebKitWebView::leave-fullscreen, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-leave-fullscreen">The "leave-fullscreen" signal</a>
 </dt>
 <dt>WebKitWebView::load-changed, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-load-changed">The "load-changed" signal</a>
@@ -357,15 +385,19 @@
 </dt>
 <dt>WebKitWebView:estimated-load-progress, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--estimated-load-progress">The "estimated-load-progress" property</a>
 </dt>
+<dt>WebKitWebView:favicon, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--favicon">The "favicon" property</a>
+</dt>
+<dt>WebKitWebView:is-loading, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--is-loading">The "is-loading" property</a>
+</dt>
 <dt>WebKitWebView:title, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--title">The "title" property</a>
 </dt>
 <dt>WebKitWebView:uri, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--uri">The "uri" property</a>
 </dt>
+<dt>WebKitWebView:view-mode, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--view-mode">The "view-mode" property</a>
+</dt>
 <dt>WebKitWebView:web-context, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--web-context">The "web-context" property</a>
 </dt>
 <dt>WebKitWebView:zoom-level, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--zoom-level">The "zoom-level" property</a>
-</dt>
-<dt>WebKitWebViewBase, <a class="indexterm" href="WebKitWebViewBase.html#WebKitWebViewBase-struct">struct WebKitWebViewBase</a>
 </dt>
 <dt>WebKitWindowProperties, <a class="indexterm" href="WebKitWindowProperties.html#WebKitWindowProperties-struct">struct WebKitWindowProperties</a>
 </dt>
@@ -491,6 +523,8 @@
 </dt>
 <dt>webkit_download_get_response, <a class="indexterm" href="WebKitDownload.html#webkit-download-get-response">webkit_download_get_response ()</a>
 </dt>
+<dt>webkit_download_get_web_view, <a class="indexterm" href="WebKitDownload.html#webkit-download-get-web-view">webkit_download_get_web_view ()</a>
+</dt>
 <dt>webkit_download_set_destination, <a class="indexterm" href="WebKitDownload.html#webkit-download-set-destination">webkit_download_set_destination ()</a>
 </dt>
 <dt>WEBKIT_EDITING_COMMAND_COPY, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-COPY:CAPS">WEBKIT_EDITING_COMMAND_COPY</a>
@@ -498,6 +532,22 @@
 <dt>WEBKIT_EDITING_COMMAND_CUT, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-CUT:CAPS">WEBKIT_EDITING_COMMAND_CUT</a>
 </dt>
 <dt>WEBKIT_EDITING_COMMAND_PASTE, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-PASTE:CAPS">WEBKIT_EDITING_COMMAND_PASTE</a>
+</dt>
+<dt>WEBKIT_EDITING_COMMAND_REDO, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-REDO:CAPS">WEBKIT_EDITING_COMMAND_REDO</a>
+</dt>
+<dt>WEBKIT_EDITING_COMMAND_SELECT_ALL, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-SELECT-ALL:CAPS">WEBKIT_EDITING_COMMAND_SELECT_ALL</a>
+</dt>
+<dt>WEBKIT_EDITING_COMMAND_UNDO, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-UNDO:CAPS">WEBKIT_EDITING_COMMAND_UNDO</a>
+</dt>
+<dt>webkit_favicon_database_clear, <a class="indexterm" href="WebKitFaviconDatabase.html#webkit-favicon-database-clear">webkit_favicon_database_clear ()</a>
+</dt>
+<dt>WEBKIT_FAVICON_DATABASE_ERROR, <a class="indexterm" href="WebKitFaviconDatabase.html#WEBKIT-FAVICON-DATABASE-ERROR:CAPS">WEBKIT_FAVICON_DATABASE_ERROR</a>
+</dt>
+<dt>webkit_favicon_database_get_favicon, <a class="indexterm" href="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon">webkit_favicon_database_get_favicon ()</a>
+</dt>
+<dt>webkit_favicon_database_get_favicon_finish, <a class="indexterm" href="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-finish">webkit_favicon_database_get_favicon_finish ()</a>
+</dt>
+<dt>webkit_favicon_database_get_favicon_uri, <a class="indexterm" href="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-uri">webkit_favicon_database_get_favicon_uri ()</a>
 </dt>
 <dt>webkit_file_chooser_request_cancel, <a class="indexterm" href="WebKitFileChooserRequest.html#webkit-file-chooser-request-cancel">webkit_file_chooser_request_cancel ()</a>
 </dt>
@@ -546,6 +596,8 @@
 <dt>webkit_hit_test_result_context_is_link, <a class="indexterm" href="WebKitHitTestResult.html#webkit-hit-test-result-context-is-link">webkit_hit_test_result_context_is_link ()</a>
 </dt>
 <dt>webkit_hit_test_result_context_is_media, <a class="indexterm" href="WebKitHitTestResult.html#webkit-hit-test-result-context-is-media">webkit_hit_test_result_context_is_media ()</a>
+</dt>
+<dt>webkit_hit_test_result_context_is_scrollbar, <a class="indexterm" href="WebKitHitTestResult.html#webkit-hit-test-result-context-is-scrollbar">webkit_hit_test_result_context_is_scrollbar ()</a>
 </dt>
 <dt>webkit_hit_test_result_get_context, <a class="indexterm" href="WebKitHitTestResult.html#webkit-hit-test-result-get-context">webkit_hit_test_result_get_context ()</a>
 </dt>
@@ -659,6 +711,30 @@
 </dt>
 <dt>webkit_script_dialog_prompt_set_text, <a class="indexterm" href="WebKitWebView.html#webkit-script-dialog-prompt-set-text">webkit_script_dialog_prompt_set_text ()</a>
 </dt>
+<dt>webkit_security_manager_register_uri_scheme_as_cors_enabled, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-cors-enabled">webkit_security_manager_register_uri_scheme_as_cors_enabled ()</a>
+</dt>
+<dt>webkit_security_manager_register_uri_scheme_as_display_isolated, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-display-isolated">webkit_security_manager_register_uri_scheme_as_display_isolated ()</a>
+</dt>
+<dt>webkit_security_manager_register_uri_scheme_as_empty_document, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-empty-document">webkit_security_manager_register_uri_scheme_as_empty_document ()</a>
+</dt>
+<dt>webkit_security_manager_register_uri_scheme_as_local, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-local">webkit_security_manager_register_uri_scheme_as_local ()</a>
+</dt>
+<dt>webkit_security_manager_register_uri_scheme_as_no_access, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-no-access">webkit_security_manager_register_uri_scheme_as_no_access ()</a>
+</dt>
+<dt>webkit_security_manager_register_uri_scheme_as_secure, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-secure">webkit_security_manager_register_uri_scheme_as_secure ()</a>
+</dt>
+<dt>webkit_security_manager_uri_scheme_is_cors_enabled, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-cors-enabled">webkit_security_manager_uri_scheme_is_cors_enabled ()</a>
+</dt>
+<dt>webkit_security_manager_uri_scheme_is_display_isolated, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-display-isolated">webkit_security_manager_uri_scheme_is_display_isolated ()</a>
+</dt>
+<dt>webkit_security_manager_uri_scheme_is_empty_document, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-empty-document">webkit_security_manager_uri_scheme_is_empty_document ()</a>
+</dt>
+<dt>webkit_security_manager_uri_scheme_is_local, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-local">webkit_security_manager_uri_scheme_is_local ()</a>
+</dt>
+<dt>webkit_security_manager_uri_scheme_is_no_access, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-no-access">webkit_security_manager_uri_scheme_is_no_access ()</a>
+</dt>
+<dt>webkit_security_manager_uri_scheme_is_secure, <a class="indexterm" href="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-secure">webkit_security_manager_uri_scheme_is_secure ()</a>
+</dt>
 <dt>webkit_settings_get_allow_modal_dialogs, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-allow-modal-dialogs">webkit_settings_get_allow_modal_dialogs ()</a>
 </dt>
 <dt>webkit_settings_get_auto_load_images, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-auto-load-images">webkit_settings_get_auto_load_images ()</a>
@@ -707,6 +783,8 @@
 </dt>
 <dt>webkit_settings_get_enable_site_specific_quirks, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-site-specific-quirks">webkit_settings_get_enable_site_specific_quirks ()</a>
 </dt>
+<dt>webkit_settings_get_enable_smooth_scrolling, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-smooth-scrolling">webkit_settings_get_enable_smooth_scrolling ()</a>
+</dt>
 <dt>webkit_settings_get_enable_tabs_to_links, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-tabs-to-links">webkit_settings_get_enable_tabs_to_links ()</a>
 </dt>
 <dt>webkit_settings_get_enable_webaudio, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-webaudio">webkit_settings_get_enable_webaudio ()</a>
@@ -738,6 +816,8 @@
 <dt>webkit_settings_get_sans_serif_font_family, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-sans-serif-font-family">webkit_settings_get_sans_serif_font_family ()</a>
 </dt>
 <dt>webkit_settings_get_serif_font_family, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-serif-font-family">webkit_settings_get_serif_font_family ()</a>
+</dt>
+<dt>webkit_settings_get_user_agent, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-user-agent">webkit_settings_get_user_agent ()</a>
 </dt>
 <dt>webkit_settings_get_zoom_text_only, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-zoom-text-only">webkit_settings_get_zoom_text_only ()</a>
 </dt>
@@ -793,6 +873,8 @@
 </dt>
 <dt>webkit_settings_set_enable_site_specific_quirks, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-site-specific-quirks">webkit_settings_set_enable_site_specific_quirks ()</a>
 </dt>
+<dt>webkit_settings_set_enable_smooth_scrolling, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-smooth-scrolling">webkit_settings_set_enable_smooth_scrolling ()</a>
+</dt>
 <dt>webkit_settings_set_enable_tabs_to_links, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-tabs-to-links">webkit_settings_set_enable_tabs_to_links ()</a>
 </dt>
 <dt>webkit_settings_set_enable_webaudio, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-webaudio">webkit_settings_set_enable_webaudio ()</a>
@@ -825,6 +907,10 @@
 </dt>
 <dt>webkit_settings_set_serif_font_family, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-serif-font-family">webkit_settings_set_serif_font_family ()</a>
 </dt>
+<dt>webkit_settings_set_user_agent, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-user-agent">webkit_settings_set_user_agent ()</a>
+</dt>
+<dt>webkit_settings_set_user_agent_with_application_details, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-user-agent-with-application-details">webkit_settings_set_user_agent_with_application_details ()</a>
+</dt>
 <dt>webkit_settings_set_zoom_text_only, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-zoom-text-only">webkit_settings_set_zoom_text_only ()</a>
 </dt>
 <dt>webkit_uri_request_get_uri, <a class="indexterm" href="WebKitURIRequest.html#webkit-uri-request-get-uri">webkit_uri_request_get_uri ()</a>
@@ -832,8 +918,6 @@
 <dt>webkit_uri_request_new, <a class="indexterm" href="WebKitURIRequest.html#webkit-uri-request-new">webkit_uri_request_new ()</a>
 </dt>
 <dt>webkit_uri_response_get_content_length, <a class="indexterm" href="WebKitURIResponse.html#webkit-uri-response-get-content-length">webkit_uri_response_get_content_length ()</a>
-</dt>
-<dt>webkit_uri_response_get_https_status, <a class="indexterm" href="WebKitURIResponse.html#webkit-uri-response-get-https-status">webkit_uri_response_get_https_status ()</a>
 </dt>
 <dt>webkit_uri_response_get_mime_type, <a class="indexterm" href="WebKitURIResponse.html#webkit-uri-response-get-mime-type">webkit_uri_response_get_mime_type ()</a>
 </dt>
@@ -851,6 +935,8 @@
 </dt>
 <dt>webkit_uri_scheme_request_get_uri, <a class="indexterm" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-uri">webkit_uri_scheme_request_get_uri ()</a>
 </dt>
+<dt>webkit_uri_scheme_request_get_web_view, <a class="indexterm" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-web-view">webkit_uri_scheme_request_get_web_view ()</a>
+</dt>
 <dt>webkit_web_context_clear_cache, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-clear-cache">webkit_web_context_clear_cache ()</a>
 </dt>
 <dt>webkit_web_context_download_uri, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-download-uri">webkit_web_context_download_uri ()</a>
@@ -861,13 +947,23 @@
 </dt>
 <dt>webkit_web_context_get_default, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-default">webkit_web_context_get_default ()</a>
 </dt>
+<dt>webkit_web_context_get_favicon_database, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-favicon-database">webkit_web_context_get_favicon_database ()</a>
+</dt>
+<dt>webkit_web_context_get_favicon_database_directory, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-favicon-database-directory">webkit_web_context_get_favicon_database_directory ()</a>
+</dt>
 <dt>webkit_web_context_get_plugins, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-plugins">webkit_web_context_get_plugins ()</a>
 </dt>
 <dt>webkit_web_context_get_plugins_finish, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-plugins-finish">webkit_web_context_get_plugins_finish ()</a>
 </dt>
+<dt>webkit_web_context_get_security_manager, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-security-manager">webkit_web_context_get_security_manager ()</a>
+</dt>
 <dt>webkit_web_context_get_spell_checking_enabled, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-spell-checking-enabled">webkit_web_context_get_spell_checking_enabled ()</a>
 </dt>
 <dt>webkit_web_context_get_spell_checking_languages, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-spell-checking-languages">webkit_web_context_get_spell_checking_languages ()</a>
+</dt>
+<dt>webkit_web_context_get_tls_errors_policy, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-tls-errors-policy">webkit_web_context_get_tls_errors_policy ()</a>
+</dt>
+<dt>webkit_web_context_prefetch_dns, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-prefetch-dns">webkit_web_context_prefetch_dns ()</a>
 </dt>
 <dt>webkit_web_context_register_uri_scheme, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-register-uri-scheme">webkit_web_context_register_uri_scheme ()</a>
 </dt>
@@ -875,11 +971,19 @@
 </dt>
 <dt>webkit_web_context_set_cache_model, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-cache-model">webkit_web_context_set_cache_model ()</a>
 </dt>
+<dt>webkit_web_context_set_favicon_database_directory, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory">webkit_web_context_set_favicon_database_directory ()</a>
+</dt>
 <dt>webkit_web_context_set_preferred_languages, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-preferred-languages">webkit_web_context_set_preferred_languages ()</a>
 </dt>
 <dt>webkit_web_context_set_spell_checking_enabled, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-spell-checking-enabled">webkit_web_context_set_spell_checking_enabled ()</a>
 </dt>
 <dt>webkit_web_context_set_spell_checking_languages, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-spell-checking-languages">webkit_web_context_set_spell_checking_languages ()</a>
+</dt>
+<dt>webkit_web_context_set_tls_errors_policy, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-tls-errors-policy">webkit_web_context_set_tls_errors_policy ()</a>
+</dt>
+<dt>webkit_web_context_set_web_extensions_directory, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory">webkit_web_context_set_web_extensions_directory ()</a>
+</dt>
+<dt>webkit_web_extension_get_page, <a class="indexterm" href="WebKitWebExtension.html#webkit-web-extension-get-page">webkit_web_extension_get_page ()</a>
 </dt>
 <dt>webkit_web_inspector_attach, <a class="indexterm" href="WebKitWebInspector.html#webkit-web-inspector-attach">webkit_web_inspector_attach ()</a>
 </dt>
@@ -896,6 +1000,8 @@
 <dt>webkit_web_inspector_is_attached, <a class="indexterm" href="WebKitWebInspector.html#webkit-web-inspector-is-attached">webkit_web_inspector_is_attached ()</a>
 </dt>
 <dt>webkit_web_inspector_show, <a class="indexterm" href="WebKitWebInspector.html#webkit-web-inspector-show">webkit_web_inspector_show ()</a>
+</dt>
+<dt>webkit_web_page_get_dom_document, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-dom-document">webkit_web_page_get_dom_document ()</a>
 </dt>
 <dt>webkit_web_resource_get_data, <a class="indexterm" href="WebKitWebResource.html#webkit-web-resource-get-data">webkit_web_resource_get_data ()</a>
 </dt>
@@ -915,6 +1021,8 @@
 </dt>
 <dt>webkit_web_view_can_show_mime_type, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-can-show-mime-type">webkit_web_view_can_show_mime_type ()</a>
 </dt>
+<dt>webkit_web_view_download_uri, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-download-uri">webkit_web_view_download_uri ()</a>
+</dt>
 <dt>webkit_web_view_execute_editing_command, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-execute-editing-command">webkit_web_view_execute_editing_command ()</a>
 </dt>
 <dt>webkit_web_view_get_back_forward_list, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-back-forward-list">webkit_web_view_get_back_forward_list ()</a>
@@ -925,6 +1033,8 @@
 </dt>
 <dt>webkit_web_view_get_estimated_load_progress, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-estimated-load-progress">webkit_web_view_get_estimated_load_progress ()</a>
 </dt>
+<dt>webkit_web_view_get_favicon, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-favicon">webkit_web_view_get_favicon ()</a>
+</dt>
 <dt>webkit_web_view_get_find_controller, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-find-controller">webkit_web_view_get_find_controller ()</a>
 </dt>
 <dt>webkit_web_view_get_inspector, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-inspector">webkit_web_view_get_inspector ()</a>
@@ -933,13 +1043,17 @@
 </dt>
 <dt>webkit_web_view_get_main_resource, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-main-resource">webkit_web_view_get_main_resource ()</a>
 </dt>
-<dt>webkit_web_view_get_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-settings">webkit_web_view_get_settings ()</a>
+<dt>webkit_web_view_get_page_id, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-page-id">webkit_web_view_get_page_id ()</a>
 </dt>
-<dt>webkit_web_view_get_subresources, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-subresources">webkit_web_view_get_subresources ()</a>
+<dt>webkit_web_view_get_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-settings">webkit_web_view_get_settings ()</a>
 </dt>
 <dt>webkit_web_view_get_title, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-title">webkit_web_view_get_title ()</a>
 </dt>
+<dt>webkit_web_view_get_tls_info, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-tls-info">webkit_web_view_get_tls_info ()</a>
+</dt>
 <dt>webkit_web_view_get_uri, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-uri">webkit_web_view_get_uri ()</a>
+</dt>
+<dt>webkit_web_view_get_view_mode, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-view-mode">webkit_web_view_get_view_mode ()</a>
 </dt>
 <dt>webkit_web_view_get_window_properties, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-window-properties">webkit_web_view_get_window_properties ()</a>
 </dt>
@@ -950,6 +1064,8 @@
 <dt>webkit_web_view_go_forward, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-forward">webkit_web_view_go_forward ()</a>
 </dt>
 <dt>webkit_web_view_go_to_back_forward_list_item, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-to-back-forward-list-item">webkit_web_view_go_to_back_forward_list_item ()</a>
+</dt>
+<dt>webkit_web_view_is_loading, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-is-loading">webkit_web_view_is_loading ()</a>
 </dt>
 <dt>webkit_web_view_load_alternate_html, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-load-alternate-html">webkit_web_view_load_alternate_html ()</a>
 </dt>
@@ -973,6 +1089,10 @@
 </dt>
 <dt>webkit_web_view_run_javascript_finish, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-run-javascript-finish">webkit_web_view_run_javascript_finish ()</a>
 </dt>
+<dt>webkit_web_view_run_javascript_from_gresource, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-run-javascript-from-gresource">webkit_web_view_run_javascript_from_gresource ()</a>
+</dt>
+<dt>webkit_web_view_run_javascript_from_gresource_finish, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-run-javascript-from-gresource-finish">webkit_web_view_run_javascript_from_gresource_finish ()</a>
+</dt>
 <dt>webkit_web_view_save, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-save">webkit_web_view_save ()</a>
 </dt>
 <dt>webkit_web_view_save_finish, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-save-finish">webkit_web_view_save_finish ()</a>
@@ -984,6 +1104,8 @@
 <dt>webkit_web_view_set_custom_charset, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-custom-charset">webkit_web_view_set_custom_charset ()</a>
 </dt>
 <dt>webkit_web_view_set_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-settings">webkit_web_view_set_settings ()</a>
+</dt>
+<dt>webkit_web_view_set_view_mode, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-view-mode">webkit_web_view_set_view_mode ()</a>
 </dt>
 <dt>webkit_web_view_set_zoom_level, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-zoom-level">webkit_web_view_set_zoom_level ()</a>
 </dt>
@@ -1010,6 +1132,6 @@
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

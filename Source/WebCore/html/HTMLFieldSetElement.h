@@ -31,7 +31,6 @@ namespace WebCore {
 
 class FormAssociatedElement;
 class HTMLCollection;
-class HTMLFormCollection;
 
 class HTMLFieldSetElement : public HTMLFormControlElement {
 public:
@@ -55,6 +54,7 @@ private:
     virtual const AtomicString& formControlType() const;
     virtual bool recalcWillValidate() const { return false; }
     virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
     static void invalidateDisabledStateUnder(Element*);
     void refreshElementsIfNeeded() const;

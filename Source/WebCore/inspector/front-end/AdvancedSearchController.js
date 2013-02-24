@@ -39,6 +39,9 @@ WebInspector.AdvancedSearchController = function()
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.FrameNavigated, this._frameNavigated, this);
 }
 
+/**
+ * @return {!WebInspector.KeyboardShortcut.Descriptor}
+ */
 WebInspector.AdvancedSearchController.createShortcut = function()
 {
     if (WebInspector.isMac())
@@ -49,7 +52,7 @@ WebInspector.AdvancedSearchController.createShortcut = function()
 
 WebInspector.AdvancedSearchController.prototype = {
     /**
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      * @return {boolean}
      */
     handleShortcut: function(event)
@@ -85,6 +88,8 @@ WebInspector.AdvancedSearchController.prototype = {
         if (!this._searchView)
             this._searchView = new WebInspector.SearchView(this);
         
+        this._searchView.syncToSelection();
+
         if (this._searchView.isShowing())
             this._searchView.focus();
         else
@@ -222,8 +227,6 @@ WebInspector.SearchView = function(controller)
 WebInspector.SearchView.maxQueriesCount = 20;
 
 WebInspector.SearchView.prototype = {
-    __proto__: WebInspector.View.prototype,
-
     /**
      * @return {Array.<Element>}
      */
@@ -238,6 +241,13 @@ WebInspector.SearchView.prototype = {
     get searchConfig()
     {
         return new WebInspector.SearchConfig(this._search.value, this._ignoreCaseCheckbox.checked, this._regexCheckbox.checked);
+    },
+
+    syncToSelection: function()
+    {
+        var selection = window.getSelection();
+        if (selection.rangeCount)
+            this._search.value = selection.toString().replace(/\r?\n.*/, "");
     },
     
     /**
@@ -387,10 +397,11 @@ WebInspector.SearchView.prototype = {
         
         this._save();
         this._controller.startSearch(this.searchConfig);
-    }
+    },
+
+    __proto__: WebInspector.View.prototype
 }
 
-//WebInspector.SearchView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -500,7 +511,7 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
     {
         var anchor = document.createElement("a");
         anchor.preferredPanel = "scripts";
-        anchor.href = uiSourceCode.url;
+        anchor.href = sanitizeHref(uiSourceCode.originURL());
         anchor.uiSourceCode = uiSourceCode;
         anchor.lineNumber = lineNumber;
         return anchor;
@@ -515,7 +526,7 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
         var uiSourceCode = searchResult.uiSourceCode;
         var searchMatches = searchResult.searchMatches;
 
-        var fileTreeElement = this._addFileTreeElement(uiSourceCode.url, searchMatches.length, this._searchResults.length - 1);
+        var fileTreeElement = this._addFileTreeElement(uiSourceCode.originURL(), searchMatches.length, this._searchResults.length - 1);
     },
 
     /**
@@ -585,7 +596,7 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
         var showMoreMatchesElement = new TreeElement(showMoreMatchesText, null, false);
         fileTreeElement.appendChild(showMoreMatchesElement);
         showMoreMatchesElement.listItemElement.addStyleClass("show-more-matches");
-        showMoreMatchesElement.onselect = this._showMoreMatchesElementSelected.bind(this, searchResult, startMatchIndex);
+        showMoreMatchesElement.onselect = this._showMoreMatchesElementSelected.bind(this, searchResult, startMatchIndex, showMoreMatchesElement);
     },
 
     /**
@@ -629,7 +640,7 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
         fileTreeElement.listItemElement.appendChild(matchesCountSpan);
         
         var searchResult = this._searchResults[searchResultIndex];
-        fileTreeElement.onexpand = this._fileTreeElementExpanded.bind(this, searchResult);
+        fileTreeElement.onexpand = this._fileTreeElementExpanded.bind(this, searchResult, fileTreeElement);
 
         // Expand until at least certain amount of matches is expanded.
         if (this._matchesExpandedCount < WebInspector.FileBasedSearchResultsPane.matchesExpandedByDefaultCount)
@@ -667,10 +678,10 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
         contentSpan.textContent = lineContent;
         WebInspector.highlightRangesWithStyleClass(contentSpan, matchRanges, "highlighted-match");
         return contentSpan;
-    }
-}
+    },
 
-WebInspector.FileBasedSearchResultsPane.prototype.__proto__ = WebInspector.SearchResultsPane.prototype;
+    __proto__: WebInspector.SearchResultsPane.prototype
+}
 
 /**
  * @constructor

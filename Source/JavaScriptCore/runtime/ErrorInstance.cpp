@@ -21,6 +21,9 @@
 #include "config.h"
 #include "ErrorInstance.h"
 
+#include "JSScope.h"
+#include "Operations.h"
+
 namespace JSC {
 
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(ErrorInstance);

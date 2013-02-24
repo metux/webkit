@@ -26,6 +26,7 @@
 #ifndef ResourceHandleInternal_h
 #define ResourceHandleInternal_h
 
+#include "NetworkingContext.h"
 #include "ResourceHandle.h"
 #include "ResourceRequest.h"
 #include "AuthenticationChallenge.h"
@@ -46,10 +47,11 @@
 #endif
 
 #if USE(SOUP)
-#include <wtf/gobject/GRefPtr.h>
 #define LIBSOUP_USE_UNSTABLE_REQUEST_API
+#include <libsoup/soup-multipart-input-stream.h>
 #include <libsoup/soup-request.h>
 #include <libsoup/soup.h>
+#include <wtf/gobject/GRefPtr.h>
 class Frame;
 #endif
 
@@ -67,6 +69,10 @@ OBJC_CLASS NSURLAuthenticationChallenge;
 OBJC_CLASS NSURLConnection;
 #endif
 
+#if PLATFORM(MAC) || USE(CFNETWORK)
+typedef const struct __CFURLStorageSession* CFURLStorageSessionRef;
+#endif
+
 // The allocations and releases in ResourceHandleInternal are
 // Cocoa-exception-free (either simple Foundation classes or
 // WebCoreResourceLoaderImp which avoids doing work in dealloc).
@@ -77,8 +83,9 @@ namespace WebCore {
     class ResourceHandleInternal {
         WTF_MAKE_NONCOPYABLE(ResourceHandleInternal); WTF_MAKE_FAST_ALLOCATED;
     public:
-        ResourceHandleInternal(ResourceHandle* loader, const ResourceRequest& request, ResourceHandleClient* c, bool defersLoading, bool shouldContentSniff)
-            : m_client(c)
+        ResourceHandleInternal(ResourceHandle* loader, NetworkingContext* context, const ResourceRequest& request, ResourceHandleClient* client, bool defersLoading, bool shouldContentSniff)
+            : m_context(context)
+            , m_client(client)
             , m_firstRequest(request)
             , m_lastHTTPMethod(request.httpMethod())
             , status(0)
@@ -107,8 +114,10 @@ namespace WebCore {
 #if USE(SOUP)
             , m_cancelled(false)
             , m_buffer(0)
+            , m_bufferSize(0)
             , m_bodySize(0)
             , m_bodyDataSent(0)
+            , m_redirectCount(0)
 #endif
 #if PLATFORM(QT)
             , m_job(0)
@@ -130,8 +139,9 @@ namespace WebCore {
         ~ResourceHandleInternal();
 
         ResourceHandleClient* client() { return m_client; }
+
+        RefPtr<NetworkingContext> m_context;
         ResourceHandleClient* m_client;
-        
         ResourceRequest m_firstRequest;
         String m_lastHTTPMethod;
 
@@ -156,6 +166,9 @@ namespace WebCore {
 #if PLATFORM(MAC)
         bool m_startWhenScheduled;
         bool m_needsSiteSpecificQuirks;
+#endif
+#if PLATFORM(MAC) || USE(CFNETWORK)
+        RetainPtr<CFURLStorageSessionRef> m_storageSession;
 #endif
 #if USE(WININET)
         Timer<ResourceHandle> m_fileLoadTimer;
@@ -185,17 +198,25 @@ namespace WebCore {
         bool m_cancelled;
         GRefPtr<SoupRequest> m_soupRequest;
         GRefPtr<GInputStream> m_inputStream;
+        GRefPtr<SoupMultipartInputStream> m_multipartInputStream;
         GRefPtr<GCancellable> m_cancellable;
         GRefPtr<GAsyncResult> m_deferredResult;
+        GRefPtr<GSource> m_timeoutSource;
         char* m_buffer;
+        int m_bufferSize;
         unsigned long m_bodySize;
         unsigned long m_bodyDataSent;
-        RefPtr<NetworkingContext> m_context;
         SoupSession* soupSession();
+        int m_redirectCount;
+#endif
+#if PLATFORM(GTK)
+        struct {
+            Credential credential;
+            AuthenticationChallenge challenge;
+        } m_credentialDataToSaveInPersistentStore;
 #endif
 #if PLATFORM(QT)
         QNetworkReplyHandler* m_job;
-        RefPtr<NetworkingContext> m_context;
 #endif
 
 #if PLATFORM(MAC)
@@ -204,6 +225,12 @@ namespace WebCore {
         NSURLAuthenticationChallenge *m_currentMacChallenge;
 #endif
         AuthenticationChallenge m_currentWebChallenge;
+#if PLATFORM(BLACKBERRY)
+        // We need to store the credentials for host and proxy separately for the platform
+        // networking layer. One of these will always be equal to m_currentWebChallenge.
+        AuthenticationChallenge m_hostWebChallenge;
+        AuthenticationChallenge m_proxyWebChallenge;
+#endif
 
         ResourceHandle::FailureType m_scheduledFailureType;
         Timer<ResourceHandle> m_failureTimer;

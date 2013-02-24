@@ -29,6 +29,7 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorInputType.h"
 
 #include "CSSPropertyNames.h"
@@ -39,16 +40,14 @@
 #include "HTMLDivElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLOptionElement.h"
+#include "InputTypeNames.h"
 #include "MouseEvent.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
-
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
-
-#if ENABLE(INPUT_TYPE_COLOR)
 
 namespace WebCore {
 
@@ -76,6 +75,11 @@ PassOwnPtr<InputType> ColorInputType::create(HTMLInputElement* element)
 ColorInputType::~ColorInputType()
 {
     endColorChooser();
+}
+
+void ColorInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeColor);
 }
 
 bool ColorInputType::isColorControl() const
@@ -117,14 +121,11 @@ void ColorInputType::createShadowSubtree()
 
     Document* document = element()->document();
     RefPtr<HTMLDivElement> wrapperElement = HTMLDivElement::create(document);
-    wrapperElement->setShadowPseudoId("-webkit-color-swatch-wrapper");
+    wrapperElement->setPseudo(AtomicString("-webkit-color-swatch-wrapper", AtomicString::ConstructFromLiteral));
     RefPtr<HTMLDivElement> colorSwatch = HTMLDivElement::create(document);
-    colorSwatch->setShadowPseudoId("-webkit-color-swatch");
-    ExceptionCode ec = 0;
-    wrapperElement->appendChild(colorSwatch.release(), ec);
-    ASSERT(!ec);
-    element()->userAgentShadowRoot()->appendChild(wrapperElement.release(), ec);
-    ASSERT(!ec);
+    colorSwatch->setPseudo(AtomicString("-webkit-color-swatch", AtomicString::ConstructFromLiteral));
+    wrapperElement->appendChild(colorSwatch.release(), ASSERT_NO_EXCEPTION);
+    element()->userAgentShadowRoot()->appendChild(wrapperElement.release(), ASSERT_NO_EXCEPTION);
     
     updateColorSwatch();
 }
@@ -143,7 +144,7 @@ void ColorInputType::setValue(const String& value, bool valueChanged, TextFieldE
 
 void ColorInputType::handleDOMActivateEvent(Event* event)
 {
-    if (element()->disabled() || element()->readOnly() || !element()->renderer())
+    if (element()->isDisabledOrReadOnly() || !element()->renderer())
         return;
 
     if (!ScriptController::processingUserGesture())
@@ -173,7 +174,7 @@ bool ColorInputType::typeMismatchFor(const String& value) const
 
 void ColorInputType::didChooseColor(const Color& color)
 {
-    if (element()->disabled() || element()->readOnly() || color == valueAsColor())
+    if (element()->isDisabledOrReadOnly() || color == valueAsColor())
         return;
     element()->setValueFromRenderer(color.serialized());
     updateColorSwatch();
@@ -208,7 +209,7 @@ HTMLElement* ColorInputType::shadowColorSwatch() const
 
 IntRect ColorInputType::elementRectRelativeToRootView() const
 {
-    return element()->document()->view()->contentsToRootView(element()->getPixelSnappedRect());
+    return element()->document()->view()->contentsToRootView(element()->pixelSnappedBoundingBox());
 }
 
 Color ColorInputType::currentColor()
@@ -220,6 +221,8 @@ bool ColorInputType::shouldShowSuggestions() const
 {
 #if ENABLE(DATALIST_ELEMENT)
     return element()->fastHasAttribute(listAttr);
+#else
+    return false;
 #endif
 }
 

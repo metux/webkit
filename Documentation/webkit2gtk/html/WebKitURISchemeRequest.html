@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWebInspector.html" title="WebKitWebInspector">
 <link rel="next" href="webkit2gtk-WebKitVersion.html" title="WebKitVersion">
-<meta name="generator" content="GTK-Doc V1.18 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -33,7 +33,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitURISchemeRequest.top_of_page"></a>WebKitURISchemeRequest</span></h2>
-<p>WebKitURISchemeRequest</p>
+<p>WebKitURISchemeRequest — Represents a URI scheme request</p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -44,9 +44,11 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
                                                         (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-uri" title="webkit_uri_scheme_request_get_uri ()">webkit_uri_scheme_request_get_uri</a>   (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-path" title="webkit_uri_scheme_request_get_path ()">webkit_uri_scheme_request_get_path</a>  (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>);
+<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="returnvalue">WebKitWebView</span></a> *     <a class="link" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-web-view" title="webkit_uri_scheme_request_get_web_view ()">webkit_uri_scheme_request_get_web_view</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish" title="webkit_uri_scheme_request_finish ()">webkit_uri_scheme_request_finish</a>    (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
                                                          <em class="parameter"><code><a href="../gio/GInputStream.html"><span class="type">GInputStream</span></a> *stream</code></em>,
-                                                         <em class="parameter"><code><span class="type">gint64</span> stream_length</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> stream_length</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *mime_type</code></em>);
 </pre>
 </div>
@@ -60,6 +62,14 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitURISchemeRequest.description"></a><h2>Description</h2>
 <p>
+If you register a particular URI scheme in a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>,
+using <a class="link" href="WebKitWebContext.html#webkit-web-context-register-uri-scheme" title="webkit_web_context_register_uri_scheme ()"><code class="function">webkit_web_context_register_uri_scheme()</code></a>, you have to provide
+a <a class="link" href="WebKitWebContext.html#WebKitURISchemeRequestCallback" title="WebKitURISchemeRequestCallback ()"><span class="type">WebKitURISchemeRequestCallback</span></a>. After that, when a URI request
+is made with that particular scheme, your callback will be
+called. There you will be able to access properties such as the
+scheme, the URI and path, and the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> that initiated the
+request, and also finish the request with
+<a class="link" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish" title="webkit_uri_scheme_request_finish ()"><code class="function">webkit_uri_scheme_request_finish()</code></a>.
 </p>
 </div>
 <div class="refsect1">
@@ -142,10 +152,34 @@ Get the URI path of <em class="parameter"><code>request</code></em>
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-uri-scheme-request-get-web-view"></a><h3>webkit_uri_scheme_request_get_web_view ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="returnvalue">WebKitWebView</span></a> *     webkit_uri_scheme_request_get_web_view
+                                                        (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> that initiated the request.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> that initiated <em class="parameter"><code>request</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-uri-scheme-request-finish"></a><h3>webkit_uri_scheme_request_finish ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_uri_scheme_request_finish    (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
                                                          <em class="parameter"><code><a href="../gio/GInputStream.html"><span class="type">GInputStream</span></a> *stream</code></em>,
-                                                         <em class="parameter"><code><span class="type">gint64</span> stream_length</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> stream_length</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *mime_type</code></em>);</pre>
 <p>
 Finish a <a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> by setting the contents of the request and its mime type.
@@ -178,6 +212,6 @@ Finish a <a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISche
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

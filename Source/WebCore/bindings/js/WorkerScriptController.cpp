@@ -31,12 +31,14 @@
 
 #include "WorkerScriptController.h"
 
+#include "JSDOMBinding.h"
 #include "JSDedicatedWorkerContext.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
 #include "WebCoreJSClientData.h"
 #include "WorkerContext.h"
 #include "WorkerObjectProxy.h"
+#include "WorkerScriptDebugServer.h"
 #include "WorkerThread.h"
 #include <heap/StrongInlines.h>
 #include <interpreter/Interpreter.h>
@@ -54,7 +56,7 @@ using namespace JSC;
 namespace WebCore {
 
 WorkerScriptController::WorkerScriptController(WorkerContext* workerContext)
-    : m_globalData(JSGlobalData::create(ThreadStackTypeSmall))
+    : m_globalData(JSGlobalData::create())
     , m_workerContext(workerContext)
     , m_workerContextWrapper(*m_globalData)
     , m_executionForbidden(false)
@@ -135,7 +137,7 @@ void WorkerScriptController::evaluate(const ScriptSourceCode& sourceCode, Script
     m_workerContextWrapper->globalData().timeoutChecker.start();
 
     JSValue evaluationException;
-    JSC::evaluate(exec, exec->dynamicGlobalObject()->globalScopeChain(), sourceCode.jsSourceCode(), m_workerContextWrapper.get(), &evaluationException);
+    JSC::evaluate(exec, sourceCode.jsSourceCode(), m_workerContextWrapper.get(), &evaluationException);
 
     m_workerContextWrapper->globalData().timeoutChecker.stop();
 
@@ -148,7 +150,7 @@ void WorkerScriptController::evaluate(const ScriptSourceCode& sourceCode, Script
         String errorMessage;
         int lineNumber = 0;
         String sourceURL = sourceCode.url().string();
-        if (m_workerContext->sanitizeScriptError(errorMessage, lineNumber, sourceURL))
+        if (m_workerContext->sanitizeScriptError(errorMessage, lineNumber, sourceURL, sourceCode.cachedScript()))
             *exception = ScriptValue(*m_globalData, throwError(exec, createError(exec, errorMessage.impl())));
         else
             *exception = ScriptValue(*m_globalData, evaluationException);
@@ -188,12 +190,23 @@ bool WorkerScriptController::isExecutionForbidden() const
     return m_executionForbidden;
 }
 
-void WorkerScriptController::disableEval()
+void WorkerScriptController::disableEval(const String& errorMessage)
 {
     initScriptIfNeeded();
     JSLockHolder lock(globalData());
 
-    m_workerContextWrapper->setEvalEnabled(false);
+    m_workerContextWrapper->setEvalEnabled(false, errorMessage);
+}
+
+void WorkerScriptController::attachDebugger(JSC::Debugger* debugger)
+{
+    initScriptIfNeeded();
+    debugger->attach(m_workerContextWrapper->globalObject());
+}
+
+void WorkerScriptController::detachDebugger(JSC::Debugger* debugger)
+{
+    debugger->detach(m_workerContextWrapper->globalObject());
 }
 
 } // namespace WebCore

@@ -32,6 +32,7 @@
 #include <wtf/RefCounted.h>
 
 #if PLATFORM(CHROMIUM)
+#include "PageClientChromium.h"
 #include "PlatformWidget.h"
 #endif
 
@@ -78,9 +79,13 @@ typedef wxWindow* PlatformWidget;
 #endif
 
 #if PLATFORM(EFL)
+#if USE(EO)
+typedef struct _Eo Evas_Object;
+typedef struct _Eo Evas;
+#else
 typedef struct _Evas_Object Evas_Object;
 typedef struct _Evas Evas;
-typedef struct _Ecore_Evas Ecore_Evas;
+#endif
 typedef Evas_Object* PlatformWidget;
 #endif
 
@@ -93,6 +98,8 @@ typedef PageClientBlackBerry* PlatformPageClient;
 #elif PLATFORM(EFL)
 class PageClientEfl;
 typedef PageClientEfl* PlatformPageClient;
+#elif PLATFORM(CHROMIUM)
+typedef WebCore::PageClientChromium* PlatformPageClient;
 #else
 typedef PlatformWidget PlatformPageClient;
 #endif

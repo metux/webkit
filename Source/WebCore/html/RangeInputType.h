@@ -43,6 +43,7 @@ public:
 
 private:
     RangeInputType(HTMLInputElement*);
+    virtual void attach() OVERRIDE;
     virtual bool isRangeControl() const OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual double valueAsDouble() const OVERRIDE;
@@ -70,6 +71,7 @@ private:
     virtual String sanitizeValue(const String& proposedValue) const OVERRIDE;
     virtual bool shouldRespectListAttribute() OVERRIDE;
     virtual HTMLElement* sliderThumbElement() const OVERRIDE;
+    virtual HTMLElement* sliderTrackElement() const OVERRIDE;
 #if ENABLE(DATALIST_ELEMENT)
     virtual void listAttributeTargetChanged() OVERRIDE;
     void updateTickMarkValues();

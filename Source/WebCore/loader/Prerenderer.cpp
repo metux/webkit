@@ -41,7 +41,9 @@
 #include "PrerendererClient.h"
 #include "ReferrerPolicy.h"
 #include "SecurityPolicy.h"
+#include "WebCoreMemoryInstrumentation.h"
 
+#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
@@ -59,6 +61,7 @@ PassOwnPtr<Prerenderer> Prerenderer::create(Document* document)
 
 Prerenderer::Prerenderer(Document* document)
     : ActiveDOMObject(document, this)
+    , m_initializedClient(false)
     , m_client(0)
 {
 }
@@ -67,7 +70,7 @@ Prerenderer::~Prerenderer()
 {
 }
 
-PassRefPtr<PrerenderHandle> Prerenderer::render(const KURL& url)
+PassRefPtr<PrerenderHandle> Prerenderer::render(PrerenderClient* prerenderClient, const KURL& url)
 {
     // Prerenders are unlike requests in most ways (for instance, they pass down fragments, and they don't return data),
     // but they do have referrers.
@@ -78,9 +81,10 @@ PassRefPtr<PrerenderHandle> Prerenderer::render(const KURL& url)
 
     const String referrer = SecurityPolicy::generateReferrerHeader(referrerPolicy, url, document()->frame()->loader()->outgoingReferrer());
 
-    RefPtr<PrerenderHandle> prerenderHandle = PrerenderHandle::create(url, referrer, referrerPolicy);
+    RefPtr<PrerenderHandle> prerenderHandle = PrerenderHandle::create(prerenderClient, url, referrer, referrerPolicy);
 
-    client()->willAddPrerender(prerenderHandle.get());
+    if (client())
+        client()->willAddPrerender(prerenderHandle.get());
     prerenderHandle->add();
 
     m_activeHandles.append(prerenderHandle);
@@ -131,9 +135,22 @@ Document* Prerenderer::document()
 
 PrerendererClient* Prerenderer::client()
 {
-    if (!m_client)
+    if (!m_initializedClient) {
+        // We can't initialize the client in our contructor, because the platform might not have
+        // provided our supplement by then.
+        m_initializedClient = true;
         m_client = PrerendererClient::from(document()->page());
+    }
     return m_client;
+}
+
+void Prerenderer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    ActiveDOMObject::reportMemoryUsage(memoryObjectInfo);
+    info.ignoreMember(m_client);
+    info.addMember(m_activeHandles, "activeHandles");
+    info.addMember(m_suspendedHandles, "suspendedHandles");
 }
 
 }

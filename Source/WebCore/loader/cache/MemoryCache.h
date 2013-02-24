@@ -26,12 +26,13 @@
 #define Cache_h
 
 #include "CachedResource.h"
-#include "PlatformString.h"
+#include "SecurityOriginHash.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 #include <wtf/text/StringHash.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore  {
 
@@ -39,7 +40,6 @@ class CachedCSSStyleSheet;
 class CachedResource;
 class CachedResourceLoader;
 class KURL;
-class MemoryObjectInfo;
 class ScriptExecutionContext;
 class SecurityOrigin;
 struct SecurityOriginHash;
@@ -159,7 +159,7 @@ public:
     
     void resourceAccessed(CachedResource*);
 
-    typedef HashSet<RefPtr<SecurityOrigin>, SecurityOriginHash> SecurityOriginSet;
+    typedef HashSet<RefPtr<SecurityOrigin> > SecurityOriginSet;
     void removeResourcesWithOrigin(SecurityOrigin*);
     void getOriginsWithCache(SecurityOriginSet& origins);
 

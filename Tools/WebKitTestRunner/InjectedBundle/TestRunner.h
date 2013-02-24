@@ -45,7 +45,11 @@ typedef QTimer PlatformTimerRef;
 #elif PLATFORM(GTK)
 typedef unsigned int PlatformTimerRef;
 #elif PLATFORM(EFL)
+#if USE(EO)
+typedef struct _Eo Ecore_Timer;
+#else
 typedef struct _Ecore_Timer Ecore_Timer;
+#endif
 typedef Ecore_Timer* PlatformTimerRef;
 #endif
 
@@ -73,7 +77,7 @@ public:
     void dumpBackForwardList() { m_shouldDumpBackForwardListsForAllWindows = true; }
     void dumpChildFrameScrollPositions() { m_shouldDumpAllFrameScrollPositions = true; }
     void dumpEditingCallbacks() { m_dumpEditingCallbacks = true; }
-    void dumpSelectionRect() { } // Will need to do something when we support pixel tests.
+    void dumpSelectionRect() { m_dumpSelectionRect = true; }
     void dumpStatusCallbacks() { m_dumpStatusCallbacks = true; }
     void dumpTitleChanges() { m_dumpTitleChanges = true; }
     void dumpFullScreenCallbacks() { m_dumpFullScreenCallbacks = true; }
@@ -81,6 +85,9 @@ public:
     void dumpProgressFinishedCallback() { setShouldDumpProgressFinishedCallback(true); }
     void dumpResourceLoadCallbacks() { m_dumpResourceLoadCallbacks = true; }
     void dumpResourceResponseMIMETypes() { m_dumpResourceResponseMIMETypes = true; }
+    void dumpWillCacheResponse() { m_dumpWillCacheResponse = true; }
+    void dumpApplicationCacheDelegateCallbacks() { m_dumpApplicationCacheDelegateCallbacks = true; }
+    void dumpDatabaseCallbacks() { m_dumpDatabaseCallbacks = true; }
 
     void setShouldDumpFrameLoadCallbacks(bool value) { m_dumpFrameLoadCallbacks = value; }
     void setShouldDumpProgressFinishedCallback(bool value) { m_dumpProgressFinishedCallback = value; }
@@ -93,9 +100,7 @@ public:
     void setXSSAuditorEnabled(bool);
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
-    void setFrameFlatteningEnabled(bool);
     void setPluginsEnabled(bool);
-    void setGeolocationPermission(bool);
     void setJavaScriptCanAccessClipboard(bool);
     void setPrivateBrowsingEnabled(bool);
     void setPopupBlockingEnabled(bool);
@@ -105,6 +110,11 @@ public:
     void removeOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
     void setUserStyleSheetEnabled(bool);
     void setUserStyleSheetLocation(JSStringRef);
+    void setSpatialNavigationEnabled(bool);
+    void setTabKeyCyclesThroughElements(bool);
+    void setSerializeHTTPLoads();
+    void dispatchPendingLoadRequests();
+    void setCacheModel(int);
 
     // Special DOM functions.
     JSValueRef computedStyleIncludingVisitedInfo(JSValueRef element);
@@ -118,15 +128,6 @@ public:
     void testRepaint() { m_testRepaint = true; }
     void repaintSweepHorizontally() { m_testRepaintSweepHorizontally = true; }
     void display();
-
-    // Animation testing.
-    unsigned numberOfActiveAnimations() const;
-    bool pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId);
-    bool pauseTransitionAtTimeOnElementWithId(JSStringRef propertyName, double time, JSStringRef elementId);
-    void suspendAnimations();
-    
-    // Compositing testing.
-    JSRetainPtr<JSStringRef> layerTreeAsText() const;
     
     // UserContent testing.
     void addUserScript(JSStringRef source, bool runAtStart, bool allFrames);
@@ -142,16 +143,28 @@ public:
 
     // Application Cache
     void clearAllApplicationCaches();
+    void clearApplicationCacheForOrigin(JSStringRef origin);
     void setAppCacheMaximumSize(uint64_t);
+    long long applicationCacheDiskUsageForOrigin(JSStringRef origin);
+    void setApplicationCacheOriginQuota(unsigned long long);
+    void disallowIncreaseForApplicationCacheQuota();
+    bool shouldDisallowIncreaseForApplicationCacheQuota() { return m_disallowIncreaseForApplicationCacheQuota; }
+    JSValueRef originsWithApplicationCache();
 
     // Printing
-    int numberOfPages(double pageWidthInPixels, double pageHeightInPixels);
-    JSRetainPtr<JSStringRef> pageSizeAndMarginsInPixels(int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft);
     bool isPageBoxVisible(int pageIndex);
+
+    // Authentication
+    void setHandlesAuthenticationChallenges(bool);
+    void setAuthenticationUsername(JSStringRef);
+    void setAuthenticationPassword(JSStringRef);
 
     void setValueForUser(JSContextRef, JSValueRef element, JSStringRef value);
 
-    enum WhatToDump { RenderTree, MainFrameText, AllFramesText };
+    // Audio testing.
+    void setAudioData(JSContextRef, JSValueRef data);
+
+    enum WhatToDump { RenderTree, MainFrameText, AllFramesText, Audio };
     WhatToDump whatToDump() const { return m_whatToDump; }
 
     bool shouldDumpAllFrameScrollPositions() const { return m_shouldDumpAllFrameScrollPositions; }
@@ -166,6 +179,10 @@ public:
     bool shouldDumpProgressFinishedCallback() const { return m_dumpProgressFinishedCallback; }
     bool shouldDumpResourceLoadCallbacks() const { return m_dumpResourceLoadCallbacks; }
     bool shouldDumpResourceResponseMIMETypes() const { return m_dumpResourceResponseMIMETypes; }
+    bool shouldDumpWillCacheResponse() const { return m_dumpWillCacheResponse; }
+    bool shouldDumpApplicationCacheDelegateCallbacks() const { return m_dumpApplicationCacheDelegateCallbacks; }
+    bool shouldDumpDatabaseCallbacks() const { return m_dumpDatabaseCallbacks; }
+    bool shouldDumpSelectionRect() const { return m_dumpSelectionRect; }
 
     bool isPolicyDelegateEnabled() const { return m_policyDelegateEnabled; }
     bool isPolicyDelegatePermissive() const { return m_policyDelegatePermissive; }
@@ -187,18 +204,23 @@ public:
 
     void setPOSIXLocale(JSStringRef);
 
-    bool willSendRequestReturnsNull() { return m_willSendRequestReturnsNull; }
+    bool willSendRequestReturnsNull() const { return m_willSendRequestReturnsNull; }
     void setWillSendRequestReturnsNull(bool f) { m_willSendRequestReturnsNull = f; }
+    bool willSendRequestReturnsNullOnRedirect() const { return m_willSendRequestReturnsNullOnRedirect; }
+    void setWillSendRequestReturnsNullOnRedirect(bool f) { m_willSendRequestReturnsNullOnRedirect = f; }
 
     void setTextDirection(JSStringRef);
 
     void setShouldStayOnPageAfterHandlingBeforeUnload(bool);
 
     void setDefersLoading(bool);
+
+    void setStopProvisionalFrameLoads() { m_shouldStopProvisionalFrameLoads = true; }
+    bool shouldStopProvisionalFrameLoads() const { return m_shouldStopProvisionalFrameLoads; }
     
     bool globalFlag() const { return m_globalFlag; }
     void setGlobalFlag(bool value) { m_globalFlag = value; }
-    
+
     void addChromeInputField(JSValueRef);
     void removeChromeInputField(JSValueRef);
     void focusWebView(JSValueRef);
@@ -211,11 +233,7 @@ public:
     void callFocusWebViewCallback();
     void callSetBackingScaleFactorCallback();
 
-    void overridePreference(JSStringRef preference, bool value);
-
-    // Web intents testing.
-    void sendWebIntentResponse(JSStringRef reply);
-    void deliverWebIntent(JSStringRef action, JSStringRef type, JSStringRef data);
+    void overridePreference(JSStringRef preference, JSStringRef value);
 
     // Cookies testing
     void setAlwaysAcceptCookies(bool);
@@ -223,11 +241,36 @@ public:
     // Custom full screen behavior.
     void setHasCustomFullScreenBehavior(bool value) { m_customFullScreenBehavior = value; }
     bool hasCustomFullScreenBehavior() const { return m_customFullScreenBehavior; }
+    void setViewModeMediaFeature(JSStringRef);
+
+    // Web notifications.
+    void grantWebNotificationPermission(JSStringRef origin);
+    void denyWebNotificationPermission(JSStringRef origin);
+    void removeAllWebNotificationPermissions();
+    void simulateWebNotificationClick(JSValueRef notification);
+
+    // Geolocation.
+    void setGeolocationPermission(bool);
+    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, JSValueRef altitude, JSValueRef altitudeAccuracy, JSValueRef heading, JSValueRef speed);
+    void setMockGeolocationPositionUnavailableError(JSStringRef message);
 
     JSRetainPtr<JSStringRef> platformName();
 
     void setPageVisibility(JSStringRef state);
     void resetPageVisibility();
+
+    bool callShouldCloseOnWebView();
+
+    void setCustomTimeout(int duration);
+
+    // Work queue.
+    void queueBackNavigation(unsigned howFarBackward);
+    void queueForwardNavigation(unsigned howFarForward);
+    void queueLoad(JSStringRef url, JSStringRef target);
+    void queueLoadHTMLString(JSStringRef content, JSStringRef baseURL, JSStringRef unreachableURL);
+    void queueReload();
+    void queueLoadingScript(JSStringRef script);
+    void queueNonLoadingScript(JSStringRef script);
 
 private:
     static const double waitToDumpWatchdogTimerInterval;
@@ -248,22 +291,31 @@ private:
     bool m_dumpStatusCallbacks;
     bool m_dumpTitleChanges;
     bool m_dumpPixels;
+    bool m_dumpSelectionRect;
     bool m_dumpFullScreenCallbacks;
     bool m_dumpFrameLoadCallbacks;
     bool m_dumpProgressFinishedCallback;
     bool m_dumpResourceLoadCallbacks;
     bool m_dumpResourceResponseMIMETypes;
+    bool m_dumpWillCacheResponse;
+    bool m_dumpApplicationCacheDelegateCallbacks;
+    bool m_dumpDatabaseCallbacks;
+    bool m_disallowIncreaseForApplicationCacheQuota;
     bool m_waitToDump; // True if waitUntilDone() has been called, but notifyDone() has not yet been called.
     bool m_testRepaint;
     bool m_testRepaintSweepHorizontally;
 
     bool m_willSendRequestReturnsNull;
+    bool m_willSendRequestReturnsNullOnRedirect;
+    bool m_shouldStopProvisionalFrameLoads;
 
     bool m_policyDelegateEnabled;
     bool m_policyDelegatePermissive;
     
     bool m_globalFlag;
     bool m_customFullScreenBehavior;
+
+    int m_timeout;
 
     bool m_userStyleSheetEnabled;
     WKRetainPtr<WKStringRef> m_userStyleSheetLocation;

@@ -46,9 +46,34 @@ class CachedResource;
 class SharedBuffer;
 class TextResourceDecoder;
 
+class XHRReplayData : public RefCounted<XHRReplayData> {
+public:
+    static PassRefPtr<XHRReplayData> create(const String &method, const KURL&, bool async, PassRefPtr<FormData>, bool includeCredentials);
+
+    void addHeader(const AtomicString& key, const String& value);
+    const String& method() const { return m_method; }
+    const KURL& url() const { return m_url; }
+    bool async() const { return m_async; }
+    PassRefPtr<FormData> formData() const { return m_formData; }
+    const HTTPHeaderMap& headers() const { return m_headers; }
+    bool includeCredentials() const { return m_includeCredentials; }
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+private:
+    XHRReplayData(const String &method, const KURL&, bool async, PassRefPtr<FormData>, bool includeCredentials);
+
+    String m_method;
+    KURL m_url;
+    bool m_async;
+    RefPtr<FormData> m_formData;
+    HTTPHeaderMap m_headers;
+    bool m_includeCredentials;
+};
+
 class NetworkResourcesData {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     class ResourceData {
+        WTF_MAKE_FAST_ALLOCATED;
         friend class NetworkResourcesData;
     public:
         ResourceData(const String& requestId, const String& loaderId);
@@ -69,8 +94,8 @@ public:
         bool base64Encoded() const { return m_base64Encoded; }
 
         unsigned removeContent();
-        bool isContentPurged() const { return m_isContentPurged; }
-        unsigned purgeContent();
+        bool isContentEvicted() const { return m_isContentEvicted; }
+        unsigned evictContent();
 
         InspectorPageAgent::ResourceType type() const { return m_type; }
         void setType(InspectorPageAgent::ResourceType type) { m_type = type; }
@@ -90,6 +115,11 @@ public:
         CachedResource* cachedResource() const { return m_cachedResource; }
         void setCachedResource(CachedResource* cachedResource) { m_cachedResource = cachedResource; }
 
+        XHRReplayData* xhrReplayData() const { return m_xhrReplayData.get(); }
+        void setXHRReplayData(XHRReplayData* xhrReplayData) { m_xhrReplayData = xhrReplayData; }
+
+        void reportMemoryUsage(MemoryObjectInfo*) const;
+
     private:
         bool hasData() const { return m_dataBuffer; }
         size_t dataLength() const;
@@ -101,9 +131,10 @@ public:
         String m_frameId;
         String m_url;
         String m_content;
+        RefPtr<XHRReplayData> m_xhrReplayData;
         bool m_base64Encoded;
         RefPtr<SharedBuffer> m_dataBuffer;
-        bool m_isContentPurged;
+        bool m_isContentEvicted;
         InspectorPageAgent::ResourceType m_type;
         int m_httpStatusCode;
 
@@ -132,6 +163,11 @@ public:
     void clear(const String& preservedLoaderId = String());
 
     void setResourcesDataSizeLimits(size_t maximumResourcesContentSize, size_t maximumSingleResourceContentSize);
+    void setXHRReplayData(const String& requestId, XHRReplayData*);
+    void reuseXHRReplayData(const String& requestId, const String& reusedRequestId);
+    XHRReplayData* xhrReplayData(const String& requestId);
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     void ensureNoDataForRequestId(const String& requestId);
@@ -139,6 +175,8 @@ private:
 
     Deque<String> m_requestIdsDeque;
 
+    typedef HashMap<String, String> ReusedRequestIds;
+    ReusedRequestIds m_reusedXHRReplayDataRequestIds;
     typedef HashMap<String, ResourceData*> ResourceDataMap;
     ResourceDataMap m_requestIdToResourceDataMap;
     size_t m_contentSize;

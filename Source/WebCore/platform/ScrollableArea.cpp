@@ -35,10 +35,15 @@
 #include "GraphicsContext.h"
 #include "GraphicsLayer.h"
 #include "FloatPoint.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "PlatformWheelEvent.h"
 #include "ScrollAnimator.h"
 #include "ScrollbarTheme.h"
 #include <wtf/PassOwnPtr.h>
+
+#if PLATFORM(CHROMIUM)
+#include "TraceEvent.h"
+#endif
 
 namespace WebCore {
 
@@ -111,11 +116,9 @@ bool ScrollableArea::scroll(ScrollDirection direction, ScrollGranularity granula
     case ScrollByPrecisePixel:
         step = scrollbar->pixelStep();
         break;
-    case ScrollByPixelVelocity:
-        break;
     }
 
-    if (granularity != ScrollByPixelVelocity && (direction == ScrollUp || direction == ScrollLeft))
+    if (direction == ScrollUp || direction == ScrollLeft)
         multiplier = -multiplier;
 
     return scrollAnimator()->scroll(orientation, granularity, step, multiplier);
@@ -142,6 +145,10 @@ void ScrollableArea::notifyScrollPositionChanged(const IntPoint& position)
 
 void ScrollableArea::scrollPositionChanged(const IntPoint& position)
 {
+#if PLATFORM(CHROMIUM)
+    TRACE_EVENT0("webkit", "ScrollableArea::scrollPositionChanged");
+#endif
+
     IntPoint oldPosition = scrollPosition();
     // Tell the derived class to scroll its contents.
     setScrollOffset(position);
@@ -170,7 +177,7 @@ void ScrollableArea::scrollPositionChanged(const IntPoint& position)
     }
 
     if (scrollPosition() != oldPosition)
-        scrollAnimator()->notifyContentAreaScrolled();
+        scrollAnimator()->notifyContentAreaScrolled(scrollPosition() - oldPosition);
 }
 
 bool ScrollableArea::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
@@ -254,6 +261,12 @@ void ScrollableArea::contentAreaDidHide() const
 {
     if (ScrollAnimator* scrollAnimator = existingScrollAnimator())
         scrollAnimator->contentAreaDidHide();
+}
+
+void ScrollableArea::finishCurrentScrollAnimations() const
+{
+    if (ScrollAnimator* scrollAnimator = existingScrollAnimator())
+        scrollAnimator->finishCurrentScrollAnimations();
 }
 
 void ScrollableArea::didAddVerticalScrollbar(Scrollbar* scrollbar)
@@ -371,6 +384,79 @@ void ScrollableArea::serviceScrollAnimations()
 {
     if (ScrollAnimator* scrollAnimator = existingScrollAnimator())
         scrollAnimator->serviceScrollAnimations();
+}
+
+IntPoint ScrollableArea::scrollPosition() const
+{
+    int x = horizontalScrollbar() ? horizontalScrollbar()->value() : 0;
+    int y = verticalScrollbar() ? verticalScrollbar()->value() : 0;
+    return IntPoint(x, y);
+}
+
+IntPoint ScrollableArea::minimumScrollPosition() const
+{
+    return IntPoint();
+}
+
+IntPoint ScrollableArea::maximumScrollPosition() const
+{
+    return IntPoint(contentsSize().width() - visibleWidth(), contentsSize().height() - visibleHeight());
+}
+
+IntRect ScrollableArea::visibleContentRect(VisibleContentRectIncludesScrollbars scrollbarInclusion) const
+{
+    int verticalScrollbarWidth = 0;
+    int horizontalScrollbarHeight = 0;
+
+    if (scrollbarInclusion == IncludeScrollbars) {
+        if (Scrollbar* verticalBar = verticalScrollbar())
+            verticalScrollbarWidth = !verticalBar->isOverlayScrollbar() ? verticalBar->width() : 0;
+        if (Scrollbar* horizontalBar = horizontalScrollbar())
+            horizontalScrollbarHeight = !horizontalBar->isOverlayScrollbar() ? horizontalBar->height() : 0;
+    }
+
+    return IntRect(scrollPosition().x(),
+                   scrollPosition().y(),
+                   std::max(0, visibleWidth() + verticalScrollbarWidth),
+                   std::max(0, visibleHeight() + horizontalScrollbarHeight));
+}
+
+static int constrainedScrollPosition(int visibleContentSize, int contentsSize, int scrollPosition, int scrollOrigin)
+{
+    int maxValue = contentsSize - visibleContentSize;
+    if (maxValue <= 0)
+        return 0;
+
+    if (!scrollOrigin) {
+        if (scrollPosition <= 0)
+            return 0;
+        if (scrollPosition > maxValue)
+            scrollPosition = maxValue;
+    } else {
+        if (scrollPosition >= 0)
+            return 0;
+        if (scrollPosition < -maxValue)
+            scrollPosition = -maxValue;
+    }
+
+    return scrollPosition;
+}
+
+IntPoint ScrollableArea::constrainScrollPositionForOverhang(const IntRect& visibleContentRect, const IntSize& contentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin)
+{
+    return IntPoint(constrainedScrollPosition(visibleContentRect.width(), contentsSize.width(), scrollPosition.x(), scrollOrigin.x()),
+        constrainedScrollPosition(visibleContentRect.height(), contentsSize.height(), scrollPosition.y(), scrollOrigin.y()));
+}
+
+IntPoint ScrollableArea::constrainScrollPositionForOverhang(const IntPoint& scrollPosition)
+{
+    return constrainScrollPositionForOverhang(visibleContentRect(), contentsSize(), scrollPosition, scrollOrigin());
+}
+
+void ScrollableArea::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this);
+    info.addMember(m_scrollAnimator, "scrollAnimator");
 }
 
 } // namespace WebCore

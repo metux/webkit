@@ -39,10 +39,9 @@ ContextFeaturesClient* ContextFeaturesClient::empty()
     return &empty;
 }
 
-const AtomicString& ContextFeatures::supplementName()
+const char* ContextFeatures::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("ContextFeatures"));
-    return name;
+    return "ContextFeatures";
 }
 
 ContextFeatures* ContextFeatures::defaultSwitch()
@@ -57,18 +56,6 @@ bool ContextFeatures::dialogElementEnabled(Document* document)
     if (!document)
         return RuntimeEnabledFeatures::dialogElementEnabled();
     return document->contextFeatures()->isEnabled(document, DialogElement, RuntimeEnabledFeatures::dialogElementEnabled());
-#else
-    UNUSED_PARAM(document);
-    return false;
-#endif
-}
-
-bool ContextFeatures::shadowDOMEnabled(Document* document)
-{
-#if ENABLE(SHADOW_DOM)
-    if (!document)
-        return RuntimeEnabledFeatures::shadowDOMEnabled();
-    return document->contextFeatures()->isEnabled(document, ShadowDOM, RuntimeEnabledFeatures::shadowDOMEnabled());
 #else
     UNUSED_PARAM(document);
     return false;
@@ -117,6 +104,11 @@ bool ContextFeatures::mutationEventsEnabled(Document* document)
     if (!document)
         return true;
     return document->contextFeatures()->isEnabled(document, MutationEvents, true);
+}
+
+bool ContextFeatures::pushStateEnabled(Document* document)
+{
+    return document->contextFeatures()->isEnabled(document, PushState, true);
 }
 
 void provideContextFeaturesTo(Page* page, ContextFeaturesClient* client)

@@ -53,14 +53,14 @@ using namespace HTMLNames;
 
 // ----------------------------
 
-RenderSearchField::RenderSearchField(Node* node)
-    : RenderTextControlSingleLine(node)
+RenderSearchField::RenderSearchField(Element* element)
+    : RenderTextControlSingleLine(element)
     , m_searchPopupIsVisible(false)
     , m_searchPopup(0)
 {
-    ASSERT(node->isHTMLElement());
-    ASSERT(node->toInputElement());
-    ASSERT(node->toInputElement()->isSearchField());
+    ASSERT(element->isHTMLElement());
+    ASSERT(element->toInputElement());
+    ASSERT(element->toInputElement()->isSearchField());
 }
 
 RenderSearchField::~RenderSearchField()
@@ -151,13 +151,13 @@ LayoutUnit RenderSearchField::computeControlHeight(LayoutUnit lineHeight, Layout
 {
     HTMLElement* resultsButton = resultsButtonElement();
     if (RenderBox* resultsRenderer = resultsButton ? resultsButton->renderBox() : 0) {
-        resultsRenderer->computeLogicalHeight();
+        resultsRenderer->updateLogicalHeight();
         nonContentHeight = max(nonContentHeight, resultsRenderer->borderAndPaddingHeight() + resultsRenderer->marginHeight());
         lineHeight = max(lineHeight, resultsRenderer->height());
     }
     HTMLElement* cancelButton = cancelButtonElement();
     if (RenderBox* cancelRenderer = cancelButton ? cancelButton->renderBox() : 0) {
-        cancelRenderer->computeLogicalHeight();
+        cancelRenderer->updateLogicalHeight();
         nonContentHeight = max(nonContentHeight, cancelRenderer->borderAndPaddingHeight() + cancelRenderer->marginHeight());
         lineHeight = max(lineHeight, cancelRenderer->height());
     }

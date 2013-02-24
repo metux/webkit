@@ -63,12 +63,11 @@ namespace InspectorAgentState {
 static const char inspectorAgentEnabled[] = "inspectorAgentEnabled";
 }
 
-InspectorAgent::InspectorAgent(Page* page, InjectedScriptManager* injectedScriptManager, InstrumentingAgents* instrumentingAgents, InspectorState* state)
+InspectorAgent::InspectorAgent(Page* page, InjectedScriptManager* injectedScriptManager, InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
     : InspectorBaseAgent<InspectorAgent>("Inspector", instrumentingAgents, state)
     , m_inspectedPage(page)
     , m_frontend(0)
     , m_injectedScriptManager(injectedScriptManager)
-    , m_didCommitLoadFired(false)
 {
     ASSERT_ARG(page, page);
     m_instrumentingAgents->setInspectorAgent(this);
@@ -87,7 +86,7 @@ void InspectorAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWorld* 
     if (m_injectedScriptForOrigin.isEmpty())
         return;
 
-    String origin = frame->document()->securityOrigin()->toString();
+    String origin = frame->document()->securityOrigin()->toRawString();
     String script = m_injectedScriptForOrigin.get(origin);
     if (!script.isEmpty())
         m_injectedScriptManager->injectScript(script, mainWorldScriptState(frame));
@@ -102,7 +101,6 @@ void InspectorAgent::clearFrontend()
 {
     m_pendingEvaluateTestCommands.clear();
     m_frontend = 0;
-    m_didCommitLoadFired = false;
     m_injectedScriptManager->discardInjectedScripts();
     ErrorString error;
     disable(&error);
@@ -110,7 +108,6 @@ void InspectorAgent::clearFrontend()
 
 void InspectorAgent::didCommitLoad()
 {
-    m_didCommitLoadFired = true;
     m_injectedScriptManager->discardInjectedScripts();
 }
 

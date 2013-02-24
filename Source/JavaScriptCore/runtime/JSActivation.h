@@ -30,37 +30,43 @@
 #define JSActivation_h
 
 #include "CodeBlock.h"
+#include "CopiedSpaceInlines.h"
 #include "JSVariableObject.h"
-#include "SymbolTable.h"
 #include "Nodes.h"
+#include "SymbolTable.h"
 
 namespace JSC {
 
-    class Arguments;
     class Register;
     
     class JSActivation : public JSVariableObject {
     private:
-        JSActivation(CallFrame*, FunctionExecutable*);
+        JSActivation(JSGlobalData& globalData, CallFrame*, SharedSymbolTable*);
     
     public:
         typedef JSVariableObject Base;
 
-        static JSActivation* create(JSGlobalData& globalData, CallFrame* callFrame, FunctionExecutable* funcExec)
+        static JSActivation* create(JSGlobalData& globalData, CallFrame* callFrame, CodeBlock* codeBlock)
         {
-            JSActivation* activation = new (NotNull, allocateCell<JSActivation>(globalData.heap)) JSActivation(callFrame, funcExec);
-            activation->finishCreation(callFrame);
+            SharedSymbolTable* symbolTable = codeBlock->symbolTable();
+            JSActivation* activation = new (
+                NotNull,
+                allocateCell<JSActivation>(
+                    globalData.heap,
+                    allocationSize(symbolTable)
+                )
+            ) JSActivation(globalData, callFrame, symbolTable);
+            activation->finishCreation(globalData);
             return activation;
         }
-
-        static void finalize(JSCell*);
 
         static void visitChildren(JSCell*, SlotVisitor&);
 
         bool isDynamicScope(bool& requiresDynamicChecks) const;
 
         static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        static void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        JS_EXPORT_PRIVATE static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
 
         static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
 
@@ -75,11 +81,15 @@ namespace JSC {
 
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue proto) { return Structure::create(globalData, globalObject, proto, TypeInfo(ActivationObjectType, StructureFlags), &s_info); }
 
-        bool isValidScopedLookup(int index) { return index < m_numCapturedVars; }
+        WriteBarrierBase<Unknown>& registerAt(int) const;
+        bool isValidIndex(int) const;
+        bool isValid(const SymbolTableEntry&) const;
+        bool isTornOff();
+        int registersOffset();
+        static int registersOffset(SharedSymbolTable*);
 
     protected:
-        void finishCreation(CallFrame*);
-        static const unsigned StructureFlags = IsEnvironmentRecord | OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | Base::StructureFlags;
 
     private:
         bool symbolTableGet(PropertyName, PropertySlot&);
@@ -91,12 +101,29 @@ namespace JSC {
         static JSValue argumentsGetter(ExecState*, JSValue, PropertyName);
         NEVER_INLINE PropertySlot::GetValueFunc getArgumentsGetter();
 
-        int m_numCapturedArgs;
-        int m_numCapturedVars : 30;
-        bool m_isTornOff : 1;
-        bool m_requiresDynamicChecks : 1;
-        int m_argumentsRegister;
+        static size_t allocationSize(SharedSymbolTable*);
+        static size_t storageOffset();
+
+        WriteBarrier<Unknown>* storage(); // captureCount() number of registers.
     };
+
+    extern int activationCount;
+    extern int allTheThingsCount;
+
+    inline JSActivation::JSActivation(JSGlobalData& globalData, CallFrame* callFrame, SharedSymbolTable* symbolTable)
+        : Base(
+            globalData,
+            callFrame->lexicalGlobalObject()->activationStructure(),
+            callFrame->registers(),
+            callFrame->scope(),
+            symbolTable
+        )
+    {
+        WriteBarrier<Unknown>* storage = this->storage();
+        size_t captureCount = symbolTable->captureCount();
+        for (size_t i = 0; i < captureCount; ++i)
+            new(&storage[i]) WriteBarrier<Unknown>;
+    }
 
     JSActivation* asActivation(JSValue);
 
@@ -113,28 +140,73 @@ namespace JSC {
 
     inline bool JSActivation::isDynamicScope(bool& requiresDynamicChecks) const
     {
-        requiresDynamicChecks = m_requiresDynamicChecks;
+        requiresDynamicChecks = symbolTable()->usesNonStrictEval();
         return false;
+    }
+
+    inline int JSActivation::registersOffset(SharedSymbolTable* symbolTable)
+    {
+        return storageOffset() - (symbolTable->captureStart() * sizeof(WriteBarrier<Unknown>));
     }
 
     inline void JSActivation::tearOff(JSGlobalData& globalData)
     {
-        ASSERT(!m_registerArray);
-        ASSERT(m_numCapturedVars + m_numCapturedArgs);
+        ASSERT(!isTornOff());
 
-        int registerOffset = CallFrame::offsetFor(m_numCapturedArgs + 1);
-        size_t registerArraySize = registerOffset + m_numCapturedVars;
+        WriteBarrierBase<Unknown>* dst = reinterpret_cast<WriteBarrierBase<Unknown>*>(
+            reinterpret_cast<char*>(this) + registersOffset(symbolTable()));
+        WriteBarrierBase<Unknown>* src = m_registers;
 
-        OwnArrayPtr<WriteBarrier<Unknown> > registerArray = adoptArrayPtr(new WriteBarrier<Unknown>[registerArraySize]);
-        WriteBarrier<Unknown>* registers = registerArray.get() + registerOffset;
+        int captureEnd = symbolTable()->captureEnd();
+        for (int i = symbolTable()->captureStart(); i < captureEnd; ++i)
+            dst[i].set(globalData, this, src[i].get());
 
-        int from = CallFrame::argumentOffset(m_numCapturedArgs - 1);
-        int to = m_numCapturedVars;
-        for (int i = from; i < to; ++i)
-            registers[i].set(globalData, this, m_registers[i].get());
+        m_registers = dst;
+        ASSERT(isTornOff());
+    }
 
-        setRegisters(registers, registerArray.release());
-        m_isTornOff = true;
+    inline bool JSActivation::isTornOff()
+    {
+        return m_registers == reinterpret_cast<WriteBarrierBase<Unknown>*>(
+            reinterpret_cast<char*>(this) + registersOffset(symbolTable()));
+    }
+
+    inline size_t JSActivation::storageOffset()
+    {
+        return WTF::roundUpToMultipleOf<sizeof(WriteBarrier<Unknown>)>(sizeof(JSActivation));
+    }
+
+    inline WriteBarrier<Unknown>* JSActivation::storage()
+    {
+        return reinterpret_cast<WriteBarrier<Unknown>*>(
+            reinterpret_cast<char*>(this) + storageOffset());
+    }
+
+    inline size_t JSActivation::allocationSize(SharedSymbolTable* symbolTable)
+    {
+        size_t objectSizeInBytes = WTF::roundUpToMultipleOf<sizeof(WriteBarrier<Unknown>)>(sizeof(JSActivation));
+        size_t storageSizeInBytes = symbolTable->captureCount() * sizeof(WriteBarrier<Unknown>);
+        return objectSizeInBytes + storageSizeInBytes;
+    }
+
+    inline bool JSActivation::isValidIndex(int index) const
+    {
+        if (index < symbolTable()->captureStart())
+            return false;
+        if (index >= symbolTable()->captureEnd())
+            return false;
+        return true;
+    }
+
+    inline bool JSActivation::isValid(const SymbolTableEntry& entry) const
+    {
+        return isValidIndex(entry.getIndex());
+    }
+
+    inline WriteBarrierBase<Unknown>& JSActivation::registerAt(int index) const
+    {
+        ASSERT(isValidIndex(index));
+        return Base::registerAt(index);
     }
 
 } // namespace JSC

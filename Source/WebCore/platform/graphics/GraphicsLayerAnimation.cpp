@@ -22,11 +22,59 @@
 #if USE(ACCELERATED_COMPOSITING)
 #include "GraphicsLayerAnimation.h"
 
+#include "LayoutSize.h"
 #include "UnitBezier.h"
 #include <wtf/CurrentTime.h>
 
 namespace WebCore {
 
+#if ENABLE(CSS_FILTERS)
+static inline PassRefPtr<FilterOperation> blendFunc(FilterOperation* fromOp, FilterOperation* toOp, double progress, const IntSize& size, bool blendToPassthrough = false)
+{
+    ASSERT(toOp);
+    if (toOp->blendingNeedsRendererSize())
+        return toOp->blend(fromOp, progress, LayoutSize(size.width(), size.height()), blendToPassthrough);
+
+    return toOp->blend(fromOp, progress, blendToPassthrough);
+}
+
+
+static FilterOperations applyFilterAnimation(const FilterOperations* from, const FilterOperations* to, double progress, const IntSize& boxSize)
+{
+    // First frame of an animation.
+    if (!progress)
+        return *from;
+
+    // Last frame of an animation.
+    if (progress == 1)
+        return *to;
+
+    if (!from->operationsMatch(*to))
+        return *to;
+
+    FilterOperations result;
+
+    size_t fromSize = from->operations().size();
+    size_t toSize = to->operations().size();
+    size_t size = std::max(fromSize, toSize);
+    for (size_t i = 0; i < size; i++) {
+        RefPtr<FilterOperation> fromOp = (i < fromSize) ? from->operations()[i].get() : 0;
+        RefPtr<FilterOperation> toOp = (i < toSize) ? to->operations()[i].get() : 0;
+        RefPtr<FilterOperation> blendedOp = toOp ? blendFunc(fromOp.get(), toOp.get(), progress, boxSize) : (fromOp ? blendFunc(0, fromOp.get(), progress, boxSize, true) : 0);
+        if (blendedOp)
+            result.operations().append(blendedOp);
+        else {
+            RefPtr<FilterOperation> identityOp = PassthroughFilterOperation::create();
+            if (progress > 0.5)
+                result.operations().append(toOp ? toOp : identityOp);
+            else
+                result.operations().append(fromOp ? fromOp : identityOp);
+        }
+    }
+
+    return result;
+}
+#endif
 
 static bool shouldReverseAnimationValue(Animation::AnimationDirection direction, int loopCount)
 {
@@ -37,7 +85,7 @@ static bool shouldReverseAnimationValue(Animation::AnimationDirection direction,
     return false;
 }
 
-static double normalizedAnimationValue(double runningTime, double duration, Animation::AnimationDirection direction)
+static double normalizedAnimationValue(double runningTime, double duration, Animation::AnimationDirection direction, double iterationCount)
 {
     if (!duration)
         return 0;
@@ -45,7 +93,8 @@ static double normalizedAnimationValue(double runningTime, double duration, Anim
     const int loopCount = runningTime / duration;
     const double lastFullLoop = duration * double(loopCount);
     const double remainder = runningTime - lastFullLoop;
-    const double normalized = remainder / duration;
+    // Ignore remainder when we've reached the end of animation.
+    const double normalized = (loopCount == iterationCount) ? 1.0 : (remainder / duration);
 
     return shouldReverseAnimationValue(direction, loopCount) ? 1 - normalized : normalized;
 }
@@ -154,15 +203,26 @@ static TransformationMatrix applyTransformAnimation(const TransformOperations* f
     return matrix;
 }
 
+static const TimingFunction* timingFunctionForAnimationValue(const AnimationValue* animValue, const Animation* anim)
+{
+    if (animValue->timingFunction())
+        return animValue->timingFunction();
+    if (anim->timingFunction())
+        return anim->timingFunction().get();
 
-GraphicsLayerAnimation::GraphicsLayerAnimation(const String& name, const KeyframeValueList& keyframes, const IntSize& boxSize, const Animation* animation, double timeOffset, bool listsMatch)
+    return CubicBezierTimingFunction::defaultTimingFunction();
+}
+
+GraphicsLayerAnimation::GraphicsLayerAnimation(const String& name, const KeyframeValueList& keyframes, const IntSize& boxSize, const Animation* animation, double startTime, bool listsMatch)
     : m_keyframes(keyframes)
     , m_boxSize(boxSize)
     , m_animation(Animation::create(animation))
     , m_name(name)
     , m_listsMatch(listsMatch)
-    , m_startTime(WTF::currentTime() - timeOffset)
+    , m_startTime(startTime)
     , m_pauseTime(0)
+    , m_totalRunningTime(0)
+    , m_lastRefreshedTime(m_startTime)
     , m_state(PlayingState)
 {
 }
@@ -176,6 +236,11 @@ void GraphicsLayerAnimation::applyInternal(Client* client, const AnimationValue*
     case AnimatedPropertyWebkitTransform:
         client->setAnimatedTransform(applyTransformAnimation(static_cast<const TransformAnimationValue*>(from)->value(), static_cast<const TransformAnimationValue*>(to)->value(), progress, m_boxSize, m_listsMatch));
         return;
+#if ENABLE(CSS_FILTERS)
+    case AnimatedPropertyWebkitFilter:
+        client->setAnimatedFilters(applyFilterAnimation(static_cast<const FilterAnimationValue*>(from)->value(), static_cast<const FilterAnimationValue*>(to)->value(), progress, m_boxSize));
+        return;
+#endif
     default:
         ASSERT_NOT_REACHED();
     }
@@ -213,8 +278,8 @@ void GraphicsLayerAnimation::apply(Client* client)
     if (!isActive())
         return;
 
-    double totalRunningTime = m_state == PausedState ? m_pauseTime : WTF::currentTime() - m_startTime;
-    double normalizedValue = normalizedAnimationValue(totalRunningTime, m_animation->duration(), m_animation->direction());
+    double totalRunningTime = computeTotalRunningTime();
+    double normalizedValue = normalizedAnimationValue(totalRunningTime, m_animation->duration(), m_animation->direction(), m_animation->iterationCount());
 
     if (m_animation->iterationCount() != Animation::IterationCountInfinite && totalRunningTime >= m_animation->duration() * m_animation->iterationCount()) {
         setState(StoppedState);
@@ -232,7 +297,8 @@ void GraphicsLayerAnimation::apply(Client* client)
         return;
     }
     if (m_keyframes.size() == 2) {
-        normalizedValue = applyTimingFunction(m_animation->timingFunction().get(), normalizedValue, m_animation->duration());
+        const TimingFunction* timingFunction = timingFunctionForAnimationValue(m_keyframes.at(0), m_animation.get());
+        normalizedValue = applyTimingFunction(timingFunction, normalizedValue, m_animation->duration());
         applyInternal(client, m_keyframes.at(0), m_keyframes.at(1), normalizedValue);
         return;
     }
@@ -244,21 +310,42 @@ void GraphicsLayerAnimation::apply(Client* client)
             continue;
 
         normalizedValue = (normalizedValue - from->keyTime()) / (to->keyTime() - from->keyTime());
-        normalizedValue = applyTimingFunction(from->timingFunction(), normalizedValue, m_animation->duration());
+        const TimingFunction* timingFunction = timingFunctionForAnimationValue(from, m_animation.get());
+        normalizedValue = applyTimingFunction(timingFunction, normalizedValue, m_animation->duration());
         applyInternal(client, from, to, normalizedValue);
         break;
     }
 }
 
-void GraphicsLayerAnimation::pause(double offset)
+double GraphicsLayerAnimation::computeTotalRunningTime()
 {
-    // FIXME: should apply offset here.
+    if (state() == PausedState)
+        return m_pauseTime;
+
+    double oldLastRefreshedTime = m_lastRefreshedTime;
+    m_lastRefreshedTime = WTF::currentTime();
+    m_totalRunningTime += m_lastRefreshedTime - oldLastRefreshedTime;
+    return m_totalRunningTime;
+}
+
+void GraphicsLayerAnimation::pause(double time)
+{
     setState(PausedState);
-    m_pauseTime = WTF::currentTime() - offset;
+    m_pauseTime = time;
+}
+
+void GraphicsLayerAnimation::resume()
+{
+    setState(PlayingState);
+    m_totalRunningTime = m_pauseTime;
+    m_lastRefreshedTime = WTF::currentTime();
 }
 
 void GraphicsLayerAnimations::add(const GraphicsLayerAnimation& animation)
 {
+    // Remove the old state if we are resuming a paused animation.
+    remove(animation.name(), animation.property());
+
     m_animations.append(animation);
 }
 
@@ -270,10 +357,30 @@ void GraphicsLayerAnimations::pause(const String& name, double offset)
     }
 }
 
+void GraphicsLayerAnimations::suspend(double offset)
+{
+    for (size_t i = 0; i < m_animations.size(); ++i)
+        m_animations[i].pause(offset);
+}
+
+void GraphicsLayerAnimations::resume()
+{
+    for (size_t i = 0; i < m_animations.size(); ++i)
+        m_animations[i].resume();
+}
+
 void GraphicsLayerAnimations::remove(const String& name)
 {
     for (int i = m_animations.size() - 1; i >= 0; --i) {
         if (m_animations[i].name() == name)
+            m_animations.remove(i);
+    }
+}
+
+void GraphicsLayerAnimations::remove(const String& name, AnimatedPropertyID property)
+{
+    for (int i = m_animations.size() - 1; i >= 0; --i) {
+        if (m_animations[i].name() == name && m_animations[i].property() == property)
             m_animations.remove(i);
     }
 }
@@ -284,6 +391,15 @@ void GraphicsLayerAnimations::apply(GraphicsLayerAnimation::Client* client)
         m_animations[i].apply(client);
 }
 
+GraphicsLayerAnimations GraphicsLayerAnimations::getActiveAnimations() const
+{
+    GraphicsLayerAnimations active;
+    for (size_t i = 0; i < m_animations.size(); ++i) {
+        if (m_animations[i].isActive())
+            active.add(m_animations[i]);
+    }
+    return active;
+}
 }
 #endif
 

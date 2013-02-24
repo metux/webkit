@@ -35,7 +35,8 @@
 #include "JSClassRef.h"
 #include "JSGlobalObject.h"
 #include "JSObject.h"
-#include "UStringBuilder.h"
+#include "Operations.h"
+#include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringHash.h>
 
 #if OS(DARWIN)
@@ -54,7 +55,7 @@ using namespace JSC;
 JSContextGroupRef JSContextGroupCreate()
 {
     initializeThreading();
-    return toRef(JSGlobalData::createContextGroup(ThreadStackTypeSmall).leakRef());
+    return toRef(JSGlobalData::createContextGroup().leakRef());
 }
 
 JSContextGroupRef JSContextGroupRetain(JSContextGroupRef group)
@@ -65,7 +66,16 @@ JSContextGroupRef JSContextGroupRetain(JSContextGroupRef group)
 
 void JSContextGroupRelease(JSContextGroupRef group)
 {
-    toJS(group)->deref();
+    IdentifierTable* savedIdentifierTable;
+    JSGlobalData& globalData = *toJS(group);
+
+    {
+        JSLockHolder lock(globalData);
+        savedIdentifierTable = wtfThreadData().setCurrentIdentifierTable(globalData.identifierTable);
+        globalData.deref();
+    }
+
+    wtfThreadData().setCurrentIdentifierTable(savedIdentifierTable);
 }
 
 // From the API's perspective, a global context remains alive iff it has been JSGlobalContextRetained.
@@ -89,7 +99,7 @@ JSGlobalContextRef JSGlobalContextCreateInGroup(JSContextGroupRef group, JSClass
 {
     initializeThreading();
 
-    RefPtr<JSGlobalData> globalData = group ? PassRefPtr<JSGlobalData>(toJS(group)) : JSGlobalData::createContextGroup(ThreadStackTypeSmall);
+    RefPtr<JSGlobalData> globalData = group ? PassRefPtr<JSGlobalData>(toJS(group)) : JSGlobalData::createContextGroup();
 
     APIEntryShim entryShim(globalData.get(), false);
     globalData->makeUsableFromMultipleThreads();
@@ -167,27 +177,25 @@ JSStringRef JSContextCreateBacktrace(JSContextRef ctx, unsigned maxStackSize)
     JSLockHolder lock(exec);
 
     unsigned count = 0;
-    UStringBuilder builder;
+    StringBuilder builder;
     CallFrame* callFrame = exec;
-    UString functionName;
+    String functionName;
     if (exec->callee()) {
         if (asObject(exec->callee())->inherits(&InternalFunction::s_info)) {
             functionName = asInternalFunction(exec->callee())->name(exec);
-            builder.append("#0 ");
+            builder.appendLiteral("#0 ");
             builder.append(functionName);
-            builder.append("() ");
+            builder.appendLiteral("() ");
             count++;
         }
     }
     while (true) {
-        ASSERT(callFrame);
+        RELEASE_ASSERT(callFrame);
         int signedLineNumber;
         intptr_t sourceID;
-        UString urlString;
+        String urlString;
         JSValue function;
-        
-        UString levelStr = UString::number(count);
-        
+
         exec->interpreter()->retrieveLastCaller(callFrame, signedLineNumber, sourceID, urlString, function);
 
         if (function)
@@ -200,20 +208,20 @@ JSStringRef JSContextCreateBacktrace(JSContextRef ctx, unsigned maxStackSize)
         }
         unsigned lineNumber = signedLineNumber >= 0 ? signedLineNumber : 0;
         if (!builder.isEmpty())
-            builder.append("\n");
-        builder.append("#");
-        builder.append(levelStr);
-        builder.append(" ");
+            builder.append('\n');
+        builder.append('#');
+        builder.appendNumber(count);
+        builder.append(' ');
         builder.append(functionName);
-        builder.append("() at ");
+        builder.appendLiteral("() at ");
         builder.append(urlString);
-        builder.append(":");
-        builder.append(UString::number(lineNumber));
+        builder.append(':');
+        builder.appendNumber(lineNumber);
         if (!function || ++count == maxStackSize)
             break;
         callFrame = callFrame->callerFrame();
     }
-    return OpaqueJSString::create(builder.toUString()).leakRef();
+    return OpaqueJSString::create(builder.toString()).leakRef();
 }
 
 

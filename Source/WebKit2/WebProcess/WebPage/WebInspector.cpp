@@ -51,6 +51,10 @@ WebInspector::WebInspector(WebPage* page, InspectorFrontendChannel* frontendChan
     , m_inspectorPage(0)
     , m_frontendClient(0)
     , m_frontendChannel(frontendChannel)
+#if PLATFORM(MAC)
+    , m_hasLocalizedStringsURL(false)
+    , m_usesWebKitUserInterface(false)
+#endif
 #if ENABLE(INSPECTOR_SERVER)
     , m_remoteFrontendConnected(false)
 #endif
@@ -141,6 +145,12 @@ void WebInspector::show()
 void WebInspector::close()
 {
     m_page->corePage()->inspectorController()->close();
+}
+
+void WebInspector::setAttachedWindow(bool attached)
+{
+    if (m_frontendClient)
+        m_frontendClient->setAttachedWindow(attached);
 }
 
 void WebInspector::evaluateScriptForTest(long callID, const String& script)
@@ -236,8 +246,12 @@ void WebInspector::stopPageProfiling()
 
 void WebInspector::updateDockingAvailability()
 {
-    if (m_frontendClient)
-        m_frontendClient->setDockingUnavailable(!m_frontendClient->canAttachWindow());
+    if (!m_frontendClient)
+        return;
+
+    bool canAttachWindow = m_frontendClient->canAttachWindow();
+    WebProcess::shared().connection()->send(Messages::WebInspectorProxy::AttachAvailabilityChanged(canAttachWindow), m_page->pageID());
+    m_frontendClient->setDockingUnavailable(!canAttachWindow);
 }
 
 #if ENABLE(INSPECTOR_SERVER)

@@ -26,20 +26,16 @@
 #include "CSSValueKeywords.h"
 #include "CachedImage.h"
 #include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
+#include "CachedResourceRequestInitiators.h"
 #include "Document.h"
+#include "Element.h"
 #include "MemoryCache.h"
-#include "MemoryInstrumentation.h"
 #include "StyleCachedImage.h"
 #include "StylePendingImage.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
-
-CSSImageValue::CSSImageValue(ClassType classType, const String& url)
-    : CSSValue(classType)
-    , m_url(url)
-    , m_accessedImage(false)
-{
-}
 
 CSSImageValue::CSSImageValue(const String& url)
     : CSSValue(ImageClass)
@@ -70,37 +66,21 @@ StyleImage* CSSImageValue::cachedOrPendingImage()
 
 StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader* loader)
 {
-    if (isCursorImageValue())
-        return static_cast<CSSCursorImageValue*>(this)->cachedImage(loader);
-    return cachedImage(loader, m_url);
-}
-
-StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader* loader, const String& url)
-{
     ASSERT(loader);
 
     if (!m_accessedImage) {
         m_accessedImage = true;
 
-        ResourceRequest request(loader->document()->completeURL(url));
+        CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(m_url)));
+        if (m_initiatorName.isEmpty())
+            request.setInitiator(cachedResourceRequestInitiators().css);
+        else
+            request.setInitiator(m_initiatorName);
         if (CachedResourceHandle<CachedImage> cachedImage = loader->requestImage(request))
             m_image = StyleCachedImage::create(cachedImage.get());
     }
 
     return (m_image && m_image->isCachedImage()) ? static_cast<StyleCachedImage*>(m_image.get()) : 0;
-}
-
-String CSSImageValue::cachedImageURL()
-{
-    if (!m_image || !m_image->isCachedImage())
-        return String();
-    return static_cast<StyleCachedImage*>(m_image.get())->cachedImage()->url();
-}
-
-void CSSImageValue::clearCachedImage()
-{
-    m_image = 0;
-    m_accessedImage = false;
 }
 
 bool CSSImageValue::hasFailedOrCanceledSubresources() const
@@ -111,6 +91,11 @@ bool CSSImageValue::hasFailedOrCanceledSubresources() const
     if (!cachedResource)
         return true;
     return cachedResource->loadFailedOrCanceled();
+}
+
+bool CSSImageValue::equals(const CSSImageValue& other) const
+{
+    return m_url == other.m_url;
 }
 
 String CSSImageValue::customCssText() const
@@ -128,9 +113,14 @@ PassRefPtr<CSSValue> CSSImageValue::cloneForCSSOM() const
 
 void CSSImageValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
-    info.addInstrumentedMember(m_url);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_url, "url");
     // No need to report m_image as it is counted as part of RenderArena.
+}
+
+bool CSSImageValue::knownToBeOpaque(const RenderObject* renderer) const
+{
+    return m_image ? m_image->knownToBeOpaque(renderer) : false;
 }
 
 } // namespace WebCore

@@ -35,6 +35,7 @@
 #include "Event.h"
 #include "EventException.h"
 #include "InspectorInstrumentation.h"
+#include "WebKitTransitionEvent.h"
 #include <wtf/MainThread.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
@@ -42,32 +43,6 @@
 using namespace WTF;
 
 namespace WebCore {
-
-#ifndef NDEBUG
-static int gEventDispatchForbidden = 0;
-
-void forbidEventDispatch()
-{
-    if (!isMainThread())
-        return;
-    ++gEventDispatchForbidden;
-}
-
-void allowEventDispatch()
-{
-    if (!isMainThread())
-        return;
-    if (gEventDispatchForbidden > 0)
-        --gEventDispatchForbidden;
-}
-
-bool eventDispatchForbidden()
-{
-    if (!isMainThread())
-        return false;
-    return gEventDispatchForbidden > 0;
-}
-#endif // NDEBUG
 
 EventTargetData::EventTargetData()
 {
@@ -110,16 +85,19 @@ bool EventTarget::removeEventListener(const AtomicString& eventType, EventListen
 
     // Notify firing events planning to invoke the listener at 'index' that
     // they have one less listener to invoke.
-    for (size_t i = 0; i < d->firingEventIterators.size(); ++i) {
-        if (eventType != d->firingEventIterators[i].eventType)
+    if (!d->firingEventIterators)
+        return true;
+    for (size_t i = 0; i < d->firingEventIterators->size(); ++i) {
+        FiringEventIterator& firingIterator = d->firingEventIterators->at(i);
+        if (eventType != firingIterator.eventType)
             continue;
 
-        if (indexOfRemovedListener >= d->firingEventIterators[i].end)
+        if (indexOfRemovedListener >= firingIterator.end)
             continue;
 
-        --d->firingEventIterators[i].end;
-        if (indexOfRemovedListener <= d->firingEventIterators[i].iterator)
-            --d->firingEventIterators[i].iterator;
+        --firingIterator.end;
+        if (indexOfRemovedListener <= firingIterator.iterator)
+            --firingIterator.iterator;
     }
 
     return true;
@@ -183,20 +161,65 @@ void EventTarget::uncaughtExceptionInEventHandler()
 {
 }
 
+static PassRefPtr<Event> createMatchingPrefixedEvent(const Event* event)
+{
+    if (event->type() == eventNames().transitionendEvent) {
+        const WebKitTransitionEvent* transitionEvent = static_cast<const WebKitTransitionEvent*>(event);
+        RefPtr<Event> prefixedEvent = WebKitTransitionEvent::create(eventNames().webkitTransitionEndEvent, transitionEvent->propertyName(), transitionEvent->elapsedTime(), transitionEvent->pseudoElement());
+        prefixedEvent->setTarget(event->target());
+        prefixedEvent->setCurrentTarget(event->currentTarget());
+        prefixedEvent->setEventPhase(event->eventPhase());
+        return prefixedEvent.release();
+    }
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+static AtomicString prefixedType(const Event* event)
+{
+    if (event->type() == eventNames().transitionendEvent)
+        return eventNames().webkitTransitionEndEvent;
+
+    return emptyString();
+}
+
 bool EventTarget::fireEventListeners(Event* event)
 {
-    ASSERT(!eventDispatchForbidden());
+    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
     ASSERT(event && !event->type().isEmpty());
 
     EventTargetData* d = eventTargetData();
     if (!d)
         return true;
 
-    EventListenerVector* listenerVector = d->eventListenerMap.find(event->type());
+    EventListenerVector* listenerPrefixedVector = 0;
+    AtomicString prefixedTypeName = prefixedType(event);
+    if (!prefixedTypeName.isEmpty())
+        listenerPrefixedVector = d->eventListenerMap.find(prefixedTypeName);
 
-    if (listenerVector)
-        fireEventListeners(event, d, *listenerVector);
-    
+    EventListenerVector* listenerUnprefixedVector = d->eventListenerMap.find(event->type());
+
+    if (listenerUnprefixedVector)
+        fireEventListeners(event, d, *listenerUnprefixedVector);
+    else if (listenerPrefixedVector)
+        fireEventListeners(createMatchingPrefixedEvent(event).get(), d, *listenerPrefixedVector);
+
+    if (!prefixedTypeName.isEmpty()) {
+        ScriptExecutionContext* context = scriptExecutionContext();
+        if (context && context->isDocument()) {
+            Document* document = static_cast<Document*>(context);
+            if (document->domWindow()) {
+                if (listenerPrefixedVector)
+                    if (listenerUnprefixedVector)
+                        FeatureObserver::observe(document->domWindow(), FeatureObserver::PrefixedAndUnprefixedTransitionEndEvent);
+                    else
+                        FeatureObserver::observe(document->domWindow(), FeatureObserver::PrefixedTransitionEndEvent);
+                else if (listenerUnprefixedVector)
+                    FeatureObserver::observe(document->domWindow(), FeatureObserver::UnprefixedTransitionEndEvent);
+            }
+        }
+    }
+
     return !event->defaultPrevented();
 }
         
@@ -211,7 +234,9 @@ void EventTarget::fireEventListeners(Event* event, EventTargetData* d, EventList
 
     size_t i = 0;
     size_t end = entry.size();
-    d->firingEventIterators.append(FiringEventIterator(event->type(), i, end));
+    if (!d->firingEventIterators)
+        d->firingEventIterators = adoptPtr(new FiringEventIteratorVector);
+    d->firingEventIterators->append(FiringEventIterator(event->type(), i, end));
     for ( ; i < end; ++i) {
         RegisteredEventListener& registeredListener = entry[i];
         if (event->eventPhase() == Event::CAPTURING_PHASE && !registeredListener.useCapture)
@@ -231,7 +256,7 @@ void EventTarget::fireEventListeners(Event* event, EventTargetData* d, EventList
         registeredListener.listener->handleEvent(context, event);
         InspectorInstrumentation::didHandleEvent(cookie);
     }
-    d->firingEventIterators.removeLast();
+    d->firingEventIterators->removeLast();
 }
 
 const EventListenerVector& EventTarget::getEventListeners(const AtomicString& eventType)
@@ -258,9 +283,11 @@ void EventTarget::removeAllEventListeners()
 
     // Notify firing events planning to invoke the listener at 'index' that
     // they have one less listener to invoke.
-    for (size_t i = 0; i < d->firingEventIterators.size(); ++i) {
-        d->firingEventIterators[i].iterator = 0;
-        d->firingEventIterators[i].end = 0;
+    if (d->firingEventIterators) {
+        for (size_t i = 0; i < d->firingEventIterators->size(); ++i) {
+            d->firingEventIterators->at(i).iterator = 0;
+            d->firingEventIterators->at(i).end = 0;
+        }
     }
 }
 

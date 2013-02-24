@@ -32,9 +32,9 @@ namespace WebCore {
 
 class CSSRule;
 class CSSStyleSheet;
+class Document;
 class MediaList;
 class MediaQuery;
-class MemoryObjectInfo;
 
 class MediaQuerySet : public RefCounted<MediaQuerySet> {
 public:
@@ -120,6 +120,11 @@ private:
     CSSStyleSheet* m_parentStyleSheet;
     CSSRule* m_parentRule;
 };
+
+#if ENABLE(RESOLUTION_MEDIA_QUERY)
+// Adds message to inspector console whenever dpi or dpcm values are used for "screen" media.
+void reportMediaQueryWarningIfNeeded(Document*, const MediaQuerySet*);
+#endif
 
 } // namespace
 

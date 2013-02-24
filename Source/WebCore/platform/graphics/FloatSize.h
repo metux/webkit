@@ -60,14 +60,14 @@ typedef struct _NSSize NSSize;
 namespace WebCore {
 
 class IntSize;
-class FractionalLayoutSize;
+class LayoutSize;
 
 class FloatSize {
 public:
     FloatSize() : m_width(0), m_height(0) { }
     FloatSize(float width, float height) : m_width(width), m_height(height) { }
     FloatSize(const IntSize&);
-    FloatSize(const FractionalLayoutSize&);
+    FloatSize(const LayoutSize&);
 
     static FloatSize narrowPrecision(double width, double height);
 
@@ -121,7 +121,7 @@ public:
     }
 
 #if PLATFORM(QT)
-    FloatSize(const QSizeF&);
+    explicit FloatSize(const QSizeF&);
     operator QSizeF() const;
 #endif
 
@@ -135,8 +135,9 @@ public:
     operator CGSize() const;
 #endif
 
-#if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)) \
-        || (PLATFORM(CHROMIUM) && OS(DARWIN)) || (PLATFORM(QT) && USE(QTKIT))
+#if (PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))) \
+        && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES) \
+        || (PLATFORM(QT) && USE(QTKIT))
     explicit FloatSize(const NSSize &); // don't do this implicitly since it's lossy
     operator NSSize() const;
 #endif
@@ -172,6 +173,16 @@ inline FloatSize operator-(const FloatSize& a, const FloatSize& b)
 inline FloatSize operator-(const FloatSize& size)
 {
     return FloatSize(-size.width(), -size.height());
+}
+
+inline FloatSize operator*(const FloatSize& a, const float b)
+{
+    return FloatSize(a.width() * b, a.height() * b);
+}
+
+inline FloatSize operator*(const float a, const FloatSize& b)
+{
+    return FloatSize(a * b.width(), a * b.height());
 }
 
 inline bool operator==(const FloatSize& a, const FloatSize& b)

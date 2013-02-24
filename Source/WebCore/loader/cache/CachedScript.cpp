@@ -27,17 +27,15 @@
 #include "config.h"
 #include "CachedScript.h"
 
-#include "MemoryCache.h"
 #include "CachedResourceClient.h"
 #include "CachedResourceClientWalker.h"
-#include "MemoryInstrumentation.h"
-#include "SharedBuffer.h"
+#include "HTTPParsers.h"
+#include "MIMETypeRegistry.h"
+#include "MemoryCache.h"
+#include "ResourceBuffer.h"
 #include "TextResourceDecoder.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/Vector.h>
-
-#if USE(JSC)  
-#include <parser/SourceProvider.h>
-#endif
 
 namespace WebCore {
 
@@ -65,13 +63,18 @@ String CachedScript::encoding() const
     return m_decoder->encoding().name();
 }
 
+String CachedScript::mimeType() const
+{
+    return extractMIMETypeFromMediaType(m_response.httpHeaderField("Content-Type")).lower();
+}
+
 const String& CachedScript::script()
 {
     ASSERT(!isPurgeable());
 
     if (!m_script && m_data) {
         m_script = m_decoder->decode(m_data->data(), encodedSize());
-        m_script += m_decoder->flush();
+        m_script.append(m_decoder->flush());
         setDecodedSize(m_script.sizeInBytes());
     }
     m_decodedDataDeletionTimer.startOneShot(0);
@@ -79,7 +82,7 @@ const String& CachedScript::script()
     return m_script;
 }
 
-void CachedScript::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
+void CachedScript::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
 {
     if (!allDataReceived)
         return;
@@ -90,52 +93,27 @@ void CachedScript::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
     checkNotify();
 }
 
-void CachedScript::error(CachedResource::Status status)
-{
-    setStatus(status);
-    ASSERT(errorOccurred());
-    setLoading(false);
-    checkNotify();
-}
-
 void CachedScript::destroyDecodedData()
 {
     m_script = String();
-    unsigned extraSize = 0;
-#if USE(JSC)
-    if (m_sourceProviderCache && m_clients.isEmpty())
-        m_sourceProviderCache->clear();
-
-    extraSize = m_sourceProviderCache ? m_sourceProviderCache->byteSize() : 0;
-#endif
-    setDecodedSize(extraSize);
+    setDecodedSize(0);
     if (!MemoryCache::shouldMakeResourcePurgeableOnEviction() && isSafeToMakePurgeable())
         makePurgeable(true);
 }
 
-#if USE(JSC)
-JSC::SourceProviderCache* CachedScript::sourceProviderCache() const
-{   
-    if (!m_sourceProviderCache) 
-        m_sourceProviderCache = adoptPtr(new JSC::SourceProviderCache); 
-    return m_sourceProviderCache.get(); 
-}
-
-void CachedScript::sourceProviderCacheSizeChanged(int delta)
+#if ENABLE(NOSNIFF)
+bool CachedScript::mimeTypeAllowedByNosniff() const
 {
-    setDecodedSize(decodedSize() + delta);
+    return !parseContentTypeOptionsHeader(m_response.httpHeaderField("X-Content-Type-Options")) == ContentTypeOptionsNosniff || MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType());
 }
 #endif
 
 void CachedScript::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CachedResourceScript);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceScript);
     CachedResource::reportMemoryUsage(memoryObjectInfo);
-    info.addInstrumentedMember(m_script);
-    info.addMember(m_decoder);
-#if USE(JSC)
-    info.addMember(m_sourceProviderCache);
-#endif
+    info.addMember(m_script, "script");
+    info.addMember(m_decoder, "decoder");
 }
 
 } // namespace WebCore

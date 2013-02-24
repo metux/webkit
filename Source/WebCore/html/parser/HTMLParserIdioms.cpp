@@ -26,11 +26,12 @@
 #include "HTMLParserIdioms.h"
 
 #include "Decimal.h"
+#include "QualifiedName.h"
 #include <limits>
 #include <wtf/MathExtras.h>
-#include <wtf/dtoa.h>
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/StringBuilder.h>
+#include <wtf/text/StringHash.h>
 
 namespace WebCore {
 
@@ -87,8 +88,7 @@ String serializeForNumberType(double number)
 {
     // According to HTML5, "the best representation of the number n as a floating
     // point number" is a string produced by applying ToString() to n.
-    NumberToStringBuffer buffer;
-    return String(numberToString(number, buffer));
+    return String::numberToStringECMAScript(number);
 }
 
 Decimal parseToDecimalForNumberType(const String& string, const Decimal& fallbackValue)
@@ -135,7 +135,7 @@ double parseToDoubleForNumberType(const String& string, double fallbackValue)
         return fallbackValue;
 
     // NaN and infinity are considered valid by String::toDouble, but not valid here.
-    if (!isfinite(value))
+    if (!std::isfinite(value))
         return fallbackValue;
 
     // Numbers are considered finite IEEE 754 single-precision floating point values.
@@ -152,14 +152,9 @@ double parseToDoubleForNumberType(const String& string)
     return parseToDoubleForNumberType(string, std::numeric_limits<double>::quiet_NaN());
 }
 
-// http://www.whatwg.org/specs/web-apps/current-work/#rules-for-parsing-integers
-bool parseHTMLInteger(const String& input, int& value)
+template <typename CharacterType>
+static bool parseHTMLIntegerInternal(const CharacterType* position, const CharacterType* end, int& value)
 {
-    // Step 1
-    // Step 2
-    const UChar* position = input.characters();
-    const UChar* end = position + input.length();
-
     // Step 3
     int sign = 1;
 
@@ -199,18 +194,31 @@ bool parseHTMLInteger(const String& input, int& value)
 
     // Step 9
     bool ok;
-    value = sign * charactersToIntStrict(digits.characters(), digits.length(), &ok);
+    if (digits.is8Bit())
+        value = sign * charactersToIntStrict(digits.characters8(), digits.length(), &ok);
+    else
+        value = sign * charactersToIntStrict(digits.characters16(), digits.length(), &ok);
     return ok;
 }
 
-// http://www.whatwg.org/specs/web-apps/current-work/#rules-for-parsing-non-negative-integers
-bool parseHTMLNonNegativeInteger(const String& input, unsigned int& value)
+// http://www.whatwg.org/specs/web-apps/current-work/#rules-for-parsing-integers
+bool parseHTMLInteger(const String& input, int& value)
 {
     // Step 1
     // Step 2
-    const UChar* position = input.characters();
-    const UChar* end = position + input.length();
+    unsigned length = input.length();
+    if (length && input.is8Bit()) {
+        const LChar* start = input.characters8();
+        return parseHTMLIntegerInternal(start, start + length, value);
+    }
 
+    const UChar* start = input.characters();
+    return parseHTMLIntegerInternal(start, start + length, value);
+}
+
+template <typename CharacterType>
+static bool parseHTMLNonNegativeIntegerInternal(const CharacterType* position, const CharacterType* end, unsigned& value)
+{
     // Step 3
     while (position < end) {
         if (!isHTMLSpace(*position))
@@ -246,8 +254,44 @@ bool parseHTMLNonNegativeInteger(const String& input, unsigned int& value)
 
     // Step 9
     bool ok;
-    value = charactersToUIntStrict(digits.characters(), digits.length(), &ok);
+    if (digits.is8Bit())
+        value = charactersToUIntStrict(digits.characters8(), digits.length(), &ok);
+    else
+        value = charactersToUIntStrict(digits.characters16(), digits.length(), &ok);
     return ok;
+}
+
+
+// http://www.whatwg.org/specs/web-apps/current-work/#rules-for-parsing-non-negative-integers
+bool parseHTMLNonNegativeInteger(const String& input, unsigned& value)
+{
+    // Step 1
+    // Step 2
+    unsigned length = input.length();
+    if (length && input.is8Bit()) {
+        const LChar* start = input.characters8();
+        return parseHTMLNonNegativeIntegerInternal(start, start + length, value);
+    }
+    
+    const UChar* start = input.characters();
+    return parseHTMLNonNegativeIntegerInternal(start, start + length, value);
+}
+
+static bool threadSafeEqual(StringImpl* a, StringImpl* b)
+{
+    if (a->hash() != b->hash())
+        return false;
+    return StringHash::equal(a, b);
+}
+
+bool threadSafeMatch(const QualifiedName& a, const QualifiedName& b)
+{
+    return threadSafeEqual(a.localName().impl(), b.localName().impl());
+}
+
+bool threadSafeMatch(const String& localName, const QualifiedName& qName)
+{
+    return threadSafeEqual(localName.impl(), qName.localName().impl());
 }
 
 }

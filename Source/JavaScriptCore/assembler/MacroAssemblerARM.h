@@ -212,6 +212,14 @@ public:
         m_assembler.orrs(dest, dest, src);
     }
 
+    void or32(RegisterID src, AbsoluteAddress dest)
+    {
+        move(TrustedImmPtr(dest.m_ptr), ARMRegisters::S0);
+        load32(Address(ARMRegisters::S0), ARMRegisters::S1);
+        or32(src, ARMRegisters::S1);
+        store32(ARMRegisters::S1, ARMRegisters::S0);
+    }
+
     void or32(TrustedImm32 imm, RegisterID dest)
     {
         m_assembler.orrs(dest, dest, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
@@ -334,7 +342,7 @@ public:
 #else
         UNUSED_PARAM(src);
         UNUSED_PARAM(dest);
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
 #endif
     }
 
@@ -435,6 +443,13 @@ public:
     void store8(RegisterID src, BaseIndex address)
     {
         m_assembler.baseIndexTransfer32(ARMAssembler::StoreUint8, src, address.base, address.index, static_cast<int>(address.scale), address.offset);
+    }
+
+    void store8(TrustedImm32 imm, void* address)
+    {
+        move(TrustedImm32(reinterpret_cast<ARMWord>(address)), ARMRegisters::S0);
+        m_assembler.moveImm(imm.m_value, ARMRegisters::S1);
+        m_assembler.dtrUp(ARMAssembler::StoreUint8, ARMRegisters::S1, ARMRegisters::S0, 0);
     }
 
     void store16(RegisterID src, BaseIndex address)
@@ -555,11 +570,7 @@ public:
 
     Jump branch32(RelationalCondition cond, RegisterID left, TrustedImm32 right, int useConstantPool = 0)
     {
-        ARMWord tmp = (right.m_value == 0x80000000) ? ARMAssembler::InvalidImmediate : m_assembler.getOp2(-right.m_value);
-        if (tmp != ARMAssembler::InvalidImmediate)
-            m_assembler.cmn(left, tmp);
-        else
-            m_assembler.cmp(left, m_assembler.getImm(right.m_value, ARMRegisters::S0));
+        internalCompare32(left, right);
         return Jump(m_assembler.jmp(ARMCondition(cond), useConstantPool));
     }
 
@@ -655,6 +666,17 @@ public:
     {
         move(TrustedImmPtr(address.m_ptr), ARMRegisters::S0);
         load32(Address(ARMRegisters::S0, 0), ARMRegisters::pc);
+    }
+
+    void moveDoubleToInts(FPRegisterID src, RegisterID dest1, RegisterID dest2)
+    {
+        m_assembler.vmov(dest1, dest2, src);
+    }
+
+    void moveIntsToDouble(RegisterID src1, RegisterID src2, FPRegisterID dest, FPRegisterID scratch)
+    {
+        UNUSED_PARAM(scratch);
+        m_assembler.vmov(dest, src1, src2);
     }
 
     Jump branchAdd32(ResultCondition cond, RegisterID src, RegisterID dest)
@@ -781,6 +803,14 @@ public:
         return Jump(m_assembler.jmp(ARMCondition(cond)));
     }
 
+    PatchableJump patchableBranch32(RelationalCondition cond, RegisterID reg, TrustedImm32 imm)
+    {
+        internalCompare32(reg, imm);
+        Jump jump(m_assembler.loadBranchTarget(ARMRegisters::S1, ARMCondition(cond), true));
+        m_assembler.bx(ARMRegisters::S1, ARMCondition(cond));
+        return PatchableJump(jump);
+    }
+
     void breakpoint()
     {
         m_assembler.bkpt(0);
@@ -863,6 +893,31 @@ public:
         m_assembler.dtrUp(ARMAssembler::StoreUint32, ARMRegisters::S1, ARMRegisters::S0, 0);
     }
 
+    void add64(TrustedImm32 imm, AbsoluteAddress address)
+    {
+        ARMWord tmp;
+
+        move(TrustedImmPtr(address.m_ptr), ARMRegisters::S1);
+        m_assembler.dtrUp(ARMAssembler::LoadUint32, ARMRegisters::S0, ARMRegisters::S1, 0);
+
+        if ((tmp = ARMAssembler::getOp2(imm.m_value)) != ARMAssembler::InvalidImmediate)
+            m_assembler.adds(ARMRegisters::S0, ARMRegisters::S0, tmp);
+        else if ((tmp = ARMAssembler::getOp2(-imm.m_value)) != ARMAssembler::InvalidImmediate)
+            m_assembler.subs(ARMRegisters::S0, ARMRegisters::S0, tmp);
+        else {
+            m_assembler.adds(ARMRegisters::S0, ARMRegisters::S0, m_assembler.getImm(imm.m_value, ARMRegisters::S1));
+            move(TrustedImmPtr(address.m_ptr), ARMRegisters::S1);
+        }
+        m_assembler.dtrUp(ARMAssembler::StoreUint32, ARMRegisters::S0, ARMRegisters::S1, 0);
+
+        m_assembler.dtrUp(ARMAssembler::LoadUint32, ARMRegisters::S0, ARMRegisters::S1, sizeof(ARMWord));
+        if (imm.m_value >= 0)
+            m_assembler.adc(ARMRegisters::S0, ARMRegisters::S0, ARMAssembler::getOp2Byte(0));
+        else
+            m_assembler.sbc(ARMRegisters::S0, ARMRegisters::S0, ARMAssembler::getOp2Byte(0));
+        m_assembler.dtrUp(ARMAssembler::StoreUint32, ARMRegisters::S0, ARMRegisters::S1, sizeof(ARMWord));
+    }
+
     void sub32(TrustedImm32 imm, AbsoluteAddress address)
     {
         m_assembler.ldrUniqueImmediate(ARMRegisters::S1, reinterpret_cast<ARMWord>(address.m_ptr));
@@ -925,6 +980,7 @@ public:
 
     Jump branchPtrWithPatch(RelationalCondition cond, RegisterID left, DataLabelPtr& dataLabel, TrustedImmPtr initialRightValue = TrustedImmPtr(0))
     {
+        ensureSpace(3 * sizeof(ARMWord), 2 * sizeof(ARMWord));
         dataLabel = moveWithPatch(initialRightValue, ARMRegisters::S1);
         Jump jump = branch32(cond, left, ARMRegisters::S1, true);
         return jump;
@@ -933,6 +989,7 @@ public:
     Jump branchPtrWithPatch(RelationalCondition cond, Address left, DataLabelPtr& dataLabel, TrustedImmPtr initialRightValue = TrustedImmPtr(0))
     {
         load32(left, ARMRegisters::S1);
+        ensureSpace(3 * sizeof(ARMWord), 2 * sizeof(ARMWord));
         dataLabel = moveWithPatch(initialRightValue, ARMRegisters::S0);
         Jump jump = branch32(cond, ARMRegisters::S0, ARMRegisters::S1, true);
         return jump;
@@ -1049,7 +1106,7 @@ public:
 
     void divDouble(Address src, FPRegisterID dest)
     {
-        ASSERT_NOT_REACHED(); // Untested
+        RELEASE_ASSERT_NOT_REACHED(); // Untested
         loadDouble(src, ARMRegisters::SD0);
         divDouble(ARMRegisters::SD0, dest);
     }
@@ -1240,6 +1297,29 @@ public:
         return 0;
     }
 
+    static bool canJumpReplacePatchableBranchPtrWithPatch() { return false; }
+
+    static CodeLocationLabel startOfPatchableBranchPtrWithPatchOnAddress(CodeLocationDataLabelPtr)
+    {
+        UNREACHABLE_FOR_PLATFORM();
+        return CodeLocationLabel();
+    }
+
+    static CodeLocationLabel startOfBranchPtrWithPatchOnRegister(CodeLocationDataLabelPtr label)
+    {
+        return label.labelAtOffset(0);
+    }
+
+    static void revertJumpReplacementToBranchPtrWithPatch(CodeLocationLabel instructionStart, RegisterID reg, void* initialValue)
+    {
+        ARMAssembler::revertBranchPtrWithPatch(instructionStart.dataLocation(), reg, reinterpret_cast<uintptr_t>(initialValue) & 0xffff);
+    }
+
+    static void revertJumpReplacementToPatchableBranchPtrWithPatch(CodeLocationLabel instructionStart, Address, void* initialValue)
+    {
+        UNREACHABLE_FOR_PLATFORM();
+    }
+
 protected:
     ARMAssembler::Condition ARMCondition(RelationalCondition cond)
     {
@@ -1270,6 +1350,15 @@ protected:
 private:
     friend class LinkBuffer;
     friend class RepatchBuffer;
+
+    void internalCompare32(RegisterID left, TrustedImm32 right)
+    {
+        ARMWord tmp = (static_cast<unsigned>(right.m_value) == 0x80000000) ? ARMAssembler::InvalidImmediate : m_assembler.getOp2(-right.m_value);
+        if (tmp != ARMAssembler::InvalidImmediate)
+            m_assembler.cmn(left, tmp);
+        else
+            m_assembler.cmp(left, m_assembler.getImm(right.m_value, ARMRegisters::S0));
+    }
 
     static void linkCall(void* code, Call call, FunctionPtr function)
     {

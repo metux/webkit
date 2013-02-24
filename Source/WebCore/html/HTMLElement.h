@@ -64,6 +64,7 @@ public:
     void insertAdjacentHTML(const String& where, const String& html, ExceptionCode&);
     void insertAdjacentText(const String& where, const String& text, ExceptionCode&);
 
+    virtual bool hasCustomFocusLogic() const;
     virtual bool supportsFocus() const;
 
     String contentEditable() const;
@@ -101,11 +102,8 @@ public:
     void getItemRefElements(Vector<HTMLElement*>&);
 #endif
 
-#ifndef NDEBUG
     virtual bool isHTMLUnknownElement() const { return false; }
-#endif
 
-    virtual bool isInsertionPoint() const { return false; }
     virtual bool isLabelable() const { return false; }
 
 protected:
@@ -117,9 +115,10 @@ protected:
     void applyAlignmentAttributeToStyle(const Attribute&, StylePropertySet*);
     void applyBorderAttributeToStyle(const Attribute&, StylePropertySet*);
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    unsigned parseBorderWidthAttribute(const QualifiedName&, const AtomicString& value) const;
 
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
     void calculateAndAdjustDirectionality();
@@ -136,7 +135,7 @@ private:
     Node* insertAdjacent(const String& where, Node* newChild, ExceptionCode&);
     PassRefPtr<DocumentFragment> textToFragment(const String&, ExceptionCode&);
 
-    void dirAttributeChanged(const Attribute&);
+    void dirAttributeChanged(const AtomicString&);
     void adjustDirectionalityIfNeededAfterChildAttributeChanged(Element* child);
     void adjustDirectionalityIfNeededAfterChildrenChanged(Node* beforeChange, int childCountDelta);
     TextDirection directionality(Node** strongDirectionalityTextNode= 0) const;
@@ -151,13 +150,13 @@ private:
 
 inline HTMLElement* toHTMLElement(Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<HTMLElement*>(node);
 }
 
 inline const HTMLElement* toHTMLElement(const Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<const HTMLElement*>(node);
 }
 

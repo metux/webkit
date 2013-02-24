@@ -64,14 +64,18 @@ static const char randomCharacterInSecWebSocketKey[] = "!\"#$%&'()*+,-./:;<=>?@A
 
 static String resourceName(const KURL& url)
 {
-    String name = url.path();
+    StringBuilder name;
+    name.append(url.path());
     if (name.isEmpty())
-        name = "/";
-    if (!url.query().isNull())
-        name += "?" + url.query();
-    ASSERT(!name.isEmpty());
-    ASSERT(!name.contains(' '));
-    return name;
+        name.append('/');
+    if (!url.query().isNull()) {
+        name.append('?');
+        name.append(url.query());
+    }
+    String result = name.toString();
+    ASSERT(!result.isEmpty());
+    ASSERT(!result.contains(' '));
+    return result;
 }
 
 static String hostName(const KURL& url, bool secure)
@@ -81,7 +85,7 @@ static String hostName(const KURL& url, bool secure)
     builder.append(url.host().lower());
     if (url.port() && ((!secure && url.port() != 80) || (secure && url.port() != 443))) {
         builder.append(':');
-        builder.append(String::number(url.port()));
+        builder.appendNumber(url.port());
     }
     return builder.toString();
 }
@@ -202,6 +206,13 @@ CString WebSocketHandshake::clientHandshakeMessage() const
         // Set "Cookie2: <cookie>" if cookies 2 exists for url?
     }
 
+    // Add no-cache headers to avoid compatibility issue.
+    // There are some proxies that rewrite "Connection: upgrade"
+    // to "Connection: close" in the response if a request doesn't contain
+    // these headers.
+    fields.append("Pragma: no-cache");
+    fields.append("Cache-Control: no-cache");
+
     fields.append("Sec-WebSocket-Key: " + m_secWebSocketKey);
     fields.append("Sec-WebSocket-Version: 13");
     const String extensionValue = m_extensionDispatcher.createHeaderValue();
@@ -243,6 +254,9 @@ PassRefPtr<WebSocketHandshakeRequest> WebSocketHandshake::clientHandshakeRequest
             request->addHeaderField("Cookie", cookie);
         // Set "Cookie2: <cookie>" if cookies 2 exists for url?
     }
+
+    request->addHeaderField("Pragma", "no-cache");
+    request->addHeaderField("Cache-Control", "no-cache");
 
     request->addHeaderField("Sec-WebSocket-Key", m_secWebSocketKey);
     request->addHeaderField("Sec-WebSocket-Version", "13");

@@ -35,7 +35,6 @@
 #include "ThreadableWebSocketChannel.h"
 
 #include "Document.h"
-#include "PlatformString.h"
 #include "ScriptExecutionContext.h"
 #include "ThreadableWebSocketChannelClientWrapper.h"
 #include "WebSocketChannel.h"
@@ -44,8 +43,8 @@
 #include "WorkerRunLoop.h"
 #include "WorkerThread.h"
 #include "WorkerThreadableWebSocketChannel.h"
-
 #include <wtf/PassRefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -66,7 +65,7 @@ PassRefPtr<ThreadableWebSocketChannel> ThreadableWebSocketChannel::create(Script
     }
 #endif // ENABLE(WORKERS)
 
-    ASSERT(context->isDocument());
+    ASSERT_WITH_SECURITY_IMPLICATION(context->isDocument());
     return WebSocketChannel::create(static_cast<Document*>(context), client);
 }
 

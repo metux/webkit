@@ -24,14 +24,15 @@
 
 #include "CSSPropertyNames.h"
 #include "LengthBox.h"
+#include "StyleResolver.h" 
 
 namespace WebCore {
 
 class FillLayer;
 class CSSValue;
 class Animation;
+class RenderStyle;
 class StyleImage;
-class StyleResolver;
 class NinePieceImage;
 
 class CSSToStyleMap {
@@ -39,11 +40,12 @@ class CSSToStyleMap {
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    CSSToStyleMap(StyleResolver* resolver) : m_resolver(resolver) { }
+    CSSToStyleMap(StyleResolver::State& state) : m_state(state) { }
 
     void mapFillAttachment(CSSPropertyID, FillLayer*, CSSValue*);
     void mapFillClip(CSSPropertyID, FillLayer*, CSSValue*);
     void mapFillComposite(CSSPropertyID, FillLayer*, CSSValue*);
+    void mapFillBlendMode(CSSPropertyID, FillLayer*, CSSValue*);
     void mapFillOrigin(CSSPropertyID, FillLayer*, CSSValue*);
     void mapFillImage(CSSPropertyID, FillLayer*, CSSValue*);
     void mapFillRepeatX(CSSPropertyID, FillLayer*, CSSValue*);
@@ -80,7 +82,7 @@ private:
     // during the resolve.
     PassRefPtr<StyleImage> styleImage(CSSPropertyID, CSSValue*);
 
-    StyleResolver* m_resolver;
+    StyleResolver::State& m_state;
 };
 
 }

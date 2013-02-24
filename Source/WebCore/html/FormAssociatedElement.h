@@ -24,13 +24,17 @@
 #ifndef FormAssociatedElement_h
 #define FormAssociatedElement_h
 
-#include "HTMLElement.h"
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
+class ContainerNode;
+class Document;
 class FormAttributeTargetObserver;
 class FormDataList;
+class HTMLElement;
 class HTMLFormElement;
+class Node;
 class ValidationMessage;
 class ValidityState;
 class VisibleSelection;
@@ -45,8 +49,6 @@ public:
     static HTMLFormElement* findAssociatedForm(const HTMLElement*, HTMLFormElement*);
     HTMLFormElement* form() const { return m_form; }
     ValidityState* validity();
-
-    ShadowRoot* ensureUserAgentShadowRoot();
 
     virtual bool isFormControlElement() const = 0;
     virtual bool isFormControlElementWithState() const;
@@ -72,6 +74,7 @@ public:
 
     // Override functions for patterMismatch, rangeOverflow, rangerUnderflow,
     // stepMismatch, tooLong and valueMissing must call willValidate method.
+    virtual bool hasBadInput() const;
     virtual bool patternMismatch() const;
     virtual bool rangeOverflow() const;
     virtual bool rangeUnderflow() const;

@@ -31,14 +31,21 @@
 /**
  * @constructor
  * @extends {WebInspector.Object}
+ * @param {WebInspector.Workspace} workspace
  */
-WebInspector.CSSStyleModel = function()
+WebInspector.CSSStyleModel = function(workspace)
 {
+    this._workspace = workspace;
     this._pendingCommandsMajorState = [];
+    /** @type {Array.<WebInspector.CSSStyleModel.LiveLocation>} */
+    this._locations = [];
     this._sourceMappings = {};
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.UndoRedoRequested, this._undoRedoRequested, this);
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.UndoRedoCompleted, this._undoRedoCompleted, this);
-    this._resourceBinding = new WebInspector.CSSStyleModelResourceBinding(this);
+    this._resourceBinding = new WebInspector.CSSStyleModelResourceBinding();
+    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.MainFrameCreatedOrNavigated, this._mainFrameCreatedOrNavigated, this);
+    this._namedFlowCollections = {};
+    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.DocumentUpdated, this._resetNamedFlowCollections, this);
     InspectorBackend.registerCSSDispatcher(new WebInspector.CSSDispatcher(this));
     CSSAgent.enable();
 }
@@ -53,13 +60,27 @@ WebInspector.CSSStyleModel.parseRuleArrayPayload = function(ruleArray)
         result.push(WebInspector.CSSRule.parsePayload(ruleArray[i]));
     return result;
 }
+    
+/**
+ * @param {Array.<CSSAgent.RuleMatch>} matchArray
+ */
+WebInspector.CSSStyleModel.parseRuleMatchArrayPayload = function(matchArray)
+{
+    var result = [];
+    for (var i = 0; i < matchArray.length; ++i)
+        result.push(WebInspector.CSSRule.parsePayload(matchArray[i].rule, matchArray[i].matchingSelectors));
+    return result;
+}
 
 WebInspector.CSSStyleModel.Events = {
     StyleSheetChanged: "StyleSheetChanged",
     MediaQueryResultChanged: "MediaQueryResultChanged",
     NamedFlowCreated: "NamedFlowCreated",
-    NamedFlowRemoved: "NamedFlowRemoved"
+    NamedFlowRemoved: "NamedFlowRemoved",
+    RegionLayoutUpdated: "RegionLayoutUpdated"
 }
+
+WebInspector.CSSStyleModel.MediaTypes = ["all", "braille", "embossed", "handheld", "print", "projection", "screen", "speech", "tty", "tv"];
 
 WebInspector.CSSStyleModel.prototype = {
     /**
@@ -73,8 +94,8 @@ WebInspector.CSSStyleModel.prototype = {
         /**
          * @param {function(?*)} userCallback
          * @param {?Protocol.Error} error
-         * @param {Array.<CSSAgent.CSSRule>=} matchedPayload
-         * @param {Array.<CSSAgent.PseudoIdRules>=} pseudoPayload
+         * @param {Array.<CSSAgent.RuleMatch>=} matchedPayload
+         * @param {Array.<CSSAgent.PseudoIdMatches>=} pseudoPayload
          * @param {Array.<CSSAgent.InheritedStyleEntry>=} inheritedPayload
          */
         function callback(userCallback, error, matchedPayload, pseudoPayload, inheritedPayload)
@@ -87,13 +108,13 @@ WebInspector.CSSStyleModel.prototype = {
 
             var result = {};
             if (matchedPayload)
-                result.matchedCSSRules = WebInspector.CSSStyleModel.parseRuleArrayPayload(matchedPayload);
+                result.matchedCSSRules = WebInspector.CSSStyleModel.parseRuleMatchArrayPayload(matchedPayload);
 
             if (pseudoPayload) {
                 result.pseudoElements = [];
                 for (var i = 0; i < pseudoPayload.length; ++i) {
                     var entryPayload = pseudoPayload[i];
-                    result.pseudoElements.push({ pseudoId: entryPayload.pseudoId, rules: WebInspector.CSSStyleModel.parseRuleArrayPayload(entryPayload.rules) });
+                    result.pseudoElements.push({ pseudoId: entryPayload.pseudoId, rules: WebInspector.CSSStyleModel.parseRuleMatchArrayPayload(entryPayload.matches) });
                 }
             }
 
@@ -105,7 +126,7 @@ WebInspector.CSSStyleModel.prototype = {
                     if (entryPayload.inlineStyle)
                         entry.inlineStyle = WebInspector.CSSStyleDeclaration.parsePayload(entryPayload.inlineStyle);
                     if (entryPayload.matchedCSSRules)
-                        entry.matchedCSSRules = WebInspector.CSSStyleModel.parseRuleArrayPayload(entryPayload.matchedCSSRules);
+                        entry.matchedCSSRules = WebInspector.CSSStyleModel.parseRuleMatchArrayPayload(entryPayload.matchedCSSRules);
                     result.inherited.push(entry);
                 }
             }
@@ -171,48 +192,62 @@ WebInspector.CSSStyleModel.prototype = {
     },
 
     /**
-     * @param {DOMAgent.NodeId} nodeId
-     * @param {function(?Array.<WebInspector.NamedFlow>)} userCallback
+     * @param {DOMAgent.NodeId} documentNodeId
+     * @param {function(?WebInspector.NamedFlowCollection)} userCallback
      */
-    getNamedFlowCollectionAsync: function(nodeId, userCallback)
+    getNamedFlowCollectionAsync: function(documentNodeId, userCallback)
     {
+        var namedFlowCollection = this._namedFlowCollections[documentNodeId];
+        if (namedFlowCollection) {
+            userCallback(namedFlowCollection);
+            return;
+        }
+
         /**
-         * @param {function(?Array.<WebInspector.NamedFlow>)} userCallback
+         * @param {function(?WebInspector.NamedFlowCollection)} userCallback
          * @param {?Protocol.Error} error
-         * @param {?Array.<CSSAgent.NamedFlow>=} namedFlowPayload
+         * @param {?Array.<CSSAgent.NamedFlow>} namedFlowPayload
          */
         function callback(userCallback, error, namedFlowPayload)
         {
             if (error || !namedFlowPayload)
                 userCallback(null);
-            else
-                userCallback(WebInspector.NamedFlow.parsePayloadArray(namedFlowPayload));
+            else {
+                var namedFlowCollection = new WebInspector.NamedFlowCollection(namedFlowPayload);
+                this._namedFlowCollections[documentNodeId] = namedFlowCollection;
+                userCallback(namedFlowCollection);
+            }
         }
 
-        CSSAgent.getNamedFlowCollection(nodeId, callback.bind(this, userCallback));
+        CSSAgent.getNamedFlowCollection(documentNodeId, callback.bind(this, userCallback));
     },
 
     /**
-     * @param {DOMAgent.NodeId} nodeId
+     * @param {DOMAgent.NodeId} documentNodeId
      * @param {string} flowName
      * @param {function(?WebInspector.NamedFlow)} userCallback
      */
-    getFlowByNameAsync: function(nodeId, flowName, userCallback)
+    getFlowByNameAsync: function(documentNodeId, flowName, userCallback)
     {
-        /**
-         * @param {function(?WebInspector.NamedFlow)} userCallback
-         * @param {?Protocol.Error} error
-         * @param {?CSSAgent.NamedFlow=} namedFlowPayload
-         */
-        function callback(userCallback, error, namedFlowPayload)
-        {
-            if (error || !namedFlowPayload)
-                userCallback(null);
-            else
-                userCallback(WebInspector.NamedFlow.parsePayload(namedFlowPayload));
+        var namedFlowCollection = this._namedFlowCollections[documentNodeId];
+        if (namedFlowCollection) {
+            userCallback(namedFlowCollection.flowByName(flowName));
+            return;
         }
 
-        CSSAgent.getFlowByName(nodeId, flowName, callback.bind(this, userCallback));
+        /**
+         * @param {function(?WebInspector.NamedFlow)} userCallback
+         * @param {?WebInspector.NamedFlowCollection} namedFlowCollection
+         */
+        function callback(userCallback, namedFlowCollection)
+        {
+            if (!namedFlowCollection)
+                userCallback(null);
+            else
+                userCallback(namedFlowCollection.flowByName(flowName));
+        }
+
+        this.getNamedFlowCollectionAsync(documentNodeId, callback.bind(this, userCallback));
     },
 
     /**
@@ -350,51 +385,48 @@ WebInspector.CSSStyleModel.prototype = {
     },
 
     /**
-     * @param {DOMAgent.NodeId} documentNodeId
-     * @param {string} name
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
      */
-    _namedFlowCreated: function(documentNodeId, name)
+    _namedFlowCreated: function(namedFlowPayload)
     {
-        if (!this.hasEventListeners(WebInspector.CSSStyleModel.Events.NamedFlowCreated))
+        var namedFlow = WebInspector.NamedFlow.parsePayload(namedFlowPayload);
+        var namedFlowCollection = this._namedFlowCollections[namedFlow.documentNodeId];
+
+        if (!namedFlowCollection)
             return;
 
-        /**
-        * @param {WebInspector.DOMDocument} root
-        */
-        function callback(root)
-        {
-            // FIXME: At the moment we only want support for NamedFlows in the main document
-            if (documentNodeId !== root.id)
-                return;
-
-            this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.NamedFlowCreated, { documentNodeId: documentNodeId, name: name });
-        }
-
-        WebInspector.domAgent.requestDocument(callback.bind(this));
+        namedFlowCollection._appendNamedFlow(namedFlow);
+        this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.NamedFlowCreated, namedFlow);
     },
 
     /**
      * @param {DOMAgent.NodeId} documentNodeId
-     * @param {string} name
+     * @param {string} flowName
      */
-    _namedFlowRemoved: function(documentNodeId, name)
+    _namedFlowRemoved: function(documentNodeId, flowName)
     {
-        if (!this.hasEventListeners(WebInspector.CSSStyleModel.Events.NamedFlowRemoved))
+        var namedFlowCollection = this._namedFlowCollections[documentNodeId];
+
+        if (!namedFlowCollection)
             return;
 
-        /**
-        * @param {WebInspector.DOMDocument} root
-        */
-        function callback(root)
-        {
-            // FIXME: At the moment we only want support for NamedFlows in the main document
-            if (documentNodeId !== root.id)
-                return;
+        namedFlowCollection._removeNamedFlow(flowName);
+        this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.NamedFlowRemoved, { documentNodeId: documentNodeId, flowName: flowName });
+    },
 
-            this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.NamedFlowRemoved, { documentNodeId: documentNodeId, name: name });
-        }
+    /**
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
+     */
+    _regionLayoutUpdated: function(namedFlowPayload)
+    {
+        var namedFlow = WebInspector.NamedFlow.parsePayload(namedFlowPayload);
+        var namedFlowCollection = this._namedFlowCollections[namedFlow.documentNodeId];
 
-        WebInspector.domAgent.requestDocument(callback.bind(this));
+        if (!namedFlowCollection)
+            return;
+
+        namedFlowCollection._appendNamedFlow(namedFlow);
+        this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.RegionLayoutUpdated, namedFlow);
     },
 
     /**
@@ -450,42 +482,148 @@ WebInspector.CSSStyleModel.prototype = {
     },
 
     /**
+     * @param {WebInspector.Event} event
+     */
+    _mainFrameCreatedOrNavigated: function(event)
+    {
+        this._resetSourceMappings();
+        this._resourceBinding._reset();
+    },
+
+    /**
      * @param {string} url
      * @param {WebInspector.SourceMapping} sourceMapping
      */
     setSourceMapping: function(url, sourceMapping)
     {
-        this._sourceMappings[url] = sourceMapping;
+        if (sourceMapping)
+            this._sourceMappings[url] = sourceMapping;
+        else
+            delete this._sourceMappings[url];
+        this._updateLocations();
     },
 
-    resetSourceMappings: function()
+    _resetSourceMappings: function()
     {
         this._sourceMappings = {};
+    },
+
+    _resetNamedFlowCollections: function()
+    {
+        this._namedFlowCollections = {};
+    },
+
+    _updateLocations: function()
+    {
+        for (var i = 0; i < this._locations.length; ++i)
+            this._locations[i].update();
+    },
+
+    /**
+     * @param {WebInspector.CSSRule} cssRule
+     * @param {function(WebInspector.UILocation):(boolean|undefined)} updateDelegate
+     * @return {?WebInspector.LiveLocation}
+     */
+    createLiveLocation: function(cssRule, updateDelegate)
+    {
+        if (!cssRule._rawLocation)
+            return null;
+        var location = new WebInspector.CSSStyleModel.LiveLocation(cssRule._rawLocation, updateDelegate);
+        if (!location.uiLocation())
+            return null;
+        this._locations.push(location);
+        location.update();
+        return location;
     },
 
     /**
      * @param {WebInspector.CSSLocation} rawLocation
      * @return {?WebInspector.UILocation}
      */
-    _rawLocationToUILocation: function(rawLocation)
+    rawLocationToUILocation: function(rawLocation)
     {
         var sourceMapping = this._sourceMappings[rawLocation.url];
-        return sourceMapping ? sourceMapping.rawLocationToUILocation(rawLocation) : null;
-    }
+        if (sourceMapping) {
+            var uiLocation = sourceMapping.rawLocationToUILocation(rawLocation);
+            if (uiLocation)
+                return uiLocation;
+        }
+        var uiSourceCode = this._workspace.uiSourceCodeForURL(rawLocation.url);
+        if (!uiSourceCode)
+            return null;
+        return new WebInspector.UILocation(uiSourceCode, rawLocation.lineNumber, rawLocation.columnNumber);
+    },
+
+    /**
+     * @param {DOMAgent.NodeId} nodeId
+     */
+    toggleInlineVisibility: function(nodeId)
+    {
+        /**
+         * @param {WebInspector.CSSStyleDeclaration} inlineStyles
+         */
+        function callback(inlineStyles)
+        {
+            var visibility = inlineStyles.getLiveProperty("visibility");
+            if (visibility) {
+                if (visibility.value === "hidden")
+                    visibility.setText("", false, true);
+                else
+                    visibility.setValue("hidden", false, true);
+            } else
+                inlineStyles.appendProperty("visibility", "hidden");
+        }
+
+        this.getInlineStylesAsync(nodeId, callback.bind(this));
+    },
+
+    __proto__: WebInspector.Object.prototype
 }
 
-WebInspector.CSSStyleModel.prototype.__proto__ = WebInspector.Object.prototype;
+/**
+ * @constructor
+ * @extends {WebInspector.LiveLocation}
+ * @param {WebInspector.CSSLocation} rawLocation
+ * @param {function(WebInspector.UILocation):(boolean|undefined)} updateDelegate
+ */
+WebInspector.CSSStyleModel.LiveLocation = function(rawLocation, updateDelegate)
+{
+    WebInspector.LiveLocation.call(this, rawLocation, updateDelegate);
+}
+
+WebInspector.CSSStyleModel.LiveLocation.prototype = {
+    /**
+     * @return {WebInspector.UILocation}
+     */
+    uiLocation: function()
+    {
+        var cssLocation = /** @type WebInspector.CSSLocation */ (this.rawLocation());
+        return WebInspector.cssModel.rawLocationToUILocation(cssLocation);
+    },
+
+    dispose: function()
+    {
+        WebInspector.LiveLocation.prototype.dispose.call(this);
+        var locations = WebInspector.cssModel._locations;
+        if (locations)
+            locations.remove(this);
+    },
+
+    __proto__: WebInspector.LiveLocation.prototype
+}
 
 /**
  * @constructor
  * @implements {WebInspector.RawLocation}
  * @param {string} url
  * @param {number} lineNumber
+ * @param {number=} columnNumber
  */
-WebInspector.CSSLocation = function(url, lineNumber)
+WebInspector.CSSLocation = function(url, lineNumber, columnNumber)
 {
     this.url = url;
     this.lineNumber = lineNumber;
+    this.columnNumber = columnNumber || 0;
 }
 
 /**
@@ -549,7 +687,7 @@ WebInspector.CSSStyleDeclaration.parsePayload = function(payload)
  */
 WebInspector.CSSStyleDeclaration.parseComputedStylePayload = function(payload)
 {
-    var newPayload = /** @type {CSSAgent.CSSStyle} */ { cssProperties: [], shorthandEntries: [], width: "", height: "" };
+    var newPayload = /** @type {CSSAgent.CSSStyle} */ ({ cssProperties: [], shorthandEntries: [], width: "", height: "" });
     if (payload)
         newPayload.cssProperties = payload;
 
@@ -607,7 +745,7 @@ WebInspector.CSSStyleDeclaration.prototype = {
      */
     longhandProperties: function(name)
     {
-        var longhands = WebInspector.CSSCompletions.cssPropertiesMetainfo.longhands(name);
+        var longhands = WebInspector.CSSMetadata.cssPropertiesMetainfo.longhands(name);
         var result = [];
         for (var i = 0; longhands && i < longhands.length; ++i) {
             var property = this._livePropertyMap[longhands[i]];
@@ -661,16 +799,15 @@ WebInspector.CSSStyleDeclaration.prototype = {
      * @param {number} index
      * @param {string} name
      * @param {string} value
-     * @param {function(?WebInspector.CSSStyleDeclaration)} userCallback
+     * @param {function(?WebInspector.CSSStyleDeclaration)=} userCallback
      */
     insertPropertyAt: function(index, name, value, userCallback)
     {
         /**
-         * @param {function(?WebInspector.CSSStyleDeclaration)} userCallback
          * @param {?string} error
          * @param {CSSAgent.CSSStyle} payload
          */
-        function callback(userCallback, error, payload)
+        function callback(error, payload)
         {
             WebInspector.cssModel._pendingCommandsMajorState.pop();
             if (!userCallback)
@@ -688,13 +825,13 @@ WebInspector.CSSStyleDeclaration.prototype = {
             throw "No style id";
 
         WebInspector.cssModel._pendingCommandsMajorState.push(true);
-        CSSAgent.setPropertyText(this.id, index, name + ": " + value + ";", false, callback.bind(this, userCallback));
+        CSSAgent.setPropertyText(this.id, index, name + ": " + value + ";", false, callback.bind(this));
     },
 
     /**
      * @param {string} name
      * @param {string} value
-     * @param {function(?WebInspector.CSSStyleDeclaration)} userCallback
+     * @param {function(?WebInspector.CSSStyleDeclaration)=} userCallback
      */
     appendProperty: function(name, value, userCallback)
     {
@@ -705,11 +842,16 @@ WebInspector.CSSStyleDeclaration.prototype = {
 /**
  * @constructor
  * @param {CSSAgent.CSSRule} payload
+ * @param {Array.<number>=} matchingSelectors
  */
-WebInspector.CSSRule = function(payload)
+WebInspector.CSSRule = function(payload, matchingSelectors)
 {
     this.id = payload.ruleId;
-    this.selectorText = payload.selectorText;
+    if (matchingSelectors)
+        this.matchingSelectors = matchingSelectors;
+    this.selectors = payload.selectorList.selectors;
+    this.selectorText = this.selectors.join(", ");
+    this.selectorRange = payload.selectorList.range;
     this.sourceLine = payload.sourceLine;
     this.sourceURL = payload.sourceURL;
     if (payload.sourceURL)
@@ -717,18 +859,18 @@ WebInspector.CSSRule = function(payload)
     this.origin = payload.origin;
     this.style = WebInspector.CSSStyleDeclaration.parsePayload(payload.style);
     this.style.parentRule = this;
-    this.selectorRange = payload.selectorRange;
     if (payload.media)
         this.media = WebInspector.CSSMedia.parseMediaArrayPayload(payload.media);
 }
 
 /**
  * @param {CSSAgent.CSSRule} payload
+ * @param {Array.<number>=} matchingIndices
  * @return {WebInspector.CSSRule}
  */
-WebInspector.CSSRule.parsePayload = function(payload)
+WebInspector.CSSRule.parsePayload = function(payload, matchingIndices)
 {
-    return new WebInspector.CSSRule(payload);
+    return new WebInspector.CSSRule(payload, matchingIndices);
 }
 
 WebInspector.CSSRule.prototype = {
@@ -750,16 +892,6 @@ WebInspector.CSSRule.prototype = {
     get isRegular()
     {
         return this.origin === "regular";
-    },
-
-    /**
-     * @return {?WebInspector.UILocation}
-     */
-    uiLocation: function()
-    {
-        if (!this._rawLocation)
-            return null;
-        return WebInspector.cssModel._rawLocationToUILocation(this._rawLocation);
     }
 }
 
@@ -774,8 +906,9 @@ WebInspector.CSSRule.prototype = {
  * @param {boolean} parsedOk
  * @param {boolean} implicit
  * @param {?string=} text
+ * @param {CSSAgent.SourceRange=} range
  */
-WebInspector.CSSProperty = function(ownerStyle, index, name, value, priority, status, parsedOk, implicit, text)
+WebInspector.CSSProperty = function(ownerStyle, index, name, value, priority, status, parsedOk, implicit, text, range)
 {
     this.ownerStyle = ownerStyle;
     this.index = index;
@@ -786,6 +919,7 @@ WebInspector.CSSProperty = function(ownerStyle, index, name, value, priority, st
     this.parsedOk = parsedOk;
     this.implicit = implicit;
     this.text = text;
+    this.range = range;
 }
 
 /**
@@ -802,7 +936,7 @@ WebInspector.CSSProperty.parsePayload = function(ownerStyle, index, payload)
     // implicit: false
     // status: "style"
     var result = new WebInspector.CSSProperty(
-        ownerStyle, index, payload.name, payload.value, payload.priority || "", payload.status || "style", ("parsedOk" in payload) ? !!payload.parsedOk : true, !!payload.implicit, payload.text);
+        ownerStyle, index, payload.name, payload.value, payload.priority || "", payload.status || "style", ("parsedOk" in payload) ? !!payload.parsedOk : true, !!payload.implicit, payload.text, payload.range);
     return result;
 }
 
@@ -1065,30 +1199,57 @@ WebInspector.CSSStyleSheet.prototype = {
 /**
  * @constructor
  */
-WebInspector.CSSStyleModelResourceBinding = function(cssModel)
+WebInspector.CSSStyleModelResourceBinding = function()
 {
-    this._cssModel = cssModel;
-    this._frameAndURLToStyleSheetId = {};
-    this._styleSheetIdToHeader = {};
-    this._cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetChanged, this._styleSheetChanged, this);
-    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.InspectedURLChanged, this._inspectedURLChanged, this);
+    this._reset();
 }
 
 WebInspector.CSSStyleModelResourceBinding.prototype = {
     /**
-     * @param {WebInspector.StyleSource} styleSource
-     * @param {string} content
-     * @param {boolean} majorChange
-     * @param {function(?string)} userCallback
+     * @param {WebInspector.Resource} resource
+     * @param {function(?CSSAgent.StyleSheetId)} callback
      */
-    setStyleContent: function(styleSource, content, majorChange, userCallback)
+    requestStyleSheetIdForResource: function(resource, callback)
     {
-        var resource = styleSource.resource();
-        if (this._styleSheetIdForResource(resource)) {
-            this._innerSetContent(resource, content, majorChange, userCallback, null);
-            return;
+        function innerCallback()
+        {
+            callback(this._styleSheetIdForResource(resource));
         }
-        this._loadStyleSheetHeaders(this._innerSetContent.bind(this, resource, content, majorChange, userCallback));
+        
+        if (this._styleSheetIdForResource(resource))
+            innerCallback.call(this);
+        else
+            this._loadStyleSheetHeaders(innerCallback.bind(this));
+    },
+
+    /**
+     * @param {CSSAgent.StyleSheetId} styleSheetId
+     * @param {function(?string)} callback
+     */
+    requestResourceURLForStyleSheetId: function(styleSheetId, callback)
+    {
+        function innerCallback()
+        {
+            var header = this._styleSheetIdToHeader[styleSheetId];
+            if (!header) {
+                callback(null);
+                return;
+            }
+
+            var frame = WebInspector.resourceTreeModel.frameForId(header.frameId);
+            if (!frame) {
+                callback(null);
+                return;
+            }
+
+            var styleSheetURL = header.origin === "inspector" ? this._viaInspectorResourceURL(header.sourceURL) : header.sourceURL;
+            callback(styleSheetURL);
+        }
+        
+        if (this._styleSheetIdToHeader[styleSheetId])
+            innerCallback.call(this);
+        else
+            this._loadStyleSheetHeaders(innerCallback.bind(this));
     },
 
     /**
@@ -1098,45 +1259,6 @@ WebInspector.CSSStyleModelResourceBinding.prototype = {
     _styleSheetIdForResource: function(resource)
     {
         return this._frameAndURLToStyleSheetId[resource.frameId + ":" + resource.url];
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
-    _inspectedURLChanged: function(event)
-    {
-        // Main frame navigation - clear history.
-        this._frameAndURLToStyleSheetId = {};
-        this._styleSheetIdToHeader = {};
-    },
-
-    /**
-     * @param {WebInspector.Resource} resource
-     * @param {string} content
-     * @param {boolean} majorChange
-     * @param {function(?string)} userCallback
-     * @param {?string} error
-     */
-    _innerSetContent: function(resource, content, majorChange, userCallback, error)
-    {
-        if (error) {
-            userCallback(error);
-            return;
-        }
-
-        var styleSheetId = this._styleSheetIdForResource(resource);
-        if (!styleSheetId) {
-            userCallback("No stylesheet found: " + resource.frameId + ":" + resource.url);
-            return;
-        }
-
-        this._isSettingContent = true;
-        function callbackWrapper(error)
-        {
-            userCallback(error);
-            delete this._isSettingContent;
-        }
-        this._cssModel.setStyleSheetText(styleSheetId, content, majorChange, callbackWrapper.bind(this));
     },
 
     /**
@@ -1167,62 +1289,6 @@ WebInspector.CSSStyleModelResourceBinding.prototype = {
             callback(null);
         }
         CSSAgent.getAllStyleSheets(didGetAllStyleSheets.bind(this));
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
-    _styleSheetChanged: function(event)
-    {
-        if (this._isSettingContent)
-            return;
-
-        if (!event.data.majorChange)
-            return;
-
-        /**
-         * @param {?string} error
-         * @param {string} content
-         */
-        function callback(error, content)
-        {
-            if (!error)
-                this._innerStyleSheetChanged(event.data.styleSheetId, content);
-        }
-        CSSAgent.getStyleSheetText(event.data.styleSheetId, callback.bind(this));
-    },
-
-    /**
-     * @param {CSSAgent.StyleSheetId} styleSheetId
-     * @param {string} content
-     */
-    _innerStyleSheetChanged: function(styleSheetId, content)
-    {
-        function setContent()
-        {
-            var header = this._styleSheetIdToHeader[styleSheetId];
-            if (!header)
-                return;
-
-            var frame = WebInspector.resourceTreeModel.frameForId(header.frameId);
-            if (!frame)
-                return;
-
-            var styleSheetURL = header.origin === "inspector" ? this._viaInspectorResourceURL(header.sourceURL) : header.sourceURL;
-            
-            var uiSourceCode = WebInspector.workspace.uiSourceCodeForURL(styleSheetURL);
-            if (!uiSourceCode)
-                return;
-
-            if (uiSourceCode.contentType() === WebInspector.resourceTypes.Stylesheet)
-                uiSourceCode.addRevision(content);
-        }
-
-        if (!this._styleSheetIdToHeader[styleSheetId]) {
-            this._loadStyleSheetHeaders(setContent.bind(this));
-            return;
-        }
-        setContent.call(this);
     },
 
     /**
@@ -1298,6 +1364,13 @@ WebInspector.CSSStyleModelResourceBinding.prototype = {
             fakeURL += "/";
         fakeURL += "inspector-stylesheet";
         return fakeURL;
+    },
+
+    _reset: function()
+    {
+        // Main frame navigation - clear history.
+        this._frameAndURLToStyleSheetId = {};
+        this._styleSheetIdToHeader = {};
     }
 }
 
@@ -1326,21 +1399,28 @@ WebInspector.CSSDispatcher.prototype = {
     },
 
     /**
-     * @param {DOMAgent.NodeId} documentNodeId
-     * @param {string} name
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
      */
-    namedFlowCreated: function(documentNodeId, name)
+    namedFlowCreated: function(namedFlowPayload)
     {
-        this._cssModel._namedFlowCreated(documentNodeId, name);
+        this._cssModel._namedFlowCreated(namedFlowPayload);
     },
 
     /**
      * @param {DOMAgent.NodeId} documentNodeId
-     * @param {string} name
+     * @param {string} flowName
      */
-    namedFlowRemoved: function(documentNodeId, name)
+    namedFlowRemoved: function(documentNodeId, flowName)
     {
-        this._cssModel._namedFlowRemoved(documentNodeId, name);
+        this._cssModel._namedFlowRemoved(documentNodeId, flowName);
+    },
+
+    /**
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
+     */
+    regionLayoutUpdated: function(namedFlowPayload)
+    {
+        this._cssModel._regionLayoutUpdated(namedFlowPayload);
     }
 }
 
@@ -1350,7 +1430,7 @@ WebInspector.CSSDispatcher.prototype = {
  */
 WebInspector.NamedFlow = function(payload)
 {
-    this.nodeId = payload.documentNodeId;
+    this.documentNodeId = payload.documentNodeId;
     this.name = payload.name;
     this.overset = payload.overset;
     this.content = payload.content;
@@ -1367,20 +1447,50 @@ WebInspector.NamedFlow.parsePayload = function(payload)
 }
 
 /**
- * @param {?Array.<CSSAgent.NamedFlow>=} namedFlowPayload
- * @return {?Array.<WebInspector.NamedFlow>}
+ * @constructor
+ * @param {Array.<CSSAgent.NamedFlow>} payload
  */
-WebInspector.NamedFlow.parsePayloadArray = function(namedFlowPayload)
+WebInspector.NamedFlowCollection = function(payload)
 {
-    if (!namedFlowPayload)
-        return null;
+    /** @type {Object.<string, WebInspector.NamedFlow>} */
+    this.namedFlowMap = {};
 
-    var parsedArray = [];
-    for (var i = 0; i < namedFlowPayload.length; ++i)
-        parsedArray[i] = WebInspector.NamedFlow.parsePayload(namedFlowPayload[i]);
-    return parsedArray;
+    for (var i = 0; i < payload.length; ++i) {
+        var namedFlow = WebInspector.NamedFlow.parsePayload(payload[i]);
+        this.namedFlowMap[namedFlow.name] = namedFlow;
+    }
 }
 
+WebInspector.NamedFlowCollection.prototype = {
+    /**
+     * @param {WebInspector.NamedFlow} namedFlow
+     */
+    _appendNamedFlow: function(namedFlow)
+    {
+        this.namedFlowMap[namedFlow.name] = namedFlow;
+    },
+
+    /**
+     * @param {string} flowName
+     */
+    _removeNamedFlow: function(flowName)
+    {
+        delete this.namedFlowMap[flowName];
+    },
+
+    /**
+     * @param {string} flowName
+     * @return {WebInspector.NamedFlow}
+     */
+    flowByName: function(flowName)
+    {
+        var namedFlow = this.namedFlowMap[flowName];
+
+        if (!namedFlow)
+            return null;
+        return namedFlow;
+    }
+}
 /**
  * @type {WebInspector.CSSStyleModel}
  */

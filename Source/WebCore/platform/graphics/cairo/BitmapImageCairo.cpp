@@ -71,12 +71,15 @@ BitmapImage::BitmapImage(NativeImageCairo* nativeImage, ImageObserver* observer)
     checkForSolidColor();
 }
 
-void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op)
+void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode)
 {
-    FloatRect srcRect(src);
-    FloatRect dstRect(dst);
+    draw(context, dst, src, styleColorSpace, op, blendMode, DoNotRespectImageOrientation);
+}
 
-    if (!dstRect.width() || !dstRect.height() || !srcRect.width() || !srcRect.height())
+void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op,
+    BlendMode blendMode, RespectImageOrientationEnum shouldRespectImageOrientation)
+{
+    if (!dst.width() || !dst.height() || !src.width() || !src.height())
         return;
 
     startAnimation();
@@ -86,18 +89,45 @@ void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const Flo
         return;
 
     if (mayFillWithSolidColor()) {
-        fillWithSolidColor(context, dstRect, solidColor(), styleColorSpace, op);
+        fillWithSolidColor(context, dst, solidColor(), styleColorSpace, op);
         return;
     }
 
     context->save();
 
     // Set the compositing operation.
-    if (op == CompositeSourceOver && !frameHasAlphaAtIndex(m_currentFrame))
+    if (op == CompositeSourceOver && blendMode == BlendModeNormal && !frameHasAlphaAtIndex(m_currentFrame))
         context->setCompositeOperation(CompositeCopy);
     else
-        context->setCompositeOperation(op);
-    context->platformContext()->drawSurfaceToContext(nativeImage->surface(), dstRect, srcRect, context);
+        context->setCompositeOperation(op, blendMode);
+
+#if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
+    cairo_surface_t* surface = nativeImage->surface();
+    IntSize scaledSize(cairo_image_surface_get_width(surface), cairo_image_surface_get_height(surface));
+    FloatRect adjustedSrcRect = adjustSourceRectForDownSampling(src, scaledSize);
+#else
+    FloatRect adjustedSrcRect(src);
+#endif
+
+    ImageOrientation orientation = DefaultImageOrientation;
+    if (shouldRespectImageOrientation == RespectImageOrientation)
+        orientation = frameOrientationAtIndex(m_currentFrame);
+
+    FloatRect dstRect = dst;
+
+    if (orientation != DefaultImageOrientation) {
+        // ImageOrientation expects the origin to be at (0, 0).
+        context->translate(dstRect.x(), dstRect.y());
+        dstRect.setLocation(FloatPoint());
+        context->concatCTM(orientation.transformFromDefault(dstRect.size()));
+        if (orientation.usesWidthAsHeight()) {
+            // The destination rectangle will have it's width and height already reversed for the orientation of
+            // the image, as it was needed for page layout, so we need to reverse it back here.
+            dstRect = FloatRect(dstRect.x(), dstRect.y(), dstRect.height(), dstRect.width());
+        }
+    }
+
+    context->platformContext()->drawSurfaceToContext(nativeImage->surface(), dstRect, adjustedSrcRect, context);
 
     context->restore();
 

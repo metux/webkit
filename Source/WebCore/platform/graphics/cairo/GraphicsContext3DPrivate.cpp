@@ -24,9 +24,15 @@
 
 #include "HostWindow.h"
 #include "NotImplemented.h"
-#include "OpenGLShims.h"
 #include "PlatformContextCairo.h"
 #include <wtf/OwnArrayPtr.h>
+
+#if USE(OPENGL_ES_2)
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#else
+#include "OpenGLShims.h"
+#endif
 
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER) && USE(TEXTURE_MAPPER_GL)
 #include <texmap/TextureMapperGL.h>
@@ -36,15 +42,25 @@ using namespace std;
 
 namespace WebCore {
 
-PassOwnPtr<GraphicsContext3DPrivate> GraphicsContext3DPrivate::create(GraphicsContext3D* context)
+PassOwnPtr<GraphicsContext3DPrivate> GraphicsContext3DPrivate::create(GraphicsContext3D* context, GraphicsContext3D::RenderStyle renderStyle)
 {
-    return adoptPtr(new GraphicsContext3DPrivate(context));
+    return adoptPtr(new GraphicsContext3DPrivate(context, renderStyle));
 }
 
-GraphicsContext3DPrivate::GraphicsContext3DPrivate(GraphicsContext3D* context)
+GraphicsContext3DPrivate::GraphicsContext3DPrivate(GraphicsContext3D* context, GraphicsContext3D::RenderStyle renderStyle)
     : m_context(context)
-    , m_glContext(GLContext::createOffscreenContext(GLContext::sharingContext()))
+    , m_renderStyle(renderStyle)
 {
+    switch (renderStyle) {
+    case GraphicsContext3D::RenderOffscreen:
+        m_glContext = GLContext::createOffscreenContext(GLContext::sharingContext());
+        break;
+    case GraphicsContext3D::RenderToCurrentGLContext:
+        break;
+    case GraphicsContext3D::RenderDirectlyToHostWindow:
+        ASSERT_NOT_REACHED();
+        break;
+    }
 }
 
 GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
@@ -58,7 +74,7 @@ bool GraphicsContext3DPrivate::makeContextCurrent()
 
 PlatformGraphicsContext3D GraphicsContext3DPrivate::platformContext()
 {
-    return m_glContext ? m_glContext->platformContext() : 0;
+    return m_glContext ? m_glContext->platformContext() : GLContext::getCurrent()->platformContext();
 }
 
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
@@ -66,6 +82,10 @@ void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper
 {
     if (!m_glContext)
         return;
+
+    ASSERT(m_renderStyle == GraphicsContext3D::RenderOffscreen);
+
+    m_context->markLayerComposited();
 
     // FIXME: We do not support mask for the moment with TextureMapperImageBuffer.
     if (textureMapper->accelerationMode() != TextureMapper::OpenGLMode) {
@@ -113,14 +133,14 @@ void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper
             m_context->makeContextCurrent();
 
         m_context->resolveMultisamplingIfNecessary();
-        glBindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_context->m_boundFBO);
+        ::glBindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_context->m_boundFBO);
 
         if (previousActiveContext && previousActiveContext != m_glContext)
             previousActiveContext->makeContextCurrent();
     }
 
     TextureMapperGL* texmapGL = static_cast<TextureMapperGL*>(textureMapper);
-    TextureMapperGL::Flags flags = TextureMapperGL::ShouldFlipTexture | (m_context->m_attrs.alpha ? TextureMapperGL::SupportsBlending : 0);
+    TextureMapperGL::Flags flags = TextureMapperGL::ShouldFlipTexture | (m_context->m_attrs.alpha ? TextureMapperGL::ShouldBlend : 0);
     IntSize textureSize(m_context->m_currentWidth, m_context->m_currentHeight);
     texmapGL->drawTexture(m_context->m_texture, flags, textureSize, targetRect, matrix, opacity, mask);
 #endif // USE(ACCELERATED_COMPOSITING_GL)

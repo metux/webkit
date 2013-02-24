@@ -81,7 +81,7 @@ void Attr::createTextChild()
 
         // This does everything appendChild() would do in this situation (assuming m_ignoreChildrenChanged was set),
         // but much more efficiently.
-        textNode->setParentOrHostNode(this);
+        textNode->setParentOrShadowHostNode(this);
         setFirstChild(textNode.get());
         setLastChild(textNode.get());
     }
@@ -130,7 +130,7 @@ void Attr::setValue(const AtomicString& value, ExceptionCode&)
     setValue(value);
 
     if (m_element)
-        m_element->didModifyAttribute(elementAttribute());
+        m_element->didModifyAttribute(qualifiedName(), value);
 }
 
 void Attr::setNodeValue(const String& v, ExceptionCode& ec)
@@ -172,7 +172,7 @@ void Attr::childrenChanged(bool, Node*, Node*, int)
             valueBuilder.append(toText(n)->data());
     }
 
-    AtomicString newValue = valueBuilder.toString();
+    AtomicString newValue = valueBuilder.toAtomicString();
     if (m_element)
         m_element->willModifyAttribute(qualifiedName(), value(), newValue);
 
@@ -182,7 +182,7 @@ void Attr::childrenChanged(bool, Node*, Node*, int)
         m_standaloneValue = newValue;
 
     if (m_element)
-        m_element->attributeChanged(elementAttribute());
+        m_element->attributeChanged(qualifiedName(), newValue);
 }
 
 bool Attr::isId() const
@@ -196,7 +196,7 @@ CSSStyleDeclaration* Attr::style()
     if (!m_element || !m_element->isStyledElement())
         return 0;
     m_style = StylePropertySet::create();
-    static_cast<StyledElement*>(m_element)->collectStyleForAttribute(elementAttribute(), m_style.get());
+    static_cast<StyledElement*>(m_element)->collectStyleForPresentationAttribute(elementAttribute(), m_style.get());
     return m_style->ensureCSSStyleDeclaration();
 }
 
@@ -210,15 +210,14 @@ const AtomicString& Attr::value() const
 Attribute& Attr::elementAttribute()
 {
     ASSERT(m_element);
-    ASSERT(m_element->attributeData());
-    return *m_element->getAttributeItem(qualifiedName());
+    ASSERT(m_element->elementData());
+    return *m_element->ensureUniqueElementData()->getAttributeItem(qualifiedName());
 }
 
 void Attr::detachFromElementWithValue(const AtomicString& value)
 {
     ASSERT(m_element);
     ASSERT(m_standaloneValue.isNull());
-    m_element->attributeData()->removeAttr(m_element, qualifiedName());
     m_standaloneValue = value;
     m_element = 0;
 }

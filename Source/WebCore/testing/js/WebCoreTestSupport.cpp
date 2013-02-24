@@ -55,8 +55,10 @@ void resetInternalsObject(JSContextRef context)
     JSLockHolder lock(exec);
     JSDOMGlobalObject* globalObject = jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject());
     ScriptExecutionContext* scriptContext = globalObject->scriptExecutionContext();
-    ASSERT(scriptContext->isDocument());
-    InternalSettings::from(static_cast<Document*>(scriptContext)->frame()->page())->reset();
+    ASSERT_WITH_SECURITY_IMPLICATION(scriptContext->isDocument());
+    Page* page = static_cast<Document*>(scriptContext)->frame()->page();
+    Internals::resetToConsistentState(page);
+    InternalSettings::from(page)->resetToConsistentState();
 }
 
 }

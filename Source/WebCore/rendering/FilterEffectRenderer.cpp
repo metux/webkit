@@ -29,6 +29,7 @@
 
 #include "FilterEffectRenderer.h"
 
+#include "ColorSpace.h"
 #include "Document.h"
 #include "FEColorMatrix.h"
 #include "FEComponentTransfer.h"
@@ -41,17 +42,19 @@
 #include <algorithm>
 #include <wtf/MathExtras.h>
 
-#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
 #include "CustomFilterGlobalContext.h"
-#include "CustomFilterProgram.h"
 #include "CustomFilterOperation.h"
+#include "CustomFilterProgram.h"
+#include "CustomFilterValidatedProgram.h"
 #include "FECustomFilter.h"
 #include "RenderView.h"
-#include "Settings.h"
+#include "ValidatedCustomFilterOperation.h"
 #endif
 
 #if ENABLE(SVG)
 #include "CachedSVGDocument.h"
+#include "CachedSVGDocumentReference.h"
 #include "SVGElement.h"
 #include "SVGFilterPrimitiveStandardAttributes.h"
 #include "SourceAlpha.h"
@@ -82,21 +85,24 @@ inline bool isFilterSizeValid(FloatRect rect)
     return true;
 }
 
-#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
-static bool isCSSCustomFilterEnabled(Document* document)
+#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
+static PassRefPtr<FECustomFilter> createCustomFilterEffect(Filter* filter, Document* document, ValidatedCustomFilterOperation* operation)
 {
-    // We only want to enable shaders if WebGL is also enabled on this platform.
-    Settings* settings = document->settings();
-    return settings && settings->isCSSCustomFilterEnabled() && settings->webGLEnabled();
+    if (!document)
+        return 0;
+
+    CustomFilterGlobalContext* globalContext = document->renderView()->customFilterGlobalContext();
+    globalContext->prepareContextIfNeeded(document->view()->hostWindow());
+    if (!globalContext->context())
+        return 0;
+
+    return FECustomFilter::create(filter, globalContext->context(), operation->validatedProgram(), operation->parameters(),
+        operation->meshRows(), operation->meshColumns(),  operation->meshType());
 }
 #endif
 
 FilterEffectRenderer::FilterEffectRenderer()
-    : m_topOutset(0)
-    , m_rightOutset(0)
-    , m_bottomOutset(0)
-    , m_leftOutset(0)
-    , m_graphicsBufferAttached(false)
+    : m_graphicsBufferAttached(false)
     , m_hasFilterThatMovesPixels(false)
 #if ENABLE(CSS_SHADERS)
     , m_hasCustomShaderFilter(false)
@@ -115,10 +121,17 @@ GraphicsContext* FilterEffectRenderer::inputContext()
     return sourceImage() ? sourceImage()->context() : 0;
 }
 
-PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(Document* document, PassRefPtr<FilterEffect> previousEffect, ReferenceFilterOperation* op)
+PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject* renderer, PassRefPtr<FilterEffect> previousEffect, ReferenceFilterOperation* filterOperation)
 {
 #if ENABLE(SVG)
-    CachedSVGDocument* cachedSVGDocument = static_cast<CachedSVGDocument*>(op->data());
+    if (!renderer)
+        return 0;
+
+    Document* document = renderer->document();
+    ASSERT(document);
+
+    CachedSVGDocumentReference* cachedSVGDocumentReference = filterOperation->cachedSVGDocumentReference();
+    CachedSVGDocument* cachedSVGDocument = cachedSVGDocumentReference ? cachedSVGDocumentReference->document() : 0;
 
     // If we have an SVG document, this is an external reference. Otherwise
     // we look up the referenced node in the current document.
@@ -128,9 +141,13 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(Document* do
     if (!document)
         return 0;
 
-    Element* filter = document->getElementById(op->fragment());
-    if (!filter)
+    Element* filter = document->getElementById(filterOperation->fragment());
+    if (!filter) {
+        // Although we did not find the referenced filter, it might exist later
+        // in the document
+        document->accessSVGExtensions()->addPendingResource(filterOperation->fragment(), toElement(renderer->node()));
         return 0;
+    }
 
     RefPtr<FilterEffect> effect;
 
@@ -161,26 +178,26 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(Document* do
     }
     return effect;
 #else
-    UNUSED_PARAM(document);
+    UNUSED_PARAM(renderer);
     UNUSED_PARAM(previousEffect);
-    UNUSED_PARAM(op);
+    UNUSED_PARAM(filterOperation);
     return 0;
 #endif
 }
 
-bool FilterEffectRenderer::build(Document* document, const FilterOperations& operations)
+bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations& operations)
 {
-#if !ENABLE(CSS_SHADERS) || !ENABLE(WEBGL)
-    UNUSED_PARAM(document);
-#endif
-
 #if ENABLE(CSS_SHADERS)
     m_hasCustomShaderFilter = false;
 #endif
     m_hasFilterThatMovesPixels = operations.hasFilterThatMovesPixels();
     if (m_hasFilterThatMovesPixels)
-        operations.getOutsets(m_topOutset, m_rightOutset, m_bottomOutset, m_leftOutset);
-    m_effects.clear();
+        m_outsets = operations.outsets();
+    
+    // Keep the old effects on the stack until we've created the new effects.
+    // New FECustomFilters can reuse cached resources from old FECustomFilters.
+    FilterEffectList oldEffects;
+    m_effects.swap(oldEffects);
 
     RefPtr<FilterEffect> previousEffect = m_sourceGraphic;
     for (size_t i = 0; i < operations.operations().size(); ++i) {
@@ -188,7 +205,9 @@ bool FilterEffectRenderer::build(Document* document, const FilterOperations& ope
         FilterOperation* filterOperation = operations.operations().at(i).get();
         switch (filterOperation->getOperationType()) {
         case FilterOperation::REFERENCE: {
-            effect = buildReferenceFilter(document, previousEffect, static_cast<ReferenceFilterOperation*>(filterOperation));
+            ReferenceFilterOperation* referenceOperation = static_cast<ReferenceFilterOperation*>(filterOperation);
+            effect = buildReferenceFilter(renderer, previousEffect, referenceOperation);
+            referenceOperation->setFilterEffect(effect);
             break;
         }
         case FilterOperation::GRAYSCALE: {
@@ -291,8 +310,8 @@ bool FilterEffectRenderer::build(Document* document, const FilterOperations& ope
             BasicComponentTransferFilterOperation* componentTransferOperation = static_cast<BasicComponentTransferFilterOperation*>(filterOperation);
             ComponentTransferFunction transferFunction;
             transferFunction.type = FECOMPONENTTRANSFER_TYPE_LINEAR;
-            transferFunction.slope = 1;
-            transferFunction.intercept = narrowPrecisionToFloat(componentTransferOperation->amount());
+            transferFunction.slope = narrowPrecisionToFloat(componentTransferOperation->amount());
+            transferFunction.intercept = 0;
 
             ComponentTransferFunction nullFunction;
             effect = FEComponentTransfer::create(this, transferFunction, transferFunction, transferFunction, nullFunction);
@@ -322,23 +341,18 @@ bool FilterEffectRenderer::build(Document* document, const FilterOperations& ope
                                                 dropShadowOperation->x(), dropShadowOperation->y(), dropShadowOperation->color(), 1);
             break;
         }
-#if ENABLE(CSS_SHADERS)
-        case FilterOperation::CUSTOM: {
-#if ENABLE(WEBGL)
-            if (!isCSSCustomFilterEnabled(document))
-                continue;
-            
-            CustomFilterOperation* customFilterOperation = static_cast<CustomFilterOperation*>(filterOperation);
-            RefPtr<CustomFilterProgram> program = customFilterOperation->program();
-            if (program->isLoaded()) {
-                CustomFilterGlobalContext* globalContext = document->renderView()->customFilterGlobalContext();
-                globalContext->prepareContextIfNeeded(document->view()->hostWindow());
-                effect = FECustomFilter::create(this, globalContext, program, customFilterOperation->parameters(),
-                                                customFilterOperation->meshRows(), customFilterOperation->meshColumns(),
-                                                customFilterOperation->meshBoxType(), customFilterOperation->meshType());
+#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
+        case FilterOperation::CUSTOM:
+            // CUSTOM operations are always converted to VALIDATED_CUSTOM before getting here.
+            // The conversion happens in RenderLayer::computeFilterOperations.
+            ASSERT_NOT_REACHED();
+            break;
+        case FilterOperation::VALIDATED_CUSTOM: {
+            ValidatedCustomFilterOperation* customFilterOperation = static_cast<ValidatedCustomFilterOperation*>(filterOperation);
+            Document* document = renderer ? renderer->document() : 0;
+            effect = createCustomFilterEffect(this, document, customFilterOperation);
+            if (effect)
                 m_hasCustomShaderFilter = true;
-            }
-#endif
             break;
         }
 #endif
@@ -349,6 +363,7 @@ bool FilterEffectRenderer::build(Document* document, const FilterOperations& ope
         if (effect) {
             // Unlike SVG, filters applied here should not clip to their primitive subregions.
             effect->setClipsToBounds(false);
+            effect->setColorSpace(ColorSpaceDeviceRGB);
             
             if (filterOperation->getOperationType() != FilterOperation::REFERENCE) {
                 effect->inputEffects().append(previousEffect);
@@ -401,11 +416,9 @@ void FilterEffectRenderer::clearIntermediateResults()
 
 void FilterEffectRenderer::apply()
 {
-    lastEffect()->apply();
-
-#if !USE(CG)
-    output()->transformColorSpace(lastEffect()->colorSpace(), ColorSpaceDeviceRGB);
-#endif
+    RefPtr<FilterEffect> effect = lastEffect();
+    effect->apply();
+    effect->transformResultColorSpace(ColorSpaceDeviceRGB);
 }
 
 LayoutRect FilterEffectRenderer::computeSourceImageRectForDirtyRect(const LayoutRect& filterBoxRect, const LayoutRect& dirtyRect)
@@ -422,8 +435,8 @@ LayoutRect FilterEffectRenderer::computeSourceImageRectForDirtyRect(const Layout
     if (hasFilterThatMovesPixels()) {
         // Note that the outsets are reversed here because we are going backwards -> we have the dirty rect and
         // need to find out what is the rectangle that might influence the result inside that dirty rect.
-        rectForRepaint.move(-m_rightOutset, -m_bottomOutset);
-        rectForRepaint.expand(m_leftOutset + m_rightOutset, m_topOutset + m_bottomOutset);
+        rectForRepaint.move(-m_outsets.right(), -m_outsets.bottom());
+        rectForRepaint.expand(m_outsets.left() + m_outsets.right(), m_outsets.top() + m_outsets.bottom());
     }
     rectForRepaint.intersect(filterBoxRect);
     return rectForRepaint;

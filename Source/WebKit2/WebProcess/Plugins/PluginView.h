@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,25 +30,34 @@
 #include "Plugin.h"
 #include "PluginController.h"
 #include "WebFrame.h"
+#include <WebCore/FindOptions.h>
+#include <WebCore/Image.h>
 #include <WebCore/MediaCanStartListener.h>
 #include <WebCore/PluginViewBase.h>
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceResponse.h>
 #include <WebCore/RunLoop.h>
+#include <WebCore/Timer.h>
 #include <wtf/Deque.h>
 
 // FIXME: Eventually this should move to WebCore.
 
 namespace WebCore {
-    class Frame;
-    class HTMLPlugInElement;
+class Frame;
+class HTMLPlugInElement;
+class MouseEvent;
+class RenderBoxModelObject;
 }
 
 namespace WebKit {
 
+class WebEvent;
+
 class PluginView : public WebCore::PluginViewBase, public PluginController, private WebCore::MediaCanStartListener, private WebFrame::LoadListener {
 public:
     static PassRefPtr<PluginView> create(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters&);
+
+    void recreateAndInitialize(PassRefPtr<Plugin>);
 
     WebCore::Frame* frame() const;
 
@@ -69,11 +78,29 @@ public:
     RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return m_plugin->pdfDocumentForPrinting(); }
 #endif
 
+    WebCore::HTMLPlugInElement* pluginElement() const { return m_pluginElement.get(); }
+    const Plugin::Parameters& initialParameters() const { return m_parameters; }
+
     // FIXME: Remove this; nobody should have to know about the plug-in view's renderer except the plug-in view itself.
     WebCore::RenderBoxModelObject* renderer() const;
+    
+    void setPageScaleFactor(double scaleFactor, WebCore::IntPoint origin);
+    double pageScaleFactor();
+    bool handlesPageScaleFactor() { return m_plugin->handlesPageScaleFactor(); }
 
     void pageScaleFactorDidChange();
     void webPageDestroyed();
+
+    bool handleEditingCommand(const String& commandName, const String& argument);
+    bool isEditingCommandEnabled(const String& commandName);
+    
+    unsigned countFindMatches(const String& target, WebCore::FindOptions, unsigned maxMatchCount);
+    bool findString(const String& target, WebCore::FindOptions, unsigned maxMatchCount);
+
+    bool shouldAllowScripting();
+
+    bool getResourceData(const unsigned char*& bytes, unsigned& length) const;
+    bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&);
 
 private:
     PluginView(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters& parameters);
@@ -103,17 +130,23 @@ private:
 
     void redeliverManualStream();
 
+    void pluginSnapshotTimerFired(WebCore::DeferrableOneShotTimer<PluginView>*);
+    void pluginDidReceiveUserInteraction();
+
     // WebCore::PluginViewBase
 #if PLATFORM(MAC)
     virtual PlatformLayer* platformLayer() const;
 #endif
     virtual JSC::JSObject* scriptObject(JSC::JSGlobalObject*);
+    virtual void storageBlockingStateChanged();
     virtual void privateBrowsingStateChanged(bool);
     virtual bool getFormValue(String&);
     virtual bool scroll(WebCore::ScrollDirection, WebCore::ScrollGranularity);
     virtual WebCore::Scrollbar* horizontalScrollbar();
     virtual WebCore::Scrollbar* verticalScrollbar();
     virtual bool wantsWheelEvents();
+    virtual bool shouldAlwaysAutoStart() const OVERRIDE;
+    virtual bool shouldAllowNavigationFromDrags() const OVERRIDE;
 
     // WebCore::Widget
     virtual void setFrameRect(const WebCore::IntRect&);
@@ -148,10 +181,6 @@ private:
     virtual bool isAcceleratedCompositingEnabled();
     virtual void pluginProcessCrashed();
     virtual void willSendEventToPlugin();
-#if PLATFORM(WIN)
-    virtual HWND nativeParentWindow();
-    virtual void scheduleWindowedPluginGeometryUpdate(const WindowGeometry&);
-#endif
 #if PLATFORM(MAC)
     virtual void pluginFocusOrWindowFocusChanged(bool pluginHasFocusAndWindowHasFocus);
     virtual void setComplexTextInputState(PluginComplexTextInputState);
@@ -175,10 +204,13 @@ private:
 
     virtual void didInitializePlugin();
     virtual void didFailToInitializePlugin();
+    void destroyPluginAndReset();
 
     // WebFrame::LoadListener
     virtual void didFinishLoad(WebFrame*);
     virtual void didFailLoad(WebFrame*, bool wasCancelled);
+
+    PassOwnPtr<WebEvent> createWebEvent(WebCore::MouseEvent*) const;
 
     RefPtr<WebCore::HTMLPlugInElement> m_pluginElement;
     RefPtr<Plugin> m_plugin;
@@ -220,7 +252,14 @@ private:
     WebCore::ResourceError m_manualStreamError;
     RefPtr<WebCore::SharedBuffer> m_manualStreamData;
     
-    RefPtr<ShareableBitmap> m_snapshot;
+    // This snapshot is used to avoid side effects should the plugin run JS during painting.
+    RefPtr<ShareableBitmap> m_transientPaintingSnapshot;
+    // This timer is used when plugin snapshotting is enabled, to capture a plugin placeholder.
+    WebCore::DeferrableOneShotTimer<PluginView> m_pluginSnapshotTimer;
+    unsigned m_countSnapshotRetries;
+    bool m_didReceiveUserInteraction;
+
+    double m_pageScaleFactor;
 };
 
 } // namespace WebKit

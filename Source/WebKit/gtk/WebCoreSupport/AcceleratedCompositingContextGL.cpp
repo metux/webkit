@@ -26,6 +26,7 @@
 #include "ChromeClientGtk.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "GraphicsLayerTextureMapper.h"
 #include "PlatformContextCairo.h"
 #include "Settings.h"
 #include "TextureMapperGL.h"
@@ -83,12 +84,12 @@ void AcceleratedCompositingContext::initialize()
     if (!m_redirectedWindow)
         return;
 
-    m_rootLayer = GraphicsLayer::create(this);
+    m_rootLayer = GraphicsLayer::create(0, this);
     m_rootLayer->setDrawsContent(false);
     m_rootLayer->setSize(pageSize);
 
     // The non-composited contents are a child of the root layer.
-    m_nonCompositedContentLayer = GraphicsLayer::create(this);
+    m_nonCompositedContentLayer = GraphicsLayer::create(0, this);
     m_nonCompositedContentLayer->setDrawsContent(true);
     m_nonCompositedContentLayer->setContentsOpaque(!m_webView->priv->transparent);
     m_nonCompositedContentLayer->setSize(pageSize);
@@ -106,8 +107,9 @@ void AcceleratedCompositingContext::initialize()
     // The creation of the TextureMapper needs an active OpenGL context.
     GLContext* context = m_redirectedWindow->context();
     context->makeContextCurrent();
-    m_textureMapper = TextureMapperGL::create();
 
+    m_textureMapper = TextureMapperGL::create();
+    static_cast<TextureMapperGL*>(m_textureMapper.get())->setEnableEdgeDistanceAntialiasing(true);
     toTextureMapperLayer(m_rootLayer.get())->setTextureMapper(m_textureMapper.get());
 
     scheduleLayerFlush();
@@ -187,6 +189,7 @@ void AcceleratedCompositingContext::compositeLayersToContext(CompositePurpose pu
 
     m_textureMapper->beginPainting();
     toTextureMapperLayer(m_rootLayer.get())->paint();
+    m_fpsCounter.updateFPSAndDisplay(m_textureMapper.get());
     m_textureMapper->endPainting();
 
     context->swapBuffers();
@@ -321,9 +324,9 @@ void AcceleratedCompositingContext::scheduleLayerFlush()
 
 bool AcceleratedCompositingContext::flushPendingLayerChanges()
 {
-    m_rootLayer->syncCompositingStateForThisLayerOnly();
-    m_nonCompositedContentLayer->syncCompositingStateForThisLayerOnly();
-    return core(m_webView)->mainFrame()->view()->syncCompositingStateIncludingSubframes();
+    m_rootLayer->flushCompositingStateForThisLayerOnly();
+    m_nonCompositedContentLayer->flushCompositingStateForThisLayerOnly();
+    return core(m_webView)->mainFrame()->view()->flushCompositingStateIncludingSubframes();
 }
 
 void AcceleratedCompositingContext::flushAndRenderLayers()
@@ -369,7 +372,7 @@ void AcceleratedCompositingContext::notifyAnimationStarted(const GraphicsLayer*,
 {
 
 }
-void AcceleratedCompositingContext::notifySyncRequired(const GraphicsLayer*)
+void AcceleratedCompositingContext::notifyFlushRequired(const GraphicsLayer*)
 {
 
 }
@@ -380,16 +383,6 @@ void AcceleratedCompositingContext::paintContents(const GraphicsLayer*, Graphics
     context.clip(rectToPaint);
     core(m_webView)->mainFrame()->view()->paint(&context, rectToPaint);
     context.restore();
-}
-
-bool AcceleratedCompositingContext::showDebugBorders(const GraphicsLayer*) const
-{
-    return false;
-}
-
-bool AcceleratedCompositingContext::showRepaintCounter(const GraphicsLayer*) const
-{
-    return false;
 }
 
 } // namespace WebKit

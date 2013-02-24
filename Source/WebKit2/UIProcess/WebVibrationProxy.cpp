@@ -29,26 +29,32 @@
 #if ENABLE(VIBRATION)
 
 #include "WebContext.h"
+#include "WebPageProxy.h"
+#include "WebProcessProxy.h"
+#include "WebVibrationProxyMessages.h"
 
 namespace WebKit {
 
-PassRefPtr<WebVibrationProxy> WebVibrationProxy::create(WebContext* context)
+PassRefPtr<WebVibrationProxy> WebVibrationProxy::create(WebPageProxy* page)
 {
-    return adoptRef(new WebVibrationProxy(context));
+    return adoptRef(new WebVibrationProxy(page));
 }
 
-WebVibrationProxy::WebVibrationProxy(WebContext* context)
-    : m_context(context)
+WebVibrationProxy::WebVibrationProxy(WebPageProxy* page)
+    : m_page(page)
 {
+    m_page->process()->context()->addMessageReceiver(Messages::WebVibrationProxy::messageReceiverName(), m_page->pageID(), this);
 }
 
 WebVibrationProxy::~WebVibrationProxy()
 {
+    m_page->process()->context()->removeMessageReceiver(Messages::WebVibrationProxy::messageReceiverName(), m_page->pageID());
 }
 
 void WebVibrationProxy::invalidate()
 {
     cancelVibration();
+    m_provider.initialize(0);
 }
 
 void WebVibrationProxy::initializeProvider(const WKVibrationProvider* provider)
@@ -56,12 +62,7 @@ void WebVibrationProxy::initializeProvider(const WKVibrationProvider* provider)
     m_provider.initialize(provider);
 }
 
-void WebVibrationProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
-{
-    didReceiveWebVibrationProxyMessage(connection, messageID, arguments);
-}
-
-void WebVibrationProxy::vibrate(uint64_t vibrationTime)
+void WebVibrationProxy::vibrate(uint32_t vibrationTime)
 {
     m_provider.vibrate(this, vibrationTime);
 }

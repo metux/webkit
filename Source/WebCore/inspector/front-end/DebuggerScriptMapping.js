@@ -30,17 +30,15 @@
 
 /**
  * @constructor
+ * @param {WebInspector.Workspace} workspace
+ * @param {WebInspector.SimpleWorkspaceProvider} networkWorkspaceProvider
  */
-WebInspector.DebuggerScriptMapping = function()
+WebInspector.DebuggerScriptMapping = function(workspace, networkWorkspaceProvider)
 {
-    this._mappings = [];
-  
-    this._resourceMapping = new WebInspector.ResourceScriptMapping();
-    this._mappings.push(this._resourceMapping);
-    this._compilerMapping = new WebInspector.CompilerScriptMapping();
-    this._mappings.push(this._compilerMapping);
+    this._defaultMapping = new WebInspector.DefaultScriptMapping(workspace);
+    this._resourceMapping = new WebInspector.ResourceScriptMapping(workspace);
+    this._compilerMapping = new WebInspector.CompilerScriptMapping(workspace, networkWorkspaceProvider);
     this._snippetMapping = WebInspector.scriptSnippetModel.scriptMapping;
-    this._mappings.push(this._snippetMapping);
 
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.ParsedScriptSource, this._parsedScriptSource, this);
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.FailedToParseScriptSource, this._parsedScriptSource, this);
@@ -48,39 +46,21 @@ WebInspector.DebuggerScriptMapping = function()
 
 WebInspector.DebuggerScriptMapping.prototype = {
     /**
-     * @return {Array.<WebInspector.UISourceCodeProvider>}
-     */
-    uiSourceCodeProviders: function()
-    {
-        return this._mappings;
-    },
-
-    /**
      * @param {WebInspector.Event} event
      */
     _parsedScriptSource: function(event)
     {
-        var script = /** @type {WebInspector.Script} */ event.data;
-        var mapping = this._mappingForScript(script);
-        mapping.addScript(script);
-    },
+        var script = /** @type {WebInspector.Script} */ (event.data);
+        this._defaultMapping.addScript(script);
 
-    /**
-     * @param {WebInspector.Script} script
-     * @return {WebInspector.SourceMapping}
-     */
-    _mappingForScript: function(script)
-    {
-        if (WebInspector.experimentsSettings.snippetsSupport.isEnabled()) {
-            if (this._snippetMapping && this._snippetMapping.snippetIdForSourceURL(script.sourceURL))
-                return this._snippetMapping;
+        if (WebInspector.experimentsSettings.snippetsSupport.isEnabled() && script.isSnippet()) {
+            this._snippetMapping.addScript(script);
+            return;
         }
 
-        if (WebInspector.settings.sourceMapsEnabled.get() && script.sourceMapURL) {
-            if (this._compilerMapping.loadSourceMapForScript(script))
-                return this._compilerMapping;
-        }
+        this._resourceMapping.addScript(script);
 
-        return this._resourceMapping;
+        if (WebInspector.settings.sourceMapsEnabled.get())
+            this._compilerMapping.addScript(script);
     }
 }

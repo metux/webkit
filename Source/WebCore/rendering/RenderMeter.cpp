@@ -19,9 +19,9 @@
  */
 
 #include "config.h"
+#if ENABLE(METER_ELEMENT)
 #include "RenderMeter.h"
 
-#if ENABLE(METER_ELEMENT)
 #include "HTMLMeterElement.h"
 #include "HTMLNames.h"
 #include "RenderTheme.h"
@@ -52,16 +52,25 @@ HTMLMeterElement* RenderMeter::meterElement() const
     return toHTMLMeterElement(node()->shadowHost());
 }
 
-void RenderMeter::computeLogicalWidth()
+void RenderMeter::updateLogicalWidth()
 {
-    RenderBox::computeLogicalWidth();
-    setWidth(theme()->meterSizeForBounds(this, pixelSnappedIntRect(frameRect())).width());
+    RenderBox::updateLogicalWidth();
+
+    IntSize frameSize = theme()->meterSizeForBounds(this, pixelSnappedIntRect(frameRect()));
+    setLogicalWidth(isHorizontalWritingMode() ? frameSize.width() : frameSize.height());
 }
 
-void RenderMeter::computeLogicalHeight()
+void RenderMeter::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues& computedValues) const
 {
-    RenderBox::computeLogicalHeight();
-    setHeight(theme()->meterSizeForBounds(this, pixelSnappedIntRect(frameRect())).height());
+    RenderBox::computeLogicalHeight(logicalHeight, logicalTop, computedValues);
+
+    LayoutRect frame = frameRect();
+    if (isHorizontalWritingMode())
+        frame.setHeight(computedValues.m_extent);
+    else
+        frame.setWidth(computedValues.m_extent);
+    IntSize frameSize = theme()->meterSizeForBounds(this, pixelSnappedIntRect(frame));
+    computedValues.m_extent = isHorizontalWritingMode() ? frameSize.height() : frameSize.width();
 }
 
 double RenderMeter::valueRatio() const

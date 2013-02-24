@@ -32,6 +32,7 @@
 #include "WebFramePolicyListenerProxy.h"
 #include "WebFrameProxy.h"
 #include "WebInspectorMessages.h"
+#include "WebInspectorProxyMessages.h"
 #include "WebPageCreationParameters.h"
 #include "WebPageGroup.h"
 #include "WebPageProxy.h"
@@ -41,9 +42,6 @@
 
 #if ENABLE(INSPECTOR_SERVER)
 #include "WebInspectorServer.h"
-#endif
-#if PLATFORM(WIN)
-#include "WebView.h"
 #endif
 
 using namespace WebCore;
@@ -65,6 +63,7 @@ static PassRefPtr<WebPageGroup> createInspectorPageGroup()
 #ifndef NDEBUG
     // Allow developers to inspect the Web Inspector in debug builds.
     pageGroup->preferences()->setDeveloperExtrasEnabled(true);
+    pageGroup->preferences()->setLogsPageMessagesToSystemConsoleEnabled(true);
 #endif
 
     pageGroup->preferences()->setApplicationChromeModeEnabled(true);
@@ -86,9 +85,7 @@ WebInspectorProxy::WebInspectorProxy(WebPageProxy* page)
     , m_isDebuggingJavaScript(false)
     , m_isProfilingJavaScript(false)
     , m_isProfilingPage(false)
-#if PLATFORM(WIN)
-    , m_inspectorWindow(0)
-#elif PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(GTK) || PLATFORM(EFL)
     , m_inspectorView(0)
     , m_inspectorWindow(0)
 #endif
@@ -96,6 +93,7 @@ WebInspectorProxy::WebInspectorProxy(WebPageProxy* page)
     , m_remoteInspectionPageId(0)
 #endif
 {
+    m_page->process()->addMessageReceiver(Messages::WebInspectorProxy::messageReceiverName(), m_page->pageID(), this);
 }
 
 WebInspectorProxy::~WebInspectorProxy()
@@ -108,6 +106,8 @@ void WebInspectorProxy::invalidate()
     if (m_remoteInspectionPageId)
         WebInspectorServer::shared().unregisterPage(m_remoteInspectionPageId);
 #endif
+
+    m_page->process()->removeMessageReceiver(Messages::WebInspectorProxy::messageReceiverName(), m_page->pageID());
 
     m_page->close();
     didClose();
@@ -179,6 +179,8 @@ void WebInspectorProxy::attach()
     if (m_isVisible)
         inspectorPageGroup()->preferences()->setInspectorStartsAttached(true);
 
+    m_page->process()->send(Messages::WebInspector::SetAttachedWindow(true), m_page->pageID());
+
     platformAttach();
 }
 
@@ -188,6 +190,8 @@ void WebInspectorProxy::detach()
     
     if (m_isVisible)
         inspectorPageGroup()->preferences()->setInspectorStartsAttached(false);
+
+    m_page->process()->send(Messages::WebInspector::SetAttachedWindow(false), m_page->pageID());
 
     platformDetach();
 }
@@ -328,8 +332,8 @@ void WebInspectorProxy::createInspectorPage(uint64_t& inspectorPageID, WebPageCr
     inspectorPage->initializePolicyClient(&policyClient);
 
     String url = inspectorPageURL();
-    if (m_isAttached)
-        url += "?docked=true";
+    url.append("?dockSide=");
+    url.append(m_isAttached ? "bottom" : "undocked");
 
     m_page->process()->assumeReadAccessToBaseURL(inspectorBaseURL());
 
@@ -363,6 +367,11 @@ void WebInspectorProxy::didClose()
 void WebInspectorProxy::bringToFront()
 {
     platformBringToFront();
+}
+
+void WebInspectorProxy::attachAvailabilityChanged(bool available)
+{
+    platformAttachAvailabilityChanged(available);
 }
 
 void WebInspectorProxy::inspectedURLChanged(const String& urlString)

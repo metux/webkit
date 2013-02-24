@@ -90,7 +90,7 @@ WebInspector.ObjectPopoverHelper.prototype = {
                         functionName.textContent = response.name || response.inferredName || response.displayName || WebInspector.UIString("(anonymous function)");
 
                         this._linkifier = new WebInspector.Linkifier();
-                        var rawLocation = /** @type {WebInspector.DebuggerModel.Location} */ response.location;
+                        var rawLocation = /** @type {WebInspector.DebuggerModel.Location} */ (response.location);
                         var link = this._linkifier.linkifyRawLocation(rawLocation, "function-location-link");
                         if (link)
                             title.appendChild(link);
@@ -106,8 +106,9 @@ WebInspector.ObjectPopoverHelper.prototype = {
                     popoverContentElement.textContent = "\"" + popoverContentElement.textContent + "\"";
                 popover.show(popoverContentElement, anchorElement);
             } else {
+                if (result.subtype === "node")
+                    result.highlightAsDOMNode();
                 popoverContentElement = document.createElement("div");
-
                 this._titleElement = document.createElement("div");
                 this._titleElement.className = "source-frame-popover-title monospace";
                 this._titleElement.textContent = result.description;
@@ -134,6 +135,7 @@ WebInspector.ObjectPopoverHelper.prototype = {
 
     _onHideObjectPopover: function()
     {
+        WebInspector.domAgent.hideDOMNodeHighlight();
         if (this._linkifier) {
             this._linkifier.reset();
             delete this._linkifier;
@@ -153,7 +155,7 @@ WebInspector.ObjectPopoverHelper.prototype = {
             }
         }
         this._sectionUpdateProperties(properties, rootTreeElementConstructor, rootPropertyComparer);
-    }
-}
+    },
 
-WebInspector.ObjectPopoverHelper.prototype.__proto__ = WebInspector.PopoverHelper.prototype;
+    __proto__: WebInspector.PopoverHelper.prototype
+}

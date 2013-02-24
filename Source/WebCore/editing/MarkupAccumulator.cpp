@@ -34,6 +34,7 @@
 #include "Editor.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
+#include "HTMLTemplateElement.h"
 #include "KURL.h"
 #include "ProcessingInstruction.h"
 #include "XLinkNames.h"
@@ -45,13 +46,13 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-void appendCharactersReplacingEntities(StringBuilder& result, const UChar* content, size_t length, EntityMask entityMask)
+void MarkupAccumulator::appendCharactersReplacingEntities(StringBuilder& result, const String& source, unsigned offset, unsigned length, EntityMask entityMask)
 {
-    DEFINE_STATIC_LOCAL(const String, ampReference, ("&amp;"));
-    DEFINE_STATIC_LOCAL(const String, ltReference, ("&lt;"));
-    DEFINE_STATIC_LOCAL(const String, gtReference, ("&gt;"));
-    DEFINE_STATIC_LOCAL(const String, quotReference, ("&quot;"));
-    DEFINE_STATIC_LOCAL(const String, nbspReference, ("&nbsp;"));
+    DEFINE_STATIC_LOCAL(const String, ampReference, (ASCIILiteral("&amp;")));
+    DEFINE_STATIC_LOCAL(const String, ltReference, (ASCIILiteral("&lt;")));
+    DEFINE_STATIC_LOCAL(const String, gtReference, (ASCIILiteral("&gt;")));
+    DEFINE_STATIC_LOCAL(const String, quotReference, (ASCIILiteral("&quot;")));
+    DEFINE_STATIC_LOCAL(const String, nbspReference, (ASCIILiteral("&nbsp;")));
 
     static const EntityDescription entityMaps[] = {
         { '&', ampReference, EntityAmp },
@@ -61,18 +62,42 @@ void appendCharactersReplacingEntities(StringBuilder& result, const UChar* conte
         { noBreakSpace, nbspReference, EntityNbsp },
     };
 
-    size_t positionAfterLastEntity = 0;
-    for (size_t i = 0; i < length; ++i) {
-        for (size_t m = 0; m < WTF_ARRAY_LENGTH(entityMaps); ++m) {
-            if (content[i] == entityMaps[m].entity && entityMaps[m].mask & entityMask) {
-                result.append(content + positionAfterLastEntity, i - positionAfterLastEntity);
-                result.append(entityMaps[m].reference);
-                positionAfterLastEntity = i + 1;
-                break;
+    if (!(offset + length))
+        return;
+
+    ASSERT(offset + length <= source.length());
+
+    if (source.is8Bit()) {
+        const LChar* text = source.characters8() + offset;
+
+        size_t positionAfterLastEntity = 0;
+        for (size_t i = 0; i < length; ++i) {
+            for (size_t entityIndex = 0; entityIndex < WTF_ARRAY_LENGTH(entityMaps); ++entityIndex) {
+                if (text[i] == entityMaps[entityIndex].entity && entityMaps[entityIndex].mask & entityMask) {
+                    result.append(text + positionAfterLastEntity, i - positionAfterLastEntity);
+                    result.append(entityMaps[entityIndex].reference);
+                    positionAfterLastEntity = i + 1;
+                    break;
+                }
             }
         }
+        result.append(text + positionAfterLastEntity, length - positionAfterLastEntity);
+    } else {
+        const UChar* text = source.characters16() + offset;
+
+        size_t positionAfterLastEntity = 0;
+        for (size_t i = 0; i < length; ++i) {
+            for (size_t entityIndex = 0; entityIndex < WTF_ARRAY_LENGTH(entityMaps); ++entityIndex) {
+                if (text[i] == entityMaps[entityIndex].entity && entityMaps[entityIndex].mask & entityMask) {
+                    result.append(text + positionAfterLastEntity, i - positionAfterLastEntity);
+                    result.append(entityMaps[entityIndex].reference);
+                    positionAfterLastEntity = i + 1;
+                    break;
+                }
+            }
+        }
+        result.append(text + positionAfterLastEntity, length - positionAfterLastEntity);
     }
-    result.append(content + positionAfterLastEntity, length - positionAfterLastEntity);
 }
 
 MarkupAccumulator::MarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs resolveUrlsMethod, const Range* range)
@@ -117,7 +142,12 @@ void MarkupAccumulator::serializeNodesWithNamespaces(Node* targetNode, Node* nod
         appendStartTag(targetNode, &namespaceHash);
 
     if (!(targetNode->document()->isHTMLDocument() && elementCannotHaveEndTag(targetNode))) {
-        for (Node* current = targetNode->firstChild(); current; current = current->nextSibling())
+#if ENABLE(TEMPLATE_ELEMENT)
+        Node* current = targetNode->hasTagName(templateTag) ? toHTMLTemplateElement(targetNode)->content()->firstChild() : targetNode->firstChild();
+#else
+        Node* current = targetNode->firstChild();
+#endif
+        for ( ; current; current = current->nextSibling())
             serializeNodesWithNamespaces(current, nodeToSkip, IncludeNode, &namespaceHash, tagNamesToSkip);
     }
 
@@ -174,7 +204,7 @@ void MarkupAccumulator::concatenateMarkup(StringBuilder& result)
 
 void MarkupAccumulator::appendAttributeValue(StringBuilder& result, const String& attribute, bool documentIsHTML)
 {
-    appendCharactersReplacingEntities(result, attribute.characters(), attribute.length(),
+    appendCharactersReplacingEntities(result, attribute, 0, attribute.length(),
         documentIsHTML ? EntityMaskInHTMLAttributeValue : EntityMaskInAttributeValue);
 }
 
@@ -192,7 +222,7 @@ void MarkupAccumulator::appendQuotedURLAttributeValue(StringBuilder& result, con
         // minimal escaping for javascript urls
         if (strippedURLString.contains('"')) {
             if (strippedURLString.contains('\''))
-                strippedURLString.replace('"', "&quot;");
+                strippedURLString.replaceWithLiteral('"', "&quot;");
             else
                 quoteChar = '\'';
         }
@@ -210,22 +240,20 @@ void MarkupAccumulator::appendQuotedURLAttributeValue(StringBuilder& result, con
 
 void MarkupAccumulator::appendNodeValue(StringBuilder& result, const Node* node, const Range* range, EntityMask entityMask)
 {
-    String str = node->nodeValue();
-    const UChar* characters = str.characters();
-    size_t length = str.length();
+    const String str = node->nodeValue();
+    unsigned length = str.length();
+    unsigned start = 0;
 
     if (range) {
-        ExceptionCode ec;
-        if (node == range->endContainer(ec))
-            length = range->endOffset(ec);
-        if (node == range->startContainer(ec)) {
-            size_t start = range->startOffset(ec);
-            characters += start;
+        if (node == range->endContainer())
+            length = range->endOffset();
+        if (node == range->startContainer()) {
+            start = range->startOffset();
             length -= start;
         }
     }
 
-    appendCharactersReplacingEntities(result, characters, length, entityMask);
+    appendCharactersReplacingEntities(result, str, start, length, entityMask);
 }
 
 bool MarkupAccumulator::shouldAddNamespaceElement(const Element* element)
@@ -235,7 +263,7 @@ bool MarkupAccumulator::shouldAddNamespaceElement(const Element* element)
     if (prefix.isEmpty())
         return !element->hasAttribute(xmlnsAtom);
 
-    DEFINE_STATIC_LOCAL(String, xmlnsWithColon, ("xmlns:"));
+    DEFINE_STATIC_LOCAL(String, xmlnsWithColon, (ASCIILiteral("xmlns:")));
     return !element->hasAttribute(xmlnsWithColon + prefix);
 }
 
@@ -426,13 +454,13 @@ void MarkupAccumulator::appendAttribute(StringBuilder& result, Element* element,
     else {
         QualifiedName prefixedName = attribute.name();
         if (attribute.namespaceURI() == XLinkNames::xlinkNamespaceURI) {
-            if (attribute.prefix() != xlinkAtom)
+            if (!attribute.prefix())
                 prefixedName.setPrefix(xlinkAtom);
         } else if (attribute.namespaceURI() == XMLNames::xmlNamespaceURI) {
-            if (attribute.prefix() != xmlAtom)
+            if (!attribute.prefix())
                 prefixedName.setPrefix(xmlAtom);
         } else if (attribute.namespaceURI() == XMLNSNames::xmlnsNamespaceURI) {
-            if (attribute.name() != XMLNSNames::xmlnsAttr && attribute.prefix() != xmlnsAtom)
+            if (attribute.name() != XMLNSNames::xmlnsAttr && !attribute.prefix())
                 prefixedName.setPrefix(xmlnsAtom);
         }
         result.append(prefixedName.toString());

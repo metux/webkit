@@ -107,7 +107,7 @@ class GTKDoc(object):
 
         self.logger = logging.getLogger('gtkdoc')
 
-        for key, value in args.iteritems():
+        for key, value in iter(args.items()):
             setattr(self, key, value)
 
         def raise_error_if_not_specified(key):
@@ -185,7 +185,7 @@ class GTKDoc(object):
         process = subprocess.Popen(args, env=env, cwd=cwd,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
+        stdout, stderr = [b.decode("utf-8") for b in process.communicate()]
 
         if print_output:
             if stdout:
@@ -361,6 +361,8 @@ class GTKDoc(object):
         self._run_command(args, cwd=self.output_dir, ignore_warnings=True)
 
     def rebase_installed_docs(self):
+        if not os.path.isdir(self.output_dir):
+            raise Exception("Tried to rebase documentation before generating it.")
         html_dir = os.path.join(self.virtual_root + self.prefix, 'share', 'gtk-doc', 'html', self.module_name)
         if not os.path.isdir(html_dir):
             return
@@ -372,6 +374,11 @@ class GTKDoc(object):
             args.extend(['--dest-dir=%s' % self.virtual_root])
         self._run_command(args, cwd=self.output_dir)
 
+    def api_missing_documentation(self):
+        unused_doc_file = os.path.join(self.output_dir, self.module_name + "-unused.txt")
+        if not os.path.exists(unused_doc_file) or not os.access(unused_doc_file, os.R_OK):
+            return []
+        return open(unused_doc_file).read().splitlines()
 
 class PkgConfigGTKDoc(GTKDoc):
 

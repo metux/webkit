@@ -33,17 +33,18 @@
 
 #include "BlobData.h"
 #include "KURL.h"
-#include "PlatformString.h"
+#include "ScriptWrappable.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class ScriptExecutionContext;
 
-class Blob : public RefCounted<Blob> {
+class Blob : public ScriptWrappable, public RefCounted<Blob> {
 public:
     static PassRefPtr<Blob> create()
     {
@@ -71,10 +72,6 @@ public:
 
 #if ENABLE(BLOB)
     PassRefPtr<Blob> slice(long long start = 0, long long end = std::numeric_limits<long long>::max(), const String& contentType = String()) const;
-
-    // Prefixed version is deprecated. This internally calls sliceInternal() (as slice() does) after showing a deprecation message.
-    PassRefPtr<Blob> webkitSlice(ScriptExecutionContext*, long long start = 0, long long end = std::numeric_limits<long long>::max(), const String& contentType = String()) const;
-
 #endif
 
 protected:
@@ -83,10 +80,6 @@ protected:
 
     // For deserialization.
     Blob(const KURL& srcURL, const String& type, long long size);
-
-#if ENABLE(BLOB)
-    PassRefPtr<Blob> sliceInternal(long long start, long long end, const String& contentType) const;
-#endif
 
     // This is an internal URL referring to the blob data associated with this object. It serves
     // as an identifier for this blob. The internal URL is never used to source the blob's content

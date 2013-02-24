@@ -27,7 +27,6 @@
 #ifndef HTMLElementStack_h
 #define HTMLElementStack_h
 
-#include "Element.h"
 #include "HTMLNames.h"
 #include "HTMLStackItem.h"
 #include <wtf/Forward.h>
@@ -52,7 +51,7 @@ public:
     ~HTMLElementStack();
 
     class ElementRecord {
-        WTF_MAKE_NONCOPYABLE(ElementRecord);
+        WTF_MAKE_NONCOPYABLE(ElementRecord); WTF_MAKE_FAST_ALLOCATED;
     public:
         ~ElementRecord(); // Public for ~PassOwnPtr()
     
@@ -151,7 +150,9 @@ public:
 
     bool hasOnlyOneElement() const;
     bool secondElementIsHTMLBodyElement() const;
-
+#if ENABLE(TEMPLATE_ELEMENT)
+    bool hasTemplateInHTMLScope() const;
+#endif
     Element* htmlElement() const;
     Element* headElement() const;
     Element* bodyElement() const;

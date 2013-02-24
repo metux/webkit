@@ -39,6 +39,8 @@ const size_t APIClientTraits<WKBundleClient>::interfaceSizesByVersion[] = {
 const size_t APIClientTraits<WKBundlePageLoaderClient>::interfaceSizesByVersion[] = {
     offsetof(WKBundlePageLoaderClient, didLayoutForFrame),
     offsetof(WKBundlePageLoaderClient, didFinishProgress),
+    offsetof(WKBundlePageLoaderClient, didReceiveIntentForFrame_unavailable),
+    offsetof(WKBundlePageLoaderClient, registerIntentServiceForFrame_unavailable),
     sizeof(WKBundlePageLoaderClient)
 };
 
@@ -60,11 +62,13 @@ const size_t APIClientTraits<WKPageContextMenuClient>::interfaceSizesByVersion[]
 
 const size_t APIClientTraits<WKPageLoaderClient>::interfaceSizesByVersion[] = {
     offsetof(WKPageLoaderClient, didDetectXSSForFrame),
+    offsetof(WKPageLoaderClient, didReceiveIntentForFrame_unavailable),
     sizeof(WKPageLoaderClient)
 };
 
 const size_t APIClientTraits<WKPageUIClient>::interfaceSizesByVersion[] = {
     offsetof(WKPageUIClient, createNewPage),
+    offsetof(WKPageUIClient, showColorPicker),
     sizeof(WKPageUIClient)
 };
     
@@ -73,9 +77,24 @@ const size_t APIClientTraits<WKBundlePageFormClient>::interfaceSizesByVersion[] 
     sizeof(WKBundlePageFormClient)
 };
 
+const size_t APIClientTraits<WKBundlePageEditorClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageEditorClient, willWriteToPasteboard),
+    sizeof(WKBundlePageEditorClient)
+};
+
+const size_t APIClientTraits<WKBundlePageUIClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageUIClient, didReachApplicationCacheOriginQuota),
+    sizeof(WKBundlePageUIClient)
+};
+
 const size_t APIClientTraits<WKContextInjectedBundleClient>::interfaceSizesByVersion[] = {
     offsetof(WKContextInjectedBundleClient, getInjectedBundleInitializationUserData),
     sizeof(WKContextInjectedBundleClient)
+};
+
+const size_t APIClientTraits<WKIconDatabaseClient>::interfaceSizesByVersion[] = {
+    offsetof(WKIconDatabaseClient, iconDataReadyForPageURL),
+    sizeof(WKIconDatabaseClient)
 };
 
 } // namespace WebKit

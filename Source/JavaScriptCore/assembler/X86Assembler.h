@@ -541,6 +541,11 @@ public:
             m_formatter.immediate32(imm);
         }
     }
+
+    void orl_rm(RegisterID src, const void* addr)
+    {
+        m_formatter.oneByteOp(OP_OR_EvGv, src, addr);
+    }
 #endif
 
     void subl_rr(RegisterID src, RegisterID dst)
@@ -1150,6 +1155,15 @@ public:
         m_formatter.immediate32(imm);
     }
 
+#if !CPU(X86_64)
+    void movb_i8m(int imm, const void* addr)
+    {
+        ASSERT(-128 <= imm && imm < 128);
+        m_formatter.oneByteOp(OP_GROUP11_EvIb, GROUP11_MOV, addr);
+        m_formatter.immediate8(imm);
+    }
+#endif
+
     void movb_i8m(int imm, int offset, RegisterID base)
     {
         ASSERT(-128 <= imm && imm < 128);
@@ -1458,6 +1472,12 @@ public:
     AssemblerLabel jo()
     {
         m_formatter.twoByteOp(jccRel32(ConditionO));
+        return m_formatter.immediateRel32();
+    }
+
+    AssemblerLabel jnp()
+    {
+        m_formatter.twoByteOp(jccRel32(ConditionNP));
         return m_formatter.immediateRel32();
     }
 
@@ -1863,6 +1883,61 @@ public:
         return 5;
     }
     
+#if CPU(X86_64)
+    static void revertJumpTo_movq_i64r(void* instructionStart, int64_t imm, RegisterID dst)
+    {
+        const int rexBytes = 1;
+        const int opcodeBytes = 1;
+        ASSERT(rexBytes + opcodeBytes <= maxJumpReplacementSize());
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
+        ptr[0] = PRE_REX | (1 << 3) | (dst >> 3);
+        ptr[1] = OP_MOV_EAXIv | (dst & 7);
+        
+        union {
+            uint64_t asWord;
+            uint8_t asBytes[8];
+        } u;
+        u.asWord = imm;
+        for (unsigned i = rexBytes + opcodeBytes; i < static_cast<unsigned>(maxJumpReplacementSize()); ++i)
+            ptr[i] = u.asBytes[i - rexBytes - opcodeBytes];
+    }
+#endif
+    
+    static void revertJumpTo_cmpl_ir_force32(void* instructionStart, int32_t imm, RegisterID dst)
+    {
+        const int opcodeBytes = 1;
+        const int modRMBytes = 1;
+        ASSERT(opcodeBytes + modRMBytes <= maxJumpReplacementSize());
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
+        ptr[0] = OP_GROUP1_EvIz;
+        ptr[1] = (X86InstructionFormatter::ModRmRegister << 6) | (GROUP1_OP_CMP << 3) | dst;
+        union {
+            uint32_t asWord;
+            uint8_t asBytes[4];
+        } u;
+        u.asWord = imm;
+        for (unsigned i = opcodeBytes + modRMBytes; i < static_cast<unsigned>(maxJumpReplacementSize()); ++i)
+            ptr[i] = u.asBytes[i - opcodeBytes - modRMBytes];
+    }
+    
+    static void revertJumpTo_cmpl_im_force32(void* instructionStart, int32_t imm, int offset, RegisterID dst)
+    {
+        ASSERT_UNUSED(offset, !offset);
+        const int opcodeBytes = 1;
+        const int modRMBytes = 1;
+        ASSERT(opcodeBytes + modRMBytes <= maxJumpReplacementSize());
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
+        ptr[0] = OP_GROUP1_EvIz;
+        ptr[1] = (X86InstructionFormatter::ModRmMemoryNoDisp << 6) | (GROUP1_OP_CMP << 3) | dst;
+        union {
+            uint32_t asWord;
+            uint8_t asBytes[4];
+        } u;
+        u.asWord = imm;
+        for (unsigned i = opcodeBytes + modRMBytes; i < static_cast<unsigned>(maxJumpReplacementSize()); ++i)
+            ptr[i] = u.asBytes[i - opcodeBytes - modRMBytes];
+    }
+    
     static void replaceWithLoad(void* instructionStart)
     {
         uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
@@ -1877,7 +1952,7 @@ public:
             *ptr = OP_MOV_GvEv;
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
     
@@ -1895,7 +1970,7 @@ public:
         case OP_LEA:
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
     
@@ -1961,6 +2036,13 @@ private:
         static const int maxInstructionSize = 16;
 
     public:
+
+        enum ModRmMode {
+            ModRmMemoryNoDisp,
+            ModRmMemoryDisp8,
+            ModRmMemoryDisp32,
+            ModRmRegister,
+        };
 
         // Legacy prefix bytes:
         //
@@ -2300,6 +2382,9 @@ private:
         // Format a REX prefix byte.
         inline void emitRex(bool w, int r, int x, int b)
         {
+            ASSERT(r >= 0);
+            ASSERT(x >= 0);
+            ASSERT(b >= 0);
             m_buffer.putByteUnchecked(PRE_REX | ((int)w << 3) | ((r>>3)<<2) | ((x>>3)<<1) | (b>>3));
         }
 
@@ -2328,13 +2413,6 @@ private:
         inline void emitRexIf(bool, int, int, int) {}
         inline void emitRexIfNeeded(int, int, int) {}
 #endif
-
-        enum ModRmMode {
-            ModRmMemoryNoDisp,
-            ModRmMemoryDisp8,
-            ModRmMemoryDisp32,
-            ModRmRegister,
-        };
 
         void putModRm(ModRmMode mode, int reg, RegisterID rm)
         {

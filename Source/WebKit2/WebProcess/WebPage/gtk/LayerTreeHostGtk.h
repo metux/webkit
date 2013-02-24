@@ -53,7 +53,7 @@ protected:
     // LayerTreeHost.
     virtual void invalidate();
     virtual void sizeDidChange(const WebCore::IntSize& newSize);
-    virtual void deviceScaleFactorDidChange();
+    virtual void deviceOrPageScaleFactorChanged();
     virtual void forceRepaint();
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*);
     virtual void scheduleLayerFlush();
@@ -64,8 +64,9 @@ private:
     virtual const LayerTreeContext& layerTreeContext();
     virtual void setShouldNotifyAfterNextScheduledLayerFlush(bool);
 
-    virtual void setNonCompositedContentsNeedDisplay(const WebCore::IntRect&);
-    virtual void scrollNonCompositedContents(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
+    virtual void setNonCompositedContentsNeedDisplay() OVERRIDE;
+    virtual void setNonCompositedContentsNeedDisplayInRect(const WebCore::IntRect&) OVERRIDE;
+    virtual void scrollNonCompositedContents(const WebCore::IntRect& scrollRect);
 
     virtual void didInstallPageOverlay();
     virtual void didUninstallPageOverlay();
@@ -75,10 +76,8 @@ private:
 
     // GraphicsLayerClient
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time);
-    virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
+    virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& clipRect);
-    virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
-    virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
     virtual void didCommitChangesForLayer(const WebCore::GraphicsLayer*) const { }
 
     void createPageOverlayLayer();

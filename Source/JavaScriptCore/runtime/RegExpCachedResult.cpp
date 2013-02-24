@@ -26,19 +26,17 @@
 #include "config.h"
 #include "RegExpCachedResult.h"
 
+#include "Operations.h"
 #include "RegExpMatchesArray.h"
 
 namespace JSC {
 
 void RegExpCachedResult::visitChildren(SlotVisitor& visitor)
 {
-    if (m_result) {
-        visitor.append(&m_lastInput);
-        visitor.append(&m_lastRegExp);
-    } else {
-        visitor.append(&m_reifiedInput);
-        visitor.append(&m_reifiedResult);
-    }
+    visitor.append(&m_lastInput);
+    visitor.append(&m_lastRegExp);
+    visitor.append(&m_reifiedInput);
+    visitor.append(&m_reifiedResult);
 }
 
 RegExpMatchesArray* RegExpCachedResult::lastResult(ExecState* exec, JSObject* owner)

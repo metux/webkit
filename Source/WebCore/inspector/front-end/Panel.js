@@ -126,9 +126,25 @@ WebInspector.Panel.prototype = {
     },
 
     /**
+     * @param {string} query
      * @param {string} text
      */
-    replaceAllWith: function(text)
+    replaceAllWith: function(query, text)
+    {
+    },
+
+    /**
+     * @return {boolean}
+     */
+    canFilter: function()
+    {
+        return false;
+    },
+
+    /**
+     * @param {string} query
+     */
+    performFilter: function(query)
     {
     },
 
@@ -136,8 +152,9 @@ WebInspector.Panel.prototype = {
      * @param {Element=} parentElement
      * @param {string=} position
      * @param {number=} defaultWidth
+     * @param {number=} defaultHeight
      */
-    createSplitView: function(parentElement, position, defaultWidth)
+    createSidebarView: function(parentElement, position, defaultWidth, defaultHeight)
     {
         if (this.splitView)
             return;
@@ -145,9 +162,9 @@ WebInspector.Panel.prototype = {
         if (!parentElement)
             parentElement = this.element;
 
-        this.splitView = new WebInspector.SplitView(position || WebInspector.SplitView.SidebarPosition.Left, this._sidebarWidthSettingName(), defaultWidth);
+        this.splitView = new WebInspector.SidebarView(position, this._sidebarWidthSettingName(), defaultWidth, defaultHeight);
         this.splitView.show(parentElement);
-        this.splitView.addEventListener(WebInspector.SplitView.EventTypes.Resized, this.sidebarResized.bind(this));
+        this.splitView.addEventListener(WebInspector.SidebarView.EventTypes.Resized, this.sidebarResized.bind(this));
 
         this.sidebarElement = this.splitView.sidebarElement;
     },
@@ -157,12 +174,12 @@ WebInspector.Panel.prototype = {
      * @param {string=} position
      * @param {number=} defaultWidth
      */
-    createSplitViewWithSidebarTree: function(parentElement, position, defaultWidth)
+    createSidebarViewWithTree: function(parentElement, position, defaultWidth)
     {
         if (this.splitView)
             return;
 
-        this.createSplitView(parentElement, position);
+        this.createSidebarView(parentElement, position);
 
         this.sidebarTreeElement = document.createElement("ol");
         this.sidebarTreeElement.className = "sidebar-tree";
@@ -184,7 +201,10 @@ WebInspector.Panel.prototype = {
     {
     },
 
-    sidebarResized: function(width)
+    /**
+     * @param {WebInspector.Event} event
+     */
+    sidebarResized: function(event)
     {
     },
 
@@ -213,6 +233,9 @@ WebInspector.Panel.prototype = {
         return [];
     },
 
+    /**
+     * @param {KeyboardEvent} event
+     */
     handleShortcut: function(event)
     {
         var shortcutKey = WebInspector.KeyboardShortcut.makeKeyFromEvent(event);
@@ -223,18 +246,18 @@ WebInspector.Panel.prototype = {
         }
     },
 
-    registerShortcut: function(key, handler)
+    /**
+     * @param {!Array.<!WebInspector.KeyboardShortcut.Descriptor>} keys
+     * @param {function(KeyboardEvent)} handler
+     */
+    registerShortcuts: function(keys, handler)
     {
-        this._shortcuts[key] = handler;
+        for (var i = 0; i < keys.length; ++i)
+            this._shortcuts[keys[i].key] = handler;
     },
 
-    unregisterShortcut: function(key)
-    {
-        delete this._shortcuts[key];
-    }
+    __proto__: WebInspector.View.prototype
 }
-
-WebInspector.Panel.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -297,5 +320,7 @@ WebInspector.PanelDescriptor.prototype = {
             importScript(this._scriptName);
         this._panel = new WebInspector[this._className];
         return this._panel;
-    }
+    },
+
+    registerShortcuts: function() {}
 }

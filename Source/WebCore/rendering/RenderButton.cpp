@@ -33,8 +33,8 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderButton::RenderButton(Node* node)
-    : RenderDeprecatedFlexibleBox(node)
+RenderButton::RenderButton(Element* element)
+    : RenderDeprecatedFlexibleBox(element)
     , m_buttonText(0)
     , m_inner(0)
     , m_default(false)
@@ -151,14 +151,6 @@ bool RenderButton::canHaveGeneratedChildren() const
     // write the code assuming any other button types that might emerge in the future
     // can also have children.
     return !node()->hasTagName(inputTag);
-}
-
-void RenderButton::updateBeforeAfterContent(PseudoId type)
-{
-    if (m_inner)
-        m_inner->children()->updateBeforeAfterContent(m_inner, type, this);
-    else
-        children()->updateBeforeAfterContent(this, type);
 }
 
 LayoutRect RenderButton::controlClipRect(const LayoutPoint& additionalOffset) const

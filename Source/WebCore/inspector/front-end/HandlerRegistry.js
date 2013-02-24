@@ -94,11 +94,24 @@ WebInspector.HandlerRegistry.prototype = {
      * @param {WebInspector.ContextMenu} contextMenu
      * @param {Object} target
      */
-    appendApplicableItems: function(contextMenu, target)
+    appendApplicableItems: function(event, contextMenu, target)
+    {
+        if (event.hasBeenHandledByHandlerRegistry)
+            return;
+        event.hasBeenHandledByHandlerRegistry = true;
+        this._appendContentProviderItems(contextMenu, target);
+        this._appendHrefItems(contextMenu, target);
+    },
+
+    /** 
+     * @param {WebInspector.ContextMenu} contextMenu
+     * @param {Object} target
+     */
+    _appendContentProviderItems: function(contextMenu, target)
     {
         if (!(target instanceof WebInspector.UISourceCode || target instanceof WebInspector.Resource || target instanceof WebInspector.NetworkRequest))
             return;
-        var contentProvider = /** @type {WebInspector.ContentProvider} */ target;
+        var contentProvider = /** @type {WebInspector.ContentProvider} */ (target);
         if (!contentProvider.contentURL())
             return;
 
@@ -122,15 +135,18 @@ WebInspector.HandlerRegistry.prototype = {
 
         function doSave(forceSaveAs, content)
         {
-            WebInspector.fileManager.save(contentProvider.contentURL(), content, forceSaveAs);
+            var url = contentProvider.contentURL();
+            WebInspector.fileManager.save(url, content, forceSaveAs);
+            WebInspector.fileManager.close(url);
         }
 
         function save(forceSaveAs)
         {
             if (contentProvider instanceof WebInspector.UISourceCode) {
-                var uiSourceCode = /** @type {WebInspector.UISourceCode} */ contentProvider;
+                var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (contentProvider);
                 if (uiSourceCode.isDirty()) {
                     doSave(forceSaveAs, uiSourceCode.workingCopy());
+                    uiSourceCode.commitWorkingCopy(function() { });
                     return;
                 }
             }
@@ -140,14 +156,40 @@ WebInspector.HandlerRegistry.prototype = {
         contextMenu.appendSeparator();
         contextMenu.appendItem(WebInspector.UIString("Save"), save.bind(this, false));
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Save as..." : "Save As..."), save.bind(this, true));
-    }
+    },
+
+    /** 
+     * @param {WebInspector.ContextMenu} contextMenu
+     * @param {Object} target
+     */
+    _appendHrefItems: function(contextMenu, target)
+    {
+        if (!(target instanceof Node))
+            return;
+        var targetNode = /** @type {Node} */ (target);
+
+        var anchorElement = targetNode.enclosingNodeOrSelfWithClass("webkit-html-resource-link") || targetNode.enclosingNodeOrSelfWithClass("webkit-html-external-link");
+        if (!anchorElement)
+            return;
+
+        var resourceURL = anchorElement.href;
+        if (!resourceURL)
+            return;
+
+        // Add resource-related actions.
+        contextMenu.appendItem(WebInspector.openLinkExternallyLabel(), WebInspector.openResource.bind(WebInspector, resourceURL, false));
+        if (WebInspector.resourceForURL(resourceURL))
+            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Open link in Resources panel" : "Open Link in Resources Panel"), WebInspector.openResource.bind(null, resourceURL, true));
+        contextMenu.appendItem(WebInspector.copyLinkAddressLabel(), InspectorFrontendHost.copyText.bind(InspectorFrontendHost, resourceURL));
+    },
+
+    __proto__: WebInspector.Object.prototype
 }
+
 
 WebInspector.HandlerRegistry.EventTypes = {
     HandlersUpdated: "HandlersUpdated"
 }
-
-WebInspector.HandlerRegistry.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor

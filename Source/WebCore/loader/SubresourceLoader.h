@@ -67,7 +67,7 @@ private:
     virtual void willCancel(const ResourceError&);
     virtual void didCancel(const ResourceError&) { }
 
-#if HAVE(NETWORK_CFDATA_ARRAY_CALLBACK)
+#if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
     virtual bool supportsDataArray() { return true; }
     virtual void didReceiveDataArray(CFArrayRef);
 #endif
@@ -95,7 +95,6 @@ private:
     };
 
     CachedResource* m_resource;
-    RefPtr<Document> m_document;
     bool m_loadingMultipartContent;
     SubresourceLoaderState m_state;
     OwnPtr<RequestCountTracker> m_requestCountTracker;
