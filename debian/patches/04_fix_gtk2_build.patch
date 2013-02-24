@@ -1,0 +1,451 @@
+From e4ced7b4d892ee4974a31dd35806d5246a85e8e1 Mon Sep 17 00:00:00 2001
+From: "kov@webkit.org" <kov@webkit.org@268f45cc-cd09-0410-ab3c-d52691b4dbfc>
+Date: Sun, 24 Feb 2013 17:42:28 +0000
+Subject: [PATCH] [GTK] GTK+ 2 build broken since GTK_API_VERSION_2 moved to
+ autoconfig.h https://bugs.webkit.org/show_bug.cgi?id=110702
+
+Reviewed by Martin Robinson.
+
+Source/WebCore:
+
+No tests. Build fix, no behaviour change.
+
+* platform/gtk/GtkVersioning.h: include the autotoolsconfig.h header,
+which contains the GTK_API_VERSION_2 define now.
+
+Source/WebKit/gtk:
+
+* tests/testapplicationcache.c: include autotoolsconfig.h.
+* tests/testatk.c: ditto.
+* tests/testatkroles.c: ditto.
+* tests/testcontextmenu.c: ditto.
+* tests/testcopyandpaste.c: ditto.
+* tests/testdomdocument.c: ditto.
+* tests/testdomdomwindow.c: ditto.
+* tests/testdomnode.c: ditto.
+* tests/testdownload.c: ditto.
+* tests/testfavicondatabase.c: ditto.
+* tests/testglobals.c: ditto.
+* tests/testhittestresult.c: ditto.
+* tests/testhttpbackend.c: ditto.
+* tests/testkeyevents.c: ditto.
+* tests/testloading.c: ditto.
+* tests/testmimehandling.c: ditto.
+* tests/testnetworkrequest.c: ditto.
+* tests/testnetworkresponse.c: ditto.
+* tests/testwebbackforwardlist.c: ditto.
+* tests/testwebdatasource.c: ditto.
+* tests/testwebframe.c: ditto.
+* tests/testwebhistoryitem.c: ditto.
+* tests/testwebinspector.c: ditto.
+* tests/testwebplugindatabase.c: ditto.
+* tests/testwebresource.c: ditto.
+* tests/testwebsettings.c: ditto.
+* tests/testwebview.c: ditto.
+* tests/testwindow.c: ditto.
+
+Tools:
+
+* GtkLauncher/main.c: include autotoolsconfig.h.
+* Scripts/webkitpy/style/checker.py: make GtkLauncher/main.c exempt of
+the include ordering check, since it uses autotoolsconfig.h which needs to
+come first.
+
+git-svn-id: http://svn.webkit.org/repository/webkit/trunk@143869 268f45cc-cd09-0410-ab3c-d52691b4dbfc
+---
+ Source/WebCore/ChangeLog                         |   12 ++++++++
+ Source/WebCore/platform/gtk/GtkVersioning.h      |    1 +
+ Source/WebKit/gtk/ChangeLog                      |   36 ++++++++++++++++++++++
+ Source/WebKit/gtk/tests/testapplicationcache.c   |    1 +
+ Source/WebKit/gtk/tests/testatk.c                |    1 +
+ Source/WebKit/gtk/tests/testatkroles.c           |    1 +
+ Source/WebKit/gtk/tests/testcontextmenu.c        |    1 +
+ Source/WebKit/gtk/tests/testcopyandpaste.c       |    1 +
+ Source/WebKit/gtk/tests/testdomdocument.c        |    1 +
+ Source/WebKit/gtk/tests/testdomdomwindow.c       |    1 +
+ Source/WebKit/gtk/tests/testdomnode.c            |    1 +
+ Source/WebKit/gtk/tests/testdownload.c           |    1 +
+ Source/WebKit/gtk/tests/testfavicondatabase.c    |    1 +
+ Source/WebKit/gtk/tests/testglobals.c            |    1 +
+ Source/WebKit/gtk/tests/testhittestresult.c      |    1 +
+ Source/WebKit/gtk/tests/testhttpbackend.c        |    1 +
+ Source/WebKit/gtk/tests/testkeyevents.c          |    1 +
+ Source/WebKit/gtk/tests/testloading.c            |    1 +
+ Source/WebKit/gtk/tests/testmimehandling.c       |    1 +
+ Source/WebKit/gtk/tests/testnetworkrequest.c     |    1 +
+ Source/WebKit/gtk/tests/testnetworkresponse.c    |    1 +
+ Source/WebKit/gtk/tests/testwebbackforwardlist.c |    1 +
+ Source/WebKit/gtk/tests/testwebdatasource.c      |    1 +
+ Source/WebKit/gtk/tests/testwebframe.c           |    1 +
+ Source/WebKit/gtk/tests/testwebhistoryitem.c     |    1 +
+ Source/WebKit/gtk/tests/testwebinspector.c       |    1 +
+ Source/WebKit/gtk/tests/testwebplugindatabase.c  |    1 +
+ Source/WebKit/gtk/tests/testwebresource.c        |    1 +
+ Source/WebKit/gtk/tests/testwebsettings.c        |    1 +
+ Source/WebKit/gtk/tests/testwebview.c            |    1 +
+ Source/WebKit/gtk/tests/testwindow.c             |    1 +
+ Tools/ChangeLog                                  |   12 ++++++++
+ Tools/GtkLauncher/main.c                         |    1 +
+ Tools/Scripts/webkitpy/style/checker.py          |    5 +++
+ 34 files changed, 95 insertions(+)
+
+Index: webkitgtk/Source/WebCore/platform/gtk/GtkVersioning.h
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/gtk/GtkVersioning.h	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebCore/platform/gtk/GtkVersioning.h	2013-02-24 17:35:34.769305072 -0300
+@@ -21,6 +21,7 @@
+ #ifndef GtkVersioning_h
+ #define GtkVersioning_h
+ 
++#include "autotoolsconfig.h"
+ #include <gtk/gtk.h>
+ 
+ #ifndef GTK_API_VERSION_2
+Index: webkitgtk/Source/WebKit/gtk/tests/testapplicationcache.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testapplicationcache.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testapplicationcache.c	2013-02-24 17:35:34.769305072 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <glib.h>
+ #include <glib/gprintf.h>
+ #include <gtk/gtk.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testatk.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testatk.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testatk.c	2013-02-24 17:35:34.769305072 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <glib.h>
+ #include <glib/gstdio.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testatkroles.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testatkroles.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testatkroles.c	2013-02-24 17:35:34.769305072 -0300
+@@ -18,6 +18,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <glib.h>
+ #include <glib/gstdio.h>
+ #include <gtk/gtk.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testcontextmenu.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testcontextmenu.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testcontextmenu.c	2013-02-24 17:35:34.769305072 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <webkit/webkit.h>
+ 
+ #if GTK_CHECK_VERSION(2, 14, 0)
+Index: webkitgtk/Source/WebKit/gtk/tests/testcopyandpaste.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testcopyandpaste.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testcopyandpaste.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <string.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testdomdocument.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testdomdocument.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testdomdocument.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "test_utils.h"
+ 
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testdomdomwindow.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testdomdomwindow.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testdomdomwindow.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "test_utils.h"
+ 
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testdomnode.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testdomnode.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testdomnode.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "test_utils.h"
+ 
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testdownload.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testdownload.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testdownload.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <glib/gstdio.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testfavicondatabase.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testfavicondatabase.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testfavicondatabase.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "test_utils.h"
+ #include <glib/gstdio.h>
+ #include <gtk/gtk.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testglobals.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testglobals.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testglobals.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <gtk/gtk.h>
+ #include <libsoup/soup.h>
+ #include <webkit/webkit.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testhittestresult.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testhittestresult.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testhittestresult.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <glib/gstdio.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testhttpbackend.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testhttpbackend.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testhttpbackend.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testkeyevents.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testkeyevents.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testkeyevents.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <string.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testloading.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testloading.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testloading.c	2013-02-24 17:35:34.773305139 -0300
+@@ -18,6 +18,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <gtk/gtk.h>
+ #include <libsoup/soup.h>
+ #include <string.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testmimehandling.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testmimehandling.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testmimehandling.c	2013-02-24 17:35:34.773305139 -0300
+@@ -18,6 +18,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "test_utils.h"
+ 
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testnetworkrequest.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testnetworkrequest.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testnetworkrequest.c	2013-02-24 17:35:34.773305139 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testnetworkresponse.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testnetworkresponse.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testnetworkresponse.c	2013-02-24 17:35:34.773305139 -0300
+@@ -18,6 +18,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebbackforwardlist.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebbackforwardlist.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebbackforwardlist.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <webkit/webkit.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebdatasource.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebdatasource.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebdatasource.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <webkit/webkit.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebframe.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebframe.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebframe.c	2013-02-24 17:35:34.777305206 -0300
+@@ -18,6 +18,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <unistd.h>
+ #include <glib.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebhistoryitem.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebhistoryitem.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebhistoryitem.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <webkit/webkit.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebinspector.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebinspector.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebinspector.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "test_utils.h"
+ 
+ #include <string.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebplugindatabase.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebplugindatabase.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebplugindatabase.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <errno.h>
+ #include <glib.h>
+ #include <glib/gstdio.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebresource.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebresource.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebresource.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <libsoup/soup.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebsettings.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebsettings.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebsettings.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <webkit/webkit.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwebview.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwebview.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwebview.c	2013-02-24 17:35:34.777305206 -0300
+@@ -19,6 +19,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "test_utils.h"
+ 
+ #include <errno.h>
+Index: webkitgtk/Source/WebKit/gtk/tests/testwindow.c
+===================================================================
+--- webkitgtk.orig/Source/WebKit/gtk/tests/testwindow.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Source/WebKit/gtk/tests/testwindow.c	2013-02-24 17:35:34.777305206 -0300
+@@ -17,6 +17,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include <gtk/gtk.h>
+ #include <webkit/webkit.h>
+ 
+Index: webkitgtk/Tools/GtkLauncher/main.c
+===================================================================
+--- webkitgtk.orig/Tools/GtkLauncher/main.c	2013-02-24 17:35:34.781305273 -0300
++++ webkitgtk/Tools/GtkLauncher/main.c	2013-02-24 17:35:58.373699248 -0300
+@@ -25,6 +25,7 @@
+  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
++#include "autotoolsconfig.h"
+ #include "LauncherInspectorWindow.h"
+ #include <errno.h>
+ #include <gst/gst.h>
