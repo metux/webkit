@@ -1,0 +1,20 @@
+Description: Fix wide pointer issues on ia64 (closes: #642750).
+Author: Stephan Schreiber <info@fs-driver.org>
+Index: webkitgtk-experimental/Source/WTF/wtf/Platform.h
+===================================================================
+--- webkitgtk-experimental.orig/Source/WTF/wtf/Platform.h	2013-02-23 21:59:31.785018340 -0300
++++ webkitgtk-experimental/Source/WTF/wtf/Platform.h	2013-02-23 21:59:41.473182284 -0300
+@@ -878,6 +878,13 @@
+ #define ENABLE_JIT 1
+ #endif
+ 
++/* FIXME: The fast malloc implementation is broken on Itanium / IA64 because
++   some memory barriers are missing in the thread-unsafe code around the
++   pagemap_cache_ object. */
++#if CPU(IA64) || CPU(IA64_32)
++#define USE_SYSTEM_MALLOC 1
++#endif
++
+ /* The JIT is enabled by default on all x86, x86-64, ARM & MIPS platforms. */
+ #if !defined(ENABLE_JIT) \
+     && (CPU(X86) || CPU(X86_64) || CPU(ARM) || CPU(MIPS)) \
