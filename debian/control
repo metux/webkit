@@ -31,6 +31,7 @@ Build-Depends: gawk,
                libgail-dev,
                libgail-3-dev,
                libgeoclue-dev,
+               libsecret-1-dev,
                gobject-introspection (>= 0.9.12-4),
                libgirepository1.0-dev (>= 0.9.12-4),
                libgl1-mesa-dev
