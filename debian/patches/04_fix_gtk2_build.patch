@@ -449,3 +449,21 @@ Index: webkitgtk/Tools/GtkLauncher/main.c
  #include "LauncherInspectorWindow.h"
  #include <errno.h>
  #include <gst/gst.h>
+Index: webkitgtk/Source/WebCore/platform/gtk/WidgetRenderingContext.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/gtk/WidgetRenderingContext.cpp
++++ webkitgtk/Source/WebCore/platform/gtk/WidgetRenderingContext.cpp
+@@ -26,11 +26,11 @@
+  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#ifdef GTK_API_VERSION_2
+-
+ #include "config.h"
+ #include "WidgetRenderingContext.h"
+ 
++#ifdef GTK_API_VERSION_2
++
+ #include "GraphicsContext.h"
+ #include "GtkVersioning.h"
+ #include "PlatformContextCairo.h"
