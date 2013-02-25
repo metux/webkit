@@ -9,8 +9,10 @@ webkitgtk (1.11.90-1) experimental; urgency=low
   - enable WebKit2 packages
   * debian/*.symbols:
   - updated with new symbols
+  * debian/control:
+  - add libwebp-dev to the build dependencies
 
- -- Gustavo Noronha Silva <kov@debian.org>  Mon, 25 Feb 2013 09:54:29 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 25 Feb 2013 11:19:19 -0300
 
 webkitgtk (1.10.2-2) experimental; urgency=low
 
