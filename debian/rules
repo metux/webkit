@@ -165,9 +165,9 @@ ifeq ($(ENABLE_WEBKIT2),yes)
 	build-3.0/libtool --mode=install install -m 755 build-3.0/Programs/MiniBrowser "$(CURDIR)"/debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
 	chrpath -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
 
-	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3-dev/html
+	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html
 	install -m 644 build-3.0/Documentation/webkit2gtk/html/* \
-		debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3-dev/html/
+		debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html/
 endif
 endif
 
@@ -220,7 +220,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_install -pgir1.2-webkit-3.0 --sourcedir=debian/tmp-3.0
 ifeq ($(ENABLE_WEBKIT2),yes)
 	dh_install -plibwebkit2gtk-3.0-0 --sourcedir=debian/tmp-3.0
-	dh_install -plibwebkit2gtk-3-dev --sourcedir=debian/tmp-3.0
+	dh_install -plibwebkit2gtk-3.0-dev --sourcedir=debian/tmp-3.0
 	dh_install -plibwebkit2gtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
 	dh_install -pgir1.2-webkit2-3.0 --sourcedir=debian/tmp-3.0
 endif
