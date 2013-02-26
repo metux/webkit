@@ -251,6 +251,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_girepository --package=gir1.2-javascriptcoregtk-3.0
 	dh_girepository --package=gir1.2-webkit-3.0
 ifeq ($(ENABLE_WEBKIT2),yes)
+	dh_makeshlibs -plibwebkit2gtk-3.0-0 -V 'libwebkit2gtk-3.0-0 (>= 1.11.90)' -- -c4
 	dh_girepository --package=gir1.2-webkit2-3.0
 endif
 endif
