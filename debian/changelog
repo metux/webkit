@@ -13,8 +13,10 @@ webkitgtk (1.11.90-1) experimental; urgency=low
   - add libwebp-dev to the build dependencies
   - add libsecret-1-dev to build dependencies
   - add libharfbuzz-dev >= 0.9.7 to build dependencies
+  * debian/libwebkitgtk-3.0-dev.install:
+  - install webkitdom includes, which now live in a new path
 
- -- Gustavo Noronha Silva <kov@debian.org>  Mon, 25 Feb 2013 11:23:15 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 28 Feb 2013 10:20:39 -0300
 
 webkitgtk (1.10.2-2) experimental; urgency=low
 
