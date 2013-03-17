@@ -3,8 +3,6 @@ webkitgtk (1.11.91-1) experimental; urgency=low
   * New development release
   * debian/patches/03_avoid_unresolved_x_symbols.patch:
   - patch to avoid linking issue
-  * debian/patches/04_fix_gtk2_build.patch:
-  - patch from upstream, fixes the gtk2 build
   * debian/rules:
   - enable WebKit2 packages
   * debian/*.symbols:

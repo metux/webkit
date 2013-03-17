@@ -1,4 +1,3 @@
 02_notebook_scroll.patch
 03_avoid_unresolved_x_symbols.patch
-04_fix_gtk2_build.patch
 15_ia64-use-system-malloc.patch
