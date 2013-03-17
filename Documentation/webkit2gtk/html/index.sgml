@@ -74,7 +74,9 @@
 <ANCHOR id="WEBKIT-EDITING-COMMAND-REDO:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-EDITING-COMMAND-REDO:CAPS">
 <ANCHOR id="webkit-web-view-new" href="webkit2gtk/WebKitWebView.html#webkit-web-view-new">
 <ANCHOR id="webkit-web-view-new-with-context" href="webkit2gtk/WebKitWebView.html#webkit-web-view-new-with-context">
+<ANCHOR id="webkit-web-view-new-with-group" href="webkit2gtk/WebKitWebView.html#webkit-web-view-new-with-group">
 <ANCHOR id="webkit-web-view-get-context" href="webkit2gtk/WebKitWebView.html#webkit-web-view-get-context">
+<ANCHOR id="webkit-web-view-get-group" href="webkit2gtk/WebKitWebView.html#webkit-web-view-get-group">
 <ANCHOR id="webkit-web-view-load-uri" href="webkit2gtk/WebKitWebView.html#webkit-web-view-load-uri">
 <ANCHOR id="webkit-web-view-load-html" href="webkit2gtk/WebKitWebView.html#webkit-web-view-load-html">
 <ANCHOR id="webkit-web-view-load-alternate-html" href="webkit2gtk/WebKitWebView.html#webkit-web-view-load-alternate-html">
@@ -140,6 +142,7 @@
 <ANCHOR id="WebKitWebView.property-details" href="webkit2gtk/WebKitWebView.html#WebKitWebView.property-details">
 <ANCHOR id="WebKitWebView--estimated-load-progress" href="webkit2gtk/WebKitWebView.html#WebKitWebView--estimated-load-progress">
 <ANCHOR id="WebKitWebView--favicon" href="webkit2gtk/WebKitWebView.html#WebKitWebView--favicon">
+<ANCHOR id="WebKitWebView--group" href="webkit2gtk/WebKitWebView.html#WebKitWebView--group">
 <ANCHOR id="WebKitWebView--is-loading" href="webkit2gtk/WebKitWebView.html#WebKitWebView--is-loading">
 <ANCHOR id="WebKitWebView--title" href="webkit2gtk/WebKitWebView.html#WebKitWebView--title">
 <ANCHOR id="WebKitWebView--uri" href="webkit2gtk/WebKitWebView.html#WebKitWebView--uri">
@@ -335,6 +338,7 @@
 <ANCHOR id="WebKitSettings--serif-font-family" href="webkit2gtk/WebKitSettings.html#WebKitSettings--serif-font-family">
 <ANCHOR id="WebKitSettings--user-agent" href="webkit2gtk/WebKitSettings.html#WebKitSettings--user-agent">
 <ANCHOR id="WebKitSettings--zoom-text-only" href="webkit2gtk/WebKitSettings.html#WebKitSettings--zoom-text-only">
+<ANCHOR id="WebKitSettings.see-also" href="webkit2gtk/WebKitSettings.html#WebKitSettings.see-also">
 <ANCHOR id="WebKitURIRequest" href="webkit2gtk/WebKitURIRequest.html">
 <ANCHOR id="WebKitURIRequest.synopsis" href="webkit2gtk/WebKitURIRequest.html#WebKitURIRequest.synopsis">
 <ANCHOR id="WebKitURIRequest.object-hierarchy" href="webkit2gtk/WebKitURIRequest.html#WebKitURIRequest.object-hierarchy">
@@ -344,6 +348,7 @@
 <ANCHOR id="WebKitURIRequest-struct" href="webkit2gtk/WebKitURIRequest.html#WebKitURIRequest-struct">
 <ANCHOR id="webkit-uri-request-new" href="webkit2gtk/WebKitURIRequest.html#webkit-uri-request-new">
 <ANCHOR id="webkit-uri-request-get-uri" href="webkit2gtk/WebKitURIRequest.html#webkit-uri-request-get-uri">
+<ANCHOR id="webkit-uri-request-set-uri" href="webkit2gtk/WebKitURIRequest.html#webkit-uri-request-set-uri">
 <ANCHOR id="WebKitURIRequest.property-details" href="webkit2gtk/WebKitURIRequest.html#WebKitURIRequest.property-details">
 <ANCHOR id="WebKitURIRequest--uri" href="webkit2gtk/WebKitURIRequest.html#WebKitURIRequest--uri">
 <ANCHOR id="WebKitURIResponse" href="webkit2gtk/WebKitURIResponse.html">
@@ -870,6 +875,20 @@
 <ANCHOR id="webkit-security-manager-uri-scheme-is-cors-enabled" href="webkit2gtk/WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-cors-enabled">
 <ANCHOR id="webkit-security-manager-register-uri-scheme-as-empty-document" href="webkit2gtk/WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-empty-document">
 <ANCHOR id="webkit-security-manager-uri-scheme-is-empty-document" href="webkit2gtk/WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-empty-document">
+<ANCHOR id="WebKitWebViewGroup" href="webkit2gtk/WebKitWebViewGroup.html">
+<ANCHOR id="WebKitWebViewGroup.synopsis" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.synopsis">
+<ANCHOR id="WebKitWebViewGroup.object-hierarchy" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.object-hierarchy">
+<ANCHOR id="WebKitWebViewGroup.properties" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.properties">
+<ANCHOR id="WebKitWebViewGroup.description" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.description">
+<ANCHOR id="WebKitWebViewGroup.details" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.details">
+<ANCHOR id="WebKitWebViewGroup-struct" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup-struct">
+<ANCHOR id="webkit-web-view-group-new" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-new">
+<ANCHOR id="webkit-web-view-group-get-name" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-get-name">
+<ANCHOR id="webkit-web-view-group-get-settings" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-get-settings">
+<ANCHOR id="webkit-web-view-group-set-settings" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-set-settings">
+<ANCHOR id="WebKitWebViewGroup.property-details" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.property-details">
+<ANCHOR id="WebKitWebViewGroup--settings" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup--settings">
+<ANCHOR id="WebKitWebViewGroup.see-also" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.see-also">
 <ANCHOR id="WebKitWebExtension" href="webkit2gtk/WebKitWebExtension.html">
 <ANCHOR id="WebKitWebExtension.synopsis" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension.synopsis">
 <ANCHOR id="WebKitWebExtension.object-hierarchy" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension.object-hierarchy">
@@ -884,10 +903,18 @@
 <ANCHOR id="WebKitWebPage" href="webkit2gtk/WebKitWebPage.html">
 <ANCHOR id="WebKitWebPage.synopsis" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.synopsis">
 <ANCHOR id="WebKitWebPage.object-hierarchy" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.object-hierarchy">
+<ANCHOR id="WebKitWebPage.properties" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.properties">
+<ANCHOR id="WebKitWebPage.signals" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.signals">
 <ANCHOR id="WebKitWebPage.description" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.description">
 <ANCHOR id="WebKitWebPage.details" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.details">
 <ANCHOR id="WebKitWebPage-struct" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage-struct">
 <ANCHOR id="webkit-web-page-get-dom-document" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-dom-document">
+<ANCHOR id="webkit-web-page-get-uri" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-uri">
+<ANCHOR id="WebKitWebPage.property-details" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.property-details">
+<ANCHOR id="WebKitWebPage--uri" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage--uri">
+<ANCHOR id="WebKitWebPage.signal-details" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.signal-details">
+<ANCHOR id="WebKitWebPage-document-loaded" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage-document-loaded">
+<ANCHOR id="WebKitWebPage-send-request" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage-send-request">
 <ANCHOR id="annotation-glossterm-out" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-out">
 <ANCHOR id="annotation-glossterm-scope async" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-scope async">
 <ANCHOR id="annotation-glossterm-allow-none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-allow-none">

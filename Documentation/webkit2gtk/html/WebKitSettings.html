@@ -35,7 +35,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitSettings.top_of_page"></a>WebKitSettings</span></h2>
-<p>WebKitSettings — Control the behaviour of a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a></p>
+<p>WebKitSettings — Control the behaviour of <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s</p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -310,8 +310,9 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitSettings.description"></a><h2>Description</h2>
 <p>
-<a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> can be applied to a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> to control text charset,
-color, font sizes, printing mode, script support, loading of images and various other things.
+<a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> can be applied to a <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a> to control text charset,
+color, font sizes, printing mode, script support, loading of images and various
+other things on the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s of the group.
 After creation, a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> object contains default settings.
 </p>
 <p>
@@ -322,14 +323,10 @@ After creation, a <a class="link" href="WebKitSettings.html" title="WebKitSettin
       <tr>
         <td class="listing_lines" align="right"><pre>1
 2
-3
-4
-5</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Create a new &lt;a class=&quot;link&quot; href=&quot;WebKitSettings.html&quot; title=&quot;WebKitSettings&quot;&gt;WebKitSettings&lt;/a&gt; and disable JavaScript. </span><span class="comment">*/</span>
-WebKitSettings *settings = webkit_settings_new ();
-g_object_set (G_OBJECT (settings), <span class="number">&quot;enable-javascript&quot;</span>, FALSE, <span class="number">NULL</span>);
-
-webkit_web_view_set_settings (WEBKIT_WEB_VIEW (my_webview), settings);</pre></td>
+3</pre></td>
+        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Disable JavaScript. </span><span class="comment">*/</span>
+WebKitSettings *settings = webkit_web_view_group_get_settings (my_view_group);
+webkit_settings_set_enable_javascript (settings, FALSE);</pre></td>
       </tr>
     </tbody>
   </table>
@@ -352,7 +349,7 @@ webkit_web_view_set_settings (WEBKIT_WEB_VIEW (my_webview), settings);</pre></td
 <pre class="programlisting"><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="returnvalue">WebKitSettings</span></a> *    webkit_settings_new                 (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 Creates a new <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> instance with default values. It must
-be manually attached to a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>.
+be manually attached to a <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
 See also <a class="link" href="WebKitSettings.html#webkit-settings-new-with-settings" title="webkit_settings_new_with_settings ()"><code class="function">webkit_settings_new_with_settings()</code></a>.
 </p>
 <div class="variablelist"><table border="0">
@@ -370,7 +367,7 @@ See also <a class="link" href="WebKitSettings.html#webkit-settings-new-with-sett
                                                          <em class="parameter"><code>...</code></em>);</pre>
 <p>
 Creates a new <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> instance with the given settings. It must
-be manually attached to a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>.
+be manually attached to a <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -2887,6 +2884,10 @@ this property is enabled.
 </p>
 <p>Default value: FALSE</p>
 </div>
+</div>
+<div class="refsect1">
+<a name="WebKitSettings.see-also"></a><h2>See Also</h2>
+<a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>, <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
 </div>
 </div>
 <div class="footer">

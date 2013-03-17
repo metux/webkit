@@ -67,7 +67,7 @@ enum                <a class="link" href="webkitgtk-Global-functions.html#WebKit
 
 enum                <a class="link" href="webkitgtk-Global-functions.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction">WebKitContextMenuAction</a>;
 <a class="link" href="webkitgtk-Global-functions.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="returnvalue">WebKitContextMenuAction</span></a> <a class="link" href="webkitgtk-Global-functions.html#webkit-context-menu-item-get-action" title="webkit_context_menu_item_get_action ()">webkit_context_menu_item_get_action</a>
-                                                        (<em class="parameter"><code><a href="../gtk3/GtkMenuItem.html"><span class="type">GtkMenuItem</span></a> *item</code></em>);
+                                                        (<em class="parameter"><code><a href="../gtk2/GtkMenuItem.html"><span class="type">GtkMenuItem</span></a> *item</code></em>);
 
 enum                <a class="link" href="webkitgtk-Global-functions.html#WebKitSecurityPolicy" title="enum WebKitSecurityPolicy">WebKitSecurityPolicy</a>;
 <span class="returnvalue">void</span>                <a class="link" href="webkitgtk-Global-functions.html#webkit-set-security-policy-for-uri-scheme" title="webkit_set_security_policy_for_uri_scheme ()">webkit_set_security_policy_for_uri_scheme</a>
@@ -690,7 +690,7 @@ Enum values used to denote actions of items in the default context menu.
 <div class="refsect2">
 <a name="webkit-context-menu-item-get-action"></a><h3>webkit_context_menu_item_get_action ()</h3>
 <pre class="programlisting"><a class="link" href="webkitgtk-Global-functions.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="returnvalue">WebKitContextMenuAction</span></a> webkit_context_menu_item_get_action
-                                                        (<em class="parameter"><code><a href="../gtk3/GtkMenuItem.html"><span class="type">GtkMenuItem</span></a> *item</code></em>);</pre>
+                                                        (<em class="parameter"><code><a href="../gtk2/GtkMenuItem.html"><span class="type">GtkMenuItem</span></a> *item</code></em>);</pre>
 <p>
 Returns the <a class="link" href="webkitgtk-Global-functions.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a> of the given <em class="parameter"><code>item</code></em>. This function
 can be used to determine the items present in the default context menu.
@@ -700,7 +700,7 @@ In order to inspect the default context menu, you should connect to
 <p>
 </p>
 <div class="example">
-<a name="idp5746376"></a><p class="title"><b>Example 1. Inspecting the default context menu</b></p>
+<a name="idp5611520"></a><p class="title"><b>Example 1. Inspecting the default context menu</b></p>
 <div class="example-contents">
   <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
     <tbody>
@@ -814,15 +814,15 @@ In order to inspect the default context menu, you should connect to
 <p><br class="example-break">
 </p>
 <p>
-Note that you can get the <a href="../gtk3/GtkAction.html"><span class="type">GtkAction</span></a> of any item in the default context menu with
-<a href="../gtk3/GtkActivatable.html#gtk-activatable-get-related-action"><code class="function">gtk_activatable_get_related_action()</code></a>.
+Note that you can get the <a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a> of any item in the default context menu with
+<a href="../gtk2/GtkActivatable.html#gtk-activatable-get-related-action"><code class="function">gtk_activatable_get_related_action()</code></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>item</code></em> :</span></p></td>
-<td>a <a href="../gtk3/GtkMenuItem.html"><span class="type">GtkMenuItem</span></a> of the default context menu</td>
+<td>a <a href="../gtk2/GtkMenuItem.html"><span class="type">GtkMenuItem</span></a> of the default context menu</td>
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>

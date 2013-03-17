@@ -87,7 +87,9 @@ WEBKIT_EDITING_COMMAND_REDO
 <SUBSECTION>
 webkit_web_view_new
 webkit_web_view_new_with_context
+webkit_web_view_new_with_group
 webkit_web_view_get_context
+webkit_web_view_get_group
 webkit_web_view_load_uri
 webkit_web_view_load_html
 webkit_web_view_load_alternate_html
@@ -330,6 +332,7 @@ webkit_settings_get_type
 WebKitURIRequest
 webkit_uri_request_new
 webkit_uri_request_get_uri
+webkit_uri_request_set_uri
 
 <SUBSECTION Standard>
 WebKitURIRequestClass
@@ -931,6 +934,28 @@ webkit_security_manager_get_type
 </SECTION>
 
 <SECTION>
+<FILE>WebKitWebViewGroup</FILE>
+WebKitWebViewGroup
+webkit_web_view_group_new
+webkit_web_view_group_get_name
+webkit_web_view_group_get_settings
+webkit_web_view_group_set_settings
+
+<SUBSECTION Standard>
+WebKitWebViewGroupClass
+WEBKIT_TYPE_WEB_VIEW_GROUP
+WEBKIT_WEB_VIEW_GROUP
+WEBKIT_IS_WEB_VIEW_GROUP
+WEBKIT_WEB_VIEW_GROUP_CLASS
+WEBKIT_IS_WEB_VIEW_GROUP_CLASS
+WEBKIT_WEB_VIEW_GROUP_GET_CLASS
+
+<SUBSECTION Private>
+WebKitWebViewGroupPrivate
+webkit_web_view_group_get_type
+</SECTION>
+
+<SECTION>
 <FILE>WebKitWebExtension</FILE>
 WebKitWebExtension
 WebKitWebExtensionInitializeFunction
@@ -954,6 +979,7 @@ webkit_web_extension_get_type
 <FILE>WebKitWebPage</FILE>
 WebKitWebPage
 webkit_web_page_get_dom_document
+webkit_web_page_get_uri
 
 <SUBSECTION Standard>
 WebKitWebPageClass

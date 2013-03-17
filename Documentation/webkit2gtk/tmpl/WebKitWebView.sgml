@@ -198,6 +198,11 @@ WebKitWebView
 
 </para>
 
+<!-- ##### ARG WebKitWebView:group ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebView:is-loading ##### -->
 <para>
 
@@ -330,7 +335,25 @@ WebKitWebView
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_web_view_new_with_group ##### -->
+<para>
+
+</para>
+
+@group: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_web_view_get_context ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_group ##### -->
 <para>
 
 </para>

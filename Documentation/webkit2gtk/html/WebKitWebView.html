@@ -59,9 +59,11 @@ enum                <a class="link" href="WebKitWebView.html#WebKitInsecureConte
 #define             <a class="link" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-UNDO:CAPS" title="WEBKIT_EDITING_COMMAND_UNDO">WEBKIT_EDITING_COMMAND_UNDO</a>
 #define             <a class="link" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-REDO:CAPS" title="WEBKIT_EDITING_COMMAND_REDO">WEBKIT_EDITING_COMMAND_REDO</a>
 
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new" title="webkit_web_view_new ()">webkit_web_view_new</a>                 (<em class="parameter"><code><span class="type">void</span></code></em>);
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()">webkit_web_view_new_with_context</a>    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+<a href="../gtk2/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new" title="webkit_web_view_new ()">webkit_web_view_new</a>                 (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../gtk2/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()">webkit_web_view_new_with_context</a>    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+<a href="../gtk2/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-group" title="webkit_web_view_new_with_group ()">webkit_web_view_new_with_group</a>      (<em class="parameter"><code><a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a> *group</code></em>);
 <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *  <a class="link" href="WebKitWebView.html#webkit-web-view-get-context" title="webkit_web_view_get_context ()">webkit_web_view_get_context</a>         (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
+<a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="returnvalue">WebKitWebViewGroup</span></a> * <a class="link" href="WebKitWebView.html#webkit-web-view-get-group" title="webkit_web_view_get_group ()">webkit_web_view_get_group</a>          (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-uri" title="webkit_web_view_load_uri ()">webkit_web_view_load_uri</a>            (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-load-html" title="webkit_web_view_load_html ()">webkit_web_view_load_html</a>           (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
@@ -198,8 +200,8 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <pre class="synopsis">
   <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
    +----<a href="../gobject/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
-         +----<a href="../gtk3/GtkWidget.html">GtkWidget</a>
-               +----<a href="../gtk3/GtkContainer.html">GtkContainer</a>
+         +----<a href="../gtk2/GtkWidget.html">GtkWidget</a>
+               +----<a href="../gtk2/GtkContainer.html">GtkContainer</a>
                      +----WebKitWebViewBase
                            +----WebKitWebView
 </pre>
@@ -216,13 +218,14 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <a name="WebKitWebView.implemented-interfaces"></a><h2>Implemented Interfaces</h2>
 <p>
 WebKitWebView implements
- AtkImplementorIface and  <a href="../gtk3/GtkBuildable.html">GtkBuildable</a>.</p>
+ AtkImplementorIface and  <a href="../gtk2/GtkBuildable.html">GtkBuildable</a>.</p>
 </div>
 <div class="refsect1">
 <a name="WebKitWebView.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
   "<a class="link" href="WebKitWebView.html#WebKitWebView--estimated-load-progress" title='The "estimated-load-progress" property'>estimated-load-progress</a>"  <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read
   "<a class="link" href="WebKitWebView.html#WebKitWebView--favicon" title='The "favicon" property'>favicon</a>"                  <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              : Read
+  "<a class="link" href="WebKitWebView.html#WebKitWebView--group" title='The "group" property'>group</a>"                    <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>*   : Read / Write / Construct Only
   "<a class="link" href="WebKitWebView.html#WebKitWebView--is-loading" title='The "is-loading" property'>is-loading</a>"               <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read
   "<a class="link" href="WebKitWebView.html#WebKitWebView--title" title='The "title" property'>title</a>"                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitWebView.html#WebKitWebView--uri" title='The "uri" property'>uri</a>"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
@@ -266,7 +269,7 @@ rendering and loading of the content.
 </p>
 <p>
 Note that <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is scrollable by itself, so you don't need
-to embed it in a <a href="../gtk3/GtkScrolledWindow.html"><span class="type">GtkScrolledWindow</span></a>.
+to embed it in a <a href="../gtk2/GtkScrolledWindow.html"><span class="type">GtkScrolledWindow</span></a>.
 </p>
 </div>
 <div class="refsect1">
@@ -541,10 +544,11 @@ to redo a command when it has been previously undone.
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-new"></a><h3>webkit_web_view_new ()</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         webkit_web_view_new                 (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         webkit_web_view_new                 (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
-Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the default <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>.
-See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()"><code class="function">webkit_web_view_new_with_context()</code></a>.
+Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the default <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> and the
+default <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
+See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()"><code class="function">webkit_web_view_new_with_context()</code></a> and <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-group" title="webkit_web_view_new_with_group ()"><code class="function">webkit_web_view_new_with_group()</code></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -557,9 +561,11 @@ See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-conte
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-new-with-context"></a><h3>webkit_web_view_new_with_context ()</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         webkit_web_view_new_with_context    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         webkit_web_view_new_with_context    (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
 <p>
-Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the given <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>.
+Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the given <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> and the
+default <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
+See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-group" title="webkit_web_view_new_with_group ()"><code class="function">webkit_web_view_new_with_group()</code></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -567,6 +573,30 @@ Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><s
 <tr>
 <td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
 <td>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> to be used by the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>The newly created <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> widget</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-new-with-group"></a><h3>webkit_web_view_new_with_group ()</h3>
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *         webkit_web_view_new_with_group      (<em class="parameter"><code><a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a> *group</code></em>);</pre>
+<p>
+Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the given <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
+The view will be part of <em class="parameter"><code>group</code></em> and it will be affected by the
+group properties like the settings.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>group</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>
 </td>
 </tr>
 <tr>
@@ -594,6 +624,29 @@ Gets the web context of <em class="parameter"><code>web_view</code></em>.
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> of the view. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-get-group"></a><h3>webkit_web_view_get_group ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="returnvalue">WebKitWebViewGroup</span></a> * webkit_web_view_get_group          (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<p>
+Gets the group <em class="parameter"><code>web_view</code></em> belongs to.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a> to which the view belongs. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1202,11 +1255,12 @@ favicon or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="li
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_set_settings        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
 <p>
-Sets the <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> to be applied to <em class="parameter"><code>web_view</code></em>. The
-existing <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> of <em class="parameter"><code>web_view</code></em> will be replaced by
-<em class="parameter"><code>settings</code></em>. New settings are applied immediately on <em class="parameter"><code>web_view</code></em>.
-The same <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> object can be shared
-by multiple <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s.
+Sets the <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> to be applied to <em class="parameter"><code>web_view</code></em>.
+This is a convenient method to set new settings to the
+<a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a> <em class="parameter"><code>web_view</code></em> belongs to.
+New settings are applied immediately on all <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s
+in the <em class="parameter"><code>web_view</code></em> group.
+See also <a class="link" href="WebKitWebViewGroup.html#webkit-web-view-group-set-settings" title="webkit_web_view_group_set_settings ()"><code class="function">webkit_web_view_group_set_settings()</code></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -1230,18 +1284,13 @@ by multiple <a class="link" href="WebKitWebView.html" title="WebKitWebView"><spa
 <pre class="programlisting"><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="returnvalue">WebKitSettings</span></a> *    webkit_web_view_get_settings        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>
 Gets the <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> currently applied to <em class="parameter"><code>web_view</code></em>.
-If no other <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> have been explicitly applied to
-<em class="parameter"><code>web_view</code></em> with <a class="link" href="WebKitWebView.html#webkit-web-view-set-settings" title="webkit_web_view_set_settings ()"><code class="function">webkit_web_view_set_settings()</code></a>, the default
-<a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> will be returned. This method always returns
-a valid <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> object.
-To modify any of the <em class="parameter"><code>web_view</code></em> settings, you can either create
-a new <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> object with <a class="link" href="WebKitSettings.html#webkit-settings-new" title="webkit_settings_new ()"><code class="function">webkit_settings_new()</code></a>, setting
-the desired preferences, and then replace the existing <em class="parameter"><code>web_view</code></em>
-settings with <a class="link" href="WebKitWebView.html#webkit-web-view-set-settings" title="webkit_web_view_set_settings ()"><code class="function">webkit_web_view_set_settings()</code></a> or get the existing
-<em class="parameter"><code>web_view</code></em> settings and update it directly. <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> objects
-can be shared by multiple <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s, so modifying
+This is a convenient method to get the settings of the
+<a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a> <em class="parameter"><code>web_view</code></em> belongs to.
+<a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> objects are shared by all the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s
+in the same <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>, so modifying
 the settings of a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> would affect other
-<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s using the same <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>.
+<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s of the same group.
+See also <a class="link" href="WebKitWebViewGroup.html#webkit-web-view-group-get-settings" title="webkit_web_view_group_get_settings ()"><code class="function">webkit_web_view_group_get_settings()</code></a>.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">
@@ -2434,6 +2483,14 @@ See <a class="link" href="WebKitWebView.html#webkit-web-view-get-favicon" title=
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitWebView--group"></a><h3>The <code class="literal">"group"</code> property</h3>
+<pre class="programlisting">  "group"                    <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>*   : Read / Write / Construct Only</pre>
+<p>
+The <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a> of the view.
+</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebView--is-loading"></a><h3>The <code class="literal">"is-loading"</code> property</h3>
 <pre class="programlisting">  "is-loading"               <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read</pre>
 <p>
@@ -2527,7 +2584,7 @@ destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><spa
 <a name="WebKitWebView-context-menu"></a><h3>The <code class="literal">"context-menu"</code> signal</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>       *web_view,
                                                         <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a>   *context_menu,
-                                                        <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
+                                                        <a href="../gdk2/gdk2-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
                                                         <a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)            : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
@@ -2552,7 +2609,7 @@ or build its own context menu.
  To build your own menu, you can remove all items from the proposed menu with
  <a class="link" href="WebKitContextMenu.html#webkit-context-menu-remove-all" title="webkit_context_menu_remove_all ()"><code class="function">webkit_context_menu_remove_all()</code></a>, add your own items and return <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> so
  that the menu will be shown. You can also ignore the proposed <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a>,
- build your own <a href="../gtk3/GtkMenu.html"><span class="type">GtkMenu</span></a> and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to prevent the proposed menu from being shown.
+ build your own <a href="../gtk2/GtkMenu.html"><span class="type">GtkMenu</span></a> and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to prevent the proposed menu from being shown.
 </p></li>
 <li class="listitem"><p>
  If you just want the default menu to be shown always, simply don't connect to this
@@ -2583,7 +2640,7 @@ during the signal emission.
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>event</code></em> :</span></p></td>
-<td>the <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</td>
+<td>the <a href="../gdk2/gdk2-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>hit_test_result</code></em> :</span></p></td>
@@ -2629,7 +2686,7 @@ to notify that the context menu is dismissed.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-create"></a><h3>The <code class="literal">"create"</code> signal</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a>*          user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a>*          user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 Emitted when the creation of a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is requested.
@@ -3049,7 +3106,7 @@ element such as a link, image or a media element. To determine
 what type of element the mouse cursor is over, a Hit Test is performed
 on the current mouse coordinates and the result is passed in the
 <em class="parameter"><code>hit_test_result</code></em> argument. The <em class="parameter"><code>modifiers</code></em> argument is a bitmask of
-<a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
+<a href="../gdk2/gdk2-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
 The signal is emitted again when the mouse is moved out of the
 current element with a new <em class="parameter"><code>hit_test_result</code></em>.
 </p>
@@ -3067,7 +3124,7 @@ current element with a new <em class="parameter"><code>hit_test_result</code></e
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>modifiers</code></em> :</span></p></td>
-<td>a bitmask of <a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a>
+<td>a bitmask of <a href="../gdk2/gdk2-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a>
 </td>
 </tr>
 <tr>
@@ -3342,7 +3399,7 @@ argument.
 </p>
 <p>
 The default signal handler will asynchronously run a regular
-<a href="../gtk3/GtkFileChooserDialog.html"><span class="type">GtkFileChooserDialog</span></a> for the user to interact with.
+<a href="../gtk2/GtkFileChooserDialog.html"><span class="type">GtkFileChooserDialog</span></a> for the user to interact with.
 </p>
 <div class="variablelist"><table border="0">
 <col align="left" valign="top">

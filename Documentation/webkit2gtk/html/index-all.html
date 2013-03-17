@@ -329,6 +329,12 @@
 </dt>
 <dt>WebKitWebPage, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage-struct">struct WebKitWebPage</a>
 </dt>
+<dt>WebKitWebPage::document-loaded, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage-document-loaded">The "document-loaded" signal</a>
+</dt>
+<dt>WebKitWebPage::send-request, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage-send-request">The "send-request" signal</a>
+</dt>
+<dt>WebKitWebPage:uri, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage--uri">The "uri" property</a>
+</dt>
 <dt>WebKitWebResource, <a class="indexterm" href="WebKitWebResource.html#WebKitWebResource-struct">struct WebKitWebResource</a>
 </dt>
 <dt>WebKitWebResource::failed, <a class="indexterm" href="WebKitWebResource.html#WebKitWebResource-failed">The "failed" signal</a>
@@ -387,6 +393,8 @@
 </dt>
 <dt>WebKitWebView:favicon, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--favicon">The "favicon" property</a>
 </dt>
+<dt>WebKitWebView:group, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--group">The "group" property</a>
+</dt>
 <dt>WebKitWebView:is-loading, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--is-loading">The "is-loading" property</a>
 </dt>
 <dt>WebKitWebView:title, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--title">The "title" property</a>
@@ -398,6 +406,10 @@
 <dt>WebKitWebView:web-context, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--web-context">The "web-context" property</a>
 </dt>
 <dt>WebKitWebView:zoom-level, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--zoom-level">The "zoom-level" property</a>
+</dt>
+<dt>WebKitWebViewGroup, <a class="indexterm" href="WebKitWebViewGroup.html#WebKitWebViewGroup-struct">struct WebKitWebViewGroup</a>
+</dt>
+<dt>WebKitWebViewGroup:settings, <a class="indexterm" href="WebKitWebViewGroup.html#WebKitWebViewGroup--settings">The "settings" property</a>
 </dt>
 <dt>WebKitWindowProperties, <a class="indexterm" href="WebKitWindowProperties.html#WebKitWindowProperties-struct">struct WebKitWindowProperties</a>
 </dt>
@@ -917,6 +929,8 @@
 </dt>
 <dt>webkit_uri_request_new, <a class="indexterm" href="WebKitURIRequest.html#webkit-uri-request-new">webkit_uri_request_new ()</a>
 </dt>
+<dt>webkit_uri_request_set_uri, <a class="indexterm" href="WebKitURIRequest.html#webkit-uri-request-set-uri">webkit_uri_request_set_uri ()</a>
+</dt>
 <dt>webkit_uri_response_get_content_length, <a class="indexterm" href="WebKitURIResponse.html#webkit-uri-response-get-content-length">webkit_uri_response_get_content_length ()</a>
 </dt>
 <dt>webkit_uri_response_get_mime_type, <a class="indexterm" href="WebKitURIResponse.html#webkit-uri-response-get-mime-type">webkit_uri_response_get_mime_type ()</a>
@@ -1003,6 +1017,8 @@
 </dt>
 <dt>webkit_web_page_get_dom_document, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-dom-document">webkit_web_page_get_dom_document ()</a>
 </dt>
+<dt>webkit_web_page_get_uri, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-uri">webkit_web_page_get_uri ()</a>
+</dt>
 <dt>webkit_web_resource_get_data, <a class="indexterm" href="WebKitWebResource.html#webkit-web-resource-get-data">webkit_web_resource_get_data ()</a>
 </dt>
 <dt>webkit_web_resource_get_data_finish, <a class="indexterm" href="WebKitWebResource.html#webkit-web-resource-get-data-finish">webkit_web_resource_get_data_finish ()</a>
@@ -1037,6 +1053,8 @@
 </dt>
 <dt>webkit_web_view_get_find_controller, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-find-controller">webkit_web_view_get_find_controller ()</a>
 </dt>
+<dt>webkit_web_view_get_group, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-group">webkit_web_view_get_group ()</a>
+</dt>
 <dt>webkit_web_view_get_inspector, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-inspector">webkit_web_view_get_inspector ()</a>
 </dt>
 <dt>webkit_web_view_get_javascript_global_context, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-javascript-global-context">webkit_web_view_get_javascript_global_context ()</a>
@@ -1065,6 +1083,14 @@
 </dt>
 <dt>webkit_web_view_go_to_back_forward_list_item, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-to-back-forward-list-item">webkit_web_view_go_to_back_forward_list_item ()</a>
 </dt>
+<dt>webkit_web_view_group_get_name, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-get-name">webkit_web_view_group_get_name ()</a>
+</dt>
+<dt>webkit_web_view_group_get_settings, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-get-settings">webkit_web_view_group_get_settings ()</a>
+</dt>
+<dt>webkit_web_view_group_new, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-new">webkit_web_view_group_new ()</a>
+</dt>
+<dt>webkit_web_view_group_set_settings, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-set-settings">webkit_web_view_group_set_settings ()</a>
+</dt>
 <dt>webkit_web_view_is_loading, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-is-loading">webkit_web_view_is_loading ()</a>
 </dt>
 <dt>webkit_web_view_load_alternate_html, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-load-alternate-html">webkit_web_view_load_alternate_html ()</a>
@@ -1080,6 +1106,8 @@
 <dt>webkit_web_view_new, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new">webkit_web_view_new ()</a>
 </dt>
 <dt>webkit_web_view_new_with_context, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new-with-context">webkit_web_view_new_with_context ()</a>
+</dt>
+<dt>webkit_web_view_new_with_group, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new-with-group">webkit_web_view_new_with_group ()</a>
 </dt>
 <dt>webkit_web_view_reload, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-reload">webkit_web_view_reload ()</a>
 </dt>
