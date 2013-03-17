@@ -1,4 +1,4 @@
-webkitgtk (1.11.90-1) experimental; urgency=low
+webkitgtk (1.11.91-1) experimental; urgency=low
 
   * New development release
   * debian/patches/03_avoid_unresolved_x_symbols.patch:
@@ -16,7 +16,7 @@ webkitgtk (1.11.90-1) experimental; urgency=low
   * debian/libwebkitgtk-3.0-dev.install:
   - install webkitdom includes, which now live in a new path
 
- -- Gustavo Noronha Silva <kov@debian.org>  Thu, 28 Feb 2013 10:20:39 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 17 Mar 2013 11:43:34 -0300
 
 webkitgtk (1.10.2-2) experimental; urgency=low
 
