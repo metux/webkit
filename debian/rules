@@ -30,7 +30,7 @@ EXTRA_CONFIGURE_ARGUMENTS =
 EXTRA_DH_ARGUMENTS =
 
 ifeq ($(ENABLE_WEBKIT2),yes)
-	EXTRA_CONFIGURE_ARGUMENTS = --enable-webkit2 --libexecdir=/usr/lib/webkit2gtk-3.0-0/libexec
+	EXTRA_CONFIGURE_ARGUMENTS = --enable-webkit2 --libexecdir=/usr/lib/webkit2gtk-3.0/libexec
 else
 	EXTRA_CONFIGURE_ARGUMENTS = --disable-webkit2 --disable-plugin-process
 	EXTRA_DH_ARGUMENTS = -Nlibwebkit2gtk-3.0-0 -Nlibwebkit2gtk-3.0-dev -Nlibwebkit2gtk-3.0-0-dbg -Ngir1.2-webkit2-3.0
@@ -161,9 +161,9 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 		debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html/
 
 ifeq ($(ENABLE_WEBKIT2),yes)
-	[ ! -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec ] && install -d -m 755 debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec || true
-	build-3.0/libtool --mode=install install -m 755 build-3.0/Programs/MiniBrowser "$(CURDIR)"/debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
-	chrpath -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0-0/libexec/MiniBrowser
+	[ ! -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec ] && install -d -m 755 debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec || true
+	build-3.0/libtool --mode=install install -m 755 build-3.0/Programs/MiniBrowser "$(CURDIR)"/debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec/MiniBrowser
+	chrpath -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec/MiniBrowser
 
 	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html
 	install -m 644 build-3.0/Documentation/webkit2gtk/html/* \
