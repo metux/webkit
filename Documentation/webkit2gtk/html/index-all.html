@@ -121,6 +121,8 @@
 </dt>
 <dt>WebKitHitTestResultContext, <a class="indexterm" href="WebKitHitTestResult.html#WebKitHitTestResultContext">enum WebKitHitTestResultContext</a>
 </dt>
+<dt>WebKitInjectedContentFrames, <a class="indexterm" href="WebKitWebViewGroup.html#WebKitInjectedContentFrames">enum WebKitInjectedContentFrames</a>
+</dt>
 <dt>WebKitInsecureContentEvent, <a class="indexterm" href="WebKitWebView.html#WebKitInsecureContentEvent">enum WebKitInsecureContentEvent</a>
 </dt>
 <dt>WebKitJavascriptError, <a class="indexterm" href="webkit2gtk-WebKitError.html#WebKitJavascriptError">enum WebKitJavascriptError</a>
@@ -277,6 +279,12 @@
 </dt>
 <dt>WebKitSettings:zoom-text-only, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--zoom-text-only">The "zoom-text-only" property</a>
 </dt>
+<dt>WebKitSnapshotError, <a class="indexterm" href="webkit2gtk-WebKitError.html#WebKitSnapshotError">enum WebKitSnapshotError</a>
+</dt>
+<dt>WebKitSnapshotOptions, <a class="indexterm" href="WebKitWebView.html#WebKitSnapshotOptions">enum WebKitSnapshotOptions</a>
+</dt>
+<dt>WebKitSnapshotRegion, <a class="indexterm" href="WebKitWebView.html#WebKitSnapshotRegion">enum WebKitSnapshotRegion</a>
+</dt>
 <dt>WebKitTLSErrorsPolicy, <a class="indexterm" href="WebKitWebContext.html#WebKitTLSErrorsPolicy">enum WebKitTLSErrorsPolicy</a>
 </dt>
 <dt>WebKitURIRequest, <a class="indexterm" href="WebKitURIRequest.html#WebKitURIRequest-struct">struct WebKitURIRequest</a>
@@ -388,6 +396,8 @@
 <dt>WebKitWebView::script-dialog, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-script-dialog">The "script-dialog" signal</a>
 </dt>
 <dt>WebKitWebView::submit-form, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-submit-form">The "submit-form" signal</a>
+</dt>
+<dt>WebKitWebView::web-process-crashed, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-web-process-crashed">The "web-process-crashed" signal</a>
 </dt>
 <dt>WebKitWebView:estimated-load-progress, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--estimated-load-progress">The "estimated-load-progress" property</a>
 </dt>
@@ -925,6 +935,12 @@
 </dt>
 <dt>webkit_settings_set_zoom_text_only, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-zoom-text-only">webkit_settings_set_zoom_text_only ()</a>
 </dt>
+<dt>WEBKIT_SNAPSHOT_ERROR, <a class="indexterm" href="webkit2gtk-WebKitError.html#WEBKIT-SNAPSHOT-ERROR:CAPS">WEBKIT_SNAPSHOT_ERROR</a>
+</dt>
+<dt>webkit_snapshot_error_quark, <a class="indexterm" href="webkit2gtk-WebKitError.html#webkit-snapshot-error-quark">webkit_snapshot_error_quark ()</a>
+</dt>
+<dt>webkit_uri_request_get_http_headers, <a class="indexterm" href="WebKitURIRequest.html#webkit-uri-request-get-http-headers">webkit_uri_request_get_http_headers ()</a>
+</dt>
 <dt>webkit_uri_request_get_uri, <a class="indexterm" href="WebKitURIRequest.html#webkit-uri-request-get-uri">webkit_uri_request_get_uri ()</a>
 </dt>
 <dt>webkit_uri_request_new, <a class="indexterm" href="WebKitURIRequest.html#webkit-uri-request-new">webkit_uri_request_new ()</a>
@@ -985,6 +1001,8 @@
 </dt>
 <dt>webkit_web_context_set_cache_model, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-cache-model">webkit_web_context_set_cache_model ()</a>
 </dt>
+<dt>webkit_web_context_set_disk_cache_directory, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory">webkit_web_context_set_disk_cache_directory ()</a>
+</dt>
 <dt>webkit_web_context_set_favicon_database_directory, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory">webkit_web_context_set_favicon_database_directory ()</a>
 </dt>
 <dt>webkit_web_context_set_preferred_languages, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-preferred-languages">webkit_web_context_set_preferred_languages ()</a>
@@ -1016,6 +1034,8 @@
 <dt>webkit_web_inspector_show, <a class="indexterm" href="WebKitWebInspector.html#webkit-web-inspector-show">webkit_web_inspector_show ()</a>
 </dt>
 <dt>webkit_web_page_get_dom_document, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-dom-document">webkit_web_page_get_dom_document ()</a>
+</dt>
+<dt>webkit_web_page_get_id, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-id">webkit_web_page_get_id ()</a>
 </dt>
 <dt>webkit_web_page_get_uri, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-uri">webkit_web_page_get_uri ()</a>
 </dt>
@@ -1065,6 +1085,10 @@
 </dt>
 <dt>webkit_web_view_get_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-settings">webkit_web_view_get_settings ()</a>
 </dt>
+<dt>webkit_web_view_get_snapshot, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-snapshot">webkit_web_view_get_snapshot ()</a>
+</dt>
+<dt>webkit_web_view_get_snapshot_finish, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-snapshot-finish">webkit_web_view_get_snapshot_finish ()</a>
+</dt>
 <dt>webkit_web_view_get_title, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-title">webkit_web_view_get_title ()</a>
 </dt>
 <dt>webkit_web_view_get_tls_info, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-tls-info">webkit_web_view_get_tls_info ()</a>
@@ -1083,11 +1107,15 @@
 </dt>
 <dt>webkit_web_view_go_to_back_forward_list_item, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-to-back-forward-list-item">webkit_web_view_go_to_back_forward_list_item ()</a>
 </dt>
+<dt>webkit_web_view_group_add_user_style_sheet, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-add-user-style-sheet">webkit_web_view_group_add_user_style_sheet ()</a>
+</dt>
 <dt>webkit_web_view_group_get_name, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-get-name">webkit_web_view_group_get_name ()</a>
 </dt>
 <dt>webkit_web_view_group_get_settings, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-get-settings">webkit_web_view_group_get_settings ()</a>
 </dt>
 <dt>webkit_web_view_group_new, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-new">webkit_web_view_group_new ()</a>
+</dt>
+<dt>webkit_web_view_group_remove_all_user_style_sheets, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-remove-all-user-style-sheets">webkit_web_view_group_remove_all_user_style_sheets ()</a>
 </dt>
 <dt>webkit_web_view_group_set_settings, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-set-settings">webkit_web_view_group_set_settings ()</a>
 </dt>

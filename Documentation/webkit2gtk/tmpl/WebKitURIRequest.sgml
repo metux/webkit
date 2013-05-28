@@ -9,10 +9,12 @@ WebKitURIRequest
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -56,5 +58,14 @@ WebKitURIRequest
 
 @request: 
 @uri: 
+
+
+<!-- ##### FUNCTION webkit_uri_request_get_http_headers ##### -->
+<para>
+
+</para>
+
+@request: 
+@Returns: 
 
 

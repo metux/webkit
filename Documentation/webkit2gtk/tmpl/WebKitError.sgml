@@ -9,10 +9,12 @@ WebKitError
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -56,6 +58,13 @@ WebKitError
 
 
 <!-- ##### MACRO WEBKIT_JAVASCRIPT_ERROR ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_SNAPSHOT_ERROR ##### -->
 <para>
 
 </para>
@@ -121,6 +130,13 @@ WebKitError
 
 @WEBKIT_JAVASCRIPT_ERROR_SCRIPT_FAILED: 
 
+<!-- ##### ENUM WebKitSnapshotError ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SNAPSHOT_ERROR_FAILED_TO_CREATE: 
+
 <!-- ##### FUNCTION webkit_network_error_quark ##### -->
 <para>
 
@@ -167,6 +183,15 @@ WebKitError
 
 
 <!-- ##### FUNCTION webkit_javascript_error_quark ##### -->
+<para>
+
+</para>
+
+@void: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_snapshot_error_quark ##### -->
 <para>
 
 </para>

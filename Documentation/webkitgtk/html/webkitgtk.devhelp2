@@ -347,6 +347,7 @@
     <keyword type="property" name="The &quot;monospace-font-family&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--monospace-font-family"/>
     <keyword type="property" name="The &quot;print-backgrounds&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--print-backgrounds"/>
     <keyword type="property" name="The &quot;resizable-text-areas&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--resizable-text-areas"/>
+    <keyword type="property" name="The &quot;respect-image-orientation&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--respect-image-orientation"/>
     <keyword type="property" name="The &quot;sans-serif-font-family&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--sans-serif-font-family"/>
     <keyword type="property" name="The &quot;serif-font-family&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--serif-font-family"/>
     <keyword type="property" name="The &quot;spell-checking-languages&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--spell-checking-languages"/>
@@ -611,7 +612,7 @@
     <keyword type="property" name="The &quot;mime-types&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--mime-types"/>
     <keyword type="property" name="The &quot;select-multiple&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--select-multiple"/>
     <keyword type="property" name="The &quot;selected-files&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--selected-files"/>
-    <keyword type="" name="Logging" link="webkit-environment.html#idp1477416"/>
+    <keyword type="" name="Logging" link="webkit-environment.html#idp4929392"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DEFAULT" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DEFAULT:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>

@@ -9,10 +9,12 @@ WebKitWebViewGroup
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -30,6 +32,14 @@ WebKitWebViewGroup
 <para>
 
 </para>
+
+<!-- ##### ENUM WebKitInjectedContentFrames ##### -->
+<para>
+
+</para>
+
+@WEBKIT_INJECTED_CONTENT_FRAMES_ALL: 
+@WEBKIT_INJECTED_CONTENT_FRAMES_TOP_ONLY: 
 
 <!-- ##### FUNCTION webkit_web_view_group_new ##### -->
 <para>
@@ -65,5 +75,26 @@ WebKitWebViewGroup
 
 @group: 
 @settings: 
+
+
+<!-- ##### FUNCTION webkit_web_view_group_add_user_style_sheet ##### -->
+<para>
+
+</para>
+
+@group: 
+@source: 
+@base_uri: 
+@whitelist: 
+@blacklist: 
+@injected_frames: 
+
+
+<!-- ##### FUNCTION webkit_web_view_group_remove_all_user_style_sheets ##### -->
+<para>
+
+</para>
+
+@group: 
 
 

@@ -177,7 +177,8 @@ static CString injectedBundleDirectory()
     if (const char* bundleDirectory = g_getenv("WEBKIT_INJECTED_BUNDLE_PATH"))
         return bundleDirectory;
 
-    static const char* injectedBundlePath = LIBDIR""G_DIR_SEPARATOR_S"webkit2gtk-"WEBKITGTK_API_VERSION_STRING""G_DIR_SEPARATOR_S"injected-bundle"G_DIR_SEPARATOR_S;
+    static const char* injectedBundlePath = LIBDIR G_DIR_SEPARATOR_S "webkit2gtk-" WEBKITGTK_API_VERSION_STRING
+        G_DIR_SEPARATOR_S "injected-bundle" G_DIR_SEPARATOR_S;
     return injectedBundlePath;
 }
 
@@ -774,6 +775,23 @@ void webkit_web_context_set_web_extensions_directory(WebKitWebContext* context, 
 }
 
 /**
+ * webkit_web_context_set_disk_cache_directory:
+ * @context: a #WebKitWebContext
+ * @directory: the directory to set
+ *
+ * Set the directory where disk cache files will be stored
+ * This method must be called before loading anything in this context, otherwise
+ * it will not have any effect.
+ */
+void webkit_web_context_set_disk_cache_directory(WebKitWebContext* context, const char* directory)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
+    g_return_if_fail(directory);
+
+    context->priv->context->setDiskCacheDirectory(WebCore::filenameToString(directory));
+}
+
+/**
  * webkit_web_context_prefetch_dns:
  * @context: a #WebKitWebContext
  * @hostname: a hostname to be resolved
@@ -804,8 +822,9 @@ WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy
 
 WebKitDownload* webkitWebContextStartDownload(WebKitWebContext* context, const char* uri, WebPageProxy* initiatingPage)
 {
-    DownloadProxy* downloadProxy = context->priv->context->download(initiatingPage, WebCore::ResourceRequest(String::fromUTF8(uri)));
-    WebKitDownload* download = webkitDownloadCreate(downloadProxy);
+    WebCore::ResourceRequest request(String::fromUTF8(uri));
+    DownloadProxy* downloadProxy = context->priv->context->download(initiatingPage, request);
+    WebKitDownload* download = webkitDownloadCreateForRequest(downloadProxy, request);
     downloadsMap().set(downloadProxy, download);
     return download;
 }

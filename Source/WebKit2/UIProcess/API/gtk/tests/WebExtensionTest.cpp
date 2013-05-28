@@ -20,6 +20,7 @@
 #include "config.h"
 
 #include <gio/gio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <webkit2/webkit-web-extension.h>
 #include <wtf/gobject/GOwnPtr.h>
@@ -30,6 +31,8 @@ static const char introspectionXML[] =
     "  <method name='GetTitle'>"
     "   <arg type='t' name='pageID' direction='in'/>"
     "   <arg type='s' name='title' direction='out'/>"
+    "  </method>"
+    "  <method name='AbortProcess'>"
     "  </method>"
     "  <signal name='DocumentLoaded'/>"
     "  <signal name='URIChanged'>"
@@ -72,6 +75,10 @@ static gboolean sendRequestCallback(WebKitWebPage*, WebKitURIRequest* request, W
         GOwnPtr<char> prefix(g_strndup(requestURI, strlen(requestURI) - strlen(suffix)));
         GOwnPtr<char> newURI(g_strdup_printf("%s/javascript.js", prefix.get()));
         webkit_uri_request_set_uri(request, newURI.get());
+    } else if (g_str_has_suffix(requestURI, "/add-do-not-track-header")) {
+        SoupMessageHeaders* headers = webkit_uri_request_get_http_headers(request);
+        g_assert(headers);
+        soup_message_headers_append(headers, "DNT", "1");
     } else if (g_str_has_suffix(requestURI, "/cancel-this.js"))
         return TRUE;
 
@@ -102,10 +109,13 @@ static void methodCallCallback(GDBusConnection* connection, const char* sender, 
                 "Invalid page ID: %"G_GUINT64_FORMAT, pageID);
             return;
         }
+        g_assert_cmpuint(webkit_web_page_get_id(page), ==, pageID);
 
         WebKitDOMDocument* document = webkit_web_page_get_dom_document(page);
         GOwnPtr<char> title(webkit_dom_document_get_title(document));
         g_dbus_method_invocation_return_value(invocation, g_variant_new("(s)", title.get()));
+    } else if (!g_strcmp0(methodName, "AbortProcess")) {
+        abort();
     }
 }
 

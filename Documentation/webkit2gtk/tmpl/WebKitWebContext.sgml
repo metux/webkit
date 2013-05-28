@@ -9,10 +9,12 @@ WebKitWebContext
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -251,6 +253,15 @@ WebKitWebContext
 
 @context: 
 @hostname: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_disk_cache_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@directory: 
 
 
 <!-- ##### USER_FUNCTION WebKitURISchemeRequestCallback ##### -->

@@ -26,6 +26,7 @@ m4_include([Source/autotools/ReadCommandLineArguments.m4])
 m4_include([Source/autotools/FindDependencies.m4])
 m4_include([Source/autotools/SetupCompilerFlags.m4])
 m4_include([Source/autotools/SetupAutoconfHeader.m4])
+m4_include([Source/autotools/SetupWebKitFeatures.m4])
 
 # We would put AM_INIT_AUTOMAKE into SetupAutomake.m4, but seems to cause autoconf errors.
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -35,7 +36,7 @@ m4_include([Source/autotools/SetupAutomake.m4])
 # Processing of configuration files
 ######################################################################################
 
-AC_CONFIG_FILES([GNUmakefile])
+AC_CONFIG_FILES([GNUmakefile Source/WebCore/platform/gtk/po/POTFILES])
 AC_CONFIG_FILES([DerivedSources/WebCore/UserAgentGtk.h:Source/WebCore/platform/gtk/UserAgentGtk.h.in])
 AC_CONFIG_FILES(
     [Source/JavaScriptCore/javascriptcoregtk-${WEBKITGTK_API_VERSION}.pc:Source/JavaScriptCore/javascriptcoregtk.pc.in
@@ -43,7 +44,7 @@ AC_CONFIG_FILES(
     [WEBKITGTK_API_VERSION=$WEBKITGTK_API_VERSION,WEBKITGTK_PC_NAME=$WEBKITGTK_PC_NAME])
 
 if test "$enable_webkit1" = "yes"; then
-    AC_CONFIG_FILES([Source/WebKit/gtk/webkit/webkitversion.h Source/WebKit/gtk/po/POTFILES])
+    AC_CONFIG_FILES([Source/WebKit/gtk/webkit/webkitversion.h])
 
     AC_CONFIG_FILES([Source/WebKit/gtk/${WEBKITGTK_PC_NAME}-${WEBKITGTK_API_VERSION}.pc:Source/WebKit/gtk/webkit.pc.in],
         [WEBKITGTK_API_VERSION=$WEBKITGTK_API_VERSION,WEBKITGTK_PC_NAME=$WEBKITGTK_PC_NAME])

@@ -1,3 +1,256 @@
+2013-04-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.0.1 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
+2013-03-31  Martin Robinson  <mrobinson@igalia.com>
+
+        Bug 110293 uses read -d which is a non-portable bashism
+        https://bugs.webkit.org/show_bug.cgi?id=113349
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * Source/autotools/SetupWebKitFeatures.m4: Pass the default feature set to the
+        feature script in a more portable way.
+
+2013-04-02  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Make libsecret optional
+        https://bugs.webkit.org/show_bug.cgi?id=113821
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add a configuration option to disable credential storage and thus remove
+        the libsecret dependency. This should make it possible to build WebKit 2.x
+        on Windows again.
+
+        * Source/autotools/FindDependencies.m4: Only look for libsecret if credential storage is active.
+        * Source/autotools/PrintBuildConfiguration.m4: Print whether or not credential storage is active.
+        * Source/autotools/ReadCommandLineArguments.m4: Added an option to control credential storage.
+        * Source/autotools/SetupAutoconfHeader.m4: Expose credential storage setting to code.
+
+2013-04-12  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Lower the pango dependency
+        https://bugs.webkit.org/show_bug.cgi?id=114520
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/autotools/Versions.m4: Only depend on Pango 1.30.0 instead of
+        Pango 1.32.0. 1.32.0 isn't strictly necessary and the version of GTK+ that
+        we depend on (3.6.0) depends on 1.30.0.
+
+2013-03-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.0.0 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
+2013-03-26  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Bump required versions of some dependencies
+        https://bugs.webkit.org/show_bug.cgi?id=113282
+
+        Reviewed by Martin Robinson.
+
+        This patch updates the following dependencies:
+
+         - libsoup 2.42.0: is the current stable release.
+
+         - glib 2.36.0: libsoup 2.42 requires 2.35.0, but we don't want to
+           depend on unstable versions and 2.36 is the next stable version
+           after 2.35.
+
+         - gtk+ 3.6.0: this is the previous stable release. We don't
+           currently have any code using newer API, so we will be able to
+           remove all the #ifdefed code.
+
+         - at-spi2 2.5.3: is the version required by gtk+ 3.6.
+
+         - GObject introspection 1.32.0: is the version required by gtk+ 3.6.
+
+         - Pango 1.32.0: it's the current stable version and the first one
+           depending on Harfbuzz.
+
+         - Fontconfig 2.5: required by pango 1.32.0 when using Harfbuzz.
+
+         - gtk+ 2.24.10: it allows us to remove a lot of deprecated code
+           and #ifdefs.
+
+        * Source/autotools/Versions.m4:
+
+2013-03-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 1.11.92 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
+2013-03-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.am: Add WebKitFeatures.txt and WebKitFeatures.h to
+        DISTCLEANFILES.
+
+2013-03-17  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Exports leveldb symbols
+        https://bugs.webkit.org/show_bug.cgi?id=112526
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/autotools/symbols.filter: make leveldb symbols local.
+
+2013-03-06  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Build fix. Fixes problems building code that uses deprecated functions from GTK+ 2,
+        such as RenderThemeGtk2.cpp, in debug mode. RenderThemeGtk2.cpp tries to allow usage
+        of deprecated functions by undefining GTK_DISABLE_DEPRECATED, but it ended up being
+        redefined because autotoolsconfig.h was included again by headers that came after
+        config.h.
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/SetupWebKitFeatures.m4: add checks to ensure the
+        autotoolsconfig.h header is only included once.
+
+2013-03-14  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Pre-release version bump.
+
+        * Source/autotools/Versions.m4: Bump version to 1.11.92 for people
+        already using the webkit-2.0 branch.
+
+2013-03-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Split GtkAuthenticationDialog in two widgets
+        https://bugs.webkit.org/show_bug.cgi?id=103644
+
+        Reviewed by Xan Lopez.
+
+        * Source/autotools/Versions.m4: Bump GTK+ 2 requirements to 2.16
+        for GtkOrientable.
+
+2013-03-12  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] 'unrecognized command line option "-Wno-c++11-extensions"' warning reported when using gcc
+        https://bugs.webkit.org/show_bug.cgi?id=111936
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/SetupCompilerFlags.m4: Only use the -Wno-c++11-extensions warning when building
+        with Clang as GCC does not support the warning just yet. Also enhance the comment about using libstdc++
+        as the standard C++ library when compiling with Clang.
+
+2013-03-11  Tobias Mueller  <tobiasmue@gnome.org>
+
+        [Autotools] Set ENABLE_GTK_DOC to false if gtk-doc is not installed
+        https://bugs.webkit.org/show_bug.cgi?id=111980
+        
+        Reviewed by Martin Robinson.
+
+        WebKit did not configure if gtk-doc-am was not installed with the error:
+        Tools/GNUmakefile.am:419: ENABLE_GTK_DOC does not appear in AM_CONDITIONAL
+
+        * Source/autotools/FindDependencies.m4:
+
+2013-03-05  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Unreviewed build fix.
+
+        * GNUmakefile.am: remove bad path for generate-feature-defines-files from EXTRA_DIST.
+
+2013-03-09  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Versions.m4 is missing some key dependencies version definitions
+        https://bugs.webkit.org/show_bug.cgi?id=111903
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/autotools/Versions.m4: Add missing required version
+        definitions.
+
+2013-03-08  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Remove media stream support from the configuration options
+        https://bugs.webkit.org/show_bug.cgi?id=111813
+
+        Reviewed by Philippe Normand.
+
+        Remove the media-stream configuration flag. The feature is incomplete and
+        thus unsupported, so it really shouldn't be possible to enable it.
+
+        * Source/autotools/PrintBuildConfiguration.m4:
+        * Source/autotools/ReadCommandLineArguments.m4:
+        * Source/autotools/SetupAutomake.m4:
+        * Source/autotools/SetupWebKitFeatures.m4:
+
+2013-03-07  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Limit the supported compilers to GCC >= 4.7 and Clang >= 3.0
+        https://bugs.webkit.org/show_bug.cgi?id=109932
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/CheckSystemAndBasicDependencies.m4: Strictly check for one of the two compilers.
+        * Source/autotools/SetupCompilerFlags.m4: Set up C++11-specific compiler flags. Force the C99 standard for the C code.
+        Use the -Qunused-arguments flag when using Clang, it reduces irrelevant errors when using ccache.
+
+2013-02-27  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Disable MathML support in release builds
+        https://bugs.webkit.org/show_bug.cgi?id=110981
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/SetupWebKitFeatures.m4: Disable the MathML support in release builds
+        as the code is not yet deemed production-ready.
+
+2013-02-21  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Move feature overriding to the configure phase
+        https://bugs.webkit.org/show_bug.cgi?id=110293
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Rework the feature overrides logic so all feature defines go into a
+        header rather than the command line. This has a few benefits. Most
+        notably, we can reuse the header in the gyp build. Another nice result
+        is that changes to the configuration automatically result in a full
+        rebuild and Debug and Release builds can have different configurations.
+
+        All feature define processing happens now during the configuration phase,
+        instead of when running autogen.sh. This means that we need to distribute
+        the feature processing script.
+
+        * GNUmakefile.am: Read feature defines from WebKitFeatures.txt when kicking
+        off a build. Also include generate-feature-defines-files in the distribution.
+        * Source/autotools/SetupAutoconfHeader.m4: Remove an extra ENABLE_3D_RENDERING
+        from the autoconf header, as it is already provided by the feature configuration.
+        * Source/autotools/SetupWebKitFeatures.m4: Added.
+        * Source/autotools/webkitfeature.m4: Removed. The functionality has been moved
+        to SetupWebKitFeatures.m4.
+        * autogen.sh: Remove the call to override-feature-defines.
+        * configure.ac: Now include SetupWebKitFeatures.
+
+2013-03-05  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Enable translations for WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=111398
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: adjust path for i18n GNUmakefile.am.
+        * configure.ac: generate the i18n makefile unconditionally, the translations are
+        used by both WebKitGTK+ and WebKit2GTK+.
+
+2013-03-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 1.11.91 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
 2013-02-22  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         Unreviewed. Update NEWS and Versions.m4 for 1.11.90 release.

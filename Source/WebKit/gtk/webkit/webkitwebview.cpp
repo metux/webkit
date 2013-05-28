@@ -3385,6 +3385,7 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     coreSettings->setSerifFontFamily(settingsPrivate->serifFontFamily.data());
     coreSettings->setLoadsImagesAutomatically(settingsPrivate->autoLoadImages);
     coreSettings->setShrinksStandaloneImagesToFit(settingsPrivate->autoShrinkImages);
+    coreSettings->setShouldRespectImageOrientation(settingsPrivate->respectImageOrientation);
     coreSettings->setShouldPrintBackgrounds(settingsPrivate->printBackgrounds);
     coreSettings->setScriptEnabled(settingsPrivate->enableScripts);
     coreSettings->setPluginsEnabled(settingsPrivate->enablePlugins);
@@ -3504,6 +3505,8 @@ static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GPar
         settings->setLoadsImagesAutomatically(g_value_get_boolean(&value));
     else if (name == g_intern_string("auto-shrink-images"))
         settings->setShrinksStandaloneImagesToFit(g_value_get_boolean(&value));
+    else if (name == g_intern_string("respect-image-orientation"))
+        settings->setShouldRespectImageOrientation(g_value_get_boolean(&value));
     else if (name == g_intern_string("print-backgrounds"))
         settings->setShouldPrintBackgrounds(g_value_get_boolean(&value));
     else if (name == g_intern_string("enable-scripts"))
@@ -5066,14 +5069,15 @@ void webkit_web_view_add_resource(WebKitWebView* webView, const char* identifier
     g_hash_table_insert(priv->subResources.get(), g_strdup(identifier), webResource);
 }
 
-void webkit_web_view_remove_resource(WebKitWebView* webView, const char* identifier)
+void webkitWebViewRemoveSubresource(WebKitWebView* webView, const char* identifier)
 {
-    WebKitWebViewPrivate* priv = webView->priv;
-    if (g_str_equal(identifier, priv->mainResourceIdentifier.data())) {
-        priv->mainResourceIdentifier = "";
-        priv->mainResource = 0;
-    } else
-      g_hash_table_remove(priv->subResources.get(), identifier);
+    ASSERT(identifier);
+
+    // Don't remove the main resource.
+    const CString& mainResource = webView->priv->mainResourceIdentifier;
+    if (!mainResource.isNull() && g_str_equal(identifier, mainResource.data()))
+        return;
+    g_hash_table_remove(webView->priv->subResources.get(), identifier);
 }
 
 WebKitWebResource* webkit_web_view_get_resource(WebKitWebView* webView, char* identifier)

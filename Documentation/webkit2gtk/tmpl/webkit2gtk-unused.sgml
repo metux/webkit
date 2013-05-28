@@ -1,7 +1,0 @@
-<!-- ##### SIGNAL WebKitWebContext::web-process-crashed ##### -->
-<para>
-
-</para>
-
-@webkitwebcontext: the object which received the signal.
-

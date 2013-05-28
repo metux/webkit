@@ -20,11 +20,11 @@ Features:
  Geolocation support                                      : $enable_geolocation
  HTML5 video element support                              : $enable_video
  JIT compilation                                          : $enable_jit
- Media stream support                                     : $enable_media_stream
  Opcode stats                                             : $enable_opcode_stats
  SVG fonts support                                        : $enable_svg_fonts
  SVG support                                              : $enable_svg
  Spellcheck support                                       : $enable_spellcheck
+ Credential storage support                               : $enable_credential_storage
  Web Audio support                                        : $enable_web_audio
  WebGL                                                    : $enable_webgl
  XSLT support                                             : $enable_xslt

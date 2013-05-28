@@ -48,6 +48,7 @@ public:
     void waitUntilTitleChanged();
     void showInWindowAndWaitUntilMapped(GtkWindowType = GTK_WINDOW_POPUP);
     void resizeView(int width, int height);
+    void selectAll();
     const char* mainResourceData(size_t& mainResourceDataSize);
 
     void mouseMoveTo(int x, int y, unsigned int mouseModifiers = 0);
@@ -64,6 +65,8 @@ public:
     static bool javascriptResultIsNull(WebKitJavascriptResult*);
     static bool javascriptResultIsUndefined(WebKitJavascriptResult*);
 
+    cairo_surface_t* getSnapshotAndWaitUntilReady(WebKitSnapshotRegion, WebKitSnapshotOptions);
+
     WebKitWebView* m_webView;
     GMainLoop* m_mainLoop;
     CString m_activeURI;
@@ -73,6 +76,7 @@ public:
     GError** m_javascriptError;
     GOwnPtr<char> m_resourceData;
     size_t m_resourceDataSize;
+    cairo_surface_t* m_surface;
 
 private:
     void doMouseButtonEvent(GdkEventType, int, int, unsigned int, unsigned int);
