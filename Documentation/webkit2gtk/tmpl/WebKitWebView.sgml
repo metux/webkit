@@ -9,10 +9,12 @@ WebKitWebView
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -188,6 +190,14 @@ WebKitWebView
 @webkitwebview: the object which received the signal.
 @arg1: 
 
+<!-- ##### SIGNAL WebKitWebView::web-process-crashed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@Returns: 
+
 <!-- ##### ARG WebKitWebView:estimated-load-progress ##### -->
 <para>
 
@@ -274,6 +284,22 @@ WebKitWebView
 
 @WEBKIT_INSECURE_CONTENT_RUN: 
 @WEBKIT_INSECURE_CONTENT_DISPLAYED: 
+
+<!-- ##### ENUM WebKitSnapshotOptions ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SNAPSHOT_OPTIONS_NONE: 
+@WEBKIT_SNAPSHOT_OPTIONS_INCLUDE_SELECTION_HIGHLIGHTING: 
+
+<!-- ##### ENUM WebKitSnapshotRegion ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SNAPSHOT_REGION_VISIBLE: 
+@WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT: 
 
 <!-- ##### MACRO WEBKIT_EDITING_COMMAND_CUT ##### -->
 <para>
@@ -801,6 +827,30 @@ WebKitWebView
 @web_view: 
 @certificate: 
 @errors: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_snapshot ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@region: 
+@options: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_snapshot_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
 @Returns: 
 
 

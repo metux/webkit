@@ -46,6 +46,7 @@
 <pre class="synopsis">struct              <a class="link" href="WebKitWebPage.html#WebKitWebPage-struct" title="struct WebKitWebPage">WebKitWebPage</a>;
 <span class="returnvalue">WebKitDOMDocument</span> * <a class="link" href="WebKitWebPage.html#webkit-web-page-get-dom-document" title="webkit_web_page_get_dom_document ()">webkit_web_page_get_dom_document</a>    (<em class="parameter"><code><a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> *web_page</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitWebPage.html#webkit-web-page-get-uri" title="webkit_web_page_get_uri ()">webkit_web_page_get_uri</a>             (<em class="parameter"><code><a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> *web_page</code></em>);
+<a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="WebKitWebPage.html#webkit-web-page-get-id" title="webkit_web_page_get_id ()">webkit_web_page_get_id</a>              (<em class="parameter"><code><a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> *web_page</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -127,6 +128,29 @@ signal of <em class="parameter"><code>web_page</code></em>.
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current active URI of <em class="parameter"><code>web_view</code></em> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if nothing has been
 loaded yet.</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-page-get-id"></a><h3>webkit_web_page_get_id ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             webkit_web_page_get_id              (<em class="parameter"><code><a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> *web_page</code></em>);</pre>
+<p>
+Get the identifier of the <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a>
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_page</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the identifier of <em class="parameter"><code>web_page</code></em>
+</td>
 </tr>
 </tbody>
 </table></div>

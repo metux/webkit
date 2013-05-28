@@ -49,6 +49,9 @@
 #include "FrameView.h"
 #include "HTMLContentElement.h"
 #include "HTMLInputElement.h"
+#if ENABLE(VIDEO)
+#include "HTMLMediaElement.h"
+#endif
 #include "HTMLNames.h"
 #include "HTMLTextAreaElement.h"
 #include "HistoryItem.h"
@@ -1995,6 +1998,19 @@ void Internals::setUsesOverlayScrollbars(bool enabled)
 void Internals::initializeMockCDM()
 {
     CDM::registerCDMFactory(MockCDM::create, MockCDM::supportsKeySytem);
+}
+#endif
+
+
+#if ENABLE(VIDEO)
+void Internals::simulateAudioInterruption(Node* node)
+{
+#if USE(GSTREAMER)
+    HTMLMediaElement* element = toMediaElement(node);
+    element->player()->simulateAudioInterruption();
+#else
+    UNUSED_PARAM(node);
+#endif
 }
 #endif
 

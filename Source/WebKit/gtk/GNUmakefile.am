@@ -18,11 +18,11 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_SOUR
 	$(webkitgtk_sources)
 
 libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CXXFLAGS = \
-	$(SYMBOL_VISIBILITY_INLINES) \
+	-fvisibility-inlines-hidden \
 	$(global_cxxflags)
 
 libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CFLAGS = \
-	$(SYMBOL_VISIBILITY) \
+	-fvisibility=hidden \
 	$(global_cflags)
 
 if ENABLE_SPELLCHECK
@@ -223,6 +223,8 @@ webkitgtk_sources += \
 	Source/WebKit/gtk/WebCoreSupport/WebViewInputMethodFilter.cpp \
 	Source/WebKit/gtk/WebCoreSupport/WebViewInputMethodFilter.h \
 	Source/WebKit/gtk/webkit/webkitapplicationcache.cpp \
+	Source/WebKit/gtk/webkit/webkitauthenticationdialog.cpp \
+	Source/WebKit/gtk/webkit/webkitauthenticationdialog.h \
 	Source/WebKit/gtk/webkit/webkitdownload.cpp \
 	Source/WebKit/gtk/webkit/webkitdownloadprivate.h \
 	Source/WebKit/gtk/webkit/webkiterror.cpp \
@@ -414,7 +416,6 @@ EXTRA_DIST += \
 	$(WebKit)/docs/webkitenvironment.xml \
 	$(WebKit)/docs/webkitgtk-overrides.txt \
 	$(WebKit)/webkitmarshal.list \
-	$(WebKit)/po/* \
 	$(WebKit)/resources/* \
 	$(WebKit)/tests/resources/* \
 	$(WebKit)/tests/test_utils.h
@@ -449,7 +450,8 @@ webkit_tests_ldadd = \
 	$(FREETYPE_LIBS) \
 	$(GTK_LIBS) \
 	$(GLIB_LIBS) \
-	$(LIBSOUP_LIBS)
+	$(LIBSOUP_LIBS) \
+	$(XRENDER_LIBS)
 
 webkit_tests_ldflags = \
 	-no-install \
@@ -642,8 +644,3 @@ DISTCLEANFILES += \
 	$(top_builddir)/Source/WebKit/gtk/@WEBKITGTK_PC_NAME@-@WEBKITGTK_API_VERSION@.pc \
 	$(top_builddir)/Source/WebKit/gtk/org.webkitgtk-@WEBKITGTK_API_VERSION@.gschema.xml \
 	$(top_builddir)/Source/WebKit/gtk/webkit/webkitversion.h
-
-install-data-local: po-install-data-local
-installdirs-data-local: po-installdirs-data-local
-uninstall-local: po-uninstall-local
-

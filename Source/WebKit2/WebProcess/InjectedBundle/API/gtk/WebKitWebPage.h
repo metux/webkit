@@ -25,7 +25,7 @@
 #define WebKitWebPage_h
 
 #include <glib-object.h>
-#include <webkit2/WebKitWebExtensionDefines.h>
+#include <webkit2/WebKitDefines.h>
 #include <webkitdom/webkitdom.h>
 
 G_BEGIN_DECLS
@@ -59,6 +59,9 @@ webkit_web_page_get_dom_document (WebKitWebPage *web_page);
 
 WEBKIT_API const gchar *
 webkit_web_page_get_uri (WebKitWebPage *web_page);
+
+WEBKIT_API guint64
+webkit_web_page_get_id           (WebKitWebPage *web_page);
 
 G_END_DECLS
 

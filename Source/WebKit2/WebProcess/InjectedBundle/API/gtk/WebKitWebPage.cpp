@@ -106,8 +106,11 @@ static void didSameDocumentNavigationForFrame(WKBundlePageRef page, WKBundleFram
     webkitWebPageSetURI(WEBKIT_WEB_PAGE(clientInfo), toImpl(frame)->coreFrame()->document()->url().string().utf8());
 }
 
-static void didFinishDocumentLoadForFrame(WKBundlePageRef, WKBundleFrameRef, WKTypeRef*, const void *clientInfo)
+static void didFinishDocumentLoadForFrame(WKBundlePageRef, WKBundleFrameRef frame, WKTypeRef*, const void *clientInfo)
 {
+    if (!WKBundleFrameIsMainFrame(frame))
+        return;
+
     g_signal_emit(WEBKIT_WEB_PAGE(clientInfo), signals[DOCUMENT_LOADED], 0);
 }
 
@@ -131,7 +134,9 @@ static WKURLRequestRef willSendRequestForFrame(WKBundlePageRef page, WKBundleFra
     if (returnValue)
         return 0;
 
-    WebURLRequest* newRequest = WebURLRequest::create(webkitURIRequestGetResourceRequest(request.get())).leakRef();
+    ResourceRequest resourceRequest;
+    webkitURIRequestGetResourceRequest(request.get(), resourceRequest);
+    WebURLRequest* newRequest = WebURLRequest::create(resourceRequest).leakRef();
 
     ImmutableDictionary::MapType message;
     message.set(String::fromUTF8("Page"), toImpl(page));
@@ -359,4 +364,19 @@ const gchar* webkit_web_page_get_uri(WebKitWebPage* webPage)
     g_return_val_if_fail(WEBKIT_IS_WEB_PAGE(webPage), 0);
 
     return webPage->priv->uri.data();
+}
+
+/**
+ * webkit_web_page_get_id:
+ * @web_page: a #WebKitWebPage
+ *
+ * Get the identifier of the #WebKitWebPage
+ *
+ * Returns: the identifier of @web_page
+ */
+guint64 webkit_web_page_get_id(WebKitWebPage* webPage)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_PAGE(webPage), 0);
+
+    return webPage->priv->webPage->pageID();
 }

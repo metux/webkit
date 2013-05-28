@@ -67,16 +67,10 @@ class TestRunner:
         SkippedTest("unittests/testwebresource", "/webkit/webresource/sub_resource_loading", "Test fails in GTK Linux 64-bit Release bot", 82330),
         SkippedTest("unittests/testwebview", "/webkit/webview/icon-uri", "Test times out in GTK Linux 64-bit Release bot", 82328),
         SkippedTest("unittests/testatk", "/webkit/atk/getTextInParagraphAndBodyModerate", "Test fails", 105538),
-        SkippedTest("unittests/testatk", SkippedTest.ENTIRE_SUITE, "", 0),
-        SkippedTest("unittests/testhittestresult", SkippedTest.ENTIRE_SUITE, "", 0),
         SkippedTest("WebKit2APITests/TestInspectorServer", SkippedTest.ENTIRE_SUITE, "Test times out", 105866),
         SkippedTest("WebKit2APITests/TestResources", "/webkit2/WebKitWebView/resources", "Test is flaky in GTK Linux 32-bit Release bot", 82868),
         SkippedTest("WebKit2APITests/TestWebKitAccessibility", "/webkit2/WebKitAccessibility/atspi-basic-hierarchy", "Test fails", 100408),
-        SkippedTest("WebKit2APITests/TestWebKitFindController", "/webkit2/WebKitFindController/hide", "Test always fails in Xvfb", 89810),
         SkippedTest("WebKit2APITests/TestWebKitWebContext", "/webkit2/WebKitWebContext/uri-scheme", "Test fails", 104779),
-        SkippedTest("WebKit2APITests/TestWebKitWebView", "/webkit2/WebKitWebView/mouse-target", "Test is flaky in GTK Linux 32-bit Release bot", 82866),
-        SkippedTest("WebKit2APITests/TestWebKitFaviconDatabase", "/webkit2/WebKitWebView/favicon", "Test times out", 111434),
-        SkippedTest("TestWebKitAPI/TestWebKit2", SkippedTest.ENTIRE_SUITE, "", 0),
         SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.CanHandleRequest", "Test fails", 88453),
         SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.MouseMoveAfterCrash", "Test is flaky", 85066),
         SkippedTest("TestWebKitAPI/TestWebKit2", "WebKit2.NewFirstVisuallyNonEmptyLayoutForImages", "Test is flaky", 85066),
@@ -388,4 +382,4 @@ if __name__ == "__main__":
                              help='Time in seconds until a test times out')
     options, args = option_parser.parse_args()
 
-    sys.exit(0)
+    #sys.exit(TestRunner(options, args).run_tests())

@@ -1,3 +1,175 @@
+2013-05-07  Tomas Popela  <tpopela@redhat.com>
+
+        [GTK] Initialize WebKitWebPlugin path to prevent double-free
+        https://bugs.webkit.org/show_bug.cgi?id=115624
+
+        Reviewed by Carlos Garcia Campos.
+
+        Use GOwnPtr for WebKitWebPlugin path to prevent double-free
+        situations. Also use GOwnPtr for GError in webkit_web_plugin_get_path.
+
+        * webkit/webkitwebplugin.cpp:
+        (webkit_web_plugin_finalize):
+        (webkit_web_plugin_get_path):
+        * webkit/webkitwebpluginprivate.h:
+
+2013-05-02  Zan Dobersek  <zdobersek@igalia.com>
+
+        Segmentation Fault with Romanian locale. Evolution not starting.
+        https://bugs.webkit.org/show_bug.cgi?id=115484
+
+        Reviewed by Darin Adler.
+
+        Do not translate the property names that are being passed to the g_param_spec_boolean
+        method - it is not required and is causing segfaults with various locales.
+
+        * webkit/webkitviewportattributes.cpp:
+        (webkit_viewport_attributes_class_init):
+
+2013-04-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.0.1 release.
+
+        * NEWS: Added release notes for 2.0.1.
+
+2013-04-08  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] DOM objects created wrapping a base class have incorrect GObject type
+        https://bugs.webkit.org/show_bug.cgi?id=113132
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Remove WebKitDOMBindindg.h include from several files because it's
+        been renamed and it was not actually needed.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        * WebCoreSupport/EditorClientGtk.cpp:
+        * webkit/webkithittestresult.cpp:
+
+2013-03-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.0.0 release.
+
+        * NEWS: Added release notes for 2.0.0.
+
+2013-03-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 1.11.92 release.
+
+        * NEWS: Added release notes for 1.11.92.
+
+2013-03-17  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Fix and improve dist hooks for translations
+        https://bugs.webkit.org/show_bug.cgi?id=112519
+
+        Reviewed by Carlos Garcia Campos.
+
+        * GNUmakefile.am: removed left-over translation files from EXTRA_DIST
+
+2013-03-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Split GtkAuthenticationDialog in two widgets
+        https://bugs.webkit.org/show_bug.cgi?id=103644
+
+        Reviewed by Xan Lopez.
+
+        * GNUmakefile.am: Add new files to compilation.
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidReceiveAuthenticationChallenge):
+        Use helper createAuthenticationDialog() to create and show the
+        auth dialog.
+        * webkit/webkitauthenticationdialog.cpp: Added.
+        (authenticationDialogResponseCallback):
+        (createAuthenticationDialog):
+        * webkit/webkitauthenticationdialog.h: Added.
+        * webkit/webkitsoupauthdialog.cpp:
+        (sessionAuthenticate): Ditto.
+
+2013-03-07  Tomas Popela  <tpopela@redhat.com>
+
+        [GTK] Expose "ShouldRespectImageOrientation" setting into WebKitWebSettings
+        https://bugs.webkit.org/show_bug.cgi?id=111414
+
+        Reviewed by Carlos Garcia Campos.
+
+        We should expose ShouldRespectImageOrientation setting into
+        WebKitWebSettings. When it is enabled, the images are shown with right
+        orientation regarding to images EXIF data.
+
+        * webkit/webkitwebsettings.cpp:
+        (webkit_web_settings_class_init):
+        (webkit_web_settings_set_property):
+        (webkit_web_settings_get_property):
+        * webkit/webkitwebsettingsprivate.h:
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+        (webkit_web_view_settings_notify):
+
+2013-02-26  Martin Robinson  <mrobinson@igalia.com>
+
+        REGRESSION (r143619): Crashes in three layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=110588
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Guard against null main resource identifiers. The main resource
+        identifier can be null at various times during the load. A null
+        identifier is never equal to the ones we are looking to remove.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidFinishLoading): Use the new webkitWebViewRemoveSubresource helper.
+        (WebKit::FrameLoaderClient::dispatchDidFailLoading): ditto.
+        * webkit/webkitwebview.cpp:
+        (webkitWebViewRemoveSubresource): Added this helper which removes a subresource, but
+        never touches the main resource. This is adapted from the old method, for which the
+        main resource branch was dead code.
+        * webkit/webkitwebviewprivate.h: Update the method list.
+
+2013-03-07  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Limit the supported compilers to GCC >= 4.7 and Clang >= 3.0
+        https://bugs.webkit.org/show_bug.cgi?id=109932
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Replace references to SYMBOL_VISIBILITY_INLINES and SYMBOL_VISIBILITY variables with the actual flags.
+        They are now available by default due to the limited set of supported compilers.
+
+2013-03-06  Dominique Leuenberger  <dimstar@opensuse.org>
+
+        Link the webkit_tests to XRENDER_LIBS.
+        This solves the linking failure when building against gtk2 like:
+        usr/lib/gcc/i586-suse-linux/4.7/../../../../i586-suse-linux/bin/ld:
+        Source/WebCore/platform/gtk/Programs_unittests_testcopyandpaste-GtkVersioning.o:
+        undefined reference to symbol 'XFree'
+        /usr/lib/gcc/i586-suse-linux/4.7/../../../../i586-suse-linux/bin/ld:
+        note: 'XFree' is defined in DSO /usr/lib/libX11.so.6 so try adding it
+        to the linker command line
+        /usr/lib/libX11.so.6: could not read symbols: Invalid operation
+
+        https://bugs.webkit.org/show_bug.cgi?id=111572
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am:
+
+2013-03-06  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Enable translations for WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=111398
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: no longer distribute po files from here, they've moved to
+        Sources/WebCore/platform/gtk.
+
+2013-03-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 1.11.91 release.
+
+        * NEWS: Added release notes for 1.11.91.
+
 2013-02-24  Gustavo Noronha Silva  <gns@gnome.org>
 
         [GTK] GTK+ 2 build broken since GTK_API_VERSION_2 moved to autoconfig.h

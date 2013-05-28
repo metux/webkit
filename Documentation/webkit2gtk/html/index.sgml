@@ -34,6 +34,7 @@
 <ANCHOR id="webkit-web-context-get-tls-errors-policy" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-get-tls-errors-policy">
 <ANCHOR id="webkit-web-context-set-web-extensions-directory" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-web-extensions-directory">
 <ANCHOR id="webkit-web-context-prefetch-dns" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-prefetch-dns">
+<ANCHOR id="webkit-web-context-set-disk-cache-directory" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-disk-cache-directory">
 <ANCHOR id="WebKitURISchemeRequestCallback" href="webkit2gtk/WebKitWebContext.html#WebKitURISchemeRequestCallback">
 <ANCHOR id="webkit-web-context-register-uri-scheme" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-register-uri-scheme">
 <ANCHOR id="WebKitWebContext.signal-details" href="webkit2gtk/WebKitWebContext.html#WebKitWebContext.signal-details">
@@ -66,6 +67,12 @@
 <ANCHOR id="WebKitInsecureContentEvent" href="webkit2gtk/WebKitWebView.html#WebKitInsecureContentEvent">
 <ANCHOR id="WEBKIT-INSECURE-CONTENT-RUN:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-INSECURE-CONTENT-RUN:CAPS">
 <ANCHOR id="WEBKIT-INSECURE-CONTENT-DISPLAYED:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-INSECURE-CONTENT-DISPLAYED:CAPS">
+<ANCHOR id="WebKitSnapshotOptions" href="webkit2gtk/WebKitWebView.html#WebKitSnapshotOptions">
+<ANCHOR id="WEBKIT-SNAPSHOT-OPTIONS-NONE:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-SNAPSHOT-OPTIONS-NONE:CAPS">
+<ANCHOR id="WEBKIT-SNAPSHOT-OPTIONS-INCLUDE-SELECTION-HIGHLIGHTING:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-SNAPSHOT-OPTIONS-INCLUDE-SELECTION-HIGHLIGHTING:CAPS">
+<ANCHOR id="WebKitSnapshotRegion" href="webkit2gtk/WebKitWebView.html#WebKitSnapshotRegion">
+<ANCHOR id="WEBKIT-SNAPSHOT-REGION-VISIBLE:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-SNAPSHOT-REGION-VISIBLE:CAPS">
+<ANCHOR id="WEBKIT-SNAPSHOT-REGION-FULL-DOCUMENT:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-SNAPSHOT-REGION-FULL-DOCUMENT:CAPS">
 <ANCHOR id="WEBKIT-EDITING-COMMAND-CUT:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-EDITING-COMMAND-CUT:CAPS">
 <ANCHOR id="WEBKIT-EDITING-COMMAND-COPY:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-EDITING-COMMAND-COPY:CAPS">
 <ANCHOR id="WEBKIT-EDITING-COMMAND-PASTE:CAPS" href="webkit2gtk/WebKitWebView.html#WEBKIT-EDITING-COMMAND-PASTE:CAPS">
@@ -123,6 +130,8 @@
 <ANCHOR id="webkit-web-view-set-view-mode" href="webkit2gtk/WebKitWebView.html#webkit-web-view-set-view-mode">
 <ANCHOR id="webkit-web-view-get-view-mode" href="webkit2gtk/WebKitWebView.html#webkit-web-view-get-view-mode">
 <ANCHOR id="webkit-web-view-get-tls-info" href="webkit2gtk/WebKitWebView.html#webkit-web-view-get-tls-info">
+<ANCHOR id="webkit-web-view-get-snapshot" href="webkit2gtk/WebKitWebView.html#webkit-web-view-get-snapshot">
+<ANCHOR id="webkit-web-view-get-snapshot-finish" href="webkit2gtk/WebKitWebView.html#webkit-web-view-get-snapshot-finish">
 <ANCHOR id="WebKitJavascriptResult-struct" href="webkit2gtk/WebKitWebView.html#WebKitJavascriptResult-struct">
 <ANCHOR id="webkit-javascript-result-ref" href="webkit2gtk/WebKitWebView.html#webkit-javascript-result-ref">
 <ANCHOR id="webkit-javascript-result-unref" href="webkit2gtk/WebKitWebView.html#webkit-javascript-result-unref">
@@ -169,6 +178,7 @@
 <ANCHOR id="WebKitWebView-run-file-chooser" href="webkit2gtk/WebKitWebView.html#WebKitWebView-run-file-chooser">
 <ANCHOR id="WebKitWebView-script-dialog" href="webkit2gtk/WebKitWebView.html#WebKitWebView-script-dialog">
 <ANCHOR id="WebKitWebView-submit-form" href="webkit2gtk/WebKitWebView.html#WebKitWebView-submit-form">
+<ANCHOR id="WebKitWebView-web-process-crashed" href="webkit2gtk/WebKitWebView.html#WebKitWebView-web-process-crashed">
 <ANCHOR id="WebKitBackForwardList" href="webkit2gtk/WebKitBackForwardList.html">
 <ANCHOR id="WebKitBackForwardList.synopsis" href="webkit2gtk/WebKitBackForwardList.html#WebKitBackForwardList.synopsis">
 <ANCHOR id="WebKitBackForwardList.object-hierarchy" href="webkit2gtk/WebKitBackForwardList.html#WebKitBackForwardList.object-hierarchy">
@@ -349,6 +359,7 @@
 <ANCHOR id="webkit-uri-request-new" href="webkit2gtk/WebKitURIRequest.html#webkit-uri-request-new">
 <ANCHOR id="webkit-uri-request-get-uri" href="webkit2gtk/WebKitURIRequest.html#webkit-uri-request-get-uri">
 <ANCHOR id="webkit-uri-request-set-uri" href="webkit2gtk/WebKitURIRequest.html#webkit-uri-request-set-uri">
+<ANCHOR id="webkit-uri-request-get-http-headers" href="webkit2gtk/WebKitURIRequest.html#webkit-uri-request-get-http-headers">
 <ANCHOR id="WebKitURIRequest.property-details" href="webkit2gtk/WebKitURIRequest.html#WebKitURIRequest.property-details">
 <ANCHOR id="WebKitURIRequest--uri" href="webkit2gtk/WebKitURIRequest.html#WebKitURIRequest--uri">
 <ANCHOR id="WebKitURIResponse" href="webkit2gtk/WebKitURIResponse.html">
@@ -577,6 +588,7 @@
 <ANCHOR id="WEBKIT-DOWNLOAD-ERROR:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR:CAPS">
 <ANCHOR id="WEBKIT-PRINT-ERROR:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-PRINT-ERROR:CAPS">
 <ANCHOR id="WEBKIT-JAVASCRIPT-ERROR:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-JAVASCRIPT-ERROR:CAPS">
+<ANCHOR id="WEBKIT-SNAPSHOT-ERROR:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-SNAPSHOT-ERROR:CAPS">
 <ANCHOR id="WebKitNetworkError" href="webkit2gtk/webkit2gtk-WebKitError.html#WebKitNetworkError">
 <ANCHOR id="WEBKIT-NETWORK-ERROR-FAILED:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-FAILED:CAPS">
 <ANCHOR id="WEBKIT-NETWORK-ERROR-TRANSPORT:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-TRANSPORT:CAPS">
@@ -606,12 +618,15 @@
 <ANCHOR id="WEBKIT-PRINT-ERROR-INVALID-PAGE-RANGE:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-PRINT-ERROR-INVALID-PAGE-RANGE:CAPS">
 <ANCHOR id="WebKitJavascriptError" href="webkit2gtk/webkit2gtk-WebKitError.html#WebKitJavascriptError">
 <ANCHOR id="WEBKIT-JAVASCRIPT-ERROR-SCRIPT-FAILED:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-JAVASCRIPT-ERROR-SCRIPT-FAILED:CAPS">
+<ANCHOR id="WebKitSnapshotError" href="webkit2gtk/webkit2gtk-WebKitError.html#WebKitSnapshotError">
+<ANCHOR id="WEBKIT-SNAPSHOT-ERROR-FAILED-TO-CREATE:CAPS" href="webkit2gtk/webkit2gtk-WebKitError.html#WEBKIT-SNAPSHOT-ERROR-FAILED-TO-CREATE:CAPS">
 <ANCHOR id="webkit-network-error-quark" href="webkit2gtk/webkit2gtk-WebKitError.html#webkit-network-error-quark">
 <ANCHOR id="webkit-plugin-error-quark" href="webkit2gtk/webkit2gtk-WebKitError.html#webkit-plugin-error-quark">
 <ANCHOR id="webkit-policy-error-quark" href="webkit2gtk/webkit2gtk-WebKitError.html#webkit-policy-error-quark">
 <ANCHOR id="webkit-download-error-quark" href="webkit2gtk/webkit2gtk-WebKitError.html#webkit-download-error-quark">
 <ANCHOR id="webkit-print-error-quark" href="webkit2gtk/webkit2gtk-WebKitError.html#webkit-print-error-quark">
 <ANCHOR id="webkit-javascript-error-quark" href="webkit2gtk/webkit2gtk-WebKitError.html#webkit-javascript-error-quark">
+<ANCHOR id="webkit-snapshot-error-quark" href="webkit2gtk/webkit2gtk-WebKitError.html#webkit-snapshot-error-quark">
 <ANCHOR id="WebKitFaviconDatabase" href="webkit2gtk/WebKitFaviconDatabase.html">
 <ANCHOR id="WebKitFaviconDatabase.synopsis" href="webkit2gtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.synopsis">
 <ANCHOR id="WebKitFaviconDatabase.object-hierarchy" href="webkit2gtk/WebKitFaviconDatabase.html#WebKitFaviconDatabase.object-hierarchy">
@@ -882,10 +897,15 @@
 <ANCHOR id="WebKitWebViewGroup.description" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.description">
 <ANCHOR id="WebKitWebViewGroup.details" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.details">
 <ANCHOR id="WebKitWebViewGroup-struct" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup-struct">
+<ANCHOR id="WebKitInjectedContentFrames" href="webkit2gtk/WebKitWebViewGroup.html#WebKitInjectedContentFrames">
+<ANCHOR id="WEBKIT-INJECTED-CONTENT-FRAMES-ALL:CAPS" href="webkit2gtk/WebKitWebViewGroup.html#WEBKIT-INJECTED-CONTENT-FRAMES-ALL:CAPS">
+<ANCHOR id="WEBKIT-INJECTED-CONTENT-FRAMES-TOP-ONLY:CAPS" href="webkit2gtk/WebKitWebViewGroup.html#WEBKIT-INJECTED-CONTENT-FRAMES-TOP-ONLY:CAPS">
 <ANCHOR id="webkit-web-view-group-new" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-new">
 <ANCHOR id="webkit-web-view-group-get-name" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-get-name">
 <ANCHOR id="webkit-web-view-group-get-settings" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-get-settings">
 <ANCHOR id="webkit-web-view-group-set-settings" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-set-settings">
+<ANCHOR id="webkit-web-view-group-add-user-style-sheet" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-add-user-style-sheet">
+<ANCHOR id="webkit-web-view-group-remove-all-user-style-sheets" href="webkit2gtk/WebKitWebViewGroup.html#webkit-web-view-group-remove-all-user-style-sheets">
 <ANCHOR id="WebKitWebViewGroup.property-details" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.property-details">
 <ANCHOR id="WebKitWebViewGroup--settings" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup--settings">
 <ANCHOR id="WebKitWebViewGroup.see-also" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.see-also">
@@ -910,6 +930,7 @@
 <ANCHOR id="WebKitWebPage-struct" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage-struct">
 <ANCHOR id="webkit-web-page-get-dom-document" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-dom-document">
 <ANCHOR id="webkit-web-page-get-uri" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-uri">
+<ANCHOR id="webkit-web-page-get-id" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-id">
 <ANCHOR id="WebKitWebPage.property-details" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.property-details">
 <ANCHOR id="WebKitWebPage--uri" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage--uri">
 <ANCHOR id="WebKitWebPage.signal-details" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.signal-details">

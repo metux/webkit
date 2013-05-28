@@ -1,13 +1,12 @@
 /* autotoolsconfig.h.in.  Generated from configure.ac by autoheader.  */
 
-/* */
-#undef DWTF_USE_TEXTURE_MAPPER
+
+#ifndef __AUTOTOOLSCONFIG_H__
+#define __AUTOTOOLSCONFIG_H__ 1
+
 
 /* */
-#undef DWTF_USE_TEXTURE_MAPPER_CAIRO
-
-/* */
-#undef ENABLE_3D_RENDERING
+#undef ENABLE_CREDENTIAL_STORAGE
 
 /* Define to enable GObject introspection support */
 #undef ENABLE_INTROSPECTION
@@ -197,6 +196,9 @@
 #undef WTF_USE_TEXTURE_MAPPER
 
 /* */
+#undef WTF_USE_TEXTURE_MAPPER_CAIRO
+
+/* */
 #undef WTF_USE_TEXTURE_MAPPER_GL
 
 /* 1 */
@@ -237,3 +239,8 @@
 /* Define to empty if the keyword `volatile' does not work. Warning: valid
    code using `volatile' can become incorrect without. Disable with care. */
 #undef volatile
+
+
+#include "WebKitFeatures.h"
+#endif // __AUTOTOOLSCONFIG_H__
+

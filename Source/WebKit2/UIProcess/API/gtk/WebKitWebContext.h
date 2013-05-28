@@ -98,11 +98,14 @@ struct _WebKitWebContext {
 struct _WebKitWebContextClass {
     GObjectClass parent;
 
-    /* Padding for future expansion */
     void (*_webkit_reserved0) (void);
     void (*_webkit_reserved1) (void);
     void (*_webkit_reserved2) (void);
     void (*_webkit_reserved3) (void);
+    void (*_webkit_reserved4) (void);
+    void (*_webkit_reserved5) (void);
+    void (*_webkit_reserved6) (void);
+    void (*_webkit_reserved7) (void);
 };
 
 WEBKIT_API GType
@@ -191,6 +194,10 @@ webkit_web_context_set_web_extensions_directory     (WebKitWebContext           
 WEBKIT_API void
 webkit_web_context_prefetch_dns                     (WebKitWebContext              *context,
                                                      const gchar                   *hostname);
+
+WEBKIT_API void
+webkit_web_context_set_disk_cache_directory         (WebKitWebContext              *context,
+                                                     const gchar                   *directory);
 
 G_END_DECLS
 

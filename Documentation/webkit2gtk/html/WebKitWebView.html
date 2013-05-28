@@ -51,6 +51,8 @@ enum                <a class="link" href="WebKitWebView.html#WebKitPolicyDecisio
 enum                <a class="link" href="WebKitWebView.html#WebKitSaveMode" title="enum WebKitSaveMode">WebKitSaveMode</a>;
 enum                <a class="link" href="WebKitWebView.html#WebKitViewMode" title="enum WebKitViewMode">WebKitViewMode</a>;
 enum                <a class="link" href="WebKitWebView.html#WebKitInsecureContentEvent" title="enum WebKitInsecureContentEvent">WebKitInsecureContentEvent</a>;
+enum                <a class="link" href="WebKitWebView.html#WebKitSnapshotOptions" title="enum WebKitSnapshotOptions">WebKitSnapshotOptions</a>;
+enum                <a class="link" href="WebKitWebView.html#WebKitSnapshotRegion" title="enum WebKitSnapshotRegion">WebKitSnapshotRegion</a>;
 
 #define             <a class="link" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-CUT:CAPS" title="WEBKIT_EDITING_COMMAND_CUT">WEBKIT_EDITING_COMMAND_CUT</a>
 #define             <a class="link" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-COPY:CAPS" title="WEBKIT_EDITING_COMMAND_COPY">WEBKIT_EDITING_COMMAND_COPY</a>
@@ -171,6 +173,15 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitWebView.html#webkit-web-view-get-tls-info" title="webkit_web_view_get_tls_info ()">webkit_web_view_get_tls_info</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                                          <em class="parameter"><code><a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> **certificate</code></em>,
                                                          <em class="parameter"><code><a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a> *errors</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebView.html#webkit-web-view-get-snapshot" title="webkit_web_view_get_snapshot ()">webkit_web_view_get_snapshot</a>        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSnapshotRegion" title="enum WebKitSnapshotRegion"><span class="type">WebKitSnapshotRegion</span></a> region</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSnapshotOptions" title="enum WebKitSnapshotOptions"><span class="type">WebKitSnapshotOptions</span></a> options</code></em>,
+                                                         <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                                                         <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);
+<span class="returnvalue">cairo_surface_t</span> *   <a class="link" href="WebKitWebView.html#webkit-web-view-get-snapshot-finish" title="webkit_web_view_get_snapshot_finish ()">webkit_web_view_get_snapshot_finish</a> (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
 
                     <a class="link" href="WebKitWebView.html#WebKitJavascriptResult-struct" title="WebKitJavascriptResult">WebKitJavascriptResult</a>;
 <a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="returnvalue">WebKitJavascriptResult</span></a> * <a class="link" href="WebKitWebView.html#webkit-javascript-result-ref" title="webkit_javascript_result_ref ()">webkit_javascript_result_ref</a>   (<em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="type">WebKitJavascriptResult</span></a> *js_result</code></em>);
@@ -256,6 +267,7 @@ WebKitWebView implements
   "<a class="link" href="WebKitWebView.html#WebKitWebView-run-file-chooser" title='The "run-file-chooser" signal'>run-file-chooser</a>"                               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-script-dialog" title='The "script-dialog" signal'>script-dialog</a>"                                  : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-submit-form" title='The "submit-form" signal'>submit-form</a>"                                    : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-web-process-crashed" title='The "web-process-crashed" signal'>web-process-crashed</a>"                            : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
 </pre>
 </div>
 <div class="refsect1">
@@ -456,6 +468,64 @@ untrusted source.
 <td>Insecure content has been
 detected by trying to display any kind of resource (e.g. an image)
 from an untrusted source.
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitSnapshotOptions"></a><h3>enum WebKitSnapshotOptions</h3>
+<pre class="programlisting">typedef enum {
+  WEBKIT_SNAPSHOT_OPTIONS_NONE = 0,
+  WEBKIT_SNAPSHOT_OPTIONS_INCLUDE_SELECTION_HIGHLIGHTING = 1 &lt;&lt; 0,
+} WebKitSnapshotOptions;
+</pre>
+<p>
+Enum values used to specify options when taking a snapshot
+from a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-SNAPSHOT-OPTIONS-NONE:CAPS"></a><span class="term"><code class="literal">WEBKIT_SNAPSHOT_OPTIONS_NONE</code></span></p></td>
+<td>Do not include any special options.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-SNAPSHOT-OPTIONS-INCLUDE-SELECTION-HIGHLIGHTING:CAPS"></a><span class="term"><code class="literal">WEBKIT_SNAPSHOT_OPTIONS_INCLUDE_SELECTION_HIGHLIGHTING</code></span></p></td>
+<td>Whether to include in the
+snapshot the highlight of the selected content.
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitSnapshotRegion"></a><h3>enum WebKitSnapshotRegion</h3>
+<pre class="programlisting">typedef enum {
+  WEBKIT_SNAPSHOT_REGION_VISIBLE = 0,
+  WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT,
+} WebKitSnapshotRegion;
+</pre>
+<p>
+Enum values used to specify the region from which to get a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+snapshot
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-SNAPSHOT-REGION-VISIBLE:CAPS"></a><span class="term"><code class="literal">WEBKIT_SNAPSHOT_REGION_VISIBLE</code></span></p></td>
+<td>Specifies a snapshot only for the area that is
+visible in the webview
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-SNAPSHOT-REGION-FULL-DOCUMENT:CAPS"></a><span class="term"><code class="literal">WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT</code></span></p></td>
+<td>A snapshot of the entire document.
 </td>
 </tr>
 </tbody>
@@ -2160,6 +2230,93 @@ from the server, or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-web-view-get-snapshot"></a><h3>webkit_web_view_get_snapshot ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_view_get_snapshot        (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSnapshotRegion" title="enum WebKitSnapshotRegion"><span class="type">WebKitSnapshotRegion</span></a> region</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSnapshotOptions" title="enum WebKitSnapshotOptions"><span class="type">WebKitSnapshotOptions</span></a> options</code></em>,
+                                                         <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                                                         <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
+<p>
+Asynchronously retrieves a snapshot of <em class="parameter"><code>web_view</code></em> for <em class="parameter"><code>region</code></em>.
+<em class="parameter"><code>options</code></em> specifies how the snapshot should be rendered.
+</p>
+<p>
+When the operation is finished, <em class="parameter"><code>callback</code></em> will be called. You must
+call <a class="link" href="WebKitWebView.html#webkit-web-view-get-snapshot-finish" title="webkit_web_view_get_snapshot_finish ()"><code class="function">webkit_web_view_get_snapshot_finish()</code></a> to get the result of the
+operation.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>region</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html#WebKitSnapshotRegion" title="enum WebKitSnapshotRegion"><span class="type">WebKitSnapshotRegion</span></a> for this snapshot</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>options</code></em> :</span></p></td>
+<td>
+<a class="link" href="WebKitWebView.html#WebKitSnapshotOptions" title="enum WebKitSnapshotOptions"><span class="type">WebKitSnapshotOptions</span></a> for the snapshot</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>cancellable</code></em> :</span></p></td>
+<td>a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a>. <span class="annotation">[<acronym title="NULL is ok, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>callback</code></em> :</span></p></td>
+<td>a <a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a>. <span class="annotation">[<acronym title="The callback is valid until first called."><span class="acronym">scope async</span></acronym>]</span>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data. <span class="annotation">[<acronym title="This parameter is a 'user_data', for callbacks; many bindings can pass NULL here."><span class="acronym">closure</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-get-snapshot-finish"></a><h3>webkit_web_view_get_snapshot_finish ()</h3>
+<pre class="programlisting"><span class="returnvalue">cairo_surface_t</span> *   webkit_web_view_get_snapshot_finish (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                                         <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<p>
+Finishes an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-get-snapshot" title="webkit_web_view_get_snapshot ()"><code class="function">webkit_web_view_get_snapshot()</code></a>.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>result</code></em> :</span></p></td>
+<td>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td>return location for error or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <span class="type">cairo_surface_t</span> with the retrieved snapshot or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> in error. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitJavascriptResult-struct"></a><h3>WebKitJavascriptResult</h3>
 <pre class="programlisting">typedef struct _WebKitJavascriptResult WebKitJavascriptResult;</pre>
 <p>
@@ -3512,6 +3669,35 @@ form has not been submitted, <a class="link" href="WebKitFormSubmissionRequest.h
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
 <td>user data set when the signal handler was connected.</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView-web-process-crashed"></a><h3>The <code class="literal">"web-process-crashed"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+This signal is emitted when the web process crashes.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
 </tr>
 </tbody>
 </table></div>

@@ -288,7 +288,11 @@ public:
 #if ENABLE(SPEECH_SYNTHESIS)
     void enableMockSpeechSynthesizer();
 #endif
-                    
+
+#if ENABLE(VIDEO)
+    void simulateAudioInterruption(Node*);
+#endif
+
 private:
     explicit Internals(Document*);
     Document* contextDocument() const;

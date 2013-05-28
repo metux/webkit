@@ -79,11 +79,10 @@ fi
 
 if test "$enable_accelerated_compositing" = "yes"; then
     AC_DEFINE([WTF_USE_ACCELERATED_COMPOSITING], [1], [ ])
-    AC_DEFINE([ENABLE_3D_RENDERING], [1], [ ])
 
     if test "$with_acceleration_backend" = "none"; then
-        AC_DEFINE([DWTF_USE_TEXTURE_MAPPER], [1], [ ])
-        AC_DEFINE([DWTF_USE_TEXTURE_MAPPER_CAIRO], [1], [ ])
+        AC_DEFINE([WTF_USE_TEXTURE_MAPPER], [1], [ ])
+        AC_DEFINE([WTF_USE_TEXTURE_MAPPER_CAIRO], [1], [ ])
     fi
 
     if test "$with_acceleration_backend" = "opengl"; then
@@ -116,4 +115,7 @@ if test "$enable_spellcheck" = "yes"; then
     AC_DEFINE([ENABLE_SPELLCHECK], [1], [ ])
 fi
 
+if test "$enable_credential_storage" = "yes"; then
+    AC_DEFINE([ENABLE_CREDENTIAL_STORAGE], [1], [ ])
+fi
 

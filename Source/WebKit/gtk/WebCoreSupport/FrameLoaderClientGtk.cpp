@@ -40,7 +40,6 @@
 #include "FrameNetworkingContextGtk.h"
 #include "FrameTree.h"
 #include "FrameView.h"
-#include "GtkAuthenticationDialog.h"
 #include "GtkPluginWidget.h"
 #include "GtkUtilities.h"
 #include "HTMLAppletElement.h"
@@ -66,6 +65,7 @@
 #include "ResourceRequest.h"
 #include "ScriptController.h"
 #include "Settings.h"
+#include "webkitauthenticationdialog.h"
 #include "webkiterror.h"
 #include "webkitfavicondatabase.h"
 #include "webkitfavicondatabaseprivate.h"
@@ -206,17 +206,16 @@ void FrameLoaderClient::dispatchDidReceiveAuthenticationChallenge(WebCore::Docum
     }
 
     WebKitWebView* view = webkit_web_frame_get_web_view(m_frame);
-    GtkAuthenticationDialog::CredentialStorageMode credentialStorageMode;
 
+    CredentialStorageMode credentialStorageMode;
     if (core(view)->settings()->privateBrowsingEnabled())
-        credentialStorageMode = GtkAuthenticationDialog::DisallowPersistentStorage;
+        credentialStorageMode = DisallowPersistentStorage;
     else
-        credentialStorageMode = GtkAuthenticationDialog::AllowPersistentStorage;
+        credentialStorageMode = AllowPersistentStorage;
 
     GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
-    GtkWindow* toplevelWindow = widgetIsOnscreenToplevelWindow(toplevel) ? GTK_WINDOW(toplevel) : 0;
-    GtkAuthenticationDialog* dialog = new GtkAuthenticationDialog(toplevelWindow, challenge, credentialStorageMode);
-    dialog->show();
+    GtkWidget* authDialog = createAuthenticationDialog(widgetIsOnscreenToplevelWindow(toplevel) ? GTK_WINDOW(toplevel) : 0, challenge, credentialStorageMode);
+    gtk_widget_show(authDialog);
 }
 
 void FrameLoaderClient::dispatchDidCancelAuthenticationChallenge(WebCore::DocumentLoader*, unsigned long  identifier, const AuthenticationChallenge&)
@@ -1021,8 +1020,7 @@ void FrameLoaderClient::dispatchDidFinishLoading(WebCore::DocumentLoader* loader
     g_signal_emit_by_name(m_frame, "resource-load-finished", webResource);
     g_signal_emit_by_name(webView, "resource-load-finished", m_frame, webResource);
 
-    if (!g_str_equal(identifierString.get(), webView->priv->mainResourceIdentifier.data()))
-        webkit_web_view_remove_resource(webView, identifierString.get());
+    webkitWebViewRemoveSubresource(webView, identifierString.get());
 }
 
 void FrameLoaderClient::dispatchDidFailLoading(WebCore::DocumentLoader* loader, unsigned long identifier, const ResourceError& error)
@@ -1046,8 +1044,7 @@ void FrameLoaderClient::dispatchDidFailLoading(WebCore::DocumentLoader* loader, 
     g_signal_emit_by_name(m_frame, "resource-load-failed", webResource, webError.get());
     g_signal_emit_by_name(webView, "resource-load-failed", m_frame, webResource, webError.get());
 
-    if (!g_str_equal(identifierString.get(), webView->priv->mainResourceIdentifier.data()))
-        webkit_web_view_remove_resource(webView, identifierString.get());
+    webkitWebViewRemoveSubresource(webView, identifierString.get());
 }
 
 bool FrameLoaderClient::dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const ResourceRequest&, const ResourceResponse&, int length)
