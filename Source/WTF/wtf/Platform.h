@@ -766,13 +766,6 @@
 #define ENABLE_JIT 1
 #endif
 
-/* FIXME: The fast malloc implementation is broken on Itanium / IA64 because
-   some memory barriers are missing in the thread-unsafe code around the
-   pagemap_cache_ object. */
-#if CPU(IA64) || CPU(IA64_32)
-#define USE_SYSTEM_MALLOC 1
-#endif
-
 /* The JIT is enabled by default on all x86, x86-64, ARM & MIPS platforms. */
 #if !defined(ENABLE_JIT) \
     && (CPU(X86) || CPU(X86_64) || CPU(ARM) || CPU(MIPS)) \

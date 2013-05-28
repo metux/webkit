@@ -449,8 +449,7 @@ webkit_tests_ldadd = \
 	$(FREETYPE_LIBS) \
 	$(GTK_LIBS) \
 	$(GLIB_LIBS) \
-	$(LIBSOUP_LIBS) \
-	$(XRENDER_LIBS)
+	$(LIBSOUP_LIBS)
 
 webkit_tests_ldflags = \
 	-no-install \
