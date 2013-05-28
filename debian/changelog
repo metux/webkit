@@ -1,3 +1,10 @@
+webkitgtk (1.11.91-2) UNRELEASED; urgency=low
+
+  * debian/watch:
+    + Updated to work with the new page.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 28 May 2013 23:35:03 +0200
+
 webkitgtk (1.11.91-1) experimental; urgency=low
 
   * New development release
