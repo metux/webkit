@@ -1,0 +1,11 @@
+Index: trunk/Tools/GNUmakefile.am
+===================================================================
+--- trunk/Tools/GNUmakefile.am	(revision 150116)
++++ trunk/Tools/GNUmakefile.am	(revision 150117)
+@@ -342,5 +342,5 @@
+ endif
+ 
+-docs-build.stamp: $(doc_build_stamp_list)
++docs-build.stamp: $(docs_build_stamp_list)
+ 	CC=$(CC) $(srcdir)/Tools/gtk/generate-gtkdoc
+ 	@touch docs-build.stamp
