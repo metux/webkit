@@ -1,5 +1,6 @@
-webkitgtk (1.11.91-2) UNRELEASED; urgency=low
+webkitgtk (2.0.2-1) UNRELEASED; urgency=low
 
+  * New upstream release.
   * debian/watch:
     + Updated to work with the new page.
 
