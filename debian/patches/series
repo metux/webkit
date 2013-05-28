@@ -1,3 +1,2 @@
 02_notebook_scroll.patch
-03_avoid_unresolved_x_symbols.patch
 15_ia64-use-system-malloc.patch
