@@ -392,71 +392,6 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  kIntClampBegin@Base 1.11.90
  kIntClampDefinition@Base 1.11.90
  kIntClampEnd@Base 1.11.90
- (optional)leveldb_approximate_sizes@Base 1.11.91
- (optional)leveldb_cache_create_lru@Base 1.11.91
- (optional)leveldb_cache_destroy@Base 1.11.91
- (optional)leveldb_close@Base 1.11.91
- (optional)leveldb_compact_range@Base 1.11.91
- (optional)leveldb_comparator_create@Base 1.11.91
- (optional)leveldb_comparator_destroy@Base 1.11.91
- (optional)leveldb_create_default_env@Base 1.11.91
- (optional)leveldb_create_iterator@Base 1.11.91
- (optional)leveldb_create_snapshot@Base 1.11.91
- (optional)leveldb_delete@Base 1.11.91
- (optional)leveldb_destroy_db@Base 1.11.91
- (optional)leveldb_env_destroy@Base 1.11.91
- (optional)leveldb_filterpolicy_create@Base 1.11.91
- (optional)leveldb_filterpolicy_create_bloom@Base 1.11.91
- (optional)leveldb_filterpolicy_destroy@Base 1.11.91
- (optional)leveldb_free@Base 1.11.91
- (optional)leveldb_get@Base 1.11.91
- (optional)leveldb_iter_destroy@Base 1.11.91
- (optional)leveldb_iter_get_error@Base 1.11.91
- (optional)leveldb_iter_key@Base 1.11.91
- (optional)leveldb_iter_next@Base 1.11.91
- (optional)leveldb_iter_prev@Base 1.11.91
- (optional)leveldb_iter_seek@Base 1.11.91
- (optional)leveldb_iter_seek_to_first@Base 1.11.91
- (optional)leveldb_iter_seek_to_last@Base 1.11.91
- (optional)leveldb_iter_valid@Base 1.11.91
- (optional)leveldb_iter_value@Base 1.11.91
- (optional)leveldb_major_version@Base 1.11.91
- (optional)leveldb_minor_version@Base 1.11.91
- (optional)leveldb_open@Base 1.11.91
- (optional)leveldb_options_create@Base 1.11.91
- (optional)leveldb_options_destroy@Base 1.11.91
- (optional)leveldb_options_set_block_restart_interval@Base 1.11.91
- (optional)leveldb_options_set_block_size@Base 1.11.91
- (optional)leveldb_options_set_cache@Base 1.11.91
- (optional)leveldb_options_set_comparator@Base 1.11.91
- (optional)leveldb_options_set_compression@Base 1.11.91
- (optional)leveldb_options_set_create_if_missing@Base 1.11.91
- (optional)leveldb_options_set_env@Base 1.11.91
- (optional)leveldb_options_set_error_if_exists@Base 1.11.91
- (optional)leveldb_options_set_filter_policy@Base 1.11.91
- (optional)leveldb_options_set_info_log@Base 1.11.91
- (optional)leveldb_options_set_max_open_files@Base 1.11.91
- (optional)leveldb_options_set_paranoid_checks@Base 1.11.91
- (optional)leveldb_options_set_write_buffer_size@Base 1.11.91
- (optional)leveldb_property_value@Base 1.11.91
- (optional)leveldb_put@Base 1.11.91
- (optional)leveldb_readoptions_create@Base 1.11.91
- (optional)leveldb_readoptions_destroy@Base 1.11.91
- (optional)leveldb_readoptions_set_fill_cache@Base 1.11.91
- (optional)leveldb_readoptions_set_snapshot@Base 1.11.91
- (optional)leveldb_readoptions_set_verify_checksums@Base 1.11.91
- (optional)leveldb_release_snapshot@Base 1.11.91
- (optional)leveldb_repair_db@Base 1.11.91
- (optional)leveldb_write@Base 1.11.91
- (optional)leveldb_writebatch_clear@Base 1.11.91
- (optional)leveldb_writebatch_create@Base 1.11.91
- (optional)leveldb_writebatch_delete@Base 1.11.91
- (optional)leveldb_writebatch_destroy@Base 1.11.91
- (optional)leveldb_writebatch_iterate@Base 1.11.91
- (optional)leveldb_writebatch_put@Base 1.11.91
- (optional)leveldb_writeoptions_create@Base 1.11.91
- (optional)leveldb_writeoptions_destroy@Base 1.11.91
- (optional)leveldb_writeoptions_set_sync@Base 1.11.91
  objectFocusedAndCaretOffsetUnignored@Base 1.7.4
  webKitWebSrcSetMediaPlayer@Base 1.9.2
  webkitAccessibleDetach@Base 1.7.5
@@ -467,6 +402,9 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkitAccessibleHyperlinkGetType@Base 1.3.10
  webkitAccessibleHyperlinkNew@Base 1.3.10
  webkitAccessibleNew@Base 1.7.5
+ webkitAuthenticationWidgetCreateCredential@Base 2.0.2-1
+ webkitAuthenticationWidgetGetChallenge@Base 2.0.2-1
+ webkitAuthenticationWidgetNew@Base 2.0.2-1
  webkitGstMapInfoQuarkString@Base 1.11.90
  webkitInit@Base 1.3.10
  webkitPageGroupName@Base 1.11.90
@@ -474,10 +412,12 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkitWebSettingsUserAgentForURI@Base 1.5.2
  webkitWebViewIconLoaded@Base 1.7.92
  webkitWebViewRegisterForIconNotification@Base 1.7.92
+ webkitWebViewRemoveSubresource@Base 2.0.2-1
  webkitWebViewRunFileChooserRequest@Base 1.10.1
  webkit_application_cache_get_database_directory_path@Base 1.3.13
  webkit_application_cache_get_maximum_size@Base 1.3.13
  webkit_application_cache_set_maximum_size@Base 1.3.10
+ webkit_authentication_widget_get_type@Base 2.0.2-1
  webkit_cache_model_get_type@Base 1.3.10
  webkit_context_menu_action_get_type@Base 1.9.2
  webkit_context_menu_item_get_action@Base 1.9.2
@@ -593,7 +533,6 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_dom_document_get_images@Base 1.3.10
  webkit_dom_document_get_implementation@Base 1.3.10
  webkit_dom_document_get_input_encoding@Base 1.3.10
- webkit_dom_document_get_items@Base 1.11.91
  webkit_dom_document_get_last_modified@Base 1.3.10
  webkit_dom_document_get_links@Base 1.3.10
  webkit_dom_document_get_override_style@Base 1.3.10
@@ -1119,7 +1058,6 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_dom_html_element_get_lang@Base 1.3.10
  webkit_dom_html_element_get_outer_html@Base 1.3.10
  webkit_dom_html_element_get_outer_text@Base 1.3.10
- webkit_dom_html_element_get_properties@Base 1.11.91
  webkit_dom_html_element_get_spellcheck@Base 1.3.10
  webkit_dom_html_element_get_tab_index@Base 1.3.10
  webkit_dom_html_element_get_title@Base 1.3.10
@@ -1471,7 +1409,6 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_dom_html_marquee_element_set_width@Base 1.3.10
  webkit_dom_html_marquee_element_start@Base 1.3.10
  webkit_dom_html_marquee_element_stop@Base 1.3.10
- webkit_dom_html_media_element_add_text_track@Base 1.11.91
  webkit_dom_html_media_element_can_play_type@Base 1.3.10
  webkit_dom_html_media_element_get_autoplay@Base 1.3.10
  webkit_dom_html_media_element_get_buffered@Base 1.3.10
@@ -1497,7 +1434,6 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_dom_html_media_element_get_seeking@Base 1.3.10
  webkit_dom_html_media_element_get_src@Base 1.3.10
  webkit_dom_html_media_element_get_start_time@Base 1.3.10
- webkit_dom_html_media_element_get_text_tracks@Base 1.11.91
  webkit_dom_html_media_element_get_type@Base 1.3.10
  webkit_dom_html_media_element_get_volume@Base 1.3.10
  webkit_dom_html_media_element_get_webkit_audio_decoded_byte_count@Base 1.5.2
@@ -2047,15 +1983,6 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_dom_performance_timing_get_type@Base 1.11.90
  webkit_dom_performance_timing_get_unload_event_end@Base 1.11.90
  webkit_dom_performance_timing_get_unload_event_start@Base 1.11.90
- webkit_dom_performance_webkit_clear_marks@Base 1.11.91
- webkit_dom_performance_webkit_clear_measures@Base 1.11.91
- webkit_dom_performance_webkit_clear_resource_timings@Base 1.11.91
- webkit_dom_performance_webkit_get_entries@Base 1.11.91
- webkit_dom_performance_webkit_get_entries_by_name@Base 1.11.91
- webkit_dom_performance_webkit_get_entries_by_type@Base 1.11.91
- webkit_dom_performance_webkit_mark@Base 1.11.91
- webkit_dom_performance_webkit_measure@Base 1.11.91
- webkit_dom_performance_webkit_set_resource_timing_buffer_size@Base 1.11.91
  webkit_dom_processing_instruction_get_data@Base 1.3.10
  webkit_dom_processing_instruction_get_sheet@Base 1.3.10
  webkit_dom_processing_instruction_get_target@Base 1.3.10
@@ -2598,7 +2525,7 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_web_view_redo@Base 1.3.10
  webkit_web_view_reload@Base 1.3.10
  webkit_web_view_reload_bypass_cache@Base 1.3.10
- webkit_web_view_remove_resource@Base 1.3.10
+#MISSING: 2.0.2-1# webkit_web_view_remove_resource@Base 1.3.10
  webkit_web_view_request_download@Base 1.3.10
  webkit_web_view_search_text@Base 1.3.10
  webkit_web_view_select_all@Base 1.3.10
