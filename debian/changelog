@@ -1,4 +1,4 @@
-webkitgtk (2.0.2-1) UNRELEASED; urgency=low
+webkitgtk (2.0.2-1) experimental; urgency=low
 
   * New upstream release.
     + debian/patches/03_avoid_unresolved_x_symbols.patch:
@@ -8,7 +8,7 @@ webkitgtk (2.0.2-1) UNRELEASED; urgency=low
   * debian/watch:
     + Updated to work with the new page.
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 28 May 2013 23:35:03 +0200
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 29 May 2013 10:39:29 +0200
 
 webkitgtk (1.11.91-1) experimental; urgency=low
 
