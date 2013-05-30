@@ -1,5 +1,7 @@
 webkitgtk (2.0.2-1) experimental; urgency=low
 
+  * Team upload.
+
   * New upstream release.
     + debian/patches/03_avoid_unresolved_x_symbols.patch:
       - Removed, applied upstream.
