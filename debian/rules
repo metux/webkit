@@ -74,9 +74,7 @@ clean:
 	rm -rf debian/tmp-*
 	rm -f Source/WebKit/gtk/docs/version.xml
 
-	set -e; for file in config.guess config.sub; do \
-		sed -i '2!b;/^exec "/ d' Source/autotools/$$file ; \
-	done
+	dh_autoreconf_clean
 
 	dh_clean
 
@@ -89,9 +87,7 @@ build-arch: build-stamp
 build-stamp:
 	dh_testdir
 
-	set -e; for file in config.guess config.sub; do \
-		sed -i '2!b;/^#/ i\exec "/usr/share/misc/'$$file'" "$$@"' Source/autotools/$$file ; \
-	done
+	dh_autoreconf
 
 ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	test -d build-2.0 || mkdir build-2.0

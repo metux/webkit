@@ -11,6 +11,9 @@ webkitgtk (2.0.2-1) experimental; urgency=low
       - Don't install .la files.
   * debian/watch:
     + Updated to work with the new page.
+  * debian/rules:
+    + Run dh_autoreconf. Makes it easier to backport upstream patches
+      that modify autotools files.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 29 May 2013 10:39:29 +0200
 
