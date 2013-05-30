@@ -12,6 +12,9 @@ webkitgtk (2.0.2-1) experimental; urgency=low
       - Updated.
     + debian/libwebkit2gtk-3.0-0.install:
       - Don't install .la files.
+    + debian/rules:
+      - Re-enable parallel build support, the above patches should
+        make it work.
   * debian/watch:
     + Updated to work with the new page.
   * debian/rules:
