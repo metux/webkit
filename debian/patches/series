@@ -1,3 +1,6 @@
 02_notebook_scroll.patch
 15_ia64-use-system-malloc.patch
 changeset_150117.diff
+changeset_150256.diff
+changeset_150326.diff
+changeset_150963.diff

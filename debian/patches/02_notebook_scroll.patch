@@ -1,8 +1,6 @@
-Index: webkitgtk-experimental/Source/WebKit/gtk/webkit/webkitwebview.cpp
-===================================================================
---- webkitgtk-experimental.orig/Source/WebKit/gtk/webkit/webkitwebview.cpp	2013-02-23 22:04:16.497835771 -0300
-+++ webkitgtk-experimental/Source/WebKit/gtk/webkit/webkitwebview.cpp	2013-02-23 22:04:16.493835703 -0300
-@@ -800,6 +800,12 @@
+--- a/Source/WebKit/gtk/webkit/webkitwebview.cpp
++++ b/Source/WebKit/gtk/webkit/webkitwebview.cpp
+@@ -789,6 +789,12 @@
      if (!frame->view())
          return FALSE;
  
