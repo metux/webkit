@@ -19,6 +19,8 @@ webkitgtk (2.0.2-1) experimental; urgency=low
       debian/control,
       debian/rules:
       - Renamed libwebkit2gtk-3.0-0 to libwebkit2gtk-3.0-25.
+    + debian/libwebkit2gtk-3.0-25.symbols:
+      - Add a symbols file for libwebkit2gtk-3.0.
   * debian/watch:
     + Updated to work with the new page.
   * debian/rules:
