@@ -26,6 +26,9 @@ webkitgtk (2.0.2-1) experimental; urgency=low
   * debian/rules:
     + Run dh_autoreconf. Makes it easier to backport upstream patches
       that modify autotools files.
+  * debian/control:
+    + Mention "dummy" in libwebkit-dev's long description to shut
+      lintian up.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 29 May 2013 10:39:29 +0200
 
