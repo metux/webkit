@@ -6,6 +6,7 @@ Uploaders: Mike Hommey <glandium@debian.org>, Gustavo Noronha Silva <kov@debian.
 Build-Depends: gawk,
                chrpath,
                debhelper (>= 7.0),
+               dh-autoreconf,
                libgtk2.0-dev (>= 2.24.3),
                gir1.2-gtk-2.0,
                libgtk-3-dev,
