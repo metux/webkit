@@ -21,6 +21,9 @@ webkitgtk (2.0.2-1) experimental; urgency=low
       debian/control,
       debian/rules:
       - Renamed libwebkit2gtk-3.0-0 to libwebkit2gtk-3.0-25.
+      - Make libwebkit2gtk-3.0-25 break/replace the old
+        libwebkit2gtk-3.0-0 as the injected-bundle module path
+        is the same.
     + debian/libwebkit2gtk-3.0-25.symbols:
       - Add a symbols file for libwebkit2gtk-3.0.
   * debian/watch:
