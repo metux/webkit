@@ -32,6 +32,8 @@ webkitgtk (2.0.2-1) experimental; urgency=low
     + Mention "dummy" in libwebkit-dev's long description to shut
       lintian up.
     + Bump Standards-Version to 3.9.4; no changes needed.
+    + Bump libharfbuzz-dev's minimum build dependency to pick up a
+      dependency against the new libharfbuzz0a package.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 29 May 2013 10:39:29 +0200
 
