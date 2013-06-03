@@ -12,8 +12,10 @@ webkitgtk (2.0.2-2) UNRELEASED; urgency=low
     + Exclude libwebkit2gtkinjectedbundle.so from dh_makeshlibs as it's a
       private library and debhelper looks at every shared lib in compat 9.
   * debian/libwebkitgtk-1.0-0.symbols,
-    debian/libwebkitgtk-1.0-0.symbols:
+    debian/libwebkitgtk-3.0-0.symbols:
     + Add missing symbols for 32 bit arches.
+  * debian/libwebkit2gtk-3.0-25.symbols:
+    + Demangle symbols.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Sat, 01 Jun 2013 22:57:27 +0200
 

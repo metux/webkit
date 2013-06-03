@@ -1061,221 +1061,223 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  _WKContextSetAdditionalPluginsDirectory@Base 2.0.2
  _WKContextSetAlwaysUsesComplexTextCodePath@Base 2.0.2
  _WKContextSetHTTPPipeliningEnabled@Base 2.0.2
- _ZN3WTF13freeOwnedGPtrI9_GdkEventEEvPT_@Base 2.0.2
- _ZN6WebKit22WebGtkExtensionManager10initializeEPK14OpaqueWKBundlePKv@Base 2.0.2
- _ZN6WebKit22WebGtkExtensionManager6sharedEv@Base 2.0.2
- _ZN7WebCore10ClientRectC1ERKNS_7IntRectE@Base 2.0.2
- _ZN7WebCore10ClientRectC1Ev@Base 2.0.2
- _ZN7WebCore10JSDocument6s_infoE@Base 2.0.2
- _ZN7WebCore10ScrollView21setDelegatesScrollingEb@Base 2.0.2
- _ZN7WebCore10ScrollView23setScrollbarsSuppressedEbb@Base 2.0.2
- _ZN7WebCore10toDocumentEN3JSC7JSValueE@Base 2.0.2
- _ZN7WebCore11HistoryItem16setDocumentStateERKN3WTF6VectorINS1_6StringELm0EEE@Base 2.0.2
- _ZN7WebCore11MemoryCache14resourceForURLERKNS_4KURLE@Base 2.0.2
- _ZN7WebCore11memoryCacheEv@Base 2.0.2
- _ZN7WebCore12PrintContext12pagePropertyEPNS_5FrameEPKci@Base 2.0.2
- _ZN7WebCore12PrintContext13numberOfPagesEPNS_5FrameERKNS_9FloatSizeE@Base 2.0.2
- _ZN7WebCore12PrintContext20pageNumberForElementEPNS_7ElementERKNS_9FloatSizeE@Base 2.0.2
- _ZN7WebCore12PrintContext26pageSizeAndMarginsInPixelsEPNS_5FrameEiiiiiii@Base 2.0.2
- _ZN7WebCore12TextIterator26rangeFromLocationAndLengthEPNS_13ContainerNodeEiib@Base 2.0.2
- _ZN7WebCore12TextIterator29getLocationAndLengthFromRangeEPNS_4NodeEPKNS_5RangeERmS6_@Base 2.0.2
- _ZN7WebCore12WorkerThread17workerThreadCountEv@Base 2.0.2
- _ZN7WebCore13createWrapperEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_4NodeE@Base 2.0.2
- _ZN7WebCore13toArrayBufferEN3JSC7JSValueE@Base 2.0.2
- _ZN7WebCore14ClientRectListC1ERKN3WTF6VectorINS_9FloatQuadELm0EEE@Base 2.0.2
- _ZN7WebCore14ClientRectListC1Ev@Base 2.0.2
- _ZN7WebCore14ClientRectListD1Ev@Base 2.0.2
- _ZN7WebCore14FormController22getReferencedFilePathsERKN3WTF6VectorINS1_6StringELm0EEE@Base 2.0.2
- _ZN7WebCore14FrameSelection19absoluteCaretBoundsEv@Base 2.0.2
- _ZN7WebCore14SchemeRegistry49registerURLSchemeAsBypassingContentSecurityPolicyERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore14SchemeRegistry57removeURLSchemeRegisteredAsBypassingContentSecurityPolicyERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore14ScrollableArea28setScrollOffsetFromInternalsERKNS_8IntPointE@Base 2.0.2
- _ZN7WebCore15InspectorClient31doDispatchMessageOnFrontendPageEPNS_4PageERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore15setDOMExceptionEPN3JSC9ExecStateEi@Base 2.0.2
- _ZN7WebCore15toDOMStringListEPN3JSC9ExecStateENS0_7JSValueE@Base 2.0.2
- _ZN7WebCore16CSSParserContextC1EPNS_8DocumentERKNS_4KURLERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore16HTMLInputElement15setEditingValueERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore16HTMLInputElement17setSuggestedValueERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore16scriptNameToCodeERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore17HistoryController26saveDocumentAndScrollStateEv@Base 2.0.2
- _ZN7WebCore17InspectorCounters12counterValueENS0_11CounterTypeE@Base 2.0.2
- _ZN7WebCore17JSDOMGlobalObject6s_infoE@Base 2.0.2
- _ZN7WebCore17cacheDOMStructureEPNS_17JSDOMGlobalObjectEPN3JSC9StructureEPKNS2_9ClassInfoE@Base 2.0.2
- _ZN7WebCore18ContentDistributor22ensureSelectFeatureSetEPNS_13ElementShadowE@Base 2.0.2
- _ZN7WebCore18HTMLContentElement6createEPNS_8DocumentE@Base 2.0.2
- _ZN7WebCore18StyleSheetContents11parseStringERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore18StyleSheetContentsC1EPNS_15StyleRuleImportERKN3WTF6StringERKNS_16CSSParserContextE@Base 2.0.2
- _ZN7WebCore18StyleSheetContentsD1Ev@Base 2.0.2
- _ZN7WebCore19AnimationController16resumeAnimationsEv@Base 2.0.2
- _ZN7WebCore19AnimationController17suspendAnimationsEv@Base 2.0.2
- _ZN7WebCore19AnimationController20pauseAnimationAtTimeEPNS_12RenderObjectERKN3WTF12AtomicStringEd@Base 2.0.2
- _ZN7WebCore19AnimationController21pauseTransitionAtTimeEPNS_12RenderObjectERKN3WTF6StringEd@Base 2.0.2
- _ZN7WebCore19InspectorController13didBeginFrameEv@Base 2.0.2
- _ZN7WebCore19InspectorController14didCancelFrameEv@Base 2.0.2
- _ZN7WebCore19InspectorController15connectFrontendEPNS_24InspectorFrontendChannelE@Base 2.0.2
- _ZN7WebCore19InspectorController15profilerEnabledEv@Base 2.0.2
- _ZN7WebCore19InspectorController18disconnectFrontendEv@Base 2.0.2
- _ZN7WebCore19InspectorController18setProfilerEnabledEb@Base 2.0.2
- _ZN7WebCore19InspectorController26setInspectorFrontendClientEN3WTF10PassOwnPtrINS_23InspectorFrontendClientEEE@Base 2.0.2
- _ZN7WebCore19InspectorController39setResourcesDataSizeLimitsFromInternalsEii@Base 2.0.2
- _ZN7WebCore20CachedResourceLoader31garbageCollectDocumentResourcesEv@Base 2.0.2
- _ZN7WebCore20NodeRenderingContextC1EPNS_4NodeE@Base 2.0.2
- _ZN7WebCore20NodeRenderingContextD1Ev@Base 2.0.2
- _ZN7WebCore21InspectorConsoleAgent28consoleMessageArgumentCountsEv@Base 2.0.2
- _ZN7WebCore21SerializedScriptValue11deserializeEPN3JSC9ExecStateEPNS1_14JSGlobalObjectEPN3WTF6VectorINS6_6RefPtrINS_11MessagePortEEELm1EEENS_22SerializationErrorModeE@Base 2.0.2
- _ZN7WebCore21SerializedScriptValue6createEPN3JSC9ExecStateENS1_7JSValueEPN3WTF6VectorINS5_6RefPtrINS_11MessagePortEEELm1EEEPNS6_INS7_INS5_11ArrayBufferEEELm1EEENS_22SerializationErrorModeE@Base 2.0.2
- _ZN7WebCore21SerializedScriptValue6createERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore21SerializedScriptValueC1ERN3WTF6VectorIhLm0EEE@Base 2.0.2
- _ZN7WebCore21SerializedScriptValueD1Ev@Base 2.0.2
- _ZN7WebCore21getCachedDOMStructureEPNS_17JSDOMGlobalObjectEPKN3JSC9ClassInfoE@Base 2.0.2
- _ZN7WebCore22RuntimeEnabledFeatures18isShadowDOMEnabledE@Base 2.0.2
- _ZN7WebCore22RuntimeEnabledFeatures22isCSSExclusionsEnabledE@Base 2.0.2
- _ZN7WebCore22RuntimeEnabledFeatures37isAuthorShadowDOMForAnyElementEnabledE@Base 2.0.2
- _ZN7WebCore22RuntimeEnabledFeatures40isLangAttributeAwareFormControlUIEnabledE@Base 2.0.2
- _ZN7WebCore22counterValueForElementEPNS_7ElementE@Base 2.0.2
- _ZN7WebCore22externalRepresentationEPNS_7ElementEj@Base 2.0.2
- _ZN7WebCore22instrumentationForPageEPNS_4PageE@Base 2.0.2
- _ZN7WebCore22userPreferredLanguagesEv@Base 2.0.2
- _ZN7WebCore24ComposedShadowTreeWalker10firstChildEv@Base 2.0.2
- _ZN7WebCore24ComposedShadowTreeWalker11nextSiblingEv@Base 2.0.2
- _ZN7WebCore24ComposedShadowTreeWalker4nextEv@Base 2.0.2
- _ZN7WebCore24ComposedShadowTreeWalker8previousEv@Base 2.0.2
- _ZN7WebCore24ComposedShadowTreeWalker9lastChildEv@Base 2.0.2
- _ZN7WebCore24DocumentMarkerController10markersForEPNS_4NodeENS_14DocumentMarker11MarkerTypesE@Base 2.0.2
- _ZN7WebCore24DocumentMarkerController18addTextMatchMarkerEPKNS_5RangeEb@Base 2.0.2
- _ZN7WebCore24InspectorInstrumentation17s_frontendCounterE@Base 2.0.2
- _ZN7WebCore24InspectorInstrumentation26instrumentingAgentsForPageEPNS_4PageE@Base 2.0.2
- _ZN7WebCore24ScopeContentDistribution16hasShadowElementEPKNS_10ShadowRootE@Base 2.0.2
- _ZN7WebCore24ScopeContentDistribution17hasContentElementEPKNS_10ShadowRootE@Base 2.0.2
- _ZN7WebCore24ScopeContentDistribution18countElementShadowEPKNS_10ShadowRootE@Base 2.0.2
- _ZN7WebCore25computeViewportAttributesENS_17ViewportArgumentsEiiifNS_7IntSizeE@Base 2.0.2
- _ZN7WebCore26ContextDestructionObserver16contextDestroyedEv@Base 2.0.2
- _ZN7WebCore26ContextDestructionObserverC2EPNS_22ScriptExecutionContextE@Base 2.0.2
- _ZN7WebCore26ContextDestructionObserverD2Ev@Base 2.0.2
- _ZN7WebCore28DocumentStyleSheetCollection12addUserSheetEN3WTF10PassRefPtrINS_18StyleSheetContentsEEE@Base 2.0.2
- _ZN7WebCore28DocumentStyleSheetCollection14addAuthorSheetEN3WTF10PassRefPtrINS_18StyleSheetContentsEEE@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal11isUnderTestEv@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal12moveWindowByEff@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal12openInNewTabERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal14frontendLoadedEv@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal18requestSetDockSideENS_23InspectorFrontendClient8DockSideE@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal19windowObjectClearedEv@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal20sendMessageToBackendERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocal26changeAttachedWindowHeightEj@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocalC2EPNS_19InspectorControllerEPNS_4PageEN3WTF10PassOwnPtrINS0_8SettingsEEE@Base 2.0.2
- _ZN7WebCore28InspectorFrontendClientLocalD2Ev@Base 2.0.2
- _ZN7WebCore30overrideUserPreferredLanguagesERKN3WTF6VectorINS0_6StringELm0EEE@Base 2.0.2
- _ZN7WebCore40restrictMinimumScaleFactorToViewportSizeERNS_18ViewportAttributesENS_7IntSizeEf@Base 2.0.2
- _ZN7WebCore4KURL10invalidateEv@Base 2.0.2
- _ZN7WebCore4Node14removedLastRefEv@Base 2.0.2
- _ZN7WebCore4Page13setPaginationERKNS_10PaginationE@Base 2.0.2
- _ZN7WebCore4Page16setCanStartMediaEb@Base 2.0.2
- _ZN7WebCore4Page18setPageScaleFactorEfRKNS_8IntPointE@Base 2.0.2
- _ZN7WebCore4Page20setDeviceScaleFactorEf@Base 2.0.2
- _ZN7WebCore4Page22nonFastScrollableRectsEPKNS_5FrameE@Base 2.0.2
- _ZN7WebCore4Page24scrollingStateTreeAsTextEv@Base 2.0.2
- _ZN7WebCore4Page32mainThreadScrollingReasonsAsTextEv@Base 2.0.2
- _ZN7WebCore4Page9initGroupEv@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPN3WTF11ArrayBufferE@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_10ClientRectE@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_10ShadowRootE@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_13DOMStringListE@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_14ClientRectListE@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_5RangeE@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_8NodeListE@Base 2.0.2
- _ZN7WebCore4toJSEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEPNS_9DOMWindowE@Base 2.0.2
- _ZN7WebCore50restrictScaleFactorToInitialScaleIfNotUserScalableERNS_18ViewportAttributesE@Base 2.0.2
- _ZN7WebCore5Range6createEN3WTF10PassRefPtrINS_8DocumentEEENS2_INS_4NodeEEEiS6_i@Base 2.0.2
- _ZN7WebCore5RangeD1Ev@Base 2.0.2
- _ZN7WebCore6CursorC1ERKS0_@Base 2.0.2
- _ZN7WebCore6CursorD1Ev@Base 2.0.2
- _ZN7WebCore6JSNode6s_infoE@Base 2.0.2
- _ZN7WebCore6toNodeEN3JSC7JSValueE@Base 2.0.2
- _ZN7WebCore7Element16createShadowRootERi@Base 2.0.2
- _ZN7WebCore7Element9setPseudoERKN3WTF12AtomicStringE@Base 2.0.2
- _ZN7WebCore7TextRun22setAllowsRoundingHacksEb@Base 2.0.2
- _ZN7WebCore7jsArrayEPN3JSC9ExecStateEPNS_17JSDOMGlobalObjectEN3WTF10PassRefPtrINS_13DOMStringListEEE@Base 2.0.2
- _ZN7WebCore7toRangeEN3JSC7JSValueE@Base 2.0.2
- _ZN7WebCore8Document16isPageBoxVisibleEi@Base 2.0.2
- _ZN7WebCore8Document33webkitDidExitFullScreenForElementEPNS_7ElementE@Base 2.0.2
- _ZN7WebCore8Document34webkitDidEnterFullScreenForElementEPNS_7ElementE@Base 2.0.2
- _ZN7WebCore8Document34webkitWillExitFullScreenForElementEPNS_7ElementE@Base 2.0.2
- _ZN7WebCore8Document35webkitWillEnterFullScreenForElementEPNS_7ElementE@Base 2.0.2
- _ZN7WebCore8Document36updateLayoutIgnorePendingStylesheetsEv@Base 2.0.2
- _ZN7WebCore8Document8iconURLsEv@Base 2.0.2
- _ZN7WebCore8Settings16setImagesEnabledEb@Base 2.0.2
- _ZN7WebCore8Settings18setFixedFontFamilyERKN3WTF12AtomicStringE11UScriptCode@Base 2.0.2
- _ZN7WebCore8Settings18setSerifFontFamilyERKN3WTF12AtomicStringE11UScriptCode@Base 2.0.2
- _ZN7WebCore8Settings19minDOMTimerIntervalEv@Base 2.0.2
- _ZN7WebCore8Settings20setCursiveFontFamilyERKN3WTF12AtomicStringE11UScriptCode@Base 2.0.2
- _ZN7WebCore8Settings20setFantasyFontFamilyERKN3WTF12AtomicStringE11UScriptCode@Base 2.0.2
- _ZN7WebCore8Settings20setMediaTypeOverrideERKN3WTF6StringE@Base 2.0.2
- _ZN7WebCore8Settings21mockScrollbarsEnabledEv@Base 2.0.2
- _ZN7WebCore8Settings21setResolutionOverrideERKNS_7IntSizeE@Base 2.0.2
- _ZN7WebCore8Settings21setStandardFontFamilyERKN3WTF12AtomicStringE11UScriptCode@Base 2.0.2
- _ZN7WebCore8Settings22setMinDOMTimerIntervalEd@Base 2.0.2
- _ZN7WebCore8Settings22setSansSerifFontFamilyERKN3WTF12AtomicStringE11UScriptCode@Base 2.0.2
- _ZN7WebCore8Settings23setPictographFontFamilyERKN3WTF12AtomicStringE11UScriptCode@Base 2.0.2
- _ZN7WebCore8Settings24setMockScrollbarsEnabledEb@Base 2.0.2
- _ZN7WebCore8Settings24setStorageBlockingPolicyENS_14SecurityOrigin21StorageBlockingPolicyE@Base 2.0.2
- _ZN7WebCore8Settings24setUsesOverlayScrollbarsEb@Base 2.0.2
- _ZN7WebCore9DOMWindow4openERKN3WTF6StringERKNS1_12AtomicStringES4_PS0_S8_@Base 2.0.2
- _ZN7WebCore9DOMWindow5closeEPNS_22ScriptExecutionContextE@Base 2.0.2
- _ZN7WebCore9FrameView17paintControlTintsEv@Base 2.0.2
- _ZN7WebCore9FrameView17setTracksRepaintsEb@Base 2.0.2
- _ZN7WebCore9FrameView19scrollElementToRectEPNS_7ElementERKNS_7IntRectE@Base 2.0.2
- _ZN7WebCore9HTMLNames11textareaTagE@Base 2.0.2
- _ZN7WebCore9HTMLNames8inputTagE@Base 2.0.2
- _ZN7WebCore9InlineBox10attachLineEv@Base 2.0.2
- _ZN7WebCore9InlineBox10deleteLineEPNS_11RenderArenaE@Base 2.0.2
- _ZN7WebCore9InlineBox11extractLineEv@Base 2.0.2
- _ZN7WebCore9InlineBox11nodeAtPointERKNS_14HitTestRequestERNS_13HitTestResultERKNS_15HitTestLocationERKNS_11LayoutPointENS_10LayoutUnitESC_@Base 2.0.2
- _ZN7WebCore9InlineBox14adjustPositionEff@Base 2.0.2
- _ZN7WebCore9InlineBox14dirtyLineBoxesEv@Base 2.0.2
- _ZN7WebCore9InlineBox14selectionStateEv@Base 2.0.2
- _ZN7WebCore9InlineBox16placeEllipsisBoxEbfffRfRb@Base 2.0.2
- _ZN7WebCore9InlineBox5paintERNS_9PaintInfoERKNS_11LayoutPointENS_10LayoutUnitES6_@Base 2.0.2
- _ZN7WebCore9InlineBox7destroyEPNS_11RenderArenaE@Base 2.0.2
- _ZN7WebCore9InlineBoxdlEPvm@Base 2.0.2
- _ZN7WebCore9JSElement6s_infoE@Base 2.0.2
- _ZN7WebCore9toElementEN3JSC7JSValueE@Base 2.0.2
- _ZNK7WebCore11HistoryItem13documentStateEv@Base 2.0.2
- _ZNK7WebCore11HistoryItem19childItemWithTargetERKN3WTF6StringE@Base 2.0.2
- _ZNK7WebCore11HistoryItem6targetEv@Base 2.0.2
- _ZNK7WebCore12RenderObject23absoluteBoundingBoxRectEb@Base 2.0.2
- _ZNK7WebCore14DocumentMarker11descriptionEv@Base 2.0.2
- _ZNK7WebCore14InsertionPoint8isActiveEv@Base 2.0.2
- _ZNK7WebCore16HTMLInputElement14suggestedValueEv@Base 2.0.2
- _ZNK7WebCore17JSDOMGlobalObject22scriptExecutionContextEv@Base 2.0.2
- _ZNK7WebCore19AnimationController24numberOfActiveAnimationsEPNS_8DocumentE@Base 2.0.2
- _ZNK7WebCore19InspectorController12getHighlightEPNS_9HighlightE@Base 2.0.2
- _ZNK7WebCore20CachedResourceLoader11isPreloadedERKN3WTF6StringE@Base 2.0.2
- _ZNK7WebCore26HTMLTextFormControlElement21lastChangeWasUserEditEv@Base 2.0.2
- _ZNK7WebCore26HTMLTextFormControlElement26placeholderShouldBeVisibleEv@Base 2.0.2
- _ZNK7WebCore4Node11isTreeScopeEv@Base 2.0.2
- _ZNK7WebCore4Node11textContentEb@Base 2.0.2
- _ZNK7WebCore4Node31numberOfScopedHTMLStyleChildrenEv@Base 2.0.2
- _ZNK7WebCore4Page17viewportArgumentsEv@Base 2.0.2
- _ZNK7WebCore5Frame15layerTreeAsTextEj@Base 2.0.2
- _ZNK7WebCore5Frame25trackedRepaintRectsAsTextEv@Base 2.0.2
- _ZNK7WebCore5Frame8settingsEv@Base 2.0.2
- _ZNK7WebCore5Range4textEv@Base 2.0.2
- _ZNK7WebCore6Editor26selectionStartHasMarkerForENS_14DocumentMarker10MarkerTypeEii@Base 2.0.2
- _ZNK7WebCore7Element13pseudoElementENS_8PseudoIdE@Base 2.0.2
- _ZNK7WebCore7Element6shadowEv@Base 2.0.2
- _ZNK7WebCore8Document11completeURLERKN3WTF6StringE@Base 2.0.2
- _ZNK7WebCore8Document13nodesFromRectEiijjjjj@Base 2.0.2
- _ZNK7WebCore8Document4pageEv@Base 2.0.2
- _ZNK7WebCore8Document4viewEv@Base 2.0.2
- _ZNK7WebCore8Document8settingsEv@Base 2.0.2
- _ZNK7WebCore9DOMWindow8documentEv@Base 2.0.2
- _ZNK7WebCore9InlineBox10lineHeightEv@Base 2.0.2
- _ZNK7WebCore9InlineBox14caretMaxOffsetEv@Base 2.0.2
- _ZNK7WebCore9InlineBox14caretMinOffsetEv@Base 2.0.2
- _ZNK7WebCore9InlineBox16baselinePositionENS_12FontBaselineE@Base 2.0.2
- _ZNK7WebCore9InlineBox17reportMemoryUsageEPN3WTF16MemoryObjectInfoE@Base 2.0.2
- _ZNK7WebCore9InlineBox22canAccommodateEllipsisEbii@Base 2.0.2
- _ZTVN7WebCore28InspectorFrontendClientLocal8SettingsE@Base 2.0.2
+ (optional|c++)"void WTF::freeOwnedGPtr<_GdkEvent>(_GdkEvent*)@Base" 2.0.2
+ (optional|c++)"WebKit::WebGtkExtensionManager::initialize(OpaqueWKBundle const*, void const*)@Base" 2.0.2
+ (optional|c++)"WebKit::WebGtkExtensionManager::shared()@Base" 2.0.2
+ (optional|c++)"WebCore::ClientRect::ClientRect(WebCore::IntRect const&)@Base" 2.0.2
+ (optional|c++)"WebCore::ClientRect::ClientRect()@Base" 2.0.2
+ (optional|c++)"WebCore::JSDocument::s_info@Base" 2.0.2
+ (optional|c++)"WebCore::ScrollView::setDelegatesScrolling(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::ScrollView::setScrollbarsSuppressed(bool, bool)@Base" 2.0.2
+ (optional|c++)"WebCore::toDocument(JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::HistoryItem::setDocumentState(WTF::Vector<WTF::String, 0ul> const&)@Base" 2.0.2
+ (optional|c++)"WebCore::MemoryCache::resourceForURL(WebCore::KURL const&)@Base" 2.0.2
+ (optional|c++)"WebCore::memoryCache()@Base" 2.0.2
+ (optional|c++)"WebCore::PrintContext::pageProperty(WebCore::Frame*, char const*, int)@Base" 2.0.2
+ (optional|c++)"WebCore::PrintContext::numberOfPages(WebCore::Frame*, WebCore::FloatSize const&)@Base" 2.0.2
+ (optional|c++)"WebCore::PrintContext::pageNumberForElement(WebCore::Element*, WebCore::FloatSize const&)@Base" 2.0.2
+ (optional|c++)"WebCore::PrintContext::pageSizeAndMarginsInPixels(WebCore::Frame*, int, int, int, int, int, int, int)@Base" 2.0.2
+ (optional|c++)"WebCore::TextIterator::rangeFromLocationAndLength(WebCore::ContainerNode*, int, int, bool)@Base" 2.0.2
+ (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Node*, WebCore::Range const*, unsigned long&, unsigned long&)@Base" 2.0.2
+ (optional|c++)"WebCore::WorkerThread::workerThreadCount()@Base" 2.0.2
+ (optional|c++)"WebCore::createWrapper(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Node*)@Base" 2.0.2
+ (optional|c++)"WebCore::toArrayBuffer(JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::ClientRectList::ClientRectList(WTF::Vector<WebCore::FloatQuad, 0ul> const&)@Base" 2.0.2
+ (optional|c++)"WebCore::ClientRectList::ClientRectList()@Base" 2.0.2
+ (optional|c++)"WebCore::ClientRectList::~ClientRectList()@Base" 2.0.2
+ (optional|c++)"WebCore::FormController::getReferencedFilePaths(WTF::Vector<WTF::String, 0ul> const&)@Base" 2.0.2
+ (optional|c++)"WebCore::FrameSelection::absoluteCaretBounds()@Base" 2.0.2
+ (optional|c++)"WebCore::SchemeRegistry::registerURLSchemeAsBypassingContentSecurityPolicy(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::SchemeRegistry::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::ScrollableArea::setScrollOffsetFromInternals(WebCore::IntPoint const&)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorClient::doDispatchMessageOnFrontendPage(WebCore::Page*, WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::setDOMException(JSC::ExecState*, int)@Base" 2.0.2
+ (optional|c++)"WebCore::toDOMStringList(JSC::ExecState*, JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::CSSParserContext::CSSParserContext(WebCore::Document*, WebCore::KURL const&, WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLInputElement::setEditingValue(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLInputElement::setSuggestedValue(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::scriptNameToCode(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::HistoryController::saveDocumentAndScrollState()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorCounters::counterValue(WebCore::InspectorCounters::CounterType)@Base" 2.0.2
+ (optional|c++)"WebCore::JSDOMGlobalObject::s_info@Base" 2.0.2
+ (optional|c++)"WebCore::cacheDOMStructure(WebCore::JSDOMGlobalObject*, JSC::Structure*, JSC::ClassInfo const*)@Base" 2.0.2
+ (optional|c++)"WebCore::ContentDistributor::ensureSelectFeatureSet(WebCore::ElementShadow*)@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLContentElement::create(WebCore::Document*)@Base" 2.0.2
+ (optional|c++)"WebCore::StyleSheetContents::parseString(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::StyleSheetContents::StyleSheetContents(WebCore::StyleRuleImport*, WTF::String const&, WebCore::CSSParserContext const&)@Base" 2.0.2
+ (optional|c++)"WebCore::StyleSheetContents::~StyleSheetContents()@Base" 2.0.2
+ (optional|c++)"WebCore::AnimationController::resumeAnimations()@Base" 2.0.2
+ (optional|c++)"WebCore::AnimationController::suspendAnimations()@Base" 2.0.2
+ (optional|c++)"WebCore::AnimationController::pauseAnimationAtTime(WebCore::RenderObject*, WTF::AtomicString const&, double)@Base" 2.0.2
+ (optional|c++)"WebCore::AnimationController::pauseTransitionAtTime(WebCore::RenderObject*, WTF::String const&, double)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::didBeginFrame()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::didCancelFrame()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::connectFrontend(WebCore::InspectorFrontendChannel*)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::profilerEnabled()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::disconnectFrontend()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::setProfilerEnabled(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::setInspectorFrontendClient(WTF::PassOwnPtr<WebCore::InspectorFrontendClient>)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::setResourcesDataSizeLimitsFromInternals(int, int)@Base" 2.0.2
+ (optional|c++)"WebCore::CachedResourceLoader::garbageCollectDocumentResources()@Base" 2.0.2
+ (optional|c++)"WebCore::NodeRenderingContext::NodeRenderingContext(WebCore::Node*)@Base" 2.0.2
+ (optional|c++)"WebCore::NodeRenderingContext::~NodeRenderingContext()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorConsoleAgent::consoleMessageArgumentCounts()@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::deserialize(JSC::ExecState*, JSC::JSGlobalObject*, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1u>*, WebCore::SerializationErrorMode)@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::deserialize(JSC::ExecState*, JSC::JSGlobalObject*, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1ul>*, WebCore::SerializationErrorMode)@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::create(JSC::ExecState*, JSC::JSValue, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1u>*, WTF::Vector<WTF::RefPtr<WTF::ArrayBuffer>, 1u>*, WebCore::SerializationErrorMode)@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::create(JSC::ExecState*, JSC::JSValue, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1ul>*, WTF::Vector<WTF::RefPtr<WTF::ArrayBuffer>, 1ul>*, WebCore::SerializationErrorMode)@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::create(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::SerializedScriptValue(WTF::Vector<unsigned char, 0ul>&)@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::~SerializedScriptValue()@Base" 2.0.2
+ (optional|c++)"WebCore::getCachedDOMStructure(WebCore::JSDOMGlobalObject*, JSC::ClassInfo const*)@Base" 2.0.2
+ (optional|c++)"WebCore::RuntimeEnabledFeatures::isShadowDOMEnabled@Base" 2.0.2
+ (optional|c++)"WebCore::RuntimeEnabledFeatures::isCSSExclusionsEnabled@Base" 2.0.2
+ (optional|c++)"WebCore::RuntimeEnabledFeatures::isAuthorShadowDOMForAnyElementEnabled@Base" 2.0.2
+ (optional|c++)"WebCore::RuntimeEnabledFeatures::isLangAttributeAwareFormControlUIEnabled@Base" 2.0.2
+ (optional|c++)"WebCore::counterValueForElement(WebCore::Element*)@Base" 2.0.2
+ (optional|c++)"WebCore::externalRepresentation(WebCore::Element*, unsigned int)@Base" 2.0.2
+ (optional|c++)"WebCore::instrumentationForPage(WebCore::Page*)@Base" 2.0.2
+ (optional|c++)"WebCore::userPreferredLanguages()@Base" 2.0.2
+ (optional|c++)"WebCore::ComposedShadowTreeWalker::firstChild()@Base" 2.0.2
+ (optional|c++)"WebCore::ComposedShadowTreeWalker::nextSibling()@Base" 2.0.2
+ (optional|c++)"WebCore::ComposedShadowTreeWalker::next()@Base" 2.0.2
+ (optional|c++)"WebCore::ComposedShadowTreeWalker::previous()@Base" 2.0.2
+ (optional|c++)"WebCore::ComposedShadowTreeWalker::lastChild()@Base" 2.0.2
+ (optional|c++)"WebCore::DocumentMarkerController::markersFor(WebCore::Node*, WebCore::DocumentMarker::MarkerTypes)@Base" 2.0.2
+ (optional|c++)"WebCore::DocumentMarkerController::addTextMatchMarker(WebCore::Range const*, bool)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorInstrumentation::s_frontendCounter@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorInstrumentation::instrumentingAgentsForPage(WebCore::Page*)@Base" 2.0.2
+ (optional|c++)"WebCore::ScopeContentDistribution::hasShadowElement(WebCore::ShadowRoot const*)@Base" 2.0.2
+ (optional|c++)"WebCore::ScopeContentDistribution::hasContentElement(WebCore::ShadowRoot const*)@Base" 2.0.2
+ (optional|c++)"WebCore::ScopeContentDistribution::countElementShadow(WebCore::ShadowRoot const*)@Base" 2.0.2
+ (optional|c++)"WebCore::computeViewportAttributes(WebCore::ViewportArguments, int, int, int, float, WebCore::IntSize)@Base" 2.0.2
+ (optional|c++)"WebCore::ContextDestructionObserver::contextDestroyed()@Base" 2.0.2
+ (optional|c++)"WebCore::ContextDestructionObserver::ContextDestructionObserver(WebCore::ScriptExecutionContext*)@Base" 2.0.2
+ (optional|c++)"WebCore::ContextDestructionObserver::~ContextDestructionObserver()@Base" 2.0.2
+ (optional|c++)"WebCore::DocumentStyleSheetCollection::addUserSheet(WTF::PassRefPtr<WebCore::StyleSheetContents>)@Base" 2.0.2
+ (optional|c++)"WebCore::DocumentStyleSheetCollection::addAuthorSheet(WTF::PassRefPtr<WebCore::StyleSheetContents>)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::isUnderTest()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::moveWindowBy(float, float)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::openInNewTab(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::frontendLoaded()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::requestSetDockSide(WebCore::InspectorFrontendClient::DockSide)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::windowObjectCleared()@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::sendMessageToBackend(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::changeAttachedWindowHeight(unsigned int)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::InspectorFrontendClientLocal(WebCore::InspectorController*, WebCore::Page*, WTF::PassOwnPtr<WebCore::InspectorFrontendClientLocal::Settings>)@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorFrontendClientLocal::~InspectorFrontendClientLocal()@Base" 2.0.2
+ (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0ul> const&)@Base" 2.0.2
+ (optional|c++)"WebCore::restrictMinimumScaleFactorToViewportSize(WebCore::ViewportAttributes&, WebCore::IntSize, float)@Base" 2.0.2
+ (optional|c++)"WebCore::KURL::invalidate()@Base" 2.0.2
+ (optional|c++)"WebCore::Node::removedLastRef()@Base" 2.0.2
+ (optional|c++)"WebCore::Page::setPagination(WebCore::Pagination const&)@Base" 2.0.2
+ (optional|c++)"WebCore::Page::setCanStartMedia(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::Page::setPageScaleFactor(float, WebCore::IntPoint const&)@Base" 2.0.2
+ (optional|c++)"WebCore::Page::setDeviceScaleFactor(float)@Base" 2.0.2
+ (optional|c++)"WebCore::Page::nonFastScrollableRects(WebCore::Frame const*)@Base" 2.0.2
+ (optional|c++)"WebCore::Page::scrollingStateTreeAsText()@Base" 2.0.2
+ (optional|c++)"WebCore::Page::mainThreadScrollingReasonsAsText()@Base" 2.0.2
+ (optional|c++)"WebCore::Page::initGroup()@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WTF::ArrayBuffer*)@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::ClientRect*)@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::ShadowRoot*)@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::DOMStringList*)@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::ClientRectList*)@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Range*)@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::NodeList*)@Base" 2.0.2
+ (optional|c++)"WebCore::toJS(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::DOMWindow*)@Base" 2.0.2
+ (optional|c++)"WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(WebCore::ViewportAttributes&)@Base" 2.0.2
+ (optional|c++)"WebCore::Range::create(WTF::PassRefPtr<WebCore::Document>, WTF::PassRefPtr<WebCore::Node>, int, WTF::PassRefPtr<WebCore::Node>, int)@Base" 2.0.2
+ (optional|c++)"WebCore::Range::~Range()@Base" 2.0.2
+ (optional|c++)"WebCore::Cursor::Cursor(WebCore::Cursor const&)@Base" 2.0.2
+ (optional|c++)"WebCore::Cursor::~Cursor()@Base" 2.0.2
+ (optional|c++)"WebCore::JSNode::s_info@Base" 2.0.2
+ (optional|c++)"WebCore::toNode(JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::Element::createShadowRoot(int&)@Base" 2.0.2
+ (optional|c++)"WebCore::Element::setPseudo(WTF::AtomicString const&)@Base" 2.0.2
+ (optional|c++)"WebCore::TextRun::setAllowsRoundingHacks(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::jsArray(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WTF::PassRefPtr<WebCore::DOMStringList>)@Base" 2.0.2
+ (optional|c++)"WebCore::toRange(JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::Document::isPageBoxVisible(int)@Base" 2.0.2
+ (optional|c++)"WebCore::Document::webkitDidExitFullScreenForElement(WebCore::Element*)@Base" 2.0.2
+ (optional|c++)"WebCore::Document::webkitDidEnterFullScreenForElement(WebCore::Element*)@Base" 2.0.2
+ (optional|c++)"WebCore::Document::webkitWillExitFullScreenForElement(WebCore::Element*)@Base" 2.0.2
+ (optional|c++)"WebCore::Document::webkitWillEnterFullScreenForElement(WebCore::Element*)@Base" 2.0.2
+ (optional|c++)"WebCore::Document::updateLayoutIgnorePendingStylesheets()@Base" 2.0.2
+ (optional|c++)"WebCore::Document::iconURLs()@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setImagesEnabled(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setFixedFontFamily(WTF::AtomicString const&, UScriptCode)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setSerifFontFamily(WTF::AtomicString const&, UScriptCode)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::minDOMTimerInterval()@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setCursiveFontFamily(WTF::AtomicString const&, UScriptCode)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setFantasyFontFamily(WTF::AtomicString const&, UScriptCode)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setMediaTypeOverride(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::mockScrollbarsEnabled()@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setResolutionOverride(WebCore::IntSize const&)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setStandardFontFamily(WTF::AtomicString const&, UScriptCode)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setMinDOMTimerInterval(double)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setSansSerifFontFamily(WTF::AtomicString const&, UScriptCode)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setPictographFontFamily(WTF::AtomicString const&, UScriptCode)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setMockScrollbarsEnabled(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setStorageBlockingPolicy(WebCore::SecurityOrigin::StorageBlockingPolicy)@Base" 2.0.2
+ (optional|c++)"WebCore::Settings::setUsesOverlayScrollbars(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::DOMWindow::open(WTF::String const&, WTF::AtomicString const&, WTF::String const&, WebCore::DOMWindow*, WebCore::DOMWindow*)@Base" 2.0.2
+ (optional|c++)"WebCore::DOMWindow::close(WebCore::ScriptExecutionContext*)@Base" 2.0.2
+ (optional|c++)"WebCore::FrameView::paintControlTints()@Base" 2.0.2
+ (optional|c++)"WebCore::FrameView::setTracksRepaints(bool)@Base" 2.0.2
+ (optional|c++)"WebCore::FrameView::scrollElementToRect(WebCore::Element*, WebCore::IntRect const&)@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLNames::textareaTag@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLNames::inputTag@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::attachLine()@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::deleteLine(WebCore::RenderArena*)@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::extractLine()@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::nodeAtPoint(WebCore::HitTestRequest const&, WebCore::HitTestResult&, WebCore::HitTestLocation const&, WebCore::LayoutPoint const&, WebCore::LayoutUnit, WebCore::LayoutUnit)@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::adjustPosition(float, float)@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::dirtyLineBoxes()@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::selectionState()@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::placeEllipsisBox(bool, float, float, float, float&, bool&)@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::paint(WebCore::PaintInfo&, WebCore::LayoutPoint const&, WebCore::LayoutUnit, WebCore::LayoutUnit)@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::destroy(WebCore::RenderArena*)@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::operator delete(void*, unsigned long)@Base" 2.0.2
+ (optional|c++)"WebCore::JSElement::s_info@Base" 2.0.2
+ (optional|c++)"WebCore::toElement(JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::HistoryItem::documentState() const@Base" 2.0.2
+ (optional|c++)"WebCore::HistoryItem::childItemWithTarget(WTF::String const&) const@Base" 2.0.2
+ (optional|c++)"WebCore::HistoryItem::target() const@Base" 2.0.2
+ (optional|c++)"WebCore::RenderObject::absoluteBoundingBoxRect(bool) const@Base" 2.0.2
+ (optional|c++)"WebCore::DocumentMarker::description() const@Base" 2.0.2
+ (optional|c++)"WebCore::InsertionPoint::isActive() const@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLInputElement::suggestedValue() const@Base" 2.0.2
+ (optional|c++)"WebCore::JSDOMGlobalObject::scriptExecutionContext() const@Base" 2.0.2
+ (optional|c++)"WebCore::AnimationController::numberOfActiveAnimations(WebCore::Document*) const@Base" 2.0.2
+ (optional|c++)"WebCore::InspectorController::getHighlight(WebCore::Highlight*) const@Base" 2.0.2
+ (optional|c++)"WebCore::CachedResourceLoader::isPreloaded(WTF::String const&) const@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLTextFormControlElement::lastChangeWasUserEdit() const@Base" 2.0.2
+ (optional|c++)"WebCore::HTMLTextFormControlElement::placeholderShouldBeVisible() const@Base" 2.0.2
+ (optional|c++)"WebCore::Node::isTreeScope() const@Base" 2.0.2
+ (optional|c++)"WebCore::Node::textContent(bool) const@Base" 2.0.2
+ (optional|c++)"WebCore::Node::numberOfScopedHTMLStyleChildren() const@Base" 2.0.2
+ (optional|c++)"WebCore::Page::viewportArguments() const@Base" 2.0.2
+ (optional|c++)"WebCore::Frame::layerTreeAsText(unsigned int) const@Base" 2.0.2
+ (optional|c++)"WebCore::Frame::trackedRepaintRectsAsText() const@Base" 2.0.2
+ (optional|c++)"WebCore::Frame::settings() const@Base" 2.0.2
+ (optional|c++)"WebCore::Range::text() const@Base" 2.0.2
+ (optional|c++)"WebCore::Editor::selectionStartHasMarkerFor(WebCore::DocumentMarker::MarkerType, int, int) const@Base" 2.0.2
+ (optional|c++)"WebCore::Element::pseudoElement(WebCore::PseudoId) const@Base" 2.0.2
+ (optional|c++)"WebCore::Element::shadow() const@Base" 2.0.2
+ (optional|c++)"WebCore::Document::completeURL(WTF::String const&) const@Base" 2.0.2
+ (optional|c++)"WebCore::Document::nodesFromRect(int, int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int) const@Base" 2.0.2
+ (optional|c++)"WebCore::Document::page() const@Base" 2.0.2
+ (optional|c++)"WebCore::Document::view() const@Base" 2.0.2
+ (optional|c++)"WebCore::Document::settings() const@Base" 2.0.2
+ (optional|c++)"WebCore::DOMWindow::document() const@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::lineHeight() const@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::caretMaxOffset() const@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::caretMinOffset() const@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::baselinePosition(WebCore::FontBaseline) const@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::reportMemoryUsage(WTF::MemoryObjectInfo*) const@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::canAccommodateEllipsis(bool, int, int) const@Base" 2.0.2
+ (optional|c++)"vtable for WebCore::InspectorFrontendClientLocal::Settings@Base" 2.0.2
  atof_dot@Base 2.0.2
  kIntClampBegin@Base 2.0.2
  kIntClampDefinition@Base 2.0.2
