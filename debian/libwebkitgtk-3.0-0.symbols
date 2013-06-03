@@ -327,8 +327,10 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  (optional|c++)"WebCore::ScrollableArea::setScrollOffsetFromInternals(WebCore::IntPoint const&)@Base" 1.6.1
  (optional|c++)"WebCore::SerializedScriptValue::SerializedScriptValue(WTF::Vector<unsigned char, 0u>&)@Base" 1.11.90
  (optional|c++)"WebCore::SerializedScriptValue::SerializedScriptValue(WTF::Vector<unsigned char, 0ul>&)@Base" 1.11.90
+ (optional|c++)"WebCore::SerializedScriptValue::create(JSC::ExecState*, JSC::JSValue, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1u>*, WTF::Vector<WTF::RefPtr<WTF::ArrayBuffer>, 1u>*, WebCore::SerializationErrorMode)@Base" 1.11.90
  (optional|c++)"WebCore::SerializedScriptValue::create(JSC::ExecState*, JSC::JSValue, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1ul>*, WTF::Vector<WTF::RefPtr<WTF::ArrayBuffer>, 1ul>*, WebCore::SerializationErrorMode)@Base" 1.11.90
  (optional|c++)"WebCore::SerializedScriptValue::create(WTF::String const&)@Base" 1.11.90
+ (optional|c++)"WebCore::SerializedScriptValue::deserialize(JSC::ExecState*, JSC::JSGlobalObject*, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1u>*, WebCore::SerializationErrorMode)@Base" 1.11.90
  (optional|c++)"WebCore::SerializedScriptValue::deserialize(JSC::ExecState*, JSC::JSGlobalObject*, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1ul>*, WebCore::SerializationErrorMode)@Base" 1.11.90
  (optional|c++)"WebCore::SerializedScriptValue::~SerializedScriptValue()@Base" 1.11.90
  (optional|c++)"WebCore::Settings::minDOMTimerInterval()@Base" 1.11.90
