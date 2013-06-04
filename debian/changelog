@@ -5,9 +5,12 @@ webkitgtk (2.0.2-2) UNRELEASED; urgency=low
     + Build depend on gcc-4.7 and g++-4.7 and set the C compiler and C++
       compiler to this version as webkitgtk now requires GCC >= 4.7 and
       the default on many architectures is still 4.6.
-  * debian/compat:
-    + Bump to 9. Among other things, this brings us compressed debug info
-      files.
+  * debian/control,
+    debian/compat:
+    + Bump debhelper compat to 9. Among other things, this brings us
+      compressed debug info files. It also brings build-id debug info
+      files which greatly speed up gdb start up as gdb won't have to
+      checksum the (rather big) webkit debug info files anymore.
   * debian/rules:
     + Exclude libwebkit2gtkinjectedbundle.so from dh_makeshlibs as it's a
       private library and debhelper looks at every shared lib in compat 9.
