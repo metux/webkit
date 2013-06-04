@@ -18,6 +18,8 @@ webkitgtk (2.0.2-2) UNRELEASED; urgency=low
     + Demangle symbols.
   * debian/control:
     + Bump required build dependencies according to Versions.mk.
+    + Add missing build dependency on flex. Thanks to Sjoerd Simons for
+      noticing this.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Sat, 01 Jun 2013 22:57:27 +0200
 
