@@ -1,4 +1,6 @@
-webkitgtk (2.0.2-2) UNRELEASED; urgency=low
+webkitgtk (2.0.2-2) experimental; urgency=low
+
+  * Team upload.
 
   * debian/control,
     debian/rules:
@@ -26,7 +28,7 @@ webkitgtk (2.0.2-2) UNRELEASED; urgency=low
     + Also add other missing build dependencies (cairo, freetype,
       fontconfig and libxml).
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Sat, 01 Jun 2013 22:57:27 +0200
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 04 Jun 2013 15:00:49 +0200
 
 webkitgtk (2.0.2-1) experimental; urgency=low
 
