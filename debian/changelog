@@ -16,7 +16,7 @@ webkitgtk (2.0.2-2) UNRELEASED; urgency=low
       private library and debhelper looks at every shared lib in compat 9.
   * debian/libwebkitgtk-1.0-0.symbols,
     debian/libwebkitgtk-3.0-0.symbols:
-    + Add missing symbols for 32 bit arches.
+    + Add missing symbols for 32 bit arches. Closes: #704886.
   * debian/libwebkit2gtk-3.0-25.symbols:
     + Demangle symbols.
   * debian/control:
