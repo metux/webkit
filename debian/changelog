@@ -16,6 +16,8 @@ webkitgtk (2.0.2-2) UNRELEASED; urgency=low
     + Add missing symbols for 32 bit arches.
   * debian/libwebkit2gtk-3.0-25.symbols:
     + Demangle symbols.
+  * debian/control:
+    + Bump required build dependencies according to Versions.mk.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Sat, 01 Jun 2013 22:57:27 +0200
 
