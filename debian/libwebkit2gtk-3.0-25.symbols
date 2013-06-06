@@ -1070,6 +1070,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  (optional|c++)"WebCore::ScrollView::setDelegatesScrolling(bool)@Base" 2.0.2
  (optional|c++)"WebCore::ScrollView::setScrollbarsSuppressed(bool, bool)@Base" 2.0.2
  (optional|c++)"WebCore::toDocument(JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::HistoryItem::setDocumentState(WTF::Vector<WTF::String, 0u> const&)@Base" 2.0.2
  (optional|c++)"WebCore::HistoryItem::setDocumentState(WTF::Vector<WTF::String, 0ul> const&)@Base" 2.0.2
  (optional|c++)"WebCore::MemoryCache::resourceForURL(WebCore::KURL const&)@Base" 2.0.2
  (optional|c++)"WebCore::memoryCache()@Base" 2.0.2
@@ -1078,13 +1079,16 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  (optional|c++)"WebCore::PrintContext::pageNumberForElement(WebCore::Element*, WebCore::FloatSize const&)@Base" 2.0.2
  (optional|c++)"WebCore::PrintContext::pageSizeAndMarginsInPixels(WebCore::Frame*, int, int, int, int, int, int, int)@Base" 2.0.2
  (optional|c++)"WebCore::TextIterator::rangeFromLocationAndLength(WebCore::ContainerNode*, int, int, bool)@Base" 2.0.2
+ (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Node*, WebCore::Range const*, unsigned int&, unsigned int&)@Base" 2.0.2
  (optional|c++)"WebCore::TextIterator::getLocationAndLengthFromRange(WebCore::Node*, WebCore::Range const*, unsigned long&, unsigned long&)@Base" 2.0.2
  (optional|c++)"WebCore::WorkerThread::workerThreadCount()@Base" 2.0.2
  (optional|c++)"WebCore::createWrapper(JSC::ExecState*, WebCore::JSDOMGlobalObject*, WebCore::Node*)@Base" 2.0.2
  (optional|c++)"WebCore::toArrayBuffer(JSC::JSValue)@Base" 2.0.2
+ (optional|c++)"WebCore::ClientRectList::ClientRectList(WTF::Vector<WebCore::FloatQuad, 0u> const&)@Base" 2.0.2
  (optional|c++)"WebCore::ClientRectList::ClientRectList(WTF::Vector<WebCore::FloatQuad, 0ul> const&)@Base" 2.0.2
  (optional|c++)"WebCore::ClientRectList::ClientRectList()@Base" 2.0.2
  (optional|c++)"WebCore::ClientRectList::~ClientRectList()@Base" 2.0.2
+ (optional|c++)"WebCore::FormController::getReferencedFilePaths(WTF::Vector<WTF::String, 0u> const&)@Base" 2.0.2
  (optional|c++)"WebCore::FormController::getReferencedFilePaths(WTF::Vector<WTF::String, 0ul> const&)@Base" 2.0.2
  (optional|c++)"WebCore::FrameSelection::absoluteCaretBounds()@Base" 2.0.2
  (optional|c++)"WebCore::SchemeRegistry::registerURLSchemeAsBypassingContentSecurityPolicy(WTF::String const&)@Base" 2.0.2
@@ -1127,6 +1131,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  (optional|c++)"WebCore::SerializedScriptValue::create(JSC::ExecState*, JSC::JSValue, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1u>*, WTF::Vector<WTF::RefPtr<WTF::ArrayBuffer>, 1u>*, WebCore::SerializationErrorMode)@Base" 2.0.2
  (optional|c++)"WebCore::SerializedScriptValue::create(JSC::ExecState*, JSC::JSValue, WTF::Vector<WTF::RefPtr<WebCore::MessagePort>, 1ul>*, WTF::Vector<WTF::RefPtr<WTF::ArrayBuffer>, 1ul>*, WebCore::SerializationErrorMode)@Base" 2.0.2
  (optional|c++)"WebCore::SerializedScriptValue::create(WTF::String const&)@Base" 2.0.2
+ (optional|c++)"WebCore::SerializedScriptValue::SerializedScriptValue(WTF::Vector<unsigned char, 0u>&)@Base" 2.0.2
  (optional|c++)"WebCore::SerializedScriptValue::SerializedScriptValue(WTF::Vector<unsigned char, 0ul>&)@Base" 2.0.2
  (optional|c++)"WebCore::SerializedScriptValue::~SerializedScriptValue()@Base" 2.0.2
  (optional|c++)"WebCore::getCachedDOMStructure(WebCore::JSDOMGlobalObject*, JSC::ClassInfo const*)@Base" 2.0.2
@@ -1166,6 +1171,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  (optional|c++)"WebCore::InspectorFrontendClientLocal::changeAttachedWindowHeight(unsigned int)@Base" 2.0.2
  (optional|c++)"WebCore::InspectorFrontendClientLocal::InspectorFrontendClientLocal(WebCore::InspectorController*, WebCore::Page*, WTF::PassOwnPtr<WebCore::InspectorFrontendClientLocal::Settings>)@Base" 2.0.2
  (optional|c++)"WebCore::InspectorFrontendClientLocal::~InspectorFrontendClientLocal()@Base" 2.0.2
+ (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0u> const&)@Base" 2.0.2
  (optional|c++)"WebCore::overrideUserPreferredLanguages(WTF::Vector<WTF::String, 0ul> const&)@Base" 2.0.2
  (optional|c++)"WebCore::restrictMinimumScaleFactorToViewportSize(WebCore::ViewportAttributes&, WebCore::IntSize, float)@Base" 2.0.2
  (optional|c++)"WebCore::KURL::invalidate()@Base" 2.0.2
@@ -1238,6 +1244,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  (optional|c++)"WebCore::InlineBox::placeEllipsisBox(bool, float, float, float, float&, bool&)@Base" 2.0.2
  (optional|c++)"WebCore::InlineBox::paint(WebCore::PaintInfo&, WebCore::LayoutPoint const&, WebCore::LayoutUnit, WebCore::LayoutUnit)@Base" 2.0.2
  (optional|c++)"WebCore::InlineBox::destroy(WebCore::RenderArena*)@Base" 2.0.2
+ (optional|c++)"WebCore::InlineBox::operator delete(void*, unsigned int)@Base" 2.0.2
  (optional|c++)"WebCore::InlineBox::operator delete(void*, unsigned long)@Base" 2.0.2
  (optional|c++)"WebCore::JSElement::s_info@Base" 2.0.2
  (optional|c++)"WebCore::toElement(JSC::JSValue)@Base" 2.0.2
