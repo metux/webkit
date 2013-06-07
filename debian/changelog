@@ -3,6 +3,10 @@ webkitgtk (2.0.2-3) UNRELEASED; urgency=low
   * debian/libwebkit2gtk-3.0-25.symbols:
     + Added missing i386 symbols. Should really fix the i386 build.
       Closes: #704886.
+  * debian/rules:
+    + Pass -I Source/autotools to autoreconf to make sure aclocal can find
+      the necessary macros, as otherwise some versions such as aclocal-1.11
+      have some trouble with this.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
 
