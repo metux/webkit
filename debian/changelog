@@ -22,6 +22,8 @@ webkitgtk (2.0.2-3) UNRELEASED; urgency=low
       disable JIT, YARR and assembler.
   * debian/control:
     + Build depend on libgudev-1.0-dev on linux for gamepad support.
+  * debian/patches/10_hurd_getCurrentExecutablePath.patch:
+    + Readd patch from #669059 that was lost. Fixes build on hurd.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
 

@@ -1,0 +1,14 @@
+--- ./Source/WTF/wtf/gobject/GlibUtilities.cpp.orig	2012-05-17 02:16:45.391414932 +0200
++++ ./Source/WTF/wtf/gobject/GlibUtilities.cpp	2012-05-17 02:17:12.370848920 +0200
+@@ -37,6 +37,11 @@
+         return CString();
+     return CString(readLinkBuffer, result);
+ }
++#elif OS(HURD)
++CString getCurrentExecutablePath()
++{
++  return CString();
++}
+ #elif OS(UNIX)
+ CString getCurrentExecutablePath()
+ {
