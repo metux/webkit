@@ -22,8 +22,7 @@ COMMON_CONFIGURE_ARGUMENTS = \
 	--build=$(DEB_BUILD_GNU_TYPE) \
 	--enable-gtk-doc \
 	--enable-introspection \
-	--enable-geolocation \
-	--with-gstreamer=1.0
+	--enable-geolocation
 
 # This is used by the GTK+ 3.0 library only.
 EXTRA_CONFIGURE_ARGUMENTS =
