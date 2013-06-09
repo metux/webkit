@@ -31,7 +31,7 @@ EXTRA_DH_ARGUMENTS =
 ifeq ($(ENABLE_WEBKIT2),yes)
 	EXTRA_CONFIGURE_ARGUMENTS = --enable-webkit2 --libexecdir=/usr/lib/webkit2gtk-3.0/libexec
 else
-	EXTRA_CONFIGURE_ARGUMENTS = --disable-webkit2 --disable-plugin-process
+	EXTRA_CONFIGURE_ARGUMENTS = --disable-webkit2
 	EXTRA_DH_ARGUMENTS = -Nlibwebkit2gtk-3.0-25 -Nlibwebkit2gtk-3.0-dev -Nlibwebkit2gtk-3.0-25-dbg -Ngir1.2-webkit2-3.0
 endif
 
@@ -101,7 +101,7 @@ ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	../configure --prefix=/usr \
 		--with-gtk=2.0 \
 		$(COMMON_CONFIGURE_ARGUMENTS) \
-		--disable-webkit2 --disable-plugin-process
+		--disable-webkit2
 endif
 
 ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))

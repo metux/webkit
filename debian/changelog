@@ -11,6 +11,8 @@ webkitgtk (2.0.2-3) UNRELEASED; urgency=low
       probably lost with the webkit2 addition.
     + Don't pass --with-gstreamer=1.0 anymore, GStreamer support is always
       1.0 now and the configure flag has been dropped.
+    + Don't pass --disable-plugin-process. The flag is gone and the plugin
+      process is always built for WebKit2, which is what we were doing.
   * debian/control:
     + Build depend on libgudev-1.0-dev on linux for gamepad support.
 
