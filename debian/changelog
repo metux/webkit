@@ -9,6 +9,8 @@ webkitgtk (2.0.2-3) UNRELEASED; urgency=low
       have some trouble with this.
     + Add --disable-jit back on mipsel, armel and powerpc. The change was
       probably lost with the webkit2 addition.
+  * debian/control:
+    + Build depend on libgudev-1.0-dev on linux for gamepad support.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
 
