@@ -56,7 +56,7 @@ endif
 
 # disable jit on some architectures (bug #651636)
 ifneq (,$(findstring $(DEB_BUILD_ARCH),armel mipsel powerpc))
-	CONFIGUREFLAGS = --disable-jit
+	COMMON_CONFIGURE_ARGUMENTS += --disable-jit
 endif
 
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))

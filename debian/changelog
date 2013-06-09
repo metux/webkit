@@ -7,6 +7,8 @@ webkitgtk (2.0.2-3) UNRELEASED; urgency=low
     + Pass -I Source/autotools to autoreconf to make sure aclocal can find
       the necessary macros, as otherwise some versions such as aclocal-1.11
       have some trouble with this.
+    + Add --disable-jit back on mipsel, armel and powerpc. The change was
+      probably lost with the webkit2 addition.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
 
