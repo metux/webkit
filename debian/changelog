@@ -1,6 +1,9 @@
 webkit (1.8.1-4) UNRELEASED; urgency=low
 
   * Acknowledge NMUs. Thanks Samuel, Ansgar and Michael!
+  * debian/patches/20_mesa-llvmpipe-crash.patch:
+    + Backport change from upstream, fixes crashes when running
+      mesa llvmpipe drivers. Closes: #711584.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 11 Jun 2013 20:30:30 +0200
 
