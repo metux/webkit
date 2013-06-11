@@ -29,7 +29,7 @@ ifeq ($(DEB_BUILD_ARCH),alpha)
         LDFLAGS += -Wl,--no-relax
 endif
 
-ifneq (,$(findstring $(DEB_BUILD_ARCH),mips mipsel s390 s390x hurd-i386))
+ifneq (,$(findstring $(DEB_BUILD_ARCH),ia64 mips mipsel s390 s390x hurd-i386))
 	CFLAGS := $(CFLAGS:-g=)
 endif
 
