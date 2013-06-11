@@ -1,6 +1,6 @@
 --- a/Source/JavaScriptCore/wtf/gobject/GlibUtilities.cpp	2012-02-19 18:45:45.000000000 +0100
 +++ b/Source/JavaScriptCore/wtf/gobject/GlibUtilities.cpp	2012-04-23 10:24:41.000000000 +0200
-@@ -37,9 +37,13 @@
+@@ -37,9 +37,14 @@
          return CString();
      return CString(readLinkBuffer, result);
  }
@@ -11,6 +11,7 @@
 +  return CString();
 +}
 +#elif OS(UNIX)
++CString getCurrentExecutablePath()
 +{
      static char readLinkBuffer[PATH_MAX];
      ssize_t result = readlink("/proc/curproc/file", readLinkBuffer, PATH_MAX);
