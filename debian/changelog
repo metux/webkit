@@ -1,3 +1,13 @@
+webkit (1.8.1-3.4) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix wide pointer issues on ia64 (closes: #642750).
+  * Make favicon database thread-safe (closes: #697172).
+  * Support architectures with large page sizes (closes: #694971).
+  * Compile with --disable-jit on armel, mipsel, and powerpc (closes: #651636).
+
+ -- Michael Gilbert <mgilbert@debian.org>  Sat, 16 Feb 2013 21:46:48 +0000
+
 webkit (1.8.1-3.3) unstable; urgency=low
 
   * Non-maintainer upload.

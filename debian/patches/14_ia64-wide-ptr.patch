@@ -1,0 +1,728 @@
+Description: Fix wide pointer issues on ia64 (closes: #642750).
+Author: Stephan Schreiber <info@fs-driver.org>
+diff -rp -u8 webkit-orig/Source/JavaScriptCore/API/APICast.h webkit-1.8.1/Source/JavaScriptCore/API/APICast.h
+--- webkit-orig/Source/JavaScriptCore/API/APICast.h	2012-12-01 19:36:43.305097015 +0100
++++ webkit-1.8.1/Source/JavaScriptCore/API/APICast.h	2012-12-01 19:42:37.485113354 +0100
+@@ -59,33 +59,33 @@ inline JSC::ExecState* toJS(JSGlobalCont
+     ASSERT(c);
+     return reinterpret_cast<JSC::ExecState*>(c);
+ }
+ 
+ inline JSC::JSValue toJS(JSC::ExecState* exec, JSValueRef v)
+ {
+     ASSERT_UNUSED(exec, exec);
+     ASSERT(v);
+-#if USE(JSVALUE32_64)
++#if USE(JSVALUE32_64) || USE(JSVALUE64W)
+     JSC::JSCell* jsCell = reinterpret_cast<JSC::JSCell*>(const_cast<OpaqueJSValue*>(v));
+     if (!jsCell)
+         return JSC::JSValue();
+     if (jsCell->isAPIValueWrapper())
+         return static_cast<JSC::JSAPIValueWrapper*>(jsCell)->value();
+     return jsCell;
+ #else
+     return JSC::JSValue::decode(reinterpret_cast<JSC::EncodedJSValue>(const_cast<OpaqueJSValue*>(v)));
+ #endif
+ }
+ 
+ inline JSC::JSValue toJSForGC(JSC::ExecState* exec, JSValueRef v)
+ {
+     ASSERT_UNUSED(exec, exec);
+     ASSERT(v);
+-#if USE(JSVALUE32_64)
++#if USE(JSVALUE32_64) || USE(JSVALUE64W)
+     JSC::JSCell* jsCell = reinterpret_cast<JSC::JSCell*>(const_cast<OpaqueJSValue*>(v));
+     if (!jsCell)
+         return JSC::JSValue();
+     return jsCell;
+ #else
+     return JSC::JSValue::decode(reinterpret_cast<JSC::EncodedJSValue>(const_cast<OpaqueJSValue*>(v)));
+ #endif
+ }
+@@ -102,17 +102,17 @@ inline JSC::PropertyNameArray* toJS(JSPr
+ 
+ inline JSC::JSGlobalData* toJS(JSContextGroupRef g)
+ {
+     return reinterpret_cast<JSC::JSGlobalData*>(const_cast<OpaqueJSContextGroup*>(g));
+ }
+ 
+ inline JSValueRef toRef(JSC::ExecState* exec, JSC::JSValue v)
+ {
+-#if USE(JSVALUE32_64)
++#if USE(JSVALUE32_64) || USE(JSVALUE64W)
+     if (!v)
+         return 0;
+     if (!v.isCell())
+         return reinterpret_cast<JSValueRef>(JSC::jsAPIValueWrapper(exec, v).asCell());
+     return reinterpret_cast<JSValueRef>(v.asCell());
+ #else
+     UNUSED_PARAM(exec);
+     return reinterpret_cast<JSValueRef>(JSC::JSValue::encode(v));
+diff -rp -u8 webkit-orig/Source/JavaScriptCore/interpreter/Interpreter.cpp webkit-1.8.1/Source/JavaScriptCore/interpreter/Interpreter.cpp
+--- webkit-orig/Source/JavaScriptCore/interpreter/Interpreter.cpp	2012-12-01 19:36:43.313097014 +0100
++++ webkit-1.8.1/Source/JavaScriptCore/interpreter/Interpreter.cpp	2012-12-01 19:42:12.133112183 +0100
+@@ -601,27 +601,35 @@ void Interpreter::dumpRegisters(CallFram
+     const Register* it;
+     const Register* end;
+     JSValue v;
+ 
+     it = callFrame->registers() - RegisterFile::CallFrameHeaderSize - codeBlock->numParameters();
+     v = (*it).jsValue();
+ #if USE(JSVALUE32_64)
+     dataLog("[this]                     | %10p | %-16s 0x%llx \n", it, v.description(), JSValue::encode(v)); ++it;
+-#else
++#elif USE(JSVALUE64)
+     dataLog("[this]                     | %10p | %-16s %p \n", it, v.description(), JSValue::encode(v)); ++it;
++#elif USE(JSVALUE64W)
++    dataLog("[this]                     | %10p | %-16s ", it, v.description());
++    JSValue::dataLogEncode(v); ++it;
++    dataLog(" \n");
+ #endif
+     end = it + max(codeBlock->numParameters() - 1, 0); // - 1 to skip "this"
+     if (it != end) {
+         do {
+             v = (*it).jsValue();
+ #if USE(JSVALUE32_64)
+             dataLog("[param]                    | %10p | %-16s 0x%llx \n", it, v.description(), JSValue::encode(v));
+-#else
++#elif USE(JSVALUE64)
+             dataLog("[param]                    | %10p | %-16s %p \n", it, v.description(), JSValue::encode(v));
++#elif USE(JSVALUE64W)
++            dataLog("[param]                    | %10p | %-16s ", it, v.description());
++            JSValue::dataLogEncode(v);
++            dataLog(" \n");
+ #endif
+             ++it;
+         } while (it != end);
+     }
+     dataLog("-----------------------------------------------------------------------------\n");
+     dataLog("[CodeBlock]                | %10p | %p \n", it, (*it).codeBlock()); ++it;
+     dataLog("[ScopeChain]               | %10p | %p \n", it, (*it).scopeChain()); ++it;
+     dataLog("[CallerRegisters]          | %10p | %d \n", it, (*it).i()); ++it;
+@@ -633,33 +641,41 @@ void Interpreter::dumpRegisters(CallFram
+     int registerCount = 0;
+ 
+     end = it + codeBlock->m_numVars;
+     if (it != end) {
+         do {
+             v = (*it).jsValue();
+ #if USE(JSVALUE32_64)
+             dataLog("[r%2d]                      | %10p | %-16s 0x%llx \n", registerCount, it, v.description(), JSValue::encode(v));
+-#else
++#elif USE(JSVALUE64)
+             dataLog("[r%2d]                      | %10p | %-16s %p \n", registerCount, it, v.description(), JSValue::encode(v));
++#elif USE(JSVALUE64W)
++            dataLog("[r%2d]                      | %10p | %-16s ", registerCount, it, v.description());
++            JSValue::dataLogEncode(v);
++            dataLog(" \n");
+ #endif
+             ++it;
+             ++registerCount;
+         } while (it != end);
+     }
+     dataLog("-----------------------------------------------------------------------------\n");
+ 
+     end = it + codeBlock->m_numCalleeRegisters - codeBlock->m_numVars;
+     if (it != end) {
+         do {
+             v = (*it).jsValue();
+ #if USE(JSVALUE32_64)
+             dataLog("[r%2d]                      | %10p | %-16s 0x%llx \n", registerCount, it, v.description(), JSValue::encode(v));
+-#else
++#elif USE(JSVALUE64)
+             dataLog("[r%2d]                      | %10p | %-16s %p \n", registerCount, it, v.description(), JSValue::encode(v));
++#elif USE(JSVALUE64W)
++            dataLog("[r%2d]                      | %10p | %-16s ", registerCount, it, v.description());
++            JSValue::dataLogEncode(v);
++            dataLog(" \n");
+ #endif
+             ++it;
+             ++registerCount;
+         } while (it != end);
+     }
+     dataLog("-----------------------------------------------------------------------------\n");
+ }
+ 
+diff -rp -u8 webkit-orig/Source/JavaScriptCore/interpreter/Register.h webkit-1.8.1/Source/JavaScriptCore/interpreter/Register.h
+--- webkit-orig/Source/JavaScriptCore/interpreter/Register.h	2012-12-01 19:36:43.313097014 +0100
++++ webkit-1.8.1/Source/JavaScriptCore/interpreter/Register.h	2012-12-01 19:41:56.013111440 +0100
+@@ -175,27 +175,37 @@ namespace JSC {
+ 
+     ALWAYS_INLINE InlineCallFrame* Register::asInlineCallFrame() const
+     {
+         return u.inlineCallFrame;
+     }
+         
+     ALWAYS_INLINE int32_t Register::unboxedInt32() const
+     {
++#if USE(JSVALUE64W)
++		return JSValue::decode(u.value).asInt32();
++#else
+         return payload();
++#endif
+     }
+ 
+     ALWAYS_INLINE bool Register::unboxedBoolean() const
+     {
++#if USE(JSVALUE64W)
++        return JSValue::decode(u.value).asBoolean();
++#else
+         return !!payload();
++#endif
+     }
+ 
+     ALWAYS_INLINE JSCell* Register::unboxedCell() const
+     {
+-#if USE(JSVALUE64)
++#if USE(JSVALUE64W)
++        return JSValue::decode(u.value).asCell();
++#elif USE(JSVALUE64)
+         return u.encodedValue.ptr;
+ #else
+         return bitwise_cast<JSCell*>(payload());
+ #endif
+     }
+ 
+     ALWAYS_INLINE int32_t Register::payload() const
+     {
+diff -rp -u8 webkit-orig/Source/JavaScriptCore/runtime/JSValue.h webkit-1.8.1/Source/JavaScriptCore/runtime/JSValue.h
+--- webkit-orig/Source/JavaScriptCore/runtime/JSValue.h	2012-12-01 19:36:43.273097012 +0100
++++ webkit-1.8.1/Source/JavaScriptCore/runtime/JSValue.h	2012-12-01 19:41:11.061109366 +0100
+@@ -23,16 +23,17 @@
+ #ifndef JSValue_h
+ #define JSValue_h
+ 
+ #include <math.h>
+ #include <stddef.h> // for size_t
+ #include <stdint.h>
+ #include <wtf/AlwaysInline.h>
+ #include <wtf/Assertions.h>
++#include <wtf/DataLog.h>
+ #include <wtf/HashMap.h>
+ #include <wtf/HashTraits.h>
+ #include <wtf/MathExtras.h>
+ #include <wtf/StdLibExtras.h>
+ 
+ namespace JSC {
+ 
+     class ExecState;
+@@ -60,43 +61,72 @@ namespace JSC {
+     struct Instruction;
+     struct MethodTable;
+ 
+     template <class T> class WriteBarrierBase;
+ 
+     enum PreferredPrimitiveType { NoPreference, PreferNumber, PreferString };
+ 
+ 
+-#if USE(JSVALUE32_64)
+-    typedef int64_t EncodedJSValue;
+-#else
+-    typedef void* EncodedJSValue;
+-#endif
+-    
++#if USE(JSVALUE32_64) || USE(JSVALUE64)
++
+     union EncodedValueDescriptor {
+         int64_t asInt64;
+ #if USE(JSVALUE32_64)
+         double asDouble;
+ #elif USE(JSVALUE64)
+         JSCell* ptr;
+ #endif
+-        
++
+ #if CPU(BIG_ENDIAN)
+         struct {
+             int32_t tag;
+             int32_t payload;
+         } asBits;
+ #else
+         struct {
+             int32_t payload;
+             int32_t tag;
+         } asBits;
+ #endif
+     };
+ 
++#elif USE(JSVALUE64W)
++
++    struct EncodedValueDescriptor {
++        unsigned char tag;
++        union {
++            int64_t asInt64;
++            double  asDouble;
++            JSCell* ptr;
++
++#if CPU(BIG_ENDIAN)
++            struct {
++                int32_t tag;
++                int32_t payload;
++            } asBits;
++#else
++            struct {
++                int32_t payload;
++                int32_t tag;
++            } asBits;
++#endif
++        };
++    };
++
++#endif
++
++#if USE(JSVALUE32_64)
++    typedef int64_t EncodedJSValue;
++#elif USE(JSVALUE64)
++    typedef void* EncodedJSValue;
++#elif USE(JSVALUE64W)
++    typedef EncodedValueDescriptor EncodedJSValue;
++#endif
++
+     // This implements ToInt32, defined in ECMA-262 9.5.
+     JS_EXPORT_PRIVATE int32_t toInt32(double);
+ 
+     // This implements ToUInt32, defined in ECMA-262 9.6.
+     inline uint32_t toUInt32(double number)
+     {
+         // As commented in the spec, the operation of ToInt32 and ToUint32 only differ
+         // in how the result is interpreted; see NOTEs in sections 9.5 and 9.6.
+@@ -117,16 +147,19 @@ namespace JSC {
+         friend class DFG::JSValueSource;
+         friend class DFG::OSRExitCompiler;
+         friend class DFG::SpeculativeJIT;
+ #endif
+ 
+     public:
+         static EncodedJSValue encode(JSValue);
+         static JSValue decode(EncodedJSValue);
++#if USE(JSVALUE64W)
++        static void dataLogEncode(JSValue);
++#endif
+ 
+         enum JSNullTag { JSNull };
+         enum JSUndefinedTag { JSUndefined };
+         enum JSTrueTag { JSTrue };
+         enum JSFalseTag { JSFalse };
+         enum EncodeAsDoubleTag { EncodeAsDouble };
+ 
+         JSValue();
+@@ -279,16 +312,18 @@ namespace JSC {
+         enum { LowestTag =  DeletedValueTag };
+ 
+         uint32_t tag() const;
+         int32_t payload() const;
+ #elif USE(JSVALUE64)
+         /*
+          * On 64-bit platforms USE(JSVALUE64) should be defined, and we use a NaN-encoded
+          * form for immediates.
++         * If the highest 16 bits of pointers aren't cleared on the platform, USE(JSVALUE_64W)
++         * should be defined instead.  See below.
+          *
+          * The encoding makes use of unused NaN space in the IEEE754 representation.  Any value
+          * with the top 13 bits set represents a QNaN (with the sign bit set).  QNaN values
+          * can encode a 51-bit payload.  Hardware produced and C-library payloads typically
+          * have a payload of zero.  We assume that non-zero payloads are available to encode
+          * pointer and integer values.  Since any 64-bit bit pattern where the top 15 bits are
+          * all set represents a NaN with a non-zero payload, we can use this space in the NaN
+          * ranges to encode other values (however there are also other ranges of NaN space that
+@@ -356,42 +391,135 @@ namespace JSC {
+ 
+         // These special values are never visible to JavaScript code; Empty is used to represent
+         // Array holes, and for uninitialized JSValues. Deleted is used in hash table code.
+         // These values would map to cell types in the JSValue encoding, but not valid GC cell
+         // pointer should have either of these values (Empty is null, deleted is at an invalid
+         // alignment for a GC cell, and in the zero page).
+         #define ValueEmpty   0x0ll
+         #define ValueDeleted 0x4ll
++#elif USE(JSVALUE64W)
++        /*
++         * On 64-bit platforms USE(JSVALUE64W) should be defined if pointers need their
++         * entire 64-bits width, including the highest 16-bits.  This is the case if the
++         * memory management maps allocated memory to high addresses on the platform.
++         *
++         * The encoding makes use of an encapsulated union without any trick in a portable way.
++         * Since the encoded value is larger than 64-bits, this isn't very efficient.  Enabling
++         * the JIT isn't possible either.
++         *
++         * The top 2-bits of tag denote the type of the encoded JSValue:
++         *     Pointer 0x00
++         *     Double  0x40
++         *     Integer 0xc0
++         *
++         * The tag 0x00 denotes a pointer, or another form of tagged immediate. Boolean,
++         * null and undefined values are represented by the bottom 5-bits of tags:
++         *
++         *     Pointer:   0x10
++         *     False:     0x06
++         *     True:      0x07
++         *     Undefined: 0x0a
++         *     Null:      0x02
++         *
++         * These values have the following properties:
++         * - Bit 1 (TagBitTypeOther) is set for all four values, allowing real pointers to be
++         *   quickly distinguished from all immediate values, including these invalid pointers.
++         * - With bit 3 is masked out (TagBitUndefined) Undefined and Null share the
++         *   same value, allowing null & undefined to be quickly detected.
++         *
++         * No valid JSValue will have the bit pattern 0x0, this is used to represent array
++         * holes, and as a C++ 'no value' result (e.g. JSValue() has an internal value of 0).
++         */
++
++        #define TagTypeMask   0xc0u
++        #define TagTypePtr    0x00u
++        #define TagTypeDouble 0x40u
++        #define TagTypeNumber 0xc0u
++
++        // All non-numeric (bool, null, undefined) immediates have bit 2 set.
++        #define TagBitTypeOther 0x02u
++        #define TagBitBool      0x04u
++        #define TagBitUndefined 0x08u
++        #define TagBitValidPtr  0x10u
++        // Combined integer value for non-numeric immediates.
++        #define ValueValidPtr  (TagTypePtr | TagBitValidPtr)
++        #define ValueFalse     (TagTypePtr | TagBitTypeOther | TagBitBool | false)
++        #define ValueTrue      (TagTypePtr | TagBitTypeOther | TagBitBool | true)
++        #define ValueUndefined (TagTypePtr | TagBitTypeOther | TagBitUndefined)
++        #define ValueNull      (TagTypePtr | TagBitTypeOther)
++
++        // TagMask is used to check for all types of immediate values (either number or 'other').
++        #define TagMask (TagTypeMask | TagBitTypeOther)
++
++        // These special values are never visible to JavaScript code; Empty is used to represent
++        // Array holes, and for uninitialized JSValues. Deleted is used in hash table code.
++        // These values would map to cell types in the JSValue encoding, but not valid GC cell
++        // pointer should have either of these values (Empty is null, deleted is at an invalid
++        // alignment for a GC cell, and in the zero page).
++        #define ValueEmpty   0x0u
++        #define ValueDeleted 0x4u
+ #endif
+ 
+         EncodedValueDescriptor u;
+     };
+ 
+ #if USE(JSVALUE32_64)
+     typedef IntHash<EncodedJSValue> EncodedJSValueHash;
+ 
+     struct EncodedJSValueHashTraits : HashTraits<EncodedJSValue> {
+         static const bool emptyValueIsZero = false;
+         static EncodedJSValue emptyValue() { return JSValue::encode(JSValue()); }
+         static void constructDeletedValue(EncodedJSValue& slot) { slot = JSValue::encode(JSValue(JSValue::HashTableDeletedValue)); }
+         static bool isDeletedValue(EncodedJSValue value) { return value == JSValue::encode(JSValue(JSValue::HashTableDeletedValue)); }
+     };
+-#else
++#elif USE(JSVALUE64)
+     typedef PtrHash<EncodedJSValue> EncodedJSValueHash;
+ 
+     struct EncodedJSValueHashTraits : HashTraits<EncodedJSValue> {
+         static void constructDeletedValue(EncodedJSValue& slot) { slot = JSValue::encode(JSValue(JSValue::HashTableDeletedValue)); }
+         static bool isDeletedValue(EncodedJSValue value) { return value == JSValue::encode(JSValue(JSValue::HashTableDeletedValue)); }
+     };
++#elif USE(JSVALUE64W)
++    struct EncodedJSValueHash {
++        static unsigned hash(const EncodedJSValue& v)
++        {
++            return WTF::intHash(static_cast<uint64_t>(WTF::intHash(static_cast<uint8_t>(v.tag))) << 32
++                                                      | WTF::intHash(static_cast<uint64_t>(v.asInt64)));
++        }
++        static bool equal(const EncodedJSValue& a, const EncodedJSValue& b)
++        {
++            return JSValue::decode(a) == JSValue::decode(b);
++        }
++        static const bool safeToCompareToEmptyOrDeleted = true;
++	};
++
++    struct EncodedJSValueHashTraits : HashTraits<EncodedJSValue> {
++        static const bool emptyValueIsZero = false;
++        static EncodedJSValue emptyValue() { return JSValue::encode(JSValue()); }
++        static void constructDeletedValue(EncodedJSValue& slot) { slot = JSValue::encode(JSValue(JSValue::HashTableDeletedValue)); }
++        static bool isDeletedValue(EncodedJSValue value) { return JSValue::decode(value) == JSValue(JSValue::HashTableDeletedValue); }
++    };
+ #endif
+ 
+     typedef HashMap<EncodedJSValue, unsigned, EncodedJSValueHash, EncodedJSValueHashTraits> JSValueMap;
+ 
+     // Stand-alone helper functions.
++#if USE(JSVALUE64W)
++    inline bool operator==(const EncodedJSValue&  a, const EncodedJSValue& b)
++    {
++        return JSValue::decode(a) == JSValue::decode(b);
++    };
++
++    inline bool operator!=(const EncodedJSValue&  a, const EncodedJSValue& b)
++    {
++        return JSValue::decode(a) != JSValue::decode(b);
++    };
++#endif
++
+     inline JSValue jsNull()
+     {
+         return JSValue(JSValue::JSNull);
+     }
+ 
+     inline JSValue jsUndefined()
+     {
+         return JSValue(JSValue::JSUndefined);
+diff -rp -u8 webkit-orig/Source/JavaScriptCore/runtime/JSValueInlineMethods.h webkit-1.8.1/Source/JavaScriptCore/runtime/JSValueInlineMethods.h
+--- webkit-orig/Source/JavaScriptCore/runtime/JSValueInlineMethods.h	2012-12-01 19:36:43.273097012 +0100
++++ webkit-1.8.1/Source/JavaScriptCore/runtime/JSValueInlineMethods.h	2012-12-01 19:41:21.021109824 +0100
+@@ -318,17 +318,17 @@ namespace JSC {
+     }
+ 
+     inline bool JSValue::asBoolean() const
+     {
+         ASSERT(isBoolean());
+         return payload();
+     }
+ 
+-#else // USE(JSVALUE32_64)
++#elif USE(JSVALUE64)
+ 
+     // JSValue member functions.
+     inline EncodedJSValue JSValue::encode(JSValue value)
+     {
+         return value.u.ptr;
+     }
+ 
+     inline JSValue JSValue::decode(EncodedJSValue ptr)
+@@ -487,13 +487,196 @@ namespace JSC {
+     }
+ 
+     ALWAYS_INLINE JSCell* JSValue::asCell() const
+     {
+         ASSERT(isCell());
+         return u.ptr;
+     }
+ 
+-#endif // USE(JSVALUE64)
++#elif USE(JSVALUE64W)
++
++    // JSValue member functions.
++    inline EncodedJSValue JSValue::encode(JSValue value)
++    {
++        return value.u;
++    }
++
++    inline JSValue JSValue::decode(EncodedJSValue encodedJSValue)
++    {
++        JSValue v;
++        v.u = encodedJSValue;
++        return v;
++    }
++
++    inline void JSValue::dataLogEncode(JSValue value)
++    {
++        WTF::dataLog("0x%x 0x%llx", value.u.tag, value.u.asInt64);
++    }
++
++    inline JSValue::JSValue()
++    {
++        u.tag = ValueEmpty;
++        u.ptr = 0;
++    }
++
++    inline JSValue::JSValue(JSNullTag)
++    {
++        u.tag = ValueNull;
++        u.ptr = 0;
++    }
++    
++    inline JSValue::JSValue(JSUndefinedTag)
++    {
++        u.tag = ValueUndefined;
++        u.ptr = 0;
++    }
++    
++    inline JSValue::JSValue(JSTrueTag)
++    {
++        u.tag = ValueTrue;
++        u.ptr = 0;
++    }
++    
++    inline JSValue::JSValue(JSFalseTag)
++    {
++        u.tag = ValueFalse;
++        u.ptr = 0;
++    }
++
++    inline JSValue::JSValue(HashTableDeletedValueTag)
++    {
++        u.tag = ValueDeleted;
++        u.ptr = 0;
++    }
++
++    inline JSValue::JSValue(JSCell* ptr)
++    {
++        if (ptr)
++            u.tag = ValueValidPtr;
++        else
++            u.tag = ValueEmpty;
++        u.ptr = ptr;
++    }
++
++    inline JSValue::JSValue(const JSCell* ptr)
++    {
++        if (ptr)
++            u.tag = ValueValidPtr;
++        else
++            u.tag = ValueEmpty;
++        u.ptr = const_cast<JSCell*>(ptr);
++    }
++
++    inline JSValue::operator bool() const
++    {
++        ASSERT(u.tag != ValueDeleted);
++        return u.tag != ValueEmpty;
++    }
++
++    inline bool JSValue::operator==(const JSValue& other) const
++    {
++        return u.tag == other.u.tag
++               && u.ptr == other.u.ptr;
++    }
++
++    inline bool JSValue::operator!=(const JSValue& other) const
++    {
++        return u.tag != other.u.tag
++               || u.ptr != other.u.ptr;
++    }
++
++    inline bool JSValue::isEmpty() const
++    {
++        return u.tag == ValueEmpty;
++    }
++
++    inline bool JSValue::isUndefined() const
++    {
++        return u.tag == ValueUndefined;
++    }
++
++    inline bool JSValue::isNull() const
++    {
++        return u.tag == ValueNull;
++    }
++
++    inline bool JSValue::isUndefinedOrNull() const
++    {
++        return isUndefined() || isNull();
++    }
++
++    inline bool JSValue::isCell() const
++    {
++        return (u.tag & TagMask) == TagTypePtr;
++    }
++
++    inline bool JSValue::isInt32() const
++    {
++        return (u.tag & TagTypeMask) == TagTypeNumber;
++    }
++
++    inline bool JSValue::isDouble() const
++    {
++        return u.tag == TagTypeDouble;
++    }
++
++    inline bool JSValue::isTrue() const
++    {
++        return u.tag == ValueTrue;
++    }
++
++    inline bool JSValue::isFalse() const
++    {
++        return u.tag == ValueFalse;
++    }
++
++    inline int32_t JSValue::asInt32() const
++    {
++        ASSERT(isInt32());
++        return static_cast<int32_t>(u.asInt64);
++    }
++
++    inline double JSValue::asDouble() const
++    {
++        ASSERT(isDouble());
++        return u.asDouble;
++    }
++
++    ALWAYS_INLINE JSCell* JSValue::asCell() const
++    {
++        ASSERT(isCell());
++        return u.ptr;
++    }
++
++    ALWAYS_INLINE JSValue::JSValue(EncodeAsDoubleTag, double d)
++    {
++        u.tag = TagTypeDouble;
++        u.asDouble = d;
++    }
++
++    inline JSValue::JSValue(int i)
++    {
++        u.tag = TagTypeNumber;
++        u.asInt64 = static_cast<uint32_t>(i);
++    }
++
++    inline bool JSValue::isNumber() const
++    {
++        return (u.tag & TagTypeMask) != TagTypePtr;
++    }
++
++    inline bool JSValue::isBoolean() const
++    {
++        return ( u.tag & TagBitBool ) ? true : false;
++    }
++
++    inline bool JSValue::asBoolean() const
++    {
++        ASSERT(isBoolean());
++        return u.tag == ValueTrue;
++    }
++
++#endif // USE(JSVALUE64W)
+ 
+ } // namespace JSC
+ 
+ #endif // JSValueInlineMethods_h
+diff -rp -u8 webkit-orig/Source/JavaScriptCore/wtf/Platform.h webkit-1.8.1/Source/JavaScriptCore/wtf/Platform.h
+--- webkit-orig/Source/JavaScriptCore/wtf/Platform.h	2012-12-01 19:36:43.289097010 +0100
++++ webkit-1.8.1/Source/JavaScriptCore/wtf/Platform.h	2012-12-01 19:40:46.865108248 +0100
+@@ -887,28 +887,33 @@
+ #if !defined(ENABLE_FULLSCREEN_API)
+ #define ENABLE_FULLSCREEN_API 0
+ #endif
+ 
+ #if !defined(ENABLE_POINTER_LOCK)
+ #define ENABLE_POINTER_LOCK 0
+ #endif
+ 
+-#if !defined(WTF_USE_JSVALUE64) && !defined(WTF_USE_JSVALUE32_64)
+-#if (CPU(X86_64) && (OS(UNIX) || OS(WINDOWS))) \
+-    || (CPU(IA64) && !CPU(IA64_32)) \
++#if !defined(WTF_USE_JSVALUE64W) \
++    && !defined(WTF_USE_JSVALUE64) \
++    && !defined(WTF_USE_JSVALUE32_64)
++#if (CPU(IA64) && !CPU(IA64_32))
++#define WTF_USE_JSVALUE64W 1
++#elif (CPU(X86_64) && (OS(UNIX) || OS(WINDOWS))) \
+     || CPU(ALPHA) \
+     || CPU(SPARC64) \
+     || CPU(S390X) \
+     || CPU(PPC64)
+ #define WTF_USE_JSVALUE64 1
+ #else
+ #define WTF_USE_JSVALUE32_64 1
+ #endif
+-#endif /* !defined(WTF_USE_JSVALUE64) && !defined(WTF_USE_JSVALUE32_64) */
++#endif /* !defined(WTF_USE_JSVALUE64W)
++          && !defined(WTF_USE_JSVALUE64)
++          && !defined(WTF_USE_JSVALUE32_64) */
+ 
+ #if !defined(ENABLE_REPAINT_THROTTLING)
+ #define ENABLE_REPAINT_THROTTLING 0
+ #endif
+ 
+ /* Disable the JIT on versions of GCC prior to 4.1 */
+ #if !defined(ENABLE_JIT) && COMPILER(GCC) && !GCC_VERSION_AT_LEAST(4, 1, 0)
+ #define ENABLE_JIT 0
+
+
+Signed-off-by: Stephan Schreiber <info@fs-driver.org>

@@ -1,3 +1,7 @@
 02_notebook_scroll.patch
 10_kfreebsd_support.patch
 11_hurd_support.patch
+12_large-mem-page.patch
+13_thread-safe-icon-db.patch
+14_ia64-wide-ptr.patch
+15_ia64-use-system-malloc.patch

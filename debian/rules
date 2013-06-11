@@ -33,6 +33,11 @@ ifneq (,$(findstring $(DEB_BUILD_ARCH),ia64 mips mipsel s390 s390x hurd-i386))
 	CFLAGS := $(CFLAGS:-g=)
 endif
 
+# disable jit on some architectures (bug #651636)
+ifneq (,$(findstring $(DEB_BUILD_ARCH),armel mipsel powerpc))
+	CONFIGUREFLAGS = --disable-jit
+endif
+
 # FIXME: parallel builds are currently not 100% working, so disable
 #ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 #	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
@@ -87,6 +92,7 @@ build-stamp:
 			--host=$(DEB_HOST_GNU_TYPE) \
 			--build=$(DEB_BUILD_GNU_TYPE) \
 			--with-gtk=$${version} \
+			$(CONFIGUREFLAGS) \
 			--enable-gtk-doc \
 			--enable-introspection \
 			--enable-geolocation; \
