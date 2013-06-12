@@ -7,3 +7,4 @@
 15_ia64-use-system-malloc.patch
 20_mesa-llvmpipe-crash.patch
 25_bison_2.6_ftbfs.patch
+30_gtkdoc_fixxref_warnings.patch

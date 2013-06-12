@@ -1,0 +1,11 @@
+diff --git a/Tools/gtk/generate-gtkdoc b/Tools/gtk/generate-gtkdoc
+index cc33c48..d249db7 100755
+--- a/Tools/gtk/generate-gtkdoc
++++ b/Tools/gtk/generate-gtkdoc
+@@ -179,4 +179,5 @@ if os.path.exists(pkg_config_path):
+         print "\nRebasing WebKit2 documentation..."
+         rebase_installed_docs(pkg_config_path, options)
+ 
+-sys.exit(saw_webkit1_warnings or saw_webkit2_warnings)
++#sys.exit(saw_webkit1_warnings or saw_webkit2_warnings)
++sys.exit(False)

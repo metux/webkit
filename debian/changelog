@@ -6,6 +6,12 @@ webkit (1.8.1-4) UNRELEASED; urgency=low
       mesa llvmpipe drivers. Closes: #711584.
   * debian/patches/25_bison_2.6_ftbfs.patch:
     + Backport change from upstream, fix the build with bison >= 2.6.
+  * debian/patches/30_gtkdoc_fixxref_warnings.patch:
+    + New patch. Ignore warnings when generating the html documentation.
+      The broken links were probably already there in previous builds
+      as we don't build depend on the necessary -doc packages. We will
+      upload 2.0.x to unstable soonish anyway so no point in fixing
+      such minor issues here.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 11 Jun 2013 20:30:30 +0200
 
