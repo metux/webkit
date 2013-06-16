@@ -1,4 +1,6 @@
-webkitgtk (2.0.3-1) UNRELEASED; urgency=low
+webkitgtk (2.0.3-1) experimental; urgency=low
+
+  * Team upload.
 
   * debian/libwebkit2gtk-3.0-25.symbols:
     + Added missing i386 symbols. Should really fix the i386 build.
@@ -36,7 +38,7 @@ webkitgtk (2.0.3-1) UNRELEASED; urgency=low
     + New patch. Fix kfreebsd and hurd builds by making gtest know about
       them.
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Sun, 16 Jun 2013 20:52:37 +0200
 
 webkitgtk (2.0.2-2) experimental; urgency=low
 
