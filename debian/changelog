@@ -32,6 +32,9 @@ webkitgtk (2.0.3-1) UNRELEASED; urgency=low
   * debian/patches/changeset_147557.diff:
     + Backport from upstream, fix a dispose/finalize mistake that can
       cause crashes in some scenarios.
+  * debian/patches/20_bsd-hurd-gtest-port.patch:
+    + New patch. Fix kfreebsd and hurd builds by making gtest know about
+      them.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
 
