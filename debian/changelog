@@ -26,6 +26,8 @@ webkitgtk (2.0.3-1) UNRELEASED; urgency=low
     + Readd patch from #669059 that was lost. Fixes build on hurd.
 
   * New upstream release.
+  * changeset_150117.diff, changeset_150326.diff, changeset_150963.diff:
+    + Dropped, included upstream.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
 

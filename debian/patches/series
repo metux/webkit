@@ -2,7 +2,4 @@
 15_ia64-use-system-malloc.patch
 10_hurd_getCurrentExecutablePath.patch
 changeset_145551.diff
-changeset_150117.diff
 changeset_150256.diff
-changeset_150326.diff
-changeset_150963.diff
