@@ -152,6 +152,7 @@ Programs_TestWebKitAPI_TestWebKit2_SOURCES = \
 	Tools/TestWebKitAPI/Tests/WebKit2/InjectedBundleInitializationUserDataCallbackWins.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/LoadAlternateHTMLStringWithNonDirectoryURL.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/LoadCanceledNoServerRedirectCallback.cpp \
+	Tools/TestWebKitAPI/Tests/WebKit2/LoadPageOnCrash.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/MouseMoveAfterCrash.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/ReloadPageAfterCrash.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/ResizeWindowAfterCrash.cpp \
@@ -168,6 +169,7 @@ Programs_TestWebKitAPI_TestWebKit2_SOURCES = \
 	Tools/TestWebKitAPI/Tests/WebKit2/RestoreSessionStateContainingFormData.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/ShouldGoToBackForwardListItem.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/SpacebarScrolling.cpp \
+	Tools/TestWebKitAPI/Tests/WebKit2/TerminateTwice.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/UserMessage.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/WillSendSubmitEvent.cpp \
 	Tools/TestWebKitAPI/Tests/WebKit2/WKConnection.cpp \

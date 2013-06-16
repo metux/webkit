@@ -115,6 +115,8 @@ public:
     void updateProcessSuppressionState();
 #endif
 
+    void requestTermination();
+
 private:
     explicit WebProcessProxy(PassRefPtr<WebContext>);
 
@@ -175,6 +177,8 @@ private:
     // Implemented in generated WebProcessProxyMessageReceiver.cpp
     void didReceiveWebProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     void didReceiveSyncWebProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
+
+    bool canTerminateChildProcess();
 
     ResponsivenessTimer m_responsivenessTimer;
     
