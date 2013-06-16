@@ -333,7 +333,7 @@ docs_build_stamp_list += \
 	Source/WebKit2/UIProcess/API/gtk/docs/webkit2gtk-sections.txt
 endif
 
-docs-build.stamp: $(doc_build_stamp_list)
+docs-build.stamp: $(docs_build_stamp_list)
 	CC=$(CC) $(srcdir)/Tools/gtk/generate-gtkdoc
 	@touch docs-build.stamp
 
@@ -394,7 +394,7 @@ if ENABLE_WEBKIT2
 	  fi; \
 	fi
 endif
-	@$(AM_V_GEN)$(PYTHON) $(srcdir)/Tools/gtk/generate-gtkdoc --rebase --virtual-root=$${DESTDIR}
+	@$(AM_V_GEN) PKG_CONFIG=$(PKG_CONFIG) $(PYTHON) $(srcdir)/Tools/gtk/generate-gtkdoc --rebase --virtual-root=$${DESTDIR}
 
 uninstall-local:
 if ENABLE_WEBKIT1
@@ -417,6 +417,6 @@ if ENABLE_WEBKIT2
 endif
 
 if ENABLE_GTK_DOC
-all: docs-build.stamp
+noinst_DATA += docs-build.stamp
 endif
 
