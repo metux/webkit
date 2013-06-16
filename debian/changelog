@@ -29,6 +29,10 @@ webkitgtk (2.0.3-1) UNRELEASED; urgency=low
   * changeset_150117.diff, changeset_150326.diff, changeset_150963.diff:
     + Dropped, included upstream.
 
+  * debian/patches/changeset_147557.diff:
+    + Backport from upstream, fix a dispose/finalize mistake that can
+      cause crashes in some scenarios.
+
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 06 Jun 2013 10:26:19 +0200
 
 webkitgtk (2.0.2-2) experimental; urgency=low
