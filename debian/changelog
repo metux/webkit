@@ -4,6 +4,9 @@ webkitgtk (2.0.3-2) UNRELEASED; urgency=low
     + Go back to compat 8 for now as compressed symbol files kill .deb
       compression. Also objcopy seems to take a lot of memory to compress
       debugging symbols, killing the build in some cases.
+  * debian/rules:
+    + Stop building with -O1 on armhf. Hopefully the compiler error we were
+      getting has been fixed.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Mon, 17 Jun 2013 00:31:18 +0200
 

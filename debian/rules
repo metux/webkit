@@ -41,10 +41,6 @@ ifeq ($(DEB_HOST_ARCH_BITS),32)
 	LDFLAGS += -Wl,--no-keep-memory
 endif
 
-ifeq (armhf,$(filter $(DEB_BUILD_ARCH),armhf))
-	CFLAGS += -O1
-endif
-
 ifeq ($(DEB_BUILD_ARCH),alpha)
         LDFLAGS += -Wl,--no-relax
 endif
