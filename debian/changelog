@@ -7,6 +7,9 @@ webkitgtk (2.0.3-2) UNRELEASED; urgency=low
   * debian/rules:
     + Stop building with -O1 on armhf. Hopefully the compiler error we were
       getting has been fixed.
+    + Build with -gstabs on armhf and kfreebsd to try to eat less memory
+      and make the build succeed. If it doesn't we may have to disable
+      debugging symbols as we do in many other arches.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Mon, 17 Jun 2013 00:31:18 +0200
 

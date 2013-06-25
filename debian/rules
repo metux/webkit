@@ -49,6 +49,11 @@ ifneq (,$(findstring $(DEB_BUILD_ARCH),ia64 mips mipsel s390 s390x hurd-i386))
 	CFLAGS := $(CFLAGS:-g=)
 endif
 
+# Let's try to keep debugging symbols on these arches.
+ifneq (,$(findstring $(DEB_BUILD_ARCH),armhf, kfreebsd-amd64 kfreebsd-i386))
+	CFLAGS += -gstabs
+endif
+
 # disable jit on some architectures (bug #651636)
 ifneq (,$(findstring $(DEB_BUILD_ARCH),armel mipsel))
 	COMMON_CONFIGURE_ARGUMENTS += --disable-jit
