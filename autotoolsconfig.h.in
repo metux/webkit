@@ -26,6 +26,9 @@
 /* */
 #undef GDK_PIXBUF_DISABLE_DEPRECATED
 
+/* Minimum GTK/GDK version required */
+#undef GDK_VERSION_MIN_REQUIRED
+
 /* The gettext catalog name */
 #undef GETTEXT_PACKAGE
 
@@ -179,9 +182,6 @@
 
 /* */
 #undef WTF_USE_ICU_UNICODE
-
-/* */
-#undef WTF_USE_NATIVE_FULLSCREEN_VIDEO
 
 /* */
 #undef WTF_USE_OPENGL

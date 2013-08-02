@@ -28,6 +28,8 @@ fi
 
 if test "$GTK_API_VERSION" = "2.0"; then
     AC_DEFINE([GTK_API_VERSION_2], [1], [ ])
+else
+    AC_DEFINE([GDK_VERSION_MIN_REQUIRED], [GDK_VERSION_3_6], [Minimum GTK/GDK version required])
 fi
 
 if test "$enable_webkit2" = "yes"; then
@@ -66,10 +68,6 @@ if test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"; then
     AC_DEFINE([WTF_USE_GSTREAMER], [1], [ ])
     if test "$enable_debug" = "yes"; then
         AC_DEFINE([GST_DISABLE_DEPRECATED], [1], [ ])
-    fi
-
-    if test "$enable_video" = "yes"; then
-        AC_DEFINE([WTF_USE_NATIVE_FULLSCREEN_VIDEO], [1], [ ])
     fi
 fi
 
