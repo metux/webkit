@@ -1,3 +1,4 @@
+01_do-not-build-testing-tools.patch
 02_notebook_scroll.patch
 10_hurd_getCurrentExecutablePath.patch
 15_ia64-use-system-malloc.patch

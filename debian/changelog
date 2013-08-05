@@ -14,8 +14,12 @@ webkitgtk (2.0.4-1) UNRELEASED; urgency=low
 
   [ Gustavo Noronha Silva ]
   * New upstream release
+  * debian/*.symbols, debian/symbols.filter,
+    debian/patches/01_do-not-build-testing-tools.patch:
+  - Avoid exposing a ton of C++ symbols by not building the testing
+    tools
 
- -- Gustavo Noronha Silva <kov@debian.org>  Thu, 01 Aug 2013 22:49:20 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 05 Aug 2013 12:01:46 -0300
 
 webkitgtk (2.0.3-1) experimental; urgency=low
 

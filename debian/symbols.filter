@@ -1,0 +1,7 @@
+{
+global:
+  webkit_*;
+  WebProcessMainGtk;
+local:
+  *;
+};
