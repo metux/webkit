@@ -73,7 +73,7 @@ clean:
 	dh_testdir
 	dh_testroot
 
-	rm -f build-stamp install-stamp
+	rm -f reconf-stamp build-stamp install-stamp
 	rm -rf build-*
 	rm -rf debian/tmp-*
 	rm -f Source/WebKit/gtk/docs/version.xml
@@ -88,11 +88,14 @@ build-indep:
 
 build-arch: build-stamp
 
-build-stamp:
+reconf-stamp:
 	dh_testdir
-
 	# See https://bugs.webkit.org/show_bug.cgi?id=117334
 	dh_autoreconf autoreconf -- -fiv -I Source/autotools
+	touch reconf-stamp
+
+build-stamp: reconf-stamp
+	dh_testdir
 
 ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	test -d build-2.0 || mkdir build-2.0

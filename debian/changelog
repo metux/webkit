@@ -18,8 +18,11 @@ webkitgtk (2.0.4-1) UNRELEASED; urgency=low
     debian/patches/01_do-not-build-testing-tools.patch:
   - Avoid exposing a ton of C++ symbols by not building the testing
     tools
+  * debian/rules:
+  - move dh_autoreconf call to its own rule with its own custom stamp,
+    so we can just call binary if the build fails and we want to try again
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 07 Aug 2013 01:45:01 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 08 Aug 2013 20:00:46 -0300
 
 webkitgtk (2.0.3-1) experimental; urgency=low
 
