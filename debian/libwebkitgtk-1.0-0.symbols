@@ -1,4 +1,4 @@
-libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
+libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_application_cache_get_database_directory_path@Base 1.3.13
  webkit_application_cache_get_maximum_size@Base 1.3.13
  webkit_application_cache_set_maximum_size@Base 1.3.10
