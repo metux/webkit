@@ -148,8 +148,6 @@ install-stamp: build-stamp
 ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	$(MAKE) -C build-2.0 install DESTDIR="$(CURDIR)"/debian/tmp-2.0
 	[ ! -d debian/tmp-2.0/usr/lib/webkitgtk-1.0-0/libexec ] && install -d -m 755 debian/tmp-2.0/usr/lib/webkitgtk-1.0-0/libexec || true
-	build-2.0/libtool --mode=install install -m 755 build-2.0/Programs/GtkLauncher "$(CURDIR)"/debian/tmp-2.0/usr/lib/webkitgtk-1.0-0/libexec/GtkLauncher
-	chrpath -d debian/tmp-2.0/usr/lib/webkitgtk-1.0-0/libexec/GtkLauncher
 
 	install -d -m 755 debian/tmp-2.0/usr/share/doc/libwebkitgtk-dev/html
 	install -m 644 build-2.0/Documentation/webkitgtk/html/* \
@@ -159,8 +157,6 @@ endif
 ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	$(MAKE) -C build-3.0 install DESTDIR="$(CURDIR)"/debian/tmp-3.0
 	[ ! -d debian/tmp-3.0/usr/lib/webkitgtk-3.0-0/libexec ] && install -d -m 755 debian/tmp-3.0/usr/lib/webkitgtk-3.0-0/libexec || true
-	build-3.0/libtool --mode=install install -m 755 build-3.0/Programs/GtkLauncher "$(CURDIR)"/debian/tmp-3.0/usr/lib/webkitgtk-3.0-0/libexec/GtkLauncher
-	chrpath -d debian/tmp-3.0/usr/lib/webkitgtk-3.0-0/libexec/GtkLauncher
 
 	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html
 	install -m 644 build-3.0/Documentation/webkitgtk/html/* \
@@ -168,8 +164,6 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 
 ifeq ($(ENABLE_WEBKIT2),yes)
 	[ ! -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec ] && install -d -m 755 debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec || true
-	build-3.0/libtool --mode=install install -m 755 build-3.0/Programs/MiniBrowser "$(CURDIR)"/debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec/MiniBrowser
-	chrpath -d debian/tmp-3.0/usr/lib/webkit2gtk-3.0/libexec/MiniBrowser
 
 	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html
 	install -m 644 build-3.0/Documentation/webkit2gtk/html/* \

@@ -15,9 +15,10 @@ webkitgtk (2.0.4-1) UNRELEASED; urgency=low
   [ Gustavo Noronha Silva ]
   * New upstream release
   * debian/*.symbols, debian/*.install, debian/symbols.filter,
-    debian/patches/01_do-not-build-testing-tools.patch:
+    debian/patches/01_do-not-build-testing-tools.patch, debian/rules:
   - Avoid exposing a ton of C++ symbols by not building the testing
     tools
+  - We no longer build the test browsers, as well
   * debian/rules:
   - move dh_autoreconf call to its own rule with its own custom stamp,
     so we can just call binary if the build fails and we want to try again
