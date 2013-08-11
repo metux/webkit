@@ -3,5 +3,6 @@ global:
   webkit_*;
   WebProcessMainGtk;
 local:
+  webkit_media_player_debug;
   *;
 };
