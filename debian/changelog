@@ -1,4 +1,4 @@
-webkitgtk (2.0.4-1) UNRELEASED; urgency=low
+webkitgtk (2.0.4-1) experimental; urgency=low
 
   [ Emilio Pozuelo Monfort ]
   * debian/compat:
