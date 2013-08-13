@@ -113,8 +113,7 @@ Depends: libjavascriptcoregtk-1.0-0 (= ${binary:Version}),
          ${misc:Depends}
 Recommends: gstreamer1.0-plugins-base (>= 1.0.3),
             gstreamer1.0-plugins-good,
-            gstreamer1.0-plugins-bad,
-            gstreamer1.0-libav
+            ${gst:Recommends}
 Breaks: midori (<< 0.4.1-2), claws-mail-fancy-plugin (<< 3.7.10-3)
 Description: Web content engine library for GTK+
  WebKit is a web content engine, derived from KHTML and KJS from KDE, and
@@ -263,8 +262,7 @@ Depends: libjavascriptcoregtk-3.0-0 (= ${binary:Version}),
          ${misc:Depends}
 Recommends: gstreamer1.0-plugins-base,
             gstreamer1.0-plugins-good,
-            gstreamer1.0-plugins-bad,
-            gstreamer1.0-libav
+            ${gst:Recommends}
 Description: Web content engine library for GTK+
  WebKit is a web content engine, derived from KHTML and KJS from KDE, and
  used primarily in Apple's Safari browser.  It is made to be embedded in
@@ -351,8 +349,7 @@ Depends: libjavascriptcoregtk-3.0-0 (= ${binary:Version}),
          ${misc:Depends}
 Recommends: gstreamer1.0-plugins-base,
             gstreamer1.0-plugins-good,
-            gstreamer1.0-plugins-bad,
-            gstreamer1.0-libav
+            ${gst:Recommends}
 Breaks: libwebkit2gtk-3.0-0
 Replaces: libwebkit2gtk-3.0-0
 Description: Web content engine library for GTK+

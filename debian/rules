@@ -69,6 +69,12 @@ ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 	MAKEARGUMENTS += -j$(NUMJOBS)
 endif
 
+ifeq ($(shell dpkg-vendor --derives-from Ubuntu && echo yes),yes)
+	DEB_DH_GENCONTROL_ARGS += -- -Vgst:Recommends=""
+else
+	DEB_DH_GENCONTROL_ARGS + = -- -Vgst:Recommends="gstreamer1.0-plugins-bad, gstreamer1.0-libav,"
+endif
+
 clean:
 	dh_testdir
 	dh_testroot
