@@ -15,7 +15,7 @@ new file mode 100644
 index 0000000..0feea15
 --- /dev/null
 +++ b/Source/WTF/wtf/Atomics.cpp
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,110 @@
 +/*
 + * Copyright (C) 2007, 2008, 2010, 2012 Apple Inc. All rights reserved.
 + * Copyright (C) 2007 Justin Haygood (jhaygood@reaktix.com)
@@ -125,3 +125,4 @@ index 0000000..0feea15
 +
 +} // namespace WTF
 +
++#endif
