@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitURIResponse</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitURIRequest.html" title="WebKitURIRequest">
@@ -35,7 +35,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitURIResponse.top_of_page"></a>WebKitURIResponse</span></h2>
-<p>WebKitURIResponse</p>
+<p>WebKitURIResponse — Represents a URI response</p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -45,6 +45,9 @@
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-uri" title="webkit_uri_response_get_uri ()">webkit_uri_response_get_uri</a>         (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
 <a href="../glib/glib-Basic-Types.html#guint"><span class="returnvalue">guint</span></a>               <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-status-code" title="webkit_uri_response_get_status_code ()">webkit_uri_response_get_status_code</a> (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
 <a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-content-length" title="webkit_uri_response_get_content_length ()">webkit_uri_response_get_content_length</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-mime-type" title="webkit_uri_response_get_mime_type ()">webkit_uri_response_get_mime_type</a>   (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
+const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitURIResponse.html#webkit-uri-response-get-suggested-filename" title="webkit_uri_response_get_suggested_filename ()">webkit_uri_response_get_suggested_filename</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);
 </pre>
 </div>
@@ -59,13 +62,18 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <a name="WebKitURIResponse.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
   "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--content-length" title='The "content-length" property'>content-length</a>"           <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>               : Read
+  "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--mime-type" title='The "mime-type" property'>mime-type</a>"                <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--status-code" title='The "status-code" property'>status-code</a>"              <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a>                 : Read
+  "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--suggested-filename" title='The "suggested-filename" property'>suggested-filename</a>"       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitURIResponse.html#WebKitURIResponse--uri" title='The "uri" property'>uri</a>"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
 </pre>
 </div>
 <div class="refsect1">
 <a name="WebKitURIResponse.description"></a><h2>Description</h2>
 <p>
+A <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> contains information such as the URI, the
+status code, the content length, the mime type, the HTTP status or
+the suggested filename.
 </p>
 </div>
 <div class="refsect1">
@@ -146,6 +154,53 @@ be 0 if the server provided an incorrect or missing Content-Length.
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-uri-response-get-mime-type"></a><h3>webkit_uri_response_get_mime_type ()</h3>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_uri_response_get_mime_type   (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);</pre>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the MIME type of the <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-uri-response-get-suggested-filename"></a><h3>webkit_uri_response_get_suggested_filename ()</h3>
+<pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_uri_response_get_suggested_filename
+                                                        (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);</pre>
+<p>
+Get the suggested filename for <em class="parameter"><code>response</code></em>, as specified by
+the 'Content-Disposition' HTTP header, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if it's not
+present.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the suggested filename or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if
+the 'Content-Disposition' HTTP header is not present. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitURIResponse.property-details"></a><h2>Property Details</h2>
@@ -159,12 +214,30 @@ The expected content length of the response.
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitURIResponse--mime-type"></a><h3>The <code class="literal">"mime-type"</code> property</h3>
+<pre class="programlisting">  "mime-type"                <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
+<p>
+The MIME type of the response.
+</p>
+<p>Default value: NULL</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitURIResponse--status-code"></a><h3>The <code class="literal">"status-code"</code> property</h3>
 <pre class="programlisting">  "status-code"              <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a>                 : Read</pre>
 <p>
 The status code of the response as returned by the server.
 </p>
 <p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitURIResponse--suggested-filename"></a><h3>The <code class="literal">"suggested-filename"</code> property</h3>
+<pre class="programlisting">  "suggested-filename"       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
+<p>
+The suggested filename for the URI response.
+</p>
+<p>Default value: NULL</p>
 </div>
 <hr>
 <div class="refsect2">

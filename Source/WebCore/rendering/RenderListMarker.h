@@ -35,18 +35,24 @@ String listMarkerText(EListStyleType, int value);
 // The RenderListMarker always has to be a child of a RenderListItem.
 class RenderListMarker : public RenderBox {
 public:
-    RenderListMarker(RenderListItem*);
-    virtual ~RenderListMarker();
+    static RenderListMarker* createAnonymous(RenderListItem*);
 
-    virtual void computePreferredLogicalWidths();
+    virtual ~RenderListMarker();
 
     const String& text() const { return m_text; }
     String suffix() const;
 
     bool isInside() const;
 
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
+    void updateMarginsAndContent();
+
 private:
+    RenderListMarker(RenderListItem*);
+
     virtual const char* renderName() const { return "RenderListMarker"; }
+    virtual void computePreferredLogicalWidths() OVERRIDE;
 
     virtual bool isListMarker() const { return true; }
 
@@ -59,22 +65,23 @@ private:
     virtual InlineBox* createInlineBox();
 
     virtual LayoutUnit lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
-    virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
+    virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
     bool isImage() const;
     bool isText() const { return !isImage(); }
 
     virtual void setSelectionState(SelectionState);
-    virtual LayoutRect selectionRectForRepaint(RenderBoxModelObject* repaintContainer, bool clipToVisibleContent = true);
+    virtual LayoutRect selectionRectForRepaint(const RenderLayerModelObject* repaintContainer, bool clipToVisibleContent = true) OVERRIDE;
     virtual bool canBeSelectionLeaf() const { return true; }
 
     void updateMargins();
+    void updateContent();
 
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
     IntRect getRelativeMarkerRect();
-    IntRect localSelectionRect();
+    LayoutRect localSelectionRect();
 
     String m_text;
     RefPtr<StyleImage> m_image;
@@ -83,13 +90,13 @@ private:
 
 inline RenderListMarker* toRenderListMarker(RenderObject* object)
 {
-    ASSERT(!object || object->isListMarker());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isListMarker());
     return static_cast<RenderListMarker*>(object);
 }
 
 inline const RenderListMarker* toRenderListMarker(const RenderObject* object)
 {
-    ASSERT(!object || object->isListMarker());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isListMarker());
     return static_cast<const RenderListMarker*>(object);
 }
 

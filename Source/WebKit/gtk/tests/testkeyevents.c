@@ -17,6 +17,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
+#include "autotoolsconfig.h"
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
@@ -130,10 +131,10 @@ static void setup_keyevent_test(KeyEventFixture* fixture, gconstpointer data, GC
     g_signal_connect(fixture->window, "map-event",
                      G_CALLBACK(map_event_cb), fixture);
 
+    gtk_widget_grab_focus(GTK_WIDGET(fixture->webView));
     gtk_widget_show(fixture->window);
     gtk_widget_show(GTK_WIDGET(fixture->webView));
     gtk_window_present(GTK_WINDOW(fixture->window));
-    gtk_widget_grab_focus(GTK_WIDGET(fixture->webView));
 
     g_signal_connect(fixture->webView, "notify::load-status",
                      load_event_callback, fixture);

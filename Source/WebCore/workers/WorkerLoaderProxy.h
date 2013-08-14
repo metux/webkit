@@ -37,6 +37,12 @@
 #include <wtf/Forward.h>
 #include <wtf/PassOwnPtr.h>
 
+#if PLATFORM(CHROMIUM)
+namespace WebKit {
+class WebWorkerBase;
+}
+#endif // PLATFORM(CHROMIUM)
+
 namespace WebCore {
 
     // A proxy to talk to the loader context. Normally, the document on the main thread
@@ -53,7 +59,13 @@ namespace WebCore {
 
         // Posts callbacks from loading code to the WorkerContext. The 'mode' is used to differentiate
         // specific synchronous loading requests so they can be 'nested', per spec.
-        virtual void postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task>, const String& mode) = 0;
+        // Returns true if the task was posted successfully.
+        virtual bool postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task>, const String& mode) = 0;
+
+#if PLATFORM(CHROMIUM)
+        // Spans divergent class hierarchies for dedicated and shared workers.
+        virtual WebKit::WebWorkerBase* toWebWorkerBase() = 0;
+#endif
     };
 
 } // namespace WebCore

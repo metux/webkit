@@ -35,8 +35,10 @@ class HTMLMapElement;
 
 class RenderImage : public RenderReplaced {
 public:
-    RenderImage(Node*);
+    RenderImage(Element*);
     virtual ~RenderImage();
+
+    static RenderImage* createAnonymous(Document*);
 
     void setImageResource(PassOwnPtr<RenderImageResource>);
 
@@ -68,6 +70,7 @@ protected:
 
     virtual void paintIntoRect(GraphicsContext*, const LayoutRect&);
     virtual void paint(PaintInfo&, const LayoutPoint&);
+    virtual void layout();
 
     virtual void intrinsicSizeChanged()
     {
@@ -85,12 +88,12 @@ private:
 
     virtual bool backgroundIsObscured() const;
 
-    virtual int minimumReplacedHeight() const;
+    virtual LayoutUnit minimumReplacedHeight() const OVERRIDE;
 
     virtual void notifyFinished(CachedResource*);
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
-    virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
+    virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox*) const OVERRIDE;
 
     IntSize imageSizeForError(CachedImage*) const;
     void imageDimensionsChanged(bool imageSizeChanged, const IntRect* = 0);
@@ -110,13 +113,13 @@ private:
 
 inline RenderImage* toRenderImage(RenderObject* object)
 {
-    ASSERT(!object || object->isRenderImage());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderImage());
     return static_cast<RenderImage*>(object);
 }
 
 inline const RenderImage* toRenderImage(const RenderObject* object)
 {
-    ASSERT(!object || object->isRenderImage());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderImage());
     return static_cast<const RenderImage*>(object);
 }
 

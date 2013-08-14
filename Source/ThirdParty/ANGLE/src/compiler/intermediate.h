@@ -16,6 +16,8 @@
 #ifndef __INTERMEDIATE_H
 #define __INTERMEDIATE_H
 
+#include "GLSLANG/ShaderLang.h"
+
 #include "compiler/Common.h"
 #include "compiler/Types.h"
 #include "compiler/ConstantUnion.h"
@@ -181,7 +183,7 @@ enum TOperator {
     EOpVectorTimesScalarAssign,
     EOpMatrixTimesScalarAssign,
     EOpMatrixTimesMatrixAssign,
-    EOpDivAssign,
+    EOpDivAssign
 };
 
 extern const char* getOperatorString(TOperator op);
@@ -267,7 +269,7 @@ protected:
 enum TLoopType {
     ELoopFor,
     ELoopWhile,
-    ELoopDoWhile,
+    ELoopDoWhile
 };
 
 class TIntermLoop : public TIntermNode {
@@ -389,7 +391,7 @@ protected:
 //
 class TIntermBinary : public TIntermOperator {
 public:
-    TIntermBinary(TOperator o) : TIntermOperator(o) {}
+    TIntermBinary(TOperator o) : TIntermOperator(o), addIndexClamp(false) {}
 
     virtual TIntermBinary* getAsBinaryNode() { return this; }
     virtual void traverse(TIntermTraverser*);
@@ -400,9 +402,15 @@ public:
     TIntermTyped* getRight() const { return right; }
     bool promote(TInfoSink&);
 
+    void setAddIndexClamp() { addIndexClamp = true; }
+    bool getAddIndexClamp() { return addIndexClamp; }
+
 protected:
     TIntermTyped* left;
     TIntermTyped* right;
+
+    // If set to true, wrap any EOpIndexIndirect with a clamp to bounds.
+    bool addIndexClamp;
 };
 
 //
@@ -433,15 +441,15 @@ protected:
 
 typedef TVector<TIntermNode*> TIntermSequence;
 typedef TVector<int> TQualifierList;
-typedef TMap<TString, TString> TPragmaTable;
+
 //
 // Nodes that operate on an arbitrary sized set of children.
 //
 class TIntermAggregate : public TIntermOperator {
 public:
-    TIntermAggregate() : TIntermOperator(EOpNull), userDefined(false), pragmaTable(0), endLine(0), useEmulatedFunction(false) { }
-    TIntermAggregate(TOperator o) : TIntermOperator(o), pragmaTable(0), useEmulatedFunction(false) { }
-    ~TIntermAggregate() { delete pragmaTable; }
+    TIntermAggregate() : TIntermOperator(EOpNull), userDefined(false), endLine(0), useEmulatedFunction(false) { }
+    TIntermAggregate(TOperator o) : TIntermOperator(o), useEmulatedFunction(false) { }
+    ~TIntermAggregate() { }
 
     virtual TIntermAggregate* getAsAggregate() { return this; }
     virtual void traverse(TIntermTraverser*);
@@ -452,14 +460,13 @@ public:
     const TString& getName() const { return name; }
 
     void setUserDefined() { userDefined = true; }
-    bool isUserDefined() { return userDefined; }
+    bool isUserDefined() const { return userDefined; }
 
     void setOptimize(bool o) { optimize = o; }
     bool getOptimize() { return optimize; }
     void setDebug(bool d) { debug = d; }
     bool getDebug() { return debug; }
-    void addToPragmaTable(const TPragmaTable& pTable);
-    const TPragmaTable& getPragmaTable() const { return *pragmaTable; }
+
     void setEndLine(TSourceLoc line) { endLine = line; }
     TSourceLoc getEndLine() const { return endLine; }
 
@@ -475,7 +482,6 @@ protected:
 
     bool optimize;
     bool debug;
-    TPragmaTable *pragmaTable;
     TSourceLoc endLine;
 
     // If set to true, replace the built-in function call with an emulated one
@@ -533,6 +539,7 @@ public:
             postVisit(postVisit),
             rightToLeft(rightToLeft),
             depth(0) {}
+    virtual ~TIntermTraverser() {};
 
     virtual void visitSymbol(TIntermSymbol*) {}
     virtual void visitConstantUnion(TIntermConstantUnion*) {}
@@ -545,6 +552,10 @@ public:
 
     void incrementDepth() {depth++;}
     void decrementDepth() {depth--;}
+
+    // Return the original name if hash function pointer is NULL;
+    // otherwise return the hashed name.
+    static TString hash(const TString& name, ShHashFunction64 hashFunction);
 
     const bool preVisit;
     const bool inVisit;

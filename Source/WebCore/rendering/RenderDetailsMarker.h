@@ -21,17 +21,14 @@
 #ifndef RenderDetailsMarker_h
 #define RenderDetailsMarker_h
 
-#if ENABLE(DETAILS)
-
+#if ENABLE(DETAILS_ELEMENT) || ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "RenderBlock.h"
 
 namespace WebCore {
 
-class RenderDetails;
-
 class RenderDetailsMarker : public RenderBlock {
 public:
-    RenderDetailsMarker(Node*);
+    RenderDetailsMarker(Element*);
 
     enum Orientation { Up, Down, Left, Right };
 
@@ -44,19 +41,18 @@ private:
 
     bool isOpen() const;
     Path getCanonicalPath() const;
-    Path getPath(const IntPoint& origin) const;
-    RenderDetails* details() const;
+    Path getPath(const LayoutPoint& origin) const;
 };
 
 inline RenderDetailsMarker* toRenderDetailsMarker(RenderObject* object)
 {
-    ASSERT(!object || object->isDetailsMarker());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isDetailsMarker());
     return static_cast<RenderDetailsMarker*>(object);
 }
 
 inline const RenderDetailsMarker* toRenderDetailsMarker(const RenderObject* object)
 {
-    ASSERT(!object || object->isDetailsMarker());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isDetailsMarker());
     return static_cast<const RenderDetailsMarker*>(object);
 }
 

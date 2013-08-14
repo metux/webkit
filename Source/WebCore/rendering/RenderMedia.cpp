@@ -29,6 +29,7 @@
 #include "RenderMedia.h"
 
 #include "HTMLMediaElement.h"
+#include "RenderFlowThread.h"
 #include "RenderView.h"
 
 namespace WebCore {
@@ -57,6 +58,7 @@ HTMLMediaElement* RenderMedia::mediaElement() const
 
 void RenderMedia::layout()
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     LayoutSize oldSize = contentBoxRect().size();
 
     RenderImage::layout();
@@ -65,8 +67,18 @@ void RenderMedia::layout()
     if (!controlsRenderer)
         return;
 
+    bool controlsNeedLayout = controlsRenderer->needsLayout();
+    // If the region chain has changed we also need to relayout the controls to update the region box info.
+    // FIXME: We can do better once we compute region box info for RenderReplaced, not only for RenderBlock.
+    if (inRenderFlowThread() && !controlsNeedLayout) {
+        const RenderFlowThread* flowThread = enclosingRenderFlowThread();
+        ASSERT(flowThread);
+        if (flowThread->pageLogicalSizeChanged())
+            controlsNeedLayout = true;
+    }
+
     LayoutSize newSize = contentBoxRect().size();
-    if (newSize == oldSize && !controlsRenderer->needsLayout())
+    if (newSize == oldSize && !controlsNeedLayout)
         return;
 
     // When calling layout() on a child node, a parent must either push a LayoutStateMaintainter, or 
@@ -77,11 +89,15 @@ void RenderMedia::layout()
     controlsRenderer->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
     controlsRenderer->style()->setHeight(Length(newSize.height(), Fixed));
     controlsRenderer->style()->setWidth(Length(newSize.width(), Fixed));
-    controlsRenderer->setNeedsLayout(true, false);
+    controlsRenderer->setNeedsLayout(true, MarkOnlyThis);
     controlsRenderer->layout();
     setChildNeedsLayout(false);
 
     statePusher.pop();
+}
+
+void RenderMedia::paintReplaced(PaintInfo&, const LayoutPoint&)
+{
 }
 
 } // namespace WebCore

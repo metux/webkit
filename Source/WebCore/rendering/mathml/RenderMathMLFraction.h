@@ -41,12 +41,16 @@ public:
     
     virtual RenderMathMLOperator* unembellishedOperator();
     
-    virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const; 
+    virtual int firstLineBoxBaseline() const OVERRIDE;
     virtual void paint(PaintInfo&, const LayoutPoint&);
 protected:
     virtual void layout();
     
 private:
+    virtual bool isRenderMathMLFraction() const { return true; }
+    void fixChildStyle(RenderObject* child);
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) OVERRIDE;
+
     virtual const char* renderName() const { return "RenderMathMLFraction"; }
     
     float m_lineThickness;

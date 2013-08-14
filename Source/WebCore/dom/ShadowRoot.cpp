@@ -27,37 +27,50 @@
 #include "config.h"
 #include "ShadowRoot.h"
 
-#include "Document.h"
-#include "Element.h"
-#include "HTMLContentElement.h"
-#include "HTMLContentSelector.h"
-#include "HTMLNames.h"
-#include "NodeRareData.h"
-#include "ShadowRootList.h"
-#include "SVGNames.h"
-#include "Text.h"
-
-#if ENABLE(SHADOW_DOM)
+#include "ContentDistributor.h"
+#include "ElementShadow.h"
+#include "HistogramSupport.h"
+#include "InsertionPoint.h"
 #include "RuntimeEnabledFeatures.h"
-#endif
+#include "StyleResolver.h"
+#include "Text.h"
+#include "markup.h"
 
 namespace WebCore {
 
-ShadowRoot::ShadowRoot(Document* document)
+struct SameSizeAsShadowRoot : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
+    void* pointers[3];
+    unsigned countersAndFlags[1];
+};
+
+COMPILE_ASSERT(sizeof(ShadowRoot) == sizeof(SameSizeAsShadowRoot), shadowroot_should_stay_small);
+
+enum ShadowRootUsageOriginType {
+    ShadowRootUsageOriginWeb = 0,
+    ShadowRootUsageOriginNotWeb,
+    ShadowRootUsageOriginMax
+};
+
+ShadowRoot::ShadowRoot(Document* document, ShadowRootType type)
     : DocumentFragment(document, CreateShadowRoot)
-    , TreeScope(this)
+    , TreeScope(this, document)
     , m_prev(0)
     , m_next(0)
-    , m_applyAuthorSheets(false)
-    , m_needsRecalculateContent(false)
+    , m_numberOfStyles(0)
+    , m_applyAuthorStyles(false)
+    , m_resetStyleInheritance(false)
+    , m_type(type)
+    , m_registeredWithParentShadowRoot(false)
 {
     ASSERT(document);
-    
-    // Assume document as parent scope.
-    setParentTreeScope(document);
-    // Shadow tree scopes have the scope pointer point to themselves.
-    // This way, direct children will receive the correct scope pointer.
-    ensureRareData()->setTreeScope(this);
+    setTreeScope(this);
+
+#if PLATFORM(CHROMIUM)
+    if (type == ShadowRoot::AuthorShadowRoot) {
+        ShadowRootUsageOriginType usageType = document->url().protocolIsInHTTPFamily() ? ShadowRootUsageOriginWeb : ShadowRootUsageOriginNotWeb;
+        HistogramSupport::histogramEnumeration("WebCore.ShadowRoot.constructor", usageType, ShadowRootUsageOriginMax);
+    }
+#endif
 }
 
 ShadowRoot::~ShadowRoot()
@@ -65,81 +78,37 @@ ShadowRoot::~ShadowRoot()
     ASSERT(!m_prev);
     ASSERT(!m_next);
 
+    // We must remove all of our children first before the TreeScope destructor
+    // runs so we don't go through TreeScopeAdopter for each child with a
+    // destructed tree scope in each descendant.
+    removeDetachedChildren();
+
     // We must call clearRareData() here since a ShadowRoot class inherits TreeScope
     // as well as Node. See a comment on TreeScope.h for the reason.
     if (hasRareData())
         clearRareData();
 }
 
-static bool allowsAuthorShadowRoot(Element* element)
+PassRefPtr<Node> ShadowRoot::cloneNode(bool, ExceptionCode& ec)
 {
-    // FIXME: MEDIA recreates shadow root dynamically.
-    // https://bugs.webkit.org/show_bug.cgi?id=77936
-    if (element->hasTagName(HTMLNames::videoTag) || element->hasTagName(HTMLNames::audioTag))
-        return false;
-
-    // FIXME: ValidationMessage recreates shadow root dynamically.
-    // https://bugs.webkit.org/show_bug.cgi?id=77937
-    // Especially, INPUT recreates shadow root dynamically.
-    // https://bugs.webkit.org/show_bug.cgi?id=77930
-    if (element->isFormControlElement())
-        return false;
-
-    // FIXME: We disable multiple shadow subtrees for SVG for while, because there will be problems to support it.
-    // https://bugs.webkit.org/show_bug.cgi?id=78205
-    // Especially SVG TREF recreates shadow root dynamically.
-    // https://bugs.webkit.org/show_bug.cgi?id=77938
-    if (element->isSVGElement())
-        return false;
-
-    return true;
-}
-
-PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ExceptionCode& ec)
-{
-    return create(element, CreatingAuthorShadowRoot, ec);
-}
-
-PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPurpose purpose, ExceptionCode& ec)
-{
-#if ENABLE(SHADOW_DOM)
-    bool isMultipleShadowSubtreesEnabled = RuntimeEnabledFeatures::multipleShadowSubtreesEnabled();
-#else
-    bool isMultipleShadowSubtreesEnabled = false;
-#endif
-
-    if (!element || (!isMultipleShadowSubtreesEnabled && element->hasShadowRoot())) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return 0;
-    }
-
-    // Since some elements recreates shadow root dynamically, multiple shadow subtrees won't work well in that element.
-    // Until they are fixed, we disable adding author shadow root for them.
-    if (purpose == CreatingAuthorShadowRoot && !allowsAuthorShadowRoot(element)) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return 0;
-    }
-
-    ASSERT(purpose != CreatingUserAgentShadowRoot || !element->hasShadowRoot());
-    RefPtr<ShadowRoot> shadowRoot = adoptRef(new ShadowRoot(element->document()));
-
-    ec = 0;
-    element->setShadowRoot(shadowRoot, ec);
-    if (ec)
-        return 0;
-
-    return shadowRoot.release();
-}
-
-String ShadowRoot::nodeName() const
-{
-    return "#shadow-root";
-}
-
-PassRefPtr<Node> ShadowRoot::cloneNode(bool)
-{
-    // ShadowRoot should not be arbitrarily cloned.
+    ec = DATA_CLONE_ERR;
     return 0;
+}
+
+String ShadowRoot::innerHTML() const
+{
+    return createMarkup(this, ChildrenOnly);
+}
+
+void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
+{
+    if (isOrphan()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, host(), AllowScriptingContent, ec))
+        replaceChildrenWithFragment(this, fragment.release(), ec);
 }
 
 bool ShadowRoot::childTypeAllowed(NodeType type) const
@@ -157,117 +126,132 @@ bool ShadowRoot::childTypeAllowed(NodeType type) const
     }
 }
 
-void ShadowRoot::recalcShadowTreeStyle(StyleChange change)
+void ShadowRoot::recalcStyle(StyleChange change)
 {
-    if (needsReattachHostChildrenAndShadow())
-        reattachHostChildrenAndShadow();
-    else {
-        for (Node* n = firstChild(); n; n = n->nextSibling()) {
-            if (n->isElementNode())
-                static_cast<Element*>(n)->recalcStyle(change);
-            else if (n->isTextNode())
-                toText(n)->recalcTextStyle(change);
-        }
+    // ShadowRoot doesn't support custom callbacks.
+    ASSERT(!hasCustomStyleCallbacks());
+
+    StyleResolver* styleResolver = document()->styleResolver();
+    styleResolver->pushParentShadowRoot(this);
+
+    for (Node* child = firstChild(); child; child = child->nextSibling()) {
+        if (child->isElementNode())
+            static_cast<Element*>(child)->recalcStyle(change);
+        else if (child->isTextNode())
+            toText(child)->recalcTextStyle(change);
     }
 
-    clearNeedsReattachHostChildrenAndShadow();
+    styleResolver->popParentShadowRoot(this);
     clearNeedsStyleRecalc();
     clearChildNeedsStyleRecalc();
 }
 
-void ShadowRoot::setNeedsReattachHostChildrenAndShadow()
+void ShadowRoot::setApplyAuthorStyles(bool value)
 {
-    m_needsRecalculateContent = true;
-    if (shadowHost())
-        shadowHost()->setNeedsStyleRecalc();
-}
-
-HTMLContentElement* ShadowRoot::insertionPointFor(Node* node) const
-{
-    if (!m_selector)
-        return 0;
-    HTMLContentSelection* found = m_selector->findFor(node);
-    if (!found)
-        return 0;
-    return found->insertionPoint();
-}
-
-void ShadowRoot::hostChildrenChanged()
-{
-    if (!hasContentElement())
+    if (isOrphan())
         return;
 
-    // This results in forced detaching/attaching of the shadow render tree. See ShadowRoot::recalcStyle().
-    setNeedsReattachHostChildrenAndShadow();
-}
-
-bool ShadowRoot::isSelectorActive() const
-{
-    return m_selector && m_selector->hasCandidates();
-}
-
-bool ShadowRoot::hasContentElement() const
-{
-    for (Node* n = firstChild(); n; n = n->traverseNextNode(this)) {
-        if (n->isContentElement())
-            return true;
+    if (m_applyAuthorStyles != value) {
+        m_applyAuthorStyles = value;
+        host()->setNeedsStyleRecalc();
     }
-
-    return false;
 }
 
-bool ShadowRoot::applyAuthorSheets() const
+void ShadowRoot::setResetStyleInheritance(bool value)
 {
-    return m_applyAuthorSheets;
-}
+    if (isOrphan())
+        return;
 
-void ShadowRoot::setApplyAuthorSheets(bool value)
-{
-    m_applyAuthorSheets = value;
+    if (value != m_resetStyleInheritance) {
+        m_resetStyleInheritance = value;
+        if (attached() && owner())
+            owner()->recalcStyle(Force);
+    }
 }
 
 void ShadowRoot::attach()
 {
-    // Children of m_selector is populated lazily in
-    // ensureSelector(), and here we just ensure that
-    // it is in clean state.
-    ASSERT(!m_selector || !m_selector->hasCandidates());
+    StyleResolver* styleResolver = document()->styleResolver();
+    styleResolver->pushParentShadowRoot(this);
     DocumentFragment::attach();
-    if (m_selector)
-        m_selector->didSelect();
+    styleResolver->popParentShadowRoot(this);
 }
 
-void ShadowRoot::reattachHostChildrenAndShadow()
+Node::InsertionNotificationRequest ShadowRoot::insertedInto(ContainerNode* insertionPoint)
 {
-    Node* hostNode = host();
-    if (!hostNode)
+    DocumentFragment::insertedInto(insertionPoint);
+
+    if (!insertionPoint->inDocument() || !isOldest())
+        return InsertionDone;
+
+    // FIXME: When parsing <video controls>, insertedInto() is called many times without invoking removedFrom.
+    // For now, we check m_registeredWithParentShadowroot. We would like to ASSERT(!m_registeredShadowRoot) here.
+    // https://bugs.webkit.org/show_bug.cig?id=101316
+    if (m_registeredWithParentShadowRoot)
+        return InsertionDone;
+
+    if (ShadowRoot* root = host()->containingShadowRoot()) {
+        root->ensureScopeDistribution()->registerElementShadow();
+        m_registeredWithParentShadowRoot = true;
+    }
+
+    return InsertionDone;
+}
+
+void ShadowRoot::removedFrom(ContainerNode* insertionPoint)
+{
+    if (insertionPoint->inDocument() && m_registeredWithParentShadowRoot) {
+        ShadowRoot* root = host()->containingShadowRoot();
+        if (!root)
+            root = insertionPoint->containingShadowRoot();
+
+        if (root && root->scopeDistribution())
+            root->scopeDistribution()->unregisterElementShadow();
+        m_registeredWithParentShadowRoot = false;
+    }
+
+    DocumentFragment::removedFrom(insertionPoint);
+}
+
+void ShadowRoot::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+{
+    if (isOrphan())
         return;
 
-    for (Node* child = hostNode->firstChild(); child; child = child->nextSibling()) {
-        if (child->attached())
-            child->detach();
-    }
-
-    reattach();
-
-    for (Node* child = hostNode->firstChild(); child; child = child->nextSibling()) {
-        if (!child->attached())
-            child->attach();
-    }
+    ContainerNode::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    owner()->invalidateDistribution();
 }
 
-HTMLContentSelector* ShadowRoot::selector() const
+void ShadowRoot::registerScopedHTMLStyleChild()
 {
-    return m_selector.get();
+    ++m_numberOfStyles;
+    setHasScopedHTMLStyleChild(true);
 }
 
-HTMLContentSelector* ShadowRoot::ensureSelector()
+void ShadowRoot::unregisterScopedHTMLStyleChild()
 {
-    if (!m_selector)
-        m_selector = adoptPtr(new HTMLContentSelector());
-    m_selector->willSelectOver(this);
-    return m_selector.get();
+    ASSERT(hasScopedHTMLStyleChild() && m_numberOfStyles > 0);
+    --m_numberOfStyles;
+    setHasScopedHTMLStyleChild(m_numberOfStyles > 0);
 }
 
+ScopeContentDistribution* ShadowRoot::ensureScopeDistribution()
+{
+    if (m_scopeDistribution)
+        return m_scopeDistribution.get();
+
+    m_scopeDistribution = adoptPtr(new ScopeContentDistribution);
+    return m_scopeDistribution.get();
+}   
+
+void ShadowRoot::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    DocumentFragment::reportMemoryUsage(memoryObjectInfo);
+    TreeScope::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_prev, "prev");
+    info.addMember(m_next, "next");
+    info.addMember(m_scopeDistribution, "scopeDistribution");
+}
 
 }

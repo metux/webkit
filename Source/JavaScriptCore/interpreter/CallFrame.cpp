@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2013 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #include "CodeBlock.h"
 #include "Interpreter.h"
+#include "Operations.h"
 
 namespace JSC {
 
@@ -36,20 +37,43 @@ void CallFrame::dumpCaller()
 {
     int signedLineNumber;
     intptr_t sourceID;
-    UString urlString;
+    String urlString;
     JSValue function;
     
     interpreter()->retrieveLastCaller(this, signedLineNumber, sourceID, urlString, function);
-    dataLog("Callpoint => %s:%d\n", urlString.utf8().data(), signedLineNumber);
+    dataLogF("Callpoint => %s:%d\n", urlString.utf8().data(), signedLineNumber);
 }
 
-RegisterFile* CallFrame::registerFile()
+JSStack* CallFrame::stack()
 {
-    return &interpreter()->registerFile();
+    return &interpreter()->stack();
 }
 
 #endif
 
+#if USE(JSVALUE32_64)
+unsigned CallFrame::bytecodeOffsetForNonDFGCode() const
+{
+    ASSERT(codeBlock());
+    return currentVPC() - codeBlock()->instructions().begin();
+}
+
+void CallFrame::setBytecodeOffsetForNonDFGCode(unsigned offset)
+{
+    ASSERT(codeBlock());
+    setCurrentVPC(codeBlock()->instructions().begin() + offset);
+}
+#else
+Instruction* CallFrame::currentVPC() const
+{
+    return codeBlock()->instructions().begin() + bytecodeOffsetForNonDFGCode();
+}
+void CallFrame::setCurrentVPC(Instruction* vpc)
+{
+    setBytecodeOffsetForNonDFGCode(vpc - codeBlock()->instructions().begin());
+}
+#endif
+    
 #if ENABLE(DFG_JIT)
 bool CallFrame::isInlineCallFrameSlow()
 {
@@ -58,7 +82,7 @@ bool CallFrame::isInlineCallFrameSlow()
     JSCell* calleeAsFunctionCell = getJSFunction(callee());
     if (!calleeAsFunctionCell)
         return false;
-    JSFunction* calleeAsFunction = asFunction(calleeAsFunctionCell);
+    JSFunction* calleeAsFunction = jsCast<JSFunction*>(calleeAsFunctionCell);
     return calleeAsFunction->executable() != codeBlock()->ownerExecutable();
 }
 
@@ -115,8 +139,8 @@ CallFrame* CallFrame::trueCallFrame(AbstractPC pc)
         
         // Fill in the inlinedCaller
         inlinedCaller->setCodeBlock(machineCodeBlock);
-        
-        inlinedCaller->setScopeChain(calleeAsFunction->scope());
+        if (calleeAsFunction)
+            inlinedCaller->setScope(calleeAsFunction->scope());
         if (nextInlineCallFrame)
             inlinedCaller->setCallerFrame(this + nextInlineCallFrame->stackOffset);
         else
@@ -124,7 +148,8 @@ CallFrame* CallFrame::trueCallFrame(AbstractPC pc)
         
         inlinedCaller->setInlineCallFrame(inlineCallFrame);
         inlinedCaller->setArgumentCountIncludingThis(inlineCallFrame->arguments.size());
-        inlinedCaller->setCallee(calleeAsFunction);
+        if (calleeAsFunction)
+            inlinedCaller->setCallee(calleeAsFunction);
         
         inlineCallFrame = nextInlineCallFrame;
     }
@@ -140,10 +165,10 @@ CallFrame* CallFrame::trueCallerFrame()
     //
     // machineCaller -> The caller according to the machine, which may be zero or
     //    more frames above the true caller due to inlining.
-    
+
     // Am I an inline call frame? If so, we're done.
     if (isInlineCallFrame())
-        return callerFrame();
+        return callerFrame()->removeHostCallFrameFlag();
     
     // I am a machine call frame, so the question is: is my caller a machine call frame
     // that has inlines or a machine call frame that doesn't?
@@ -153,11 +178,28 @@ CallFrame* CallFrame::trueCallerFrame()
     ASSERT(!machineCaller->isInlineCallFrame());
     
     // Figure out how we want to get the current code location.
-    if (hasHostCallFrameFlag() || returnAddressIsInCtiTrampoline(returnPC()))
-        return machineCaller->trueCallFrameFromVMCode();
+    if (!hasReturnPC() || returnAddressIsInCtiTrampoline(returnPC()))
+        return machineCaller->trueCallFrameFromVMCode()->removeHostCallFrameFlag();
     
-    return machineCaller->trueCallFrame(returnPC());
+    return machineCaller->trueCallFrame(returnPC())->removeHostCallFrameFlag();
 }
+
+CodeBlock* CallFrame::someCodeBlockForPossiblyInlinedCode()
+{
+    if (!isInlineCallFrame())
+        return codeBlock();
+    
+    return jsCast<FunctionExecutable*>(inlineCallFrame()->executable.get())->baselineCodeBlockFor(
+        inlineCallFrame()->isCall ? CodeForCall : CodeForConstruct);
+}
+
 #endif
+
+Register* CallFrame::frameExtentInternal()
+{
+    CodeBlock* codeBlock = this->codeBlock();
+    ASSERT(codeBlock);
+    return registers() + codeBlock->m_numCalleeRegisters;
+}
 
 }

@@ -31,6 +31,20 @@
 #include "IntPoint.h"
 #include <wtf/MathExtras.h>
 
+#if PLATFORM(QT)
+QT_BEGIN_NAMESPACE
+class QSizeF;
+QT_END_NAMESPACE
+#endif
+
+#if PLATFORM(BLACKBERRY)
+namespace BlackBerry {
+namespace Platform {
+class FloatSize;
+}
+}
+#endif
+
 #if USE(CG) || (PLATFORM(WX) && OS(DARWIN)) || USE(SKIA_ON_MAC_CHROMIUM)
 typedef struct CGSize CGSize;
 #endif
@@ -46,14 +60,14 @@ typedef struct _NSSize NSSize;
 namespace WebCore {
 
 class IntSize;
-class FractionalLayoutSize;
+class LayoutSize;
 
 class FloatSize {
 public:
     FloatSize() : m_width(0), m_height(0) { }
     FloatSize(float width, float height) : m_width(width), m_height(height) { }
     FloatSize(const IntSize&);
-    FloatSize(const FractionalLayoutSize&);
+    FloatSize(const LayoutSize&);
 
     static FloatSize narrowPrecision(double width, double height);
 
@@ -106,13 +120,24 @@ public:
         return FloatSize(m_height, m_width);
     }
 
+#if PLATFORM(QT)
+    explicit FloatSize(const QSizeF&);
+    operator QSizeF() const;
+#endif
+
+#if PLATFORM(BLACKBERRY)
+    FloatSize(const BlackBerry::Platform::FloatSize&);
+    operator BlackBerry::Platform::FloatSize() const;
+#endif
+
 #if USE(CG) || (PLATFORM(WX) && OS(DARWIN)) || USE(SKIA_ON_MAC_CHROMIUM)
     explicit FloatSize(const CGSize&); // don't do this implicitly since it's lossy
     operator CGSize() const;
 #endif
 
-#if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)) \
-        || (PLATFORM(CHROMIUM) && OS(DARWIN)) || (PLATFORM(QT) && USE(QTKIT))
+#if (PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))) \
+        && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES) \
+        || (PLATFORM(QT) && USE(QTKIT))
     explicit FloatSize(const NSSize &); // don't do this implicitly since it's lossy
     operator NSSize() const;
 #endif
@@ -150,6 +175,16 @@ inline FloatSize operator-(const FloatSize& size)
     return FloatSize(-size.width(), -size.height());
 }
 
+inline FloatSize operator*(const FloatSize& a, const float b)
+{
+    return FloatSize(a.width() * b, a.height() * b);
+}
+
+inline FloatSize operator*(const float a, const FloatSize& b)
+{
+    return FloatSize(a * b.width(), a * b.height());
+}
+
 inline bool operator==(const FloatSize& a, const FloatSize& b)
 {
     return a.width() == b.width() && a.height() == b.height();
@@ -162,7 +197,12 @@ inline bool operator!=(const FloatSize& a, const FloatSize& b)
 
 inline IntSize roundedIntSize(const FloatSize& p)
 {
-    return IntSize(static_cast<int>(roundf(p.width())), static_cast<int>(roundf(p.height())));
+    return IntSize(clampToInteger(roundf(p.width())), clampToInteger(roundf(p.height())));
+}
+
+inline IntSize flooredIntSize(const FloatSize& p)
+{
+    return IntSize(clampToInteger(floorf(p.width())), clampToInteger(floorf(p.height())));
 }
 
 inline IntSize expandedIntSize(const FloatSize& p)
@@ -172,7 +212,7 @@ inline IntSize expandedIntSize(const FloatSize& p)
 
 inline IntPoint flooredIntPoint(const FloatSize& p)
 {
-    return IntPoint(static_cast<int>(p.width()), static_cast<int>(p.height()));
+    return IntPoint(clampToInteger(floorf(p.width())), clampToInteger(floorf(p.height())));
 }
 
 } // namespace WebCore

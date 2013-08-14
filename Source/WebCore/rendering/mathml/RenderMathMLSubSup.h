@@ -32,30 +32,32 @@
 
 namespace WebCore {
     
+// Render a base with a subscript and/or a superscript.
 class RenderMathMLSubSup : public RenderMathMLBlock {
 public:
     RenderMathMLSubSup(Element*);
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
     
     virtual RenderMathMLOperator* unembellishedOperator();
-    virtual bool hasBase() const { return true; }
-    virtual int nonOperatorHeight() const;
-    virtual void stretchToHeight(int pixelHeight);
-    virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
 protected:
     virtual void layout();
     
 private:
+    virtual bool isRenderMathMLSubSup() const { return true; }
+    void fixAnonymousStyles();
+
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) OVERRIDE;
+
     virtual const char* renderName() const { return "RenderMathMLSubSup"; }
 
     // Omit our subscript and/or superscript. This may return 0 for a non-MathML base (which
     // won't occur in valid MathML).
     RenderBoxModelObject* base() const;
     
-    enum SubSupType { Sub, Sup, SubSup };
+    enum SubSupType { Sub, Super, SubSup };
     SubSupType m_kind;
-    RenderBlock* m_scripts;
+    RenderMathMLBlock* m_scripts;
 };
     
 }

@@ -55,20 +55,21 @@ WebKitWebFrame
 @arg1: 
 @arg2: 
 
-<!-- ##### SIGNAL WebKitWebFrame::load-committed ##### -->
-<para>
-
-</para>
-
-@webkitwebframe: the object which received the signal.
-
-<!-- ##### SIGNAL WebKitWebFrame::load-done ##### -->
+<!-- ##### SIGNAL WebKitWebFrame::insecure-content-run ##### -->
 <para>
 
 </para>
 
 @webkitwebframe: the object which received the signal.
 @arg1: 
+@arg2: 
+
+<!-- ##### SIGNAL WebKitWebFrame::load-committed ##### -->
+<para>
+
+</para>
+
+@webkitwebframe: the object which received the signal.
 
 <!-- ##### SIGNAL WebKitWebFrame::resource-content-length-received ##### -->
 <para>
@@ -172,6 +173,15 @@ WebKitWebFrame
 
 
 <!-- ##### FUNCTION webkit_web_frame_get_data_source ##### -->
+<para>
+
+</para>
+
+@frame: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_frame_get_dom_document ##### -->
 <para>
 
 </para>

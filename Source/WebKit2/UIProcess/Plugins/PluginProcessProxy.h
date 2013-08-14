@@ -28,8 +28,10 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
+#include "ChildProcessProxy.h"
 #include "Connection.h"
 #include "PluginModuleInfo.h"
+#include "PluginProcess.h"
 #include "ProcessLauncher.h"
 #include "WebProcessProxyMessages.h"
 #include <wtf/Deque.h>
@@ -52,9 +54,17 @@ class WebPluginSiteDataManager;
 class WebProcessProxy;
 struct PluginProcessCreationParameters;
 
-class PluginProcessProxy : CoreIPC::Connection::Client, ProcessLauncher::Client {
+#if PLUGIN_ARCHITECTURE(X11)
+struct RawPluginMetaData {
+    String name;
+    String description;
+    String mimeDescription;
+};
+#endif
+
+class PluginProcessProxy : public ChildProcessProxy {
 public:
-    static PassOwnPtr<PluginProcessProxy> create(PluginProcessManager*, const PluginModuleInfo&);
+    static PassRefPtr<PluginProcessProxy> create(PluginProcessManager*, const PluginModuleInfo&, PluginProcess::Type);
     ~PluginProcessProxy();
 
     const PluginModuleInfo& pluginInfo() const { return m_pluginInfo; }
@@ -69,10 +79,13 @@ public:
     // Asks the plug-in process to clear the data for the given sites.
     void clearSiteData(WebPluginSiteDataManager*, const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
 
-    // Terminates the plug-in process.
-    void terminate();
+    bool isValid() const { return m_connection; }
+
+    PluginProcess::Type processType() const { return m_processType; }
 
 #if PLATFORM(MAC)
+    void setProcessSuppressionEnabled(bool);
+
     // Returns whether the plug-in needs the heap to be marked executable.
     static bool pluginNeedsExecutableHeap(const PluginModuleInfo&);
 
@@ -80,23 +93,29 @@ public:
     static bool createPropertyListFile(const PluginModuleInfo&);
 #endif
 
+#if PLUGIN_ARCHITECTURE(X11)
+    static bool scanPlugin(const String& pluginPath, RawPluginMetaData& result);
+#endif
+
 private:
-    PluginProcessProxy(PluginProcessManager*, const PluginModuleInfo&);
+    PluginProcessProxy(PluginProcessManager*, const PluginModuleInfo&, PluginProcess::Type);
+
+    virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) OVERRIDE;
+    void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&, const PluginModuleInfo&);
 
     void pluginProcessCrashedOrFailedToLaunch();
 
     // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    virtual void didClose(CoreIPC::Connection*);
-    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
-    virtual void syncMessageSendTimedOut(CoreIPC::Connection*);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didClose(CoreIPC::Connection*) OVERRIDE;
+    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 
     // ProcessLauncher::Client
     virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier);
 
     // Message handlers
-    void didReceivePluginProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didCreateWebProcessConnection(const CoreIPC::Attachment&);
+    void didReceivePluginProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    void didCreateWebProcessConnection(const CoreIPC::Attachment&, bool supportsAsynchronousPluginInitialization);
     void didGetSitesWithData(const Vector<String>& sites, uint64_t callbackID);
     void didClearSiteData(uint64_t callbackID);
 
@@ -127,9 +146,6 @@ private:
     // The connection to the plug-in host process.
     RefPtr<CoreIPC::Connection> m_connection;
 
-    // The process launcher for the plug-in host process.
-    RefPtr<ProcessLauncher> m_processLauncher;
-
     Deque<RefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply> > m_pendingConnectionReplies;
 
     Vector<uint64_t> m_pendingGetSitesRequests;
@@ -155,6 +171,8 @@ private:
     bool m_fullscreenWindowIsShowing;
     unsigned m_preFullscreenAppPresentationOptions;
 #endif
+
+    PluginProcess::Type m_processType;
 };
 
 } // namespace WebKit

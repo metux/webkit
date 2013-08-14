@@ -42,10 +42,6 @@ public:
     int width();
     int height();
 
-#if ENABLE(FULLSCREEN_API)
-    virtual bool allowFullScreen() const;
-#endif
-
     virtual bool canContainRangeEndPoint() const { return false; }
 
 protected:
@@ -53,16 +49,19 @@ protected:
 
     bool isURLAllowed() const;
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual void insertedIntoDocument();
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void didNotifySubtreeInsertions(ContainerNode*) OVERRIDE;
     virtual void attach();
 
 private:
     virtual bool supportsFocus() const;
-    virtual void setFocus(bool);
+    virtual void setFocus(bool) OVERRIDE;
     
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual bool isFrameElementBase() const { return true; }
+
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
     bool viewSourceMode() const { return m_viewSource; }
 
@@ -78,7 +77,6 @@ private:
     int m_marginHeight;
 
     bool m_viewSource;
-    bool m_remainsAliveOnRemovalFromTree;
 };
 
 } // namespace WebCore

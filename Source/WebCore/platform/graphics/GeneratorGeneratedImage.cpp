@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2010, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,12 +28,12 @@
 
 #include "FloatRect.h"
 #include "GraphicsContext.h"
-#include "ImageBuffer.h"
 #include "Length.h"
+#include "PlatformMemoryInstrumentation.h"
 
 namespace WebCore {
 
-void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp)
+void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode)
 {
     GraphicsContextStateSaver stateSaver(*destContext);
     destContext->setCompositeOperation(compositeOp);
@@ -46,7 +46,7 @@ void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect
 }
 
 void GeneratorGeneratedImage::drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
-                                 const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& destRect)
+    const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& destRect, BlendMode)
 {
     // Allow the generator to provide visually-equivalent tiling parameters for better performance.
     IntSize adjustedSize = m_size;
@@ -54,30 +54,45 @@ void GeneratorGeneratedImage::drawPattern(GraphicsContext* destContext, const Fl
     m_generator->adjustParametersForTiledDrawing(adjustedSize, adjustedSrcRect);
 
     // Factor in the destination context's scale to generate at the best resolution
-    AffineTransform destContextCTM = destContext->getCTM();
+    AffineTransform destContextCTM = destContext->getCTM(GraphicsContext::DefinitelyIncludeDeviceScale);
     double xScale = fabs(destContextCTM.xScale());
     double yScale = fabs(destContextCTM.yScale());
     AffineTransform adjustedPatternCTM = patternTransform;
     adjustedPatternCTM.scale(1.0 / xScale, 1.0 / yScale);
     adjustedSrcRect.scale(xScale, yScale);
 
-    // Create a BitmapImage and call drawPattern on it.
-    OwnPtr<ImageBuffer> imageBuffer = destContext->createCompatibleBuffer(adjustedSize);
-    if (!imageBuffer)
-        return;
+    unsigned generatorHash = m_generator->hash();
 
-    // Fill with the generated image.
-    GraphicsContext* graphicsContext = imageBuffer->context();
-    graphicsContext->fillRect(FloatRect(FloatPoint(), adjustedSize), *m_generator.get());
+    if (!m_cachedImageBuffer || m_cachedGeneratorHash != generatorHash || m_cachedAdjustedSize != adjustedSize || !destContext->isCompatibleWithBuffer(m_cachedImageBuffer.get())) {
+        m_cachedImageBuffer = destContext->createCompatibleBuffer(adjustedSize, m_generator->hasAlpha());
+        if (!m_cachedImageBuffer)
+            return;
+
+        // Fill with the generated image.
+        m_cachedImageBuffer->context()->fillRect(FloatRect(FloatPoint(), adjustedSize), *m_generator);
+
+        m_cachedGeneratorHash = generatorHash;
+        m_cachedAdjustedSize = adjustedSize;
+    }
 
     // Tile the image buffer into the context.
-    imageBuffer->drawPattern(destContext, adjustedSrcRect, adjustedPatternCTM, phase, styleColorSpace, compositeOp, destRect);
+    m_cachedImageBuffer->drawPattern(destContext, adjustedSrcRect, adjustedPatternCTM, phase, styleColorSpace, compositeOp, destRect);
+    m_cacheTimer.restart();
 }
 
-void GeneratedImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio)
+void GeneratorGeneratedImage::invalidateCacheTimerFired(DeferrableOneShotTimer<GeneratorGeneratedImage>*)
 {
-    Image::computeIntrinsicDimensions(intrinsicWidth, intrinsicHeight, intrinsicRatio);
-    intrinsicRatio = FloatSize();
+    m_cachedImageBuffer.clear();
+    m_cachedAdjustedSize = IntSize();
+}
+
+void GeneratorGeneratedImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
+    GeneratedImage::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_generator, "generator");
+    info.addMember(m_cachedImageBuffer, "cachedImageBuffer");
+    info.addMember(m_cacheTimer, "cacheTimer");
 }
 
 }

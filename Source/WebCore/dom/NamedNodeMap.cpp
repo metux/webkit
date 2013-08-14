@@ -3,7 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Peter Kelly (pmk@post.com)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
  *           (C) 2007 Eric Seidel (eric@webkit.org)
  *
  * This library is free software; you can redistribute it and/or
@@ -42,58 +42,47 @@ static inline bool shouldIgnoreAttributeCase(const Element* e)
 
 void NamedNodeMap::ref()
 {
-    ASSERT(m_element);
     m_element->ref();
 }
 
 void NamedNodeMap::deref()
 {
-    ASSERT(m_element);
     m_element->deref();
 }
 
-PassRefPtr<Node> NamedNodeMap::getNamedItem(const String& name) const
+PassRefPtr<Node> NamedNodeMap::getNamedItem(const AtomicString& name) const
 {
-    Attribute* a = m_attributeData.getAttributeItem(name, shouldIgnoreAttributeCase(m_element));
-    if (!a)
-        return 0;
-    
-    return a->createAttrIfNeeded(m_element);
+    return m_element->getAttributeNode(name);
 }
 
-PassRefPtr<Node> NamedNodeMap::getNamedItemNS(const String& namespaceURI, const String& localName) const
+PassRefPtr<Node> NamedNodeMap::getNamedItemNS(const AtomicString& namespaceURI, const AtomicString& localName) const
 {
-    return getNamedItem(QualifiedName(nullAtom, localName, namespaceURI));
+    return m_element->getAttributeNodeNS(namespaceURI, localName);
 }
 
-PassRefPtr<Node> NamedNodeMap::removeNamedItem(const String& name, ExceptionCode& ec)
+PassRefPtr<Node> NamedNodeMap::removeNamedItem(const AtomicString& name, ExceptionCode& ec)
 {
-    Attribute* a = m_attributeData.getAttributeItem(name, shouldIgnoreAttributeCase(m_element));
-    if (!a) {
+    size_t index = m_element->hasAttributes() ? m_element->getAttributeItemIndex(name, shouldIgnoreAttributeCase(m_element)) : notFound;
+    if (index == notFound) {
         ec = NOT_FOUND_ERR;
         return 0;
     }
-    
-    return removeNamedItem(a->name(), ec);
+    return m_element->detachAttribute(index);
 }
 
-PassRefPtr<Node> NamedNodeMap::removeNamedItemNS(const String& namespaceURI, const String& localName, ExceptionCode& ec)
+PassRefPtr<Node> NamedNodeMap::removeNamedItemNS(const AtomicString& namespaceURI, const AtomicString& localName, ExceptionCode& ec)
 {
-    return removeNamedItem(QualifiedName(nullAtom, localName, namespaceURI), ec);
-}
-
-PassRefPtr<Node> NamedNodeMap::getNamedItem(const QualifiedName& name) const
-{
-    Attribute* a = getAttributeItem(name);
-    if (!a)
+    size_t index = m_element->hasAttributes() ? m_element->getAttributeItemIndex(QualifiedName(nullAtom, localName, namespaceURI)) : notFound;
+    if (index == notFound) {
+        ec = NOT_FOUND_ERR;
         return 0;
-
-    return a->createAttrIfNeeded(m_element);
+    }
+    return m_element->detachAttribute(index);
 }
 
 PassRefPtr<Node> NamedNodeMap::setNamedItem(Node* node, ExceptionCode& ec)
 {
-    if (!m_element || !node) {
+    if (!node) {
         ec = NOT_FOUND_ERR;
         return 0;
     }
@@ -103,29 +92,8 @@ PassRefPtr<Node> NamedNodeMap::setNamedItem(Node* node, ExceptionCode& ec)
         ec = HIERARCHY_REQUEST_ERR;
         return 0;
     }
-    Attr* attr = static_cast<Attr*>(node);
 
-    Attribute* attribute = attr->attr();
-    size_t index = getAttributeItemIndex(attribute->name());
-    Attribute* oldAttribute = index != notFound ? attributeItem(index) : 0;
-    if (oldAttribute == attribute)
-        return node; // we know about it already
-
-    // INUSE_ATTRIBUTE_ERR: Raised if node is an Attr that is already an attribute of another Element object.
-    // The DOM user must explicitly clone Attr nodes to re-use them in other elements.
-    if (attr->ownerElement()) {
-        ec = INUSE_ATTRIBUTE_ERR;
-        return 0;
-    }
-
-    RefPtr<Attr> oldAttr;
-    if (oldAttribute) {
-        oldAttr = oldAttribute->createAttrIfNeeded(m_element);
-        m_attributeData.replaceAttribute(index, attribute, m_element);
-    } else
-        m_attributeData.addAttribute(attribute, m_element);
-
-    return oldAttr.release();
+    return m_element->setAttributeNode(static_cast<Attr*>(node), ec);
 }
 
 PassRefPtr<Node> NamedNodeMap::setNamedItemNS(Node* node, ExceptionCode& ec)
@@ -133,58 +101,18 @@ PassRefPtr<Node> NamedNodeMap::setNamedItemNS(Node* node, ExceptionCode& ec)
     return setNamedItem(node, ec);
 }
 
-PassRefPtr<Node> NamedNodeMap::removeNamedItem(const QualifiedName& name, ExceptionCode& ec)
-{
-    ASSERT(m_element);
-
-    size_t index = getAttributeItemIndex(name);
-    if (index == notFound) {
-        ec = NOT_FOUND_ERR;
-        return 0;
-    }
-
-    RefPtr<Attr> attr = m_attributeData.m_attributes[index]->createAttrIfNeeded(m_element);
-
-    removeAttribute(index);
-
-    return attr.release();
-}
-
 PassRefPtr<Node> NamedNodeMap::item(unsigned index) const
 {
     if (index >= length())
         return 0;
-
-    return m_attributeData.m_attributes[index]->createAttrIfNeeded(m_element);
+    return m_element->ensureAttr(m_element->attributeItem(index)->name());
 }
 
-void NamedNodeMap::detachFromElement()
+size_t NamedNodeMap::length() const
 {
-    // This can't happen if the holder of the map is JavaScript, because we mark the
-    // element if the map is alive. So it has no impact on web page behavior. Because
-    // of that, we can simply clear all the attributes to avoid accessing stale
-    // pointers to do things like create Attr objects.
-    m_element = 0;
-    m_attributeData.clearAttributes();
-}
-
-bool NamedNodeMap::mapsEquivalent(const NamedNodeMap* otherMap) const
-{
-    if (!otherMap)
-        return isEmpty();
-    
-    unsigned len = length();
-    if (len != otherMap->length())
-        return false;
-    
-    for (unsigned i = 0; i < len; i++) {
-        Attribute* attr = attributeItem(i);
-        Attribute* otherAttr = otherMap->getAttributeItem(attr->name());
-        if (!otherAttr || attr->value() != otherAttr->value())
-            return false;
-    }
-    
-    return true;
+    if (!m_element->hasAttributes())
+        return 0;
+    return m_element->attributeCount();
 }
 
 } // namespace WebCore

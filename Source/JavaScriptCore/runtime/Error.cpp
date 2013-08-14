@@ -34,6 +34,7 @@
 #include "JSObject.h"
 #include "JSString.h"
 #include "NativeErrorConstructor.h"
+#include "Operations.h"
 #include "SourceCode.h"
 
 #include <wtf/text/StringBuilder.h>
@@ -43,114 +44,108 @@ namespace JSC {
 static const char* linePropertyName = "line";
 static const char* sourceURLPropertyName = "sourceURL";
 
-JSObject* createError(JSGlobalObject* globalObject, const UString& message)
+JSObject* createError(JSGlobalObject* globalObject, const String& message)
 {
     ASSERT(!message.isEmpty());
     return ErrorInstance::create(globalObject->globalData(), globalObject->errorStructure(), message);
 }
 
-JSObject* createEvalError(JSGlobalObject* globalObject, const UString& message)
+JSObject* createEvalError(JSGlobalObject* globalObject, const String& message)
 {
     ASSERT(!message.isEmpty());
     return ErrorInstance::create(globalObject->globalData(), globalObject->evalErrorConstructor()->errorStructure(), message);
 }
 
-JSObject* createRangeError(JSGlobalObject* globalObject, const UString& message)
+JSObject* createRangeError(JSGlobalObject* globalObject, const String& message)
 {
     ASSERT(!message.isEmpty());
     return ErrorInstance::create(globalObject->globalData(), globalObject->rangeErrorConstructor()->errorStructure(), message);
 }
 
-JSObject* createReferenceError(JSGlobalObject* globalObject, const UString& message)
+JSObject* createReferenceError(JSGlobalObject* globalObject, const String& message)
 {
     ASSERT(!message.isEmpty());
     return ErrorInstance::create(globalObject->globalData(), globalObject->referenceErrorConstructor()->errorStructure(), message);
 }
 
-JSObject* createSyntaxError(JSGlobalObject* globalObject, const UString& message)
+JSObject* createSyntaxError(JSGlobalObject* globalObject, const String& message)
 {
     ASSERT(!message.isEmpty());
     return ErrorInstance::create(globalObject->globalData(), globalObject->syntaxErrorConstructor()->errorStructure(), message);
 }
 
-JSObject* createTypeError(JSGlobalObject* globalObject, const UString& message)
+JSObject* createTypeError(JSGlobalObject* globalObject, const String& message)
 {
     ASSERT(!message.isEmpty());
     return ErrorInstance::create(globalObject->globalData(), globalObject->typeErrorConstructor()->errorStructure(), message);
 }
 
-JSObject* createURIError(JSGlobalObject* globalObject, const UString& message)
+JSObject* createNotEnoughArgumentsError(JSGlobalObject* globalObject)
+{
+    return createTypeError(globalObject, ASCIILiteral("Not enough arguments"));
+}
+
+JSObject* createURIError(JSGlobalObject* globalObject, const String& message)
 {
     ASSERT(!message.isEmpty());
     return ErrorInstance::create(globalObject->globalData(), globalObject->URIErrorConstructor()->errorStructure(), message);
 }
 
-JSObject* createError(ExecState* exec, const UString& message)
+JSObject* createError(ExecState* exec, const String& message)
 {
     return createError(exec->lexicalGlobalObject(), message);
 }
 
-JSObject* createEvalError(ExecState* exec, const UString& message)
+JSObject* createEvalError(ExecState* exec, const String& message)
 {
     return createEvalError(exec->lexicalGlobalObject(), message);
 }
 
-JSObject* createRangeError(ExecState* exec, const UString& message)
+JSObject* createRangeError(ExecState* exec, const String& message)
 {
     return createRangeError(exec->lexicalGlobalObject(), message);
 }
 
-JSObject* createReferenceError(ExecState* exec, const UString& message)
+JSObject* createReferenceError(ExecState* exec, const String& message)
 {
     return createReferenceError(exec->lexicalGlobalObject(), message);
 }
 
-JSObject* createSyntaxError(ExecState* exec, const UString& message)
+JSObject* createSyntaxError(ExecState* exec, const String& message)
 {
     return createSyntaxError(exec->lexicalGlobalObject(), message);
 }
 
-JSObject* createTypeError(ExecState* exec, const UString& message)
+JSObject* createTypeError(ExecState* exec, const String& message)
 {
     return createTypeError(exec->lexicalGlobalObject(), message);
 }
 
-JSObject* createURIError(ExecState* exec, const UString& message)
+JSObject* createNotEnoughArgumentsError(ExecState* exec)
+{
+    return createNotEnoughArgumentsError(exec->lexicalGlobalObject());
+}
+
+JSObject* createURIError(ExecState* exec, const String& message)
 {
     return createURIError(exec->lexicalGlobalObject(), message);
 }
 
-JSObject* addErrorInfo(JSGlobalData* globalData, JSObject* error, int line, const SourceCode& source, const Vector<StackFrame>& stackTrace)
+JSObject* addErrorInfo(CallFrame* callFrame, JSObject* error, int line, const SourceCode& source)
 {
-    const UString& sourceURL = source.provider()->url();
+    JSGlobalData* globalData = &callFrame->globalData();
+    const String& sourceURL = source.provider()->url();
 
     if (line != -1)
         error->putDirect(*globalData, Identifier(globalData, linePropertyName), jsNumber(line), ReadOnly | DontDelete);
     if (!sourceURL.isNull())
         error->putDirect(*globalData, Identifier(globalData, sourceURLPropertyName), jsString(globalData, sourceURL), ReadOnly | DontDelete);
-    if (!stackTrace.isEmpty()) {
-        JSGlobalObject* globalObject = 0;
-        if (isTerminatedExecutionException(error) || isInterruptedExecutionException(error))
-            globalObject = globalData->dynamicGlobalObject;
-        else
-            globalObject = error->globalObject();
-        StringBuilder builder;
-        for (unsigned i = 0; i < stackTrace.size(); i++) {
-            builder.append(String(stackTrace[i].toString(globalObject->globalExec()).impl()));
-            if (i != stackTrace.size() - 1)
-                builder.append('\n');
-        }
 
-        error->putDirect(*globalData, globalData->propertyNames->stack, jsString(globalData, UString(builder.toString().impl())), ReadOnly | DontDelete);
-    }
+    globalData->interpreter->addStackTraceIfNecessary(callFrame, error);
 
     return error;
 }
 
-JSObject* addErrorInfo(ExecState* exec, JSObject* error, int line, const SourceCode& source, const Vector<StackFrame>& stackTrace)
-{
-    return addErrorInfo(&exec->globalData(), error, line, source, stackTrace);
-}
 
 bool hasErrorInfo(ExecState* exec, JSObject* error)
 {
@@ -160,33 +155,34 @@ bool hasErrorInfo(ExecState* exec, JSObject* error)
 
 JSValue throwError(ExecState* exec, JSValue error)
 {
+    if (error.isObject())
+        return throwError(exec, asObject(error));
     exec->globalData().exception = error;
     return error;
 }
 
 JSObject* throwError(ExecState* exec, JSObject* error)
 {
+    Interpreter::addStackTraceIfNecessary(exec, error);
     exec->globalData().exception = error;
     return error;
 }
 
 JSObject* throwTypeError(ExecState* exec)
 {
-    return throwError(exec, createTypeError(exec, "Type error"));
+    return throwError(exec, createTypeError(exec, ASCIILiteral("Type error")));
 }
 
 JSObject* throwSyntaxError(ExecState* exec)
 {
-    return throwError(exec, createSyntaxError(exec, "Syntax error"));
+    return throwError(exec, createSyntaxError(exec, ASCIILiteral("Syntax error")));
 }
-
-ASSERT_CLASS_FITS_IN_CELL(StrictModeTypeErrorFunction);
 
 const ClassInfo StrictModeTypeErrorFunction::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(StrictModeTypeErrorFunction) };
 
 void StrictModeTypeErrorFunction::destroy(JSCell* cell)
 {
-    jsCast<StrictModeTypeErrorFunction*>(cell)->StrictModeTypeErrorFunction::~StrictModeTypeErrorFunction();
+    static_cast<StrictModeTypeErrorFunction*>(cell)->StrictModeTypeErrorFunction::~StrictModeTypeErrorFunction();
 }
 
 } // namespace JSC

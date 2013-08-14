@@ -32,9 +32,10 @@
 #if ENABLE(INSPECTOR) && ENABLE(SQL_DATABASE)
 
 #include "InspectorBaseAgent.h"
-#include "PlatformString.h"
+#include "InspectorFrontend.h"
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -49,9 +50,7 @@ typedef String ErrorString;
 
 class InspectorDatabaseAgent : public InspectorBaseAgent<InspectorDatabaseAgent>, public InspectorBackendDispatcher::DatabaseCommandHandler {
 public:
-    class FrontendProvider;
-
-    static PassOwnPtr<InspectorDatabaseAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state)
+    static PassOwnPtr<InspectorDatabaseAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
     {
         return adoptPtr(new InspectorDatabaseAgent(instrumentingAgents, state));
     }
@@ -66,22 +65,22 @@ public:
     // Called from the front-end.
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
-    virtual void getDatabaseTableNames(ErrorString*, int databaseId, RefPtr<InspectorArray>& names);
-    virtual void executeSQL(ErrorString*, int databaseId, const String& query, bool* success, int* transactionId);
+    virtual void getDatabaseTableNames(ErrorString*, const String& databaseId, RefPtr<TypeBuilder::Array<String> >& names);
+    virtual void executeSQL(ErrorString*, const String& databaseId, const String& query, PassRefPtr<ExecuteSQLCallback>);
 
     // Called from the injected script.
-    int databaseId(Database*);
+    String databaseId(Database*);
 
     void didOpenDatabase(PassRefPtr<Database>, const String& domain, const String& name, const String& version);
 private:
-    explicit InspectorDatabaseAgent(InstrumentingAgents*, InspectorState*);
+    explicit InspectorDatabaseAgent(InstrumentingAgents*, InspectorCompositeState*);
 
-    Database* databaseForId(int databaseId);
+    Database* databaseForId(const String& databaseId);
     InspectorDatabaseResource* findByFileName(const String& fileName);
 
-    typedef HashMap<int, RefPtr<InspectorDatabaseResource> > DatabaseResourcesMap;
+    InspectorFrontend::Database* m_frontend;
+    typedef HashMap<String, RefPtr<InspectorDatabaseResource> > DatabaseResourcesMap;
     DatabaseResourcesMap m_resources;
-    RefPtr<FrontendProvider> m_frontendProvider;
     bool m_enabled;
 };
 

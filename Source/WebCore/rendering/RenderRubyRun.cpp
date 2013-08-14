@@ -36,13 +36,14 @@
 #include "RenderRubyText.h"
 #include "RenderText.h"
 #include "RenderView.h"
+#include "StyleInheritedData.h"
 
 using namespace std;
 
 namespace WebCore {
 
-RenderRubyRun::RenderRubyRun(Node* node)
-    : RenderBlock(node)
+RenderRubyRun::RenderRubyRun()
+    : RenderBlock(0)
 {
     setReplaced(true);
     setInline(true);
@@ -74,6 +75,9 @@ bool RenderRubyRun::isEmpty() const
 RenderRubyText* RenderRubyRun::rubyText() const
 {
     RenderObject* child = firstChild();
+    // If in future it becomes necessary to support floating or positioned ruby text,
+    // layout will have to be changed to handle them properly.
+    ASSERT(!child || !child->isRubyText() || !child->isFloatingOrOutOfFlowPositioned());
     return child && child->isRubyText() ? static_cast<RenderRubyText*>(child) : 0;
 }
 
@@ -195,32 +199,32 @@ void RenderRubyRun::removeChild(RenderObject* child)
 
 RenderRubyBase* RenderRubyRun::createRubyBase() const
 {
-    RenderRubyBase* rb = new (renderArena()) RenderRubyBase(document() /* anonymous */);
-    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyle(style());
-    newStyle->setDisplay(BLOCK);
+    RenderRubyBase* renderer = RenderRubyBase::createAnonymous(document());
+    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(style(), BLOCK);
     newStyle->setTextAlign(CENTER); // FIXME: use WEBKIT_CENTER?
-    rb->setStyle(newStyle.release());
-    return rb;
+    renderer->setStyle(newStyle.release());
+    return renderer;
 }
 
 RenderRubyRun* RenderRubyRun::staticCreateRubyRun(const RenderObject* parentRuby)
 {
     ASSERT(parentRuby && parentRuby->isRuby());
-    RenderRubyRun* rr = new (parentRuby->renderArena()) RenderRubyRun(parentRuby->document() /* anonymous */);
-    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyle(parentRuby->style());
-    newStyle->setDisplay(INLINE_BLOCK);
+    RenderRubyRun* rr = new (parentRuby->renderArena()) RenderRubyRun();
+    rr->setDocumentForAnonymous(parentRuby->document());
+    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parentRuby->style(), INLINE_BLOCK);
     rr->setStyle(newStyle.release());
     return rr;
 }
 
 RenderObject* RenderRubyRun::layoutSpecialExcludedChild(bool relayoutChildren)
 {
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     // Don't bother positioning the RenderRubyRun yet.
     RenderRubyText* rt = rubyText();
     if (!rt)
         return 0;
     if (relayoutChildren)
-        rt->setChildNeedsLayout(true, false);
+        rt->setChildNeedsLayout(true, MarkOnlyThis);
     rt->layoutIfNeeded();
     return rt;
 }
@@ -243,7 +247,7 @@ void RenderRubyRun::layout()
         lastLineRubyTextBottom = rootBox->logicalBottomLayoutOverflow();
     }
 
-    if (!style()->isFlippedLinesWritingMode()) {
+    if (style()->isFlippedLinesWritingMode() == (style()->rubyPosition() == RubyPositionAfter)) {
         LayoutUnit firstLineTop = 0;
         if (RenderRubyBase* rb = rubyBase()) {
             RootInlineBox* rootBox = rb->firstRootBox();

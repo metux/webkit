@@ -65,6 +65,7 @@ AccessibilityOrientation AccessibilitySlider::orientation() const
     case SliderThumbHorizontalPart:
     case SliderHorizontalPart:
     case MediaSliderPart:
+    case MediaFullScreenVolumeSliderPart:
         return AccessibilityOrientationHorizontal;
     
     case SliderThumbVerticalPart: 
@@ -101,7 +102,7 @@ const AtomicString& AccessibilitySlider::getAttribute(const QualifiedName& attri
     return element()->getAttribute(attribute);
 }
     
-AccessibilityObject* AccessibilitySlider::elementAccessibilityHitTest(const LayoutPoint& point) const
+AccessibilityObject* AccessibilitySlider::elementAccessibilityHitTest(const IntPoint& point) const
 {
     if (m_children.size()) {
         ASSERT(m_children.size() == 1);
@@ -112,7 +113,7 @@ AccessibilityObject* AccessibilitySlider::elementAccessibilityHitTest(const Layo
     return axObjectCache()->getOrCreate(m_renderer);
 }
 
-bool AccessibilitySlider::accessibilityIsIgnored() const
+bool AccessibilitySlider::computeAccessibilityIsIgnored() const
 {
     AccessibilityObjectInclusion decision = accessibilityIsIgnoredBase();
     if (decision == IncludeObject)
@@ -174,15 +175,10 @@ LayoutRect AccessibilitySliderThumb::elementRect() const
     RenderObject* sliderRenderer = m_parent->renderer();
     if (!sliderRenderer || !sliderRenderer->isSlider())
         return LayoutRect();
-    return sliderThumbElementOf(sliderRenderer->node())->getRect();
+    return sliderThumbElementOf(sliderRenderer->node())->boundingBox();
 }
 
-LayoutSize AccessibilitySliderThumb::size() const
-{
-    return elementRect().size();
-}
-
-bool AccessibilitySliderThumb::accessibilityIsIgnored() const
+bool AccessibilitySliderThumb::computeAccessibilityIsIgnored() const
 {
     AccessibilityObjectInclusion decision = accessibilityPlatformIncludesObject();
     if (decision == IncludeObject)

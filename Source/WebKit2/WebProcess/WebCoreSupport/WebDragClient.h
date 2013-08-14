@@ -26,12 +26,9 @@
 #ifndef WebDragClient_h
 #define WebDragClient_h
 
-#include <WebCore/DragClient.h>
+#if ENABLE(DRAG_SUPPORT)
 
-#if PLATFORM(MAC)
-OBJC_CLASS WKPasteboardFilePromiseOwner;
-OBJC_CLASS WKPasteboardOwner;
-#endif
+#include <WebCore/DragClient.h>
 
 namespace WebKit {
 
@@ -56,18 +53,13 @@ private:
     virtual void declareAndWriteDragImage(const String& pasteboardName, DOMElement*, NSURL*, NSString*, WebCore::Frame*) OVERRIDE;
 #endif
 
-    virtual void dragEnded() OVERRIDE;
-
     virtual void dragControllerDestroyed() OVERRIDE;
 
     WebPage* m_page;
-    
-#if PLATFORM(MAC)
-    RetainPtr<WKPasteboardFilePromiseOwner> m_filePromiseOwner;
-    RetainPtr<WKPasteboardOwner> m_pasteboardOwner;
-#endif
 };
 
 } // namespace WebKit
+
+#endif // ENABLE(DRAG_SUPPORT)
 
 #endif // WebDragClient_h

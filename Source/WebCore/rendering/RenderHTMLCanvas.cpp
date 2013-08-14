@@ -58,13 +58,16 @@ bool RenderHTMLCanvas::requiresLayer() const
 
 void RenderHTMLCanvas::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    if (Frame* frame = this->frame()) {
-        if (Page* page = frame->page())
-            page->addRelevantRepaintedObject(this, paintInfo.rect);
-    }
-
     LayoutRect rect = contentBoxRect();
     rect.moveBy(paintOffset);
+
+    if (Frame* frame = this->frame()) {
+        if (Page* page = frame->page()) {
+            if (paintInfo.phase == PaintPhaseForeground)
+                page->addRelevantRepaintedObject(this, rect);
+        }
+    }
+
     bool useLowQualityScale = style()->imageRendering() == ImageRenderingOptimizeContrast;
     static_cast<HTMLCanvasElement*>(node())->paint(paintInfo.context, rect, useLowQualityScale);
 }
@@ -72,7 +75,7 @@ void RenderHTMLCanvas::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& pa
 void RenderHTMLCanvas::canvasSizeChanged()
 {
     IntSize canvasSize = static_cast<HTMLCanvasElement*>(node())->size();
-    IntSize zoomedSize(canvasSize.width() * style()->effectiveZoom(), canvasSize.height() * style()->effectiveZoom());
+    LayoutSize zoomedSize(canvasSize.width() * style()->effectiveZoom(), canvasSize.height() * style()->effectiveZoom());
 
     if (zoomedSize == intrinsicSize())
         return;
@@ -85,9 +88,9 @@ void RenderHTMLCanvas::canvasSizeChanged()
     if (!preferredLogicalWidthsDirty())
         setPreferredLogicalWidthsDirty(true);
 
-    IntSize oldSize = size();
-    computeLogicalWidth();
-    computeLogicalHeight();
+    LayoutSize oldSize = size();
+    updateLogicalWidth();
+    updateLogicalHeight();
     if (oldSize == size())
         return;
 

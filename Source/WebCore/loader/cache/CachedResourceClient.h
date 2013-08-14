@@ -39,15 +39,18 @@ public:
         ImageType,
         FontType,
         StyleSheetType,
+#if ENABLE(SVG)
+        SVGDocumentType,
+#endif
         RawResourceType
     };
 
     virtual ~CachedResourceClient() { }
     virtual void notifyFinished(CachedResource*) { }
-    virtual void didReceiveData(CachedResource*) { };
+    virtual void deprecatedDidReceiveCachedResource(CachedResource*) { }
     
     static CachedResourceClientType expectedType() { return BaseResourceType; }
-    virtual CachedResourceClientType resourceClientType() { return expectedType(); }
+    virtual CachedResourceClientType resourceClientType() const { return expectedType(); }
 
 protected:
     CachedResourceClient() { }

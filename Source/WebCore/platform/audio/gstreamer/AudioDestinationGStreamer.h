@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2011 Philippe Normand <pnormand@igalia.com>
+ *  Copyright (C) 2011, 2012 Igalia S.L
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -24,12 +24,13 @@
 
 typedef struct _GstElement GstElement;
 typedef struct _GstPad GstPad;
+typedef struct _GstMessage GstMessage;
 
 namespace WebCore {
 
 class AudioDestinationGStreamer : public AudioDestination {
 public:
-    AudioDestinationGStreamer(AudioSourceProvider&, float sampleRate);
+    AudioDestinationGStreamer(AudioIOCallback&, float sampleRate);
     virtual ~AudioDestinationGStreamer();
 
     virtual void start();
@@ -37,12 +38,13 @@ public:
 
     bool isPlaying() { return m_isPlaying; }
     float sampleRate() const { return m_sampleRate; }
-    AudioSourceProvider& sourceProvider() const { return m_provider; }
+    AudioIOCallback& callback() const { return m_callback; }
 
     void finishBuildingPipelineAfterWavParserPadReady(GstPad*);
+    gboolean handleMessage(GstMessage*);
 
 private:
-    AudioSourceProvider& m_provider;
+    AudioIOCallback& m_callback;
     AudioBus m_renderBus;
 
     float m_sampleRate;

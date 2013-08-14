@@ -36,8 +36,8 @@ protected:
     HTMLDivElement(const QualifiedName&, Document*);
 
 private:
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
 };
 
 } // namespace WebCore

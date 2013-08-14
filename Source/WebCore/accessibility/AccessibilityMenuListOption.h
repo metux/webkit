@@ -46,7 +46,6 @@ private:
 
     virtual AccessibilityRole roleValue() const { return MenuListOptionRole; }
     virtual bool canHaveChildren() const { return false; }
-    virtual LayoutSize size() const { return elementRect().size(); }
 
     virtual Element* actionElement() const;
     virtual bool isEnabled() const;
@@ -58,6 +57,7 @@ private:
     virtual bool canSetSelectedAttribute() const;
     virtual LayoutRect elementRect() const;
     virtual String stringValue() const;
+    virtual bool computeAccessibilityIsIgnored() const;
 
     RefPtr<HTMLElement> m_element;
 };

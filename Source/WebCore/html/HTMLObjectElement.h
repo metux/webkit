@@ -54,36 +54,34 @@ public:
 
     // Implementations of constraint validation API.
     // Note that the object elements are always barred from constraint validation.
-    String validationMessage() { return String(); }
+    virtual String validationMessage() const OVERRIDE { return String(); }
     bool checkValidity() { return true; }
-    void setCustomValidity(const String&) { }
+    virtual void setCustomValidity(const String&) OVERRIDE { }
 
-    using TreeShared<ContainerNode>::ref;
-    using TreeShared<ContainerNode>::deref;
+    using Node::ref;
+    using Node::deref;
 
     virtual bool canContainRangeEndPoint() const { return useFallbackContent(); }
 
 private:
     HTMLObjectElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
 
-    virtual void insertedIntoTree(bool deep);
-    virtual void removedFromTree(bool deep);
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
 
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual const QualifiedName& imageSourceAttributeName() const;
 
-    virtual RenderWidget* renderWidgetForJSBindings();
+    virtual RenderWidget* renderWidgetForJSBindings() const;
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
@@ -102,8 +100,6 @@ private:
     virtual void refFormAssociatedElement() { ref(); }
     virtual void derefFormAssociatedElement() { deref(); }
     virtual HTMLFormElement* virtualForm() const;
-
-    virtual const AtomicString& formControlName() const;
 
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const OVERRIDE;

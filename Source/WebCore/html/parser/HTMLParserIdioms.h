@@ -26,9 +26,13 @@
 #define HTMLParserIdioms_h
 
 #include <wtf/Forward.h>
+#include <wtf/text/WTFString.h>
 #include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
+
+class Decimal;
+class QualifiedName;
 
 // Space characters as defined by the HTML specification.
 bool isHTMLSpace(UChar);
@@ -37,15 +41,23 @@ bool isNotHTMLSpace(UChar);
 
 // Strip leading and trailing whitespace as defined by the HTML specification. 
 String stripLeadingAndTrailingHTMLSpaces(const String&);
+template<size_t inlineCapacity>
+String stripLeadingAndTrailingHTMLSpaces(const Vector<UChar, inlineCapacity>& vector)
+{
+    return stripLeadingAndTrailingHTMLSpaces(StringImpl::create8BitIfPossible(vector));
+}
 
 // An implementation of the HTML specification's algorithm to convert a number to a string for number and range types.
+String serializeForNumberType(const Decimal&);
 String serializeForNumberType(double);
 
-// Convert the specified string to a double. If the conversion fails, the return value is false.
+// Convert the specified string to a decimal/double. If the conversion fails, the return value is fallback value or NaN if not specified.
 // Leading or trailing illegal characters cause failure, as does passing an empty string.
 // The double* parameter may be 0 to check if the string can be parsed without getting the result.
-bool parseToDoubleForNumberType(const String&, double*);
-bool parseToDoubleForNumberTypeWithDecimalPlaces(const String&, double*, unsigned*);
+Decimal parseToDecimalForNumberType(const String&);
+Decimal parseToDecimalForNumberType(const String&, const Decimal& fallbackValue);
+double parseToDoubleForNumberType(const String&);
+double parseToDoubleForNumberType(const String&, double fallbackValue);
 
 // http://www.whatwg.org/specs/web-apps/current-work/#rules-for-parsing-integers
 bool parseHTMLInteger(const String&, int&);
@@ -79,6 +91,9 @@ inline bool isNotHTMLSpace(UChar character)
 {
     return !isHTMLSpace(character);
 }
+
+bool threadSafeMatch(const QualifiedName&, const QualifiedName&);
+bool threadSafeMatch(const String&, const QualifiedName&);
 
 }
 

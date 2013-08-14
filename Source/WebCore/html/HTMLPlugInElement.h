@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
- * Copyright (C) 2004, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2006, 2007, 2008, 2009, 2012 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -24,6 +24,8 @@
 #define HTMLPlugInElement_h
 
 #include "HTMLFrameOwnerElement.h"
+#include "Image.h"
+
 #include "ScriptInstance.h"
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -40,9 +42,24 @@ class HTMLPlugInElement : public HTMLFrameOwnerElement {
 public:
     virtual ~HTMLPlugInElement();
 
+    void resetInstance();
+
     PassScriptInstance getInstance();
 
-    Widget* pluginWidget();
+    Widget* pluginWidget() const;
+
+    enum DisplayState {
+        WaitingForSnapshot,
+        DisplayingSnapshot,
+        PlayingWithPendingMouseClick,
+        Playing
+    };
+    DisplayState displayState() const { return m_displayState; }
+    void setDisplayState(DisplayState state) { m_displayState = state; }
+    virtual void updateSnapshot(PassRefPtr<Image>) { }
+    virtual void dispatchPendingMouseClick() { }
+
+    unsigned plugInOriginHash() const { return m_plugInOriginHash; }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     NPObject* getNPObject();
@@ -53,31 +70,43 @@ public:
 
     bool canContainRangeEndPoint() const { return false; }
 
+    bool canProcessDrag() const;
+
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+
 protected:
     HTMLPlugInElement(const QualifiedName& tagName, Document*);
 
     virtual void detach();
-    virtual void removedFromDocument();
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
 
-    bool m_inBeforeLoadEventHandler;
     // Subclasses should use guardedDispatchBeforeLoadEvent instead of calling dispatchBeforeLoadEvent directly.
     bool guardedDispatchBeforeLoadEvent(const String& sourceURL);
+
+    bool m_inBeforeLoadEventHandler;
+
+    unsigned m_plugInOriginHash;
 
 private:
     bool dispatchBeforeLoadEvent(const String& sourceURL); // Not implemented, generates a compile error if subclasses call this by mistake.
 
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
+
     virtual void defaultEventHandler(Event*);
 
-    virtual RenderWidget* renderWidgetForJSBindings() = 0;
+    virtual RenderWidget* renderWidgetForJSBindings() const = 0;
 
-private:
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
+    virtual bool isPluginElement() const;
+
     mutable ScriptInstance m_instance;
 #if ENABLE(NETSCAPE_PLUGIN_API)
     NPObject* m_NPObject;
 #endif
     bool m_isCapturingMouseEvents;
+
+    DisplayState m_displayState;
 };
 
 } // namespace WebCore

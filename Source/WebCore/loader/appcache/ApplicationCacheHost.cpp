@@ -103,7 +103,7 @@ bool ApplicationCacheHost::maybeLoadFallbackForMainResponse(const ResourceReques
         if (isApplicationCacheEnabled()) {
             m_mainResourceApplicationCache = ApplicationCacheGroup::fallbackCacheForMainRequest(request, documentLoader());
 
-            if (scheduleLoadFallbackResourceFromApplicationCache(documentLoader()->mainResourceLoader(), m_mainResourceApplicationCache.get()))
+            if (scheduleLoadFallbackResourceFromApplicationCache(documentLoader()->mainResourceLoader()->loader(), m_mainResourceApplicationCache.get()))
                 return true;
         }
     }
@@ -117,7 +117,7 @@ bool ApplicationCacheHost::maybeLoadFallbackForMainError(const ResourceRequest& 
         if (isApplicationCacheEnabled()) {
             m_mainResourceApplicationCache = ApplicationCacheGroup::fallbackCacheForMainRequest(request, m_documentLoader);
 
-            if (scheduleLoadFallbackResourceFromApplicationCache(documentLoader()->mainResourceLoader(), m_mainResourceApplicationCache.get()))
+            if (scheduleLoadFallbackResourceFromApplicationCache(documentLoader()->mainResourceLoader()->loader(), m_mainResourceApplicationCache.get()))
                 return true;
         }
     }
@@ -228,7 +228,7 @@ void ApplicationCacheHost::maybeLoadFallbackSynchronously(const ResourceRequest&
     }
 }
 
-bool ApplicationCacheHost::canCacheInPageCache() const 
+bool ApplicationCacheHost::canCacheInPageCache()
 {
     return !applicationCache() && !candidateApplicationCacheGroup();
 }
@@ -282,7 +282,7 @@ void ApplicationCacheHost::fillResourceList(ResourceInfoList* resources)
      
     ApplicationCache::ResourceMap::const_iterator end = cache->end();
     for (ApplicationCache::ResourceMap::const_iterator it = cache->begin(); it != end; ++it) {
-        RefPtr<ApplicationCacheResource> resource = it->second;
+        RefPtr<ApplicationCacheResource> resource = it->value;
         unsigned type = resource->type();
         bool isMaster   = type & ApplicationCacheResource::Master;
         bool isManifest = type & ApplicationCacheResource::Manifest;
@@ -308,14 +308,12 @@ void ApplicationCacheHost::dispatchDOMEvent(EventID id, int total, int done)
 {
     if (m_domApplicationCache) {
         const AtomicString& eventType = DOMApplicationCache::toEventType(id);
-        ExceptionCode ec = 0;
         RefPtr<Event> event;
         if (id == PROGRESS_EVENT)
             event = ProgressEvent::create(eventType, true, done, total);
         else
             event = Event::create(eventType, false, false);
-        m_domApplicationCache->dispatchEvent(event, ec);
-        ASSERT(!ec);
+        m_domApplicationCache->dispatchEvent(event, ASSERT_NO_EXCEPTION);
     }
 }
 

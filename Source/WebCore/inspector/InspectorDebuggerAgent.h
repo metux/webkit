@@ -31,6 +31,8 @@
 #define InspectorDebuggerAgent_h
 
 #if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
+#include "ConsoleAPITypes.h"
+#include "ConsoleTypes.h"
 #include "InjectedScript.h"
 #include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
@@ -67,33 +69,31 @@ public:
 
     virtual void causesRecompilation(ErrorString*, bool*);
     virtual void canSetScriptSource(ErrorString*, bool*);
-    virtual void supportsNativeBreakpoints(ErrorString*, bool*);
-
-    virtual void enable(ErrorString*);
-    virtual void disable(ErrorString*);
+    virtual void supportsSeparateScriptCompilationAndExecution(ErrorString*, bool*);
 
     virtual void setFrontend(InspectorFrontend*);
     virtual void clearFrontend();
     virtual void restore();
 
-    void didClearMainFrameWindowObject();
     bool isPaused();
+    bool runningNestedMessageLoop();
+    void addMessageToConsole(MessageSource, MessageType);
 
     // Part of the protocol.
+    virtual void enable(ErrorString*);
+    virtual void disable(ErrorString*);
     virtual void setBreakpointsActive(ErrorString*, bool active);
 
-    virtual void setBreakpointByUrl(ErrorString*, int lineNumber, const String* optionalURL, const String* optionalURLRegex, const int* optionalColumnNumber, const String* optionalCondition, String* breakpointId, RefPtr<InspectorArray>& locations);
-    virtual void setBreakpoint(ErrorString*, const RefPtr<InspectorObject>& location, const String* optionalCondition, String* breakpointId, RefPtr<InspectorObject>& actualLocation);
+    virtual void setBreakpointByUrl(ErrorString*, int lineNumber, const String* optionalURL, const String* optionalURLRegex, const int* optionalColumnNumber, const String* optionalCondition, TypeBuilder::Debugger::BreakpointId*, RefPtr<TypeBuilder::Array<TypeBuilder::Debugger::Location> >& locations);
+    virtual void setBreakpoint(ErrorString*, const RefPtr<InspectorObject>& location, const String* optionalCondition, TypeBuilder::Debugger::BreakpointId*, RefPtr<TypeBuilder::Debugger::Location>& actualLocation);
     virtual void removeBreakpoint(ErrorString*, const String& breakpointId);
     virtual void continueToLocation(ErrorString*, const RefPtr<InspectorObject>& location);
 
-    virtual void searchInContent(ErrorString*, const String& scriptId, const String& query, const bool* optionalCaseSensitive, const bool* optionalIsRegex, RefPtr<InspectorArray>&);
-    virtual void setScriptSource(ErrorString*, const String& scriptId, const String& newContent, const bool* preview, RefPtr<InspectorArray>& newCallFrames, RefPtr<InspectorObject>& result);
+    virtual void searchInContent(ErrorString*, const String& scriptId, const String& query, const bool* optionalCaseSensitive, const bool* optionalIsRegex, RefPtr<TypeBuilder::Array<TypeBuilder::Page::SearchMatch> >&);
+    virtual void setScriptSource(ErrorString*, const String& scriptId, const String& newContent, const bool* preview, RefPtr<TypeBuilder::Array<TypeBuilder::Debugger::CallFrame> >& newCallFrames, RefPtr<InspectorObject>& result);
+    virtual void restartFrame(ErrorString*, const String& callFrameId, RefPtr<TypeBuilder::Array<TypeBuilder::Debugger::CallFrame> >& newCallFrames, RefPtr<InspectorObject>& result);
     virtual void getScriptSource(ErrorString*, const String& scriptId, String* scriptSource);
-    virtual void getFunctionDetails(ErrorString*, const String& functionId, RefPtr<InspectorObject>& details);
-    void schedulePauseOnNextStatement(const String& breakReason, PassRefPtr<InspectorObject> data);
-    void cancelPauseOnNextStatement();
-    void breakProgram(const String& breakReason, PassRefPtr<InspectorObject> data);
+    virtual void getFunctionDetails(ErrorString*, const String& functionId, RefPtr<TypeBuilder::Debugger::FunctionDetails>&);
     virtual void pause(ErrorString*);
     virtual void resume(ErrorString*);
     virtual void stepOver(ErrorString*);
@@ -105,41 +105,62 @@ public:
                              const String& expression,
                              const String* objectGroup,
                              const bool* includeCommandLineAPI,
+                             const bool* doNotPauseOnExceptionsAndMuteConsole,
                              const bool* returnByValue,
-                             RefPtr<InspectorObject>& result,
-                             bool* wasThrown);
+                             const bool* generatePreview,
+                             RefPtr<TypeBuilder::Runtime::RemoteObject>& result,
+                             TypeBuilder::OptOutput<bool>* wasThrown);
+    void compileScript(ErrorString*, const String& expression, const String& sourceURL, TypeBuilder::OptOutput<TypeBuilder::Debugger::ScriptId>*, TypeBuilder::OptOutput<String>* syntaxErrorMessage);
+    void runScript(ErrorString*, const TypeBuilder::Debugger::ScriptId&, const int* executionContextId, const String* objectGroup, const bool* doNotPauseOnExceptionsAndMuteConsole, RefPtr<TypeBuilder::Runtime::RemoteObject>& result, TypeBuilder::OptOutput<bool>* wasThrown);
+    virtual void setOverlayMessage(ErrorString*, const String*);
+    virtual void setVariableValue(ErrorString*, int in_scopeNumber, const String& in_variableName, const RefPtr<InspectorObject>& in_newValue, const String* in_callFrame, const String* in_functionObjectId);
+
+    void schedulePauseOnNextStatement(InspectorFrontend::Debugger::Reason::Enum breakReason, PassRefPtr<InspectorObject> data);
+    void cancelPauseOnNextStatement();
+    void breakProgram(InspectorFrontend::Debugger::Reason::Enum breakReason, PassRefPtr<InspectorObject> data);
+    virtual void scriptExecutionBlockedByCSP(const String& directiveText);
 
     class Listener {
     public:
         virtual ~Listener() { }
         virtual void debuggerWasEnabled() = 0;
         virtual void debuggerWasDisabled() = 0;
+        virtual void stepInto() = 0;
+        virtual void didPause() = 0;
     };
     void setListener(Listener* listener) { m_listener = listener; }
 
     virtual ScriptDebugServer& scriptDebugServer() = 0;
 
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
 protected:
-    InspectorDebuggerAgent(InstrumentingAgents*, InspectorState*, InjectedScriptManager*);
+    InspectorDebuggerAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*);
 
     virtual void startListeningScriptDebugServer() = 0;
     virtual void stopListeningScriptDebugServer() = 0;
+    virtual void muteConsole() = 0;
+    virtual void unmuteConsole() = 0;
+    InjectedScriptManager* injectedScriptManager() { return m_injectedScriptManager; }
+    virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId) = 0;
+
+    virtual void enable();
+    virtual void disable();
+    virtual void didPause(ScriptState*, const ScriptValue& callFrames, const ScriptValue& exception);
+    virtual void didContinue();
+    void reset();
 
 private:
-    void enable();
-    void disable();
     bool enabled();
 
-    PassRefPtr<InspectorArray> currentCallFrames();
+    PassRefPtr<TypeBuilder::Array<TypeBuilder::Debugger::CallFrame> > currentCallFrames();
 
     virtual void didParseSource(const String& scriptId, const Script&);
     virtual void failedToParseSource(const String& url, const String& data, int firstLine, int errorLine, const String& errorMessage);
-    virtual void didPause(ScriptState*, const ScriptValue& callFrames, const ScriptValue& exception);
-    virtual void didContinue();
 
     void setPauseOnExceptionsImpl(ErrorString*, int);
 
-    PassRefPtr<InspectorObject> resolveBreakpoint(const String& breakpointId, const String& scriptId, const ScriptBreakpoint&);
+    PassRefPtr<TypeBuilder::Debugger::Location> resolveBreakpoint(const String& breakpointId, const String& scriptId, const ScriptBreakpoint&);
     void clear();
     bool assertPaused(ErrorString*);
     void clearBreakDetails();
@@ -156,7 +177,7 @@ private:
     ScriptsMap m_scripts;
     BreakpointIdToDebugServerBreakpointIdsMap m_breakpointIdToDebugServerBreakpointIds;
     String m_continueToLocationBreakpointId;
-    String m_breakReason;
+    InspectorFrontend::Debugger::Reason::Enum m_breakReason;
     RefPtr<InspectorObject> m_breakAuxData;
     bool m_javaScriptPauseScheduled;
     Listener* m_listener;

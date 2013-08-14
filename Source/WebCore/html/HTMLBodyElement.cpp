@@ -61,52 +61,55 @@ HTMLBodyElement::~HTMLBodyElement()
 {
 }
 
-bool HTMLBodyElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLBodyElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == backgroundAttr || attr->name() == marginwidthAttr || attr->name() == leftmarginAttr || attr->name() == marginheightAttr || attr->name() == topmarginAttr || attr->name() == bgcolorAttr || attr->name() == textAttr || attr->name() == bgpropertiesAttr)
+    if (name == backgroundAttr || name == marginwidthAttr || name == leftmarginAttr || name == marginheightAttr || name == topmarginAttr || name == bgcolorAttr || name == textAttr || name == bgpropertiesAttr)
         return true;
-    return HTMLElement::isPresentationAttribute(attr);
+    return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLBodyElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLBodyElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == backgroundAttr) {
-        String url = stripLeadingAndTrailingHTMLSpaces(attr->value());
-        if (!url.isEmpty())
-            style->setProperty(CSSProperty(CSSPropertyBackgroundImage, CSSImageValue::create(document()->completeURL(url).string())));
-    } else if (attr->name() == marginwidthAttr || attr->name() == leftmarginAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attr->value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attr->value());
-    } else if (attr->name() == marginheightAttr || attr->name() == topmarginAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attr->value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attr->value());
-    } else if (attr->name() == bgcolorAttr) {
-        addHTMLColorToStyle(style, CSSPropertyBackgroundColor, attr->value());
-    } else if (attr->name() == textAttr) {
-        addHTMLColorToStyle(style, CSSPropertyColor, attr->value());
-    } else if (attr->name() == bgpropertiesAttr) {
-        if (equalIgnoringCase(attr->value(), "fixed"))
-           style->setProperty(CSSPropertyBackgroundAttachment, CSSValueFixed);
+    if (attribute.name() == backgroundAttr) {
+        String url = stripLeadingAndTrailingHTMLSpaces(attribute.value());
+        if (!url.isEmpty()) {
+            RefPtr<CSSImageValue> imageValue = CSSImageValue::create(document()->completeURL(url).string());
+            imageValue->setInitiator(localName());
+            style->setProperty(CSSProperty(CSSPropertyBackgroundImage, imageValue));
+        }
+    } else if (attribute.name() == marginwidthAttr || attribute.name() == leftmarginAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attribute.value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attribute.value());
+    } else if (attribute.name() == marginheightAttr || attribute.name() == topmarginAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attribute.value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attribute.value());
+    } else if (attribute.name() == bgcolorAttr) {
+        addHTMLColorToStyle(style, CSSPropertyBackgroundColor, attribute.value());
+    } else if (attribute.name() == textAttr) {
+        addHTMLColorToStyle(style, CSSPropertyColor, attribute.value());
+    } else if (attribute.name() == bgpropertiesAttr) {
+        if (equalIgnoringCase(attribute.value(), "fixed"))
+           addPropertyToPresentationAttributeStyle(style, CSSPropertyBackgroundAttachment, CSSValueFixed);
     } else
-        HTMLElement::collectStyleForAttribute(attr, style);
+        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
-void HTMLBodyElement::parseAttribute(Attribute* attr)
+void HTMLBodyElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attr->name() == vlinkAttr || attr->name() == alinkAttr || attr->name() == linkAttr) {
-        if (attr->isNull()) {
-            if (attr->name() == linkAttr)
+    if (name == vlinkAttr || name == alinkAttr || name == linkAttr) {
+        if (value.isNull()) {
+            if (name == linkAttr)
                 document()->resetLinkColor();
-            else if (attr->name() == vlinkAttr)
+            else if (name == vlinkAttr)
                 document()->resetVisitedLinkColor();
             else
                 document()->resetActiveLinkColor();
         } else {
             RGBA32 color;
-            if (CSSParser::parseColor(color, attr->value(), !document()->inQuirksMode())) {
-                if (attr->name() == linkAttr)
+            if (CSSParser::parseColor(color, value, !document()->inQuirksMode())) {
+                if (name == linkAttr)
                     document()->setLinkColor(color);
-                else if (attr->name() == vlinkAttr)
+                else if (name == vlinkAttr)
                     document()->setVisitedLinkColor(color);
                 else
                     document()->setActiveLinkColor(color);
@@ -114,48 +117,55 @@ void HTMLBodyElement::parseAttribute(Attribute* attr)
         }
 
         setNeedsStyleRecalc();
-    } else if (attr->name() == onloadAttr)
-        document()->setWindowAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onbeforeunloadAttr)
-        document()->setWindowAttributeEventListener(eventNames().beforeunloadEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onunloadAttr)
-        document()->setWindowAttributeEventListener(eventNames().unloadEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onpagehideAttr)
-        document()->setWindowAttributeEventListener(eventNames().pagehideEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onpageshowAttr)
-        document()->setWindowAttributeEventListener(eventNames().pageshowEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onpopstateAttr)
-        document()->setWindowAttributeEventListener(eventNames().popstateEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onblurAttr)
-        document()->setWindowAttributeEventListener(eventNames().blurEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onfocusAttr)
-        document()->setWindowAttributeEventListener(eventNames().focusEvent, createAttributeEventListener(document()->frame(), attr));
+    } else if (name == onloadAttr)
+        document()->setWindowAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onbeforeunloadAttr)
+        document()->setWindowAttributeEventListener(eventNames().beforeunloadEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onunloadAttr)
+        document()->setWindowAttributeEventListener(eventNames().unloadEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onpagehideAttr)
+        document()->setWindowAttributeEventListener(eventNames().pagehideEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onpageshowAttr)
+        document()->setWindowAttributeEventListener(eventNames().pageshowEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onpopstateAttr)
+        document()->setWindowAttributeEventListener(eventNames().popstateEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onblurAttr)
+        document()->setWindowAttributeEventListener(eventNames().blurEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onfocusAttr)
+        document()->setWindowAttributeEventListener(eventNames().focusEvent, createAttributeEventListener(document()->frame(), name, value));
 #if ENABLE(ORIENTATION_EVENTS)
-    else if (attr->name() == onorientationchangeAttr)
-        document()->setWindowAttributeEventListener(eventNames().orientationchangeEvent, createAttributeEventListener(document()->frame(), attr));
+    else if (name == onorientationchangeAttr)
+        document()->setWindowAttributeEventListener(eventNames().orientationchangeEvent, createAttributeEventListener(document()->frame(), name, value));
 #endif
-    else if (attr->name() == onhashchangeAttr)
-        document()->setWindowAttributeEventListener(eventNames().hashchangeEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onresizeAttr)
-        document()->setWindowAttributeEventListener(eventNames().resizeEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onscrollAttr)
-        document()->setWindowAttributeEventListener(eventNames().scrollEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onselectionchangeAttr)
-        document()->setAttributeEventListener(eventNames().selectionchangeEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onstorageAttr)
-        document()->setWindowAttributeEventListener(eventNames().storageEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == ononlineAttr)
-        document()->setWindowAttributeEventListener(eventNames().onlineEvent, createAttributeEventListener(document()->frame(), attr));
-    else if (attr->name() == onofflineAttr)
-        document()->setWindowAttributeEventListener(eventNames().offlineEvent, createAttributeEventListener(document()->frame(), attr));
+    else if (name == onhashchangeAttr)
+        document()->setWindowAttributeEventListener(eventNames().hashchangeEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onresizeAttr)
+        document()->setWindowAttributeEventListener(eventNames().resizeEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onscrollAttr)
+        document()->setWindowAttributeEventListener(eventNames().scrollEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onselectionchangeAttr)
+        document()->setAttributeEventListener(eventNames().selectionchangeEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onstorageAttr)
+        document()->setWindowAttributeEventListener(eventNames().storageEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == ononlineAttr)
+        document()->setWindowAttributeEventListener(eventNames().onlineEvent, createAttributeEventListener(document()->frame(), name, value));
+    else if (name == onofflineAttr)
+        document()->setWindowAttributeEventListener(eventNames().offlineEvent, createAttributeEventListener(document()->frame(), name, value));
     else
-        HTMLElement::parseAttribute(attr);
+        HTMLElement::parseAttribute(name, value);
 }
 
-void HTMLBodyElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLBodyElement::insertedInto(ContainerNode* insertionPoint)
 {
-    HTMLElement::insertedIntoDocument();
+    HTMLElement::insertedInto(insertionPoint);
+    if (insertionPoint->inDocument())
+        return InsertionShouldCallDidNotifySubtreeInsertions;
+    return InsertionDone;
+}
 
+void HTMLBodyElement::didNotifySubtreeInsertions(ContainerNode* insertionPoint)
+{
+    ASSERT_UNUSED(insertionPoint, insertionPoint->inDocument());
     ASSERT(document());
 
     // FIXME: Perhaps this code should be in attach() instead of here.
@@ -174,13 +184,11 @@ void HTMLBodyElement::insertedIntoDocument()
     // But without it we hang during WebKit tests; need to fix that and remove this.
     if (FrameView* view = document()->view())
         view->scheduleRelayout();
-
-    document()->updateViewportArguments();
 }
 
-bool HTMLBodyElement::isURLAttribute(Attribute *attr) const
+bool HTMLBodyElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == backgroundAttr || HTMLElement::isURLAttribute(attr);
+    return attribute.name() == backgroundAttr || HTMLElement::isURLAttribute(attribute);
 }
 
 bool HTMLBodyElement::supportsFocus() const

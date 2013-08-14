@@ -29,13 +29,15 @@
 #include <WebKit2/WKRetainPtr.h>
 
 #if defined(BUILDING_QT__)
+QT_BEGIN_NAMESPACE
+class QQuickView;
+class QEventLoop;
+QT_END_NAMESPACE
 class QQuickWebView;
 typedef QQuickWebView* PlatformWKView;
-class QQuickView;
 typedef QQuickView* PlatformWindow;
-class QEventLoop;
 #elif defined(__APPLE__) && __APPLE__
-#if __OBJC__
+#ifdef __OBJC__
 @class WKView;
 @class WebKitTestRunnerWindow;
 #else
@@ -51,13 +53,17 @@ typedef HWND PlatformWindow;
 typedef struct _GtkWidget GtkWidget;
 typedef WKViewRef PlatformWKView;
 typedef GtkWidget* PlatformWindow;
+#elif PLATFORM(EFL)
+typedef struct _Ecore_Evas Ecore_Evas;
+typedef WKViewRef PlatformWKView;
+typedef Ecore_Evas* PlatformWindow;
 #endif
 
 namespace WTR {
 
 class PlatformWebView {
 public:
-    PlatformWebView(WKContextRef, WKPageGroupRef);
+    PlatformWebView(WKContextRef, WKPageGroupRef, WKDictionaryRef options = 0);
     ~PlatformWebView();
 
     WKPageRef page();
@@ -70,6 +76,7 @@ public:
     bool sendEvent(QEvent*);
     void postEvent(QEvent*);
     void setModalEventLoop(QEventLoop* eventLoop) { m_modalEventLoop = eventLoop; }
+    static bool windowShapshotEnabled();
 #endif
 
     WKRect windowFrame();
@@ -80,13 +87,24 @@ public:
     void makeWebViewFirstResponder();
     void setWindowIsKey(bool isKey) { m_windowIsKey = isKey; }
     bool windowIsKey() const { return m_windowIsKey; }
-    
+
+#if PLATFORM(MAC) || PLATFORM(EFL) || PLATFORM(QT)
+    bool viewSupportsOptions(WKDictionaryRef) const;
+#else
+    bool viewSupportsOptions(WKDictionaryRef) const { return true; }
+#endif
+
     WKRetainPtr<WKImageRef> windowSnapshotImage();
+    WKDictionaryRef options() const { return m_options.get(); }
 
 private:
     PlatformWKView m_view;
     PlatformWindow m_window;
     bool m_windowIsKey;
+    WKRetainPtr<WKDictionaryRef> m_options;
+#if PLATFORM(EFL) || PLATFORM(QT)
+    bool m_usingFixedLayout;
+#endif
 #if PLATFORM(QT)
     QEventLoop* m_modalEventLoop;
 #endif

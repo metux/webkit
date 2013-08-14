@@ -107,7 +107,7 @@ class GTKDoc(object):
 
         self.logger = logging.getLogger('gtkdoc')
 
-        for key, value in args.iteritems():
+        for key, value in iter(args.items()):
             setattr(self, key, value)
 
         def raise_error_if_not_specified(key):
@@ -185,7 +185,7 @@ class GTKDoc(object):
         process = subprocess.Popen(args, env=env, cwd=cwd,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
+        stdout, stderr = [b.decode("utf-8") for b in process.communicate()]
 
         if print_output:
             if stdout:
@@ -361,6 +361,8 @@ class GTKDoc(object):
         self._run_command(args, cwd=self.output_dir, ignore_warnings=True)
 
     def rebase_installed_docs(self):
+        if not os.path.isdir(self.output_dir):
+            raise Exception("Tried to rebase documentation before generating it.")
         html_dir = os.path.join(self.virtual_root + self.prefix, 'share', 'gtk-doc', 'html', self.module_name)
         if not os.path.isdir(html_dir):
             return
@@ -372,6 +374,11 @@ class GTKDoc(object):
             args.extend(['--dest-dir=%s' % self.virtual_root])
         self._run_command(args, cwd=self.output_dir)
 
+    def api_missing_documentation(self):
+        unused_doc_file = os.path.join(self.output_dir, self.module_name + "-unused.txt")
+        if not os.path.exists(unused_doc_file) or not os.access(unused_doc_file, os.R_OK):
+            return []
+        return open(unused_doc_file).read().splitlines()
 
 class PkgConfigGTKDoc(GTKDoc):
 
@@ -389,19 +396,21 @@ class PkgConfigGTKDoc(GTKDoc):
     def __init__(self, pkg_config_path, args):
         super(PkgConfigGTKDoc, self).__init__(args)
 
+        pkg_config = os.environ.get('PKG_CONFIG', 'pkg-config')
+
         if not os.path.exists(pkg_config_path):
             raise Exception('Could not find pkg-config file at: %s'
                             % pkg_config_path)
 
-        self.cflags += " " + self._run_command(['pkg-config',
+        self.cflags += " " + self._run_command([pkg_config,
                                                 pkg_config_path,
                                                 '--cflags'], print_output=False)
-        self.ldflags += " " + self._run_command(['pkg-config',
+        self.ldflags += " " + self._run_command([pkg_config,
                                                 pkg_config_path,
                                                 '--libs'], print_output=False)
-        self.version = self._run_command(['pkg-config',
+        self.version = self._run_command([pkg_config,
                                           pkg_config_path,
                                           '--modversion'], print_output=False)
-        self.prefix = self._run_command(['pkg-config',
+        self.prefix = self._run_command([pkg_config,
                                          pkg_config_path,
                                          '--variable=prefix'], print_output=False)

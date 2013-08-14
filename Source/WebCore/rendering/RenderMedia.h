@@ -36,9 +36,12 @@ class HTMLMediaElement;
 
 class RenderMedia : public RenderImage {
 public:
-    RenderMedia(HTMLMediaElement*);
+    explicit RenderMedia(HTMLMediaElement*);
     RenderMedia(HTMLMediaElement*, const IntSize& intrinsicSize);
     virtual ~RenderMedia();
+
+    RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
+    RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
 
     const RenderObjectChildList* children() const { return &m_children; }
     RenderObjectChildList* children() { return &m_children; }
@@ -51,10 +54,12 @@ protected:
 private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
+    virtual bool canHaveChildren() const { return true; }
 
     virtual const char* renderName() const { return "RenderMedia"; }
     virtual bool isMedia() const { return true; }
     virtual bool isImage() const { return false; }
+    virtual void paintReplaced(PaintInfo&, const LayoutPoint&);
 
     virtual bool requiresForcedStyleRecalcPropagation() const { return true; }
 
@@ -63,7 +68,7 @@ private:
 
 inline RenderMedia* toRenderMedia(RenderObject* object)
 {
-    ASSERT(!object || object->isMedia());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isMedia());
     return static_cast<RenderMedia*>(object);
 }
 

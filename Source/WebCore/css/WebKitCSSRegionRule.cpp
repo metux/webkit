@@ -1,5 +1,6 @@
 /*
- * Copyright 2011 Adobe Systems Incorporated. All Rights Reserved.
+ * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
+ * Copyright (C) 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,43 +33,34 @@
 #include "WebKitCSSRegionRule.h"
 
 #include "CSSParser.h"
-#include "CSSParserValues.h"
 #include "CSSRuleList.h"
-#include "Document.h"
-#include "ExceptionCode.h"
+#include "StyleRule.h"
+#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/text/StringBuilder.h>
+
+#if ENABLE(CSS_REGIONS)
 
 namespace WebCore {
-WebKitCSSRegionRule::WebKitCSSRegionRule(CSSStyleSheet* parent, Vector<OwnPtr<CSSParserSelector> >* selectors, PassRefPtr<CSSRuleList> rules)
-    : CSSRule(parent, CSSRule::WEBKIT_REGION_RULE)
-    , m_ruleList(rules)
+WebKitCSSRegionRule::WebKitCSSRegionRule(StyleRuleRegion* regionRule, CSSStyleSheet* parent)
+    : CSSGroupingRule(regionRule, parent)
 {
-    for (unsigned index = 0; index < m_ruleList->length(); ++index)
-        m_ruleList->item(index)->setParentRule(this);
-
-    m_selectorList.adoptSelectorVector(*selectors);
-}
-
-WebKitCSSRegionRule::~WebKitCSSRegionRule()
-{
-    for (unsigned index = 0; index < m_ruleList->length(); ++index)
-        m_ruleList->item(index)->setParentRule(0);
 }
 
 String WebKitCSSRegionRule::cssText() const
 {
-    String result = "@-webkit-region ";
+    StringBuilder result;
+    result.appendLiteral("@-webkit-region ");
 
     // First add the selectors.
-    result += m_selectorList.selectorsText();
+    result.append(toStyleRuleRegion(m_groupRule.get())->selectorList().selectorsText());
 
     // Then add the rules.
-    result += " { \n";
-
-    if (m_ruleList)
-        result += m_ruleList->rulesText();
-
-    result += "}";
-    return result;
+    result.appendLiteral(" { \n");
+    appendCssTextForItems(result);
+    result.append('}');
+    return result.toString();
 }
 
 } // namespace WebCore
+
+#endif

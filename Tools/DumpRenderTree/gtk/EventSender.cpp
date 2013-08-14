@@ -3,6 +3,7 @@
  * Copyright (C) 2009 Zan Dobersek <zandobersek@gmail.com>
  * Copyright (C) 2009 Holger Hans Peter Freyther
  * Copyright (C) 2010 Igalia S.L.
+ * Copyright (C) 2012 ChangSeok Oh <shivamidow@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -77,6 +78,9 @@ static unsigned endOfQueue;
 static unsigned startOfQueue;
 
 static const float zoomMultiplierRatio = 1.2f;
+
+// WebCore and layout tests assume this value.
+static const float pixelsPerScrollTick = 40;
 
 // Key event location code defined in DOM Level 3.
 enum KeyLocationCode {
@@ -156,7 +160,8 @@ static JSValueRef getMenuItemTitleCallback(JSContextRef context, JSObjectRef obj
     else
         label = gtk_menu_item_get_label(GTK_MENU_ITEM(widget));
 
-    return JSValueMakeString(context, JSStringCreateWithUTF8CString(label.data()));
+    JSRetainPtr<JSStringRef> itemText(Adopt, JSStringCreateWithUTF8CString(label.data()));
+    return JSValueMakeString(context, itemText.get());
 }
 
 static bool setMenuItemTitleCallback(JSContextRef context, JSObjectRef object, JSStringRef propertyName, JSValueRef value, JSValueRef* exception)
@@ -203,8 +208,10 @@ static JSValueRef contextClickCallback(JSContextRef context, JSObjectRef functio
 {
     GdkEvent* pressEvent = gdk_event_new(GDK_BUTTON_PRESS);
 
-    if (!prepareMouseButtonEvent(pressEvent, 2, 0))
+    if (!prepareMouseButtonEvent(pressEvent, 2, 0)) {
+        gdk_event_free(pressEvent);
         return JSObjectMakeArray(context, 0, 0, 0);
+    }
 
     GdkEvent* releaseEvent = gdk_event_copy(pressEvent);
     sendOrQueueEvent(pressEvent);
@@ -213,10 +220,10 @@ static JSValueRef contextClickCallback(JSContextRef context, JSObjectRef functio
     WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
     GtkMenu* gtkMenu = webkit_web_view_get_context_menu(view);
     if (gtkMenu) {
-        GList* items = gtk_container_get_children(GTK_CONTAINER(gtkMenu));
-        JSValueRef arrayValues[g_list_length(items)];
+        GOwnPtr<GList> items(gtk_container_get_children(GTK_CONTAINER(gtkMenu)));
+        JSValueRef arrayValues[g_list_length(items.get())];
         int index = 0;
-        for (GList* item = g_list_first(items); item; item = g_list_next(item)) {
+        for (GList* item = g_list_first(items.get()); item; item = g_list_next(item)) {
             arrayValues[index] = JSObjectMake(context, getMenuItemClass(), item->data);
             index++;
         }
@@ -248,7 +255,7 @@ static gboolean sendClick(gpointer)
 
 static JSValueRef scheduleAsynchronousClickCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
-    g_idle_add(sendClick, 0);
+    g_timeout_add(0, sendClick, 0);
     return JSValueMakeUndefined(context);
 }
 
@@ -296,7 +303,8 @@ static guint gdkModifersFromJSValue(JSContextRef context, const JSValueRef modif
         return 0;
 
     guint gdkModifiers = 0;
-    int modifiersCount = JSValueToNumber(context, JSObjectGetProperty(context, modifiersArray, JSStringCreateWithUTF8CString("length"), 0), 0);
+    JSRetainPtr<JSStringRef> lengthProperty(Adopt, JSStringCreateWithUTF8CString("length"));
+    int modifiersCount = JSValueToNumber(context, JSObjectGetProperty(context, modifiersArray, lengthProperty.get(), 0), 0);
     for (int i = 0; i < modifiersCount; ++i)
         gdkModifiers |= gdkModifierFromJSValue(context, JSObjectGetPropertyAtIndex(context, modifiersArray, i, 0));
     return gdkModifiers;
@@ -312,12 +320,16 @@ static JSValueRef mouseDownCallback(JSContextRef context, JSObjectRef function, 
     guint modifiers = argumentCount >= 2 ? gdkModifersFromJSValue(context, arguments[1]) : 0;
 
     GdkEvent* event = gdk_event_new(GDK_BUTTON_PRESS);
-    if (!prepareMouseButtonEvent(event, button, modifiers))
+    if (!prepareMouseButtonEvent(event, button, modifiers)) {
+        gdk_event_free(event);
         return JSValueMakeUndefined(context);
+    }
 
     // If the same mouse button is already in the down position don't send another event as it may confuse Xvfb.
-    if (buttonCurrentlyDown == event->button.button)
+    if (buttonCurrentlyDown == event->button.button) {
+        gdk_event_free(event);
         return JSValueMakeUndefined(context);
+    }
 
     buttonCurrentlyDown = event->button.button;
 
@@ -360,8 +372,10 @@ static JSValueRef mouseUpCallback(JSContextRef context, JSObjectRef function, JS
     guint modifiers = argumentCount >= 2 ? gdkModifersFromJSValue(context, arguments[1]) : 0;
 
     GdkEvent* event = gdk_event_new(GDK_BUTTON_RELEASE);
-    if (!prepareMouseButtonEvent(event, button, modifiers))
+    if (!prepareMouseButtonEvent(event, button, modifiers)) {
+        gdk_event_free(event);
         return JSValueMakeUndefined(context);
+    }
 
     lastClickPositionX = lastMousePositionX;
     lastClickPositionY = lastMousePositionY;
@@ -423,15 +437,27 @@ static JSValueRef mouseScrollByCallback(JSContextRef context, JSObjectRef functi
     int vertical = (int)JSValueToNumber(context, arguments[1], exception);
     g_return_val_if_fail((!exception || !*exception), JSValueMakeUndefined(context));
 
-    // GTK+ doesn't support multiple direction scrolls in the same event!
-    g_return_val_if_fail((!vertical || !horizontal), JSValueMakeUndefined(context));
-
     GdkEvent* event = gdk_event_new(GDK_SCROLL);
     event->scroll.x = lastMousePositionX;
     event->scroll.y = lastMousePositionY;
     event->scroll.time = GDK_CURRENT_TIME;
     event->scroll.window = gtk_widget_get_window(GTK_WIDGET(view));
     g_object_ref(event->scroll.window);
+
+    // GTK+ only supports one tick in each scroll event that is not smooth. For the cases of more than one direction,
+    // and more than one step in a direction, we can only use smooth events, supported from Gtk 3.3.18.
+#if GTK_CHECK_VERSION(3, 3, 18)
+    if ((horizontal && vertical) || horizontal > 1 || horizontal < -1 || vertical > 1 || vertical < -1) {
+        event->scroll.direction = GDK_SCROLL_SMOOTH;
+        event->scroll.delta_x = -horizontal;
+        event->scroll.delta_y = -vertical;
+
+        sendOrQueueEvent(event);
+        return JSValueMakeUndefined(context);
+    }
+#else
+    g_return_val_if_fail((!vertical || !horizontal), JSValueMakeUndefined(context));
+#endif
 
     if (horizontal < 0)
         event->scroll.direction = GDK_SCROLL_RIGHT;
@@ -450,7 +476,36 @@ static JSValueRef mouseScrollByCallback(JSContextRef context, JSObjectRef functi
 
 static JSValueRef continuousMouseScrollByCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
-    // GTK doesn't support continuous scroll events.
+#if GTK_CHECK_VERSION(3, 3, 18)
+    WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
+    if (!view)
+        return JSValueMakeUndefined(context);
+
+    if (argumentCount < 2)
+        return JSValueMakeUndefined(context);
+
+    int horizontal = JSValueToNumber(context, arguments[0], exception);
+    g_return_val_if_fail((!exception || !*exception), JSValueMakeUndefined(context));
+    int vertical = JSValueToNumber(context, arguments[1], exception);
+    g_return_val_if_fail((!exception || !*exception), JSValueMakeUndefined(context));
+
+    // We do not yet support continuous scrolling by page.
+    if (argumentCount >= 3 && JSValueToBoolean(context, arguments[2]))
+        return JSValueMakeUndefined(context);
+
+    GdkEvent* event = gdk_event_new(GDK_SCROLL);
+    event->scroll.x = lastMousePositionX;
+    event->scroll.y = lastMousePositionY;
+    event->scroll.time = GDK_CURRENT_TIME;
+    event->scroll.window = gtk_widget_get_window(GTK_WIDGET(view));
+    g_object_ref(event->scroll.window);
+
+    event->scroll.direction = GDK_SCROLL_SMOOTH;
+    event->scroll.delta_x = -horizontal / pixelsPerScrollTick;
+    event->scroll.delta_y = -vertical / pixelsPerScrollTick;
+
+    sendOrQueueEvent(event);
+#endif
     return JSValueMakeUndefined(context);
 }
 
@@ -614,10 +669,9 @@ void replaySavedEvents()
     endOfQueue = 0;
 }
 
-static JSValueRef keyDownCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static GdkEvent* createKeyPressEvent(JSContextRef context, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
-    if (argumentCount < 1)
-        return JSValueMakeUndefined(context);
+    g_return_val_if_fail(argumentCount >= 1, 0);
     guint modifiers = argumentCount >= 2 ? gdkModifersFromJSValue(context, arguments[1]) : 0;
 
     // handle location argument.
@@ -626,7 +680,8 @@ static JSValueRef keyDownCallback(JSContextRef context, JSObjectRef function, JS
         location = (int)JSValueToNumber(context, arguments[2], exception);
 
     JSStringRef character = JSValueToStringCopy(context, arguments[0], exception);
-    g_return_val_if_fail((!exception || !*exception), JSValueMakeUndefined(context));
+    g_return_val_if_fail((!exception || !*exception), 0);
+
     int gdkKeySym = GDK_VoidSymbol;
     if (location == DOM_KEY_LOCATION_NUMPAD) {
         if (JSStringIsEqualToUTF8CString(character, "leftArrow"))
@@ -702,6 +757,18 @@ static JSValueRef keyDownCallback(JSContextRef context, JSObjectRef function, JS
             gdkKeySym = GDK_F11;
         else if (JSStringIsEqualToUTF8CString(character, "F12"))
             gdkKeySym = GDK_F12;
+        else if (JSStringIsEqualToUTF8CString(character, "leftAlt"))
+            gdkKeySym = GDK_Alt_L;
+        else if (JSStringIsEqualToUTF8CString(character, "leftControl"))
+            gdkKeySym = GDK_Control_L;
+        else if (JSStringIsEqualToUTF8CString(character, "leftShift"))
+            gdkKeySym = GDK_Shift_L;
+        else if (JSStringIsEqualToUTF8CString(character, "rightAlt"))
+            gdkKeySym = GDK_Alt_R;
+        else if (JSStringIsEqualToUTF8CString(character, "rightControl"))
+            gdkKeySym = GDK_Control_R;
+        else if (JSStringIsEqualToUTF8CString(character, "rightShift"))
+            gdkKeySym = GDK_Shift_R;
         else {
             int charCode = JSStringGetCharactersPtr(character)[0];
             if (charCode == '\n' || charCode == '\r')
@@ -720,10 +787,8 @@ static JSValueRef keyDownCallback(JSContextRef context, JSObjectRef function, JS
     JSStringRelease(character);
 
     WebKitWebView* view = webkit_web_frame_get_web_view(mainFrame);
-    if (!view)
-        return JSValueMakeUndefined(context);
+    g_return_val_if_fail(view, 0);
 
-    // create and send the event
     GdkEvent* pressEvent = gdk_event_new(GDK_KEY_PRESS);
     pressEvent->key.keyval = gdkKeySym;
     pressEvent->key.state = modifiers;
@@ -735,17 +800,30 @@ static JSValueRef keyDownCallback(JSContextRef context, JSObjectRef function, JS
 
     // When synthesizing an event, an invalid hardware_keycode value
     // can cause it to be badly processed by Gtk+.
-    GdkKeymapKey* keys;
-    gint n_keys;
-    if (gdk_keymap_get_entries_for_keyval(gdk_keymap_get_default(), gdkKeySym, &keys, &n_keys)) {
-        pressEvent->key.hardware_keycode = keys[0].keycode;
-        g_free(keys);
-    }
+    GOwnPtr<GdkKeymapKey> keys;
+    gint nKeys;
+    if (gdk_keymap_get_entries_for_keyval(gdk_keymap_get_default(), gdkKeySym, &keys.outPtr(), &nKeys))
+        pressEvent->key.hardware_keycode = keys.get()[0].keycode;
 
+    return pressEvent;
+}
+
+static void sendKeyDown(GdkEvent* pressEvent)
+{
+    g_return_if_fail(pressEvent);
     GdkEvent* releaseEvent = gdk_event_copy(pressEvent);
+    releaseEvent->type = GDK_KEY_RELEASE;
+
     dispatchEvent(pressEvent);
-    releaseEvent->key.type = GDK_KEY_RELEASE;
     dispatchEvent(releaseEvent);
+
+    DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary();
+}
+
+static JSValueRef keyDownCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    GdkEvent* pressEvent = createKeyPressEvent(context, argumentCount, arguments, exception);
+    sendKeyDown(pressEvent);
 
     return JSValueMakeUndefined(context);
 }
@@ -814,6 +892,21 @@ static JSValueRef scalePageByCallback(JSContextRef context, JSObjectRef function
     return JSValueMakeUndefined(context);
 }
 
+static gboolean sendAsynchronousKeyDown(gpointer userData)
+{
+    sendKeyDown(static_cast<GdkEvent*>(userData));
+    return FALSE;
+}
+
+static JSValueRef scheduleAsynchronousKeyDownCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    GdkEvent* pressEvent = createKeyPressEvent(context, argumentCount, arguments, exception);
+    if (pressEvent)
+        g_timeout_add(0, sendAsynchronousKeyDown, static_cast<gpointer>(pressEvent));
+
+    return JSValueMakeUndefined(context);
+}
+
 static JSStaticFunction staticFunctions[] = {
     { "mouseScrollBy", mouseScrollByCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
     { "continuousMouseScrollBy", continuousMouseScrollByCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -830,6 +923,7 @@ static JSStaticFunction staticFunctions[] = {
     { "zoomPageOut", zoomPageOutCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
     { "scheduleAsynchronousClick", scheduleAsynchronousClickCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
     { "scalePageBy", scalePageByCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+    { "scheduleAsynchronousKeyDown", scheduleAsynchronousKeyDownCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
 
     { 0, 0, 0 }
 };

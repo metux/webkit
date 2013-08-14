@@ -76,6 +76,8 @@ public:
     NPError NPN_GetURLNotify(const char* url, const char* target, void* notifyData);
     NPError NPN_GetValue(NPNVariable, void* value);
     void NPN_InvalidateRect(NPRect* invalidRect);
+    bool NPN_Invoke(NPObject *, NPIdentifier methodName, const NPVariant *args, uint32_t argCount, NPVariant *result);
+    void* NPN_MemAlloc(uint32_t size);
 
     // NPRuntime NPN functions.
     NPIdentifier NPN_GetStringIdentifier(const NPUTF8* name);
@@ -88,6 +90,7 @@ public:
     NPObject* NPN_RetainObject(NPObject*);
     void NPN_ReleaseObject(NPObject*);
     bool NPN_RemoveProperty(NPObject*, NPIdentifier propertyName);
+    void NPN_ReleaseVariantValue(NPVariant*);
 
 #ifdef XP_MACOSX
     bool NPN_ConvertPoint(double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double *destX, double *destY, NPCoordinateSpace destSpace);
@@ -122,6 +125,8 @@ protected:
     NPP m_npp;
 
     const std::string& identifier() const { return m_identifier; }
+
+    static NPNetscapeFuncs* netscapeFuncs();
 
     void waitUntilDone();
     void notifyDone();

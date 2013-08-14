@@ -3,22 +3,22 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitError</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitPrintOperation.html" title="WebKitPrintOperation">
-<link rel="next" href="WebKitFindController.html" title="WebKitFindController">
+<link rel="prev" href="WebKitWebResource.html" title="WebKitWebResource">
+<link rel="next" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
 <tr valign="middle">
-<td><a accesskey="p" href="WebKitPrintOperation.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitWebResource.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitFindController.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitFaviconDatabase.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
 </tr>
 <tr><td colspan="5" class="shortcuts">
 <a href="#webkit2gtk-WebKitError.synopsis" class="shortcut">Top</a>
@@ -31,7 +31,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="webkit2gtk-WebKitError.top_of_page"></a>WebKitError</span></h2>
-<p>WebKitError</p>
+<p>WebKitError — Categorized WebKit errors</p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -41,26 +41,36 @@
 #define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-PLUGIN-ERROR:CAPS" title="WEBKIT_PLUGIN_ERROR">WEBKIT_PLUGIN_ERROR</a>
 #define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-POLICY-ERROR:CAPS" title="WEBKIT_POLICY_ERROR">WEBKIT_POLICY_ERROR</a>
 #define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR:CAPS" title="WEBKIT_DOWNLOAD_ERROR">WEBKIT_DOWNLOAD_ERROR</a>
+#define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-PRINT-ERROR:CAPS" title="WEBKIT_PRINT_ERROR">WEBKIT_PRINT_ERROR</a>
+#define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-JAVASCRIPT-ERROR:CAPS" title="WEBKIT_JAVASCRIPT_ERROR">WEBKIT_JAVASCRIPT_ERROR</a>
+#define             <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-SNAPSHOT-ERROR:CAPS" title="WEBKIT_SNAPSHOT_ERROR">WEBKIT_SNAPSHOT_ERROR</a>
 enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitNetworkError" title="enum WebKitNetworkError">WebKitNetworkError</a>;
 enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitPluginError" title="enum WebKitPluginError">WebKitPluginError</a>;
 enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitPolicyError" title="enum WebKitPolicyError">WebKitPolicyError</a>;
 enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitDownloadError" title="enum WebKitDownloadError">WebKitDownloadError</a>;
+enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitPrintError" title="enum WebKitPrintError">WebKitPrintError</a>;
+enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitJavascriptError" title="enum WebKitJavascriptError">WebKitJavascriptError</a>;
+enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitSnapshotError" title="enum WebKitSnapshotError">WebKitSnapshotError</a>;
 <a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-network-error-quark" title="webkit_network_error_quark ()">webkit_network_error_quark</a>          (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-plugin-error-quark" title="webkit_plugin_error_quark ()">webkit_plugin_error_quark</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-policy-error-quark" title="webkit_policy_error_quark ()">webkit_policy_error_quark</a>           (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-download-error-quark" title="webkit_download_error_quark ()">webkit_download_error_quark</a>         (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-print-error-quark" title="webkit_print_error_quark ()">webkit_print_error_quark</a>            (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-javascript-error-quark" title="webkit_javascript_error_quark ()">webkit_javascript_error_quark</a>       (<em class="parameter"><code><span class="type">void</span></code></em>);
+<a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              <a class="link" href="webkit2gtk-WebKitError.html#webkit-snapshot-error-quark" title="webkit_snapshot_error_quark ()">webkit_snapshot_error_quark</a>         (<em class="parameter"><code><span class="type">void</span></code></em>);
 </pre>
 </div>
 <div class="refsect1">
 <a name="webkit2gtk-WebKitError.description"></a><h2>Description</h2>
 <p>
+Categorized WebKit errors.
 </p>
 </div>
 <div class="refsect1">
 <a name="webkit2gtk-WebKitError.details"></a><h2>Details</h2>
 <div class="refsect2">
 <a name="WEBKIT-NETWORK-ERROR:CAPS"></a><h3>WEBKIT_NETWORK_ERROR</h3>
-<pre class="programlisting">#define WEBKIT_NETWORK_ERROR webkit_network_error_quark ()
+<pre class="programlisting">#define WEBKIT_NETWORK_ERROR    webkit_network_error_quark ()
 </pre>
 <p>
 </p>
@@ -68,7 +78,7 @@ enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitDown
 <hr>
 <div class="refsect2">
 <a name="WEBKIT-PLUGIN-ERROR:CAPS"></a><h3>WEBKIT_PLUGIN_ERROR</h3>
-<pre class="programlisting">#define WEBKIT_PLUGIN_ERROR  webkit_plugin_error_quark ()
+<pre class="programlisting">#define WEBKIT_PLUGIN_ERROR     webkit_plugin_error_quark ()
 </pre>
 <p>
 </p>
@@ -76,7 +86,7 @@ enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitDown
 <hr>
 <div class="refsect2">
 <a name="WEBKIT-POLICY-ERROR:CAPS"></a><h3>WEBKIT_POLICY_ERROR</h3>
-<pre class="programlisting">#define WEBKIT_POLICY_ERROR  webkit_policy_error_quark ()
+<pre class="programlisting">#define WEBKIT_POLICY_ERROR     webkit_policy_error_quark ()
 </pre>
 <p>
 </p>
@@ -84,7 +94,31 @@ enum                <a class="link" href="webkit2gtk-WebKitError.html#WebKitDown
 <hr>
 <div class="refsect2">
 <a name="WEBKIT-DOWNLOAD-ERROR:CAPS"></a><h3>WEBKIT_DOWNLOAD_ERROR</h3>
-<pre class="programlisting">#define WEBKIT_DOWNLOAD_ERROR webkit_download_error_quark ()
+<pre class="programlisting">#define WEBKIT_DOWNLOAD_ERROR   webkit_download_error_quark ()
+</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-PRINT-ERROR:CAPS"></a><h3>WEBKIT_PRINT_ERROR</h3>
+<pre class="programlisting">#define WEBKIT_PRINT_ERROR      webkit_print_error_quark ()
+</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-JAVASCRIPT-ERROR:CAPS"></a><h3>WEBKIT_JAVASCRIPT_ERROR</h3>
+<pre class="programlisting">#define WEBKIT_JAVASCRIPT_ERROR webkit_print_error_quark ()
+</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-SNAPSHOT-ERROR:CAPS"></a><h3>WEBKIT_SNAPSHOT_ERROR</h3>
+<pre class="programlisting">#define WEBKIT_SNAPSHOT_ERROR   webkit_snapshot_error_quark ()
 </pre>
 <p>
 </p>
@@ -265,6 +299,77 @@ Enum values used to denote the various download errors.
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitPrintError"></a><h3>enum WebKitPrintError</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_PRINT_ERROR_GENERAL = 599,
+    WEBKIT_PRINT_ERROR_PRINTER_NOT_FOUND = 500,
+    WEBKIT_PRINT_ERROR_INVALID_PAGE_RANGE = 501
+} WebKitPrintError;
+</pre>
+<p>
+Enum values used to denote the various print errors.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-PRINT-ERROR-GENERAL:CAPS"></a><span class="term"><code class="literal">WEBKIT_PRINT_ERROR_GENERAL</code></span></p></td>
+<td>Unspecified error during a print operation
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-PRINT-ERROR-PRINTER-NOT-FOUND:CAPS"></a><span class="term"><code class="literal">WEBKIT_PRINT_ERROR_PRINTER_NOT_FOUND</code></span></p></td>
+<td>Selected printer cannot be found
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-PRINT-ERROR-INVALID-PAGE-RANGE:CAPS"></a><span class="term"><code class="literal">WEBKIT_PRINT_ERROR_INVALID_PAGE_RANGE</code></span></p></td>
+<td>Invalid page range
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitJavascriptError"></a><h3>enum WebKitJavascriptError</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_JAVASCRIPT_ERROR_SCRIPT_FAILED = 699
+} WebKitJavascriptError;
+</pre>
+<p>
+Enum values used to denote errors happending when executing Javascript
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody><tr>
+<td><p><a name="WEBKIT-JAVASCRIPT-ERROR-SCRIPT-FAILED:CAPS"></a><span class="term"><code class="literal">WEBKIT_JAVASCRIPT_ERROR_SCRIPT_FAILED</code></span></p></td>
+<td>An exception was raised in Javascript execution
+</td>
+</tr></tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitSnapshotError"></a><h3>enum WebKitSnapshotError</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_SNAPSHOT_ERROR_FAILED_TO_CREATE = 799
+} WebKitSnapshotError;
+</pre>
+<p>
+Enum values used to denote errors happending when creating snapshots of <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody><tr>
+<td><p><a name="WEBKIT-SNAPSHOT-ERROR-FAILED-TO-CREATE:CAPS"></a><span class="term"><code class="literal">WEBKIT_SNAPSHOT_ERROR_FAILED_TO_CREATE</code></span></p></td>
+<td>An error occurred when creating a webpage snapshot.
+</td>
+</tr></tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-network-error-quark"></a><h3>webkit_network_error_quark ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_network_error_quark          (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
@@ -288,6 +393,27 @@ Enum values used to denote the various download errors.
 <div class="refsect2">
 <a name="webkit-download-error-quark"></a><h3>webkit_download_error_quark ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_download_error_quark         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-print-error-quark"></a><h3>webkit_print_error_quark ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_print_error_quark            (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-javascript-error-quark"></a><h3>webkit_javascript_error_quark ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_javascript_error_quark       (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
+<p>
+</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-snapshot-error-quark"></a><h3>webkit_snapshot_error_quark ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Quarks.html#GQuark"><span class="returnvalue">GQuark</span></a>              webkit_snapshot_error_quark         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
 </p>
 </div>

@@ -21,10 +21,8 @@
 #include "config.h"
 #include "webkitfavicondatabase.h"
 
-#include "DatabaseDetails.h"
-#include "DatabaseTracker.h"
 #include "FileSystem.h"
-#include "GRefPtr.h"
+#include "GdkCairoUtilities.h"
 #include "IconDatabase.h"
 #include "IconDatabaseClient.h"
 #include "Image.h"
@@ -38,6 +36,7 @@
 #include <glib/gi18n-lib.h>
 #include <wtf/MainThread.h>
 #include <wtf/gobject/GOwnPtr.h>
+#include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 
 /**
@@ -79,7 +78,6 @@ static void webkitFaviconDatabaseClose(WebKitFaviconDatabase* database);
 class IconDatabaseClientGtk : public IconDatabaseClient {
 public:
     // IconDatabaseClient interface
-    virtual bool performImport() { return true; }
     virtual void didRemoveAllIcons() { };
 
     // Called when an icon is requested while the initial import is
@@ -394,17 +392,19 @@ static GdkPixbuf* getIconPixbufSynchronously(WebKitFaviconDatabase* database, co
 
     // The exact size we pass is irrelevant to the iconDatabase code.
     // We must pass something greater than 0x0 to get a pixbuf.
-    Image* icon = iconDatabase().synchronousIconForPageURL(pageURL, !iconSize.isZero() ? iconSize : IntSize(1, 1));
+    NativeImagePtr icon = iconDatabase().synchronousNativeIconForPageURL(pageURL, !iconSize.isZero() ? iconSize : IntSize(1, 1));
     if (!icon)
         return 0;
 
-    GRefPtr<GdkPixbuf> pixbuf = adoptGRef(icon->getGdkPixbuf());
+    GRefPtr<GdkPixbuf> pixbuf = adoptGRef(cairoImageSurfaceToGdkPixbuf(icon->surface()));
     if (!pixbuf)
         return 0;
 
     // A size of (0, 0) means the maximum available size.
-    if (!iconSize.isZero() && (icon->width() != iconSize.width() || icon->height() != iconSize.height()))
-        pixbuf = gdk_pixbuf_scale_simple(pixbuf.get(), iconSize.width(), iconSize.height(), GDK_INTERP_BILINEAR);
+    int pixbufWidth = gdk_pixbuf_get_width(pixbuf.get());
+    int pixbufHeight = gdk_pixbuf_get_height(pixbuf.get());
+    if (!iconSize.isZero() && (pixbufWidth != iconSize.width() || pixbufHeight != iconSize.height()))
+        pixbuf = adoptGRef(gdk_pixbuf_scale_simple(pixbuf.get(), iconSize.width(), iconSize.height(), GDK_INTERP_BILINEAR));
     return pixbuf.leakRef();
 }
 
@@ -521,8 +521,10 @@ void webkit_favicon_database_get_favicon_pixbuf(WebKitFaviconDatabase* database,
     GRefPtr<GSimpleAsyncResult> result = adoptGRef(g_simple_async_result_new(G_OBJECT(database), callback, userData,
                                                                              reinterpret_cast<gpointer>(webkit_favicon_database_get_favicon_pixbuf)));
 
-    // If we don't have an icon for the given URI return ASAP.
-    if (database->priv->importFinished && iconDatabase().synchronousIconURLForPageURL(String::fromUTF8(pageURI)).isEmpty()) {
+    // If we don't have an icon for the given URI or the database is not opened then return ASAP. We have to check that
+    // because if the database is not opened it will skip (and not notify about) every single icon load request
+    if ((database->priv->importFinished && iconDatabase().synchronousIconURLForPageURL(String::fromUTF8(pageURI)).isEmpty())
+        || !iconDatabase().isOpen()) {
         g_simple_async_result_set_op_res_gpointer(result.get(), 0, 0);
         g_simple_async_result_complete_in_idle(result.get());
         return;
@@ -536,11 +538,11 @@ void webkit_favicon_database_get_favicon_pixbuf(WebKitFaviconDatabase* database,
     ASSERT(icons);
     icons->append(adoptPtr(request));
 
+    // We ask for the icon directly. If we don't get the icon data now,
+    // we'll be notified later (even if the database is still importing icons).
     GdkPixbuf* pixbuf = getIconPixbufSynchronously(database, pageURL, IntSize(width, height));
-    if (!pixbuf && !database->priv->importFinished) {
-        // Initial import is ongoing, the icon data will be available later.
+    if (!pixbuf)
         return;
-    }
 
     request->asyncResultCompleteInIdle(pixbuf);
 
@@ -609,18 +611,18 @@ static void webkitFaviconDatabaseImportFinished(WebKitFaviconDatabase* database)
     Vector<String> toDeleteURLs;
     PendingIconRequestMap::const_iterator end = database->priv->pendingIconRequests.end();
     for (PendingIconRequestMap::const_iterator iter = database->priv->pendingIconRequests.begin(); iter != end; ++iter) {
-        String iconURL = iconDatabase().synchronousIconURLForPageURL(iter->first);
+        String iconURL = iconDatabase().synchronousIconURLForPageURL(iter->key);
         if (!iconURL.isEmpty())
             continue;
 
-        PendingIconRequestVector* icons = iter->second;
+        PendingIconRequestVector* icons = iter->value;
         for (size_t i = 0; i < icons->size(); ++i) {
             PendingIconRequest* request = icons->at(i).get();
             if (request->asyncResult())
                 request->asyncResultComplete(0);
         }
 
-        toDeleteURLs.append(iter->first);
+        toDeleteURLs.append(iter->key);
     }
 
     for (size_t i = 0; i < toDeleteURLs.size(); ++i)

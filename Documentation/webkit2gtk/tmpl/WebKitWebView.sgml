@@ -35,6 +35,24 @@ WebKitWebView
 
 @webkitwebview: the object which received the signal.
 
+<!-- ##### SIGNAL WebKitWebView::context-menu ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@arg3: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebView::context-menu-dismissed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+
 <!-- ##### SIGNAL WebKitWebView::create ##### -->
 <para>
 
@@ -51,6 +69,30 @@ WebKitWebView
 @webkitwebview: the object which received the signal.
 @arg1: 
 @arg2: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebView::enter-fullscreen ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebView::insecure-content-detected ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+
+<!-- ##### SIGNAL WebKitWebView::leave-fullscreen ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
 @Returns: 
 
 <!-- ##### SIGNAL WebKitWebView::load-changed ##### -->
@@ -81,7 +123,16 @@ WebKitWebView
 @arg1: 
 @arg2: 
 
-<!-- ##### SIGNAL WebKitWebView::print-requested ##### -->
+<!-- ##### SIGNAL WebKitWebView::permission-request ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@Returns: 
+
+<!-- ##### SIGNAL WebKitWebView::print ##### -->
 <para>
 
 </para>
@@ -97,7 +148,23 @@ WebKitWebView
 
 @webkitwebview: the object which received the signal.
 
-<!-- ##### SIGNAL WebKitWebView::script-alert ##### -->
+<!-- ##### SIGNAL WebKitWebView::resource-load-started ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+
+<!-- ##### SIGNAL WebKitWebView::run-as-modal ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+
+<!-- ##### SIGNAL WebKitWebView::run-file-chooser ##### -->
 <para>
 
 </para>
@@ -106,28 +173,47 @@ WebKitWebView
 @arg1: 
 @Returns: 
 
-<!-- ##### SIGNAL WebKitWebView::script-confirm ##### -->
+<!-- ##### SIGNAL WebKitWebView::script-dialog ##### -->
 <para>
 
 </para>
 
 @webkitwebview: the object which received the signal.
 @arg1: 
-@arg2: 
 @Returns: 
 
-<!-- ##### SIGNAL WebKitWebView::script-prompt ##### -->
+<!-- ##### SIGNAL WebKitWebView::submit-form ##### -->
 <para>
 
 </para>
 
 @webkitwebview: the object which received the signal.
 @arg1: 
-@arg2: 
-@arg3: 
+
+<!-- ##### SIGNAL WebKitWebView::web-process-crashed ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
 @Returns: 
 
 <!-- ##### ARG WebKitWebView:estimated-load-progress ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebView:favicon ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebView:group ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebView:is-loading ##### -->
 <para>
 
 </para>
@@ -138,6 +224,11 @@ WebKitWebView
 </para>
 
 <!-- ##### ARG WebKitWebView:uri ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebView:view-mode ##### -->
 <para>
 
 </para>
@@ -171,6 +262,45 @@ WebKitWebView
 @WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION: 
 @WEBKIT_POLICY_DECISION_TYPE_RESPONSE: 
 
+<!-- ##### ENUM WebKitSaveMode ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SAVE_MODE_MHTML: 
+
+<!-- ##### ENUM WebKitViewMode ##### -->
+<para>
+
+</para>
+
+@WEBKIT_VIEW_MODE_WEB: 
+@WEBKIT_VIEW_MODE_SOURCE: 
+
+<!-- ##### ENUM WebKitInsecureContentEvent ##### -->
+<para>
+
+</para>
+
+@WEBKIT_INSECURE_CONTENT_RUN: 
+@WEBKIT_INSECURE_CONTENT_DISPLAYED: 
+
+<!-- ##### ENUM WebKitSnapshotOptions ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SNAPSHOT_OPTIONS_NONE: 
+@WEBKIT_SNAPSHOT_OPTIONS_INCLUDE_SELECTION_HIGHLIGHTING: 
+
+<!-- ##### ENUM WebKitSnapshotRegion ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SNAPSHOT_REGION_VISIBLE: 
+@WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT: 
+
 <!-- ##### MACRO WEBKIT_EDITING_COMMAND_CUT ##### -->
 <para>
 
@@ -186,6 +316,27 @@ WebKitWebView
 
 
 <!-- ##### MACRO WEBKIT_EDITING_COMMAND_PASTE ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_SELECT_ALL ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_UNDO ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_EDITING_COMMAND_REDO ##### -->
 <para>
 
 </para>
@@ -210,7 +361,25 @@ WebKitWebView
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_web_view_new_with_group ##### -->
+<para>
+
+</para>
+
+@group: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_web_view_get_context ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_group ##### -->
 <para>
 
 </para>
@@ -238,6 +407,17 @@ WebKitWebView
 @base_uri: 
 
 
+<!-- ##### FUNCTION webkit_web_view_load_alternate_html ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@content: 
+@content_uri: 
+@base_uri: 
+
+
 <!-- ##### FUNCTION webkit_web_view_load_plain_text ##### -->
 <para>
 
@@ -254,17 +434,6 @@ WebKitWebView
 
 @web_view: 
 @request: 
-
-
-<!-- ##### FUNCTION webkit_web_view_replace_content ##### -->
-<para>
-
-</para>
-
-@web_view: 
-@content: 
-@content_uri: 
-@base_uri: 
 
 
 <!-- ##### FUNCTION webkit_web_view_can_go_back ##### -->
@@ -310,6 +479,15 @@ WebKitWebView
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_web_view_get_page_id ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_web_view_reload ##### -->
 <para>
 
@@ -332,6 +510,15 @@ WebKitWebView
 </para>
 
 @web_view: 
+
+
+<!-- ##### FUNCTION webkit_web_view_is_loading ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
 
 
 <!-- ##### FUNCTION webkit_web_view_get_estimated_load_progress ##### -->
@@ -380,6 +567,15 @@ WebKitWebView
 
 
 <!-- ##### FUNCTION webkit_web_view_get_uri ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_favicon ##### -->
 <para>
 
 </para>
@@ -440,6 +636,7 @@ WebKitWebView
 
 @web_view: 
 @command: 
+@cancellable: 
 @callback: 
 @user_data: 
 
@@ -465,6 +662,300 @@ WebKitWebView
 
 
 <!-- ##### FUNCTION webkit_web_view_get_find_controller ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_inspector ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_javascript_global_context ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_run_javascript ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@script: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_view_run_javascript_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_run_javascript_from_gresource ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@resource: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_view_run_javascript_from_gresource_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_can_show_mime_type ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@mime_type: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_save ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@save_mode: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_view_save_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_save_to_file ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@file: 
+@save_mode: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_view_save_to_file_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_download_uri ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@uri: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_set_view_mode ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@view_mode: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_view_mode ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_tls_info ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@certificate: 
+@errors: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_snapshot ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@region: 
+@options: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_snapshot_finish ##### -->
+<para>
+
+</para>
+
+@web_view: 
+@result: 
+@error: 
+@Returns: 
+
+
+<!-- ##### STRUCT WebKitJavascriptResult ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### FUNCTION webkit_javascript_result_ref ##### -->
+<para>
+
+</para>
+
+@js_result: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_javascript_result_unref ##### -->
+<para>
+
+</para>
+
+@js_result: 
+
+
+<!-- ##### FUNCTION webkit_javascript_result_get_global_context ##### -->
+<para>
+
+</para>
+
+@js_result: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_javascript_result_get_value ##### -->
+<para>
+
+</para>
+
+@js_result: 
+@Returns: 
+
+
+<!-- ##### STRUCT WebKitScriptDialog ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ENUM WebKitScriptDialogType ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SCRIPT_DIALOG_ALERT: 
+@WEBKIT_SCRIPT_DIALOG_CONFIRM: 
+@WEBKIT_SCRIPT_DIALOG_PROMPT: 
+
+<!-- ##### FUNCTION webkit_script_dialog_get_dialog_type ##### -->
+<para>
+
+</para>
+
+@dialog: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_script_dialog_get_message ##### -->
+<para>
+
+</para>
+
+@dialog: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_script_dialog_confirm_set_confirmed ##### -->
+<para>
+
+</para>
+
+@dialog: 
+@confirmed: 
+
+
+<!-- ##### FUNCTION webkit_script_dialog_prompt_get_default_text ##### -->
+<para>
+
+</para>
+
+@dialog: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_script_dialog_prompt_set_text ##### -->
+<para>
+
+</para>
+
+@dialog: 
+@text: 
+
+
+<!-- ##### FUNCTION webkit_web_view_get_main_resource ##### -->
 <para>
 
 </para>

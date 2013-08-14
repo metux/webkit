@@ -26,6 +26,8 @@
 #include "config.h"
 #include "RemoveCSSPropertyCommand.h"
 
+#include "CSSStyleDeclaration.h"
+#include "ExceptionCodePlaceholder.h"
 #include "StylePropertySet.h"
 #include <wtf/Assertions.h>
 
@@ -42,20 +44,18 @@ RemoveCSSPropertyCommand::RemoveCSSPropertyCommand(Document* document, PassRefPt
 
 void RemoveCSSPropertyCommand::doApply()
 {
-    StylePropertySet* style = m_element->inlineStyleDecl();
+    const StylePropertySet* style = m_element->inlineStyle();
     m_oldValue = style->getPropertyValue(m_property);
     m_important = style->propertyIsImportant(m_property);
 
     // Mutate using the CSSOM wrapper so we get the same event behavior as a script.
-    ExceptionCode ec;
     // Setting to null string removes the property. We don't have internal version of removeProperty.
-    m_element->style()->setPropertyInternal(m_property, String(), false, ec);
+    m_element->style()->setPropertyInternal(m_property, String(), false, IGNORE_EXCEPTION);
 }
 
 void RemoveCSSPropertyCommand::doUnapply()
 {
-    ExceptionCode ec;
-    m_element->style()->setPropertyInternal(m_property, m_oldValue, m_important, ec);
+    m_element->style()->setPropertyInternal(m_property, m_oldValue, m_important, IGNORE_EXCEPTION);
 }
 
 #ifndef NDEBUG

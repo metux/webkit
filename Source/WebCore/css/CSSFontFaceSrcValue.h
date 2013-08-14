@@ -28,8 +28,8 @@
 
 #include "CSSValue.h"
 #include "CachedResourceHandle.h"
-#include "PlatformString.h"
 #include <wtf/PassRefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -65,9 +65,15 @@ public:
 
     String customCssText() const;
 
-    void addSubresourceStyleURLs(ListHashSet<KURL>&, const CSSStyleSheet*);
+    void addSubresourceStyleURLs(ListHashSet<KURL>&, const StyleSheetContents*) const;
+
+    bool hasFailedOrCanceledSubresources() const;
 
     CachedFont* cachedFont(Document*);
+
+    bool equals(const CSSFontFaceSrcValue&) const;
+
+    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     CSSFontFaceSrcValue(const String& resource, bool local)

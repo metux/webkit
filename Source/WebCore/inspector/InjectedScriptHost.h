@@ -42,15 +42,20 @@ class Database;
 class InjectedScript;
 class InspectorAgent;
 class InspectorConsoleAgent;
+class InspectorDOMAgent;
 class InspectorDOMStorageAgent;
 class InspectorDatabaseAgent;
+class InspectorDebuggerAgent;
 class InspectorFrontend;
 class InspectorObject;
 class InspectorValue;
 class Node;
+class ScriptDebugServer;
 class ScriptObject;
 class ScriptValue;
 class Storage;
+
+struct EventListenerInfo;
 
 class InjectedScriptHost : public RefCounted<InjectedScriptHost> {
 public:
@@ -63,6 +68,10 @@ public:
             , InspectorDatabaseAgent* databaseAgent
 #endif
             , InspectorDOMStorageAgent* domStorageAgent
+            , InspectorDOMAgent* domAgent
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+            , InspectorDebuggerAgent* debuggerAgent
+#endif
         )
     {
         m_inspectorAgent = inspectorAgent;
@@ -71,6 +80,10 @@ public:
         m_databaseAgent = databaseAgent;
 #endif
         m_domStorageAgent = domStorageAgent;
+        m_domAgent = domAgent;
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+        m_debuggerAgent = debuggerAgent;
+#endif
     }
 
     static Node* scriptValueAsNode(ScriptValue);
@@ -79,6 +92,7 @@ public:
     void disconnect();
 
     class InspectableObject {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
         virtual ScriptValue get(ScriptState*);
         virtual ~InspectableObject() { }
@@ -88,16 +102,17 @@ public:
     InspectableObject* inspectedObject(unsigned int num);
 
     void inspectImpl(PassRefPtr<InspectorValue> objectToInspect, PassRefPtr<InspectorValue> hints);
+    void getEventListenersImpl(Node*, Vector<EventListenerInfo>& listenersArray);
+
     void clearConsoleMessages();
     void copyText(const String& text);
 #if ENABLE(SQL_DATABASE)
-    int databaseIdImpl(Database*);
+    String databaseIdImpl(Database*);
 #endif
-    int storageIdImpl(Storage*);
-#if ENABLE(WORKERS)
-    long nextWorkerId();
-    void didCreateWorker(long id, const String& url, bool isSharedWorker);
-    void didDestroyWorker(long id);
+    String storageIdImpl(Storage*);
+
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+    ScriptDebugServer& scriptDebugServer();
 #endif
 
 private:
@@ -109,7 +124,10 @@ private:
     InspectorDatabaseAgent* m_databaseAgent;
 #endif
     InspectorDOMStorageAgent* m_domStorageAgent;
-    long m_lastWorkerId;
+    InspectorDOMAgent* m_domAgent;
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+    InspectorDebuggerAgent* m_debuggerAgent;
+#endif
     Vector<OwnPtr<InspectableObject> > m_inspectedObjects;
     OwnPtr<InspectableObject> m_defaultInspectableObject;
 };

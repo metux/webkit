@@ -21,6 +21,7 @@
 #include "WebKitPrivate.h"
 
 #include <gdk/gdk.h>
+#include <libintl.h>
 
 unsigned wkEventModifiersToGdkModifiers(WKEventModifiers wkModifiers)
 {
@@ -34,4 +35,26 @@ unsigned wkEventModifiersToGdkModifiers(WKEventModifiers wkModifiers)
     if (wkModifiers & kWKEventModifiersMetaKey)
         modifiers |= GDK_META_MASK;
     return modifiers;
+}
+
+unsigned wkEventMouseButtonToWebKitMouseButton(WKEventMouseButton wkButton)
+{
+    switch (wkButton) {
+    case kWKEventMouseButtonNoButton:
+        return 0;
+    case kWKEventMouseButtonLeftButton:
+        return 1;
+    case kWKEventMouseButtonMiddleButton:
+        return 2;
+    case kWKEventMouseButtonRightButton:
+        return 3;
+    }
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+static __attribute__((constructor)) void wkInitialize()
+{
+    bindtextdomain(GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
+    bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
 }

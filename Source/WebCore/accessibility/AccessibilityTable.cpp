@@ -48,18 +48,20 @@ namespace WebCore {
 using namespace HTMLNames;
 
 AccessibilityTable::AccessibilityTable(RenderObject* renderer)
-    : AccessibilityRenderObject(renderer),
-    m_headerContainer(0)
+    : AccessibilityRenderObject(renderer)
+    , m_headerContainer(0)
+    , m_isAccessibilityTable(true)
 {
-#if ACCESSIBILITY_TABLES
-    m_isAccessibilityTable = isTableExposableThroughAccessibility();
-#else
-    m_isAccessibilityTable = false;
-#endif
 }
 
 AccessibilityTable::~AccessibilityTable()
 {
+}
+
+void AccessibilityTable::init()
+{
+    AccessibilityRenderObject::init();
+    m_isAccessibilityTable = isTableExposableThroughAccessibility();
 }
 
 PassRefPtr<AccessibilityTable> AccessibilityTable::create(RenderObject* renderer)
@@ -96,6 +98,12 @@ bool AccessibilityTable::isDataTable() const
     if (hasARIARole())
         return false;
 
+    // When a section of the document is contentEditable, all tables should be
+    // treated as data tables, otherwise users may not be able to work with rich
+    // text editors that allow creating and editing tables.
+    if (node() && node()->rendererIsEditable())
+        return true;
+
     // This employs a heuristic to determine if this table should appear.
     // Only "data" tables should be exposed as tables.
     // Unfortunately, there is no good way to determine the difference
@@ -114,9 +122,16 @@ bool AccessibilityTable::isDataTable() const
     // if someone used "rules" attribute than the table should appear
     if (!tableElement->rules().isEmpty())
         return true;    
+
+    // if there's a colgroup or col element, it's probably a data table.
+    for (Node* child = tableElement->firstChild(); child; child = child->nextSibling()) {
+        if (child->hasTagName(colTag) || child->hasTagName(colgroupTag))
+            return true;
+    }
     
     // go through the cell's and check for tell-tale signs of "data" table status
     // cells have borders, or use attributes like headers, abbr, scope or axis
+    table->recalcSectionsIfNeeded();
     RenderTableSection* firstBody = table->firstBody();
     if (!firstBody)
         return false;
@@ -124,11 +139,15 @@ bool AccessibilityTable::isDataTable() const
     int numCols = firstBody->numColumns();
     int numRows = firstBody->numRows();
     
-    // if there's only one cell, it's not a good AXTable candidate
+    // If there's only one cell, it's not a good AXTable candidate.
     if (numRows == 1 && numCols == 1)
         return false;
+
+    // If there are at least 20 rows, we'll call it a data table.
+    if (numRows >= 20)
+        return true;
     
-    // store the background color of the table to check against cell's background colors
+    // Store the background color of the table to check against cell's background colors.
     RenderStyle* tableStyle = table->style();
     if (!tableStyle)
         return false;
@@ -142,6 +161,10 @@ bool AccessibilityTable::isDataTable() const
     unsigned validCellCount = 0;
     unsigned borderedCellCount = 0;
     unsigned backgroundDifferenceCellCount = 0;
+    unsigned cellsWithTopBorder = 0;
+    unsigned cellsWithBottomBorder = 0;
+    unsigned cellsWithLeftBorder = 0;
+    unsigned cellsWithRightBorder = 0;
     
     Color alternatingRowColors[5];
     int alternatingRowColorCount = 0;
@@ -183,19 +206,34 @@ bool AccessibilityTable::isDataTable() const
             if (!renderStyle)
                 continue;
 
-            // a cell needs to have matching bordered sides, before it can be considered a bordered cell.
+            // If the empty-cells style is set, we'll call it a data table.
+            if (renderStyle->emptyCells() == HIDE)
+                return true;
+
+            // If a cell has matching bordered sides, call it a (fully) bordered cell.
             if ((cell->borderTop() > 0 && cell->borderBottom() > 0)
                 || (cell->borderLeft() > 0 && cell->borderRight() > 0))
                 borderedCellCount++;
+
+            // Also keep track of each individual border, so we can catch tables where most
+            // cells have a bottom border, for example.
+            if (cell->borderTop() > 0)
+                cellsWithTopBorder++;
+            if (cell->borderBottom() > 0)
+                cellsWithBottomBorder++;
+            if (cell->borderLeft() > 0)
+                cellsWithLeftBorder++;
+            if (cell->borderRight() > 0)
+                cellsWithRightBorder++;
             
-            // if the cell has a different color from the table and there is cell spacing,
-            // then it is probably a data table cell (spacing and colors take the place of borders)
+            // If the cell has a different color from the table and there is cell spacing,
+            // then it is probably a data table cell (spacing and colors take the place of borders).
             Color cellColor = renderStyle->visitedDependentColor(CSSPropertyBackgroundColor);
             if (table->hBorderSpacing() > 0 && table->vBorderSpacing() > 0
                 && tableBGColor != cellColor && cellColor.alpha() != 1)
                 backgroundDifferenceCellCount++;
             
-            // if we've found 10 "good" cells, we don't need to keep searching
+            // If we've found 10 "good" cells, we don't need to keep searching.
             if (borderedCellCount >= 10 || backgroundDifferenceCellCount >= 10)
                 return true;
             
@@ -226,7 +264,11 @@ bool AccessibilityTable::isDataTable() const
     
     // half of the cells had borders, it's a data table
     unsigned neededCellCount = validCellCount / 2;
-    if (borderedCellCount >= neededCellCount)
+    if (borderedCellCount >= neededCellCount
+        || cellsWithTopBorder >= neededCellCount
+        || cellsWithBottomBorder >= neededCellCount
+        || cellsWithLeftBorder >= neededCellCount
+        || cellsWithRightBorder >= neededCellCount)
         return true;
     
     // half had different background colors, it's a data table
@@ -500,8 +542,8 @@ AccessibilityTableCell* AccessibilityTable::cellForColumnAndRow(unsigned column,
                 for (int testRow = sectionSpecificRow - 1; testRow >= 0; --testRow) {
                     cell = tableSection->primaryCellAt(testRow, column);
                     // cell overlapped. use this one
-                    ASSERT(cell->rowSpan() >= 1);
-                    if (cell && ((cell->row() + (cell->rowSpan() - 1)) >= sectionSpecificRow))
+                    ASSERT(!cell || cell->rowSpan() >= 1);
+                    if (cell && ((cell->rowIndex() + (cell->rowSpan() - 1)) >= sectionSpecificRow))
                         break;
                     cell = 0;
                 }
@@ -511,7 +553,7 @@ AccessibilityTableCell* AccessibilityTable::cellForColumnAndRow(unsigned column,
                     for (int testCol = column - 1; testCol >= 0; --testCol) {
                         cell = tableSection->primaryCellAt(sectionSpecificRow, testCol);
                         // cell overlapped. use this one
-                        ASSERT(cell->rowSpan() >= 1);
+                        ASSERT(!cell || cell->rowSpan() >= 1);
                         if (cell && ((cell->col() + (cell->colSpan() - 1)) >= column))
                             break;
                         cell = 0;
@@ -534,7 +576,7 @@ AccessibilityTableCell* AccessibilityTable::cellForColumnAndRow(unsigned column,
         return 0;
     
     AccessibilityObject* cellObject = axObjectCache()->getOrCreate(cell);
-    ASSERT(cellObject->isTableCell());
+    ASSERT_WITH_SECURITY_IMPLICATION(cellObject->isTableCell());
     
     return static_cast<AccessibilityTableCell*>(cellObject);
 }
@@ -547,7 +589,7 @@ AccessibilityRole AccessibilityTable::roleValue() const
     return TableRole;
 }
     
-bool AccessibilityTable::accessibilityIsIgnored() const
+bool AccessibilityTable::computeAccessibilityIsIgnored() const
 {
     AccessibilityObjectInclusion decision = accessibilityIsIgnoredBase();
     if (decision == IncludeObject)
@@ -556,7 +598,7 @@ bool AccessibilityTable::accessibilityIsIgnored() const
         return true;
     
     if (!isAccessibilityTable())
-        return AccessibilityRenderObject::accessibilityIsIgnored();
+        return AccessibilityRenderObject::computeAccessibilityIsIgnored();
         
     return false;
 }

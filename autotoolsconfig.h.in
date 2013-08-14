@@ -1,25 +1,57 @@
 /* autotoolsconfig.h.in.  Generated from configure.ac by autoheader.  */
 
+
+#ifndef __AUTOTOOLSCONFIG_H__
+#define __AUTOTOOLSCONFIG_H__ 1
+
+
+/* */
+#undef ENABLE_CREDENTIAL_STORAGE
+
 /* Define to enable GObject introspection support */
 #undef ENABLE_INTROSPECTION
-
-/* Define to enable link prefetch support */
-#undef ENABLE_LINK_PREFETCH
 
 /* Define to enable Opcode statistics */
 #undef ENABLE_OPCODE_STATS
 
+/* */
+#undef ENABLE_PLUGIN_PROCESS
+
+/* */
+#undef ENABLE_SPELLCHECK
+
+/* */
+#undef GDK_DISABLE_DEPRECATED
+
+/* */
+#undef GDK_PIXBUF_DISABLE_DEPRECATED
+
+/* Minimum GTK/GDK version required */
+#undef GDK_VERSION_MIN_REQUIRED
+
 /* The gettext catalog name */
 #undef GETTEXT_PACKAGE
 
-/* Using GStreamer 0.11 */
+/* Using GStreamer 1.0 */
 #undef GST_API_VERSION_1
 
-/* Using unstable GStreamer API */
-#undef GST_USE_UNSTABLE_API
+/* */
+#undef GST_DISABLE_DEPRECATED
+
+/* */
+#undef GTK_API_VERSION_2
+
+/* */
+#undef GTK_DISABLE_DEPRECATED
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the <EGL/egl.h> header file. */
+#undef HAVE_EGL_EGL_H
+
+/* Define to 1 if you have the <GLES2/gl2.h> header file. */
+#undef HAVE_GLES2_GL2_H
 
 /* Define to 1 if you have the <GL/glx.h> header file. */
 #undef HAVE_GL_GLX_H
@@ -66,6 +98,9 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
+/* Define to 1 if you have the <webp/decode.h> header file. */
+#undef HAVE_WEBP_DECODE_H
+
 /* Define to 1 if the system has the type `_Bool'. */
 #undef HAVE__BOOL
 
@@ -73,7 +108,10 @@
    */
 #undef LT_OBJDIR
 
-/* Define to disable debugging features */
+/* */
+#undef MOZ_X11
+
+/* Define to disable debugging */
 #undef NDEBUG
 
 /* Define to 1 if your C compiler doesn't accept -c and -o together. */
@@ -100,23 +138,94 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* */
+#undef PANGO_DISABLE_DEPRECATED
+
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* */
+#undef UNICODE
 
 /* Version number of package */
 #undef VERSION
 
-/* Define if target is DirectFB */
-#undef WTF_PLATFORM_DIRECTFB
-
 /* Define if target is X11 */
 #undef WTF_PLATFORM_X11
+
+/* */
+#undef WTF_SYSTEM_MALLOC
+
+/* */
+#undef WTF_USE_ACCELERATED_COMPOSITING
+
+/* */
+#undef WTF_USE_CLUTTER
+
+/* */
+#undef WTF_USE_EGL
+
+/* */
+#undef WTF_USE_FREETYPE
+
+/* */
+#undef WTF_USE_GLIB
+
+/* */
+#undef WTF_USE_GLX
+
+/* */
+#undef WTF_USE_GSTREAMER
+
+/* */
+#undef WTF_USE_HARFBUZZ
+
+/* */
+#undef WTF_USE_ICU_UNICODE
+
+/* */
+#undef WTF_USE_OPENGL
+
+/* */
+#undef WTF_USE_OPENGL_ES_2
+
+/* */
+#undef WTF_USE_SOUP
+
+/* */
+#undef WTF_USE_TEXTURE_MAPPER
+
+/* */
+#undef WTF_USE_TEXTURE_MAPPER_CAIRO
+
+/* */
+#undef WTF_USE_TEXTURE_MAPPER_GL
+
+/* 1 */
+#undef WTF_USE_WEBAUDIO_GSTREAMER
+
+/* */
+#undef WTF_USE_WEBP
+
+/* */
+#undef XP_UNIX
+
+/* */
+#undef XP_WIN
+
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 #undef _FILE_OFFSET_BITS
 
 /* Define for large files, on AIX-style hosts. */
 #undef _LARGE_FILES
+
+/* */
+#undef _UNICODE
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
@@ -130,3 +239,8 @@
 /* Define to empty if the keyword `volatile' does not work. Warning: valid
    code using `volatile' can become incorrect without. Disable with care. */
 #undef volatile
+
+
+#include "WebKitFeatures.h"
+#endif // __AUTOTOOLSCONFIG_H__
+

@@ -42,14 +42,15 @@ public:
 private:
     PasswordInputType(HTMLInputElement* element) : BaseTextInputType(element) { }
     virtual const AtomicString& formControlType() const OVERRIDE;
-    virtual bool saveFormControlState(String&) const OVERRIDE;
-    virtual void restoreFormControlState(const String&) const OVERRIDE;
+    virtual bool shouldSaveAndRestoreFormControlState() const OVERRIDE;
+    virtual FormControlState saveFormControlState() const OVERRIDE;
+    virtual void restoreFormControlState(const FormControlState&) OVERRIDE;
     virtual bool shouldUseInputMethod() const OVERRIDE;
     virtual bool shouldResetOnDocumentActivation() OVERRIDE;
     virtual bool shouldRespectListAttribute() OVERRIDE;
     virtual bool shouldRespectSpeechAttribute() OVERRIDE;
     virtual bool isPasswordField() const OVERRIDE;
-    virtual void handleFocusEvent() OVERRIDE;
+    virtual void handleFocusEvent(Node* oldFocusedNode, FocusDirection) OVERRIDE;
     virtual void handleBlurEvent() OVERRIDE;
 };
 

@@ -44,6 +44,7 @@ const SVGPropertyInfo* SVGTextContentElement::textLengthPropertyInfo()
     static const SVGPropertyInfo* s_propertyInfo = 0;
     if (!s_propertyInfo) {
         s_propertyInfo = new SVGPropertyInfo(AnimatedLength,
+                                             PropertyIsReadWrite,
                                              SVGNames::textLengthAttr,
                                              SVGNames::textLengthAttr.localName(),
                                              &SVGTextContentElement::synchronizeTextLength,
@@ -80,25 +81,22 @@ void SVGTextContentElement::synchronizeTextLength(void* contextElement)
     if (!ownerType->m_textLength.shouldSynchronize)
         return;
     AtomicString value(SVGPropertyTraits<SVGLength>::toString(ownerType->m_specifiedTextLength));
-    SVGAnimatedPropertySynchronizer<true>::synchronize(ownerType, textLengthPropertyInfo()->attributeName, value);
+    ownerType->m_textLength.synchronize(ownerType, textLengthPropertyInfo()->attributeName, value);
 }
 
 PassRefPtr<SVGAnimatedProperty> SVGTextContentElement::lookupOrCreateTextLengthWrapper(void* contextElement)
 {
     ASSERT(contextElement);
     SVGTextContentElement* ownerType = static_cast<SVGTextContentElement*>(contextElement);
-    return SVGAnimatedProperty::lookupOrCreateWrapper<SVGTextContentElement, SVGAnimatedLength, SVGLength, true>
+    return SVGAnimatedProperty::lookupOrCreateWrapper<SVGTextContentElement, SVGAnimatedLength, SVGLength>
            (ownerType, textLengthPropertyInfo(), ownerType->m_textLength.value);
 }
 
 PassRefPtr<SVGAnimatedLength> SVGTextContentElement::textLengthAnimated()
 {
     DEFINE_STATIC_LOCAL(SVGLength, defaultTextLength, (LengthModeOther));
-    if (m_specifiedTextLength == defaultTextLength) {
-        ExceptionCode ec = 0;
-        m_textLength.value.newValueSpecifiedUnits(LengthTypeNumber, getComputedTextLength(), ec);
-        ASSERT(!ec);
-    }
+    if (m_specifiedTextLength == defaultTextLength)
+        m_textLength.value.newValueSpecifiedUnits(LengthTypeNumber, getComputedTextLength(), ASSERT_NO_EXCEPTION);
 
     m_textLength.shouldSynchronize = true;
     return static_pointer_cast<SVGAnimatedLength>(lookupOrCreateTextLengthWrapper(this));
@@ -228,46 +226,46 @@ bool SVGTextContentElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-bool SVGTextContentElement::isPresentationAttribute(Attribute* attr) const
+bool SVGTextContentElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name().matches(XMLNames::spaceAttr))
+    if (name.matches(XMLNames::spaceAttr))
         return true;
-    return SVGStyledElement::isPresentationAttribute(attr);
+    return SVGStyledElement::isPresentationAttribute(name);
 }
 
-void SVGTextContentElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void SVGTextContentElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (!isSupportedAttribute(attr->name()))
-        SVGStyledElement::collectStyleForAttribute(attr, style);
-    else if (attr->name().matches(XMLNames::spaceAttr)) {
-        DEFINE_STATIC_LOCAL(const AtomicString, preserveString, ("preserve"));
+    if (!isSupportedAttribute(attribute.name()))
+        SVGStyledElement::collectStyleForPresentationAttribute(attribute, style);
+    else if (attribute.name().matches(XMLNames::spaceAttr)) {
+        DEFINE_STATIC_LOCAL(const AtomicString, preserveString, ("preserve", AtomicString::ConstructFromLiteral));
 
-        if (attr->value() == preserveString)
-            style->setProperty(CSSPropertyWhiteSpace, CSSValuePre);
+        if (attribute.value() == preserveString)
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyWhiteSpace, CSSValuePre);
         else
-            style->setProperty(CSSPropertyWhiteSpace, CSSValueNowrap);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyWhiteSpace, CSSValueNowrap);
     }
 }
 
-void SVGTextContentElement::parseAttribute(Attribute* attr)
+void SVGTextContentElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     SVGParsingError parseError = NoError;
 
-    if (!isSupportedAttribute(attr->name()))
-        SVGStyledElement::parseAttribute(attr);
-    else if (attr->name() == SVGNames::lengthAdjustAttr) {
-        SVGLengthAdjustType propertyValue = SVGPropertyTraits<SVGLengthAdjustType>::fromString(attr->value());
+    if (!isSupportedAttribute(name))
+        SVGStyledElement::parseAttribute(name, value);
+    else if (name == SVGNames::lengthAdjustAttr) {
+        SVGLengthAdjustType propertyValue = SVGPropertyTraits<SVGLengthAdjustType>::fromString(value);
         if (propertyValue > 0)
             setLengthAdjustBaseValue(propertyValue);
-    } else if (attr->name() == SVGNames::textLengthAttr) {
-        m_textLength.value = SVGLength::construct(LengthModeOther, attr->value(), parseError, ForbidNegativeLengths);
-    } else if (SVGTests::parseAttribute(attr)
-               || SVGExternalResourcesRequired::parseAttribute(attr)) {
-    } else if (SVGLangSpace::parseAttribute(attr)) {
+    } else if (name == SVGNames::textLengthAttr) {
+        m_textLength.value = SVGLength::construct(LengthModeOther, value, parseError, ForbidNegativeLengths);
+    } else if (SVGTests::parseAttribute(name, value)
+               || SVGExternalResourcesRequired::parseAttribute(name, value)) {
+    } else if (SVGLangSpace::parseAttribute(name, value)) {
     } else
         ASSERT_NOT_REACHED();
 
-    reportAttributeParsingError(parseError, attr);
+    reportAttributeParsingError(parseError, name, value);
 }
 
 void SVGTextContentElement::svgAttributeChanged(const QualifiedName& attrName)
@@ -319,19 +317,6 @@ SVGTextContentElement* SVGTextContentElement::elementFromRenderer(RenderObject* 
         return 0;
 
     return static_cast<SVGTextContentElement*>(node);
-}
-
-void SVGTextContentElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
-{
-    SVGStyledElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
-
-    if (changedByParser || !renderer())
-        return;
-
-    // Invalidate the TextPosition cache in SVGTextLayoutAttributesBuilder as it may now point
-    // to no-longer existing SVGTextPositioningElements and thus needs to be rebuilt.
-    if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(renderer()))
-        textRenderer->invalidateTextPositioningElements();
 }
 
 }

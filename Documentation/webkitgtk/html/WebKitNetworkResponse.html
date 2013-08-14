@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitNetworkResponse</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest">
@@ -44,6 +44,8 @@
 <pre class="synopsis">                    <a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse-struct" title="WebKitNetworkResponse">WebKitNetworkResponse</a>;
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-get-uri" title="webkit_network_response_get_uri ()">webkit_network_response_get_uri</a>     (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);
 <a href="../libsoup-2.4/SoupMessage.html"><span class="returnvalue">SoupMessage</span></a> *       <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-get-message" title="webkit_network_response_get_message ()">webkit_network_response_get_message</a> (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);
+const <span class="returnvalue">char</span> *        <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-get-suggested-filename" title="webkit_network_response_get_suggested_filename ()">webkit_network_response_get_suggested_filename</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitNetworkResponse.html#webkit-network-response-set-uri" title="webkit_network_response_set_uri ()">webkit_network_response_set_uri</a>     (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
 </pre>
@@ -59,6 +61,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <a name="WebKitNetworkResponse.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
   "<a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse--message" title='The "message" property'>message</a>"                  <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a>*          : Read / Write / Construct Only
+  "<a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse--suggested-filename" title='The "suggested-filename" property'>suggested-filename</a>"       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitNetworkResponse.html#WebKitNetworkResponse--uri" title='The "uri" property'>uri</a>"                      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
 </pre>
 </div>
@@ -126,6 +129,34 @@ represented.
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-network-response-get-suggested-filename"></a><h3>webkit_network_response_get_suggested_filename ()</h3>
+<pre class="programlisting">const <span class="returnvalue">char</span> *        webkit_network_response_get_suggested_filename
+                                                        (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>);</pre>
+<p>
+Obtains the suggested filename for the given network response. The
+suggested filename is taken from the 'Content-Disposition' HTTP
+header, but this is not always present, and this method will return
+<a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> in such case.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the suggested filename or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if not present. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 1.10</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-network-response-set-uri"></a><h3>webkit_network_response_set_uri ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_network_response_set_uri     (<em class="parameter"><code><a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> *response</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);</pre>
@@ -160,6 +191,16 @@ call.
 The <a href="../libsoup-2.4/SoupMessage.html"><span class="type">SoupMessage</span></a> that backs the response.
 </p>
 <p class="since">Since 1.1.14</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitNetworkResponse--suggested-filename"></a><h3>The <code class="literal">"suggested-filename"</code> property</h3>
+<pre class="programlisting">  "suggested-filename"       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
+<p>
+The suggested filename for the response.
+</p>
+<p>Default value: NULL</p>
+<p class="since">Since 1.10</p>
 </div>
 <hr>
 <div class="refsect2">

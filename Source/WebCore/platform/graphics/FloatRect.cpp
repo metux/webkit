@@ -29,6 +29,7 @@
 
 #include "FloatConversion.h"
 #include "IntRect.h"
+#include "LayoutRect.h"
 #include <algorithm>
 #include <math.h>
 #include <wtf/MathExtras.h>
@@ -39,6 +40,10 @@ using std::min;
 namespace WebCore {
 
 FloatRect::FloatRect(const IntRect& r) : m_location(r.location()), m_size(r.size())
+{
+}
+
+FloatRect::FloatRect(const LayoutRect& r) : m_location(r.location()), m_size(r.size())
 {
 }
 
@@ -72,7 +77,7 @@ bool FloatRect::contains(const FloatPoint& point, ContainsMode containsMode) con
 {
     if (containsMode == InsideOrOnStroke)
         return contains(point.x(), point.y());
-    return x() < point.x() && maxX() > point.x() && y() < point.y() && maxY() > y();
+    return x() < point.x() && maxX() > point.x() && y() < point.y() && maxY() > point.y();
 }
 
 void FloatRect::intersect(const FloatRect& other)
@@ -127,6 +132,16 @@ void FloatRect::uniteIfNonZero(const FloatRect& other)
     }
 
     uniteEvenIfEmpty(other);
+}
+
+void FloatRect::extend(const FloatPoint& p)
+{
+    float minX = min(x(), p.x());
+    float minY = min(y(), p.y());
+    float maxX = max(this->maxX(), p.x());
+    float maxY = max(this->maxY(), p.y());
+
+    setLocationAndSizeFromEdges(minX, minY, maxX, maxY);
 }
 
 void FloatRect::scale(float sx, float sy)
@@ -209,26 +224,25 @@ void FloatRect::fitToPoints(const FloatPoint& p0, const FloatPoint& p1, const Fl
 
 IntRect enclosingIntRect(const FloatRect& rect)
 {
-    float left = floorf(rect.x());
-    float top = floorf(rect.y());
-    float width = ceilf(rect.maxX()) - left;
-    float height = ceilf(rect.maxY()) - top;
-    
-    return IntRect(clampToInteger(left), clampToInteger(top), 
-                   clampToInteger(width), clampToInteger(height));
+    IntPoint location = flooredIntPoint(rect.minXMinYCorner());
+    IntPoint maxPoint = ceiledIntPoint(rect.maxXMaxYCorner());
+
+    return IntRect(location, maxPoint - location);
 }
 
 IntRect enclosedIntRect(const FloatRect& rect)
 {
-    int x = clampToInteger(ceilf(rect.x()));
-    int y = clampToInteger(ceilf(rect.y()));
-    float maxX = clampToInteger(floorf(rect.maxX()));
-    float maxY = clampToInteger(floorf(rect.maxY()));
-    // A rect of width 0 should not become a rect of width -1 due to ceil/floor.
-    int width = max(clampToInteger(maxX - x), 0);
-    int height = max(clampToInteger(maxY - y), 0);
+    IntPoint location = ceiledIntPoint(rect.minXMinYCorner());
+    IntPoint maxPoint = flooredIntPoint(rect.maxXMaxYCorner());
+    IntSize size = maxPoint - location;
+    size.clampNegativeToZero();
 
-    return IntRect(x, y, width, height);
+    return IntRect(location, size);
+}
+
+IntRect roundedIntRect(const FloatRect& rect)
+{
+    return IntRect(roundedIntPoint(rect.location()), roundedIntSize(rect.size()));
 }
 
 FloatRect mapRect(const FloatRect& r, const FloatRect& srcRect, const FloatRect& destRect)

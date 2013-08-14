@@ -29,19 +29,20 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SHADOW_DOM)
-
 #include "HTMLShadowElement.h"
 
 #include "HTMLNames.h"
+#include "ShadowRoot.h"
+#include <wtf/text/AtomicString.h>
+
+#if ENABLE(SHADOW_DOM)
 
 namespace WebCore {
 
 class Document;
 
 inline HTMLShadowElement::HTMLShadowElement(const QualifiedName& tagName, Document* document)
-    : HTMLElement(tagName, document)
+    : InsertionPoint(tagName, document)
 {
     ASSERT(hasTagName(HTMLNames::shadowTag));
 }
@@ -55,6 +56,21 @@ HTMLShadowElement::~HTMLShadowElement()
 {
 }
 
+ShadowRoot* HTMLShadowElement::olderShadowRoot()
+{
+    ShadowRoot* containingRoot = containingShadowRoot();
+    if (!containingRoot)
+        return 0;
+
+    ContentDistributor::ensureDistribution(containingRoot);
+
+    ShadowRoot* older = containingRoot->olderShadowRoot();
+    if (!older || older->type() != ShadowRoot::AuthorShadowRoot || ScopeContentDistribution::assignedTo(older) != this)
+        return 0;
+
+    return older;
+}
+
 } // namespace WebCore
 
-#endif // ENABLE(SHADOW_DOM)
+#endif // if ENABLE(SHADOW_DOM)

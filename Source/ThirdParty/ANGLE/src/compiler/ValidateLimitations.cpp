@@ -6,6 +6,7 @@
 
 #include "compiler/ValidateLimitations.h"
 #include "compiler/InfoSink.h"
+#include "compiler/InitializeParseContext.h"
 #include "compiler/ParseHelper.h"
 
 namespace {
@@ -426,7 +427,14 @@ bool ValidateLimitations::validateFunctionCall(TIntermAggregate* node)
     for (TIntermSequence::size_type i = 0; i < params.size(); ++i) {
         TIntermSymbol* symbol = params[i]->getAsSymbolNode();
         if (symbol && isLoopIndex(symbol))
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#endif
             pIndex.push_back(i);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     }
     // If none of the loop indices are used as arguments,
     // there is nothing to check.

@@ -27,6 +27,7 @@
 #include "Element.h"
 #include "InsertListCommand.h"
 #include "DocumentFragment.h"
+#include "ExceptionCodePlaceholder.h"
 #include "htmlediting.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
@@ -87,7 +88,7 @@ bool InsertListCommand::selectionHasListOfType(const VisibleSelection& selection
     if (!enclosingList(start.deepEquivalent().deprecatedNode()))
         return false;
 
-    VisiblePosition end = selection.visibleEnd();
+    VisiblePosition end = startOfParagraph(selection.visibleEnd());
     while (start.isNotNull() && start != end) {
         Element* listNode = enclosingList(start.deepEquivalent().deprecatedNode());
         if (!listNode || !listNode->hasTagName(listTag))
@@ -152,7 +153,7 @@ void InsertListCommand::doApply()
                 // FIXME: This is an inefficient way to keep selection alive because indexForVisiblePosition walks from
                 // the beginning of the document to the endOfSelection everytime this code is executed.
                 // But not using index is hard because there are so many ways we can lose selection inside doApplyForSingleParagraph.
-                RefPtr<Element> scope;
+                RefPtr<ContainerNode> scope;
                 int indexForEndOfSelection = indexForVisiblePosition(endOfSelection, scope);
                 doApplyForSingleParagraph(forceCreateList, listTag, currentSelection.get());
                 if (endOfSelection.isNull() || endOfSelection.isOrphan() || startOfLastParagraph.isNull() || startOfLastParagraph.isOrphan()) {
@@ -232,11 +233,10 @@ void InsertListCommand::doApplyForSingleParagraph(bool forceCreateList, const Qu
 
             // Restore the start and the end of current selection if they started inside listNode
             // because moveParagraphWithClones could have removed them.
-            ExceptionCode ec;
             if (rangeStartIsInList && newList)
-                currentSelection->setStart(newList, 0, ec);
+                currentSelection->setStart(newList, 0, IGNORE_EXCEPTION);
             if (rangeEndIsInList && newList)
-                currentSelection->setEnd(newList, lastOffsetInNode(newList.get()), ec);
+                currentSelection->setEnd(newList, lastOffsetInNode(newList.get()), IGNORE_EXCEPTION);
 
             setEndingSelection(VisiblePosition(firstPositionInNode(newList.get())));
 

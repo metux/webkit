@@ -23,6 +23,7 @@
 #if ENABLE(SVG)
 #include "SVGSymbolElement.h"
 
+#include "RenderSVGHiddenContainer.h"
 #include "SVGElementInstance.h"
 #include "SVGFitToViewBox.h"
 #include "SVGNames.h"
@@ -64,18 +65,18 @@ bool SVGSymbolElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGSymbolElement::parseAttribute(Attribute* attr)
+void SVGSymbolElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(attr->name())) {
-        SVGStyledElement::parseAttribute(attr);
+    if (!isSupportedAttribute(name)) {
+        SVGStyledElement::parseAttribute(name, value);
         return;
     }
 
-    if (SVGLangSpace::parseAttribute(attr))
+    if (SVGLangSpace::parseAttribute(name, value))
         return;
-    if (SVGExternalResourcesRequired::parseAttribute(attr))
+    if (SVGExternalResourcesRequired::parseAttribute(name, value))
         return;
-    if (SVGFitToViewBox::parseAttribute(document(), attr))
+    if (SVGFitToViewBox::parseAttribute(this, name, value))
         return;
 
     ASSERT_NOT_REACHED();
@@ -98,6 +99,11 @@ void SVGSymbolElement::svgAttributeChanged(const QualifiedName& attrName)
 bool SVGSymbolElement::selfHasRelativeLengths() const
 {
     return hasAttribute(SVGNames::viewBoxAttr);
+}
+
+RenderObject* SVGSymbolElement::createRenderer(RenderArena* arena, RenderStyle*)
+{
+    return new (arena) RenderSVGHiddenContainer(this);
 }
 
 }

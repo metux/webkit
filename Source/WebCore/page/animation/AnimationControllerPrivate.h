@@ -30,7 +30,6 @@
 #define AnimationControllerPrivate_h
 
 #include "CSSPropertyNames.h"
-#include "PlatformString.h"
 #include "Timer.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -38,6 +37,7 @@
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -49,7 +49,6 @@ class Frame;
 class Node;
 class RenderObject;
 class RenderStyle;
-class WebKitAnimationList;
 
 enum SetChanged {
     DoNotCallSetChanged = 0,
@@ -88,7 +87,7 @@ public:
     bool isRunningAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
     bool isRunningAcceleratedAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
 
-    bool pauseAnimationAtTime(RenderObject*, const String& name, double t);
+    bool pauseAnimationAtTime(RenderObject*, const AtomicString& name, double t);
     bool pauseTransitionAtTime(RenderObject*, const String& property, double t);
     unsigned numberOfActiveAnimations(Document*) const;
 
@@ -107,7 +106,7 @@ public:
 
     void animationWillBeRemoved(AnimationBase*);
 
-    PassRefPtr<WebKitAnimationList> animationsForRenderer(RenderObject*) const;
+    void updateAnimationTimerForRenderer(RenderObject*);
     
 private:
     void animationTimerFired(Timer<AnimationControllerPrivate>*);
@@ -140,6 +139,7 @@ private:
     WaitingAnimationsSet m_animationsWaitingForStyle;
     WaitingAnimationsSet m_animationsWaitingForStartTimeResponse;
     bool m_waitingForAsyncStartNotification;
+    double m_previousTimeToNextService;
 };
 
 } // namespace WebCore

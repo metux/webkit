@@ -37,19 +37,20 @@ OBJC_CLASS NSWindow;
 
 typedef uint32_t PlatformDisplayID;
 
+typedef WTF::Vector<char> ColorProfile;
+
 namespace WebCore {
 
     class FloatRect;
     class Widget;
 
-    int screenHorizontalDPI(Widget*);
-    int screenVerticalDPI(Widget*);
     int screenDepth(Widget*);
     int screenDepthPerComponent(Widget*);
     bool screenIsMonochrome(Widget*);
 
     FloatRect screenRect(Widget*);
     FloatRect screenAvailableRect(Widget*);
+    void screenColorProfile(ColorProfile&);
 
 #if PLATFORM(MAC)
     NSScreen *screenForWindow(NSWindow *);

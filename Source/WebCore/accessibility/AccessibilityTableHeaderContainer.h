@@ -47,13 +47,12 @@ public:
     
     virtual void addChildren();
     
-    virtual LayoutSize size() const;
     virtual LayoutRect elementRect() const;
     
 private:
     LayoutRect m_headerRect;
     
-    virtual bool accessibilityIsIgnored() const;
+    virtual bool computeAccessibilityIsIgnored() const;
 }; 
     
 } // namespace WebCore 

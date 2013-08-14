@@ -26,20 +26,17 @@
 #ifndef GCAssertions_h
 #define GCAssertions_h
 
-#include "Assertions.h"
+#include <wtf/Assertions.h>
 
 #if ENABLE(GC_VALIDATION)
 #define ASSERT_GC_OBJECT_LOOKS_VALID(cell) do { \
-    if (!(cell))\
-        CRASH();\
-    if (cell->unvalidatedStructure()->unvalidatedStructure() != cell->unvalidatedStructure()->unvalidatedStructure()->unvalidatedStructure())\
-        CRASH();\
+    RELEASE_ASSERT(cell);\
+    RELEASE_ASSERT(cell->unvalidatedStructure()->unvalidatedStructure() == cell->unvalidatedStructure()->unvalidatedStructure()->unvalidatedStructure()); \
 } while (0)
 
 #define ASSERT_GC_OBJECT_INHERITS(object, classInfo) do {\
     ASSERT_GC_OBJECT_LOOKS_VALID(object); \
-    if (!object->inherits(classInfo)) \
-        CRASH();\
+    RELEASE_ASSERT(object->inherits(classInfo)); \
 } while (0)
 
 #else

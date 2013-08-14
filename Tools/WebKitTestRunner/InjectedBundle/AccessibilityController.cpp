@@ -44,6 +44,14 @@ PassRefPtr<AccessibilityController> AccessibilityController::create()
 }
 
 AccessibilityController::AccessibilityController()
+#if PLATFORM(GTK) || PLATFORM(EFL)
+    : m_stateChangeListenerId(0)
+    , m_focusEventListenerId(0)
+    , m_activeDescendantChangedListenerId(0)
+    , m_childrenChangedListenerId(0)
+    , m_propertyChangedListenerId(0)
+    , m_visibleDataChangedListenerId(0)
+#endif
 {
 }
 
@@ -93,11 +101,21 @@ PassRefPtr<AccessibilityUIElement> AccessibilityController::elementAtPoint(int x
     return uiElement->elementAtPoint(x, y);
 }
 
-// Unsupported methods on various platforms. As they're implemented on other platforms this list should be modified.
+// Unsupported methods on various platforms.
+// As they're implemented on other platforms this list should be modified.
 #if !PLATFORM(MAC)
 bool AccessibilityController::addNotificationListener(JSValueRef) { return false; }
 bool AccessibilityController::removeNotificationListener() { return false; }
 #endif
-    
+
+#if !PLATFORM(MAC) && !PLATFORM(GTK) && !PLATFORM(EFL)
+PassRefPtr<AccessibilityUIElement> AccessibilityController::accessibleElementById(JSStringRef attribute) { return 0; }
+#endif
+
+#if !PLATFORM(GTK) && !PLATFORM(EFL)
+void AccessibilityController::logAccessibilityEvents() { }
+void AccessibilityController::resetToConsistentState() { }
+#endif
+
 } // namespace WTR
 

@@ -29,12 +29,16 @@
 
 #include <stdint.h>
 
-#if defined(WIN32) || defined(_WIN32)
-#include <WebKit2/WKBaseWin.h>
-#endif
-
 #if defined(BUILDING_GTK__)
 #include <WebKit2/WKBaseGtk.h>
+#endif
+
+#if defined(WTF_USE_SOUP)
+#include <WebKit2/WKBaseSoup.h>
+#endif
+
+#if defined(BUILDING_EFL__)
+#include <WebKit2/WKBaseEfl.h>
 #endif
 
 /* WebKit2 shared types */
@@ -59,6 +63,8 @@ typedef const struct OpaqueWKGraphicsContext* WKGraphicsContextRef;
 typedef const struct OpaqueWKImage* WKImageRef;
 typedef const struct OpaqueWKPointRef* WKPointRef;
 typedef const struct OpaqueWKRectRef* WKRectRef;
+typedef const struct OpaqueWKRenderLayer* WKRenderLayerRef;
+typedef const struct OpaqueWKRenderObject* WKRenderObjectRef;
 typedef const struct OpaqueWKSecurityOrigin* WKSecurityOriginRef;
 typedef const struct OpaqueWKSerializedScriptValue* WKSerializedScriptValueRef;
 typedef const struct OpaqueWKSizeRef* WKSizeRef;
@@ -68,6 +74,20 @@ typedef const struct OpaqueWKURL* WKURLRef;
 typedef const struct OpaqueWKURLRequest* WKURLRequestRef;
 typedef const struct OpaqueWKURLResponse* WKURLResponseRef;
 typedef const struct OpaqueWKUserContentURLPattern* WKUserContentURLPatternRef;
+typedef const struct OpaqueWKWebArchive* WKWebArchiveRef;
+typedef const struct OpaqueWKWebArchiveResource* WKWebArchiveResourceRef;
+
+enum WKUserContentInjectedFrames {
+    kWKInjectInAllFrames,
+    kWKInjectInTopFrameOnly
+};
+typedef enum WKUserContentInjectedFrames WKUserContentInjectedFrames;
+
+enum WKUserScriptInjectionTime {
+    kWKInjectAtDocumentStart,
+    kWKInjectAtDocumentEnd
+};
+typedef enum WKUserScriptInjectionTime WKUserScriptInjectionTime;
 
 /* WebKit2 main API types */
 
@@ -76,7 +96,10 @@ typedef const struct OpaqueWKAuthenticationChallenge* WKAuthenticationChallengeR
 typedef const struct OpaqueWKAuthenticationDecisionListener* WKAuthenticationDecisionListenerRef;
 typedef const struct OpaqueWKBackForwardList* WKBackForwardListRef;
 typedef const struct OpaqueWKBackForwardListItem* WKBackForwardListItemRef;
+typedef const struct OpaqueWKBatteryManager* WKBatteryManagerRef;
+typedef const struct OpaqueWKBatteryStatus* WKBatteryStatusRef;
 typedef const struct OpaqueWKResourceCacheManager* WKResourceCacheManagerRef;
+typedef const struct OpaqueWKColorPickerResultListener* WKColorPickerResultListenerRef;
 typedef const struct OpaqueWKContext* WKContextRef;
 typedef const struct OpaqueWKCookieManager* WKCookieManagerRef;
 typedef const struct OpaqueWKCredential* WKCredentialRef;
@@ -95,6 +118,8 @@ typedef const struct OpaqueWKInspector* WKInspectorRef;
 typedef const struct OpaqueWKKeyValueStorageManager* WKKeyValueStorageManagerRef;
 typedef const struct OpaqueWKMediaCacheManager* WKMediaCacheManagerRef;
 typedef const struct OpaqueWKNavigationData* WKNavigationDataRef;
+typedef const struct OpaqueWKNetworkInfoManager* WKNetworkInfoManagerRef;
+typedef const struct OpaqueWKNetworkInfo* WKNetworkInfoRef;
 typedef const struct OpaqueWKNotification* WKNotificationRef;
 typedef const struct OpaqueWKNotificationManager* WKNotificationManagerRef;
 typedef const struct OpaqueWKNotificationPermissionRequest* WKNotificationPermissionRequestRef;
@@ -107,6 +132,7 @@ typedef const struct OpaqueWKPluginSiteDataManager* WKPluginSiteDataManagerRef;
 typedef const struct OpaqueWKPreferences* WKPreferencesRef;
 typedef const struct OpaqueWKProtectionSpace* WKProtectionSpaceRef;
 typedef const struct OpaqueWKTextChecker* WKTextCheckerRef;
+typedef const struct OpaqueWKVibration* WKVibrationRef;
 
 /* WebKit2 Bundle types */
 
@@ -114,6 +140,7 @@ typedef const struct OpaqueWKBundle* WKBundleRef;
 typedef const struct OpaqueWKBundleBackForwardList* WKBundleBackForwardListRef;
 typedef const struct OpaqueWKBundleBackForwardListItem* WKBundleBackForwardListItemRef;
 typedef const struct OpaqueWKBundleDOMCSSStyleDeclaration* WKBundleCSSStyleDeclarationRef;
+typedef const struct OpaqueWKBundleDOMWindowExtension* WKBundleDOMWindowExtensionRef;
 typedef const struct OpaqueWKBundleFrame* WKBundleFrameRef;
 typedef const struct OpaqueWKBundleHitTestResult* WKBundleHitTestResultRef;
 typedef const struct OpaqueWKBundleInspector* WKBundleInspectorRef;

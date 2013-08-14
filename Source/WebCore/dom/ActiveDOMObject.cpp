@@ -28,34 +28,11 @@
 #include "ActiveDOMObject.h"
 
 #include "ScriptExecutionContext.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "WorkerContext.h"
 #include "WorkerThread.h"
 
 namespace WebCore {
-
-ContextDestructionObserver::ContextDestructionObserver(ScriptExecutionContext* scriptExecutionContext)
-    : m_scriptExecutionContext(scriptExecutionContext)
-{
-    if (!m_scriptExecutionContext)
-        return;
-
-    ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->didCreateDestructionObserver(this);
-}
-
-ContextDestructionObserver::~ContextDestructionObserver()
-{
-    if (!m_scriptExecutionContext)
-        return;
-
-    ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->willDestroyDestructionObserver(this);
-}
-
-void ContextDestructionObserver::contextDestroyed()
-{
-    m_scriptExecutionContext = 0;
-}
 
 ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext, void* upcastPointer)
     : ContextDestructionObserver(scriptExecutionContext)
@@ -77,8 +54,17 @@ ActiveDOMObject::~ActiveDOMObject()
         return;
 
     ASSERT(m_suspendIfNeededCalled);
-    ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->willDestroyActiveDOMObject(this);
+
+    // ActiveDOMObject may be inherited by a sub-class whose life-cycle
+    // exceeds that of the associated ScriptExecutionContext. In those cases,
+    // m_scriptExecutionContext would/should have been nullified by
+    // ContextDestructionObserver::contextDestroyed() (which we implement /
+    // inherit). Hence, we should ensure that this is not 0 before use it
+    // here.
+    if (m_scriptExecutionContext) {
+        ASSERT(m_scriptExecutionContext->isContextThread());
+        m_scriptExecutionContext->willDestroyActiveDOMObject(this);
+    }
 }
 
 void ActiveDOMObject::suspendIfNeeded()
@@ -114,5 +100,11 @@ void ActiveDOMObject::resume()
 void ActiveDOMObject::stop()
 {
 }
+
+void ActiveDOMObject::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+}
+
 
 } // namespace WebCore

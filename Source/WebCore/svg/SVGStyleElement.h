@@ -53,9 +53,9 @@ private:
     SVGStyleElement(const QualifiedName&, Document*, bool createdByParser);
 
     bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
 
     virtual void finishParsingChildren();
@@ -63,6 +63,9 @@ private:
     virtual bool isLoading() const { return StyleElement::isLoading(); }
     virtual bool sheetLoaded() { return StyleElement::sheetLoaded(document()); }
     virtual void startLoadingDynamicSheet() { StyleElement::startLoadingDynamicSheet(document()); }
+    virtual Timer<SVGElement>* svgLoadEventTimer() OVERRIDE { return &m_svgLoadEventTimer; }
+
+    Timer<SVGElement> m_svgLoadEventTimer;
 };
 
 } // namespace WebCore

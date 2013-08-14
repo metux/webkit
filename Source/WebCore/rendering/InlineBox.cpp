@@ -20,6 +20,7 @@
 #include "config.h"
 #include "InlineBox.h"
 
+#include "FontMetrics.h"
 #include "Frame.h"
 #include "HitTestResult.h"
 #include "InlineFlowBox.h"
@@ -28,6 +29,7 @@
 #include "RenderArena.h"
 #include "RenderBlock.h"
 #include "RootInlineBox.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 #ifndef NDEBUG
 #include <stdio.h>
@@ -37,22 +39,18 @@ using namespace std;
 
 namespace WebCore {
 
-#if !COMPILER(MSVC)
-// FIXME: Figure out why this doesn't work on MSVC.
-class SameSizeAsInlineBox {
+struct SameSizeAsInlineBox {
     virtual ~SameSizeAsInlineBox() { }
     void* a[4];
     FloatPoint b;
     float c;
-    uint32_t d : 31;
-    bool e : 1;
+    uint32_t d : 32;
 #ifndef NDEBUG
     bool f;
 #endif
 };
 
 COMPILE_ASSERT(sizeof(InlineBox) == sizeof(SameSizeAsInlineBox), InlineBox_size_guard);
-#endif
 
 #ifndef NDEBUG
 static bool inInlineBoxDetach;
@@ -149,17 +147,27 @@ float InlineBox::logicalHeight() const
         return virtualLogicalHeight();
     
     if (renderer()->isText())
-        return m_isText ? renderer()->style(m_firstLine)->fontMetrics().height() : 0;
+        return m_bitfields.isText() ? renderer()->style(isFirstLineStyle())->fontMetrics().height() : 0;
     if (renderer()->isBox() && parent())
         return isHorizontal() ? toRenderBox(m_renderer)->height() : toRenderBox(m_renderer)->width();
 
     ASSERT(isInlineFlowBox());
     RenderBoxModelObject* flowObject = boxModelObject();
-    const FontMetrics& fontMetrics = renderer()->style(m_firstLine)->fontMetrics();
+    const FontMetrics& fontMetrics = renderer()->style(isFirstLineStyle())->fontMetrics();
     float result = fontMetrics.height();
     if (parent())
         result += flowObject->borderAndPaddingLogicalHeight();
     return result;
+}
+
+int InlineBox::baselinePosition(FontBaseline baselineType) const
+{
+    return boxModelObject()->baselinePosition(baselineType, m_bitfields.firstLine(), isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine);
+}
+
+LayoutUnit InlineBox::lineHeight() const
+{
+    return boxModelObject()->lineHeight(m_bitfields.firstLine(), isHorizontal() ? HorizontalLine : VerticalLine, PositionOnContainingLine);
 }
 
 int InlineBox::caretMinOffset() const 
@@ -181,21 +189,21 @@ void InlineBox::dirtyLineBoxes()
 
 void InlineBox::deleteLine(RenderArena* arena)
 {
-    if (!m_extracted && m_renderer->isBox())
+    if (!m_bitfields.extracted() && m_renderer->isBox())
         toRenderBox(m_renderer)->setInlineBoxWrapper(0);
     destroy(arena);
 }
 
 void InlineBox::extractLine()
 {
-    m_extracted = true;
+    m_bitfields.setExtracted(true);
     if (m_renderer->isBox())
         toRenderBox(m_renderer)->setInlineBoxWrapper(0);
 }
 
 void InlineBox::attachLine()
 {
-    m_extracted = false;
+    m_bitfields.setExtracted(false);
     if (m_renderer->isBox())
         toRenderBox(m_renderer)->setInlineBoxWrapper(this);
 }
@@ -212,11 +220,6 @@ void InlineBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, Layo
 {
     if (!paintInfo.shouldPaintWithinRoot(renderer()) || (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection))
         return;
-
-    if (Frame* frame = renderer()->frame()) {
-        if (Page* page = frame->page())
-            page->addRelevantRepaintedObject(renderer(), paintInfo.rect);
-    }
 
     LayoutPoint childPoint = paintOffset;
     if (parent()->renderer()->style()->isFlippedBlocksWritingMode()) // Faster than calling containingBlock().
@@ -241,12 +244,16 @@ void InlineBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, Layo
     }
 }
 
-bool InlineBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
+bool InlineBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
 {
     // Hit test all phases of replaced elements atomically, as though the replaced element established its
     // own stacking context.  (See Appendix E.2, section 6.4 on inline block/table elements in the CSS2.1
     // specification.)
-    return renderer()->hitTest(request, result, pointInContainer, accumulatedOffset);
+    LayoutPoint childPoint = accumulatedOffset;
+    if (parent()->renderer()->style()->isFlippedBlocksWritingMode()) // Faster than calling containingBlock().
+        childPoint = renderer()->containingBlock()->flipForWritingModeForChild(toRenderBox(renderer()), childPoint);
+    
+    return renderer()->hitTest(request, result, locationInContainer, childPoint);
 }
 
 const RootInlineBox* InlineBox::root() const
@@ -267,17 +274,17 @@ RootInlineBox* InlineBox::root()
 
 bool InlineBox::nextOnLineExists() const
 {
-    if (!m_determinedIfNextOnLineExists) {
-        m_determinedIfNextOnLineExists = true;
+    if (!m_bitfields.determinedIfNextOnLineExists()) {
+        m_bitfields.setDeterminedIfNextOnLineExists(true);
 
         if (!parent())
-            m_nextOnLineExists = false;
+            m_bitfields.setNextOnLineExists(false);
         else if (nextOnLine())
-            m_nextOnLineExists = true;
+            m_bitfields.setNextOnLineExists(true);
         else
-            m_nextOnLineExists = parent()->nextOnLineExists();
+            m_bitfields.setNextOnLineExists(parent()->nextOnLineExists());
     }
-    return m_nextOnLineExists;
+    return m_bitfields.nextOnLineExists();
 }
 
 InlineBox* InlineBox::nextLeafChild() const
@@ -321,7 +328,7 @@ RenderObject::SelectionState InlineBox::selectionState()
     return renderer()->selectionState();
 }
 
-bool InlineBox::canAccommodateEllipsis(bool ltr, int blockEdge, int ellipsisWidth)
+bool InlineBox::canAccommodateEllipsis(bool ltr, int blockEdge, int ellipsisWidth) const
 {
     // Non-replaced elements can always accommodate an ellipsis.
     if (!m_renderer || !m_renderer->isReplaced())
@@ -332,15 +339,16 @@ bool InlineBox::canAccommodateEllipsis(bool ltr, int blockEdge, int ellipsisWidt
     return !(boxRect.intersects(ellipsisRect));
 }
 
-float InlineBox::placeEllipsisBox(bool, float, float, float, bool&)
+float InlineBox::placeEllipsisBox(bool, float, float, float, float& truncatedWidth, bool&)
 {
     // Use -1 to mean "we didn't set the position."
+    truncatedWidth += logicalWidth();
     return -1;
 }
 
 void InlineBox::clearKnownToHaveNoOverflow()
 { 
-    m_knownToHaveNoOverflow = false;
+    m_bitfields.setKnownToHaveNoOverflow(false);
     if (parent() && parent()->knownToHaveNoOverflow())
         parent()->clearKnownToHaveNoOverflow();
 }
@@ -370,18 +378,29 @@ FloatPoint InlineBox::flipForWritingMode(const FloatPoint& point)
     return root()->block()->flipForWritingMode(point);
 }
 
-void InlineBox::flipForWritingMode(IntRect& rect)
+void InlineBox::flipForWritingMode(LayoutRect& rect)
 {
     if (!renderer()->style()->isFlippedBlocksWritingMode())
         return;
     root()->block()->flipForWritingMode(rect);
 }
 
-IntPoint InlineBox::flipForWritingMode(const IntPoint& point)
+LayoutPoint InlineBox::flipForWritingMode(const LayoutPoint& point)
 {
     if (!renderer()->style()->isFlippedBlocksWritingMode())
         return point;
     return root()->block()->flipForWritingMode(point);
+}
+
+void InlineBox::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Rendering);
+    info.addMember(m_next, "next");
+    info.addMember(m_prev, "prev");
+    info.addMember(m_parent, "parent");
+    info.addMember(m_renderer, "renderer");
+
+    info.setCustomAllocation(true);
 }
 
 } // namespace WebCore

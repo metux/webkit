@@ -24,10 +24,10 @@
 
 #include "JSGlobalObject.h"
 #include "NumberPrototype.h"
+#include "Operations.h"
 
 namespace JSC {
 
-ASSERT_CLASS_FITS_IN_CELL(NumberObject);
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(NumberObject);
 
 const ClassInfo NumberObject::s_info = { "Number", &JSWrapperObject::s_info, 0, 0, CREATE_METHOD_TABLE(NumberObject) };

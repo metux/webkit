@@ -32,29 +32,30 @@
 #include <wtf/Forward.h>
 #include <wtf/text/WTFString.h>
 
-namespace WebCore {
-class RunLoop;
-}
-
 namespace WebKit {
 
 class NetscapePluginModule;
 class WebProcessConnection;
 struct PluginProcessCreationParameters;
         
-class PluginProcess : ChildProcess {
+class PluginProcess : public ChildProcess {
     WTF_MAKE_NONCOPYABLE(PluginProcess);
 public:
+    enum Type {
+        // Start with value one since default HashTraits<> disallows zero as key.
+        TypeRegularProcess = 1,
+        TypeSnapshotProcess
+    };
+
     static PluginProcess& shared();
 
-    void initialize(CoreIPC::Connection::Identifier, WebCore::RunLoop*);
-    void removeWebProcessConnection(WebProcessConnection* webProcessConnection);
+    void removeWebProcessConnection(WebProcessConnection*);
 
     NetscapePluginModule* netscapePluginModule();
 
-#if PLATFORM(MAC)
-    void initializeShim();
+    const String& pluginPath() const { return m_pluginPath; }
 
+#if PLATFORM(MAC)
     void setModalWindowIsShowing(bool);
     void setFullscreenWindowIsShowing(bool);
 
@@ -68,26 +69,28 @@ private:
     ~PluginProcess();
 
     // ChildProcess
-    virtual bool shouldTerminate();
+    virtual void initializeProcess(const ChildProcessInitializationParameters&) OVERRIDE;
+    virtual void initializeProcessName(const ChildProcessInitializationParameters&) OVERRIDE;
+    virtual void initializeSandbox(const ChildProcessInitializationParameters&, SandboxInitializationParameters&) OVERRIDE;
+    virtual bool shouldTerminate() OVERRIDE;
+    void platformInitializeProcess(const ChildProcessInitializationParameters&);
 
     // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    virtual void didClose(CoreIPC::Connection*);
-    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
-    virtual void syncMessageSendTimedOut(CoreIPC::Connection*);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didClose(CoreIPC::Connection*) OVERRIDE;
+    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 
     // Message handlers.
-    void didReceivePluginProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void didReceivePluginProcessMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     void initializePluginProcess(const PluginProcessCreationParameters&);
     void createWebProcessConnection();
     void getSitesWithData(uint64_t callbackID);
     void clearSiteData(const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
 
-    void platformInitialize(const PluginProcessCreationParameters&);
-
-    // The connection to the UI process.
-    RefPtr<CoreIPC::Connection> m_connection;
-
+    void platformInitializePluginProcess(const PluginProcessCreationParameters&);
+    
+    void setMinimumLifetime(double);
+    void minimumLifetimeTimerFired();
     // Our web process connections.
     Vector<RefPtr<WebProcessConnection> > m_webProcessConnections;
 
@@ -97,14 +100,26 @@ private:
     // The plug-in module.
     RefPtr<NetscapePluginModule> m_pluginModule;
     
+    bool m_supportsAsynchronousPluginInitialization;
+
+    WebCore::RunLoop::Timer<PluginProcess> m_minimumLifetimeTimer;
+
 #if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
     // The Mach port used for accelerated compositing.
     mach_port_t m_compositingRenderServerPort;
 #endif
-    
+
+    static void lowMemoryHandler(bool critical);
 };
 
 } // namespace WebKit
+
+namespace WTF {
+
+template<> struct DefaultHash<WebKit::PluginProcess::Type> { typedef DefaultHash<uint32_t>::Hash Hash; };
+template<> struct IsInteger<WebKit::PluginProcess::Type> { static const bool value = true; };
+
+} // namespace WTF
 
 #endif // ENABLE(PLUGIN_PROCESS)
 

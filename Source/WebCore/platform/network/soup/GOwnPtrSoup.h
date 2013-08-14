@@ -20,13 +20,17 @@
 #ifndef GOwnPtrSoup_h
 #define GOwnPtrSoup_h
 
-#include "GOwnPtr.h"
+#include <wtf/gobject/GOwnPtr.h>
 
 typedef struct _SoupURI SoupURI;
+typedef struct _SoupCookie SoupCookie;
+typedef struct SoupMessageHeaders SoupMessageHeaders;
 
 namespace WTF {
 
 template<> void freeOwnedGPtr<SoupURI>(SoupURI* ptr);
+template<> void freeOwnedGPtr<SoupCookie>(SoupCookie* ptr);
+template<> void freeOwnedGPtr<SoupMessageHeaders>(SoupMessageHeaders*);
 
 }
 

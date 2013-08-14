@@ -38,6 +38,7 @@ class PlatformWheelEvent;
 class ScrollAnimator;
 #if USE(ACCELERATED_COMPOSITING)
 class GraphicsLayer;
+class TiledBacking;
 #endif
 
 class ScrollableArea {
@@ -80,6 +81,8 @@ public:
     void contentAreaDidShow() const;
     void contentAreaDidHide() const;
 
+    void finishCurrentScrollAnimations() const;
+
     void didAddVerticalScrollbar(Scrollbar*);
     void willRemoveVerticalScrollbar(Scrollbar*);
     virtual void didAddHorizontalScrollbar(Scrollbar*);
@@ -91,17 +94,22 @@ public:
     virtual void setScrollbarOverlayStyle(ScrollbarOverlayStyle);
     ScrollbarOverlayStyle scrollbarOverlayStyle() const { return static_cast<ScrollbarOverlayStyle>(m_scrollbarOverlayStyle); }
 
+    // This getter will create a ScrollAnimator if it doesn't already exist.
     ScrollAnimator* scrollAnimator() const;
+
+    // This getter will return null if the ScrollAnimator hasn't been created yet.
+    ScrollAnimator* existingScrollAnimator() const { return m_scrollAnimator.get(); }
+
     const IntPoint& scrollOrigin() const { return m_scrollOrigin; }
     bool scrollOriginChanged() const { return m_scrollOriginChanged; }
 
     virtual bool isActive() const = 0;
     virtual int scrollSize(ScrollbarOrientation) const = 0;
     virtual int scrollPosition(Scrollbar*) const = 0;
-    void invalidateScrollbar(Scrollbar*, const IntRect&);
+    virtual void invalidateScrollbar(Scrollbar*, const IntRect&);
     virtual bool isScrollCornerVisible() const = 0;
     virtual IntRect scrollCornerRect() const = 0;
-    void invalidateScrollCorner(const IntRect&);
+    virtual void invalidateScrollCorner(const IntRect&);
     virtual void getTickmarks(Vector<IntRect>&) const { }
 
     // Convert points and rects between the scrollbar and its containing view.
@@ -127,34 +135,52 @@ public:
     virtual Scrollbar* horizontalScrollbar() const { return 0; }
     virtual Scrollbar* verticalScrollbar() const { return 0; }
 
-    virtual IntPoint scrollPosition() const { ASSERT_NOT_REACHED(); return IntPoint(); }
-    virtual IntPoint minimumScrollPosition() const { ASSERT_NOT_REACHED(); return IntPoint(); }
-    virtual IntPoint maximumScrollPosition() const { ASSERT_NOT_REACHED(); return IntPoint(); }
-    virtual IntRect visibleContentRect(bool /*includeScrollbars*/ = false) const { ASSERT_NOT_REACHED(); return IntRect(); }
-    virtual int visibleHeight() const { ASSERT_NOT_REACHED(); return 0; }
-    virtual int visibleWidth() const { ASSERT_NOT_REACHED(); return 0; }
-    virtual IntSize contentsSize() const { ASSERT_NOT_REACHED(); return IntSize(); }
-    virtual IntSize overhangAmount() const { ASSERT_NOT_REACHED(); return IntSize(); }
-    virtual IntPoint currentMousePosition() const { return IntPoint(); }
+    virtual IntPoint scrollPosition() const;
+    virtual IntPoint minimumScrollPosition() const;
+    virtual IntPoint maximumScrollPosition() const;
+
+    enum VisibleContentRectIncludesScrollbars { ExcludeScrollbars, IncludeScrollbars };
+    virtual IntRect visibleContentRect(VisibleContentRectIncludesScrollbars = ExcludeScrollbars) const;
+    virtual int visibleHeight() const = 0;
+    virtual int visibleWidth() const = 0;
+    virtual IntSize contentsSize() const = 0;
+    virtual IntSize overhangAmount() const { return IntSize(); }
+    virtual IntPoint lastKnownMousePosition() const { return IntPoint(); }
 
     virtual bool shouldSuspendScrollAnimations() const { return true; }
     virtual void scrollbarStyleChanged(int /*newStyle*/, bool /*forceUpdate*/) { }
     virtual void setVisibleScrollerThumbRect(const IntRect&) { }
 
-    virtual bool isOnActivePage() const { ASSERT_NOT_REACHED(); return true; }
+    virtual bool scrollbarsCanBeActive() const = 0;
     
     // Note that this only returns scrollable areas that can actually be scrolled.
     virtual ScrollableArea* enclosingScrollableArea() const = 0;
 
     // Returns the bounding box of this scrollable area, in the coordinate system of the enclosing scroll view.
-    virtual IntRect scrollableAreaBoundingBox() const { ASSERT_NOT_REACHED(); return IntRect(); }
+    virtual IntRect scrollableAreaBoundingBox() const = 0;
 
     virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
+    virtual bool isRubberBandInProgress() const { return false; }
 
     virtual bool scrollAnimatorEnabled() const { return false; }
 
     // NOTE: Only called from Internals for testing.
     void setScrollOffsetFromInternals(const IntPoint&);
+
+    static IntPoint constrainScrollPositionForOverhang(const IntRect& visibleContentRect, const IntSize& contentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin);
+    IntPoint constrainScrollPositionForOverhang(const IntPoint& scrollPosition);
+
+    // Let subclasses provide a way of asking for and servicing scroll
+    // animations.
+    virtual bool scheduleAnimation() { return false; }
+    void serviceScrollAnimations();
+
+#if USE(ACCELERATED_COMPOSITING)
+    virtual TiledBacking* tiledBacking() { return 0; }
+    virtual bool usesCompositedScrolling() const { return false; }
+#endif
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     ScrollableArea();
@@ -179,6 +205,8 @@ protected:
     bool hasLayerForScrollCorner() const;
 
 private:
+    void scrollPositionChanged(const IntPoint&);
+    
     // NOTE: Only called from the ScrollAnimator.
     friend class ScrollAnimator;
     void setScrollOffsetFromAnimation(const IntPoint&);
@@ -188,14 +216,16 @@ private:
     virtual void setScrollOffset(const IntPoint&) = 0;
 
     mutable OwnPtr<ScrollAnimator> m_scrollAnimator;
-    bool m_constrainsScrollingToContentEdge : 1;
+    unsigned m_constrainsScrollingToContentEdge : 1;
 
-    bool m_inLiveResize : 1;
+    unsigned m_inLiveResize : 1;
 
     unsigned m_verticalScrollElasticity : 2; // ScrollElasticity
     unsigned m_horizontalScrollElasticity : 2; // ScrollElasticity
 
     unsigned m_scrollbarOverlayStyle : 2; // ScrollbarOverlayStyle
+
+    unsigned m_scrollOriginChanged : 1;
 
     // There are 8 possible combinations of writing mode and direction. Scroll origin will be non-zero in the x or y axis
     // if there is any reversed direction or writing-mode. The combinations are:
@@ -209,8 +239,6 @@ private:
     // vertical-rl / ltr            YES                     NO
     // vertical-rl / rtl            YES                     YES
     IntPoint m_scrollOrigin;
-
-    bool m_scrollOriginChanged;
 };
 
 } // namespace WebCore

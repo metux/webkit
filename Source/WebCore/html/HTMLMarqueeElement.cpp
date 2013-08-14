@@ -58,55 +58,55 @@ int HTMLMarqueeElement::minimumDelay() const
     return 0;
 }
 
-bool HTMLMarqueeElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLMarqueeElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == widthAttr || attr->name() == heightAttr || attr->name() == bgcolorAttr || attr->name() == vspaceAttr || attr->name() == hspaceAttr || attr->name() == scrollamountAttr || attr->name() == scrolldelayAttr || attr->name() == loopAttr || attr->name() == behaviorAttr || attr->name() == directionAttr)
+    if (name == widthAttr || name == heightAttr || name == bgcolorAttr || name == vspaceAttr || name == hspaceAttr || name == scrollamountAttr || name == scrolldelayAttr || name == loopAttr || name == behaviorAttr || name == directionAttr)
         return true;
-    return HTMLElement::isPresentationAttribute(attr);
+    return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLMarqueeElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLMarqueeElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == widthAttr) {
-        if (!attr->isEmpty())
-            addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
-    } else if (attr->name() == heightAttr) {
-        if (!attr->value().isEmpty())
-            addHTMLLengthToStyle(style, CSSPropertyHeight, attr->value());
-    } else if (attr->name() == bgcolorAttr) {
-        if (!attr->value().isEmpty())
-            addHTMLColorToStyle(style, CSSPropertyBackgroundColor, attr->value());
-    } else if (attr->name() == vspaceAttr) {
-        if (!attr->value().isEmpty()) {
-            addHTMLLengthToStyle(style, CSSPropertyMarginTop, attr->value());
-            addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attr->value());
+    if (attribute.name() == widthAttr) {
+        if (!attribute.isEmpty())
+            addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
+    } else if (attribute.name() == heightAttr) {
+        if (!attribute.isEmpty())
+            addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
+    } else if (attribute.name() == bgcolorAttr) {
+        if (!attribute.isEmpty())
+            addHTMLColorToStyle(style, CSSPropertyBackgroundColor, attribute.value());
+    } else if (attribute.name() == vspaceAttr) {
+        if (!attribute.isEmpty()) {
+            addHTMLLengthToStyle(style, CSSPropertyMarginTop, attribute.value());
+            addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attribute.value());
         }
-    } else if (attr->name() == hspaceAttr) {
-        if (!attr->value().isEmpty()) {
-            addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attr->value());
-            addHTMLLengthToStyle(style, CSSPropertyMarginRight, attr->value());
+    } else if (attribute.name() == hspaceAttr) {
+        if (!attribute.isEmpty()) {
+            addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attribute.value());
+            addHTMLLengthToStyle(style, CSSPropertyMarginRight, attribute.value());
         }
-    } else if (attr->name() == scrollamountAttr) {
-        if (!attr->value().isEmpty())
-            addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeIncrement, attr->value());
-    } else if (attr->name() == scrolldelayAttr) {
-        if (!attr->value().isEmpty())
-            addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeSpeed, attr->value());
-    } else if (attr->name() == loopAttr) {
-        if (!attr->value().isEmpty()) {
-            if (attr->value() == "-1" || equalIgnoringCase(attr->value(), "infinite"))
-                style->setProperty(CSSPropertyWebkitMarqueeRepetition, CSSValueInfinite);
+    } else if (attribute.name() == scrollamountAttr) {
+        if (!attribute.isEmpty())
+            addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeIncrement, attribute.value());
+    } else if (attribute.name() == scrolldelayAttr) {
+        if (!attribute.isEmpty())
+            addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeSpeed, attribute.value());
+    } else if (attribute.name() == loopAttr) {
+        if (!attribute.isEmpty()) {
+            if (attribute.value() == "-1" || equalIgnoringCase(attribute.value(), "infinite"))
+                addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitMarqueeRepetition, CSSValueInfinite);
             else
-                addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeRepetition, attr->value());
+                addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeRepetition, attribute.value());
         }
-    } else if (attr->name() == behaviorAttr) {
-        if (!attr->value().isEmpty())
-            style->setProperty(CSSPropertyWebkitMarqueeStyle, attr->value());
-    } else if (attr->name() == directionAttr) {
-        if (!attr->value().isEmpty())
-            style->setProperty(CSSPropertyWebkitMarqueeDirection, attr->value());
+    } else if (attribute.name() == behaviorAttr) {
+        if (!attribute.isEmpty())
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitMarqueeStyle, attribute.value());
+    } else if (attribute.name() == directionAttr) {
+        if (!attribute.isEmpty())
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitMarqueeDirection, attribute.value());
     } else
-        HTMLElement::collectStyleForAttribute(attr, style);
+        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
 void HTMLMarqueeElement::start()
@@ -125,7 +125,7 @@ int HTMLMarqueeElement::scrollAmount() const
 {
     bool ok;
     int scrollAmount = fastGetAttribute(scrollamountAttr).toInt(&ok);
-    return ok && scrollAmount >= 0 ? scrollAmount : RenderStyle::initialMarqueeIncrement().value();
+    return ok && scrollAmount >= 0 ? scrollAmount : RenderStyle::initialMarqueeIncrement().intValue();
 }
     
 void HTMLMarqueeElement::setScrollAmount(int scrollAmount, ExceptionCode& ec)

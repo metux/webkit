@@ -47,7 +47,6 @@ public:
     
     AccessibilityObject* headerObject();
         
-    virtual bool accessibilityIsIgnored() const;
     virtual AccessibilityRole roleValue() const { return ColumnRole; }
     virtual bool isTableColumn() const { return true; }
     
@@ -57,7 +56,6 @@ public:
     virtual void addChildren();
     virtual void setParent(AccessibilityObject*);
     
-    virtual LayoutSize size() const;
     virtual LayoutRect elementRect() const;
     
 private:    
@@ -65,6 +63,7 @@ private:
     LayoutRect m_columnRect;
     
     AccessibilityObject* headerObjectForSection(RenderTableSection*, bool thTagRequired);
+    virtual bool computeAccessibilityIsIgnored() const;
 };
    
 } // namespace WebCore 

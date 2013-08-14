@@ -26,7 +26,7 @@
 #ifndef PropertyDescriptor_h
 #define PropertyDescriptor_h
 
-#include "JSValue.h"
+#include "JSCJSValue.h"
 
 namespace JSC {
     class GetterSetter;
@@ -70,7 +70,6 @@ namespace JSC {
         bool getterPresent() const { return m_getter; }
         bool equalTo(ExecState* exec, const PropertyDescriptor& other) const;
         bool attributesEqual(const PropertyDescriptor& other) const;
-        unsigned attributesWithOverride(const PropertyDescriptor& other) const;
         unsigned attributesOverridingCurrent(const PropertyDescriptor& current) const;
 
     private:

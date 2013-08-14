@@ -26,15 +26,69 @@
 #ifndef StructureTransitionTable_h
 #define StructureTransitionTable_h
 
-#include "UString.h"
+#include "IndexingType.h"
 #include "WeakGCMap.h"
 #include <wtf/HashFunctions.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/StringImpl.h>
 
 namespace JSC {
 
+class JSCell;
 class Structure;
+
+static const unsigned FirstInternalAttribute = 1 << 6; // Use for transitions that don't have to do with property additions.
+
+// Support for attributes used to indicate transitions not related to properties.
+// If any of these are used, the string portion of the key should be 0.
+enum NonPropertyTransition {
+    AllocateUndecided,
+    AllocateInt32,
+    AllocateDouble,
+    AllocateContiguous,
+    AllocateArrayStorage,
+    AllocateSlowPutArrayStorage,
+    SwitchToSlowPutArrayStorage,
+    AddIndexedAccessors
+};
+
+inline unsigned toAttributes(NonPropertyTransition transition)
+{
+    return transition + FirstInternalAttribute;
+}
+
+inline IndexingType newIndexingType(IndexingType oldType, NonPropertyTransition transition)
+{
+    switch (transition) {
+    case AllocateUndecided:
+        ASSERT(!hasIndexedProperties(oldType));
+        return oldType | UndecidedShape;
+    case AllocateInt32:
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType));
+        return (oldType & ~IndexingShapeMask) | Int32Shape;
+    case AllocateDouble:
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType));
+        return (oldType & ~IndexingShapeMask) | DoubleShape;
+    case AllocateContiguous:
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType));
+        return (oldType & ~IndexingShapeMask) | ContiguousShape;
+    case AllocateArrayStorage:
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType) || hasContiguous(oldType));
+        return (oldType & ~IndexingShapeMask) | ArrayStorageShape;
+    case AllocateSlowPutArrayStorage:
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType) || hasContiguous(oldType) || hasContiguous(oldType));
+        return (oldType & ~IndexingShapeMask) | SlowPutArrayStorageShape;
+    case SwitchToSlowPutArrayStorage:
+        ASSERT(hasFastArrayStorage(oldType));
+        return (oldType & ~IndexingShapeMask) | SlowPutArrayStorageShape;
+    case AddIndexedAccessors:
+        return oldType | MayHaveIndexedAccessors;
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+        return oldType;
+    }
+}
 
 class StructureTransitionTable {
     static const intptr_t UsingSingleSlotFlag = 1;
@@ -43,7 +97,10 @@ class StructureTransitionTable {
         typedef std::pair<RefPtr<StringImpl>, unsigned> Key;
         static unsigned hash(const Key& p)
         {
-            return p.first->existingHash();
+            unsigned result = p.second;
+            if (p.first)
+                result += p.first->existingHash();
+            return result;
         }
 
         static bool equal(const Key& a, const Key& b)
@@ -54,21 +111,7 @@ class StructureTransitionTable {
         static const bool safeToCompareToEmptyOrDeleted = true;
     };
 
-    struct WeakGCMapFinalizerCallback {
-        static void* finalizerContextFor(Hash::Key)
-        {
-            return 0;
-        }
-
-        static inline Hash::Key keyForFinalizer(void* context, Structure* structure)
-        {
-            return keyForWeakGCMapFinalizer(context, structure);
-        }
-    };
-
-    typedef WeakGCMap<Hash::Key, Structure, WeakGCMapFinalizerCallback, Hash> TransitionMap;
-
-    static Hash::Key keyForWeakGCMapFinalizer(void* context, Structure*);
+    typedef WeakGCMap<Hash::Key, Structure, Hash> TransitionMap;
 
 public:
     StructureTransitionTable()
@@ -83,10 +126,10 @@ public:
             return;
         }
 
-        HandleSlot slot = this->slot();
-        if (!slot)
+        WeakImpl* impl = this->weakImpl();
+        if (!impl)
             return;
-        HandleHeap::heapFor(slot)->deallocate(slot);
+        WeakSet::deallocate(impl);
     }
 
     inline void add(JSGlobalData&, Structure*);
@@ -105,18 +148,18 @@ private:
         return reinterpret_cast<TransitionMap*>(m_data);
     }
 
-    HandleSlot slot() const
+    WeakImpl* weakImpl() const
     {
         ASSERT(isUsingSingleSlot());
-        return reinterpret_cast<HandleSlot>(m_data & ~UsingSingleSlotFlag);
+        return reinterpret_cast<WeakImpl*>(m_data & ~UsingSingleSlotFlag);
     }
 
     void setMap(TransitionMap* map)
     {
         ASSERT(isUsingSingleSlot());
         
-        if (HandleSlot slot = this->slot())
-            HandleHeap::heapFor(slot)->deallocate(slot);
+        if (WeakImpl* impl = this->weakImpl())
+            WeakSet::deallocate(impl);
 
         // This implicitly clears the flag that indicates we're using a single transition
         m_data = reinterpret_cast<intptr_t>(map);
@@ -127,24 +170,20 @@ private:
     Structure* singleTransition() const
     {
         ASSERT(isUsingSingleSlot());
-        if (HandleSlot slot = this->slot()) {
-            if (*slot)
-                return reinterpret_cast<Structure*>(slot->asCell());
+        if (WeakImpl* impl = this->weakImpl()) {
+            if (impl->state() == WeakImpl::Live)
+                return reinterpret_cast<Structure*>(impl->jsValue().asCell());
         }
         return 0;
     }
     
-    void setSingleTransition(JSGlobalData& globalData, Structure* structure)
+    void setSingleTransition(JSGlobalData&, Structure* structure)
     {
         ASSERT(isUsingSingleSlot());
-        HandleSlot slot = this->slot();
-        if (!slot) {
-            slot = globalData.heap.handleHeap()->allocate();
-            HandleHeap::heapFor(slot)->makeWeak(slot, 0, 0);
-            m_data = reinterpret_cast<intptr_t>(slot) | UsingSingleSlotFlag;
-        }
-        HandleHeap::heapFor(slot)->writeBarrier(slot, reinterpret_cast<JSCell*>(structure));
-        *slot = reinterpret_cast<JSCell*>(structure);
+        if (WeakImpl* impl = this->weakImpl())
+            WeakSet::deallocate(impl);
+        WeakImpl* impl = WeakSet::allocate(reinterpret_cast<JSCell*>(structure));
+        m_data = reinterpret_cast<intptr_t>(impl) | UsingSingleSlotFlag;
     }
 
     intptr_t m_data;

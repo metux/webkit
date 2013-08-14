@@ -34,6 +34,7 @@
 
 #include "RenderRubyRun.h"
 #include "RenderStyle.h"
+#include "StyleInheritedData.h"
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -84,10 +85,8 @@ static inline RenderBlock* rubyAfterBlock(const RenderObject* ruby)
 
 static RenderBlock* createAnonymousRubyInlineBlock(RenderObject* ruby)
 {
-    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyle(ruby->style());
-    newStyle->setDisplay(INLINE_BLOCK);
-
-    RenderBlock* newBlock = new (ruby->renderArena()) RenderBlock(ruby->document() /* anonymous box */);
+    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(ruby->style(), INLINE_BLOCK);
+    RenderBlock* newBlock = RenderBlock::createAnonymous(ruby->document());
     newBlock->setStyle(newStyle.release());
     return newBlock;
 }
@@ -110,8 +109,8 @@ static inline RenderRubyRun* findRubyRunParent(RenderObject* child)
 
 //=== ruby as inline object ===
 
-RenderRubyAsInline::RenderRubyAsInline(Node* node)
-    : RenderInline(node)
+RenderRubyAsInline::RenderRubyAsInline(Element* element)
+    : RenderInline(element)
 {
 }
 
@@ -185,7 +184,7 @@ void RenderRubyAsInline::addChild(RenderObject* child, RenderObject* beforeChild
     RenderRubyRun* lastRun = lastRubyRun(this);
     if (!lastRun || lastRun->hasRubyText()) {
         lastRun = RenderRubyRun::staticCreateRubyRun(this);
-        RenderInline::addChild(lastRun);
+        RenderInline::addChild(lastRun, beforeChild);
     }
     lastRun->addChild(child);
 }
@@ -214,11 +213,10 @@ void RenderRubyAsInline::removeChild(RenderObject* child)
     run->removeChild(child);
 }
 
-
 //=== ruby as block object ===
 
-RenderRubyAsBlock::RenderRubyAsBlock(Node* node)
-    : RenderBlock(node)
+RenderRubyAsBlock::RenderRubyAsBlock(Element* element)
+    : RenderBlock(element)
 {
 }
 
@@ -292,7 +290,7 @@ void RenderRubyAsBlock::addChild(RenderObject* child, RenderObject* beforeChild)
     RenderRubyRun* lastRun = lastRubyRun(this);
     if (!lastRun || lastRun->hasRubyText()) {
         lastRun = RenderRubyRun::staticCreateRubyRun(this);
-        RenderBlock::addChild(lastRun);
+        RenderBlock::addChild(lastRun, beforeChild);
     }
     lastRun->addChild(child);
 }

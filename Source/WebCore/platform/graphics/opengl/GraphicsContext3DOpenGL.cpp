@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2011 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,7 +26,7 @@
 
 #include "config.h"
 
-#if ENABLE(WEBGL)
+#if USE(3D_GRAPHICS)
 
 #include "GraphicsContext3D.h"
 
@@ -34,6 +35,12 @@
 #include "IntSize.h"
 #include "NotImplemented.h"
 
+#include <algorithm>
+#include <cstring>
+#include <wtf/MainThread.h>
+#include <wtf/UnusedParam.h>
+#include <wtf/text/CString.h>
+
 #if PLATFORM(MAC)
 #include <OpenGL/gl.h>
 #elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT)
@@ -41,6 +48,22 @@
 #endif
 
 namespace WebCore {
+
+void GraphicsContext3D::releaseShaderCompiler()
+{
+    makeContextCurrent();
+    notImplemented();
+}
+
+void GraphicsContext3D::readPixelsAndConvertToBGRAIfNecessary(int x, int y, int width, int height, unsigned char* pixels)
+{
+    ::glReadPixels(x, y, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
+}
+
+void GraphicsContext3D::validateAttributes()
+{
+    validateDepthStencil("GL_EXT_packed_depth_stencil");
+}
 
 bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
 {
@@ -135,7 +158,12 @@ void GraphicsContext3D::resolveMultisamplingIfNecessary(const IntRect& rect)
 {
     ::glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, m_multisampleFBO);
     ::glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, m_fbo);
-    ::glBlitFramebufferEXT(rect.x(), rect.y(), rect.maxX(), rect.maxY(), rect.x(), rect.y(), rect.maxX(), rect.maxY(), GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+    IntRect resolveRect = rect;
+    if (rect.isEmpty())
+        resolveRect = IntRect(0, 0, m_currentWidth, m_currentHeight);
+
+    ::glBlitFramebufferEXT(resolveRect.x(), resolveRect.y(), resolveRect.maxX(), resolveRect.maxY(), resolveRect.x(), resolveRect.y(), resolveRect.maxX(), resolveRect.maxY(), GL_COLOR_BUFFER_BIT, GL_LINEAR);
 }
 
 void GraphicsContext3D::renderbufferStorage(GC3Denum target, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height)
@@ -184,13 +212,44 @@ void GraphicsContext3D::getIntegerv(GC3Denum pname, GC3Dint* value)
     }
 }
 
+void GraphicsContext3D::getShaderPrecisionFormat(GC3Denum shaderType, GC3Denum precisionType, GC3Dint* range, GC3Dint* precision)
+{
+    UNUSED_PARAM(shaderType);
+    ASSERT(range);
+    ASSERT(precision);
+
+    makeContextCurrent();
+
+    switch (precisionType) {
+    case GraphicsContext3D::LOW_INT:
+    case GraphicsContext3D::MEDIUM_INT:
+    case GraphicsContext3D::HIGH_INT:
+        // These values are for a 32-bit twos-complement integer format.
+        range[0] = 31;
+        range[1] = 30;
+        precision[0] = 0;
+        break;
+    case GraphicsContext3D::LOW_FLOAT:
+    case GraphicsContext3D::MEDIUM_FLOAT:
+    case GraphicsContext3D::HIGH_FLOAT:
+        // These values are for an IEEE single-precision floating-point format.
+        range[0] = 127;
+        range[1] = 127;
+        precision[0] = 23;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
 bool GraphicsContext3D::texImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, const void* pixels)
 {
     if (width && height && !pixels) {
         synthesizeGLError(INVALID_VALUE);
         return false;
     }
-    makeContextCurrent();
+
     GC3Denum openGLInternalFormat = internalformat;
     if (type == GL_FLOAT) {
         if (format == GL_RGBA)
@@ -199,10 +258,45 @@ bool GraphicsContext3D::texImage2D(GC3Denum target, GC3Dint level, GC3Denum inte
             openGLInternalFormat = GL_RGB32F_ARB;
     }
 
-    ::glTexImage2D(target, level, openGLInternalFormat, width, height, border, format, type, pixels);
+    texImage2DDirect(target, level, openGLInternalFormat, width, height, border, format, type, pixels);
     return true;
 }
 
+void GraphicsContext3D::depthRange(GC3Dclampf zNear, GC3Dclampf zFar)
+{
+    makeContextCurrent();
+    ::glDepthRange(zNear, zFar);
 }
 
-#endif // ENABLE(WEBGL)
+void GraphicsContext3D::clearDepth(GC3Dclampf depth)
+{
+    makeContextCurrent();
+    ::glClearDepth(depth);
+}
+
+Extensions3D* GraphicsContext3D::getExtensions()
+{
+    if (!m_extensions)
+        m_extensions = adoptPtr(new Extensions3DOpenGL(this));
+    return m_extensions.get();
+}
+
+void GraphicsContext3D::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Denum type, void* data)
+{
+    // FIXME: remove the two glFlush calls when the driver bug is fixed, i.e.,
+    // all previous rendering calls should be done before reading pixels.
+    makeContextCurrent();
+    ::glFlush();
+    if (m_attrs.antialias && m_boundFBO == m_multisampleFBO) {
+        resolveMultisamplingIfNecessary(IntRect(x, y, width, height));
+        ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_fbo);
+        ::glFlush();
+    }
+    ::glReadPixels(x, y, width, height, format, type, data);
+    if (m_attrs.antialias && m_boundFBO == m_multisampleFBO)
+        ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_multisampleFBO);
+}
+
+}
+
+#endif // USE(3D_GRAPHICS)

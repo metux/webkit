@@ -35,6 +35,7 @@
 #include "HTMLElement.h"
 #include "HTMLNames.h"
 #include "Node.h"
+#include "NodeTraversal.h"
 #include "NodeWithIndex.h"
 #include "Page.h"
 #include "ProcessingInstruction.h"
@@ -196,6 +197,18 @@ bool Range::collapsed(ExceptionCode& ec) const
     return m_start == m_end;
 }
 
+static inline bool checkForDifferentRootContainer(const RangeBoundaryPoint& start, const RangeBoundaryPoint& end)
+{
+    Node* endRootContainer = end.container();
+    while (endRootContainer->parentNode())
+        endRootContainer = endRootContainer->parentNode();
+    Node* startRootContainer = start.container();
+    while (startRootContainer->parentNode())
+        startRootContainer = startRootContainer->parentNode();
+
+    return startRootContainer != endRootContainer || (Range::compareBoundaryPoints(start, end, ASSERT_NO_EXCEPTION) > 0);
+}
+
 void Range::setStart(PassRefPtr<Node> refNode, int offset, ExceptionCode& ec)
 {
     if (!m_start.container()) {
@@ -208,9 +221,10 @@ void Range::setStart(PassRefPtr<Node> refNode, int offset, ExceptionCode& ec)
         return;
     }
 
+    bool didMoveDocument = false;
     if (refNode->document() != m_ownerDocument) {
-        ec = WRONG_DOCUMENT_ERR;
-        return;
+        setDocument(refNode->document());
+        didMoveDocument = true;
     }
 
     ec = 0;
@@ -220,20 +234,8 @@ void Range::setStart(PassRefPtr<Node> refNode, int offset, ExceptionCode& ec)
 
     m_start.set(refNode, offset, childNode);
 
-    // check if different root container
-    Node* endRootContainer = m_end.container();
-    while (endRootContainer->parentNode())
-        endRootContainer = endRootContainer->parentNode();
-    Node* startRootContainer = m_start.container();
-    while (startRootContainer->parentNode())
-        startRootContainer = startRootContainer->parentNode();
-    if (startRootContainer != endRootContainer)
+    if (didMoveDocument || checkForDifferentRootContainer(m_start, m_end))
         collapse(true, ec);
-    // check if new start after end
-    else if (compareBoundaryPoints(m_start, m_end, ec) > 0) {
-        ASSERT(!ec);
-        collapse(true, ec);
-    }
 }
 
 void Range::setEnd(PassRefPtr<Node> refNode, int offset, ExceptionCode& ec)
@@ -248,9 +250,10 @@ void Range::setEnd(PassRefPtr<Node> refNode, int offset, ExceptionCode& ec)
         return;
     }
 
+    bool didMoveDocument = false;
     if (refNode->document() != m_ownerDocument) {
-        ec = WRONG_DOCUMENT_ERR;
-        return;
+        setDocument(refNode->document());
+        didMoveDocument = true;
     }
 
     ec = 0;
@@ -260,20 +263,8 @@ void Range::setEnd(PassRefPtr<Node> refNode, int offset, ExceptionCode& ec)
 
     m_end.set(refNode, offset, childNode);
 
-    // check if different root container
-    Node* endRootContainer = m_end.container();
-    while (endRootContainer->parentNode())
-        endRootContainer = endRootContainer->parentNode();
-    Node* startRootContainer = m_start.container();
-    while (startRootContainer->parentNode())
-        startRootContainer = startRootContainer->parentNode();
-    if (startRootContainer != endRootContainer)
+    if (didMoveDocument || checkForDifferentRootContainer(m_start, m_end))
         collapse(false, ec);
-    // check if new end before start
-    if (compareBoundaryPoints(m_start, m_end, ec) > 0) {
-        ASSERT(!ec);
-        collapse(false, ec);
-    }
 }
 
 void Range::setStart(const Position& start, ExceptionCode& ec)
@@ -313,13 +304,7 @@ bool Range::isPointInRange(Node* refNode, int offset, ExceptionCode& ec)
         return false;
     }
 
-    if (!refNode->attached()) {
-        // Firefox doesn't throw an exception for this case; it returns false.
-        return false;
-    }
-
-    if (refNode->document() != m_ownerDocument) {
-        ec = WRONG_DOCUMENT_ERR;
+    if (!refNode->attached() || refNode->document() != m_ownerDocument) {
         return false;
     }
 
@@ -1081,7 +1066,7 @@ String Range::toString(ExceptionCode& ec) const
     StringBuilder builder;
 
     Node* pastLast = pastLastNode();
-    for (Node* n = firstNode(); n != pastLast; n = n->traverseNextNode()) {
+    for (Node* n = firstNode(); n != pastLast; n = NodeTraversal::next(n)) {
         if (n->nodeType() == Node::TEXT_NODE || n->nodeType() == Node::CDATA_SECTION_NODE) {
             String data = static_cast<CharacterData*>(n)->data();
             int length = data.length();
@@ -1111,58 +1096,7 @@ String Range::text() const
     return plainText(this);
 }
 
-static inline void removeElementPreservingChildren(PassRefPtr<DocumentFragment> fragment, HTMLElement* element)
-{
-    ExceptionCode ignoredExceptionCode;
-
-    RefPtr<Node> nextChild;
-    for (RefPtr<Node> child = element->firstChild(); child; child = nextChild) {
-        nextChild = child->nextSibling();
-        element->removeChild(child.get(), ignoredExceptionCode);
-        ASSERT(!ignoredExceptionCode);
-        fragment->insertBefore(child, element, ignoredExceptionCode);
-        ASSERT(!ignoredExceptionCode);
-    }
-    fragment->removeChild(element, ignoredExceptionCode);
-    ASSERT(!ignoredExceptionCode);
-}
-
-PassRefPtr<DocumentFragment> Range::createDocumentFragmentForElement(const String& markup, Element* element,  FragmentScriptingPermission scriptingPermission)
-{
-    ASSERT(element);
-    HTMLElement* htmlElement = toHTMLElement(element);
-    if (htmlElement->ieForbidsInsertHTML())
-        return 0;
-
-    if (htmlElement->hasLocalName(colTag) || htmlElement->hasLocalName(colgroupTag) || htmlElement->hasLocalName(framesetTag)
-        || htmlElement->hasLocalName(headTag) || htmlElement->hasLocalName(styleTag) || htmlElement->hasLocalName(titleTag))
-        return 0;
-
-    RefPtr<DocumentFragment> fragment = element->document()->createDocumentFragment();
-
-    if (element->document()->isHTMLDocument())
-        fragment->parseHTML(markup, element, scriptingPermission);
-    else if (!fragment->parseXML(markup, element, scriptingPermission))
-        return 0; // FIXME: We should propagate a syntax error exception out here.
-
-    // We need to pop <html> and <body> elements and remove <head> to
-    // accommodate folks passing complete HTML documents to make the
-    // child of an element.
-
-    RefPtr<Node> nextNode;
-    for (RefPtr<Node> node = fragment->firstChild(); node; node = nextNode) {
-        nextNode = node->nextSibling();
-        if (node->hasTagName(htmlTag) || node->hasTagName(headTag) || node->hasTagName(bodyTag)) {
-            HTMLElement* element = toHTMLElement(node.get());
-            if (Node* firstChild = element->firstChild())
-                nextNode = firstChild;
-            removeElementPreservingChildren(fragment, element);
-        }
-    }
-    return fragment.release();
-}
-
-PassRefPtr<DocumentFragment> Range::createContextualFragment(const String& markup, ExceptionCode& ec, FragmentScriptingPermission scriptingPermission)
+PassRefPtr<DocumentFragment> Range::createContextualFragment(const String& markup, ExceptionCode& ec)
 {
     if (!m_start.container()) {
         ec = INVALID_STATE_ERR;
@@ -1175,12 +1109,9 @@ PassRefPtr<DocumentFragment> Range::createContextualFragment(const String& marku
         return 0;
     }
 
-    RefPtr<DocumentFragment> fragment = createDocumentFragmentForElement(markup, toElement(element), scriptingPermission);
-
-    if (!fragment) {
-        ec = NOT_SUPPORTED_ERR;
+    RefPtr<DocumentFragment> fragment = WebCore::createContextualFragment(markup, toHTMLElement(element), AllowScriptingContentAndDoNotMarkAlreadyStarted, ec);
+    if (!fragment)
         return 0;
-    }
 
     return fragment.release();
 }
@@ -1280,8 +1211,6 @@ void Range::checkNodeBA(Node* n, ExceptionCode& ec) const
         case Node::PROCESSING_INSTRUCTION_NODE:
         case Node::TEXT_NODE:
         case Node::XPATH_NAMESPACE_NODE:
-            if (root->isSVGShadowRoot())
-                break;
             ec = RangeException::INVALID_NODE_TYPE_ERR;
             return;
     }
@@ -1309,11 +1238,6 @@ void Range::setStartAfter(Node* refNode, ExceptionCode& ec)
         return;
     }
 
-    if (refNode->document() != m_ownerDocument) {
-        ec = WRONG_DOCUMENT_ERR;
-        return;
-    }
-
     ec = 0;
     checkNodeBA(refNode, ec);
     if (ec)
@@ -1331,11 +1255,6 @@ void Range::setEndBefore(Node* refNode, ExceptionCode& ec)
 
     if (!refNode) {
         ec = NOT_FOUND_ERR;
-        return;
-    }
-
-    if (refNode->document() != m_ownerDocument) {
-        ec = WRONG_DOCUMENT_ERR;
         return;
     }
 
@@ -1359,18 +1278,12 @@ void Range::setEndAfter(Node* refNode, ExceptionCode& ec)
         return;
     }
 
-    if (refNode->document() != m_ownerDocument) {
-        ec = WRONG_DOCUMENT_ERR;
-        return;
-    }
-
     ec = 0;
     checkNodeBA(refNode, ec);
     if (ec)
         return;
 
     setEnd(refNode->parentNode(), refNode->nodeIndex() + 1, ec);
-
 }
 
 void Range::selectNode(Node* refNode, ExceptionCode& ec)
@@ -1535,7 +1448,7 @@ void Range::surroundContents(PassRefPtr<Node> passNewParent, ExceptionCode& ec)
         return;
     }
     
-    if (m_start.container() == newParent || m_start.container()->isDescendantOf(newParent.get())) {
+    if (newParent->contains(m_start.container())) {
         ec = HIERARCHY_REQUEST_ERR;
         return;
     }
@@ -1585,11 +1498,6 @@ void Range::setStartBefore(Node* refNode, ExceptionCode& ec)
         return;
     }
 
-    if (refNode->document() != m_ownerDocument) {
-        ec = WRONG_DOCUMENT_ERR;
-        return;
-    }
-
     ec = 0;
     checkNodeBA(refNode, ec);
     if (ec)
@@ -1610,7 +1518,7 @@ void Range::checkDeleteExtract(ExceptionCode& ec)
         return;
         
     Node* pastLast = pastLastNode();
-    for (Node* n = firstNode(); n != pastLast; n = n->traverseNextNode()) {
+    for (Node* n = firstNode(); n != pastLast; n = NodeTraversal::next(n)) {
         if (n->isReadOnlyNode()) {
             ec = NO_MODIFICATION_ALLOWED_ERR;
             return;
@@ -1650,12 +1558,12 @@ Node* Range::firstNode() const
         return child;
     if (!m_start.offset())
         return m_start.container();
-    return m_start.container()->traverseNextSibling();
+    return NodeTraversal::nextSkippingChildren(m_start.container());
 }
 
-Node* Range::shadowTreeRootNode() const
+ShadowRoot* Range::shadowRoot() const
 {
-    return startContainer() ? startContainer()->shadowTreeRootNode() : 0;
+    return startContainer() ? startContainer()->containingShadowRoot() : 0;
 }
 
 Node* Range::pastLastNode() const
@@ -1663,13 +1571,13 @@ Node* Range::pastLastNode() const
     if (!m_start.container() || !m_end.container())
         return 0;
     if (m_end.container()->offsetInCharacters())
-        return m_end.container()->traverseNextSibling();
+        return NodeTraversal::nextSkippingChildren(m_end.container());
     if (Node* child = m_end.container()->childNode(m_end.offset()))
         return child;
-    return m_end.container()->traverseNextSibling();
+    return NodeTraversal::nextSkippingChildren(m_end.container());
 }
 
-IntRect Range::boundingBox()
+IntRect Range::boundingBox() const
 {
     IntRect result;
     Vector<IntRect> rects;
@@ -1677,10 +1585,10 @@ IntRect Range::boundingBox()
     const size_t n = rects.size();
     for (size_t i = 0; i < n; ++i)
         result.unite(rects[i]);
-    return pixelSnappedIntRect(result);
+    return result;
 }
 
-void Range::textRects(Vector<IntRect>& rects, bool useSelectionHeight, RangeInFixedPosition* inFixed)
+void Range::textRects(Vector<IntRect>& rects, bool useSelectionHeight, RangeInFixedPosition* inFixed) const
 {
     Node* startContainer = m_start.container();
     Node* endContainer = m_end.container();
@@ -1695,7 +1603,7 @@ void Range::textRects(Vector<IntRect>& rects, bool useSelectionHeight, RangeInFi
     bool someFixed = false;
 
     Node* stopNode = pastLastNode();
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
         RenderObject* r = node->renderer();
         if (!r || !r->isText())
             continue;
@@ -1727,7 +1635,7 @@ void Range::textQuads(Vector<FloatQuad>& quads, bool useSelectionHeight, RangeIn
     bool someFixed = false;
 
     Node* stopNode = pastLastNode();
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
         RenderObject* r = node->renderer();
         if (!r || !r->isText())
             continue;
@@ -1745,31 +1653,30 @@ void Range::textQuads(Vector<FloatQuad>& quads, bool useSelectionHeight, RangeIn
 }
 
 #ifndef NDEBUG
-#define FormatBufferSize 1024
 void Range::formatForDebugger(char* buffer, unsigned length) const
 {
-    String result;
+    StringBuilder result;
     String s;
-    
+
     if (!m_start.container() || !m_end.container())
-        result = "<empty>";
+        result.appendLiteral("<empty>");
     else {
+        const int FormatBufferSize = 1024;
         char s[FormatBufferSize];
-        result += "from offset ";
-        result += String::number(m_start.offset());
-        result += " of ";
+        result.appendLiteral("from offset ");
+        result.appendNumber(m_start.offset());
+        result.appendLiteral(" of ");
         m_start.container()->formatForDebugger(s, FormatBufferSize);
-        result += s;
-        result += " to offset ";
-        result += String::number(m_end.offset());
-        result += " of ";
+        result.append(s);
+        result.appendLiteral(" to offset ");
+        result.appendNumber(m_end.offset());
+        result.appendLiteral(" of ");
         m_end.container()->formatForDebugger(s, FormatBufferSize);
-        result += s;
+        result.append(s);
     }
-          
-    strncpy(buffer, result.utf8().data(), length - 1);
+
+    strncpy(buffer, result.toString().utf8().data(), length - 1);
 }
-#undef FormatBufferSize
 #endif
 
 bool areRangesEqual(const Range* a, const Range* b)
@@ -1996,25 +1903,6 @@ PassRefPtr<ClientRect> Range::getBoundingClientRect() const
     return ClientRect::create(boundingRect());
 }
 
-static void adjustFloatQuadsForScrollAndAbsoluteZoomAndPageScale(Vector<FloatQuad>& quads, Document* document, RenderObject* renderer)
-{
-    FrameView* view = document->view();
-    if (!view)
-        return;
-
-    float pageScale = 1;
-    if (Page* page = document->page())
-        pageScale = page->pageScaleFactor();
-
-    LayoutRect visibleContentRect = view->visibleContentRect();
-    for (size_t i = 0; i < quads.size(); ++i) {
-        quads[i].move(-visibleContentRect.x(), -visibleContentRect.y());
-        adjustFloatQuadForAbsoluteZoom(quads[i], renderer);
-        if (pageScale != 1)
-            adjustFloatQuadForPageScale(quads[i], pageScale);
-    }
-}
-
 void Range::getBorderAndTextQuads(Vector<FloatQuad>& quads) const
 {
     Node* startContainer = m_start.container();
@@ -2022,18 +1910,18 @@ void Range::getBorderAndTextQuads(Vector<FloatQuad>& quads) const
     Node* stopNode = pastLastNode();
 
     HashSet<Node*> nodeSet;
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
         if (node->isElementNode())
             nodeSet.add(node);
     }
 
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
         if (node->isElementNode()) {
             if (!nodeSet.contains(node->parentNode())) {
                 if (RenderBoxModelObject* renderBoxModelObject = static_cast<Element*>(node)->renderBoxModelObject()) {
                     Vector<FloatQuad> elementQuads;
                     renderBoxModelObject->absoluteQuads(elementQuads);
-                    adjustFloatQuadsForScrollAndAbsoluteZoomAndPageScale(elementQuads, m_ownerDocument.get(), renderBoxModelObject);
+                    m_ownerDocument->adjustFloatQuadsForScrollAndAbsoluteZoomAndFrameScale(elementQuads, renderBoxModelObject);
 
                     quads.append(elementQuads);
                 }
@@ -2046,7 +1934,7 @@ void Range::getBorderAndTextQuads(Vector<FloatQuad>& quads) const
                 
                 Vector<FloatQuad> textQuads;
                 renderText->absoluteQuadsForRange(textQuads, startOffset, endOffset);
-                adjustFloatQuadsForScrollAndAbsoluteZoomAndPageScale(textQuads, m_ownerDocument.get(), renderText);
+                m_ownerDocument->adjustFloatQuadsForScrollAndAbsoluteZoomAndFrameScale(textQuads, renderText);
 
                 quads.append(textQuads);
             }
@@ -2054,7 +1942,6 @@ void Range::getBorderAndTextQuads(Vector<FloatQuad>& quads) const
     }
 }
 
-    
 FloatRect Range::boundingRect() const
 {
     if (!m_start.container())

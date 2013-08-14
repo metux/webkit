@@ -33,6 +33,7 @@
 #include "DocumentFragment.h"
 #include "DocumentLoader.h"
 #include "DocumentLoaderGtk.h"
+#include "FrameLoadRequest.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClientGtk.h"
 #include "FrameSelection.h"
@@ -51,13 +52,13 @@
 #include "RenderListItem.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
-#include "ReplaceSelectionCommand.h"
 #include "ScriptController.h"
 #include "SubstituteData.h"
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
+#include "WebKitDOMDocumentPrivate.h"
+#include "WebKitDOMRangePrivate.h"
 #include "markup.h"
-#include "webkit/WebKitDOMRangePrivate.h"
 #include "webkitenumtypes.h"
 #include "webkitglobalsprivate.h"
 #include "webkitmarshal.h"
@@ -113,6 +114,7 @@ enum {
     RESOURCE_LOAD_FINISHED,
     RESOURCE_CONTENT_LENGTH_RECEIVED,
     RESOURCE_LOAD_FAILED,
+    INSECURE_CONTENT_RUN,
 
     LAST_SIGNAL
 };
@@ -228,25 +230,6 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
             0,
             g_cclosure_marshal_VOID__VOID,
             G_TYPE_NONE, 0);
-
-    /**
-     * WebKitWebFrame::load-done
-     * @web_frame: the object on which the signal is emitted
-     *
-     * Emitted when frame loading is done.
-     *
-     * Deprecated: Use the "load-status" property instead, and/or
-     * WebKitWebView::load-error to be notified of load errors
-     */
-    webkit_web_frame_signals[LOAD_DONE] = g_signal_new("load-done",
-            G_TYPE_FROM_CLASS(frameClass),
-            (GSignalFlags)G_SIGNAL_RUN_LAST,
-            0,
-            0,
-            0,
-            g_cclosure_marshal_VOID__BOOLEAN,
-            G_TYPE_NONE, 1,
-            G_TYPE_BOOLEAN);
 
     /**
      * WebKitWebFrame::title-changed:
@@ -431,6 +414,28 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
             G_TYPE_NONE, 2,
             WEBKIT_TYPE_WEB_RESOURCE,
             G_TYPE_POINTER);
+
+    /**
+     * WebKitWebFrame::insecure-content-run:
+     * @web_frame: the #WebKitWebFrame the response was received for.
+     * @security_origin: the #WebKitSecurityOrigin.
+     * @url: the url of the insecure content.
+     *
+     * Invoked when insecure content is run from a secure page. This happens
+     * when a page loaded via HTTPS loads a stylesheet, script, image or
+     * iframe from an unencrypted HTTP URL.
+     *
+     * Since: 1.10.0
+     */
+    webkit_web_frame_signals[INSECURE_CONTENT_RUN] = g_signal_new("insecure-content-run",
+            G_TYPE_FROM_CLASS(frameClass),
+            G_SIGNAL_RUN_LAST,
+            0,
+            0, 0,
+            webkit_marshal_VOID__OBJECT_STRING,
+            G_TYPE_NONE, 2,
+            WEBKIT_TYPE_SECURITY_ORIGIN,
+            G_TYPE_STRING);
 
     /*
      * implementations of virtual methods
@@ -670,7 +675,7 @@ void webkit_web_frame_load_uri(WebKitWebFrame* frame, const gchar* uri)
     if (!coreFrame)
         return;
 
-    coreFrame->loader()->load(ResourceRequest(KURL(KURL(), String::fromUTF8(uri))), false);
+    coreFrame->loader()->load(FrameLoadRequest(coreFrame, ResourceRequest(KURL(KURL(), String::fromUTF8(uri)))));
 }
 
 static void webkit_web_frame_load_data(WebKitWebFrame* frame, const gchar* content, const gchar* mimeType, const gchar* encoding, const gchar* baseURL, const gchar* unreachableURL)
@@ -689,7 +694,7 @@ static void webkit_web_frame_load_data(WebKitWebFrame* frame, const gchar* conte
                                   KURL(KURL(), String::fromUTF8(unreachableURL)),
                                   KURL(KURL(), String::fromUTF8(unreachableURL)));
 
-    coreFrame->loader()->load(request, substituteData, false);
+    coreFrame->loader()->load(FrameLoadRequest(coreFrame, request, substituteData));
 }
 
 /**
@@ -758,7 +763,7 @@ void webkit_web_frame_load_request(WebKitWebFrame* frame, WebKitNetworkRequest* 
     if (!coreFrame)
         return;
 
-    coreFrame->loader()->load(core(request), false);
+    coreFrame->loader()->load(FrameLoadRequest(coreFrame->document()->securityOrigin(), core(request)));
 }
 
 /**
@@ -1156,6 +1161,30 @@ WebKitDOMRange* webkit_web_frame_get_range_for_word_around_caret(WebKitWebFrame*
     visibleSelection.expandUsingGranularity(WordGranularity);
 
     return kit(visibleSelection.firstRange().get());
+}
+
+/**
+ * webkit_web_frame_get_dom_document:
+ * @frame: a #WebKitWebFrame
+ * 
+ * Returns: (transfer none): the #WebKitDOMDocument currently loaded
+ * in the @frame or %NULL if no document is loaded
+ *
+ * Since: 1.10
+ **/
+WebKitDOMDocument* webkit_web_frame_get_dom_document(WebKitWebFrame* frame)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_FRAME(frame), 0);
+
+    Frame* coreFrame = core(frame);
+    if (!coreFrame)
+        return 0;
+
+    Document* doc = coreFrame->document();
+    if (!doc)
+        return 0;
+
+    return kit(doc);
 }
 
 namespace WebKit {

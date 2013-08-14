@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,13 +30,13 @@
 #define SamplingTool_h
 
 #include "Strong.h"
-#include "Nodes.h"
 #include "Opcode.h"
 #include "SamplingCounter.h"
 #include <wtf/Assertions.h>
 #include <wtf/Atomics.h>
 #include <wtf/HashMap.h>
 #include <wtf/MainThread.h>
+#include <wtf/Spectrum.h>
 #include <wtf/Threading.h>
 
 namespace JSC {
@@ -124,7 +124,7 @@ namespace JSC {
         
         static void sample();
         
-        static void dump();
+        JS_EXPORT_PRIVATE static void dump();
         
     private:
         const char* m_name;
@@ -148,7 +148,7 @@ namespace JSC {
                 if (previousPtr)
                     *previousPtr = bitwise_cast<SamplingRegion*>(previous);
                 
-                if (WTF::weakCompareAndSwap(&s_currentOrReserved, previous, bitwise_cast<uintptr_t>(current)))
+                if (WTF::weakCompareAndSwapUIntPtr(&s_currentOrReserved, previous, bitwise_cast<uintptr_t>(current)))
                     break;
             }
         }
@@ -229,17 +229,18 @@ namespace JSC {
     class SamplingTool {
     public:
         friend struct CallRecord;
-        friend class HostCallRecord;
         
 #if ENABLE(OPCODE_SAMPLING)
         class CallRecord {
             WTF_MAKE_NONCOPYABLE(CallRecord);
         public:
-            CallRecord(SamplingTool* samplingTool)
+            CallRecord(SamplingTool* samplingTool, bool isHostCall = false)
                 : m_samplingTool(samplingTool)
                 , m_savedSample(samplingTool->m_sample)
                 , m_savedCodeBlock(samplingTool->m_codeBlock)
             {
+                if (isHostcall)
+                    samplingTool->m_sample |= 0x1;
             }
 
             ~CallRecord()
@@ -253,32 +254,15 @@ namespace JSC {
             intptr_t m_savedSample;
             CodeBlock* m_savedCodeBlock;
         };
-        
-        class HostCallRecord : public CallRecord {
-        public:
-            HostCallRecord(SamplingTool* samplingTool)
-                : CallRecord(samplingTool)
-            {
-                samplingTool->m_sample |= 0x1;
-            }
-        };
 #else
         class CallRecord {
             WTF_MAKE_NONCOPYABLE(CallRecord);
         public:
-            CallRecord(SamplingTool*)
+            CallRecord(SamplingTool*, bool = false)
             {
             }
         };
-
-        class HostCallRecord : public CallRecord {
-        public:
-            HostCallRecord(SamplingTool* samplingTool)
-                : CallRecord(samplingTool)
-            {
-            }
-        };
-#endif        
+#endif
 
         SamplingTool(Interpreter* interpreter)
             : m_interpreter(interpreter)

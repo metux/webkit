@@ -33,6 +33,11 @@ WebKitNetworkResponse
 
 </para>
 
+<!-- ##### ARG WebKitNetworkResponse:suggested-filename ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitNetworkResponse:uri ##### -->
 <para>
 
@@ -48,6 +53,15 @@ WebKitNetworkResponse
 
 
 <!-- ##### FUNCTION webkit_network_response_get_message ##### -->
+<para>
+
+</para>
+
+@response: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_network_response_get_suggested_filename ##### -->
 <para>
 
 </para>

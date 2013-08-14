@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2004, 2007, 2008, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,10 +28,15 @@
 #include "KURL.h"
 
 #include "DecodeEscapeSequences.h"
+#include "MIMETypeRegistry.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "TextEncoding.h"
 #include <stdio.h>
 #include <wtf/HashMap.h>
+#if !USE(WTFURL)
 #include <wtf/HexNumber.h>
+#endif
+#include <wtf/MemoryInstrumentationString.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -38,11 +44,6 @@
 
 #if USE(ICU_UNICODE)
 #include <unicode/uidna.h>
-#elif USE(QT4_UNICODE)
-#include <QUrl>
-#elif USE(GLIB_UNICODE)
-#include <glib.h>
-#include "GOwnPtr.h"
 #endif
 
 // FIXME: This file makes too much use of the + operator on String.
@@ -66,7 +67,7 @@ static inline bool isLetterMatchIgnoringCase(UChar character, char lowercaseLett
     return (character | 0x20) == lowercaseLetter;
 }
 
-#if !USE(GOOGLEURL)
+#if !USE(GOOGLEURL) && !USE(WTFURL)
 
 static const char wsScheme[] = {'w', 's'};
 static const char ftpScheme[] = {'f', 't', 'p'};
@@ -290,7 +291,7 @@ static void appendASCII(const String& base, const char* rel, size_t len, CharBuf
     buffer[buffer.size() - 1] = '\0';
 }
 
-// FIXME: Move to PlatformString.h eventually.
+// FIXME: Move to WTFString.h eventually.
 // Returns the index of the first index in string |s| of any of the characters
 // in |toFind|. |toFind| should be a null-terminated string, all characters up
 // to the null will be searched. Returns int if not found.
@@ -559,11 +560,6 @@ KURL KURL::copy() const
     return result;
 }
 
-bool KURL::hasPath() const
-{
-    return m_pathEnd != m_portEnd;
-}
-
 String KURL::lastPathComponent() const
 {
     if (!hasPath())
@@ -634,37 +630,20 @@ bool KURL::hasFragmentIdentifier() const
     return m_fragmentEnd != m_queryEnd;
 }
 
-void KURL::copyParsedQueryTo(ParsedURLParameters& parameters) const
-{
-    const UChar* pos = m_string.characters() + m_pathEnd + 1;
-    const UChar* end = m_string.characters() + m_queryEnd;
-    while (pos < end) {
-        const UChar* parameterStart = pos;
-        while (pos < end && *pos != '&')
-            ++pos;
-        const UChar* parameterEnd = pos;
-        if (pos < end) {
-            ASSERT(*pos == '&');
-            ++pos;
-        }
-        if (parameterStart == parameterEnd)
-            continue;
-        const UChar* nameStart = parameterStart;
-        const UChar* equalSign = parameterStart;
-        while (equalSign < parameterEnd && *equalSign != '=')
-            ++equalSign;
-        if (equalSign == nameStart)
-            continue;
-        String name(nameStart, equalSign - nameStart);
-        String value = equalSign == parameterEnd ? String() : String(equalSign + 1, parameterEnd - equalSign - 1);
-        parameters.set(name, value);
-    }
-}
-
 String KURL::baseAsString() const
 {
     return m_string.left(m_pathAfterLastSlash);
 }
+
+#if !PLATFORM(QT) && !USE(CF)
+String KURL::fileSystemPath() const
+{
+    if (!isValid() || !isLocalFile())
+        return String();
+
+    return decodeURLEscapeSequences(path());
+}
+#endif
 
 #ifdef NDEBUG
 
@@ -786,21 +765,24 @@ void KURL::setUser(const String& user)
 
     // FIXME: Non-ASCII characters must be encoded and escaped to match parse() expectations,
     // and to avoid changing more than just the user login.
-    String u;
+
     int end = m_userEnd;
     if (!user.isEmpty()) {
-        u = user;
+        String u = user;
         if (m_userStart == m_schemeEnd + 1)
             u = "//" + u;
         // Add '@' if we didn't have one before.
         if (end == m_hostEnd || (end == m_passwordEnd && m_string[end] != '@'))
             u.append('@');
+        parse(m_string.left(m_userStart) + u + m_string.substring(end));
     } else {
         // Remove '@' if we now have neither user nor password.
         if (m_userEnd == m_passwordEnd && end != m_hostEnd && m_string[end] == '@')
             end += 1;
+        // We don't want to parse in the extremely common case where we are not going to make a change.
+        if (m_userStart != end)
+            parse(m_string.left(m_userStart) + m_string.substring(end));
     }
-    parse(m_string.left(m_userStart) + u + m_string.substring(end));
 }
 
 void KURL::setPass(const String& password)
@@ -810,21 +792,24 @@ void KURL::setPass(const String& password)
 
     // FIXME: Non-ASCII characters must be encoded and escaped to match parse() expectations,
     // and to avoid changing more than just the user password.
-    String p;
+
     int end = m_passwordEnd;
     if (!password.isEmpty()) {
-        p = ":" + password + "@";
+        String p = ":" + password + "@";
         if (m_userEnd == m_schemeEnd + 1)
             p = "//" + p;
         // Eat the existing '@' since we are going to add our own.
         if (end != m_hostEnd && m_string[end] == '@')
             end += 1;
+        parse(m_string.left(m_userEnd) + p + m_string.substring(end));
     } else {
         // Remove '@' if we now have neither user nor password.
         if (m_userStart == m_userEnd && end != m_hostEnd && m_string[end] == '@')
             end += 1;
+        // We don't want to parse in the extremely common case where we are not going to make a change.
+        if (m_userEnd != end)
+            parse(m_string.left(m_userEnd) + m_string.substring(end));
     }
-    parse(m_string.left(m_userEnd) + p + m_string.substring(end));
 }
 
 void KURL::setFragmentIdentifier(const String& s)
@@ -870,54 +855,6 @@ void KURL::setPath(const String& s)
         path = "/" + path;
 
     parse(m_string.left(m_portEnd) + encodeWithURLEscapeSequences(path) + m_string.substring(m_pathEnd));
-}
-
-String KURL::deprecatedString() const
-{
-    if (!m_isValid)
-        return m_string;
-
-    StringBuilder result;
-
-    result.append(protocol());
-    result.append(':');
-
-    StringBuilder authority;
-
-    if (m_hostEnd != m_passwordEnd) {
-        if (m_userEnd != m_userStart) {
-            authority.append(user());
-            authority.append('@');
-        }
-        authority.append(host());
-        if (hasPort()) {
-            authority.append(':');
-            authority.append(String::number(port()));
-        }
-    }
-
-    if (!authority.isEmpty()) {
-        result.append('/');
-        result.append('/');
-        result.append(authority.characters(), authority.length());
-    } else if (protocolIs("file")) {
-        result.append('/');
-        result.append('/');
-    }
-
-    result.append(path());
-
-    if (m_pathEnd != m_queryEnd) {
-        result.append('?');
-        result.append(query());
-    }
-
-    if (m_fragmentEnd != m_queryEnd) {
-        result.append('#');
-        result.append(fragmentIdentifier());
-    }
-
-    return result.toString();
 }
 
 String decodeURLEscapeSequences(const String& string)
@@ -1179,6 +1116,17 @@ void KURL::parse(const char* url, const String* originalString)
         && isLetterMatchIgnoringCase(url[1], 'i')
         && isLetterMatchIgnoringCase(url[2], 'l')
         && isLetterMatchIgnoringCase(url[3], 'e');
+
+#if PLATFORM(BLACKBERRY)
+    // Parse local: urls the same as file: urls.
+    if (!isFile)
+        isFile = schemeEnd == 5
+            && isLetterMatchIgnoringCase(url[0], 'l')
+            && isLetterMatchIgnoringCase(url[1], 'o')
+            && isLetterMatchIgnoringCase(url[2], 'c')
+            && isLetterMatchIgnoringCase(url[3], 'a')
+            && isLetterMatchIgnoringCase(url[4], 'l');
+#endif
 
     m_protocolIsInHTTPFamily = isLetterMatchIgnoringCase(url[0], 'h')
         && isLetterMatchIgnoringCase(url[1], 't')
@@ -1539,22 +1487,6 @@ static void appendEncodedHostname(UCharBuffer& buffer, const UChar* str, unsigne
         hostnameBufferLength, UIDNA_ALLOW_UNASSIGNED, 0, &error);
     if (error == U_ZERO_ERROR)
         buffer.append(hostnameBuffer, numCharactersConverted);
-#elif USE(QT4_UNICODE)
-    QByteArray result = QUrl::toAce(String(str, strLen));
-    buffer.append(result.constData(), result.length());
-#elif USE(GLIB_UNICODE)
-    GOwnPtr<gchar> utf8Hostname;
-    GOwnPtr<GError> utf8Err;
-    utf8Hostname.set(g_utf16_to_utf8(str, strLen, 0, 0, &utf8Err.outPtr()));
-    if (utf8Err)
-        return;
-
-    GOwnPtr<gchar> encodedHostname;
-    encodedHostname.set(g_hostname_to_ascii(utf8Hostname.get()));
-    if (!encodedHostname) 
-        return;
-
-    buffer.append(encodedHostname.get(), strlen(encodedHostname.get()));
 #endif
 }
 
@@ -1796,7 +1728,7 @@ void KURL::print() const
 }
 #endif
 
-#endif // !USE(GOOGLEURL)
+#endif // !USE(GOOGLEURL) && !USE(WTFURL)
 
 String KURL::strippedForUseAsReferrer() const
 {
@@ -1825,6 +1757,11 @@ const KURL& blankURL()
 {
     DEFINE_STATIC_LOCAL(KURL, staticBlankURL, (ParsedURLString, "about:blank"));
     return staticBlankURL;
+}
+
+bool KURL::isBlankURL() const
+{
+    return protocolIs("about");
 }
 
 bool isDefaultPortForProtocol(unsigned short port, const String& protocol)
@@ -1944,6 +1881,11 @@ bool portAllowed(const KURL& url)
     if (url.protocolIs("file"))
         return true;
 
+#if PLATFORM(BLACKBERRY)
+    if (url.protocolIs("local"))
+        return true;
+#endif
+
     return false;
 }
 
@@ -1961,17 +1903,36 @@ String mimeTypeFromDataURL(const String& url)
     return "";
 }
 
-bool protocolIsInHTTPFamily(const String& url)
+String mimeTypeFromURL(const KURL& url)
 {
-    unsigned length = url.length();
-    const UChar* characters = url.characters();
-    return length > 4
-        && isLetterMatchIgnoringCase(characters[0], 'h')
-        && isLetterMatchIgnoringCase(characters[1], 't')
-        && isLetterMatchIgnoringCase(characters[2], 't')
-        && isLetterMatchIgnoringCase(characters[3], 'p')
-        && (characters[4] == ':'
-            || (isLetterMatchIgnoringCase(characters[4], 's') && length > 5 && characters[5] == ':'));
+    String decodedPath = decodeURLEscapeSequences(url.path());
+    String extension = decodedPath.substring(decodedPath.reverseFind('.') + 1);
+
+    // We don't use MIMETypeRegistry::getMIMETypeForPath() because it returns "application/octet-stream" upon failure
+    return MIMETypeRegistry::getMIMETypeForExtension(extension);
+}
+
+void KURL::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this);
+#if USE(GOOGLEURL)
+    info.addMember(m_url, "url");
+#elif USE(WTFURL)
+    info.addMember(m_urlImpl, "urlImpl");
+#else // !USE(GOOGLEURL)
+    info.addMember(m_string, "string");
+#endif
+}
+
+bool KURL::isSafeToSendToAnotherThread() const
+{
+#if USE(GOOGLEURL)
+    return m_url.isSafeToSendToAnotherThread();
+#elif USE(WTFURL)
+    return m_urlImpl->isSafeToSendToAnotherThread();
+#else // !USE(GOOGLEURL)
+    return m_string.isSafeToSendToAnotherThread();
+#endif
 }
 
 }

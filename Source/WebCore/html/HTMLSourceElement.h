@@ -27,7 +27,6 @@
 #define HTMLSourceElement_h
 
 #if ENABLE(VIDEO)
-
 #include "HTMLElement.h"
 #include "Timer.h"
 
@@ -49,9 +48,9 @@ public:
 private:
     HTMLSourceElement(const QualifiedName&, Document*);
     
-    virtual void insertedIntoTree(bool);
-    virtual void willRemove();
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     void errorEventTimerFired(Timer<HTMLSourceElement>*);
 

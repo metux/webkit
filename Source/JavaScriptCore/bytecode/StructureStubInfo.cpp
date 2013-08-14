@@ -28,7 +28,7 @@
 
 #include "JSObject.h"
 #include "PolymorphicPutByIdList.h"
-#include "ScopeChain.h"
+
 
 namespace JSC {
 
@@ -63,7 +63,7 @@ void StructureStubInfo::deref()
         // These instructions don't have to release any allocated memory
         return;
     default:
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
     }
 }
 
@@ -92,7 +92,7 @@ bool StructureStubInfo::visitWeakReferences()
     }
     case access_get_by_id_proto_list: {
         PolymorphicAccessStructureList* polymorphicStructures = u.getByIdProtoList.structureList;
-        if (!polymorphicStructures->visitWeak(u.getByIdSelfList.listSize))
+        if (!polymorphicStructures->visitWeak(u.getByIdProtoList.listSize))
             return false;
         break;
     }

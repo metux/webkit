@@ -29,13 +29,14 @@
 
 #include <wtf/Platform.h>
 
-#if OS(WINDOWS) && !OS(WINCE) && !PLATFORM(QT) && !PLATFORM(CHROMIUM) && !PLATFORM(GTK) && !PLATFORM(WX)
+#if PLATFORM(WIN) && !OS(WINCE)
 #include <WebCore/WebCoreHeaderDetection.h>
 #endif
 
 #include <wtf/ExportMacros.h>
-#include <runtime/JSExportMacros.h>
 #include "PlatformExportMacros.h"
+
+#include <runtime/JSExportMacros.h>
 
 #ifdef __APPLE__
 #define HAVE_FUNC_USLEEP 1
@@ -44,11 +45,11 @@
 #if OS(WINDOWS)
 
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0500
+#define _WIN32_WINNT 0x0502
 #endif
 
 #ifndef WINVER
-#define WINVER 0x0500
+#define WINVER 0x0502
 #endif
 
 // If we don't define these, they get defined in windef.h.
@@ -87,14 +88,7 @@
 #include <wx/defs.h>
 #endif
 
-// this breaks compilation of <QFontDatabase>, at least, so turn it off for now
-// Also generates errors on wx on Windows, presumably because these functions
-// are used from wx headers. On GTK+ for Mac many GTK+ files include <libintl.h>
-// or <glib/gi18n-lib.h>, which in turn include <xlocale/_ctype.h> which uses
-// isacii(). 
-#if !PLATFORM(QT) && !PLATFORM(WX) && !PLATFORM(CHROMIUM) && !(OS(DARWIN) && PLATFORM(GTK)) && !defined(_LIBCPP_VERSION)
 #include <wtf/DisallowCType.h>
-#endif
 
 #if COMPILER(MSVC)
 #define SKIP_STATIC_CONSTRUCTORS_ON_MSVC 1
@@ -122,10 +116,6 @@
 #define WTF_USE_NEW_THEME 1
 #endif // PLATFORM(MAC)
 
-#if OS(UNIX) || OS(WINDOWS)
-#define WTF_USE_OS_RANDOMNESS 1
-#endif
-
 #if PLATFORM(CHROMIUM)
 
 // Chromium uses this file instead of JavaScriptCore/config.h to compile
@@ -148,18 +138,9 @@ typedef float CGFloat;
 #endif
 #endif /* USE(CG) */
 
-#if PLATFORM(WIN) && USE(CG)
-#define WTF_USE_SAFARI_THEME 1
-#endif
-
 // CoreAnimation is available to IOS, Mac and Windows if using CG
 #if PLATFORM(MAC) || PLATFORM(IOS) || (PLATFORM(WIN) && USE(CG))
 #define WTF_USE_CA 1
-#endif
-
-#if PLATFORM(QT) && USE(V8) && defined(Q_WS_X11)
-/* protect ourselves from evil X11 defines */
-#include <bridge/npruntime_internal.h>
 #endif
 
 // FIXME: Move this to JavaScriptCore/wtf/Platform.h, which is where we define WTF_USE_AVFOUNDATION on the Mac.

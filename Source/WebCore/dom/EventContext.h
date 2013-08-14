@@ -27,43 +27,75 @@
 #ifndef EventContext_h
 #define EventContext_h
 
+#include "EventTarget.h"
+#include "Node.h"
+#include "TreeScope.h"
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-class EventTarget;
 class Event;
-class Node;
 
 class EventContext {
 public:
     // FIXME: Use ContainerNode instead of Node.
     EventContext(PassRefPtr<Node>, PassRefPtr<EventTarget> currentTarget, PassRefPtr<EventTarget> target);
+    virtual ~EventContext();
 
-    Node* node() const;
-    EventTarget* target() const;
-    bool currentTargetSameAsTarget() const;
-    void handleLocalEvents(Event*) const;
+    Node* node() const { return m_node.get(); }
+    EventTarget* target() const { return m_target.get(); }
+    bool currentTargetSameAsTarget() const { return m_currentTarget.get() == m_target.get(); }
+    virtual void handleLocalEvents(Event*) const;
+    virtual bool isMouseOrFocusEventContext() const;
 
-private:
+protected:
+#ifndef NDEBUG
+    bool isUnreachableNode(EventTarget*);
+    bool isReachable(Node*);
+#endif
     RefPtr<Node> m_node;
     RefPtr<EventTarget> m_currentTarget;
     RefPtr<EventTarget> m_target;
 };
 
-inline Node* EventContext::node() const
+typedef Vector<OwnPtr<EventContext>, 32> EventPath;
+
+class MouseOrFocusEventContext : public EventContext {
+public:
+    MouseOrFocusEventContext(PassRefPtr<Node>, PassRefPtr<EventTarget> currentTarget, PassRefPtr<EventTarget> target);
+    virtual ~MouseOrFocusEventContext();
+    EventTarget* relatedTarget() const { return m_relatedTarget.get(); }
+    void setRelatedTarget(PassRefPtr<EventTarget>);
+    virtual void handleLocalEvents(Event*) const OVERRIDE;
+    virtual bool isMouseOrFocusEventContext() const OVERRIDE;
+
+private:
+    RefPtr<EventTarget> m_relatedTarget;
+};
+
+#ifndef NDEBUG
+inline bool EventContext::isUnreachableNode(EventTarget* target)
 {
-    return m_node.get();
+    // FIXME: Checks also for SVG elements.
+    return target && target->toNode() && !target->toNode()->isSVGElement() && !isReachable(target->toNode());
 }
 
-inline EventTarget* EventContext::target() const
+inline bool EventContext::isReachable(Node* target)
 {
-    return m_target.get();
+    ASSERT(target);
+    TreeScope* targetScope = target->treeScope();
+    for (TreeScope* scope = m_node->treeScope(); scope; scope = scope->parentTreeScope()) {
+        if (scope == targetScope)
+            return true;
+    }
+    return false;
 }
+#endif
 
-inline bool EventContext::currentTargetSameAsTarget() const
+inline void MouseOrFocusEventContext::setRelatedTarget(PassRefPtr<EventTarget> relatedTarget)
 {
-    return m_currentTarget.get() == m_target.get();
+    ASSERT(!isUnreachableNode(relatedTarget.get()));
+    m_relatedTarget = relatedTarget;
 }
 
 }

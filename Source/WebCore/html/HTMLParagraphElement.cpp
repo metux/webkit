@@ -39,31 +39,36 @@ inline HTMLParagraphElement::HTMLParagraphElement(const QualifiedName& tagName, 
     ASSERT(hasTagName(pTag));
 }
 
+PassRefPtr<HTMLParagraphElement> HTMLParagraphElement::create(Document* document)
+{
+    return adoptRef(new HTMLParagraphElement(pTag, document));
+}
+
 PassRefPtr<HTMLParagraphElement> HTMLParagraphElement::create(const QualifiedName& tagName, Document* document)
 {
     return adoptRef(new HTMLParagraphElement(tagName, document));
 }
 
-bool HTMLParagraphElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLParagraphElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == alignAttr)
+    if (name == alignAttr)
         return true;
-    return HTMLElement::isPresentationAttribute(attr);
+    return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLParagraphElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLParagraphElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == alignAttr) {
-        if (equalIgnoringCase(attr->value(), "middle") || equalIgnoringCase(attr->value(), "center"))
-            style->setProperty(CSSPropertyTextAlign, CSSValueWebkitCenter);
-        else if (equalIgnoringCase(attr->value(), "left"))
-            style->setProperty(CSSPropertyTextAlign, CSSValueWebkitLeft);
-        else if (equalIgnoringCase(attr->value(), "right"))
-            style->setProperty(CSSPropertyTextAlign, CSSValueWebkitRight);
+    if (attribute.name() == alignAttr) {
+        if (equalIgnoringCase(attribute.value(), "middle") || equalIgnoringCase(attribute.value(), "center"))
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitCenter);
+        else if (equalIgnoringCase(attribute.value(), "left"))
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitLeft);
+        else if (equalIgnoringCase(attribute.value(), "right"))
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitRight);
         else
-            style->setProperty(CSSPropertyTextAlign, attr->value());
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, attribute.value());
     } else
-        HTMLElement::collectStyleForAttribute(attr, style);
+        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
 }

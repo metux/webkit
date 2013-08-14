@@ -30,8 +30,11 @@ namespace WebKit {
 
 enum DrawingAreaType {
     DrawingAreaTypeImpl,
-#if PLATFORM(MAC)
+#if PLATFORM(MAC) && ENABLE(THREADED_SCROLLING)
     DrawingAreaTypeTiledCoreAnimation,
+#endif
+#if PLATFORM(MAC)
+    DrawingAreaTypeRemoteLayerTree,
 #endif
 };
 

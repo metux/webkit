@@ -35,10 +35,10 @@ void addChildNodesToDeletionQueue(GenericNode*& head, GenericNode*& tail, Generi
 
 class SVGUseElement;
 class SVGElementInstanceList;
+class SVGStyledElement;
 
 // SVGElementInstance mimics Node, but without providing all its functionality
-class SVGElementInstance : public TreeShared<SVGElementInstance>,
-                           public EventTarget {
+class SVGElementInstance : public EventTarget, public TreeShared<SVGElementInstance> {
 public:
     static PassRefPtr<SVGElementInstance> create(SVGUseElement* correspondingUseElement, SVGUseElement* directUseElement, PassRefPtr<SVGElement> originalElement)
     {
@@ -47,14 +47,17 @@ public:
 
     virtual ~SVGElementInstance();
 
+    void setParentOrShadowHostNode(SVGElementInstance* instance) { m_parentInstance = instance; }
+
     virtual const AtomicString& interfaceName() const;
     virtual ScriptExecutionContext* scriptExecutionContext() const;
 
     virtual bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture);
     virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture);
     virtual void removeAllEventListeners();
+
     using EventTarget::dispatchEvent;
-    virtual bool dispatchEvent(PassRefPtr<Event>);
+    virtual bool dispatchEvent(PassRefPtr<Event>) OVERRIDE;
 
     SVGElement* correspondingElement() const { return m_element.get(); }
     SVGUseElement* correspondingUseElement() const { return m_correspondingUseElement; }
@@ -63,7 +66,7 @@ public:
 
     void detach();
 
-    SVGElementInstance* parentNode() const { return parent(); }
+    SVGElementInstance* parentNode() const { return m_parentInstance; }
     PassRefPtr<SVGElementInstanceList> childNodes();
 
     SVGElementInstance* previousSibling() const { return m_previousSibling; }
@@ -83,6 +86,16 @@ public:
         SVGElement* m_element;
     };
 
+    class InstanceUpdateBlocker {
+        WTF_MAKE_NONCOPYABLE(InstanceUpdateBlocker);
+    public:
+        InstanceUpdateBlocker(SVGElement* targetElement);
+        ~InstanceUpdateBlocker();
+
+    private:
+        SVGStyledElement* m_targetElement;
+    };
+    
     static void invalidateAllInstancesOfElement(SVGElement*);
 
     using TreeShared<SVGElementInstance>::ref;
@@ -132,8 +145,12 @@ public:
 
 private:
     friend class SVGUseElement;
+    friend class TreeShared<SVGElementInstance>;
 
     SVGElementInstance(SVGUseElement*, SVGUseElement*, PassRefPtr<SVGElement> originalElement);
+
+    void removedLastRef();
+    bool hasTreeSharedParent() const { return !!m_parentInstance; }
 
     virtual Node* toNode() { return shadowTreeElement(); }
 
@@ -144,7 +161,7 @@ private:
     friend void appendChildToContainer(GenericNode* child, GenericNodeContainer* container);
 
     template<class GenericNode, class GenericNodeContainer>
-    friend void removeAllChildrenInContainer(GenericNodeContainer* container);
+    friend void removeDetachedChildrenInContainer(GenericNodeContainer*);
 
     template<class GenericNode, class GenericNodeContainer>
     friend void Private::addChildNodesToDeletionQueue(GenericNode*& head, GenericNode*& tail, GenericNodeContainer* container);
@@ -161,6 +178,8 @@ private:
     virtual void derefEventTarget() { deref(); }
     virtual EventTargetData* eventTargetData();
     virtual EventTargetData* ensureEventTargetData();
+
+    SVGElementInstance* m_parentInstance;
 
     SVGUseElement* m_correspondingUseElement;
     SVGUseElement* m_directUseElement;

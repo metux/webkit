@@ -31,6 +31,7 @@
 #include "NativeWebWheelEvent.h"
 #include "NotificationPermissionRequest.h"
 #include "WKAPICast.h"
+#include "WebColorPickerResultListenerProxy.h"
 #include "WebNumber.h"
 #include "WebOpenPanelResultListenerProxy.h"
 #include "WebPageProxy.h"
@@ -174,12 +175,18 @@ void WebUIClient::mouseDidMoveOverElement(WebPageProxy* page, const WebHitTestRe
     m_client.mouseDidMoveOverElement(toAPI(page), toAPI(webHitTestResult.get()), toAPI(modifiers), toAPI(userData), m_client.clientInfo);
 }
 
-void WebUIClient::missingPluginButtonClicked(WebPageProxy* page, const String& mimeType, const String& url, const String& pluginsPageURL)
+void WebUIClient::unavailablePluginButtonClicked(WebPageProxy* page, WKPluginUnavailabilityReason pluginUnavailabilityReason, const String& mimeType, const String& url, const String& pluginsPageURL)
 {
-    if (!m_client.missingPluginButtonClicked)
+    if (pluginUnavailabilityReason == kWKPluginUnavailabilityReasonPluginMissing) {
+        if (m_client.missingPluginButtonClicked_deprecatedForUseWithV0)
+            m_client.missingPluginButtonClicked_deprecatedForUseWithV0(toAPI(page), toAPI(mimeType.impl()), toAPI(url.impl()), toAPI(pluginsPageURL.impl()), m_client.clientInfo);
+    }
+
+    if (!m_client.unavailablePluginButtonClicked)
         return;
 
-    m_client.missingPluginButtonClicked(toAPI(page), toAPI(mimeType.impl()), toAPI(url.impl()), toAPI(pluginsPageURL.impl()), m_client.clientInfo);
+    m_client.unavailablePluginButtonClicked(toAPI(page), pluginUnavailabilityReason, toAPI(mimeType.impl()), toAPI(url.impl()), toAPI(pluginsPageURL.impl()), m_client.clientInfo);
+
 }
 
 bool WebUIClient::implementsDidNotHandleKeyEvent() const
@@ -409,6 +416,64 @@ bool WebUIClient::shouldInterruptJavaScript(WebPageProxy* page)
         return false;
 
     return m_client.shouldInterruptJavaScript(toAPI(page), m_client.clientInfo);
+}
+
+#if ENABLE(INPUT_TYPE_COLOR)
+bool WebUIClient::showColorPicker(WebPageProxy* page, const String& initialColor, WebColorPickerResultListenerProxy* listener)
+{
+    if (!m_client.showColorPicker)
+        return false;
+
+    m_client.showColorPicker(toAPI(page), toAPI(initialColor.impl()), toAPI(listener), m_client.clientInfo);
+    return true;
+}
+
+bool WebUIClient::hideColorPicker(WebPageProxy* page)
+{
+    if (!m_client.hideColorPicker)
+        return false;
+
+    m_client.hideColorPicker(toAPI(page), m_client.clientInfo);
+    return true;
+}
+#endif
+
+static inline WKPluginLoadPolicy toWKPluginLoadPolicy(PluginModuleLoadPolicy pluginModuleLoadPolicy)
+{
+    switch (pluginModuleLoadPolicy) {
+    case PluginModuleLoadNormally:
+        return kWKPluginLoadPolicyLoadNormally;
+    case PluginModuleBlocked:
+        return kWKPluginLoadPolicyBlocked;
+    case PluginModuleInactive:
+        return kWKPluginLoadPolicyInactive;
+    }
+
+    ASSERT_NOT_REACHED();
+    return kWKPluginLoadPolicyBlocked;
+}
+
+static inline PluginModuleLoadPolicy toPluginModuleLoadPolicy(WKPluginLoadPolicy pluginLoadPolicy)
+{
+    switch (pluginLoadPolicy) {
+    case kWKPluginLoadPolicyLoadNormally:
+        return PluginModuleLoadNormally;
+    case kWKPluginLoadPolicyBlocked:
+        return PluginModuleBlocked;
+    case kWKPluginLoadPolicyInactive:
+        return PluginModuleInactive;
+    }
+
+    ASSERT_NOT_REACHED();
+    return PluginModuleBlocked;
+}
+
+PluginModuleLoadPolicy WebUIClient::pluginLoadPolicy(WebPageProxy* page, const String& identifier, const String& displayName, const String& documentURLString, PluginModuleLoadPolicy currentPluginLoadPolicy)
+{
+    if (!m_client.pluginLoadPolicy)
+        return currentPluginLoadPolicy;
+
+    return toPluginModuleLoadPolicy(m_client.pluginLoadPolicy(toAPI(page), toAPI(identifier.impl()), toAPI(displayName.impl()), toURLRef(documentURLString.impl()), toWKPluginLoadPolicy(currentPluginLoadPolicy), m_client.clientInfo));
 }
 
 } // namespace WebKit

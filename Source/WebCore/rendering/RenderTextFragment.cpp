@@ -78,6 +78,7 @@ void RenderTextFragment::willBeDestroyed()
 void RenderTextFragment::setText(PassRefPtr<StringImpl> text, bool force)
 {
     RenderText::setText(text, force);
+
     m_start = 0;
     m_end = textLength();
     if (m_firstLetter) {

@@ -29,7 +29,7 @@
 #include "SVGExternalResourcesRequired.h"
 #include "SVGFitToViewBox.h"
 #include "SVGLangSpace.h"
-#include "SVGStyledLocatableElement.h"
+#include "SVGStyledTransformableElement.h"
 #include "SVGTests.h"
 #include "SVGZoomAndPan.h"
 
@@ -42,7 +42,7 @@ class SVGViewSpec;
 class SVGViewElement;
 class SMILTimeContainer;
 
-class SVGSVGElement : public SVGStyledLocatableElement,
+class SVGSVGElement : public SVGStyledTransformableElement,
                       public SVGTests,
                       public SVGLangSpace,
                       public SVGExternalResourcesRequired,
@@ -50,6 +50,9 @@ class SVGSVGElement : public SVGStyledLocatableElement,
                       public SVGZoomAndPan {
 public:
     static PassRefPtr<SVGSVGElement> create(const QualifiedName&, Document*);
+
+    using SVGStyledTransformableElement::ref;
+    using SVGStyledTransformableElement::deref;
 
     virtual bool isValid() const { return SVGTests::isValid(); }
     virtual bool supportsFocus() const { return true; }
@@ -68,10 +71,8 @@ public:
     float screenPixelToMillimeterX() const;
     float screenPixelToMillimeterY() const;
 
-    bool useCurrentView() const;
-    void setUseCurrentView(bool currentView);
-
-    SVGViewSpec* currentView() const;
+    bool useCurrentView() const { return m_useCurrentView; }
+    SVGViewSpec* currentView();
 
     enum ConsiderCSSMode {
         RespectCSSProperties,
@@ -131,6 +132,9 @@ public:
     bool widthAttributeEstablishesViewport() const;
     bool heightAttributeEstablishesViewport() const;
 
+    SVGZoomAndPanType zoomAndPan() const { return m_zoomAndPan; }
+    void setZoomAndPan(unsigned short zoomAndPan) { m_zoomAndPan = SVGZoomAndPan::parseFromNumber(zoomAndPan); }
+
 protected:
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
@@ -140,13 +144,13 @@ private:
 
     virtual bool isSVG() const { return true; }
     
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
-    virtual bool rendererIsNeeded(const NodeRenderingContext& context) { return StyledElement::rendererIsNeeded(context); }
+    virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
 
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
 
     virtual void svgAttributeChanged(const QualifiedName&);
 
@@ -182,9 +186,10 @@ private:
     virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const;
 
     bool m_useCurrentView;
+    SVGZoomAndPanType m_zoomAndPan;
     RefPtr<SMILTimeContainer> m_timeContainer;
     FloatPoint m_translation;
-    mutable OwnPtr<SVGViewSpec> m_viewSpec;
+    RefPtr<SVGViewSpec> m_viewSpec;
 };
 
 } // namespace WebCore

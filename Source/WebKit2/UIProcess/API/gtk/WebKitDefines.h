@@ -23,7 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if !defined(__WEBKIT2_H_INSIDE__) && !defined(WEBKIT2_COMPILATION)
+#if !defined(__WEBKIT2_H_INSIDE__) && !defined(WEBKIT2_COMPILATION) && !defined(__WEBKIT_WEB_EXTENSION_H_INSIDE__)
 #error "Only <webkit2/webkit2.h> can be included directly."
 #endif
 
@@ -31,8 +31,6 @@
 #define WebKitDefines_h
 
 #include <glib.h>
-
-typedef struct _WebKitPrintOperation WebKitPrintOperation;
 
 #ifdef G_OS_WIN32
 #    ifdef BUILDING_WEBKIT
@@ -45,8 +43,5 @@ typedef struct _WebKitPrintOperation WebKitPrintOperation;
 #    define WEBKIT_API __attribute__((visibility("default")))
 #    define WEBKIT_OBSOLETE_API WEBKIT_API __attribute__((deprecated))
 #endif
-
-typedef struct _WebKitFindController WebKitFindController;
-typedef struct _WebKitWebView        WebKitWebView;
 
 #endif // WebKitDefines_h

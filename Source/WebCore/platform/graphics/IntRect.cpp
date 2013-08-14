@@ -27,6 +27,7 @@
 #include "IntRect.h"
 
 #include "FloatRect.h"
+#include "LayoutRect.h"
 #include <algorithm>
 
 using std::max;
@@ -35,8 +36,14 @@ using std::min;
 namespace WebCore {
 
 IntRect::IntRect(const FloatRect& r)
-    : m_location(IntPoint(static_cast<int>(r.x()), static_cast<int>(r.y())))
-    , m_size(IntSize(static_cast<int>(r.width()), static_cast<int>(r.height())))
+    : m_location(clampToInteger(r.x()), clampToInteger(r.y()))
+    , m_size(clampToInteger(r.width()), clampToInteger(r.height()))
+{
+}
+
+IntRect::IntRect(const LayoutRect& r)
+    : m_location(r.x(), r.y())
+    , m_size(r.width(), r.height())
 {
 }
 
@@ -123,6 +130,22 @@ void IntRect::scale(float s)
     m_location.setY((int)(y() * s));
     m_size.setWidth((int)(width() * s));
     m_size.setHeight((int)(height() * s));
+}
+
+static inline int distanceToInterval(int pos, int start, int end)
+{
+    if (pos < start)
+        return start - pos;
+    if (pos > end)
+        return end - pos;
+    return 0;
+}
+
+IntSize IntRect::differenceToPoint(const IntPoint& point) const
+{
+    int xdistance = distanceToInterval(point.x(), x(), maxX());
+    int ydistance = distanceToInterval(point.y(), y(), maxY());
+    return IntSize(xdistance, ydistance);
 }
 
 IntRect unionRect(const Vector<IntRect>& rects)

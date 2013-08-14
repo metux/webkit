@@ -116,15 +116,6 @@ AccessibilityObject* AccessibilityARIAGridRow::disclosedByRow() const
     return 0;
 }
     
-AccessibilityObject* AccessibilityARIAGridRow::parentTable() const
-{
-    AccessibilityObject* parent = parentObjectUnignored();
-    if (!parent->isAccessibilityTable())
-        return 0;
-    
-    return parent;
-}
-
 AccessibilityObject* AccessibilityARIAGridRow::headerObject()
 {
     AccessibilityChildrenVector rowChildren = children();

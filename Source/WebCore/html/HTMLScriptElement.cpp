@@ -42,58 +42,58 @@ inline HTMLScriptElement::HTMLScriptElement(const QualifiedName& tagName, Docume
     ASSERT(hasTagName(scriptTag));
 }
 
-PassRefPtr<HTMLScriptElement> HTMLScriptElement::create(const QualifiedName& tagName, Document* document, bool wasInsertedByParser)
+PassRefPtr<HTMLScriptElement> HTMLScriptElement::create(const QualifiedName& tagName, Document* document, bool wasInsertedByParser, bool alreadyStarted)
 {
-    return adoptRef(new HTMLScriptElement(tagName, document, wasInsertedByParser, false));
+    return adoptRef(new HTMLScriptElement(tagName, document, wasInsertedByParser, alreadyStarted));
 }
 
-bool HTMLScriptElement::isURLAttribute(Attribute* attr) const
+bool HTMLScriptElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == srcAttr || HTMLElement::isURLAttribute(attr);
+    return attribute.name() == srcAttr || HTMLElement::isURLAttribute(attribute);
 }
 
 void HTMLScriptElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
-    ScriptElement::childrenChanged();
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    ScriptElement::childrenChanged();
 }
 
-void HTMLScriptElement::parseAttribute(Attribute* attr)
+void HTMLScriptElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    const QualifiedName& attrName = attr->name();
-
-    if (attrName == srcAttr)
-        handleSourceAttribute(attr->value());
-    else if (attr->name() == asyncAttr)
+    if (name == srcAttr)
+        handleSourceAttribute(value);
+    else if (name == asyncAttr)
         handleAsyncAttribute();
-    else if (attrName == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attr));
-    else if (attrName == onbeforeloadAttr)
-        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attr));
+    else if (name == onloadAttr)
+        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, name, value));
+    else if (name == onbeforeloadAttr)
+        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, name, value));
     else
-        HTMLElement::parseAttribute(attr);
+        HTMLElement::parseAttribute(name, value);
 }
 
-void HTMLScriptElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLScriptElement::insertedInto(ContainerNode* insertionPoint)
 {
-    HTMLElement::insertedIntoDocument();
-    ScriptElement::insertedIntoDocument();
+    HTMLElement::insertedInto(insertionPoint);
+    ScriptElement::insertedInto(insertionPoint);
+    return InsertionDone;
 }
 
 void HTMLScriptElement::setText(const String &value)
 {
-    ExceptionCode ec = 0;
+    RefPtr<Node> protectFromMutationEvents(this);
+
     int numChildren = childNodeCount();
 
     if (numChildren == 1 && firstChild()->isTextNode()) {
-        toText(firstChild())->setData(value, ec);
+        toText(firstChild())->setData(value, IGNORE_EXCEPTION);
         return;
     }
 
     if (numChildren > 0)
         removeChildren();
 
-    appendChild(document()->createTextNode(value.impl()), ec);
+    appendChild(document()->createTextNode(value.impl()), IGNORE_EXCEPTION);
 }
 
 void HTMLScriptElement::setAsync(bool async)

@@ -28,6 +28,11 @@ WebKitSettings
 </para>
 
 
+<!-- ##### ARG WebKitSettings:allow-modal-dialogs ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitSettings:auto-load-images ##### -->
 <para>
 
@@ -54,6 +59,11 @@ WebKitSettings
 </para>
 
 <!-- ##### ARG WebKitSettings:default-monospace-font-size ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:draw-compositing-indicators ##### -->
 <para>
 
 </para>
@@ -113,6 +123,11 @@ WebKitSettings
 
 </para>
 
+<!-- ##### ARG WebKitSettings:enable-page-cache ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitSettings:enable-plugins ##### -->
 <para>
 
@@ -128,12 +143,27 @@ WebKitSettings
 
 </para>
 
+<!-- ##### ARG WebKitSettings:enable-site-specific-quirks ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:enable-smooth-scrolling ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitSettings:enable-tabs-to-links ##### -->
 <para>
 
 </para>
 
 <!-- ##### ARG WebKitSettings:enable-webaudio ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:enable-webgl ##### -->
 <para>
 
 </para>
@@ -148,12 +178,27 @@ WebKitSettings
 
 </para>
 
+<!-- ##### ARG WebKitSettings:javascript-can-access-clipboard ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitSettings:javascript-can-open-windows-automatically ##### -->
 <para>
 
 </para>
 
 <!-- ##### ARG WebKitSettings:load-icons-ignoring-image-load-setting ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:media-playback-allows-inline ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:media-playback-requires-user-gesture ##### -->
 <para>
 
 </para>
@@ -184,6 +229,11 @@ WebKitSettings
 </para>
 
 <!-- ##### ARG WebKitSettings:serif-font-family ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:user-agent ##### -->
 <para>
 
 </para>
@@ -788,6 +838,42 @@ WebKitSettings
 @enabled: 
 
 
+<!-- ##### FUNCTION webkit_settings_get_enable_webgl ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_webgl ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_allow_modal_dialogs ##### -->
+<para>
+
+</para>
+
+@settings: 
+@allowed: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_allow_modal_dialogs ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_settings_get_zoom_text_only ##### -->
 <para>
 
@@ -804,5 +890,159 @@ WebKitSettings
 
 @settings: 
 @zoom_text_only: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_javascript_can_access_clipboard ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_javascript_can_access_clipboard ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_media_playback_requires_user_gesture ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_media_playback_requires_user_gesture ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_media_playback_allows_inline ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_media_playback_allows_inline ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_draw_compositing_indicators ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_draw_compositing_indicators ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_site_specific_quirks ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_site_specific_quirks ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_page_cache ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_page_cache ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_user_agent ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_user_agent ##### -->
+<para>
+
+</para>
+
+@settings: 
+@user_agent: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_user_agent_with_application_details ##### -->
+<para>
+
+</para>
+
+@settings: 
+@application_name: 
+@application_version: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_smooth_scrolling ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_smooth_scrolling ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
 
 

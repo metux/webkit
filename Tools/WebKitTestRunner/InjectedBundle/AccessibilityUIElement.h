@@ -49,7 +49,7 @@ typedef struct objc_object* PlatformUIElement;
 #include <oleacc.h>
 
 typedef COMPtr<IAccessible> PlatformUIElement;
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
 #include <atk/atk.h>
 typedef AtkObject* PlatformUIElement;
 #else
@@ -112,7 +112,9 @@ public:
     bool boolAttributeValue(JSStringRef attribute);
     bool isAttributeSupported(JSStringRef attribute);
     bool isAttributeSettable(JSStringRef attribute);
-    bool isActionSupported(JSStringRef action);
+    bool isPressActionSupported();
+    bool isIncrementActionSupported();
+    bool isDecrementActionSupported();
     JSRetainPtr<JSStringRef> role();
     JSRetainPtr<JSStringRef> subrole();
     JSRetainPtr<JSStringRef> roleDescription();
@@ -180,6 +182,7 @@ public:
     PassRefPtr<AccessibilityUIElement> selectedRowAtIndex(unsigned);
     PassRefPtr<AccessibilityUIElement> disclosedByRow();
     PassRefPtr<AccessibilityUIElement> disclosedRowAtIndex(unsigned);
+    PassRefPtr<AccessibilityUIElement> rowAtIndex(unsigned);
 
     // ARIA specific
     PassRefPtr<AccessibilityUIElement> ariaOwnsElementAtIndex(unsigned);
@@ -193,6 +196,7 @@ public:
     // Parameterized attributes
     int lineForIndex(int);
     JSRetainPtr<JSStringRef> rangeForLine(int);
+    JSRetainPtr<JSStringRef> rangeForPosition(int x, int y);
     JSRetainPtr<JSStringRef> boundsForRange(unsigned location, unsigned length);
     void setSelectedTextRange(unsigned location, unsigned length);
     JSRetainPtr<JSStringRef> stringForRange(unsigned location, unsigned length);
@@ -219,6 +223,9 @@ public:
     JSRetainPtr<JSStringRef> stringForTextMarkerRange(AccessibilityTextMarkerRange*);
     int textMarkerRangeLength(AccessibilityTextMarkerRange*);
     bool attributedStringForTextMarkerRangeContainsAttribute(JSStringRef, AccessibilityTextMarkerRange*);
+    int indexForTextMarker(AccessibilityTextMarker*);
+    bool isTextMarkerValid(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarker> textMarkerForIndex(int);
 
     // Notifications
     // Function callback should take one argument, the name of the notification.
@@ -238,6 +245,9 @@ private:
 
     void getLinkedUIElements(Vector<RefPtr<AccessibilityUIElement> >&);
     void getDocumentLinks(Vector<RefPtr<AccessibilityUIElement> >&);
+#endif
+
+#if PLATFORM(MAC) || PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
     void getChildren(Vector<RefPtr<AccessibilityUIElement> >&);
     void getChildrenWithRange(Vector<RefPtr<AccessibilityUIElement> >&, unsigned location, unsigned length);
 #endif

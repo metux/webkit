@@ -24,7 +24,7 @@
 #ifndef RenderMenuList_h
 #define RenderMenuList_h
 
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
 #include "PopupMenu.h"
 #include "PopupMenuClient.h"
 #include "RenderDeprecatedFlexibleBox.h"
@@ -37,6 +37,7 @@
 
 namespace WebCore {
 
+class HTMLSelectElement;
 class RenderText;
 
 class RenderMenuList : public RenderDeprecatedFlexibleBox, private PopupMenuClient {
@@ -57,21 +58,25 @@ public:
     String text() const;
 
 private:
+    HTMLSelectElement* selectElement() const;
+
     virtual bool isMenuList() const { return true; }
 
     virtual void addChild(RenderObject* newChild, RenderObject* beforeChild = 0);
     virtual void removeChild(RenderObject*);
     virtual bool createsAnonymousWrapper() const { return true; }
-    virtual bool canHaveChildren() const { return false; }
 
     virtual void updateFromElement();
 
-    virtual bool hasControlClip() const { return true; }
     virtual LayoutRect controlClipRect(const LayoutPoint&) const;
+    virtual bool hasControlClip() const { return true; }
+    virtual bool canHaveGeneratedChildren() const OVERRIDE { return false; }
+    virtual bool canBeReplacedWithInlineRunIn() const OVERRIDE;
 
     virtual const char* renderName() const { return "RenderMenuList"; }
 
-    virtual void computePreferredLogicalWidths();
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const OVERRIDE;
+    virtual void computePreferredLogicalWidths() OVERRIDE;
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
@@ -136,7 +141,7 @@ private:
 
 inline RenderMenuList* toRenderMenuList(RenderObject* object)
 {
-    ASSERT(!object || object->isMenuList());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isMenuList());
     return static_cast<RenderMenuList*>(object);
 }
 

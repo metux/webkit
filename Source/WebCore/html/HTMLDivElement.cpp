@@ -48,26 +48,26 @@ PassRefPtr<HTMLDivElement> HTMLDivElement::create(const QualifiedName& tagName, 
     return adoptRef(new HTMLDivElement(tagName, document));
 }
 
-bool HTMLDivElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLDivElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == alignAttr)
+    if (name == alignAttr)
         return true;
-    return HTMLElement::isPresentationAttribute(attr);
+    return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLDivElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLDivElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == alignAttr) {
-        if (equalIgnoringCase(attr->value(), "middle") || equalIgnoringCase(attr->value(), "center"))
-            style->setProperty(CSSPropertyTextAlign, CSSValueWebkitCenter);
-        else if (equalIgnoringCase(attr->value(), "left"))
-            style->setProperty(CSSPropertyTextAlign, CSSValueWebkitLeft);
-        else if (equalIgnoringCase(attr->value(), "right"))
-            style->setProperty(CSSPropertyTextAlign, CSSValueWebkitRight);
+    if (attribute.name() == alignAttr) {
+        if (equalIgnoringCase(attribute.value(), "middle") || equalIgnoringCase(attribute.value(), "center"))
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitCenter);
+        else if (equalIgnoringCase(attribute.value(), "left"))
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitLeft);
+        else if (equalIgnoringCase(attribute.value(), "right"))
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitRight);
         else
-            style->setProperty(CSSPropertyTextAlign, attr->value());
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, attribute.value());
     } else
-        HTMLElement::collectStyleForAttribute(attr, style);
+        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
 }

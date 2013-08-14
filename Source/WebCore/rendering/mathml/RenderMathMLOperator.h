@@ -36,25 +36,38 @@ namespace WebCore {
 class RenderMathMLOperator : public RenderMathMLBlock {
 public:
     RenderMathMLOperator(Element*);
-    RenderMathMLOperator(Node*, UChar operatorChar);
+    RenderMathMLOperator(Element*, UChar operatorChar);
+
     virtual bool isRenderMathMLOperator() const { return true; }
-    virtual RenderMathMLOperator* unembellishedOperator() { return this; }
-    virtual void stretchToHeight(int pixelHeight);
-    virtual void updateFromElement(); 
+    
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
-    virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
-        
+    virtual void updateFromElement() OVERRIDE;
+    
+    virtual RenderMathMLOperator* unembellishedOperator() OVERRIDE { return this; }
+    void stretchToHeight(int pixelHeight);
+    
+    virtual int firstLineBoxBaseline() const OVERRIDE;
+    
+    enum OperatorType { Default, Separator, Fence };
+    void setOperatorType(OperatorType type) { m_operatorType = type; }
+    OperatorType operatorType() const { return m_operatorType; }
+    
 protected:
-    virtual void layout();
-    virtual PassRefPtr<RenderStyle> createStackableStyle(int size, int topRelative);
-    virtual RenderBlock* createGlyph(UChar glyph, int size = 0, int charRelative = 0, int topRelative = 0);
+    virtual void computePreferredLogicalWidths() OVERRIDE;
+    PassRefPtr<RenderStyle> createStackableStyle(int maxHeightForRenderer);
+    RenderBlock* createGlyph(UChar glyph, int maxHeightForRenderer, int charRelative);
     
 private:
     virtual const char* renderName() const { return isAnonymous() ? "RenderMathMLOperator (anonymous)" : "RenderMathMLOperator"; }
 
+    int glyphHeightForCharacter(UChar);
+
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) OVERRIDE;
+
     int m_stretchHeight;
     bool m_isStacked;
     UChar m_operator;
+    OperatorType m_operatorType;
 };
 
 inline RenderMathMLOperator* toRenderMathMLOperator(RenderMathMLBlock* block)

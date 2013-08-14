@@ -27,6 +27,7 @@
 #include "Attr.h"
 #include "CachedImage.h"
 #include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
 #include "ColorSpace.h"
 #include "Document.h"
 #include "Image.h"
@@ -80,7 +81,8 @@ void SVGFEImageElement::clearResourceReferences()
 
 void SVGFEImageElement::requestImageResource()
 {
-    ResourceRequest request(ownerDocument()->completeURL(href()));
+    CachedResourceRequest request(ResourceRequest(ownerDocument()->completeURL(href())));
+    request.setInitiator(this);
     m_cachedImage = document()->cachedResourceLoader()->requestImage(request);
 
     if (m_cachedImage)
@@ -96,9 +98,6 @@ void SVGFEImageElement::buildPendingResource()
     String id;
     Element* target = SVGURIReference::targetElementFromIRIString(href(), document(), &id);
     if (!target) {
-        if (hasPendingResources())
-            return;
-
         if (id.isEmpty())
             requestImageResource();
         else {
@@ -126,24 +125,25 @@ bool SVGFEImageElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGFEImageElement::parseAttribute(Attribute* attr)
+void SVGFEImageElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(attr->name())) {
-        SVGFilterPrimitiveStandardAttributes::parseAttribute(attr);
+    if (!isSupportedAttribute(name)) {
+        SVGFilterPrimitiveStandardAttributes::parseAttribute(name, value);
         return;
     }
 
-    const AtomicString& value = attr->value();
-    if (attr->name() == SVGNames::preserveAspectRatioAttr) {
-        SVGPreserveAspectRatio::parsePreserveAspectRatio(this, value);
+    if (name == SVGNames::preserveAspectRatioAttr) {
+        SVGPreserveAspectRatio preserveAspectRatio;
+        preserveAspectRatio.parse(value);
+        setPreserveAspectRatioBaseValue(preserveAspectRatio);
         return;
     }
 
-    if (SVGURIReference::parseAttribute(attr))
+    if (SVGURIReference::parseAttribute(name, value))
         return;
-    if (SVGLangSpace::parseAttribute(attr))
+    if (SVGLangSpace::parseAttribute(name, value))
         return;
-    if (SVGExternalResourcesRequired::parseAttribute(attr))
+    if (SVGExternalResourcesRequired::parseAttribute(name, value))
         return;
 
     ASSERT_NOT_REACHED();
@@ -174,16 +174,18 @@ void SVGFEImageElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-void SVGFEImageElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGFEImageElement::insertedInto(ContainerNode* rootParent)
 {
-    SVGFilterPrimitiveStandardAttributes::insertedIntoDocument();
+    SVGFilterPrimitiveStandardAttributes::insertedInto(rootParent);
     buildPendingResource();
+    return InsertionDone;
 }
 
-void SVGFEImageElement::removedFromDocument()
+void SVGFEImageElement::removedFrom(ContainerNode* rootParent)
 {
-    SVGFilterPrimitiveStandardAttributes::removedFromDocument();
-    clearResourceReferences();
+    SVGFilterPrimitiveStandardAttributes::removedFrom(rootParent);
+    if (rootParent->inDocument())
+        clearResourceReferences();
 }
 
 void SVGFEImageElement::notifyFinished(CachedResource*)

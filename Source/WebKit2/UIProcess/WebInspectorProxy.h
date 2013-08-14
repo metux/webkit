@@ -30,22 +30,29 @@
 #if ENABLE(INSPECTOR)
 
 #include "APIObject.h"
-#include "Connection.h"
+#include "MessageReceiver.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
+#include "WKGeometry.h"
 #include <wtf/RetainPtr.h>
 
+OBJC_CLASS NSButton;
 OBJC_CLASS NSWindow;
 OBJC_CLASS WKWebInspectorProxyObjCAdapter;
 OBJC_CLASS WKWebInspectorWKView;
 #endif
 
-#if PLATFORM(WIN)
-#include <WebCore/WindowMessageListener.h>
+#if PLATFORM(GTK)
+#include "WebInspectorClientGtk.h"
+#endif
+
+#if PLATFORM(EFL)
+#include <Ecore_Evas.h>
+#include <Evas.h>
 #endif
 
 namespace WebKit {
@@ -55,15 +62,7 @@ class WebPageGroup;
 class WebPageProxy;
 struct WebPageCreationParameters;
 
-#if PLATFORM(WIN)
-class WebView;
-#endif
-
-class WebInspectorProxy : public APIObject
-#if PLATFORM(WIN)
-    , public WebCore::WindowMessageListener
-#endif
-{
+class WebInspectorProxy : public APIObject, public CoreIPC::MessageReceiver {
 public:
     static const Type APIType = TypeInspector;
 
@@ -80,6 +79,8 @@ public:
     WebPageProxy* page() const { return m_page; }
 
     bool isVisible() const { return m_isVisible; }
+    bool isFront();
+
     void show();
     void close();
     
@@ -87,8 +88,14 @@ public:
     void createInspectorWindow();
     void updateInspectorWindowTitle() const;
     void inspectedViewFrameDidChange();
-#elif PLATFORM(GTK)
-    void windowDestroyed();
+
+    void setInspectorWindowFrame(WKRect&);
+    WKRect inspectorWindowFrame();
+#endif
+
+#if PLATFORM(GTK)
+    GtkWidget* inspectorView() const { return m_inspectorView; };
+    void initializeInspectorClientGtk(const WKInspectorClientGtk*);
 #endif
 
     void showConsole();
@@ -109,67 +116,70 @@ public:
     bool isProfilingPage() const { return m_isProfilingPage; }
     void togglePageProfiling();
 
-#if ENABLE(INSPECTOR)
-    // Implemented in generated WebInspectorProxyMessageReceiver.cpp
-    void didReceiveWebInspectorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncWebInspectorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
-#endif
-
     static bool isInspectorPage(WebPageProxy*);
 
+    // Implemented the platform WebInspectorProxy file
+    String inspectorPageURL() const;
+    String inspectorBaseURL() const;
+
+#if ENABLE(INSPECTOR_SERVER)
+    void enableRemoteInspection();
+    void remoteFrontendConnected();
+    void remoteFrontendDisconnected();
+    void dispatchMessageFromRemoteFrontend(const String& message);
+    int remoteInspectionPageID() const { return m_remoteInspectionPageId; }
+#endif
+
 private:
-    WebInspectorProxy(WebPageProxy* page);
+    explicit WebInspectorProxy(WebPageProxy*);
 
     virtual Type type() const { return APIType; }
+
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
 
     WebPageProxy* platformCreateInspectorPage();
     void platformOpen();
     void platformDidClose();
     void platformBringToFront();
+    bool platformIsFront();
+    void platformAttachAvailabilityChanged(bool);
     void platformInspectedURLChanged(const String&);
     unsigned platformInspectedWindowHeight();
     void platformAttach();
     void platformDetach();
     void platformSetAttachedWindowHeight(unsigned);
 
-    // Implemented the platform WebInspectorProxy file
-    String inspectorPageURL() const;
-    String inspectorBaseURL() const;
-
     // Called by WebInspectorProxy messages
     void createInspectorPage(uint64_t& inspectorPageID, WebPageCreationParameters&);
     void didLoadInspectorPage();
     void didClose();
     void bringToFront();
+    void attachAvailabilityChanged(bool);
     void inspectedURLChanged(const String&);
+
+#if ENABLE(INSPECTOR_SERVER)
+    void sendMessageToRemoteFrontend(const String& message);
+#endif
 
     bool canAttach();
     bool shouldOpenAttached();
 
     static WebPageGroup* inspectorPageGroup();
 
-#if PLATFORM(WIN)
-    static bool registerInspectorViewWindowClass();
-    static LRESULT CALLBACK InspectorViewWndProc(HWND, UINT, WPARAM, LPARAM);
-    LRESULT wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-
-    LRESULT onSizeEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-    LRESULT onMinMaxInfoEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-    LRESULT onSetFocusEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-    LRESULT onCloseEvent(HWND hWnd, UINT message, WPARAM, LPARAM, bool& handled);
-
-    void onWebViewWindowPosChangingEvent(WPARAM, LPARAM);
-    virtual void windowReceivedMessage(HWND, UINT message, WPARAM, LPARAM);
+#if PLATFORM(GTK) || PLATFORM(EFL)
+    void createInspectorWindow();
 #endif
 
-    static const unsigned minimumWindowWidth = 500;
-    static const unsigned minimumWindowHeight = 400;
+    static const unsigned minimumWindowWidth;
+    static const unsigned minimumWindowHeight;
 
-    static const unsigned initialWindowWidth = 750;
-    static const unsigned initialWindowHeight = 650;
+    static const unsigned initialWindowWidth;
+    static const unsigned initialWindowHeight;
 
     // Keep this in sync with the value in InspectorFrontendClientLocal.
-    static const unsigned minimumAttachedHeight = 250;
+    static const unsigned minimumAttachedHeight;
 
     WebPageProxy* m_page;
 
@@ -182,14 +192,19 @@ private:
 #if PLATFORM(MAC)
     RetainPtr<WKWebInspectorWKView> m_inspectorView;
     RetainPtr<NSWindow> m_inspectorWindow;
+    RetainPtr<NSButton> m_dockButton;
     RetainPtr<WKWebInspectorProxyObjCAdapter> m_inspectorProxyObjCAdapter;
     String m_urlString;
-#elif PLATFORM(WIN)
-    HWND m_inspectorWindow;
-    RefPtr<WebView> m_inspectorView;
 #elif PLATFORM(GTK)
+    WebInspectorClientGtk m_client;
     GtkWidget* m_inspectorView;
     GtkWidget* m_inspectorWindow;
+#elif PLATFORM(EFL)
+    Evas_Object* m_inspectorView;
+    Ecore_Evas* m_inspectorWindow;
+#endif
+#if ENABLE(INSPECTOR_SERVER)
+    int m_remoteInspectionPageId;
 #endif
 };
 

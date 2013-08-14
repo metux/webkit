@@ -42,6 +42,7 @@
  * inside a GTK application.  
  */
 
+#include "config.h"
 #include "GtkVersioning.h"
 #include "xembed.h"
 #include "gtk2xtbin.h"
@@ -132,9 +133,9 @@ xt_event_prepare (GSource*  source_data,
 {   
   int mask;
 
-  GDK_THREADS_ENTER();
+  gdk_threads_enter();
   mask = XPending(xtdisplay);
-  GDK_THREADS_LEAVE();
+  gdk_threads_leave();
 
   return (gboolean)mask;
 }
@@ -142,16 +143,16 @@ xt_event_prepare (GSource*  source_data,
 static gboolean
 xt_event_check (GSource*  source_data)
 {
-  GDK_THREADS_ENTER ();
+  gdk_threads_enter();
 
   if (xt_event_poll_fd.revents & G_IO_IN) {
     int mask;
     mask = XPending(xtdisplay);
-    GDK_THREADS_LEAVE ();
+    gdk_threads_leave();
     return (gboolean)mask;
   }
 
-  GDK_THREADS_LEAVE ();
+  gdk_threads_leave();
   return FALSE;
 }   
 
@@ -165,7 +166,7 @@ xt_event_dispatch (GSource*  source_data,
 
   ac = XtDisplayToApplicationContext(xtdisplay);
 
-  GDK_THREADS_ENTER ();
+  gdk_threads_enter();
 
   /* Process only real X traffic here.  We only look for data on the
    * pipe, limit it to XTBIN_MAX_EVENTS and only call
@@ -176,7 +177,7 @@ xt_event_dispatch (GSource*  source_data,
     XtAppProcessEvent(ac, XtIMXEvent);
   }
 
-  GDK_THREADS_LEAVE ();
+  gdk_threads_leave();
 
   return TRUE;  
 }

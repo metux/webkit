@@ -28,67 +28,92 @@
 
 #include "HTMLToken.h"
 #include "HTTPParsers.h"
+#include "KURL.h"
 #include "SuffixTree.h"
+#include "TextEncoding.h"
+#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
+class Document;
 class HTMLDocumentParser;
+class HTMLSourceTracker;
+class XSSInfo;
+
+struct FilterTokenRequest {
+    FilterTokenRequest(HTMLToken& token, HTMLSourceTracker& sourceTracker, bool shouldAllowCDATA)
+        : token(token)
+        , sourceTracker(sourceTracker)
+        , shouldAllowCDATA(shouldAllowCDATA)
+    { }
+
+    HTMLToken& token;
+    HTMLSourceTracker& sourceTracker;
+    bool shouldAllowCDATA;
+};
 
 class XSSAuditor {
     WTF_MAKE_NONCOPYABLE(XSSAuditor);
 public:
-    explicit XSSAuditor(HTMLDocumentParser*);
+    XSSAuditor();
 
-    void filterToken(HTMLToken&);
+    void init(Document*);
+    PassOwnPtr<XSSInfo> filterToken(const FilterTokenRequest&);
+    bool isSafeToSendToAnotherThread() const;
 
 private:
+    static const size_t kMaximumFragmentLengthTarget = 100;
+
     enum State {
         Uninitialized,
-        Initial,
-        AfterScriptStartTag,
+        Initialized
     };
 
     enum AttributeKind {
         NormalAttribute,
-        SrcLikeAttribute
+        SrcLikeAttribute,
+        ScriptLikeAttribute
     };
 
-    void init();
+    bool filterStartToken(const FilterTokenRequest&);
+    void filterEndToken(const FilterTokenRequest&);
+    bool filterCharacterToken(const FilterTokenRequest&);
+    bool filterScriptToken(const FilterTokenRequest&);
+    bool filterObjectToken(const FilterTokenRequest&);
+    bool filterParamToken(const FilterTokenRequest&);
+    bool filterEmbedToken(const FilterTokenRequest&);
+    bool filterAppletToken(const FilterTokenRequest&);
+    bool filterIframeToken(const FilterTokenRequest&);
+    bool filterMetaToken(const FilterTokenRequest&);
+    bool filterBaseToken(const FilterTokenRequest&);
+    bool filterFormToken(const FilterTokenRequest&);
 
-    bool filterTokenInitial(HTMLToken&);
-    bool filterTokenAfterScriptStartTag(HTMLToken&);
+    bool eraseDangerousAttributesIfInjected(const FilterTokenRequest&);
+    bool eraseAttributeIfInjected(const FilterTokenRequest&, const QualifiedName&, const String& replacementValue = String(), AttributeKind treatment = NormalAttribute);
 
-    bool filterScriptToken(HTMLToken&);
-    bool filterObjectToken(HTMLToken&);
-    bool filterParamToken(HTMLToken&);
-    bool filterEmbedToken(HTMLToken&);
-    bool filterAppletToken(HTMLToken&);
-    bool filterIframeToken(HTMLToken&);
-    bool filterMetaToken(HTMLToken&);
-    bool filterBaseToken(HTMLToken&);
-    bool filterFormToken(HTMLToken&);
-
-    bool eraseDangerousAttributesIfInjected(HTMLToken&);
-    bool eraseAttributeIfInjected(HTMLToken&, const QualifiedName&, const String& replacementValue = String(), AttributeKind treatment = NormalAttribute);
-
-    String snippetForRange(const HTMLToken&, int start, int end);
-    String snippetForJavaScript(const String&);
-    String decodedSnippetForAttribute(const HTMLToken&, const HTMLToken::Attribute&, AttributeKind treatment = NormalAttribute);
+    String decodedSnippetForToken(const HTMLToken&);
+    String decodedSnippetForName(const FilterTokenRequest&);
+    String decodedSnippetForAttribute(const FilterTokenRequest&, const HTMLToken::Attribute&, AttributeKind treatment = NormalAttribute);
+    String decodedSnippetForJavaScript(const FilterTokenRequest&);
 
     bool isContainedInRequest(const String&);
-    bool isSameOriginResource(const String& url);
+    bool isLikelySafeResource(const String& url);
 
-    HTMLDocumentParser* m_parser;
+    KURL m_documentURL;
     bool m_isEnabled;
     XSSProtectionDisposition m_xssProtection;
 
+    String m_originalURL;
+    String m_originalHTTPBody;
     String m_decodedURL;
     String m_decodedHTTPBody;
     OwnPtr<SuffixTree<ASCIICodebook> > m_decodedHTTPBodySuffixTree;
 
     State m_state;
-    String m_cachedSnippet;
-    bool m_notifiedClient;
+    String m_cachedDecodedSnippet;
+    unsigned m_scriptTagNestingLevel;
+    KURL m_reportURL;
+    TextEncoding m_encoding;
 };
 
 }

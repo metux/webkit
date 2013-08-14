@@ -27,14 +27,16 @@
 #define FindController_h
 
 #include "PageOverlay.h"
+#include "ShareableBitmap.h"
 #include "WebFindOptions.h"
+#include <WebCore/IntRect.h>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
     class Frame;
-    class IntRect;
+    class Range;
 }
 
 namespace WebKit {
@@ -49,6 +51,9 @@ public:
     virtual ~FindController();
 
     void findString(const String&, FindOptions, unsigned maxMatchCount);
+    void findStringMatches(const String&, FindOptions, unsigned maxMatchCount);
+    void getImageForFindMatch(uint32_t matchIndex);
+    void selectFindMatch(uint32_t matchIndex);
     void hideFindUI();
     void countStringMatches(const String&, FindOptions, unsigned maxMatchCount);
     
@@ -68,15 +73,19 @@ private:
     virtual void drawRect(PageOverlay*, WebCore::GraphicsContext&, const WebCore::IntRect& dirtyRect);
 
     Vector<WebCore::IntRect> rectsForTextMatches();
+    bool getFindIndicatorBitmapAndRect(WebCore::Frame*, ShareableBitmap::Handle&, WebCore::IntRect& selectionRect);
     bool updateFindIndicator(WebCore::Frame* selectedFrame, bool isShowingOverlay, bool shouldAnimate = true);
 
-private:
+    void updateFindUIAfterPageScroll(bool found, const String&, FindOptions, unsigned maxMatchCount);
+
     WebPage* m_webPage;
     PageOverlay* m_findPageOverlay;
 
     // Whether the UI process is showing the find indicator. Note that this can be true even if
     // the find indicator isn't showing, but it will never be false when it is showing.
     bool m_isShowingFindIndicator;
+    WebCore::IntRect m_findIndicatorRect;
+    Vector<RefPtr<WebCore::Range> > m_findMatches;
 };
 
 } // namespace WebKit

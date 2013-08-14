@@ -26,12 +26,21 @@
 #include "config.h"
 #include "APIClientTraits.h"
 
+#include "WKBundle.h"
 #include "WKBundlePage.h"
 
 namespace WebKit {
 
+const size_t APIClientTraits<WKBundleClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundleClient, didReceiveMessageToPage),
+    sizeof(WKBundleClient)
+};
+
 const size_t APIClientTraits<WKBundlePageLoaderClient>::interfaceSizesByVersion[] = {
     offsetof(WKBundlePageLoaderClient, didLayoutForFrame),
+    offsetof(WKBundlePageLoaderClient, didFinishProgress),
+    offsetof(WKBundlePageLoaderClient, didReceiveIntentForFrame_unavailable),
+    offsetof(WKBundlePageLoaderClient, registerIntentServiceForFrame_unavailable),
     sizeof(WKBundlePageLoaderClient)
 };
 
@@ -39,20 +48,53 @@ const size_t APIClientTraits<WKBundlePageResourceLoadClient>::interfaceSizesByVe
     offsetof(WKBundlePageResourceLoadClient, shouldCacheResponse),
     sizeof(WKBundlePageResourceLoadClient)
 };
+
+const size_t APIClientTraits<WKBundlePageFullScreenClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageFullScreenClient, beganEnterFullScreen),
+    sizeof(WKBundlePageFullScreenClient)
+};
     
 const size_t APIClientTraits<WKPageContextMenuClient>::interfaceSizesByVersion[] = {
     offsetof(WKPageContextMenuClient, contextMenuDismissed),
+    offsetof(WKPageContextMenuClient, getContextMenuFromProposedMenu),
     sizeof(WKPageContextMenuClient)
 };
 
 const size_t APIClientTraits<WKPageLoaderClient>::interfaceSizesByVersion[] = {
-    offsetof(WKPageLoaderClient, didFailToInitializePlugin),
+    offsetof(WKPageLoaderClient, didDetectXSSForFrame),
+    offsetof(WKPageLoaderClient, didReceiveIntentForFrame_unavailable),
     sizeof(WKPageLoaderClient)
 };
 
 const size_t APIClientTraits<WKPageUIClient>::interfaceSizesByVersion[] = {
     offsetof(WKPageUIClient, createNewPage),
+    offsetof(WKPageUIClient, showColorPicker),
     sizeof(WKPageUIClient)
 };
     
+const size_t APIClientTraits<WKBundlePageFormClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageFormClient, willSendSubmitEvent),
+    sizeof(WKBundlePageFormClient)
+};
+
+const size_t APIClientTraits<WKBundlePageEditorClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageEditorClient, willWriteToPasteboard),
+    sizeof(WKBundlePageEditorClient)
+};
+
+const size_t APIClientTraits<WKBundlePageUIClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageUIClient, didReachApplicationCacheOriginQuota),
+    sizeof(WKBundlePageUIClient)
+};
+
+const size_t APIClientTraits<WKContextInjectedBundleClient>::interfaceSizesByVersion[] = {
+    offsetof(WKContextInjectedBundleClient, getInjectedBundleInitializationUserData),
+    sizeof(WKContextInjectedBundleClient)
+};
+
+const size_t APIClientTraits<WKIconDatabaseClient>::interfaceSizesByVersion[] = {
+    offsetof(WKIconDatabaseClient, iconDataReadyForPageURL),
+    sizeof(WKIconDatabaseClient)
+};
+
 } // namespace WebKit

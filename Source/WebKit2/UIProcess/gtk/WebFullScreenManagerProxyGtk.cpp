@@ -25,58 +25,53 @@
 #include "WebContext.h"
 #include "WebFullScreenManagerMessages.h"
 #include "WebFullScreenManagerProxyMessages.h"
+#include "WebKitWebViewBasePrivate.h"
 #include "WebProcess.h"
-
 #include <WebCore/NotImplemented.h>
+
+using namespace WebCore;
 
 namespace WebKit {
 
 void WebFullScreenManagerProxy::invalidate()
 {
+    m_page->process()->removeMessageReceiver(Messages::WebFullScreenManagerProxy::messageReceiverName(), m_page->pageID());
     m_webView = 0;
+}
+
+void WebFullScreenManagerProxy::close()
+{
+    notImplemented();
+}
+
+bool WebFullScreenManagerProxy::isFullScreen()
+{
+    notImplemented();
+    return false;
 }
 
 void WebFullScreenManagerProxy::enterFullScreen()
 {
-    notImplemented();
+    if (!m_webView)
+        return;
+
+    webkitWebViewBaseEnterFullScreen(m_webView);
 }
 
 void WebFullScreenManagerProxy::exitFullScreen()
 {
-    notImplemented();
+    if (!m_webView)
+        return;
+
+    webkitWebViewBaseExitFullScreen(m_webView);
 }
 
-void WebFullScreenManagerProxy::beganEnterFullScreenAnimation()
+void WebFullScreenManagerProxy::beganEnterFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
 {
     notImplemented();
 }
 
-void WebFullScreenManagerProxy::finishedEnterFullScreenAnimation(bool completed)
-{
-    notImplemented();
-}
-
-void WebFullScreenManagerProxy::beganExitFullScreenAnimation()
-{
-    notImplemented();
-}
-
-void WebFullScreenManagerProxy::finishedExitFullScreenAnimation(bool completed)
-{
-    notImplemented();
-}
-
-void WebFullScreenManagerProxy::enterAcceleratedCompositingMode(const LayerTreeContext& context)
-{
-    notImplemented();
-}
-
-void WebFullScreenManagerProxy::exitAcceleratedCompositingMode()
-{
-    notImplemented();
-}
-
-void WebFullScreenManagerProxy::getFullScreenRect(WebCore::IntRect& rect)
+void WebFullScreenManagerProxy::beganExitFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
 {
     notImplemented();
 }

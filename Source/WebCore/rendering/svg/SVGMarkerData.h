@@ -29,55 +29,76 @@ namespace WebCore {
 
 class RenderSVGResourceMarker;
 
+enum SVGMarkerType {
+    StartMarker,
+    MidMarker,
+    EndMarker
+};
+
+struct MarkerPosition {
+    MarkerPosition(SVGMarkerType useType, const FloatPoint& useOrigin, float useAngle)
+        : type(useType)
+        , origin(useOrigin)
+        , angle(useAngle)
+    {
+    }
+
+    SVGMarkerType type;
+    FloatPoint origin;
+    float angle;
+};
+
 class SVGMarkerData {
 public:
-    enum Type {
-        Unknown = 0,
-        Start,
-        Mid,
-        End
-    };
-
-    SVGMarkerData(const Type& type = Unknown, RenderSVGResourceMarker* marker = 0)
-        : m_type(type)
-        , m_marker(marker)
+    SVGMarkerData(Vector<MarkerPosition>& positions)
+        : m_positions(positions)
+        , m_elementIndex(0)
     {
     }
 
-    FloatPoint origin() const { return m_origin; }
-    RenderSVGResourceMarker* marker() const { return m_marker; }
-
-    float currentAngle() const
+    static void updateFromPathElement(void* info, const PathElement* element)
     {
-        FloatSize inslopeChange = m_inslopePoints[1] - m_inslopePoints[0];
-        FloatSize outslopeChange = m_outslopePoints[1] - m_outslopePoints[0];
+        SVGMarkerData* markerData = static_cast<SVGMarkerData*>(info);
 
-        double inslope = rad2deg(atan2(inslopeChange.height(), inslopeChange.width()));
-        double outslope = rad2deg(atan2(outslopeChange.height(), outslopeChange.width()));
+        // First update the outslope for the previous element.
+        markerData->updateOutslope(element->points[0]);
 
-        double angle = 0;
-        switch (m_type) {
-        case Start:
-            angle = outslope;
-            break;
-        case Mid:
-            angle = (inslope + outslope) / 2;
-            break;
-        case End:
-            angle = inslope;
-            break;
-        default:
-            ASSERT_NOT_REACHED();
-            break;
+        // Record the marker for the previous element.
+        if (markerData->m_elementIndex > 0) {
+            SVGMarkerType markerType = markerData->m_elementIndex == 1 ? StartMarker : MidMarker;
+            markerData->m_positions.append(MarkerPosition(markerType, markerData->m_origin, markerData->currentAngle(markerType)));
         }
 
-        return narrowPrecisionToFloat(angle);
+        // Update our marker data for this element.
+        markerData->updateMarkerDataForPathElement(element);
+        ++markerData->m_elementIndex;
     }
 
-    void updateTypeAndMarker(const Type& type, RenderSVGResourceMarker* marker)
+    void pathIsDone()
     {
-        m_type = type;
-        m_marker = marker;
+        m_positions.append(MarkerPosition(EndMarker, m_origin, currentAngle(EndMarker)));
+    }
+
+private:
+    float currentAngle(SVGMarkerType type) const
+    {
+        FloatPoint inslopeChange(m_inslopePoints[1] - m_inslopePoints[0]);
+        FloatPoint outslopeChange(m_outslopePoints[1] - m_outslopePoints[0]);
+
+        double inslope = rad2deg(inslopeChange.slopeAngleRadians());
+        double outslope = rad2deg(outslopeChange.slopeAngleRadians());
+
+        switch (type) {
+        case StartMarker:
+            return narrowPrecisionToFloat(outslope);
+        case MidMarker:
+            return narrowPrecisionToFloat((inslope + outslope) / 2);
+        case EndMarker:
+            return narrowPrecisionToFloat(inslope);
+        }
+
+        ASSERT_NOT_REACHED();
+        return 0;
     }
 
     void updateOutslope(const FloatPoint& point)
@@ -113,15 +134,14 @@ public:
         }
     }
 
-private:
     void updateInslope(const FloatPoint& point)
     {
         m_inslopePoints[0] = m_origin;
         m_inslopePoints[1] = point;
     }
 
-    Type m_type;
-    RenderSVGResourceMarker* m_marker;
+    Vector<MarkerPosition>& m_positions;
+    unsigned m_elementIndex;
     FloatPoint m_origin;
     FloatPoint m_subpathStart;
     FloatPoint m_inslopePoints[2];

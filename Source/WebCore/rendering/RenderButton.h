@@ -34,11 +34,13 @@ class RenderTextFragment;
 // to date as the button changes.
 class RenderButton : public RenderDeprecatedFlexibleBox {
 public:
-    explicit RenderButton(Node*);
+    explicit RenderButton(Element*);
     virtual ~RenderButton();
 
     virtual const char* renderName() const { return "RenderButton"; }
     virtual bool isRenderButton() const { return true; }
+
+    virtual bool canBeSelectionLeaf() const OVERRIDE { return node() && node()->rendererIsEditable(); }
 
     virtual void addChild(RenderObject* newChild, RenderObject *beforeChild = 0);
     virtual void removeChild(RenderObject*);
@@ -48,15 +50,12 @@ public:
     void setupInnerStyle(RenderStyle*);
     virtual void updateFromElement();
 
-    virtual void updateBeforeAfterContent(PseudoId);
-
+    virtual bool canHaveGeneratedChildren() const OVERRIDE;
     virtual bool hasControlClip() const { return true; }
     virtual LayoutRect controlClipRect(const LayoutPoint&) const;
 
     void setText(const String&);
     String text() const;
-
-    virtual bool canHaveChildren() const;
 
 private:
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
@@ -77,13 +76,13 @@ private:
 
 inline RenderButton* toRenderButton(RenderObject* object)
 { 
-    ASSERT(!object || object->isRenderButton());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderButton());
     return static_cast<RenderButton*>(object);
 }
 
 inline const RenderButton* toRenderButton(const RenderObject* object)
 { 
-    ASSERT(!object || object->isRenderButton());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderButton());
     return static_cast<const RenderButton*>(object);
 }
 

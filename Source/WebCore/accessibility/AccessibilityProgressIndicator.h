@@ -21,8 +21,7 @@
 #ifndef AccessibilityProgressIndicator_h
 #define AccessibilityProgressIndicator_h
 
-#if ENABLE(PROGRESS_TAG)
-
+#if ENABLE(PROGRESS_ELEMENT)
 #include "AccessibilityRenderObject.h"
 
 namespace WebCore {
@@ -43,15 +42,15 @@ private:
     virtual float maxValueForRange() const;
     virtual float minValueForRange() const;
 
-    AccessibilityProgressIndicator(RenderProgress*);
+    explicit AccessibilityProgressIndicator(RenderProgress*);
 
     HTMLProgressElement* element() const;
-    virtual bool accessibilityIsIgnored() const;
+    virtual bool computeAccessibilityIsIgnored() const;
 };
 
 
 } // namespace WebCore
 
-#endif // ENABLE(PROGRESS_TAG)
+#endif // ENABLE(PROGRESS_ELEMENT)
 
 #endif // AccessibilityProgressIndicator_h

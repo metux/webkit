@@ -26,13 +26,16 @@
 #ifndef ScrollingCoordinator_h
 #define ScrollingCoordinator_h
 
-#include "GraphicsLayer.h"
 #include "IntRect.h"
+#include "LayoutRect.h"
+#include "PlatformWheelEvent.h"
+#include "RenderObject.h"
 #include "ScrollTypes.h"
 #include "Timer.h"
 #include <wtf/Forward.h>
 
 #if ENABLE(THREADED_SCROLLING)
+#include <wtf/HashMap.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/Threading.h>
 #endif
@@ -43,37 +46,45 @@
 
 namespace WebCore {
 
+typedef unsigned MainThreadScrollingReasons;
+typedef uint64_t ScrollingNodeID;
+
+enum ScrollingNodeType { ScrollingNode, FixedNode, StickyNode };
+
+class Document;
+class Frame;
 class FrameView;
 class GraphicsLayer;
 class Page;
-class PlatformWheelEvent;
 class Region;
-class ScrollingTreeState;
+class ScrollableArea;
+class ViewportConstraints;
 
 #if ENABLE(THREADED_SCROLLING)
 class ScrollingTree;
 #endif
 
-#if ENABLE(GESTURE_EVENTS)
-class PlatformGestureEvent;
-#endif
+enum SetOrSyncScrollingLayerPosition {
+    SetScrollingLayerPosition,
+    SyncScrollingLayerPosition
+};
 
 class ScrollingCoordinator : public ThreadSafeRefCounted<ScrollingCoordinator> {
 public:
     static PassRefPtr<ScrollingCoordinator> create(Page*);
-    ~ScrollingCoordinator();
+    virtual ~ScrollingCoordinator();
 
-    void pageDestroyed();
+    virtual void pageDestroyed();
 
 #if ENABLE(THREADED_SCROLLING)
-    ScrollingTree* scrollingTree() const;
+    virtual ScrollingTree* scrollingTree() const { return 0; }
 #endif
 
     // Return whether this scrolling coordinator handles scrolling for the given frame view.
     bool coordinatesScrollingForFrameView(FrameView*) const;
 
     // Should be called whenever the given frame view has been laid out.
-    void frameViewLayoutUpdated(FrameView*);
+    virtual void frameViewLayoutUpdated(FrameView*) { }
 
     // Should be called whenever a wheel event handler is added or removed in the 
     // frame view's underlying document.
@@ -82,61 +93,102 @@ public:
     // Should be called whenever the slow repaint objects counter changes between zero and one.
     void frameViewHasSlowRepaintObjectsDidChange(FrameView*);
 
-    // Should be called whenever the fixed objects counter changes between zero and one.
-    // FIXME: This is a temporary workaround so that we'll fall into main thread scrolling mode
-    // if a page has fixed elements. The scrolling tree should know about the fixed elements
-    // so it can make sure they stay fixed even when we scroll on the scrolling thread.
-    void frameViewHasFixedObjectsDidChange(FrameView*);
+    // Should be called whenever the set of fixed objects changes.
+    void frameViewFixedObjectsDidChange(FrameView*);
 
     // Should be called whenever the root layer for the given frame view changes.
-    void frameViewRootLayerDidChange(FrameView*);
+    virtual void frameViewRootLayerDidChange(FrameView*);
 
-    // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
-    void frameViewHorizontalScrollbarLayerDidChange(FrameView*, GraphicsLayer* horizontalScrollbarLayer);
+    // Return whether this scrolling coordinator can keep fixed position layers fixed to their
+    // containers while scrolling.
+    virtual bool supportsFixedPositionLayers() const { return false; }
 
-    // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
-    void frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer* verticalScrollbarLayer);
+#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+    // Dispatched by the scrolling tree during handleWheelEvent. This is required as long as scrollbars are painted on the main thread.
+    void handleWheelEventPhase(PlatformWheelEventPhase);
+#endif
 
-    // Requests that the scrolling coordinator updates the scroll position of the given frame view. If this function returns true, it means that the
-    // position will be updated asynchronously. If it returns false, the caller should update the scrolling position itself.
-    bool requestScrollPositionUpdate(FrameView*, const IntPoint&);
+    // Force all scroll layer position updates to happen on the main thread.
+    void setForceMainThreadScrollLayerPositionUpdates(bool);
 
-    // Handle the wheel event on the scrolling thread. Returns whether the event was handled or not.
-    bool handleWheelEvent(FrameView*, const PlatformWheelEvent&);
+    // These virtual functions are currently unique to the threaded scrolling architecture. 
+    // Their meaningful implementations are in ScrollingCoordinatorMac.
+    virtual void commitTreeStateIfNeeded() { }
+    virtual bool requestScrollPositionUpdate(FrameView*, const IntPoint&) { return false; }
+    virtual bool handleWheelEvent(FrameView*, const PlatformWheelEvent&) { return true; }
+    virtual ScrollingNodeID attachToStateTree(ScrollingNodeType, ScrollingNodeID newNodeID, ScrollingNodeID /*parentID*/) { return newNodeID; }
+    virtual void detachFromStateTree(ScrollingNodeID) { }
+    virtual void clearStateTree() { }
+    virtual void updateViewportConstrainedNode(ScrollingNodeID, const ViewportConstraints&, GraphicsLayer*) { }
+    virtual void updateScrollingNode(ScrollingNodeID, GraphicsLayer* /*scrollLayer*/, GraphicsLayer* /*counterScrollingLayer*/) { }
+    virtual void syncChildPositions(const LayoutRect&) { }
+    virtual String scrollingStateTreeAsText() const;
+    virtual bool isRubberBandInProgress() const { return false; }
+    virtual bool rubberBandsAtBottom() const { return false; }
+    virtual void setRubberBandsAtBottom(bool) { }
+    virtual bool rubberBandsAtTop() const { return false; }
+    virtual void setRubberBandsAtTop(bool) { }
+
+    // Generated a unique id for scroll layers.
+    ScrollingNodeID uniqueScrollLayerID();
 
     // Dispatched by the scrolling tree whenever the main frame scroll position changes.
-    void updateMainFrameScrollPosition(const IntPoint&);
+    void scheduleUpdateMainFrameScrollPosition(const IntPoint&, bool programmaticScroll, SetOrSyncScrollingLayerPosition);
+    void updateMainFrameScrollPosition(const IntPoint&, bool programmaticScroll, SetOrSyncScrollingLayerPosition);
 
-    // Dispatched by the scrolling tree whenever the main frame scroll position changes and the scroll layer position needs to be updated as well.
-    void updateMainFrameScrollPositionAndScrollLayerPosition(const IntPoint&);
+    enum MainThreadScrollingReasonFlags {
+        ForcedOnMainThread = 1 << 0,
+        HasSlowRepaintObjects = 1 << 1,
+        HasViewportConstrainedObjectsWithoutSupportingFixedLayers = 1 << 2,
+        HasNonLayerViewportConstrainedObjects = 1 << 3,
+        IsImageDocument = 1 << 4
+    };
 
-private:
+    MainThreadScrollingReasons mainThreadScrollingReasons() const;
+    bool shouldUpdateScrollLayerPositionOnMainThread() const { return mainThreadScrollingReasons() != 0; }
+
+    // These virtual functions are currently unique to Chromium's WebLayer approach. Their meaningful
+    // implementations are in ScrollingCoordinatorChromium.
+    virtual void frameViewHorizontalScrollbarLayerDidChange(FrameView*, GraphicsLayer*) { }
+    virtual void frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer*) { }
+    virtual void scrollableAreaScrollLayerDidChange(ScrollableArea*, GraphicsLayer*) { }
+    virtual void setLayerIsContainerForFixedPositionLayers(GraphicsLayer*, bool) { }
+    virtual void setLayerIsFixedToContainerLayer(GraphicsLayer*, bool) { }
+    virtual void touchEventTargetRectsDidChange(const Document*) { }
+
+#if ENABLE(TOUCH_EVENT_TRACKING)
+    void computeAbsoluteTouchEventTargetRects(const Document*, Vector<IntRect>&);
+#endif
+
+    static String mainThreadScrollingReasonsAsText(MainThreadScrollingReasons);
+    String mainThreadScrollingReasonsAsText() const;
+
+    Region computeNonFastScrollableRegion(const Frame*, const IntPoint& frameLocation) const;
+
+protected:
     explicit ScrollingCoordinator(Page*);
 
-    void recomputeWheelEventHandlerCount();
-    void updateShouldUpdateScrollLayerPositionOnMainThread();
-
-    void setScrollLayer(GraphicsLayer*);
-    void setNonFastScrollableRegion(const Region&);
-    void setScrollParameters(ScrollElasticity horizontalScrollElasticity, ScrollElasticity verticalScrollElasticity,
-                             bool hasEnabledHorizontalScrollbar, bool hasEnabledVerticalScrollbar,
-                             const IntRect& viewportRect, const IntSize& contentsSize);
-    void setWheelEventHandlerCount(unsigned);
-    void setShouldUpdateScrollLayerPositionOnMainThread(bool);
+    unsigned computeCurrentWheelEventHandlerCount();
+    GraphicsLayer* scrollLayerForFrameView(FrameView*);
+    GraphicsLayer* counterScrollingLayerForFrameView(FrameView*);
 
     Page* m_page;
 
-#if ENABLE(THREADED_SCROLLING)
-    void scheduleTreeStateCommit();
+private:
+    virtual void recomputeWheelEventHandlerCountForFrameView(FrameView*) { }
+    virtual void setShouldUpdateScrollLayerPositionOnMainThread(MainThreadScrollingReasons) { }
 
-    void scrollingTreeStateCommitterTimerFired(Timer<ScrollingCoordinator>*);
-    void commitTreeStateIfNeeded();
-    void commitTreeState();
+    virtual bool hasVisibleSlowRepaintViewportConstrainedObjects(FrameView*) const;
+    void updateShouldUpdateScrollLayerPositionOnMainThread();
+    
+    void updateMainFrameScrollPositionTimerFired(Timer<ScrollingCoordinator>*);
 
-    OwnPtr<ScrollingTreeState> m_scrollingTreeState;
-    RefPtr<ScrollingTree> m_scrollingTree;
-    Timer<ScrollingCoordinator> m_scrollingTreeStateCommitterTimer;
-#endif
+    Timer<ScrollingCoordinator> m_updateMainFrameScrollPositionTimer;
+    IntPoint m_scheduledUpdateScrollPosition;
+    bool m_scheduledUpdateIsProgrammaticScroll;
+    SetOrSyncScrollingLayerPosition m_scheduledScrollingLayerPositionAction;
+
+    bool m_forceMainThreadScrollLayerPositionUpdates;
 };
 
 } // namespace WebCore

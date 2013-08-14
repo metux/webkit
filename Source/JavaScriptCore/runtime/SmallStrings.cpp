@@ -29,8 +29,10 @@
 #include "HeapRootVisitor.h"
 #include "JSGlobalObject.h"
 #include "JSString.h"
+#include "Operations.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/text/StringImpl.h>
 
 namespace JSC {
 
@@ -68,9 +70,31 @@ SmallStringsStorage::SmallStringsStorage()
 }
 
 SmallStrings::SmallStrings()
+    : m_emptyString(0)
+#define JSC_COMMON_STRINGS_ATTRIBUTE_INITIALIZE(name) , m_##name(0)
+    JSC_COMMON_STRINGS_EACH_NAME(JSC_COMMON_STRINGS_ATTRIBUTE_INITIALIZE)
+#undef JSC_COMMON_STRINGS_ATTRIBUTE_INITIALIZE
 {
     COMPILE_ASSERT(singleCharacterStringCount == sizeof(m_singleCharacterStrings) / sizeof(m_singleCharacterStrings[0]), IsNumCharactersConstInSyncWithClassUsage);
-    clear();
+
+    for (unsigned i = 0; i < singleCharacterStringCount; ++i)
+        m_singleCharacterStrings[i] = 0;
+}
+
+void SmallStrings::initializeCommonStrings(JSGlobalData& globalData)
+{
+    createEmptyString(&globalData);
+#define JSC_COMMON_STRINGS_ATTRIBUTE_INITIALIZE(name) initialize(&globalData, m_##name, #name);
+    JSC_COMMON_STRINGS_EACH_NAME(JSC_COMMON_STRINGS_ATTRIBUTE_INITIALIZE)
+#undef JSC_COMMON_STRINGS_ATTRIBUTE_INITIALIZE
+}
+
+void SmallStrings::visitStrongReferences(SlotVisitor& visitor)
+{
+    visitor.appendUnbarrieredPointer(&m_emptyString);
+#define JSC_COMMON_STRINGS_ATTRIBUTE_VISIT(name) visitor.appendUnbarrieredPointer(&m_##name);
+    JSC_COMMON_STRINGS_EACH_NAME(JSC_COMMON_STRINGS_ATTRIBUTE_VISIT)
+#undef JSC_COMMON_STRINGS_ATTRIBUTE_VISIT
 }
 
 SmallStrings::~SmallStrings()
@@ -82,25 +106,6 @@ void SmallStrings::finalizeSmallStrings()
     finalize(m_emptyString);
     for (unsigned i = 0; i < singleCharacterStringCount; ++i)
         finalize(m_singleCharacterStrings[i]);
-}
-
-void SmallStrings::clear()
-{
-    m_emptyString = 0;
-    for (unsigned i = 0; i < singleCharacterStringCount; ++i)
-        m_singleCharacterStrings[i] = 0;
-}
-
-unsigned SmallStrings::count() const
-{
-    unsigned count = 0;
-    if (m_emptyString)
-        ++count;
-    for (unsigned i = 0; i < singleCharacterStringCount; ++i) {
-        if (m_singleCharacterStrings[i])
-            ++count;
-    }
-    return count;
 }
 
 void SmallStrings::createEmptyString(JSGlobalData* globalData)
@@ -122,6 +127,11 @@ StringImpl* SmallStrings::singleCharacterStringRep(unsigned char character)
     if (!m_storage)
         m_storage = adoptPtr(new SmallStringsStorage);
     return m_storage->rep(character);
+}
+
+void SmallStrings::initialize(JSGlobalData* globalData, JSString*& string, const char* value) const
+{
+    string = JSString::create(*globalData, StringImpl::create(value));
 }
 
 } // namespace JSC

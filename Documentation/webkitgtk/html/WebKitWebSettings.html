@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebSettings</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebFrame.html" title="WebKitWebFrame">
@@ -69,8 +69,10 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--editing-behavior" title='The "editing-behavior" property'>editing-behavior</a>"         <a class="link" href="WebKitWebSettings.html#WebKitEditingBehavior" title="enum WebKitEditingBehavior"><span class="type">WebKitEditingBehavior</span></a>  : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-accelerated-compositing" title='The "enable-accelerated-compositing" property'>enable-accelerated-compositing</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-caret-browsing" title='The "enable-caret-browsing" property'>enable-caret-browsing</a>"    <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-css-shaders" title='The "enable-css-shaders" property'>enable-css-shaders</a>"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-default-context-menu" title='The "enable-default-context-menu" property'>enable-default-context-menu</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-developer-extras" title='The "enable-developer-extras" property'>enable-developer-extras</a>"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-display-of-insecure-content" title='The "enable-display-of-insecure-content" property'>enable-display-of-insecure-content</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-dns-prefetching" title='The "enable-dns-prefetching" property'>enable-dns-prefetching</a>"   <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-dom-paste" title='The "enable-dom-paste" property'>enable-dom-paste</a>"         <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-file-access-from-file-uris" title='The "enable-file-access-from-file-uris" property'>enable-file-access-from-file-uris</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -80,12 +82,15 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-html5-local-storage" title='The "enable-html5-local-storage" property'>enable-html5-local-storage</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-hyperlink-auditing" title='The "enable-hyperlink-auditing" property'>enable-hyperlink-auditing</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-java-applet" title='The "enable-java-applet" property'>enable-java-applet</a>"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-media-stream" title='The "enable-media-stream" property'>enable-media-stream</a>"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-offline-web-application-cache" title='The "enable-offline-web-application-cache" property'>enable-offline-web-application-cache</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-page-cache" title='The "enable-page-cache" property'>enable-page-cache</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-plugins" title='The "enable-plugins" property'>enable-plugins</a>"           <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-private-browsing" title='The "enable-private-browsing" property'>enable-private-browsing</a>"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-running-of-insecure-content" title='The "enable-running-of-insecure-content" property'>enable-running-of-insecure-content</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-scripts" title='The "enable-scripts" property'>enable-scripts</a>"           <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-site-specific-quirks" title='The "enable-site-specific-quirks" property'>enable-site-specific-quirks</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-smooth-scrolling" title='The "enable-smooth-scrolling" property'>enable-smooth-scrolling</a>"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-spatial-navigation" title='The "enable-spatial-navigation" property'>enable-spatial-navigation</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-spell-checking" title='The "enable-spell-checking" property'>enable-spell-checking</a>"    <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-universal-access-from-file-uris" title='The "enable-universal-access-from-file-uris" property'>enable-universal-access-from-file-uris</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -97,11 +102,14 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--html5-local-storage-database-path" title='The "html5-local-storage-database-path" property'>html5-local-storage-database-path</a>" <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--javascript-can-access-clipboard" title='The "javascript-can-access-clipboard" property'>javascript-can-access-clipboard</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--javascript-can-open-windows-automatically" title='The "javascript-can-open-windows-automatically" property'>javascript-can-open-windows-automatically</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--media-playback-allows-inline" title='The "media-playback-allows-inline" property'>media-playback-allows-inline</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--media-playback-requires-user-gesture" title='The "media-playback-requires-user-gesture" property'>media-playback-requires-user-gesture</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--minimum-font-size" title='The "minimum-font-size" property'>minimum-font-size</a>"        <a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a>                  : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--minimum-logical-font-size" title='The "minimum-logical-font-size" property'>minimum-logical-font-size</a>" <a href="../glib/glib-Basic-Types.html#gint"><span class="type">gint</span></a>                  : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--monospace-font-family" title='The "monospace-font-family" property'>monospace-font-family</a>"    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--print-backgrounds" title='The "print-backgrounds" property'>print-backgrounds</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--resizable-text-areas" title='The "resizable-text-areas" property'>resizable-text-areas</a>"     <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--respect-image-orientation" title='The "respect-image-orientation" property'>respect-image-orientation</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--sans-serif-font-family" title='The "sans-serif-font-family" property'>sans-serif-font-family</a>"   <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--serif-font-family" title='The "serif-font-family" property'>serif-font-family</a>"        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--spell-checking-languages" title='The "spell-checking-languages" property'>spell-checking-languages</a>" <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
@@ -359,8 +367,27 @@ Whether to enable caret browsing mode.
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitWebSettings--enable-css-shaders"></a><h3>The <code class="literal">"enable-css-shaders"</code> property</h3>
+<pre class="programlisting">  "enable-css-shaders"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable support for css shaders (css custom filters).
+Accelerated compositing needs to be enabled at compile time, but needs
+not be enabled at runtime.
+</p>
+<p>
+See also https://dvcs.w3.org/hg/FXTF/raw-file/tip/custom/index.html
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 2.0</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebSettings--enable-default-context-menu"></a><h3>The <code class="literal">"enable-default-context-menu"</code> property</h3>
 <pre class="programlisting">  "enable-default-context-menu" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<div class="warning" style="margin-left: 0.5in; margin-right: 0.5in;">
+<h3 class="title">Warning</h3>
+<p><code class="literal">WebKitWebSettings:enable-default-context-menu</code> has been deprecated since version 1.10 and should not be used in newly-written code. Use <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView-context-menu" title='The "context-menu" signal'><span class="type">"context-menu"</span></a> signal instead.</p>
+</div>
 <p>
 Whether right-clicks should be handled automatically to create,
 and display the context menu. Turning this off will make
@@ -384,6 +411,17 @@ setting is enabled for.
 </p>
 <p>Default value: FALSE</p>
 <p class="since">Since 1.0.3</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--enable-display-of-insecure-content"></a><h3>The <code class="literal">"enable-display-of-insecure-content"</code> property</h3>
+<pre class="programlisting">  "enable-display-of-insecure-content" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Whether pages loaded via HTTPS should load subresources such as
+images and frames from non-HTTPS URLs.
+</p>
+<p>Default value: TRUE</p>
+<p class="since">Since 2.0</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -487,6 +525,22 @@ mind that Java content can be still shown in the page through
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitWebSettings--enable-media-stream"></a><h3>The <code class="literal">"enable-media-stream"</code> property</h3>
+<pre class="programlisting">  "enable-media-stream"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable support for Media Stream on pages. Media Stream is
+an experimental proposal for allowing web pages to access local video and
+audio input devices.  The standard is currently a work-in-progress as part
+of the Web Applications 1.0 specification from WHATWG.
+</p>
+<p>
+See also http://www.w3.org/TR/mediacapture-streams/
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 1.10.0</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebSettings--enable-offline-web-application-cache"></a><h3>The <code class="literal">"enable-offline-web-application-cache"</code> property</h3>
 <pre class="programlisting">  "enable-offline-web-application-cache" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
 <p>
@@ -540,6 +594,17 @@ This is currently experimental for WebKitGtk.
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitWebSettings--enable-running-of-insecure-content"></a><h3>The <code class="literal">"enable-running-of-insecure-content"</code> property</h3>
+<pre class="programlisting">  "enable-running-of-insecure-content" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Whether pages loaded via HTTPS should run subresources such as
+CSS, scripts, and plugins from non-HTTPS URLs.
+</p>
+<p>Default value: TRUE</p>
+<p class="since">Since 2.0</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebSettings--enable-scripts"></a><h3>The <code class="literal">"enable-scripts"</code> property</h3>
 <pre class="programlisting">  "enable-scripts"           <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
 <p>Enable embedded scripting languages.</p>
@@ -551,6 +616,17 @@ This is currently experimental for WebKitGtk.
 <pre class="programlisting">  "enable-site-specific-quirks" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
 <p>Enables the site-specific compatibility workarounds.</p>
 <p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--enable-smooth-scrolling"></a><h3>The <code class="literal">"enable-smooth-scrolling"</code> property</h3>
+<pre class="programlisting">  "enable-smooth-scrolling"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable support for smooth scrolling. The current implementation relies upon
+CPU work to produce a smooth scrolling experience.
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 1.9.0</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -656,7 +732,7 @@ content from the web should provide a preference for this.
 Path to store persistent HTML5 localStorage databases, which are enabled by
 "enable-html5-local-storage". The default path is $XDG_DATA_HOME/webkit/databases/.
 </p>
-<p>Default value: "/home/martin/.local/share/webkit/databases"</p>
+<p>Default value: "/home/cgarcia/.local/share/webkit/databases"</p>
 <p class="since">Since 1.5.2</p>
 </div>
 <hr>
@@ -679,6 +755,32 @@ intervention.
 </p>
 <p>Default value: FALSE</p>
 <p class="since">Since 1.1.11</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--media-playback-allows-inline"></a><h3>The <code class="literal">"media-playback-allows-inline"</code> property</h3>
+<pre class="programlisting">  "media-playback-allows-inline" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Whether media playback is full-screen only or inline playback is allowed.
+This is true by default, so media playback can be inline. Setting it to
+false allows specifying that media playback should be always fullscreen.
+</p>
+<p>Default value: TRUE</p>
+<p class="since">Since 1.10.0</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--media-playback-requires-user-gesture"></a><h3>The <code class="literal">"media-playback-requires-user-gesture"</code> property</h3>
+<pre class="programlisting">  "media-playback-requires-user-gesture" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Whether a user gesture (such as clicking the play button) would
+be required to start media playback or load media. This is off
+by default, so media playback could start automatically. Setting
+it on requires a gesture by the user to start playback, or to load
+the media.
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 1.10.0</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -716,6 +818,13 @@ intervention.
 <pre class="programlisting">  "resizable-text-areas"     <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
 <p>Whether text areas are resizable.</p>
 <p>Default value: TRUE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--respect-image-orientation"></a><h3>The <code class="literal">"respect-image-orientation"</code> property</h3>
+<pre class="programlisting">  "respect-image-orientation" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>Whether WebKit should respect image orientation.</p>
+<p>Default value: FALSE</p>
 </div>
 <hr>
 <div class="refsect2">

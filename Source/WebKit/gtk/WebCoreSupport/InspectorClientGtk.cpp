@@ -25,13 +25,13 @@
 #include "InspectorController.h"
 #include "NotImplemented.h"
 #include "Page.h"
-#include "PlatformString.h"
 #include "webkitversion.h"
 #include "webkitwebinspector.h"
 #include "webkitwebinspectorprivate.h"
 #include "webkitwebview.h"
 #include "webkitwebviewprivate.h"
 #include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 using namespace WebCore;
 
@@ -83,7 +83,7 @@ void InspectorClient::inspectorDestroyed()
     delete this;
 }
 
-void InspectorClient::openInspectorFrontend(InspectorController* controller)
+InspectorFrontendChannel* InspectorClient::openInspectorFrontend(InspectorController* controller)
 {
     // This g_object_get will ref the inspector. We're not doing an
     // unref if this method succeeds because the inspector object must
@@ -99,7 +99,7 @@ void InspectorClient::openInspectorFrontend(InspectorController* controller)
 
     if (!inspectorWebView) {
         g_object_unref(webInspector);
-        return;
+        return 0;
     }
 
     webkit_web_inspector_set_web_view(webInspector, inspectorWebView);
@@ -117,6 +117,8 @@ void InspectorClient::openInspectorFrontend(InspectorController* controller)
 
     // The inspector must be in it's own PageGroup to avoid deadlock while debugging.
     m_frontendPage->setGroupName("");
+    
+    return this;
 }
 
 void InspectorClient::closeInspectorFrontend()

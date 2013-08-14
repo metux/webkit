@@ -26,6 +26,7 @@
 #include "OwnPtrCairo.h"
 #include "RefPtrCairo.h"
 #include "SimpleFontData.h"
+#include "UTF16UChar32Iterator.h"
 #include <cairo-ft.h>
 #include <cairo.h>
 #include <fontconfig/fcfreetype.h>
@@ -41,19 +42,18 @@ void FontCache::platformInit()
         ASSERT_NOT_REACHED();
 }
 
-FcPattern* createFontConfigPatternForCharacters(const UChar* characters, int length)
+FcPattern* createFontConfigPatternForCharacters(const UChar* characters, int bufferLength)
 {
     FcPattern* pattern = FcPatternCreate();
-
     FcCharSet* fontConfigCharSet = FcCharSetCreate();
-    for (int i = 0; i < length; ++i) {
-        if (U16_IS_SURROGATE(characters[i]) && U16_IS_SURROGATE_LEAD(characters[i])
-                && i != length - 1 && U16_IS_TRAIL(characters[i + 1])) {
-            FcCharSetAddChar(fontConfigCharSet, U16_GET_SUPPLEMENTARY(characters[i], characters[i+1]));
-            i++;
-        } else
-            FcCharSetAddChar(fontConfigCharSet, characters[i]);
+
+    UTF16UChar32Iterator iterator(characters, bufferLength);
+    UChar32 character = iterator.next();
+    while (character != iterator.end()) {
+        FcCharSetAddChar(fontConfigCharSet, character);
+        character = iterator.next();
     }
+
     FcPatternAddCharSet(pattern, FC_CHARSET, fontConfigCharSet);
     FcCharSetDestroy(fontConfigCharSet);
 
@@ -81,7 +81,7 @@ FcPattern* findBestFontGivenFallbacks(const FontPlatformData& fontData, FcPatter
     return FcFontSetMatch(0, sets, 1, pattern, &fontConfigResult);
 }
 
-const SimpleFontData* FontCache::getFontDataForCharacters(const Font& font, const UChar* characters, int length)
+PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacters(const Font& font, const UChar* characters, int length)
 {
     RefPtr<FcPattern> pattern = adoptRef(createFontConfigPatternForCharacters(characters, length));
     const FontPlatformData& fontData = font.primaryFont()->platformData();
@@ -100,12 +100,12 @@ const SimpleFontData* FontCache::getFontDataForCharacters(const Font& font, cons
     return getCachedFontData(&alternateFontData, DoNotRetain);
 }
 
-SimpleFontData* FontCache::getSimilarFontPlatformData(const Font& font)
+PassRefPtr<SimpleFontData> FontCache::getSimilarFontPlatformData(const Font&)
 {
     return 0;
 }
 
-SimpleFontData* FontCache::getLastResortFallbackFont(const FontDescription& fontDescription, ShouldRetain shouldRetain)
+PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescription& fontDescription, ShouldRetain shouldRetain)
 {
     // We want to return a fallback font here, otherwise the logic preventing FontConfig
     // matches for non-fallback fonts might return 0. See isFallbackFontAllowed.
@@ -113,7 +113,7 @@ SimpleFontData* FontCache::getLastResortFallbackFont(const FontDescription& font
     return getCachedFontData(fontDescription, timesStr, false, shouldRetain);
 }
 
-void FontCache::getTraitsInFamily(const AtomicString& familyName, Vector<unsigned>& traitsMasks)
+void FontCache::getTraitsInFamily(const AtomicString&, Vector<unsigned>&)
 {
 }
 

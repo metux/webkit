@@ -43,12 +43,12 @@ public:
     virtual ~AccessibilitySlider() { }
 
 protected:
-    AccessibilitySlider(RenderObject*);
+    explicit AccessibilitySlider(RenderObject*);
 
 private:
     HTMLInputElement* element() const;
-    virtual bool accessibilityIsIgnored() const;
-    virtual AccessibilityObject* elementAccessibilityHitTest(const LayoutPoint&) const;
+    virtual bool computeAccessibilityIsIgnored() const;
+    virtual AccessibilityObject* elementAccessibilityHitTest(const IntPoint&) const;
 
     virtual AccessibilityRole roleValue() const { return SliderRole; }    
     virtual bool isSlider() const { return true; }
@@ -75,13 +75,12 @@ public:
 
     virtual AccessibilityRole roleValue() const { return SliderThumbRole; }
 
-    virtual LayoutSize size() const;
     virtual LayoutRect elementRect() const;
-
-    virtual bool accessibilityIsIgnored() const;
 
 private:
     AccessibilitySliderThumb();
+
+    virtual bool computeAccessibilityIsIgnored() const;
 };
 
 

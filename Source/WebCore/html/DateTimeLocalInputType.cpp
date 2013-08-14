@@ -29,25 +29,39 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_TYPE_DATETIMELOCAL)
 #include "DateTimeLocalInputType.h"
 
 #include "DateComponents.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "InputTypeNames.h"
 #include <wtf/PassOwnPtr.h>
 
-#if ENABLE(INPUT_TYPE_DATETIMELOCAL)
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#include "DateTimeFieldsState.h"
+#include "LocalizedStrings.h"
+#include "PlatformLocale.h"
+#include <wtf/text/StringBuilder.h>
+#include <wtf/text/WTFString.h>
+#endif
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-static const double dateTimeLocalDefaultStep = 60.0;
-static const double dateTimeLocalStepScaleFactor = 1000.0;
+static const int dateTimeLocalDefaultStep = 60;
+static const int dateTimeLocalDefaultStepBase = 0;
+static const int dateTimeLocalStepScaleFactor = 1000;
 
 PassOwnPtr<InputType> DateTimeLocalInputType::create(HTMLInputElement* element)
 {
     return adoptPtr(new DateTimeLocalInputType(element));
+}
+
+void DateTimeLocalInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeDateTimeLocal);
 }
 
 const AtomicString& DateTimeLocalInputType::formControlType() const
@@ -72,29 +86,15 @@ void DateTimeLocalInputType::setValueAsDate(double value, ExceptionCode& ec) con
     InputType::setValueAsDate(value, ec);
 }
 
-double DateTimeLocalInputType::minimum() const
+StepRange DateTimeLocalInputType::createStepRange(AnyStepHandling anyStepHandling) const
 {
-    return parseToDouble(element()->fastGetAttribute(minAttr), DateComponents::minimumDateTime());
-}
+    DEFINE_STATIC_LOCAL(const StepRange::StepDescription, stepDescription, (dateTimeLocalDefaultStep, dateTimeLocalDefaultStepBase, dateTimeLocalStepScaleFactor, StepRange::ScaledStepValueShouldBeInteger));
 
-double DateTimeLocalInputType::maximum() const
-{
-    return parseToDouble(element()->fastGetAttribute(maxAttr), DateComponents::maximumDateTime());
-}
-
-double DateTimeLocalInputType::defaultStep() const
-{
-    return dateTimeLocalDefaultStep;
-}
-
-double DateTimeLocalInputType::stepScaleFactor() const
-{
-    return dateTimeLocalStepScaleFactor;
-}
-
-bool DateTimeLocalInputType::scaledStepValueShouldBeInteger() const
-{
-    return true;
+    const Decimal stepBase = parseToNumber(element()->fastGetAttribute(minAttr), 0);
+    const Decimal minimum = parseToNumber(element()->fastGetAttribute(minAttr), Decimal::fromDouble(DateComponents::minimumDateTime()));
+    const Decimal maximum = parseToNumber(element()->fastGetAttribute(maxAttr), Decimal::fromDouble(DateComponents::maximumDateTime()));
+    const Decimal step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
+    return StepRange(stepBase, minimum, maximum, step, stepDescription);
 }
 
 bool DateTimeLocalInputType::parseToDateComponentsInternal(const UChar* characters, unsigned length, DateComponents* out) const
@@ -109,6 +109,68 @@ bool DateTimeLocalInputType::setMillisecondToDateComponents(double value, DateCo
     ASSERT(date);
     return date->setMillisecondsSinceEpochForDateTimeLocal(value);
 }
+
+bool DateTimeLocalInputType::isDateTimeLocalField() const
+{
+    return true;
+}
+
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+// FIXME: It is better to share code for DateTimeInputType::formatDateTimeFieldsState()
+// and DateTimeInputLocalType::formatDateTimeFieldsState().
+String DateTimeLocalInputType::formatDateTimeFieldsState(const DateTimeFieldsState& dateTimeFieldsState) const
+{
+    if (!dateTimeFieldsState.hasDayOfMonth() || !dateTimeFieldsState.hasMonth() || !dateTimeFieldsState.hasYear()
+        || !dateTimeFieldsState.hasHour() || !dateTimeFieldsState.hasMinute() || !dateTimeFieldsState.hasAMPM())
+        return emptyString();
+
+    if (dateTimeFieldsState.hasMillisecond() && dateTimeFieldsState.millisecond()) {
+        return String::format("%04u-%02u-%02uT%02u:%02u:%02u.%03u",
+            dateTimeFieldsState.year(),
+            dateTimeFieldsState.month(),
+            dateTimeFieldsState.dayOfMonth(),
+            dateTimeFieldsState.hour23(),
+            dateTimeFieldsState.minute(),
+            dateTimeFieldsState.hasSecond() ? dateTimeFieldsState.second() : 0,
+            dateTimeFieldsState.millisecond());
+    }
+
+    if (dateTimeFieldsState.hasSecond() && dateTimeFieldsState.second()) {
+        return String::format("%04u-%02u-%02uT%02u:%02u:%02u",
+            dateTimeFieldsState.year(),
+            dateTimeFieldsState.month(),
+            dateTimeFieldsState.dayOfMonth(),
+            dateTimeFieldsState.hour23(),
+            dateTimeFieldsState.minute(),
+            dateTimeFieldsState.second());
+    }
+
+    return String::format("%04u-%02u-%02uT%02u:%02u",
+        dateTimeFieldsState.year(),
+        dateTimeFieldsState.month(),
+        dateTimeFieldsState.dayOfMonth(),
+        dateTimeFieldsState.hour23(),
+        dateTimeFieldsState.minute());
+}
+
+void DateTimeLocalInputType::setupLayoutParameters(DateTimeEditElement::LayoutParameters& layoutParameters, const DateComponents& date) const
+{
+    if (shouldHaveSecondField(date)) {
+        layoutParameters.dateTimeFormat = layoutParameters.locale.dateTimeFormatWithSeconds();
+        layoutParameters.fallbackDateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss";
+    } else {
+        layoutParameters.dateTimeFormat = layoutParameters.locale.dateTimeFormatWithoutSeconds();
+        layoutParameters.fallbackDateTimeFormat = "yyyy-MM-dd'T'HH:mm";
+    }
+    if (!parseToDateComponents(element()->fastGetAttribute(minAttr), &layoutParameters.minimum))
+        layoutParameters.minimum = DateComponents();
+    if (!parseToDateComponents(element()->fastGetAttribute(maxAttr), &layoutParameters.maximum))
+        layoutParameters.maximum = DateComponents();
+    layoutParameters.placeholderForDay = placeholderForDayOfMonthField();
+    layoutParameters.placeholderForMonth = placeholderForMonthField();
+    layoutParameters.placeholderForYear = placeholderForYearField();
+}
+#endif
 
 } // namespace WebCore
 

@@ -28,7 +28,7 @@ namespace WebCore {
 class EditingBehavior {
 
 public:
-    EditingBehavior(EditingBehaviorType type)
+    explicit EditingBehavior(EditingBehaviorType type)
         : m_type(type)
     {
     }
@@ -39,7 +39,10 @@ public:
     // When extending a selection beyond the top or bottom boundary of an editable area,
     // maintain the horizontal position on Windows but extend it to the boundary of the editable
     // content on Mac.
-    bool shouldMoveCaretToHorizontalBoundaryWhenPastTopOrBottom() const { return m_type != EditingWindowsBehavior; }
+    bool shouldMoveCaretToHorizontalBoundaryWhenPastTopOrBottom() const
+    {
+        return m_type != EditingWindowsBehavior && m_type != EditingAndroidBehavior;
+    }
 
     // On Windows, selections should always be considered as directional, regardless if it is
     // mouse-based or keyboard-based.
@@ -59,18 +62,33 @@ public:
 
     // On Mac, when processing a contextual click, the object being clicked upon should be selected.
     bool shouldSelectOnContextualMenuClick() const { return m_type == EditingMacBehavior; }
-    
-    // On Windows, moving caret left or right by word moves the caret by word in visual order. 
-    // It moves the caret by word in logical order in other platforms.
-    bool shouldMoveLeftRightByWordInVisualOrder() const { return m_type == EditingWindowsBehavior; }
 
+    // On Linux, should be able to get and insert spelling suggestions without selecting the misspelled word.
+    // Skip this policy for Chromium, they require selection for the misspelled word.
+    bool shouldAllowSpellingSuggestionsWithoutSelection() const
+    {
+#if !PLATFORM(CHROMIUM)
+        return m_type == EditingUnixBehavior || m_type == EditingAndroidBehavior;
+#else
+        return false;
+#endif
+    }
+    
     // On Mac and Windows, pressing backspace (when it isn't handled otherwise) should navigate back.
-    bool shouldNavigateBackOnBackspace() const { return m_type != EditingUnixBehavior; }
+    bool shouldNavigateBackOnBackspace() const
+    {
+        return m_type != EditingUnixBehavior && m_type != EditingAndroidBehavior;
+    }
 
     // On Mac, selecting backwards by word/line from the middle of a word/line, and then going
     // forward leaves the caret back in the middle with no selection, instead of directly selecting
     // to the other end of the line/word (Unix/Windows behavior).
     bool shouldExtendSelectionByWordOrLineAcrossCaret() const { return m_type != EditingMacBehavior; }
+
+    // Based on native behavior, when using ctrl(alt)+arrow to move caret by word, ctrl(alt)+left arrow moves caret to
+    // immediately before the word in all platforms, for example, the word break positions are: "|abc |def |hij |opq".
+    // But ctrl+right arrow moves caret to "abc |def |hij |opq" on Windows and "abc| def| hij| opq|" on Mac and Linux.
+    bool shouldSkipSpaceWhenMovingRight() const { return m_type == EditingWindowsBehavior; }
 
 private:
     EditingBehaviorType m_type;

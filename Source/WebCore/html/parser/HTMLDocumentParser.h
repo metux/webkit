@@ -26,9 +26,13 @@
 #ifndef HTMLDocumentParser_h
 #define HTMLDocumentParser_h
 
+#include "BackgroundHTMLInputStream.h"
 #include "CachedResourceClient.h"
+#include "CompactHTMLToken.h"
 #include "FragmentScriptingPermission.h"
 #include "HTMLInputStream.h"
+#include "HTMLParserOptions.h"
+#include "HTMLPreloadScanner.h"
 #include "HTMLScriptRunnerHost.h"
 #include "HTMLSourceTracker.h"
 #include "HTMLToken.h"
@@ -36,10 +40,16 @@
 #include "SegmentedString.h"
 #include "Timer.h"
 #include "XSSAuditor.h"
+#include "XSSAuditorDelegate.h"
+#include <wtf/Deque.h>
 #include <wtf/OwnPtr.h>
+#include <wtf/WeakPtr.h>
+#include <wtf/text/TextPosition.h>
 
 namespace WebCore {
 
+class BackgroundHTMLParser;
+class CompactHTMLToken;
 class Document;
 class DocumentFragment;
 class HTMLDocument;
@@ -47,7 +57,7 @@ class HTMLParserScheduler;
 class HTMLTokenizer;
 class HTMLScriptRunner;
 class HTMLTreeBuilder;
-class HTMLPreloadScanner;
+class HTMLResourcePreloader;
 class ScriptController;
 class ScriptSourceCode;
 
@@ -60,29 +70,29 @@ public:
     {
         return adoptRef(new HTMLDocumentParser(document, reportErrors));
     }
-    static PassRefPtr<HTMLDocumentParser> create(DocumentFragment* fragment, Element* contextElement, FragmentScriptingPermission permission)
-    {
-        return adoptRef(new HTMLDocumentParser(fragment, contextElement, permission));
-    }
-
     virtual ~HTMLDocumentParser();
 
     // Exposed for HTMLParserScheduler
     void resumeParsingAfterYield();
 
-    static void parseDocumentFragment(const String&, DocumentFragment*, Element* contextElement, FragmentScriptingPermission = FragmentScriptingAllowed);
-    
-    static bool usePreHTML5ParserQuirks(Document*);
-    static unsigned maximumDOMTreeDepth(Document*);
+    static void parseDocumentFragment(const String&, DocumentFragment*, Element* contextElement, FragmentScriptingPermission = AllowScriptingContent);
 
     HTMLTokenizer* tokenizer() const { return m_tokenizer.get(); }
-    String sourceForToken(const HTMLToken&);
 
     virtual TextPosition textPosition() const;
     virtual OrdinalNumber lineNumber() const;
 
     virtual void suspendScheduledTasks();
     virtual void resumeScheduledTasks();
+
+#if ENABLE(THREADED_HTML_PARSER)
+    struct ParsedChunk {
+        OwnPtr<CompactHTMLTokenStream> tokens;
+        PreloadRequestStream preloads;
+        HTMLInputCheckpoint checkpoint;
+    };
+    void didReceiveParsedChunkFromBackgroundParser(PassOwnPtr<ParsedChunk>);
+#endif
 
 protected:
     virtual void insert(const SegmentedString&);
@@ -94,11 +104,17 @@ protected:
 
     HTMLTreeBuilder* treeBuilder() const { return m_treeBuilder.get(); }
 
+    void forcePlaintextForTextDocument();
+
 private:
+    static PassRefPtr<HTMLDocumentParser> create(DocumentFragment* fragment, Element* contextElement, FragmentScriptingPermission permission)
+    {
+        return adoptRef(new HTMLDocumentParser(fragment, contextElement, permission));
+    }
+
     // DocumentParser
     virtual void detach();
     virtual bool hasInsertionPoint();
-    virtual bool finishWasCalled();
     virtual bool processingData() const;
     virtual void prepareToStopParsing();
     virtual void stopParsing();
@@ -110,11 +126,21 @@ private:
     virtual void watchForLoad(CachedResource*);
     virtual void stopWatchingForLoad(CachedResource*);
     virtual HTMLInputStream& inputStream() { return m_input; }
-    virtual bool hasPreloadScanner() const { return m_preloadScanner.get(); }
+    virtual bool hasPreloadScanner() const { return m_preloadScanner.get() && !shouldUseThreading(); }
     virtual void appendCurrentInputStreamToPreloadScannerAndScan();
 
     // CachedResourceClient
     virtual void notifyFinished(CachedResource*);
+
+#if ENABLE(THREADED_HTML_PARSER)
+    void startBackgroundParser();
+    void stopBackgroundParser();
+    void checkForSpeculationFailure();
+    void didFailSpeculation(PassOwnPtr<HTMLToken>, PassOwnPtr<HTMLTokenizer>);
+    void processParsedChunkFromBackgroundParser(PassOwnPtr<ParsedChunk>);
+#endif
+
+    Document* contextForParsingSession();
 
     enum SynchronousMode {
         AllowYield,
@@ -123,28 +149,32 @@ private:
     bool canTakeNextToken(SynchronousMode, PumpSession&);
     void pumpTokenizer(SynchronousMode);
     void pumpTokenizerIfPossible(SynchronousMode);
+    void constructTreeFromHTMLToken(HTMLToken&);
+#if ENABLE(THREADED_HTML_PARSER)
+    void constructTreeFromCompactHTMLToken(const CompactHTMLToken&);
+#endif
 
-    bool runScriptsForPausedTreeBuilder();
+    void runScriptsForPausedTreeBuilder();
     void resumeParsingAfterScriptExecution();
 
-    void begin();
     void attemptToEnd();
     void endIfDelayed();
     void attemptToRunDeferredScriptsAndEnd();
     void end();
+
+    bool shouldUseThreading() const { return m_options.useThreading && !isParsingFragment(); }
 
     bool isParsingFragment() const;
     bool isScheduledForResume() const;
     bool inPumpSession() const { return m_pumpSessionNestingLevel > 0; }
     bool shouldDelayEnd() const { return inPumpSession() || isWaitingForScripts() || isScheduledForResume() || isExecutingScript(); }
 
-    ScriptController* script() const;
+    HTMLToken& token() { return *m_token.get(); }
 
+    HTMLParserOptions m_options;
     HTMLInputStream m_input;
 
-    // We hold m_token here because it might be partially complete.
-    HTMLToken m_token;
-
+    OwnPtr<HTMLToken> m_token;
     OwnPtr<HTMLTokenizer> m_tokenizer;
     OwnPtr<HTMLScriptRunner> m_scriptRunner;
     OwnPtr<HTMLTreeBuilder> m_treeBuilder;
@@ -152,9 +182,20 @@ private:
     OwnPtr<HTMLPreloadScanner> m_insertionPreloadScanner;
     OwnPtr<HTMLParserScheduler> m_parserScheduler;
     HTMLSourceTracker m_sourceTracker;
+    TextPosition m_textPosition;
     XSSAuditor m_xssAuditor;
+    XSSAuditorDelegate m_xssAuditorDelegate;
+
+#if ENABLE(THREADED_HTML_PARSER)
+    OwnPtr<ParsedChunk> m_currentChunk;
+    Deque<OwnPtr<ParsedChunk> > m_speculations;
+    WeakPtrFactory<HTMLDocumentParser> m_weakFactory;
+    WeakPtr<BackgroundHTMLParser> m_backgroundParser;
+#endif
+    OwnPtr<HTMLResourcePreloader> m_preloader;
 
     bool m_endWasDelayed;
+    bool m_haveBackgroundParser;
     unsigned m_pumpSessionNestingLevel;
 };
 

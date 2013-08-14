@@ -26,36 +26,41 @@
 #ifndef StorageArea_h
 #define StorageArea_h
 
-#include "PlatformString.h"
-
+#include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-    class Frame;
-    class SecurityOrigin;
-    class StorageSyncManager;
-    typedef int ExceptionCode;
-    enum StorageType { LocalStorage, SessionStorage };
+class Frame;
+class SecurityOrigin;
+class StorageSyncManager;
+typedef int ExceptionCode;
+enum StorageType { LocalStorage, SessionStorage };
 
-    // This interface is required for Chromium since these actions need to be proxied between processes.
-    class StorageArea : public RefCounted<StorageArea> {
-    public:
-        virtual ~StorageArea() { }
+class StorageArea : public RefCounted<StorageArea> {
+public:
+    virtual ~StorageArea() { }
 
-        // The HTML5 DOM Storage API
-        // FIXME: We should pass Document instead of Frame. Also, that parameter should go first.
-        virtual unsigned length(Frame* sourceFrame) const = 0;
-        virtual String key(unsigned index, Frame* sourceFrame) const = 0;
-        virtual String getItem(const String& key, Frame* sourceFrame) const = 0;
-        virtual String setItem(const String& key, const String& value, ExceptionCode& ec, Frame* sourceFrame) = 0;
-        virtual String removeItem(const String& key, Frame* sourceFrame) = 0;
-        virtual bool clear(Frame* sourceFrame) = 0;
-        virtual bool contains(const String& key, Frame* sourceFrame) const = 0;
+    // The HTML5 DOM Storage API
+    // FIXME: We should pass Document instead of Frame. Also, that parameter should go first.
+    virtual unsigned length(ExceptionCode&, Frame* sourceFrame) = 0;
+    virtual String key(unsigned index, ExceptionCode&, Frame* sourceFrame) = 0;
+    virtual String getItem(const String& key, ExceptionCode&, Frame* sourceFrame) = 0;
+    virtual void setItem(const String& key, const String& value, ExceptionCode&, Frame* sourceFrame) = 0;
+    virtual void removeItem(const String& key, ExceptionCode&, Frame* sourceFrame) = 0;
+    virtual void clear(ExceptionCode&, Frame* sourceFrame) = 0;
+    virtual bool contains(const String& key, ExceptionCode&, Frame* sourceFrame) = 0;
 
-        virtual bool disabledByPrivateBrowsingInFrame(const Frame* sourceFrame) const = 0;
-    };
+    virtual bool canAccessStorage(Frame*) = 0;
+
+    virtual size_t memoryBytesUsedByCache() = 0;
+
+    virtual void incrementAccessCount() { }
+    virtual void decrementAccessCount() { }
+    virtual void closeDatabaseIfIdle() { }
+};
 
 } // namespace WebCore
 

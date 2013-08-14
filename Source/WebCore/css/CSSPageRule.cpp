@@ -24,64 +24,91 @@
 
 #include "CSSParser.h"
 #include "CSSSelector.h"
+#include "CSSStyleSheet.h"
 #include "Document.h"
+#include "PropertySetCSSStyleDeclaration.h"
 #include "StylePropertySet.h"
+#include "StyleRule.h"
 #include <wtf/Vector.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
-CSSPageRule::CSSPageRule(CSSStyleSheet* parent, int sourceLine)
-    : CSSRule(parent, CSSRule::PAGE_RULE)
+CSSPageRule::CSSPageRule(StyleRulePage* pageRule, CSSStyleSheet* parent)
+    : CSSRule(parent)
+    , m_pageRule(pageRule)
 {
-    setSourceLine(sourceLine);
 }
 
 CSSPageRule::~CSSPageRule()
 {
-    m_style->clearParentRule(this);
+    if (m_propertiesCSSOMWrapper)
+        m_propertiesCSSOMWrapper->clearParentRule();
+}
+
+CSSStyleDeclaration* CSSPageRule::style() const
+{
+    if (!m_propertiesCSSOMWrapper)
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_pageRule->mutableProperties(), const_cast<CSSPageRule*>(this));
+    return m_propertiesCSSOMWrapper.get();
 }
 
 String CSSPageRule::selectorText() const
 {
-    String text = "@page";
-    const CSSSelector* selector = this->selector();
+    StringBuilder text;
+    text.appendLiteral("@page");
+    const CSSSelector* selector = m_pageRule->selector();
     if (selector) {
         String pageSpecification = selector->selectorText();
-        if (!pageSpecification.isEmpty() && pageSpecification != starAtom)
-            text += " " + pageSpecification;
+        if (!pageSpecification.isEmpty() && pageSpecification != starAtom) {
+            text.append(' ');
+            text.append(pageSpecification);
+        }
     }
-    return text;
+    return text.toString();
 }
 
 void CSSPageRule::setSelectorText(const String& selectorText)
 {
-    Document* doc = 0;
-    if (CSSStyleSheet* styleSheet = parentStyleSheet())
-        doc = styleSheet->findDocument();
-    if (!doc)
-        return;
-    
-    CSSParser p;
+    CSSParser parser(parserContext());
     CSSSelectorList selectorList;
-    p.parseSelector(selectorText, doc, selectorList);
-    if (!selectorList.first())
+    parser.parseSelector(selectorText, selectorList);
+    if (!selectorList.isValid())
         return;
-    
-    String oldSelectorText = this->selectorText();
-    m_selectorList.adopt(selectorList);
-    
-    if (this->selectorText() == oldSelectorText)
-        return;
-    doc->styleSelectorChanged(DeferRecalcStyle);
+
+    CSSStyleSheet::RuleMutationScope mutationScope(this);
+
+    m_pageRule->wrapperAdoptSelectorList(selectorList);
 }
 
 String CSSPageRule::cssText() const
 {
-    String result = selectorText();
-    result += " { ";
-    result += m_style->asText();
-    result += "}";
-    return result;
+    StringBuilder result;
+    result.append(selectorText());
+    result.appendLiteral(" { ");
+    String decls = m_pageRule->properties()->asText();
+    result.append(decls);
+    if (!decls.isEmpty())
+        result.append(' ');
+    result.append('}');
+    return result.toString();
+}
+
+void CSSPageRule::reattach(StyleRuleBase* rule)
+{
+    ASSERT(rule);
+    ASSERT_WITH_SECURITY_IMPLICATION(rule->isPageRule());
+    m_pageRule = static_cast<StyleRulePage*>(rule);
+    if (m_propertiesCSSOMWrapper)
+        m_propertiesCSSOMWrapper->reattach(m_pageRule->mutableProperties());
+}
+
+void CSSPageRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_pageRule, "pageRule");
+    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
 }
 
 } // namespace WebCore

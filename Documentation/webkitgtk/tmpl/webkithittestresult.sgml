@@ -53,6 +53,16 @@ WebKitHitTestResult
 
 </para>
 
+<!-- ##### ARG WebKitHitTestResult:x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitHitTestResult:y ##### -->
+<para>
+
+</para>
+
 <!-- ##### ENUM WebKitHitTestResultContext ##### -->
 <para>
 

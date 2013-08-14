@@ -58,14 +58,14 @@ public:
     // live Objective-C objects whose methods come from that bundle.
     void unload();
 
+#if PLATFORM(MAC)
+    String bundleIdentifier() const;
+#endif
+
     template<typename FunctionType> FunctionType functionPointer(const char* functionName) const;
 
 #if PLATFORM(MAC) && !defined(__LP64__)
     CFBundleRefNum bundleResourceMap();
-#endif
-
-#if PLATFORM(WIN)
-    void installIATHook(const char* importDLLName, const char* importFunctionName, const void* hookFunction);
 #endif
 
 private:
@@ -77,8 +77,6 @@ private:
 #if !defined(__LP64__)
     CFBundleRefNum m_bundleResourceMap;
 #endif
-#elif PLATFORM(WIN)
-    HMODULE m_module;
 #elif PLATFORM(QT)
     QLibrary m_lib;
 #elif PLATFORM(GTK)

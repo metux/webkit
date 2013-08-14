@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitSpellChecker</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitIconDatabase.html" title="WebKitIconDatabase">
@@ -45,8 +45,8 @@
 <span class="returnvalue">void</span>                <a class="link" href="WebKitSpellChecker.html#webkit-spell-checker-check-spelling-of-string" title="webkit_spell_checker_check_spelling_of_string ()">webkit_spell_checker_check_spelling_of_string</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> *checker</code></em>,
                                                          <em class="parameter"><code>const <span class="type">char</span> *string</code></em>,
-                                                         <em class="parameter"><code><span class="type">int</span> *misspelling_location</code></em>,
-                                                         <em class="parameter"><code><span class="type">int</span> *misspelling_length</code></em>);
+                                                         <em class="parameter"><code><a href="../gnutls/gnutls-crypto.html#int"><span class="type">int</span></a> *misspelling_location</code></em>,
+                                                         <em class="parameter"><code><a href="../gnutls/gnutls-crypto.html#int"><span class="type">int</span></a> *misspelling_length</code></em>);
 <span class="returnvalue">char</span> **             <a class="link" href="WebKitSpellChecker.html#webkit-spell-checker-get-guesses-for-word" title="webkit_spell_checker_get_guesses_for_word ()">webkit_spell_checker_get_guesses_for_word</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> *checker</code></em>,
                                                          <em class="parameter"><code>const <span class="type">char</span> *word</code></em>,
@@ -100,8 +100,8 @@ auto-correct features.
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_spell_checker_check_spelling_of_string
                                                         (<em class="parameter"><code><a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> *checker</code></em>,
                                                          <em class="parameter"><code>const <span class="type">char</span> *string</code></em>,
-                                                         <em class="parameter"><code><span class="type">int</span> *misspelling_location</code></em>,
-                                                         <em class="parameter"><code><span class="type">int</span> *misspelling_length</code></em>);</pre>
+                                                         <em class="parameter"><code><a href="../gnutls/gnutls-crypto.html#int"><span class="type">int</span></a> *misspelling_location</code></em>,
+                                                         <em class="parameter"><code><a href="../gnutls/gnutls-crypto.html#int"><span class="type">int</span></a> *misspelling_length</code></em>);</pre>
 <p>
 Checks <em class="parameter"><code>string</code></em> for misspellings using <em class="parameter"><code>checker</code></em>, storing the
 location and length of the first misspelling in

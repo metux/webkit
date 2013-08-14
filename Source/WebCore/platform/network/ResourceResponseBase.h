@@ -81,6 +81,7 @@ public:
     String httpHeaderField(const AtomicString& name) const;
     String httpHeaderField(const char* name) const;
     void setHTTPHeaderField(const AtomicString& name, const String& value);
+    void addHTTPHeaderField(const AtomicString& name, const String& value);
     const HTTPHeaderMap& httpHeaderFields() const;
 
     bool isMultipart() const { return mimeType() == "multipart/x-mixed-replace"; }
@@ -126,6 +127,8 @@ public:
         return 1280;
     }
 
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
     static bool compare(const ResourceResponse&, const ResourceResponse&);
 
 protected:
@@ -167,6 +170,7 @@ protected:
 private:
     const ResourceResponse& asResourceResponse() const;
     void parseCacheControlDirectives() const;
+    void updateHeaderParsedState(const AtomicString& name);
 
     mutable bool m_haveParsedCacheControlHeader : 1;
     mutable bool m_haveParsedAgeHeader : 1;
@@ -189,7 +193,7 @@ inline bool operator==(const ResourceResponse& a, const ResourceResponse& b) { r
 inline bool operator!=(const ResourceResponse& a, const ResourceResponse& b) { return !(a == b); }
 
 struct CrossThreadResourceResponseDataBase {
-    WTF_MAKE_NONCOPYABLE(CrossThreadResourceResponseDataBase);
+    WTF_MAKE_NONCOPYABLE(CrossThreadResourceResponseDataBase); WTF_MAKE_FAST_ALLOCATED;
 public:
     CrossThreadResourceResponseDataBase() { }
     KURL m_url;

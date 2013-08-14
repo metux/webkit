@@ -54,7 +54,7 @@ PassRefPtr<AccessibilityTableCell> AccessibilityTableCell::create(RenderObject* 
     return adoptRef(new AccessibilityTableCell(renderer));
 }
 
-bool AccessibilityTableCell::accessibilityIsIgnored() const
+bool AccessibilityTableCell::computeAccessibilityIsIgnored() const
 {
     AccessibilityObjectInclusion decision = accessibilityIsIgnoredBase();
     if (decision == IncludeObject)
@@ -63,7 +63,7 @@ bool AccessibilityTableCell::accessibilityIsIgnored() const
         return true;
     
     if (!isTableCell())
-        return AccessibilityRenderObject::accessibilityIsIgnored();
+        return AccessibilityRenderObject::computeAccessibilityIsIgnored();
     
     return false;
 }
@@ -71,6 +71,10 @@ bool AccessibilityTableCell::accessibilityIsIgnored() const
 AccessibilityObject* AccessibilityTableCell::parentTable() const
 {
     if (!m_renderer || !m_renderer->isTableCell())
+        return 0;
+
+    // If the document no longer exists, we might not have an axObjectCache.
+    if (!axObjectCache())
         return 0;
     
     // Do not use getOrCreate. parentTable() can be called while the render tree is being modified 
@@ -83,17 +87,17 @@ AccessibilityObject* AccessibilityTableCell::parentTable() const
     
 bool AccessibilityTableCell::isTableCell() const
 {
-    AccessibilityObject* table = parentTable();
-    if (!table || !table->isAccessibilityTable())
+    AccessibilityObject* parent = parentObjectUnignored();
+    if (!parent || !parent->isTableRow())
         return false;
     
     return true;
 }
     
-AccessibilityRole AccessibilityTableCell::roleValue() const
+AccessibilityRole AccessibilityTableCell::determineAccessibilityRole()
 {
     if (!isTableCell())
-        return AccessibilityRenderObject::roleValue();
+        return AccessibilityRenderObject::determineAccessibilityRole();
     
     return CellRole;
 }
@@ -104,7 +108,7 @@ void AccessibilityTableCell::rowIndexRange(pair<int, int>& rowRange)
         return;
     
     RenderTableCell* renderCell = toRenderTableCell(m_renderer);
-    rowRange.first = renderCell->row();
+    rowRange.first = renderCell->rowIndex();
     rowRange.second = renderCell->rowSpan();
     
     // since our table might have multiple sections, we have to offset our row appropriately
@@ -160,7 +164,7 @@ AccessibilityObject* AccessibilityTableCell::titleUIElement() const
     if (!col)
         return 0;
 
-    int row = renderCell->row();
+    int row = renderCell->rowIndex();
 
     RenderTableSection* section = renderCell->section();
     if (!section)

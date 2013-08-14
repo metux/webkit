@@ -1,5 +1,6 @@
 /*
- * Copyright 2011 Adobe Systems Incorporated. All Rights Reserved.
+ * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
+ * Copyright (C) 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,38 +31,27 @@
 #ifndef WebKitCSSRegionRule_h
 #define WebKitCSSRegionRule_h
 
-#include "CSSSelectorList.h"
-#include "CSSStyleRule.h"
+#include "CSSGroupingRule.h"
 
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#if ENABLE(CSS_REGIONS)
 
 namespace WebCore {
 
-class CSSParserSelector;
-class CSSRuleList;
+class StyleRuleRegion;
 
-class WebKitCSSRegionRule: public CSSRule {
+class WebKitCSSRegionRule : public CSSGroupingRule {
 public:
-    static PassRefPtr<WebKitCSSRegionRule> create(CSSStyleSheet* parent, Vector<OwnPtr<CSSParserSelector> >* selectors, PassRefPtr<CSSRuleList> rules)
-    {
-        return adoptRef(new WebKitCSSRegionRule(parent, selectors, rules));
-    }
+    static PassRefPtr<WebKitCSSRegionRule> create(StyleRuleRegion* rule, CSSStyleSheet* sheet) { return adoptRef(new WebKitCSSRegionRule(rule, sheet)); }
 
-    ~WebKitCSSRegionRule();
-
-    String cssText() const;
-    const CSSSelectorList& selectorList() const { return m_selectorList; }
-    CSSRuleList* cssRules() const { return m_ruleList.get(); }
+    virtual CSSRule::Type type() const OVERRIDE { return WEBKIT_REGION_RULE; }
+    virtual String cssText() const OVERRIDE;
 
 private:
-    WebKitCSSRegionRule(CSSStyleSheet* parent, Vector<OwnPtr<CSSParserSelector> >* selectors, PassRefPtr<CSSRuleList> rules);
-
-    CSSSelectorList m_selectorList;
-    RefPtr<CSSRuleList> m_ruleList;
+    WebKitCSSRegionRule(StyleRuleRegion*, CSSStyleSheet* parent);
 };
 
 }
 
-#endif
+#endif // ENABLE(CSS_REGIONS)
+
+#endif // WebKitCSSRegionRule_h

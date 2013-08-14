@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- * Copyright (C) 2006, 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  * Copyright (C) 2007-2009 Torch Mobile, Inc.
  * Copyright (C) 2010 &yet, LLC. (nate@andyet.net)
@@ -72,29 +72,25 @@
 #include "config.h"
 #include "JSDateMath.h"
 
-#include "Assertions.h"
-#include "ASCIICType.h"
-#include "CurrentTime.h"
 #include "JSObject.h"
-#include "MathExtras.h"
-#include "ScopeChain.h"
-#include "StdLibExtras.h"
-#include "StringExtras.h"
+#include "JSScope.h"
+#include "Operations.h"
 
 #include <algorithm>
 #include <limits.h>
 #include <limits>
 #include <stdint.h>
 #include <time.h>
+#include <wtf/ASCIICType.h>
+#include <wtf/Assertions.h>
+#include <wtf/CurrentTime.h>
+#include <wtf/MathExtras.h>
+#include <wtf/StdLibExtras.h>
+#include <wtf/StringExtras.h>
 #include <wtf/text/StringBuilder.h>
 
 #if HAVE(ERRNO_H)
 #include <errno.h>
-#endif
-
-#if OS(WINCE)
-extern "C" size_t strftime(char * const s, const size_t maxsize, const char * const format, const struct tm * const t);
-extern "C" struct tm * localtime(const time_t *timer);
 #endif
 
 #if HAVE(SYS_TIME_H)
@@ -200,7 +196,7 @@ static double getDSTOffset(ExecState* exec, double ms, double utcOffset)
 double getUTCOffset(ExecState* exec)
 {
     double utcOffset = exec->globalData().cachedUTCOffset;
-    if (!isnan(utcOffset))
+    if (!std::isnan(utcOffset))
         return utcOffset;
     exec->globalData().cachedUTCOffset = calculateUTCOffset();
     return exec->globalData().cachedUTCOffset;
@@ -208,8 +204,8 @@ double getUTCOffset(ExecState* exec)
 
 double gregorianDateTimeToMS(ExecState* exec, const GregorianDateTime& t, double milliSeconds, bool inputIsUTC)
 {
-    double day = dateToDaysFrom1970(t.year + 1900, t.month, t.monthDay);
-    double ms = timeToMS(t.hour, t.minute, t.second, milliSeconds);
+    double day = dateToDaysFrom1970(t.year(), t.month(), t.monthDay());
+    double ms = timeToMS(t.hour(), t.minute(), t.second(), milliSeconds);
     double result = (day * WTF::msPerDay) + ms;
 
     if (!inputIsUTC) { // convert to UTC
@@ -233,17 +229,16 @@ void msToGregorianDateTime(ExecState* exec, double ms, bool outputIsUTC, Gregori
     }
 
     const int year = msToYear(ms);
-    tm.second   =  msToSeconds(ms);
-    tm.minute   =  msToMinutes(ms);
-    tm.hour     =  msToHours(ms);
-    tm.weekDay  =  msToWeekDay(ms);
-    tm.yearDay  =  dayInYear(ms, year);
-    tm.monthDay =  dayInMonthFromDayInYear(tm.yearDay, isLeapYear(year));
-    tm.month    =  monthFromDayInYear(tm.yearDay, isLeapYear(year));
-    tm.year     =  year - 1900;
-    tm.isDST    =  dstOff != 0.0;
-    tm.utcOffset = static_cast<long>((dstOff + utcOff) / WTF::msPerSecond);
-    tm.timeZone = nullptr;
+    tm.setSecond(msToSeconds(ms));
+    tm.setMinute(msToMinutes(ms));
+    tm.setHour(msToHours(ms));
+    tm.setWeekDay(msToWeekDay(ms));
+    tm.setYearDay(dayInYear(ms, year));
+    tm.setMonthDay(dayInMonthFromDayInYear(tm.yearDay(), isLeapYear(year)));
+    tm.setMonth(monthFromDayInYear(tm.yearDay(), isLeapYear(year)));
+    tm.setYear(year);
+    tm.setIsDST(dstOff != 0.0);
+    tm.setUtcOffset(static_cast<long>((dstOff + utcOff) / WTF::msPerSecond));
 }
 
 double parseDateFromNullTerminatedCharacters(ExecState* exec, const char* dateString)
@@ -252,16 +247,28 @@ double parseDateFromNullTerminatedCharacters(ExecState* exec, const char* dateSt
     bool haveTZ;
     int offset;
     double ms = WTF::parseDateFromNullTerminatedCharacters(dateString, haveTZ, offset);
-    if (isnan(ms))
-        return std::numeric_limits<double>::quiet_NaN();
+    if (std::isnan(ms))
+        return QNaN;
 
     // fall back to local timezone
     if (!haveTZ) {
         double utcOffset = getUTCOffset(exec);
         double dstOffset = getDSTOffset(exec, ms, utcOffset);
-        offset = static_cast<int>((utcOffset + dstOffset) / WTF::msPerMinute);
+        offset = (utcOffset + dstOffset) / WTF::msPerMinute;
     }
     return ms - (offset * WTF::msPerMinute);
+}
+
+double parseDate(ExecState* exec, const String& date)
+{
+    if (date == exec->globalData().cachedDateString)
+        return exec->globalData().cachedDateStringValue;
+    double value = parseES5DateFromNullTerminatedCharacters(date.utf8().data());
+    if (std::isnan(value))
+        value = parseDateFromNullTerminatedCharacters(exec, date.utf8().data());
+    exec->globalData().cachedDateString = date;
+    exec->globalData().cachedDateStringValue = value;
+    return value;
 }
 
 } // namespace JSC

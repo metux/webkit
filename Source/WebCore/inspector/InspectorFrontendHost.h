@@ -32,14 +32,14 @@
 #include "ConsoleTypes.h"
 #include "ContextMenu.h"
 #include "ContextMenuProvider.h"
-#include "PlatformString.h"
-
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class ContextMenuItem;
+class DOMFileSystem;
 class Event;
 class FrontendMenuProvider;
 class InspectorClient;
@@ -58,11 +58,10 @@ public:
     void disconnectClient();
 
     void loaded();
-    void requestAttachWindow();
-    void requestDetachWindow();
     void requestSetDockSide(const String&);
     void closeWindow();
     void bringToFront();
+    void setZoomFactor(float);
     void inspectedURLChanged(const String&);
 
     void setAttachedWindowHeight(unsigned height);
@@ -74,14 +73,28 @@ public:
 
     void copyText(const String& text);
     void openInNewTab(const String& url);
-    bool canSaveAs();
-    void saveAs(const String& fileName, const String& content);
+    bool canSave();
+    void save(const String& url, const String& content, bool forceSaveAs);
+    void append(const String& url, const String& content);
+    void close(const String& url);
+
+    bool canInspectWorkers();
 
     // Called from [Custom] implementations.
-    void showContextMenu(Event*, const Vector<ContextMenuItem*>& items);
+    void showContextMenu(Event*, const Vector<ContextMenuItem>& items);
     void sendMessageToBackend(const String& message);
 
     String loadResourceSynchronously(const String& url);
+
+    bool supportsFileSystems();
+    void requestFileSystems();
+    void addFileSystem();
+    void removeFileSystem(const String& fileSystemPath);
+#if ENABLE(FILE_SYSTEM)
+    PassRefPtr<DOMFileSystem> isolatedFileSystem(const String& fileSystemName, const String& rootURL);
+#endif
+
+    bool isUnderTest();
 
 private:
 #if ENABLE(CONTEXT_MENUS)

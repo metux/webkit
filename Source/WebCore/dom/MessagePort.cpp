@@ -83,7 +83,7 @@ void MessagePort::postMessage(PassRefPtr<SerializedScriptValue> message, const M
         for (unsigned int i = 0; i < ports->size(); ++i) {
             MessagePort* dataPort = (*ports)[i].get();
             if (dataPort == this || m_entangledChannel->isConnectedTo(dataPort)) {
-                ec = DATA_CLONE_ERR;
+                ec = INVALID_STATE_ERR;
                 return;
             }
         }
@@ -133,10 +133,9 @@ void MessagePort::start()
 
 void MessagePort::close()
 {
+    if (isEntangled())
+        m_entangledChannel->close();
     m_closed = true;
-    if (!isEntangled())
-        return;
-    m_entangledChannel->close();
 }
 
 void MessagePort::entangle(PassOwnPtr<MessagePortChannel> remote)
@@ -187,9 +186,7 @@ void MessagePort::dispatchMessages()
         OwnPtr<MessagePortArray> ports = MessagePort::entanglePorts(*m_scriptExecutionContext, eventData->channels());
         RefPtr<Event> evt = MessageEvent::create(ports.release(), eventData->message());
 
-        ExceptionCode ec = 0;
-        dispatchEvent(evt.release(), ec);
-        ASSERT(!ec);
+        dispatchEvent(evt.release(), ASSERT_NO_EXCEPTION);
     }
 }
 
@@ -230,8 +227,7 @@ PassOwnPtr<MessagePortChannelArray> MessagePort::disentanglePorts(const MessageP
     // Passed-in ports passed validity checks, so we can disentangle them.
     OwnPtr<MessagePortChannelArray> portArray = adoptPtr(new MessagePortChannelArray(ports->size()));
     for (unsigned int i = 0 ; i < ports->size() ; ++i) {
-        OwnPtr<MessagePortChannel> channel = (*ports)[i]->disentangle(ec);
-        ASSERT(!ec); // Can't generate exception here if passed above checks.
+        OwnPtr<MessagePortChannel> channel = (*ports)[i]->disentangle(ASSERT_NO_EXCEPTION); // Can't generate exception here if passed above checks.
         (*portArray)[i] = channel.release();
     }
     return portArray.release();

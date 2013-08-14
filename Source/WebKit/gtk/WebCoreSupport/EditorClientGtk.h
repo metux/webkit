@@ -65,20 +65,15 @@ class EditorClient : public WebCore::EditorClient {
         EditorClient(WebKitWebView*);
         ~EditorClient();
         WebKitWebView* webView() { return m_webView; }
-        bool treatContextCommitAsKeyEvent() { return m_treatContextCommitAsKeyEvent; }
-        bool preventNextCompositionCommit() { return m_preventNextCompositionCommit; }
-        void clearPendingComposition() { m_pendingComposition.set(0); }
-        bool hasPendingComposition() { return m_pendingComposition; }
         void addPendingEditorCommand(const char* command) { m_pendingEditorCommands.append(command); }
-        void updatePendingComposition(const char*);
         void generateEditorCommands(const WebCore::KeyboardEvent*);
         bool executePendingEditorCommands(WebCore::Frame*, bool);
 
         // from EditorClient
         virtual void pageDestroyed();
+        virtual void frameWillDetachPage(WebCore::Frame*) { }
 
         virtual bool shouldDeleteRange(WebCore::Range*);
-        virtual bool shouldShowDeleteInterface(WebCore::HTMLElement*);
         virtual bool smartInsertDeleteEnabled();
         void setSmartInsertDeleteEnabled(bool);
         virtual bool isSelectTrailingWhitespaceEnabled();
@@ -94,7 +89,7 @@ class EditorClient : public WebCore::EditorClient {
         virtual bool shouldInsertText(const WTF::String&, WebCore::Range*, WebCore::EditorInsertAction);
         virtual bool shouldChangeSelectedRange(WebCore::Range* fromRange, WebCore::Range* toRange, WebCore::EAffinity, bool stillSelecting);
 
-        virtual bool shouldApplyStyle(WebCore::CSSStyleDeclaration*, WebCore::Range*);
+        virtual bool shouldApplyStyle(WebCore::StylePropertySet*, WebCore::Range*);
 
         virtual bool shouldMoveRangeAfterDelete(WebCore::Range*, WebCore::Range*);
 
@@ -102,7 +97,9 @@ class EditorClient : public WebCore::EditorClient {
         virtual void respondToChangedContents();
         virtual void respondToChangedSelection(WebCore::Frame*);
         virtual void didEndEditing();
+        virtual void willWriteSelectionToPasteboard(WebCore::Range*);
         virtual void didWriteSelectionToPasteboard();
+        virtual void getClientPasteboardDataForRange(WebCore::Range*, Vector<String>& pasteboardTypes, Vector<RefPtr<WebCore::SharedBuffer> >& pasteboardData);
         virtual void didSetSelectionTypesForPasteboard();
 
         virtual void registerUndoStep(WTF::PassRefPtr<WebCore::UndoStep>);
@@ -119,7 +116,6 @@ class EditorClient : public WebCore::EditorClient {
 
         virtual void handleKeyboardEvent(WebCore::KeyboardEvent*);
         virtual void handleInputMethodKeydown(WebCore::KeyboardEvent*);
-        virtual void handleInputMethodMousePress();
 
         virtual void textFieldDidBeginEditing(WebCore::Element*);
         virtual void textFieldDidEndEditing(WebCore::Element*);
@@ -137,6 +133,10 @@ class EditorClient : public WebCore::EditorClient {
         virtual void willSetInputMethodState();
         virtual void setInputMethodState(bool enabled);
 
+        virtual bool shouldShowUnicodeMenu();
+
+        virtual bool supportsGlobalSelection() OVERRIDE;
+
     private:
 #if ENABLE(SPELLCHECK)
         TextCheckerClientGtk m_textCheckerClient;
@@ -144,13 +144,8 @@ class EditorClient : public WebCore::EditorClient {
         WebCore::EmptyTextCheckerClient m_textCheckerClient;
 #endif
         WebKitWebView* m_webView;
-        bool m_preventNextCompositionCommit;
-        bool m_treatContextCommitAsKeyEvent;
-        GOwnPtr<gchar> m_pendingComposition;
-
         WebCore::KeyBindingTranslator m_keyBindingTranslator;
         Vector<WTF::String> m_pendingEditorCommands;
-
         bool m_smartInsertDeleteEnabled;
     };
 }

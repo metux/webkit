@@ -30,7 +30,7 @@
 
 namespace WebKit {
 
-class APIObject : public RefCounted<APIObject> {
+class APIObject : public ThreadSafeRefCounted<APIObject> {
 public:
     enum Type {
         // Base types
@@ -48,6 +48,8 @@ public:
         TypeGraphicsContext,
         TypeImage,
         TypeProtectionSpace,
+        TypeRenderLayer,
+        TypeRenderObject,
         TypeSecurityOrigin,
         TypeSerializedScriptValue,
         TypeString,
@@ -55,6 +57,8 @@ public:
         TypeURLRequest,
         TypeURLResponse,
         TypeUserContentURLPattern,
+        TypeWebArchive,
+        TypeWebArchiveResource,
 
         // Base numeric types
         TypeBoolean,
@@ -70,7 +74,10 @@ public:
         TypeApplicationCacheManager,
         TypeBackForwardList,
         TypeBackForwardListItem,
+        TypeBatteryManager,
+        TypeBatteryStatus,
         TypeCacheManager,
+        TypeColorPickerResultListener,
         TypeContext,
         TypeCookieManager,
         TypeDatabaseManager,
@@ -89,6 +96,8 @@ public:
         TypeKeyValueStorageManager,
         TypeMediaCacheManager,
         TypeNavigationData,
+        TypeNetworkInfo,
+        TypeNetworkInfoManager,
         TypeNotification,
         TypeNotificationManager,
         TypeNotificationPermissionRequest,
@@ -99,11 +108,13 @@ public:
         TypePluginSiteDataManager,
         TypePreferences,
         TypeTextChecker,
+        TypeVibration,
 
         // Bundle types
         TypeBundle,
         TypeBundleBackForwardList,
         TypeBundleBackForwardListItem,
+        TypeBundleDOMWindowExtension,
         TypeBundleFrame,
         TypeBundleHitTestResult,
         TypeBundleInspector,
@@ -117,7 +128,14 @@ public:
 
         // Platform specific
         TypeEditCommandProxy,
-        TypeView
+        TypeObjCObjectGraph,
+        TypeView,
+#if USE(SOUP)
+        TypeSoupRequestManager,
+#endif
+#if PLATFORM(EFL)
+        TypePopupMenuItem,
+#endif
     };
 
     virtual ~APIObject()

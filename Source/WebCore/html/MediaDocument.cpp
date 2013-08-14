@@ -30,11 +30,13 @@
 
 #include "DocumentLoader.h"
 #include "EventNames.h"
+#include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
 #include "FrameLoaderClient.h"
 #include "HTMLEmbedElement.h"
 #include "HTMLHtmlElement.h"
 #include "HTMLNames.h"
+#include "HTMLSourceElement.h"
 #include "HTMLVideoElement.h"
 #include "KeyboardEvent.h"
 #include "MainResourceLoader.h"
@@ -70,9 +72,8 @@ private:
     
 void MediaDocumentParser::createDocumentStructure()
 {
-    ExceptionCode ec;
     RefPtr<Element> rootElement = document()->createElement(htmlTag, false);
-    document()->appendChild(rootElement, ec);
+    document()->appendChild(rootElement, IGNORE_EXCEPTION);
     document()->setCSSTarget(rootElement.get());
     static_cast<HTMLHtmlElement*>(rootElement.get())->insertedByParser();
 
@@ -80,7 +81,7 @@ void MediaDocumentParser::createDocumentStructure()
         document()->frame()->loader()->dispatchDocumentElementAvailable();
         
     RefPtr<Element> body = document()->createElement(bodyTag, false);
-    rootElement->appendChild(body, ec);
+    rootElement->appendChild(body, IGNORE_EXCEPTION);
 
     RefPtr<Element> mediaElement = document()->createElement(videoTag, false);
 
@@ -89,15 +90,22 @@ void MediaDocumentParser::createDocumentStructure()
     m_mediaElement->setAttribute(autoplayAttr, "");
 
     m_mediaElement->setAttribute(nameAttr, "media");
-    m_mediaElement->setSrc(document()->url());
-    
-    body->appendChild(mediaElement, ec);
+
+    RefPtr<Element> sourceElement = document()->createElement(sourceTag, false);
+    HTMLSourceElement* source = static_cast<HTMLSourceElement*>(sourceElement.get());
+    source->setSrc(document()->url());
+
+    if (DocumentLoader* loader = document()->loader())
+        source->setType(loader->responseMIMEType());
+
+    m_mediaElement->appendChild(sourceElement, IGNORE_EXCEPTION);
+    body->appendChild(mediaElement, IGNORE_EXCEPTION);
 
     Frame* frame = document()->frame();
     if (!frame)
         return;
 
-    frame->loader()->activeDocumentLoader()->mainResourceLoader()->setShouldBufferData(DoNotBufferData);
+    frame->loader()->activeDocumentLoader()->mainResourceLoader()->setDataBufferingPolicy(DoNotBufferData);
 }
 
 void MediaDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
@@ -145,7 +153,7 @@ static inline HTMLVideoElement* descendentVideoElement(Node* node)
 static inline HTMLVideoElement* ancestorVideoElement(Node* node)
 {
     while (node && !node->hasTagName(videoTag))
-        node = node->parentOrHostNode();
+        node = node->parentOrShadowHostNode();
 
     return static_cast<HTMLVideoElement*>(node);
 }
@@ -158,6 +166,7 @@ void MediaDocument::defaultEventHandler(Event* event)
     if (!targetNode)
         return;
 
+#if !PLATFORM(CHROMIUM)
     if (HTMLVideoElement* video = ancestorVideoElement(targetNode)) {
         if (event->type() == eventNames().clickEvent) {
             if (!video->canPlay()) {
@@ -171,7 +180,8 @@ void MediaDocument::defaultEventHandler(Event* event)
             }
         }
     }
-    
+#endif
+
     if (event->type() == eventNames().keydownEvent && event->isKeyboardEvent()) {
         HTMLVideoElement* video = descendentVideoElement(targetNode);
         if (!video)
@@ -223,8 +233,7 @@ void MediaDocument::replaceMediaElementTimerFired(Timer<MediaDocument>*)
         if (documentLoader)
             embedElement->setAttribute(typeAttr, documentLoader->writer()->mimeType());
 
-        ExceptionCode ec;
-        videoElement->parentNode()->replaceChild(embedElement, videoElement, ec);
+        videoElement->parentNode()->replaceChild(embedElement, videoElement, IGNORE_EXCEPTION);
     }
 }
 

@@ -83,12 +83,22 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:enable-css-shaders ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:enable-default-context-menu ##### -->
 <para>
 
 </para>
 
 <!-- ##### ARG WebKitWebSettings:enable-developer-extras ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:enable-display-of-insecure-content ##### -->
 <para>
 
 </para>
@@ -138,6 +148,11 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:enable-media-stream ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:enable-offline-web-application-cache ##### -->
 <para>
 
@@ -158,12 +173,22 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:enable-running-of-insecure-content ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:enable-scripts ##### -->
 <para>
 
 </para>
 
 <!-- ##### ARG WebKitWebSettings:enable-site-specific-quirks ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:enable-smooth-scrolling ##### -->
 <para>
 
 </para>
@@ -223,6 +248,16 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:media-playback-allows-inline ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:media-playback-requires-user-gesture ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:minimum-font-size ##### -->
 <para>
 
@@ -244,6 +279,11 @@ WebKitWebSettings
 </para>
 
 <!-- ##### ARG WebKitWebSettings:resizable-text-areas ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitWebSettings:respect-image-orientation ##### -->
 <para>
 
 </para>

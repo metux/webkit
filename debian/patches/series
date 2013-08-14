@@ -1,10 +1,9 @@
+01_do-not-build-testing-tools.patch
 02_notebook_scroll.patch
-10_kfreebsd_support.patch
-11_hurd_support.patch
-12_large-mem-page.patch
-13_thread-safe-icon-db.patch
-14_ia64-wide-ptr.patch
+03_atomics-buildfix.patch
+10_hurd_getCurrentExecutablePath.patch
 15_ia64-use-system-malloc.patch
-20_mesa-llvmpipe-crash.patch
-25_bison_2.6_ftbfs.patch
-30_gtkdoc_fixxref_warnings.patch
+20_bsd-hurd-gtest-port.patch
+changeset_145551.diff
+changeset_147557.diff
+changeset_150256.diff

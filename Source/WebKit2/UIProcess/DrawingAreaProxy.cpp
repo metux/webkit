@@ -26,11 +26,12 @@
 #include "config.h"
 #include "DrawingAreaProxy.h"
 
+#include "DrawingAreaProxyMessages.h"
 #include "WebPageProxy.h"
+#include "WebProcessProxy.h"
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
-#include "LayerTreeHostProxy.h"
-#include <CoreIPC/MessageID.h>
+#if USE(COORDINATED_GRAPHICS)
+#include "CoordinatedLayerTreeHostProxy.h"
 #endif
 
 using namespace WebCore;
@@ -42,10 +43,12 @@ DrawingAreaProxy::DrawingAreaProxy(DrawingAreaType type, WebPageProxy* webPagePr
     , m_webPageProxy(webPageProxy)
     , m_size(webPageProxy->viewSize())
 {
+    m_webPageProxy->process()->addMessageReceiver(Messages::DrawingAreaProxy::messageReceiverName(), webPageProxy->pageID(), this);
 }
 
 DrawingAreaProxy::~DrawingAreaProxy()
 {
+    m_webPageProxy->process()->removeMessageReceiver(Messages::DrawingAreaProxy::messageReceiverName(), m_webPageProxy->pageID());
 }
 
 void DrawingAreaProxy::setSize(const IntSize& size, const IntSize& scrollOffset)
@@ -58,7 +61,7 @@ void DrawingAreaProxy::setSize(const IntSize& size, const IntSize& scrollOffset)
     sizeDidChange();
 }
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(COORDINATED_GRAPHICS)
 void DrawingAreaProxy::updateViewport()
 {
     m_webPageProxy->setViewNeedsDisplay(viewportVisibleRect());
@@ -68,13 +71,6 @@ WebCore::IntRect DrawingAreaProxy::contentsRect() const
 {
     return IntRect(IntPoint::zero(), m_webPageProxy->viewSize());
 }
-
-#if USE(TILED_BACKING_STORE)
-void DrawingAreaProxy::didReceiveLayerTreeHostProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
-{
-}
-#endif
-
 #endif
 
 } // namespace WebKit

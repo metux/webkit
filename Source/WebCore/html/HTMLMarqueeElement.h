@@ -53,8 +53,8 @@ public:
 private:
     HTMLMarqueeElement(const QualifiedName&, Document*);
 
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
 
     // ActiveDOMObject
     virtual bool canSuspend() const;

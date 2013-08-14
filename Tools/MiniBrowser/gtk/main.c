@@ -45,7 +45,7 @@ static gchar *argumentToURL(const char *filename)
 static void createBrowserWindow(const gchar *uri, WebKitSettings *webkitSettings)
 {
     GtkWidget *webView = webkit_web_view_new();
-    GtkWidget *mainWindow = browser_window_new(WEBKIT_WEB_VIEW(webView));
+    GtkWidget *mainWindow = browser_window_new(WEBKIT_WEB_VIEW(webView), NULL);
     gchar *url = argumentToURL(uri);
 
     if (webkitSettings) {
@@ -53,7 +53,7 @@ static void createBrowserWindow(const gchar *uri, WebKitSettings *webkitSettings
         g_object_unref(webkitSettings);
     }
 
-    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(webView), url);
+    browser_window_load_uri(BROWSER_WINDOW(mainWindow), url);
     g_free(url);
 
     gtk_widget_grab_focus(webView);
@@ -207,6 +207,7 @@ int main(int argc, char *argv[])
     g_option_context_add_group(context, gtk_get_option_group(TRUE));
 
     WebKitSettings *webkitSettings = webkit_settings_new();
+    webkit_settings_set_enable_developer_extras(webkitSettings, TRUE);
     if (!addSettingsGroupToContext(context, webkitSettings)) {
         g_object_unref(webkitSettings);
         webkitSettings = 0;
@@ -221,6 +222,14 @@ int main(int argc, char *argv[])
         return 1;
     }
     g_option_context_free (context);
+
+#ifdef WEBKIT_EXEC_PATH
+    g_setenv("WEBKIT_INSPECTOR_PATH", WEBKIT_EXEC_PATH "resources/inspector", FALSE);
+#endif /* WEBKIT_EXEC_PATH */
+    g_setenv("WEBKIT_INJECTED_BUNDLE_PATH", WEBKIT_INJECTED_BUNDLE_PATH, FALSE);
+
+    // Enable the favicon database, by specifying the default directory.
+    webkit_web_context_set_favicon_database_directory(webkit_web_context_get_default(), NULL);
 
     if (uriArguments) {
         int i;

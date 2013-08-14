@@ -92,10 +92,6 @@ public:
             m_modifierFlags |= WebEvent::AltKey;
         if (webEvent.metaKey())
             m_modifierFlags |= WebEvent::MetaKey;
-
-#if PLATFORM(WIN)
-        m_didActivateWebView = webEvent.didActivateWebView();
-#endif
     }
 };
 
@@ -136,6 +132,9 @@ public:
         m_phase = static_cast<WebCore::PlatformWheelEventPhase>(webEvent.phase());
         m_momentumPhase = static_cast<WebCore::PlatformWheelEventPhase>(webEvent.momentumPhase());
         m_hasPreciseScrollingDeltas = webEvent.hasPreciseScrollingDeltas();
+        m_scrollCount = webEvent.scrollCount();
+        m_unacceleratedScrollingDeltaX = webEvent.unacceleratedScrollingDelta().width();
+        m_unacceleratedScrollingDeltaY = webEvent.unacceleratedScrollingDelta().height();
 #endif
     }
 };
@@ -316,7 +315,7 @@ public:
         m_timestamp = webEvent.timestamp();
 
         // PlatformTouchEvent
-        for (int i = 0; i < webEvent.touchPoints().size(); ++i)
+        for (size_t i = 0; i < webEvent.touchPoints().size(); ++i)
             m_touchPoints.append(WebKit2PlatformTouchPoint(webEvent.touchPoints().at(i)));
     }
 };

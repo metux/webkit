@@ -25,7 +25,7 @@
 #define HTMLLabelElement_h
 
 #include "HTMLElement.h"
-#include "HTMLFormControlElement.h"
+#include "LabelableElement.h"
 
 namespace WebCore {
 
@@ -33,7 +33,10 @@ class HTMLLabelElement : public HTMLElement {
 public:
     static PassRefPtr<HTMLLabelElement> create(const QualifiedName&, Document*);
 
-    HTMLFormControlElement* control();
+    LabelableElement* control();
+    HTMLFormElement* form() const;
+
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
 private:
     HTMLLabelElement(const QualifiedName&, Document*);
@@ -49,9 +52,7 @@ private:
     // Overridden to either click() or focus() the corresponding control.
     virtual void defaultEventHandler(Event*);
 
-    void focus(bool restorePreviousSelection = true);
-
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void focus(bool restorePreviousSelection, FocusDirection) OVERRIDE;
 };
 
 } //namespace

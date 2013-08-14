@@ -39,7 +39,9 @@
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxyGtk.h"
 #include <WebCore/Cursor.h>
+#include <WebCore/EventNames.h>
 #include <WebCore/GtkUtilities.h>
+#include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
@@ -96,26 +98,22 @@ WebCore::IntSize PageClientImpl::viewSize()
 
 bool PageClientImpl::isViewWindowActive()
 {
-    notImplemented();
-    return true;
+    return webkitWebViewBaseIsInWindowActive(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 bool PageClientImpl::isViewFocused()
 {
-    notImplemented();
-    return true;
+    return webkitWebViewBaseIsFocused(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 bool PageClientImpl::isViewVisible()
 {
-    notImplemented();
-    return true;
+    return webkitWebViewBaseIsVisible(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 bool PageClientImpl::isViewInWindow()
 {
-    notImplemented();
-    return true;
+    return webkitWebViewBaseIsInWindow(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 void PageClientImpl::PageClientImpl::processDidCrash()
@@ -140,6 +138,9 @@ void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
 
 void PageClientImpl::setCursor(const Cursor& cursor)
 {
+    if (!gtk_widget_get_realized(m_viewWidget))
+        return;
+
     // [GTK] Widget::setCursor() gets called frequently
     // http://bugs.webkit.org/show_bug.cgi?id=16388
     // Setting the cursor may be an expensive operation in some backends,
@@ -156,7 +157,7 @@ void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
     notImplemented();
 }
 
-void PageClientImpl::didChangeViewportProperties(const WebCore::ViewportArguments&)
+void PageClientImpl::didChangeViewportProperties(const WebCore::ViewportAttributes&)
 {
     notImplemented();
 }
@@ -211,6 +212,8 @@ void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool 
 {
     if (wasEventHandled)
         return;
+    if (event.isFakeEventForComposition())
+        return;
 
     WebKitWebViewBase* webkitWebViewBase = WEBKIT_WEB_VIEW_BASE(m_viewWidget);
     webkitWebViewBaseForwardNextKeyEvent(webkitWebViewBase);
@@ -227,6 +230,14 @@ PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPagePr
     return WebContextMenuProxyGtk::create(m_viewWidget, page);
 }
 
+#if ENABLE(INPUT_TYPE_COLOR)
+PassRefPtr<WebColorChooserProxy> PageClientImpl::createColorChooserProxy(WebPageProxy*, const WebCore::Color&, const WebCore::IntRect&)
+{
+    notImplemented();
+    return 0;
+}
+#endif
+
 void PageClientImpl::setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut, bool animate)
 {
     notImplemented();
@@ -239,6 +250,11 @@ void PageClientImpl::enterAcceleratedCompositingMode(const LayerTreeContext&)
 }
 
 void PageClientImpl::exitAcceleratedCompositingMode()
+{
+    notImplemented();
+}
+
+void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext&)
 {
     notImplemented();
 }
@@ -268,10 +284,6 @@ void PageClientImpl::pageClosed()
     notImplemented();
 }
 
-void PageClientImpl::didChangeScrollbarsForMainFrame() const
-{
-}
-
 void PageClientImpl::flashBackingStoreUpdates(const Vector<IntRect>&)
 {
     notImplemented();
@@ -287,9 +299,19 @@ void PageClientImpl::countStringMatchesInCustomRepresentation(const String&, Fin
     notImplemented();
 }
 
+void PageClientImpl::updateTextInputState()
+{
+    webkitWebViewBaseUpdateTextInputState(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
+}
+
 void PageClientImpl::startDrag(const WebCore::DragData& dragData, PassRefPtr<ShareableBitmap> dragImage)
 {
     webkitWebViewBaseStartDrag(WEBKIT_WEB_VIEW_BASE(m_viewWidget), dragData, dragImage);
+}
+
+void PageClientImpl::handleDownloadRequest(DownloadProxy* download)
+{
+    webkitWebViewBaseHandleDownloadRequest(WEBKIT_WEB_VIEW_BASE(m_viewWidget), download);
 }
 
 } // namespace WebKit

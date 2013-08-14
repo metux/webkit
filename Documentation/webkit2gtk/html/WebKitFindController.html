@@ -3,22 +3,22 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitFindController</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="webkit2gtk-WebKitError.html" title="WebKitError">
-<link rel="next" href="index-all.html" title="Index">
+<link rel="prev" href="WebKitFileChooserRequest.html" title="WebKitFileChooserRequest">
+<link rel="next" href="WebKitCookieManager.html" title="WebKitCookieManager">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
 <tr valign="middle">
-<td><a accesskey="p" href="webkit2gtk-WebKitError.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitFileChooserRequest.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="index-all.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitCookieManager.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
 </tr>
 <tr><td colspan="5" class="shortcuts">
 <a href="#WebKitFindController.synopsis" class="shortcut">Top</a>
@@ -37,7 +37,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitFindController.top_of_page"></a>WebKitFindController</span></h2>
-<p>WebKitFindController</p>
+<p>WebKitFindController — Controls text search in a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a></p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -94,6 +94,15 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitFindController.description"></a><h2>Description</h2>
 <p>
+A <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> is used to search text in a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>. You
+can get a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>'s <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> with
+<a class="link" href="WebKitWebView.html#webkit-web-view-get-find-controller" title="webkit_web_view_get_find_controller ()"><code class="function">webkit_web_view_get_find_controller()</code></a>, and later use it to search
+for text using <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()"><code class="function">webkit_find_controller_search()</code></a>, or get the
+number of matches using <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()"><code class="function">webkit_find_controller_count_matches()</code></a>. The
+operations are asynchronous and trigger signals when ready, such as
+<a class="link" href="WebKitFindController.html#WebKitFindController-found-text" title='The "found-text" signal'><span class="type">"found-text"</span></a>,
+<a class="link" href="WebKitFindController.html#WebKitFindController-failed-to-find-text" title='The "failed-to-find-text" signal'><span class="type">"failed-to-find-text"</span></a> or
+<a class="link" href="WebKitFindController.html#WebKitFindController-counted-matches" title='The "counted-matches" signal'><span class="type">"counted-matches"</span></a>.
 </p>
 </div>
 <div class="refsect1">

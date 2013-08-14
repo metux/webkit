@@ -28,6 +28,14 @@ WebKitPrintOperation
 </para>
 
 
+<!-- ##### SIGNAL WebKitPrintOperation::failed ##### -->
+<para>
+
+</para>
+
+@webkitprintoperation: the object which received the signal.
+@arg1: 
+
 <!-- ##### SIGNAL WebKitPrintOperation::finished ##### -->
 <para>
 

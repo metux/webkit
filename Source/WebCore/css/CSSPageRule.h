@@ -1,7 +1,7 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
  * (C) 2002-2003 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2002, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2002, 2006, 2008, 2012 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,42 +23,35 @@
 #define CSSPageRule_h
 
 #include "CSSRule.h"
-#include "CSSSelectorList.h"
-#include "StylePropertySet.h"
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-class CSSSelector;
-class CSSSelectorList;
+class CSSStyleDeclaration;
+class CSSStyleSheet;
+class StyleRulePage;
+class StyleRuleCSSStyleDeclaration;
 
 class CSSPageRule : public CSSRule {
 public:
-    static PassRefPtr<CSSPageRule> create(CSSStyleSheet* parent, int sourceLine)
-    {
-        return adoptRef(new CSSPageRule(parent, sourceLine));
-    }
-    ~CSSPageRule();
+    static PassRefPtr<CSSPageRule> create(StyleRulePage* rule, CSSStyleSheet* sheet) { return adoptRef(new CSSPageRule(rule, sheet)); }
 
-    CSSStyleDeclaration* style() const { return m_style->ensureRuleCSSStyleDeclaration(this); }
+    virtual ~CSSPageRule();
+
+    virtual CSSRule::Type type() const OVERRIDE { return PAGE_RULE; }
+    virtual String cssText() const OVERRIDE;
+    virtual void reattach(StyleRuleBase*) OVERRIDE;
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
+    CSSStyleDeclaration* style() const;
 
     String selectorText() const;
     void setSelectorText(const String&);
 
-    String cssText() const;
-    
-    const CSSSelector* selector() const { return m_selectorList.first(); }
-    StylePropertySet* properties() const { return m_style.get(); }
-    
-    void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectors) { m_selectorList.adoptSelectorVector(selectors); }
-    void setDeclaration(PassRefPtr<StylePropertySet> style) { m_style = style; }
-
 private:
-    CSSPageRule(CSSStyleSheet* parent, int sourceLine);
-
-    RefPtr<StylePropertySet> m_style;
-    CSSSelectorList m_selectorList;
+    CSSPageRule(StyleRulePage*, CSSStyleSheet*);
+    
+    RefPtr<StyleRulePage> m_pageRule;
+    mutable RefPtr<StyleRuleCSSStyleDeclaration> m_propertiesCSSOMWrapper;
 };
 
 } // namespace WebCore

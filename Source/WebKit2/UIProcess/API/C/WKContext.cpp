@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,20 @@
 #include "WebURLRequest.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/UnusedParam.h>
 #include <wtf/text/WTFString.h>
+
+// Supplements
+#include "WebApplicationCacheManagerProxy.h"
+#include "WebCookieManagerProxy.h"
+#include "WebGeolocationManagerProxy.h"
+#include "WebKeyValueStorageManagerProxy.h"
+#include "WebMediaCacheManagerProxy.h"
+#include "WebNotificationManagerProxy.h"
+#include "WebResourceCacheManagerProxy.h"
+#if ENABLE(SQL_DATABASE)
+#include "WebDatabaseManagerProxy.h"
+#endif
 
 using namespace WebKit;
 
@@ -61,14 +74,9 @@ WKContextRef WKContextCreateWithInjectedBundlePath(WKStringRef pathRef)
     return toAPI(context.release().leakRef());
 }
 
-WKContextRef WKContextGetSharedProcessContext()
+void WKContextSetClient(WKContextRef contextRef, const WKContextClient* wkClient)
 {
-    return toAPI(WebContext::sharedProcessContext());
-}
-
-WKContextRef WKContextGetSharedThreadContext()
-{
-    return toAPI(WebContext::sharedThreadContext());
+    toImpl(contextRef)->initializeClient(wkClient);
 }
 
 void WKContextSetInjectedBundleClient(WKContextRef contextRef, const WKContextInjectedBundleClient* wkClient)
@@ -112,7 +120,7 @@ void WKContextGetGlobalStatistics(WKContextStatistics* statistics)
 
     statistics->wkViewCount = webContextStatistics.wkViewCount;
     statistics->wkPageCount = webContextStatistics.wkPageCount;
-    statistics->wkFrameCount = webContextStatistics.wkViewCount;
+    statistics->wkFrameCount = webContextStatistics.wkFrameCount;
 }
 
 void WKContextAddVisitedLink(WKContextRef contextRef, WKStringRef visitedURL)
@@ -130,6 +138,26 @@ WKCacheModel WKContextGetCacheModel(WKContextRef contextRef)
     return toAPI(toImpl(contextRef)->cacheModel());
 }
 
+void WKContextSetProcessModel(WKContextRef contextRef, WKProcessModel processModel)
+{
+    toImpl(contextRef)->setProcessModel(toProcessModel(processModel));
+}
+
+WKProcessModel WKContextGetProcessModel(WKContextRef contextRef)
+{
+    return toAPI(toImpl(contextRef)->processModel());
+}
+
+void WKContextSetMaximumNumberOfProcesses(WKContextRef contextRef, unsigned numberOfProcesses)
+{
+    toImpl(contextRef)->setMaximumNumberOfProcesses(numberOfProcesses);
+}
+
+unsigned WKContextGetMaximumNumberOfProcesses(WKContextRef contextRef)
+{
+    return toImpl(contextRef)->maximumNumberOfProcesses();
+}
+
 void WKContextSetAlwaysUsesComplexTextCodePath(WKContextRef contextRef, bool alwaysUseComplexTextCodePath)
 {
     toImpl(contextRef)->setAlwaysUsesComplexTextCodePath(alwaysUseComplexTextCodePath);
@@ -142,7 +170,12 @@ void WKContextSetShouldUseFontSmoothing(WKContextRef contextRef, bool useFontSmo
 
 void WKContextSetAdditionalPluginsDirectory(WKContextRef contextRef, WKStringRef pluginsDirectory)
 {
+#if ENABLE(NETSCAPE_PLUGIN_API)
     toImpl(contextRef)->setAdditionalPluginsDirectory(toImpl(pluginsDirectory)->string());
+#else
+    UNUSED_PARAM(contextRef);
+    UNUSED_PARAM(pluginsDirectory);
+#endif
 }
 
 void WKContextRegisterURLSchemeAsEmptyDocument(WKContextRef contextRef, WKStringRef urlScheme)
@@ -162,22 +195,44 @@ void WKContextSetDomainRelaxationForbiddenForURLScheme(WKContextRef contextRef, 
 
 WKCookieManagerRef WKContextGetCookieManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->cookieManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebCookieManagerProxy>());
 }
 
 WKApplicationCacheManagerRef WKContextGetApplicationCacheManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->applicationCacheManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebApplicationCacheManagerProxy>());
+}
+
+WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef contextRef)
+{
+#if ENABLE(BATTERY_STATUS)
+    return toAPI(toImpl(contextRef)->batteryManagerProxy());
+#else
+    return 0;
+#endif
 }
 
 WKDatabaseManagerRef WKContextGetDatabaseManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->databaseManagerProxy());
+#if ENABLE(SQL_DATABASE)
+    return toAPI(toImpl(contextRef)->supplement<WebDatabaseManagerProxy>());
+#else
+    return 0;
+#endif
 }
 
 WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->geolocationManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebGeolocationManagerProxy>());
+}
+
+WKNetworkInfoManagerRef WKContextGetNetworkInfoManager(WKContextRef contextRef)
+{
+#if ENABLE(NETWORK_INFO)
+    return toAPI(toImpl(contextRef)->networkInfoManagerProxy());
+#else
+    return 0;
+#endif
 }
 
 WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef contextRef)
@@ -187,27 +242,31 @@ WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef contextRef)
 
 WKKeyValueStorageManagerRef WKContextGetKeyValueStorageManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->keyValueStorageManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebKeyValueStorageManagerProxy>());
 }
 
 WKMediaCacheManagerRef WKContextGetMediaCacheManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->mediaCacheManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebMediaCacheManagerProxy>());
 }
 
 WKNotificationManagerRef WKContextGetNotificationManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->notificationManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebNotificationManagerProxy>());
 }
 
 WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef contextRef)
 {
+#if ENABLE(NETSCAPE_PLUGIN_API)
     return toAPI(toImpl(contextRef)->pluginSiteDataManager());
+#else
+    return 0;
+#endif
 }
 
 WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->resourceCacheManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebResourceCacheManagerProxy>());
 }
 
 void WKContextStartMemorySampler(WKContextRef contextRef, WKDoubleRef interval)
@@ -225,6 +284,11 @@ void WKContextSetIconDatabasePath(WKContextRef contextRef, WKStringRef iconDatab
     toImpl(contextRef)->setIconDatabasePath(toImpl(iconDatabasePath)->string());
 }
 
+void WKContextAllowSpecificHTTPSCertificateForHost(WKContextRef contextRef, WKCertificateInfoRef certificateRef, WKStringRef hostRef)
+{
+    toImpl(contextRef)->allowSpecificHTTPSCertificateForHost(toImpl(certificateRef), toImpl(hostRef)->string());
+}
+
 void WKContextSetDatabaseDirectory(WKContextRef contextRef, WKStringRef databaseDirectory)
 {
     toImpl(contextRef)->setDatabaseDirectory(toImpl(databaseDirectory)->string());
@@ -235,19 +299,14 @@ void WKContextSetLocalStorageDirectory(WKContextRef contextRef, WKStringRef loca
     toImpl(contextRef)->setLocalStorageDirectory(toImpl(localStorageDirectory)->string());
 }
 
-void WKContextSetOverrideWebInspectorBaseDirectory(WKContextRef contextRef, WKStringRef webInspectorBaseDirectory)
+WK_EXPORT void WKContextSetDiskCacheDirectory(WKContextRef contextRef, WKStringRef diskCacheDirectory)
 {
-    toImpl(contextRef)->setOverrideWebInspectorBaseDirectory(toImpl(webInspectorBaseDirectory)->string());
+    toImpl(contextRef)->setDiskCacheDirectory(toImpl(diskCacheDirectory)->string());
 }
 
-void WKContextSetOverrideWebInspectorPagePath(WKContextRef contextRef, WKStringRef webInspectorPagePath)
+WK_EXPORT void WKContextSetCookieStorageDirectory(WKContextRef contextRef, WKStringRef cookieStorageDirectory)
 {
-    toImpl(contextRef)->setOverrideWebInspectorPagePath(toImpl(webInspectorPagePath)->string());
-}
-
-void WKContextSetOverrideWebInspectorLocalizedStringsPath(WKContextRef contextRef, WKStringRef webInspectorLocalizedStringsPath)
-{
-    toImpl(contextRef)->setOverrideWebInspectorLocalizedStringsPath(toImpl(webInspectorLocalizedStringsPath)->string());
+    toImpl(contextRef)->setCookieStorageDirectory(toImpl(cookieStorageDirectory)->string());
 }
 
 void WKContextDisableProcessTermination(WKContextRef contextRef)
@@ -272,12 +331,39 @@ void WKContextWarmInitialProcess(WKContextRef contextRef)
 
 void WKContextGetStatistics(WKContextRef contextRef, void* context, WKContextGetStatisticsFunction callback)
 {
-    toImpl(contextRef)->getWebCoreStatistics(DictionaryCallback::create(context, callback));    
+    toImpl(contextRef)->getStatistics(0xFFFFFFFF, DictionaryCallback::create(context, callback));
+}
+
+void WKContextGetStatisticsWithOptions(WKContextRef contextRef, WKStatisticsOptions optionsMask, void* context, WKContextGetStatisticsFunction callback)
+{
+    toImpl(contextRef)->getStatistics(optionsMask, DictionaryCallback::create(context, callback));
 }
 
 void WKContextGarbageCollectJavaScriptObjects(WKContextRef contextRef)
 {
     toImpl(contextRef)->garbageCollectJavaScriptObjects();
+}
+
+void WKContextSetJavaScriptGarbageCollectorTimerEnabled(WKContextRef contextRef, bool enable)
+{
+    toImpl(contextRef)->setJavaScriptGarbageCollectorTimerEnabled(enable);
+}
+
+void WKContextSetUsesNetworkProcess(WKContextRef contextRef, bool usesNetworkProcess)
+{
+    toImpl(contextRef)->setUsesNetworkProcess(usesNetworkProcess);
+}
+
+WKDictionaryRef WKContextCopyPlugInAutoStartOriginHashes(WKContextRef contextRef)
+{
+    return toAPI(toImpl(contextRef)->plugInAutoStartOriginHashes().leakRef());
+}
+
+void WKContextSetPlugInAutoStartOriginHashes(WKContextRef contextRef, WKDictionaryRef dictionaryRef)
+{
+    if (!dictionaryRef)
+        return;
+    toImpl(contextRef)->setPlugInAutoStartOriginHashes(*toImpl(dictionaryRef));
 }
 
 // Deprecated functions.

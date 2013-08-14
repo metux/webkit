@@ -31,25 +31,54 @@
 #ifndef HTMLShadowElement_h
 #define HTMLShadowElement_h
 
-#if ENABLE(SHADOW_DOM)
-
-#include "HTMLElement.h"
+#include "InsertionPoint.h"
+#include <wtf/Forward.h>
 
 namespace WebCore {
 
-class HTMLShadowElement : public HTMLElement {
+#if ENABLE(SHADOW_DOM)
+
+class HTMLShadowElement : public InsertionPoint {
 public:
     static PassRefPtr<HTMLShadowElement> create(const QualifiedName&, Document*);
 
     virtual ~HTMLShadowElement();
 
+    virtual Type insertionPointType() const OVERRIDE { return ShadowInsertionPoint; }
+
+    ShadowRoot* olderShadowRoot();
+
 private:
     HTMLShadowElement(const QualifiedName&, Document*);
-    virtual bool isShadowElement() const { return true; }
 };
 
-} // namespace WebCore
+inline bool isHTMLShadowElement(const Node* node)
+{
+    ASSERT(node);
+    return node->hasTagName(HTMLNames::shadowTag);
+}
 
-#endif // ENABLE(SHADOW_DOM)
+inline HTMLShadowElement* toHTMLShadowElement(Node* node)
+{
+    ASSERT(!node || isHTMLShadowElement(node));
+    return static_cast<HTMLShadowElement*>(node);
+}
+
+inline const HTMLShadowElement* toHTMLShadowElement(const Node* node)
+{
+    ASSERT(!node || isHTMLShadowElement(node));
+    return static_cast<const HTMLShadowElement*>(node);
+}
+
+#else
+
+class HTMLShadowElement { };
+inline bool isHTMLShadowElement(const Node*) { return false; }
+inline HTMLShadowElement* toHTMLShadowElement(Node*) { return 0; }
+inline const HTMLShadowElement* toHTMLShadowElement(const Node*) { return 0; }
+
+#endif // if ENABLE(SHADOW_DOM)
+
+} // namespace WebCore
 
 #endif // HTMLShadowElement_h

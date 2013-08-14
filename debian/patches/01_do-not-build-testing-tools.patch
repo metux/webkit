@@ -1,0 +1,58 @@
+From 60233e55df5c49c4668dd719102932b8c81c50d4 Mon Sep 17 00:00:00 2001
+From: Gustavo Noronha Silva <kov@debian.org>
+Date: Mon, 5 Aug 2013 11:49:04 -0300
+Subject: [PATCH] Avoid exporting a bunch of C++ symbols by not building
+ testing harness
+
+---
+ GNUmakefile.am                   | 12 ++++++------
+ Source/WebKit/gtk/GNUmakefile.am |  2 +-
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+Index: webkit/GNUmakefile.am
+===================================================================
+--- webkit.orig/GNUmakefile.am	2013-08-05 23:10:58.626811708 -0300
++++ webkit/GNUmakefile.am	2013-08-06 09:02:20.071560793 -0300
+@@ -161,7 +161,7 @@
+ endif
+ 
+ if OS_GNU
+-version_script = -Wl,--version-script,$(srcdir)/Source/autotools/symbols.filter
++version_script = -Wl,--version-script,$(srcdir)/debian/symbols.filter
+ endif
+ 
+ if ENABLE_COVERAGE
+@@ -181,14 +181,14 @@
+ include Source/WebCore/bindings/gobject/GNUmakefile.am
+ include Source/WebCore/platform/gtk/po/GNUmakefile.am
+ include Source/WebKit/gtk/GNUmakefile.am
+-include Tools/GNUmakefile.am
++# include Tools/GNUmakefile.am
+ 
+ include Source/WebKit2/GNUmakefile.am
+-include Source/WebKit2/UIProcess/API/gtk/tests/GNUmakefile.am
+-include Tools/MiniBrowser/gtk/GNUmakefile.am
+-include Tools/WebKitTestRunner/GNUmakefile.am
+-include Source/ThirdParty/gtest/GNUmakefile.am
+-include Tools/TestWebKitAPI/GNUmakefile.am
++# include Source/WebKit2/UIProcess/API/gtk/tests/GNUmakefile.am
++# include Tools/MiniBrowser/gtk/GNUmakefile.am
++# include Tools/WebKitTestRunner/GNUmakefile.am
++# include Source/ThirdParty/gtest/GNUmakefile.am
++# include Tools/TestWebKitAPI/GNUmakefile.am
+ # [GTK] Refactor the translations now that we have webkit2
+ # https://bugs.webkit.org/show_bug.cgi?id=55153
+ 
+Index: webkit/Source/WebKit/gtk/GNUmakefile.am
+===================================================================
+--- webkit.orig/Source/WebKit/gtk/GNUmakefile.am	2013-08-05 23:10:58.626811708 -0300
++++ webkit/Source/WebKit/gtk/GNUmakefile.am	2013-08-05 23:13:31.000000000 -0300
+@@ -458,7 +458,7 @@
+ 	-no-fast-install
+ 
+ if ENABLE_WEBKIT1
+-noinst_PROGRAMS += \
++DEBIAN_DISABLED = \
+ 	Programs/unittests/testapplicationcache \
+ 	Programs/unittests/testcontextmenu \
+ 	Programs/unittests/testdomdocument \

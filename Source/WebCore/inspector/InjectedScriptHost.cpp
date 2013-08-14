@@ -29,9 +29,10 @@
  */
 
 #include "config.h"
-#include "InjectedScriptHost.h"
 
 #if ENABLE(INSPECTOR)
+
+#include "InjectedScriptHost.h"
 
 #include "Element.h"
 #include "Frame.h"
@@ -41,8 +42,10 @@
 #include "InspectorAgent.h"
 #include "InspectorClient.h"
 #include "InspectorConsoleAgent.h"
+#include "InspectorDOMAgent.h"
 #include "InspectorDOMStorageAgent.h"
 #include "InspectorDatabaseAgent.h"
+#include "InspectorDebuggerAgent.h"
 #include "InspectorFrontend.h"
 #include "InspectorValues.h"
 #include "Pasteboard.h"
@@ -73,7 +76,7 @@ InjectedScriptHost::InjectedScriptHost()
     , m_databaseAgent(0)
 #endif
     , m_domStorageAgent(0)
-    , m_lastWorkerId(1 << 31) // Distinguish ids of fake workers from real ones, to minimize the chances they overlap.
+    , m_domAgent(0)
 {
     m_defaultInspectableObject = adoptPtr(new InspectableObject());
 }
@@ -90,12 +93,21 @@ void InjectedScriptHost::disconnect()
     m_databaseAgent = 0;
 #endif
     m_domStorageAgent = 0;
+    m_domAgent = 0;
 }
 
 void InjectedScriptHost::inspectImpl(PassRefPtr<InspectorValue> object, PassRefPtr<InspectorValue> hints)
 {
-    if (m_inspectorAgent)
-        m_inspectorAgent->inspect(object->asObject(), hints->asObject());
+    if (m_inspectorAgent) {
+        RefPtr<TypeBuilder::Runtime::RemoteObject> remoteObject = TypeBuilder::Runtime::RemoteObject::runtimeCast(object);
+        m_inspectorAgent->inspect(remoteObject, hints->asObject());
+    }
+}
+
+void InjectedScriptHost::getEventListenersImpl(Node* node, Vector<EventListenerInfo>& listenersArray)
+{
+    if (m_domAgent)
+        m_domAgent->getEventListeners(node, listenersArray, false);
 }
 
 void InjectedScriptHost::clearConsoleMessages()
@@ -108,7 +120,7 @@ void InjectedScriptHost::clearConsoleMessages()
 
 void InjectedScriptHost::copyText(const String& text)
 {
-    Pasteboard::generalPasteboard()->writePlainText(text);
+    Pasteboard::generalPasteboard()->writePlainText(text, Pasteboard::CannotSmartReplace);
 }
 
 ScriptValue InjectedScriptHost::InspectableObject::get(ScriptState*)
@@ -136,39 +148,28 @@ InjectedScriptHost::InspectableObject* InjectedScriptHost::inspectedObject(unsig
 }
 
 #if ENABLE(SQL_DATABASE)
-int InjectedScriptHost::databaseIdImpl(Database* database)
+String InjectedScriptHost::databaseIdImpl(Database* database)
 {
     if (m_databaseAgent)
         return m_databaseAgent->databaseId(database);
-    return 0;
+    return String();
 }
 #endif
 
-int InjectedScriptHost::storageIdImpl(Storage* storage)
+String InjectedScriptHost::storageIdImpl(Storage* storage)
 {
     if (m_domStorageAgent)
         return m_domStorageAgent->storageId(storage);
-    return 0;
+    return String();
 }
 
-#if ENABLE(WORKERS)
-long InjectedScriptHost::nextWorkerId()
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+ScriptDebugServer& InjectedScriptHost::scriptDebugServer()
 {
-    return ++m_lastWorkerId;
+    return m_debuggerAgent->scriptDebugServer();
 }
+#endif
 
-void InjectedScriptHost::didCreateWorker(long id, const String& url, bool isSharedWorker)
-{
-    if (m_inspectorAgent)
-        m_inspectorAgent->didCreateWorker(static_cast<int>(id), url, isSharedWorker);
-}
-
-void InjectedScriptHost::didDestroyWorker(long id)
-{
-    if (m_inspectorAgent)
-        m_inspectorAgent->didDestroyWorker(static_cast<int>(id));
-}
-#endif // ENABLE(WORKERS)
 
 } // namespace WebCore
 

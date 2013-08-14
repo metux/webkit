@@ -56,6 +56,7 @@ static inline int roundUpToMultipleOf32(int d)
 // Instead of creating and destroying the buffer for every operation,
 // we create a buffer which will be automatically purged via a timer.
 class ScratchBuffer {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     ScratchBuffer()
         : m_purgeTimer(this, &ScratchBuffer::timerFired)
@@ -73,14 +74,14 @@ public:
         m_bufferInUse = true;
 #endif
         // We do not need to recreate the buffer if the current buffer is large enough.
-        if (m_imageBuffer && m_imageBuffer->width() >= size.width() && m_imageBuffer->height() >= size.height())
+        if (m_imageBuffer && m_imageBuffer->logicalSize().width() >= size.width() && m_imageBuffer->logicalSize().height() >= size.height())
             return m_imageBuffer.get();
 
         // Round to the nearest 32 pixels so we do not grow the buffer for similar sized requests.
         IntSize roundedSize(roundUpToMultipleOf32(size.width()), roundUpToMultipleOf32(size.height()));
 
         clearScratchBuffer();
-        m_imageBuffer = ImageBuffer::create(roundedSize);
+        m_imageBuffer = ImageBuffer::create(roundedSize, 1);
         return m_imageBuffer.get();
     }
 
@@ -410,6 +411,11 @@ IntRect ShadowBlur::calculateLayerBoundingRect(GraphicsContext* context, const F
         if (m_type == BlurShadow) {
             inflatedClip.inflateX(edgeSize.width());
             inflatedClip.inflateY(edgeSize.height());
+        } else {
+            // Enlarge the clipping area 1 pixel so that the fill does not
+            // bleed (due to antialiasing) even if the unaligned clip rect occurred
+            inflatedClip.inflateX(1);
+            inflatedClip.inflateY(1);
         }
         
         layerRect.intersect(inflatedClip);
@@ -440,7 +446,7 @@ void ShadowBlur::drawShadowBuffer(GraphicsContext* graphicsContext)
 
     GraphicsContextStateSaver stateSaver(*graphicsContext);
 
-    IntSize bufferSize = m_layerImage->size();
+    IntSize bufferSize = m_layerImage->internalSize();
     if (bufferSize != m_layerSize) {
         // The rect passed to clipToImageBuffer() has to be the size of the entire buffer,
         // but we may not have cleared it all, so clip to the filled part first.
@@ -826,7 +832,7 @@ void ShadowBlur::blurShadowBuffer(const IntSize& templateSize)
         return;
 
     IntRect blurRect(IntPoint(), templateSize);
-    RefPtr<ByteArray> layerData = m_layerImage->getUnmultipliedImageData(blurRect);
+    RefPtr<Uint8ClampedArray> layerData = m_layerImage->getUnmultipliedImageData(blurRect);
     blurLayerImage(layerData->data(), blurRect.size(), blurRect.width() * 4);
     m_layerImage->putByteArray(Unmultiplied, layerData.get(), blurRect.size(), blurRect, IntPoint());
 }

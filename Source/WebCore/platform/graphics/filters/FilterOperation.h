@@ -29,11 +29,21 @@
 #if ENABLE(CSS_FILTERS)
 
 #include "Color.h"
+#include "FilterEffect.h"
+#include "LayoutSize.h"
 #include "Length.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
-#include <wtf/text/AtomicString.h>
+#include <wtf/text/WTFString.h>
+
+#if PLATFORM(BLACKBERRY)
+#include <wtf/ThreadSafeRefCounted.h>
+#endif
+
+#if ENABLE(SVG)
+#include "CachedSVGDocumentReference.h"
+#endif
 
 // Annoyingly, wingdi.h #defines this.
 #ifdef PASSTHROUGH
@@ -44,7 +54,11 @@ namespace WebCore {
 
 // CSS Filters
 
+#if PLATFORM(BLACKBERRY)
+class FilterOperation : public ThreadSafeRefCounted<FilterOperation> {
+#else
 class FilterOperation : public RefCounted<FilterOperation> {
+#endif
 public:
     enum OperationType {
         REFERENCE, // url(#somefilter)
@@ -60,6 +74,7 @@ public:
         DROP_SHADOW,
 #if ENABLE(CSS_SHADERS)
         CUSTOM,
+        VALIDATED_CUSTOM,
 #endif
         PASSTHROUGH,
         NONE
@@ -70,7 +85,17 @@ public:
     virtual bool operator==(const FilterOperation&) const = 0;
     bool operator!=(const FilterOperation& o) const { return !(*this == o); }
 
-    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* /*from*/, double /*progress*/, bool /*blendToPassthrough*/ = false) { return 0; }
+    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* /*from*/, double /*progress*/, bool /*blendToPassthrough*/ = false)
+    { 
+        ASSERT(!blendingNeedsRendererSize());
+        return 0; 
+    }
+
+    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* /*from*/, double /*progress*/, const LayoutSize&, bool /*blendToPassthrough*/ = false)
+    { 
+        ASSERT(blendingNeedsRendererSize());
+        return 0; 
+    }
 
     virtual OperationType getOperationType() const { return m_type; }
     virtual bool isSameType(const FilterOperation& o) const { return o.getOperationType() == m_type; }
@@ -81,6 +106,8 @@ public:
     virtual bool affectsOpacity() const { return false; }
     // True if the the value of one pixel can affect the value of another pixel under this operation, such as blur.
     virtual bool movesPixels() const { return false; }
+    // True if the filter needs the size of the box in order to calculate the animations.
+    virtual bool blendingNeedsRendererSize() const { return false; }
 
 protected:
     FilterOperation(OperationType type)
@@ -135,15 +162,24 @@ private:
 
 class ReferenceFilterOperation : public FilterOperation {
 public:
-    static PassRefPtr<ReferenceFilterOperation> create(const AtomicString& reference, OperationType type)
+    static PassRefPtr<ReferenceFilterOperation> create(const String& url, const String& fragment, OperationType type)
     {
-        return adoptRef(new ReferenceFilterOperation(reference, type));
+        return adoptRef(new ReferenceFilterOperation(url, fragment, type));
     }
 
     virtual bool affectsOpacity() const { return true; }
     virtual bool movesPixels() const { return true; }
 
-    const AtomicString& reference() const { return m_reference; }
+    const String& url() const { return m_url; }
+    const String& fragment() const { return m_fragment; }
+
+#if ENABLE(SVG)
+    CachedSVGDocumentReference* cachedSVGDocumentReference() const { return m_cachedSVGDocumentReference.get(); }
+    void setCachedSVGDocumentReference(PassOwnPtr<CachedSVGDocumentReference> cachedSVGDocumentReference) { m_cachedSVGDocumentReference = cachedSVGDocumentReference; }
+#endif
+
+    FilterEffect* filterEffect() const { return m_filterEffect.get(); }
+    void setFilterEffect(PassRefPtr<FilterEffect> filterEffect) { m_filterEffect = filterEffect; }
 
 private:
 
@@ -152,16 +188,22 @@ private:
         if (!isSameType(o))
             return false;
         const ReferenceFilterOperation* other = static_cast<const ReferenceFilterOperation*>(&o);
-        return m_reference == other->m_reference;
+        return m_url == other->m_url;
     }
 
-    ReferenceFilterOperation(const AtomicString& reference, OperationType type)
+    ReferenceFilterOperation(const String& url, const String& fragment, OperationType type)
         : FilterOperation(type)
-        , m_reference(reference)
+        , m_url(url)
+        , m_fragment(fragment)
     {
     }
 
-    AtomicString m_reference;
+    String m_url;
+    String m_fragment;
+#if ENABLE(SVG)
+    OwnPtr<CachedSVGDocumentReference> m_cachedSVGDocumentReference;
+#endif
+    RefPtr<FilterEffect> m_filterEffect;
 };
 
 // GRAYSCALE, SEPIA, SATURATE and HUE_ROTATE are variations on a basic color matrix effect.
@@ -300,17 +342,19 @@ private:
 
 class DropShadowFilterOperation : public FilterOperation {
 public:
-    static PassRefPtr<DropShadowFilterOperation> create(int x, int y, int stdDeviation, Color color, OperationType type)
+    static PassRefPtr<DropShadowFilterOperation> create(const IntPoint& location, int stdDeviation, Color color, OperationType type)
     {
-        return adoptRef(new DropShadowFilterOperation(x, y, stdDeviation, color, type));
+        return adoptRef(new DropShadowFilterOperation(location, stdDeviation, color, type));
     }
 
-    int x() const { return m_x; }
-    int y() const { return m_y; }
+    int x() const { return m_location.x(); }
+    int y() const { return m_location.y(); }
+    IntPoint location() const { return m_location; }
     int stdDeviation() const { return m_stdDeviation; }
     Color color() const { return m_color; }
 
     virtual bool affectsOpacity() const { return true; }
+    virtual bool movesPixels() const { return true; }
 
     virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
 
@@ -321,20 +365,18 @@ private:
         if (!isSameType(o))
             return false;
         const DropShadowFilterOperation* other = static_cast<const DropShadowFilterOperation*>(&o);
-        return m_x == other->m_x && m_y == other->m_y && m_stdDeviation == other->m_stdDeviation && m_color == other->m_color;
+        return m_location == other->m_location && m_stdDeviation == other->m_stdDeviation && m_color == other->m_color;
     }
 
-    DropShadowFilterOperation(int x, int y, int stdDeviation, Color color, OperationType type)
+    DropShadowFilterOperation(const IntPoint& location, int stdDeviation, Color color, OperationType type)
         : FilterOperation(type)
-        , m_x(x)
-        , m_y(y)
+        , m_location(location)
         , m_stdDeviation(stdDeviation)
         , m_color(color)
     {
     }
 
-    int m_x; // FIXME: x and y should be Lengths?
-    int m_y;
+    IntPoint m_location; // FIXME: should location be in Lengths?
     int m_stdDeviation;
     Color m_color;
 };

@@ -32,13 +32,15 @@
 #include "AnimationBase.h"
 #include "AnimationControllerPrivate.h"
 #include "CSSParser.h"
+#include "CSSPropertyAnimation.h"
 #include "CompositeAnimation.h"
 #include "EventNames.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "PseudoElement.h"
 #include "RenderView.h"
+#include "TransitionEvent.h"
 #include "WebKitAnimationEvent.h"
-#include "WebKitAnimationList.h"
 #include "WebKitTransitionEvent.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/UnusedParam.h>
@@ -56,6 +58,7 @@ AnimationControllerPrivate::AnimationControllerPrivate(Frame* frame)
     , m_animationsWaitingForStyle()
     , m_animationsWaitingForStartTimeResponse()
     , m_waitingForAsyncStartNotification(false)
+    , m_previousTimeToNextService(0)
 {
 }
 
@@ -91,14 +94,14 @@ double AnimationControllerPrivate::updateAnimations(SetChanged callSetChanged/* 
 
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
-        CompositeAnimation* compAnim = it->second.get();
+        CompositeAnimation* compAnim = it->value.get();
         if (!compAnim->suspended() && compAnim->hasAnimations()) {
             double t = compAnim->timeToNextService();
             if (t != -1 && (t < timeToNextService || timeToNextService == -1))
                 timeToNextService = t;
             if (!timeToNextService) {
                 if (callSetChanged == CallSetChanged) {
-                    Node* node = it->first->node();
+                    Node* node = it->key->node();
                     ASSERT(!node || (node->document() && !node->document()->inPageCache()));
                     node->setNeedsStyleRecalc(SyntheticStyleChange);
                     calledSetChanged = true;
@@ -115,6 +118,25 @@ double AnimationControllerPrivate::updateAnimations(SetChanged callSetChanged/* 
     return timeToNextService;
 }
 
+void AnimationControllerPrivate::updateAnimationTimerForRenderer(RenderObject* renderer)
+{
+    double timeToNextService = 0;
+
+    RefPtr<CompositeAnimation> compAnim = m_compositeAnimations.get(renderer);
+    if (!compAnim->suspended() && compAnim->hasAnimations())
+        timeToNextService = compAnim->timeToNextService();
+
+    if (m_animationTimer.isActive()) {
+        if (m_previousTimeToNextService < timeToNextService)
+            return;
+
+        m_animationTimer.stop();
+    }
+
+    m_previousTimeToNextService = timeToNextService;
+    m_animationTimer.startOneShot(timeToNextService);
+}
+
 void AnimationControllerPrivate::updateAnimationTimer(SetChanged callSetChanged/* = DoNotCallSetChanged*/)
 {
     double timeToNextService = updateAnimations(callSetChanged);
@@ -123,6 +145,8 @@ void AnimationControllerPrivate::updateAnimationTimer(SetChanged callSetChanged/
     if (!timeToNextService) {
         if (!m_animationTimer.isActive() || m_animationTimer.repeatInterval() == 0)
             m_animationTimer.startRepeating(cAnimationTimerDelay);
+
+        m_previousTimeToNextService = timeToNextService;
         return;
     }
 
@@ -136,6 +160,7 @@ void AnimationControllerPrivate::updateAnimationTimer(SetChanged callSetChanged/
     // Otherwise, we want to start a one-shot timer so we get here again
     if (m_animationTimer.isActive())
         m_animationTimer.stop();
+    m_previousTimeToNextService = timeToNextService;
     m_animationTimer.startOneShot(timeToNextService);
 }
 
@@ -156,10 +181,11 @@ void AnimationControllerPrivate::fireEventsAndUpdateStyle()
     m_eventsToDispatch.clear();
     Vector<EventToDispatch>::const_iterator eventsToDispatchEnd = eventsToDispatch.end();
     for (Vector<EventToDispatch>::const_iterator it = eventsToDispatch.begin(); it != eventsToDispatchEnd; ++it) {
-        if (it->eventType == eventNames().webkitTransitionEndEvent)
-            it->element->dispatchEvent(WebKitTransitionEvent::create(it->eventType, it->name, it->elapsedTime));
+        Element* element = it->element.get();
+        if (it->eventType == eventNames().transitionendEvent)
+            element->dispatchEvent(TransitionEvent::create(it->eventType, it->name, it->elapsedTime, PseudoElement::pseudoElementNameForEvents(element->pseudoId())));
         else
-            it->element->dispatchEvent(WebKitAnimationEvent::create(it->eventType, it->name, it->elapsedTime));
+            element->dispatchEvent(WebKitAnimationEvent::create(it->eventType, it->name, it->elapsedTime));
     }
 
     // call setChanged on all the elements
@@ -268,9 +294,9 @@ void AnimationControllerPrivate::suspendAnimationsForDocument(Document* document
     
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
-        RenderObject* renderer = it->first;
+        RenderObject* renderer = it->key;
         if (renderer->document() == document) {
-            CompositeAnimation* compAnim = it->second.get();
+            CompositeAnimation* compAnim = it->value.get();
             compAnim->suspendAnimations();
         }
     }
@@ -284,9 +310,9 @@ void AnimationControllerPrivate::resumeAnimationsForDocument(Document* document)
     
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
-        RenderObject* renderer = it->first;
+        RenderObject* renderer = it->key;
         if (renderer->document() == document) {
-            CompositeAnimation* compAnim = it->second.get();
+            CompositeAnimation* compAnim = it->value.get();
             compAnim->resumeAnimations();
         }
     }
@@ -294,7 +320,7 @@ void AnimationControllerPrivate::resumeAnimationsForDocument(Document* document)
     updateAnimationTimer();
 }
 
-bool AnimationControllerPrivate::pauseAnimationAtTime(RenderObject* renderer, const String& name, double t)
+bool AnimationControllerPrivate::pauseAnimationAtTime(RenderObject* renderer, const AtomicString& name, double t)
 {
     if (!renderer)
         return false;
@@ -359,9 +385,6 @@ PassRefPtr<RenderStyle> AnimationControllerPrivate::getAnimatedStyleForRenderer(
     if (!rendererAnimations)
         return renderer->style();
     
-    // Make sure animationUpdateTime is updated, so that it is current even if no
-    // styleChange has happened (e.g. accelerated animations).
-    setBeginAnimationUpdateTime(cBeginAnimationUpdateTimeNotSet);
     RefPtr<RenderStyle> animatingStyle = rendererAnimations->getAnimatedStyle();
     if (!animatingStyle)
         animatingStyle = renderer->style();
@@ -375,8 +398,8 @@ unsigned AnimationControllerPrivate::numberOfActiveAnimations(Document* document
     
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
-        RenderObject* renderer = it->first;
-        CompositeAnimation* compAnim = it->second.get();
+        RenderObject* renderer = it->key;
+        CompositeAnimation* compAnim = it->value.get();
         if (renderer->document() == document)
             count += compAnim->numberOfActiveAnimations();
     }
@@ -461,18 +484,9 @@ void AnimationControllerPrivate::animationWillBeRemoved(AnimationBase* animation
     removeFromAnimationsWaitingForStartTimeResponse(animation);
 }
 
-PassRefPtr<WebKitAnimationList> AnimationControllerPrivate::animationsForRenderer(RenderObject* renderer) const
-{
-    RefPtr<CompositeAnimation> animation = m_compositeAnimations.get(renderer);
-
-    if (!animation)
-        return 0;
-
-    return animation->animations();
-}
-
 AnimationController::AnimationController(Frame* frame)
     : m_data(adoptPtr(new AnimationControllerPrivate(frame)))
+    , m_beginAnimationUpdateCount(0)
 {
 }
 
@@ -488,7 +502,8 @@ void AnimationController::cancelAnimations(RenderObject* renderer)
     if (m_data->clear(renderer)) {
         Node* node = renderer->node();
         ASSERT(!node || (node->document() && !node->document()->inPageCache()));
-        node->setNeedsStyleRecalc(SyntheticStyleChange);
+        if (node)
+            node->setNeedsStyleRecalc(SyntheticStyleChange);
     }
 }
 
@@ -511,13 +526,15 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
     // against the animations in the style and make sure we're in sync.  If destination values
     // have changed, we reset the animation.  We then do a blend to get new values and we return
     // a new style.
-    ASSERT(renderer->node()); // FIXME: We do not animate generated content yet.
+
+    // We don't support anonymous pseudo elements like :first-line or :first-letter.
+    ASSERT(renderer->node());
 
     RefPtr<CompositeAnimation> rendererAnimations = m_data->accessCompositeAnimation(renderer);
     RefPtr<RenderStyle> blendedStyle = rendererAnimations->animate(renderer, oldStyle, newStyle);
 
     if (renderer->parent() || newStyle->animations() || (oldStyle && oldStyle->animations())) {
-        m_data->updateAnimationTimer();
+        m_data->updateAnimationTimerForRenderer(renderer);
 #if ENABLE(REQUEST_ANIMATION_FRAME)
         if (FrameView* view = renderer->document()->view())
             view->scheduleAnimation();
@@ -527,7 +544,7 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
     if (blendedStyle != newStyle) {
         // If the animations/transitions change opacity or transform, we need to update
         // the style to impose the stacking rules. Note that this is also
-        // done in CSSStyleSelector::adjustRenderStyle().
+        // done in StyleResolver::adjustRenderStyle().
         if (blendedStyle->hasAutoZIndex() && (blendedStyle->opacity() < 1.0f || blendedStyle->hasTransform()))
             blendedStyle->setZIndex(0);
     }
@@ -544,7 +561,7 @@ void AnimationController::notifyAnimationStarted(RenderObject*, double startTime
     m_data->receivedStartTimeResponse(startTime);
 }
 
-bool AnimationController::pauseAnimationAtTime(RenderObject* renderer, const String& name, double t)
+bool AnimationController::pauseAnimationAtTime(RenderObject* renderer, const AtomicString& name, double t)
 {
     return m_data->pauseAnimationAtTime(renderer, name, t);
 }
@@ -598,27 +615,27 @@ void AnimationController::resumeAnimationsForDocument(Document* document)
 
 void AnimationController::beginAnimationUpdate()
 {
-    m_data->setBeginAnimationUpdateTime(cBeginAnimationUpdateTimeNotSet);
+    if (!m_beginAnimationUpdateCount)
+        m_data->setBeginAnimationUpdateTime(cBeginAnimationUpdateTimeNotSet);
+    ++m_beginAnimationUpdateCount;
 }
 
 void AnimationController::endAnimationUpdate()
 {
-    m_data->endAnimationUpdate();
+    ASSERT(m_beginAnimationUpdateCount > 0);
+    --m_beginAnimationUpdateCount;
+    if (!m_beginAnimationUpdateCount)
+        m_data->endAnimationUpdate();
 }
 
 bool AnimationController::supportsAcceleratedAnimationOfProperty(CSSPropertyID property)
 {
 #if USE(ACCELERATED_COMPOSITING)
-    return AnimationBase::animationOfPropertyIsAccelerated(property);
+    return CSSPropertyAnimation::animationOfPropertyIsAccelerated(property);
 #else
     UNUSED_PARAM(property);
     return false;
 #endif
-}
-
-PassRefPtr<WebKitAnimationList> AnimationController::animationsForRenderer(RenderObject* renderer) const
-{
-    return m_data->animationsForRenderer(renderer);
 }
 
 } // namespace WebCore

@@ -23,6 +23,8 @@
 
 #include "CSSPropertyNames.h"
 #include "CSSRule.h"
+#include "ScriptWrappable.h"
+#include "StylePropertySet.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -30,12 +32,11 @@ namespace WebCore {
 class CSSProperty;
 class CSSStyleSheet;
 class CSSValue;
-class StylePropertySet;
 class StyledElement;
 
 typedef int ExceptionCode;
 
-class CSSStyleDeclaration {
+class CSSStyleDeclaration : public ScriptWrappable {
     WTF_MAKE_NONCOPYABLE(CSSStyleDeclaration); WTF_MAKE_FAST_ALLOCATED;
 public:
     virtual ~CSSStyleDeclaration() { }
@@ -58,6 +59,7 @@ public:
 
     // CSSPropertyID versions of the CSSOM functions to support bindings and editing.
     // Use the non-virtual methods in the concrete subclasses when possible.
+    // The CSSValue returned by this function should not be exposed to the web as it may be used by multiple documents at the same time.
     virtual PassRefPtr<CSSValue> getPropertyCSSValueInternal(CSSPropertyID) = 0;
     virtual String getPropertyValueInternal(CSSPropertyID) = 0;
     virtual void setPropertyInternal(CSSPropertyID, const String& value, bool important, ExceptionCode&) = 0;
@@ -65,12 +67,10 @@ public:
     virtual PassRefPtr<StylePropertySet> copy() const = 0;
     virtual PassRefPtr<StylePropertySet> makeMutable() = 0;
 
-    virtual bool cssPropertyMatches(const CSSProperty*) const = 0;
+    virtual bool cssPropertyMatches(const StylePropertySet::PropertyReference&) const = 0;
     virtual CSSStyleSheet* parentStyleSheet() const { return 0; }
 
-#ifndef NDEBUG
-    void showStyle();
-#endif
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const = 0;
 
 protected:
     CSSStyleDeclaration() { }

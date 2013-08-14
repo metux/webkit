@@ -31,6 +31,7 @@
 #include "config.h"
 #include "ActivateFonts.h"
 
+#include "InjectedBundleUtilities.h"
 #include <fontconfig/fontconfig.h>
 #include <gtk/gtk.h>
 #include <wtf/gobject/GlibUtilities.h>
@@ -49,31 +50,34 @@ void initializeGtkSettings()
                  "gtk-xft-hinting", 0,
                  "gtk-font-name", "Liberation Sans 12",
                  "gtk-theme-name", "Raleigh",
+                 "gtk-icon-theme-name", "gnome",
                  "gtk-xft-rgba", "none", NULL);
-
-    GdkScreen* screen = gdk_screen_get_default();
-    ASSERT(screen);
-    const cairo_font_options_t* screenOptions = gdk_screen_get_font_options(screen);
-    ASSERT(screenOptions);
-    cairo_font_options_t* options = cairo_font_options_copy(screenOptions);
-    // Turn off text metrics hinting, which quantizes metrics to pixels in device space.
-    cairo_font_options_set_hint_metrics(options, CAIRO_HINT_METRICS_OFF);
-    gdk_screen_set_font_options(screen, options);
-    cairo_font_options_destroy(options);
 }
 
-static CString getTopLevelPath()
+CString getOutputDir()
 {
-    if (const char* topLevelDirectory = g_getenv("WEBKIT_TOP_LEVEL"))
-        return topLevelDirectory;
+    const char* webkitOutputDir = g_getenv("WEBKITOUTPUTDIR");
+    if (webkitOutputDir)
+        return webkitOutputDir;
 
-    // If the environment variable wasn't provided then assume we were built into
-    // WebKitBuild/Debug or WebKitBuild/Release. Obviously this will fail if the build
-    // directory is non-standard, but we can't do much more about this.
-    GOwnPtr<char> parentPath(g_path_get_dirname(getCurrentExecutablePath().data()));
-    GOwnPtr<char> layoutTestsPath(g_build_filename(parentPath.get(), "..", "..", "..", NULL));
-    GOwnPtr<char> absoluteTopLevelPath(realpath(layoutTestsPath.get(), 0));
-    return absoluteTopLevelPath.get();
+    CString topLevelPath = WTR::topLevelPath();
+    GOwnPtr<char> outputDir(g_build_filename(topLevelPath.data(), "WebKitBuild", NULL));
+    return outputDir.get();
+}
+
+static CString getFontsPath()
+{
+    CString webkitOutputDir = getOutputDir();
+    GOwnPtr<char> fontsPath(g_build_filename(webkitOutputDir.data(), "Dependencies", "Root", "webkitgtk-test-fonts", NULL));
+    if (g_file_test(fontsPath.get(), static_cast<GFileTest>(G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+        return fontsPath.get();
+
+    // Try alternative fonts path.
+    fontsPath.set(g_build_filename(webkitOutputDir.data(), "webkitgtk-test-fonts", NULL));
+    if (g_file_test(fontsPath.get(), static_cast<GFileTest>(G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+        return fontsPath.get();
+
+    return CString();
 }
 
 void inititializeFontConfigSetting()
@@ -96,18 +100,15 @@ void inititializeFontConfigSetting()
     if (!FcConfigParseAndLoad(config, reinterpret_cast<FcChar8*>(fontConfigFilename.get()), true))
         g_error("Couldn't load font configuration file from: %s", fontConfigFilename.get());
 
-    CString topLevelPath = getTopLevelPath();
-    GOwnPtr<char> fontsPath(g_build_filename(topLevelPath.data(), "WebKitBuild", "Dependencies",
-                                             "Root", "webkitgtk-test-fonts", NULL));
-    if (!g_file_test(fontsPath.get(), static_cast<GFileTest>(G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
-        g_error("Could not locate test fonts at %s. Is WEBKIT_TOP_LEVEL set?", fontsPath.get());
+    CString fontsPath = getFontsPath();
+    if (fontsPath.isNull())
+        g_error("Could not locate test fonts at %s. Is WEBKIT_TOP_LEVEL set?", fontsPath.data());
 
-    GOwnPtr<GError> error;
-    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.get(), 0, &error.outPtr()));
+    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.data(), 0, 0));
     while (const char* directoryEntry = g_dir_read_name(fontsDirectory.get())) {
         if (!g_str_has_suffix(directoryEntry, ".ttf") && !g_str_has_suffix(directoryEntry, ".otf"))
             continue;
-        GOwnPtr<gchar> fontPath(g_build_filename(fontsPath.get(), directoryEntry, NULL));
+        GOwnPtr<gchar> fontPath(g_build_filename(fontsPath.data(), directoryEntry, NULL));
         if (!FcConfigAppFontAddFile(config, reinterpret_cast<const FcChar8*>(fontPath.get())))
             g_error("Could not load font at %s!", fontPath.get());
     }

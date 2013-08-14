@@ -38,14 +38,21 @@ using namespace std;
 
 namespace WebCore {
 
-RenderRubyBase::RenderRubyBase(Node* node)
-    : RenderBlock(node)
+RenderRubyBase::RenderRubyBase()
+    : RenderBlock(0)
 {
     setInline(false);
 }
 
 RenderRubyBase::~RenderRubyBase()
 {
+}
+
+RenderRubyBase* RenderRubyBase::createAnonymous(Document* document)
+{
+    RenderRubyBase* renderer = new (document->renderArena()) RenderRubyBase();
+    renderer->setDocumentForAnonymous(document);
+    return renderer;
 }
 
 bool RenderRubyBase::isChildAllowed(RenderObject* child, RenderStyle*) const
@@ -60,7 +67,7 @@ void RenderRubyBase::moveChildren(RenderRubyBase* toBase, RenderObject* beforeCh
     ASSERT_ARG(toBase, toBase);
 
     if (beforeChild && beforeChild->parent() != this)
-        beforeChild = splitAnonymousBlocksAroundChild(beforeChild);
+        beforeChild = splitAnonymousBoxesAroundChild(beforeChild);
 
     if (childrenInline())
         moveInlineChildren(toBase, beforeChild);

@@ -29,6 +29,7 @@
 #include "Attr.h"
 #include "Element.h"
 #include "Node.h"
+#include "NodeTraversal.h"
 
 namespace WebCore {
 namespace XPath {
@@ -206,7 +207,7 @@ void NodeSet::traversalSort() const
     Vector<RefPtr<Node> > sortedNodes;
     sortedNodes.reserveInitialCapacity(nodeCount);
 
-    for (Node* n = findRootNode(m_nodes.first().get()); n; n = n->traverseNextNode()) {
+    for (Node* n = findRootNode(m_nodes.first().get()); n; n = NodeTraversal::next(n)) {
         if (nodes.contains(n))
             sortedNodes.append(n);
 
@@ -219,9 +220,9 @@ void NodeSet::traversalSort() const
 
         unsigned attributeCount = element->attributeCount();
         for (unsigned i = 0; i < attributeCount; ++i) {
-            Attr* attribute = element->attributeItem(i)->attr();
-            if (attribute && nodes.contains(attribute))
-                sortedNodes.append(attribute);
+            RefPtr<Attr> attr = element->attrIfExists(element->attributeItem(i)->name());
+            if (attr && nodes.contains(attr.get()))
+                sortedNodes.append(attr);
         }
     }
 

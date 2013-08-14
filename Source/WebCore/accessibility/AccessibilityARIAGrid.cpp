@@ -43,11 +43,6 @@ namespace WebCore {
 AccessibilityARIAGrid::AccessibilityARIAGrid(RenderObject* renderer)
     : AccessibilityTable(renderer)
 {
-#if ACCESSIBILITY_TABLES
-    m_isAccessibilityTable = true;
-#else
-    m_isAccessibilityTable = false;
-#endif
 }
 
 AccessibilityARIAGrid::~AccessibilityARIAGrid()
@@ -59,7 +54,7 @@ PassRefPtr<AccessibilityARIAGrid> AccessibilityARIAGrid::create(RenderObject* re
     return adoptRef(new AccessibilityARIAGrid(renderer));
 }
 
-bool AccessibilityARIAGrid::addChild(AccessibilityObject* child, HashSet<AccessibilityObject*>& appendedRows, unsigned& columnCount)
+bool AccessibilityARIAGrid::addTableCellChild(AccessibilityObject* child, HashSet<AccessibilityObject*>& appendedRows, unsigned& columnCount)
 {
     if (!child || !child->isTableRow() || child->ariaRoleAttribute() != RowRole)
         return false;
@@ -107,7 +102,7 @@ void AccessibilityARIAGrid::addChildren()
     unsigned columnCount = 0;
     for (RefPtr<AccessibilityObject> child = firstChild(); child; child = child->nextSibling()) {
 
-        if (!addChild(child.get(), appendedRows, columnCount)) {
+        if (!addTableCellChild(child.get(), appendedRows, columnCount)) {
             
             // in case the render tree doesn't match the expected ARIA hierarchy, look at the children
             if (!child->hasChildren())
@@ -118,7 +113,7 @@ void AccessibilityARIAGrid::addChildren()
             AccessibilityChildrenVector children = child->children();
             size_t length = children.size();
             for (size_t i = 0; i < length; ++i)
-                addChild(children[i].get(), appendedRows, columnCount);
+                addTableCellChild(children[i].get(), appendedRows, columnCount);
         }
     }
     

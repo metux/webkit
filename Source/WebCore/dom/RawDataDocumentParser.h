@@ -32,7 +32,7 @@ namespace WebCore {
 
 class RawDataDocumentParser : public DocumentParser {
 protected:
-    RawDataDocumentParser(Document* document)
+    explicit RawDataDocumentParser(Document* document)
         : DocumentParser(document)
     {
     }
@@ -59,13 +59,6 @@ private:
     virtual void append(const SegmentedString&)
     {
         ASSERT_NOT_REACHED();
-    }
-
-    virtual bool finishWasCalled()
-    {
-        // finish() always calls document()->finishedParsing() so we will be
-        // deleted after finish().
-        return false;
     }
 };
 

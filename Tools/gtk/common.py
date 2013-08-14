@@ -15,7 +15,9 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
+import errno
 import os
+import select
 import subprocess
 import sys
 
@@ -34,13 +36,17 @@ def top_level_path(*args):
     return os.path.join(*((script_path('..', '..'),) + args))
 
 
-def get_build_path():
+def get_build_path(build_types=('Release', 'Debug')):
     global build_dir
     if build_dir:
         return build_dir
 
     def is_valid_build_directory(path):
-        return os.path.exists(os.path.join(path, 'GNUmakefile'))
+        return os.path.exists(os.path.join(path, 'GNUmakefile')) or \
+            os.path.exists(os.path.join(path, 'Programs', 'DumpRenderTree'))
+
+    if len(sys.argv[1:]) > 1 and os.path.exists(sys.argv[-1]) and is_valid_build_directory(sys.argv[-1]):
+        return sys.argv[-1]
 
     # Debian and Ubuntu build both flavours of the library (with gtk2
     # and with gtk3); they use directories build-2.0 and build-3.0 for
@@ -50,10 +56,6 @@ def get_build_path():
     build_dir = os.getcwd()
     if is_valid_build_directory(build_dir):
         return build_dir
-
-    build_types = ['Release', 'Debug']
-    if '--debug' in sys.argv:
-        build_types.reverse()
 
     for build_type in build_types:
         build_dir = top_level_path('WebKitBuild', build_type)
@@ -73,34 +75,65 @@ def get_build_path():
     if is_valid_build_directory(build_dir):
         return build_dir
 
-    print 'Could not determine build directory.'
+    print('Could not determine build directory.')
     sys.exit(1)
 
 
+def build_path_for_build_types(build_types, *args):
+    return os.path.join(*(get_build_path(build_types),) + args)
+
+
 def build_path(*args):
-    return os.path.join(*(get_build_path(),) + args)
+    return build_path_for_build_types(('Release', 'Debug'), *args)
 
 
-def number_of_cpus():
-    process = subprocess.Popen([script_path('num-cpus')], stdout=subprocess.PIPE)
-    stdout = process.communicate()[0]
-    return int(stdout)
+def pkg_config_file_variable(package, variable):
+    process = subprocess.Popen(['pkg-config', '--variable=%s' % variable, package],
+                               stdout=subprocess.PIPE)
+    stdout = process.communicate()[0].decode("utf-8")
+    if process.returncode:
+        return None
+    return stdout.strip()
 
 
 def prefix_of_pkg_config_file(package):
-    process = subprocess.Popen(['pkg-config', '--variable=prefix', package],
-                                   stdout=subprocess.PIPE)
-    stdout = process.communicate()[0]
-    if process.returncode != 0:
-        return None
-    return stdout.strip()
+    return pkg_config_file_variable(package, 'prefix')
 
 
 def gtk_version_of_pkg_config_file(pkg_config_path):
     process = subprocess.Popen(['pkg-config', pkg_config_path, '--print-requires'],
                                stdout=subprocess.PIPE)
-    stdout = process.communicate()[0]
+    stdout = process.communicate()[0].decode("utf-8")
 
     if 'gtk+-3.0' in stdout:
         return 3
     return 2
+
+
+def parse_output_lines(fd, parse_line_callback):
+    output = ''
+    read_set = [fd]
+    while read_set:
+        rlist, wlist, xlist = select.select(read_set, [], [])
+
+        if fd in rlist:
+            try:
+                chunk = os.read(fd, 1024)
+            except OSError as e:
+                if e.errno == errno.EIO:
+                    # Child process finished.
+                    chunk = ''
+                else:
+                    raise e
+            if not chunk:
+                read_set.remove(fd)
+
+            output += chunk
+            while '\n' in output:
+                pos = output.find('\n')
+                parse_line_callback(output[:pos + 1])
+                output = output[pos + 1:]
+
+            if not chunk and output:
+                parse_line_callback(output)
+                output = ''

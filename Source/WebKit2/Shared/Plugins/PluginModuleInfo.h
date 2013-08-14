@@ -28,7 +28,23 @@
 
 #include <WebCore/PluginData.h>
 
+#if PLATFORM(MAC)
+#include <mach/machine.h>
+#endif
+
 namespace WebKit {
+
+enum PluginModuleLoadPolicy {
+    // The plug-in module should be loaded normally.
+    PluginModuleLoadNormally,
+
+    // The plug-in should be blocked from being instantiated.
+    // Note that the plug-in will still be seen by e.g. navigator.plugins
+    PluginModuleBlocked,
+
+    // The plug-in module is inactive and should not be instantiated unless the user explicitly allows it.
+    PluginModuleInactive
+};
 
 struct PluginModuleInfo {
     String path;
@@ -38,8 +54,6 @@ struct PluginModuleInfo {
     cpu_type_t pluginArchitecture;
     String bundleIdentifier;
     String versionString;
-#elif PLATFORM(WIN)
-    uint64_t fileVersion;
 #endif
 };
 

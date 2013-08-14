@@ -30,14 +30,15 @@
 #if ENABLE(SVG)
 
 #include "Image.h"
-#include "LayoutTypes.h"
 
 namespace WebCore {
 
+class FrameView;
 class ImageBuffer;
 class Page;
 class RenderBox;
 class SVGImageChromeClient;
+class SVGImageForContainer;
 
 class SVGImage : public Image {
 public:
@@ -46,13 +47,8 @@ public:
         return adoptRef(new SVGImage(observer));
     }
 
-    enum ShouldClearBuffer {
-        ClearImageBuffer,
-        DontClearImageBuffer
-    };
-
-    void drawSVGToImageBuffer(ImageBuffer*, const IntSize&, float zoom, ShouldClearBuffer);
     RenderBox* embeddedContentBox() const;
+    FrameView* frameView() const;
 
     virtual bool isSVGImage() const { return true; }
     virtual IntSize size() const;
@@ -60,14 +56,22 @@ public:
     virtual bool hasRelativeWidth() const;
     virtual bool hasRelativeHeight() const;
 
+    virtual void startAnimation(bool /*catchUpIfNecessary*/ = true) OVERRIDE;
+    virtual void stopAnimation() OVERRIDE;
+    virtual void resetAnimation() OVERRIDE;
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 private:
     friend class SVGImageChromeClient;
+    friend class SVGImageForContainer;
+
     virtual ~SVGImage();
 
     virtual String filenameExtension() const;
 
     virtual void setContainerSize(const IntSize&);
-    virtual bool usesContainerSize() const;
+    virtual bool usesContainerSize() const { return true; }
     virtual void computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio);
 
     virtual bool dataChanged(bool allDataReceived);
@@ -79,14 +83,17 @@ private:
 
     virtual NativeImagePtr frameAtIndex(size_t) { return 0; }
 
-    SVGImage(ImageObserver*);
-    virtual void draw(GraphicsContext*, const FloatRect& fromRect, const FloatRect& toRect, ColorSpace styleColorSpace, CompositeOperator);
+    // FIXME: Implement this to be less conservative.
+    virtual bool currentFrameKnownToBeOpaque() OVERRIDE { return false; }
 
-    virtual NativeImagePtr nativeImageForCurrentFrame();
+    SVGImage(ImageObserver*);
+    virtual void draw(GraphicsContext*, const FloatRect& fromRect, const FloatRect& toRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode);
+    void drawForContainer(GraphicsContext*, const FloatSize, float, const FloatRect&, const FloatRect&, ColorSpace, CompositeOperator, BlendMode);
+    void drawPatternForContainer(GraphicsContext*, const FloatSize, float, const FloatRect&, const AffineTransform&, const FloatPoint&, ColorSpace,
+        CompositeOperator, const FloatRect&);
 
     OwnPtr<SVGImageChromeClient> m_chromeClient;
     OwnPtr<Page> m_page;
-    RefPtr<Image> m_frameCache;
 };
 }
 

@@ -31,8 +31,8 @@
 #include "RenderObject.h"
 #include "RenderTreeAsText.h"
 #include "SVGFilter.h"
-#include "SVGImageBufferTools.h"
 #include "SVGPreserveAspectRatio.h"
+#include "SVGRenderingContext.h"
 #include "SVGStyledElement.h"
 #include "SVGURIReference.h"
 #include "TextStream.h"
@@ -118,6 +118,9 @@ void FEImage::platformApplySoftware()
     IntPoint paintLocation = absolutePaintRect().location();
     destRect.move(-paintLocation.x(), -paintLocation.y());
 
+    // FEImage results are always in ColorSpaceDeviceRGB
+    setResultColorSpace(ColorSpaceDeviceRGB);
+
     if (renderer) {
         const AffineTransform& absoluteTransform = svgFilter->absoluteTransform();
         resultImage->context()->concatCTM(absoluteTransform);
@@ -135,7 +138,7 @@ void FEImage::platformApplySoftware()
         }
 
         AffineTransform contentTransformation;
-        SVGImageBufferTools::renderSubtreeToImageBuffer(resultImage, renderer, contentTransformation);
+        SVGRenderingContext::renderSubtreeToImageBuffer(resultImage, renderer, contentTransformation);
         return;
     }
 

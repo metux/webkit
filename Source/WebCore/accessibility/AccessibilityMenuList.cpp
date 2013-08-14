@@ -37,6 +37,11 @@ AccessibilityMenuList::AccessibilityMenuList(RenderMenuList* renderer)
 {
 }
 
+PassRefPtr<AccessibilityMenuList> AccessibilityMenuList::create(RenderMenuList* renderer)
+{
+    return adoptRef(new AccessibilityMenuList(renderer));
+}
+
 bool AccessibilityMenuList::press() const
 {
     RenderMenuList* menuList = static_cast<RenderMenuList*>(m_renderer);
@@ -80,6 +85,14 @@ void AccessibilityMenuList::childrenChanged()
 bool AccessibilityMenuList::isCollapsed() const
 {
     return !static_cast<RenderMenuList*>(m_renderer)->popupIsVisible();
+}
+
+bool AccessibilityMenuList::canSetFocusAttribute() const
+{
+    if (!node())
+        return false;
+
+    return static_cast<Element*>(node())->isEnabledFormControl();
 }
 
 void AccessibilityMenuList::didUpdateActiveOption(int optionIndex)

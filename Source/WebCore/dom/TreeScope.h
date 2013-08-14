@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All Rights Reserved.
+ * Copyright (C) 2012 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,8 +34,13 @@
 namespace WebCore {
 
 class ContainerNode;
+class DOMSelection;
+class Document;
 class Element;
+class HTMLLabelElement;
 class HTMLMapElement;
+class LayoutPoint;
+class IdTargetObserverRegistry;
 class Node;
 
 // A class which inherits both Node and TreeScope must call clearRareData() in its destructor
@@ -42,24 +48,36 @@ class Node;
 // the destructor.
 class TreeScope {
     friend class Document;
+    friend class TreeScopeAdopter;
 
 public:
     TreeScope* parentTreeScope() const { return m_parentTreeScope; }
     void setParentTreeScope(TreeScope*);
 
+    Node* focusedNode();
     Element* getElementById(const AtomicString&) const;
     bool hasElementWithId(AtomicStringImpl* id) const;
     bool containsMultipleElementsWithId(const AtomicString& id) const;
     void addElementById(const AtomicString& elementId, Element*);
     void removeElementById(const AtomicString& elementId, Element*);
 
+    Document* documentScope() const { return m_documentScope; }
+
+    Node* ancestorInThisScope(Node*) const;
+
     void addImageMap(HTMLMapElement*);
     void removeImageMap(HTMLMapElement*);
     HTMLMapElement* getImageMap(const String& url) const;
 
-    void addNodeListCache() { ++m_numNodeListCaches; }
-    void removeNodeListCache() { ASSERT(m_numNodeListCaches > 0); --m_numNodeListCaches; }
-    bool hasNodeListCaches() const { return m_numNodeListCaches; }
+    Element* elementFromPoint(int x, int y) const;
+
+    // For accessibility.
+    bool shouldCacheLabelsByForAttribute() const { return m_labelsByForAttribute; }
+    void addLabel(const AtomicString& forAttributeValue, HTMLLabelElement*);
+    void removeLabel(const AtomicString& forAttributeValue, HTMLLabelElement*);
+    HTMLLabelElement* labelElementForId(const AtomicString& forAttributeValue);
+
+    DOMSelection* getSelection() const;
 
     // Find first anchor with the given name.
     // First searches for an element with the given ID, but if that fails, then looks
@@ -68,41 +86,68 @@ public:
     // quirks mode for historical compatibility reasons.
     Element* findAnchor(const String& name);
 
-    virtual bool applyAuthorSheets() const;
+    virtual bool applyAuthorStyles() const;
+    virtual bool resetStyleInheritance() const;
 
     // Used by the basic DOM mutation methods (e.g., appendChild()).
     void adoptIfNeeded(Node*);
 
     ContainerNode* rootNode() const { return m_rootNode; }
 
+    IdTargetObserverRegistry& idTargetObserverRegistry() const { return *m_idTargetObserverRegistry.get(); }
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
+    static TreeScope* noDocumentInstance()
+    {
+        DEFINE_STATIC_LOCAL(TreeScope, instance, ());
+        return &instance;
+    }
+
 protected:
-    TreeScope(ContainerNode*);
+    TreeScope(ContainerNode*, Document*);
+    TreeScope(Document*);
     virtual ~TreeScope();
 
     void destroyTreeScopeData();
+    void clearDocumentScope();
+    void setDocumentScope(Document* document)
+    {
+        ASSERT(document);
+        ASSERT(this != noDocumentInstance());
+        m_documentScope = document;
+    }
 
 private:
+    TreeScope();
+
     ContainerNode* m_rootNode;
+    Document* m_documentScope;
     TreeScope* m_parentTreeScope;
 
-    DocumentOrderedMap m_elementsById;
-    DocumentOrderedMap m_imageMapsByName;
+    OwnPtr<DocumentOrderedMap> m_elementsById;
+    OwnPtr<DocumentOrderedMap> m_imageMapsByName;
+    OwnPtr<DocumentOrderedMap> m_labelsByForAttribute;
 
-    unsigned m_numNodeListCaches;
+    OwnPtr<IdTargetObserverRegistry> m_idTargetObserverRegistry;
+
+    mutable RefPtr<DOMSelection> m_selection;
 };
 
 inline bool TreeScope::hasElementWithId(AtomicStringImpl* id) const
 {
     ASSERT(id);
-    return m_elementsById.contains(id);
+    return m_elementsById && m_elementsById->contains(id);
 }
 
 inline bool TreeScope::containsMultipleElementsWithId(const AtomicString& id) const
 {
-    return m_elementsById.containsMultiple(id.impl());
+    return m_elementsById && m_elementsById->containsMultiple(id.impl());
 }
+
+Node* nodeFromPoint(Document*, int x, int y, LayoutPoint* localPoint = 0);
+TreeScope* commonTreeScope(Node*, Node*);
 
 } // namespace WebCore
 
 #endif // TreeScope_h
-

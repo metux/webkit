@@ -33,6 +33,7 @@
 
 #include "Document.h"
 #include "Element.h"
+#include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
 #include "Page.h"
 #include "ScriptSourceCode.h"
@@ -62,7 +63,7 @@ bool XMLTreeViewer::hasNoStyleInformation() const
     if (!m_document->frame()->page()->settings()->developerExtrasEnabled())
         return false;
 
-    if (m_document->frame()->tree()->parent(true))
+    if (m_document->frame()->tree()->parent())
         return false; // This document is not in a top frame
 
     return true;
@@ -78,9 +79,8 @@ void XMLTreeViewer::transformDocumentToTreeView()
 
     String cssString(reinterpret_cast<const char*>(XMLViewer_css), sizeof(XMLViewer_css));
     RefPtr<Text> text = m_document->createTextNode(cssString);
-    ExceptionCode exceptionCode;
-    m_document->getElementById("xml-viewer-style")->appendChild(text, exceptionCode);
-    m_document->styleSelectorChanged(RecalcStyleImmediately);
+    m_document->getElementById("xml-viewer-style")->appendChild(text, IGNORE_EXCEPTION);
+    m_document->styleResolverChanged(RecalcStyleImmediately);
 }
 
 } // namespace WebCore

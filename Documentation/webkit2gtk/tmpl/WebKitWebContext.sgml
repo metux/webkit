@@ -45,6 +45,14 @@ WebKitWebContext
 @WEBKIT_CACHE_MODEL_WEB_BROWSER: 
 @WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER: 
 
+<!-- ##### ENUM WebKitTLSErrorsPolicy ##### -->
+<para>
+
+</para>
+
+@WEBKIT_TLS_ERRORS_POLICY_IGNORE: 
+@WEBKIT_TLS_ERRORS_POLICY_FAIL: 
+
 <!-- ##### FUNCTION webkit_web_context_get_default ##### -->
 <para>
 
@@ -72,6 +80,14 @@ WebKitWebContext
 @cache_model: 
 
 
+<!-- ##### FUNCTION webkit_web_context_clear_cache ##### -->
+<para>
+
+</para>
+
+@context: 
+
+
 <!-- ##### FUNCTION webkit_web_context_download_uri ##### -->
 <para>
 
@@ -80,5 +96,192 @@ WebKitWebContext
 @context: 
 @uri: 
 @Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_cookie_manager ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_favicon_database ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_favicon_database_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@path: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_favicon_database_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_security_manager ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_additional_plugins_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@directory: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_plugins ##### -->
+<para>
+
+</para>
+
+@context: 
+@cancellable: 
+@callback: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_plugins_finish ##### -->
+<para>
+
+</para>
+
+@context: 
+@result: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_spell_checking_enabled ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_spell_checking_enabled ##### -->
+<para>
+
+</para>
+
+@context: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_spell_checking_languages ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_spell_checking_languages ##### -->
+<para>
+
+</para>
+
+@context: 
+@languages: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_preferred_languages ##### -->
+<para>
+
+</para>
+
+@context: 
+@languages: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_tls_errors_policy ##### -->
+<para>
+
+</para>
+
+@context: 
+@policy: 
+
+
+<!-- ##### FUNCTION webkit_web_context_get_tls_errors_policy ##### -->
+<para>
+
+</para>
+
+@context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_web_extensions_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@directory: 
+
+
+<!-- ##### FUNCTION webkit_web_context_prefetch_dns ##### -->
+<para>
+
+</para>
+
+@context: 
+@hostname: 
+
+
+<!-- ##### FUNCTION webkit_web_context_set_disk_cache_directory ##### -->
+<para>
+
+</para>
+
+@context: 
+@directory: 
+
+
+<!-- ##### USER_FUNCTION WebKitURISchemeRequestCallback ##### -->
+<para>
+
+</para>
+
+@request: 
+@user_data: 
+
+
+<!-- ##### FUNCTION webkit_web_context_register_uri_scheme ##### -->
+<para>
+
+</para>
+
+@context: 
+@scheme: 
+@callback: 
+@user_data: 
+@user_data_destroy_func: 
 
 

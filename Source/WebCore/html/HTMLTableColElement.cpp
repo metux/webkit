@@ -47,30 +47,30 @@ PassRefPtr<HTMLTableColElement> HTMLTableColElement::create(const QualifiedName&
     return adoptRef(new HTMLTableColElement(tagName, document));
 }
 
-bool HTMLTableColElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLTableColElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == widthAttr)
+    if (name == widthAttr)
         return true;
-    return HTMLTablePartElement::isPresentationAttribute(attr);
+    return HTMLTablePartElement::isPresentationAttribute(name);
 }
 
-void HTMLTableColElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLTableColElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == widthAttr)
-        addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
+    if (attribute.name() == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
     else
-        HTMLTablePartElement::collectStyleForAttribute(attr, style);
+        HTMLTablePartElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
-void HTMLTableColElement::parseAttribute(Attribute* attr)
+void HTMLTableColElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attr->name() == spanAttr) {
-        m_span = !attr->isNull() ? attr->value().toInt() : 1;
-        if (renderer() && renderer()->isTableCol())
+    if (name == spanAttr) {
+        m_span = !value.isNull() ? value.toInt() : 1;
+        if (renderer() && renderer()->isRenderTableCol())
             renderer()->updateFromElement();
-    } else if (attr->name() == widthAttr) {
-        if (!attr->value().isEmpty()) {
-            if (renderer() && renderer()->isTableCol()) {
+    } else if (name == widthAttr) {
+        if (!value.isEmpty()) {
+            if (renderer() && renderer()->isRenderTableCol()) {
                 RenderTableCol* col = toRenderTableCol(renderer());
                 int newWidth = width().toInt();
                 if (newWidth != col->width())
@@ -78,10 +78,10 @@ void HTMLTableColElement::parseAttribute(Attribute* attr)
             }
         }
     } else
-        HTMLTablePartElement::parseAttribute(attr);
+        HTMLTablePartElement::parseAttribute(name, value);
 }
 
-StylePropertySet* HTMLTableColElement::additionalAttributeStyle()
+const StylePropertySet* HTMLTableColElement::additionalPresentationAttributeStyle()
 {
     if (!hasLocalName(colgroupTag))
         return 0;

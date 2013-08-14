@@ -26,6 +26,7 @@
 #if ENABLE(SVG)
 #include "CSSValueList.h"
 #include "DataRef.h"
+#include "ExceptionCodePlaceholder.h"
 #include "GraphicsTypes.h"
 #include "Path.h"
 #include "RenderStyleConstants.h"
@@ -92,40 +93,33 @@ public:
     static String initialMarkerStartResource() { return String(); }
     static String initialMarkerMidResource() { return String(); }
     static String initialMarkerEndResource() { return String(); }
+    static EMaskType initialMaskType() { return MT_LUMINANCE; }
 
     static SVGLength initialBaselineShiftValue()
     {
         SVGLength length;
-        ExceptionCode ec = 0;
-        length.newValueSpecifiedUnits(LengthTypeNumber, 0, ec);
-        ASSERT(!ec);
+        length.newValueSpecifiedUnits(LengthTypeNumber, 0, ASSERT_NO_EXCEPTION);
         return length;
     }
 
     static SVGLength initialKerning()
     {
         SVGLength length;
-        ExceptionCode ec = 0;
-        length.newValueSpecifiedUnits(LengthTypeNumber, 0, ec);
-        ASSERT(!ec);
+        length.newValueSpecifiedUnits(LengthTypeNumber, 0, ASSERT_NO_EXCEPTION);
         return length;
     }
 
     static SVGLength initialStrokeDashOffset()
     {
         SVGLength length;
-        ExceptionCode ec = 0;
-        length.newValueSpecifiedUnits(LengthTypeNumber, 0, ec);
-        ASSERT(!ec);
+        length.newValueSpecifiedUnits(LengthTypeNumber, 0, ASSERT_NO_EXCEPTION);
         return length;
     }
 
     static SVGLength initialStrokeWidth()
     {
         SVGLength length;
-        ExceptionCode ec = 0;
-        length.newValueSpecifiedUnits(LengthTypeNumber, 1, ec);
-        ASSERT(!ec);
+        length.newValueSpecifiedUnits(LengthTypeNumber, 1, ASSERT_NO_EXCEPTION);
         return length;
     }
 
@@ -146,7 +140,8 @@ public:
     void setWritingMode(SVGWritingMode val) { svg_inherited_flags._writingMode = val; }
     void setGlyphOrientationHorizontal(EGlyphOrientation val) { svg_inherited_flags._glyphOrientationHorizontal = val; }
     void setGlyphOrientationVertical(EGlyphOrientation val) { svg_inherited_flags._glyphOrientationVertical = val; }
-    
+    void setMaskType(EMaskType val) { svg_noninherited_flags.f.maskType = val; }
+
     void setFillOpacity(float obj)
     {
         if (!(fill->opacity == obj))
@@ -348,7 +343,8 @@ public:
     String markerStartResource() const { return inheritedResources->markerStart; }
     String markerMidResource() const { return inheritedResources->markerMid; }
     String markerEndResource() const { return inheritedResources->markerEnd; }
-    
+    EMaskType maskType() const { return (EMaskType) svg_noninherited_flags.f.maskType; }
+
     const SVGPaint::SVGPaintType& visitedLinkFillPaintType() const { return fill->visitedLinkPaintType; }
     const Color& visitedLinkFillPaintColor() const { return fill->visitedLinkPaintColor; }
     const String& visitedLinkFillPaintUri() const { return fill->visitedLinkPaintUri; }
@@ -362,6 +358,7 @@ public:
     bool hasFilter() const { return !filterResource().isEmpty(); }
     bool hasMarkers() const { return !markerStartResource().isEmpty() || !markerMidResource().isEmpty() || !markerEndResource().isEmpty(); }
     bool hasStroke() const { return strokePaintType() != SVGPaint::SVG_PAINTTYPE_NONE; }
+    bool hasVisibleStroke() const { return hasStroke() && !strokeWidth().isZero(); }
     bool hasFill() const { return fillPaintType() != SVGPaint::SVG_PAINTTYPE_NONE; }
     bool isVerticalWritingMode() const { return writingMode() == WM_TBRL || writingMode() == WM_TB; }
 
@@ -415,7 +412,8 @@ protected:
                 unsigned _dominantBaseline : 4; // EDominantBaseline
                 unsigned _baselineShift : 2; // EBaselineShift
                 unsigned _vectorEffect: 1; // EVectorEffect
-                // 21 bits unused
+                unsigned maskType: 1; // EMaskType
+                // 20 bits unused
             } f;
             uint32_t _niflags;
         };
@@ -460,6 +458,7 @@ private:
         svg_noninherited_flags.f._dominantBaseline = initialDominantBaseline();
         svg_noninherited_flags.f._baselineShift = initialBaselineShift();
         svg_noninherited_flags.f._vectorEffect = initialVectorEffect();
+        svg_noninherited_flags.f.maskType = initialMaskType();
     }
 };
 

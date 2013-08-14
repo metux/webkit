@@ -30,9 +30,10 @@
 #define InspectorDOMStorageAgent_h
 
 #include "InspectorBaseAgent.h"
-#include "PlatformString.h"
+#include "StorageArea.h"
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -42,6 +43,7 @@ class InspectorDOMStorageResource;
 class InspectorFrontend;
 class InspectorState;
 class InstrumentingAgents;
+class Page;
 class Storage;
 class StorageArea;
 
@@ -49,7 +51,7 @@ typedef String ErrorString;
 
 class InspectorDOMStorageAgent : public InspectorBaseAgent<InspectorDOMStorageAgent>, public InspectorBackendDispatcher::DOMStorageCommandHandler {
 public:
-    static PassOwnPtr<InspectorDOMStorageAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state)
+    static PassOwnPtr<InspectorDOMStorageAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
     {
         return adoptPtr(new InspectorDOMStorageAgent(instrumentingAgents, state));
     }
@@ -64,22 +66,26 @@ public:
     // Called from the front-end.
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
-    virtual void getDOMStorageEntries(ErrorString*, int storageId, RefPtr<InspectorArray>& entries);
-    virtual void setDOMStorageItem(ErrorString*, int storageId, const String& key, const String& value, bool* success);
-    virtual void removeDOMStorageItem(ErrorString*, int storageId, const String& key, bool* success);
+    virtual void getDOMStorageEntries(ErrorString*, const String& storageId, RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > >& entries);
+    virtual void setDOMStorageItem(ErrorString*, const String& storageId, const String& key, const String& value, bool* success);
+    virtual void removeDOMStorageItem(ErrorString*, const String& storageId, const String& key, bool* success);
 
     // Called from the injected script.
-    int storageId(Storage*);
+    String storageId(Storage*);
+    String storageId(SecurityOrigin*, bool isLocalStorage);
 
     // Called from InspectorInstrumentation
     void didUseDOMStorage(StorageArea*, bool isLocalStorage, Frame*);
+    void didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType, SecurityOrigin*, Page*);
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
-    InspectorDOMStorageAgent(InstrumentingAgents*, InspectorState*);
+    InspectorDOMStorageAgent(InstrumentingAgents*, InspectorCompositeState*);
 
-    InspectorDOMStorageResource* getDOMStorageResourceForId(int storageId);
+    InspectorDOMStorageResource* getDOMStorageResourceForId(const String& storageId);
 
-    typedef HashMap<int, RefPtr<InspectorDOMStorageResource> > DOMStorageResourcesMap;
+    typedef HashMap<String, RefPtr<InspectorDOMStorageResource> > DOMStorageResourcesMap;
     DOMStorageResourcesMap m_resources;
     InspectorFrontend* m_frontend;
     bool m_enabled;

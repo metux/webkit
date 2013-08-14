@@ -67,12 +67,16 @@ namespace WebCore {
             updateFromSoupMessage(soupMessage);
         }
 
+        void updateSoupMessageHeaders(SoupMessageHeaders*) const;
+        void updateFromSoupMessageHeaders(SoupMessageHeaders*);
         void updateSoupMessage(SoupMessage*) const;
         SoupMessage* toSoupMessage() const;
         void updateFromSoupMessage(SoupMessage*);
 
         SoupMessageFlags soupMessageFlags() const { return m_soupFlags; }
         void setSoupMessageFlags(SoupMessageFlags soupFlags) { m_soupFlags = soupFlags; }
+
+        SoupURI* soupURI() const;
 
     private:
         friend class ResourceRequestBase;

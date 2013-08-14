@@ -28,6 +28,7 @@
 #include "CSSSelectorList.h"
 
 #include "CSSParserValues.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -35,6 +36,19 @@ namespace WebCore {
 CSSSelectorList::~CSSSelectorList()
 {
     deleteSelectors();
+}
+
+CSSSelectorList::CSSSelectorList(const CSSSelectorList& o)
+{
+    unsigned length = o.length();
+    if (length == 1) {
+        // Destructor expects a single selector to be allocated by new, multiple with fastMalloc.
+        m_selectorArray = new CSSSelector(o.m_selectorArray[0]);
+        return;
+    }
+    m_selectorArray = reinterpret_cast<CSSSelector*>(fastMalloc(sizeof(CSSSelector) * length));
+    for (unsigned i = 0; i < length; ++i)
+        new (&m_selectorArray[i]) CSSSelector(o.m_selectorArray[i]);
 }
 
 void CSSSelectorList::adopt(CSSSelectorList& list)
@@ -81,6 +95,16 @@ void CSSSelectorList::adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& se
     selectorVector.shrink(0);
 }
 
+unsigned CSSSelectorList::length() const
+{
+    if (!m_selectorArray)
+        return 0;
+    CSSSelector* current = m_selectorArray;
+    while (!current->isLastInSelectorList())
+        ++current;
+    return (current - m_selectorArray) + 1;
+}
+
 void CSSSelectorList::deleteSelectors()
 {
     if (!m_selectorArray)
@@ -110,7 +134,7 @@ String CSSSelectorList::selectorsText() const
 {
     StringBuilder result;
 
-    for (CSSSelector* s = first(); s; s = next(s)) {
+    for (const CSSSelector* s = first(); s; s = next(s)) {
         if (s != first())
             result.append(", ");
         result.append(s->selectorText());
@@ -119,16 +143,22 @@ String CSSSelectorList::selectorsText() const
     return result.toString();
 }
 
+void CSSSelectorList::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addRawBuffer(m_selectorArray, length() * sizeof(CSSSelector), "CSSSelectors", "selectorArray");
+}
+
 template <typename Functor>
-static bool forEachTagSelector(Functor& functor, CSSSelector* selector)
+static bool forEachTagSelector(Functor& functor, const CSSSelector* selector)
 {
     ASSERT(selector);
 
     do {
         if (functor(selector))
             return true;
-        if (CSSSelectorList* selectorList = selector->selectorList()) {
-            for (CSSSelector* subSelector = selectorList->first(); subSelector; subSelector = CSSSelectorList::next(subSelector)) {
+        if (const CSSSelectorList* selectorList = selector->selectorList()) {
+            for (const CSSSelector* subSelector = selectorList->first(); subSelector; subSelector = CSSSelectorList::next(subSelector)) {
                 if (forEachTagSelector(functor, subSelector))
                     return true;
             }
@@ -141,7 +171,7 @@ static bool forEachTagSelector(Functor& functor, CSSSelector* selector)
 template <typename Functor>
 static bool forEachSelector(Functor& functor, const CSSSelectorList* selectorList)
 {
-    for (CSSSelector* selector = selectorList->first(); selector; selector = CSSSelectorList::next(selector)) {
+    for (const CSSSelector* selector = selectorList->first(); selector; selector = CSSSelectorList::next(selector)) {
         if (forEachTagSelector(functor, selector))
             return true;
     }
@@ -151,9 +181,9 @@ static bool forEachSelector(Functor& functor, const CSSSelectorList* selectorLis
 
 class SelectorNeedsNamespaceResolutionFunctor {
 public:
-    bool operator()(CSSSelector* selector)
+    bool operator()(const CSSSelector* selector)
     {
-        if (selector->hasTag() && selector->tag().prefix() != nullAtom && selector->tag().prefix() != starAtom)
+        if (selector->m_match == CSSSelector::Tag && selector->tagQName().prefix() != nullAtom && selector->tagQName().prefix() != starAtom)
             return true;
         if (selector->isAttributeSelector() && selector->attribute().prefix() != nullAtom && selector->attribute().prefix() != starAtom)
             return true;
@@ -167,20 +197,34 @@ bool CSSSelectorList::selectorsNeedNamespaceResolution()
     return forEachSelector(functor, this);
 }
 
-class SelectorHasUnknownPseudoElementFunctor {
+class SelectorHasInvalidSelectorFunctor {
 public:
-    bool operator()(CSSSelector* selector)
+    bool operator()(const CSSSelector* selector)
     {
-        return selector->isUnknownPseudoElement();
+        return selector->isUnknownPseudoElement() || selector->isCustomPseudoElement();
     }
 };
 
-bool CSSSelectorList::hasUnknownPseudoElements() const
+bool CSSSelectorList::hasInvalidSelector() const
 {
-    SelectorHasUnknownPseudoElementFunctor functor;
+    SelectorHasInvalidSelectorFunctor functor;
     return forEachSelector(functor, this);
 }
 
+#if ENABLE(SHADOW_DOM)
+class SelectorHasShadowDistributed {
+public:
+    bool operator()(const CSSSelector* selector)
+    {
+        return selector->isShadowDistributed();
+    }
+};
 
+bool CSSSelectorList::hasShadowDistributedAt(size_t index) const
+{
+    SelectorHasShadowDistributed functor;
+    return forEachTagSelector(functor, selectorAt(index));
+}
+#endif
 
 } // namespace WebCore

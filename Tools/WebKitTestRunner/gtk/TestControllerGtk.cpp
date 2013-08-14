@@ -54,6 +54,10 @@ void TestController::platformInitialize()
 {
 }
 
+void TestController::platformDestroy()
+{
+}
+
 static gboolean timeoutCallback(gpointer)
 {
     fprintf(stderr, "FAIL: TestControllerRunLoop timed out.\n");
@@ -64,7 +68,8 @@ static gboolean timeoutCallback(gpointer)
 void TestController::platformRunUntil(bool&, double timeout)
 {
     cancelTimeout();
-    gTimeoutSourceId = g_timeout_add(timeout * 1000, timeoutCallback, 0);
+    if (timeout != m_noTimeout)
+        gTimeoutSourceId = g_timeout_add(timeout * 1000, timeoutCallback, 0);
     gtk_main();
 }
 

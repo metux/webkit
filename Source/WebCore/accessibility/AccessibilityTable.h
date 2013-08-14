@@ -32,12 +32,6 @@
 #include "AccessibilityRenderObject.h"
 #include <wtf/Forward.h>
 
-#if PLATFORM(MAC) && defined(BUILDING_ON_LEOPARD)
-#define ACCESSIBILITY_TABLES 0
-#else
-#define ACCESSIBILITY_TABLES 1
-#endif
-
 namespace WebCore {
 
 class AccessibilityTableCell;
@@ -45,18 +39,18 @@ class AccessibilityTableCell;
 class AccessibilityTable : public AccessibilityRenderObject {
 
 protected:
-    AccessibilityTable(RenderObject*);
+    explicit AccessibilityTable(RenderObject*);
 public:
     static PassRefPtr<AccessibilityTable> create(RenderObject*);
     virtual ~AccessibilityTable();
+
+    virtual void init();
 
     virtual bool isAccessibilityTable() const;
     virtual bool isDataTable() const;
 
     virtual AccessibilityRole roleValue() const;
     virtual bool isAriaTable() const { return false; }
-    
-    virtual bool accessibilityIsIgnored() const;
     
     virtual void addChildren();
     virtual void clearChildren();
@@ -86,10 +80,11 @@ protected:
     AccessibilityChildrenVector m_columns;
 
     RefPtr<AccessibilityObject> m_headerContainer;
-    mutable bool m_isAccessibilityTable;
+    bool m_isAccessibilityTable;
 
     bool hasARIARole() const;
-    bool isTableExposableThroughAccessibility() const;
+    virtual bool isTableExposableThroughAccessibility() const;
+    virtual bool computeAccessibilityIsIgnored() const;
 };
     
 inline AccessibilityTable* toAccessibilityTable(AccessibilityObject* object)

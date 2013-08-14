@@ -50,6 +50,27 @@ WebKitError
 
 
 
+<!-- ##### MACRO WEBKIT_PRINT_ERROR ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_JAVASCRIPT_ERROR ##### -->
+<para>
+
+</para>
+
+
+
+<!-- ##### MACRO WEBKIT_SNAPSHOT_ERROR ##### -->
+<para>
+
+</para>
+
+
+
 <!-- ##### ENUM WebKitNetworkError ##### -->
 <para>
 
@@ -93,6 +114,29 @@ WebKitError
 @WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER: 
 @WEBKIT_DOWNLOAD_ERROR_DESTINATION: 
 
+<!-- ##### ENUM WebKitPrintError ##### -->
+<para>
+
+</para>
+
+@WEBKIT_PRINT_ERROR_GENERAL: 
+@WEBKIT_PRINT_ERROR_PRINTER_NOT_FOUND: 
+@WEBKIT_PRINT_ERROR_INVALID_PAGE_RANGE: 
+
+<!-- ##### ENUM WebKitJavascriptError ##### -->
+<para>
+
+</para>
+
+@WEBKIT_JAVASCRIPT_ERROR_SCRIPT_FAILED: 
+
+<!-- ##### ENUM WebKitSnapshotError ##### -->
+<para>
+
+</para>
+
+@WEBKIT_SNAPSHOT_ERROR_FAILED_TO_CREATE: 
+
 <!-- ##### FUNCTION webkit_network_error_quark ##### -->
 <para>
 
@@ -121,6 +165,33 @@ WebKitError
 
 
 <!-- ##### FUNCTION webkit_download_error_quark ##### -->
+<para>
+
+</para>
+
+@void: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_print_error_quark ##### -->
+<para>
+
+</para>
+
+@void: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_javascript_error_quark ##### -->
+<para>
+
+</para>
+
+@void: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_snapshot_error_quark ##### -->
 <para>
 
 </para>

@@ -26,6 +26,8 @@
 #include "config.h"
 #include "WebDragClient.h"
 
+#if ENABLE(DRAG_SUPPORT)
+
 #include "WebPage.h"
 
 using namespace WebCore;
@@ -36,6 +38,8 @@ void WebDragClient::willPerformDragDestinationAction(DragDestinationAction actio
 {
     if (action == DragDestinationActionLoad)
         m_page->willPerformLoadDragDestinationAction();
+    else
+        m_page->mayPerformUploadDragDestinationAction(); // Upload can happen from a drop event handler, so we should prepare early.
 }
 
 void WebDragClient::willPerformDragSourceAction(DragSourceAction, const IntPoint&, Clipboard*)
@@ -47,19 +51,13 @@ DragDestinationAction WebDragClient::actionMaskForDrag(DragData*)
     return DragDestinationActionAny;
 }
 
-DragSourceAction WebDragClient::dragSourceActionMaskForPoint(const IntPoint& windowPoint)
+DragSourceAction WebDragClient::dragSourceActionMaskForPoint(const IntPoint& /*windowPoint*/)
 {
     return DragSourceActionAny;
 }
 
-#if !PLATFORM(MAC) && !PLATFORM(WIN) && !PLATFORM(QT) && !PLATFORM(GTK)
+#if !PLATFORM(MAC) && !PLATFORM(QT) && !PLATFORM(GTK)
 void WebDragClient::startDrag(DragImageRef, const IntPoint&, const IntPoint&, Clipboard*, Frame*, bool)
-{
-}
-#endif
-
-#if !PLATFORM(MAC)
-void WebDragClient::dragEnded()
 {
 }
 #endif
@@ -70,3 +68,5 @@ void WebDragClient::dragControllerDestroyed()
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(DRAG_SUPPORT)

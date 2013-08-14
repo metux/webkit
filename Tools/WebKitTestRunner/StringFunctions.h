@@ -38,6 +38,8 @@
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 #include <wtf/Platform.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 #include <wtf/Vector.h>
 
 namespace WTR {
@@ -52,6 +54,11 @@ inline WKRetainPtr<WKStringRef> toWK(JSStringRef string)
 inline WKRetainPtr<WKStringRef> toWK(JSRetainPtr<JSStringRef> string)
 {
     return toWK(string.get());
+}
+
+inline WKRetainPtr<WKStringRef> toWK(const WTF::String& string)
+{
+    return adoptWK(WKStringCreateWithUTF8CString(string.utf8().data()));
 }
 
 inline JSRetainPtr<JSStringRef> toJS(WKStringRef string)
@@ -77,32 +84,17 @@ inline std::string toSTD(const WKRetainPtr<WKStringRef>& string)
     return toSTD(string.get());
 }
 
-// Streaming functions
-
-inline std::ostream& operator<<(std::ostream& out, WKStringRef stringRef)
+inline WTF::String toWTFString(WKStringRef string)
 {
-    if (!stringRef)
-        return out;
-
-    return out << toSTD(stringRef);
+    size_t bufferSize = WKStringGetMaximumUTF8CStringSize(string);
+    OwnArrayPtr<char> buffer = adoptArrayPtr(new char[bufferSize]);
+    size_t stringLength = WKStringGetUTF8CString(string, buffer.get(), bufferSize);
+    return WTF::String::fromUTF8WithLatin1Fallback(buffer.get(), stringLength - 1);
 }
-
-inline std::ostream& operator<<(std::ostream& out, const WKRetainPtr<WKStringRef>& stringRef)
+    
+inline WTF::String toWTFString(const WKRetainPtr<WKStringRef>& string)
 {
-    return out << stringRef.get();
-}
-
-inline std::ostream& operator<<(std::ostream& out, WKURLRef urlRef)
-{
-    if (!urlRef)
-        return out;
-
-    return out << toSTD(adoptWK(WKURLCopyString(urlRef)));
-}
-
-inline std::ostream& operator<<(std::ostream& out, const WKRetainPtr<WKURLRef>& urlRef)
-{
-    return out << urlRef.get();
+    return toWTFString(string.get());
 }
 
 } // namespace WTR

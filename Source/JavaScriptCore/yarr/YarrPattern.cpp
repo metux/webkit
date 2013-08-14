@@ -28,6 +28,7 @@
 #include "YarrPattern.h"
 
 #include "Yarr.h"
+#include "YarrCanonicalizeUCS2.h"
 #include "YarrParser.h"
 #include <wtf/Vector.h>
 
@@ -66,32 +67,43 @@ public:
 
     void putChar(UChar ch)
     {
+        // Handle ascii cases.
         if (ch <= 0x7f) {
             if (m_isCaseInsensitive && isASCIIAlpha(ch)) {
                 addSorted(m_matches, toASCIIUpper(ch));
                 addSorted(m_matches, toASCIILower(ch));
             } else
                 addSorted(m_matches, ch);
-        } else {
-            UChar upper, lower;
-            if (m_isCaseInsensitive && ((upper = Unicode::toUpper(ch)) != (lower = Unicode::toLower(ch)))) {
-                addSorted(m_matchesUnicode, upper);
-                addSorted(m_matchesUnicode, lower);
-            } else
-                addSorted(m_matchesUnicode, ch);
+            return;
         }
+
+        // Simple case, not a case-insensitive match.
+        if (!m_isCaseInsensitive) {
+            addSorted(m_matchesUnicode, ch);
+            return;
+        }
+
+        // Add multiple matches, if necessary.
+        UCS2CanonicalizationRange* info = rangeInfoFor(ch);
+        if (info->type == CanonicalizeUnique)
+            addSorted(m_matchesUnicode, ch);
+        else
+            putUnicodeIgnoreCase(ch, info);
     }
 
-    // returns true if this character has another case, and 'ch' is the upper case form.
-    static inline bool isUnicodeUpper(UChar ch)
+    void putUnicodeIgnoreCase(UChar ch, UCS2CanonicalizationRange* info)
     {
-        return ch != Unicode::toLower(ch);
-    }
-
-    // returns true if this character has another case, and 'ch' is the lower case form.
-    static inline bool isUnicodeLower(UChar ch)
-    {
-        return ch != Unicode::toUpper(ch);
+        ASSERT(m_isCaseInsensitive);
+        ASSERT(ch > 0x7f);
+        ASSERT(ch >= info->begin && ch <= info->end);
+        ASSERT(info->type != CanonicalizeUnique);
+        if (info->type == CanonicalizeSet) {
+            for (uint16_t* set = characterSetInfo[info->value]; (ch = *set); ++set)
+                addSorted(m_matchesUnicode, ch);
+        } else {
+            addSorted(m_matchesUnicode, ch);
+            addSorted(m_matchesUnicode, getCanonicalPair(info, ch));
+        }
     }
 
     void putRange(UChar lo, UChar hi)
@@ -108,48 +120,71 @@ public:
                     addSortedRange(m_ranges, std::max(asciiLo, 'a')+('A'-'a'), std::min(asciiHi, 'z')+('A'-'a'));
             }
         }
-        if (hi >= 0x80) {
-            uint32_t unicodeCurr = std::max(lo, (UChar)0x80);
-            addSortedRange(m_rangesUnicode, unicodeCurr, hi);
-            
-            if (m_isCaseInsensitive) {
-                while (unicodeCurr <= hi) {
-                    // If the upper bound of the range (hi) is 0xffff, the increments to
-                    // unicodeCurr in this loop may take it to 0x10000.  This is fine
-                    // (if so we won't re-enter the loop, since the loop condition above
-                    // will definitely fail) - but this does mean we cannot use a UChar
-                    // to represent unicodeCurr, we must use a 32-bit value instead.
-                    ASSERT(unicodeCurr <= 0xffff);
+        if (hi <= 0x7f)
+            return;
 
-                    if (isUnicodeUpper(unicodeCurr)) {
-                        UChar lowerCaseRangeBegin = Unicode::toLower(unicodeCurr);
-                        UChar lowerCaseRangeEnd = lowerCaseRangeBegin;
-                        while ((++unicodeCurr <= hi) && isUnicodeUpper(unicodeCurr) && (Unicode::toLower(unicodeCurr) == (lowerCaseRangeEnd + 1)))
-                            lowerCaseRangeEnd++;
-                        addSortedRange(m_rangesUnicode, lowerCaseRangeBegin, lowerCaseRangeEnd);
-                    } else if (isUnicodeLower(unicodeCurr)) {
-                        UChar upperCaseRangeBegin = Unicode::toUpper(unicodeCurr);
-                        UChar upperCaseRangeEnd = upperCaseRangeBegin;
-                        while ((++unicodeCurr <= hi) && isUnicodeLower(unicodeCurr) && (Unicode::toUpper(unicodeCurr) == (upperCaseRangeEnd + 1)))
-                            upperCaseRangeEnd++;
-                        addSortedRange(m_rangesUnicode, upperCaseRangeBegin, upperCaseRangeEnd);
-                    } else
-                        ++unicodeCurr;
-                }
+        lo = std::max(lo, (UChar)0x80);
+        addSortedRange(m_rangesUnicode, lo, hi);
+        
+        if (!m_isCaseInsensitive)
+            return;
+
+        UCS2CanonicalizationRange* info = rangeInfoFor(lo);
+        while (true) {
+            // Handle the range [lo .. end]
+            UChar end = std::min<UChar>(info->end, hi);
+
+            switch (info->type) {
+            case CanonicalizeUnique:
+                // Nothing to do - no canonical equivalents.
+                break;
+            case CanonicalizeSet: {
+                UChar ch;
+                for (uint16_t* set = characterSetInfo[info->value]; (ch = *set); ++set)
+                    addSorted(m_matchesUnicode, ch);
+                break;
             }
-        }
+            case CanonicalizeRangeLo:
+                addSortedRange(m_rangesUnicode, lo + info->value, end + info->value);
+                break;
+            case CanonicalizeRangeHi:
+                addSortedRange(m_rangesUnicode, lo - info->value, end - info->value);
+                break;
+            case CanonicalizeAlternatingAligned:
+                // Use addSortedRange since there is likely an abutting range to combine with.
+                if (lo & 1)
+                    addSortedRange(m_rangesUnicode, lo - 1, lo - 1);
+                if (!(end & 1))
+                    addSortedRange(m_rangesUnicode, end + 1, end + 1);
+                break;
+            case CanonicalizeAlternatingUnaligned:
+                // Use addSortedRange since there is likely an abutting range to combine with.
+                if (!(lo & 1))
+                    addSortedRange(m_rangesUnicode, lo - 1, lo - 1);
+                if (end & 1)
+                    addSortedRange(m_rangesUnicode, end + 1, end + 1);
+                break;
+            }
+
+            if (hi == end)
+                return;
+
+            ++info;
+            lo = info->begin;
+        };
+
     }
 
-    CharacterClass* charClass()
+    PassOwnPtr<CharacterClass> charClass()
     {
-        CharacterClass* characterClass = new CharacterClass(0);
+        OwnPtr<CharacterClass> characterClass = adoptPtr(new CharacterClass(0));
 
         characterClass->m_matches.swap(m_matches);
         characterClass->m_ranges.swap(m_ranges);
         characterClass->m_matchesUnicode.swap(m_matchesUnicode);
         characterClass->m_rangesUnicode.swap(m_rangesUnicode);
 
-        return characterClass;
+        return characterClass.release();
     }
 
 private:
@@ -239,9 +274,10 @@ public:
         , m_characterClassConstructor(pattern.m_ignoreCase)
         , m_invertParentheticalAssertion(false)
     {
-        m_pattern.m_body = new PatternDisjunction();
-        m_alternative = m_pattern.m_body->addNewAlternative();
-        m_pattern.m_disjunctions.append(m_pattern.m_body);
+        OwnPtr<PatternDisjunction> body = adoptPtr(new PatternDisjunction);
+        m_pattern.m_body = body.get();
+        m_alternative = body->addNewAlternative();
+        m_pattern.m_disjunctions.append(body.release());
     }
 
     ~YarrPatternConstructor()
@@ -253,9 +289,10 @@ public:
         m_pattern.reset();
         m_characterClassConstructor.reset();
 
-        m_pattern.m_body = new PatternDisjunction();
-        m_alternative = m_pattern.m_body->addNewAlternative();
-        m_pattern.m_disjunctions.append(m_pattern.m_body);
+        OwnPtr<PatternDisjunction> body = adoptPtr(new PatternDisjunction);
+        m_pattern.m_body = body.get();
+        m_alternative = body->addNewAlternative();
+        m_pattern.m_disjunctions.append(body.release());
     }
     
     void assertionBOL()
@@ -280,12 +317,21 @@ public:
     {
         // We handle case-insensitive checking of unicode characters which do have both
         // cases by handling them as if they were defined using a CharacterClass.
-        if (m_pattern.m_ignoreCase && !isASCII(ch) && (Unicode::toUpper(ch) != Unicode::toLower(ch))) {
-            atomCharacterClassBegin();
-            atomCharacterClassAtom(ch);
-            atomCharacterClassEnd();
-        } else
+        if (!m_pattern.m_ignoreCase || isASCII(ch)) {
             m_alternative->m_terms.append(PatternTerm(ch));
+            return;
+        }
+
+        UCS2CanonicalizationRange* info = rangeInfoFor(ch);
+        if (info->type == CanonicalizeUnique) {
+            m_alternative->m_terms.append(PatternTerm(ch));
+            return;
+        }
+
+        m_characterClassConstructor.putUnicodeIgnoreCase(ch, info);
+        OwnPtr<CharacterClass> newCharacterClass = m_characterClassConstructor.charClass();
+        m_alternative->m_terms.append(PatternTerm(newCharacterClass.get(), false));
+        m_pattern.m_userCharacterClasses.append(newCharacterClass.release());
     }
 
     void atomBuiltInCharacterClass(BuiltInCharacterClassID classID, bool invert)
@@ -339,15 +385,15 @@ public:
             break;
         
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
 
     void atomCharacterClassEnd()
     {
-        CharacterClass* newCharacterClass = m_characterClassConstructor.charClass();
-        m_pattern.m_userCharacterClasses.append(newCharacterClass);
-        m_alternative->m_terms.append(PatternTerm(newCharacterClass, m_invertCharacterClass));
+        OwnPtr<CharacterClass> newCharacterClass = m_characterClassConstructor.charClass();
+        m_alternative->m_terms.append(PatternTerm(newCharacterClass.get(), m_invertCharacterClass));
+        m_pattern.m_userCharacterClasses.append(newCharacterClass.release());
     }
 
     void atomParenthesesSubpatternBegin(bool capture = true)
@@ -356,19 +402,19 @@ public:
         if (capture)
             m_pattern.m_numSubpatterns++;
 
-        PatternDisjunction* parenthesesDisjunction = new PatternDisjunction(m_alternative);
-        m_pattern.m_disjunctions.append(parenthesesDisjunction);
-        m_alternative->m_terms.append(PatternTerm(PatternTerm::TypeParenthesesSubpattern, subpatternId, parenthesesDisjunction, capture, false));
+        OwnPtr<PatternDisjunction> parenthesesDisjunction = adoptPtr(new PatternDisjunction(m_alternative));
+        m_alternative->m_terms.append(PatternTerm(PatternTerm::TypeParenthesesSubpattern, subpatternId, parenthesesDisjunction.get(), capture, false));
         m_alternative = parenthesesDisjunction->addNewAlternative();
+        m_pattern.m_disjunctions.append(parenthesesDisjunction.release());
     }
 
     void atomParentheticalAssertionBegin(bool invert = false)
     {
-        PatternDisjunction* parenthesesDisjunction = new PatternDisjunction(m_alternative);
-        m_pattern.m_disjunctions.append(parenthesesDisjunction);
-        m_alternative->m_terms.append(PatternTerm(PatternTerm::TypeParentheticalAssertion, m_pattern.m_numSubpatterns + 1, parenthesesDisjunction, false, invert));
+        OwnPtr<PatternDisjunction> parenthesesDisjunction = adoptPtr(new PatternDisjunction(m_alternative));
+        m_alternative->m_terms.append(PatternTerm(PatternTerm::TypeParentheticalAssertion, m_pattern.m_numSubpatterns + 1, parenthesesDisjunction.get(), false, invert));
         m_alternative = parenthesesDisjunction->addNewAlternative();
         m_invertParentheticalAssertion = invert;
+        m_pattern.m_disjunctions.append(parenthesesDisjunction.release());
     }
 
     void atomParenthesesEnd()
@@ -433,23 +479,27 @@ public:
     // skip alternatives with m_startsWithBOL set true.
     PatternDisjunction* copyDisjunction(PatternDisjunction* disjunction, bool filterStartsWithBOL = false)
     {
-        PatternDisjunction* newDisjunction = 0;
+        OwnPtr<PatternDisjunction> newDisjunction;
         for (unsigned alt = 0; alt < disjunction->m_alternatives.size(); ++alt) {
-            PatternAlternative* alternative = disjunction->m_alternatives[alt];
+            PatternAlternative* alternative = disjunction->m_alternatives[alt].get();
             if (!filterStartsWithBOL || !alternative->m_startsWithBOL) {
                 if (!newDisjunction) {
-                    newDisjunction = new PatternDisjunction();
+                    newDisjunction = adoptPtr(new PatternDisjunction());
                     newDisjunction->m_parent = disjunction->m_parent;
                 }
                 PatternAlternative* newAlternative = newDisjunction->addNewAlternative();
+                newAlternative->m_terms.reserveInitialCapacity(alternative->m_terms.size());
                 for (unsigned i = 0; i < alternative->m_terms.size(); ++i)
                     newAlternative->m_terms.append(copyTerm(alternative->m_terms[i], filterStartsWithBOL));
             }
         }
         
-        if (newDisjunction)
-            m_pattern.m_disjunctions.append(newDisjunction);
-        return newDisjunction;
+        if (!newDisjunction)
+            return 0;
+
+        PatternDisjunction* copiedDisjunction = newDisjunction.get();
+        m_pattern.m_disjunctions.append(newDisjunction.release());
+        return copiedDisjunction;
     }
     
     PatternTerm copyTerm(PatternTerm& term, bool filterStartsWithBOL = false)
@@ -611,10 +661,10 @@ public:
         bool hasFixedSize = true;
 
         for (unsigned alt = 0; alt < disjunction->m_alternatives.size(); ++alt) {
-            PatternAlternative* alternative = disjunction->m_alternatives[alt];
+            PatternAlternative* alternative = disjunction->m_alternatives[alt].get();
             unsigned currentAlternativeCallFrameSize = setupAlternativeOffsets(alternative, initialCallFrameSize, initialInputPosition);
-            minimumInputSize = min(minimumInputSize, alternative->m_minimumSize);
-            maximumCallFrameSize = max(maximumCallFrameSize, currentAlternativeCallFrameSize);
+            minimumInputSize = std::min(minimumInputSize, alternative->m_minimumSize);
+            maximumCallFrameSize = std::max(maximumCallFrameSize, currentAlternativeCallFrameSize);
             hasFixedSize &= alternative->m_hasFixedSize;
         }
         
@@ -646,7 +696,7 @@ public:
         if (m_pattern.m_numSubpatterns)
             return;
 
-        Vector<PatternAlternative*>& alternatives = m_pattern.m_body->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives = m_pattern.m_body->m_alternatives;
         for (size_t i = 0; i < alternatives.size(); ++i) {
             Vector<PatternTerm>& terms = alternatives[i]->m_terms;
             if (terms.size()) {
@@ -681,7 +731,7 @@ public:
         if (loopDisjunction) {
             // Move alternatives from loopDisjunction to disjunction
             for (unsigned alt = 0; alt < loopDisjunction->m_alternatives.size(); ++alt)
-                disjunction->m_alternatives.append(loopDisjunction->m_alternatives[alt]);
+                disjunction->m_alternatives.append(loopDisjunction->m_alternatives[alt].release());
                 
             loopDisjunction->m_alternatives.clear();
         }
@@ -700,7 +750,7 @@ public:
             if (term.type == PatternTerm::TypeParenthesesSubpattern) {
                 PatternDisjunction* nestedDisjunction = term.parentheses.disjunction;
                 for (unsigned alt = 0; alt < nestedDisjunction->m_alternatives.size(); ++alt) {
-                    if (containsCapturingTerms(nestedDisjunction->m_alternatives[alt], 0, nestedDisjunction->m_alternatives[alt]->m_terms.size() - 1))
+                    if (containsCapturingTerms(nestedDisjunction->m_alternatives[alt].get(), 0, nestedDisjunction->m_alternatives[alt]->m_terms.size() - 1))
                         return true;
                 }
             }
@@ -716,11 +766,11 @@ public:
     // beginning and the end of the match.
     void optimizeDotStarWrappedExpressions()
     {
-        Vector<PatternAlternative*>& alternatives = m_pattern.m_body->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives = m_pattern.m_body->m_alternatives;
         if (alternatives.size() != 1)
             return;
 
-        PatternAlternative* alternative = alternatives[0];
+        PatternAlternative* alternative = alternatives[0].get();
         Vector<PatternTerm>& terms = alternative->m_terms;
         if (terms.size() >= 3) {
             bool startsWithBOL = false;
@@ -776,7 +826,7 @@ private:
     bool m_invertParentheticalAssertion;
 };
 
-const char* YarrPattern::compile(const UString& patternString)
+const char* YarrPattern::compile(const String& patternString)
 {
     YarrPatternConstructor constructor(*this);
 
@@ -809,7 +859,7 @@ const char* YarrPattern::compile(const UString& patternString)
     return 0;
 }
 
-YarrPattern::YarrPattern(const UString& pattern, bool ignoreCase, bool multiline, const char** error)
+YarrPattern::YarrPattern(const String& pattern, bool ignoreCase, bool multiline, const char** error)
     : m_ignoreCase(ignoreCase)
     , m_multiline(multiline)
     , m_containsBackreferences(false)

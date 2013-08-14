@@ -50,6 +50,7 @@
 #include "HTMLMarqueeElement.h"
 #include "HTMLNames.h"
 #include "RenderLayer.h"
+#include "RenderView.h"
 
 using namespace std;
 
@@ -115,8 +116,8 @@ int RenderMarquee::computePosition(EMarqueeDirection dir, bool stopAtContentEdge
     RenderStyle* s = box->style();
     if (isHorizontal()) {
         bool ltr = s->isLeftToRightDirection();
-        int clientWidth = box->clientWidth();
-        int contentWidth = ltr ? box->maxPreferredLogicalWidth() : box->minPreferredLogicalWidth();
+        LayoutUnit clientWidth = box->clientWidth();
+        LayoutUnit contentWidth = ltr ? box->maxPreferredLogicalWidth() : box->minPreferredLogicalWidth();
         if (ltr)
             contentWidth += (box->paddingRight() - box->borderLeft());
         else {
@@ -125,19 +126,19 @@ int RenderMarquee::computePosition(EMarqueeDirection dir, bool stopAtContentEdge
         }
         if (dir == MRIGHT) {
             if (stopAtContentEdge)
-                return max(zeroLayoutUnit, ltr ? (contentWidth - clientWidth) : (clientWidth - contentWidth));
+                return max<LayoutUnit>(0, ltr ? (contentWidth - clientWidth) : (clientWidth - contentWidth));
             else
                 return ltr ? contentWidth : clientWidth;
         }
         else {
             if (stopAtContentEdge)
-                return min(zeroLayoutUnit, ltr ? (contentWidth - clientWidth) : (clientWidth - contentWidth));
+                return min<LayoutUnit>(0, ltr ? (contentWidth - clientWidth) : (clientWidth - contentWidth));
             else
                 return ltr ? -clientWidth : -contentWidth;
         }
     }
     else {
-        int contentHeight = box->maxYLayoutOverflow() - box->borderTop() + box->paddingBottom();
+        int contentHeight = box->layoutOverflowRect().maxY() - box->borderTop() + box->paddingBottom();
         int clientHeight = box->clientHeight();
         if (dir == MUP) {
             if (stopAtContentEdge)
@@ -167,9 +168,9 @@ void RenderMarquee::start()
 
     if (!m_suspended && !m_stopped) {
         if (isHorizontal())
-            m_layer->scrollToOffset(m_start, 0);
+            m_layer->scrollToOffset(IntSize(m_start, 0));
         else
-            m_layer->scrollToOffset(0, m_start);
+            m_layer->scrollToOffset(IntSize(0, m_start));
     }
     else {
         m_suspended = false;
@@ -230,17 +231,12 @@ void RenderMarquee::updateMarqueeStyle()
         // FIXME: Bring these up with the CSS WG.
         if (isHorizontal() && m_layer->renderer()->childrenInline()) {
             s->setWhiteSpace(NOWRAP);
-            s->setTextAlign(TAAUTO);
+            s->setTextAlign(TASTART);
         }
     }
     
-    // Marquee height hack!! Make sure that, if it is a horizontal marquee, the height attribute is overridden 
-    // if it is smaller than the font size. If it is a vertical marquee and height is not specified, we default
-    // to a marquee of 200px.
-    if (isHorizontal()) {
-        if (s->height().isFixed() && s->height().value() < s->fontSize())
-            s->setHeight(Length(s->fontSize(), Fixed));
-    } else if (s->height().isAuto())  //vertical marquee with no specified height
+    // Legacy hack - multiple browsers default vertical marquees to 200px tall.
+    if (!isHorizontal() && s->height().isAuto())
         s->setHeight(Length(200, Fixed)); 
    
     if (speed() != marqueeSpeed()) {
@@ -259,7 +255,7 @@ void RenderMarquee::updateMarqueeStyle()
 
 void RenderMarquee::timerFired(Timer<RenderMarquee>*)
 {
-    if (m_layer->renderer()->needsLayout())
+    if (m_layer->renderer()->view()->needsLayout())
         return;
     
     if (m_reset) {
@@ -289,7 +285,7 @@ void RenderMarquee::timerFired(Timer<RenderMarquee>*)
         }
         bool positive = range > 0;
         int clientSize = (isHorizontal() ? m_layer->renderBox()->clientWidth() : m_layer->renderBox()->clientHeight());
-        int increment = abs(m_layer->renderer()->style()->marqueeIncrement().calcValue(clientSize));
+        int increment = abs(intValueForLength(m_layer->renderer()->style()->marqueeIncrement(), clientSize));
         int currentPos = (isHorizontal() ? m_layer->scrollXOffset() : m_layer->scrollYOffset());
         newPos =  currentPos + (addIncrement ? increment : -increment);
         if (positive)

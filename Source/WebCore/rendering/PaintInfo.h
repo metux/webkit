@@ -32,7 +32,9 @@
 
 #include "GraphicsContext.h"
 #include "IntRect.h"
+#include "LayoutRect.h"
 #include "PaintPhase.h"
+#include <limits>
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 
@@ -50,13 +52,13 @@ typedef HashMap<OverlapTestRequestClient*, IntRect> OverlapTestRequestMap;
  * (tx|ty) is the calculated position of the parent
  */
 struct PaintInfo {
-    PaintInfo(GraphicsContext* newContext, const IntRect& newRect, PaintPhase newPhase, bool newForceBlackText,
-              RenderObject* newPaintingRoot, RenderRegion* region, ListHashSet<RenderInline*>* newOutlineObjects,
+    PaintInfo(GraphicsContext* newContext, const IntRect& newRect, PaintPhase newPhase, PaintBehavior newPaintBehavior,
+              RenderObject* newPaintingRoot = 0, RenderRegion* region = 0, ListHashSet<RenderInline*>* newOutlineObjects = 0,
               OverlapTestRequestMap* overlapTestRequests = 0)
         : context(newContext)
         , rect(newRect)
         , phase(newPhase)
-        , forceBlackText(newForceBlackText)
+        , paintBehavior(newPaintBehavior)
         , paintingRoot(newPaintingRoot)
         , renderRegion(region)
         , outlineObjects(newOutlineObjects)
@@ -81,6 +83,11 @@ struct PaintInfo {
         return !paintingRoot || paintingRoot == renderer;
     }
 
+    bool forceBlackText() const { return paintBehavior & PaintBehaviorForceBlackText; }
+
+    bool skipRootBackground() const { return paintBehavior & PaintBehaviorSkipRootBackground; }
+    bool paintRootBackgroundOnly() const { return paintBehavior & PaintBehaviorRootBackgroundOnly; }
+
 #if ENABLE(SVG)
     void applyTransform(const AffineTransform& localToAncestorTransform)
     {
@@ -96,13 +103,13 @@ struct PaintInfo {
     }
 #endif
 
-    static IntRect infiniteRect() { return IntRect(INT_MIN / 2, INT_MIN / 2, INT_MAX, INT_MAX); }
+    static IntRect infiniteRect() { return IntRect(LayoutRect::infiniteRect()); }
 
     // FIXME: Introduce setters/getters at some point. Requires a lot of changes throughout rendering/.
     GraphicsContext* context;
     IntRect rect;
     PaintPhase phase;
-    bool forceBlackText;
+    PaintBehavior paintBehavior;
     RenderObject* paintingRoot; // used to draw just one element and its visual kids
     RenderRegion* renderRegion;
     ListHashSet<RenderInline*>* outlineObjects; // used to list outlines that should be painted by a block with inline children

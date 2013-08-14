@@ -21,9 +21,9 @@
 #define SVGImageCache_h
 
 #if ENABLE(SVG)
+#include "FloatSize.h"
 #include "Image.h"
 #include "IntSize.h"
-#include "Timer.h"
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
@@ -31,11 +31,14 @@
 namespace WebCore {
 
 class CachedImage;
+class CachedImageClient;
 class ImageBuffer;
-class RenderObject;
 class SVGImage;
+class SVGImageForContainer;
+class RenderObject;
 
 class SVGImageCache {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     ~SVGImageCache();
 
@@ -44,63 +47,20 @@ public:
         return adoptPtr(new SVGImageCache(image));
     }
 
-    struct SizeAndZoom {
-        SizeAndZoom()
-            : zoom(1)
-        {
-        }
+    void removeClientFromCache(const CachedImageClient*);
 
-        SizeAndZoom(const IntSize& newSize, float newZoom)
-            : size(newSize)
-            , zoom(newZoom)
-        {
-        }
+    void setContainerSizeForRenderer(const CachedImageClient*, const IntSize&, float);
+    IntSize imageSizeForRenderer(const RenderObject*) const;
 
-        IntSize size;
-        float zoom;
-    };
-
-    void removeRendererFromCache(const RenderObject*);
-
-    void setRequestedSizeAndZoom(const RenderObject*, const SizeAndZoom&);
-    SizeAndZoom requestedSizeAndZoom(const RenderObject*) const;
-
-    Image* lookupOrCreateBitmapImageForRenderer(const RenderObject*);
-    void imageContentChanged();
+    Image* imageForRenderer(const RenderObject*);
 
 private:
     SVGImageCache(SVGImage*);
-    void redrawTimerFired(Timer<SVGImageCache>*);
 
-    struct ImageData {
-        ImageData()
-            : imageNeedsUpdate(false)
-            , buffer(0)
-        {
-        }
-
-        ImageData(ImageBuffer* newBuffer, PassRefPtr<Image> newImage, const SizeAndZoom& newSizeAndZoom)
-            : imageNeedsUpdate(false)
-            , sizeAndZoom(newSizeAndZoom)
-            , buffer(newBuffer)
-            , image(newImage)
-        {
-        }
-
-        bool imageNeedsUpdate;
-        SizeAndZoom sizeAndZoom;
-
-        ImageBuffer* buffer;
-        RefPtr<Image> image;
-    };
-
-    typedef HashMap<const RenderObject*, SizeAndZoom> SizeAndZoomMap;
-    typedef HashMap<const RenderObject*, ImageData> ImageDataMap;
+    typedef HashMap<const CachedImageClient*, RefPtr<SVGImageForContainer> > ImageForContainerMap;
 
     SVGImage* m_svgImage;
-    SizeAndZoomMap m_sizeAndZoomMap;
-    ImageDataMap m_imageDataMap;
-    Timer<SVGImageCache> m_redrawTimer;
+    ImageForContainerMap m_imageForContainerMap;
 };
 
 } // namespace WebCore

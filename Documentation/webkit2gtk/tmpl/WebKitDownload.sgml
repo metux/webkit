@@ -53,7 +53,6 @@ WebKitDownload
 
 @webkitdownload: the object which received the signal.
 @arg1: 
-@Returns: 
 
 <!-- ##### SIGNAL WebKitDownload::finished ##### -->
 <para>
@@ -61,7 +60,6 @@ WebKitDownload
 </para>
 
 @webkitdownload: the object which received the signal.
-@Returns: 
 
 <!-- ##### SIGNAL WebKitDownload::received-data ##### -->
 <para>
@@ -70,7 +68,6 @@ WebKitDownload
 
 @webkitdownload: the object which received the signal.
 @arg1: 
-@Returns: 
 
 <!-- ##### ARG WebKitDownload:destination ##### -->
 <para>
@@ -86,6 +83,15 @@ WebKitDownload
 <para>
 
 </para>
+
+<!-- ##### FUNCTION webkit_download_get_request ##### -->
+<para>
+
+</para>
+
+@download: 
+@Returns: 
+
 
 <!-- ##### FUNCTION webkit_download_get_destination ##### -->
 <para>
@@ -132,6 +138,24 @@ WebKitDownload
 
 
 <!-- ##### FUNCTION webkit_download_get_elapsed_time ##### -->
+<para>
+
+</para>
+
+@download: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_download_get_received_data_length ##### -->
+<para>
+
+</para>
+
+@download: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_download_get_web_view ##### -->
 <para>
 
 </para>

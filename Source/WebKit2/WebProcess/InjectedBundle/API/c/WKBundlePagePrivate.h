@@ -55,7 +55,11 @@ WK_EXPORT void WKBundlePageSimulateMouseMotion(WKBundlePageRef page, WKPoint pos
 
 WK_EXPORT uint64_t WKBundlePageGetRenderTreeSize(WKBundlePageRef page);
 
-// FIXME: This is temporary. Ultimately WebKit should choose the threshold itself.
+WK_EXPORT WKRenderObjectRef WKBundlePageCopyRenderTree(WKBundlePageRef page);
+WK_EXPORT WKRenderLayerRef WKBundlePageCopyRenderLayerTree(WKBundlePageRef page);
+
+// FIXME: This function is only still here to keep open source Mac builds building. It doesn't do anything anymore!
+// We should remove it as soon as we can.
 WK_EXPORT void WKBundlePageSetPaintedObjectsCounterThreshold(WKBundlePageRef page, uint64_t threshold);
 
 WK_EXPORT void WKBundlePageSetTracksRepaints(WKBundlePageRef page, bool trackRepaints);
@@ -63,16 +67,19 @@ WK_EXPORT bool WKBundlePageIsTrackingRepaints(WKBundlePageRef page);
 WK_EXPORT void WKBundlePageResetTrackedRepaints(WKBundlePageRef page);
 WK_EXPORT WKArrayRef WKBundlePageCopyTrackedRepaintRects(WKBundlePageRef page);
 
-WK_EXPORT WKStringRef WKBundlePageViewportConfigurationAsText(WKBundlePageRef, int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight);
-
 WK_EXPORT void WKBundlePageSetComposition(WKBundlePageRef page, WKStringRef text, int from, int length);
 WK_EXPORT bool WKBundlePageHasComposition(WKBundlePageRef page);
 WK_EXPORT void WKBundlePageConfirmComposition(WKBundlePageRef page);
 WK_EXPORT void WKBundlePageConfirmCompositionWithText(WKBundlePageRef page, WKStringRef text);
 
-WK_EXPORT void* WKAccessibilityRootObject(WKBundlePageRef);
-WK_EXPORT void* WKAccessibilityFocusedObject(WKBundlePageRef);    
+WK_EXPORT bool WKBundlePageCanShowMIMEType(WKBundlePageRef, WKStringRef mimeType);
 
+WK_EXPORT void* WKAccessibilityRootObject(WKBundlePageRef);
+WK_EXPORT void* WKAccessibilityFocusedObject(WKBundlePageRef);
+
+WK_EXPORT WKArrayRef WKBundlePageCopyContextMenuItemTitles(WKBundlePageRef);
+
+WK_EXPORT void WKBundlePageSetViewMode(WKBundlePageRef pageRef, WKStringRef mode);
 #ifdef __cplusplus
 }
 #endif

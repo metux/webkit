@@ -31,6 +31,7 @@
 #include "FloatRect.h"
 #include "HTMLElement.h"
 #include "IntSize.h"
+#include <wtf/Forward.h>
 
 #if PLATFORM(CHROMIUM) || PLATFORM(QT)
 #define DefaultInterpolationQuality InterpolationMedium
@@ -45,6 +46,7 @@ namespace WebCore {
 class CanvasContextAttributes;
 class CanvasRenderingContext;
 class GraphicsContext;
+class GraphicsContextStateSaver;
 class HTMLCanvasElement;
 class Image;
 class ImageData;
@@ -80,7 +82,7 @@ public:
 
     void setSize(const IntSize& newSize)
     { 
-        if (newSize == size())
+        if (newSize == size() && targetDeviceScaleFactor() == m_deviceScaleFactor)
             return;
         m_ignoreReset = true; 
         setWidth(newSize.width());
@@ -97,6 +99,7 @@ public:
 
     // Used for rendering
     void didDraw(const FloatRect&);
+    void notifyObserversCanvasChanged(const FloatRect&);
 
     void paint(GraphicsContext*, const LayoutRect&, bool useLowQualityScale = false);
 
@@ -121,7 +124,7 @@ public:
     void setOriginTainted() { m_originClean = false; }
     bool originClean() const { return m_originClean; }
 
-    CSSStyleSelector* styleSelector();
+    StyleResolver* styleResolver();
 
     AffineTransform baseTransform() const;
 
@@ -134,19 +137,30 @@ public:
 
     bool shouldAccelerate(const IntSize&) const;
 
+    float deviceScaleFactor() const { return m_deviceScaleFactor; }
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 private:
     HTMLCanvasElement(const QualifiedName&, Document*);
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual void attach();
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
     void reset();
 
+    float targetDeviceScaleFactor() const;
+
     void createImageBuffer() const;
+    void clearImageBuffer() const;
 
     void setSurfaceSize(const IntSize&);
 
     bool shouldDefer() const;
+
+    bool paintsIntoCanvasBuffer() const;
 
     HashSet<CanvasObserver*> m_observers;
 
@@ -164,7 +178,9 @@ private:
 
     // m_createdImageBuffer means we tried to malloc the buffer.  We didn't necessarily get it.
     mutable bool m_hasCreatedImageBuffer;
+    mutable bool m_didClearImageBuffer;
     mutable OwnPtr<ImageBuffer> m_imageBuffer;
+    mutable OwnPtr<GraphicsContextStateSaver> m_contextStateSaver;
     
     mutable RefPtr<Image> m_presentedImage;
     mutable RefPtr<Image> m_copiedImage; // FIXME: This is temporary for platforms that have to copy the image buffer to render (and for CSSCanvasValue).

@@ -94,6 +94,13 @@ public:
             m_client->didFail(error);
     }
 
+    void didFailAccessControlCheck(const ResourceError& error)
+    {
+        m_done = true;
+        if (m_client)
+            m_client->didFailAccessControlCheck(error);
+    }
+
     void didFailRedirectCheck()
     {
         m_done = true;
@@ -116,7 +123,7 @@ public:
 #endif
 
 protected:
-    ThreadableLoaderClientWrapper(ThreadableLoaderClient* client)
+    explicit ThreadableLoaderClientWrapper(ThreadableLoaderClient* client)
         : m_client(client)
         , m_done(false)
     {

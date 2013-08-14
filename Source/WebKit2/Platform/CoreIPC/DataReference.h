@@ -72,8 +72,8 @@ public:
         return result;
     }
 
-    void encode(ArgumentEncoder* encoder) const;
-    static bool decode(ArgumentDecoder* decoder, DataReference& dataReference);
+    void encode(ArgumentEncoder&) const;
+    static bool decode(ArgumentDecoder&, DataReference&);
 
 private:
     const uint8_t* m_data;

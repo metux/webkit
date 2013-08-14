@@ -30,9 +30,9 @@
 
 #include "config.h"
 
-#include "PageConsoleAgent.h"
-
 #if ENABLE(INSPECTOR)
+
+#include "PageConsoleAgent.h"
 
 #include "DOMWindow.h"
 #include "InjectedScriptHost.h"
@@ -44,7 +44,7 @@
 
 namespace WebCore {
 
-PageConsoleAgent::PageConsoleAgent(InstrumentingAgents* instrumentingAgents, InspectorAgent* inspectorAgent, InspectorState* state, InjectedScriptManager* injectedScriptManager, InspectorDOMAgent* domAgent)
+PageConsoleAgent::PageConsoleAgent(InstrumentingAgents* instrumentingAgents, InspectorAgent* inspectorAgent, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, InspectorDOMAgent* domAgent)
     : InspectorConsoleAgent(instrumentingAgents, state, injectedScriptManager)
     , m_inspectorAgent(inspectorAgent)
     , m_inspectorDOMAgent(domAgent)
@@ -77,7 +77,7 @@ private:
 void PageConsoleAgent::addInspectedNode(ErrorString* errorString, int nodeId)
 {
     Node* node = m_inspectorDOMAgent->nodeForId(nodeId);
-    if (!node) {
+    if (!node || node->isInShadowTree()) {
         *errorString = "nodeId is not valid";
         return;
     }

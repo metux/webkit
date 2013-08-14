@@ -43,18 +43,14 @@
 // knowledge of the frame and editor or moved into the editing directory.
 
 #if PLATFORM(MAC)
+OBJC_CLASS NSAttributedString;
 OBJC_CLASS NSFileWrapper;
-OBJC_CLASS NSPasteboard;
 OBJC_CLASS NSArray;
 #endif
 
 #if PLATFORM(WIN)
 #include <windows.h>
 typedef struct HWND__* HWND;
-#endif
-
-#if PLATFORM(CHROMIUM)
-#include "PasteboardPrivate.h"
 #endif
 
 namespace WebCore {
@@ -67,6 +63,7 @@ extern const char* WebURLPboardType;
 extern const char* WebURLsWithTitlesPboardType;
 #endif
 
+    class ArchiveResource;
 class Clipboard;
 class DocumentFragment;
 class Frame;
@@ -74,20 +71,27 @@ class HitTestResult;
 class KURL;
 class Node;
 class Range;
-class ArchiveResource;
+class SharedBuffer;
     
 class Pasteboard {
     WTF_MAKE_NONCOPYABLE(Pasteboard); WTF_MAKE_FAST_ALLOCATED;
 public:
+    enum SmartReplaceOption {
+        CanSmartReplace,
+        CannotSmartReplace
+    };
+
 #if PLATFORM(MAC)
     // This is required to support OS X services.
-    void writeSelectionForTypes(const Vector<String>& pasteboardTypes, Range* selectedRange, bool canSmartCopyOrDelete, Frame*);
-    Pasteboard(const String& pasteboardName);
+    void writeSelectionForTypes(const Vector<String>& pasteboardTypes, bool canSmartCopyOrDelete, Frame*);
+    explicit Pasteboard(const String& pasteboardName);
+    static String getStringSelection(Frame*);
+    static PassRefPtr<SharedBuffer> getDataSelection(Frame*, const String& pasteboardType);
 #endif
     
     static Pasteboard* generalPasteboard();
     void writeSelection(Range*, bool canSmartCopyOrDelete, Frame*);
-    void writePlainText(const String&);
+    void writePlainText(const String&, SmartReplaceOption);
     void writeURL(const KURL&, const String&, Frame* = 0);
     void writeImage(Node*, const KURL&, const String& title);
     void writeClipboard(Clipboard*);
@@ -96,9 +100,12 @@ public:
     PassRefPtr<DocumentFragment> documentFragment(Frame*, PassRefPtr<Range>, bool allowPlainText, bool& chosePlainText);
     String plainText(Frame* = 0);
     
-#if PLATFORM(QT) || PLATFORM(CHROMIUM)
+#if PLATFORM(QT) || PLATFORM(CHROMIUM) || PLATFORM(GTK)
     bool isSelectionMode() const;
-    void setSelectionMode(bool selectionMode);
+    void setSelectionMode(bool);
+#else
+    bool isSelectionMode() const { return false; }
+    void setSelectionMode(bool) { }
 #endif
 
 #if PLATFORM(GTK)
@@ -120,9 +127,6 @@ private:
     bool m_selectionMode;
 #endif
 
-#if PLATFORM(CHROMIUM)
-    PasteboardPrivate p;
-#endif
 };
 
 } // namespace WebCore

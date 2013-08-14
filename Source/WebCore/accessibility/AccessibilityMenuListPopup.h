@@ -44,19 +44,20 @@ public:
 
     void didUpdateActiveOption(int optionIndex);
 
+
 private:
     AccessibilityMenuListPopup();
 
     virtual bool isMenuListPopup() const { return true; }
 
     virtual LayoutRect elementRect() const { return LayoutRect(); }
-    virtual LayoutSize size() const { return LayoutSize(); }
     virtual AccessibilityRole roleValue() const { return MenuListPopupRole; }
 
     virtual bool isVisible() const;
     virtual bool press() const;
     virtual void addChildren();
     virtual void childrenChanged();
+    virtual bool computeAccessibilityIsIgnored() const;
 
     AccessibilityMenuListOption* menuListOptionAccessibilityObject(HTMLElement*) const;
 };

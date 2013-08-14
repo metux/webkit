@@ -40,10 +40,13 @@
 namespace WebCore {
 
 struct FilterData {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    enum FilterDataState { PaintingSource, Applying, Built, CycleDetected, MarkedForRemoval };
+
     FilterData()
         : savedContext(0)
-        , builded(false)
-        , markedForRemoval(false)
+        , state(PaintingSource)
     {
     }
 
@@ -53,9 +56,9 @@ struct FilterData {
     GraphicsContext* savedContext;
     AffineTransform shearFreeAbsoluteTransform;
     FloatRect boundaries;
+    FloatRect drawingRegion;
     FloatSize scale;
-    bool builded : 1;
-    bool markedForRemoval : 1;
+    FilterDataState state;
 };
 
 class GraphicsContext;
@@ -86,6 +89,7 @@ public:
     virtual RenderSVGResourceType resourceType() const { return s_resourceType; }
     static RenderSVGResourceType s_resourceType;
 
+    FloatRect drawingRegion(RenderObject*) const;
 private:
     bool fitsInMaximumImageSize(const FloatSize&, FloatSize&);
 

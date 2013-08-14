@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,6 +25,8 @@
 
 #include "config.h"
 #include "PluginInfoStore.h"
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "PluginModuleInfo.h"
 #include <WebCore/KURL.h>
@@ -88,13 +90,12 @@ void PluginInfoStore::loadPluginsIfNecessary()
     // Then load plug-ins that are not in the standard plug-ins directories.
     addFromVector(uniquePluginPaths, individualPluginPaths());
 
-    Vector<PluginModuleInfo> plugins;
+    m_plugins.clear();
 
     PathHashSet::const_iterator end = uniquePluginPaths.end();
     for (PathHashSet::const_iterator it = uniquePluginPaths.begin(); it != end; ++it)
-        loadPlugin(plugins, *it);
+        loadPlugin(m_plugins, *it);
 
-    m_plugins.swap(plugins);
     m_pluginListIsUpToDate = true;
 }
 
@@ -114,10 +115,7 @@ void PluginInfoStore::loadPlugin(Vector<PluginModuleInfo>& plugins, const String
 Vector<PluginModuleInfo> PluginInfoStore::plugins()
 {
     loadPluginsIfNecessary();
-
-    Vector<PluginModuleInfo> plugins(m_plugins);
-
-    return plugins;
+    return m_plugins;
 }
 
 PluginModuleInfo PluginInfoStore::findPluginForMIMEType(const String& mimeType) const
@@ -164,7 +162,7 @@ static inline String pathExtension(const KURL& url)
 {
     String extension;
     String filename = url.lastPathComponent();
-    if (!filename.endsWith("/")) {
+    if (!filename.endsWith('/')) {
         int extensionPos = filename.reverseFind('.');
         if (extensionPos != -1)
             extension = filename.substring(extensionPos + 1);
@@ -174,6 +172,16 @@ static inline String pathExtension(const KURL& url)
 }
 
 #if !PLATFORM(MAC)
+PluginModuleLoadPolicy PluginInfoStore::policyForPlugin(const PluginModuleInfo&)
+{
+    return PluginModuleLoadNormally;
+}
+
+bool PluginInfoStore::reactivateInactivePlugin(const PluginModuleInfo&)
+{
+    return false;
+}
+
 String PluginInfoStore::getMIMETypeForExtension(const String& extension)
 {
     return MIMETypeRegistry::getMIMETypeForExtension(extension);
@@ -224,3 +232,5 @@ PluginModuleInfo PluginInfoStore::infoForPluginWithPath(const String& pluginPath
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

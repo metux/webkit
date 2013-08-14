@@ -33,17 +33,20 @@
 #include "TextFieldInputType.h"
 
 #include "BeforeTextInsertedEvent.h"
+#include "Chrome.h"
+#include "ChromeClient.h"
+#include "ElementShadow.h"
 #include "FormDataList.h"
 #include "Frame.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "KeyboardEvent.h"
+#include "NodeRenderStyle.h"
 #include "Page.h"
 #include "RenderLayer.h"
 #include "RenderTextControlSingleLine.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
 #include "TextControlInnerElements.h"
 #include "TextEvent.h"
 #include "TextIterator.h"
@@ -61,6 +64,18 @@ TextFieldInputType::TextFieldInputType(HTMLInputElement* element)
 
 TextFieldInputType::~TextFieldInputType()
 {
+    if (m_innerSpinButton)
+        m_innerSpinButton->removeSpinButtonOwner();
+}
+
+bool TextFieldInputType::isKeyboardFocusable(KeyboardEvent*) const
+{
+    return element()->isTextFormControlFocusable();
+}
+
+bool TextFieldInputType::isMouseFocusable() const
+{
+    return element()->isTextFormControlFocusable();
 }
 
 bool TextFieldInputType::isTextField() const
@@ -70,7 +85,7 @@ bool TextFieldInputType::isTextField() const
 
 bool TextFieldInputType::valueMissing(const String& value) const
 {
-    return element()->required() && value.isEmpty();
+    return element()->isRequired() && value.isEmpty();
 }
 
 bool TextFieldInputType::canSetSuggestedValue()
@@ -80,34 +95,49 @@ bool TextFieldInputType::canSetSuggestedValue()
 
 void TextFieldInputType::setValue(const String& sanitizedValue, bool valueChanged, TextFieldEventBehavior eventBehavior)
 {
+    // Grab this input element to keep reference even if JS event handler
+    // changes input type.
+    RefPtr<HTMLInputElement> input(element());
+
     // We don't ask InputType::setValue to dispatch events because
     // TextFieldInputType dispatches events different way from InputType.
     InputType::setValue(sanitizedValue, valueChanged, DispatchNoEvent);
 
     if (valueChanged)
-        element()->updateInnerTextValue();
+        updateInnerTextValue();
 
     unsigned max = visibleValue().length();
-    if (element()->focused())
-        element()->setSelectionRange(max, max);
+    if (input->focused())
+        input->setSelectionRange(max, max);
     else
-        element()->cacheSelectionInResponseToSetValue(max);
+        input->cacheSelectionInResponseToSetValue(max);
 
     if (!valueChanged)
         return;
 
-    if (eventBehavior != DispatchNoEvent) {
+    switch (eventBehavior) {
+    case DispatchChangeEvent:
         // If the user is still editing this field, dispatch an input event rather than a change event.
         // The change event will be dispatched when editing finishes.
-        if (element()->focused())
-            element()->dispatchFormControlInputEvent();
+        if (input->focused())
+            input->dispatchFormControlInputEvent();
         else
-            element()->dispatchFormControlChangeEvent();
+            input->dispatchFormControlChangeEvent();
+        break;
+
+    case DispatchInputAndChangeEvent: {
+        input->dispatchFormControlInputEvent();
+        input->dispatchFormControlChangeEvent();
+        break;
+    }
+
+    case DispatchNoEvent:
+        break;
     }
 
     // FIXME: Why do we do this when eventBehavior == DispatchNoEvent
-    if (!element()->focused() || eventBehavior == DispatchNoEvent)
-        element()->setTextAsOfLastFormControlChangeEvent(sanitizedValue);
+    if (!input->focused() || eventBehavior == DispatchNoEvent)
+        input->setTextAsOfLastFormControlChangeEvent(sanitizedValue);
 }
 
 void TextFieldInputType::handleKeydownEvent(KeyboardEvent* event)
@@ -122,43 +152,34 @@ void TextFieldInputType::handleKeydownEvent(KeyboardEvent* event)
 
 void TextFieldInputType::handleKeydownEventForSpinButton(KeyboardEvent* event)
 {
-    if (element()->disabled() || element()->readOnly())
+    if (element()->isDisabledOrReadOnly())
         return;
     const String& key = event->keyIdentifier();
-    int step = 0;
     if (key == "Up")
-        step = 1;
+        spinButtonStepUp();
     else if (key == "Down")
-        step = -1;
+        spinButtonStepDown();
     else
         return;
-    element()->stepUpFromRenderer(step);
-    event->setDefaultHandled();
-}
-
-void TextFieldInputType::handleWheelEventForSpinButton(WheelEvent* event)
-{
-    if (element()->disabled() || element()->readOnly() || !element()->focused())
-        return;
-    int step = 0;
-    if (event->wheelDeltaY() > 0)
-        step = 1;
-    else if (event->wheelDeltaY() < 0)
-        step = -1;
-    else
-        return;
-    element()->stepUpFromRenderer(step);
     event->setDefaultHandled();
 }
 
 void TextFieldInputType::forwardEvent(Event* event)
 {
+    if (m_innerSpinButton) {
+        m_innerSpinButton->forwardEvent(event);
+        if (event->defaultHandled())
+            return;
+    }
+
     if (element()->renderer() && (event->isMouseEvent() || event->isDragEvent() || event->hasInterface(eventNames().interfaceForWheelEvent) || event->type() == eventNames().blurEvent || event->type() == eventNames().focusEvent)) {
         RenderTextControlSingleLine* renderTextControl = toRenderTextControlSingleLine(element()->renderer());
         if (event->type() == eventNames().blurEvent) {
             if (RenderBox* innerTextRenderer = innerTextElement()->renderBox()) {
-                if (RenderLayer* innerLayer = innerTextRenderer->layer())
-                    innerLayer->scrollToOffset(!renderTextControl->style()->isLeftToRightDirection() ? innerLayer->scrollWidth() : 0, 0, RenderLayer::ScrollOffsetClamped);
+                if (RenderLayer* innerLayer = innerTextRenderer->layer()) {
+                    IntSize scrollOffset(!renderTextControl->style()->isLeftToRightDirection() ? innerLayer->scrollWidth() : 0, 0);
+                    innerLayer->scrollToOffset(scrollOffset, RenderLayer::ScrollOffsetClamped);
+                }
             }
 
             renderTextControl->capsLockStateMayHaveChanged();
@@ -172,8 +193,7 @@ void TextFieldInputType::forwardEvent(Event* event)
 void TextFieldInputType::handleBlurEvent()
 {
     InputType::handleBlurEvent();
-    if (Frame* frame = element()->document()->frame())
-        frame->editor()->textFieldDidEndEditing(element());
+    element()->endEditing();
 }
 
 bool TextFieldInputType::shouldSubmitImplicitly(Event* event)
@@ -195,47 +215,57 @@ bool TextFieldInputType::needsContainer() const
 #endif
 }
 
+bool TextFieldInputType::shouldHaveSpinButton() const
+{
+    Document* document = element()->document();
+    RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
+    return theme->shouldHaveSpinButton(element());
+}
+
 void TextFieldInputType::createShadowSubtree()
 {
-    ASSERT(element()->hasShadowRoot());
+    ASSERT(element()->shadow());
 
     ASSERT(!m_innerText);
     ASSERT(!m_innerBlock);
     ASSERT(!m_innerSpinButton);
 
     Document* document = element()->document();
-    RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
-    bool shouldHaveSpinButton = theme->shouldHaveSpinButton(element());
-    bool createsContainer = shouldHaveSpinButton || needsContainer();
+    ChromeClient* chromeClient = document->page() ? document->page()->chrome()->client() : 0;
+    bool shouldAddDecorations = chromeClient && chromeClient->willAddTextFieldDecorationsTo(element());
+    bool shouldHaveSpinButton = this->shouldHaveSpinButton();
+    bool createsContainer = shouldHaveSpinButton || needsContainer() || shouldAddDecorations;
 
-    ExceptionCode ec = 0;
     m_innerText = TextControlInnerTextElement::create(document);
     if (!createsContainer) {
-        element()->shadowRootList()->oldestShadowRoot()->appendChild(m_innerText, ec);
+        element()->userAgentShadowRoot()->appendChild(m_innerText, IGNORE_EXCEPTION);
         return;
     }
 
-    ShadowRoot* shadowRoot = element()->shadowRootList()->oldestShadowRoot();
+    ShadowRoot* shadowRoot = element()->userAgentShadowRoot();
     m_container = HTMLDivElement::create(document);
-    m_container->setShadowPseudoId("-webkit-textfield-decoration-container");
-    shadowRoot->appendChild(m_container, ec);
+    m_container->setPseudo(AtomicString("-webkit-textfield-decoration-container", AtomicString::ConstructFromLiteral));
+    shadowRoot->appendChild(m_container, IGNORE_EXCEPTION);
 
     m_innerBlock = TextControlInnerElement::create(document);
-    m_innerBlock->appendChild(m_innerText, ec);
-    m_container->appendChild(m_innerBlock, ec);
+    m_innerBlock->appendChild(m_innerText, IGNORE_EXCEPTION);
+    m_container->appendChild(m_innerBlock, IGNORE_EXCEPTION);
 
 #if ENABLE(INPUT_SPEECH)
     ASSERT(!m_speechButton);
     if (element()->isSpeechEnabled()) {
         m_speechButton = InputFieldSpeechButtonElement::create(document);
-        m_container->appendChild(m_speechButton, ec);
+        m_container->appendChild(m_speechButton, IGNORE_EXCEPTION);
     }
 #endif
 
     if (shouldHaveSpinButton) {
-        m_innerSpinButton = SpinButtonElement::create(document);
-        m_container->appendChild(m_innerSpinButton, ec);
+        m_innerSpinButton = SpinButtonElement::create(document, *this);
+        m_container->appendChild(m_innerSpinButton, IGNORE_EXCEPTION);
     }
+
+    if (shouldAddDecorations)
+        chromeClient->addTextFieldDecorationsTo(element());
 }
 
 HTMLElement* TextFieldInputType::containerElement() const
@@ -280,6 +310,8 @@ void TextFieldInputType::destroyShadowSubtree()
 #if ENABLE(INPUT_SPEECH)
     m_speechButton.clear();
 #endif
+    if (m_innerSpinButton)
+        m_innerSpinButton->removeSpinButtonOwner();
     m_innerSpinButton.clear();
     m_container.clear();
 }
@@ -294,6 +326,11 @@ void TextFieldInputType::readonlyAttributeChanged()
 {
     if (m_innerSpinButton)
         m_innerSpinButton->releaseCapture();
+}
+
+bool TextFieldInputType::supportsReadOnly() const
+{
+    return true;
 }
 
 bool TextFieldInputType::shouldUseInputMethod() const
@@ -348,6 +385,10 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent* 
 
     // Truncate the inserted text to avoid violating the maxLength and other constraints.
     String eventText = event->text();
+    unsigned textLength = eventText.length();
+    while (textLength > 0 && isASCIILineBreak(eventText[textLength - 1]))
+        textLength--;
+    eventText.truncate(textLength);
     eventText.replace("\r\n", " ");
     eventText.replace('\r', ' ');
     eventText.replace('\n', ' ');
@@ -357,31 +398,37 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent* 
 
 bool TextFieldInputType::shouldRespectListAttribute()
 {
-    return true;
+    return InputType::themeSupportsDataListUI(this);
 }
 
 void TextFieldInputType::updatePlaceholderText()
 {
     if (!supportsPlaceholder())
         return;
-    ExceptionCode ec = 0;
     String placeholderText = element()->strippedPlaceholder();
     if (placeholderText.isEmpty()) {
         if (m_placeholder) {
-            m_placeholder->parentNode()->removeChild(m_placeholder.get(), ec);
-            ASSERT(!ec);
+            m_placeholder->parentNode()->removeChild(m_placeholder.get(), ASSERT_NO_EXCEPTION);
             m_placeholder.clear();
         }
         return;
     }
     if (!m_placeholder) {
         m_placeholder = HTMLDivElement::create(element()->document());
-        m_placeholder->setShadowPseudoId("-webkit-input-placeholder");
-        element()->shadowRootList()->oldestShadowRoot()->insertBefore(m_placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling(), ec);
-        ASSERT(!ec);
+        m_placeholder->setPseudo(AtomicString("-webkit-input-placeholder", AtomicString::ConstructFromLiteral));
+        element()->userAgentShadowRoot()->insertBefore(m_placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling(), ASSERT_NO_EXCEPTION);
     }
-    m_placeholder->setInnerText(placeholderText, ec);
-    ASSERT(!ec);
+    m_placeholder->setInnerText(placeholderText, ASSERT_NO_EXCEPTION);
+    element()->fixPlaceholderRenderer(m_placeholder.get(), m_container ? m_container.get() : m_innerText.get());
+}
+
+void TextFieldInputType::attach()
+{
+    InputType::attach();
+    // If container exists, the container should not have any content data.
+    ASSERT(!m_container || !m_container->renderStyle() || !m_container->renderStyle()->hasContent());
+
+    element()->fixPlaceholderRenderer(m_placeholder.get(), m_container ? m_container.get() : m_innerText.get());
 }
 
 bool TextFieldInputType::appendFormData(FormDataList& list, bool multipart) const
@@ -391,6 +438,81 @@ bool TextFieldInputType::appendFormData(FormDataList& list, bool multipart) cons
     if (!dirnameAttrValue.isNull())
         list.appendData(dirnameAttrValue, element()->directionForFormData());
     return true;
+}
+
+String TextFieldInputType::convertFromVisibleValue(const String& visibleValue) const
+{
+    return visibleValue;
+}
+
+void TextFieldInputType::subtreeHasChanged()
+{
+    ASSERT(element()->renderer());
+
+    bool wasChanged = element()->wasChangedSinceLastFormControlChangeEvent();
+    element()->setChangedSinceLastFormControlChangeEvent(true);
+
+    // We don't need to call sanitizeUserInputValue() function here because
+    // HTMLInputElement::handleBeforeTextInsertedEvent() has already called
+    // sanitizeUserInputValue().
+    // sanitizeValue() is needed because IME input doesn't dispatch BeforeTextInsertedEvent.
+    element()->setValueFromRenderer(sanitizeValue(convertFromVisibleValue(element()->innerTextValue())));
+    element()->updatePlaceholderVisibility(false);
+    // Recalc for :invalid change.
+    element()->setNeedsStyleRecalc();
+
+    didSetValueByUserEdit(wasChanged ? ValueChangeStateChanged : ValueChangeStateNone);
+}
+
+void TextFieldInputType::didSetValueByUserEdit(ValueChangeState state)
+{
+    if (!element()->focused())
+        return;
+    if (Frame* frame = element()->document()->frame()) {
+        if (state == ValueChangeStateNone)
+            frame->editor()->textFieldDidBeginEditing(element());
+        frame->editor()->textDidChangeInTextField(element());
+    }
+}
+
+void TextFieldInputType::spinButtonStepDown()
+{
+    stepUpFromRenderer(-1);
+}
+
+void TextFieldInputType::spinButtonStepUp()
+{
+    stepUpFromRenderer(1);
+}
+
+void TextFieldInputType::updateInnerTextValue()
+{
+    if (!element()->suggestedValue().isNull()) {
+        element()->setInnerTextValue(element()->suggestedValue());
+        element()->updatePlaceholderVisibility(false);
+    } else if (!element()->formControlValueMatchesRenderer()) {
+        // Update the renderer value if the formControlValueMatchesRenderer() flag is false.
+        // It protects an unacceptable renderer value from being overwritten with the DOM value.
+        element()->setInnerTextValue(visibleValue());
+        element()->updatePlaceholderVisibility(false);
+    }
+}
+
+void TextFieldInputType::focusAndSelectSpinButtonOwner()
+{
+    RefPtr<HTMLInputElement> input(element());
+    input->focus();
+    input->select();
+}
+
+bool TextFieldInputType::shouldSpinButtonRespondToMouseEvents()
+{
+    return !element()->isDisabledOrReadOnly();
+}
+
+bool TextFieldInputType::shouldSpinButtonRespondToWheelEvents()
+{
+    return shouldSpinButtonRespondToMouseEvents() && element()->focused();
 }
 
 } // namespace WebCore

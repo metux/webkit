@@ -63,7 +63,8 @@ enum StyleDifference {
 enum StyleDifferenceContextSensitiveProperty {
     ContextSensitivePropertyNone = 0,
     ContextSensitivePropertyTransform = (1 << 0),
-    ContextSensitivePropertyOpacity = (1 << 1)
+    ContextSensitivePropertyOpacity = (1 << 1),
+    ContextSensitivePropertyFilter = (1 << 2)
 };
 
 // Static pseudo styles. Dynamic ones are produced on the fly.
@@ -80,7 +81,7 @@ enum PseudoId {
     PUBLIC_PSEUDOID_MASK = ((1 << FIRST_INTERNAL_PSEUDOID) - 1) & ~((1 << FIRST_PUBLIC_PSEUDOID) - 1)
 };
 
-enum ColumnSpan { ColumnSpanOne = 0, ColumnSpanAll};
+enum ColumnSpan { ColumnSpanNone = 0, ColumnSpanAll };
 
 enum EBorderCollapse { BSEPARATE = 0, BCOLLAPSE = 1 };
 
@@ -93,14 +94,23 @@ enum EBorderPrecedence { BOFF, BTABLE, BCOLGROUP, BCOL, BROWGROUP, BROW, BCELL }
 enum OutlineIsAuto { AUTO_OFF = 0, AUTO_ON };
 
 enum EPosition {
-    StaticPosition, RelativePosition, AbsolutePosition, FixedPosition
+    StaticPosition = 0,
+    RelativePosition = 1,
+    AbsolutePosition = 2,
+    StickyPosition = 3,
+    // This value is required to pack our bits efficiently in RenderObject.
+    FixedPosition = 6
 };
 
 enum EFloat {
-    NoFloat, LeftFloat, RightFloat, PositionedFloat
+    NoFloat, LeftFloat, RightFloat
 };
 
 enum EMarginCollapse { MCOLLAPSE, MSEPARATE, MDISCARD };
+
+// Box decoration attributes. Not inherited.
+
+enum EBoxDecorationBreak { DSLICE, DCLONE };
 
 // Box attributes. Not inherited.
 
@@ -109,7 +119,7 @@ enum EBoxSizing { CONTENT_BOX, BORDER_BOX };
 // Random visual rendering model attributes. Not inherited.
 
 enum EOverflow {
-    OVISIBLE, OHIDDEN, OSCROLL, OAUTO, OOVERLAY, OMARQUEE
+    OVISIBLE, OHIDDEN, OSCROLL, OAUTO, OOVERLAY, OMARQUEE, OPAGEDX, OPAGEDY
 };
 
 enum EVerticalAlign {
@@ -123,11 +133,6 @@ enum EClear {
 
 enum ETableLayout {
     TAUTO, TFIXED
-};
-
-// CSS Text Layout Module Level 3: Vertical writing support
-enum WritingMode {
-    TopToBottomWritingMode, RightToLeftWritingMode, LeftToRightWritingMode, BottomToTopWritingMode
 };
 
 enum TextCombine {
@@ -153,6 +158,9 @@ enum EFillLayerType {
 // CSS3 Background Values
 enum EFillSizeType { Contain, Cover, SizeLength, SizeNone };
 
+// CSS3 Background Position
+enum BackgroundEdgeOrigin { TopEdge, RightEdge, BottomEdge, LeftEdge };
+
 // CSS3 Marquee Properties
 
 enum EMarqueeBehavior { MNONE, MSCROLL, MSLIDE, MALTERNATE };
@@ -168,10 +176,11 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 
 // CSS3 Flexbox Properties
 
-enum EFlexPack { PackStart, PackEnd, PackCenter, PackJustify, PackDistribute };
-enum EFlexAlign { AlignAuto, AlignStart, AlignEnd, AlignCenter, AlignStretch, AlignBaseline };
+enum EAlignContent { AlignContentFlexStart, AlignContentFlexEnd, AlignContentCenter, AlignContentSpaceBetween, AlignContentSpaceAround, AlignContentStretch };
+enum EAlignItems { AlignAuto, AlignFlexStart, AlignFlexEnd, AlignCenter, AlignStretch, AlignBaseline };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
-enum EFlexWrap { FlexWrapNone, FlexWrap, FlexWrapReverse };
+enum EFlexWrap { FlexNoWrap, FlexWrap, FlexWrapReverse };
+enum EJustifyContent { JustifyFlexStart, JustifyFlexEnd, JustifyCenter, JustifySpaceBetween, JustifySpaceAround };
 
 enum ETextSecurity {
     TSNONE, TSDISC, TSCIRCLE, TSSQUARE
@@ -192,7 +201,7 @@ enum EUserDrag {
 // CSS3 User Select Values
 
 enum EUserSelect {
-    SELECT_NONE, SELECT_TEXT
+    SELECT_NONE, SELECT_TEXT, SELECT_ALL
 };
 
 // Word Break Values. Matches WinIE, rather than CSS3
@@ -201,20 +210,16 @@ enum EWordBreak {
     NormalWordBreak, BreakAllWordBreak, BreakWordBreak
 };
 
-enum EWordWrap {
-    NormalWordWrap, BreakWordWrap
+enum EOverflowWrap {
+    NormalOverflowWrap, BreakOverflowWrap
 };
 
 enum ENBSPMode {
     NBNORMAL, SPACE
 };
 
-enum EKHTMLLineBreak {
-    LBNORMAL, AFTER_WHITE_SPACE
-};
-
-enum EMatchNearestMailBlockquoteColor {
-    BCNORMAL, MATCH
+enum LineBreak {
+    LineBreakAuto, LineBreakLoose, LineBreakNormal, LineBreakStrict, LineBreakAfterWhiteSpace
 };
 
 enum EResize {
@@ -306,10 +311,6 @@ enum EListStyleType {
     NoneListStyle
 };
 
-enum StyleContentType {
-    CONTENT_NONE, CONTENT_OBJECT, CONTENT_TEXT, CONTENT_COUNTER, CONTENT_QUOTE
-};
-
 enum QuoteType {
     OPEN_QUOTE, CLOSE_QUOTE, NO_OPEN_QUOTE, NO_CLOSE_QUOTE
 };
@@ -329,7 +330,7 @@ enum EWhiteSpace {
 
 // The order of this enum must match the order of the text align values in CSSValueKeywords.in.
 enum ETextAlign {
-    TAAUTO, LEFT, RIGHT, CENTER, JUSTIFY, WEBKIT_LEFT, WEBKIT_RIGHT, WEBKIT_CENTER, TASTART, TAEND,
+    LEFT, RIGHT, CENTER, JUSTIFY, WEBKIT_LEFT, WEBKIT_RIGHT, WEBKIT_CENTER, TASTART, TAEND,
 };
 
 enum ETextTransform {
@@ -342,6 +343,22 @@ enum ETextDecoration {
 };
 inline ETextDecoration operator|(ETextDecoration a, ETextDecoration b) { return ETextDecoration(int(a) | int(b)); }
 inline ETextDecoration& operator|=(ETextDecoration& a, ETextDecoration b) { return a = a | b; }
+
+enum TextDecorationStyle {
+    TextDecorationStyleSolid,
+#if ENABLE(CSS3_TEXT)
+    TextDecorationStyleDouble,
+    TextDecorationStyleDotted,
+    TextDecorationStyleDashed,
+    TextDecorationStyleWavy
+#endif // CSS3_TEXT
+};
+
+#if ENABLE(CSS3_TEXT)
+enum TextAlignLast {
+    TextAlignLastAuto, TextAlignLastStart, TextAlignLastEnd, TextAlignLastLeft, TextAlignLastRight, TextAlignLastCenter, TextAlignLastJustify
+};
+#endif // CSS3_TEXT
 
 enum EPageBreak {
     PBAUTO, PBALWAYS, PBAVOID
@@ -407,11 +424,9 @@ enum EDisplay {
     TABLE, INLINE_TABLE, TABLE_ROW_GROUP,
     TABLE_HEADER_GROUP, TABLE_FOOTER_GROUP, TABLE_ROW,
     TABLE_COLUMN_GROUP, TABLE_COLUMN, TABLE_CELL,
-    TABLE_CAPTION, BOX, INLINE_BOX, 
-    FLEXBOX, INLINE_FLEXBOX,
-#if ENABLE(CSS_GRID_LAYOUT)
+    TABLE_CAPTION, BOX, INLINE_BOX,
+    FLEX, INLINE_FLEX,
     GRID, INLINE_GRID,
-#endif
     NONE
 };
 
@@ -444,9 +459,15 @@ enum TextEmphasisMark { TextEmphasisMarkNone, TextEmphasisMarkAuto, TextEmphasis
 
 enum TextEmphasisPosition { TextEmphasisPositionOver, TextEmphasisPositionUnder };
 
+enum TextOrientation { TextOrientationVerticalRight, TextOrientationUpright, TextOrientationSideways, TextOrientationSidewaysRight };
+
 enum TextOverflow { TextOverflowClip = 0, TextOverflowEllipsis };
 
 enum EImageRendering { ImageRenderingAuto, ImageRenderingOptimizeSpeed, ImageRenderingOptimizeQuality, ImageRenderingOptimizeContrast };
+
+enum ImageResolutionSource { ImageResolutionSpecified = 0, ImageResolutionFromImage };
+
+enum ImageResolutionSnap { ImageResolutionNoSnap = 0, ImageResolutionSnapPixels };
 
 enum Order { LogicalOrder = 0, VisualOrder };
 
@@ -454,13 +475,26 @@ enum RegionOverflow { AutoRegionOverflow, BreakRegionOverflow };
 
 enum ColumnAxis { HorizontalColumnAxis, VerticalColumnAxis, AutoColumnAxis };
 
+enum ColumnProgression { NormalColumnProgression, ReverseColumnProgression };
+
 enum LineSnap { LineSnapNone, LineSnapBaseline, LineSnapContain };
 
 enum LineAlign { LineAlignNone, LineAlignEdges };
 
-enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowLeft, WrapFlowRight, WrapFlowMaximum, WrapFlowClear };
+enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowStart, WrapFlowEnd, WrapFlowMaximum, WrapFlowClear };
 
 enum WrapThrough { WrapThroughWrap, WrapThroughNone };
+
+enum RubyPosition { RubyPositionBefore, RubyPositionAfter };
+
+enum GridAutoFlow { AutoFlowNone, AutoFlowColumn, AutoFlowRow };
+
+#if ENABLE(DRAGGABLE_REGION)
+enum DraggableRegionMode { DraggableRegionNone, DraggableRegionDrag, DraggableRegionNoDrag };
+#endif
+
+// Reasonable maximum to prevent insane font sizes from causing crashes on some platforms (such as Windows).
+static const float maximumAllowedFontSize = 1000000.0f;
 
 } // namespace WebCore
 

@@ -38,57 +38,17 @@
 #include "ProcessingInstruction.h"
 #include "SegmentedString.h"
 #include "Text.h"
+#include "WebVTTElement.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-const int secondsPerHour = 3600;
-const int secondsPerMinute = 60;
+const double secondsPerHour = 3600;
+const double secondsPerMinute = 60;
+const double secondsPerMillisecond = 0.001;
 const double malformedTime = -1;
 const unsigned bomLength = 3;
-const unsigned fileIdentiferLength = 6;
-    
-unsigned WebVTTParser::fileIdentifierMaximumLength()
-{
-    return bomLength + fileIdentiferLength;
-}
-
-inline bool hasLongWebVTTIdentifier(String line)
-{
-    // If line is more than six characters ...
-    if (line.length() < fileIdentiferLength)
-        return false;
-
-    // but the first six characters do not exactly equal "WEBVTT" ...
-    if (line.substring(0, fileIdentiferLength) != "WEBVTT")
-        return false;
-
-    // or the seventh character is neither a space nor a tab character, then abort.
-    if (line.length() > fileIdentiferLength && line[fileIdentiferLength] != ' ' && line[fileIdentiferLength] != '\t')
-        return false;
-
-    return true;
-}
-
-bool WebVTTParser::hasRequiredFileIdentifier(const char* data, unsigned length)
-{
-    // A WebVTT file identifier consists of an optional BOM character,
-    // the string "WEBVTT" followed by an optional space or tab character,
-    // and any number of characters that are not line terminators ...
-    unsigned position = 0;
-    if (length >= bomLength && data[0] == '\xEF' && data[1] == '\xBB' && data[2] == '\xBF')
-        position += bomLength;
-    String line = collectNextLine(data, length, &position);
-
-    if (line.length() < fileIdentiferLength)
-        return false;
-    if (line.length() == fileIdentiferLength && line != "WEBVTT")
-        return false;
-    if (!hasLongWebVTTIdentifier(line))
-        return false;
-
-    return true;
-}
+const unsigned fileIdentifierLength = 6;
 
 String WebVTTParser::collectDigits(const String& input, unsigned* position)
 {
@@ -133,10 +93,20 @@ void WebVTTParser::parseBytes(const char* data, unsigned length)
         
         switch (m_state) {
         case Initial:
-            // 4-12 - Collect the first line and check for "WEBVTT".
-            if (!hasRequiredFileIdentifier(data, length))
+            // Buffer up at least 9 bytes before proceeding with checking for the file identifier.
+            m_identifierData.append(data, length);
+            if (m_identifierData.size() < bomLength + fileIdentifierLength)
                 return;
+
+            // 4-12 - Collect the first line and check for "WEBVTT".
+            if (!hasRequiredFileIdentifier()) {
+                if (m_client)
+                    m_client->fileFailedToParse();
+                return;
+            }
+
             m_state = Header;
+            m_identifierData.clear();
             break;
         
         case Header:
@@ -171,6 +141,26 @@ void WebVTTParser::parseBytes(const char* data, unsigned length)
             break;
         }
     }
+}
+
+bool WebVTTParser::hasRequiredFileIdentifier()
+{
+    // A WebVTT file identifier consists of an optional BOM character,
+    // the string "WEBVTT" followed by an optional space or tab character,
+    // and any number of characters that are not line terminators ...
+    unsigned position = 0;
+    if (m_identifierData.size() >= bomLength && m_identifierData[0] == '\xEF' && m_identifierData[1] == '\xBB' && m_identifierData[2] == '\xBF')
+        position += bomLength;
+    String line = collectNextLine(m_identifierData.data(), m_identifierData.size(), &position);
+
+    if (line.length() < fileIdentifierLength)
+        return false;
+    if (line.substring(0, fileIdentifierLength) != "WEBVTT")
+        return false;
+    if (line.length() > fileIdentifierLength && line[fileIdentifierLength] != ' ' && line[fileIdentifierLength] != '\t')
+        return false;
+
+    return true;
 }
 
 WebVTTParser::ParseState WebVTTParser::collectCueId(const String& line)
@@ -261,6 +251,7 @@ PassRefPtr<DocumentFragment>  WebVTTParser::createDocumentFragmentFromCueText(co
     m_tokenizer->reset();
     m_token.clear();
     
+    m_languageStack.clear();
     SegmentedString content(text);
     while (m_tokenizer->nextToken(content, m_token))
         constructTreeFromToken(document);
@@ -273,10 +264,10 @@ void WebVTTParser::createNewCue()
     if (!m_currentContent.length())
         return;
 
-    RefPtr<DocumentFragment> attachmentRoot = createDocumentFragmentFromCueText(m_currentContent.toString());
-    
-    RefPtr<TextTrackCue> cue = TextTrackCue::create(m_scriptExecutionContext, m_currentId, m_currentStartTime, m_currentEndTime, m_currentContent.toString(), m_currentSettings, false);
-    cue->setCueHTML(attachmentRoot);
+    RefPtr<TextTrackCue> cue = TextTrackCue::create(m_scriptExecutionContext, m_currentStartTime, m_currentEndTime, m_currentContent.toString());
+    cue->setId(m_currentId);
+    cue->setCueSettings(m_currentSettings);
+
     m_cuelist.append(cue);
     if (m_client)
         m_client->newCuesParsed();
@@ -348,55 +339,89 @@ double WebVTTParser::collectTimeStamp(const String& line, unsigned* position)
         return malformedTime;
 
     // 20-21 - Calculate result.
-    return (value1 * secondsPerHour) + (value2 * secondsPerMinute) + value3 + ((double)value4 / 1000);
+    return (value1 * secondsPerHour) + (value2 * secondsPerMinute) + value3 + (value4 * secondsPerMillisecond);
+}
+
+static WebVTTNodeType tokenToNodeType(WebVTTToken& token)
+{
+    switch (token.name().size()) {
+    case 1:
+        if (token.name()[0] == 'c')
+            return WebVTTNodeTypeClass;
+        if (token.name()[0] == 'v')
+            return WebVTTNodeTypeVoice;
+        if (token.name()[0] == 'b')
+            return WebVTTNodeTypeBold;
+        if (token.name()[0] == 'i')
+            return WebVTTNodeTypeItalic;
+        if (token.name()[0] == 'u')
+            return WebVTTNodeTypeUnderline;
+        break;
+    case 2:
+        if (token.name()[0] == 'r' && token.name()[1] == 't')
+            return WebVTTNodeTypeRubyText;
+        break;
+    case 4:
+        if (token.name()[0] == 'r' && token.name()[1] == 'u' && token.name()[2] == 'b' && token.name()[3] == 'y')
+            return WebVTTNodeTypeRuby;
+        if (token.name()[0] == 'l' && token.name()[1] == 'a' && token.name()[2] == 'n' && token.name()[3] == 'g')
+            return WebVTTNodeTypeLanguage;
+        break;
+    }
+    return WebVTTNodeTypeNone;
 }
 
 void WebVTTParser::constructTreeFromToken(Document* document)
 {
-    AtomicString tokenTagName(m_token.name().data(), m_token.name().size());
-    QualifiedName tagName(nullAtom, tokenTagName, xhtmlNamespaceURI);
+    QualifiedName tagName(nullAtom, AtomicString(m_token.name()), xhtmlNamespaceURI);
 
     // http://dev.w3.org/html5/webvtt/#webvtt-cue-text-dom-construction-rules
-    
+
     switch (m_token.type()) {
     case WebVTTTokenTypes::Character: {
-        String content(m_token.characters().data(), m_token.characters().size());
+        String content(m_token.characters()); // FIXME: This should be 8bit if possible.
         RefPtr<Text> child = Text::create(document, content);
-        m_currentNode->parserAddChild(child);
+        m_currentNode->parserAppendChild(child);
         break;
     }
     case WebVTTTokenTypes::StartTag: {
-        RefPtr<HTMLElement> child;
-        if (isRecognizedTag(tokenTagName))
-            child = HTMLElement::create(tagName, document);
-        else if (m_token.name().size() == 1 && m_token.name()[0] == 'c')
-            child = HTMLElement::create(spanTag, document);
-        else if (m_token.name().size() == 1 && m_token.name()[0] == 'v')
-            child = HTMLElement::create(qTag, document);
-
+        RefPtr<WebVTTElement> child;
+        WebVTTNodeType nodeType = tokenToNodeType(m_token);
+        if (nodeType != WebVTTNodeTypeNone)
+            child = WebVTTElement::create(nodeType, document);
         if (child) {
             if (m_token.classes().size() > 0)
-                child->setAttribute(classAttr, AtomicString(m_token.classes().data(), m_token.classes().size()));
-            if (child->hasTagName(qTag))
-                child->setAttribute(titleAttr, AtomicString(m_token.annotation().data(), m_token.annotation().size()));
-            m_currentNode->parserAddChild(child);
+                child->setAttribute(classAttr, AtomicString(m_token.classes()));
+
+            if (child->webVTTNodeType() == WebVTTNodeTypeVoice)
+                child->setAttribute(WebVTTElement::voiceAttributeName(), AtomicString(m_token.annotation()));
+            else if (child->webVTTNodeType() == WebVTTNodeTypeLanguage) {
+                m_languageStack.append(AtomicString(m_token.annotation()));
+                child->setAttribute(WebVTTElement::langAttributeName(), m_languageStack.last());
+            }
+            if (!m_languageStack.isEmpty())
+                child->setLanguage(m_languageStack.last());
+            m_currentNode->parserAppendChild(child);
             m_currentNode = child;
         }
         break;
     }
-    case WebVTTTokenTypes::EndTag:
-        if (isRecognizedTag(tokenTagName)
-            || (m_token.name().size() == 1 && m_token.name()[0] == 'c')
-            || (m_token.name().size() == 1 && m_token.name()[0] == 'v')) {
+    case WebVTTTokenTypes::EndTag: {
+        WebVTTNodeType nodeType = tokenToNodeType(m_token);
+        if (nodeType != WebVTTNodeTypeNone) {
+            if (nodeType == WebVTTNodeTypeLanguage && m_currentNode->isWebVTTElement() && toWebVTTElement(m_currentNode.get())->webVTTNodeType() == WebVTTNodeTypeLanguage)
+                m_languageStack.removeLast();
             if (m_currentNode->parentNode())
                 m_currentNode = m_currentNode->parentNode();
         }
         break;
+    }
     case WebVTTTokenTypes::TimestampTag: {
         unsigned position = 0;
-        double time = collectTimeStamp(m_token.characters().data(), &position);
+        String charactersString(StringImpl::create8BitIfPossible(m_token.characters()));
+        double time = collectTimeStamp(charactersString, &position);
         if (time != malformedTime)
-            m_currentNode->parserAddChild(ProcessingInstruction::create(document, "timestamp", String(m_token.characters().data(), m_token.characters().size())));
+            m_currentNode->parserAppendChild(ProcessingInstruction::create(document, "timestamp", charactersString));
         break;
     }
     default:

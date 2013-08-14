@@ -38,7 +38,6 @@ TextDocumentParser::TextDocumentParser(HTMLDocument* document)
     : HTMLDocumentParser(document, false)
     , m_haveInsertedFakePreElement(false)
 {
-    tokenizer()->setState(HTMLTokenizerState::PLAINTEXTState);
 }
 
 TextDocumentParser::~TextDocumentParser()
@@ -59,16 +58,18 @@ void TextDocumentParser::insertFakePreElement()
     // We create a fake token and give it to the tree builder rather than
     // sending fake bytes through the front-end of the parser to avoid
     // distrubing the line/column number calculations.
+    Vector<Attribute> attributes;
+    attributes.append(Attribute(styleAttr, "word-wrap: break-word; white-space: pre-wrap;"));
+    RefPtr<AtomicHTMLToken> fakePre = AtomicHTMLToken::create(HTMLToken::StartTag, preTag.localName(), attributes);
+    treeBuilder()->constructTree(fakePre.get());
 
-    RefPtr<Attribute> styleAttribute = Attribute::create("style", "word-wrap: break-word; white-space: pre-wrap;");
-    OwnPtr<NamedNodeMap> attributes = NamedNodeMap::create();
-    attributes->insertAttribute(styleAttribute.release(), false);
-    AtomicHTMLToken fakePre(HTMLTokenTypes::StartTag, preTag.localName(), attributes.release());
-
-    treeBuilder()->constructTreeFromAtomicToken(fakePre);
     // Normally we would skip the first \n after a <pre> element, but we don't
     // want to skip the first \n for text documents!
     treeBuilder()->setShouldSkipLeadingNewline(false);
+
+    // Although Text Documents expose a "pre" element in their DOM, they
+    // act like a <plaintext> tag, so we have to force plaintext mode.
+    forcePlaintextForTextDocument();
 
     m_haveInsertedFakePreElement = true;
 }

@@ -3,11 +3,11 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitDownload</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
+<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWindowProperties.html" title="WebKitWindowProperties">
-<link rel="next" href="WebKitPolicyDecision.html" title="WebKitPolicyDecision">
+<link rel="next" href="WebKitPermissionRequest.html" title="WebKitPermissionRequest">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -18,7 +18,7 @@
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitPolicyDecision.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitPermissionRequest.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
 </tr>
 <tr><td colspan="5" class="shortcuts">
 <a href="#WebKitDownload.synopsis" class="shortcut">Top</a>
@@ -37,13 +37,14 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitDownload.top_of_page"></a>WebKitDownload</span></h2>
-<p>WebKitDownload</p>
+<p>WebKitDownload — Object used to communicate with the application when downloading</p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
 <div class="refsynopsisdiv">
 <a name="WebKitDownload.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">struct              <a class="link" href="WebKitDownload.html#WebKitDownload-struct" title="struct WebKitDownload">WebKitDownload</a>;
+<a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="returnvalue">WebKitURIRequest</span></a> *  <a class="link" href="WebKitDownload.html#webkit-download-get-request" title="webkit_download_get_request ()">webkit_download_get_request</a>         (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);
 const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       <a class="link" href="WebKitDownload.html#webkit-download-get-destination" title="webkit_download_get_destination ()">webkit_download_get_destination</a>     (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDownload.html#webkit-download-set-destination" title="webkit_download_set_destination ()">webkit_download_set_destination</a>     (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *uri</code></em>);
@@ -52,6 +53,9 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitDownload.html#webkit-download-get-estimated-progress" title="webkit_download_get_estimated_progress ()">webkit_download_get_estimated_progress</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);
 <a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitDownload.html#webkit-download-get-elapsed-time" title="webkit_download_get_elapsed_time ()">webkit_download_get_elapsed_time</a>    (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);
+<a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             <a class="link" href="WebKitDownload.html#webkit-download-get-received-data-length" title="webkit_download_get_received_data_length ()">webkit_download_get_received_data_length</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);
+<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="returnvalue">WebKitWebView</span></a> *     <a class="link" href="WebKitDownload.html#webkit-download-get-web-view" title="webkit_download_get_web_view ()">webkit_download_get_web_view</a>        (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -82,6 +86,11 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitDownload.description"></a><h2>Description</h2>
 <p>
+<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> carries information about a download request and
+response, including a <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> and a <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>
+objects. The application may use this object to control the
+download process, or to simply figure out what is to be downloaded,
+and handle the download process itself.
 </p>
 </div>
 <div class="refsect1">
@@ -91,6 +100,30 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <pre class="programlisting">struct WebKitDownload;</pre>
 <p>
 </p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-download-get-request"></a><h3>webkit_download_get_request ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="returnvalue">WebKitURIRequest</span></a> *  webkit_download_get_request         (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);</pre>
+<p>
+Retrieves the <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> object that backs the download
+process.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> of <em class="parameter"><code>download</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
 </div>
 <hr>
 <div class="refsect2">
@@ -248,6 +281,54 @@ the time between its start and the event.
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-download-get-received-data-length"></a><h3>webkit_download_get_received_data_length ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint64"><span class="returnvalue">guint64</span></a>             webkit_download_get_received_data_length
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);</pre>
+<p>
+Gets the length of the data already downloaded for <em class="parameter"><code>download</code></em>
+in bytes.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the amount of bytes already downloaded.</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-download-get-web-view"></a><h3>webkit_download_get_web_view ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="returnvalue">WebKitWebView</span></a> *     webkit_download_get_web_view        (<em class="parameter"><code><a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> that initiated the download.
+</p>
+<div class="variablelist"><table border="0">
+<col align="left" valign="top">
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> that initiated <em class="parameter"><code>download</code></em>,
+or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if <em class="parameter"><code>download</code></em> was not initiated by a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitDownload.property-details"></a><h2>Property Details</h2>
@@ -311,12 +392,6 @@ created successfully at <em class="parameter"><code>destination</code></em>.
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
 <td>user data set when the signal handler was connected.</td>
 </tr>
-<tr>
-<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>
-<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
-<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
-</tr>
 </tbody>
 </table></div>
 </div>
@@ -360,7 +435,7 @@ directory using <em class="parameter"><code>suggested_filename</code></em>.
 <hr>
 <div class="refsect2">
 <a name="WebKitDownload-failed"></a><h3>The <code class="literal">"failed"</code> signal</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
+<pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        error,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
@@ -387,19 +462,13 @@ after an error and <a class="link" href="WebKitDownload.html#WebKitDownload-fini
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
 <td>user data set when the signal handler was connected.</td>
 </tr>
-<tr>
-<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>
-<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
-<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
-</tr>
 </tbody>
 </table></div>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitDownload-finished"></a><h3>The <code class="literal">"finished"</code> signal</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
+<pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 This signal is emitted when download finishes successfully or due to an error.
@@ -417,19 +486,13 @@ In case of errors <a class="link" href="WebKitDownload.html#WebKitDownload-faile
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
 <td>user data set when the signal handler was connected.</td>
 </tr>
-<tr>
-<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>
-<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
-<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
-</tr>
 </tbody>
 </table></div>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitDownload-received-data"></a><h3>The <code class="literal">"received-data"</code> signal</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
+<pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
                                                         <a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a>         data_length,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)        : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
@@ -452,12 +515,6 @@ useful to know the progress of the download operation.
 <tr>
 <td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
 <td>user data set when the signal handler was connected.</td>
-</tr>
-<tr>
-<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>
-<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
-<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
 </tr>
 </tbody>
 </table></div>

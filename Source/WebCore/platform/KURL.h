@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,10 @@
 #ifndef KURL_h
 #define KURL_h
 
-#include "PlatformString.h"
+#include "KURLWTFURLImpl.h"
+#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
+#include <wtf/text/WTFString.h>
 
 #if USE(CF)
 typedef const struct __CFURL* CFURLRef;
@@ -47,16 +49,10 @@ QT_END_NAMESPACE
 #include "KURLGooglePrivate.h"
 #endif
 
-#if USE(JSC)
-#include <runtime/UString.h>
-#endif
-
 namespace WebCore {
 
 class TextEncoding;
 struct KURLHash;
-
-typedef HashMap<String, String> ParsedURLParameters;
 
 enum ParsedURLStringTag { ParsedURLString };
 
@@ -70,11 +66,17 @@ public:
     // It is usually best to avoid repeatedly parsing a string, unless memory saving outweigh the possible slow-downs.
     KURL(ParsedURLStringTag, const String&);
 #if USE(GOOGLEURL)
-    KURL(WTF::HashTableDeletedValueType) : m_url(WTF::HashTableDeletedValue) { }
+    explicit KURL(WTF::HashTableDeletedValueType) : m_url(WTF::HashTableDeletedValue) { }
+#elif USE(WTFURL)
+    explicit KURL(WTF::HashTableDeletedValueType) : m_urlImpl(WTF::HashTableDeletedValue) { }
 #else
-    KURL(WTF::HashTableDeletedValueType) : m_string(WTF::HashTableDeletedValue) { }
+    explicit KURL(WTF::HashTableDeletedValueType) : m_string(WTF::HashTableDeletedValue) { }
 #endif
+#if !USE(WTFURL)
     bool isHashTableDeletedValue() const { return string().isHashTableDeletedValue(); }
+#else
+    bool isHashTableDeletedValue() const { return m_urlImpl.isHashTableDeletedValue(); }
+#endif
 
     // Resolves the relative URL with the given base URL. If provided, the
     // TextEncoding is used to encode non-ASCII characers. The base URL can be
@@ -118,9 +120,13 @@ public:
     bool canSetHostOrPort() const { return isHierarchical(); }
 
     bool canSetPathname() const { return isHierarchical(); }
+    bool isHierarchical() const;
 
 #if USE(GOOGLEURL)
     const String& string() const { return m_url.string(); }
+#elif USE(WTFURL)
+    // FIXME: Split this in URLString and InvalidURLString, get rid of the implicit conversions.
+    const String& string() const;
 #else
     const String& string() const { return m_string; }
 #endif
@@ -137,13 +143,8 @@ public:
     String fragmentIdentifier() const;
     bool hasFragmentIdentifier() const;
 
-    void copyParsedQueryTo(ParsedURLParameters&) const;
-
     String baseAsString() const;
 
-    // This function is only used by location.href. It's likely we shouldn't
-    // use it for that purpose, but more study is necessary before we remove it.
-    String deprecatedString() const;
     String fileSystemPath() const;
 
     // Returns true if the current URL's protocol is the same as the null-
@@ -152,6 +153,7 @@ public:
     bool protocolIsData() const { return protocolIs("data"); }
     bool protocolIsInHTTPFamily() const;
     bool isLocalFile() const;
+    bool isBlankURL() const;
 
     bool setProtocol(const String&);
     void setHost(const String&);
@@ -225,16 +227,17 @@ public:
     void print() const;
 #endif
 
-    // FIXME: Remove this after changing all callers to use protocolIsInHTTPFamily.
-    bool protocolInHTTPFamily() const { return protocolIsInHTTPFamily(); }
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+    bool isSafeToSendToAnotherThread() const;
 
 private:
     void invalidate();
-    bool isHierarchical() const;
     static bool protocolIs(const String&, const char*);
 #if USE(GOOGLEURL)
     friend class KURLGooglePrivate;
     KURLGooglePrivate m_url;
+#elif USE(WTFURL)
+    RefPtr<KURLWTFURLImpl> m_urlImpl;
 #else  // !USE(GOOGLEURL)
     void init(const KURL&, const String&, const TextEncoding&);
     void copyToBuffer(Vector<char, 512>& buffer) const;
@@ -271,7 +274,7 @@ bool operator!=(const String&, const KURL&);
 
 bool equalIgnoringFragmentIdentifier(const KURL&, const KURL&);
 bool protocolHostAndPortAreEqual(const KURL&, const KURL&);
-    
+
 const KURL& blankURL();
 
 // Functions to do URL operations on strings.
@@ -280,7 +283,6 @@ const KURL& blankURL();
 // This is especially important because valid javascript URLs are not necessarily considered valid by KURL.
 
 bool protocolIs(const String& url, const char* protocol);
-bool protocolIsInHTTPFamily(const String& url);
 bool protocolIsJavaScript(const String& url);
 
 bool isDefaultPortForProtocol(unsigned short port, const String& protocol);
@@ -289,6 +291,7 @@ bool portAllowed(const KURL&); // Blacklist ports that should never be used for 
 bool isValidProtocol(const String&);
 
 String mimeTypeFromDataURL(const String& url);
+String mimeTypeFromURL(const KURL&);
 
 // Unescapes the given string using URL escaping rules, given an optional
 // encoding (defaulting to UTF-8 otherwise). DANGER: If the URL has "%00"
@@ -330,7 +333,7 @@ inline bool operator!=(const String& a, const KURL& b)
     return a != b.string();
 }
 
-#if !USE(GOOGLEURL)
+#if !USE(GOOGLEURL) && !USE(WTFURL)
 
 // Inline versions of some non-GoogleURL functions so we can get inlining
 // without having to have a lot of ugly ifdefs in the class definition.
@@ -348,6 +351,11 @@ inline bool KURL::isEmpty() const
 inline bool KURL::isValid() const
 {
     return m_isValid;
+}
+
+inline bool KURL::hasPath() const
+{
+    return m_pathEnd != m_portEnd;
 }
 
 inline bool KURL::hasPort() const
@@ -385,7 +393,7 @@ inline unsigned KURL::pathAfterLastSlash() const
     return m_pathAfterLastSlash;
 }
 
-#endif  // !USE(GOOGLEURL)
+#endif // !USE(GOOGLEURL) && !USE(WTFURL)
 
 } // namespace WebCore
 

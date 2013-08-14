@@ -30,7 +30,7 @@
 #include "HandleTypes.h"
 #include "Heap.h"
 #include "SamplingCounter.h"
-#include "TypeTraits.h"
+#include <wtf/TypeTraits.h>
 
 namespace JSC {
 
@@ -177,6 +177,9 @@ public:
         return u.slot;
     }
     
+    int32_t* tagPointer() { return &bitwise_cast<EncodedValueDescriptor*>(&m_value)->asBits.tag; }
+    int32_t* payloadPointer() { return &bitwise_cast<EncodedValueDescriptor*>(&m_value)->asBits.payload; }
+    
     typedef JSValue (WriteBarrierBase::*UnspecifiedBoolType);
     operator UnspecifiedBoolType*() const { return get() ? reinterpret_cast<UnspecifiedBoolType*>(1) : 0; }
     bool operator!() const { return !get(); } 
@@ -222,14 +225,14 @@ template <typename U, typename V> inline bool operator==(const WriteBarrierBase<
     return lhs.get() == rhs.get();
 }
 
-// MarkStack functions
+// SlotVisitor functions
 
-template<typename T> inline void MarkStack::append(WriteBarrierBase<T>* slot)
+template<typename T> inline void SlotVisitor::append(WriteBarrierBase<T>* slot)
 {
     internalAppend(*slot->slot());
 }
 
-ALWAYS_INLINE void MarkStack::appendValues(WriteBarrierBase<Unknown>* barriers, size_t count)
+ALWAYS_INLINE void SlotVisitor::appendValues(WriteBarrierBase<Unknown>* barriers, size_t count)
 {
     append(barriers->slot(), count);
 }

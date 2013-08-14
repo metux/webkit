@@ -32,6 +32,7 @@
 #include <wtf/RefCounted.h>
 
 #if PLATFORM(CHROMIUM)
+#include "PageClientChromium.h"
 #include "PlatformWidget.h"
 #endif
 
@@ -40,8 +41,8 @@
 #endif
 
 #if PLATFORM(QT)
+#include <QPointer>
 #include <qglobal.h>
-#include <QWeakPointer>
 #endif
 
 #if PLATFORM(MAC)
@@ -68,21 +69,37 @@ QT_END_NAMESPACE
 typedef QObject* PlatformWidget;
 #endif
 
+#if PLATFORM(BLACKBERRY)
+typedef void* PlatformWidget;
+#endif
+
 #if PLATFORM(WX)
 class wxWindow;
 typedef wxWindow* PlatformWidget;
 #endif
 
 #if PLATFORM(EFL)
+#if USE(EO)
+typedef struct _Eo Evas_Object;
+typedef struct _Eo Evas;
+#else
 typedef struct _Evas_Object Evas_Object;
 typedef struct _Evas Evas;
-typedef struct _Ecore_Evas Ecore_Evas;
+#endif
 typedef Evas_Object* PlatformWidget;
 #endif
 
 #if PLATFORM(QT)
 class QWebPageClient;
 typedef QWebPageClient* PlatformPageClient;
+#elif PLATFORM(BLACKBERRY)
+#include "PageClientBlackBerry.h"
+typedef PageClientBlackBerry* PlatformPageClient;
+#elif PLATFORM(EFL)
+class PageClientEfl;
+typedef PageClientEfl* PlatformPageClient;
+#elif PLATFORM(CHROMIUM)
+typedef WebCore::PageClientChromium* PlatformPageClient;
 #else
 typedef PlatformWidget PlatformPageClient;
 #endif
@@ -117,7 +134,7 @@ enum WidgetNotification { WillPaintFlattened, DidPaintFlattened };
 //
 class Widget : public RefCounted<Widget> {
 public:
-    Widget(PlatformWidget = 0);
+    explicit Widget(PlatformWidget = 0);
     virtual ~Widget();
 
     PlatformWidget platformWidget() const;
@@ -211,10 +228,6 @@ public:
 
     void setEvasObject(Evas_Object*);
     Evas_Object* evasObject() const;
-
-    const String edjeTheme() const;
-    void setEdjeTheme(const String &);
-    const String edjeThemeRecursive() const;
 #endif
 
 #if PLATFORM(CHROMIUM)
@@ -261,20 +274,12 @@ private:
 
     IntRect m_frame; // Not used when a native widget exists.
 
-#if PLATFORM(EFL)
-    // FIXME: Please see the previous #if PLATFORM(EFL) block.
-    Ecore_Evas* ecoreEvas() const;
-
-    void applyFallbackCursor();
-    void applyCursor();
-#endif
-
 #if PLATFORM(MAC) || PLATFORM(EFL)
     WidgetPrivate* m_data;
 #endif
 
 #if PLATFORM(QT)
-    QWeakPointer<QObject> m_bindingObject;
+    QPointer<QObject> m_bindingObject;
 #endif
 
 };

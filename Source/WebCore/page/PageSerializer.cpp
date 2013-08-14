@@ -52,6 +52,8 @@
 #include "Page.h"
 #include "StyleCachedImage.h"
 #include "StyleImage.h"
+#include "StyleRule.h"
+#include "StyleSheetContents.h"
 #include "Text.h"
 #include "TextEncoding.h"
 #include <wtf/text/CString.h>
@@ -71,9 +73,9 @@ static bool isCharsetSpecifyingNode(Node* node)
     HTMLMetaCharsetParser::AttributeList attributes;
     if (element->hasAttributes()) {
         for (unsigned i = 0; i < element->attributeCount(); ++i) {
-            Attribute* item = element->attributeItem(i);
+            const Attribute* attribute = element->attributeItem(i);
             // FIXME: We should deal appropriately with the attribute if they have a namespace.
-            attributes.append(make_pair(item->name().toString(), item->value().string()));
+            attributes.append(std::make_pair(attribute->name().toString(), attribute->value().string()));
         }
     }
     TextEncoding textEncoding = HTMLMetaCharsetParser::encodingFromMetaAttributes(attributes);
@@ -153,13 +155,12 @@ void SerializerMarkupAccumulator::appendCustomAttributes(StringBuilder& out, Ele
         return;
 
     KURL url = frame->document()->url();
-    if (url.isValid() && !url.protocolIs("about"))
+    if (url.isValid() && !url.isBlankURL())
         return;
 
     // We need to give a fake location to blank frames so they can be referenced by the serialized frame.
     url = m_serializer->urlForBlankFrame(frame);
-    RefPtr<Attribute> attribute = Attribute::create(frameOwnerURLAttributeName(*frameOwner), url.string());
-    appendAttribute(out, element, *attribute, namespaces);
+    appendAttribute(out, element, Attribute(frameOwnerURLAttributeName(*frameOwner), url.string()), namespaces);
 }
 
 void SerializerMarkupAccumulator::appendEndTag(Node* node)
@@ -194,7 +195,7 @@ void PageSerializer::serializeFrame(Frame* frame)
 {
     Document* document = frame->document();
     KURL url = document->url();
-    if (!url.isValid() || url.protocolIs("about")) {
+    if (!url.isValid() || url.isBlankURL()) {
         // For blank frames we generate a fake URL so they can be referenced by their containing frame.
         url = urlForBlankFrame(frame);
     }
@@ -227,7 +228,7 @@ void PageSerializer::serializeFrame(Frame* frame)
         Element* element = toElement(node);
         // We have to process in-line style as it might contain some resources (typically background images).
         if (element->isStyledElement())
-            retrieveResourcesForCSSDeclaration(static_cast<StyledElement*>(element)->inlineStyleDecl(), document);
+            retrieveResourcesForProperties(static_cast<StyledElement*>(element)->inlineStyle(), document);
 
         if (element->hasTagName(HTMLNames::imgTag)) {
             HTMLImageElement* imageElement = static_cast<HTMLImageElement*>(element);
@@ -263,24 +264,24 @@ void PageSerializer::serializeCSSStyleSheet(CSSStyleSheet* styleSheet, const KUR
             if (i < styleSheet->length() - 1)
                 cssText.append("\n\n");
         }
-        Document* document = styleSheet->findDocument();
+        Document* document = styleSheet->ownerDocument();
         // Some rules have resources associated with them that we need to retrieve.
-        if (rule->isImportRule()) {
-            CSSImportRule* importRule = static_cast<CSSImportRule*>(rule);            
+        if (rule->type() == CSSRule::IMPORT_RULE) {
+            CSSImportRule* importRule = static_cast<CSSImportRule*>(rule);
             KURL importURL = document->completeURL(importRule->href());
             if (m_resourceURLs.contains(importURL))
                 continue;
             serializeCSSStyleSheet(importRule->styleSheet(), importURL);
-        } else if (rule->isFontFaceRule()) {
+        } else if (rule->type() == CSSRule::FONT_FACE_RULE) {
             // FIXME: Add support for font face rule. It is not clear to me at this point if the actual otf/eot file can
             // be retrieved from the CSSFontFaceRule object.
-        } else if (rule->isStyleRule())
-            retrieveResourcesForCSSRule(static_cast<CSSStyleRule*>(rule), document);
+        } else if (rule->type() == CSSRule::STYLE_RULE)
+            retrieveResourcesForRule(static_cast<CSSStyleRule*>(rule)->styleRule(), document);
     }
 
     if (url.isValid() && !m_resourceURLs.contains(url)) {
         // FIXME: We should check whether a charset has been specified and if none was found add one.
-        TextEncoding textEncoding(styleSheet->charset());
+        TextEncoding textEncoding(styleSheet->contents()->charset());
         ASSERT(textEncoding.isValid());
         String textString = cssText.toString();
         CString text = textEncoding.encode(textString.characters(), textString.length(), EntitiesForUnencodables);
@@ -297,17 +298,26 @@ void PageSerializer::addImageToResources(CachedImage* image, RenderObject* image
     if (!image || image->image() == Image::nullImage())
         return;
 
+    RefPtr<SharedBuffer> data = imageRenderer ? image->imageForRenderer(imageRenderer)->data() : 0;
+    if (!data)
+        data = image->image()->data();
+
+    if (!data) {
+        LOG_ERROR("No data for image %s", url.string().utf8().data());
+        return;
+    }
+
     String mimeType = image->response().mimeType();
-    m_resources->append(Resource(url, mimeType, imageRenderer ? image->imageForRenderer(imageRenderer)->data() : image->image()->data()));
+    m_resources->append(Resource(url, mimeType, data));
     m_resourceURLs.add(url);
 }
 
-void PageSerializer::retrieveResourcesForCSSRule(CSSStyleRule* rule, Document* document)
+void PageSerializer::retrieveResourcesForRule(StyleRule* rule, Document* document)
 {
-    retrieveResourcesForCSSDeclaration(rule->declaration(), document);
+    retrieveResourcesForProperties(rule->properties(), document);
 }
 
-void PageSerializer::retrieveResourcesForCSSDeclaration(StylePropertySet* styleDeclaration, Document* document)
+void PageSerializer::retrieveResourcesForProperties(const StylePropertySet* styleDeclaration, Document* document)
 {
     if (!styleDeclaration)
         return;
@@ -338,7 +348,7 @@ KURL PageSerializer::urlForBlankFrame(Frame* frame)
 {
     HashMap<Frame*, KURL>::iterator iter = m_blankFrameURLs.find(frame);
     if (iter != m_blankFrameURLs.end())
-        return iter->second;
+        return iter->value;
     String url = "wyciwyg://frame/" + String::number(m_blankFrameCounter++);
     KURL fakeURL(ParsedURLString, url);
     m_blankFrameURLs.add(frame, fakeURL);

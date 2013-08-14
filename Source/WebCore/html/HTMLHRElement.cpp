@@ -26,6 +26,7 @@
 #include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
+#include "CSSValuePool.h"
 #include "HTMLNames.h"
 
 namespace WebCore {
@@ -48,56 +49,52 @@ PassRefPtr<HTMLHRElement> HTMLHRElement::create(const QualifiedName& tagName, Do
     return adoptRef(new HTMLHRElement(tagName, document));
 }
 
-bool HTMLHRElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLHRElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == alignAttr || attr->name() == widthAttr || attr->name() == colorAttr || attr->name() == noshadeAttr || attr->name() == sizeAttr)
+    if (name == alignAttr || name == widthAttr || name == colorAttr || name == noshadeAttr || name == sizeAttr)
         return true;
-    return HTMLElement::isPresentationAttribute(attr);
+    return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLHRElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+void HTMLHRElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
 {
-    if (attr->name() == alignAttr) {
-        if (equalIgnoringCase(attr->value(), "left")) {
-            style->setProperty(CSSPropertyMarginLeft, "0"); // FIXME: Pass as integer.
-            style->setProperty(CSSPropertyMarginRight, CSSValueAuto);
-        } else if (equalIgnoringCase(attr->value(), "right")) {
-            style->setProperty(CSSPropertyMarginLeft, CSSValueAuto);
-            style->setProperty(CSSPropertyMarginRight, "0"); // FIXME: Pass as integer.
+    if (attribute.name() == alignAttr) {
+        if (equalIgnoringCase(attribute.value(), "left")) {
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginLeft, 0, CSSPrimitiveValue::CSS_PX);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginRight, CSSValueAuto);
+        } else if (equalIgnoringCase(attribute.value(), "right")) {
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginLeft, CSSValueAuto);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginRight, 0, CSSPrimitiveValue::CSS_PX);
         } else {
-            style->setProperty(CSSPropertyMarginLeft, CSSValueAuto);
-            style->setProperty(CSSPropertyMarginRight, CSSValueAuto);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginLeft, CSSValueAuto);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginRight, CSSValueAuto);
         }
-    } else if (attr->name() == widthAttr) {
+    } else if (attribute.name() == widthAttr) {
         bool ok;
-        int v = attr->value().toInt(&ok);
+        int v = attribute.value().toInt(&ok);
         if (ok && !v)
-            addHTMLLengthToStyle(style, CSSPropertyWidth, "1"); // FIXME: Pass as integer.
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyWidth, 1, CSSPrimitiveValue::CSS_PX);
         else
-            addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
-    } else if (attr->name() == colorAttr) {
-        style->setProperty(CSSPropertyBorderTopStyle, CSSValueSolid);
-        style->setProperty(CSSPropertyBorderRightStyle, CSSValueSolid);
-        style->setProperty(CSSPropertyBorderBottomStyle, CSSValueSolid);
-        style->setProperty(CSSPropertyBorderLeftStyle, CSSValueSolid);
-        addHTMLColorToStyle(style, CSSPropertyBorderColor, attr->value());
-        addHTMLColorToStyle(style, CSSPropertyBackgroundColor, attr->value());
-    } else if (attr->name() == noshadeAttr) {
-        style->setProperty(CSSPropertyBorderTopStyle, CSSValueSolid);
-        style->setProperty(CSSPropertyBorderRightStyle, CSSValueSolid);
-        style->setProperty(CSSPropertyBorderBottomStyle, CSSValueSolid);
-        style->setProperty(CSSPropertyBorderLeftStyle, CSSValueSolid);
-        addHTMLColorToStyle(style, CSSPropertyBorderColor, String("grey")); // FIXME: Pass as rgb() value.
-        addHTMLColorToStyle(style, CSSPropertyBackgroundColor, String("grey")); // FIXME: Pass as rgb() value.
-    } else if (attr->name() == sizeAttr) {
-        StringImpl* si = attr->value().impl();
+            addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
+    } else if (attribute.name() == colorAttr) {
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderStyle, CSSValueSolid);
+        addHTMLColorToStyle(style, CSSPropertyBorderColor, attribute.value());
+        addHTMLColorToStyle(style, CSSPropertyBackgroundColor, attribute.value());
+    } else if (attribute.name() == noshadeAttr) {
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderStyle, CSSValueSolid);
+
+        RefPtr<CSSPrimitiveValue> darkGrayValue = cssValuePool().createColorValue(Color::darkGray);
+        style->setProperty(CSSPropertyBorderColor, darkGrayValue);
+        style->setProperty(CSSPropertyBackgroundColor, darkGrayValue);
+    } else if (attribute.name() == sizeAttr) {
+        StringImpl* si = attribute.value().impl();
         int size = si->toInt();
         if (size <= 1)
-            style->setProperty(CSSPropertyBorderBottomWidth, String("0")); // FIXME: Pass as integer.
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderBottomWidth, 0, CSSPrimitiveValue::CSS_PX);
         else
-            addHTMLLengthToStyle(style, CSSPropertyHeight, String::number(size - 2)); // FIXME: Pass as integer.
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyHeight, size - 2, CSSPrimitiveValue::CSS_PX);
     } else
-        HTMLElement::collectStyleForAttribute(attr, style);
+        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
 }
 
 }

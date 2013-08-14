@@ -33,7 +33,17 @@ WebKitURIResponse
 
 </para>
 
+<!-- ##### ARG WebKitURIResponse:mime-type ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitURIResponse:status-code ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitURIResponse:suggested-filename ##### -->
 <para>
 
 </para>
@@ -62,6 +72,24 @@ WebKitURIResponse
 
 
 <!-- ##### FUNCTION webkit_uri_response_get_content_length ##### -->
+<para>
+
+</para>
+
+@response: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_uri_response_get_mime_type ##### -->
+<para>
+
+</para>
+
+@response: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_uri_response_get_suggested_filename ##### -->
 <para>
 
 </para>

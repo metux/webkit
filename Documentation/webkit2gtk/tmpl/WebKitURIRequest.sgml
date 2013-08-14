@@ -51,3 +51,21 @@ WebKitURIRequest
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_uri_request_set_uri ##### -->
+<para>
+
+</para>
+
+@request: 
+@uri: 
+
+
+<!-- ##### FUNCTION webkit_uri_request_get_http_headers ##### -->
+<para>
+
+</para>
+
+@request: 
+@Returns: 
+
+

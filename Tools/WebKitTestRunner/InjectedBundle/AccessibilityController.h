@@ -48,6 +48,7 @@ public:
     PassRefPtr<AccessibilityUIElement> rootElement();
     PassRefPtr<AccessibilityUIElement> focusedElement();
     PassRefPtr<AccessibilityUIElement> elementAtPoint(int x, int y);
+    PassRefPtr<AccessibilityUIElement> accessibleElementById(JSStringRef idAttribute);
 
     bool addNotificationListener(JSValueRef functionCallback);
     bool removeNotificationListener();
@@ -56,15 +57,24 @@ public:
     void logFocusEvents() { }
     void logValueChangeEvents() { }
     void logScrollingStartEvents() { }
-    void logAccessibilityEvents() { }
-    
-    void resetToConsistentState() { }
+    void logAccessibilityEvents();
+
+    void resetToConsistentState();
 
 private:
     AccessibilityController();
 
 #if PLATFORM(MAC)
     RetainPtr<NotificationHandler> m_globalNotificationHandler;
+#endif
+
+#if PLATFORM(GTK) || PLATFORM(EFL)
+    unsigned m_stateChangeListenerId;
+    unsigned m_focusEventListenerId;
+    unsigned m_activeDescendantChangedListenerId;
+    unsigned m_childrenChangedListenerId;
+    unsigned m_propertyChangedListenerId;
+    unsigned m_visibleDataChangedListenerId;
 #endif
 };
 

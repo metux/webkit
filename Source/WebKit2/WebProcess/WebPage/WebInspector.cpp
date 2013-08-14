@@ -27,7 +27,6 @@
 #include "WebInspector.h"
 
 #if ENABLE(INSPECTOR)
-
 #include "WebFrame.h"
 #include "WebInspectorFrontendClient.h"
 #include "WebInspectorProxyMessages.h"
@@ -35,21 +34,30 @@
 #include "WebPageCreationParameters.h"
 #include "WebProcess.h"
 #include <WebCore/InspectorController.h>
+#include <WebCore/InspectorFrontendChannel.h>
 #include <WebCore/Page.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebInspector> WebInspector::create(WebPage* page)
+PassRefPtr<WebInspector> WebInspector::create(WebPage* page, InspectorFrontendChannel* frontendChannel)
 {
-    return adoptRef(new WebInspector(page));
+    return adoptRef(new WebInspector(page, frontendChannel));
 }
 
-WebInspector::WebInspector(WebPage* page)
+WebInspector::WebInspector(WebPage* page, InspectorFrontendChannel* frontendChannel)
     : m_page(page)
     , m_inspectorPage(0)
     , m_frontendClient(0)
+    , m_frontendChannel(frontendChannel)
+#if PLATFORM(MAC)
+    , m_hasLocalizedStringsURL(false)
+    , m_usesWebKitUserInterface(false)
+#endif
+#if ENABLE(INSPECTOR_SERVER)
+    , m_remoteFrontendConnected(false)
+#endif
 {
 }
 
@@ -58,6 +66,9 @@ WebPage* WebInspector::createInspectorPage()
 {
     if (!m_page)
         return 0;
+
+    ASSERT(!m_inspectorPage);
+    ASSERT(!m_frontendClient);
 
     uint64_t inspectorPageID = 0;
     WebPageCreationParameters parameters;
@@ -81,6 +92,13 @@ WebPage* WebInspector::createInspectorPage()
     return m_inspectorPage;
 }
 
+void WebInspector::destroyInspectorPage()
+{
+    m_inspectorPage = 0;
+    m_frontendClient = 0;
+    m_frontendChannel = 0;
+}
+
 // Called from WebInspectorFrontendClient
 void WebInspector::didLoadInspectorPage()
 {
@@ -90,6 +108,7 @@ void WebInspector::didLoadInspectorPage()
 void WebInspector::didClose()
 {
     WebProcess::shared().connection()->send(Messages::WebInspectorProxy::DidClose(), m_page->pageID());
+    destroyInspectorPage();
 }
 
 void WebInspector::bringToFront()
@@ -126,6 +145,12 @@ void WebInspector::show()
 void WebInspector::close()
 {
     m_page->corePage()->inspectorController()->close();
+}
+
+void WebInspector::setAttachedWindow(bool attached)
+{
+    if (m_frontendClient)
+        m_frontendClient->setAttachedWindow(attached);
 }
 
 void WebInspector::evaluateScriptForTest(long callID, const String& script)
@@ -182,10 +207,8 @@ void WebInspector::setJavaScriptProfilingEnabled(bool enabled)
     m_page->corePage()->inspectorController()->show();
     if (!m_frontendClient)
         return;
-    if (enabled)
-        m_page->corePage()->inspectorController()->enableProfiler();
-    else
-        m_page->corePage()->inspectorController()->disableProfiler();        
+
+    m_page->corePage()->inspectorController()->setProfilerEnabled(enabled);
 #endif
 }
 
@@ -220,6 +243,46 @@ void WebInspector::stopPageProfiling()
     if (m_frontendClient)
         m_frontendClient->setTimelineProfilingEnabled(false);
 }
+
+void WebInspector::updateDockingAvailability()
+{
+    if (!m_frontendClient)
+        return;
+
+    bool canAttachWindow = m_frontendClient->canAttachWindow();
+    WebProcess::shared().connection()->send(Messages::WebInspectorProxy::AttachAvailabilityChanged(canAttachWindow), m_page->pageID());
+    m_frontendClient->setDockingUnavailable(!canAttachWindow);
+}
+
+#if ENABLE(INSPECTOR_SERVER)
+void WebInspector::sendMessageToRemoteFrontend(const String& message)
+{
+    ASSERT(m_remoteFrontendConnected);
+    WebProcess::shared().connection()->send(Messages::WebInspectorProxy::SendMessageToRemoteFrontend(message), m_page->pageID());
+}
+
+void WebInspector::dispatchMessageFromRemoteFrontend(const String& message)
+{
+    m_page->corePage()->inspectorController()->dispatchMessageFromFrontend(message);
+}
+
+void WebInspector::remoteFrontendConnected()
+{
+    ASSERT(!m_remoteFrontendConnected);
+    // Switching between in-process and remote inspectors isn't supported yet.
+    ASSERT(!m_inspectorPage);
+    
+    m_page->corePage()->inspectorController()->connectFrontend(m_frontendChannel);
+    m_remoteFrontendConnected = true;
+}
+
+void WebInspector::remoteFrontendDisconnected()
+{
+    ASSERT(m_remoteFrontendConnected);
+    m_page->corePage()->inspectorController()->disconnectFrontend();
+    m_remoteFrontendConnected = false;
+}
+#endif
 
 } // namespace WebKit
 

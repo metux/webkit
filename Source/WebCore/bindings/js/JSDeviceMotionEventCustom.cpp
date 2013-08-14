@@ -31,6 +31,7 @@
 
 #include "DeviceMotionData.h"
 #include "DeviceMotionEvent.h"
+#include <runtime/ObjectConstructor.h>
 
 using namespace JSC;
 
@@ -164,7 +165,7 @@ JSValue JSDeviceMotionEvent::interval(ExecState*) const
 
 JSValue JSDeviceMotionEvent::initDeviceMotionEvent(ExecState* exec)
 {
-    const String& type = ustringToString(exec->argument(0).toString(exec)->value(exec));
+    const String type = exec->argument(0).toString(exec)->value(exec);
     bool bubbles = exec->argument(1).toBoolean(exec);
     bool cancelable = exec->argument(2).toBoolean(exec);
 

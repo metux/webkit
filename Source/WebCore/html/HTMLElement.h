@@ -32,6 +32,7 @@ class HTMLCollection;
 class HTMLFormElement;
 
 #if ENABLE(MICRODATA)
+class HTMLPropertiesCollection;
 class MicroDataItemValue;
 #endif
 
@@ -45,7 +46,7 @@ class HTMLElement : public StyledElement {
 public:
     static PassRefPtr<HTMLElement> create(const QualifiedName& tagName, Document*);
 
-    HTMLCollection* children();
+    PassRefPtr<HTMLCollection> children();
 
     virtual String title() const;
 
@@ -63,6 +64,7 @@ public:
     void insertAdjacentHTML(const String& where, const String& html, ExceptionCode&);
     void insertAdjacentText(const String& where, const String& text, ExceptionCode&);
 
+    virtual bool hasCustomFocusLogic() const;
     virtual bool supportsFocus() const;
 
     String contentEditable() const;
@@ -90,42 +92,50 @@ public:
 
     HTMLFormElement* findFormAncestor() const;
 
+    bool hasDirectionAuto() const;
     TextDirection directionalityIfhasDirAutoAttribute(bool& isAuto) const;
 
 #if ENABLE(MICRODATA)
     void setItemValue(const String&, ExceptionCode&);
     PassRefPtr<MicroDataItemValue> itemValue() const;
+    PassRefPtr<HTMLPropertiesCollection> properties();
+    void getItemRefElements(Vector<HTMLElement*>&);
 #endif
 
+    virtual bool isHTMLUnknownElement() const { return false; }
+
+    virtual bool isLabelable() const { return false; }
+
 protected:
-    HTMLElement(const QualifiedName& tagName, Document*);
+    HTMLElement(const QualifiedName& tagName, Document*, ConstructionType);
 
-    static void addHTMLLengthToStyle(StylePropertySet*, int propertyID, const String& value);
-    static void addHTMLColorToStyle(StylePropertySet*, int propertyID, const String& color);
+    void addHTMLLengthToStyle(StylePropertySet*, CSSPropertyID, const String& value);
+    void addHTMLColorToStyle(StylePropertySet*, CSSPropertyID, const String& color);
 
-    void applyAlignmentAttributeToStyle(Attribute*, StylePropertySet*);
-    void applyBorderAttributeToStyle(Attribute*, StylePropertySet*);
+    void applyAlignmentAttributeToStyle(const Attribute&, StylePropertySet*);
+    void applyBorderAttributeToStyle(const Attribute&, StylePropertySet*);
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    unsigned parseBorderWidthAttribute(const QualifiedName&, const AtomicString& value) const;
 
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
     void calculateAndAdjustDirectionality();
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
 private:
     virtual String nodeName() const;
 
-    void mapLanguageAttributeToLocale(Attribute*, StylePropertySet*);
+    void mapLanguageAttributeToLocale(const Attribute&, StylePropertySet*);
 
     virtual HTMLFormElement* virtualForm() const;
 
     Node* insertAdjacent(const String& where, Node* newChild, ExceptionCode&);
     PassRefPtr<DocumentFragment> textToFragment(const String&, ExceptionCode&);
 
-    void dirAttributeChanged(Attribute*);
+    void dirAttributeChanged(const AtomicString&);
     void adjustDirectionalityIfNeededAfterChildAttributeChanged(Element* child);
     void adjustDirectionalityIfNeededAfterChildrenChanged(Node* beforeChange, int childCountDelta);
     TextDirection directionality(Node** strongDirectionalityTextNode= 0) const;
@@ -140,21 +150,21 @@ private:
 
 inline HTMLElement* toHTMLElement(Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<HTMLElement*>(node);
 }
 
 inline const HTMLElement* toHTMLElement(const Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<const HTMLElement*>(node);
 }
 
 // This will catch anyone doing an unnecessary cast.
 void toHTMLElement(const HTMLElement*);
 
-inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document* document)
-    : StyledElement(tagName, document, CreateHTMLElement)
+inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document* document, ConstructionType type = CreateHTMLElement)
+    : StyledElement(tagName, document, type)
 {
     ASSERT(tagName.localName().impl());
 }

@@ -1,3 +1,84 @@
+webkitgtk (2.0.4-2) UNRELEASED; urgency=low
+
+  [ Jeremy Bicha ]
+  * Don't recommend universe gstreamer codecs on Ubuntu. Closes: #714299.
+
+  [ Gustavo Noronha ]
+  * debian/patches/03_atomics-buildfix.patch:
+  - patch from upstream to fix build in architectures which do not support
+    some atomic builtins for 64 bits types (should fix powerpc and sparc)
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 14 Aug 2013 14:11:23 -0300
+
+webkitgtk (2.0.4-1) experimental; urgency=low
+
+  [ Emilio Pozuelo Monfort ]
+  * debian/compat:
+    + Go back to compat 8 for now as compressed symbol files kill .deb
+      compression. Also objcopy seems to take a lot of memory to compress
+      debugging symbols, killing the build in some cases.
+  * debian/rules:
+    + Stop building with -O1 on armhf. Hopefully the compiler error we were
+      getting has been fixed.
+    + Build with -gstabs on armhf and kfreebsd to try to eat less memory
+      and make the build succeed. If it doesn't we may have to disable
+      debugging symbols as we do in many other arches.
+
+  [ Gustavo Noronha Silva ]
+  * New upstream release
+  * debian/*.symbols, debian/*.install, debian/symbols.filter,
+    debian/patches/01_do-not-build-testing-tools.patch, debian/rules:
+  - Avoid exposing a ton of C++ symbols by not building the testing
+    tools
+  - We no longer build the test browsers, as well
+  * debian/rules:
+  - move dh_autoreconf call to its own rule with its own custom stamp,
+    so we can just call binary if the build fails and we want to try again
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 08 Aug 2013 20:00:46 -0300
+
+webkitgtk (2.0.3-1) experimental; urgency=low
+
+  * Team upload.
+
+  * debian/libwebkit2gtk-3.0-25.symbols:
+    + Added missing i386 symbols. Should really fix the i386 build.
+      Closes: #704886.
+  * debian/rules:
+    + Pass -I Source/autotools to autoreconf to make sure aclocal can find
+      the necessary macros, as otherwise some versions such as aclocal-1.11
+      have some trouble with this.
+    + Add --disable-jit back on mipsel, armel and powerpc. The change was
+      probably lost with the webkit2 addition.
+    + Don't pass --with-gstreamer=1.0 anymore, GStreamer support is always
+      1.0 now and the configure flag has been dropped.
+    + Don't pass --disable-plugin-process. The flag is gone and the plugin
+      process is always built for WebKit2, which is what we were doing.
+    + Don't pass --disable-jit on powerpc. Instead disable JIT, YARR and
+      assembler in ia64 powerpc sparc s390 and s390x as there's no
+      support for MacroAssembler for them.
+  * debian/patches/changeset_145551.diff:
+    + Backport from upstream, implement Double2Ints in CLoop backend for
+      32 bit architectures, needed for the above architectures where we
+      disable JIT, YARR and assembler.
+  * debian/control:
+    + Build depend on libgudev-1.0-dev on linux for gamepad support.
+  * debian/patches/10_hurd_getCurrentExecutablePath.patch:
+    + Readd patch from #669059 that was lost. Fixes build on hurd.
+
+  * New upstream release.
+  * changeset_150117.diff, changeset_150326.diff, changeset_150963.diff:
+    + Dropped, included upstream.
+
+  * debian/patches/changeset_147557.diff:
+    + Backport from upstream, fix a dispose/finalize mistake that can
+      cause crashes in some scenarios.
+  * debian/patches/20_bsd-hurd-gtest-port.patch:
+    + New patch. Fix kfreebsd and hurd builds by making gtest know about
+      them.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Sun, 16 Jun 2013 20:52:37 +0200
+
 webkit (1.8.1-4) unstable; urgency=low
 
   * Acknowledge NMUs. Thanks Samuel, Ansgar and Michael!
@@ -14,6 +95,151 @@ webkit (1.8.1-4) unstable; urgency=low
       such minor issues here.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 12 Jun 2013 21:48:22 +0200
+
+webkitgtk (2.0.2-2) experimental; urgency=low
+
+  * Team upload.
+
+  * debian/control,
+    debian/rules:
+    + Build depend on gcc-4.7 and g++-4.7 and set the C compiler and C++
+      compiler to this version as webkitgtk now requires GCC >= 4.7 and
+      the default on many architectures is still 4.6.
+  * debian/control,
+    debian/compat:
+    + Bump debhelper compat to 9. Among other things, this brings us
+      compressed debug info files. It also brings build-id debug info
+      files which greatly speed up gdb start up as gdb won't have to
+      checksum the (rather big) webkit debug info files anymore.
+  * debian/rules:
+    + Exclude libwebkit2gtkinjectedbundle.so from dh_makeshlibs as it's a
+      private library and debhelper looks at every shared lib in compat 9.
+  * debian/libwebkitgtk-1.0-0.symbols,
+    debian/libwebkitgtk-3.0-0.symbols:
+    + Add missing symbols for 32 bit arches. Closes: #704886.
+  * debian/libwebkit2gtk-3.0-25.symbols:
+    + Demangle symbols.
+  * debian/control:
+    + Bump required build dependencies according to Versions.mk.
+    + Add missing build dependency on flex. Thanks to Sjoerd Simons for
+      noticing this.
+    + Also add other missing build dependencies (cairo, freetype,
+      fontconfig and libxml).
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 04 Jun 2013 15:00:49 +0200
+
+webkitgtk (2.0.2-1) experimental; urgency=low
+
+  * Team upload.
+
+  * New upstream release.
+    + debian/patches/03_avoid_unresolved_x_symbols.patch:
+      - Removed, applied upstream.
+    + debian/patches/changeset_150117.diff,
+      debian/patches/changeset_150256.diff,
+      debian/patches/changeset_150326.diff,
+      debian/patches/changeset_150963.diff:
+      - Backport various build fixes from upstream.
+    + debian/*.symbols:
+      - Updated.
+    + debian/libwebkit2gtk-3.0-0.install:
+      - Don't install .la files.
+    + debian/rules:
+      - Re-enable parallel build support, the above patches should
+        make it work.
+    + debian/libwebkit2gtk-3.0-{0,25}.install,
+      debian/control,
+      debian/rules:
+      - Renamed libwebkit2gtk-3.0-0 to libwebkit2gtk-3.0-25.
+      - Make libwebkit2gtk-3.0-25 break/replace the old
+        libwebkit2gtk-3.0-0 as the injected-bundle module path
+        is the same.
+    + debian/libwebkit2gtk-3.0-25.symbols:
+      - Add a symbols file for libwebkit2gtk-3.0.
+  * debian/watch:
+    + Updated to work with the new page.
+  * debian/rules:
+    + Run dh_autoreconf. Makes it easier to backport upstream patches
+      that modify autotools files.
+  * debian/control:
+    + Mention "dummy" in libwebkit-dev's long description to shut
+      lintian up.
+    + Bump Standards-Version to 3.9.4; no changes needed.
+    + Bump libharfbuzz-dev's minimum build dependency to pick up a
+      dependency against the new libharfbuzz0a package.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 29 May 2013 10:39:29 +0200
+
+webkitgtk (1.11.91-1) experimental; urgency=low
+
+  * New development release
+  * debian/patches/03_avoid_unresolved_x_symbols.patch:
+  - patch to avoid linking issue
+  * debian/rules:
+  - enable WebKit2 packages
+  * debian/*.symbols:
+  - updated with new symbols
+  * debian/control:
+  - add libwebp-dev to the build dependencies
+  - add libsecret-1-dev to build dependencies
+  - add libharfbuzz-dev >= 0.9.7 to build dependencies
+  * debian/libwebkitgtk-3.0-dev.install:
+  - install webkitdom includes, which now live in a new path
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 17 Mar 2013 11:43:34 -0300
+
+webkitgtk (1.10.2-2) experimental; urgency=low
+
+  * Integrate patches and acknowledge NMUs; thanks to Ansgar Burchardt
+    <ansgar@debian.org>, and Michael Gilbert <mgilbert@debian.org>
+  * debian/control, debian/rules:
+  - switch to building with GStreamer 1.0
+  * debian/control:
+  - added ruby to the Build-Dependencies, it is now required
+    for building WebKit
+  * debian/rules:
+  - ensure configure is the last command run in a single shell invocation,
+    so the build fails early if configure fails
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 24 Feb 2013 16:51:07 -0300
+
+webkitgtk (1.10.2-1) experimental; urgency=low
+
+  * New stable release
+  - source package renamed following upstream
+  - Includes the WebCore split patches, so the make command line
+    limit problem should not happen
+  * Acknowledge NMU to fix FreeBSD and Hurd, thanks to Samuel
+    Thibault <sthibault@debian.org>
+  * Acknowledge NMU to change deb compression to xz, thanks to
+    Ansgar Burchardt <ansgar@debian.org>
+  * Acknowledge NMU to use smaller debug format for ia64 as well,
+    thanks to Ansgar Burchardt <ansgar@debian.org>
+  * debian/*.symbols:
+  - updated
+  * debian/control:
+  - bump libsoup dependency to 2.40 accross the board,
+    following upstream's bump but using the first stable
+    release instead of the development one
+  * debian/*webkit2*, debian/rules, debian/control:
+  - new packages for the WebKit2GTK+ library, not built by default, you
+    can enable them by setting the make ENABLE_WEBKIT2 variable to yes
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 05 Dec 2012 23:41:36 -0200
+
+webkit (1.9.2-1) experimental; urgency=low
+
+  * New development release
+  * debian/patches/10_kfreebsd_support.patch:
+  - removed; applied upstream
+  * debian/rules:
+  - disable AR_FLAGS space optimization for now, since linking two libtool
+    convenience libraries seems to break that
+  * debian/*.symbols:
+  - updated with symbols of the new version
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Tue, 08 May 2012 12:01:33 -0300
+>>>>>>> experimental
 
 webkit (1.8.1-3.4) unstable; urgency=medium
 

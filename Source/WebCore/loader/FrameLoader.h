@@ -38,6 +38,8 @@
 #include "HistoryController.h"
 #include "IconController.h"
 #include "IconURL.h"
+#include "LayoutMilestones.h"
+#include "MixedContentChecker.h"
 #include "PolicyChecker.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadNotifier.h"
@@ -92,9 +94,9 @@ public:
     ResourceLoadNotifier* notifier() const { return &m_notifer; }
     SubframeLoader* subframeLoader() const { return &m_subframeLoader; }
     IconController* icon() const { return &m_icon; }
+    MixedContentChecker* mixedContentChecker() const { return &m_mixedContentChecker; }
 
     void prepareForHistoryNavigation();
-    void prepareForLoadStart();
     void setupForReplace();
 
     // FIXME: These are all functions which start loads. We have too many.
@@ -102,9 +104,8 @@ public:
     void loadFrameRequest(const FrameLoadRequest&, bool lockHistory, bool lockBackForwardList,  // Called by submitForm, calls loadPostRequest and loadURL.
         PassRefPtr<Event>, PassRefPtr<FormState>, ShouldSendReferrer);
 
-    void load(const ResourceRequest&, bool lockHistory);                                        // Called by WebFrame, calls load(ResourceRequest, SubstituteData).
-    void load(const ResourceRequest&, const SubstituteData&, bool lockHistory);                 // Called both by WebFrame and internally, calls load(DocumentLoader*).
-    void load(const ResourceRequest&, const String& frameName, bool lockHistory);               // Called by WebPluginController.
+    void load(const FrameLoadRequest&);
+
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
     void loadArchive(PassRefPtr<Archive>);
 #endif
@@ -116,10 +117,13 @@ public:
 
     void reload(bool endToEndReload = false);
     void reloadWithOverrideEncoding(const String& overrideEncoding);
+    void reloadWithOverrideURL(const KURL& overrideUrl, bool endToEndReload = false);
 
     void open(CachedFrameBase&);
     void loadItem(HistoryItem*, FrameLoadType);
     HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
+
+    void retryAfterFailedCacheOnlyMainResourceLoad();
 
     static void reportLocalLoadFailed(Frame*, const String& url);
 
@@ -130,9 +134,9 @@ public:
     void stopLoading(UnloadEventPolicy);
     bool closeURL();
     void cancelAndClear();
-    void clear(bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
+    // FIXME: clear() is trying to do too many things. We should break it down into smaller functions (ideally with fewer raw Boolean parameters).
+    void clear(Document* newDocument, bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
 
-    bool isLoadingMainResource() const { return m_isLoadingMainResource; }
     bool isLoading() const;
     bool frameHasLoaded() const;
 
@@ -150,38 +154,32 @@ public:
 
     const ResourceRequest& originalRequest() const;
     const ResourceRequest& initialRequest() const;
-    void receivedMainResourceError(const ResourceError&, bool isComplete);
+    void receivedMainResourceError(const ResourceError&);
 
     bool willLoadMediaElementURL(KURL&);
 
     void handleFallbackContent();
-
-    void finishedLoading();
 
     ResourceError cancelledError(const ResourceRequest&) const;
 
     bool isHostedByObjectElement() const;
     bool isLoadingMainFrame() const;
 
-    void finishedLoadingDocument(DocumentLoader*);
     bool isReplacing() const;
     void setReplacing();
-    void mainReceivedCompleteError(DocumentLoader*, const ResourceError&);
     bool subframeIsLoading() const;
     void willChangeTitle(DocumentLoader*);
     void didChangeTitle(DocumentLoader*);
     void didChangeIcons(IconType);
 
+    bool shouldTreatURLAsSrcdocDocument(const KURL&) const;
+
     FrameLoadType loadType() const;
 
     CachePolicy subresourceCachePolicy() const;
 
+    void didLayout(LayoutMilestones);
     void didFirstLayout();
-
-    // FIXME: didFirstVisuallyNonEmptyLayout() and didNewFirstVisuallyNonEmptyLayout() should be merged.
-    // The only reason for both to exist is to experiment with different heuristics for the time being.
-    void didFirstVisuallyNonEmptyLayout();
-    void didNewFirstVisuallyNonEmptyLayout();
 
     void loadedResourceFromMemoryCache(CachedResource*);
     void tellClientAboutPastMemoryCacheLoads();
@@ -203,8 +201,8 @@ public:
 
     // Callbacks from DocumentWriter
     void didBeginDocument(bool dispatchWindowObjectAvailable);
-    void didEndDocument();
-    void willSetEncoding();
+
+    void receivedFirstData();
 
     void handledOnloadEvents();
     String userAgent(const KURL&) const;
@@ -218,10 +216,7 @@ public:
     void forceSandboxFlags(SandboxFlags flags) { m_forcedSandboxFlags |= flags; }
     SandboxFlags effectiveSandboxFlags() const;
 
-    // Mixed content related functions.
-    static bool isMixedContent(SecurityOrigin* context, const KURL&);
-    bool checkIfDisplayInsecureContent(SecurityOrigin* context, const KURL&);
-    bool checkIfRunInsecureContent(SecurityOrigin* context, const KURL&);
+    bool checkIfFormActionAllowedByCSP(const KURL&) const;
 
     Frame* opener();
     void setOpener(Frame*);
@@ -248,11 +243,11 @@ public:
 
     FrameLoaderStateMachine* stateMachine() const { return &m_stateMachine; }
 
-    Frame* findFrameForNavigation(const AtomicString& name);
+    Frame* findFrameForNavigation(const AtomicString& name, Document* activeDocument = 0);
 
     void applyUserAgent(ResourceRequest&);
 
-    bool shouldInterruptLoadForXFrameOptions(const String&, const KURL&);
+    bool shouldInterruptLoadForXFrameOptions(const String&, const KURL&, unsigned long requestIdentifier);
 
     void completed();
     bool allAncestorsAreComplete() const; // including this
@@ -286,21 +281,22 @@ public:
 
     NetworkingContext* networkingContext() const;
 
-#if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-    Archive* archive() const { return m_archive.get(); }
-#endif
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
+    enum FormSubmissionCacheLoadPolicy {
+        MayAttemptCacheOnlyLoadForFormSubmissionItem,
+        MayNotAttemptCacheOnlyLoadForFormSubmissionItem
+    };
+
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
     void checkTimerFired(Timer<FrameLoader>*);
     
     void loadSameDocumentItem(HistoryItem*);
-    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType);
+    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType, FormSubmissionCacheLoadPolicy);
     
     void loadProvisionalItemFromCachedPage();
-
-    void receivedFirstData();
 
     void updateFirstPartyForCookies();
     void setFirstPartyForCookies(const KURL&);
@@ -310,6 +306,8 @@ private:
     void clearProvisionalLoad();
     void transitionToCommitted(PassRefPtr<CachedPage>);
     void frameLoadCompleted();
+
+    SubstituteData defaultSubstituteDataForURL(const KURL&);
 
     static void callContinueLoadAfterNavigationPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
     static void callContinueLoadAfterNewWindowPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, const NavigationAction&, bool shouldContinue);
@@ -321,7 +319,8 @@ private:
     void continueLoadAfterNewWindowPolicy(const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, const NavigationAction&, bool shouldContinue);
     void continueFragmentScrollAfterNavigationPolicy(const ResourceRequest&, bool shouldContinue);
 
-    bool shouldScrollToAnchor(bool isFormSubmission, const String& httpMethod, FrameLoadType, const KURL&);
+    bool shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType, const KURL&);
+    void scrollToFragmentWithParentBoundary(const KURL&);
 
     void checkLoadCompleteForThisFrame();
 
@@ -351,6 +350,8 @@ private:
     void loadURL(const KURL&, const String& referrer, const String& frameName,          // Called by loadFrameRequest, calls loadWithNavigationAction or dispatches to navigation policy delegate
         bool lockHistory, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);                                                         
 
+    void reloadWithRequest(const ResourceRequest&, bool endToEndReload);
+
     bool shouldReload(const KURL& currentURL, const KURL& destinationURL);
 
     void requestFromDelegate(ResourceRequest&, unsigned long& identifier, ResourceError&);
@@ -358,8 +359,9 @@ private:
     void detachChildren();
     void closeAndRemoveChild(Frame*);
 
-    void loadInSameDocument(const KURL&, SerializedScriptValue* stateObject, bool isNewNavigation);
+    void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation);
 
+    void prepareForLoadStart();
     void provisionalLoadStarted();
 
     bool didOpenURL();
@@ -370,15 +372,24 @@ private:
 
     bool shouldTreatURLAsSameAsCurrent(const KURL&) const;
 
+    void dispatchGlobalObjectAvailableInAllWorlds();
+
     Frame* m_frame;
     FrameLoaderClient* m_client;
 
+    // FIXME: These should be OwnPtr<T> to reduce build times and simplify
+    // header dependencies unless performance testing proves otherwise.
+    // Some of these could be lazily created for memory savings on devices.
     mutable PolicyChecker m_policyChecker;
     mutable HistoryController m_history;
     mutable ResourceLoadNotifier m_notifer;
     mutable SubframeLoader m_subframeLoader;
     mutable FrameLoaderStateMachine m_stateMachine;
     mutable IconController m_icon;
+    mutable MixedContentChecker m_mixedContentChecker;
+
+    class FrameProgressTracker;
+    OwnPtr<FrameProgressTracker> m_progressTracker;
 
     FrameState m_state;
     FrameLoadType m_loadType;
@@ -405,11 +416,8 @@ private:
     bool m_wasUnloadEventEmitted;
     PageDismissalType m_pageDismissalEventBeingDispatched;
     bool m_isComplete;
-    bool m_isLoadingMainResource;
 
     RefPtr<SerializedScriptValue> m_pendingStateObject;
-
-    bool m_hasReceivedFirstData;
 
     bool m_needsClear;
 
@@ -429,10 +437,6 @@ private:
     SandboxFlags m_forcedSandboxFlags;
 
     RefPtr<FrameNetworkingContext> m_networkingContext;
-
-#if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-    RefPtr<Archive> m_archive;
-#endif
 
     KURL m_previousUrl;
     RefPtr<HistoryItem> m_requestedHistoryItem;

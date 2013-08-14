@@ -1,0 +1,56 @@
+<!-- ##### SECTION Title ##### -->
+WebKitWebExtension
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitWebExtension ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SIGNAL WebKitWebExtension::page-created ##### -->
+<para>
+
+</para>
+
+@webkitwebextension: the object which received the signal.
+@arg1: 
+
+<!-- ##### USER_FUNCTION WebKitWebExtensionInitializeFunction ##### -->
+<para>
+
+</para>
+
+@extension: 
+
+
+<!-- ##### FUNCTION webkit_web_extension_get_page ##### -->
+<para>
+
+</para>
+
+@extension: 
+@page_id: 
+@Returns: 
+
+

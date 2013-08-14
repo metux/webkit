@@ -28,9 +28,11 @@
 #include "ResourceResponseBase.h"
 
 #include "HTTPParsers.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "ResourceResponse.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/StdLibExtras.h>
 
 using namespace std;
@@ -274,16 +276,15 @@ String ResourceResponseBase::httpHeaderField(const char* name) const
     return m_httpHeaderFields.get(name); 
 }
 
-void ResourceResponseBase::setHTTPHeaderField(const AtomicString& name, const String& value)
+void ResourceResponseBase::updateHeaderParsedState(const AtomicString& name)
 {
-    lazyInit(CommonAndUncommonFields);
+    DEFINE_STATIC_LOCAL(const AtomicString, ageHeader, ("age", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, cacheControlHeader, ("cache-control", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, dateHeader, ("date", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, expiresHeader, ("expires", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, lastModifiedHeader, ("last-modified", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, pragmaHeader, ("pragma", AtomicString::ConstructFromLiteral));
 
-    DEFINE_STATIC_LOCAL(const AtomicString, ageHeader, ("age"));
-    DEFINE_STATIC_LOCAL(const AtomicString, cacheControlHeader, ("cache-control"));
-    DEFINE_STATIC_LOCAL(const AtomicString, dateHeader, ("date"));
-    DEFINE_STATIC_LOCAL(const AtomicString, expiresHeader, ("expires"));
-    DEFINE_STATIC_LOCAL(const AtomicString, lastModifiedHeader, ("last-modified"));
-    DEFINE_STATIC_LOCAL(const AtomicString, pragmaHeader, ("pragma"));
     if (equalIgnoringCase(name, ageHeader))
         m_haveParsedAgeHeader = false;
     else if (equalIgnoringCase(name, cacheControlHeader) || equalIgnoringCase(name, pragmaHeader))
@@ -294,8 +295,26 @@ void ResourceResponseBase::setHTTPHeaderField(const AtomicString& name, const St
         m_haveParsedExpiresHeader = false;
     else if (equalIgnoringCase(name, lastModifiedHeader))
         m_haveParsedLastModifiedHeader = false;
+}
+
+void ResourceResponseBase::setHTTPHeaderField(const AtomicString& name, const String& value)
+{
+    lazyInit(CommonAndUncommonFields);
+
+    updateHeaderParsedState(name);
 
     m_httpHeaderFields.set(name, value);
+}
+
+void ResourceResponseBase::addHTTPHeaderField(const AtomicString& name, const String& value)
+{
+    lazyInit(CommonAndUncommonFields);
+
+    updateHeaderParsedState(name);
+
+    HTTPHeaderMap::AddResult result = m_httpHeaderFields.add(name, value);
+    if (!result.isNewEntry)
+        result.iterator->value.append(", " + value);
 }
 
 const HTTPHeaderMap& ResourceResponseBase::httpHeaderFields() const
@@ -317,11 +336,11 @@ void ResourceResponseBase::parseCacheControlDirectives() const
     m_cacheControlContainsNoCache = false;
     m_cacheControlMaxAge = numeric_limits<double>::quiet_NaN();
 
-    DEFINE_STATIC_LOCAL(const AtomicString, cacheControlString, ("cache-control"));
-    DEFINE_STATIC_LOCAL(const AtomicString, noCacheDirective, ("no-cache"));
-    DEFINE_STATIC_LOCAL(const AtomicString, noStoreDirective, ("no-store"));
-    DEFINE_STATIC_LOCAL(const AtomicString, mustRevalidateDirective, ("must-revalidate"));
-    DEFINE_STATIC_LOCAL(const AtomicString, maxAgeDirective, ("max-age"));
+    DEFINE_STATIC_LOCAL(const AtomicString, cacheControlString, ("cache-control", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, noCacheDirective, ("no-cache", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, noStoreDirective, ("no-store", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, mustRevalidateDirective, ("must-revalidate", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, maxAgeDirective, ("max-age", AtomicString::ConstructFromLiteral));
 
     String cacheControlValue = m_httpHeaderFields.get(cacheControlString);
     if (!cacheControlValue.isEmpty()) {
@@ -339,6 +358,10 @@ void ResourceResponseBase::parseCacheControlDirectives() const
             else if (equalIgnoringCase(directives[i].first, mustRevalidateDirective))
                 m_cacheControlContainsMustRevalidate = true;
             else if (equalIgnoringCase(directives[i].first, maxAgeDirective)) {
+                if (!std::isnan(m_cacheControlMaxAge)) {
+                    // First max-age directive wins if there are multiple ones.
+                    continue;
+                }
                 bool ok;
                 double maxAge = directives[i].second.toDouble(&ok);
                 if (ok)
@@ -351,7 +374,7 @@ void ResourceResponseBase::parseCacheControlDirectives() const
         // Handle Pragma: no-cache
         // This is deprecated and equivalent to Cache-control: no-cache
         // Don't bother tokenizing the value, it is not important
-        DEFINE_STATIC_LOCAL(const AtomicString, pragmaHeader, ("pragma"));
+        DEFINE_STATIC_LOCAL(const AtomicString, pragmaHeader, ("pragma", AtomicString::ConstructFromLiteral));
         String pragmaValue = m_httpHeaderFields.get(pragmaHeader);
 
         m_cacheControlContainsNoCache = pragmaValue.lower().contains(noCacheDirective);
@@ -383,8 +406,8 @@ bool ResourceResponseBase::hasCacheValidatorFields() const
 {
     lazyInit(CommonFieldsOnly);
 
-    DEFINE_STATIC_LOCAL(const AtomicString, lastModifiedHeader, ("last-modified"));
-    DEFINE_STATIC_LOCAL(const AtomicString, eTagHeader, ("etag"));
+    DEFINE_STATIC_LOCAL(const AtomicString, lastModifiedHeader, ("last-modified", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, eTagHeader, ("etag", AtomicString::ConstructFromLiteral));
     return !m_httpHeaderFields.get(lastModifiedHeader).isEmpty() || !m_httpHeaderFields.get(eTagHeader).isEmpty();
 }
 
@@ -405,7 +428,7 @@ static double parseDateValueInHeader(const HTTPHeaderMap& headers, const AtomicS
     // Sunday, 06-Nov-94 08:49:37 GMT ; RFC 850, obsoleted by RFC 1036
     // Sun Nov  6 08:49:37 1994       ; ANSI C's asctime() format
     double dateInMilliseconds = parseDate(headerValue);
-    if (!isfinite(dateInMilliseconds))
+    if (!std::isfinite(dateInMilliseconds))
         return std::numeric_limits<double>::quiet_NaN();
     return dateInMilliseconds / 1000;
 }
@@ -415,7 +438,7 @@ double ResourceResponseBase::date() const
     lazyInit(CommonFieldsOnly);
 
     if (!m_haveParsedDateHeader) {
-        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("date"));
+        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("date", AtomicString::ConstructFromLiteral));
         m_date = parseDateValueInHeader(m_httpHeaderFields, headerName);
         m_haveParsedDateHeader = true;
     }
@@ -427,7 +450,7 @@ double ResourceResponseBase::age() const
     lazyInit(CommonFieldsOnly);
 
     if (!m_haveParsedAgeHeader) {
-        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("age"));
+        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("age", AtomicString::ConstructFromLiteral));
         String headerValue = m_httpHeaderFields.get(headerName);
         bool ok;
         m_age = headerValue.toDouble(&ok);
@@ -443,7 +466,7 @@ double ResourceResponseBase::expires() const
     lazyInit(CommonFieldsOnly);
 
     if (!m_haveParsedExpiresHeader) {
-        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("expires"));
+        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("expires", AtomicString::ConstructFromLiteral));
         m_expires = parseDateValueInHeader(m_httpHeaderFields, headerName);
         m_haveParsedExpiresHeader = true;
     }
@@ -455,7 +478,7 @@ double ResourceResponseBase::lastModified() const
     lazyInit(CommonFieldsOnly);
 
     if (!m_haveParsedLastModifiedHeader) {
-        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("last-modified"));
+        DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("last-modified", AtomicString::ConstructFromLiteral));
         m_lastModified = parseDateValueInHeader(m_httpHeaderFields, headerName);
         m_haveParsedLastModifiedHeader = true;
     }
@@ -466,13 +489,13 @@ bool ResourceResponseBase::isAttachment() const
 {
     lazyInit(CommonAndUncommonFields);
 
-    DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("content-disposition"));
+    DEFINE_STATIC_LOCAL(const AtomicString, headerName, ("content-disposition", AtomicString::ConstructFromLiteral));
     String value = m_httpHeaderFields.get(headerName);
     size_t loc = value.find(';');
     if (loc != notFound)
         value = value.left(loc);
     value = value.stripWhiteSpace();
-    DEFINE_STATIC_LOCAL(const AtomicString, attachmentString, ("attachment"));
+    DEFINE_STATIC_LOCAL(const AtomicString, attachmentString, ("attachment", AtomicString::ConstructFromLiteral));
     return equalIgnoringCase(value, attachmentString);
 }
   
@@ -562,6 +585,19 @@ void ResourceResponseBase::lazyInit(InitLevel initLevel) const
 {
     const_cast<ResourceResponse*>(static_cast<const ResourceResponse*>(this))->platformLazyInit(initLevel);
 }
+
+void ResourceResponseBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Loader);
+    info.addMember(m_url, "url");
+    info.addMember(m_mimeType, "mimeType");
+    info.addMember(m_textEncodingName, "textEncodingName");
+    info.addMember(m_suggestedFilename, "suggestedFilename");
+    info.addMember(m_httpStatusText, "httpStatusText");
+    info.addMember(m_httpHeaderFields, "httpHeaderFields");
+    info.addMember(m_resourceLoadTiming, "resourceLoadTiming");
+    info.addMember(m_resourceLoadInfo, "resourceLoadInfo");
+}
     
 bool ResourceResponseBase::compare(const ResourceResponse& a, const ResourceResponse& b)
 {
@@ -626,7 +662,7 @@ static bool isControlCharacter(UChar c)
 
 static inline String trimToNextSeparator(const String& str)
 {
-    return str.substring(0, str.find(isCacheHeaderSeparator, 0));
+    return str.substring(0, str.find(isCacheHeaderSeparator));
 }
 
 static void parseCacheHeader(const String& header, Vector<pair<String, String> >& result)
@@ -662,7 +698,7 @@ static void parseCacheHeader(const String& header, Vector<pair<String, String> >
                 }
             } else {
                 // The value is a token until the next comma
-                size_t nextCommaPosition2 = value.find(',', 0);
+                size_t nextCommaPosition2 = value.find(',');
                 if (nextCommaPosition2 != notFound) {
                     // The value is delimited by the next comma
                     result.append(pair<String, String>(directive, trimToNextSeparator(value.substring(0, nextCommaPosition2).stripWhiteSpace())));

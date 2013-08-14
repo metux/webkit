@@ -44,6 +44,8 @@
 #include "DumpRenderTreeWx.h"
 #elif PLATFORM(EFL)
 #include "DumpRenderTreeEfl.h"
+#elif PLATFORM(BLACKBERRY)
+#include "DumpRenderTreeBlackBerry.h"
 #endif
 
 #include <string>
@@ -53,14 +55,25 @@
 std::wstring urlSuitableForTestResult(const std::wstring& url);
 #endif
 
-class LayoutTestController;
+class TestRunner;
 
 extern volatile bool done;
 
 // FIXME: This is a bad abstraction.  We should insted pass this to other controller objects which need access to it.
-extern RefPtr<LayoutTestController> gLayoutTestController;
+extern RefPtr<TestRunner> gTestRunner;
 
 void dump();
 void displayWebView();
+
+struct TestCommand {
+    TestCommand() : shouldDumpPixels(false), timeout(30000) { }
+
+    std::string pathOrURL;
+    bool shouldDumpPixels;
+    std::string expectedPixelHash;
+    int timeout; // in ms
+};
+
+TestCommand parseInputLine(const std::string&);
 
 #endif // DumpRenderTree_h

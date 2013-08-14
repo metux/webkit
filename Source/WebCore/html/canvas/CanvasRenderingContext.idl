@@ -23,16 +23,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-module html {
-
-    interface [
-        JSCustomMarkFunction,
-        JSGenerateIsReachable,
-        JSCustomToJSObject
-    ] CanvasRenderingContext {
-
-        readonly attribute HTMLCanvasElement canvas;
-    };
-
-}
+[
+    JSCustomMarkFunction,
+    JSGenerateIsReachable,
+    CustomToJSObject
+] interface CanvasRenderingContext {
+    readonly attribute HTMLCanvasElement canvas;
+};
 

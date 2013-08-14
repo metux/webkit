@@ -21,16 +21,17 @@
 #ifndef HTMLMeterElement_h
 #define HTMLMeterElement_h
 
-#if ENABLE(METER_TAG)
-#include "HTMLFormControlElement.h"
+#if ENABLE(METER_ELEMENT)
+#include "LabelableElement.h"
 
 namespace WebCore {
 
 class MeterValueElement;
+class RenderMeter;
 
-class HTMLMeterElement : public HTMLFormControlElement {
+class HTMLMeterElement : public LabelableElement {
 public:
-    static PassRefPtr<HTMLMeterElement> create(const QualifiedName&, Document*, HTMLFormElement*);
+    static PassRefPtr<HTMLMeterElement> create(const QualifiedName&, Document*);
 
     enum GaugeRegion {
         GaugeRegionOptimum,
@@ -62,22 +63,37 @@ public:
     bool canContainRangeEndPoint() const { return false; }
 
 private:
-    HTMLMeterElement(const QualifiedName&, Document*, HTMLFormElement*);
+    HTMLMeterElement(const QualifiedName&, Document*);
     virtual ~HTMLMeterElement();
+
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
+    RenderMeter* renderMeter() const;
+
+    virtual bool supportLabels() const OVERRIDE { return true; }
 
     virtual bool supportsFocus() const;
 
     virtual bool recalcWillValidate() const { return false; }
-    virtual const AtomicString& formControlType() const;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual void attach();
+    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
     void didElementStateChange();
-    void createShadowSubtree();
+    virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
 
     RefPtr<MeterValueElement> m_value;
 };
+
+inline bool isHTMLMeterElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::meterTag);
+}
+
+inline HTMLMeterElement* toHTMLMeterElement(Node* node)
+{
+    ASSERT(!node || isHTMLMeterElement(node));
+    return static_cast<HTMLMeterElement*>(node);
+}
 
 } // namespace
 

@@ -52,9 +52,9 @@ bool AccessibilityUIElement::isValid() const
 {
     return m_element;            
 }
-    
+
 // Unsupported methods on various platforms. As they're implemented on other platforms this list should be modified.
-#if !PLATFORM(MAC)
+#if !PLATFORM(MAC) && !PLATFORM(GTK) && !PLATFORM(EFL)
 AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement) { }
 AccessibilityUIElement::AccessibilityUIElement(const AccessibilityUIElement&) { }
 AccessibilityUIElement::~AccessibilityUIElement() { }
@@ -85,7 +85,9 @@ double AccessibilityUIElement::numberAttributeValue(JSStringRef) { return 0; }
 bool AccessibilityUIElement::boolAttributeValue(JSStringRef) { return false; }
 bool AccessibilityUIElement::isAttributeSupported(JSStringRef) { return false; }
 bool AccessibilityUIElement::isAttributeSettable(JSStringRef) { return false; }
-bool AccessibilityUIElement::isActionSupported(JSStringRef) { return false; }
+bool AccessibilityUIElement::isPressActionSupported() { return false; }
+bool AccessibilityUIElement::isIncrementActionSupported() { return false; }
+bool AccessibilityUIElement::isDecrementActionSupported() { return false; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::role() { return 0; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::subrole() { return 0; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::roleDescription() { return 0; }
@@ -144,12 +146,14 @@ int AccessibilityUIElement::columnCount() { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::selectedRowAtIndex(unsigned) { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::disclosedByRow() { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::disclosedRowAtIndex(unsigned) { return 0; }
+PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::rowAtIndex(unsigned) { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::ariaOwnsElementAtIndex(unsigned) { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::ariaFlowToElementAtIndex(unsigned) { return 0; }
 bool AccessibilityUIElement::ariaIsGrabbed() const { return false; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::ariaDropEffects() const { return 0; }
 int AccessibilityUIElement::lineForIndex(int) { return 0; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::rangeForLine(int) { return 0; }
+JSRetainPtr<JSStringRef> AccessibilityUIElement::rangeForPosition(int, int) { return 0; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::boundsForRange(unsigned, unsigned) { return 0; }
 void AccessibilityUIElement::setSelectedTextRange(unsigned, unsigned) { }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::stringForRange(unsigned, unsigned) { return 0; }
@@ -172,6 +176,10 @@ PassRefPtr<AccessibilityTextMarker> AccessibilityUIElement::previousTextMarker(A
 PassRefPtr<AccessibilityTextMarker> AccessibilityUIElement::nextTextMarker(AccessibilityTextMarker*) { return 0; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::stringForTextMarkerRange(AccessibilityTextMarkerRange*) { return 0; }
 bool AccessibilityUIElement::attributedStringForTextMarkerRangeContainsAttribute(JSStringRef, AccessibilityTextMarkerRange*) { return false; }
+int AccessibilityUIElement::indexForTextMarker(AccessibilityTextMarker*) { return -1; }
+bool AccessibilityUIElement::isTextMarkerValid(AccessibilityTextMarker*) { return false; }
+PassRefPtr<AccessibilityTextMarker> AccessibilityUIElement::textMarkerForIndex(int) { return 0; }
+
 #endif
 
 } // namespace WTR

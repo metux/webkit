@@ -37,26 +37,48 @@ enum CollapsedBorderSide {
     CBSEnd
 };
 
+// Helper class for paintObject.
+class CellSpan {
+public:
+    CellSpan(unsigned start, unsigned end)
+        : m_start(start)
+        , m_end(end)
+    {
+    }
+
+    unsigned start() const { return m_start; }
+    unsigned end() const { return m_end; }
+
+    unsigned& start() { return m_start; }
+    unsigned& end() { return m_end; }
+
+private:
+    unsigned m_start;
+    unsigned m_end;
+};
+
 class RenderTableCell;
 class RenderTableRow;
 
 class RenderTableSection : public RenderBox {
 public:
-    RenderTableSection(Node*);
+    RenderTableSection(Element*);
     virtual ~RenderTableSection();
+
+    RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
+    RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
 
     const RenderObjectChildList* children() const { return &m_children; }
     RenderObjectChildList* children() { return &m_children; }
 
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
 
-    virtual LayoutUnit firstLineBoxBaseline() const;
+    virtual int firstLineBoxBaseline() const OVERRIDE;
 
     void addCell(RenderTableCell*, RenderTableRow* row);
 
-    void setCellLogicalWidths();
     int calcRowLogicalHeight();
-    int layoutRows(int logicalHeight);
+    void layoutRows();
 
     RenderTable* table() const { return toRenderTable(parent()); }
 
@@ -80,6 +102,8 @@ public:
         }
 
         bool hasCells() const { return cells.size() > 0; }
+
+        void reportMemoryUsage(MemoryObjectInfo*) const;
     };
 
     typedef Vector<CellStruct> Row;
@@ -91,11 +115,35 @@ public:
         {
         }
 
+        void reportMemoryUsage(MemoryObjectInfo*) const;
+
         Row row;
         RenderTableRow* rowRenderer;
         LayoutUnit baseline;
         Length logicalHeight;
     };
+
+    const BorderValue& borderAdjoiningTableStart() const
+    {
+        if (hasSameDirectionAs(table()))
+            return style()->borderStart();
+
+        return style()->borderEnd();
+    }
+
+    const BorderValue& borderAdjoiningTableEnd() const
+    {
+        if (hasSameDirectionAs(table()))
+            return style()->borderEnd();
+
+        return style()->borderStart();
+    }
+
+    const BorderValue& borderAdjoiningStartCell(const RenderTableCell*) const;
+    const BorderValue& borderAdjoiningEndCell(const RenderTableCell*) const;
+
+    const RenderTableCell* firstRowCellAdjoiningTableStart() const;
+    const RenderTableCell* firstRowCellAdjoiningTableEnd() const;
 
     CellStruct& cellAt(unsigned row,  unsigned col) { return m_grid[row].row[col]; }
     const CellStruct& cellAt(unsigned row, unsigned col) const { return m_grid[row].row[col]; }
@@ -131,15 +179,27 @@ public:
     bool needsCellRecalc() const { return m_needsCellRecalc; }
     void setNeedsCellRecalc();
 
-    LayoutUnit getBaseline(unsigned row) { return m_grid[row].baseline; }
+    LayoutUnit rowBaseline(unsigned row) { return m_grid[row].baseline; }
 
     void rowLogicalHeightChanged(unsigned rowIndex);
-
-    unsigned rowIndexForRenderer(const RenderTableRow*) const;
 
     void removeCachedCollapsedBorders(const RenderTableCell*);
     void setCachedCollapsedBorder(const RenderTableCell*, CollapsedBorderSide, CollapsedBorderValue);
     CollapsedBorderValue& cachedCollapsedBorder(const RenderTableCell*, CollapsedBorderSide);
+
+    // distributeExtraLogicalHeightToRows methods return the *consumed* extra logical height.
+    // FIXME: We may want to introduce a structure holding the in-flux layout information.
+    int distributeExtraLogicalHeightToRows(int extraLogicalHeight);
+
+    static RenderTableSection* createAnonymousWithParentRenderer(const RenderObject*);
+    virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE
+    {
+        return createAnonymousWithParentRenderer(parent);
+    }
+    
+    virtual void paint(PaintInfo&, const LayoutPoint&) OVERRIDE;
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
@@ -148,27 +208,44 @@ private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
 
-    virtual const char* renderName() const { return isAnonymous() ? "RenderTableSection (anonymous)" : "RenderTableSection"; }
+    virtual const char* renderName() const { return (isAnonymous() || isPseudoElement()) ? "RenderTableSection (anonymous)" : "RenderTableSection"; }
 
     virtual bool isTableSection() const { return true; }
 
-    virtual void willBeDestroyed();
+    virtual void willBeRemovedFromTree() OVERRIDE;
 
     virtual void layout();
 
-    virtual void removeChild(RenderObject* oldChild);
-
-    virtual void paint(PaintInfo&, const LayoutPoint&);
     virtual void paintCell(RenderTableCell*, PaintInfo&, const LayoutPoint&);
     virtual void paintObject(PaintInfo&, const LayoutPoint&);
 
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0);
 
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     void ensureRows(unsigned);
 
+    void distributeExtraLogicalHeightToPercentRows(int& extraLogicalHeight, int totalPercent);
+    void distributeExtraLogicalHeightToAutoRows(int& extraLogicalHeight, unsigned autoRowsCount);
+    void distributeRemainingExtraLogicalHeight(int& extraLogicalHeight);
+
     bool hasOverflowingCell() const { return m_overflowingCells.size() || m_forceSlowPaintPathWithOverflowingCell; }
+
+    CellSpan fullTableRowSpan() const { return CellSpan(0, m_grid.size()); }
+    CellSpan fullTableColumnSpan() const { return CellSpan(0, table()->columns().size()); }
+
+    // Flip the rect so it aligns with the coordinates used by the rowPos and columnPos vectors.
+    LayoutRect logicalRectForWritingModeAndDirection(const LayoutRect&) const;
+
+    CellSpan dirtiedRows(const LayoutRect& repaintRect) const;
+    CellSpan dirtiedColumns(const LayoutRect& repaintRect) const;
+
+    // These two functions take a rectangle as input that has been flipped by logicalRectForWritingModeAndDirection.
+    // The returned span of rows or columns is end-exclusive, and empty if start==end.
+    CellSpan spannedRows(const LayoutRect& flippedRect) const;
+    CellSpan spannedColumns(const LayoutRect& flippedRect) const;
+
+    void setLogicalPositionForCell(RenderTableCell*, unsigned effectiveColumn) const;
 
     RenderObjectChildList m_children;
 
@@ -201,13 +278,13 @@ private:
 
 inline RenderTableSection* toRenderTableSection(RenderObject* object)
 {
-    ASSERT(!object || object->isTableSection());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableSection());
     return static_cast<RenderTableSection*>(object);
 }
 
 inline const RenderTableSection* toRenderTableSection(const RenderObject* object)
 {
-    ASSERT(!object || object->isTableSection());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableSection());
     return static_cast<const RenderTableSection*>(object);
 }
 

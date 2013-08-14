@@ -26,7 +26,9 @@
 
 #include "CachedScript.h"
 #include "CachedResourceLoader.h"
+#include "CachedResourceRequest.h"
 #include "ContentSecurityPolicy.h"
+#include "CrossOriginAccessControl.h"
 #include "Document.h"
 #include "DocumentParser.h"
 #include "Frame.h"
@@ -37,14 +39,18 @@
 #include "IgnoreDestructiveWriteCountIncrementer.h"
 #include "MIMETypeRegistry.h"
 #include "Page.h"
+#include "ScriptCallStack.h"
 #include "ScriptRunner.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
+#include "ScriptableDocumentParser.h"
+#include "SecurityOrigin.h"
 #include "Settings.h"
 #include "Text.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringHash.h>
+#include <wtf/text/TextPosition.h>
 
 #if ENABLE(SVG)
 #include "SVGNames.h"
@@ -56,6 +62,7 @@ namespace WebCore {
 ScriptElement::ScriptElement(Element* element, bool parserInserted, bool alreadyStarted)
     : m_element(element)
     , m_cachedScript(0)
+    , m_startLineNumber(WTF::OrdinalNumber::beforeFirst())
     , m_parserInserted(parserInserted)
     , m_isExternalScript(false)
     , m_alreadyStarted(alreadyStarted)
@@ -65,8 +72,11 @@ ScriptElement::ScriptElement(Element* element, bool parserInserted, bool already
     , m_willExecuteWhenDocumentFinishedParsing(false)
     , m_forceAsync(!parserInserted)
     , m_willExecuteInOrder(false)
+    , m_requestUsesAccessControl(false)
 {
     ASSERT(m_element);
+    if (parserInserted && m_element->document()->scriptableDocumentParser() && !m_element->document()->isInDocumentWrite())
+        m_startLineNumber = m_element->document()->scriptableDocumentParser()->lineNumber();
 }
 
 ScriptElement::~ScriptElement()
@@ -74,9 +84,9 @@ ScriptElement::~ScriptElement()
     stopLoadRequest();
 }
 
-void ScriptElement::insertedIntoDocument()
+void ScriptElement::insertedInto(ContainerNode* insertionPoint)
 {
-    if (!m_parserInserted)
+    if (insertionPoint->inDocument() && !m_parserInserted)
         prepareScript(); // FIXME: Provide a real starting line number here.
 }
 
@@ -199,15 +209,6 @@ bool ScriptElement::prepareScript(const TextPosition& scriptStartPosition, Legac
     if (!document->frame()->script()->canExecuteScripts(AboutToExecuteScript))
         return false;
 
-    Node* ancestor = m_element->parentNode();
-    while (ancestor) {
-        if (ancestor->isSVGShadowRoot()) {
-            fprintf(stderr, "aborted script: shadow root\n");
-            return false;
-        }
-        ancestor = ancestor->parentNode();
-    }
-
     if (!isScriptForEventSupported())
         return false;
 
@@ -251,11 +252,23 @@ bool ScriptElement::requestScript(const String& sourceUrl)
         return false;
     if (!m_element->inDocument() || m_element->document() != originalDocument)
         return false;
+    if (!m_element->document()->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr), m_element->document()->url(), m_startLineNumber, m_element->document()->completeURL(sourceUrl)))
+        return false;
 
     ASSERT(!m_cachedScript);
     if (!stripLeadingAndTrailingHTMLSpaces(sourceUrl).isEmpty()) {
-        ResourceRequest request(m_element->document()->completeURL(sourceUrl));
-        m_cachedScript = m_element->document()->cachedResourceLoader()->requestScript(request, scriptCharset());
+        CachedResourceRequest request(ResourceRequest(m_element->document()->completeURL(sourceUrl)));
+
+        String crossOriginMode = m_element->fastGetAttribute(HTMLNames::crossoriginAttr);
+        if (!crossOriginMode.isNull()) {
+            m_requestUsesAccessControl = true;
+            StoredCredentials allowCredentials = equalIgnoringCase(crossOriginMode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+            updateRequestForAccessControl(request.mutableResourceRequest(), m_element->document()->securityOrigin(), allowCredentials);
+        }
+        request.setCharset(scriptCharset());
+        request.setInitiator(element());
+
+        m_cachedScript = m_element->document()->cachedResourceLoader()->requestScript(request);
         m_isExternalScript = true;
     }
 
@@ -274,8 +287,18 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
     if (sourceCode.isEmpty())
         return;
 
-    if (!m_isExternalScript && !m_element->document()->contentSecurityPolicy()->allowInlineScript())
+    if (!m_element->document()->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr), m_element->document()->url(), m_startLineNumber))
         return;
+
+    if (!m_isExternalScript && !m_element->document()->contentSecurityPolicy()->allowInlineScript(m_element->document()->url(), m_startLineNumber))
+        return;
+
+#if ENABLE(NOSNIFF)
+    if (m_isExternalScript && m_cachedScript && !m_cachedScript->mimeTypeAllowedByNosniff()) {
+        m_element->document()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Refused to execute script from '" + m_cachedScript->url().string() + "' because its MIME type ('" + m_cachedScript->mimeType() + "') is not executable, and strict MIME type checking is enabled.");
+        return;
+    }
+#endif
 
     RefPtr<Document> document = m_element->document();
     ASSERT(document);
@@ -312,10 +335,28 @@ void ScriptElement::execute(CachedScript* cachedScript)
     cachedScript->removeClient(this);
 }
 
-void ScriptElement::notifyFinished(CachedResource* o)
+void ScriptElement::notifyFinished(CachedResource* resource)
 {
     ASSERT(!m_willBeParserExecuted);
-    ASSERT_UNUSED(o, o == m_cachedScript);
+
+    // CachedResource possibly invokes this notifyFinished() more than
+    // once because ScriptElement doesn't unsubscribe itself from
+    // CachedResource here and does it in execute() instead.
+    // We use m_cachedScript to check if this function is already called.
+    ASSERT_UNUSED(resource, resource == m_cachedScript);
+    if (!m_cachedScript)
+        return;
+
+    if (m_requestUsesAccessControl
+        && !m_element->document()->securityOrigin()->canRequest(m_cachedScript->response().url())
+        && !m_cachedScript->passesAccessControlCheck(m_element->document()->securityOrigin())) {
+
+        dispatchErrorEvent();
+        DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Cross-origin script load denied by Cross-Origin Resource Sharing policy.")));
+        m_element->document()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, consoleMessage);
+        return;
+    }
+
     if (m_willExecuteInOrder)
         m_element->document()->scriptRunner()->notifyScriptReady(this, ScriptRunner::IN_ORDER_EXECUTION);
     else

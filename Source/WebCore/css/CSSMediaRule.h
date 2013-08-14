@@ -1,7 +1,7 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
  * (C) 2002-2003 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2002, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2002, 2006, 2008, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2006 Samuel Weinig (sam@webkit.org)
  *
  * This library is free software; you can redistribute it and/or
@@ -23,39 +23,32 @@
 #ifndef CSSMediaRule_h
 #define CSSMediaRule_h
 
-#include "CSSRule.h"
-#include "CSSRuleList.h"
+#include "CSSGroupingRule.h"
 #include "MediaList.h"
-#include "PlatformString.h" // needed so bindings will compile
 
 namespace WebCore {
 
-class CSSRuleList;
+class StyleRuleMedia;
 
-class CSSMediaRule : public CSSRule {
+class CSSMediaRule : public CSSGroupingRule {
 public:
-    static PassRefPtr<CSSMediaRule> create(CSSStyleSheet* parent, PassRefPtr<MediaList> media, PassRefPtr<CSSRuleList> rules)
-    {
-        return adoptRef(new CSSMediaRule(parent, media, rules));
-    }
-    ~CSSMediaRule();
+    static PassRefPtr<CSSMediaRule> create(StyleRuleMedia* rule, CSSStyleSheet* sheet) { return adoptRef(new CSSMediaRule(rule, sheet)); }
 
-    MediaList* media() const { return m_lstMedia.get(); }
-    CSSRuleList* cssRules() { return m_lstCSSRules.get(); }
+    virtual ~CSSMediaRule();
 
-    unsigned insertRule(const String& rule, unsigned index, ExceptionCode&);
-    void deleteRule(unsigned index, ExceptionCode&);
+    virtual CSSRule::Type type() const OVERRIDE { return MEDIA_RULE; }
+    virtual void reattach(StyleRuleBase*) OVERRIDE;
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+    virtual String cssText() const OVERRIDE;
 
-    String cssText() const;
-
-    // Not part of the CSSOM
-    unsigned append(CSSRule*);
+    MediaList* media() const;
 
 private:
-    CSSMediaRule(CSSStyleSheet* parent, PassRefPtr<MediaList>, PassRefPtr<CSSRuleList>);
+    CSSMediaRule(StyleRuleMedia*, CSSStyleSheet*);
 
-    RefPtr<MediaList> m_lstMedia;
-    RefPtr<CSSRuleList> m_lstCSSRules;
+    MediaQuerySet* mediaQueries() const;
+    
+    mutable RefPtr<MediaList> m_mediaCSSOMWrapper;
 };
 
 } // namespace WebCore

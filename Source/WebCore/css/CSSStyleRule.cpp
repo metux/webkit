@@ -1,7 +1,7 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
  * (C) 2002-2003 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2002, 2005, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2002, 2005, 2006, 2008, 2012 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,34 +22,17 @@
 #include "config.h"
 #include "CSSStyleRule.h"
 
-#include "CSSPageRule.h"
 #include "CSSParser.h"
 #include "CSSSelector.h"
 #include "CSSStyleSheet.h"
 #include "Document.h"
+#include "PropertySetCSSStyleDeclaration.h"
 #include "StylePropertySet.h"
-#include "StyledElement.h"
-#include "StyleSheet.h"
-
+#include "StyleRule.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
-
-CSSStyleRule::CSSStyleRule(CSSStyleSheet* parent, int line)
-    : CSSRule(parent, CSSRule::STYLE_RULE)
-{
-    setSourceLine(line);
-
-    // m_sourceLine is a bitfield, so let's catch any overflow early in debug mode.
-    ASSERT(sourceLine() == line);
-}
-
-CSSStyleRule::~CSSStyleRule()
-{
-    if (m_style)
-        m_style->clearParentRule(this);
-    cleanup();
-}
 
 typedef HashMap<const CSSStyleRule*, String> SelectorTextCache;
 static SelectorTextCache& selectorTextCache()
@@ -58,21 +41,38 @@ static SelectorTextCache& selectorTextCache()
     return cache;
 }
 
-inline void CSSStyleRule::cleanup()
+CSSStyleRule::CSSStyleRule(StyleRule* styleRule, CSSStyleSheet* parent)
+    : CSSRule(parent)
+    , m_styleRule(styleRule)
 {
+}
+
+CSSStyleRule::~CSSStyleRule()
+{
+    if (m_propertiesCSSOMWrapper)
+        m_propertiesCSSOMWrapper->clearParentRule();
+
     if (hasCachedSelectorText()) {
         selectorTextCache().remove(this);
         setHasCachedSelectorText(false);
     }
 }
 
+CSSStyleDeclaration* CSSStyleRule::style() const
+{
+    if (!m_propertiesCSSOMWrapper) {
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_styleRule->mutableProperties(), const_cast<CSSStyleRule*>(this));
+    }
+    return m_propertiesCSSOMWrapper.get();
+}
+
 String CSSStyleRule::generateSelectorText() const
 {
     StringBuilder builder;
-    for (CSSSelector* s = selectorList().first(); s; s = CSSSelectorList::next(s)) {
-        if (s != selectorList().first())
+    for (const CSSSelector* selector = m_styleRule->selectorList().first(); selector; selector = CSSSelectorList::next(selector)) {
+        if (selector != m_styleRule->selectorList().first())
             builder.append(", ");
-        builder.append(s->selectorText());
+        builder.append(selector->selectorText());
     }
     return builder.toString();
 }
@@ -93,47 +93,50 @@ String CSSStyleRule::selectorText() const
 
 void CSSStyleRule::setSelectorText(const String& selectorText)
 {
-    Document* doc = 0;
-    if (CSSStyleSheet* styleSheet = parentStyleSheet())
-        doc = styleSheet->findDocument();
-    if (!doc)
-        return;
-
-    CSSParser p;
+    CSSParser p(parserContext());
     CSSSelectorList selectorList;
-    p.parseSelector(selectorText, doc, selectorList);
-    if (!selectorList.first())
+    p.parseSelector(selectorText, selectorList);
+    if (!selectorList.isValid())
         return;
 
-    String oldSelectorText = this->selectorText();
-    m_selectorList.adopt(selectorList);
+    CSSStyleSheet::RuleMutationScope mutationScope(this);
+
+    m_styleRule->wrapperAdoptSelectorList(selectorList);
 
     if (hasCachedSelectorText()) {
-        ASSERT(selectorTextCache().contains(this));
-        selectorTextCache().set(this, generateSelectorText());
+        selectorTextCache().remove(this);
+        setHasCachedSelectorText(false);
     }
-
-    if (this->selectorText() == oldSelectorText)
-        return;
-
-    doc->styleSelectorChanged(DeferRecalcStyle);
 }
 
 String CSSStyleRule::cssText() const
 {
-    String result = selectorText();
-
-    result += " { ";
-    result += m_style->asText();
-    result += "}";
-
-    return result;
+    StringBuilder result;
+    result.append(selectorText());
+    result.appendLiteral(" { ");
+    String decls = m_styleRule->properties()->asText();
+    result.append(decls);
+    if (!decls.isEmpty())
+        result.append(' ');
+    result.append('}');
+    return result.toString();
 }
 
-void CSSStyleRule::addSubresourceStyleURLs(ListHashSet<KURL>& urls)
+void CSSStyleRule::reattach(StyleRuleBase* rule)
 {
-    if (m_style)
-        m_style->addSubresourceStyleURLs(urls);
+    ASSERT(rule);
+    ASSERT_WITH_SECURITY_IMPLICATION(rule->isStyleRule());
+    m_styleRule = static_cast<StyleRule*>(rule);
+    if (m_propertiesCSSOMWrapper)
+        m_propertiesCSSOMWrapper->reattach(m_styleRule->mutableProperties());
+}
+
+void CSSStyleRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_styleRule, "styleRule");
+    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
 }
 
 } // namespace WebCore

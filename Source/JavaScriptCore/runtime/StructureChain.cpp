@@ -27,6 +27,7 @@
 #include "StructureChain.h"
 
 #include "JSObject.h"
+#include "Operations.h"
 #include "Structure.h"
 #include <wtf/RefPtr.h>
 
@@ -41,7 +42,7 @@ StructureChain::StructureChain(JSGlobalData& globalData, Structure* structure)
 
 void StructureChain::destroy(JSCell* cell)
 {
-    jsCast<StructureChain*>(cell)->StructureChain::~StructureChain();
+    static_cast<StructureChain*>(cell)->StructureChain::~StructureChain();
 }
 
 void StructureChain::visitChildren(JSCell* cell, SlotVisitor& visitor)

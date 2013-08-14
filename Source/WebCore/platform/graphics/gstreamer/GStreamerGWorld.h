@@ -20,12 +20,14 @@
 
 #ifndef GStreamerGWorld_h
 #define GStreamerGWorld_h
-#if ENABLE(VIDEO) && USE(GSTREAMER)
+#if ENABLE(VIDEO) && USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)
 
-#include "GOwnPtr.h"
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
+#include <wtf/gobject/GOwnPtr.h>
+
 #include "PlatformVideoWindow.h"
-#include "RefCounted.h"
-#include "RefPtr.h"
+
 #include <glib.h>
 
 typedef struct _GstElement GstElement;
@@ -47,6 +49,7 @@ public:
     ~GStreamerGWorld();
 
     GstElement* pipeline() const { return m_pipeline; }
+    void removePlatformVideoSink();
 
     // Returns the full-screen window created
     bool enterFullscreen();
@@ -65,5 +68,5 @@ private:
 };
 
 }
-#endif // USE(GSTREAMER)
+#endif // ENABLE(VIDEO) && USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)
 #endif

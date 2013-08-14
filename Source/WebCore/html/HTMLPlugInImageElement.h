@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2011, 2012 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,17 +25,21 @@
 
 #include "RenderStyle.h"
 #include <wtf/OwnPtr.h>
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
 class HTMLImageLoader;
 class FrameLoader;
+class Image;
+class MouseEvent;
+class Widget;
 
 enum PluginCreationOption {
     CreateAnyWidgetType,
     CreateOnlyNonNetscapePlugins,
 };
-    
+
 enum PreferPlugInsForImagesOption {
     ShouldPreferPlugInsForImages,
     ShouldNotPreferPlugInsForImages
@@ -57,6 +61,13 @@ public:
     // Public for FrameView::addWidgetToUpdate()
     bool needsWidgetUpdate() const { return m_needsWidgetUpdate; }
     void setNeedsWidgetUpdate(bool needsWidgetUpdate) { m_needsWidgetUpdate = needsWidgetUpdate; }
+
+    void userDidClickSnapshot(PassRefPtr<MouseEvent>);
+    void updateSnapshotInfo();
+
+    // Plug-in URL might not be the same as url() with overriding parameters.
+    void subframeLoaderWillCreatePlugIn(const KURL& plugInURL);
+    void subframeLoaderDidCreatePlugIn(const Widget*);
 
 protected:
     HTMLPlugInImageElement(const QualifiedName& tagName, Document*, bool createdByParser, PreferPlugInsForImagesOption);
@@ -84,16 +95,31 @@ protected:
 private:
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual bool willRecalcStyle(StyleChange);
-    
+
+    void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
+
     virtual void finishParsingChildren();
 
     void updateWidgetIfNecessary();
     virtual bool useFallbackContent() const { return false; }
-    
+
+    virtual void updateSnapshot(PassRefPtr<Image>) OVERRIDE;
+    virtual void dispatchPendingMouseClick() OVERRIDE;
+    void simulatedMouseClickTimerFired(DeferrableOneShotTimer<HTMLPlugInImageElement>*);
+
+    void swapRendererTimerFired(Timer<HTMLPlugInImageElement>*);
+
+    void setShouldShowSnapshotLabelAutomatically() { m_shouldShowSnapshotLabelAutomatically = true; }
+
     bool m_needsWidgetUpdate;
     bool m_shouldPreferPlugInsForImages;
     bool m_needsDocumentActivationCallbacks;
+    bool m_shouldShowSnapshotLabelAutomatically;
     RefPtr<RenderStyle> m_customStyleForPageCache;
+    RefPtr<MouseEvent> m_pendingClickEventFromSnapshot;
+    DeferrableOneShotTimer<HTMLPlugInImageElement> m_simulatedMouseClickTimer;
+    Timer<HTMLPlugInImageElement> m_swapRendererTimer;
+    RefPtr<Image> m_snapshotImage;
 };
 
 } // namespace WebCore

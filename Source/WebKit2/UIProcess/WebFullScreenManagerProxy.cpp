@@ -43,6 +43,7 @@ WebFullScreenManagerProxy::WebFullScreenManagerProxy(WebPageProxy* page)
     : m_page(page)
     , m_webView(0)
 {
+    m_page->process()->addMessageReceiver(Messages::WebFullScreenManagerProxy::messageReceiverName(), m_page->pageID(), this);
 }
 
 WebFullScreenManagerProxy::~WebFullScreenManagerProxy()
@@ -52,16 +53,6 @@ WebFullScreenManagerProxy::~WebFullScreenManagerProxy()
 void WebFullScreenManagerProxy::setWebView(PlatformWebView* webView)
 {
     m_webView = webView;
-}
-
-void WebFullScreenManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
-{
-    didReceiveWebFullScreenManagerProxyMessage(connection, messageID, arguments);
-}
-
-void WebFullScreenManagerProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, OwnPtr<CoreIPC::ArgumentEncoder>& reply)
-{
-    didReceiveSyncWebFullScreenManagerProxyMessage(connection, messageID, arguments, reply);
 }
 
 void WebFullScreenManagerProxy::willEnterFullScreen()
@@ -84,27 +75,19 @@ void WebFullScreenManagerProxy::didExitFullScreen()
     m_page->process()->send(Messages::WebFullScreenManager::DidExitFullScreen(), m_page->pageID());
 }
 
-void WebFullScreenManagerProxy::beginEnterFullScreenAnimation(float duration)
+void WebFullScreenManagerProxy::setAnimatingFullScreen(bool animating)
 {
-    m_page->process()->send(Messages::WebFullScreenManager::BeginEnterFullScreenAnimation(duration), m_page->pageID());
+    m_page->process()->send(Messages::WebFullScreenManager::SetAnimatingFullScreen(animating), m_page->pageID());
 }
 
-void WebFullScreenManagerProxy::beginExitFullScreenAnimation(float duration)
+void WebFullScreenManagerProxy::requestExitFullScreen()
 {
-    m_page->process()->send(Messages::WebFullScreenManager::BeginExitFullScreenAnimation(duration), m_page->pageID());
-}
-
-void WebFullScreenManagerProxy::disposeOfLayerClient()
-{
-    m_page->process()->send(Messages::WebFullScreenManager::DisposeOfLayerClient(), m_page->pageID());
+    m_page->process()->send(Messages::WebFullScreenManager::RequestExitFullScreen(), m_page->pageID());
 }
 
 void WebFullScreenManagerProxy::supportsFullScreen(bool withKeyboard, bool& supports)
 {
-    if (withKeyboard)
-        supports = false;
-    else
-        supports = true;
+    supports = !withKeyboard;
 }
 
 } // namespace WebKit
