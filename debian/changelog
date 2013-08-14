@@ -1,4 +1,4 @@
-webkitgtk (2.0.4-2) UNRELEASED; urgency=low
+webkitgtk (2.0.4-2) unstable; urgency=low
 
   [ Jeremy Bicha ]
   * Don't recommend universe gstreamer codecs on Ubuntu. Closes: #714299.
