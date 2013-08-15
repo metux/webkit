@@ -7,8 +7,11 @@ webkitgtk (2.0.4-2) unstable; urgency=low
   * debian/patches/03_atomics-buildfix.patch:
   - patch from upstream to fix build in architectures which do not support
     some atomic builtins for 64 bits types (should fix powerpc and sparc)
+  * debian/libwebkit2gtk-3.0-25.symbols, debian/symbols.filter:
+  - export the WebGtkExtensionManager, used by WebKit2GTK+ for loading
+    injected bundle plugins
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 14 Aug 2013 14:11:23 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 14 Aug 2013 22:13:41 -0300
 
 webkitgtk (2.0.4-1) experimental; urgency=low
 
