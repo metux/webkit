@@ -41,10 +41,10 @@ class CharacterData;
 class Frame;
 class GraphicsContext;
 class HTMLFormElement;
+class MutableStylePropertySet;
 class RenderObject;
 class RenderView;
 class Settings;
-class StylePropertySet;
 class VisiblePosition;
 
 enum EUserTriggered { NotUserTriggered = 0, UserTriggered = 1 };
@@ -227,8 +227,6 @@ public:
     // Painting.
     void updateAppearance();
 
-    void updateSecureKeyboardEntryIfActive();
-
 #ifndef NDEBUG
     void formatForDebugger(char* buffer, unsigned length) const;
     void showTreeForThis() const;
@@ -238,13 +236,12 @@ public:
     bool shouldDeleteSelection(const VisibleSelection&) const;
     enum EndPointsAdjustmentMode { AdjustEndpointsAtBidiBoundary, DoNotAdjsutEndpoints };
     void setNonDirectionalSelectionIfNeeded(const VisibleSelection&, TextGranularity, EndPointsAdjustmentMode = DoNotAdjsutEndpoints);
-    void setFocusedNodeIfNeeded();
     void notifyRendererOfSelectionChange(EUserTriggered);
 
     void paintDragCaret(GraphicsContext*, const LayoutPoint&, const LayoutRect& clipRect) const;
 
     EditingStyle* typingStyle() const;
-    PassRefPtr<StylePropertySet> copyTypingStyle() const;
+    PassRefPtr<MutableStylePropertySet> copyTypingStyle() const;
     void setTypingStyle(PassRefPtr<EditingStyle>);
     void clearTypingStyle();
 
@@ -257,6 +254,9 @@ public:
     void revealSelection(const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded, RevealExtentOption = DoNotRevealExtent);
     void setSelectionFromNone();
 
+    bool shouldShowBlockCursor() const { return m_shouldShowBlockCursor; }
+    void setShouldShowBlockCursor(bool);
+
 private:
     enum EPositionType { START, END, BASE, EXTENT };
 
@@ -267,6 +267,7 @@ private:
     VisiblePosition positionForPlatform(bool isGetStart) const;
     VisiblePosition startForPlatform() const;
     VisiblePosition endForPlatform() const;
+    VisiblePosition nextWordPositionForPlatform(const VisiblePosition&);
 
     VisiblePosition modifyExtendingRight(TextGranularity);
     VisiblePosition modifyExtendingForward(TextGranularity);
@@ -278,14 +279,15 @@ private:
     VisiblePosition modifyMovingBackward(TextGranularity);
 
     LayoutUnit lineDirectionPointForBlockDirectionNavigation(EPositionType);
-    
-    void notifyAccessibilityForSelectionChange();
 
+#if HAVE(ACCESSIBILITY)
+    void notifyAccessibilityForSelectionChange();
+#endif
+
+    void setFocusedElementIfNeeded();
     void focusedOrActiveStateChanged();
 
     void caretBlinkTimerFired(Timer<FrameSelection>*);
-
-    void setUseSecureKeyboardEntry(bool);
 
     void setCaretVisibility(CaretVisibility);
 
@@ -312,6 +314,7 @@ private:
     bool m_caretPaint : 1;
     bool m_isCaretBlinkingSuspended : 1;
     bool m_focused : 1;
+    bool m_shouldShowBlockCursor : 1;
 };
 
 inline EditingStyle* FrameSelection::typingStyle() const
@@ -329,10 +332,12 @@ inline void FrameSelection::setTypingStyle(PassRefPtr<EditingStyle> style)
     m_typingStyle = style;
 }
 
-#if !(PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(CHROMIUM))
+#if !(PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL))
+#if HAVE(ACCESSIBILITY)
 inline void FrameSelection::notifyAccessibilityForSelectionChange()
 {
 }
+#endif
 #endif
 
 } // namespace WebCore

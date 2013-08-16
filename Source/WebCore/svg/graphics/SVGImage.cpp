@@ -30,12 +30,15 @@
 #if ENABLE(SVG)
 #include "SVGImage.h"
 
+#include "Chrome.h"
 #include "DocumentLoader.h"
 #include "FrameView.h"
 #include "ImageBuffer.h"
 #include "ImageObserver.h"
 #include "IntRect.h"
+#include "NodeTraversal.h"
 #include "RenderSVGRoot.h"
+#include "RenderStyle.h"
 #include "SVGDocument.h"
 #include "SVGImageChromeClient.h"
 #include "SVGSVGElement.h"
@@ -60,13 +63,34 @@ SVGImage::~SVGImage()
     ASSERT(!m_chromeClient || !m_chromeClient->image());
 }
 
+bool SVGImage::hasSingleSecurityOrigin() const
+{
+    if (!m_page)
+        return true;
+
+    Frame* frame = m_page->mainFrame();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    if (!rootElement)
+        return true;
+
+    // Don't allow foreignObject elements since they can leak information with arbitrary HTML (like spellcheck or control theme).
+    for (Element* current = ElementTraversal::firstWithin(rootElement); current; current = ElementTraversal::next(current, rootElement)) {
+        if (current->hasTagName(SVGNames::foreignObjectTag))
+            return false;
+    }
+
+    // Because SVG image rendering disallows external resources and links,
+    // these images effectively are restricted to a single security origin.
+    return true;
+}
+
 void SVGImage::setContainerSize(const IntSize& size)
 {
     if (!m_page || !usesContainerSize())
         return;
 
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return;
     RenderSVGRoot* renderer = toRenderSVGRoot(rootElement->renderer());
@@ -74,17 +98,17 @@ void SVGImage::setContainerSize(const IntSize& size)
         return;
 
     FrameView* view = frameView();
-    view->resize(this->size());
+    view->resize(this->containerSize());
 
     renderer->setContainerSize(size);
 }
 
-IntSize SVGImage::size() const
+IntSize SVGImage::containerSize() const
 {
     if (!m_page)
         return IntSize();
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return IntSize();
 
@@ -141,6 +165,25 @@ void SVGImage::drawForContainer(GraphicsContext* context, const FloatSize contai
     setImageObserver(observer);
 }
 
+#if USE(CAIRO)
+// Passes ownership of the native image to the caller so PassNativeImagePtr needs
+// to be a smart pointer type.
+PassNativeImagePtr SVGImage::nativeImageForCurrentFrame()
+{
+    if (!m_page)
+        return 0;
+
+    OwnPtr<ImageBuffer> buffer = ImageBuffer::create(size(), 1);
+    if (!buffer) // failed to allocate image
+        return 0;
+
+    draw(buffer->context(), rect(), rect(), ColorSpaceDeviceRGB, CompositeSourceOver, BlendModeNormal);
+
+    // FIXME: WK(Bug 113657): We should use DontCopyBackingStore here.
+    return buffer->copyImage(CopyBackingStore)->nativeImageForCurrentFrame();
+}
+#endif
+
 void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize containerSize, float zoom, const FloatRect& srcRect,
     const AffineTransform& patternTransform, const FloatPoint& phase, ColorSpace colorSpace, CompositeOperator compositeOp, const FloatRect& dstRect)
 {
@@ -157,8 +200,10 @@ void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize
     imageBufferSize.scale(imageBufferScale.width(), imageBufferScale.height());
 
     OwnPtr<ImageBuffer> buffer = ImageBuffer::create(expandedIntSize(imageBufferSize.size()), 1);
+    if (!buffer) // Failed to allocate buffer.
+        return;
     drawForContainer(buffer->context(), containerSize, zoom, imageBufferSize, zoomedContainerRect, ColorSpaceDeviceRGB, CompositeSourceOver, BlendModeNormal);
-    RefPtr<Image> image = buffer->copyImage(CopyBackingStore, Unscaled);
+    RefPtr<Image> image = buffer->copyImage(DontCopyBackingStore, Unscaled);
 
     // Adjust the source rect and transform due to the image buffer's scaling.
     FloatRect scaledSrcRect = srcRect;
@@ -169,7 +214,7 @@ void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize
     image->drawPattern(context, scaledSrcRect, unscaledPatternTransform, phase, colorSpace, compositeOp, dstRect);
 }
 
-void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode)
+void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode blendMode)
 {
     if (!m_page)
         return;
@@ -177,7 +222,7 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
     FrameView* view = frameView();
 
     GraphicsContextStateSaver stateSaver(*context);
-    context->setCompositeOperation(compositeOp);
+    context->setCompositeOperation(compositeOp, blendMode);
     context->clip(enclosingIntRect(dstRect));
     if (compositeOp != CompositeSourceOver)
         context->beginTransparencyLayer(1);
@@ -192,12 +237,12 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
     context->translate(destOffset.x(), destOffset.y());
     context->scale(scale);
 
-    view->resize(size());
+    view->resize(containerSize());
 
     if (view->needsLayout())
         view->layout();
 
-    view->paint(context, IntRect(0, 0, view->width(), view->height()));
+    view->paint(context, enclosingIntRect(srcRect));
 
     if (compositeOp != CompositeSourceOver)
         context->endTransparencyLayer();
@@ -213,7 +258,7 @@ RenderBox* SVGImage::embeddedContentBox() const
     if (!m_page)
         return 0;
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return 0;
     return toRenderBox(rootElement->renderer());
@@ -232,7 +277,7 @@ bool SVGImage::hasRelativeWidth() const
     if (!m_page)
         return false;
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return false;
     return rootElement->intrinsicWidth().isPercent();
@@ -243,7 +288,7 @@ bool SVGImage::hasRelativeHeight() const
     if (!m_page)
         return false;
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return false;
     return rootElement->intrinsicHeight().isPercent();
@@ -254,7 +299,7 @@ void SVGImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrin
     if (!m_page)
         return;
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return;
 
@@ -274,7 +319,7 @@ void SVGImage::startAnimation(bool /* catchUpIfNecessary */)
     if (!m_page)
         return;
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return;
     rootElement->unpauseAnimations();
@@ -286,7 +331,7 @@ void SVGImage::stopAnimation()
     if (!m_page)
         return;
     Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return;
     rootElement->pauseAnimations();
@@ -295,7 +340,6 @@ void SVGImage::stopAnimation()
 void SVGImage::resetAnimation()
 {
     stopAnimation();
-    startAnimation();
 }
 
 bool SVGImage::dataChanged(bool allDataReceived)
@@ -337,6 +381,9 @@ bool SVGImage::dataChanged(bool allDataReceived)
         loader->activeDocumentLoader()->writer()->begin(KURL()); // create the empty document
         loader->activeDocumentLoader()->writer()->addData(data()->data(), data()->size());
         loader->activeDocumentLoader()->writer()->end();
+
+        // Set the intrinsic size before a container size is available.
+        m_intrinsicSize = containerSize();
     }
 
     return m_page;
@@ -347,12 +394,16 @@ String SVGImage::filenameExtension() const
     return "svg";
 }
 
-void SVGImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool isInSVGImage(const Element* element)
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceImage);
-    Image::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_chromeClient, "chromeClient");
-    info.addMember(m_page, "page");
+    ASSERT(element);
+
+    Page* page = element->document()->page();
+    if (!page)
+        return false;
+
+    ChromeClient* chromeClient = page->chrome().client();
+    return chromeClient && chromeClient->isSVGImageChromeClient();
 }
 
 }

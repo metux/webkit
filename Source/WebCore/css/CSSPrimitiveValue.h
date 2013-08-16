@@ -22,7 +22,9 @@
 #ifndef CSSPrimitiveValue_h
 #define CSSPrimitiveValue_h
 
+#include "CSSPropertyNames.h"
 #include "CSSValue.h"
+#include "CSSValueKeywords.h"
 #include "Color.h"
 #include <wtf/Forward.h>
 #include <wtf/MathExtras.h>
@@ -121,7 +123,7 @@ public:
         // This is used internally for counter names (as opposed to counter values)
         CSS_COUNTER_NAME = 110,
 
-        // This is used by the CSS Exclusions draft
+        // This is used by the CSS Shapes draft
         CSS_SHAPE = 111,
 
         // Used by border images.
@@ -134,6 +136,8 @@ public:
 #if ENABLE(CSS_VARIABLES)
         CSS_VARIABLE_NAME = 116,
 #endif
+        CSS_PROPERTY_ID = 117,
+        CSS_VALUE_ID = 118
     };
 
     // This enum follows the CSSParser::Units enum augmented with UNIT_FREQUENCY for frequencies.
@@ -168,7 +172,6 @@ public:
             || m_primitiveUnitType == CSS_REMS
             || m_primitiveUnitType == CSS_CHS;
     }
-    bool isIdent() const { return m_primitiveUnitType == CSS_IDENT; }
     bool isLength() const
     {
         unsigned short type = primitiveType();
@@ -189,13 +192,22 @@ public:
     bool isDotsPerInch() const { return primitiveType() == CSS_DPI; }
     bool isDotsPerPixel() const { return primitiveType() == CSS_DPPX; }
     bool isDotsPerCentimeter() const { return primitiveType() == CSS_DPCM; }
+    bool isResolution() const
+    {
+        unsigned short type = primitiveType();
+        return type >= CSS_DPPX && type <= CSS_DPCM;
+    }
 
 #if ENABLE(CSS_VARIABLES)
     bool isVariableName() const { return primitiveType() == CSS_VARIABLE_NAME; }
 #endif
     bool isViewportPercentageLength() const { return m_primitiveUnitType >= CSS_VW && m_primitiveUnitType <= CSS_VMAX; }
+    bool isValueID() const { return m_primitiveUnitType == CSS_VALUE_ID; }
+    
+    static PassRefPtr<CSSPrimitiveValue> createIdentifier(CSSValueID valueID) { return adoptRef(new CSSPrimitiveValue(valueID)); }
+    static PassRefPtr<CSSPrimitiveValue> createIdentifier(CSSPropertyID propertyID) { return adoptRef(new CSSPrimitiveValue(propertyID)); }
+    static PassRefPtr<CSSPrimitiveValue> createParserOperator(int parserOperator) { return adoptRef(new CSSPrimitiveValue(parserOperator)); }
 
-    static PassRefPtr<CSSPrimitiveValue> createIdentifier(int identifier) { return adoptRef(new CSSPrimitiveValue(identifier)); }
     static PassRefPtr<CSSPrimitiveValue> createColor(unsigned rgbValue) { return adoptRef(new CSSPrimitiveValue(rgbValue)); }
     static PassRefPtr<CSSPrimitiveValue> create(double value, UnitTypes type) { return adoptRef(new CSSPrimitiveValue(value, type)); }
     static PassRefPtr<CSSPrimitiveValue> create(const String& value, UnitTypes type) { return adoptRef(new CSSPrimitiveValue(value, type)); }
@@ -249,10 +261,10 @@ public:
      * this is screen/printer dependent, so we probably need a config option for this,
      * and some tool to calibrate.
      */
-    template<typename T> T computeLength(RenderStyle* currStyle, RenderStyle* rootStyle, float multiplier = 1.0f, bool computingFontSize = false);
+    template<typename T> T computeLength(const RenderStyle* currStyle, const RenderStyle* rootStyle, float multiplier = 1.0f, bool computingFontSize = false) const;
 
     // Converts to a Length, mapping various unit types appropriately.
-    template<int> Length convertToLength(RenderStyle* currStyle, RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false);
+    template<int> Length convertToLength(const RenderStyle* currStyle, const RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const;
 
     // use with care!!!
     void setPrimitiveType(unsigned short type) { m_primitiveUnitType = type; }
@@ -301,7 +313,8 @@ public:
     
     CSSCalcValue* cssCalcValue() const { return m_primitiveUnitType != CSS_CALC ? 0 : m_value.calc; }
 
-    int getIdent() const { return m_primitiveUnitType == CSS_IDENT ? m_value.ident : 0; }
+    CSSPropertyID getPropertyID() const { return m_primitiveUnitType == CSS_PROPERTY_ID ? m_value.propertyID : CSSPropertyInvalid; }
+    CSSValueID getValueID() const { return m_primitiveUnitType == CSS_VALUE_ID ? m_value.valueID : CSSValueInvalid; }
 
     template<typename T> inline operator T() const; // Defined in CSSPrimitiveValueMappings.h
 
@@ -315,18 +328,18 @@ public:
 
     void addSubresourceStyleURLs(ListHashSet<KURL>&, const StyleSheetContents*) const;
 
-    Length viewportPercentageLength();
+    Length viewportPercentageLength() const;
     
     PassRefPtr<CSSPrimitiveValue> cloneForCSSOM() const;
     void setCSSOMSafe() { m_isCSSOMSafe = true; }
 
     bool equals(const CSSPrimitiveValue&) const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
-
 private:
-    // FIXME: int vs. unsigned overloading is too subtle to distinguish the color and identifier cases.
-    CSSPrimitiveValue(int ident);
+    CSSPrimitiveValue(CSSValueID);
+    CSSPrimitiveValue(CSSPropertyID);
+    // FIXME: int vs. unsigned overloading is too subtle to distinguish the color and operator cases.
+    CSSPrimitiveValue(int parserOperator);
     CSSPrimitiveValue(unsigned color); // RGB value
     CSSPrimitiveValue(const Length&);
     CSSPrimitiveValue(const String&, UnitTypes);
@@ -360,10 +373,12 @@ private:
     void init(PassRefPtr<CSSCalcValue>);
     bool getDoubleValueInternal(UnitTypes targetUnitType, double* result) const;
 
-    double computeLengthDouble(RenderStyle* currentStyle, RenderStyle* rootStyle, float multiplier, bool computingFontSize);
+    double computeLengthDouble(const RenderStyle* currentStyle, const RenderStyle* rootStyle, float multiplier, bool computingFontSize) const;
 
     union {
-        int ident;
+        CSSPropertyID propertyID;
+        CSSValueID valueID;
+        int parserOperator;
         double num;
         StringImpl* string;
         Counter* counter;

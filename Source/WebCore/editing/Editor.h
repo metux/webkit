@@ -38,6 +38,7 @@
 #include "FrameDestructionObserver.h"
 #include "FrameSelection.h"
 #include "TextChecking.h"
+#include "TextIterator.h"
 #include "VisibleSelection.h"
 #include "WritingDirection.h"
 
@@ -234,7 +235,6 @@ public:
     String misspelledSelectionString() const;
     String misspelledWordAtCaretOrRange(Node* clickedNode) const;
     Vector<String> guessesForMisspelledWord(const String&) const;
-    Vector<String> guessesForUngrammaticalSelection();
     Vector<String> guessesForMisspelledOrUngrammatical(bool& misspelled, bool& ungrammatical);
     bool isSpellCheckingEnabledInFocusedNode() const;
     bool isSpellCheckingEnabledFor(Node*) const;
@@ -243,6 +243,9 @@ public:
     void markBadGrammar(const VisibleSelection&);
     void markMisspellingsAndBadGrammar(const VisibleSelection& spellingSelection, bool markGrammar, const VisibleSelection& grammarSelection);
     void markAndReplaceFor(PassRefPtr<SpellCheckRequest>, const Vector<TextCheckingResult>&);
+
+    bool isOverwriteModeEnabled() const { return m_overwriteModeEnabled; }
+    void toggleOverwriteModeEnabled();
 
 #if USE(APPKIT)
     void uppercaseWord();
@@ -309,7 +312,6 @@ public:
     bool cancelCompositionIfSelectionIsInvalid();
     PassRefPtr<Range> compositionRange() const;
     bool getCompositionSelection(unsigned& selectionStart, unsigned& selectionEnd) const;
-    bool setSelectionOffsets(int selectionStart, int selectionEnd);
 
     // getting international text input composition state (for use by InlineTextBox)
     Text* compositionNode() const { return m_compositionNode.get(); }
@@ -355,6 +357,7 @@ public:
     Node* findEventTargetFrom(const VisibleSelection& selection) const;
 
     String selectedText() const;
+    String selectedTextForClipboard() const;
     bool findString(const String&, FindOptions);
     // FIXME: Switch callers over to the FindOptions version and retire this one.
     bool findString(const String&, bool forward, bool caseFlag, bool wrapFlag, bool startInSelection);
@@ -393,6 +396,7 @@ public:
     void writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes);
     void readSelectionFromPasteboard(const String& pasteboardName);
     String stringSelectionForPasteboard();
+    String stringSelectionForPasteboardWithImageAltText();
     PassRefPtr<SharedBuffer> dataSelectionForPasteboard(const String& pasteboardName);
 #endif
 
@@ -431,6 +435,7 @@ private:
     VisibleSelection m_mark;
     bool m_areMarkedTextMatchesHighlighted;
     EditorParagraphSeparator m_defaultParagraphSeparator;
+    bool m_overwriteModeEnabled;
 
     bool canDeleteRange(Range*) const;
     bool canSmartReplaceWithPasteboard(Pasteboard*);
@@ -441,6 +446,8 @@ private:
     void revealSelectionAfterEditingOperation(const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded, RevealExtentOption = DoNotRevealExtent);
     void markMisspellingsOrBadGrammar(const VisibleSelection&, bool checkSpelling, RefPtr<Range>& firstMisspellingRange);
     TextCheckingTypeMask resolveTextCheckingTypeMask(TextCheckingTypeMask);
+
+    String selectedText(TextIteratorBehavior) const;
 
     void selectComposition();
     enum SetCompositionMode { ConfirmComposition, CancelComposition };

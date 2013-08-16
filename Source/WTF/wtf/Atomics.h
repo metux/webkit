@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2010, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Justin Haygood (jhaygood@reaktix.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,14 +61,17 @@
 
 #include <wtf/Platform.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/UnusedParam.h>
 
 #if OS(WINDOWS)
+#if OS(WINCE)
+#include <cmnintrin.h>
+#else
+extern "C" void _ReadWriteBarrier(void);
+#pragma intrinsic(_ReadWriteBarrier)
+#endif
 #include <windows.h>
 #elif OS(QNX)
 #include <atomic.h>
-#elif OS(ANDROID)
-#include <sys/atomics.h>
 #endif
 
 namespace WTF {
@@ -79,7 +82,7 @@ namespace WTF {
 #if OS(WINCE)
 inline int atomicIncrement(int* addend) { return InterlockedIncrement(reinterpret_cast<long*>(addend)); }
 inline int atomicDecrement(int* addend) { return InterlockedDecrement(reinterpret_cast<long*>(addend)); }
-#elif COMPILER(MINGW) || COMPILER(MSVC7_OR_LOWER)
+#elif COMPILER(MINGW)
 inline int atomicIncrement(int* addend) { return InterlockedIncrement(reinterpret_cast<long*>(addend)); }
 inline int atomicDecrement(int* addend) { return InterlockedDecrement(reinterpret_cast<long*>(addend)); }
 
@@ -99,13 +102,6 @@ inline int64_t atomicDecrement(int64_t volatile* addend) { return InterlockedDec
 // Note, atomic_{add, sub}_value() return the previous value of addend's content.
 inline int atomicIncrement(int volatile* addend) { return static_cast<int>(atomic_add_value(reinterpret_cast<unsigned volatile*>(addend), 1)) + 1; }
 inline int atomicDecrement(int volatile* addend) { return static_cast<int>(atomic_sub_value(reinterpret_cast<unsigned volatile*>(addend), 1)) - 1; }
-
-#elif OS(ANDROID)
-#define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
-
-// Note, __atomic_{inc, dec}() return the previous value of addend's content.
-inline int atomicIncrement(int volatile* addend) { return __atomic_inc(addend) + 1; }
-inline int atomicDecrement(int volatile* addend) { return __atomic_dec(addend) - 1; }
 
 #elif COMPILER(GCC) && !CPU(SPARC64) // sizeof(_Atomic_word) != sizeof(int) on sparc64 gcc
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
@@ -207,24 +203,132 @@ inline bool weakCompareAndSwapUIntPtr(volatile uintptr_t* location, uintptr_t ex
     return weakCompareAndSwap(reinterpret_cast<void*volatile*>(location), reinterpret_cast<void*>(expected), reinterpret_cast<void*>(newValue));
 }
 
+inline bool weakCompareAndSwapSize(volatile size_t* location, size_t expected, size_t newValue)
+{
+    return weakCompareAndSwap(reinterpret_cast<void*volatile*>(location), reinterpret_cast<void*>(expected), reinterpret_cast<void*>(newValue));
+}
+
+// Just a compiler fence. Has no effect on the hardware, but tells the compiler
+// not to move things around this call. Should not affect the compiler's ability
+// to do things like register allocation and code motion over pure operations.
+inline void compilerFence()
+{
+#if OS(WINDOWS)
+    _ReadWriteBarrier();
+#else
+    asm volatile("" ::: "memory");
+#endif
+}
+
 #if CPU(ARM_THUMB2)
 
-inline void memoryBarrierAfterLock()
+// Full memory fence. No accesses will float above this, and no accesses will sink
+// below it.
+inline void armV7_dmb()
 {
     asm volatile("dmb" ::: "memory");
 }
 
-inline void memoryBarrierBeforeUnlock()
+// Like the above, but only affects stores.
+inline void armV7_dmb_st()
 {
-    asm volatile("dmb" ::: "memory");
+    asm volatile("dmb st" ::: "memory");
 }
+
+inline void loadLoadFence() { armV7_dmb(); }
+inline void loadStoreFence() { armV7_dmb(); }
+inline void storeLoadFence() { armV7_dmb(); }
+inline void storeStoreFence() { armV7_dmb_st(); }
+inline void memoryBarrierAfterLock() { armV7_dmb(); }
+inline void memoryBarrierBeforeUnlock() { armV7_dmb(); }
+
+#elif CPU(X86) || CPU(X86_64)
+
+inline void x86_mfence()
+{
+#if OS(WINDOWS)
+    // I think that this does the equivalent of a dummy interlocked instruction,
+    // instead of using the 'mfence' instruction, at least according to MSDN. I
+    // know that it is equivalent for our purposes, but it would be good to
+    // investigate if that is actually better.
+    MemoryBarrier();
+#else
+    asm volatile("mfence" ::: "memory");
+#endif
+}
+
+inline void loadLoadFence() { compilerFence(); }
+inline void loadStoreFence() { compilerFence(); }
+inline void storeLoadFence() { x86_mfence(); }
+inline void storeStoreFence() { compilerFence(); }
+inline void memoryBarrierAfterLock() { compilerFence(); }
+inline void memoryBarrierBeforeUnlock() { compilerFence(); }
 
 #else
 
-inline void memoryBarrierAfterLock() { }
-inline void memoryBarrierBeforeUnlock() { }
+inline void loadLoadFence() { compilerFence(); }
+inline void loadStoreFence() { compilerFence(); }
+inline void storeLoadFence() { compilerFence(); }
+inline void storeStoreFence() { compilerFence(); }
+inline void memoryBarrierAfterLock() { compilerFence(); }
+inline void memoryBarrierBeforeUnlock() { compilerFence(); }
 
 #endif
+
+inline bool weakCompareAndSwap(uint8_t* location, uint8_t expected, uint8_t newValue)
+{
+#if ENABLE(COMPARE_AND_SWAP)
+#if !OS(WINDOWS) && (CPU(X86) || CPU(X86_64))
+    unsigned char result;
+    asm volatile(
+        "lock; cmpxchgb %3, %2\n\t"
+        "sete %1"
+        : "+a"(expected), "=q"(result), "+m"(*location)
+        : "r"(newValue)
+        : "memory"
+        );
+    return result;
+#elif OS(WINDOWS) && CPU(X86)
+    // FIXME: We need a 64-bit ASM implementation, but this cannot be inline due to
+    // Microsoft's decision to exclude it from the compiler.
+    bool result = false;
+
+    __asm {
+        mov al, expected
+        mov edx, location
+        mov cl, newValue
+        lock cmpxchg byte ptr[edx], cl
+        setz result
+    }
+
+    return result;
+#else
+    uintptr_t locationValue = bitwise_cast<uintptr_t>(location);
+    uintptr_t alignedLocationValue = locationValue & ~(sizeof(unsigned) - 1);
+    uintptr_t locationOffset = locationValue - alignedLocationValue;
+    ASSERT(locationOffset < sizeof(unsigned));
+    unsigned* alignedLocation = bitwise_cast<unsigned*>(alignedLocationValue);
+    // Make sure that this load is always issued and never optimized away.
+    unsigned oldAlignedValue = *const_cast<volatile unsigned*>(alignedLocation);
+    union {
+        uint8_t bytes[sizeof(unsigned)];
+        unsigned word;
+    } u;
+    u.word = oldAlignedValue;
+    if (u.bytes[locationOffset] != expected)
+        return false;
+    u.bytes[locationOffset] = newValue;
+    unsigned newAlignedValue = u.word;
+    return weakCompareAndSwap(alignedLocation, oldAlignedValue, newAlignedValue);
+#endif
+#else
+    UNUSED_PARAM(location);
+    UNUSED_PARAM(expected);
+    UNUSED_PARAM(newValue);
+    CRASH();
+    return false;
+#endif
+}
 
 } // namespace WTF
 

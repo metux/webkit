@@ -24,20 +24,16 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */ 
 
-#if defined (BUILDING_GTK__)
-#include "autotoolsconfig.h"
-#endif /* defined (BUILDING_GTK__) */
-
-#if defined (BUILDING_WITH_CMAKE)
+#if defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
+#elif defined(BUILDING_GTK__)
+#include "autotoolsconfig.h"
 #endif
 
+#include <runtime/JSExportMacros.h>
 #include <wtf/DisallowCType.h>
 #include <wtf/Platform.h>
 #include <wtf/ExportMacros.h>
-#if USE(JSC)
-#include <runtime/JSExportMacros.h>
-#endif
 
 #ifdef __cplusplus
 #ifndef EXTERN_C_BEGIN

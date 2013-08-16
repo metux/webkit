@@ -86,9 +86,9 @@ public:
     void addVideoComponent(PassRefPtr<MediaStreamComponent> component) { m_videoComponents.append(component); }
     void removeVideoComponent(MediaStreamComponent* component)
     {
-        size_t pos = m_audioComponents.find(component);
+        size_t pos = m_videoComponents.find(component);
         if (pos != notFound)
-            m_audioComponents.remove(pos);
+            m_videoComponents.remove(pos);
     }
 
     bool ended() const { return m_ended; }
@@ -109,6 +109,9 @@ private:
 
         for (size_t i = 0; i < videoSources.size(); i++)
             m_videoComponents.append(MediaStreamComponent::create(this, videoSources[i]));
+
+        if (!audioSources.size() && !videoSources.size())
+            m_ended = true;
     }
 
     MediaStreamDescriptor(const String& id, const MediaStreamComponentVector& audioComponents, const MediaStreamComponentVector& videoComponents)

@@ -37,7 +37,7 @@
 namespace WebCore {
 
 SVGDocument::SVGDocument(Frame* frame, const KURL& url)
-    : Document(frame, url, false, false)
+    : Document(frame, url, SVGDocumentClass)
 {
 }
 
@@ -45,7 +45,7 @@ SVGSVGElement* SVGDocument::rootElement() const
 {
     Element* elem = documentElement();
     if (elem && elem->hasTagName(SVGNames::svgTag))
-        return static_cast<SVGSVGElement*>(elem);
+        return toSVGSVGElement(elem);
 
     return 0;
 }
@@ -97,7 +97,7 @@ void SVGDocument::updatePan(const FloatPoint& pos) const
 bool SVGDocument::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
     if (childContext.node()->hasTagName(SVGNames::svgTag))
-        return static_cast<SVGSVGElement*>(childContext.node())->isValid();
+        return toSVGSVGElement(childContext.node())->isValid();
     return true;
 }
 

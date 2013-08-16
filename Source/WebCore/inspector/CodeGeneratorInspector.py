@@ -32,6 +32,7 @@ import os.path
 import sys
 import string
 import optparse
+import re
 try:
     import json
 except ImportError:
@@ -75,6 +76,7 @@ EXACTLY_INT_SUPPORTED = False
 cmdline_parser = optparse.OptionParser()
 cmdline_parser.add_option("--output_h_dir")
 cmdline_parser.add_option("--output_cpp_dir")
+cmdline_parser.add_option("--write_always", action="store_true")
 
 try:
     arg_options, arg_values = cmdline_parser.parse_args()
@@ -83,6 +85,7 @@ try:
     input_json_filename = arg_values[0]
     output_header_dirname = arg_options.output_h_dir
     output_cpp_dirname = arg_options.output_cpp_dir
+    write_always = arg_options.write_always
     if not output_header_dirname:
         raise Exception("Output .h directory must be specified")
     if not output_cpp_dirname:
@@ -91,12 +94,22 @@ except Exception:
     # Work with python 2 and 3 http://docs.python.org/py3k/howto/pyporting.html
     exc = sys.exc_info()[1]
     sys.stderr.write("Failed to parse command-line arguments: %s\n\n" % exc)
-    sys.stderr.write("Usage: <script> Inspector.json --output_h_dir <output_header_dir> --output_cpp_dir <output_cpp_dir>\n")
+    sys.stderr.write("Usage: <script> Inspector.json --output_h_dir <output_header_dir> --output_cpp_dir <output_cpp_dir> [--write_always]\n")
     exit(1)
 
 
 def dash_to_camelcase(word):
     return ''.join(x.capitalize() or '-' for x in word.split('-'))
+
+
+def fix_camel_case(name):
+    refined = re.sub(r'-(\w)', lambda pat: pat.group(1).upper(), name)
+    refined = to_title_case(refined)
+    return re.sub(r'(?i)HTML|XML|WML|API', lambda pat: pat.group(0).upper(), refined)
+
+
+def to_title_case(name):
+    return name[:1].upper() + name[1:]
 
 
 class Capitalizer:
@@ -1861,6 +1874,18 @@ class Generator:
             if not domain_fixes.skip_js_bind:
                 Generator.backend_js_domain_initializer_list.append("InspectorBackend.register%sDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, \"%s\");\n" % (domain_name, domain_name))
 
+            if "types" in json_domain:
+                for json_type in json_domain["types"]:
+                    if "type" in json_type and json_type["type"] == "string" and "enum" in json_type:
+                        enum_name = "%s.%s" % (domain_name, json_type["id"])
+                        Generator.process_enum(json_type, enum_name)
+                    elif json_type["type"] == "object":
+                        if "properties" in json_type:
+                            for json_property in json_type["properties"]:
+                                if "type" in json_property and json_property["type"] == "string" and "enum" in json_property:
+                                    enum_name = "%s.%s%s" % (domain_name, json_type["id"], to_title_case(json_property["name"]))
+                                    Generator.process_enum(json_property, enum_name)
+
             if "events" in json_domain:
                 for json_event in json_domain["events"]:
                     Generator.process_event(json_event, domain_name, frontend_method_declaration_lines)
@@ -1893,6 +1918,15 @@ class Generator:
                 for l in reversed(first_cycle_guardable_list_list):
                     domain_guard.generate_close(l)
             Generator.backend_js_domain_initializer_list.append("\n")
+
+    @staticmethod
+    def process_enum(json_enum, enum_name):
+        enum_members = []
+        for member in json_enum["enum"]:
+            enum_members.append("%s: \"%s\"" % (fix_camel_case(member), member))
+
+        Generator.backend_js_domain_initializer_list.append("InspectorBackend.registerEnum(\"%s\", {%s});\n" % (
+            enum_name, ", ".join(enum_members)))
 
     @staticmethod
     def process_event(json_event, domain_name, frontend_method_declaration_lines):
@@ -2311,7 +2345,7 @@ class SmartOutput:
             # Ignore, just overwrite by default
             pass
 
-        if text_changed:
+        if text_changed or write_always:
             out_file = open(self.file_name_, "w")
             out_file.write(self.output_)
             out_file.close()

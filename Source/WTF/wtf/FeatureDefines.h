@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2007-2009 Torch Mobile, Inc.
  * Copyright (C) 2010, 2011 Research In Motion Limited. All rights reserved.
  * Copyright (C) 2013 Samsung Electronics. All rights reserved.
@@ -80,6 +80,10 @@
 #define ENABLE_ICONDATABASE 0
 #endif
 
+#if !defined(ENABLE_METER_ELEMENT)
+#define ENABLE_METER_ELEMENT 0
+#endif
+
 #if !defined(ENABLE_NETSCAPE_PLUGIN_API)
 #define ENABLE_NETSCAPE_PLUGIN_API 0
 #endif
@@ -96,14 +100,12 @@
 #define ENABLE_TEXT_CARET 0
 #endif
 
-#if ENABLE(NOTIFICATIONS)
-#if !defined(ENABLE_TEXT_NOTIFICATIONS_ONLY)
-#define ENABLE_TEXT_NOTIFICATIONS_ONLY 1
-#endif
-#endif
-
 #if !defined(ENABLE_WEB_ARCHIVE)
 #define ENABLE_WEB_ARCHIVE 1
+#endif
+
+#if !defined(ENABLE_VIEW_MODE_CSS_MEDIA)
+#define ENABLE_VIEW_MODE_CSS_MEDIA 0
 #endif
 
 #if !defined(ENABLE_WEBGL)
@@ -132,6 +134,9 @@
 #endif
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if !defined(ENABLE_ENCRYPTED_MEDIA)
+#define ENABLE_ENCRYPTED_MEDIA 1
+#endif
 #if !defined(ENABLE_ENCRYPTED_MEDIA_V2)
 #define ENABLE_ENCRYPTED_MEDIA_V2 1
 #endif
@@ -157,12 +162,6 @@
 #define ENABLE_SMOOTH_SCROLLING 1
 #endif
 
-#if ENABLE(NOTIFICATIONS)
-#if !defined(ENABLE_TEXT_NOTIFICATIONS_ONLY)
-#define ENABLE_TEXT_NOTIFICATIONS_ONLY 1
-#endif
-#endif
-
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
 #if !defined(ENABLE_THREADED_SCROLLING)
 #define ENABLE_THREADED_SCROLLING 1
@@ -175,12 +174,28 @@
 #endif
 #endif
 
+#if !defined(ENABLE_VIEW_MODE_CSS_MEDIA)
+#define ENABLE_VIEW_MODE_CSS_MEDIA 0
+#endif
+
 #if !defined(ENABLE_WEB_ARCHIVE)
 #define ENABLE_WEB_ARCHIVE 1
 #endif
 
 #if !defined(ENABLE_WEB_AUDIO)
 #define ENABLE_WEB_AUDIO 1
+#endif
+
+#if !defined(ENABLE_CURSOR_VISIBILITY)
+#define ENABLE_CURSOR_VISIBILITY 1
+#endif
+
+#if !defined(ENABLE_INPUT_TYPE_COLOR)
+#define ENABLE_INPUT_TYPE_COLOR 1
+#endif
+
+#if !defined(ENABLE_INPUT_TYPE_COLOR_POPOVER)
+#define ENABLE_INPUT_TYPE_COLOR_POPOVER 1
 #endif
 
 #endif /* PLATFORM(MAC) && !PLATFORM(IOS) */
@@ -226,24 +241,15 @@
 #define ENABLE_WEB_ARCHIVE 1
 #endif
 
+#if !defined(ENABLE_VIEW_MODE_CSS_MEDIA)
+#define ENABLE_VIEW_MODE_CSS_MEDIA 0
+#endif
+
+#if !defined(ENABLE_WEBGL)
+#define ENABLE_WEBGL 1
+#endif
+
 #endif /* PLATFORM(WIN_CAIRO) */
-
-/* --------- WX port (Mac OS and Windows) --------- */
-#if PLATFORM(WX)
-
-#if OS(DARWIN)
-#if !defined(ENABLE_WEB_ARCHIVE)
-#define ENABLE_WEB_ARCHIVE 1
-#endif
-#endif
-
-#if OS(UNIX)
-#if !defined(ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH)
-#define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH 1
-#endif
-#endif
-
-#endif /* PLATFORM(WX) */
 
 /* --------- EFL port (Unix) --------- */
 #if PLATFORM(EFL)
@@ -292,10 +298,6 @@
 /* ENABLE macro defaults for WebCore */
 /* Do not use PLATFORM() tests in this section ! */
 
-#if !defined(ENABLE_3D_PLUGIN)
-#define ENABLE_3D_PLUGIN 0
-#endif
-
 #if !defined(ENABLE_3D_RENDERING)
 #define ENABLE_3D_RENDERING 0
 #endif
@@ -318,10 +320,6 @@
 
 #if !defined(ENABLE_BLOB)
 #define ENABLE_BLOB 0
-#endif
-
-#if !defined(ENABLE_CALENDAR_PICKER)
-#define ENABLE_CALENDAR_PICKER 0
 #endif
 
 #if !defined(ENABLE_CANVAS_PATH)
@@ -464,6 +462,10 @@
 #define ENABLE_FILTERS 0
 #endif
 
+#if !defined(ENABLE_FONT_LOAD_EVENTS)
+#define ENABLE_FONT_LOAD_EVENTS 0
+#endif
+
 #if !defined(ENABLE_FTPDIR)
 #define ENABLE_FTPDIR 1
 #endif
@@ -512,10 +514,6 @@
 #define ENABLE_INDEXED_DATABASE 0
 #endif
 
-#if !defined(ENABLE_INPUT_MULTIPLE_FIELDS_UI)
-#define ENABLE_INPUT_MULTIPLE_FIELDS_UI 0
-#endif
-
 #if !defined(ENABLE_INPUT_SPEECH)
 #define ENABLE_INPUT_SPEECH 0
 #endif
@@ -524,12 +522,16 @@
 #define ENABLE_INPUT_TYPE_COLOR 0
 #endif
 
+#if !defined(ENABLE_INPUT_TYPE_COLOR_POPOVER)
+#define ENABLE_INPUT_TYPE_COLOR_POPOVER 0
+#endif
+
 #if !defined(ENABLE_INPUT_TYPE_DATE)
 #define ENABLE_INPUT_TYPE_DATE 0
 #endif
 
-#if !defined(ENABLE_INPUT_TYPE_DATETIME)
-#define ENABLE_INPUT_TYPE_DATETIME 0
+#if !defined(ENABLE_INPUT_TYPE_DATETIME_INCOMPLETE)
+#define ENABLE_INPUT_TYPE_DATETIME_INCOMPLETE 0
 #endif
 
 #if !defined(ENABLE_INPUT_TYPE_DATETIMELOCAL)
@@ -548,7 +550,7 @@
 #define ENABLE_INPUT_TYPE_WEEK 0
 #endif
 
-#if ENABLE(INPUT_TYPE_DATE) || ENABLE(INPUT_TYPE_DATETIME) || ENABLE(INPUT_TYPE_DATETIMELOCAL) || ENABLE(INPUT_TYPE_MONTH) || ENABLE(INPUT_TYPE_TIME) || ENABLE(INPUT_TYPE_WEEK)
+#if ENABLE(INPUT_TYPE_DATE) || ENABLE(INPUT_TYPE_DATETIME_INCOMPLETE) || ENABLE(INPUT_TYPE_DATETIMELOCAL) || ENABLE(INPUT_TYPE_MONTH) || ENABLE(INPUT_TYPE_TIME) || ENABLE(INPUT_TYPE_WEEK)
 #if !defined(ENABLE_DATE_AND_TIME_INPUT_TYPES)
 #define ENABLE_DATE_AND_TIME_INPUT_TYPES 1
 #endif
@@ -586,10 +588,6 @@
 #define ENABLE_LINK_PREFETCH 0
 #endif
 
-#if !defined(ENABLE_LINK_PRERENDER)
-#define ENABLE_LINK_PRERENDER 0
-#endif
-
 #if !defined(ENABLE_MATHML)
 #define ENABLE_MATHML 1
 #endif
@@ -616,10 +614,6 @@
 
 #if !defined(ENABLE_MHTML)
 #define ENABLE_MHTML 0
-#endif
-
-#if !defined(ENABLE_MICRODATA)
-#define ENABLE_MICRODATA 0
 #endif
 
 #if !defined(ENABLE_MOUSE_CURSOR_SCALE)
@@ -662,10 +656,6 @@
 #define ENABLE_ORIENTATION_EVENTS 0
 #endif
 
-#if !defined(ENABLE_PAGE_POPUP)
-#define ENABLE_PAGE_POPUP 0
-#endif
-
 #if !defined(ENABLE_PAGE_VISIBILITY_API)
 #define ENABLE_PAGE_VISIBILITY_API 0
 #endif
@@ -674,10 +664,6 @@
 #if !defined(ENABLE_PAN_SCROLLING)
 #define ENABLE_PAN_SCROLLING 1
 #endif
-#endif
-
-#if !defined(ENABLE_PARSED_STYLE_SHEET_CACHING)
-#define ENABLE_PARSED_STYLE_SHEET_CACHING 1
 #endif
 
 #if !defined(ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH)
@@ -710,10 +696,6 @@
 
 #if !defined(ENABLE_REQUEST_ANIMATION_FRAME)
 #define ENABLE_REQUEST_ANIMATION_FRAME 0
-#endif
-
-#if !defined(ENABLE_REQUEST_AUTOCOMPLETE)
-#define ENABLE_REQUEST_AUTOCOMPLETE 0
 #endif
 
 #if !defined(ENABLE_RUBBER_BANDING)
@@ -765,12 +747,6 @@
 #endif
 
 #if ENABLE(SVG)
-#if !defined(ENABLE_SVG_DOM_OBJC_BINDINGS)
-#define ENABLE_SVG_DOM_OBJC_BINDINGS 0
-#endif
-#endif
-
-#if ENABLE(SVG)
 #if !defined(ENABLE_SVG_FONTS)
 #define ENABLE_SVG_FONTS 1
 #endif
@@ -786,10 +762,6 @@
 
 #if !defined(ENABLE_TEXT_CARET)
 #define ENABLE_TEXT_CARET 1
-#endif
-
-#if !defined(ENABLE_TEXT_NOTIFICATIONS_ONLY)
-#define ENABLE_TEXT_NOTIFICATIONS_ONLY 0
 #endif
 
 #if !defined(ENABLE_THREADED_HTML_PARSER)
@@ -822,6 +794,14 @@
 
 #if !defined(ENABLE_VIEWPORT)
 #define ENABLE_VIEWPORT 0
+#endif
+
+#if !defined(ENABLE_VIEWSOURCE_ATTRIBUTE)
+#define ENABLE_VIEWSOURCE_ATTRIBUTE 1
+#endif
+
+#if !defined(ENABLE_VIEW_MODE_CSS_MEDIA)
+#define ENABLE_VIEW_MODE_CSS_MEDIA 1
 #endif
 
 #if !defined(ENABLE_WEBGL)
@@ -860,10 +840,6 @@
 
 #if ENABLE(SATURATED_LAYOUT_ARITHMETIC) && !ENABLE(SUBPIXEL_LAYOUT)
 #error "ENABLE(SATURATED_LAYOUT_ARITHMETIC) requires ENABLE(SUBPIXEL_LAYOUT)"
-#endif
-
-#if ENABLE(SVG_DOM_OBJC_BINDINGS) && !ENABLE(SVG)
-#error "ENABLE(SVG_DOM_OBJC_BINDINGS) requires ENABLE(SVG)"
 #endif
 
 #if ENABLE(SVG_FONTS) && !ENABLE(SVG)

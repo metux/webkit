@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2007, 2008, 2011 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2011, 2013 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -24,10 +24,11 @@
 #define CallFrame_h
 
 #include "AbstractPC.h"
-#include "JSGlobalData.h"
+#include "VM.h"
 #include "JSStack.h"
 #include "MacroAssemblerCodeRef.h"
 #include "Register.h"
+#include "StackIteratorPrivate.h"
 
 namespace JSC  {
 
@@ -60,43 +61,45 @@ namespace JSC  {
         // the actual DOM window, which can't be "this" for security reasons.
         JSObject* globalThisValue() const;
 
-        JSGlobalData& globalData() const;
+        VM& vm() const;
 
         // Convenience functions for access to global data.
         // It takes a few memory references to get from a call frame to the global data
         // pointer, so these are inefficient, and should be used sparingly in new code.
         // But they're used in many places in legacy code, so they're not going away any time soon.
 
-        void clearException() { globalData().exception = JSValue(); }
-        JSValue exception() const { return globalData().exception; }
-        bool hadException() const { return globalData().exception; }
+        void clearException() { vm().exception = JSValue(); }
+        void clearSupplementaryExceptionInfo()
+        {
+            vm().clearExceptionStack();
+        }
 
-        const CommonIdentifiers& propertyNames() const { return *globalData().propertyNames; }
-        const MarkedArgumentBuffer& emptyList() const { return *globalData().emptyList; }
-        Interpreter* interpreter() { return globalData().interpreter; }
-        Heap* heap() { return &globalData().heap; }
+        JSValue exception() const { return vm().exception; }
+        bool hadException() const { return vm().exception; }
+
+        const CommonIdentifiers& propertyNames() const { return *vm().propertyNames; }
+        const MarkedArgumentBuffer& emptyList() const { return *vm().emptyList; }
+        Interpreter* interpreter() { return vm().interpreter; }
+        Heap* heap() { return &vm().heap; }
 #ifndef NDEBUG
         void dumpCaller();
 #endif
-        static const HashTable* arrayConstructorTable(CallFrame* callFrame) { return callFrame->globalData().arrayConstructorTable; }
-        static const HashTable* arrayPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().arrayPrototypeTable; }
-        static const HashTable* booleanPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().booleanPrototypeTable; }
-        static const HashTable* dateTable(CallFrame* callFrame) { return callFrame->globalData().dateTable; }
-        static const HashTable* dateConstructorTable(CallFrame* callFrame) { return callFrame->globalData().dateConstructorTable; }
-        static const HashTable* errorPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().errorPrototypeTable; }
-        static const HashTable* globalObjectTable(CallFrame* callFrame) { return callFrame->globalData().globalObjectTable; }
-        static const HashTable* jsonTable(CallFrame* callFrame) { return callFrame->globalData().jsonTable; }
-        static const HashTable* mathTable(CallFrame* callFrame) { return callFrame->globalData().mathTable; }
-        static const HashTable* numberConstructorTable(CallFrame* callFrame) { return callFrame->globalData().numberConstructorTable; }
-        static const HashTable* numberPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().numberPrototypeTable; }
-        static const HashTable* objectConstructorTable(CallFrame* callFrame) { return callFrame->globalData().objectConstructorTable; }
-        static const HashTable* objectPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().objectPrototypeTable; }
-        static const HashTable* privateNamePrototypeTable(CallFrame* callFrame) { return callFrame->globalData().privateNamePrototypeTable; }
-        static const HashTable* regExpTable(CallFrame* callFrame) { return callFrame->globalData().regExpTable; }
-        static const HashTable* regExpConstructorTable(CallFrame* callFrame) { return callFrame->globalData().regExpConstructorTable; }
-        static const HashTable* regExpPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().regExpPrototypeTable; }
-        static const HashTable* stringTable(CallFrame* callFrame) { return callFrame->globalData().stringTable; }
-        static const HashTable* stringConstructorTable(CallFrame* callFrame) { return callFrame->globalData().stringConstructorTable; }
+        static const HashTable* arrayConstructorTable(CallFrame* callFrame) { return callFrame->vm().arrayConstructorTable; }
+        static const HashTable* arrayPrototypeTable(CallFrame* callFrame) { return callFrame->vm().arrayPrototypeTable; }
+        static const HashTable* booleanPrototypeTable(CallFrame* callFrame) { return callFrame->vm().booleanPrototypeTable; }
+        static const HashTable* dateTable(CallFrame* callFrame) { return callFrame->vm().dateTable; }
+        static const HashTable* dateConstructorTable(CallFrame* callFrame) { return callFrame->vm().dateConstructorTable; }
+        static const HashTable* errorPrototypeTable(CallFrame* callFrame) { return callFrame->vm().errorPrototypeTable; }
+        static const HashTable* globalObjectTable(CallFrame* callFrame) { return callFrame->vm().globalObjectTable; }
+        static const HashTable* jsonTable(CallFrame* callFrame) { return callFrame->vm().jsonTable; }
+        static const HashTable* numberConstructorTable(CallFrame* callFrame) { return callFrame->vm().numberConstructorTable; }
+        static const HashTable* numberPrototypeTable(CallFrame* callFrame) { return callFrame->vm().numberPrototypeTable; }
+        static const HashTable* objectConstructorTable(CallFrame* callFrame) { return callFrame->vm().objectConstructorTable; }
+        static const HashTable* privateNamePrototypeTable(CallFrame* callFrame) { return callFrame->vm().privateNamePrototypeTable; }
+        static const HashTable* regExpTable(CallFrame* callFrame) { return callFrame->vm().regExpTable; }
+        static const HashTable* regExpConstructorTable(CallFrame* callFrame) { return callFrame->vm().regExpConstructorTable; }
+        static const HashTable* regExpPrototypeTable(CallFrame* callFrame) { return callFrame->vm().regExpPrototypeTable; }
+        static const HashTable* stringConstructorTable(CallFrame* callFrame) { return callFrame->vm().stringConstructorTable; }
 
         static CallFrame* create(Register* callFrameBase) { return static_cast<CallFrame*>(callFrameBase); }
         Register* registers() { return this; }
@@ -109,22 +112,58 @@ namespace JSC  {
         bool hasReturnPC() const { return !!this[JSStack::ReturnPC].vPC(); }
         void clearReturnPC() { registers()[JSStack::ReturnPC] = static_cast<Instruction*>(0); }
 #endif
-        AbstractPC abstractReturnPC(JSGlobalData& globalData) { return AbstractPC(globalData, this); }
-#if USE(JSVALUE32_64)
-        unsigned bytecodeOffsetForNonDFGCode() const;
-        void setBytecodeOffsetForNonDFGCode(unsigned offset);
+        AbstractPC abstractReturnPC(VM& vm) { return AbstractPC(vm, this); }
+
+        class Location {
+        public:
+            static inline uint32_t decode(uint32_t bits);
+
+            static inline bool isBytecodeLocation(uint32_t bits);
+#if USE(JSVALUE64)
+            static inline uint32_t encodeAsBytecodeOffset(uint32_t bits);
 #else
-        unsigned bytecodeOffsetForNonDFGCode() const
-        {
-            ASSERT(codeBlock());
-            return this[JSStack::ArgumentCount].tag();
-        }
-        
-        void setBytecodeOffsetForNonDFGCode(unsigned offset)
-        {
-            ASSERT(codeBlock());
-            this[JSStack::ArgumentCount].tag() = static_cast<int32_t>(offset);
-        }
+            static inline uint32_t encodeAsBytecodeInstruction(Instruction*);
+#endif
+
+            static inline bool isCodeOriginIndex(uint32_t bits);
+            static inline uint32_t encodeAsCodeOriginIndex(uint32_t bits);
+
+            static inline bool isInlinedCode(uint32_t bits);
+            static inline uint32_t encodeAsInlinedCode(uint32_t bits);
+
+        private:
+            enum TypeTag {
+                BytecodeLocationTag = 0,
+                CodeOriginIndexTag = 1,
+                IsInlinedCodeTag = 2,
+            };
+
+            static inline uint32_t encode(TypeTag, uint32_t bits);
+
+            static const uint32_t s_mask = 0x3;
+#if USE(JSVALUE64)
+            static const uint32_t s_shift = 30;
+            static const uint32_t s_shiftedMask = s_mask << s_shift;
+#else
+            static const uint32_t s_shift = 2;
+#endif
+        };
+
+        bool isInlinedFrame() const;
+        void setIsInlinedFrame();
+
+        bool hasLocationAsBytecodeOffset() const;
+        bool hasLocationAsCodeOriginIndex() const;
+
+        unsigned locationAsRawBits() const;
+        unsigned locationAsBytecodeOffset() const;
+        unsigned locationAsCodeOriginIndex() const;
+
+        void setLocationAsRawBits(unsigned);
+        void setLocationAsBytecodeOffset(unsigned);
+
+#if ENABLE(DFG_JIT)
+        unsigned bytecodeOffsetFromCodeOriginIndex();
 #endif
 
         Register* frameExtent()
@@ -138,10 +177,9 @@ namespace JSC  {
     
 #if ENABLE(DFG_JIT)
         InlineCallFrame* inlineCallFrame() const { return this[JSStack::ReturnPC].asInlineCallFrame(); }
-        unsigned codeOriginIndexForDFG() const { return this[JSStack::ArgumentCount].tag(); }
 #else
         // This will never be called if !ENABLE(DFG_JIT) since all calls should be guarded by
-        // isInlineCallFrame(). But to make it easier to write code without having a bunch of
+        // isInlinedFrame(). But to make it easier to write code without having a bunch of
         // #if's, we make a dummy implementation available anyway.
         InlineCallFrame* inlineCallFrame() const
         {
@@ -235,39 +273,13 @@ namespace JSC  {
         void setReturnPC(void* value) { static_cast<Register*>(this)[JSStack::ReturnPC] = (Instruction*)value; }
         
 #if ENABLE(DFG_JIT)
-        bool isInlineCallFrame();
-        
         void setInlineCallFrame(InlineCallFrame* inlineCallFrame) { static_cast<Register*>(this)[JSStack::ReturnPC] = inlineCallFrame; }
-        
-        // Call this to get the semantically correct JS CallFrame* for the
-        // currently executing function.
-        CallFrame* trueCallFrame(AbstractPC);
-        
-        // Call this to get the semantically correct JS CallFrame* corresponding
-        // to the caller. This resolves issues surrounding inlining and the
-        // HostCallFrameFlag stuff.
-        CallFrame* trueCallerFrame();
-        
-        CodeBlock* someCodeBlockForPossiblyInlinedCode();
-#else
-        bool isInlineCallFrame() { return false; }
-        
-        CallFrame* trueCallFrame(AbstractPC) { return this; }
-        CallFrame* trueCallerFrame() { return callerFrame()->removeHostCallFrameFlag(); }
-        
-        CodeBlock* someCodeBlockForPossiblyInlinedCode() { return codeBlock(); }
 #endif
         CallFrame* callerFrameNoFlags() { return callerFrame()->removeHostCallFrameFlag(); }
-        
-        // Call this to get the true call frame (accounted for inlining and any
-        // other optimizations), when you have entered into VM code through one
-        // of the "blessed" entrypoints (JITStubs or DFGOperations). This means
-        // that if you're pretty much anywhere in the VM you can safely call this;
-        // though if you were to magically get an ExecState* by, say, interrupting
-        // a thread that is running JS code and brutishly scraped the call frame
-        // register, calling this method would probably lead to horrible things
-        // happening.
-        CallFrame* trueCallFrameFromVMCode() { return trueCallFrame(AbstractPC()); }
+
+        JS_EXPORT_PRIVATE StackIterator begin(StackIterator::FrameFilter = 0);
+        JS_EXPORT_PRIVATE StackIterator find(JSFunction* calleeFunctionObj, StackIterator::FrameFilter = 0);
+        JS_EXPORT_PRIVATE StackIterator::Frame* end();
 
     private:
         static const intptr_t HostCallFrameFlag = 1;
@@ -276,9 +288,6 @@ namespace JSC  {
 
 #ifndef NDEBUG
         JSStack* stack();
-#endif
-#if ENABLE(DFG_JIT)
-        bool isInlineCallFrameSlow();
 #endif
         ExecState();
         ~ExecState();

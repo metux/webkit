@@ -96,13 +96,6 @@ AC_ARG_ENABLE(video,
     [enable_video="yes"])
 AC_MSG_RESULT([$enable_video])
 
-AC_MSG_CHECKING([whether to enable XSLT support])
-AC_ARG_ENABLE(xslt, 
-    AC_HELP_STRING([--enable-xslt], [enable support for XSLT [default=yes]]),
-    [],
-    [enable_xslt="yes"])
-AC_MSG_RESULT([$enable_xslt])
-
 AC_MSG_CHECKING([whether to enable geolocation support])
 AC_ARG_ENABLE(geolocation, 
     AC_HELP_STRING([--enable-geolocation], [enable support for geolocation [default=yes]]),
@@ -130,6 +123,13 @@ AC_ARG_ENABLE(web_audio,
     [],
     [enable_web_audio="no"])
 AC_MSG_RESULT([$enable_web_audio])
+
+AC_MSG_CHECKING([whether to enable Battery Status API support])
+AC_ARG_ENABLE(battery_status,
+    AC_HELP_STRING([--enable-battery-status], [enable support for Battery Status API [default=no]]),
+    [],
+    [enable_battery_status="no"])
+AC_MSG_RESULT([$enable_battery_status])
 
 AC_MSG_CHECKING([whether to enable code coverage support])
 AC_ARG_ENABLE(coverage,
@@ -168,29 +168,21 @@ AC_ARG_ENABLE(debug_symbols,
     ])
 AC_MSG_RESULT([$enable_debug_symbols])
 
-AC_MSG_CHECKING([which GPU acceleration backend to use])
-AC_ARG_WITH(acceleration_backend,
-    AC_HELP_STRING([--with-acceleration-backend=@<:@opengl/clutter/none@:>@],
-        [Select accelerated backend (Clutter currently unsupported, OpenGL autodetected) [default=autodetect]]),
-    [],
-    [with_acceleration_backend="auto"])
-AC_MSG_RESULT([$with_acceleration_backend])
-
 AC_MSG_CHECKING([whether to enable WebGL support])
-AC_ARG_ENABLE(webgl, AC_HELP_STRING([--enable-webgl], [enable support for WebGL [default=check]]),
+AC_ARG_ENABLE(webgl, AC_HELP_STRING([--enable-webgl], [enable support for WebGL [default=auto]]),
     [],
     [enable_webgl="auto"])
 AC_MSG_RESULT([$enable_webgl])
 
 AC_MSG_CHECKING([whether to enable accelerated compositing support])
 AC_ARG_ENABLE(accelerated_compositing,
-    AC_HELP_STRING([--enable-accelerated-compositing], [enable support for accelerated compositing [default=check]]),
+    AC_HELP_STRING([--enable-accelerated-compositing], [enable support for accelerated compositing [default=auto]]),
     [],
     [enable_accelerated_compositing="auto"])
 AC_MSG_RESULT([$enable_accelerated_compositing])
 
 AC_MSG_CHECKING([whether to enable JIT compilation])
-AC_ARG_ENABLE(jit, AS_HELP_STRING([--enable-jit], [Enable JIT compilation (default: autodetect)]))
+AC_ARG_ENABLE(jit, AS_HELP_STRING([--enable-jit], [Enable JIT compilation (default: auto)]), [], [enable_jit=auto])
 AC_MSG_RESULT([$enable_jit])
 
 AC_MSG_CHECKING([whether to enable opcode stats])

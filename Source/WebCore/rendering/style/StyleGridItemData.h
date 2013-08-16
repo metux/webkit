@@ -46,7 +46,8 @@ public:
 
     bool operator==(const StyleGridItemData& o) const
     {
-        return m_gridColumn == o.m_gridColumn && m_gridRow == o.m_gridRow;
+        return m_gridColumnStart == o.m_gridColumnStart && m_gridColumnEnd == o.m_gridColumnEnd
+            && m_gridRowStart == o.m_gridRowStart && m_gridRowEnd == o.m_gridRowEnd;
     }
 
     bool operator!=(const StyleGridItemData& o) const
@@ -54,8 +55,10 @@ public:
         return !(*this == o);
     }
 
-    GridPosition m_gridColumn;
-    GridPosition m_gridRow;
+    GridPosition m_gridColumnStart;
+    GridPosition m_gridColumnEnd;
+    GridPosition m_gridRowStart;
+    GridPosition m_gridRowEnd;
 
 private:
     StyleGridItemData();

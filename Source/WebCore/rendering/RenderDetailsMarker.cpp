@@ -19,11 +19,12 @@
  */
 
 #include "config.h"
-#if ENABLE(DETAILS_ELEMENT) || ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(DETAILS_ELEMENT)
 #include "RenderDetailsMarker.h"
 
 #include "Element.h"
 #include "GraphicsContext.h"
+#include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "PaintInfo.h"
 
@@ -144,7 +145,7 @@ bool RenderDetailsMarker::isOpen() const
             continue;
         if (renderer->node()->hasTagName(detailsTag))
             return !toElement(renderer->node())->getAttribute(openAttr).isNull();
-        if (renderer->node()->hasTagName(inputTag))
+        if (isHTMLInputElement(renderer->node()))
             return true;
     }
 

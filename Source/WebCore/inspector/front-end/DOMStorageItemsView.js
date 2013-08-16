@@ -52,7 +52,7 @@ WebInspector.DOMStorageItemsView = function(domStorage, domStorageModel)
 }
 
 WebInspector.DOMStorageItemsView.prototype = {
-    get statusBarItems()
+    statusBarItems: function()
     {
         return [this.refreshButton.element, this.deleteButton.element];
     },
@@ -142,13 +142,22 @@ WebInspector.DOMStorageItemsView.prototype = {
 
         event.consume(true);
 
+        var keyFound = false;
         for (var i = 0; i < children.length; ++i) {
             var childNode = children[i];
             if (childNode.data.key === storageData.key) {
-                childNode.data.value = storageData.newValue;
-                childNode.refresh();
+                if (keyFound) {
+                    rootNode.removeChild(childNode);
+                    return;
+                }
+                keyFound = true;
+                if (childNode.data.value !== storageData.newValue) {
+                    childNode.data.value = storageData.newValue;
+                    childNode.refresh();
+                    childNode.select();
+                    childNode.reveal();
+                }
                 this.deleteButton.visible = true;
-                return;
             }
         }
     },
@@ -156,37 +165,34 @@ WebInspector.DOMStorageItemsView.prototype = {
     _update: function()
     {
         this.detachChildViews();
-        this.domStorage.getEntries(this._showDOMStorageEntries.bind(this));
+        this.domStorage.getItems(this._showDOMStorageItems.bind(this));
     },
 
-    _showDOMStorageEntries: function(error, entries)
+    _showDOMStorageItems: function(error, items)
     {
         if (error)
             return;
 
-        this._dataGrid = this._dataGridForDOMStorageEntries(entries);
+        this._dataGrid = this._dataGridForDOMStorageItems(items);
         this._dataGrid.show(this.element);
         this._dataGrid.autoSizeColumns(10);
         this.deleteButton.visible = (this._dataGrid.rootNode().children.length > 1);
     },
 
-    _dataGridForDOMStorageEntries: function(entries)
+    _dataGridForDOMStorageItems: function(items)
     {
-        var columns = {key: {}, value: {}};
-
-        columns.key.title = WebInspector.UIString("Key");
-        columns.key.editable = true;
-
-        columns.value.title = WebInspector.UIString("Value");
-        columns.value.editable = true;
+        var columns = [
+            {id: "key", title: WebInspector.UIString("Key"), editable: true},
+            {id: "value", title: WebInspector.UIString("Value"), editable: true}
+        ];
 
         var nodes = [];
 
         var keys = [];
-        var length = entries.length;
-        for (var i = 0; i < entries.length; i++) {
-            var key = entries[i][0];
-            var value = entries[i][1];
+        var length = items.length;
+        for (var i = 0; i < items.length; i++) {
+            var key = items[i][0];
+            var value = items[i][1];
             var node = new WebInspector.DataGridNode({key: key, value: value}, false);
             node.selectable = true;
             nodes.push(node);
@@ -209,6 +215,7 @@ WebInspector.DOMStorageItemsView.prototype = {
             return;
 
         this._deleteCallback(this._dataGrid.selectedNode);
+        this._dataGrid.changeNodeAfterDeletion();
     },
 
     _refreshButtonClicked: function(event)
@@ -222,10 +229,24 @@ WebInspector.DOMStorageItemsView.prototype = {
         if ("key" === columnIdentifier) {
             if (oldText)
                 domStorage.removeItem(oldText);
-
             domStorage.setItem(newText, editingNode.data.value);
+            this._removeDupes(editingNode);
         } else
             domStorage.setItem(editingNode.data.key, newText);
+    },
+
+    /**
+     * @param {!WebInspector.DataGridNode} masterNode
+     */
+    _removeDupes: function(masterNode)
+    {
+        var rootNode = this._dataGrid.rootNode();
+        var children = rootNode.children;
+        for (var i = children.length - 1; i >= 0; --i) {
+            var childNode = children[i];
+            if ((childNode.data.key === masterNode.data.key) && (masterNode !== childNode))
+                rootNode.removeChild(childNode);
+        }
     },
 
     _deleteCallback: function(node)

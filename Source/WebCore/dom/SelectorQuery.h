@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,7 +27,9 @@
 #define SelectorQuery_h
 
 #include "CSSSelectorList.h"
+#include "NodeList.h"
 #include <wtf/HashMap.h>
+#include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicStringHash.h>
 
@@ -55,9 +57,15 @@ private:
         bool isFastCheckable;
     };
 
-    bool canUseIdLookup(Node* rootNode) const;
+    bool selectorMatches(const SelectorData&, Element*, const Node*) const;
     template <bool firstMatchOnly>
     void execute(Node* rootNode, Vector<RefPtr<Node> >&) const;
+
+    template <bool firstMatchOnly> void executeFastPathForIdSelector(const Node* rootNode, const SelectorData&, const CSSSelector* idSelector, Vector<RefPtr<Node> >&) const;
+    template <bool firstMatchOnly> void executeSingleTagNameSelectorData(const Node* rootNode, const SelectorData&, Vector<RefPtr<Node> >&) const;
+    template <bool firstMatchOnly> void executeSingleClassNameSelectorData(const Node* rootNode, const SelectorData&, Vector<RefPtr<Node> >&) const;
+    template <bool firstMatchOnly> void executeSingleSelectorData(const Node* rootNode, const SelectorData&, Vector<RefPtr<Node> >&) const;
+    template <bool firstMatchOnly> void executeSingleMultiSelectorData(const Node* rootNode, Vector<RefPtr<Node> >&) const;
 
     Vector<SelectorData> m_selectors;
 };
@@ -84,6 +92,21 @@ public:
 private:
     HashMap<AtomicString, OwnPtr<SelectorQuery> > m_entries;
 };
+
+inline bool SelectorQuery::matches(Element* element) const
+{
+    return m_selectors.matches(element);
+}
+
+inline PassRefPtr<NodeList> SelectorQuery::queryAll(Node* rootNode) const
+{
+    return m_selectors.queryAll(rootNode);
+}
+
+inline PassRefPtr<Element> SelectorQuery::queryFirst(Node* rootNode) const
+{
+    return m_selectors.queryFirst(rootNode);
+}
 
 }
 

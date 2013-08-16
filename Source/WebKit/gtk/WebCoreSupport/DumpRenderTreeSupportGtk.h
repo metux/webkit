@@ -21,6 +21,7 @@
 #define DumpRenderTreeSupportGtk_h
 
 #include "JSStringRef.h"
+#include "PageVisibilityState.h"
 #include <atk/atk.h>
 #include <glib.h>
 #include <webkit/webkitdefines.h>
@@ -51,8 +52,6 @@ public:
 
     static void setLinksIncludedInFocusChain(bool);
     static bool linksIncludedInFocusChain();
-    static void setSelectTrailingWhitespaceEnabled(bool);
-    static bool selectTrailingWhitespaceEnabled();
 
     static void clearOpener(WebKitWebFrame*);
 
@@ -63,16 +62,12 @@ public:
     static void addUserScript(WebKitWebFrame*, const char*, bool, bool);
     static void addUserStyleSheet(WebKitWebFrame*, const char* sourceCode, bool allFrames);
     static guint getPendingUnloadEventCount(WebKitWebFrame*);
-    static WTF::CString markerTextForListItem(WebKitWebFrame*, JSContextRef, JSValueRef nodeObject);
     static void clearMainFrameName(WebKitWebFrame*);
     static AtkObject* getFocusedAccessibleElement(WebKitWebFrame*);
     static AtkObject* getRootAccessibleElement(WebKitWebFrame*);
     static void layoutFrame(WebKitWebFrame*);
-    static void setAutofilled(JSContextRef, JSValueRef, bool);
     static void setValueForUser(JSContextRef, JSValueRef, JSStringRef);
     static bool shouldClose(WebKitWebFrame*);
-    static bool elementDoesAutoCompleteForElementWithId(WebKitWebFrame*, JSStringRef);
-    static JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
 
     // WebKitWebView
     static void executeCoreCommandByName(WebKitWebView*, const gchar* name, const gchar* value);
@@ -81,7 +76,6 @@ public:
     static void rectangleForSelection(WebKitWebFrame*, cairo_rectangle_int_t*);
     static void scalePageBy(WebKitWebView*, float, float, float);
     static void setDefersLoading(WebKitWebView*, bool);
-    static void setSmartInsertDeleteEnabled(WebKitWebView*, bool);
     static void forceWebViewPaint(WebKitWebView*);
 
     // Accessibility
@@ -145,11 +139,11 @@ public:
     typedef bool (*AuthenticationCallback) (CString& username, CString& password);
     static void setAuthenticationCallback(AuthenticationCallback);
     static AuthenticationCallback s_authenticationCallback;
+    static void setPageVisibility(WebKitWebView*, WebCore::PageVisibilityState, bool);
 
 private:
     static bool s_drtRun;
     static bool s_linksIncludedInTabChain;
-    static bool s_selectTrailingWhitespaceEnabled;
 };
 
 #endif

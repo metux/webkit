@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitPlugin</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitCookieManager.html" title="WebKitCookieManager">
@@ -87,8 +87,11 @@ be obtained from the <a class="link" href="WebKitWebContext.html" title="WebKitW
 <div class="refsect2">
 <a name="webkit-plugin-get-name"></a><h3>webkit_plugin_get_name ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_plugin_get_name              (<em class="parameter"><code><a class="link" href="WebKitPlugin.html" title="WebKitPlugin"><span class="type">WebKitPlugin</span></a> *plugin</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -106,8 +109,11 @@ be obtained from the <a class="link" href="WebKitWebContext.html" title="WebKitW
 <div class="refsect2">
 <a name="webkit-plugin-get-description"></a><h3>webkit_plugin_get_description ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_plugin_get_description       (<em class="parameter"><code><a class="link" href="WebKitPlugin.html" title="WebKitPlugin"><span class="type">WebKitPlugin</span></a> *plugin</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -125,8 +131,11 @@ be obtained from the <a class="link" href="WebKitWebContext.html" title="WebKitW
 <div class="refsect2">
 <a name="webkit-plugin-get-path"></a><h3>webkit_plugin_get_path ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_plugin_get_path              (<em class="parameter"><code><a class="link" href="WebKitPlugin.html" title="WebKitPlugin"><span class="type">WebKitPlugin</span></a> *plugin</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -148,8 +157,11 @@ be obtained from the <a class="link" href="WebKitWebContext.html" title="WebKitW
 Get information about MIME types handled by the plugin,
 as a list of <a class="link" href="WebKitPlugin.html#WebKitMimeInfo"><span class="type">WebKitMimeInfo</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -179,8 +191,11 @@ as a list of <a class="link" href="WebKitPlugin.html#WebKitMimeInfo"><span class
 Atomically increments the reference count of <em class="parameter"><code>info</code></em> by one. This
 function is MT-safe and may be called from any thread.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>info</code></em> :</span></p></td>
@@ -205,8 +220,11 @@ reference count drops to 0, all memory allocated by the <a class="link" href="We
 released. This function is MT-safe and may be called from any
 thread.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>info</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitPlugin.html#WebKitMimeInfo"><span class="type">WebKitMimeInfo</span></a>
@@ -218,8 +236,11 @@ thread.
 <div class="refsect2">
 <a name="webkit-mime-info-get-mime-type"></a><h3>webkit_mime_info_get_mime_type ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_mime_info_get_mime_type      (<em class="parameter"><code><a class="link" href="WebKitPlugin.html#WebKitMimeInfo"><span class="type">WebKitMimeInfo</span></a> *info</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>info</code></em> :</span></p></td>
@@ -238,8 +259,11 @@ thread.
 <div class="refsect2">
 <a name="webkit-mime-info-get-description"></a><h3>webkit_mime_info_get_description ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_mime_info_get_description    (<em class="parameter"><code><a class="link" href="WebKitPlugin.html#WebKitMimeInfo"><span class="type">WebKitMimeInfo</span></a> *info</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>info</code></em> :</span></p></td>
@@ -262,8 +286,11 @@ thread.
 Get the list of file extensions associated to the
 MIME type of <em class="parameter"><code>info</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>info</code></em> :</span></p></td>

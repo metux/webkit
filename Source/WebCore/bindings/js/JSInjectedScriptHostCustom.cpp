@@ -84,10 +84,10 @@ Node* InjectedScriptHost::scriptValueAsNode(ScriptValue value)
 ScriptValue InjectedScriptHost::nodeAsScriptValue(ScriptState* state, Node* node)
 {
     if (!shouldAllowAccessToNode(state, node))
-        return ScriptValue(state->globalData(), jsNull());
+        return ScriptValue(state->vm(), jsNull());
 
     JSLockHolder lock(state);
-    return ScriptValue(state->globalData(), toJS(state, deprecatedGlobalObjectForPrototype(state), node));
+    return ScriptValue(state->vm(), toJS(state, deprecatedGlobalObjectForPrototype(state), node));
 }
 
 JSValue JSInjectedScriptHost::inspectedObject(ExecState* exec)
@@ -112,7 +112,7 @@ JSValue JSInjectedScriptHost::internalConstructorName(ExecState* exec)
     if (exec->argumentCount() < 1)
         return jsUndefined();
 
-    JSObject* thisObject = exec->argument(0).toThisObject(exec);
+    JSObject* thisObject = jsCast<JSObject*>(exec->argument(0).toThis(exec, NotStrictMode));
     String result = thisObject->methodTable()->className(thisObject);
     return jsStringWithCache(exec, result);
 }
@@ -177,17 +177,17 @@ JSValue JSInjectedScriptHost::functionDetails(ExecState* exec)
     String scriptId = String::number(sourceCode->provider()->asID());
 
     JSObject* location = constructEmptyObject(exec);
-    location->putDirect(exec->globalData(), Identifier(exec, "lineNumber"), jsNumber(lineNumber));
-    location->putDirect(exec->globalData(), Identifier(exec, "scriptId"), jsString(exec, scriptId));
+    location->putDirect(exec->vm(), Identifier(exec, "lineNumber"), jsNumber(lineNumber));
+    location->putDirect(exec->vm(), Identifier(exec, "scriptId"), jsString(exec, scriptId));
 
     JSObject* result = constructEmptyObject(exec);
-    result->putDirect(exec->globalData(), Identifier(exec, "location"), location);
+    result->putDirect(exec->vm(), Identifier(exec, "location"), location);
     String name = function->name(exec);
     if (!name.isEmpty())
-        result->putDirect(exec->globalData(), Identifier(exec, "name"), jsStringWithCache(exec, name));
+        result->putDirect(exec->vm(), Identifier(exec, "name"), jsStringWithCache(exec, name));
     String displayName = function->displayName(exec);
     if (!displayName.isEmpty())
-        result->putDirect(exec->globalData(), Identifier(exec, "displayName"), jsStringWithCache(exec, displayName));
+        result->putDirect(exec->vm(), Identifier(exec, "displayName"), jsStringWithCache(exec, displayName));
     // FIXME: provide function scope data in "scopesRaw" property when JSC supports it.
     //     https://bugs.webkit.org/show_bug.cgi?id=87192
     return result;
@@ -216,8 +216,8 @@ static JSArray* getJSListenerFunctions(ExecState* exec, Document* document, cons
         if (!function)
             continue;
         JSObject* listenerEntry = constructEmptyObject(exec);
-        listenerEntry->putDirect(exec->globalData(), Identifier(exec, "listener"), function);
-        listenerEntry->putDirect(exec->globalData(), Identifier(exec, "useCapture"), jsBoolean(listenerInfo.eventListenerVector[i].useCapture));
+        listenerEntry->putDirect(exec->vm(), Identifier(exec, "listener"), function);
+        listenerEntry->putDirect(exec->vm(), Identifier(exec, "useCapture"), jsBoolean(listenerInfo.eventListenerVector[i].useCapture));
         result->putDirectIndex(exec, outputIndex++, JSValue(listenerEntry));
     }
     return result;
@@ -247,7 +247,7 @@ JSValue JSInjectedScriptHost::getEventListeners(ExecState* exec)
         if (!listeners->length())
             continue;
         AtomicString eventType = listenersArray[i].eventType;
-        result->putDirect(exec->globalData(), Identifier(exec, eventType.impl()), JSValue(listeners));
+        result->putDirect(exec->vm(), Identifier(exec, eventType.impl()), JSValue(listeners));
     }
 
     return result;
@@ -256,8 +256,8 @@ JSValue JSInjectedScriptHost::getEventListeners(ExecState* exec)
 JSValue JSInjectedScriptHost::inspect(ExecState* exec)
 {
     if (exec->argumentCount() >= 2) {
-        ScriptValue object(exec->globalData(), exec->argument(0));
-        ScriptValue hints(exec->globalData(), exec->argument(1));
+        ScriptValue object(exec->vm(), exec->argument(0));
+        ScriptValue hints(exec->vm(), exec->argument(1));
         impl()->inspectImpl(object.toInspectorValue(exec), hints.toInspectorValue(exec));
     }
     return jsUndefined();
@@ -285,26 +285,10 @@ JSValue JSInjectedScriptHost::storageId(ExecState* exec)
     return jsUndefined();
 }
 
-JSValue JSInjectedScriptHost::evaluate(ExecState* exec)
+JSValue JSInjectedScriptHost::evaluate(ExecState* exec) const
 {
-    JSValue expression = exec->argument(0);
-    if (!expression.isString())
-        return throwError(exec, createError(exec, "String argument expected."));
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
-    JSFunction* evalFunction = globalObject->evalFunction();
-    CallData callData;
-    CallType callType = evalFunction->methodTable()->getCallData(evalFunction, callData);
-    if (callType == CallTypeNone)
-        return jsUndefined();
-    MarkedArgumentBuffer args;
-    args.append(expression);
-
-    bool wasEvalEnabled = globalObject->evalEnabled();
-    globalObject->setEvalEnabled(true);
-    JSValue result = JSC::call(exec, evalFunction, callType, callData, exec->globalThisValue(), args);
-    globalObject->setEvalEnabled(wasEvalEnabled);
-
-    return result;
+    return globalObject->evalFunction();
 }
 
 JSValue JSInjectedScriptHost::setFunctionVariableValue(JSC::ExecState* exec)

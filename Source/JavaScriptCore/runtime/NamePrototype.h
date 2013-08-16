@@ -43,9 +43,9 @@ public:
     
     static const ClassInfo s_info;
 
-    static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(globalData, globalObject, prototype, TypeInfo(NameInstanceType, StructureFlags), &s_info);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(NameInstanceType, StructureFlags), &s_info);
     }
 
 protected:
@@ -55,7 +55,7 @@ protected:
     static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NameInstance::StructureFlags;
 
 private:
-    static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
     static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
 };
 

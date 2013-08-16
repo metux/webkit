@@ -27,8 +27,9 @@
 
 #include "RenderObject.h"
 #include "SVGException.h"
+#include "SVGGraphicsElement.h"
+#include "SVGImageElement.h"
 #include "SVGNames.h"
-#include "SVGStyledLocatableElement.h"
 
 namespace WebCore {
 
@@ -37,7 +38,7 @@ static bool isViewportElement(Node* node)
     return (node->hasTagName(SVGNames::svgTag)
         || node->hasTagName(SVGNames::symbolTag)
         || node->hasTagName(SVGNames::foreignObjectTag)
-        || node->hasTagName(SVGNames::imageTag));
+        || isSVGImageElement(node));
 }
 
 SVGElement* SVGLocatable::nearestViewportElement(const SVGElement* element)
@@ -45,7 +46,7 @@ SVGElement* SVGLocatable::nearestViewportElement(const SVGElement* element)
     ASSERT(element);
     for (Element* current = element->parentOrShadowHostElement(); current; current = current->parentOrShadowHostElement()) {
         if (isViewportElement(current))
-            return static_cast<SVGElement*>(current);
+            return toSVGElement(current);
     }
 
     return 0;
@@ -57,7 +58,7 @@ SVGElement* SVGLocatable::farthestViewportElement(const SVGElement* element)
     SVGElement* farthest = 0;
     for (Element* current = element->parentOrShadowHostElement(); current; current = current->parentOrShadowHostElement()) {
         if (isViewportElement(current))
-            farthest = static_cast<SVGElement*>(current);
+            farthest = toSVGElement(current);
     }
     return farthest;
 }
@@ -88,8 +89,8 @@ AffineTransform SVGLocatable::computeCTM(SVGElement* element, CTMScope mode, Sty
         if (!currentElement->isSVGElement())
             break;
 
-        if (static_cast<SVGElement*>(currentElement)->isStyled())
-            ctm = static_cast<SVGStyledElement*>(currentElement)->localCoordinateSpaceTransform(mode).multiply(ctm);
+        if (toSVGElement(currentElement)->isSVGStyledElement())
+            ctm = toSVGStyledElement(currentElement)->localCoordinateSpaceTransform(mode).multiply(ctm);
 
         // For getCTM() computation, stop at the nearest viewport element
         if (currentElement == stopAtElement)
@@ -103,8 +104,8 @@ AffineTransform SVGLocatable::getTransformToElement(SVGElement* target, Exceptio
 {
     AffineTransform ctm = getCTM(styleUpdateStrategy);
 
-    if (target && target->isStyledLocatable()) {
-        AffineTransform targetCTM = static_cast<SVGStyledLocatableElement*>(target)->getCTM(styleUpdateStrategy);
+    if (target && target->isSVGGraphicsElement()) {
+        AffineTransform targetCTM = toSVGGraphicsElement(target)->getCTM(styleUpdateStrategy);
         if (!targetCTM.isInvertible()) {
             ec = SVGException::SVG_MATRIX_NOT_INVERTABLE;
             return ctm;

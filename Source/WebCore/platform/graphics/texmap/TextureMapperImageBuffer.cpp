@@ -20,7 +20,6 @@
 #include "config.h"
 #include "TextureMapperImageBuffer.h"
 
-#include "FilterEffectRenderer.h"
 #include "GraphicsLayer.h"
 #if PLATFORM(QT)
 #include "NativeImageQt.h"
@@ -67,6 +66,7 @@ void BitmapTextureImageBuffer::updateContents(TextureMapper*, GraphicsLayer* sou
     IntRect sourceRect(targetRect);
     sourceRect.setLocation(sourceOffset);
     context->save();
+    context->clip(targetRect);
     context->translate(targetRect.x() - sourceOffset.x(), targetRect.y() - sourceOffset.y());
     sourceLayer->paintGraphicsLayerContents(*context, sourceRect);
     context->restore();
@@ -114,7 +114,7 @@ void TextureMapperImageBuffer::beginClip(const TransformationMatrix& matrix, con
 #endif
 }
 
-void TextureMapperImageBuffer::drawTexture(const BitmapTexture& texture, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, const BitmapTexture* maskTexture, unsigned /* exposedEdges */)
+void TextureMapperImageBuffer::drawTexture(const BitmapTexture& texture, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, unsigned /* exposedEdges */)
 {
     GraphicsContext* context = currentContext();
     if (!context)
@@ -122,22 +122,8 @@ void TextureMapperImageBuffer::drawTexture(const BitmapTexture& texture, const F
 
     const BitmapTextureImageBuffer& textureImageBuffer = static_cast<const BitmapTextureImageBuffer&>(texture);
     ImageBuffer* image = textureImageBuffer.m_image.get();
-    OwnPtr<ImageBuffer> maskedImage;
-
-    if (maskTexture && maskTexture->isValid()) {
-        const BitmapTextureImageBuffer* mask = static_cast<const BitmapTextureImageBuffer*>(maskTexture);
-        maskedImage = ImageBuffer::create(maskTexture->contentSize());
-        GraphicsContext* maskContext = maskedImage->context();
-        maskContext->drawImageBuffer(image, ColorSpaceDeviceRGB, IntPoint::zero(), CompositeCopy);
-        if (opacity < 1) {
-            maskContext->setAlpha(opacity);
-            opacity = 1;
-        }
-        maskContext->drawImageBuffer(mask->m_image.get(), ColorSpaceDeviceRGB, IntPoint::zero(), CompositeDestinationIn);
-        image = maskedImage.get();
-    }
-
     context->save();
+    context->setCompositeOperation(isInMaskMode() ? CompositeDestinationIn : CompositeSourceOver);
     context->setAlpha(opacity);
 #if ENABLE(3D_RENDERING)
     context->concat3DTransform(matrix);
@@ -155,6 +141,7 @@ void TextureMapperImageBuffer::drawSolidColor(const FloatRect& rect, const Trans
         return;
 
     context->save();
+    context->setCompositeOperation(isInMaskMode() ? CompositeDestinationIn : CompositeSourceOver);
 #if ENABLE(3D_RENDERING)
     context->concat3DTransform(matrix);
 #else
@@ -176,19 +163,8 @@ void TextureMapperImageBuffer::drawNumber(int /* number */, const Color&, const 
 }
 
 #if ENABLE(CSS_FILTERS)
-PassRefPtr<BitmapTexture> BitmapTextureImageBuffer::applyFilters(TextureMapper*, const BitmapTexture& contentTexture, const FilterOperations& filters)
+PassRefPtr<BitmapTexture> BitmapTextureImageBuffer::applyFilters(TextureMapper*, const FilterOperations&)
 {
-    RefPtr<FilterEffectRenderer> renderer = FilterEffectRenderer::create();
-    renderer->setSourceImageRect(FloatRect(FloatPoint::zero(), contentTexture.size()));
-
-    // The renderer parameter is only needed for CSS shaders and reference filters.
-    if (renderer->build(0 /*renderer */, filters)) {
-        renderer->allocateBackingStoreIfNeeded();
-        GraphicsContext* context = renderer->inputContext();
-        context->drawImageBuffer(static_cast<const BitmapTextureImageBuffer&>(contentTexture).m_image.get(), ColorSpaceDeviceRGB, IntPoint::zero());
-        renderer->apply();
-        m_image->context()->drawImageBuffer(renderer->output(), ColorSpaceDeviceRGB, renderer->outputRect());
-    }
     return this;
 }
 #endif

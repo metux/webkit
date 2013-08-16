@@ -29,6 +29,7 @@
 #include "DocumentStyleSheetCollection.h"
 
 #include "CSSStyleSheet.h"
+#include "DOMWrapperWorld.h"
 #include "Document.h"
 #include "Element.h"
 #include "HTMLIFrameElement.h"
@@ -47,9 +48,6 @@
 #include "StyleSheetContents.h"
 #include "StyleSheetList.h"
 #include "UserContentURLPattern.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationListHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
 
@@ -60,7 +58,7 @@ DocumentStyleSheetCollection::DocumentStyleSheetCollection(Document* document)
     , m_pendingStylesheets(0)
     , m_injectedStyleSheetCacheValid(false)
     , m_hadActiveLoadingStylesheet(false)
-    , m_needsUpdateActiveStylesheetsOnStyleRecalc(false)
+    , m_pendingUpdateType(NoUpdate)
     , m_usesSiblingRules(false)
     , m_usesSiblingRulesOverride(false)
     , m_usesFirstLineRules(false)
@@ -88,7 +86,7 @@ DocumentStyleSheetCollection::~DocumentStyleSheetCollection()
 void DocumentStyleSheetCollection::combineCSSFeatureFlags()
 {
     // Delay resetting the flags until after next style recalc since unapplying the style may not work without these set (this is true at least with before/after).
-    StyleResolver* styleResolver = m_document->styleResolver();
+    StyleResolver* styleResolver = m_document->ensureStyleResolver();
     m_usesSiblingRules = m_usesSiblingRules || styleResolver->usesSiblingRules();
     m_usesFirstLineRules = m_usesFirstLineRules || styleResolver->usesFirstLineRules();
     m_usesBeforeAfterRules = m_usesBeforeAfterRules || styleResolver->usesBeforeAfterRules();
@@ -96,7 +94,7 @@ void DocumentStyleSheetCollection::combineCSSFeatureFlags()
 
 void DocumentStyleSheetCollection::resetCSSFeatureFlags()
 {
-    StyleResolver* styleResolver = m_document->styleResolver();
+    StyleResolver* styleResolver = m_document->ensureStyleResolver();
     m_usesSiblingRules = styleResolver->usesSiblingRules();
     m_usesFirstLineRules = styleResolver->usesFirstLineRules();
     m_usesBeforeAfterRules = styleResolver->usesBeforeAfterRules();
@@ -189,7 +187,11 @@ void DocumentStyleSheetCollection::updateInjectedStyleSheetCache() const
 
 void DocumentStyleSheetCollection::invalidateInjectedStyleSheetCache()
 {
+    if (!m_injectedStyleSheetCacheValid)
+        return;
     m_injectedStyleSheetCacheValid = false;
+    if (m_injectedUserStyleSheets.isEmpty() && m_injectedAuthorStyleSheets.isEmpty())
+        return;
     m_document->styleResolverChanged(DeferRecalcStyle);
 }
 
@@ -298,10 +300,10 @@ void DocumentStyleSheetCollection::collectActiveStyleSheets(Vector<RefPtr<StyleS
                    ||  (n->isSVGElement() && n->hasTagName(SVGNames::styleTag))
 #endif
                    ) {
-            Element* e = static_cast<Element*>(n);
+            Element* e = toElement(n);
             AtomicString title = e->getAttribute(titleAttr);
             bool enabledViaScript = false;
-            if (e->hasLocalName(linkTag)) {
+            if (e->hasTagName(linkTag)) {
                 // <LINK> element
                 HTMLLinkElement* linkElement = static_cast<HTMLLinkElement*>(n);
                 if (linkElement->isDisabled())
@@ -324,15 +326,17 @@ void DocumentStyleSheetCollection::collectActiveStyleSheets(Vector<RefPtr<StyleS
             // Get the current preferred styleset. This is the
             // set of sheets that will be enabled.
 #if ENABLE(SVG)
-            if (n->isSVGElement() && n->hasTagName(SVGNames::styleTag))
+            if (e->hasTagName(SVGNames::styleTag))
                 sheet = static_cast<SVGStyleElement*>(n)->sheet();
             else
 #endif
-            if (e->hasLocalName(linkTag))
-                sheet = static_cast<HTMLLinkElement*>(n)->sheet();
-            else
-                // <STYLE> element
-                sheet = static_cast<HTMLStyleElement*>(n)->sheet();
+            {
+                if (e->hasTagName(linkTag))
+                    sheet = static_cast<HTMLLinkElement*>(n)->sheet();
+                else
+                    // <STYLE> element
+                    sheet = toHTMLStyleElement(e)->sheet();
+            }
             // Check to see if this sheet belongs to a styleset
             // (thus making it PREFERRED or ALTERNATE rather than
             // PERSISTENT).
@@ -344,7 +348,7 @@ void DocumentStyleSheetCollection::collectActiveStyleSheets(Vector<RefPtr<StyleS
                     // we are NOT an alternate sheet, then establish
                     // us as the preferred set. Otherwise, just ignore
                     // this sheet.
-                    if (e->hasLocalName(styleTag) || !rel.contains("alternate"))
+                    if (e->hasTagName(styleTag) || !rel.contains("alternate"))
                         m_preferredStylesheetSetName = m_selectedStylesheetSetName = title;
                 }
                 if (title != m_preferredStylesheetSetName)
@@ -427,14 +431,17 @@ static bool styleSheetsUseRemUnits(const Vector<RefPtr<CSSStyleSheet> >& sheets)
     return false;
 }
 
-static void filterEnabledCSSStyleSheets(Vector<RefPtr<CSSStyleSheet> >& result, const Vector<RefPtr<StyleSheet> >& sheets)
+static void filterEnabledNonemptyCSSStyleSheets(Vector<RefPtr<CSSStyleSheet> >& result, const Vector<RefPtr<StyleSheet> >& sheets)
 {
     for (unsigned i = 0; i < sheets.size(); ++i) {
         if (!sheets[i]->isCSSStyleSheet())
             continue;
         if (sheets[i]->disabled())
             continue;
-        result.append(static_cast<CSSStyleSheet*>(sheets[i].get()));
+        CSSStyleSheet* sheet = static_cast<CSSStyleSheet*>(sheets[i].get());
+        if (!sheet->length())
+            continue;
+        result.append(sheet);
     }
 }
 
@@ -443,7 +450,7 @@ static void collectActiveCSSStyleSheetsFromSeamlessParents(Vector<RefPtr<CSSStyl
     HTMLIFrameElement* seamlessParentIFrame = document->seamlessParentIFrame();
     if (!seamlessParentIFrame)
         return;
-    sheets.append(seamlessParentIFrame->document()->styleSheetCollection()->activeAuthorStyleSheets());
+    sheets.appendVector(seamlessParentIFrame->document()->styleSheetCollection()->activeAuthorStyleSheets());
 }
 
 bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag)
@@ -452,7 +459,7 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag
         // SVG <use> element may manage to invalidate style selector in the middle of a style recalc.
         // https://bugs.webkit.org/show_bug.cgi?id=54344
         // FIXME: This should be fixed in SVG and the call site replaced by ASSERT(!m_inStyleRecalc).
-        m_needsUpdateActiveStylesheetsOnStyleRecalc = true;
+        m_pendingUpdateType = FullUpdate;
         m_document->scheduleForcedStyleRecalc();
         return false;
 
@@ -464,10 +471,10 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag
     collectActiveStyleSheets(activeStyleSheets);
 
     Vector<RefPtr<CSSStyleSheet> > activeCSSStyleSheets;
-    activeCSSStyleSheets.append(injectedAuthorStyleSheets());
-    activeCSSStyleSheets.append(documentAuthorStyleSheets());
+    activeCSSStyleSheets.appendVector(injectedAuthorStyleSheets());
+    activeCSSStyleSheets.appendVector(documentAuthorStyleSheets());
     collectActiveCSSStyleSheetsFromSeamlessParents(activeCSSStyleSheets, m_document);
-    filterEnabledCSSStyleSheets(activeCSSStyleSheets, activeStyleSheets);
+    filterEnabledNonemptyCSSStyleSheets(activeCSSStyleSheets, activeStyleSheets);
 
     StyleResolverUpdateType styleResolverUpdateType;
     bool requiresFullStyleRecalc;
@@ -476,7 +483,7 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag
     if (styleResolverUpdateType == Reconstruct)
         m_document->clearStyleResolver();
     else {
-        StyleResolver* styleResolver = m_document->styleResolver();
+        StyleResolver* styleResolver = m_document->ensureStyleResolver();
         if (styleResolverUpdateType == Reset) {
             styleResolver->ruleSets().resetAuthorStyle();
             styleResolver->appendAuthorStyleSheets(0, activeCSSStyleSheets);
@@ -486,31 +493,27 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag
         }
         resetCSSFeatureFlags();
     }
+
+    m_weakCopyOfActiveStyleSheetListForFastLookup.clear();
     m_activeAuthorStyleSheets.swap(activeCSSStyleSheets);
     m_styleSheetsForStyleSheetList.swap(activeStyleSheets);
 
     m_usesRemUnits = styleSheetsUseRemUnits(m_activeAuthorStyleSheets);
-    m_needsUpdateActiveStylesheetsOnStyleRecalc = false;
+    m_pendingUpdateType = NoUpdate;
 
     m_document->notifySeamlessChildDocumentsOfStylesheetUpdate();
 
     return requiresFullStyleRecalc;
 }
 
-void DocumentStyleSheetCollection::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool DocumentStyleSheetCollection::activeStyleSheetsContains(const CSSStyleSheet* sheet) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_pageUserSheet, "pageUserSheet");
-    info.addMember(m_injectedUserStyleSheets, "injectedUserStyleSheets");
-    info.addMember(m_injectedAuthorStyleSheets, "injectedAuthorStyleSheets");
-    info.addMember(m_userStyleSheets, "userStyleSheets");
-    info.addMember(m_authorStyleSheets, "authorStyleSheets");
-    info.addMember(m_activeAuthorStyleSheets, "activeAuthorStyleSheets");
-    info.addMember(m_styleSheetsForStyleSheetList, "styleSheetsForStyleSheetList");
-    info.addMember(m_styleSheetCandidateNodes, "styleSheetCandidateNodes");
-    info.addMember(m_preferredStylesheetSetName, "preferredStylesheetSetName");
-    info.addMember(m_selectedStylesheetSetName, "selectedStylesheetSetName");
-    info.addMember(m_document, "document");
+    if (!m_weakCopyOfActiveStyleSheetListForFastLookup) {
+        m_weakCopyOfActiveStyleSheetListForFastLookup = adoptPtr(new HashSet<const CSSStyleSheet*>);
+        for (unsigned i = 0; i < m_activeAuthorStyleSheets.size(); ++i)
+            m_weakCopyOfActiveStyleSheetListForFastLookup->add(m_activeAuthorStyleSheets[i].get());
+    }
+    return m_weakCopyOfActiveStyleSheetListForFastLookup->contains(sheet);
 }
 
 }

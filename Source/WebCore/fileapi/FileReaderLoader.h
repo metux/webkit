@@ -40,6 +40,10 @@
 #include <wtf/Forward.h>
 #include <wtf/text/WTFString.h>
 
+namespace JSC {
+class ArrayBuffer;
+}
+
 namespace WebCore {
 
 class Blob;
@@ -53,6 +57,7 @@ public:
     enum ReadType {
         ReadAsArrayBuffer,
         ReadAsBinaryString,
+        ReadAsBlob,
         ReadAsText,
         ReadAsDataURL
     };
@@ -71,14 +76,20 @@ public:
     virtual void didFail(const ResourceError&);
 
     String stringResult();
-    PassRefPtr<ArrayBuffer> arrayBufferResult() const;
+    PassRefPtr<JSC::ArrayBuffer> arrayBufferResult() const;
+#if ENABLE(STREAM)
+    PassRefPtr<Blob> blobResult();
+#endif // ENABLE(STREAM)
     unsigned bytesLoaded() const { return m_bytesLoaded; }
     unsigned totalBytes() const { return m_totalBytes; }
     int errorCode() const { return m_errorCode; }
 
     void setEncoding(const String&);
     void setDataType(const String& dataType) { m_dataType = dataType; }
-    
+#if ENABLE(STREAM)
+    void setRange(unsigned, unsigned);
+#endif // ENABLE(STREAM)
+
 private:
     void terminate();
     void cleanup();
@@ -98,16 +109,23 @@ private:
     KURL m_urlForReading;
     RefPtr<ThreadableLoader> m_loader;
 
-    RefPtr<ArrayBuffer> m_rawData;
+    RefPtr<JSC::ArrayBuffer> m_rawData;
     bool m_isRawDataConverted;
 
     String m_stringResult;
+    RefPtr<Blob> m_blobResult;
 
     // The decoder used to decode the text data.
     RefPtr<TextResourceDecoder> m_decoder;
 
+    bool m_variableLength;
     unsigned m_bytesLoaded;
     unsigned m_totalBytes;
+
+    bool m_hasRange;
+    unsigned m_rangeStart;
+    unsigned m_rangeEnd;
+
     int m_errorCode;
 };
 

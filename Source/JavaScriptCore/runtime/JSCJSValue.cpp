@@ -80,9 +80,12 @@ JSObject* JSValue::toObjectSlowCase(ExecState* exec, JSGlobalObject* globalObjec
     return JSNotAnObject::create(exec);
 }
 
-JSObject* JSValue::toThisObjectSlowCase(ExecState* exec) const
+JSValue JSValue::toThisSlowCase(ExecState* exec, ECMAMode ecmaMode) const
 {
     ASSERT(!isCell());
+
+    if (ecmaMode == StrictMode)
+        return *this;
 
     if (isInt32() || isDouble())
         return constructNumber(exec, exec->lexicalGlobalObject(), asValue());
@@ -112,7 +115,7 @@ JSObject* JSValue::synthesizePrototype(ExecState* exec) const
 // ECMA 8.7.2
 void JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
 {
-    JSGlobalData& globalData = exec->globalData();
+    VM& vm = exec->vm();
 
     unsigned index = propertyName.asIndex();
     if (index != PropertyName::NotAnIndex) {
@@ -137,7 +140,7 @@ void JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
     for (; ; obj = asObject(prototype)) {
         unsigned attributes;
         JSCell* specificValue;
-        PropertyOffset offset = obj->structure()->get(globalData, propertyName, attributes, specificValue);
+        PropertyOffset offset = obj->structure()->get(vm, propertyName, attributes, specificValue);
         if (offset != invalidOffset) {
             if (attributes & ReadOnly) {
                 if (slot.isStrictMode())
@@ -147,20 +150,7 @@ void JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
 
             JSValue gs = obj->getDirect(offset);
             if (gs.isGetterSetter()) {
-                JSObject* setterFunc = asGetterSetter(gs)->setter();        
-                if (!setterFunc) {
-                    if (slot.isStrictMode())
-                        throwError(exec, createTypeError(exec, ASCIILiteral("setting a property that has only a getter")));
-                    return;
-                }
-                
-                CallData callData;
-                CallType callType = setterFunc->methodTable()->getCallData(setterFunc, callData);
-                MarkedArgumentBuffer args;
-                args.append(value);
-
-                // If this is WebCore's global object then we need to substitute the shell.
-                call(exec, setterFunc, callType, callData, *this, args);
+                callSetter(exec, *this, gs, value, slot.isStrictMode() ? StrictMode : NotStrictMode);
                 return;
             }
 
@@ -196,6 +186,11 @@ void JSValue::putToPrimitiveByIndex(ExecState* exec, unsigned propertyName, JSVa
 
 void JSValue::dump(PrintStream& out) const
 {
+    dumpInContext(out, 0);
+}
+
+void JSValue::dumpInContext(PrintStream& out, DumpContext* context) const
+{
     if (!*this)
         out.print("<JSValue()>");
     else if (isInt32())
@@ -214,22 +209,23 @@ void JSValue::dump(PrintStream& out) const
     } else if (isCell()) {
         if (asCell()->inherits(&JSString::s_info)) {
             JSString* string = jsCast<JSString*>(asCell());
-            out.print("String: ");
+            out.print("String");
             if (string->isRope())
-                out.print("(rope) ");
-            out.print(string->tryGetValue());
-        } else if (asCell()->inherits(&Structure::s_info)) {
-            Structure* structure = jsCast<Structure*>(asCell());
-            out.print(
-                "Structure: ", RawPointer(structure), ": ", structure->classInfo()->className,
-                ", ", IndexingTypeDump(structure->indexingTypeIncludingHistory()));
-        } else {
+                out.print(" (rope)");
+            const StringImpl* impl = string->tryGetValueImpl();
+            if (impl) {
+                if (impl->isAtomic())
+                    out.print(" (atomic)");
+                if (impl->isIdentifier())
+                    out.print(" (identifier)");
+            } else
+                out.print(" (unresolved)");
+            out.print(": ", impl);
+        } else if (asCell()->inherits(&Structure::s_info))
+            out.print("Structure: ", inContext(*jsCast<Structure*>(asCell()), context));
+        else {
             out.print("Cell: ", RawPointer(asCell()));
-            if (isObject() && asObject(*this)->butterfly())
-                out.print("->", RawPointer(asObject(*this)->butterfly()));
-            out.print(
-                " (", RawPointer(asCell()->structure()), ": ", asCell()->structure()->classInfo()->className,
-                ", ", IndexingTypeDump(asCell()->structure()->indexingTypeIncludingHistory()), ")");
+            out.print(" (", inContext(*asCell()->structure(), context), ")");
         }
     } else if (isTrue())
         out.print("True");
@@ -295,20 +291,20 @@ bool JSValue::isValidCallee()
 
 JSString* JSValue::toStringSlowCase(ExecState* exec) const
 {
-    JSGlobalData& globalData = exec->globalData();
+    VM& vm = exec->vm();
     ASSERT(!isString());
     if (isInt32())
-        return jsString(&globalData, globalData.numericStrings.add(asInt32()));
+        return jsString(&vm, vm.numericStrings.add(asInt32()));
     if (isDouble())
-        return jsString(&globalData, globalData.numericStrings.add(asDouble()));
+        return jsString(&vm, vm.numericStrings.add(asDouble()));
     if (isTrue())
-        return globalData.smallStrings.trueString();
+        return vm.smallStrings.trueString();
     if (isFalse())
-        return globalData.smallStrings.falseString();
+        return vm.smallStrings.falseString();
     if (isNull())
-        return globalData.smallStrings.nullString();
+        return vm.smallStrings.nullString();
     if (isUndefined())
-        return globalData.smallStrings.undefinedString();
+        return vm.smallStrings.undefinedString();
 
     ASSERT(isCell());
     JSValue value = asCell()->toPrimitive(exec, PreferString);

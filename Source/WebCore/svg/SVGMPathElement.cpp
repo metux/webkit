@@ -24,8 +24,10 @@
 
 #include "Document.h"
 #include "SVGAnimateMotionElement.h"
+#include "SVGDocumentExtensions.h"
 #include "SVGNames.h"
 #include "SVGPathElement.h"
+#include "XLinkNames.h"
 
 namespace WebCore {
 
@@ -75,7 +77,7 @@ void SVGMPathElement::buildPendingResource()
     } else if (target->isSVGElement()) {
         // Register us with the target in the dependencies map. Any change of hrefElement
         // that leads to relayout/repainting now informs us, so we can react to it.
-        document()->accessSVGExtensions()->addElementReferencingTarget(this, static_cast<SVGElement*>(target));
+        document()->accessSVGExtensions()->addElementReferencingTarget(this, toSVGElement(target));
     }
 
     targetPathChanged();
@@ -110,7 +112,7 @@ bool SVGMPathElement::isSupportedAttribute(const QualifiedName& attrName)
         SVGURIReference::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGMPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -152,7 +154,7 @@ SVGPathElement* SVGMPathElement::pathElement()
 {
     Element* target = targetElementFromIRIString(href(), document());
     if (target && target->hasTagName(SVGNames::pathTag))
-        return static_cast<SVGPathElement*>(target);
+        return toSVGPathElement(target);
     return 0;
 }
 

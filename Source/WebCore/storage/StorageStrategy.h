@@ -26,19 +26,20 @@
 #ifndef StorageStrategy_h
 #define StorageStrategy_h
 
-#if USE(PLATFORM_STRATEGIES)
-
 #include <wtf/Forward.h>
 
 namespace WebCore {
 
 class Page;
+class PageGroup;
+class SecurityOrigin;
 class StorageNamespace;
 
 class StorageStrategy {
 public:
-    virtual PassRefPtr<StorageNamespace> localStorageNamespace(const String& path, unsigned quota);
-    virtual PassRefPtr<StorageNamespace> sessionStorageNamespace(Page*, unsigned quota);
+    virtual PassRefPtr<StorageNamespace> localStorageNamespace(PageGroup*);
+    virtual PassRefPtr<StorageNamespace> transientLocalStorageNamespace(PageGroup*, SecurityOrigin*);
+    virtual PassRefPtr<StorageNamespace> sessionStorageNamespace(Page*);
 
 protected:
     virtual ~StorageStrategy()
@@ -47,7 +48,5 @@ protected:
 };
 
 } // namespace WebCore
-
-#endif // USE(PLATFORM_STRATEGIES)
 
 #endif // StorageStrategy_h

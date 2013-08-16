@@ -27,9 +27,33 @@
 // MarkedArgumentBuffer of property names, passed to a macro so we can do set them up various
 // ways without repeating the list.
 #define JSC_COMMON_IDENTIFIERS_EACH_PROPERTY_NAME(macro) \
+    macro(Array) \
+    macro(Boolean) \
+    macro(Date) \
+    macro(Error) \
+    macro(EvalError) \
+    macro(Function) \
+    macro(Infinity) \
+    macro(JSON) \
+    macro(Math) \
+    macro(NaN) \
+    macro(Number) \
+    macro(Object) \
+    macro(RangeError) \
+    macro(ReferenceError) \
+    macro(RegExp) \
+    macro(String) \
+    macro(SyntaxError) \
+    macro(TypeError) \
+    macro(URIError) \
+    macro(UTC) \
+    macro(__defineGetter__) \
+    macro(__defineSetter__) \
+    macro(__lookupGetter__) \
+    macro(__lookupSetter__) \
+    macro(anonymous) \
     macro(apply) \
     macro(arguments) \
-    macro(Array) \
     macro(bind) \
     macro(bytecode) \
     macro(bytecodeIndex) \
@@ -47,14 +71,16 @@
     macro(counters) \
     macro(description) \
     macro(descriptions) \
+    macro(displayName) \
+    macro(document) \
     macro(enumerable) \
     macro(eval) \
     macro(exec) \
     macro(executionCount) \
     macro(exitKind) \
     macro(fromCharCode) \
-    macro(global) \
     macro(get) \
+    macro(global) \
     macro(hasOwnProperty) \
     macro(hash) \
     macro(header) \
@@ -67,13 +93,16 @@
     macro(isArray) \
     macro(isPrototypeOf) \
     macro(isWatchpoint) \
+    macro(join) \
     macro(lastIndex) \
     macro(length) \
     macro(message) \
     macro(multiline) \
     macro(name) \
     macro(now) \
-    macro(Object) \
+    macro(numInlinedCalls) \
+    macro(numInlinedGetByIds) \
+    macro(numInlinedPutByIds) \
     macro(opcode) \
     macro(origin) \
     macro(osrExitSites) \
@@ -94,12 +123,10 @@
     macro(toLocaleString) \
     macro(toPrecision) \
     macro(toString) \
-    macro(UTC) \
     macro(value) \
     macro(valueOf) \
-    macro(writable) \
-    macro(displayName) \
-    macro(join)
+    macro(window) \
+    macro(writable)
 
 #define JSC_COMMON_IDENTIFIERS_EACH_KEYWORD(macro) \
     macro(null) \
@@ -154,8 +181,8 @@ namespace JSC {
     class CommonIdentifiers {
         WTF_MAKE_NONCOPYABLE(CommonIdentifiers); WTF_MAKE_FAST_ALLOCATED;
     private:
-        CommonIdentifiers(JSGlobalData*);
-        friend class JSGlobalData;
+        CommonIdentifiers(VM*);
+        friend class VM;
 
     public:
         const Identifier nullIdentifier;

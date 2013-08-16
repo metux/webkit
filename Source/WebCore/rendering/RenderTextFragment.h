@@ -31,7 +31,7 @@ namespace WebCore {
 // first letter and that must therefore have different styles (and positions in the render tree).
 // We cache offsets so that text transformations can be applied in such a way that we can recover
 // the original unaltered string from our corresponding DOM node.
-class RenderTextFragment : public RenderText {
+class RenderTextFragment FINAL : public RenderText {
 public:
     RenderTextFragment(Node*, StringImpl*, int startOffset, int length);
     RenderTextFragment(Node*, StringImpl*);
@@ -71,13 +71,13 @@ private:
 
 inline RenderTextFragment* toRenderTextFragment(RenderObject* object)
 { 
-    ASSERT(!object || toRenderText(object)->isTextFragment());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || toRenderText(object)->isTextFragment());
     return static_cast<RenderTextFragment*>(object);
 }
 
 inline const RenderTextFragment* toRenderTextFragment(const RenderObject* object)
 { 
-    ASSERT(!object || toRenderText(object)->isTextFragment());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || toRenderText(object)->isTextFragment());
     return static_cast<const RenderTextFragment*>(object);
 }
 

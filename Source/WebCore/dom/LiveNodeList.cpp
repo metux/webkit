@@ -26,9 +26,6 @@
 #include "Document.h"
 #include "Element.h"
 #include "HTMLCollection.h"
-#include "HTMLPropertiesCollection.h"
-#include "PropertyNodeList.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -36,18 +33,6 @@ Node* LiveNodeListBase::rootNode() const
 {
     if (isRootedAtDocument() && m_ownerNode->inDocument())
         return m_ownerNode->document();
-
-#if ENABLE(MICRODATA)
-    if (m_rootType == NodeListIsRootedAtDocumentIfOwnerHasItemrefAttr && toElement(ownerNode())->fastHasAttribute(HTMLNames::itemrefAttr)) {
-        if (m_ownerNode->inDocument())
-            return m_ownerNode->document();
-
-        Node* root = m_ownerNode.get();
-        while (Node* parent = root->parentNode())
-            root = parent;
-        return root;
-    }
-#endif
 
     return m_ownerNode.get();
 }
@@ -74,12 +59,6 @@ void LiveNodeListBase::invalidateCache() const
     cacheBase->m_idCache.clear();
     cacheBase->m_nameCache.clear();
     cacheBase->m_cachedElementsArrayOffset = 0;
-
-#if ENABLE(MICRODATA)
-    // FIXME: There should be more generic mechanism to clear caches in subclasses.
-    if (type() == ItemProperties)
-        static_cast<const HTMLPropertiesCollection*>(this)->invalidateCache();
-#endif
 }
 
 void LiveNodeListBase::invalidateIdNameCacheMaps() const
@@ -90,24 +69,11 @@ void LiveNodeListBase::invalidateIdNameCacheMaps() const
     cacheBase->m_nameCache.clear();
 }
 
-void LiveNodeListBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    NodeList::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_ownerNode, "ownerNode");
-    info.addWeakPointer(m_cachedItem);
-}
-
 Node* LiveNodeList::namedItem(const AtomicString& elementId) const
 {
     Node* rootNode = this->rootNode();
 
     if (rootNode->inDocument()) {
-#if ENABLE(MICRODATA)
-        if (type() == PropertyNodeListType)
-            static_cast<const PropertyNodeList*>(this)->updateRefElements();
-#endif
-
         Element* element = rootNode->treeScope()->getElementById(elementId);
         if (element && nodeMatches(element) && element->isDescendantOf(rootNode))
             return element;
@@ -119,8 +85,11 @@ Node* LiveNodeList::namedItem(const AtomicString& elementId) const
     unsigned length = this->length();
     for (unsigned i = 0; i < length; i++) {
         Node* node = item(i);
+        if (!node->isElementNode())
+            continue;
+        Element* element = toElement(node);
         // FIXME: This should probably be using getIdAttribute instead of idForStyleResolution.
-        if (node->hasID() && static_cast<Element*>(node)->idForStyleResolution() == elementId)
+        if (element->hasID() && element->idForStyleResolution() == elementId)
             return node;
     }
 

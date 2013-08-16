@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebNavigationAction</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebHistoryItem.html" title="WebKitWebHistoryItem">
@@ -109,8 +109,11 @@ clicked a link to start that navigation, and what mouse button was used.
 <p>
 Enum values used to denote the various navigation reasons.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-WEB-NAVIGATION-REASON-LINK-CLICKED:CAPS"></a><span class="term"><code class="literal">WEBKIT_WEB_NAVIGATION_REASON_LINK_CLICKED</code></span></p></td>
@@ -155,8 +158,11 @@ The GTK+ identifier for the mouse button used to click. Notice that GTK+ button 
 are 1, 2 and 3 for left, middle and right buttons, so they are DOM button values +1. If the action was not
 initiated by a mouse click the value will be -1.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>navigationAction</code></em> :</span></p></td>
@@ -179,8 +185,11 @@ initiated by a mouse click the value will be -1.
 <p>
 Returns a bitmask with the the state of the modifier keys.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>navigationAction</code></em> :</span></p></td>
@@ -204,8 +213,11 @@ Returns a bitmask with the the state of the modifier keys.
 Returns the URI that was originally requested. This may differ from the
 navigation target, for instance because of a redirect.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>navigationAction</code></em> :</span></p></td>
@@ -228,8 +240,11 @@ navigation target, for instance because of a redirect.
 <p>
 Returns the reason why WebKit is requesting a navigation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>navigationAction</code></em> :</span></p></td>
@@ -253,8 +268,11 @@ Returns the reason why WebKit is requesting a navigation.
 <p>
 Returns the target frame of the action.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>navigationAction</code></em> :</span></p></td>
@@ -280,8 +298,11 @@ if there is no target.</td>
 Sets the URI that was originally requested. This may differ from the
 navigation target, for instance because of a redirect.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>navigationAction</code></em> :</span></p></td>
@@ -305,8 +326,11 @@ navigation target, for instance because of a redirect.
 <p>
 Sets the reason why WebKit is requesting a navigation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>navigationAction</code></em> :</span></p></td>
@@ -333,7 +357,7 @@ The GTK+ identifier for the mouse button used to click. Notice that GTK+ button 
 are 1, 2 and 3 for left, middle and right buttons, so they are DOM button values +1. If the action was not
 initiated by a mouse click the value will be -1.
 </p>
-<p>Allowed values: &gt;= -1</p>
+<p>Allowed values: &gt;= G_MAXULONG</p>
 <p>Default value: -1</p>
 <p class="since">Since 1.0.3</p>
 </div>

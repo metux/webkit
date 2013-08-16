@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  *
  * This library is free software; you can redistribute it and/or
@@ -36,6 +36,7 @@
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
 #if OS(SOLARIS)
@@ -43,7 +44,7 @@
 #endif
 
 #if PLATFORM(MAC)
-#include "SchedulePair.h"
+#include <wtf/SchedulePair.h>
 #endif
 
 namespace JSC {
@@ -74,7 +75,10 @@ class InspectorClient;
 class InspectorController;
 class MediaCanStartListener;
 class Node;
+class PageActivityAssertionToken;
+class PageConsole;
 class PageGroup;
+class PageThrottler;
 class PlugInClient;
 class PluginData;
 class PluginViewBase;
@@ -109,8 +113,10 @@ struct ArenaSize {
 class Page : public Supplementable<Page> {
     WTF_MAKE_NONCOPYABLE(Page);
     friend class Settings;
+    friend class PageThrottler;
+
 public:
-    static void scheduleForcedStyleRecalcForAllPages();
+    static void updateStyleForAllPagesAfterGlobalChangeInEnvironment();
 
     // It is up to the platform to ensure that non-null clients are provided where required.
     struct PageClients {
@@ -178,7 +184,7 @@ public:
     void decrementSubframeCount() { ASSERT(m_subframeCount); --m_subframeCount; }
     int subframeCount() const { checkSubframeCountConsistency(); return m_subframeCount; }
 
-    Chrome* chrome() const { return m_chrome.get(); }
+    Chrome& chrome() const { return *m_chrome; }
     DragCaretController* dragCaretController() const { return m_dragCaretController.get(); }
 #if ENABLE(DRAG_SUPPORT)
     DragController* dragController() const { return m_dragController.get(); }
@@ -207,6 +213,7 @@ public:
 
     FeatureObserver* featureObserver() { return &m_featureObserver; }
 
+#if ENABLE(VIEW_MODE_CSS_MEDIA)
     enum ViewMode {
         ViewModeInvalid,
         ViewModeWindowed,
@@ -219,6 +226,7 @@ public:
 
     ViewMode viewMode() const { return m_viewMode; }
     void setViewMode(ViewMode);
+#endif // ENABLE(VIEW_MODE_CSS_MEDIA)
 
     void setTabKeyCyclesThroughElements(bool b) { m_tabKeyCyclesThroughElements = b; }
     bool tabKeyCyclesThroughElements() const { return m_tabKeyCyclesThroughElements; }
@@ -229,17 +237,17 @@ public:
 
     PassRefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
 
-    unsigned markAllMatchesForText(const String&, FindOptions, bool shouldHighlight, unsigned);
-    // FIXME: Switch callers over to the FindOptions version and retire this one.
-    unsigned markAllMatchesForText(const String&, TextCaseSensitivity, bool shouldHighlight, unsigned);
+    unsigned countFindMatches(const String&, FindOptions, unsigned maxMatchCount);
+    unsigned markAllMatchesForText(const String&, FindOptions, bool shouldHighlight, unsigned maxMatchCount);
+
     void unmarkAllTextMatches();
 
     // find all the Ranges for the matching text.
     // Upon return, indexForSelection will be one of the following:
     // 0 if there is no user selection
     // the index of the first range after the user selection
-    // NoMatchBeforeUserSelection if there is no matching text after the user selection.
-    enum { NoMatchBeforeUserSelection = -1 };
+    // NoMatchAfterUserSelection if there is no matching text after the user selection.
+    enum { NoMatchAfterUserSelection = -1 };
     void findStringMatchingRanges(const String&, FindOptions, int maxCount, Vector<RefPtr<Range> >*, int& indexForSelection);
 #if PLATFORM(MAC)
     void addSchedulePair(PassRefPtr<SchedulePair>);
@@ -294,11 +302,10 @@ public:
     void setIsInWindow(bool);
     bool isInWindow() const { return m_isInWindow; }
 
-    void windowScreenDidChange(PlatformDisplayID);
-
     void suspendScriptedAnimations();
     void resumeScriptedAnimations();
     bool scriptedAnimationsSuspended() const { return m_scriptedAnimationsSuspended; }
+    void setThrottled(bool);
 
     void userStyleSheetLocationChanged();
     const String& userStyleSheet() const;
@@ -346,10 +353,17 @@ public:
     void setVisibilityState(PageVisibilityState, bool);
 #endif
 
-    PlatformDisplayID displayID() const { return m_displayID; }
-
     void addLayoutMilestones(LayoutMilestones);
-    LayoutMilestones layoutMilestones() const { return m_layoutMilestones; }
+    void removeLayoutMilestones(LayoutMilestones);
+    LayoutMilestones requestedLayoutMilestones() const { return m_requestedLayoutMilestones; }
+
+#if ENABLE(RUBBER_BANDING)
+    void addHeaderWithHeight(int);
+    void addFooterWithHeight(int);
+#endif
+
+    int headerHeight() const { return m_headerHeight; }
+    int footerHeight() const { return m_footerHeight; }
 
     bool isCountingRelevantRepaintedObjects() const;
     void startCountingRelevantRepaintedObjects();
@@ -376,7 +390,27 @@ public:
     void sawMediaEngine(const String& engineName);
     void resetSeenMediaEngines();
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
+    PageThrottler* pageThrottler() { return m_pageThrottler.get(); }
+    PassOwnPtr<PageActivityAssertionToken> createActivityToken();
+
+    PageConsole* console() { return m_console.get(); }
+
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+    void hiddenPageDOMTimerThrottlingStateChanged();
+#endif
+#if ENABLE(PAGE_VISIBILITY_API)
+    void hiddenPageCSSAnimationSuspensionStateChanged();
+#endif
+
+#if ENABLE(VIDEO_TRACK)
+    void captionPreferencesChanged();
+#endif
+
+    void incrementFrameHandlingBeforeUnloadEventCount();
+    void decrementFrameHandlingBeforeUnloadEventCount();
+    bool isAnyFrameHandlingBeforeUnloadEvent();
+    void setLastSpatialNavigationCandidateCount(unsigned count) { m_lastSpatialNavigationCandidatesCount = count; }
+    unsigned lastSpatialNavigationCandidateCount() const { return m_lastSpatialNavigationCandidatesCount; }
 
 private:
     void initGroup();
@@ -386,6 +420,11 @@ private:
 #else
     void checkSubframeCountConsistency() const;
 #endif
+
+    enum ShouldHighlightMatches { DoNotHighlightMatches, HighlightMatches };
+    enum ShouldMarkMatches { DoNotMarkMatches, MarkMatches };
+
+    unsigned findMatchesForText(const String&, FindOptions, unsigned maxMatchCount, ShouldHighlightMatches, ShouldMarkMatches);
 
     MediaCanStartListener* takeAnyMediaCanStartListener();
 
@@ -397,7 +436,10 @@ private:
 
     void collectPluginViews(Vector<RefPtr<PluginViewBase>, 32>& pluginViewBases);
 
-    OwnPtr<Chrome> m_chrome;
+    void throttleTimers();
+    void unthrottleTimers();
+
+    const OwnPtr<Chrome> m_chrome;
     OwnPtr<DragCaretController> m_dragCaretController;
 
 #if ENABLE(DRAG_SUPPORT)
@@ -468,7 +510,9 @@ private:
 
     RefPtr<StorageNamespace> m_sessionStorage;
 
+#if ENABLE(VIEW_MODE_CSS_MEDIA)
     ViewMode m_viewMode;
+#endif // ENABLE(VIEW_MODE_CSS_MEDIA)
 
     double m_minimumTimerInterval;
 
@@ -481,12 +525,15 @@ private:
 #if ENABLE(PAGE_VISIBILITY_API)
     PageVisibilityState m_visibilityState;
 #endif
-    PlatformDisplayID m_displayID;
 
-    LayoutMilestones m_layoutMilestones;
+    LayoutMilestones m_requestedLayoutMilestones;
+
+    int m_headerHeight;
+    int m_footerHeight;
 
     HashSet<RenderObject*> m_relevantUnpaintedRenderObjects;
-    Region m_relevantPaintedRegion;
+    Region m_topRelevantPaintedRegion;
+    Region m_bottomRelevantPaintedRegion;
     Region m_relevantUnpaintedRegion;
     bool m_isCountingRelevantRepaintedObjects;
 #ifndef NDEBUG
@@ -495,9 +542,15 @@ private:
     AlternativeTextClient* m_alternativeTextClient;
 
     bool m_scriptedAnimationsSuspended;
+    OwnPtr<PageThrottler> m_pageThrottler;
+
+    OwnPtr<PageConsole> m_console;
 
     HashSet<String> m_seenPlugins;
     HashSet<String> m_seenMediaEngines;
+
+    unsigned m_lastSpatialNavigationCandidatesCount;
+    unsigned m_framesHandlingBeforeUnloadEvent;
 };
 
 inline PageGroup& Page::group()

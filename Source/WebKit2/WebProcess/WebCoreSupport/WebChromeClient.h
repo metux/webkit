@@ -63,7 +63,7 @@ private:
     virtual bool canTakeFocus(WebCore::FocusDirection) OVERRIDE;
     virtual void takeFocus(WebCore::FocusDirection) OVERRIDE;
 
-    virtual void focusedNodeChanged(WebCore::Node*) OVERRIDE;
+    virtual void focusedElementChanged(WebCore::Element*) OVERRIDE;
     virtual void focusedFrameChanged(WebCore::Frame*) OVERRIDE;
 
     // The Frame pointer provides the ChromeClient with context about which
@@ -90,7 +90,7 @@ private:
     
     virtual void setResizable(bool) OVERRIDE;
     
-    virtual void addMessageToConsole(WebCore::MessageSource, WebCore::MessageLevel, const String& message, unsigned lineNumber, const String& sourceID) OVERRIDE;
+    virtual void addMessageToConsole(WebCore::MessageSource, WebCore::MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID) OVERRIDE;
     
     virtual bool canRunBeforeUnloadConfirmPanel() OVERRIDE;
     virtual bool runBeforeUnloadConfirmPanel(const String& message, WebCore::Frame*) OVERRIDE;
@@ -170,6 +170,9 @@ private:
     // will be called frequently, so handling should be very fast.
     virtual void formStateDidChange(const WebCore::Node*) OVERRIDE;
 
+    virtual void didAssociateFormControls(const Vector<RefPtr<WebCore::Element>>&) OVERRIDE;
+    virtual bool shouldNotifyOnFormChanges() OVERRIDE;
+
     virtual bool selectItemWritingDirectionIsNatural() OVERRIDE;
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() OVERRIDE;
     virtual bool hasOpenedPopup() const OVERRIDE;
@@ -191,6 +194,8 @@ private:
             CanvasTrigger |
             AnimationTrigger);
     }
+
+    virtual bool layerTreeStateIsFrozen() const OVERRIDE;
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
@@ -206,20 +211,32 @@ private:
 #if PLATFORM(MAC)
     virtual void makeFirstResponder() OVERRIDE;
 #endif
+
+    virtual void enableSuddenTermination() OVERRIDE;
+    virtual void disableSuddenTermination() OVERRIDE;
     
     virtual void dispatchViewportPropertiesDidChange(const WebCore::ViewportArguments&) const OVERRIDE;
 
     virtual void notifyScrollerThumbIsVisibleInRect(const WebCore::IntRect&) OVERRIDE;
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) OVERRIDE;
     virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const OVERRIDE;
+
+    virtual WebCore::Color underlayColor() const OVERRIDE;
     
     virtual void numWheelEventHandlersChanged(unsigned) OVERRIDE;
 
     virtual void logDiagnosticMessage(const String& message, const String& description, const String& success) OVERRIDE;
 
-    virtual String plugInStartLabelTitle() const OVERRIDE;
-    virtual String plugInStartLabelSubtitle() const OVERRIDE;
+    virtual String plugInStartLabelTitle(const String& mimeType) const OVERRIDE;
+    virtual String plugInStartLabelSubtitle(const String& mimeType) const OVERRIDE;
     virtual String plugInExtraStyleSheet() const OVERRIDE;
+    virtual String plugInExtraScript() const OVERRIDE;
+
+    virtual void didAddHeaderLayer(WebCore::GraphicsLayer*) OVERRIDE;
+    virtual void didAddFooterLayer(WebCore::GraphicsLayer*) OVERRIDE;
+
+    virtual void incrementActivePageCount() OVERRIDE;
+    virtual void decrementActivePageCount() OVERRIDE;
 
     String m_cachedToolTip;
     mutable RefPtr<WebFrame> m_cachedFrameSetLargestFrame;

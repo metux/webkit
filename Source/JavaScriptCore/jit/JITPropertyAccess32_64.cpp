@@ -92,11 +92,11 @@ void JIT::emit_op_del_by_id(Instruction* currentInstruction)
     stubCall.call(dst);
 }
 
-JIT::CodeRef JIT::stringGetByValStubGenerator(JSGlobalData* globalData)
+JIT::CodeRef JIT::stringGetByValStubGenerator(VM* vm)
 {
     JSInterfaceJIT jit;
     JumpList failures;
-    failures.append(jit.branchPtr(NotEqual, Address(regT0, JSCell::structureOffset()), TrustedImmPtr(globalData->stringStructure.get())));
+    failures.append(jit.branchPtr(NotEqual, Address(regT0, JSCell::structureOffset()), TrustedImmPtr(vm->stringStructure.get())));
     
     // Load string length to regT1, and start the process of loading the data pointer into regT0
     jit.load32(Address(regT0, ThunkHelpers::jsStringLengthOffset()), regT1);
@@ -110,9 +110,9 @@ JIT::CodeRef JIT::stringGetByValStubGenerator(JSGlobalData* globalData)
     JumpList is16Bit;
     JumpList cont8Bit;
     // Load the string flags
-    jit.loadPtr(Address(regT0, ThunkHelpers::stringImplFlagsOffset()), regT1);
-    jit.loadPtr(Address(regT0, ThunkHelpers::stringImplDataOffset()), regT0);
-    is16Bit.append(jit.branchTest32(Zero, regT1, TrustedImm32(ThunkHelpers::stringImpl8BitFlag())));
+    jit.loadPtr(Address(regT0, StringImpl::flagsOffset()), regT1);
+    jit.loadPtr(Address(regT0, StringImpl::dataOffset()), regT0);
+    is16Bit.append(jit.branchTest32(Zero, regT1, TrustedImm32(StringImpl::flagIs8Bit())));
     jit.load8(BaseIndex(regT0, regT2, TimesOne, 0), regT0);
     cont8Bit.append(jit.jump());
     is16Bit.link(&jit);
@@ -121,7 +121,7 @@ JIT::CodeRef JIT::stringGetByValStubGenerator(JSGlobalData* globalData)
     cont8Bit.link(&jit);
     
     failures.append(jit.branch32(AboveOrEqual, regT0, TrustedImm32(0x100)));
-    jit.move(TrustedImmPtr(globalData->smallStrings.singleCharacterStrings()), regT1);
+    jit.move(TrustedImmPtr(vm->smallStrings.singleCharacterStrings()), regT1);
     jit.loadPtr(BaseIndex(regT1, regT0, ScalePtr, 0), regT0);
     jit.move(TrustedImm32(JSValue::CellTag), regT1); // We null check regT0 on return so this is safe
     jit.ret();
@@ -130,7 +130,7 @@ JIT::CodeRef JIT::stringGetByValStubGenerator(JSGlobalData* globalData)
     jit.move(TrustedImm32(0), regT0);
     jit.ret();
     
-    LinkBuffer patchBuffer(*globalData, &jit, GLOBAL_THUNK_ID);
+    LinkBuffer patchBuffer(*vm, &jit, GLOBAL_THUNK_ID);
     return FINALIZE_CODE(patchBuffer, ("String get_by_val stub"));
 }
 
@@ -181,7 +181,7 @@ void JIT::emit_op_get_by_val(Instruction* currentInstruction)
     resultOK.link(this);
 #endif
 
-    emitValueProfilingSite();
+    emitValueProfilingSite(regT4);
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_val), dst, regT1, regT0);
     
@@ -249,8 +249,8 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
 
     Jump nonCell = jump();
     linkSlowCase(iter); // base array check
-    Jump notString = branchPtr(NotEqual, Address(regT0, JSCell::structureOffset()), TrustedImmPtr(m_globalData->stringStructure.get()));
-    emitNakedCall(m_globalData->getCTIStub(stringGetByValStubGenerator).code());
+    Jump notString = branchPtr(NotEqual, Address(regT0, JSCell::structureOffset()), TrustedImmPtr(m_vm->stringStructure.get()));
+    emitNakedCall(m_vm->getCTIStub(stringGetByValStubGenerator).code());
     Jump failed = branchTestPtr(Zero, regT0);
     emitStore(dst, regT1, regT0);
     emitJumpSlowToHot(jump(), OPCODE_LENGTH(op_get_by_val));
@@ -278,7 +278,7 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
     m_byValCompilationInfo[m_byValInstructionIndex].returnAddress = call;
     m_byValInstructionIndex++;
 
-    emitValueProfilingSite();
+    emitValueProfilingSite(regT4);
 }
 
 void JIT::emit_op_put_by_val(Instruction* currentInstruction)
@@ -465,7 +465,7 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
     emitLoad(base, regT1, regT0);
     emitJumpSlowCaseIfNotJSCell(base, regT1);
     compileGetByIdHotPath(ident);
-    emitValueProfilingSite();
+    emitValueProfilingSite(regT4);
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
 }
@@ -477,7 +477,7 @@ void JIT::compileGetByIdHotPath(Identifier* ident)
     // to array-length / prototype access tranpolines, and finally we also the the property-map access offset as a label
     // to jump back to if one of these trampolies finds a match.
     
-    if (*ident == m_globalData->propertyNames->length && canBeOptimized()) {
+    if (*ident == m_vm->propertyNames->length && shouldEmitProfiling()) {
         loadPtr(Address(regT0, JSCell::structureOffset()), regT2);
         emitArrayProfilingSiteForBytecodeIndex(regT2, regT3, m_bytecodeOffset);
     }
@@ -508,7 +508,7 @@ void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCase
     int ident = currentInstruction[3].u.operand;
     
     compileGetByIdSlowCase(dst, base, &(m_codeBlock->identifier(ident)), iter);
-    emitValueProfilingSite();
+    emitValueProfilingSite(regT4);
 }
 
 void JIT::compileGetByIdSlowCase(int dst, int base, Identifier* ident, Vector<SlowCaseEntry>::iterator& iter)
@@ -648,10 +648,10 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
     // If we succeed in all of our checks, and the code was optimizable, then make sure we
     // decrement the rare case counter.
 #if ENABLE(VALUE_PROFILER)
-    if (m_codeBlock->canCompileWithDFG() >= DFG::ShouldProfile) {
+    if (m_codeBlock->capabilityLevelState() != DFG::CannotCompile) {
         sub32(
             TrustedImm32(1),
-            AbsoluteAddress(&m_codeBlock->rareCaseProfileForBytecodeOffset(stubInfo->bytecodeIndex)->m_counter));
+            AbsoluteAddress(&m_codeBlock->rareCaseProfileForBytecodeOffset(stubInfo->codeOrigin.bytecodeIndex)->m_counter));
     }
 #endif
     
@@ -704,7 +704,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
     restoreArgumentReferenceForTrampoline();
     Call failureCall = tailRecursiveCall();
     
-    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
+    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
     
     patchBuffer.link(failureCall, FunctionPtr(direct ? cti_op_put_by_id_direct_fail : cti_op_put_by_id_fail));
     
@@ -718,7 +718,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
             patchBuffer,
             ("Baseline put_by_id transition stub for %s, return point %p",
                 toCString(*m_codeBlock).data(), returnAddress.value())),
-        *m_globalData,
+        *m_vm,
         m_codeBlock->ownerExecutable(),
         willNeedStorageRealloc,
         newStructure);
@@ -776,7 +776,7 @@ void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
     move(TrustedImm32(JSValue::Int32Tag), regT1);
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
+    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
     
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-stubInfo->patch.baseline.u.get.coldPathBegin);
@@ -818,7 +818,7 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
 
     bool needsStubLink = false;
     // Checks out okay!
-    if (slot.cachedPropertyType() == PropertySlot::Getter) {
+    if (slot.isCacheableGetter()) {
         needsStubLink = true;
         compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
@@ -826,7 +826,7 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
         stubCall.addArgument(regT0);
         stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
-    } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
+    } else if (slot.isCacheableCustom()) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
         stubCall.addArgument(TrustedImmPtr(protoObject));
@@ -839,7 +839,7 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
     
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
+    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
     
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-stubInfo->patch.baseline.u.get.coldPathBegin);
@@ -864,7 +864,7 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
             ("Baseline get_by_id proto stub for %s, return point %p",
                 toCString(*m_codeBlock).data(), stubInfo->hotPathBegin.labelAtOffset(
                     stubInfo->patch.baseline.u.get.putResult).executableAddress())),
-        *m_globalData,
+        *m_vm,
         m_codeBlock->ownerExecutable(),
         needsStubLink);
     
@@ -884,7 +884,7 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
     Jump failureCase = checkStructure(regT0, structure);
     bool needsStubLink = false;
     bool isDirect = false;
-    if (slot.cachedPropertyType() == PropertySlot::Getter) {
+    if (slot.isCacheableGetter()) {
         needsStubLink = true;
         compileGetDirectOffset(regT0, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
@@ -892,7 +892,7 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
         stubCall.addArgument(regT0);
         stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
-    } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
+    } else if (slot.isCacheableCustom()) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
         stubCall.addArgument(regT0);
@@ -907,7 +907,7 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
 
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
+    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -930,11 +930,11 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
             ("Baseline get_by_id self list stub for %s, return point %p",
                 toCString(*m_codeBlock).data(), stubInfo->hotPathBegin.labelAtOffset(
                     stubInfo->patch.baseline.u.get.putResult).executableAddress())),
-        *m_globalData,
+        *m_vm,
         m_codeBlock->ownerExecutable(),
         needsStubLink);
 
-    polymorphicStructures->list[currentIndex].set(*m_globalData, m_codeBlock->ownerExecutable(), stubRoutine, structure, isDirect);
+    polymorphicStructures->list[currentIndex].set(*m_vm, m_codeBlock->ownerExecutable(), stubRoutine, structure, isDirect);
     
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
@@ -958,7 +958,7 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     
     bool needsStubLink = false;
     bool isDirect = false;
-    if (slot.cachedPropertyType() == PropertySlot::Getter) {
+    if (slot.isCacheableGetter()) {
         needsStubLink = true;
         compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
@@ -966,7 +966,7 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
         stubCall.addArgument(regT0);
         stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
-    } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
+    } else if (slot.isCacheableCustom()) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
         stubCall.addArgument(TrustedImmPtr(protoObject));
@@ -981,7 +981,7 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
+    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -1003,11 +1003,11 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
             ("Baseline get_by_id proto list stub for %s, return point %p",
                 toCString(*m_codeBlock).data(), stubInfo->hotPathBegin.labelAtOffset(
                     stubInfo->patch.baseline.u.get.putResult).executableAddress())),
-        *m_globalData,
+        *m_vm,
         m_codeBlock->ownerExecutable(),
         needsStubLink);
 
-    prototypeStructures->list[currentIndex].set(callFrame->globalData(), m_codeBlock->ownerExecutable(), stubRoutine, structure, prototypeStructure, isDirect);
+    prototypeStructures->list[currentIndex].set(callFrame->vm(), m_codeBlock->ownerExecutable(), stubRoutine, structure, prototypeStructure, isDirect);
     
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
@@ -1037,7 +1037,7 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
     
     bool needsStubLink = false;
     bool isDirect = false;
-    if (slot.cachedPropertyType() == PropertySlot::Getter) {
+    if (slot.isCacheableGetter()) {
         needsStubLink = true;
         compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
@@ -1045,7 +1045,7 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
         stubCall.addArgument(regT0);
         stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
-    } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
+    } else if (slot.isCacheableCustom()) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
         stubCall.addArgument(TrustedImmPtr(protoObject));
@@ -1060,7 +1060,7 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
 
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
+    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -1081,12 +1081,12 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
             ("Baseline get_by_id chain list stub for %s, return point %p",
                 toCString(*m_codeBlock).data(), stubInfo->hotPathBegin.labelAtOffset(
                     stubInfo->patch.baseline.u.get.putResult).executableAddress())),
-        *m_globalData,
+        *m_vm,
         m_codeBlock->ownerExecutable(),
         needsStubLink);
     
     // Track the stub we have created so that it will be deleted later.
-    prototypeStructures->list[currentIndex].set(callFrame->globalData(), m_codeBlock->ownerExecutable(), stubRoutine, structure, chain, isDirect);
+    prototypeStructures->list[currentIndex].set(callFrame->vm(), m_codeBlock->ownerExecutable(), stubRoutine, structure, chain, isDirect);
     
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
@@ -1115,7 +1115,7 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
     ASSERT(protoObject);
     
     bool needsStubLink = false;
-    if (slot.cachedPropertyType() == PropertySlot::Getter) {
+    if (slot.isCacheableGetter()) {
         needsStubLink = true;
         compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
@@ -1123,7 +1123,7 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
         stubCall.addArgument(regT0);
         stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
-    } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
+    } else if (slot.isCacheableCustom()) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
         stubCall.addArgument(TrustedImmPtr(protoObject));
@@ -1135,7 +1135,7 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
         compileGetDirectOffset(protoObject, regT1, regT0, cachedOffset);
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
+    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -1155,7 +1155,7 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
             ("Baseline get_by_id chain stub for %s, return point %p",
                 toCString(*m_codeBlock).data(), stubInfo->hotPathBegin.labelAtOffset(
                     stubInfo->patch.baseline.u.get.putResult).executableAddress())),
-        *m_globalData,
+        *m_vm,
         m_codeBlock->ownerExecutable(),
         needsStubLink);
     stubInfo->stubRoutine = stubRoutine;
@@ -1244,6 +1244,219 @@ void JIT::emitSlow_op_get_by_pname(Instruction* currentInstruction, Vector<SlowC
     stubCall.call(dst);
 }
 
+void JIT::emitVarInjectionCheck(bool needsVarInjectionChecks)
+{
+    if (!needsVarInjectionChecks)
+        return;
+    addSlowCase(branchTest8(NonZero, AbsoluteAddress(m_codeBlock->globalObject()->varInjectionWatchpoint()->addressOfIsInvalidated())));
+}
+
+void JIT::emitResolveClosure(unsigned dst, bool needsVarInjectionChecks, unsigned depth)
+{
+    emitVarInjectionCheck(needsVarInjectionChecks);
+    move(TrustedImm32(JSValue::CellTag), regT1);
+    emitLoadPayload(JSStack::ScopeChain, regT0);
+    if (m_codeBlock->needsActivation()) {
+        emitLoadPayload(m_codeBlock->activationRegister(), regT2);
+        Jump noActivation = branchTestPtr(Zero, regT2);
+        loadPtr(Address(regT2, JSScope::offsetOfNext()), regT0);
+        noActivation.link(this);
+    }
+    for (unsigned i = 0; i < depth; ++i)
+        loadPtr(Address(regT0, JSScope::offsetOfNext()), regT0);
+    emitStore(dst, regT1, regT0);
+    map(m_bytecodeOffset + OPCODE_LENGTH(op_resolve_scope), dst, regT1, regT0);
+}
+
+void JIT::emit_op_resolve_scope(Instruction* currentInstruction)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    ResolveType resolveType = static_cast<ResolveType>(currentInstruction[3].u.operand);
+    unsigned depth = currentInstruction[4].u.operand;
+
+    switch (resolveType) {
+    case GlobalProperty:
+    case GlobalVar:
+    case GlobalPropertyWithVarInjectionChecks:
+    case GlobalVarWithVarInjectionChecks:
+        emitVarInjectionCheck(needsVarInjectionChecks(resolveType));
+        move(TrustedImm32(JSValue::CellTag), regT1);
+        move(TrustedImmPtr(m_codeBlock->globalObject()), regT0);
+        emitStore(dst, regT1, regT0);
+        map(m_bytecodeOffset + OPCODE_LENGTH(op_resolve_scope), dst, regT1, regT0);
+        break;
+    case ClosureVar:
+    case ClosureVarWithVarInjectionChecks:
+        emitResolveClosure(dst, needsVarInjectionChecks(resolveType), depth);
+        break;
+    case Dynamic:
+        addSlowCase(jump());
+        break;
+    }
+}
+
+void JIT::emitSlow_op_resolve_scope(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    ResolveType resolveType = static_cast<ResolveType>(currentInstruction[3].u.operand);
+
+    if (resolveType == GlobalProperty || resolveType == GlobalVar || resolveType == ClosureVar)
+        return;
+
+    linkSlowCase(iter);
+
+    JITStubCall stubCall(this, cti_op_resolve_scope);
+    stubCall.addArgument(TrustedImmPtr(currentInstruction));
+    stubCall.call(dst);
+}
+
+void JIT::emitLoadWithStructureCheck(unsigned scope, Structure** structureSlot)
+{
+    emitLoad(scope, regT1, regT0);
+    loadPtr(structureSlot, regT2);
+    addSlowCase(branchPtr(NotEqual, Address(regT0, JSCell::structureOffset()), regT2));
+}
+
+void JIT::emitGetGlobalProperty(uintptr_t* operandSlot)
+{
+    move(regT0, regT2);
+    load32(operandSlot, regT3);
+    compileGetDirectOffset(regT2, regT1, regT0, regT3, KnownNotFinal);
+}
+
+void JIT::emitGetGlobalVar(uintptr_t operand)
+{
+    load32(reinterpret_cast<char*>(operand) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag), regT1);
+    load32(reinterpret_cast<char*>(operand) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload), regT0);
+}
+
+void JIT::emitGetClosureVar(unsigned scope, uintptr_t operand)
+{
+    emitLoad(scope, regT1, regT0);
+    loadPtr(Address(regT0, JSVariableObject::offsetOfRegisters()), regT0);
+    load32(Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)), regT1);
+    load32(Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload)), regT0);
+}
+
+void JIT::emit_op_get_from_scope(Instruction* currentInstruction)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    unsigned scope = currentInstruction[2].u.operand;
+    ResolveType resolveType = ResolveModeAndType(currentInstruction[4].u.operand).type();
+    Structure** structureSlot = currentInstruction[5].u.structure.slot();
+    uintptr_t* operandSlot = reinterpret_cast<uintptr_t*>(&currentInstruction[6].u.pointer);
+
+    switch (resolveType) {
+    case GlobalProperty:
+    case GlobalPropertyWithVarInjectionChecks:
+        emitLoadWithStructureCheck(scope, structureSlot); // Structure check covers var injection.
+        emitGetGlobalProperty(operandSlot);
+        break;
+    case GlobalVar:
+    case GlobalVarWithVarInjectionChecks:
+        emitVarInjectionCheck(needsVarInjectionChecks(resolveType));
+        emitGetGlobalVar(*operandSlot);
+        break;
+    case ClosureVar:
+    case ClosureVarWithVarInjectionChecks:
+        emitVarInjectionCheck(needsVarInjectionChecks(resolveType));
+        emitGetClosureVar(scope, *operandSlot);
+        break;
+    case Dynamic:
+        addSlowCase(jump());
+        break;
+    }
+    emitValueProfilingSite(regT4);
+    emitStore(dst, regT1, regT0);
+    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_from_scope), dst, regT1, regT0);
+}
+
+void JIT::emitSlow_op_get_from_scope(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    ResolveType resolveType = ResolveModeAndType(currentInstruction[4].u.operand).type();
+
+    if (resolveType == GlobalVar || resolveType == ClosureVar)
+        return;
+
+    linkSlowCase(iter);
+
+    JITStubCall stubCall(this, cti_op_get_from_scope);
+    stubCall.addArgument(TrustedImmPtr(currentInstruction));
+    stubCall.call(dst);
+    emitValueProfilingSite(regT4);
+}
+
+void JIT::emitPutGlobalProperty(uintptr_t* operandSlot, unsigned value)
+{
+    loadPtr(Address(regT0, JSObject::butterflyOffset()), regT0);
+    loadPtr(operandSlot, regT1);
+    negPtr(regT1);
+    emitLoad(value, regT3, regT2);
+    store32(regT3, BaseIndex(regT0, regT1, TimesEight, (firstOutOfLineOffset - 2) * sizeof(EncodedJSValue) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)));
+    store32(regT2, BaseIndex(regT0, regT1, TimesEight, (firstOutOfLineOffset - 2) * sizeof(EncodedJSValue) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload)));
+}
+
+void JIT::emitPutGlobalVar(uintptr_t operand, unsigned value)
+{
+    emitLoad(value, regT1, regT0);
+    store32(regT1, reinterpret_cast<char*>(operand) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag));
+    store32(regT0, reinterpret_cast<char*>(operand) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
+}
+
+void JIT::emitPutClosureVar(unsigned scope, uintptr_t operand, unsigned value)
+{
+    emitLoad(value, regT3, regT2);
+    emitLoad(scope, regT1, regT0);
+    loadPtr(Address(regT0, JSVariableObject::offsetOfRegisters()), regT0);
+    store32(regT3, Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)));
+    store32(regT2, Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload)));
+}
+
+void JIT::emit_op_put_to_scope(Instruction* currentInstruction)
+{
+    unsigned scope = currentInstruction[1].u.operand;
+    unsigned value = currentInstruction[3].u.operand;
+    ResolveType resolveType = ResolveModeAndType(currentInstruction[4].u.operand).type();
+    Structure** structureSlot = currentInstruction[5].u.structure.slot();
+    uintptr_t* operandSlot = reinterpret_cast<uintptr_t*>(&currentInstruction[6].u.pointer);
+
+    switch (resolveType) {
+    case GlobalProperty:
+    case GlobalPropertyWithVarInjectionChecks:
+        emitLoadWithStructureCheck(scope, structureSlot); // Structure check covers var injection.
+        emitPutGlobalProperty(operandSlot, value);
+        break;
+    case GlobalVar:
+    case GlobalVarWithVarInjectionChecks:
+        emitVarInjectionCheck(needsVarInjectionChecks(resolveType));
+        emitPutGlobalVar(*operandSlot, value);
+        break;
+    case ClosureVar:
+    case ClosureVarWithVarInjectionChecks:
+        emitVarInjectionCheck(needsVarInjectionChecks(resolveType));
+        emitPutClosureVar(scope, *operandSlot, value);
+        break;
+    case Dynamic:
+        addSlowCase(jump());
+        break;
+    }
+}
+
+void JIT::emitSlow_op_put_to_scope(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    ResolveType resolveType = ResolveModeAndType(currentInstruction[4].u.operand).type();
+
+    if (resolveType == GlobalVar || resolveType == ClosureVar)
+        return;
+
+    linkSlowCase(iter);
+
+    JITStubCall stubCall(this, cti_op_put_to_scope);
+    stubCall.addArgument(TrustedImmPtr(currentInstruction));
+    stubCall.call();
+}
+
 void JIT::emit_op_init_global_const(Instruction* currentInstruction)
 {
     WriteBarrier<Unknown>* registerPointer = currentInstruction[1].u.registerPointer;
@@ -1262,37 +1475,6 @@ void JIT::emit_op_init_global_const(Instruction* currentInstruction)
     store32(regT1, registerPointer->tagPointer());
     store32(regT0, registerPointer->payloadPointer());
     map(m_bytecodeOffset + OPCODE_LENGTH(op_init_global_const), value, regT1, regT0);
-}
-
-void JIT::emit_op_init_global_const_check(Instruction* currentInstruction)
-{
-    WriteBarrier<Unknown>* registerPointer = currentInstruction[1].u.registerPointer;
-    int value = currentInstruction[2].u.operand;
-    
-    JSGlobalObject* globalObject = m_codeBlock->globalObject();
-    
-    emitLoad(value, regT1, regT0);
-    
-    addSlowCase(branchTest8(NonZero, AbsoluteAddress(currentInstruction[3].u.predicatePointer)));
-    
-    if (Heap::isWriteBarrierEnabled()) {
-        move(TrustedImmPtr(globalObject), regT2);
-        emitWriteBarrier(globalObject, regT1, regT3, ShouldFilterImmediates, WriteBarrierForVariableAccess);
-    }
-    
-    store32(regT1, registerPointer->tagPointer());
-    store32(regT0, registerPointer->payloadPointer());
-    unmap();
-}
-
-void JIT::emitSlow_op_init_global_const_check(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    linkSlowCase(iter);
-    
-    JITStubCall stubCall(this, cti_op_init_global_const_check);
-    stubCall.addArgument(regT1, regT0);
-    stubCall.addArgument(TrustedImm32(currentInstruction[4].u.operand));
-    stubCall.call();
 }
 
 void JIT::resetPatchGetById(RepatchBuffer& repatchBuffer, StructureStubInfo* stubInfo)

@@ -9,12 +9,10 @@ WebKitWebView
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -27,6 +25,15 @@ WebKitWebView
 
 </para>
 
+
+<!-- ##### SIGNAL WebKitWebView::authenticate ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@Returns: 
 
 <!-- ##### SIGNAL WebKitWebView::close ##### -->
 <para>

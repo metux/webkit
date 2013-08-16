@@ -1,6 +1,6 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2006, 2007, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2006, 2007, 2012, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -28,14 +28,12 @@
 #include "Document.h"
 #include "MediaList.h"
 #include "Node.h"
+#include "RuleSet.h"
 #include "SecurityOrigin.h"
 #include "StylePropertySet.h"
 #include "StyleRule.h"
 #include "StyleRuleImport.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/Deque.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
 
@@ -142,6 +140,14 @@ void StyleSheetContents::parserAppendRule(PassRefPtr<StyleRuleBase> rule)
     if (rule->isMediaRule())
         reportMediaQueryWarningIfNeeded(singleOwnerDocument(), static_cast<StyleRuleMedia*>(rule.get())->mediaQueries());
 #endif
+
+    // NOTE: The selector list has to fit into RuleData. <http://webkit.org/b/118369>
+    // If we're adding a rule with a huge number of selectors, split it up into multiple rules
+    if (rule->isStyleRule() && toStyleRule(rule.get())->selectorList().componentCount() > RuleData::maximumSelectorComponentCount) {
+        Vector<RefPtr<StyleRule> > rules = toStyleRule(rule.get())->splitIntoMultipleRulesWithMaximumSelectorComponentCount(RuleData::maximumSelectorComponentCount);
+        m_childRules.appendVector(rules);
+        return;
+    }
 
     m_childRules.append(rule);
 }
@@ -285,7 +291,7 @@ void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cached
     String sheetText = cachedStyleSheet->sheetText(enforceMIMEType, &hasValidMIMEType);
 
     CSSParser p(parserContext());
-    p.parseSheet(this, sheetText, 0);
+    p.parseSheet(this, sheetText, 0, 0, true);
 
     // If we're loading a stylesheet cross-origin, and the MIME type is not standard, require the CSS
     // to at least start with a syntactically valid CSS rule.
@@ -310,13 +316,13 @@ void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cached
 
 bool StyleSheetContents::parseString(const String& sheetText)
 {
-    return parseStringAtLine(sheetText, 0);
+    return parseStringAtLine(sheetText, 0, false);
 }
 
-bool StyleSheetContents::parseStringAtLine(const String& sheetText, int startLineNumber)
+bool StyleSheetContents::parseStringAtLine(const String& sheetText, int startLineNumber, bool createdByParser)
 {
     CSSParser p(parserContext());
-    p.parseSheet(this, sheetText, startLineNumber);
+    p.parseSheet(this, sheetText, startLineNumber, 0, createdByParser);
 
     return true;
 }
@@ -415,9 +421,9 @@ void StyleSheetContents::addSubresourceStyleURLs(ListHashSet<KURL>& urls)
         for (unsigned i = 0; i < styleSheet->m_childRules.size(); ++i) {
             StyleRuleBase* rule = styleSheet->m_childRules[i].get();
             if (rule->isStyleRule())
-                static_cast<StyleRule*>(rule)->properties()->addSubresourceStyleURLs(urls, this);
+                static_cast<StyleRule*>(rule)->properties().addSubresourceStyleURLs(urls, this);
             else if (rule->isFontFaceRule())
-                static_cast<StyleRuleFontFace*>(rule)->properties()->addSubresourceStyleURLs(urls, this);
+                static_cast<StyleRuleFontFace*>(rule)->properties().addSubresourceStyleURLs(urls, this);
         }
     }
 }
@@ -428,11 +434,11 @@ static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<Style
         const StyleRuleBase* rule = rules[i].get();
         switch (rule->type()) {
         case StyleRuleBase::Style:
-            if (static_cast<const StyleRule*>(rule)->properties()->hasFailedOrCanceledSubresources())
+            if (static_cast<const StyleRule*>(rule)->properties().hasFailedOrCanceledSubresources())
                 return true;
             break;
         case StyleRuleBase::FontFace:
-            if (static_cast<const StyleRuleFontFace*>(rule)->properties()->hasFailedOrCanceledSubresources())
+            if (static_cast<const StyleRuleFontFace*>(rule)->properties().hasFailedOrCanceledSubresources())
                 return true;
             break;
         case StyleRuleBase::Media:
@@ -513,19 +519,6 @@ void StyleSheetContents::shrinkToFit()
 {
     m_importRules.shrinkToFit();
     m_childRules.shrinkToFit();
-}
-
-void StyleSheetContents::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_ownerRule, "ownerRule");
-    info.addMember(m_originalURL, "originalURL");
-    info.addMember(m_encodingFromCharsetRule, "encodingFromCharsetRule");
-    info.addMember(m_importRules, "importRules");
-    info.addMember(m_childRules, "childRules");
-    info.addMember(m_namespaces, "namespaces");
-    info.addMember(m_parserContext, "parserContext");
-    info.addMember(m_clients, "clients");
 }
 
 }

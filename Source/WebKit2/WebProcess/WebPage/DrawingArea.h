@@ -47,6 +47,7 @@ namespace WebKit {
 
 struct ColorSpaceData;
 class LayerTreeHost;
+class PageOverlay;
 class WebPage;
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
@@ -72,20 +73,20 @@ public:
     virtual bool layerTreeStateIsFrozen() const { return false; }
     virtual LayerTreeHost* layerTreeHost() const { return 0; }
 
-    virtual void didInstallPageOverlay() { }
-    virtual void didUninstallPageOverlay() { }
-    virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&) { }
-    virtual void setPageOverlayOpacity(float) { }
-    // If this function returns false, PageOverlay should apply opacity when painting.
-    virtual bool pageOverlayShouldApplyFadeWhenPainting() const { return true; }
-    virtual void pageCustomRepresentationChanged() { }
+    virtual void didInstallPageOverlay(PageOverlay*) { }
+    virtual void didUninstallPageOverlay(PageOverlay*) { }
+    virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&) { }
+    virtual void setPageOverlayOpacity(PageOverlay*, float) { }
 
     virtual void setPaintingEnabled(bool) { }
     virtual void updatePreferences(const WebPreferencesStore&) { }
     virtual void mainFrameContentSizeChanged(const WebCore::IntSize&) { }
 
     virtual void setExposedRect(const WebCore::FloatRect&) { }
+    virtual void setClipsToExposedRect(bool) { }
     virtual void mainFrameScrollabilityChanged(bool) { }
+
+    virtual void didChangeScrollOffsetForAnyFrame() { }
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() { return 0; }
@@ -117,7 +118,7 @@ private:
 
 #if PLATFORM(MAC)
     // Used by TiledCoreAnimationDrawingArea.
-    virtual void updateGeometry(const WebCore::IntSize& viewSize) { }
+    virtual void updateGeometry(const WebCore::IntSize& viewSize, const WebCore::IntSize& layerPosition) { }
     virtual void setDeviceScaleFactor(float) { }
     virtual void setColorSpace(const ColorSpaceData&) { }
 #endif

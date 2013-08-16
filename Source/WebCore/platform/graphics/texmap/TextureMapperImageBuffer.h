@@ -38,7 +38,7 @@ public:
     virtual void updateContents(TextureMapper*, GraphicsLayer*, const IntRect& target, const IntPoint& offset, UpdateContentsFlag);
     virtual void updateContents(const void*, const IntRect& target, const IntPoint& sourceOffset, int bytesPerLine, UpdateContentsFlag);
 #if ENABLE(CSS_FILTERS)
-    PassRefPtr<BitmapTexture> applyFilters(TextureMapper*, const BitmapTexture&, const FilterOperations&);
+    PassRefPtr<BitmapTexture> applyFilters(TextureMapper*, const FilterOperations&);
 #endif
 
 private:
@@ -55,11 +55,12 @@ public:
     // TextureMapper implementation
     virtual void drawBorder(const Color&, float borderWidth, const FloatRect&, const TransformationMatrix&) OVERRIDE;
     virtual void drawNumber(int number, const Color&, const FloatPoint&, const TransformationMatrix&) OVERRIDE;
-    virtual void drawTexture(const BitmapTexture&, const FloatRect& targetRect, const TransformationMatrix&, float opacity, const BitmapTexture* maskTexture, unsigned exposedEdges) OVERRIDE;
+    virtual void drawTexture(const BitmapTexture&, const FloatRect& targetRect, const TransformationMatrix&, float opacity, unsigned exposedEdges) OVERRIDE;
     virtual void drawSolidColor(const FloatRect&, const TransformationMatrix&, const Color&) OVERRIDE;
     virtual void beginClip(const TransformationMatrix&, const FloatRect&) OVERRIDE;
     virtual void bindSurface(BitmapTexture* surface) OVERRIDE { m_currentSurface = surface;}
     virtual void endClip() OVERRIDE { graphicsContext()->restore(); }
+    virtual IntRect clipBounds() OVERRIDE { return currentContext()->clipBounds(); }
     virtual IntSize maxTextureSize() const;
     virtual PassRefPtr<BitmapTexture> createTexture() OVERRIDE { return BitmapTextureImageBuffer::create(); }
 

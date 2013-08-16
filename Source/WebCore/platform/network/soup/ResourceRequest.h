@@ -28,7 +28,6 @@
 #define ResourceRequest_h
 
 #include "ResourceRequestBase.h"
-
 #include <libsoup/soup.h>
 
 namespace WebCore {
@@ -37,18 +36,21 @@ namespace WebCore {
     public:
         ResourceRequest(const String& url)
             : ResourceRequestBase(KURL(ParsedURLString, url), UseProtocolCachePolicy)
+            , m_acceptEncoding(true)
             , m_soupFlags(static_cast<SoupMessageFlags>(0))
         {
         }
 
         ResourceRequest(const KURL& url)
             : ResourceRequestBase(url, UseProtocolCachePolicy)
+            , m_acceptEncoding(true)
             , m_soupFlags(static_cast<SoupMessageFlags>(0))
         {
         }
 
         ResourceRequest(const KURL& url, const String& referrer, ResourceRequestCachePolicy policy = UseProtocolCachePolicy)
             : ResourceRequestBase(url, policy)
+            , m_acceptEncoding(true)
             , m_soupFlags(static_cast<SoupMessageFlags>(0))
         {
             setHTTPReferrer(referrer);
@@ -56,16 +58,23 @@ namespace WebCore {
 
         ResourceRequest()
             : ResourceRequestBase(KURL(), UseProtocolCachePolicy)
+            , m_acceptEncoding(true)
             , m_soupFlags(static_cast<SoupMessageFlags>(0))
         {
         }
 
         ResourceRequest(SoupMessage* soupMessage)
             : ResourceRequestBase(KURL(), UseProtocolCachePolicy)
+            , m_acceptEncoding(true)
             , m_soupFlags(static_cast<SoupMessageFlags>(0))
         {
             updateFromSoupMessage(soupMessage);
         }
+
+        void updateFromDelegatePreservingOldHTTPBody(const ResourceRequest& delegateProvidedRequest) { *this = delegateProvidedRequest; }
+
+        bool acceptEncoding() const { return m_acceptEncoding; }
+        void setAcceptEncoding(bool acceptEncoding) { m_acceptEncoding = acceptEncoding; }
 
         void updateSoupMessageHeaders(SoupMessageHeaders*) const;
         void updateFromSoupMessageHeaders(SoupMessageHeaders*);
@@ -81,10 +90,13 @@ namespace WebCore {
     private:
         friend class ResourceRequestBase;
 
+        bool m_acceptEncoding : 1;
         SoupMessageFlags m_soupFlags;
 
-        void doUpdatePlatformRequest() {};
-        void doUpdateResourceRequest() {};
+        void doUpdatePlatformRequest() { }
+        void doUpdateResourceRequest() { }
+        void doUpdatePlatformHTTPBody() { }
+        void doUpdateResourceHTTPBody() { }
 
         PassOwnPtr<CrossThreadResourceRequestData> doPlatformCopyData(PassOwnPtr<CrossThreadResourceRequestData> data) const { return data; }
         void doPlatformAdopt(PassOwnPtr<CrossThreadResourceRequestData>) { }
@@ -92,6 +104,29 @@ namespace WebCore {
 
     struct CrossThreadResourceRequestData : public CrossThreadResourceRequestDataBase {
     };
+
+#if SOUP_CHECK_VERSION(2, 43, 1)
+inline SoupMessagePriority toSoupMessagePriority(ResourceLoadPriority priority)
+{
+    switch (priority) {
+    case ResourceLoadPriorityUnresolved:
+        return SOUP_MESSAGE_PRIORITY_NORMAL;
+    case ResourceLoadPriorityVeryLow:
+        return SOUP_MESSAGE_PRIORITY_VERY_LOW;
+    case ResourceLoadPriorityLow:
+        return SOUP_MESSAGE_PRIORITY_LOW;
+    case ResourceLoadPriorityMedium:
+        return SOUP_MESSAGE_PRIORITY_NORMAL;
+    case ResourceLoadPriorityHigh:
+        return SOUP_MESSAGE_PRIORITY_HIGH;
+    case ResourceLoadPriorityVeryHigh:
+        return SOUP_MESSAGE_PRIORITY_VERY_HIGH;
+    }
+
+    ASSERT_NOT_REACHED();
+    return SOUP_MESSAGE_PRIORITY_VERY_LOW;
+}
+#endif
 
 } // namespace WebCore
 

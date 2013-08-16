@@ -24,6 +24,7 @@
 #define Length_h
 
 #include "AnimationUtilities.h"
+#include <string.h>
 #include <wtf/Assertions.h>
 #include <wtf/FastAllocBase.h>
 #include <wtf/Forward.h>
@@ -223,6 +224,7 @@ public:
     bool isLegacyIntrinsic() const { return type() == Intrinsic || type() == MinIntrinsic; }
     bool isIntrinsic() const { return type() == MinContent || type() == MaxContent || type() == FillAvailable || type() == FitContent; }
     bool isSpecified() const { return type() == Fixed || type() == Percent || type() == Calculated || isViewportPercentage(); }
+    bool isSpecifiedOrIntrinsic() const { return isSpecified() || isIntrinsic(); }
     bool isCalculated() const { return type() == Calculated; }
     bool isCalculatedEqual(const Length&) const;
     bool isMinContent() const { return type() == MinContent; }
@@ -278,17 +280,9 @@ private:
         ASSERT(!isUndefined());
         return m_isFloat ? static_cast<int>(m_floatValue) : m_intValue;
     }
-    void initFromLength(const Length &length) 
+    void initFromLength(const Length& length)
     {
-        m_quirk = length.m_quirk;
-        m_type = length.m_type;
-        m_isFloat = length.m_isFloat;
-        
-        if (m_isFloat)
-            m_floatValue = length.m_floatValue;
-        else
-            m_intValue = length.m_intValue;
-        
+        memcpy(this, &length, sizeof(Length));
         if (isCalculated())
             incrementCalculatedRef();
     }

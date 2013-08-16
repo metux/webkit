@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 #include "SerializedScriptValue.h"
 
 #include "Blob.h"
+#include "ExceptionCode.h"
 #include "File.h"
 #include "FileList.h"
 #include "ImageData.h"
@@ -53,9 +54,11 @@
 #include "NotImplemented.h"
 #include "ScriptValue.h"
 #include "SharedBuffer.h"
+#include "WebCoreJSClientData.h"
 #include <limits>
 #include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/APIShims.h>
+#include <runtime/ArrayBuffer.h>
 #include <runtime/BooleanObject.h>
 #include <runtime/DateInstance.h>
 #include <runtime/Error.h>
@@ -65,9 +68,8 @@
 #include <runtime/PropertyNameArray.h>
 #include <runtime/RegExp.h>
 #include <runtime/RegExpObject.h>
-#include <wtf/ArrayBuffer.h>
+#include <runtime/Uint8ClampedArray.h>
 #include <wtf/HashTraits.h>
-#include <wtf/Uint8ClampedArray.h>
 #include <wtf/Vector.h>
 
 using namespace JSC;
@@ -256,7 +258,6 @@ protected:
     CloneBase(ExecState* exec)
         : m_exec(exec)
         , m_failed(false)
-        , m_timeoutChecker(exec->globalData().timeoutChecker)
     {
     }
 
@@ -265,24 +266,9 @@ protected:
         return m_exec->hadException();
     }
 
-    unsigned ticksUntilNextCheck()
-    {
-        return m_timeoutChecker.ticksUntilNextCheck();
-    }
-
-    bool didTimeOut()
-    {
-        return m_timeoutChecker.didTimeOut(m_exec);
-    }
-
     void throwStackOverflow()
     {
         throwError(m_exec, createStackOverflowError(m_exec));
-    }
-
-    void throwInterruptedException()
-    {
-        throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
     }
 
     NO_RETURN_DUE_TO_ASSERT
@@ -294,7 +280,6 @@ protected:
 
     ExecState* m_exec;
     bool m_failed;
-    TimeoutChecker m_timeoutChecker;
     MarkedArgumentBuffer m_gcBuffer;
 };
 
@@ -846,7 +831,6 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
     Vector<WalkerState, 16> stateStack;
     WalkerState state = StateUnknown;
     JSValue inValue = in;
-    unsigned tickCount = ticksUntilNextCheck();
     while (1) {
         switch (state) {
             arrayStartState:
@@ -866,12 +850,6 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
             }
             arrayStartVisitMember:
             case ArrayStartVisitMember: {
-                if (!--tickCount) {
-                    if (didTimeOut())
-                        return InterruptedExecutionError;
-                    tickCount = ticksUntilNextCheck();
-                }
-
                 JSObject* array = inputObjectStack.last();
                 uint32_t index = indexStack.last();
                 if (index == lengthStack.last()) {
@@ -934,12 +912,6 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
             }
             objectStartVisitMember:
             case ObjectStartVisitMember: {
-                if (!--tickCount) {
-                    if (didTimeOut())
-                        return InterruptedExecutionError;
-                    tickCount = ticksUntilNextCheck();
-                }
-
                 JSObject* object = inputObjectStack.last();
                 uint32_t index = indexStack.last();
                 PropertyNameArray& properties = propertyStack.last();
@@ -999,12 +971,6 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
 
         state = stateStack.last();
         stateStack.removeLast();
-
-        if (!--tickCount) {
-            if (didTimeOut())
-                return InterruptedExecutionError;
-            tickCount = ticksUntilNextCheck();
-        }
     }
     if (m_failed)
         return UnspecifiedError;
@@ -1012,7 +978,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
     return SuccessfullyCompleted;
 }
 
-typedef Vector<WTF::ArrayBufferContents> ArrayBufferContentsArray;
+typedef Vector<JSC::ArrayBufferContents> ArrayBufferContentsArray;
 
 class CloneDeserializer : CloneBase {
 public:
@@ -1418,14 +1384,14 @@ private:
         case TrueTag:
             return jsBoolean(true);
         case FalseObjectTag: {
-            BooleanObject* obj = BooleanObject::create(m_exec->globalData(), m_globalObject->booleanObjectStructure());
-            obj->setInternalValue(m_exec->globalData(), jsBoolean(false));
+            BooleanObject* obj = BooleanObject::create(m_exec->vm(), m_globalObject->booleanObjectStructure());
+            obj->setInternalValue(m_exec->vm(), jsBoolean(false));
             m_gcBuffer.append(obj);
             return obj;
         }
         case TrueObjectTag: {
-            BooleanObject* obj = BooleanObject::create(m_exec->globalData(), m_globalObject->booleanObjectStructure());
-            obj->setInternalValue(m_exec->globalData(), jsBoolean(true));
+            BooleanObject* obj = BooleanObject::create(m_exec->vm(), m_globalObject->booleanObjectStructure());
+            obj->setInternalValue(m_exec->vm(), jsBoolean(true));
              m_gcBuffer.append(obj);
             return obj;
         }
@@ -1517,7 +1483,7 @@ private:
             return cachedString->jsString(m_exec);
         }
         case EmptyStringTag:
-            return jsEmptyString(&m_exec->globalData());
+            return jsEmptyString(&m_exec->vm());
         case StringObjectTag: {
             CachedStringRef cachedString;
             if (!readStringData(cachedString))
@@ -1527,7 +1493,7 @@ private:
             return obj;
         }
         case EmptyStringObjectTag: {
-            StringObject* obj = constructString(m_exec, m_globalObject, jsEmptyString(&m_exec->globalData()));
+            StringObject* obj = constructString(m_exec, m_globalObject, jsEmptyString(&m_exec->vm()));
             m_gcBuffer.append(obj);
             return obj;
         }
@@ -1540,7 +1506,7 @@ private:
                 return JSValue();
             RegExpFlags reFlags = regExpFlags(flags->string());
             ASSERT(reFlags != InvalidFlags);
-            RegExp* regExp = RegExp::create(m_exec->globalData(), pattern->string(), reFlags);
+            RegExp* regExp = RegExp::create(m_exec->vm(), pattern->string(), reFlags);
             return RegExpObject::create(m_exec, m_exec->lexicalGlobalObject(), m_globalObject->regExpStructure(), regExp); 
         }
         case ObjectReferenceTag: {
@@ -1618,7 +1584,6 @@ DeserializationResult CloneDeserializer::deserialize()
     WalkerState state = StateUnknown;
     JSValue outValue;
 
-    unsigned tickCount = ticksUntilNextCheck();
     while (1) {
         switch (state) {
         arrayStartState:
@@ -1635,12 +1600,6 @@ DeserializationResult CloneDeserializer::deserialize()
         }
         arrayStartVisitMember:
         case ArrayStartVisitMember: {
-            if (!--tickCount) {
-                if (didTimeOut())
-                    return make_pair(JSValue(), InterruptedExecutionError);
-                tickCount = ticksUntilNextCheck();
-            }
-
             uint32_t index;
             if (!read(index)) {
                 fail();
@@ -1682,12 +1641,6 @@ DeserializationResult CloneDeserializer::deserialize()
         }
         objectStartVisitMember:
         case ObjectStartVisitMember: {
-            if (!--tickCount) {
-                if (didTimeOut())
-                    return make_pair(JSValue(), InterruptedExecutionError);
-                tickCount = ticksUntilNextCheck();
-            }
-
             CachedStringRef cachedString;
             bool wasTerminator = false;
             if (!readStringData(cachedString, wasTerminator)) {
@@ -1731,12 +1684,6 @@ DeserializationResult CloneDeserializer::deserialize()
 
         state = stateStack.last();
         stateStack.removeLast();
-
-        if (!--tickCount) {
-            if (didTimeOut())
-                return make_pair(JSValue(), InterruptedExecutionError);
-            tickCount = ticksUntilNextCheck();
-        }
     }
     ASSERT(outValue);
     ASSERT(!m_failed);
@@ -1775,8 +1722,49 @@ SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>& buffer, Vector<Str
     m_blobURLs.swap(blobURLs);
 }
 
+static void neuterView(JSCell* jsView)
+{
+    if (!jsView)
+        return;
+    
+    switch (jsView->classInfo()->typedArrayStorageType) {
+    case TypedArrayNone:
+        // This could be a DataView, for example. Assume that there are views that the
+        // DFG doesn't care about.
+        return;
+    case TypedArrayInt8:
+        jsCast<JSInt8Array*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayInt16:
+        jsCast<JSInt16Array*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayInt32:
+        jsCast<JSInt32Array*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayUint8:
+        jsCast<JSUint8Array*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayUint8Clamped:
+        jsCast<JSUint8ClampedArray*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayUint16:
+        jsCast<JSUint16Array*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayUint32:
+        jsCast<JSUint32Array*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayFloat32:
+        jsCast<JSFloat32Array*>(jsView)->m_storageLength = 0;
+        return;
+    case TypedArrayFloat64:
+        jsCast<JSFloat64Array*>(jsView)->m_storageLength = 0;
+        return;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
 PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValue::transferArrayBuffers(
-    ArrayBufferArray& arrayBuffers, SerializationReturnCode& code)
+    ExecState* exec, ArrayBufferArray& arrayBuffers, SerializationReturnCode& code)
 {
     for (size_t i = 0; i < arrayBuffers.size(); i++) {
         if (arrayBuffers[i]->isNeutered()) {
@@ -1786,19 +1774,30 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
     }
 
     OwnPtr<ArrayBufferContentsArray> contents = adoptPtr(new ArrayBufferContentsArray(arrayBuffers.size()));
+    Vector<RefPtr<DOMWrapperWorld> > worlds;
+    static_cast<WebCoreJSClientData*>(exec->vm().clientData)->getAllWorlds(worlds);
 
-    HashSet<WTF::ArrayBuffer*> visited;
-    for (size_t i = 0; i < arrayBuffers.size(); i++) {
+    HashSet<JSC::ArrayBuffer*> visited;
+    for (size_t arrayBufferIndex = 0; arrayBufferIndex < arrayBuffers.size(); arrayBufferIndex++) {
         Vector<RefPtr<ArrayBufferView> > neuteredViews;
 
-        if (visited.contains(arrayBuffers[i].get()))
+        if (visited.contains(arrayBuffers[arrayBufferIndex].get()))
             continue;
-        visited.add(arrayBuffers[i].get());
+        visited.add(arrayBuffers[arrayBufferIndex].get());
 
-        bool result = arrayBuffers[i]->transfer(contents->at(i), neuteredViews);
+        bool result = arrayBuffers[arrayBufferIndex]->transfer(contents->at(arrayBufferIndex), neuteredViews);
         if (!result) {
             code = ValidationError;
             return nullptr;
+        }
+        
+        // The views may have been neutered, but their wrappers also need to be neutered, too.
+        for (size_t viewIndex = neuteredViews.size(); viewIndex--;) {
+            ArrayBufferView* view = neuteredViews[viewIndex].get();
+            for (size_t worldIndex = worlds.size(); worldIndex--;) {
+                DOMWrapperWorld* world = worlds[worldIndex].get();
+                neuterView(getCachedWrapper(world, view));
+            }
         }
     }
     return contents.release();
@@ -1816,7 +1815,7 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec,
     OwnPtr<ArrayBufferContentsArray> arrayBufferContentsArray;
 
     if (arrayBuffers && serializationDidCompleteSuccessfully(code))
-        arrayBufferContentsArray = transferArrayBuffers(*arrayBuffers, code);
+        arrayBufferContentsArray = transferArrayBuffers(exec, *arrayBuffers, code);
 
     if (throwExceptions == Throwing)
         maybeThrowExceptionIfSerializationFailed(exec, code);
@@ -1903,7 +1902,7 @@ JSValue SerializedScriptValue::deserialize(ExecState* exec, JSGlobalObject* glob
 ScriptValue SerializedScriptValue::deserializeForInspector(ScriptState* scriptState)
 {
     JSValue value = deserialize(scriptState, scriptState->lexicalGlobalObject(), 0);
-    return ScriptValue(scriptState->globalData(), value);
+    return ScriptValue(scriptState->vm(), value);
 }
 #endif
 
@@ -1955,9 +1954,6 @@ void SerializedScriptValue::maybeThrowExceptionIfSerializationFailed(ExecState* 
     switch (code) {
     case StackOverflowError:
         throwError(exec, createStackOverflowError(exec));
-        break;
-    case InterruptedExecutionError:
-        throwError(exec, createInterruptedExecutionException(&exec->globalData()));
         break;
     case ValidationError:
         throwError(exec, createTypeError(exec, "Unable to deserialize data."));

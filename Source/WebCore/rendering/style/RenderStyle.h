@@ -34,7 +34,6 @@
 #include "ColorSpace.h"
 #include "CounterDirectives.h"
 #include "DataRef.h"
-#include "ExclusionShapeValue.h"
 #include "FontBaseline.h"
 #include "FontDescription.h"
 #include "GraphicsTypes.h"
@@ -46,9 +45,11 @@
 #include "LineClampValue.h"
 #include "NinePieceImage.h"
 #include "OutlineValue.h"
+#include "Pagination.h"
 #include "RenderStyleConstants.h"
 #include "RoundedRect.h"
 #include "ShadowData.h"
+#include "ShapeValue.h"
 #include "StyleBackgroundData.h"
 #include "StyleBoxData.h"
 #include "StyleDeprecatedFlexibleBoxData.h"
@@ -124,12 +125,12 @@ typedef Vector<RefPtr<RenderStyle>, 4> PseudoStyleCache;
 class RenderStyle: public RefCounted<RenderStyle> {
     friend class CSSPropertyAnimation; // Used by CSS animations. We can't allow them to animate based off visited colors.
     friend class ApplyStyleCommand; // Editing has to only reveal unvisited info.
+    friend class DeprecatedStyleBuilder; // Sets members directly.
     friend class EditingStyle; // Editing has to only reveal unvisited info.
-    friend class CSSComputedStyleDeclaration; // Ignores visited styles, so needs to be able to see unvisited info.
+    friend class ComputedStyleExtractor; // Ignores visited styles, so needs to be able to see unvisited info.
     friend class PropertyWrapperMaybeInvalidColor; // Used by CSS animations. We can't allow them to animate based off visited colors.
     friend class RenderSVGResource; // FIXME: Needs to alter the visited state by hand. Should clean the SVG code up and move it into RenderStyle perhaps.
     friend class RenderTreeAsText; // FIXME: Only needed so the render tree can keep lying and dump the wrong colors.  Rebaselining would allow this to be yanked.
-    friend class StyleBuilder; // Sets members directly.
     friend class StyleResolver; // Sets members directly.
 protected:
 
@@ -166,6 +167,9 @@ protected:
                 && (_text_transform == other._text_transform)
                 && (_text_decorations == other._text_decorations)
                 && (_cursor_style == other._cursor_style)
+#if ENABLE(CURSOR_VISIBILITY)
+                && (m_cursorVisibility == other.m_cursorVisibility)
+#endif
                 && (_direction == other._direction)
                 && (_white_space == other._white_space)
                 && (_border_collapse == other._border_collapse)
@@ -186,8 +190,11 @@ protected:
         unsigned _visibility : 2; // EVisibility
         unsigned _text_align : 4; // ETextAlign
         unsigned _text_transform : 2; // ETextTransform
-        unsigned _text_decorations : ETextDecorationBits;
+        unsigned _text_decorations : TextDecorationBits;
         unsigned _cursor_style : 6; // ECursor
+#if ENABLE(CURSOR_VISIBILITY)
+        unsigned m_cursorVisibility : 1; // CursorVisibility
+#endif
         unsigned _direction : 1; // TextDirection
         unsigned _white_space : 3; // EWhiteSpace
         // 32 bits
@@ -293,6 +300,9 @@ protected:
         inherited_flags._text_transform = initialTextTransform();
         inherited_flags._text_decorations = initialTextDecoration();
         inherited_flags._cursor_style = initialCursor();
+#if ENABLE(CURSOR_VISIBILITY)
+        inherited_flags.m_cursorVisibility = initialCursorVisibility();
+#endif
         inherited_flags._direction = initialDirection();
         inherited_flags._white_space = initialWhiteSpace();
         inherited_flags._border_collapse = initialBorderCollapse();
@@ -370,6 +380,8 @@ public:
     void setAffectedByActive() { noninherited_flags.setAffectedByActive(true); }
     void setAffectedByDrag() { noninherited_flags.setAffectedByDrag(true); }
 
+    void setColumnStylesFromPaginationMode(const Pagination::Mode&);
+    
     bool operator==(const RenderStyle& other) const;
     bool operator!=(const RenderStyle& other) const { return !(*this == other); }
     bool isFloating() const { return noninherited_flags._floating != NoFloat; }
@@ -377,8 +389,8 @@ public:
     bool hasBorder() const { return surround->border.hasBorder(); }
     bool hasPadding() const { return surround->padding.nonZero(); }
     bool hasOffset() const { return surround->offset.nonZero(); }
-    bool isMarginBeforeQuirk() const { return marginBefore().quirk(); }
-    bool isMarginAfterQuirk() const { return marginAfter().quirk(); }
+    bool hasMarginBeforeQuirk() const { return marginBefore().quirk(); }
+    bool hasMarginAfterQuirk() const { return marginAfter().quirk(); }
 
     bool hasBackgroundImage() const { return m_background->background().hasImage(); }
     bool hasFixedBackgroundImage() const { return m_background->background().hasFixedImage(); }
@@ -451,14 +463,6 @@ public:
     EPosition position() const { return static_cast<EPosition>(noninherited_flags._position); }
     bool hasOutOfFlowPosition() const { return position() == AbsolutePosition || position() == FixedPosition; }
     bool hasInFlowPosition() const { return position() == RelativePosition || position() == StickyPosition; }
-    bool hasPaintOffset() const
-    {
-        bool paintOffset = hasInFlowPosition();
-#if ENABLE(CSS_EXCLUSIONS)
-        paintOffset = paintOffset || (isFloating() && shapeOutside());
-#endif
-        return paintOffset;
-    }
     bool hasViewportConstrainedPosition() const { return position() == FixedPosition || position() == StickyPosition; }
     EFloat floating() const { return static_cast<EFloat>(noninherited_flags._floating); }
 
@@ -553,19 +557,26 @@ public:
     float specifiedFontSize() const;
     float computedFontSize() const;
     int fontSize() const;
+    void getFontAndGlyphOrientation(FontOrientation&, NonCJKGlyphOrientation&);
 
 #if ENABLE(TEXT_AUTOSIZING)
     float textAutosizingMultiplier() const { return visual->m_textAutosizingMultiplier; }
 #endif
 
     Length textIndent() const { return rareInheritedData->indent; }
+#if ENABLE(CSS3_TEXT)
+    TextIndentLine textIndentLine() const { return static_cast<TextIndentLine>(rareInheritedData->m_textIndentLine); }
+    TextIndentType textIndentType() const { return static_cast<TextIndentType>(rareInheritedData->m_textIndentType); }
+#endif
     ETextAlign textAlign() const { return static_cast<ETextAlign>(inherited_flags._text_align); }
     ETextTransform textTransform() const { return static_cast<ETextTransform>(inherited_flags._text_transform); }
-    ETextDecoration textDecorationsInEffect() const { return static_cast<ETextDecoration>(inherited_flags._text_decorations); }
-    ETextDecoration textDecoration() const { return static_cast<ETextDecoration>(visual->textDecoration); }
+    TextDecoration textDecorationsInEffect() const { return static_cast<TextDecoration>(inherited_flags._text_decorations); }
+    TextDecoration textDecoration() const { return static_cast<TextDecoration>(visual->textDecoration); }
 #if ENABLE(CSS3_TEXT)
     TextDecorationStyle textDecorationStyle() const { return static_cast<TextDecorationStyle>(rareNonInheritedData->m_textDecorationStyle); }
     TextAlignLast textAlignLast() const { return static_cast<TextAlignLast>(rareInheritedData->m_textAlignLast); }
+    TextJustify textJustify() const { return static_cast<TextJustify>(rareInheritedData->m_textJustify); }
+    TextUnderlinePosition textUnderlinePosition() const { return static_cast<TextUnderlinePosition>(rareInheritedData->m_textUnderlinePosition); }
 #else
     TextDecorationStyle textDecorationStyle() const { return TextDecorationStyleSolid; }
 #endif // CSS3_TEXT
@@ -700,6 +711,9 @@ public:
     Length paddingEnd() const { return surround->padding.end(writingMode(), direction()); }
 
     ECursor cursor() const { return static_cast<ECursor>(inherited_flags._cursor_style); }
+#if ENABLE(CURSOR_VISIBILITY)
+    CursorVisibility cursorVisibility() const { return static_cast<CursorVisibility>(inherited_flags.m_cursorVisibility); }
+#endif
 
     CursorList* cursors() const { return rareInheritedData->cursorData.get(); }
 
@@ -763,10 +777,16 @@ public:
 
     const Vector<GridTrackSize>& gridColumns() const { return rareNonInheritedData->m_grid->m_gridColumns; }
     const Vector<GridTrackSize>& gridRows() const { return rareNonInheritedData->m_grid->m_gridRows; }
+    const NamedGridLinesMap& namedGridColumnLines() const { return rareNonInheritedData->m_grid->m_namedGridColumnLines; }
+    const NamedGridLinesMap& namedGridRowLines() const { return rareNonInheritedData->m_grid->m_namedGridRowLines; }
     GridAutoFlow gridAutoFlow() const { return rareNonInheritedData->m_grid->m_gridAutoFlow; }
+    const GridTrackSize& gridAutoColumns() const { return rareNonInheritedData->m_grid->m_gridAutoColumns; }
+    const GridTrackSize& gridAutoRows() const { return rareNonInheritedData->m_grid->m_gridAutoRows; }
 
-    const GridPosition& gridItemColumn() const { return rareNonInheritedData->m_gridItem->m_gridColumn; }
-    const GridPosition& gridItemRow() const { return rareNonInheritedData->m_gridItem->m_gridRow; }
+    const GridPosition& gridItemColumnStart() const { return rareNonInheritedData->m_gridItem->m_gridColumnStart; }
+    const GridPosition& gridItemColumnEnd() const { return rareNonInheritedData->m_gridItem->m_gridColumnEnd; }
+    const GridPosition& gridItemRowStart() const { return rareNonInheritedData->m_gridItem->m_gridRowStart; }
+    const GridPosition& gridItemRowEnd() const { return rareNonInheritedData->m_gridItem->m_gridRowEnd; }
 
     const ShadowData* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
     void getBoxShadowExtent(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const { getShadowExtent(boxShadow(), top, right, bottom, left); }
@@ -864,7 +884,7 @@ public:
 
     const AtomicString& flowThread() const { return rareNonInheritedData->m_flowThread; }
     const AtomicString& regionThread() const { return rareNonInheritedData->m_regionThread; }
-    RegionOverflow regionOverflow() const { return static_cast<RegionOverflow>(rareNonInheritedData->m_regionOverflow); }
+    RegionFragment regionFragment() const { return static_cast<RegionFragment>(rareNonInheritedData->m_regionFragment); }
 
     const AtomicString& lineGrid() const { return rareInheritedData->m_lineGrid; }
     LineSnap lineSnap() const { return static_cast<LineSnap>(rareInheritedData->m_lineSnap); }
@@ -911,7 +931,6 @@ public:
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
     bool useTouchOverflowScrolling() const { return rareInheritedData->useTouchOverflowScrolling; }
 #endif
-    bool textSizeAdjust() const { return rareInheritedData->textSizeAdjust; }
     ETextSecurity textSecurity() const { return static_cast<ETextSecurity>(rareInheritedData->textSecurity); }
 
     WritingMode writingMode() const { return static_cast<WritingMode>(inherited_flags.m_writingMode); }
@@ -969,6 +988,24 @@ public:
 
     void setWidth(Length v) { SET_VAR(m_box, m_width, v); }
     void setHeight(Length v) { SET_VAR(m_box, m_height, v); }
+
+    void setLogicalWidth(Length v)
+    {
+        if (isHorizontalWritingMode()) {
+            SET_VAR(m_box, m_width, v);
+        } else {
+            SET_VAR(m_box, m_height, v);
+        }
+    }
+
+    void setLogicalHeight(Length v)
+    {
+        if (isHorizontalWritingMode()) {
+            SET_VAR(m_box, m_height, v);
+        } else {
+            SET_VAR(m_box, m_width, v);
+        }
+    }
 
     void setMinWidth(Length v) { SET_VAR(m_box, m_minWidth, v); }
     void setMaxWidth(Length v) { SET_VAR(m_box, m_maxWidth, v); }
@@ -1098,14 +1135,20 @@ public:
 
     void setColor(const Color&);
     void setTextIndent(Length v) { SET_VAR(rareInheritedData, indent, v); }
+#if ENABLE(CSS3_TEXT)
+    void setTextIndentLine(TextIndentLine v) { SET_VAR(rareInheritedData, m_textIndentLine, v); }
+    void setTextIndentType(TextIndentType v) { SET_VAR(rareInheritedData, m_textIndentType, v); }
+#endif
     void setTextAlign(ETextAlign v) { inherited_flags._text_align = v; }
     void setTextTransform(ETextTransform v) { inherited_flags._text_transform = v; }
-    void addToTextDecorationsInEffect(ETextDecoration v) { inherited_flags._text_decorations |= v; }
-    void setTextDecorationsInEffect(ETextDecoration v) { inherited_flags._text_decorations = v; }
-    void setTextDecoration(ETextDecoration v) { SET_VAR(visual, textDecoration, v); }
+    void addToTextDecorationsInEffect(TextDecoration v) { inherited_flags._text_decorations |= v; }
+    void setTextDecorationsInEffect(TextDecoration v) { inherited_flags._text_decorations = v; }
+    void setTextDecoration(TextDecoration v) { SET_VAR(visual, textDecoration, v); }
 #if ENABLE(CSS3_TEXT)
     void setTextDecorationStyle(TextDecorationStyle v) { SET_VAR(rareNonInheritedData, m_textDecorationStyle, v); }
     void setTextAlignLast(TextAlignLast v) { SET_VAR(rareInheritedData, m_textAlignLast, v); }
+    void setTextJustify(TextJustify v) { SET_VAR(rareInheritedData, m_textJustify, v); }
+    void setTextUnderlinePosition(TextUnderlinePosition v) { SET_VAR(rareInheritedData, m_textUnderlinePosition, v); }
 #endif // CSS3_TEXT
     void setDirection(TextDirection v) { inherited_flags._direction = v; }
     void setLineHeight(Length specifiedLineHeight);
@@ -1194,6 +1237,10 @@ public:
     void setCursorList(PassRefPtr<CursorList>);
     void clearCursorList();
 
+#if ENABLE(CURSOR_VISIBILITY)
+    void setCursorVisibility(CursorVisibility c) { inherited_flags.m_cursorVisibility = c; }
+#endif
+
     void setInsideLink(EInsideLink insideLink) { inherited_flags._insideLink = insideLink; }
     void setIsLink(bool b) { noninherited_flags.setIsLink(b); }
 
@@ -1250,13 +1297,19 @@ public:
     void setFlexDirection(EFlexDirection direction) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexDirection, direction); }
     void setFlexWrap(EFlexWrap w) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexWrap, w); }
     void setJustifyContent(EJustifyContent p) { SET_VAR(rareNonInheritedData, m_justifyContent, p); }
+    void setGridAutoColumns(const GridTrackSize& length) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridAutoColumns, length); }
+    void setGridAutoRows(const GridTrackSize& length) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridAutoRows, length); }
     void setGridColumns(const Vector<GridTrackSize>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridColumns, lengths); }
     void setGridRows(const Vector<GridTrackSize>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridRows, lengths); }
+    void setNamedGridColumnLines(const NamedGridLinesMap& namedGridColumnLines) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridColumnLines, namedGridColumnLines); }
+    void setNamedGridRowLines(const NamedGridLinesMap& namedGridRowLines) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridRowLines, namedGridRowLines); }
     void setGridAutoFlow(GridAutoFlow flow) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridAutoFlow, flow); }
-    void setGridItemColumn(const GridPosition& columnPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumn, columnPosition); }
-    void setGridItemRow(const GridPosition& rowPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridRow, rowPosition); }
+    void setGridItemColumnStart(const GridPosition& columnStartPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumnStart, columnStartPosition); }
+    void setGridItemColumnEnd(const GridPosition& columnEndPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumnEnd, columnEndPosition); }
+    void setGridItemRowStart(const GridPosition& rowStartPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridRowStart, rowStartPosition); }
+    void setGridItemRowEnd(const GridPosition& rowEndPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridRowEnd, rowEndPosition); }
 
-    void setMarqueeIncrement(const Length& f) { SET_VAR(rareNonInheritedData.access()->m_marquee, increment, f); }
+    void setMarqueeIncrement(Length f) { SET_VAR(rareNonInheritedData.access()->m_marquee, increment, f); }
     void setMarqueeSpeed(int f) { SET_VAR(rareNonInheritedData.access()->m_marquee, speed, f); }
     void setMarqueeDirection(EMarqueeDirection d) { SET_VAR(rareNonInheritedData.access()->m_marquee, direction, d); }
     void setMarqueeBehavior(EMarqueeBehavior b) { SET_VAR(rareNonInheritedData.access()->m_marquee, behavior, b); }
@@ -1307,6 +1360,9 @@ public:
     void setTransformOriginZ(float f) { SET_VAR(rareNonInheritedData.access()->m_transform, m_z, f); }
     void setSpeak(ESpeak s) { SET_VAR(rareInheritedData, speak, s); }
     void setTextCombine(TextCombine v) { SET_VAR(rareNonInheritedData, m_textCombine, v); }
+#if ENABLE(CSS3_TEXT)
+    void setTextDecorationColor(const Color& c) { SET_VAR(rareNonInheritedData, m_textDecorationColor, c); }
+#endif // CSS3_TEXT
     void setTextEmphasisColor(const Color& c) { SET_VAR(rareInheritedData, textEmphasisColor, c); }
     void setTextEmphasisFill(TextEmphasisFill fill) { SET_VAR(rareInheritedData, textEmphasisFill, fill); }
     void setTextEmphasisMark(TextEmphasisMark mark) { SET_VAR(rareInheritedData, textEmphasisMark, mark); }
@@ -1330,7 +1386,7 @@ public:
 
     void setFlowThread(const AtomicString& flowThread) { SET_VAR(rareNonInheritedData, m_flowThread, flowThread); }
     void setRegionThread(const AtomicString& regionThread) { SET_VAR(rareNonInheritedData, m_regionThread, regionThread); }
-    void setRegionOverflow(RegionOverflow regionOverflow) { SET_VAR(rareNonInheritedData, m_regionOverflow, regionOverflow); }
+    void setRegionFragment(RegionFragment regionFragment) { SET_VAR(rareNonInheritedData, m_regionFragment, regionFragment); }
 
     void setWrapFlow(WrapFlow wrapFlow) { SET_VAR(rareNonInheritedData, m_wrapFlow, wrapFlow); }
     void setWrapThrough(WrapThrough wrapThrough) { SET_VAR(rareNonInheritedData, m_wrapThrough, wrapThrough); }
@@ -1374,7 +1430,6 @@ public:
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
     void setUseTouchOverflowScrolling(bool v) { SET_VAR(rareInheritedData, useTouchOverflowScrolling, v); }
 #endif
-    bool setTextSizeAdjust(bool);
     void setTextSecurity(ETextSecurity aTextSecurity) { SET_VAR(rareInheritedData, textSecurity, aTextSecurity); }
 
 #if ENABLE(SVG)
@@ -1394,6 +1449,8 @@ public:
     void setStrokeOpacity(float f) { accessSVGStyle()->setStrokeOpacity(f); }
     SVGLength strokeWidth() const { return svgStyle()->strokeWidth(); }
     void setStrokeWidth(SVGLength w) { accessSVGStyle()->setStrokeWidth(w); }
+    Vector<SVGLength> strokeDashArray() const { return svgStyle()->strokeDashArray(); }
+    void setStrokeDashArray(Vector<SVGLength> array) { accessSVGStyle()->setStrokeDashArray(array); }
     SVGLength strokeDashOffset() const { return svgStyle()->strokeDashOffset(); }
     void setStrokeDashOffset(SVGLength d) { accessSVGStyle()->setStrokeDashOffset(d); }
     float strokeMiterLimit() const { return svgStyle()->strokeMiterLimit(); }
@@ -1415,31 +1472,41 @@ public:
     void setKerning(SVGLength k) { accessSVGStyle()->setKerning(k); }
 #endif
 
-    void setShapeInside(PassRefPtr<ExclusionShapeValue> value)
+#if ENABLE(CSS_SHAPES)
+    void setShapeInside(PassRefPtr<ShapeValue> value)
     {
         if (rareNonInheritedData->m_shapeInside == value)
             return;
         rareNonInheritedData.access()->m_shapeInside = value;
     }
-    ExclusionShapeValue* shapeInside() const { return rareNonInheritedData->m_shapeInside.get(); }
-    ExclusionShapeValue* resolvedShapeInside() const
+    ShapeValue* shapeInside() const { return rareNonInheritedData->m_shapeInside.get(); }
+    ShapeValue* resolvedShapeInside() const
     {
-        ExclusionShapeValue* shapeInside = this->shapeInside();
-        if (shapeInside && shapeInside->type() == ExclusionShapeValue::OUTSIDE)
+        ShapeValue* shapeInside = this->shapeInside();
+        if (shapeInside && shapeInside->type() == ShapeValue::Outside)
             return shapeOutside();
         return shapeInside;
     }
 
-    void setShapeOutside(PassRefPtr<ExclusionShapeValue> value)
+    void setShapeOutside(PassRefPtr<ShapeValue> value)
     {
         if (rareNonInheritedData->m_shapeOutside == value)
             return;
         rareNonInheritedData.access()->m_shapeOutside = value;
     }
-    ExclusionShapeValue* shapeOutside() const { return rareNonInheritedData->m_shapeOutside.get(); }
+    ShapeValue* shapeOutside() const { return rareNonInheritedData->m_shapeOutside.get(); }
 
-    static ExclusionShapeValue* initialShapeInside();
-    static ExclusionShapeValue* initialShapeOutside() { return 0; }
+    static ShapeValue* initialShapeInside();
+    static ShapeValue* initialShapeOutside() { return 0; }
+
+    Length shapePadding() const { return rareNonInheritedData->m_shapePadding; }
+    void setShapePadding(Length shapePadding) { SET_VAR(rareNonInheritedData, m_shapePadding, shapePadding); }
+    static Length initialShapePadding() { return Length(0, Fixed); }
+
+    Length shapeMargin() const { return rareNonInheritedData->m_shapeMargin; }
+    void setShapeMargin(Length shapeMargin) { SET_VAR(rareNonInheritedData, m_shapeMargin, shapeMargin); }
+    static Length initialShapeMargin() { return Length(0, Fixed); }
+#endif
 
     void setClipPath(PassRefPtr<ClipPathOperation> operation)
     {
@@ -1449,14 +1516,6 @@ public:
     ClipPathOperation* clipPath() const { return rareNonInheritedData->m_clipPath.get(); }
 
     static ClipPathOperation* initialClipPath() { return 0; }
-
-    Length shapePadding() const { return rareNonInheritedData->m_shapePadding; }
-    void setShapePadding(Length shapePadding) { SET_VAR(rareNonInheritedData, m_shapePadding, shapePadding); }
-    static Length initialShapePadding() { return Length(0, Fixed); }
-
-    Length shapeMargin() const { return rareNonInheritedData->m_shapeMargin; }
-    void setShapeMargin(Length shapeMargin) { SET_VAR(rareNonInheritedData, m_shapeMargin, shapeMargin); }
-    static Length initialShapeMargin() { return Length(0, Fixed); }
 
     bool hasContent() const { return contentData(); }
     const ContentData* contentData() const { return rareNonInheritedData->m_content.get(); }
@@ -1480,6 +1539,7 @@ public:
     bool inheritedDataShared(const RenderStyle*) const;
 
     StyleDifference diff(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    bool diffRequiresRepaint(const RenderStyle*) const;
 
     bool isDisplayReplacedType() const { return isDisplayReplacedType(display()); }
     bool isDisplayInlineType() const { return isDisplayInlineType(display()); }
@@ -1515,8 +1575,6 @@ public:
 
     void setHasExplicitlyInheritedProperties() { noninherited_flags.explicitInheritance = true; }
     bool hasExplicitlyInheritedProperties() const { return noninherited_flags.explicitInheritance; }
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
     
     // Initial values for all the properties
     static EBorderCollapse initialBorderCollapse() { return BSEPARATE; }
@@ -1550,6 +1608,9 @@ public:
     static short initialHorizontalBorderSpacing() { return 0; }
     static short initialVerticalBorderSpacing() { return 0; }
     static ECursor initialCursor() { return CURSOR_AUTO; }
+#if ENABLE(CURSOR_VISIBILITY)
+    static CursorVisibility initialCursorVisibility() { return CursorVisibilityAuto; }
+#endif
     static Color initialColor() { return Color::black; }
     static StyleImage* initialListStyleImage() { return 0; }
     static unsigned initialBorderWidth() { return 3; }
@@ -1557,21 +1618,27 @@ public:
     static unsigned short initialOutlineWidth() { return 3; }
     static int initialLetterWordSpacing() { return 0; }
     static Length initialSize() { return Length(); }
-    static Length initialMinSize() { return Length(); }
+    static Length initialMinSize() { return Length(Fixed); }
     static Length initialMaxSize() { return Length(Undefined); }
     static Length initialOffset() { return Length(); }
     static Length initialMargin() { return Length(Fixed); }
     static Length initialPadding() { return Length(Fixed); }
     static Length initialTextIndent() { return Length(Fixed); }
+#if ENABLE(CSS3_TEXT)
+    static TextIndentLine initialTextIndentLine() { return TextIndentFirstLine; }
+    static TextIndentType initialTextIndentType() { return TextIndentNormal; }
+#endif
     static EVerticalAlign initialVerticalAlign() { return BASELINE; }
     static short initialWidows() { return 2; }
     static short initialOrphans() { return 2; }
     static Length initialLineHeight() { return Length(-100.0, Percent); }
     static ETextAlign initialTextAlign() { return TASTART; }
-    static ETextDecoration initialTextDecoration() { return TDNONE; }
+    static TextDecoration initialTextDecoration() { return TextDecorationNone; }
 #if ENABLE(CSS3_TEXT)
     static TextDecorationStyle initialTextDecorationStyle() { return TextDecorationStyleSolid; }
     static TextAlignLast initialTextAlignLast() { return TextAlignLastAuto; }
+    static TextJustify initialTextJustify() { return TextJustifyAuto; }
+    static TextUnderlinePosition initialTextUnderlinePosition() { return TextUnderlinePositionAuto; }
 #endif // CSS3_TEXT
     static float initialZoom() { return 1.0f; }
     static int initialOutlineOffset() { return 0; }
@@ -1663,9 +1730,11 @@ public:
 
     static GridAutoFlow initialGridAutoFlow() { return AutoFlowNone; }
 
+    static GridTrackSize initialGridAutoColumns() { return GridTrackSize(Auto); }
+    static GridTrackSize initialGridAutoRows() { return GridTrackSize(Auto); }
+
     // 'auto' is the default.
-    static GridPosition initialGridItemColumn() { return GridPosition(); }
-    static GridPosition initialGridItemRow() { return GridPosition(); }
+    static GridPosition initialGridPosition() { return GridPosition(); }
 
     static unsigned initialTabSize() { return 8; }
 
@@ -1675,14 +1744,13 @@ public:
 
     static const AtomicString& initialFlowThread() { return nullAtom; }
     static const AtomicString& initialRegionThread() { return nullAtom; }
-    static RegionOverflow initialRegionOverflow() { return AutoRegionOverflow; }
+    static RegionFragment initialRegionFragment() { return AutoRegionFragment; }
 
     static WrapFlow initialWrapFlow() { return WrapFlowAuto; }
     static WrapThrough initialWrapThrough() { return WrapThroughWrap; }
 
     // Keep these at the end.
     static LineClampValue initialLineClamp() { return LineClampValue(); }
-    static bool initialTextSizeAdjust() { return true; }
     static ETextSecurity initialTextSecurity() { return TSNONE; }
 #if ENABLE(TOUCH_EVENTS)
     static Color initialTapHighlightColor();
@@ -1700,7 +1768,15 @@ public:
 #if ENABLE(CSS_COMPOSITING)
     static BlendMode initialBlendMode() { return BlendModeNormal; }
 #endif
+
 private:
+    bool changeRequiresLayout(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresPositionedLayoutOnly(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresLayerRepaint(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresRepaint(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresRepaintIfText(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+    bool changeRequiresRecompositeLayer(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
+
     void setVisitedLinkColor(const Color&);
     void setVisitedLinkBackgroundColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBackgroundColor, v); }
     void setVisitedLinkBorderLeftColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBorderLeftColor, v); }
@@ -1709,6 +1785,9 @@ private:
     void setVisitedLinkBorderTopColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBorderTopColor, v); }
     void setVisitedLinkOutlineColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkOutlineColor, v); }
     void setVisitedLinkColumnRuleColor(const Color& v) { SET_VAR(rareNonInheritedData.access()->m_multiCol, m_visitedLinkColumnRuleColor, v); }
+#if ENABLE(CSS3_TEXT)
+    void setVisitedLinkTextDecorationColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkTextDecorationColor, v); }
+#endif // CSS3_TEXT
     void setVisitedLinkTextEmphasisColor(const Color& v) { SET_VAR(rareInheritedData, visitedLinkTextEmphasisColor, v); }
     void setVisitedLinkTextFillColor(const Color& v) { SET_VAR(rareInheritedData, visitedLinkTextFillColor, v); }
     void setVisitedLinkTextStrokeColor(const Color& v) { SET_VAR(rareInheritedData, visitedLinkTextStrokeColor, v); }
@@ -1759,6 +1838,10 @@ private:
     Color visitedLinkBorderTopColor() const { return rareNonInheritedData->m_visitedLinkBorderTopColor; }
     Color visitedLinkOutlineColor() const { return rareNonInheritedData->m_visitedLinkOutlineColor; }
     Color visitedLinkColumnRuleColor() const { return rareNonInheritedData->m_multiCol->m_visitedLinkColumnRuleColor; }
+#if ENABLE(CSS3_TEXT)
+    Color textDecorationColor() const { return rareNonInheritedData->m_textDecorationColor; }
+    Color visitedLinkTextDecorationColor() const { return rareNonInheritedData->m_visitedLinkTextDecorationColor; }
+#endif // CSS3_TEXT
     Color visitedLinkTextEmphasisColor() const { return rareInheritedData->visitedLinkTextEmphasisColor; }
     Color visitedLinkTextFillColor() const { return rareInheritedData->visitedLinkTextFillColor; }
     Color visitedLinkTextStrokeColor() const { return rareInheritedData->visitedLinkTextStrokeColor; }
@@ -1816,14 +1899,6 @@ inline bool RenderStyle::setEffectiveZoom(float f)
     if (compareEqual(rareInheritedData->m_effectiveZoom, f))
         return false;
     rareInheritedData.access()->m_effectiveZoom = f;
-    return true;
-}
-
-inline bool RenderStyle::setTextSizeAdjust(bool b)
-{
-    if (compareEqual(rareInheritedData->textSizeAdjust, b))
-        return false;
-    rareInheritedData.access()->textSizeAdjust = b;
     return true;
 }
 

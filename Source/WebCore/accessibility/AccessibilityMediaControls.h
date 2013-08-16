@@ -90,7 +90,7 @@ private:
     explicit AccessibilityMediaControlsContainer(RenderObject*);
     bool controllingVideoElement() const;
     const String elementTypeName() const;
-    virtual bool computeAccessibilityIsIgnored() const { return false; }
+    virtual bool computeAccessibilityIsIgnored() const;
 };
 
 
@@ -100,7 +100,7 @@ public:
     static PassRefPtr<AccessibilityObject> create(RenderObject*);
     virtual ~AccessibilityMediaTimeDisplay() { }
 
-    virtual AccessibilityRole roleValue() const { return StaticTextRole; }
+    virtual AccessibilityRole roleValue() const { return ApplicationTimerRole; }
 
     virtual String stringValue() const;
     virtual String accessibilityDescription() const;

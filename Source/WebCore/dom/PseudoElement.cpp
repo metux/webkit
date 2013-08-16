@@ -28,6 +28,7 @@
 #include "PseudoElement.h"
 
 #include "ContentData.h"
+#include "InspectorInstrumentation.h"
 #include "NodeRenderingContext.h"
 #include "RenderObject.h"
 #include "RenderQuote.h"
@@ -63,16 +64,23 @@ PseudoElement::PseudoElement(Element* parent, PseudoId pseudoId)
     setHasCustomStyleCallbacks();
 }
 
+PseudoElement::~PseudoElement()
+{
+#if USE(ACCELERATED_COMPOSITING)
+    InspectorInstrumentation::pseudoElementDestroyed(document()->page(), this);
+#endif
+}
+
 PassRefPtr<RenderStyle> PseudoElement::customStyleForRenderer()
 {
     return parentOrShadowHostElement()->renderer()->getCachedPseudoStyle(m_pseudoId);
 }
 
-void PseudoElement::attach()
+void PseudoElement::attach(const AttachContext& context)
 {
     ASSERT(!renderer());
 
-    Element::attach();
+    Element::attach(context);
 
     RenderObject* renderer = this->renderer();
     if (!renderer || !renderer->style()->regionThread().isEmpty())
@@ -97,7 +105,7 @@ bool PseudoElement::rendererIsNeeded(const NodeRenderingContext& context)
     return pseudoElementRendererIsNeeded(context.style());
 }
 
-void PseudoElement::didRecalcStyle(StyleChange)
+void PseudoElement::didRecalcStyle(Style::Change)
 {
     if (!renderer())
         return;

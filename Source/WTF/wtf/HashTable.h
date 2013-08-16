@@ -24,7 +24,6 @@
 
 #include <wtf/Alignment.h>
 #include <wtf/Assertions.h>
-#include <wtf/DataLog.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/HashTraits.h>
 #include <wtf/StdLibExtras.h>
@@ -37,10 +36,14 @@
 #include <wtf/PassOwnPtr.h>
 #endif
 
-namespace WTF {
-
 #define DUMP_HASHTABLE_STATS 0
 #define DUMP_HASHTABLE_STATS_PER_TABLE 0
+
+#if DUMP_HASHTABLE_STATS_PER_TABLE
+#include <wtf/DataLog.h>
+#endif
+
+namespace WTF {
 
 // Enables internal WTF consistency checks that are invoked automatically. Non-WTF callers can call checkTableConsistency() even if internal checks are disabled.
 #define CHECK_HASHTABLE_CONSISTENCY 0
@@ -297,7 +300,7 @@ namespace WTF {
     template<typename HashFunctions> class IdentityHashTranslator {
     public:
         template<typename T> static unsigned hash(const T& key) { return HashFunctions::hash(key); }
-        template<typename T> static bool equal(const T& a, const T& b) { return HashFunctions::equal(a, b); }
+        template<typename T, typename U> static bool equal(const T& a, const U& b) { return HashFunctions::equal(a, b); }
         template<typename T, typename U> static void translate(T& location, const U&, const T& value) { location = value; }
     };
 
@@ -1170,6 +1173,8 @@ namespace WTF {
     {
         // Copy the hash table the dumb way, by adding each element to the new table.
         // It might be more efficient to copy the table slots, but it's not clear that efficiency is needed.
+        // FIXME: It's likely that this can be improved, for static analyses that use
+        // HashSets. https://bugs.webkit.org/show_bug.cgi?id=118455
         const_iterator end = other.end();
         for (const_iterator it = other.begin(); it != end; ++it)
             add(*it);
@@ -1209,6 +1214,8 @@ namespace WTF {
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
     HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>& HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::operator=(const HashTable& other)
     {
+        // FIXME: It's likely that this can be improved, for static analyses that use
+        // HashSets. https://bugs.webkit.org/show_bug.cgi?id=118455
         HashTable tmp(other);
         swap(tmp);
         return *this;

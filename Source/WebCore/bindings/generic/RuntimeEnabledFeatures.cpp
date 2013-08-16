@@ -49,14 +49,15 @@ bool RuntimeEnabledFeatures::isApplicationCacheEnabled = true;
 bool RuntimeEnabledFeatures::isDataTransferItemsEnabled = true;
 bool RuntimeEnabledFeatures::isGeolocationEnabled = true;
 bool RuntimeEnabledFeatures::isIndexedDBEnabled = false;
-bool RuntimeEnabledFeatures::isWebAudioEnabled = false;
 bool RuntimeEnabledFeatures::isTouchEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceMotionEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceOrientationEnabled = true;
 bool RuntimeEnabledFeatures::isSpeechInputEnabled = true;
 bool RuntimeEnabledFeatures::isCanvasPathEnabled = false;
-bool RuntimeEnabledFeatures::isCSSExclusionsEnabled = false;
+bool RuntimeEnabledFeatures::isCSSExclusionsEnabled = true;
+bool RuntimeEnabledFeatures::isCSSShapesEnabled = true;
 bool RuntimeEnabledFeatures::isCSSRegionsEnabled = false;
+bool RuntimeEnabledFeatures::isCSSCompositingEnabled = false;
 bool RuntimeEnabledFeatures::isLangAttributeAwareFormControlUIEnabled = false;
 
 #if ENABLE(SCRIPTED_SPEECH)
@@ -66,6 +67,10 @@ bool RuntimeEnabledFeatures::isScriptedSpeechEnabled = false;
 #if ENABLE(MEDIA_STREAM)
 bool RuntimeEnabledFeatures::isMediaStreamEnabled = true;
 bool RuntimeEnabledFeatures::isPeerConnectionEnabled = true;
+#endif
+
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
+bool RuntimeEnabledFeatures::isLegacyCSSVendorPrefixesEnabled = false;
 #endif
 
 #if ENABLE(GAMEPAD)
@@ -173,7 +178,7 @@ bool RuntimeEnabledFeatures::isMediaSourceEnabled = false;
 #endif
 
 #if ENABLE(VIDEO_TRACK)
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(CHROMIUM) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN) || PLATFORM(QT)
     bool RuntimeEnabledFeatures::isVideoTrackEnabled = true;
 #else
     bool RuntimeEnabledFeatures::isVideoTrackEnabled = false;
@@ -190,6 +195,10 @@ bool RuntimeEnabledFeatures::isShadowDOMEnabled = false;
 bool RuntimeEnabledFeatures::isAuthorShadowDOMForAnyElementEnabled = false;
 #endif
 
+#if ENABLE(CUSTOM_ELEMENTS)
+bool RuntimeEnabledFeatures::isCustomDOMElementsEnabled = false;
+#endif
+
 #if ENABLE(STYLE_SCOPED)
 bool RuntimeEnabledFeatures::isStyleScopedEnabled = false;
 #endif
@@ -198,12 +207,8 @@ bool RuntimeEnabledFeatures::isStyleScopedEnabled = false;
 bool RuntimeEnabledFeatures::isInputTypeDateEnabled = true;
 #endif
 
-#if ENABLE(INPUT_TYPE_DATETIME)
-#if PLATFORM(CHROMIUM) && !OS(ANDROID)
+#if ENABLE(INPUT_TYPE_DATETIME_INCOMPLETE)
 bool RuntimeEnabledFeatures::isInputTypeDateTimeEnabled = false;
-#else
-bool RuntimeEnabledFeatures::isInputTypeDateTimeEnabled = true;
-#endif
 #endif
 
 #if ENABLE(INPUT_TYPE_DATETIMELOCAL)
@@ -226,16 +231,16 @@ bool RuntimeEnabledFeatures::isInputTypeWeekEnabled = true;
 bool RuntimeEnabledFeatures::isDialogElementEnabled = false;
 #endif
 
-#if ENABLE(REQUEST_AUTOCOMPLETE)
-bool RuntimeEnabledFeatures::isRequestAutocompleteEnabled = false;
-#endif
-
 #if ENABLE(CSP_NEXT)
 bool RuntimeEnabledFeatures::areExperimentalContentSecurityPolicyFeaturesEnabled = false;
 #endif
 
 #if ENABLE(IFRAME_SEAMLESS)
 bool RuntimeEnabledFeatures::areSeamlessIFramesEnabled = false;
+#endif
+
+#if ENABLE(FONT_LOAD_EVENTS)
+bool RuntimeEnabledFeatures::isFontLoadEventsEnabled = false;
 #endif
 
 } // namespace WebCore

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebPlugin</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitHitTestResult.html" title="WebKitHitTestResult">
@@ -98,8 +98,11 @@ plugin. A <a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="ty
 <a class="link" href="WebKitWebPlugin.html#webkit-web-plugin-get-mimetypes" title="webkit_web_plugin_get_mimetypes ()"><span class="type">webkit_web_plugin_get_mimetypes</span></a>, use
 <span class="type">webkit_web_plugin_mime_type_list_free</span> to free it.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><span class="type">char</span> *<em class="structfield"><code><a name="WebKitWebPluginMIMEType.name"></a>name</code></em>;</span></p></td>
@@ -122,8 +125,11 @@ associated with this MIME type.</td>
 <div class="refsect2">
 <a name="webkit-web-plugin-get-description"></a><h3>webkit_web_plugin_get_description ()</h3>
 <pre class="programlisting">const <span class="returnvalue">char</span> *        webkit_web_plugin_get_description   (<em class="parameter"><code><a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> *plugin</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -142,8 +148,11 @@ associated with this MIME type.</td>
 <div class="refsect2">
 <a name="webkit-web-plugin-get-enabled"></a><h3>webkit_web_plugin_get_enabled ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_web_plugin_get_enabled       (<em class="parameter"><code><a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> *plugin</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -167,8 +176,11 @@ associated with this MIME type.</td>
 Returns all the <a class="link" href="WebKitWebPlugin.html#WebKitWebPluginMIMEType" title="WebKitWebPluginMIMEType"><span class="type">WebKitWebPluginMIMEType</span></a> that <em class="parameter"><code>plugin</code></em> is handling
 at the moment.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -177,7 +189,7 @@ at the moment.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a <a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> of <a class="link" href="WebKitWebPlugin.html#WebKitWebPluginMIMEType" title="WebKitWebPluginMIMEType"><span class="type">WebKitWebPluginMIMEType</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>][<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> WebKit.WebKitWebPluginMIMEType]</span>
+<td>a <a href="../glib/glib-Singly-Linked-Lists.html#GSList"><span class="type">GSList</span></a> of <a class="link" href="WebKitWebPlugin.html#WebKitWebPluginMIMEType" title="WebKitWebPluginMIMEType"><span class="type">WebKitWebPluginMIMEType</span></a>
 </td>
 </tr>
 </tbody>
@@ -188,8 +200,11 @@ at the moment.
 <div class="refsect2">
 <a name="webkit-web-plugin-get-name"></a><h3>webkit_web_plugin_get_name ()</h3>
 <pre class="programlisting">const <span class="returnvalue">char</span> *        webkit_web_plugin_get_name          (<em class="parameter"><code><a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> *plugin</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -212,8 +227,11 @@ at the moment.
 <p>
 Sets the enabled status of the <em class="parameter"><code>plugin</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>
@@ -232,8 +250,11 @@ Sets the enabled status of the <em class="parameter"><code>plugin</code></em>.
 <div class="refsect2">
 <a name="webkit-web-plugin-get-path"></a><h3>webkit_web_plugin_get_path ()</h3>
 <pre class="programlisting">const <span class="returnvalue">char</span> *        webkit_web_plugin_get_path          (<em class="parameter"><code><a class="link" href="WebKitWebPlugin.html" title="WebKitWebPlugin"><span class="type">WebKitWebPlugin</span></a> *plugin</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>plugin</code></em> :</span></p></td>

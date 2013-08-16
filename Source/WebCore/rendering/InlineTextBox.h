@@ -57,7 +57,7 @@ public:
     {
     }
 
-    virtual void destroy(RenderArena*);
+    virtual void destroy(RenderArena*) OVERRIDE FINAL;
 
     InlineTextBox* prevTextBox() const { return m_prevTextBox; }
     InlineTextBox* nextTextBox() const { return m_nextTextBox; }
@@ -76,7 +76,7 @@ public:
 
     unsigned short truncation() { return m_truncation; }
 
-    virtual void markDirty(bool dirty = true) OVERRIDE;
+    virtual void markDirty(bool dirty = true) OVERRIDE FINAL;
 
     using InlineBox::hasHyphen;
     using InlineBox::setHasHyphen;
@@ -85,8 +85,8 @@ public:
 
     static inline bool compareByStart(const InlineTextBox* first, const InlineTextBox* second) { return first->start() < second->start(); }
 
-    virtual int baselinePosition(FontBaseline) const;
-    virtual LayoutUnit lineHeight() const;
+    virtual int baselinePosition(FontBaseline) const OVERRIDE FINAL;
+    virtual LayoutUnit lineHeight() const OVERRIDE FINAL;
 
     bool getEmphasisMarkPosition(RenderStyle*, TextEmphasisPosition&) const;
 
@@ -101,8 +101,6 @@ public:
     virtual void showBox(int = 0) const;
     virtual const char* boxName() const;
 #endif
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
     LayoutUnit selectionTop();
@@ -127,19 +125,19 @@ public:
     RenderText* textRenderer() const;
 
 private:
-    virtual void deleteLine(RenderArena*);
-    virtual void extractLine();
-    virtual void attachLine();
+    virtual void deleteLine(RenderArena*) OVERRIDE FINAL;
+    virtual void extractLine() OVERRIDE FINAL;
+    virtual void attachLine() OVERRIDE FINAL;
 
 public:
-    virtual RenderObject::SelectionState selectionState();
+    virtual RenderObject::SelectionState selectionState() OVERRIDE FINAL;
 
 private:
-    virtual void clearTruncation() { m_truncation = cNoTruncation; }
-    virtual float placeEllipsisBox(bool flowIsLTR, float visibleLeftEdge, float visibleRightEdge, float ellipsisWidth, float &truncatedWidth, bool& foundBox) OVERRIDE;
+    virtual void clearTruncation() OVERRIDE FINAL { m_truncation = cNoTruncation; }
+    virtual float placeEllipsisBox(bool flowIsLTR, float visibleLeftEdge, float visibleRightEdge, float ellipsisWidth, float &truncatedWidth, bool& foundBox) OVERRIDE FINAL;
 
 public:
-    virtual bool isLineBreak() const;
+    virtual bool isLineBreak() const OVERRIDE FINAL;
 
     void setExpansion(int newExpansion)
     {
@@ -149,11 +147,11 @@ public:
     }
 
 private:
-    virtual bool isInlineTextBox() const { return true; }    
+    virtual bool isInlineTextBox() const OVERRIDE FINAL { return true; }
 
 public:
-    virtual int caretMinOffset() const;
-    virtual int caretMaxOffset() const;
+    virtual int caretMinOffset() const OVERRIDE FINAL;
+    virtual int caretMaxOffset() const OVERRIDE FINAL;
 
 private:
     float textPos() const; // returns the x position relative to the left start of the text line.
@@ -186,7 +184,7 @@ protected:
 #endif
 
 private:
-    void paintDecoration(GraphicsContext*, const FloatPoint& boxOrigin, ETextDecoration, TextDecorationStyle, const ShadowData*);
+    void paintDecoration(GraphicsContext*, const FloatPoint& boxOrigin, TextDecoration, TextDecorationStyle, const ShadowData*);
     void paintSelection(GraphicsContext*, const FloatPoint& boxOrigin, RenderStyle*, const Font&, Color textColor);
     void paintDocumentMarker(GraphicsContext*, const FloatPoint& boxOrigin, DocumentMarker*, RenderStyle*, const Font&, bool grammar);
     void paintTextMatchMarker(GraphicsContext*, const FloatPoint& boxOrigin, DocumentMarker*, RenderStyle*, const Font&);
@@ -201,13 +199,13 @@ private:
 
 inline InlineTextBox* toInlineTextBox(InlineBox* inlineBox)
 {
-    ASSERT(!inlineBox || inlineBox->isInlineTextBox());
+    ASSERT_WITH_SECURITY_IMPLICATION(!inlineBox || inlineBox->isInlineTextBox());
     return static_cast<InlineTextBox*>(inlineBox);
 }
 
 inline const InlineTextBox* toInlineTextBox(const InlineBox* inlineBox)
 {
-    ASSERT(!inlineBox || inlineBox->isInlineTextBox());
+    ASSERT_WITH_SECURITY_IMPLICATION(!inlineBox || inlineBox->isInlineTextBox());
     return static_cast<const InlineTextBox*>(inlineBox);
 }
 

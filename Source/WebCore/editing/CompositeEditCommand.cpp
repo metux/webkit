@@ -28,14 +28,12 @@
 
 #include "AppendNodeCommand.h"
 #include "ApplyStyleCommand.h"
-#if ENABLE(DELETION_UI)
-#include "DeleteButtonController.h"
-#endif
 #include "DeleteFromTextNodeCommand.h"
 #include "DeleteSelectionCommand.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "DocumentMarkerController.h"
+#include "Editor.h"
 #include "EditorInsertAction.h"
 #include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
@@ -64,11 +62,14 @@
 #include "SplitTextNodeContainingElementCommand.h"
 #include "Text.h"
 #include "TextIterator.h"
+#include "VisibleUnits.h"
 #include "WrapContentsInDummySpanCommand.h"
 #include "htmlediting.h"
 #include "markup.h"
-#include "visible_units.h"
-#include <wtf/unicode/CharacterNames.h>
+
+#if ENABLE(DELETION_UI)
+#include "DeleteButtonController.h"
+#endif
 
 using namespace std;
 
@@ -113,7 +114,7 @@ void EditCommandComposition::unapply()
             m_commands[i - 1]->doUnapply();
     }
 
-    frame->editor()->unappliedEditing(this);
+    frame->editor().unappliedEditing(this);
 }
 
 void EditCommandComposition::reapply()
@@ -136,7 +137,7 @@ void EditCommandComposition::reapply()
             m_commands[i]->doReapply();
     }
     
-    frame->editor()->reappliedEditing(this);
+    frame->editor().reappliedEditing(this);
 }
 
 void EditCommandComposition::append(SimpleEditCommand* command)
@@ -217,7 +218,7 @@ void CompositeEditCommand::apply()
     // Only need to call appliedEditing for top-level commands,
     // and TypingCommands do it on their own (see TypingCommand::typingAddedToOpenCommand).
     if (!isTypingCommand())
-        frame->editor()->appliedEditing(this);
+        frame->editor().appliedEditing(this);
     setShouldRetainAutocorrectionIndicator(false);
 }
 
@@ -364,7 +365,7 @@ void CompositeEditCommand::insertNodeAt(PassRefPtr<Node> insertChild, const Posi
         if (child)
             insertNodeBefore(insertChild, child);
         else
-            appendNode(insertChild, static_cast<Element*>(refChild));
+            appendNode(insertChild, toContainerNode(refChild));
     } else if (caretMinOffset(refChild) >= offset)
         insertNodeBefore(insertChild, refChild);
     else if (refChild->isTextNode() && caretMaxOffset(refChild) > offset) {
@@ -500,9 +501,10 @@ void CompositeEditCommand::deleteTextFromNode(PassRefPtr<Text> node, unsigned of
     applyCommandToComposite(DeleteFromTextNodeCommand::create(node, offset, count));
 }
 
-void CompositeEditCommand::replaceTextInNode(PassRefPtr<Text> node, unsigned offset, unsigned count, const String& replacementText)
+void CompositeEditCommand::replaceTextInNode(PassRefPtr<Text> prpNode, unsigned offset, unsigned count, const String& replacementText)
 {
-    applyCommandToComposite(DeleteFromTextNodeCommand::create(node.get(), offset, count));
+    RefPtr<Text> node(prpNode);
+    applyCommandToComposite(DeleteFromTextNodeCommand::create(node, offset, count));
     if (!replacementText.isEmpty())
         applyCommandToComposite(InsertIntoTextNodeCommand::create(node, offset, replacementText));
 }
@@ -979,7 +981,7 @@ void CompositeEditCommand::pushAnchorElementDown(Node* anchorNode)
     ASSERT(anchorNode->isLink());
     
     setEndingSelection(VisibleSelection::selectionFromContentsOfNode(anchorNode));
-    applyStyledElement(static_cast<Element*>(anchorNode));
+    applyStyledElement(toElement(anchorNode));
     // Clones of anchorNode have been pushed down, now remove it.
     if (anchorNode->inDocument())
         removeNodePreservingChildren(anchorNode);
@@ -1029,8 +1031,8 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(Position& start, Positi
             outerNode = outerNode->parentNode();
         }
 
-        Node* startNode = start.deprecatedNode();
-        for (Node* node = NodeTraversal::nextSkippingChildren(startNode, outerNode.get()); node; node = NodeTraversal::nextSkippingChildren(node, outerNode.get())) {
+        RefPtr<Node> startNode = start.deprecatedNode();
+        for (RefPtr<Node> node = NodeTraversal::nextSkippingChildren(startNode.get(), outerNode.get()); node; node = NodeTraversal::nextSkippingChildren(node.get(), outerNode.get())) {
             // Move lastNode up in the tree as much as node was moved up in the
             // tree by NodeTraversal::nextSkippingChildren, so that the relative depth between
             // node and the original start node is maintained in the clone.
@@ -1042,7 +1044,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(Position& start, Positi
             RefPtr<Node> clonedNode = node->cloneNode(true);
             insertNodeAfter(clonedNode, lastNode);
             lastNode = clonedNode.release();
-            if (node == end.deprecatedNode() || end.deprecatedNode()->isDescendantOf(node))
+            if (node == end.deprecatedNode() || end.deprecatedNode()->isDescendantOf(node.get()))
                 break;
         }
     }
@@ -1214,7 +1216,7 @@ void CompositeEditCommand::moveParagraphs(const VisiblePosition& startOfParagrap
     // FIXME (5098931): We should add a new insert action "WebViewInsertActionMoved" and call shouldInsertFragment here.
     
     setEndingSelection(VisibleSelection(start, end, DOWNSTREAM));
-    document()->frame()->editor()->clearMisspellingsAndBadGrammar(endingSelection());
+    document()->frame()->editor().clearMisspellingsAndBadGrammar(endingSelection());
     deleteSelection(false, false, false, false);
 
     ASSERT(destination.deepEquivalent().anchorNode()->inDocument());
@@ -1247,7 +1249,7 @@ void CompositeEditCommand::moveParagraphs(const VisiblePosition& startOfParagrap
         options |= ReplaceSelectionCommand::MatchStyle;
     applyCommandToComposite(ReplaceSelectionCommand::create(document(), fragment, options));
 
-    document()->frame()->editor()->markMisspellingsAndBadGrammar(endingSelection());
+    document()->frame()->editor().markMisspellingsAndBadGrammar(endingSelection());
 
     // If the selection is in an empty paragraph, restore styles from the old empty paragraph to the new empty paragraph.
     bool selectionIsEmptyParagraph = endingSelection().isCaret() && isStartOfParagraph(endingSelection().visibleStart()) && isEndOfParagraph(endingSelection().visibleStart());
@@ -1293,7 +1295,7 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
                 // e.g. <ul><li>hello <ul><li><br></li></ul> </li></ul> should become <ul><li>hello</li> <ul><li><br></li></ul> </ul> after this section
                 // If listNode does NOT appear at the end, then we should consider it as a regular paragraph.
                 // e.g. <ul><li> <ul><li><br></li></ul> hello</li></ul> should become <ul><li> <div><br></div> hello</li></ul> at the end
-                splitElement(static_cast<Element*>(blockEnclosingList), listNode);
+                splitElement(toElement(blockEnclosingList), listNode);
                 removeNodePreservingChildren(listNode->parentNode());
                 newBlock = createListItemElement(document());
             }
@@ -1309,7 +1311,7 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
     if (isListItem(nextListNode.get()) || isListElement(nextListNode.get())) {
         // If emptyListItem follows another list item or nested list, split the list node.
         if (isListItem(previousListNode.get()) || isListElement(previousListNode.get()))
-            splitElement(static_cast<Element*>(listNode.get()), emptyListItem);
+            splitElement(toElement(listNode.get()), emptyListItem);
 
         // If emptyListItem is followed by other list item or nested list, then insert newBlock before the list node.
         // Because we have splitted the element, emptyListItem is the first element in the list node.
@@ -1468,7 +1470,7 @@ PassRefPtr<Node> CompositeEditCommand::splitTreeToNode(Node* start, Node* end, b
         VisiblePosition positionInParent = firstPositionInNode(node->parentNode());
         VisiblePosition positionInNode = firstPositionInOrBeforeNode(node.get());
         if (positionInParent != positionInNode)
-            splitElement(static_cast<Element*>(node->parentNode()), node);
+            splitElement(toElement(node->parentNode()), node);
     }
 
     return node.release();

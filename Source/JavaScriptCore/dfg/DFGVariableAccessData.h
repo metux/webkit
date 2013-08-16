@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 #define DFGVariableAccessData_h
 
 #include "DFGDoubleFormatState.h"
+#include "DFGFlushFormat.h"
 #include "DFGNodeFlags.h"
 #include "Operands.h"
 #include "SpeculatedType.h"
@@ -46,10 +47,14 @@ public:
         , m_prediction(SpecNone)
         , m_argumentAwarePrediction(SpecNone)
         , m_flags(0)
-        , m_doubleFormatState(EmptyDoubleFormatState)
         , m_isCaptured(false)
+        , m_shouldNeverUnbox(false)
         , m_isArgumentsAlias(false)
         , m_structureCheckHoistingFailed(false)
+        , m_checkArrayHoistingFailed(false)
+        , m_isProfitableToUnbox(false)
+        , m_isLoadedFrom(false)
+        , m_doubleFormatState(EmptyDoubleFormatState)
     {
         clearVotes();
     }
@@ -59,10 +64,13 @@ public:
         , m_prediction(SpecNone)
         , m_argumentAwarePrediction(SpecNone)
         , m_flags(0)
-        , m_doubleFormatState(EmptyDoubleFormatState)
         , m_isCaptured(isCaptured)
+        , m_shouldNeverUnbox(isCaptured)
         , m_isArgumentsAlias(false)
         , m_structureCheckHoistingFailed(false)
+        , m_checkArrayHoistingFailed(false)
+        , m_isProfitableToUnbox(false)
+        , m_doubleFormatState(EmptyDoubleFormatState)
     {
         clearVotes();
     }
@@ -80,11 +88,8 @@ public:
     
     bool mergeIsCaptured(bool isCaptured)
     {
-        bool newIsCaptured = m_isCaptured | isCaptured;
-        if (newIsCaptured == m_isCaptured)
-            return false;
-        m_isCaptured = newIsCaptured;
-        return true;
+        return checkAndSet(m_shouldNeverUnbox, m_shouldNeverUnbox | isCaptured)
+            | checkAndSet(m_isCaptured, m_isCaptured | isCaptured);
     }
     
     bool isCaptured()
@@ -92,13 +97,50 @@ public:
         return m_isCaptured;
     }
     
+    bool mergeIsProfitableToUnbox(bool isProfitableToUnbox)
+    {
+        return checkAndSet(m_isProfitableToUnbox, m_isProfitableToUnbox | isProfitableToUnbox);
+    }
+    
+    bool isProfitableToUnbox()
+    {
+        return m_isProfitableToUnbox;
+    }
+    
+    bool mergeShouldNeverUnbox(bool shouldNeverUnbox)
+    {
+        bool newShouldNeverUnbox = m_shouldNeverUnbox | shouldNeverUnbox;
+        if (newShouldNeverUnbox == m_shouldNeverUnbox)
+            return false;
+        m_shouldNeverUnbox = newShouldNeverUnbox;
+        return true;
+    }
+    
+    // Returns true if it would be unsound to store the value in an unboxed fashion.
+    // If this returns false, it simply means that it is sound to unbox; it doesn't
+    // mean that we have actually done so.
+    bool shouldNeverUnbox()
+    {
+        ASSERT(!(m_isCaptured && !m_shouldNeverUnbox));
+        return m_shouldNeverUnbox;
+    }
+    
+    // Returns true if we should be unboxing the value provided that the predictions
+    // and double format vote say so. This may return false even if shouldNeverUnbox()
+    // returns false, since this incorporates heuristics of profitability.
+    bool shouldUnboxIfPossible()
+    {
+        return !shouldNeverUnbox() && isProfitableToUnbox();
+    }
+
     bool mergeStructureCheckHoistingFailed(bool failed)
     {
-        bool newFailed = m_structureCheckHoistingFailed | failed;
-        if (newFailed == m_structureCheckHoistingFailed)
-            return false;
-        m_structureCheckHoistingFailed = newFailed;
-        return true;
+        return checkAndSet(m_structureCheckHoistingFailed, m_structureCheckHoistingFailed | failed);
+    }
+    
+    bool mergeCheckArrayHoistingFailed(bool failed)
+    {
+        return checkAndSet(m_checkArrayHoistingFailed, m_checkArrayHoistingFailed | failed);
     }
     
     bool structureCheckHoistingFailed()
@@ -106,18 +148,34 @@ public:
         return m_structureCheckHoistingFailed;
     }
     
+    bool checkArrayHoistingFailed()
+    {
+        return m_checkArrayHoistingFailed;
+    }
+    
     bool mergeIsArgumentsAlias(bool isArgumentsAlias)
     {
-        bool newIsArgumentsAlias = m_isArgumentsAlias | isArgumentsAlias;
-        if (newIsArgumentsAlias == m_isArgumentsAlias)
-            return false;
-        m_isArgumentsAlias = newIsArgumentsAlias;
-        return true;
+        return checkAndSet(m_isArgumentsAlias, m_isArgumentsAlias | isArgumentsAlias);
     }
     
     bool isArgumentsAlias()
     {
         return m_isArgumentsAlias;
+    }
+    
+    bool mergeIsLoadedFrom(bool isLoadedFrom)
+    {
+        return checkAndSet(m_isLoadedFrom, m_isLoadedFrom | isLoadedFrom);
+    }
+    
+    void setIsLoadedFrom(bool isLoadedFrom)
+    {
+        m_isLoadedFrom = isLoadedFrom;
+    }
+    
+    bool isLoadedFrom()
+    {
+        return m_isLoadedFrom;
     }
     
     bool predict(SpeculatedType prediction)
@@ -210,12 +268,18 @@ public:
     bool shouldUseDoubleFormat()
     {
         ASSERT(isRoot());
-        return m_doubleFormatState == UsingDoubleFormat;
+        bool doubleState = m_doubleFormatState == UsingDoubleFormat;
+        ASSERT(!(doubleState && shouldNeverUnbox()));
+        ASSERT(!(doubleState && isCaptured()));
+        return doubleState && isProfitableToUnbox();
     }
     
     bool tallyVotesForShouldUseDoubleFormat()
     {
         ASSERT(isRoot());
+        
+        if (operandIsArgument(local()) || shouldNeverUnbox())
+            return DFG::mergeDoubleFormatState(m_doubleFormatState, NotUsingDoubleFormat);
         
         if (m_doubleFormatState == CantUseDoubleFormat)
             return false;
@@ -252,11 +316,30 @@ public:
     
     bool mergeFlags(NodeFlags newFlags)
     {
-        newFlags |= m_flags;
-        if (newFlags == m_flags)
-            return false;
-        m_flags = newFlags;
-        return true;
+        return checkAndSet(m_flags, m_flags | newFlags);
+    }
+    
+    FlushFormat flushFormat()
+    {
+        ASSERT(find() == this);
+        
+        if (!shouldUnboxIfPossible())
+            return FlushedJSValue;
+        
+        if (shouldUseDoubleFormat())
+            return FlushedDouble;
+        
+        SpeculatedType prediction = argumentAwarePrediction();
+        if (isInt32Speculation(prediction))
+            return FlushedInt32;
+        
+        if (isCellSpeculation(prediction))
+            return FlushedCell;
+        
+        if (isBooleanSpeculation(prediction))
+            return FlushedBoolean;
+        
+        return FlushedJSValue;
     }
     
 private:
@@ -269,13 +352,17 @@ private:
     SpeculatedType m_prediction;
     SpeculatedType m_argumentAwarePrediction;
     NodeFlags m_flags;
-    
-    float m_votes[2]; // Used primarily for double voting but may be reused for other purposes.
-    DoubleFormatState m_doubleFormatState;
-    
+
     bool m_isCaptured;
+    bool m_shouldNeverUnbox;
     bool m_isArgumentsAlias;
     bool m_structureCheckHoistingFailed;
+    bool m_checkArrayHoistingFailed;
+    bool m_isProfitableToUnbox;
+    bool m_isLoadedFrom;
+
+    float m_votes[2]; // Used primarily for double voting but may be reused for other purposes.
+    DoubleFormatState m_doubleFormatState;
 };
 
 } } // namespace JSC::DFG

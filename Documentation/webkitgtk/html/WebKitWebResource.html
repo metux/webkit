@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebResource</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebDataSource.html" title="WebKitWebDataSource">
@@ -104,8 +104,11 @@ MIME type and frame name of the resource.
 <p>
 Returns the data of the <em class="parameter"><code>webResource</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -127,8 +130,11 @@ not be freed or destroyed. <span class="annotation">[<acronym title="Don't free 
 <div class="refsect2">
 <a name="webkit-web-resource-get-encoding"></a><h3>webkit_web_resource_get_encoding ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_resource_get_encoding    (<em class="parameter"><code><a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *web_resource</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -147,8 +153,11 @@ not be freed or destroyed. <span class="annotation">[<acronym title="Don't free 
 <div class="refsect2">
 <a name="webkit-web-resource-get-frame-name"></a><h3>webkit_web_resource_get_frame_name ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_resource_get_frame_name  (<em class="parameter"><code><a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *web_resource</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -167,8 +176,11 @@ not be freed or destroyed. <span class="annotation">[<acronym title="Don't free 
 <div class="refsect2">
 <a name="webkit-web-resource-get-mime-type"></a><h3>webkit_web_resource_get_mime_type ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_resource_get_mime_type   (<em class="parameter"><code><a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *web_resource</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -187,8 +199,11 @@ not be freed or destroyed. <span class="annotation">[<acronym title="Don't free 
 <div class="refsect2">
 <a name="webkit-web-resource-get-uri"></a><h3>webkit_web_resource_get_uri ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_web_resource_get_uri         (<em class="parameter"><code><a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *web_resource</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -217,8 +232,11 @@ Returns a new <a class="link" href="WebKitWebResource.html" title="WebKitWebReso
 <em class="parameter"><code>frame_name</code></em> argument can be used if the resource represents contents of an
 entire HTML frame, otherwise pass <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data</code></em> :</span></p></td>
@@ -315,8 +333,11 @@ Emitted when new resource data has been received. The
 since the last time this signal was emitted. This is useful to
 provide progress information about the resource load operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -343,8 +364,11 @@ provide progress information about the resource load operation.
 <p>
 Invoked when the <em class="parameter"><code>web_resource</code></em> failed to load
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -370,8 +394,11 @@ Invoked when the <em class="parameter"><code>web_resource</code></em> failed to 
 <p>
 Emitted when all the data for the resource was loaded
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>
@@ -394,8 +421,11 @@ Emitted when all the data for the resource was loaded
 <p>
 Emitted when the response is received from the server.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_resource</code></em> :</span></p></td>

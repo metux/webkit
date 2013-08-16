@@ -78,12 +78,11 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGSVGElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(externalResourcesRequired)
     REGISTER_LOCAL_ANIMATED_PROPERTY(viewBox)
     REGISTER_LOCAL_ANIMATED_PROPERTY(preserveAspectRatio)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGStyledTransformableElement)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTests)
+    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGraphicsElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
 inline SVGSVGElement::SVGSVGElement(const QualifiedName& tagName, Document* doc)
-    : SVGStyledTransformableElement(tagName, doc)
+    : SVGGraphicsElement(tagName, doc)
     , m_x(LengthModeWidth)
     , m_y(LengthModeHeight)
     , m_width(LengthModeWidth, "100%")
@@ -117,7 +116,7 @@ void SVGSVGElement::didMoveToNewDocument(Document* oldDocument)
     if (oldDocument)
         oldDocument->unregisterForPageCacheSuspensionCallbacks(this);
     document()->registerForPageCacheSuspensionCallbacks(this);
-    SVGStyledTransformableElement::didMoveToNewDocument(oldDocument);
+    SVGGraphicsElement::didMoveToNewDocument(oldDocument);
 }
 
 const AtomicString& SVGSVGElement::contentScriptType() const
@@ -269,19 +268,18 @@ void SVGSVGElement::parseAttribute(const QualifiedName& name, const AtomicString
         setWidthBaseValue(SVGLength::construct(LengthModeWidth, value, parseError, ForbidNegativeLengths));
     else if (name == SVGNames::heightAttr)
         setHeightBaseValue(SVGLength::construct(LengthModeHeight, value, parseError, ForbidNegativeLengths));
-    else if (SVGTests::parseAttribute(name, value)
-               || SVGLangSpace::parseAttribute(name, value)
+    else if (SVGLangSpace::parseAttribute(name, value)
                || SVGExternalResourcesRequired::parseAttribute(name, value)
                || SVGFitToViewBox::parseAttribute(this, name, value)
                || SVGZoomAndPan::parseAttribute(this, name, value)) {
     } else
-        SVGStyledTransformableElement::parseAttribute(name, value);
+        SVGGraphicsElement::parseAttribute(name, value);
 
     reportAttributeParsingError(parseError, name, value);
 }
 
 void SVGSVGElement::svgAttributeChanged(const QualifiedName& attrName)
-{ 
+{
     bool updateRelativeLengthsOrViewBox = false;
     bool widthChanged = attrName == SVGNames::widthAttr;
     if (widthChanged
@@ -307,8 +305,6 @@ void SVGSVGElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    if (SVGTests::handleAttributeChange(this, attrName))
-        return;
 
     if (updateRelativeLengthsOrViewBox
         || SVGLangSpace::isKnownAttribute(attrName)
@@ -319,7 +315,7 @@ void SVGSVGElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGStyledElement::svgAttributeChanged(attrName);
+    SVGGraphicsElement::svgAttributeChanged(attrName);
 }
 
 unsigned SVGSVGElement::suspendRedraw(unsigned /* maxWaitMilliseconds */)
@@ -349,11 +345,12 @@ PassRefPtr<NodeList> SVGSVGElement::collectIntersectionOrEnclosureList(const Flo
     Element* element = ElementTraversal::next(referenceElement ? referenceElement : this);
     while (element) {
         if (element->isSVGElement()) { 
+            SVGElement* svgElement = toSVGElement(element);
             if (collect == CollectIntersectionList) {
-                if (checkIntersection(static_cast<SVGElement*>(element), rect))
+                if (checkIntersection(svgElement, rect))
                     nodes.append(element);
             } else {
-                if (checkEnclosure(static_cast<SVGElement*>(element), rect))
+                if (checkEnclosure(svgElement, rect))
                     nodes.append(element);
             }
         }
@@ -408,9 +405,9 @@ SVGAngle SVGSVGElement::createSVGAngle()
     return SVGAngle();
 }
 
-FloatPoint SVGSVGElement::createSVGPoint()
+SVGPoint SVGSVGElement::createSVGPoint()
 {
-    return FloatPoint();
+    return SVGPoint();
 }
 
 SVGMatrix SVGSVGElement::createSVGMatrix()
@@ -436,7 +433,7 @@ SVGTransform SVGSVGElement::createSVGTransformFromMatrix(const SVGMatrix& matrix
 AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMScope mode) const
 {
     AffineTransform viewBoxTransform;
-    if (hasAttribute(SVGNames::viewBoxAttr)) {
+    if (!hasEmptyViewBox()) {
         FloatSize size = currentViewportSize();
         viewBoxTransform = viewBoxToViewTransform(size.width(), size.height());
     }
@@ -510,14 +507,14 @@ Node::InsertionNotificationRequest SVGSVGElement::insertedInto(ContainerNode* ro
         if (!document()->parsing() && !document()->processingLoadEvent() && document()->loadEventFinished() && !timeContainer()->isStarted())
             timeContainer()->begin();
     }
-    return SVGStyledTransformableElement::insertedInto(rootParent);
+    return SVGGraphicsElement::insertedInto(rootParent);
 }
 
 void SVGSVGElement::removedFrom(ContainerNode* rootParent)
 {
     if (rootParent->inDocument())
         document()->accessSVGExtensions()->removeTimeContainer(this);
-    SVGStyledTransformableElement::removedFrom(rootParent);
+    SVGGraphicsElement::removedFrom(rootParent);
 }
 
 void SVGSVGElement::pauseAnimations()
@@ -792,7 +789,7 @@ Element* SVGSVGElement::getElementById(const AtomicString& id) const
         if (!node->isElementNode())
             continue;
 
-        Element* element = static_cast<Element*>(node);
+        Element* element = toElement(node);
         if (element->getIdAttribute() == id)
             return element;
     }

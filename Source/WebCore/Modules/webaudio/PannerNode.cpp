@@ -56,14 +56,19 @@ PannerNode::PannerNode(AudioContext* context, float sampleRate)
 {
     addInput(adoptPtr(new AudioNodeInput(this)));
     addOutput(adoptPtr(new AudioNodeOutput(this, 2)));
-    
-    m_distanceGain = AudioGain::create(context, "distanceGain", 1.0, 0.0, 1.0);
-    m_coneGain = AudioGain::create(context, "coneGain", 1.0, 0.0, 1.0);
+
+    // Node-specific default mixing rules.
+    m_channelCount = 2;
+    m_channelCountMode = ClampedMax;
+    m_channelInterpretation = AudioBus::Speakers;
+
+    m_distanceGain = AudioParam::create(context, "distanceGain", 1.0, 0.0, 1.0);
+    m_coneGain = AudioParam::create(context, "coneGain", 1.0, 0.0, 1.0);
 
     m_position = FloatPoint3D(0, 0, 0);
     m_orientation = FloatPoint3D(1, 0, 0);
     m_velocity = FloatPoint3D(0, 0, 0);
-    
+
     setNodeType(NodeTypePanner);
 
     initialize();
@@ -139,8 +144,8 @@ void PannerNode::initialize()
 {
     if (isInitialized())
         return;
-        
-    m_panner = Panner::create(m_panningModel, sampleRate());
+
+    m_panner = Panner::create(m_panningModel, sampleRate(), context()->hrtfDatabaseLoader());
 
     AudioNode::initialize();
 }
@@ -195,7 +200,7 @@ bool PannerNode::setPanningModel(unsigned model)
             // This synchronizes with process().
             MutexLocker processLocker(m_pannerLock);
             
-            OwnPtr<Panner> newPanner = Panner::create(model, sampleRate());
+            OwnPtr<Panner> newPanner = Panner::create(model, sampleRate(), context()->hrtfDatabaseLoader());
             m_panner = newPanner.release();
             m_panningModel = model;
         }

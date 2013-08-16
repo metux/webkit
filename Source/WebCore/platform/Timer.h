@@ -95,6 +95,7 @@ private:
 
 #ifndef NDEBUG
     ThreadIdentifier m_thread;
+    bool m_wasDeleted;
 #endif
 
     friend class ThreadTimers;
@@ -122,7 +123,7 @@ inline bool TimerBase::isActive() const
     return m_nextFireTime;
 }
 
-template <typename TimerFiredClass> class DeferrableOneShotTimer : private TimerBase {
+template <typename TimerFiredClass> class DeferrableOneShotTimer : protected TimerBase {
 public:
     typedef void (TimerFiredClass::*TimerFiredFunction)(DeferrableOneShotTimer*);
 
@@ -147,8 +148,14 @@ public:
         startOneShot(m_delay);
     }
 
-    using TimerBase::stop;
+    void stop()
+    {
+        m_shouldRestartWhenTimerFires = false;
+        TimerBase::stop();
+    }
+
     using TimerBase::isActive;
+
 private:
     virtual void fired()
     {

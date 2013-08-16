@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebResource</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitPrintOperation.html" title="WebKitPrintOperation">
@@ -137,8 +137,11 @@ a load operation:
 You can monitor the active URI by connecting to the notify::uri
 signal of <em class="parameter"><code>resource</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>
@@ -163,8 +166,11 @@ This method returns <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code 
 is received from the server. You can connect to notify::response
 signal to be notified when the response is received.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>
@@ -194,8 +200,11 @@ Asynchronously get the raw data for <em class="parameter"><code>resource</code><
 When the operation is finished, <em class="parameter"><code>callback</code></em> will be called. You can then call
 <a class="link" href="WebKitWebResource.html#webkit-web-resource-get-data-finish" title="webkit_web_resource_get_data_finish ()"><code class="function">webkit_web_resource_get_data_finish()</code></a> to get the result of the operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>
@@ -230,8 +239,11 @@ When the operation is finished, <em class="parameter"><code>callback</code></em>
 <p>
 Finish an asynchronous operation started with <a class="link" href="WebKitWebResource.html#webkit-web-resource-get-data" title="webkit_web_resource_get_data ()"><code class="function">webkit_web_resource_get_data()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>
@@ -293,8 +305,11 @@ See <a class="link" href="WebKitWebResource.html#webkit-web-resource-get-uri" ti
 This signal is emitted when an error occurs during the resource
 load operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>
@@ -322,8 +337,11 @@ This signal is emitted when the resource load finishes successfully
 or due to an error. In case of errors <a class="link" href="WebKitWebResource.html#WebKitWebResource-failed" title='The "failed" signal'><span class="type">"failed"</span></a> signal
 is emitted before this one.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>
@@ -348,8 +366,11 @@ This signal is emitted after response is received,
 every time new data has been received. It's
 useful to know the progress of the resource load operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>
@@ -382,8 +403,11 @@ request sent to the server due to the redirection and the
 <em class="parameter"><code>redirected_response</code></em> parameter containing the response
 received by the server for the initial request.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>resource</code></em> :</span></p></td>

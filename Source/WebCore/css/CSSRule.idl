@@ -20,12 +20,11 @@
 
 // Introduced in DOM Level 2:
 [
+    JSCustomHeader,
     JSCustomMarkFunction,
-    JSGenerateIsReachable,
+    GenerateIsReachable,
     CustomToJSObject,
     ObjCPolymorphic,
-    V8DependentLifetime,
-    V8SkipVTableValidation
 ] interface CSSRule {
 
     // RuleType
@@ -56,8 +55,7 @@
 
     readonly attribute unsigned short   type;
 
-             [TreatReturnedNullStringAs=Null, TreatNullAs=NullString] attribute DOMString        cssText
-                 setter raises (DOMException);
+    [TreatReturnedNullStringAs=Null, TreatNullAs=NullString, SetterRaisesException] attribute DOMString cssText;
 
     readonly attribute CSSStyleSheet    parentStyleSheet;
     readonly attribute CSSRule          parentRule;

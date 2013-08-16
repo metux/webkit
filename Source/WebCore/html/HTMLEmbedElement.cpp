@@ -26,17 +26,14 @@
 
 #include "Attribute.h"
 #include "CSSPropertyNames.h"
-#include "DocumentLoader.h"
 #include "Frame.h"
-#include "HTMLDocument.h"
+#include "FrameLoader.h"
 #include "HTMLImageLoader.h"
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
-#include "MainResourceLoader.h"
 #include "PluginDocument.h"
 #include "RenderEmbeddedObject.h"
-#include "RenderImage.h"
 #include "RenderWidget.h"
 #include "Settings.h"
 
@@ -81,15 +78,15 @@ bool HTMLEmbedElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLPlugInImageElement::isPresentationAttribute(name);
 }
 
-void HTMLEmbedElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLEmbedElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == hiddenAttr) {
-        if (equalIgnoringCase(attribute.value(), "yes") || equalIgnoringCase(attribute.value(), "true")) {
+    if (name == hiddenAttr) {
+        if (equalIgnoringCase(value, "yes") || equalIgnoringCase(value, "true")) {
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWidth, 0, CSSPrimitiveValue::CSS_PX);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyHeight, 0, CSSPrimitiveValue::CSS_PX);
         }
     } else
-        HTMLPlugInImageElement::collectStyleForPresentationAttribute(attribute, style);
+        HTMLPlugInImageElement::collectStyleForPresentationAttribute(name, value, style);
 }
 
 void HTMLEmbedElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -118,9 +115,9 @@ void HTMLEmbedElement::parametersForPlugin(Vector<String>& paramNames, Vector<St
         return;
 
     for (unsigned i = 0; i < attributeCount(); ++i) {
-        const Attribute* attribute = attributeItem(i);
-        paramNames.append(attribute->localName().string());
-        paramValues.append(attribute->value().string());
+        const Attribute& attribute = attributeAt(i);
+        paramNames.append(attribute.localName().string());
+        paramValues.append(attribute.value().string());
     }
 }
 
@@ -128,7 +125,7 @@ void HTMLEmbedElement::parametersForPlugin(Vector<String>& paramNames, Vector<St
 // moved down into HTMLPluginImageElement.cpp
 void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
 {
-    ASSERT(!renderEmbeddedObject()->showsUnavailablePluginIndicator());
+    ASSERT(!renderEmbeddedObject()->isPluginUnavailable());
     ASSERT(needsWidgetUpdate());
     setNeedsWidgetUpdate(false);
 
@@ -209,9 +206,9 @@ bool HTMLEmbedElement::isURLAttribute(const Attribute& attribute) const
     return attribute.name() == srcAttr || HTMLPlugInImageElement::isURLAttribute(attribute);
 }
 
-const QualifiedName& HTMLEmbedElement::imageSourceAttributeName() const
+const AtomicString& HTMLEmbedElement::imageSourceURL() const
 {
-    return srcAttr;
+    return getAttribute(srcAttr);
 }
 
 void HTMLEmbedElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
@@ -220,17 +217,5 @@ void HTMLEmbedElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) cons
 
     addSubresourceURL(urls, document()->completeURL(getAttribute(srcAttr)));
 }
-
-#if ENABLE(MICRODATA)
-String HTMLEmbedElement::itemValueText() const
-{
-    return getURLAttribute(srcAttr);
-}
-
-void HTMLEmbedElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(srcAttr, value);
-}
-#endif
 
 }

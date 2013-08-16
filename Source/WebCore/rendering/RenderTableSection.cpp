@@ -25,7 +25,6 @@
 
 #include "config.h"
 #include "RenderTableSection.h"
-#include "CachedImage.h"
 #include "Document.h"
 #include "HitTestResult.h"
 #include "HTMLNames.h"
@@ -35,13 +34,9 @@
 #include "RenderTableRow.h"
 #include "RenderView.h"
 #include "StyleInheritedData.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <limits>
 #include <wtf/HashSet.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/Vector.h>
+#include <wtf/StackStats.h>
 
 using namespace std;
 
@@ -278,7 +273,9 @@ int RenderTableSection::calcRowLogicalHeight()
     m_rowPos.resize(m_grid.size() + 1);
     m_rowPos[0] = spacing;
 
-    for (unsigned r = 0; r < m_grid.size(); r++) {
+    unsigned totalRows = m_grid.size();
+
+    for (unsigned r = 0; r < totalRows; r++) {
         m_grid[r].baseline = 0;
         LayoutUnit baselineDescent = 0;
 
@@ -297,8 +294,26 @@ int RenderTableSection::calcRowLogicalHeight()
 
                 // FIXME: We are always adding the height of a rowspan to the last rows which doesn't match
                 // other browsers. See webkit.org/b/52185 for example.
-                if ((cell->rowIndex() + cell->rowSpan() - 1) != r)
-                    continue;
+                if ((cell->rowIndex() + cell->rowSpan() - 1) != r) {
+                    // We will apply the height of the rowspan to the current row if next row is not valid.
+                    if ((r + 1) < totalRows) {
+                        unsigned col = 0;
+                        CellStruct nextRowCell = cellAt(r + 1, col);
+
+                        // We are trying to find that next row is valid or not.
+                        while (nextRowCell.cells.size() && nextRowCell.cells[0]->rowSpan() > 1 && nextRowCell.cells[0]->rowIndex() < (r + 1)) {
+                            col++;
+                            if (col < totalCols)
+                                nextRowCell = cellAt(r + 1, col);
+                            else
+                                break;
+                        }
+
+                        // We are adding the height of the rowspan to the current row if next row is not valid.
+                        if (col < totalCols && nextRowCell.cells.size())
+                            continue;
+                    }
+                }
 
                 // For row spanning cells, |r| is the last row in the span.
                 unsigned cellStartRow = cell->rowIndex();
@@ -319,16 +334,19 @@ int RenderTableSection::calcRowLogicalHeight()
                 m_rowPos[r + 1] = max(m_rowPos[r + 1], m_rowPos[cellStartRow] + cellLogicalHeight);
 
                 // Find out the baseline. The baseline is set on the first row in a rowspan.
-                EVerticalAlign va = cell->style()->verticalAlign();
-                if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH) {
+                if (cell->isBaselineAligned()) {
                     LayoutUnit baselinePosition = cell->cellBaselinePosition();
-                    if (baselinePosition > cell->borderBefore() + cell->paddingBefore()) {
+                    if (baselinePosition > cell->borderAndPaddingBefore()) {
                         m_grid[cellStartRow].baseline = max(m_grid[cellStartRow].baseline, baselinePosition);
                         // The descent of a cell that spans multiple rows does not affect the height of the first row it spans, so don't let it
-                        // become the baseline descent applied to the rest of the row. 
-                        if (cell->rowSpan() == 1)
+                        // become the baseline descent applied to the rest of the row. Also we don't account for the baseline descent of
+                        // non-spanning cells when computing a spanning cell's extent.
+                        int cellStartRowBaselineDescent = 0;
+                        if (cell->rowSpan() == 1) {
                             baselineDescent = max(baselineDescent, cellLogicalHeight - (baselinePosition - cell->intrinsicPaddingBefore()));
-                        m_rowPos[cellStartRow + 1] = max<int>(m_rowPos[cellStartRow + 1], m_rowPos[cellStartRow] + m_grid[cellStartRow].baseline + baselineDescent);
+                            cellStartRowBaselineDescent = baselineDescent;
+                        }
+                        m_rowPos[cellStartRow + 1] = max<int>(m_rowPos[cellStartRow + 1], m_rowPos[cellStartRow] + m_grid[cellStartRow].baseline + cellStartRowBaselineDescent);
                     }
                 }
             }
@@ -357,7 +375,7 @@ void RenderTableSection::layout()
     // can be called in a loop (e.g during parsing). Doing it now ensures we have a stable-enough structure.
     m_grid.shrinkToFit();
 
-    LayoutStateMaintainer statePusher(view(), this, locationOffset(), style()->isFlippedBlocksWritingMode());
+    LayoutStateMaintainer statePusher(view(), this, locationOffset(), hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
 
     const Vector<int>& columnPos = table()->columnPositions();
 
@@ -497,14 +515,12 @@ void RenderTableSection::layoutRows()
 
     // Set the width of our section now.  The rows will also be this width.
     setLogicalWidth(table()->contentLogicalWidth());
-    m_overflow.clear();
-    m_overflowingCells.clear();
     m_forceSlowPaintPathWithOverflowingCell = false;
 
     int vspacing = table()->vBorderSpacing();
     unsigned nEffCols = table()->numEffCols();
 
-    LayoutStateMaintainer statePusher(view(), this, locationOffset(), style()->isFlippedBlocksWritingMode());
+    LayoutStateMaintainer statePusher(view(), this, locationOffset(), hasTransform() || style()->isFlippedBlocksWritingMode());
 
     for (unsigned r = 0; r < totalRows; r++) {
         // Set the row's x/y position and width/height.
@@ -545,7 +561,7 @@ void RenderTableSection::layoutRows()
                 || (!table()->style()->logicalHeight().isAuto() && rHeight != cell->logicalHeight());
 
             for (RenderObject* o = cell->firstChild(); o; o = o->nextSibling()) {
-                if (!o->isText() && o->style()->logicalHeight().isPercent() && (flexAllChildren || o->isReplaced() || (o->isBox() && toRenderBox(o)->scrollsOverflow()))) {
+                if (!o->isText() && o->style()->logicalHeight().isPercent() && (flexAllChildren || ((o->isReplaced() || (o->isBox() && toRenderBox(o)->scrollsOverflow())) && !o->isTextControl()))) {
                     // Tables with no sections do not flex.
                     if (!o->isTable() || toRenderTable(o)->hasSections()) {
                         o->setNeedsLayout(true, MarkOnlyThis);
@@ -583,10 +599,9 @@ void RenderTableSection::layoutRows()
                 cell->layoutIfNeeded();
 
                 // If the baseline moved, we may have to update the data for our row. Find out the new baseline.
-                EVerticalAlign va = cell->style()->verticalAlign();
-                if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH) {
+                if (cell->isBaselineAligned()) {
                     LayoutUnit baseline = cell->cellBaselinePosition();
-                    if (baseline > cell->borderBefore() + cell->paddingBefore())
+                    if (baseline > cell->borderAndPaddingBefore())
                         m_grid[r].baseline = max(m_grid[r].baseline, baseline);
                 }
             }
@@ -638,6 +653,22 @@ void RenderTableSection::layoutRows()
 
     setLogicalHeight(m_rowPos[totalRows]);
 
+    computeOverflowFromCells(totalRows, nEffCols);
+
+    statePusher.pop();
+}
+
+void RenderTableSection::computeOverflowFromCells()
+{
+    unsigned totalRows = m_grid.size();
+    unsigned nEffCols = table()->numEffCols();
+    computeOverflowFromCells(totalRows, nEffCols);
+}
+
+void RenderTableSection::computeOverflowFromCells(unsigned totalRows, unsigned nEffCols)
+{
+    m_overflow.clear();
+    m_overflowingCells.clear();
     unsigned totalCellsCount = nEffCols * totalRows;
     int maxAllowedOverflowingCellsCount = totalCellsCount < gMinTableSizeToUseFastPaintPathWithOverflowingCell ? 0 : gMaxAllowedOverflowingCellRatioForFastPaintPath * totalCellsCount;
 
@@ -670,8 +701,6 @@ void RenderTableSection::layoutRows()
     }
 
     ASSERT(hasOverflowingCell == this->hasOverflowingCell());
-
-    statePusher.pop();
 }
 
 int RenderTableSection::calcOuterBorderBefore() const
@@ -888,7 +917,7 @@ int RenderTableSection::firstLineBoxBaseline() const
         const RenderTableCell* cell = cs.primaryCell();
         // Only cells with content have a baseline
         if (cell && cell->contentLogicalHeight())
-            firstLineBaseline = max<int>(firstLineBaseline, cell->logicalTop() + cell->paddingBefore() + cell->borderBefore() + cell->contentLogicalHeight());
+            firstLineBaseline = max<int>(firstLineBaseline, cell->logicalTop() + cell->borderAndPaddingBefore() + cell->contentLogicalHeight());
     }
 
     return firstLineBaseline;
@@ -917,7 +946,7 @@ void RenderTableSection::paint(PaintInfo& paintInfo, const LayoutPoint& paintOff
         popContentsClip(paintInfo, phase, adjustedPaintOffset);
 
     if ((phase == PaintPhaseOutline || phase == PaintPhaseSelfOutline) && style()->visibility() == VISIBLE)
-        paintOutline(paintInfo.context, LayoutRect(adjustedPaintOffset, size()));
+        paintOutline(paintInfo, LayoutRect(adjustedPaintOffset, size()));
 }
 
 static inline bool compareCellPositions(RenderTableCell* elem1, RenderTableCell* elem2)
@@ -1089,8 +1118,10 @@ void RenderTableSection::paintObject(PaintInfo& paintInfo, const LayoutPoint& pa
         if (!m_hasMultipleCellLevels && !m_overflowingCells.size()) {
             if (paintInfo.phase == PaintPhaseCollapsedTableBorders) {
                 // Collapsed borders are painted from the bottom right to the top left so that precedence
-                // due to cell position is respected.
-                for (unsigned r = dirtiedRows.end(); r > dirtiedRows.start(); r--) {
+                // due to cell position is respected. We need to paint one row beyond the topmost dirtied
+                // row to calculate its collapsed border value.
+                unsigned startRow = dirtiedRows.start() ? dirtiedRows.start() - 1 : 0;
+                for (unsigned r = dirtiedRows.end(); r > startRow; r--) {
                     unsigned row = r - 1;
                     for (unsigned c = dirtiedColumns.end(); c > dirtiedColumns.start(); c--) {
                         unsigned col = c - 1;
@@ -1144,9 +1175,8 @@ void RenderTableSection::paintObject(PaintInfo& paintInfo, const LayoutPoint& pa
                             continue;
 
                         if (current.cells[i]->rowSpan() > 1 || current.cells[i]->colSpan() > 1) {
-                            if (spanningCells.contains(current.cells[i]))
+                            if (!spanningCells.add(current.cells[i]).isNewEntry)
                                 continue;
-                            spanningCells.add(current.cells[i]);
                         }
 
                         cells.append(current.cells[i]);
@@ -1297,7 +1327,7 @@ void RenderTableSection::splitColumn(unsigned pos, unsigned first)
         Row& r = m_grid[row].row;
         r.insert(pos + 1, CellStruct());
         if (r[pos].hasCells()) {
-            r[pos + 1].cells.append(r[pos].cells);
+            r[pos + 1].cells.appendVector(r[pos].cells);
             RenderTableCell* cell = r[pos].primaryCell();
             ASSERT(cell);
             ASSERT(cell->colSpan() >= (r[pos].inColSpan ? 1u : 0));
@@ -1427,31 +1457,6 @@ void RenderTableSection::setLogicalPositionForCell(RenderTableCell* cell, unsign
 
     cell->setLogicalLocation(cellLocation);
     view()->addLayoutDelta(oldCellLocation - cell->location());
-}
-
-void RenderTableSection::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
-    RenderBox::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_children, "children");
-    info.addMember(m_grid, "grid");
-    info.addMember(m_rowPos, "rowPos");
-    info.addMember(m_overflowingCells, "overflowingCells");
-    info.addMember(m_cellsCollapsedBorders, "cellsCollapsedBorders");
-}
-
-void RenderTableSection::RowStruct::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
-    info.addMember(row, "row");
-    info.addMember(rowRenderer, "rowRenderer");
-    info.addMember(logicalHeight, "logicalHeight");
-}
-
-void RenderTableSection::CellStruct::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
-    info.addMember(cells, "cells");
 }
 
 } // namespace WebCore

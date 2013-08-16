@@ -27,6 +27,7 @@
 #define WebLoaderClient_h
 
 #include "APIClient.h"
+#include "PluginModuleInfo.h"
 #include "SameDocumentNavigationType.h"
 #include "WKPage.h"
 #include <WebCore/LayoutMilestones.h>
@@ -43,6 +44,7 @@ namespace WebKit {
 class APIObject;
 class AuthenticationChallengeProxy;
 class AuthenticationDecisionListener;
+class ImmutableDictionary;
 class WebBackForwardListItem;
 class WebFrameProxy;
 class WebPageProxy;
@@ -84,12 +86,13 @@ public:
     void processDidBecomeResponsive(WebPageProxy*);
     void processDidCrash(WebPageProxy*);
 
-    void didChangeBackForwardList(WebPageProxy*, WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject> >* removedItems);
+    void didChangeBackForwardList(WebPageProxy*, WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject>>* removedItems);
     bool shouldGoToBackForwardListItem(WebPageProxy*, WebBackForwardListItem*);
     void willGoToBackForwardListItem(WebPageProxy*, WebBackForwardListItem*, APIObject*);
 
-    void didFailToInitializePlugin(WebPageProxy*, const String& mimeType);
-    void didBlockInsecurePluginVersion(WebPageProxy*, const String& mimeType, const String& pluginIdentifier, const String& pluginVersion);
+    PluginModuleLoadPolicy pluginLoadPolicy(WebPageProxy*, PluginModuleLoadPolicy currentPluginLoadPolicy, ImmutableDictionary*, String& unavailabilityDescriptionOutParameter);
+    void didFailToInitializePlugin(WebPageProxy*, ImmutableDictionary*);
+    void didBlockInsecurePluginVersion(WebPageProxy*, ImmutableDictionary*);
 };
 
 } // namespace WebKit

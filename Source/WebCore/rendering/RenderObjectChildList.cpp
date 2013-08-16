@@ -67,7 +67,7 @@ RenderObject* RenderObjectChildList::removeChildNode(RenderObject* owner, Render
         oldChild->setNeedsLayoutAndPrefWidthsRecalc();
         // We only repaint |oldChild| if we have a RenderLayer as its visual overflow may not be tracked by its parent.
         if (oldChild->isBody())
-            owner->view()->repaint();
+            owner->view()->repaintRootContents();
         else
             oldChild->repaint();
     }
@@ -109,8 +109,8 @@ RenderObject* RenderObjectChildList::removeChildNode(RenderObject* owner, Render
     if (!owner->documentBeingDestroyed())
         RenderCounter::rendererRemovedFromTree(oldChild);
 
-    if (AXObjectCache::accessibilityEnabled())
-        owner->document()->axObjectCache()->childrenChanged(owner);
+    if (AXObjectCache* cache = owner->document()->existingAXObjectCache())
+        cache->childrenChanged(owner);
 
     return oldChild;
 }
@@ -158,11 +158,12 @@ void RenderObjectChildList::insertChildNode(RenderObject* owner, RenderObject* n
     }
 
     newChild->setNeedsLayoutAndPrefWidthsRecalc();
+    owner->setPreferredLogicalWidthsDirty(true);
     if (!owner->normalChildNeedsLayout())
         owner->setChildNeedsLayout(true); // We may supply the static position for an absolute positioned child.
 
-    if (AXObjectCache::accessibilityEnabled())
-        owner->document()->axObjectCache()->childrenChanged(owner);
+    if (AXObjectCache* cache = owner->document()->axObjectCache())
+        cache->childrenChanged(owner);
 }
 
 } // namespace WebCore

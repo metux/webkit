@@ -54,12 +54,11 @@ libWebCoreInternals_la_SOURCES = \
 	Source/WebCore/bindings/js/JSDOMWrapper.cpp \
 	Source/WebCore/bindings/js/JSDOMWrapper.h \
 	Source/WebCore/testing/MallocStatistics.h \
+	Source/WebCore/testing/MemoryInfo.h \
 	Source/WebCore/testing/Internals.cpp \
 	Source/WebCore/testing/Internals.h \
 	Source/WebCore/testing/InternalSettings.cpp \
 	Source/WebCore/testing/InternalSettings.h \
-	Source/WebCore/testing/MockPagePopupDriver.cpp \
-	Source/WebCore/testing/MockPagePopupDriver.h \
 	Source/WebCore/testing/TypeConversions.h \
 	Source/WebCore/testing/js/WebCoreTestSupport.cpp \
 	Source/WebCore/testing/js/WebCoreTestSupport.h
@@ -69,6 +68,8 @@ libwebcoreinternals_built_sources += \
 	DerivedSources/WebCore/InternalSettingsGenerated.h   \
 	DerivedSources/WebCore/JSMallocStatistics.cpp \
 	DerivedSources/WebCore/JSMallocStatistics.h   \
+	DerivedSources/WebCore/JSMemoryInfo.cpp \
+	DerivedSources/WebCore/JSMemoryInfo.h \
 	DerivedSources/WebCore/JSInternals.cpp \
 	DerivedSources/WebCore/JSInternals.h   \
 	DerivedSources/WebCore/JSInternalSettings.cpp \
@@ -83,6 +84,8 @@ BUILT_SOURCES += $(libwebcoreinternals_built_sources)
 
 libWebCoreInternals_la_CPPFLAGS = \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
@@ -115,6 +118,8 @@ Programs_DumpRenderTree_CPPFLAGS = \
 	-I$(top_builddir)/DerivedSources \
 	-I$(top_builddir)/Source/WebKit/gtk \
 	$(javascriptcore_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags)
 
 if TARGET_X11
@@ -124,6 +129,7 @@ Programs_DumpRenderTree_CPPFLAGS += \
 endif
 
 Programs_DumpRenderTree_SOURCES = \
+	Source/WebCore/platform/gtk/GtkVersioning.c \
 	Tools/DumpRenderTree/DumpRenderTree.h \
 	Tools/DumpRenderTree/DumpRenderTreeCommon.cpp \
 	Tools/DumpRenderTree/DumpRenderTreePrefix.h \
@@ -148,7 +154,7 @@ Programs_DumpRenderTree_SOURCES = \
 	Tools/DumpRenderTree/config.h \
 	Tools/DumpRenderTree/atk/AccessibilityCallbacks.h \
 	Tools/DumpRenderTree/atk/AccessibilityCallbacksAtk.cpp \
-    	Tools/DumpRenderTree/atk/AccessibilityControllerAtk.cpp \
+	Tools/DumpRenderTree/atk/AccessibilityControllerAtk.cpp \
 	Tools/DumpRenderTree/atk/AccessibilityUIElementAtk.cpp \
 	Tools/DumpRenderTree/cairo/PixelDumpSupportCairo.cpp \
 	Tools/DumpRenderTree/cairo/PixelDumpSupportCairo.h \
@@ -167,8 +173,7 @@ Programs_DumpRenderTree_SOURCES = \
 	Tools/DumpRenderTree/gtk/SelfScrollingWebKitWebView.h \
 	Tools/DumpRenderTree/gtk/TextInputController.h \
 	Tools/DumpRenderTree/gtk/TextInputController.cpp \
-	Tools/DumpRenderTree/gtk/WorkQueueItemGtk.cpp \
-	Source/WebCore/platform/gtk/GtkVersioning.c
+	Tools/DumpRenderTree/gtk/WorkQueueItemGtk.cpp
 
 Programs_DumpRenderTree_CXXFLAGS = \
 	$(global_cxxflags) \
@@ -177,7 +182,6 @@ Programs_DumpRenderTree_CXXFLAGS = \
 Programs_DumpRenderTree_CFLAGS = \
 	-fno-strict-aliasing \
 	$(global_cflags) \
-	$(GLOBALDEPS_CFLAGS) \
 	$(CAIRO_CFLAGS) \
 	$(GTK_CFLAGS) \
 	$(LIBSOUP_CFLAGS)
@@ -185,10 +189,11 @@ Programs_DumpRenderTree_CFLAGS = \
 Programs_DumpRenderTree_LDADD = \
 	libjavascriptcoregtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la \
 	libwebkitgtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la \
+	libPlatform.la \
+	libPlatformGtk.la \
 	libWebCorePlatform.la \
 	libWebCoreModules.la \
 	libWebCoreInternals.la \
-	$(GLOBALDEPS_LIBS) \
 	$(CAIRO_LIBS) \
 	$(GTK_LIBS) \
 	$(GLIB_LIBS) \
@@ -216,7 +221,6 @@ Programs_ImageDiff_CXXFLAGS = \
 Programs_ImageDiff_CFLAGS = \
    -fno-strict-aliasing \
    $(global_cflags) \
-   $(GLOBALDEPS_CFLAGS) \
    $(GTK_CFLAGS)
 
 Programs_ImageDiff_LDADD = \
@@ -247,7 +251,8 @@ TestNetscapePlugin_libtestnetscapeplugin_la_CPPFLAGS = \
 	-I$(srcdir)/Tools/DumpRenderTree/TestNetscapePlugIn \
 	-I$(srcdir)/Tools/DumpRenderTree/TestNetscapePlugIn/unix/ForwardingHeaders \
 	$(global_cppflags) \
-	$(javascriptcore_cppflags)
+	$(javascriptcore_cppflags) \
+	-Wno-missing-format-attribute
 
 # For the Gtk port we want to use XP_UNIX both on X11 and Mac
 if !TARGET_WIN32
@@ -267,6 +272,7 @@ TestNetscapePlugin_libtestnetscapeplugin_la_SOURCES = \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/GetURLWithJavaScriptURL.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/GetURLWithJavaScriptURLDestroyingPlugin.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/GetUserAgentWithNullNPPFromNPPNew.cpp \
+	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/LogNPPSetWindow.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/NPDeallocateCalledBeforeNPShutdown.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/NPPNewFails.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/NPPSetWindowCalledDuringDestruction.cpp \
@@ -277,6 +283,7 @@ TestNetscapePlugin_libtestnetscapeplugin_la_SOURCES = \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/PassDifferentNPPStruct.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/PluginScriptableNPObjectInvokeDefault.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/PrivateBrowsing.cpp \
+	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/ToStringAndValueOfObject.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/x11/CallInvalidateRectWithNullNPPArgument.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/PluginTest.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/PluginTest.h \

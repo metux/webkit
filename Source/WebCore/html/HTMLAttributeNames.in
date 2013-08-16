@@ -37,11 +37,13 @@ aria-multiline
 aria-multiselectable
 aria-orientation
 aria-owns
+aria-posinset
 aria-pressed
 aria-readonly
 aria-relevant
 aria-required
 aria-selected
+aria-setsize
 aria-sort
 aria-valuemax
 aria-valuemin
@@ -124,6 +126,7 @@ http_equiv
 id
 incremental
 indeterminate
+is
 ismap
 itemid
 itemprop
@@ -166,8 +169,6 @@ novalidate
 nowrap
 object
 onabort
-onautocomplete
-onautocompleteerror
 onbeforecopy
 onbeforecut
 onbeforeload
@@ -207,6 +208,8 @@ onloadeddata
 onloadedmetadata
 onloadstart
 onmousedown
+onmouseenter
+onmouseleave
 onmousemove
 onmouseout
 onmouseover
@@ -308,6 +311,7 @@ x-webkit-speech
 x-webkit-grammar
 spellcheck
 src
+srcset
 srcdoc
 srclang
 standby
@@ -325,6 +329,7 @@ topmargin
 translate
 truespeed
 type
+uiactions
 usemap
 valign
 value

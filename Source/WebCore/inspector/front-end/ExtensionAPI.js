@@ -41,7 +41,6 @@ function defineCommonExtensionSymbols(apiPrivate)
     if (!apiPrivate.console)
         apiPrivate.console = {};
     apiPrivate.console.Severity = {
-        Tip: "tip",
         Debug: "debug",
         Log: "log",
         Warning: "warning",
@@ -885,7 +884,7 @@ function buildPlatformExtensionAPI(extensionInfo)
 
 function buildExtensionAPIInjectedScript(extensionInfo)
 {
-    return "(function(injectedScriptHost, inspectedWindow, injectedScriptId){ " +
+    return "(function(injectedScriptId){ " +
         "var extensionServer;" +
         defineCommonExtensionSymbols.toString() + ";" +
         injectedExtensionAPI.toString() + ";" +

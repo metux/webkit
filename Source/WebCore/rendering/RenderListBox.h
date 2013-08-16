@@ -38,7 +38,7 @@ namespace WebCore {
 
 class HTMLSelectElement;
 
-class RenderListBox : public RenderBlock, private ScrollableArea {
+class RenderListBox FINAL : public RenderBlock, private ScrollableArea {
 public:
     explicit RenderListBox(Element*);
     virtual ~RenderListBox();
@@ -82,7 +82,7 @@ private:
 
     virtual void layout();
 
-    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&);
+    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) OVERRIDE;
 
     virtual bool canBeProgramaticallyScrolled() const { return true; }
     virtual void autoscroll(const IntPoint&);
@@ -119,8 +119,10 @@ private:
     virtual int visibleHeight() const OVERRIDE;
     virtual int visibleWidth() const OVERRIDE;
     virtual IntPoint lastKnownMousePosition() const OVERRIDE;
+    virtual bool isHandlingWheelEvent() const OVERRIDE;
     virtual bool shouldSuspendScrollAnimations() const OVERRIDE;
     virtual bool scrollbarsCanBeActive() const OVERRIDE;
+    virtual bool scrollbarAnimationsAreSuppressed() const OVERRIDE;
 
     virtual ScrollableArea* enclosingScrollableArea() const OVERRIDE;
     virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;

@@ -38,25 +38,6 @@
 
 namespace WebCore {
 
-#if ENABLE(SHADOW_DOM)
-void ShadowDistributedRules::addRule(StyleRule* rule, size_t selectorIndex, ContainerNode* scope, AddRuleFlags addRuleFlags)
-{
-    if (m_shadowDistributedRuleSetMap.contains(scope))
-        m_shadowDistributedRuleSetMap.get(scope)->addRule(rule, selectorIndex, addRuleFlags);
-    else {
-        OwnPtr<RuleSet> ruleSetForScope = adoptPtr(new RuleSet());
-        ruleSetForScope->addRule(rule, selectorIndex, addRuleFlags);
-        m_shadowDistributedRuleSetMap.add(scope, ruleSetForScope.release());
-    }
-}
-
-void ShadowDistributedRules::collectMatchRequests(bool includeEmptyRules, Vector<MatchRequest>& matchRequests)
-{
-    for (ShadowDistributedRuleSetMap::iterator it = m_shadowDistributedRuleSetMap.begin(); it != m_shadowDistributedRuleSetMap.end(); ++it)
-        matchRequests.append(MatchRequest(it->value.get(), includeEmptyRules, it->key, SelectorChecker::CrossesBoundary));
-}
-#endif
-
 DocumentRuleSets::DocumentRuleSets()
 {
 }
@@ -100,9 +81,6 @@ void DocumentRuleSets::resetAuthorStyle()
 {
     m_authorStyle = RuleSet::create();
     m_authorStyle->disableAutoShrinkToFit();
-#if ENABLE(SHADOW_DOM)
-    m_shadowDistributedRules.clear();
-#endif
 }
 
 void DocumentRuleSets::appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >& styleSheets, MediaQueryEvaluator* medium, InspectorCSSOMWrappers& inspectorCSSOMWrappers, bool isViewSource, StyleResolver* resolver)
@@ -152,16 +130,6 @@ void DocumentRuleSets::collectFeatures(bool isViewSource, StyleScopeResolver* sc
 
     m_siblingRuleSet = makeRuleSet(m_features.siblingRules);
     m_uncommonAttributeRuleSet = makeRuleSet(m_features.uncommonAttributeRules);
-}
-
-void DocumentRuleSets::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_authorStyle, "authorStyle");
-    info.addMember(m_userStyle, "userStyle");
-    info.addMember(m_features, "features");
-    info.addMember(m_siblingRuleSet, "siblingRuleSet");
-    info.addMember(m_uncommonAttributeRuleSet, "uncommonAttributeRuleSet");
 }
 
 } // namespace WebCore

@@ -165,10 +165,10 @@ void SVGSMILElement::buildPendingResource()
     String href = getAttribute(XLinkNames::hrefAttr);
     Element* target;
     if (href.isEmpty())
-        target = parentNode() && parentNode()->isElementNode() ? static_cast<Element*>(parentNode()) : 0;
+        target = parentNode() && parentNode()->isElementNode() ? toElement(parentNode()) : 0;
     else
         target = SVGURIReference::targetElementFromIRIString(href, document(), &id);
-    SVGElement* svgTarget = target && target->isSVGElement() ? static_cast<SVGElement*>(target) : 0;
+    SVGElement* svgTarget = target && target->isSVGElement() ? toSVGElement(target) : 0;
 
     if (svgTarget && !svgTarget->inDocument())
         svgTarget = 0;
@@ -457,7 +457,7 @@ bool SVGSMILElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::attributeNameAttr);
         supportedAttributes.add(XLinkNames::hrefAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGSMILElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -543,7 +543,7 @@ void SVGSMILElement::connectConditions()
                 condition.m_syncbase = 0;
                 continue;
             }
-            SVGSMILElement* syncbase = static_cast<SVGSMILElement*>(condition.m_syncbase.get());
+            SVGSMILElement* syncbase = toSVGSMILElement(condition.m_syncbase.get());
             syncbase->addTimeDependent(this);
         }
     }
@@ -571,10 +571,8 @@ void SVGSMILElement::disconnectConditions()
             condition.m_eventListener->disconnectAnimation();
             condition.m_eventListener = 0;
         } else if (condition.m_type == Condition::Syncbase) {
-            if (condition.m_syncbase) {
-                ASSERT(isSMILElement(condition.m_syncbase.get()));
-                static_cast<SVGSMILElement*>(condition.m_syncbase.get())->removeTimeDependent(this);
-            }
+            if (condition.m_syncbase)
+                toSVGSMILElement(condition.m_syncbase.get())->removeTimeDependent(this);
         }
         condition.m_syncbase = 0;
     }
@@ -743,6 +741,10 @@ SMILTime SVGSMILElement::findInstanceTime(BeginOrEnd beginOrEnd, SMILTime minimu
     const SMILTimeWithOrigin* result = approximateBinarySearch<const SMILTimeWithOrigin, SMILTime>(list, sizeOfList, minimumTime, extractTimeFromVector);
     int indexOfResult = result - list.begin();
     ASSERT_WITH_SECURITY_IMPLICATION(indexOfResult < sizeOfList);
+
+    if (list[indexOfResult].time() < minimumTime && indexOfResult < sizeOfList - 1)
+        ++indexOfResult;
+
     const SMILTime& currentTime = list[indexOfResult].time();
 
     // The special value "indefinite" does not yield an instance time in the begin list.
@@ -1066,8 +1068,11 @@ bool SVGSMILElement::progress(SMILTime elapsed, SVGSMILElement* resultElement, b
 
     if (elapsed < m_intervalBegin) {
         ASSERT(m_activeState != Active);
-        if (m_activeState == Frozen)
+        if (m_activeState == Frozen) {
+            if (this == resultElement)
+                resetAnimatedType();
             updateAnimation(m_lastPercent, m_lastRepeat, resultElement);
+        }
         m_nextProgressTime = m_intervalBegin;
         return false;
     }

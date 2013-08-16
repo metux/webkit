@@ -34,10 +34,11 @@
 
 #include "BeforeTextInsertedEvent.h"
 #include "Chrome.h"
-#include "ChromeClient.h"
+#include "Editor.h"
 #include "ElementShadow.h"
 #include "FormDataList.h"
 #include "Frame.h"
+#include "FrameSelection.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "KeyboardEvent.h"
@@ -145,7 +146,7 @@ void TextFieldInputType::handleKeydownEvent(KeyboardEvent* event)
     if (!element()->focused())
         return;
     Frame* frame = element()->document()->frame();
-    if (!frame || !frame->editor()->doTextFieldCommandFromEvent(element(), event))
+    if (!frame || !frame->editor().doTextFieldCommandFromEvent(element(), event))
         return;
     event->setDefaultHandled();
 }
@@ -231,10 +232,8 @@ void TextFieldInputType::createShadowSubtree()
     ASSERT(!m_innerSpinButton);
 
     Document* document = element()->document();
-    ChromeClient* chromeClient = document->page() ? document->page()->chrome()->client() : 0;
-    bool shouldAddDecorations = chromeClient && chromeClient->willAddTextFieldDecorationsTo(element());
     bool shouldHaveSpinButton = this->shouldHaveSpinButton();
-    bool createsContainer = shouldHaveSpinButton || needsContainer() || shouldAddDecorations;
+    bool createsContainer = shouldHaveSpinButton || needsContainer();
 
     m_innerText = TextControlInnerTextElement::create(document);
     if (!createsContainer) {
@@ -243,7 +242,7 @@ void TextFieldInputType::createShadowSubtree()
     }
 
     ShadowRoot* shadowRoot = element()->userAgentShadowRoot();
-    m_container = HTMLDivElement::create(document);
+    m_container = TextControlInnerContainer::create(document);
     m_container->setPseudo(AtomicString("-webkit-textfield-decoration-container", AtomicString::ConstructFromLiteral));
     shadowRoot->appendChild(m_container, IGNORE_EXCEPTION);
 
@@ -263,9 +262,6 @@ void TextFieldInputType::createShadowSubtree()
         m_innerSpinButton = SpinButtonElement::create(document, *this);
         m_container->appendChild(m_innerSpinButton, IGNORE_EXCEPTION);
     }
-
-    if (shouldAddDecorations)
-        chromeClient->addTextFieldDecorationsTo(element());
 }
 
 HTMLElement* TextFieldInputType::containerElement() const
@@ -314,6 +310,13 @@ void TextFieldInputType::destroyShadowSubtree()
         m_innerSpinButton->removeSpinButtonOwner();
     m_innerSpinButton.clear();
     m_container.clear();
+}
+
+void TextFieldInputType::attributeChanged()
+{
+    // FIXME: Updating the inner text on any attribute update should
+    // be unnecessary. We should figure out what attributes affect.
+    updateInnerTextValue();
 }
 
 void TextFieldInputType::disabledAttributeChanged()
@@ -470,8 +473,8 @@ void TextFieldInputType::didSetValueByUserEdit(ValueChangeState state)
         return;
     if (Frame* frame = element()->document()->frame()) {
         if (state == ValueChangeStateNone)
-            frame->editor()->textFieldDidBeginEditing(element());
-        frame->editor()->textDidChangeInTextField(element());
+            frame->editor().textFieldDidBeginEditing(element());
+        frame->editor().textDidChangeInTextField(element());
     }
 }
 

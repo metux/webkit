@@ -30,11 +30,24 @@
 
 #include "PluginModuleInfo.h"
 
+#include <WebCore/PluginData.h>
+
 namespace WebCore {
     class KURL;
 }
 
 namespace WebKit {
+
+class PluginInfoStore;
+
+class PluginInfoStoreClient {
+    WTF_MAKE_NONCOPYABLE(PluginInfoStoreClient);
+public:
+    virtual ~PluginInfoStoreClient() { }
+    virtual void pluginInfoStoreDidLoadPlugins(PluginInfoStore*) = 0;
+protected:
+    PluginInfoStoreClient() { }
+};
 
 class PluginInfoStore {
     WTF_MAKE_NONCOPYABLE(PluginInfoStore);
@@ -50,17 +63,22 @@ public:
     // Returns the info for a plug-in that can handle the given MIME type.
     // If the MIME type is null, the file extension of the given url will be used to infer the
     // plug-in type. In that case, mimeType will be filled in with the right MIME type.
-    PluginModuleInfo findPlugin(String& mimeType, const WebCore::KURL&);
-    
+    PluginModuleInfo findPlugin(String& mimeType, const WebCore::KURL&, WebCore::PluginData::AllowedPluginTypes = WebCore::PluginData::AllPlugins);
+
+    // Returns the info for the plug-in with the given bundle identifier.
+    PluginModuleInfo findPluginWithBundleIdentifier(const String& bundleIdentifier);
+
     // Returns the info for the plug-in with the given path.
     PluginModuleInfo infoForPluginWithPath(const String& pluginPath) const;
 
-    static PluginModuleLoadPolicy policyForPlugin(const PluginModuleInfo&);
-    static bool reactivateInactivePlugin(const PluginModuleInfo&);
+    static PluginModuleLoadPolicy defaultLoadPolicyForPlugin(const PluginModuleInfo&);
+
+    void setClient(PluginInfoStoreClient* client) { m_client = client; }
+    PluginInfoStoreClient* client() const { return m_client; }
 
 private:
-    PluginModuleInfo findPluginForMIMEType(const String& mimeType) const;
-    PluginModuleInfo findPluginForExtension(const String& extension, String& mimeType) const;
+    PluginModuleInfo findPluginForMIMEType(const String& mimeType, WebCore::PluginData::AllowedPluginTypes) const;
+    PluginModuleInfo findPluginForExtension(const String& extension, String& mimeType, WebCore::PluginData::AllowedPluginTypes) const;
 
     void loadPluginsIfNecessary();
     static void loadPlugin(Vector<PluginModuleInfo>& plugins, const String& pluginPath);
@@ -88,6 +106,7 @@ private:
     Vector<String> m_additionalPluginsDirectories;
     Vector<PluginModuleInfo> m_plugins;
     bool m_pluginListIsUpToDate;
+    PluginInfoStoreClient* m_client;
 };
     
 } // namespace WebKit

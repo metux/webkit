@@ -31,13 +31,12 @@
 
 #if ENABLE(SQL_DATABASE)
 
-#include "AutodrainedPool.h"
 #include "Database.h"
 #include "DatabaseTask.h"
 #include "Logging.h"
 #include "SQLTransactionClient.h"
 #include "SQLTransactionCoordinator.h"
-#include <wtf/UnusedParam.h>
+#include <wtf/AutodrainedPool.h>
 
 namespace WebCore {
 
@@ -107,10 +106,10 @@ void DatabaseThread::databaseThread()
         LOG(StorageAPI, "Started DatabaseThread %p", this);
     }
 
-    AutodrainedPool pool;
     while (OwnPtr<DatabaseTask> task = m_queue.waitForMessage()) {
+        AutodrainedPool pool;
+
         task->performTask();
-        pool.cycle();
     }
 
     // Clean up the list of all pending transactions on this database thread

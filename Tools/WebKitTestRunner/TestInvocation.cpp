@@ -43,6 +43,7 @@
 #include <wtf/text/CString.h>
 
 #if PLATFORM(MAC)
+#include <Carbon/Carbon.h>
 #include <WebKit2/WKPagePrivateMac.h>
 #endif
 
@@ -127,20 +128,16 @@ void TestInvocation::setCustomTimeout(int timeout)
     m_timeout = timeout;
 }
 
-static const unsigned w3cSVGWidth = 480;
-static const unsigned w3cSVGHeight = 360;
-static const unsigned normalWidth = 800;
-static const unsigned normalHeight = 600;
-
 static void sizeWebViewForCurrentTest(const char* pathOrURL)
 {
     bool isSVGW3CTest = strstr(pathOrURL, "svg/W3C-SVG-1.1") || strstr(pathOrURL, "svg\\W3C-SVG-1.1");
 
     if (isSVGW3CTest)
-        TestController::shared().mainWebView()->resizeTo(w3cSVGWidth, w3cSVGHeight);
+        TestController::shared().mainWebView()->resizeTo(TestController::w3cSVGViewWidth, TestController::w3cSVGViewHeight);
     else
-        TestController::shared().mainWebView()->resizeTo(normalWidth, normalHeight);
+        TestController::shared().mainWebView()->resizeTo(TestController::viewWidth, TestController::viewHeight);
 }
+
 static bool shouldLogFrameLoadDelegates(const char* pathOrURL)
 {
     return strstr(pathOrURL, "loading/");
@@ -279,6 +276,11 @@ end:
 
 void TestInvocation::dumpWebProcessUnresponsiveness()
 {
+    dumpWebProcessUnresponsiveness(m_errorMessage.c_str());
+}
+
+void TestInvocation::dumpWebProcessUnresponsiveness(const char* errorMessage)
+{
     const char* errorMessageToStderr = 0;
 #if PLATFORM(MAC)
     char buffer[64];
@@ -289,7 +291,7 @@ void TestInvocation::dumpWebProcessUnresponsiveness()
     errorMessageToStderr = "#PROCESS UNRESPONSIVE - WebProcess";
 #endif
 
-    dump(m_errorMessage.c_str(), errorMessageToStderr, true);
+    dump(errorMessage, errorMessageToStderr, true);
 }
 
 void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bool seenError)
@@ -649,6 +651,13 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         return;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SetBlockAllPlugins")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef shouldBlock = static_cast<WKBooleanRef>(messageBody);
+        TestController::shared().setBlockAllPlugins(WKBooleanGetValue(shouldBlock));
+        return;
+    }
+
     ASSERT_NOT_REACHED();
 }
 
@@ -667,6 +676,14 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
         return result;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SecureEventInputIsEnabled")) {
+#if PLATFORM(MAC)
+        WKRetainPtr<WKBooleanRef> result(AdoptWK, WKBooleanCreate(IsSecureEventInputEnabled()));
+#else
+        WKRetainPtr<WKBooleanRef> result(AdoptWK, WKBooleanCreate(false));
+#endif
+        return result;
+    }
     ASSERT_NOT_REACHED();
     return 0;
 }

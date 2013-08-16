@@ -38,7 +38,7 @@ SymbolTableEntry& SymbolTableEntry::copySlow(const SymbolTableEntry& other)
     ASSERT(other.isFat());
     FatEntry* newFatEntry = new FatEntry(*other.fatEntry());
     freeFatEntry();
-    m_bits = bitwise_cast<intptr_t>(newFatEntry) | FatFlag;
+    m_bits = bitwise_cast<intptr_t>(newFatEntry);
     return *this;
 }
 
@@ -94,9 +94,12 @@ void SymbolTableEntry::notifyWriteSlow()
 SymbolTableEntry::FatEntry* SymbolTableEntry::inflateSlow()
 {
     FatEntry* entry = new FatEntry(m_bits);
-    m_bits = bitwise_cast<intptr_t>(entry) | FatFlag;
+    m_bits = bitwise_cast<intptr_t>(entry);
     return entry;
 }
+
+SymbolTable::SymbolTable() { }
+SymbolTable::~SymbolTable() { }
 
 } // namespace JSC
 

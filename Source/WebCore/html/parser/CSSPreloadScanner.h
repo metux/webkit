@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2013 Apple Inc. All Rights Reserved.
  * Copyright (C) 2010 Google Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,9 +29,11 @@
 
 #include "HTMLResourcePreloader.h"
 #include "HTMLToken.h"
-#include <wtf/text/StringBuilder.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
+
+class HTMLIdentifier;
 
 class CSSPreloadScanner {
     WTF_MAKE_NONCOPYABLE(CSSPreloadScanner);
@@ -42,7 +44,7 @@ public:
     void reset();
 
     void scan(const HTMLToken::DataVector&, PreloadRequestStream&);
-    void scan(const String&, PreloadRequestStream&);
+    void scan(const HTMLIdentifier&, PreloadRequestStream&);
 
 private:
     enum State {
@@ -65,8 +67,8 @@ private:
     void emitRule();
 
     State m_state;
-    StringBuilder m_rule;
-    StringBuilder m_ruleValue;
+    Vector<UChar> m_rule;
+    Vector<UChar> m_ruleValue;
 
     // Only non-zero during scan()
     PreloadRequestStream* m_requests;

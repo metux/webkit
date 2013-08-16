@@ -32,13 +32,16 @@
 #include <JavaScriptCore/JSBase.h>
 #include <WebCore/LayoutMilestones.h>
 #include <wtf/Forward.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 class DOMWindowExtension;
 class DOMWrapperWorld;
+class KURL;
 class ResourceError;
 class ResourceRequest;
 class ResourceResponse;
+class SharedBuffer;
 }
 
 namespace WebKit {
@@ -50,6 +53,9 @@ class WebFrame;
 
 class InjectedBundlePageLoaderClient : public APIClient<WKBundlePageLoaderClient, kWKBundlePageLoaderClientCurrentVersion> {
 public:
+    void willLoadURLRequest(WebPage*, const WebCore::ResourceRequest&, APIObject*);
+    void willLoadDataRequest(WebPage*, const WebCore::ResourceRequest&, const WebCore::SharedBuffer*, const String&, const String&, const WebCore::KURL&, APIObject*);
+
     bool shouldGoToBackForwardListItem(WebPage*, InjectedBundleBackForwardListItem*, RefPtr<APIObject>& userData);
     void didStartProvisionalLoadForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didReceiveServerRedirectForProvisionalLoadForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
@@ -83,6 +89,8 @@ public:
     void willDestroyGlobalObjectForDOMWindowExtension(WebPage*, WebCore::DOMWindowExtension*);
 
     bool shouldForceUniversalAccessFromLocalURL(WebPage*, const String& url);
+
+    void featuresUsedInPage(WebPage*, const Vector<String>&);
 };
 
 } // namespace WebKit

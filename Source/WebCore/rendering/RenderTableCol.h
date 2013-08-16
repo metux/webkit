@@ -33,7 +33,7 @@ namespace WebCore {
 class RenderTable;
 class RenderTableCell;
 
-class RenderTableCol : public RenderBox {
+class RenderTableCol FINAL : public RenderBox {
 public:
     explicit RenderTableCol(Element*);
 
@@ -75,8 +75,6 @@ public:
     const BorderValue& borderAdjoiningCellEndBorder(const RenderTableCell*) const;
     const BorderValue& borderAdjoiningCellBefore(const RenderTableCell*) const;
     const BorderValue& borderAdjoiningCellAfter(const RenderTableCell*) const;
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }

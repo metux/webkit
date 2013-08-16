@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitIconDatabase</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebWindowFeatures.html" title="WebKitWebWindowFeatures">
@@ -37,7 +37,7 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="WebKitIconDatabase.top_of_page"></a>WebKitIconDatabase</span></h2>
-<p>WebKitIconDatabase</p>
+<p>WebKitIconDatabase — A WebKit web application database</p>
 </td>
 <td valign="top" align="right"></td>
 </tr></table></div>
@@ -78,6 +78,29 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <div class="refsect1">
 <a name="WebKitIconDatabase.description"></a><h2>Description</h2>
 <p>
+<a class="link" href="WebKitIconDatabase.html" title="WebKitIconDatabase"><span class="type">WebKitIconDatabase</span></a> provides access to website icons, as shown
+in tab labels, window captions or bookmarks. All views share
+the same icon database.
+</p>
+<p>
+The icon database is enabled by default and stored in
+~/.local/share/webkit/icondatabase, depending on XDG_DATA_HOME.
+</p>
+<p>
+WebKit will automatically look for available icons in link elements
+on opened pages as well as an existing favicon.ico and load the
+images found into the memory cache if possible. The signal "icon-loaded"
+will be emitted when any icon is found and loaded.
+Old Icons are automatically cleaned up after 4 days.
+</p>
+<p>
+<a class="link" href="WebKitIconDatabase.html#webkit-icon-database-set-path" title="webkit_icon_database_set_path ()"><code class="function">webkit_icon_database_set_path()</code></a> can be used to change the location
+of the database and also to disable it by passing <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>.
+</p>
+<p>
+If WebKitWebSettings::enable-private-browsing is <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> new icons
+won't be added to the database on disk and no existing icons will
+be deleted from it.
 </p>
 </div>
 <div class="refsect1">
@@ -99,8 +122,11 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <p>
 Clears all icons from the database.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>database</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitIconDatabase.html" title="WebKitIconDatabase"><span class="type">WebKitIconDatabase</span></a>
@@ -131,8 +157,11 @@ The pixbuf will have the largest size provided by the server and should
 be resized before it is displayed.
 See also <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-get-icon-pixbuf" title="webkit_web_view_get_icon_pixbuf ()"><code class="function">webkit_web_view_get_icon_pixbuf()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>database</code></em> :</span></p></td>
@@ -165,8 +194,11 @@ See also <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-get-
 Obtains the URI for the favicon for the given page URI.
 See also <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-get-icon-uri" title="webkit_web_view_get_icon_uri ()"><code class="function">webkit_web_view_get_icon_uri()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>database</code></em> :</span></p></td>
@@ -197,8 +229,11 @@ See also <a class="link" href="webkitgtk-webkitwebview.html#webkit-web-view-get-
 <p>
 Determines the absolute path to the database folder on disk.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>database</code></em> :</span></p></td>
@@ -236,8 +271,11 @@ Specifies the absolute path to the database folder on disk.
 <p>
 Passing <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> or "" disables the icon database.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>database</code></em> :</span></p></td>
@@ -287,8 +325,11 @@ or a child frame.
 See WebKitWebView::icon-loaded if you only need the favicon for
 the main frame of a particular <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>database</code></em> :</span></p></td>

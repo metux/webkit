@@ -26,11 +26,11 @@
     Conditional=MEDIA_STREAM,
     EventTarget,
     Constructor,
-    Constructor(in MediaStream stream),
-    Constructor(in MediaStreamTrack[] tracks),
-    ConstructorParameters=0,
-    CallWith=ScriptExecutionContext,
-    V8SkipVTableValidation
+    Constructor(MediaStream stream),
+    Constructor(MediaStreamTrack[] tracks),
+    ConstructorCallWith=ScriptExecutionContext,
+    SkipVTableValidation,
+    InterfaceName=webkitMediaStream
 ] interface MediaStream {
     // DEPRECATED
     readonly attribute DOMString label;
@@ -40,10 +40,8 @@
     sequence<MediaStreamTrack> getAudioTracks();
     sequence<MediaStreamTrack> getVideoTracks();
 
-    void addTrack(MediaStreamTrack track)
-        raises(DOMException);
-    void removeTrack(MediaStreamTrack track)
-        raises(DOMException);
+    [RaisesException] void addTrack(MediaStreamTrack track);
+    [RaisesException] void removeTrack(MediaStreamTrack track);
     MediaStreamTrack getTrackById(DOMString trackId);
 
     readonly attribute boolean ended;
@@ -53,13 +51,12 @@
     attribute EventListener onremovetrack;
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event event)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event event);
 };
 

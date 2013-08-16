@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebBackForwardList</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebSettings.html" title="WebKitWebSettings">
@@ -106,8 +106,48 @@
 7
 8
 9
-10</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Get the WebKitWebBackForwardList from the WebKitWebView </span><span class="comment">*/</span>
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+.Constant { color: #0000c0; text-decoration: underline; }
+.Special { color: #c000c0; font-weight: bold; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="comment">/*</span><span class="comment"> Get the WebKitWebBackForwardList from the WebKitWebView </span><span class="comment">*/</span>
 WebKitWebBackForwardList *back_forward_list = webkit_web_view_get_back_forward_list (my_web_view);
 WebKitWebHistoryItem *item = webkit_web_back_forward_list_get_current_item (back_forward_list);
 
@@ -146,8 +186,11 @@ Adds the item to the <a class="link" href="WebKitWebBackForwardList.html" title=
 The <em class="parameter"><code>webBackForwardList</code></em> will add a reference to the <em class="parameter"><code>webHistoryItem</code></em>, so you
 don't need to keep a reference once you've added it to the list.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -173,8 +216,11 @@ the current page is kept in list when cleared so you would have to add it later.
 This method also clears the list of visited links which means that all links will
 appear unvisited.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
 <td>the <a class="link" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList"><span class="type">WebKitWebBackForwardList</span></a> to be cleared</td>
@@ -191,8 +237,11 @@ appear unvisited.
 <p>
 Checks if <em class="parameter"><code>web_history_item</code></em> is in the back forward list
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -220,8 +269,11 @@ Checks if <em class="parameter"><code>web_history_item</code></em> is in the bac
 <p>
 Returns the item that precedes the current item
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -244,8 +296,11 @@ Returns the item that precedes the current item
 <p>
 Returns the number of items that preced the current item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -268,8 +323,11 @@ Returns the number of items that preced the current item.
 <p>
 Returns a list of items that precede the current item, limited by <em class="parameter"><code>limit</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -296,8 +354,11 @@ Returns a list of items that precede the current item, limited by <em class="par
 <p>
 Returns a NULL value if the back forward list is empty
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -320,8 +381,11 @@ Returns a NULL value if the back forward list is empty
 <p>
 Returns a NULL value if there nothing that succeeds the current item
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -344,8 +408,11 @@ Returns a NULL value if there nothing that succeeds the current item
 <p>
 Returns the number of items that succeed the current item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -368,8 +435,11 @@ Returns the number of items that succeed the current item.
 <p>
 Returns a list of items that succeed the current item, limited by <em class="parameter"><code>limit</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -396,8 +466,11 @@ Returns a list of items that succeed the current item, limited by <em class="par
 <p>
 Returns the maximum limit of the back forward list.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -420,8 +493,11 @@ Returns the maximum limit of the back forward list.
 <p>
 Returns the item at a given index relative to the current item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -448,8 +524,11 @@ Returns the item at a given index relative to the current item.
 <p>
 Steps backward in the back forward list
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList"><span class="type">WebKitWebBackForwardList</span></a>
@@ -465,8 +544,11 @@ Steps backward in the back forward list
 <p>
 Steps forward in the back forward list
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebBackForwardList.html" title="WebKitWebBackForwardList"><span class="type">WebKitWebBackForwardList</span></a>
@@ -483,8 +565,11 @@ Steps forward in the back forward list
 <p>
 Go to the specified <em class="parameter"><code>web_history_item</code></em> in the back forward list
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>
@@ -512,8 +597,11 @@ created and owned by <a class="link" href="webkitgtk-webkitwebview.html#WebKitWe
 <p>
 Creates an instance of the back forward list with a controlling <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -539,8 +627,11 @@ Sets the maximum limit of the back forward list. If the back forward list
 exceeds its capacity, items will be removed everytime a new item has been
 added.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_back_forward_list</code></em> :</span></p></td>

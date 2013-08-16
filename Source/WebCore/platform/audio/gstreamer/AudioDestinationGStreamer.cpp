@@ -43,8 +43,10 @@ gboolean messageCallback(GstBus*, GstMessage* message, AudioDestinationGStreamer
     return destination->handleMessage(message);
 }
 
-PassOwnPtr<AudioDestination> AudioDestination::create(AudioIOCallback& callback, unsigned numberOfInputChannels, unsigned numberOfOutputChannels, float sampleRate)
+PassOwnPtr<AudioDestination> AudioDestination::create(AudioIOCallback& callback, const String&, unsigned numberOfInputChannels, unsigned numberOfOutputChannels, float sampleRate)
 {
+    // FIXME: make use of inputDeviceId as appropriate.
+
     // FIXME: Add support for local/live audio input.
     if (numberOfInputChannels)
         LOG(Media, "AudioDestination::create(%u, %u, %f) - unhandled input channels", numberOfInputChannels, numberOfOutputChannels, sampleRate);
@@ -61,6 +63,13 @@ float AudioDestination::hardwareSampleRate()
     return 44100;
 }
 
+unsigned long AudioDestination::maxChannelCount()
+{
+    // FIXME: query the default audio hardware device to return the actual number
+    // of channels of the device. Also see corresponding FIXME in create().
+    return 0;
+}
+
 #ifndef GST_API_VERSION_1
 static void onGStreamerWavparsePadAddedCallback(GstElement*, GstPad* pad, AudioDestinationGStreamer* destination)
 {
@@ -70,7 +79,7 @@ static void onGStreamerWavparsePadAddedCallback(GstElement*, GstPad* pad, AudioD
 
 AudioDestinationGStreamer::AudioDestinationGStreamer(AudioIOCallback& callback, float sampleRate)
     : m_callback(callback)
-    , m_renderBus(2, framesToPull, false)
+    , m_renderBus(AudioBus::create(2, framesToPull, false))
     , m_sampleRate(sampleRate)
     , m_isPlaying(false)
 {
@@ -82,7 +91,7 @@ AudioDestinationGStreamer::AudioDestinationGStreamer(AudioIOCallback& callback, 
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,
                                                                             "rate", sampleRate,
-                                                                            "bus", &m_renderBus,
+                                                                            "bus", m_renderBus.get(),
                                                                             "provider", &m_callback,
                                                                             "frames", framesToPull, NULL));
 

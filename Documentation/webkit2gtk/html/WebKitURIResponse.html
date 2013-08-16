@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitURIResponse</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitURIRequest.html" title="WebKitURIRequest">
@@ -88,8 +88,11 @@ the suggested filename.
 <div class="refsect2">
 <a name="webkit-uri-response-get-uri"></a><h3>webkit_uri_response_get_uri ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_uri_response_get_uri         (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>
@@ -114,8 +117,11 @@ the server. It will normally be a <a href="../libsoup-2.4/libsoup-2.4-soup-statu
 example <a href="../libsoup-2.4/libsoup-2.4-soup-status.html#SOUP-STATUS-OK:CAPS"><code class="literal">SOUP_STATUS_OK</code></a>, though the server can respond with any
 unsigned integer.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>
@@ -139,8 +145,11 @@ unsigned integer.
 Get the expected content length of the <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>. It can
 be 0 if the server provided an incorrect or missing Content-Length.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>
@@ -158,8 +167,11 @@ be 0 if the server provided an incorrect or missing Content-Length.
 <div class="refsect2">
 <a name="webkit-uri-response-get-mime-type"></a><h3>webkit_uri_response_get_mime_type ()</h3>
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_uri_response_get_mime_type   (<em class="parameter"><code><a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> *response</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>
@@ -184,8 +196,11 @@ Get the suggested filename for <em class="parameter"><code>response</code></em>,
 the 'Content-Disposition' HTTP header, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if it's not
 present.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>response</code></em> :</span></p></td>

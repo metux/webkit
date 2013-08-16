@@ -27,7 +27,6 @@
 #include "DeleteSelectionCommand.h"
 
 #include "Document.h"
-#include "DocumentFragment.h"
 #include "DocumentMarkerController.h"
 #include "EditingBoundary.h"
 #include "Editor.h"
@@ -37,10 +36,11 @@
 #include "htmlediting.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "HTMLTableElement.h"
 #include "NodeTraversal.h"
 #include "RenderTableCell.h"
 #include "Text.h"
-#include "visible_units.h"
+#include "VisibleUnits.h"
 
 namespace WebCore {
 
@@ -309,7 +309,10 @@ bool DeleteSelectionCommand::handleSpecialCaseBRDelete()
     // Check for special-case where the selection contains only a BR on a line by itself after another BR.
     bool upstreamStartIsBR = nodeAfterUpstreamStart->hasTagName(brTag);
     bool downstreamStartIsBR = nodeAfterDownstreamStart->hasTagName(brTag);
-    bool isBROnLineByItself = upstreamStartIsBR && downstreamStartIsBR && nodeAfterDownstreamStart == nodeAfterUpstreamEnd;
+    // We should consider that the BR is on a line by itself also when we have <br><br>. This test should be true only
+    // when the two elements are siblings and should be false in a case like <div><br></div><br>.
+    bool isBROnLineByItself = upstreamStartIsBR && downstreamStartIsBR && ((nodeAfterDownstreamStart == nodeAfterUpstreamEnd) || (nodeAfterUpstreamEnd && nodeAfterUpstreamEnd->hasTagName(brTag) && nodeAfterUpstreamStart->nextSibling() == nodeAfterUpstreamEnd));
+
     if (isBROnLineByItself) {
         removeNode(nodeAfterDownstreamStart);
         return true;
@@ -426,8 +429,10 @@ void DeleteSelectionCommand::makeStylingElementsDirectChildrenOfEditableRootToPr
         if ((node->hasTagName(styleTag) && !(toElement(node.get())->hasAttribute(scopedAttr))) || node->hasTagName(linkTag)) {
             nextNode = NodeTraversal::nextSkippingChildren(node.get());
             RefPtr<ContainerNode> rootEditableElement = node->rootEditableElement();
-            removeNode(node);
-            appendNode(node, rootEditableElement);
+            if (rootEditableElement) {
+                removeNode(node);
+                appendNode(node, rootEditableElement);
+            }
         }
         node = nextNode;
     }
@@ -444,7 +449,7 @@ void DeleteSelectionCommand::handleGeneralDelete()
     makeStylingElementsDirectChildrenOfEditableRootToPreventStyleLoss();
 
     // Never remove the start block unless it's a table, in which case we won't merge content in.
-    if (startNode == m_startBlock && startOffset == 0 && canHaveChildrenForEditing(startNode) && !startNode->hasTagName(tableTag)) {
+    if (startNode == m_startBlock && startOffset == 0 && canHaveChildrenForEditing(startNode) && !isHTMLTableElement(startNode)) {
         startOffset = 0;
         startNode = NodeTraversal::next(startNode);
         if (!startNode)
@@ -648,7 +653,7 @@ void DeleteSelectionCommand::mergeParagraphs()
     
     RefPtr<Range> range = Range::create(document(), startOfParagraphToMove.deepEquivalent().parentAnchoredEquivalent(), endOfParagraphToMove.deepEquivalent().parentAnchoredEquivalent());
     RefPtr<Range> rangeToBeReplaced = Range::create(document(), mergeDestination.deepEquivalent().parentAnchoredEquivalent(), mergeDestination.deepEquivalent().parentAnchoredEquivalent());
-    if (!document()->frame()->editor()->client()->shouldMoveRangeAfterDelete(range.get(), rangeToBeReplaced.get()))
+    if (!document()->frame()->editor().client()->shouldMoveRangeAfterDelete(range.get(), rangeToBeReplaced.get()))
         return;
     
     // moveParagraphs will insert placeholders if it removes blocks that would require their use, don't let block
@@ -794,7 +799,7 @@ void DeleteSelectionCommand::doApply()
     if (!m_replace) {
         Element* textControl = enclosingTextFormControl(m_selectionToDelete.start());
         if (textControl && textControl->focused())
-            document()->frame()->editor()->textWillBeDeletedInTextField(textControl);
+            document()->frame()->editor().textWillBeDeletedInTextField(textControl);
     }
 
     // save this to later make the selection with
@@ -854,7 +859,7 @@ void DeleteSelectionCommand::doApply()
 
     if (!originalString.isEmpty()) {
         if (Frame* frame = document()->frame())
-            frame->editor()->deletedAutocorrectionAtPosition(m_endingPosition, originalString);
+            frame->editor().deletedAutocorrectionAtPosition(m_endingPosition, originalString);
     }
 
     setEndingSelection(VisibleSelection(m_endingPosition, affinity, endingSelection().isDirectional()));

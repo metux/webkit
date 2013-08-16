@@ -33,7 +33,9 @@
 #include "WKData.h"
 #include "WebFrame.h"
 #include "WebSecurityOrigin.h"
+#include <WebCore/Document.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameLoader.h>
 #include <WebCore/FrameView.h>
 
 using namespace WebCore;
@@ -122,19 +124,9 @@ WKStringRef WKBundleFrameCopyName(WKBundleFrameRef frameRef)
     return toCopiedAPI(toImpl(frameRef)->name());
 }
 
-JSValueRef WKBundleFrameGetComputedStyleIncludingVisitedInfo(WKBundleFrameRef frameRef, JSObjectRef element)
-{
-    return toImpl(frameRef)->computedStyleIncludingVisitedInfo(element);
-}
-
 WKStringRef WKBundleFrameCopyCounterValue(WKBundleFrameRef frameRef, JSObjectRef element)
 {
     return toCopiedAPI(toImpl(frameRef)->counterValue(element));
-}
-
-WKStringRef WKBundleFrameCopyMarkerText(WKBundleFrameRef frameRef, JSObjectRef element)
-{
-    return toCopiedAPI(toImpl(frameRef)->markerText(element));
 }
 
 WKStringRef WKBundleFrameCopyInnerText(WKBundleFrameRef frameRef)
@@ -227,6 +219,11 @@ WKStringRef WKBundleFrameCopyMIMETypeForResourceWithURL(WKBundleFrameRef frameRe
 bool WKBundleFrameContainsAnyFormElements(WKBundleFrameRef frameRef)
 {
     return toImpl(frameRef)->containsAnyFormElements();
+}
+
+bool WKBundleFrameContainsAnyFormControls(WKBundleFrameRef frameRef)
+{
+    return toImpl(frameRef)->containsAnyFormControls();
 }
 
 void WKBundleFrameSetTextDirection(WKBundleFrameRef frameRef, WKStringRef directionRef)

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitSettings</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem">
@@ -250,6 +250,16 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-smooth-scrolling" title="webkit_settings_set_enable_smooth_scrolling ()">webkit_settings_set_enable_smooth_scrolling</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitSettings.html#webkit-settings-get-enable-accelerated-2d-canvas" title="webkit_settings_get_enable_accelerated_2d_canvas ()">webkit_settings_get_enable_accelerated_2d_canvas</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-accelerated-2d-canvas" title="webkit_settings_set_enable_accelerated_2d_canvas ()">webkit_settings_set_enable_accelerated_2d_canvas</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitSettings.html#webkit-settings-get-enable-write-console-messages-to-stdout" title="webkit_settings_get_enable_write_console_messages_to_stdout ()">webkit_settings_get_enable_write_console_messages_to_stdout</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-write-console-messages-to-stdout" title="webkit_settings_set_enable_write_console_messages_to_stdout ()">webkit_settings_set_enable_write_console_messages_to_stdout</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -270,6 +280,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitSettings.html#WebKitSettings--default-font-size" title='The "default-font-size" property'>default-font-size</a>"        <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a>                 : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--default-monospace-font-size" title='The "default-monospace-font-size" property'>default-monospace-font-size</a>" <a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a>                 : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--draw-compositing-indicators" title='The "draw-compositing-indicators" property'>draw-compositing-indicators</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-accelerated-2d-canvas" title='The "enable-accelerated-2d-canvas" property'>enable-accelerated-2d-canvas</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-caret-browsing" title='The "enable-caret-browsing" property'>enable-caret-browsing</a>"    <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-developer-extras" title='The "enable-developer-extras" property'>enable-developer-extras</a>"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-dns-prefetching" title='The "enable-dns-prefetching" property'>enable-dns-prefetching</a>"   <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -290,6 +301,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-tabs-to-links" title='The "enable-tabs-to-links" property'>enable-tabs-to-links</a>"     <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-webaudio" title='The "enable-webaudio" property'>enable-webaudio</a>"          <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-webgl" title='The "enable-webgl" property'>enable-webgl</a>"             <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-write-console-messages-to-stdout" title='The "enable-write-console-messages-to-stdout" property'>enable-write-console-messages-to-stdout</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-xss-auditor" title='The "enable-xss-auditor" property'>enable-xss-auditor</a>"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--fantasy-font-family" title='The "fantasy-font-family" property'>fantasy-font-family</a>"      <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can-access-clipboard" title='The "javascript-can-access-clipboard" property'>javascript-can-access-clipboard</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -323,8 +335,44 @@ After creation, a <a class="link" href="WebKitSettings.html" title="WebKitSettin
       <tr>
         <td class="listing_lines" align="right"><pre>1
 2
-3</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Disable JavaScript. </span><span class="comment">*/</span>
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="comment">/*</span><span class="comment"> Disable JavaScript. </span><span class="comment">*/</span>
 WebKitSettings *settings = webkit_web_view_group_get_settings (my_view_group);
 webkit_settings_set_enable_javascript (settings, FALSE);</pre></td>
       </tr>
@@ -352,8 +400,11 @@ Creates a new <a class="link" href="WebKitSettings.html" title="WebKitSettings">
 be manually attached to a <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
 See also <a class="link" href="WebKitSettings.html#webkit-settings-new-with-settings" title="webkit_settings_new_with_settings ()"><code class="function">webkit_settings_new_with_settings()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>a new <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> instance.</td>
@@ -369,8 +420,11 @@ See also <a class="link" href="WebKitSettings.html#webkit-settings-new-with-sett
 Creates a new <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> instance with the given settings. It must
 be manually attached to a <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>first_setting_name</code></em> :</span></p></td>
@@ -396,8 +450,11 @@ be manually attached to a <a class="link" href="WebKitWebViewGroup.html" title="
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--auto-load-images" title='The "auto-load-images" property'><span class="type">"auto-load-images"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -421,8 +478,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--auto-load-imag
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--auto-load-images" title='The "auto-load-images" property'><span class="type">"auto-load-images"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -444,8 +504,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--auto-load-imag
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-frame-flattening" title='The "enable-frame-flattening" property'><span class="type">"enable-frame-flattening"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -469,8 +532,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-frame-f
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-frame-flattening" title='The "enable-frame-flattening" property'><span class="type">"enable-frame-flattening"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -492,8 +558,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-frame-f
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-database" title='The "enable-html5-database" property'><span class="type">"enable-html5-database"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -517,8 +586,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-d
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-database" title='The "enable-html5-database" property'><span class="type">"enable-html5-database"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -540,8 +612,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-d
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-local-storage" title='The "enable-html5-local-storage" property'><span class="type">"enable-html5-local-storage"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -565,8 +640,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-l
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-local-storage" title='The "enable-html5-local-storage" property'><span class="type">"enable-html5-local-storage"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -588,8 +666,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-html5-l
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-hyperlink-auditing" title='The "enable-hyperlink-auditing" property'><span class="type">"enable-hyperlink-auditing"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -613,8 +694,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-hyperli
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-hyperlink-auditing" title='The "enable-hyperlink-auditing" property'><span class="type">"enable-hyperlink-auditing"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -635,8 +719,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-hyperli
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-java" title='The "enable-java" property'><span class="type">"enable-java"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -659,8 +746,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-java" t
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-java" title='The "enable-java" property'><span class="type">"enable-java"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -682,8 +772,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-java" t
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-javascript" title='The "enable-javascript" property'><span class="type">"enable-javascript"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -707,8 +800,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-javascr
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-javascript" title='The "enable-javascript" property'><span class="type">"enable-javascript"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -730,8 +826,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-javascr
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-offline-web-application-cache" title='The "enable-offline-web-application-cache" property'><span class="type">"enable-offline-web-application-cache"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -755,8 +854,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-offline
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-offline-web-application-cache" title='The "enable-offline-web-application-cache" property'><span class="type">"enable-offline-web-application-cache"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -777,8 +879,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-offline
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-plugins" title='The "enable-plugins" property'><span class="type">"enable-plugins"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -801,8 +906,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-plugins
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-plugins" title='The "enable-plugins" property'><span class="type">"enable-plugins"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -824,8 +932,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-plugins
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-xss-auditor" title='The "enable-xss-auditor" property'><span class="type">"enable-xss-auditor"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -849,8 +960,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-xss-aud
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-xss-auditor" title='The "enable-xss-auditor" property'><span class="type">"enable-xss-auditor"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -872,8 +986,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-xss-aud
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can-open-windows-automatically" title='The "javascript-can-open-windows-automatically" property'><span class="type">"javascript-can-open-windows-automatically"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -897,8 +1014,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can-open-windows-automatically" title='The "javascript-can-open-windows-automatically" property'><span class="type">"javascript-can-open-windows-automatically"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -920,8 +1040,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--load-icons-ignoring-image-load-setting" title='The "load-icons-ignoring-image-load-setting" property'><span class="type">"load-icons-ignoring-image-load-setting"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -945,8 +1068,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--load-icons-ign
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--load-icons-ignoring-image-load-setting" title='The "load-icons-ignoring-image-load-setting" property'><span class="type">"load-icons-ignoring-image-load-setting"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -977,8 +1103,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--load-icons-ign
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-font-family" title='The "default-font-family" property'><span class="type">"default-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1000,8 +1129,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-font-f
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--monospace-font-family" title='The "monospace-font-family" property'><span class="type">"monospace-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1024,8 +1156,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--monospace-fon
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--monospace-font-family" title='The "monospace-font-family" property'><span class="type">"monospace-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1047,8 +1182,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--monospace-font
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--serif-font-family" title='The "serif-font-family" property'><span class="type">"serif-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1071,8 +1209,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--serif-font-fa
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--serif-font-family" title='The "serif-font-family" property'><span class="type">"serif-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1094,8 +1235,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--serif-font-fam
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--sans-serif-font-family" title='The "sans-serif-font-family" property'><span class="type">"sans-serif-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1118,8 +1262,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--sans-serif-fo
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--sans-serif-font-family" title='The "sans-serif-font-family" property'><span class="type">"sans-serif-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1141,8 +1288,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--sans-serif-fon
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--cursive-font-family" title='The "cursive-font-family" property'><span class="type">"cursive-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1165,8 +1315,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--cursive-font-
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--cursive-font-family" title='The "cursive-font-family" property'><span class="type">"cursive-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1188,8 +1341,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--cursive-font-f
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--fantasy-font-family" title='The "fantasy-font-family" property'><span class="type">"fantasy-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1212,8 +1368,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--fantasy-font-
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--fantasy-font-family" title='The "fantasy-font-family" property'><span class="type">"fantasy-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1235,8 +1394,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--fantasy-font-f
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--pictograph-font-family" title='The "pictograph-font-family" property'><span class="type">"pictograph-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1259,8 +1421,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--pictograph-fo
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--pictograph-font-family" title='The "pictograph-font-family" property'><span class="type">"pictograph-font-family"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1282,8 +1447,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--pictograph-fon
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--default-font-size" title='The "default-font-size" property'><span class="type">"default-font-size"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1306,8 +1474,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--default-font-
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-font-size" title='The "default-font-size" property'><span class="type">"default-font-size"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1329,8 +1500,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-font-s
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--default-monospace-font-size" title='The "default-monospace-font-size" property'><span class="type">"default-monospace-font-size"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1353,8 +1527,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--default-monos
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-monospace-font-size" title='The "default-monospace-font-size" property'><span class="type">"default-monospace-font-size"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1376,8 +1553,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-monosp
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--minimum-font-size" title='The "minimum-font-size" property'><span class="type">"minimum-font-size"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1400,8 +1580,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--minimum-font-
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--minimum-font-size" title='The "minimum-font-size" property'><span class="type">"minimum-font-size"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1422,8 +1605,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--minimum-font-s
 <p>
 Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--default-charset" title='The "default-charset" property'><span class="type">"default-charset"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1445,8 +1631,11 @@ Gets the <a class="link" href="WebKitSettings.html#WebKitSettings--default-chars
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-charset" title='The "default-charset" property'><span class="type">"default-charset"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1468,8 +1657,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--default-charse
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-private-browsing" title='The "enable-private-browsing" property'><span class="type">"enable-private-browsing"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1501,8 +1693,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-private
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-developer-extras" title='The "enable-developer-extras" property'><span class="type">"enable-developer-extras"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1526,8 +1721,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-develop
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-developer-extras" title='The "enable-developer-extras" property'><span class="type">"enable-developer-extras"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1549,8 +1747,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-develop
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-resizable-text-areas" title='The "enable-resizable-text-areas" property'><span class="type">"enable-resizable-text-areas"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1574,8 +1775,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-resizab
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-resizable-text-areas" title='The "enable-resizable-text-areas" property'><span class="type">"enable-resizable-text-areas"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1597,8 +1801,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-resizab
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-tabs-to-links" title='The "enable-tabs-to-links" property'><span class="type">"enable-tabs-to-links"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1622,8 +1829,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-tabs-to
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-tabs-to-links" title='The "enable-tabs-to-links" property'><span class="type">"enable-tabs-to-links"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1645,8 +1855,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-tabs-to
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-dns-prefetching" title='The "enable-dns-prefetching" property'><span class="type">"enable-dns-prefetching"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1670,8 +1883,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-dns-pre
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-dns-prefetching" title='The "enable-dns-prefetching" property'><span class="type">"enable-dns-prefetching"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1693,8 +1909,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-dns-pre
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-caret-browsing" title='The "enable-caret-browsing" property'><span class="type">"enable-caret-browsing"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1718,8 +1937,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-caret-b
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-caret-browsing" title='The "enable-caret-browsing" property'><span class="type">"enable-caret-browsing"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1741,8 +1963,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-caret-b
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-fullscreen" title='The "enable-fullscreen" property'><span class="type">"enable-fullscreen"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1766,8 +1991,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-fullscr
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-fullscreen" title='The "enable-fullscreen" property'><span class="type">"enable-fullscreen"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1789,8 +2017,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-fullscr
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--print-backgrounds" title='The "print-backgrounds" property'><span class="type">"print-backgrounds"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1814,8 +2045,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--print-backgrou
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--print-backgrounds" title='The "print-backgrounds" property'><span class="type">"print-backgrounds"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1836,8 +2070,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--print-backgrou
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webaudio" title='The "enable-webaudio" property'><span class="type">"enable-webaudio"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1860,8 +2097,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webaudi
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webaudio" title='The "enable-webaudio" property'><span class="type">"enable-webaudio"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1882,8 +2122,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webaudi
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webgl" title='The "enable-webgl" property'><span class="type">"enable-webgl"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1906,8 +2149,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webgl" 
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webgl" title='The "enable-webgl" property'><span class="type">"enable-webgl"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1930,8 +2176,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-webgl" 
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--allow-modal-dialogs" title='The "allow-modal-dialogs" property'><span class="type">"allow-modal-dialogs"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1953,8 +2202,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--allow-modal-di
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--allow-modal-dialogs" title='The "allow-modal-dialogs" property'><span class="type">"allow-modal-dialogs"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -1976,8 +2228,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--allow-modal-di
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--zoom-text-only" title='The "zoom-text-only" property'><span class="type">"zoom-text-only"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2001,8 +2256,11 @@ or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--zoom-text-only" title='The "zoom-text-only" property'><span class="type">"zoom-text-only"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2024,8 +2282,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--zoom-text-only
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can-access-clipboard" title='The "javascript-can-access-clipboard" property'><span class="type">"javascript-can-access-clipboard"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2049,8 +2310,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can-access-clipboard" title='The "javascript-can-access-clipboard" property'><span class="type">"javascript-can-access-clipboard"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2072,8 +2336,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--javascript-can
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--media-playback-requires-user-gesture" title='The "media-playback-requires-user-gesture" property'><span class="type">"media-playback-requires-user-gesture"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2098,8 +2365,11 @@ or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--media-playback-requires-user-gesture" title='The "media-playback-requires-user-gesture" property'><span class="type">"media-playback-requires-user-gesture"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2121,8 +2391,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--media-playback
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--media-playback-allows-inline" title='The "media-playback-allows-inline" property'><span class="type">"media-playback-allows-inline"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2147,8 +2420,11 @@ or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--media-playback-allows-inline" title='The "media-playback-allows-inline" property'><span class="type">"media-playback-allows-inline"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2170,8 +2446,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--media-playback
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--draw-compositing-indicators" title='The "draw-compositing-indicators" property'><span class="type">"draw-compositing-indicators"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2195,8 +2474,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--draw-compositi
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--draw-compositing-indicators" title='The "draw-compositing-indicators" property'><span class="type">"draw-compositing-indicators"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2218,8 +2500,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--draw-compositi
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-site-specific-quirks" title='The "enable-site-specific-quirks" property'><span class="type">"enable-site-specific-quirks"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2243,8 +2528,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-site-sp
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-site-specific-quirks" title='The "enable-site-specific-quirks" property'><span class="type">"enable-site-specific-quirks"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2266,8 +2554,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-site-sp
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-page-cache" title='The "enable-page-cache" property'><span class="type">"enable-page-cache"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2291,8 +2582,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-page-ca
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-page-cache" title='The "enable-page-cache" property'><span class="type">"enable-page-cache"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2313,8 +2607,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-page-ca
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--user-agent" title='The "user-agent" property'><span class="type">"user-agent"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2336,8 +2633,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--user-agent" ti
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--user-agent" title='The "user-agent" property'><span class="type">"user-agent"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2364,8 +2664,11 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--user-agent" ti
 agent. If no application name or version is given, the default user agent used will be used. If only
 the version is given, the default engine version is used with the given application name.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2393,8 +2696,11 @@ the version is given, the default engine version is used with the given applicat
 <p>
 Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-smooth-scrolling" title='The "enable-smooth-scrolling" property'><span class="type">"enable-smooth-scrolling"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2418,8 +2724,11 @@ Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-smooth-
 <p>
 Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-smooth-scrolling" title='The "enable-smooth-scrolling" property'><span class="type">"enable-smooth-scrolling"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
@@ -2432,6 +2741,119 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-smooth-
 </tr>
 </tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-get-enable-accelerated-2d-canvas"></a><h3>webkit_settings_get_enable_accelerated_2d_canvas ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_settings_get_enable_accelerated_2d_canvas
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-accelerated-2d-canvas" title='The "enable-accelerated-2d-canvas" property'><span class="type">"enable-accelerated-2d-canvas"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if accelerated 2D canvas is enabled or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-set-enable-accelerated-2d-canvas"></a><h3>webkit_settings_set_enable_accelerated_2d_canvas ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_settings_set_enable_accelerated_2d_canvas
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);</pre>
+<p>
+Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-accelerated-2d-canvas" title='The "enable-accelerated-2d-canvas" property'><span class="type">"enable-accelerated-2d-canvas"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>enabled</code></em> :</span></p></td>
+<td>Value to be set</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-get-enable-write-console-messages-to-stdout"></a><h3>webkit_settings_get_enable_write_console_messages_to_stdout ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_settings_get_enable_write_console_messages_to_stdout
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-write-console-messages-to-stdout" title='The "enable-write-console-messages-to-stdout" property'><span class="type">"enable-write-console-messages-to-stdout"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if writing console messages to stdout is enabled or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a>
+otherwise.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-set-enable-write-console-messages-to-stdout"></a><h3>webkit_settings_set_enable_write_console_messages_to_stdout ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_settings_set_enable_write_console_messages_to_stdout
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);</pre>
+<p>
+Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-write-console-messages-to-stdout" title='The "enable-write-console-messages-to-stdout" property'><span class="type">"enable-write-console-messages-to-stdout"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>enabled</code></em> :</span></p></td>
+<td>Value to be set</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
 </div>
 </div>
 <div class="refsect1">
@@ -2507,6 +2929,19 @@ with accelerated compositing. This is useful for debugging issues related
 to web content that is composited with the GPU.
 </p>
 <p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitSettings--enable-accelerated-2d-canvas"></a><h3>The <code class="literal">"enable-accelerated-2d-canvas"</code> property</h3>
+<pre class="programlisting">  "enable-accelerated-2d-canvas" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable accelerated 2D canvas. Accelerated 2D canvas is only available
+if WebKitGTK+ was compiled with a version of Cairo including the unstable CairoGL API.
+When accelerated 2D canvas is enabled, WebKit may render some 2D canvas content
+using hardware accelerated drawing operations.
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 2.2</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -2739,6 +3174,17 @@ proposal for allowing web pages to use OpenGL ES-like calls directly. The
 standard is currently a work-in-progress by the Khronos Group.
 </p>
 <p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitSettings--enable-write-console-messages-to-stdout"></a><h3>The <code class="literal">"enable-write-console-messages-to-stdout"</code> property</h3>
+<pre class="programlisting">  "enable-write-console-messages-to-stdout" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable writing console messages to stdout. These are messages
+sent to the console with console.log and related methods.
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 2.2</p>
 </div>
 <hr>
 <div class="refsect2">

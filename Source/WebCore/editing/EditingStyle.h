@@ -33,6 +33,7 @@
 #define EditingStyle_h
 
 #include "CSSPropertyNames.h"
+#include "CSSValueKeywords.h"
 #include "WritingDirection.h"
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
@@ -50,6 +51,7 @@ class CSSValue;
 class Document;
 class Element;
 class HTMLElement;
+class MutableStylePropertySet;
 class Node;
 class Position;
 class QualifiedName;
@@ -62,6 +64,7 @@ class EditingStyle : public RefCounted<EditingStyle> {
 public:
 
     enum PropertiesToInclude { AllProperties, OnlyEditingInheritableProperties, EditingPropertiesInEffect };
+
     enum ShouldPreserveWritingDirection { PreserveWritingDirection, DoNotPreserveWritingDirection };
     enum ShouldExtractMatchingStyle { ExtractMatchingStyle, DoNotExtractMatchingStyle };
     static float NoFontDelta;
@@ -86,11 +89,6 @@ public:
         return adoptRef(new EditingStyle(style));
     }
 
-    static PassRefPtr<EditingStyle> create(const CSSStyleDeclaration* style)
-    {
-        return adoptRef(new EditingStyle(style));
-    }
-
     static PassRefPtr<EditingStyle> create(CSSPropertyID propertyID, const String& value)
     {
         return adoptRef(new EditingStyle(propertyID, value));
@@ -98,10 +96,10 @@ public:
 
     ~EditingStyle();
 
-    StylePropertySet* style() { return m_mutableStyle.get(); }
+    MutableStylePropertySet* style() { return m_mutableStyle.get(); }
     bool textDirection(WritingDirection&) const;
     bool isEmpty() const;
-    void setStyle(PassRefPtr<StylePropertySet>);
+    void setStyle(PassRefPtr<MutableStylePropertySet>);
     void overrideWithStyle(const StylePropertySet*);
     void clear();
     PassRefPtr<EditingStyle> copy() const;
@@ -110,7 +108,6 @@ public:
     void removeBlockProperties();
     void removeStyleAddedByNode(Node*);
     void removeStyleConflictingWithStyleOfNode(Node*);
-    void removeNonEditingProperties();
     void collapseTextDecorationProperties();
     enum ShouldIgnoreTextOnlyProperties { IgnoreTextOnlyProperties, DoNotIgnoreTextOnlyProperties };
     TriState triStateOfStyle(EditingStyle*) const;
@@ -151,19 +148,18 @@ private:
     EditingStyle(Node*, PropertiesToInclude);
     EditingStyle(const Position&, PropertiesToInclude);
     explicit EditingStyle(const StylePropertySet*);
-    explicit EditingStyle(const CSSStyleDeclaration*);
     EditingStyle(CSSPropertyID, const String& value);
     void init(Node*, PropertiesToInclude);
     void removeTextFillAndStrokeColorsIfNeeded(RenderStyle*);
     void setProperty(CSSPropertyID, const String& value, bool important = false);
-    void replaceFontSizeByKeywordIfPossible(RenderStyle*, CSSComputedStyleDeclaration*);
     void extractFontSizeDelta();
-    TriState triStateOfStyle(CSSStyleDeclaration* styleToCompare, ShouldIgnoreTextOnlyProperties) const;
+    template<typename T>
+    TriState triStateOfStyle(T* styleToCompare, ShouldIgnoreTextOnlyProperties) const;
     bool conflictsWithInlineStyleOfElement(StyledElement*, EditingStyle* extractedStyle, Vector<CSSPropertyID>* conflictingProperties) const;
     void mergeInlineAndImplicitStyleOfElement(StyledElement*, CSSPropertyOverrideMode, PropertiesToInclude);
     void mergeStyle(const StylePropertySet*, CSSPropertyOverrideMode);
 
-    RefPtr<StylePropertySet> m_mutableStyle;
+    RefPtr<MutableStylePropertySet> m_mutableStyle;
     bool m_shouldUseFixedDefaultFontSize;
     float m_fontSizeDelta;
 
@@ -217,7 +213,7 @@ public:
         return !(*this == other);
     }
 private:
-    void extractTextStyles(Document*, StylePropertySet*, bool shouldUseFixedFontDefaultSize);
+    void extractTextStyles(Document*, MutableStylePropertySet*, bool shouldUseFixedFontDefaultSize);
 
     String m_cssStyle;
     bool m_applyBold;
@@ -230,10 +226,6 @@ private:
     String m_applyFontFace;
     String m_applyFontSize;
 };
-
-// FIXME: Remove these functions or make them non-global to discourage using CSSStyleDeclaration directly.
-int getIdentifierValue(CSSStyleDeclaration*, CSSPropertyID);
-int getIdentifierValue(StylePropertySet*, CSSPropertyID);
 
 } // namespace WebCore
 

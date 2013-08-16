@@ -23,17 +23,18 @@
 #if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedString.h"
-#include "SVGDocumentExtensions.h"
+#include "SVGElement.h"
 #include "SVGExternalResourcesRequired.h"
+#include "SVGNames.h"
 #include "SVGURIReference.h"
 
 namespace WebCore {
     
 class SVGPathElement;
 
-class SVGMPathElement : public SVGElement,
-                        public SVGURIReference,
-                        public SVGExternalResourcesRequired {
+class SVGMPathElement FINAL : public SVGElement,
+                              public SVGURIReference,
+                              public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGMPathElement> create(const QualifiedName&, Document*);
 
@@ -62,6 +63,12 @@ private:
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
+
+inline SVGMPathElement* toSVGMPathElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(SVGNames::mpathTag));
+    return static_cast<SVGMPathElement*>(node);
+}
 
 } // namespace WebCore
 

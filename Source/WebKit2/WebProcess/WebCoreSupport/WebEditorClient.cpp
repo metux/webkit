@@ -37,6 +37,7 @@
 #include <WebCore/DocumentFragment.h>
 #include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameLoader.h>
 #include <WebCore/FrameView.h>
 #include <WebCore/HTMLInputElement.h>
 #include <WebCore/HTMLNames.h>
@@ -44,6 +45,8 @@
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
+#include <WebCore/SpellChecker.h>
+#include <WebCore/StylePropertySet.h>
 #include <WebCore/TextIterator.h>
 #include <WebCore/UndoStep.h>
 #include <WebCore/UserTypingGestureIndicator.h>
@@ -58,6 +61,12 @@ using namespace WebCore;
 using namespace HTMLNames;
 
 namespace WebKit {
+
+static uint64_t generateTextCheckingRequestID()
+{
+    static uint64_t uniqueTextCheckingRequestID = 1;
+    return uniqueTextCheckingRequestID++;
+}
 
 void WebEditorClient::pageDestroyed()
 {
@@ -81,18 +90,12 @@ bool WebEditorClient::shouldShowDeleteInterface(HTMLElement*)
 
 bool WebEditorClient::smartInsertDeleteEnabled()
 {
-    // FIXME: Why isn't this Mac specific like toggleSmartInsertDeleteEnabled?
-#if PLATFORM(MAC)
     return m_page->isSmartInsertDeleteEnabled();
-#else
-    return true;
-#endif
 }
  
 bool WebEditorClient::isSelectTrailingWhitespaceEnabled()
 {
-    notImplemented();
-    return false;
+    return m_page->isSelectTrailingWhitespaceEnabled();
 }
 
 bool WebEditorClient::isContinuousSpellCheckingEnabled()
@@ -158,7 +161,8 @@ bool WebEditorClient::shouldChangeSelectedRange(Range* fromRange, Range* toRange
     
 bool WebEditorClient::shouldApplyStyle(StylePropertySet* style, Range* range)
 {
-    bool result = m_page->injectedBundleEditorClient().shouldApplyStyle(m_page, style->ensureCSSStyleDeclaration(), range);
+    RefPtr<MutableStylePropertySet> mutableStyle = style->isMutable() ? static_cast<MutableStylePropertySet*>(style) : style->mutableCopy();
+    bool result = m_page->injectedBundleEditorClient().shouldApplyStyle(m_page, mutableStyle->ensureCSSStyleDeclaration(), range);
     notImplemented();
     return result;
 }
@@ -191,9 +195,7 @@ void WebEditorClient::respondToChangedSelection(Frame* frame)
     if (!frame)
         return;
 
-    EditorState state = m_page->editorState();
-
-    m_page->send(Messages::WebPageProxy::EditorStateChanged(state));
+    m_page->didChangeSelection();
 
 #if PLATFORM(GTK) || PLATFORM(QT)
     updateGlobalSelection(frame);
@@ -207,7 +209,7 @@ void WebEditorClient::updateGlobalSelection(Frame* frame)
     if (supportsGlobalSelection() && frame->selection()->isRange()) {
         bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
         Pasteboard::generalPasteboard()->setSelectionMode(true);
-        Pasteboard::generalPasteboard()->writeSelection(frame->selection()->toNormalizedRange().get(), frame->editor()->canSmartCopyOrDelete(), frame);
+        Pasteboard::generalPasteboard()->writeSelection(frame->selection()->toNormalizedRange().get(), frame->editor().canSmartCopyOrDelete(), frame);
         Pasteboard::generalPasteboard()->setSelectionMode(oldSelectionMode);
     }
 }
@@ -230,7 +232,7 @@ void WebEditorClient::willWriteSelectionToPasteboard(Range* range)
     m_page->injectedBundleEditorClient().willWriteToPasteboard(m_page, range);
 }
 
-void WebEditorClient::getClientPasteboardDataForRange(Range* range, Vector<String>& pasteboardTypes, Vector<RefPtr<SharedBuffer> >& pasteboardData)
+void WebEditorClient::getClientPasteboardDataForRange(Range* range, Vector<String>& pasteboardTypes, Vector<RefPtr<SharedBuffer>>& pasteboardData)
 {
     m_page->injectedBundleEditorClient().getPasteboardDataForRange(m_page, range, pasteboardTypes, pasteboardData);
 }
@@ -314,41 +316,53 @@ void WebEditorClient::handleInputMethodKeydown(KeyboardEvent*)
 
 void WebEditorClient::textFieldDidBeginEditing(Element* element)
 {
-    if (!element->hasTagName(inputTag))
+    if (!isHTMLInputElement(element))
         return;
 
-    WebFrame* webFrame =  static_cast<WebFrameLoaderClient*>(element->document()->frame()->loader()->client())->webFrame();
-    m_page->injectedBundleFormClient().textFieldDidBeginEditing(m_page, static_cast<HTMLInputElement*>(element), webFrame);
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
+    m_page->injectedBundleFormClient().textFieldDidBeginEditing(m_page, toHTMLInputElement(element), webFrame);
 }
 
 void WebEditorClient::textFieldDidEndEditing(Element* element)
 {
-    if (!element->hasTagName(inputTag))
+    if (!isHTMLInputElement(element))
         return;
 
-    WebFrame* webFrame =  static_cast<WebFrameLoaderClient*>(element->document()->frame()->loader()->client())->webFrame();
-    m_page->injectedBundleFormClient().textFieldDidEndEditing(m_page, static_cast<HTMLInputElement*>(element), webFrame);
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
+    m_page->injectedBundleFormClient().textFieldDidEndEditing(m_page, toHTMLInputElement(element), webFrame);
 }
 
 void WebEditorClient::textDidChangeInTextField(Element* element)
 {
-    if (!element->hasTagName(inputTag))
+    if (!isHTMLInputElement(element))
         return;
 
     if (!UserTypingGestureIndicator::processingUserTypingGesture() || UserTypingGestureIndicator::focusedElementAtGestureStart() != element)
         return;
 
-    WebFrame* webFrame =  static_cast<WebFrameLoaderClient*>(element->document()->frame()->loader()->client())->webFrame();
-    m_page->injectedBundleFormClient().textDidChangeInTextField(m_page, static_cast<HTMLInputElement*>(element), webFrame);
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
+    m_page->injectedBundleFormClient().textDidChangeInTextField(m_page, toHTMLInputElement(element), webFrame);
 }
 
 void WebEditorClient::textDidChangeInTextArea(Element* element)
 {
-    if (!element->hasTagName(textareaTag))
+    if (!isHTMLTextAreaElement(element))
         return;
 
-    WebFrame* webFrame =  static_cast<WebFrameLoaderClient*>(element->document()->frame()->loader()->client())->webFrame();
-    m_page->injectedBundleFormClient().textDidChangeInTextArea(m_page, static_cast<HTMLTextAreaElement*>(element), webFrame);
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
+    m_page->injectedBundleFormClient().textDidChangeInTextArea(m_page, toHTMLTextAreaElement(element), webFrame);
 }
 
 static bool getActionTypeForKeyEvent(KeyboardEvent* event, WKInputFieldActionType& type)
@@ -375,30 +389,36 @@ static bool getActionTypeForKeyEvent(KeyboardEvent* event, WKInputFieldActionTyp
 
 bool WebEditorClient::doTextFieldCommandFromEvent(Element* element, KeyboardEvent* event)
 {
-    if (!element->hasTagName(inputTag))
+    if (!isHTMLInputElement(element))
         return false;
 
     WKInputFieldActionType actionType = static_cast<WKInputFieldActionType>(0);
     if (!getActionTypeForKeyEvent(event, actionType))
         return false;
 
-    WebFrame* webFrame =  static_cast<WebFrameLoaderClient*>(element->document()->frame()->loader()->client())->webFrame();
-    return m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, static_cast<HTMLInputElement*>(element), actionType, webFrame);
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
+    return m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), actionType, webFrame);
 }
 
 void WebEditorClient::textWillBeDeletedInTextField(Element* element)
 {
-    if (!element->hasTagName(inputTag))
+    if (!isHTMLInputElement(element))
         return;
 
-    WebFrame* webFrame =  static_cast<WebFrameLoaderClient*>(element->document()->frame()->loader()->client())->webFrame();
-    m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, static_cast<HTMLInputElement*>(element), WKInputFieldActionTypeInsertDelete, webFrame);
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
+    m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), WKInputFieldActionTypeInsertDelete, webFrame);
 }
 
 bool WebEditorClient::shouldEraseMarkersAfterChangeSelection(WebCore::TextCheckingType type) const
 {
     // This prevents erasing spelling markers on OS X Lion or later to match AppKit on these Mac OS X versions.
-#if PLATFORM(MAC)
+#if PLATFORM(MAC) || PLATFORM(EFL)
     return type != TextCheckingTypeSpelling;
 #else
     UNUSED_PARAM(type);
@@ -444,6 +464,14 @@ void WebEditorClient::checkGrammarOfString(const UChar* text, int length, Vector
     *badGrammarLength = resultLength;
 }
 
+#if USE(UNIFIED_TEXT_CHECKING)
+void WebEditorClient::checkTextOfParagraph(const UChar* text, int length, WebCore::TextCheckingTypeMask checkingTypes, Vector<TextCheckingResult>& results)
+{
+    // FIXME: It would be nice if we wouldn't have to copy the text here.
+    m_page->sendSync(Messages::WebPageProxy::CheckTextOfParagraph(String(text, length), checkingTypes), Messages::WebPageProxy::CheckTextOfParagraph::Reply(results));
+}
+#endif
+
 void WebEditorClient::updateSpellingUIWithGrammarString(const String& badGrammarPhrase, const GrammarDetail& grammarDetail)
 {
     m_page->send(Messages::WebPageProxy::UpdateSpellingUIWithGrammarString(badGrammarPhrase, grammarDetail));
@@ -471,6 +499,16 @@ void WebEditorClient::getGuessesForWord(const String& word, const String& contex
     m_page->sendSync(Messages::WebPageProxy::GetGuessesForWord(word, context), Messages::WebPageProxy::GetGuessesForWord::Reply(guesses));
 }
 
+void WebEditorClient::requestCheckingOfString(WTF::PassRefPtr<TextCheckingRequest> prpRequest)
+{
+    RefPtr<TextCheckingRequest> request = prpRequest;
+
+    uint64_t requestID = generateTextCheckingRequestID();
+    m_page->addTextCheckingRequest(requestID, request);
+
+    m_page->send(Messages::WebPageProxy::RequestCheckingOfString(requestID, request->data()));
+}
+
 void WebEditorClient::willSetInputMethodState()
 {
 #if PLATFORM(QT)
@@ -481,11 +519,6 @@ void WebEditorClient::willSetInputMethodState()
 }
 
 void WebEditorClient::setInputMethodState(bool)
-{
-    notImplemented();
-}
-
-void WebEditorClient::requestCheckingOfString(WTF::PassRefPtr<WebCore::TextCheckingRequest>)
 {
     notImplemented();
 }

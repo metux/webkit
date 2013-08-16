@@ -27,7 +27,6 @@
 #define WebUIClient_h
 
 #include "APIClient.h"
-#include "PluginModuleInfo.h"
 #include "WKPage.h"
 #include "WebEvent.h"
 #include "WebHitTestResult.h"
@@ -46,6 +45,7 @@ namespace WebKit {
 
 class APIObject;
 class GeolocationPermissionRequestProxy;
+class ImmutableDictionary;
 class NativeWebKeyboardEvent;
 class NativeWebWheelEvent;
 class NotificationPermissionRequest;
@@ -72,7 +72,7 @@ public:
 
     void setStatusText(WebPageProxy*, const String&);
     void mouseDidMoveOverElement(WebPageProxy*, const WebHitTestResult::Data&, WebEvent::Modifiers, APIObject*);
-    void unavailablePluginButtonClicked(WebPageProxy*, WKPluginUnavailabilityReason, const String& mimeType, const String& url, const String& pluginsPageURL);
+    void unavailablePluginButtonClicked(WebPageProxy*, WKPluginUnavailabilityReason, ImmutableDictionary*);
     
     bool implementsDidNotHandleKeyEvent() const;
     void didNotHandleKeyEvent(WebPageProxy*, const NativeWebKeyboardEvent&);
@@ -122,8 +122,6 @@ public:
     bool showColorPicker(WebPageProxy*, const String&, WebColorPickerResultListenerProxy*);
     bool hideColorPicker(WebPageProxy*);
 #endif
-
-    PluginModuleLoadPolicy pluginLoadPolicy(WebPageProxy*, const String& identifier, const String& displayName, const String& documentURLString, PluginModuleLoadPolicy currentPluginLoadPolicy);
 };
 
 } // namespace WebKit

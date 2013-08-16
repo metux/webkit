@@ -31,11 +31,11 @@
 #include "Dictionary.h"
 #include "Event.h"
 #include "EventTarget.h"
-#include "IDBDatabaseBackendInterface.h"
 #include "IDBDatabaseCallbacks.h"
 #include "IDBMetadata.h"
 #include "IDBObjectStore.h"
 #include "IDBTransaction.h"
+#include "IndexedDB.h"
 #include "ScriptWrappable.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -77,13 +77,11 @@ public:
 
     // IDBDatabaseCallbacks
     virtual void onVersionChange(int64_t oldVersion, int64_t newVersion);
-    virtual void onVersionChange(const String& requestedVersion);
     virtual void onAbort(int64_t, PassRefPtr<IDBDatabaseError>);
     virtual void onComplete(int64_t);
 
     // ActiveDOMObject
     virtual bool hasPendingActivity() const OVERRIDE;
-    virtual void stop() OVERRIDE;
 
     // EventTarget
     virtual const AtomicString& interfaceName() const;
@@ -112,6 +110,9 @@ public:
 
 private:
     IDBDatabase(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendInterface>, PassRefPtr<IDBDatabaseCallbacks>);
+
+    // ActiveDOMObject
+    virtual void stop() OVERRIDE;
 
     // EventTarget
     virtual void refEventTarget() { ref(); }

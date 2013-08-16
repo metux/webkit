@@ -30,6 +30,7 @@
 #include "Event.h"
 #include "EventNames.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLNames.h"
 #include "Length.h"
@@ -71,12 +72,12 @@ bool HTMLFrameSetElement::isPresentationAttribute(const QualifiedName& name) con
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLFrameSetElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLFrameSetElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == bordercolorAttr)
-        addHTMLColorToStyle(style, CSSPropertyBorderColor, attribute.value());
+    if (name == bordercolorAttr)
+        addHTMLColorToStyle(style, CSSPropertyBorderColor, value);
     else
-        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
+        HTMLElement::collectStyleForPresentationAttribute(name, value, style);
 }
 
 void HTMLFrameSetElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -164,7 +165,7 @@ RenderObject *HTMLFrameSetElement::createRenderer(RenderArena *arena, RenderStyl
     return new (arena) RenderFrameSet(this);
 }
 
-void HTMLFrameSetElement::attach()
+void HTMLFrameSetElement::attach(const AttachContext& context)
 {
     // Inherit default settings from parent frameset
     // FIXME: This is not dynamic.
@@ -185,7 +186,7 @@ void HTMLFrameSetElement::attach()
         }
     }
 
-    HTMLElement::attach();
+    HTMLElement::attach(context);
 }
 
 void HTMLFrameSetElement::defaultEventHandler(Event* evt)
@@ -199,7 +200,7 @@ void HTMLFrameSetElement::defaultEventHandler(Event* evt)
     HTMLElement::defaultEventHandler(evt);
 }
 
-bool HTMLFrameSetElement::willRecalcStyle(StyleChange)
+bool HTMLFrameSetElement::willRecalcStyle(Style::Change)
 {
     if (needsStyleRecalc() && renderer()) {
         renderer()->setNeedsLayout(true);

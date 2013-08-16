@@ -88,6 +88,7 @@ public:
     void dumpWillCacheResponse() { m_dumpWillCacheResponse = true; }
     void dumpApplicationCacheDelegateCallbacks() { m_dumpApplicationCacheDelegateCallbacks = true; }
     void dumpDatabaseCallbacks() { m_dumpDatabaseCallbacks = true; }
+    void dumpDOMAsWebArchive() { m_whatToDump = DOMAsWebArchive; }
 
     void setShouldDumpFrameLoadCallbacks(bool value) { m_dumpFrameLoadCallbacks = value; }
     void setShouldDumpProgressFinishedCallback(bool value) { m_dumpProgressFinishedCallback = value; }
@@ -115,13 +116,12 @@ public:
     void setSerializeHTTPLoads();
     void dispatchPendingLoadRequests();
     void setCacheModel(int);
+    void setAsynchronousSpellCheckingEnabled(bool);
 
     // Special DOM functions.
-    JSValueRef computedStyleIncludingVisitedInfo(JSValueRef element);
     void clearBackForwardList();
     void execCommand(JSStringRef name, JSStringRef argument);
     bool isCommandEnabled(JSStringRef name);
-    JSRetainPtr<JSStringRef> markerTextForListItem(JSValueRef element);
     unsigned windowCount();
 
     // Repaint testing.
@@ -153,6 +153,8 @@ public:
 
     // Printing
     bool isPageBoxVisible(int pageIndex);
+    bool isPrinting() { return m_isPrinting; }
+    void setPrinting() { m_isPrinting = true; }
 
     // Authentication
     void setHandlesAuthenticationChallenges(bool);
@@ -162,9 +164,11 @@ public:
     void setValueForUser(JSContextRef, JSValueRef element, JSStringRef value);
 
     // Audio testing.
-    void setAudioData(JSContextRef, JSValueRef data);
+    void setAudioResult(JSContextRef, JSValueRef data);
 
-    enum WhatToDump { RenderTree, MainFrameText, AllFramesText, Audio };
+    void setBlockAllPlugins(bool shouldBlock);
+
+    enum WhatToDump { RenderTree, MainFrameText, AllFramesText, Audio, DOMAsWebArchive };
     WhatToDump whatToDump() const { return m_whatToDump; }
 
     bool shouldDumpAllFrameScrollPositions() const { return m_shouldDumpAllFrameScrollPositions; }
@@ -241,7 +245,6 @@ public:
     // Custom full screen behavior.
     void setHasCustomFullScreenBehavior(bool value) { m_customFullScreenBehavior = value; }
     bool hasCustomFullScreenBehavior() const { return m_customFullScreenBehavior; }
-    void setViewModeMediaFeature(JSStringRef);
 
     // Web notifications.
     void grantWebNotificationPermission(JSStringRef origin);
@@ -271,6 +274,11 @@ public:
     void queueReload();
     void queueLoadingScript(JSStringRef script);
     void queueNonLoadingScript(JSStringRef script);
+
+    bool secureEventInputIsEnabled() const;
+    
+    JSValueRef numberOfDFGCompiles(JSValueRef theFunction);
+    JSValueRef neverInlineFunction(JSValueRef theFunction);
 
 private:
     static const double waitToDumpWatchdogTimerInterval;
@@ -304,6 +312,7 @@ private:
     bool m_waitToDump; // True if waitUntilDone() has been called, but notifyDone() has not yet been called.
     bool m_testRepaint;
     bool m_testRepaintSweepHorizontally;
+    bool m_isPrinting;
 
     bool m_willSendRequestReturnsNull;
     bool m_willSendRequestReturnsNullOnRedirect;

@@ -31,22 +31,14 @@
 #include "ActiveDOMObject.h"
 #include "ConsoleTypes.h"
 #include "KURL.h"
-#include "ScriptCallStack.h"
-#include "ScriptState.h"
 #include "SecurityContext.h"
 #include "Supplementable.h"
-#include <wtf/Forward.h>
-#include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/Threading.h>
-#include <wtf/text/StringHash.h>
 
-#if USE(JSC)
-#include <runtime/JSGlobalData.h>
-#endif
+namespace JSC {
+class ExecState;
+class VM;
+}
 
 namespace WebCore {
 
@@ -57,13 +49,12 @@ class EventListener;
 class EventQueue;
 class EventTarget;
 class MessagePort;
+class ScriptCallStack;
+
+typedef JSC::ExecState ScriptState;
 
 #if ENABLE(BLOB)
 class PublicURLManager;
-#endif
-
-#if ENABLE(BLOB)
-class FileThread;
 #endif
 
 class ScriptExecutionContext : public SecurityContext, public Supplementable<ScriptExecutionContext> {
@@ -72,7 +63,7 @@ public:
     virtual ~ScriptExecutionContext();
 
     virtual bool isDocument() const { return false; }
-    virtual bool isWorkerContext() const { return false; }
+    virtual bool isWorkerGlobalScope() const { return false; }
 
     virtual bool isContextThread() const { return true; }
     virtual bool isJSExecutionForbidden() const = 0;
@@ -84,13 +75,14 @@ public:
 
     virtual void disableEval(const String& errorMessage) = 0;
 
-    bool sanitizeScriptError(String& errorMessage, int& lineNumber, String& sourceURL, CachedScript* = 0);
-    void reportException(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>, CachedScript* = 0);
+    bool sanitizeScriptError(String& errorMessage, int& lineNumber, int& columnNumber, String& sourceURL, CachedScript* = 0);
+    // FIXME: <http://webkit.org/b/114315> ScriptExecutionContext log exception should include a column number
+    void reportException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>, CachedScript* = 0);
 
-    void addConsoleMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState* = 0, unsigned long requestIdentifier = 0);
+    void addConsoleMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, ScriptState* = 0, unsigned long requestIdentifier = 0);
     virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) = 0;
 
-    virtual const SecurityOrigin* topOrigin() const = 0;
+    virtual SecurityOrigin* topOrigin() const = 0;
 
 #if ENABLE(BLOB)
     PublicURLManager& publicURLManager();
@@ -100,27 +92,24 @@ public:
     // Active objects can be asked to suspend even if canSuspendActiveDOMObjects() returns 'false' -
     // step-by-step JS debugging is one example.
     virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension);
-    virtual void resumeActiveDOMObjects();
+    virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension);
     virtual void stopActiveDOMObjects();
 
     bool activeDOMObjectsAreSuspended() const { return m_activeDOMObjectsAreSuspended; }
     bool activeDOMObjectsAreStopped() const { return m_activeDOMObjectsAreStopped; }
 
     // Called from the constructor and destructors of ActiveDOMObject.
-    void didCreateActiveDOMObject(ActiveDOMObject*, void* upcastPointer);
+    void didCreateActiveDOMObject(ActiveDOMObject*);
     void willDestroyActiveDOMObject(ActiveDOMObject*);
 
     // Called after the construction of an ActiveDOMObject to synchronize suspend state.
     void suspendActiveDOMObjectIfNeeded(ActiveDOMObject*);
 
-    typedef const HashMap<ActiveDOMObject*, void*> ActiveDOMObjectsMap;
-    ActiveDOMObjectsMap& activeDOMObjects() const { return m_activeDOMObjects; }
+    typedef HashSet<ActiveDOMObject*> ActiveDOMObjectsSet;
+    const ActiveDOMObjectsSet& activeDOMObjects() const { return m_activeDOMObjects; }
 
     void didCreateDestructionObserver(ContextDestructionObserver*);
     void willDestroyDestructionObserver(ContextDestructionObserver*);
-
-    virtual void suspendScriptedAnimationControllerCallbacks() { }
-    virtual void resumeScriptedAnimationControllerCallbacks() { }
 
     // MessagePort is conceptually a kind of ActiveDOMObject, but it needs to be tracked separately for message dispatch.
     void processMessagePortMessagesSoon();
@@ -152,14 +141,7 @@ public:
     void removeTimeout(int timeoutId) { m_timeouts.remove(timeoutId); }
     DOMTimer* findTimeout(int timeoutId) { return m_timeouts.get(timeoutId); }
 
-#if USE(JSC)
-    JSC::JSGlobalData* globalData();
-#endif
-
-#if ENABLE(BLOB)
-    FileThread* fileThread();
-    void stopFileThread();
-#endif
+    JSC::VM* vm();
 
     // Interval is in seconds.
     void adjustMinimumTimerInterval(double oldMinimumTimerInterval);
@@ -169,8 +151,6 @@ public:
     virtual double timerAlignmentInterval() const;
 
     virtual EventQueue* eventQueue() const = 0;
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 #if ENABLE(SQL_DATABASE)
     void setDatabaseContext(DatabaseContext*);
@@ -196,14 +176,16 @@ protected:
         String m_message;
     };
 
+    ActiveDOMObject::ReasonForSuspension reasonForSuspendingActiveDOMObjects() const { return m_reasonForSuspendingActiveDOMObjects; }
+
 private:
     virtual const KURL& virtualURL() const = 0;
     virtual KURL virtualCompleteURL(const String&) const = 0;
 
-    virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>, ScriptState* = 0, unsigned long requestIdentifier = 0) = 0;
+    virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, PassRefPtr<ScriptCallStack>, ScriptState* = 0, unsigned long requestIdentifier = 0) = 0;
     virtual EventTarget* errorEventTarget() = 0;
-    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>) = 0;
-    bool dispatchErrorEvent(const String& errorMessage, int lineNumber, const String& sourceURL, CachedScript*);
+    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack>) = 0;
+    bool dispatchErrorEvent(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, CachedScript*);
 
     void closeMessagePorts();
 
@@ -212,7 +194,7 @@ private:
 
     HashSet<MessagePort*> m_messagePorts;
     HashSet<ContextDestructionObserver*> m_destructionObservers;
-    HashMap<ActiveDOMObject*, void*> m_activeDOMObjects;
+    ActiveDOMObjectsSet m_activeDOMObjects;
     bool m_iteratingActiveDOMObjects;
     bool m_inDestructor;
 
@@ -230,7 +212,6 @@ private:
 
 #if ENABLE(BLOB)
     OwnPtr<PublicURLManager> m_publicURLManager;
-    RefPtr<FileThread> m_fileThread;
 #endif
 
 #if ENABLE(SQL_DATABASE)

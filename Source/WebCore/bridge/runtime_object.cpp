@@ -38,14 +38,14 @@ namespace Bindings {
 const ClassInfo RuntimeObject::s_info = { "RuntimeObject", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(RuntimeObject) };
 
 RuntimeObject::RuntimeObject(ExecState*, JSGlobalObject* globalObject, Structure* structure, PassRefPtr<Instance> instance)
-    : JSDestructibleObject(globalObject->globalData(), structure)
+    : JSDestructibleObject(globalObject->vm(), structure)
     , m_instance(instance)
 {
 }
 
 void RuntimeObject::finishCreation(JSGlobalObject* globalObject)
 {
-    Base::finishCreation(globalObject->globalData());
+    Base::finishCreation(globalObject->vm());
     ASSERT(inherits(&s_info));
 }
 
@@ -116,9 +116,9 @@ JSValue RuntimeObject::methodGetter(ExecState* exec, JSValue slotBase, PropertyN
     return method;
 }
 
-bool RuntimeObject::getOwnPropertySlot(JSCell* cell, ExecState *exec, PropertyName propertyName, PropertySlot& slot)
+bool RuntimeObject::getOwnPropertySlot(JSObject* object, ExecState *exec, PropertyName propertyName, PropertySlot& slot)
 {
-    RuntimeObject* thisObject = jsCast<RuntimeObject*>(cell);
+    RuntimeObject* thisObject = jsCast<RuntimeObject*>(object);
     if (!thisObject->m_instance) {
         throwInvalidAccessError(exec);
         return false;
@@ -178,7 +178,7 @@ bool RuntimeObject::getOwnPropertyDescriptor(JSObject* object, ExecState *exec, 
         // See if the instance has a field with the specified name.
         Field *aField = aClass->fieldNamed(propertyName, instance.get());
         if (aField) {
-            PropertySlot slot;
+            PropertySlot slot(thisObject);
             slot.setCustom(thisObject, fieldGetter);
             instance->end();
             descriptor.setDescriptor(slot.getValue(exec, propertyName), DontDelete);
@@ -187,7 +187,7 @@ bool RuntimeObject::getOwnPropertyDescriptor(JSObject* object, ExecState *exec, 
             // Now check if a method with specified name exists, if so return a function object for
             // that method.
             if (aClass->methodNamed(propertyName, instance.get())) {
-                PropertySlot slot;
+                PropertySlot slot(thisObject);
                 slot.setCustom(thisObject, methodGetter);
                 instance->end();
                 descriptor.setDescriptor(slot.getValue(exec, propertyName), DontDelete | ReadOnly);
@@ -197,7 +197,7 @@ bool RuntimeObject::getOwnPropertyDescriptor(JSObject* object, ExecState *exec, 
         
         // Try a fallback object.
         if (!aClass->fallbackObject(exec, instance.get(), propertyName).isUndefined()) {
-            PropertySlot slot;
+            PropertySlot slot(thisObject);
             slot.setCustom(thisObject, fallbackObjectGetter);
             instance->end();
             descriptor.setDescriptor(slot.getValue(exec, propertyName), DontDelete | ReadOnly | DontEnum);

@@ -31,8 +31,10 @@
 #include "BytecodeConventions.h"
 #include "CodeType.h"
 #include "Instruction.h"
+#include "JSScope.h"
 #include "LLIntCLoop.h"
 #include "Opcode.h"
+#include "PropertyOffset.h"
 
 namespace JSC { namespace LLInt {
 
@@ -62,9 +64,9 @@ void initialize()
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 #endif
-void Data::performAssertions(JSGlobalData& globalData)
+void Data::performAssertions(VM& vm)
 {
-    UNUSED_PARAM(globalData);
+    UNUSED_PARAM(vm);
     
     // Assertions to match LowLevelInterpreter.asm.  If you change any of this code, be
     // prepared to change LowLevelInterpreter.asm as well!!
@@ -104,6 +106,7 @@ void Data::performAssertions(JSGlobalData& globalData)
 #endif
     ASSERT(StringType == 5);
     ASSERT(ObjectType == 17);
+    ASSERT(FinalObjectType == 18);
     ASSERT(MasqueradesAsUndefined == 1);
     ASSERT(ImplementsHasInstance == 2);
     ASSERT(ImplementsDefaultHasInstance == 8);
@@ -111,16 +114,26 @@ void Data::performAssertions(JSGlobalData& globalData)
     ASSERT(GlobalCode == 0);
     ASSERT(EvalCode == 1);
     ASSERT(FunctionCode == 2);
+
+    ASSERT(GlobalProperty == 0);
+    ASSERT(GlobalVar == 1);
+    ASSERT(ClosureVar == 2);
+    ASSERT(GlobalPropertyWithVarInjectionChecks == 3);
+    ASSERT(GlobalVarWithVarInjectionChecks == 4);
+    ASSERT(ClosureVarWithVarInjectionChecks == 5);
+    ASSERT(Dynamic == 6);
     
+    ASSERT(ResolveModeAndType::mask == 0xffff);
+
     // FIXME: make these assertions less horrible.
 #if !ASSERT_DISABLED
     Vector<int> testVector;
     testVector.resize(42);
-    ASSERT(bitwise_cast<size_t*>(&testVector)[0] == 42);
-    ASSERT(bitwise_cast<int**>(&testVector)[1] == testVector.begin());
+    ASSERT(bitwise_cast<uint32_t*>(&testVector)[sizeof(void*)/sizeof(uint32_t) + 1] == 42);
+    ASSERT(bitwise_cast<int**>(&testVector)[0] == testVector.begin());
 #endif
 
-    ASSERT(StringImpl::s_hashFlag8BitBuffer == 64);
+    ASSERT(StringImpl::s_hashFlag8BitBuffer == 32);
 }
 #if COMPILER(CLANG)
 #pragma clang diagnostic pop

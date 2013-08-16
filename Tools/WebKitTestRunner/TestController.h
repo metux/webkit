@@ -46,6 +46,12 @@ class TestController {
 public:
     static TestController& shared();
 
+    static const unsigned viewWidth;
+    static const unsigned viewHeight;
+
+    static const unsigned w3cSVGViewWidth;
+    static const unsigned w3cSVGViewHeight;
+
     TestController(int argc, const char* argv[]);
     ~TestController();
 
@@ -92,6 +98,8 @@ public:
     void setAuthenticationUsername(String username) { m_authenticationUsername = username; }
     void setAuthenticationPassword(String password) { m_authenticationPassword = password; }
 
+    void setBlockAllPlugins(bool shouldBlock) { m_shouldBlockAllPlugins = shouldBlock; }
+
 private:
     void initialize(int argc, const char* argv[]);
     void createWebViewWithOptions(WKDictionaryRef);
@@ -128,10 +136,14 @@ private:
     static void processDidCrash(WKPageRef, const void* clientInfo);
     void processDidCrash();
 
+    static WKPluginLoadPolicy pluginLoadPolicy(WKPageRef, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription, const void* clientInfo);
+    WKPluginLoadPolicy pluginLoadPolicy(WKPageRef, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription);
+    
+
     static void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef, const void*);
     void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef);
 
-    static void unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailabilityReason, WKStringRef, WKStringRef, WKStringRef, const void*);
+    static void unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailabilityReason, WKDictionaryRef, const void*);
 
     static void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef, const void *clientInfo);
     void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef);
@@ -200,6 +212,8 @@ private:
     bool m_handlesAuthenticationChallenges;
     String m_authenticationUsername;
     String m_authenticationPassword;
+
+    bool m_shouldBlockAllPlugins;
 
 #if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
     OwnPtr<EventSenderProxy> m_eventSenderProxy;

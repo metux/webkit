@@ -26,19 +26,13 @@
 #include "ClassNodeList.h"
 #include "HTMLDocument.h"
 #include "HTMLElement.h"
+#include "HTMLNameCollection.h"
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "HTMLOptionElement.h"
 #include "NodeList.h"
 #include "NodeRareData.h"
 #include "NodeTraversal.h"
-
-#if ENABLE(MICRODATA)
-#include "HTMLPropertiesCollection.h"
-#include "PropertyNodeList.h"
-#endif
-
-#include <utility>
 
 namespace WebCore {
 
@@ -62,9 +56,6 @@ static bool shouldOnlyIncludeDirectChildren(CollectionType type)
     case SelectedOptions:
     case DataListOptions:
     case WindowNamedItems:
-#if ENABLE(MICRODATA)
-    case ItemProperties:
-#endif
     case FormControls:
         return false;
     case NodeChildren:
@@ -79,8 +70,6 @@ static bool shouldOnlyIncludeDirectChildren(CollectionType type)
     case HTMLTagNodeListType:
     case RadioNodeListType:
     case LabelsNodeListType:
-    case MicroDataItemListType:
-    case PropertyNodeListType:
         break;
     }
     ASSERT_NOT_REACHED();
@@ -100,9 +89,6 @@ static NodeListRootType rootTypeFromCollectionType(CollectionType type)
     case DocAll:
     case WindowNamedItems:
     case DocumentNamedItems:
-#if ENABLE(MICRODATA)
-    case ItemProperties:
-#endif
     case FormControls:
         return NodeListIsRootedAtDocument;
     case NodeChildren:
@@ -122,8 +108,6 @@ static NodeListRootType rootTypeFromCollectionType(CollectionType type)
     case HTMLTagNodeListType:
     case RadioNodeListType:
     case LabelsNodeListType:
-    case MicroDataItemListType:
-    case PropertyNodeListType:
         break;
     }
     ASSERT_NOT_REACHED();
@@ -159,10 +143,6 @@ static NodeListInvalidationType invalidationTypeExcludingIdAndNameAttributes(Col
         return InvalidateOnIdNameAttrChange;
     case DocumentNamedItems:
         return InvalidateOnIdNameAttrChange;
-#if ENABLE(MICRODATA)
-    case ItemProperties:
-        return InvalidateOnItemAttrChange;
-#endif
     case FormControls:
         return InvalidateForFormControls;
     case ChildNodeListType:
@@ -172,8 +152,6 @@ static NodeListInvalidationType invalidationTypeExcludingIdAndNameAttributes(Col
     case HTMLTagNodeListType:
     case RadioNodeListType:
     case LabelsNodeListType:
-    case MicroDataItemListType:
-    case PropertyNodeListType:
         break;
     }
     ASSERT_NOT_REACHED();
@@ -226,8 +204,8 @@ template <> inline bool isMatchingElement(const HTMLCollection* htmlCollection, 
         return element->hasLocalName(optionTag) && toHTMLOptionElement(element)->selected();
     case DataListOptions:
         if (element->hasLocalName(optionTag)) {
-            HTMLOptionElement* option = static_cast<HTMLOptionElement*>(element);
-            if (!option->disabled() && !option->value().isEmpty())
+            HTMLOptionElement* option = toHTMLOptionElement(element);
+            if (!option->isDisabledFormControl() && !option->value().isEmpty())
                 return true;
         }
         return false;
@@ -244,14 +222,12 @@ template <> inline bool isMatchingElement(const HTMLCollection* htmlCollection, 
     case DocAll:
     case NodeChildren:
         return true;
-#if ENABLE(MICRODATA)
-    case ItemProperties:
-        return element->fastHasAttribute(itempropAttr);
-#endif
-    case FormControls:
     case DocumentNamedItems:
-    case TableRows:
+        return static_cast<const DocumentNameCollection*>(htmlCollection)->nodeMatches(element);
     case WindowNamedItems:
+        return static_cast<const WindowNameCollection*>(htmlCollection)->nodeMatches(element);
+    case FormControls:
+    case TableRows:
     case ChildNodeListType:
     case ClassNodeListType:
     case NameNodeListType:
@@ -259,8 +235,6 @@ template <> inline bool isMatchingElement(const HTMLCollection* htmlCollection, 
     case HTMLTagNodeListType:
     case RadioNodeListType:
     case LabelsNodeListType:
-    case MicroDataItemListType:
-    case PropertyNodeListType:
         ASSERT_NOT_REACHED();
     }
     return false;
@@ -444,13 +418,6 @@ Node* LiveNodeListBase::item(unsigned offset) const
     if (isLengthCacheValid() && cachedLength() <= offset)
         return 0;
 
-#if ENABLE(MICRODATA)
-    if (type() == ItemProperties)
-        static_cast<const HTMLPropertiesCollection*>(this)->updateRefElements();
-    else if (type() == PropertyNodeListType)
-        static_cast<const PropertyNodeList*>(this)->updateRefElements();
-#endif
-
     ContainerNode* root = rootContainerNode();
     if (!root) {
         // FIMXE: In someTextNode.childNodes case the root is Text. We shouldn't even make a LiveNodeList for that.
@@ -543,21 +510,6 @@ static inline bool nameShouldBeVisibleInDocumentAll(HTMLElement* element)
         || element->hasLocalName(selectTag);
 }
 
-bool HTMLCollection::checkForNameMatch(Element* element, bool checkName, const AtomicString& name) const
-{
-    if (!element->isHTMLElement())
-        return false;
-    
-    HTMLElement* e = toHTMLElement(element);
-    if (!checkName)
-        return e->getIdAttribute() == name;
-
-    if (type() == DocAll && !nameShouldBeVisibleInDocumentAll(e))
-        return false;
-
-    return e->getNameAttribute() == name && e->getIdAttribute() != name;
-}
-
 inline Element* firstMatchingChildElement(const HTMLCollection* nodeList, ContainerNode* root)
 {
     Element* element = ElementTraversal::firstWithin(root);
@@ -624,26 +576,41 @@ Node* HTMLCollection::namedItem(const AtomicString& name) const
     // that are allowed a name attribute.
 
     ContainerNode* root = rootContainerNode();
-    if (!root)
+    if (name.isEmpty() || !root)
         return 0;
 
-    unsigned arrayOffset = 0;
-    unsigned i = 0;
-    for (Element* element = traverseFirstElement(arrayOffset, root); element; element = traverseNextElement(arrayOffset, element, root)) {
-        if (checkForNameMatch(element, /* checkName */ false, name)) {
-            setItemCache(element, i, arrayOffset);
-            return element;
-        }
-        i++;
+    if (!overridesItemAfter() && root->isInTreeScope()) {
+        TreeScope* treeScope = root->treeScope();
+        Element* candidate = 0;
+        if (treeScope->hasElementWithId(name.impl())) {
+            if (!treeScope->containsMultipleElementsWithId(name))
+                candidate = treeScope->getElementById(name);
+        } else if (treeScope->hasElementWithName(name.impl())) {
+            if (!treeScope->containsMultipleElementsWithName(name)) {
+                candidate = treeScope->getElementByName(name);
+                if (candidate && type() == DocAll && (!candidate->isHTMLElement() || !nameShouldBeVisibleInDocumentAll(toHTMLElement(candidate))))
+                    candidate = 0;
+            }
+        } else
+            return 0;
+
+        if (candidate
+            && isMatchingElement(this, candidate)
+            && (shouldOnlyIncludeDirectChildren() ? candidate->parentNode() == root : candidate->isDescendantOf(root)))
+            return candidate;
     }
 
-    i = 0;
-    for (Element* element = traverseFirstElement(arrayOffset, root); element; element = traverseNextElement(arrayOffset, element, root)) {
-        if (checkForNameMatch(element, /* checkName */ true, name)) {
-            setItemCache(element, i, arrayOffset);
-            return element;
-        }
-        i++;
+    // The pathological case. We need to walk the entire subtree.
+    updateNameCache();
+
+    if (Vector<Element*>* idResults = idCache(name)) {
+        if (idResults->size())
+            return idResults->at(0);
+    }
+
+    if (Vector<Element*>* nameResults = nameCache(name)) {
+        if (nameResults->size())
+            return nameResults->at(0);
     }
 
     return 0;
@@ -676,22 +643,8 @@ void HTMLCollection::updateNameCache() const
 
 bool HTMLCollection::hasNamedItem(const AtomicString& name) const
 {
-    if (name.isEmpty())
-        return false;
-
-    updateNameCache();
-
-    if (Vector<Element*>* cache = idCache(name)) {
-        if (!cache->isEmpty())
-            return true;
-    }
-
-    if (Vector<Element*>* cache = nameCache(name)) {
-        if (!cache->isEmpty())
-            return true;
-    }
-
-    return false;
+    // FIXME: We can do better when there are multiple elements of the same name.
+    return namedItem(name);
 }
 
 void HTMLCollection::namedItems(const AtomicString& name, Vector<RefPtr<Node> >& result) const

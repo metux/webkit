@@ -310,11 +310,8 @@ WebInspector.ExtensionServer.prototype = {
         var options = /** @type ExtensionReloadOptions */ (message.options || {});
         NetworkAgent.setUserAgentOverride(typeof options.userAgent === "string" ? options.userAgent : "");
         var injectedScript;
-        if (options.injectedScript) {
-            // Wrap client script into anonymous function, return another anonymous function that
-            // returns empty object for compatibility with InjectedScriptManager on the backend.
-            injectedScript = "((function(){" + options.injectedScript + "})(),function(){return {}})";
-        }
+        if (options.injectedScript)
+            injectedScript = "(function(){" + options.injectedScript + "})()";
         PageAgent.reload(!!options.ignoreCache, injectedScript);
         return this._status.OK();
     },
@@ -351,8 +348,6 @@ WebInspector.ExtensionServer.prototype = {
         function convertSeverity(level)
         {
             switch (level) {
-                case WebInspector.extensionAPI.console.Severity.Tip:
-                    return WebInspector.ConsoleMessage.MessageLevel.Tip;
                 case WebInspector.extensionAPI.console.Severity.Log:
                     return WebInspector.ConsoleMessage.MessageLevel.Log;
                 case WebInspector.extensionAPI.console.Severity.Warning:
@@ -384,8 +379,6 @@ WebInspector.ExtensionServer.prototype = {
             if (!level)
                 return;
             switch (level) {
-                case WebInspector.ConsoleMessage.MessageLevel.Tip:
-                    return WebInspector.extensionAPI.console.Severity.Tip;
                 case WebInspector.ConsoleMessage.MessageLevel.Log:
                     return WebInspector.extensionAPI.console.Severity.Log;
                 case WebInspector.ConsoleMessage.MessageLevel.Warning:
@@ -780,13 +773,49 @@ WebInspector.ExtensionServer.prototype = {
     evaluate: function(expression, exposeCommandLineAPI, returnByValue, options, securityOrigin, callback) 
     {
         var contextId;
-        if (typeof options === "object" && options["useContentScriptContext"]) {
-            var mainFrame = WebInspector.resourceTreeModel.mainFrame;
-            if (!mainFrame)
-                return this._status.E_FAILED("main frame not available yet");
-            var context = WebInspector.runtimeModel.contextByFrameAndSecurityOrigin(mainFrame, securityOrigin);
-            if (!context)
-                return this._status.E_NOTFOUND(securityOrigin);
+        if (typeof options === "object") {
+
+            function resolveURLToFrame(url)
+            {
+                var found;
+                function hasMatchingURL(frame) 
+                {
+                    found = (frame.url === url) ? frame : null;
+                    return found;
+                }
+                WebInspector.resourceTreeModel.frames().some(hasMatchingURL);
+                return found;
+            }
+
+            var frame = options.frameURL ? resolveURLToFrame(options.frameURL) : WebInspector.resourceTreeModel.mainFrame;
+            if (!frame) {
+                if (options.frameURL)
+                    console.warn("evaluate: there is no frame with URL " + options.frameURL);
+                else
+                    console.warn("evaluate: the main frame is not yet available");
+                return this._status.E_NOTFOUND(options.frameURL || "<top>");
+            }
+
+            var contextSecurityOrigin;
+            if (options.useContentScriptContext)
+                contextSecurityOrigin = securityOrigin;
+            else if (options.scriptExecutionContext)
+                contextSecurityOrigin = options.scriptExecutionContext;
+
+            var frameContextList = WebInspector.runtimeModel.contextListByFrame(frame);
+            var context; 
+            if (contextSecurityOrigin) {
+                context = frameContextList.contextBySecurityOrigin(contextSecurityOrigin);
+                if (!context) {
+                    console.warn("The JS context " + contextSecurityOrigin + " was not found in the frame " + frame.url)
+                    return this._status.E_NOTFOUND(contextSecurityOrigin)
+                }
+            } else {
+                context = frameContextList.mainWorldContext();
+                if (!context) 
+                    return this._status.E_FAILED(frame.url + " has no execution context");
+            }
+
             contextId = context.id;
         }
         RuntimeAgent.evaluate(expression, "extension", exposeCommandLineAPI, true, contextId, returnByValue, false, callback);

@@ -38,6 +38,7 @@
 
 namespace WebCore {
 
+class AXObjectCache;
 class Element;
 class Event;
 class FloatSize;
@@ -50,6 +51,7 @@ class RenderEmbeddedObject;
 class RenderLayer;
 class RenderObject;
 class RenderScrollbarPart;
+class RenderStyle;
 
 Pagination::Mode paginationModeForRenderStyle(RenderStyle*);
 
@@ -111,8 +113,9 @@ public:
 
     bool needsLayout() const;
     void setNeedsLayout();
+    void setViewportConstrainedObjectsNeedLayout();
 
-    bool needsFullRepaint() const { return m_doFullRepaint; }
+    bool needsFullRepaint() const { return m_needsFullRepaint; }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     void serviceScriptedAnimations(double monotonicAnimationStartTime);
@@ -194,6 +197,8 @@ public:
     virtual bool shouldRubberBandInDirection(ScrollDirection) const;
     virtual bool requestScrollPositionUpdate(const IntPoint&) OVERRIDE;
     virtual bool isRubberBandInProgress() const OVERRIDE;
+    virtual IntPoint minimumScrollPosition() const OVERRIDE;
+    virtual IntPoint maximumScrollPosition() const OVERRIDE;
 
     // This is different than visibleContentRect() in that it ignores negative (or overly positive)
     // offsets from rubber-banding, and it takes zooming into account. 
@@ -209,9 +214,10 @@ public:
     bool isOverlappedIncludingAncestors() const;
     void setContentIsOpaque(bool);
 
-    void addSlowRepaintObject();
-    void removeSlowRepaintObject();
-    bool hasSlowRepaintObjects() const { return m_slowRepaintObjectCount; }
+    void addSlowRepaintObject(RenderObject*);
+    void removeSlowRepaintObject(RenderObject*);
+    bool hasSlowRepaintObject(RenderObject* o) const { return m_slowRepaintObjects && m_slowRepaintObjects->contains(o); }
+    bool hasSlowRepaintObjects() const { return m_slowRepaintObjects && m_slowRepaintObjects->size(); }
 
     // Includes fixed- and sticky-position objects.
     typedef HashSet<RenderObject*> ViewportConstrainedObjectSet;
@@ -224,7 +230,7 @@ public:
     // and adjusting for page scale.
     IntSize scrollOffsetForFixedPosition() const;
     // Static function can be called from another thread.
-    static IntSize scrollOffsetForFixedPosition(const IntRect& visibleContentRect, const IntSize& contentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin, float frameScaleFactor, bool fixedElementsLayoutRelativeToFrame);
+    static IntSize scrollOffsetForFixedPosition(const IntRect& visibleContentRect, const IntSize& totalContentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin, float frameScaleFactor, bool fixedElementsLayoutRelativeToFrame, int headerHeight, int footerHeight);
 
     bool fixedElementsLayoutRelativeToFrame() const;
 
@@ -234,6 +240,9 @@ public:
     void flushDeferredRepaints();
     void startDeferredRepaintTimer(double delay);
     void resetDeferredRepaintDelay();
+
+    void updateLayerFlushThrottlingInAllFrames();
+    void adjustTiledBackingCoverage();
 
     void beginDisableRepaints();
     void endDisableRepaints();
@@ -268,9 +277,9 @@ public:
     void setLastPaintTime(double lastPaintTime) { m_lastPaintTime = lastPaintTime; }
     void setNodeToDraw(Node*);
 
-    enum SelectionInSnaphot { IncludeSelection, ExcludeSelection };
+    enum SelectionInSnapshot { IncludeSelection, ExcludeSelection };
     enum CoordinateSpaceForSnapshot { DocumentCoordinates, ViewCoordinates };
-    void paintContentsForSnapshot(GraphicsContext*, const IntRect& imageRect, SelectionInSnaphot shouldPaintSelection, CoordinateSpaceForSnapshot);
+    void paintContentsForSnapshot(GraphicsContext*, const IntRect& imageRect, SelectionInSnapshot shouldPaintSelection, CoordinateSpaceForSnapshot);
 
     virtual void paintOverhangAreas(GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
     virtual void paintScrollCorner(GraphicsContext*, const IntRect& cornerRect);
@@ -286,9 +295,11 @@ public:
 
     void incrementVisuallyNonEmptyCharacterCount(unsigned);
     void incrementVisuallyNonEmptyPixelCount(const IntSize&);
-    void setIsVisuallyNonEmpty() { m_isVisuallyNonEmpty = true; }
+    void updateIsVisuallyNonEmpty();
     bool isVisuallyNonEmpty() const { return m_isVisuallyNonEmpty; }
     void enableAutoSizeMode(bool enable, const IntSize& minSize, const IntSize& maxSize);
+    void setAutoSizeFixedMinimumHeight(int fixedMinimumHeight);
+    IntSize autoSizingIntrinsicContentSize() const { return m_autoSizeContentSize; }
 
     void forceLayout(bool allowSubtree = false);
     void forceLayoutForPagination(const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkFactor, AdjustViewSizeOrNot);
@@ -339,6 +350,8 @@ public:
     static void setRepaintThrottlingDeferredRepaintDelayIncrementDuringLoading(double p);
 
     virtual IntPoint lastKnownMousePosition() const;
+    virtual bool isHandlingWheelEvent() const OVERRIDE;
+    bool shouldSetCursor() const;
 
     virtual bool scrollbarsCanBeActive() const OVERRIDE;
 
@@ -396,9 +409,41 @@ public:
     void setInitialViewportSize(const IntSize& size) { m_initialViewportSize = size; }
 #endif
 
+    virtual bool isActive() const OVERRIDE;
+
+#if ENABLE(RUBBER_BANDING)
+    GraphicsLayer* setWantsLayerForTopOverHangArea(bool) const;
+    GraphicsLayer* setWantsLayerForBottomOverHangArea(bool) const;
+#endif
+
+    virtual int headerHeight() const OVERRIDE { return m_headerHeight; }
+    void setHeaderHeight(int);
+    virtual int footerHeight() const OVERRIDE { return m_footerHeight; }
+    void setFooterHeight(int);
+
+    virtual void willStartLiveResize() OVERRIDE;
+    virtual void willEndLiveResize() OVERRIDE;
+
+#if USE(ACCELERATED_COMPOSITING)
+    virtual bool scrollbarAnimationsAreSuppressed() const OVERRIDE;
+#endif
+
+    void addPaintPendingMilestones(LayoutMilestones);
+    void firePaintRelatedMilestones();
+    LayoutMilestones milestonesPendingPaint() const { return m_milestonesPendingPaint; }
+
+    bool visualUpdatesAllowedByClient() const { return m_visualUpdatesAllowedByClient; }
+    void setVisualUpdatesAllowedByClient(bool);
+
+    void resumeAnimatingImages();
+    
+    void setScrollPinningBehavior(ScrollPinningBehavior);
+
 protected:
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);
     virtual void scrollContentsSlowPath(const IntRect& updateRect);
+    
+    void repaintSlowRepaintObjects();
 
     virtual bool isVerticalDocument() const;
     virtual bool isFlippedDocument() const;
@@ -409,7 +454,7 @@ private:
     void reset();
     void init();
 
-    virtual bool isFrameView() const;
+    virtual bool isFrameView() const OVERRIDE { return true; }
 
     friend class RenderWidget;
     bool useSlowRepaints(bool considerOverlap = true) const;
@@ -445,7 +490,6 @@ private:
 
     // ScrollableArea interface
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) OVERRIDE;
-    virtual bool isActive() const OVERRIDE;
     virtual void getTickmarks(Vector<IntRect>&) const OVERRIDE;
     virtual void scrollTo(const IntSize&) OVERRIDE;
     virtual void setVisibleScrollerThumbRect(const IntRect&) OVERRIDE;
@@ -454,6 +498,7 @@ private:
     virtual bool scrollAnimatorEnabled() const OVERRIDE;
 #if USE(ACCELERATED_COMPOSITING)
     virtual bool usesCompositedScrolling() const OVERRIDE;
+    virtual GraphicsLayer* layerForScrolling() const OVERRIDE;
     virtual GraphicsLayer* layerForHorizontalScrollbar() const OVERRIDE;
     virtual GraphicsLayer* layerForVerticalScrollbar() const OVERRIDE;
     virtual GraphicsLayer* layerForScrollCorner() const OVERRIDE;
@@ -461,6 +506,12 @@ private:
     virtual GraphicsLayer* layerForOverhangAreas() const OVERRIDE;
 #endif
 #endif
+
+    // Override scrollbar notifications to update the AXObject cache.
+    virtual void didAddScrollbar(Scrollbar*, ScrollbarOrientation) OVERRIDE;
+    virtual void willRemoveScrollbar(Scrollbar*, ScrollbarOrientation) OVERRIDE;
+
+    void sendResizeEventIfNeeded();
 
     void updateScrollableAreaSet();
 
@@ -484,8 +535,10 @@ private:
     FrameView* parentFrameView() const;
 
     bool doLayoutWithFrameFlattening(bool allowSubtree);
+    bool frameFlatteningEnabled() const;
+    bool isFrameFlatteningValidForThisFrame() const;
 
-    void setViewportConstrainedObjectsNeedLayout();
+    bool qualifiesAsVisuallyNonEmpty() const;
 
     virtual AXObjectCache* axObjectCache() const;
     void notifyWidgetsInAllFrames(WidgetNotification);
@@ -500,13 +553,15 @@ private:
     OwnPtr<RenderObjectSet> m_widgetUpdateSet;
     RefPtr<Frame> m_frame;
 
-    bool m_doFullRepaint;
+    OwnPtr<RenderObjectSet> m_slowRepaintObjects;
+
+    bool m_needsFullRepaint;
     
     bool m_canHaveScrollbars;
     bool m_cannotBlitToWindow;
     bool m_isOverlapped;
     bool m_contentIsOpaque;
-    unsigned m_slowRepaintObjectCount;
+
     int m_borderX;
     int m_borderY;
 
@@ -585,14 +640,26 @@ private:
     IntSize m_minAutoSize;
     // The upper bound on the size when autosizing.
     IntSize m_maxAutoSize;
+    // The fixed height to resize the view to after autosizing is complete.
+    int m_autoSizeFixedMinimumHeight;
+    // The intrinsic content size decided by autosizing.
+    IntSize m_autoSizeContentSize;
 
     OwnPtr<ScrollableAreaSet> m_scrollableAreas;
     OwnPtr<ViewportConstrainedObjectSet> m_viewportConstrainedObjects;
+
+    int m_headerHeight;
+    int m_footerHeight;
+
+    LayoutMilestones m_milestonesPendingPaint;
 
     static double s_normalDeferredRepaintDelay;
     static double s_initialDeferredRepaintDelayDuringLoading;
     static double s_maxDeferredRepaintDelayDuringLoading;
     static double s_deferredRepaintDelayIncrementDuringLoading;
+
+    static const unsigned visualCharacterThreshold = 200;
+    static const unsigned visualPixelThreshold = 32 * 32;
 
 #if ENABLE(CSS_FILTERS)
     bool m_hasSoftwareFilters;
@@ -602,6 +669,10 @@ private:
     // the viewport given by the window or viewing area of the UA.
     IntSize m_initialViewportSize;
 #endif
+
+    bool m_visualUpdatesAllowedByClient;
+    
+    ScrollPinningBehavior m_scrollPinningBehavior;
 };
 
 inline void FrameView::incrementVisuallyNonEmptyCharacterCount(unsigned count)
@@ -609,11 +680,9 @@ inline void FrameView::incrementVisuallyNonEmptyCharacterCount(unsigned count)
     if (m_isVisuallyNonEmpty)
         return;
     m_visuallyNonEmptyCharacterCount += count;
-    // Use a threshold value to prevent very small amounts of visible content from triggering didFirstVisuallyNonEmptyLayout.
-    // The first few hundred characters rarely contain the interesting content of the page.
-    static const unsigned visualCharacterThreshold = 200;
-    if (m_visuallyNonEmptyCharacterCount > visualCharacterThreshold)
-        setIsVisuallyNonEmpty();
+    if (m_visuallyNonEmptyCharacterCount <= visualCharacterThreshold)
+        return;
+    updateIsVisuallyNonEmpty();
 }
 
 inline void FrameView::incrementVisuallyNonEmptyPixelCount(const IntSize& size)
@@ -621,10 +690,9 @@ inline void FrameView::incrementVisuallyNonEmptyPixelCount(const IntSize& size)
     if (m_isVisuallyNonEmpty)
         return;
     m_visuallyNonEmptyPixelCount += size.width() * size.height();
-    // Use a threshold value to prevent very small amounts of visible content from triggering didFirstVisuallyNonEmptyLayout
-    static const unsigned visualPixelThreshold = 32 * 32;
-    if (m_visuallyNonEmptyPixelCount > visualPixelThreshold)
-        setIsVisuallyNonEmpty();
+    if (m_visuallyNonEmptyPixelCount <= visualPixelThreshold)
+        return;
+    updateIsVisuallyNonEmpty();
 }
 
 inline int FrameView::mapFromLayoutToCSSUnits(LayoutUnit value)
@@ -636,6 +704,21 @@ inline LayoutUnit FrameView::mapFromCSSToLayoutUnits(int value)
 {
     return value * m_frame->pageZoomFactor() * m_frame->frameScaleFactor();
 }
+
+inline FrameView* toFrameView(Widget* widget)
+{
+    ASSERT(!widget || widget->isFrameView());
+    return static_cast<FrameView*>(widget);
+}
+
+inline const FrameView* toFrameView(const Widget* widget)
+{
+    ASSERT(!widget || widget->isFrameView());
+    return static_cast<const FrameView*>(widget);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toFrameView(const FrameView*);
 
 } // namespace WebCore
 

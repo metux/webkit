@@ -29,10 +29,8 @@
 #include "StyleImage.h"
 #include "StylePendingImage.h"
 #include "TreeScope.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/MathExtras.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/UnusedParam.h>
+#include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
 
 #if ENABLE(SVG)
@@ -126,7 +124,7 @@ bool CSSCursorImageValue::updateIfSVGCursorIsUsed(Element* element)
         if (cachedImageURL() != element->document()->completeURL(cursorElement->href()))
             clearCachedImage();
 
-        SVGElement* svgElement = static_cast<SVGElement*>(element);
+        SVGElement* svgElement = toSVGElement(element);
         m_referencedElements.add(svgElement);
         svgElement->setCursorImageValue(this);
         cursorElement->addClient(svgElement);
@@ -221,16 +219,6 @@ bool CSSCursorImageValue::equals(const CSSCursorImageValue& other) const
 {
     return m_hasHotSpot ? other.m_hasHotSpot && m_hotSpot == other.m_hotSpot : !other.m_hasHotSpot
         && compareCSSValuePtr(m_imageValue, other.m_imageValue);
-}
-
-void CSSCursorImageValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    m_imageValue->reportMemoryUsage(memoryObjectInfo);
-    // No need to report m_image as it is counted as part of RenderArena.
-#if ENABLE(SVG)
-    info.addMember(m_referencedElements, "referencedElements");
-#endif
 }
 
 } // namespace WebCore

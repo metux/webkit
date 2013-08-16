@@ -28,7 +28,7 @@ namespace JSC {
 
     class RegExpMatchesArray : public JSArray {
     private:
-        RegExpMatchesArray(JSGlobalData&, Butterfly*, JSGlobalObject*, JSString*, RegExp*, MatchResult);
+        RegExpMatchesArray(VM&, Butterfly*, JSGlobalObject*, JSString*, RegExp*, MatchResult);
 
         enum ReifiedState { ReifiedNone, ReifiedMatch, ReifiedAll };
 
@@ -42,15 +42,15 @@ namespace JSC {
 
         static const ClassInfo s_info;
 
-        static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
+        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
         {
-            return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info, ArrayWithArrayStorage);
+            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info, ArrayWithArrayStorage);
         }
 
         static void visitChildren(JSCell*, SlotVisitor&);
 
     protected:
-        void finishCreation(JSGlobalData&);
+        void finishCreation(VM&);
 
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | Base::StructureFlags;
 
@@ -67,16 +67,16 @@ namespace JSC {
                 reifyMatchProperty(exec);
         }
 
-        static bool getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+        static bool getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
         {
-            RegExpMatchesArray* thisObject = jsCast<RegExpMatchesArray*>(cell);
+            RegExpMatchesArray* thisObject = jsCast<RegExpMatchesArray*>(object);
             thisObject->reifyAllPropertiesIfNecessary(exec);
             return JSArray::getOwnPropertySlot(thisObject, exec, propertyName, slot);
         }
 
-        static bool getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, PropertySlot& slot)
+        static bool getOwnPropertySlotByIndex(JSObject* object, ExecState* exec, unsigned propertyName, PropertySlot& slot)
         {
-            RegExpMatchesArray* thisObject = jsCast<RegExpMatchesArray*>(cell);
+            RegExpMatchesArray* thisObject = jsCast<RegExpMatchesArray*>(object);
             if (propertyName)
                 thisObject->reifyAllPropertiesIfNecessary(exec);
             else

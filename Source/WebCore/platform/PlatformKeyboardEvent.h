@@ -28,9 +28,7 @@
 #define PlatformKeyboardEvent_h
 
 #include "PlatformEvent.h"
-#if OS(WINDOWS)
-#include "WindowsExtras.h"
-#endif
+#include <wtf/WindowsExtras.h>
 #include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
@@ -47,10 +45,6 @@ typedef struct _GdkEventKey GdkEventKey;
 QT_BEGIN_NAMESPACE
 class QKeyEvent;
 QT_END_NAMESPACE
-#endif
-
-#if PLATFORM(WX)
-class wxKeyEvent;
 #endif
 
 #if PLATFORM(BLACKBERRY)
@@ -87,6 +81,7 @@ namespace WebCore {
 #endif
 #if PLATFORM(QT)
             , m_qtEvent(0)
+            , m_useNativeVirtualKeyAsDOMKey(false)
 #endif
         {
         }
@@ -161,14 +156,10 @@ namespace WebCore {
 #endif
 
 #if PLATFORM(QT)
-        PlatformKeyboardEvent(QKeyEvent*);
+        PlatformKeyboardEvent(QKeyEvent*, bool);
         QKeyEvent* qtEvent() const { return m_qtEvent; }
         uint32_t nativeModifiers() const;
         uint32_t nativeScanCode() const;
-#endif
-
-#if PLATFORM(WX)
-        PlatformKeyboardEvent(wxKeyEvent&);
 #endif
 
 #if PLATFORM(BLACKBERRY)
@@ -204,6 +195,7 @@ namespace WebCore {
 #endif
 #if PLATFORM(QT)
         QKeyEvent* m_qtEvent;
+        bool m_useNativeVirtualKeyAsDOMKey;
 #endif
     };
     

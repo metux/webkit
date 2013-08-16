@@ -58,7 +58,7 @@ static void gtkStyleChangedCallback(GObject*, GParamSpec*)
     for (StyleContextMap::const_iterator iter = styleContextMap().begin(); iter != end; ++iter)
         gtk_style_context_invalidate(iter->value.get());
 
-    Page::scheduleForcedStyleRecalcForAllPages();
+    Page::updateStyleForAllPagesAfterGlobalChangeInEnvironment();
 }
 
 static StyleContextMap& styleContextMap()
@@ -982,7 +982,7 @@ Color RenderThemeGtk::inactiveListBoxSelectionForegroundColor() const
     return gdkRGBAColor;
 }
 
-Color RenderThemeGtk::systemColor(int cssValueId) const
+Color RenderThemeGtk::systemColor(CSSValueID cssValueId) const
 {
     GdkRGBA gdkRGBAColor;
 

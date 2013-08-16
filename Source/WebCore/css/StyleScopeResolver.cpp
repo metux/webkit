@@ -39,10 +39,6 @@
 #include "RuleFeature.h"
 #include "RuleSet.h"
 #include "ShadowRoot.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
 
@@ -64,10 +60,10 @@ const ContainerNode* StyleScopeResolver::scopeFor(const CSSStyleSheet* sheet)
     if (!document)
         return 0;
     Node* ownerNode = sheet->ownerNode();
-    if (!ownerNode || !ownerNode->isHTMLElement() || !ownerNode->hasTagName(HTMLNames::styleTag))
+    if (!ownerNode || !ownerNode->isHTMLElement() || !isHTMLStyleElement(ownerNode))
         return 0;
 
-    HTMLStyleElement* styleElement = static_cast<HTMLStyleElement*>(ownerNode);
+    HTMLStyleElement* styleElement = toHTMLStyleElement(ownerNode);
     if (!styleElement->scoped())
         return styleElement->isInShadowTree() ? styleElement->containingShadowRoot() : 0;
 
@@ -155,6 +151,10 @@ void StyleScopeResolver::collectFeaturesTo(RuleFeatureSet& features)
 {
     for (ScopedRuleSetMap::iterator it = m_authorStyles.begin(); it != m_authorStyles.end(); ++it)
         features.add(it->value->features());
+#if ENABLE(SHADOW_DOM)
+    for (ScopedRuleSetMap::iterator it = m_atHostRules.begin(); it != m_atHostRules.end(); ++it)
+        features.add(it->value->features());
+#endif
 }
 
 inline RuleSet* StyleScopeResolver::ensureAtHostRuleSetFor(const ShadowRoot* shadowRoot)
@@ -207,12 +207,9 @@ bool StyleScopeResolver::styleSharingCandidateMatchesHostRules(const Element* el
     // add a new flag to ElementShadow and cache whether any@host @-rules are
     // applied to the element or not. So we can avoid always traversing
     // shadow roots.
-    for (ShadowRoot* shadowRoot = shadow->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot()) {
+    if (ShadowRoot* shadowRoot = shadow->shadowRoot()) {
         if (atHostRuleSetFor(shadowRoot))
             return true;
-
-        if (!ScopeContentDistribution::hasShadowElement(shadowRoot))
-            break;
     }
     return false;
 }
@@ -230,21 +227,10 @@ void StyleScopeResolver::matchHostRules(const Element* element, Vector<RuleSet*>
     // add a new flag to ElementShadow and cache whether any @host @-rules are
     // applied to the element or not. So we can quickly exit this method
     // by using the flag.
-    for (ShadowRoot* shadowRoot = shadow->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot()) { 
+    if (ShadowRoot* shadowRoot = shadow->shadowRoot()) {
         if (RuleSet* ruleSet = atHostRuleSetFor(shadowRoot))
             matchedRules.append(ruleSet);
-        if (!ScopeContentDistribution::hasShadowElement(shadowRoot))
-            break;
     }
-}
-
-void StyleScopeResolver::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_authorStyles, "authorStyles");
-    info.addMember(m_stack, "stack");
-    info.addMember(m_atHostRules, "atHostRules");
-    info.addMember(m_stackParent, "stackParent");
 }
 
 }

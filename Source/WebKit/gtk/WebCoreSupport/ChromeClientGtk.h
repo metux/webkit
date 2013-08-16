@@ -43,7 +43,6 @@ namespace WebKit {
     class ChromeClient : public WebCore::ChromeClient {
     public:
         ChromeClient(WebKitWebView*);
-        virtual void* webView() const { return m_webView; }
         GtkAdjustmentWatcher* adjustmentWatcher() { return &m_adjustmentWatcher; }
 
         virtual void chromeDestroyed();
@@ -59,7 +58,7 @@ namespace WebKit {
         virtual bool canTakeFocus(FocusDirection);
         virtual void takeFocus(FocusDirection);
 
-        virtual void focusedNodeChanged(Node*);
+        virtual void focusedElementChanged(Element*);
         virtual void focusedFrameChanged(Frame*);
 
         virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&);
@@ -82,7 +81,7 @@ namespace WebKit {
 
         virtual void setResizable(bool);
 
-        virtual void addMessageToConsole(MessageSource, MessageLevel, const WTF::String& message, unsigned lineNumber, const WTF::String& sourceID);
+        virtual void addMessageToConsole(MessageSource, MessageLevel, const WTF::String& message, unsigned lineNumber, unsigned columnNumber, const WTF::String& sourceID);
 
         virtual bool canRunBeforeUnloadConfirmPanel();
         virtual bool runBeforeUnloadConfirmPanel(const WTF::String& message, Frame* frame);
@@ -162,6 +161,8 @@ namespace WebKit {
         void paint(Timer<ChromeClient>*);
         void forcePaint();
         void widgetSizeChanged(const IntSize& oldWidgetSize, IntSize newSize);
+
+        WebKitWebView* webView() { return m_webView; }
 
     private:
         WebKitWebView* m_webView;

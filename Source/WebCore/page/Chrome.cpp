@@ -65,6 +65,7 @@ using namespace std;
 Chrome::Chrome(Page* page, ChromeClient* client)
     : m_page(page)
     , m_client(client)
+    , m_displayID(0)
 {
     ASSERT(m_client);
 }
@@ -177,9 +178,9 @@ void Chrome::takeFocus(FocusDirection direction) const
     m_client->takeFocus(direction);
 }
 
-void Chrome::focusedNodeChanged(Node* node) const
+void Chrome::focusedElementChanged(Element* element) const
 {
-    m_client->focusedNodeChanged(node);
+    m_client->focusedElementChanged(element);
 }
 
 void Chrome::focusedFrameChanged(Frame* frame) const
@@ -190,11 +191,11 @@ void Chrome::focusedFrameChanged(Frame* frame) const
 Page* Chrome::createWindow(Frame* frame, const FrameLoadRequest& request, const WindowFeatures& features, const NavigationAction& action) const
 {
     Page* newPage = m_client->createWindow(frame, request, features, action);
+    if (!newPage)
+        return 0;
 
-    if (newPage) {
-        if (StorageNamespace* oldSessionStorage = m_page->sessionStorage(false))
-            newPage->setSessionStorage(oldSessionStorage->copy());
-    }
+    if (StorageNamespace* oldSessionStorage = m_page->sessionStorage(false))
+        newPage->setSessionStorage(oldSessionStorage->copy(newPage));
 
     return newPage;
 }
@@ -214,7 +215,7 @@ static bool canRunModalIfDuringPageDismissal(Page* page, ChromeClient::DialogTyp
     for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
         FrameLoader::PageDismissalType dismissal = frame->loader()->pageDismissalEventBeingDispatched();
         if (dismissal != FrameLoader::NoDismissal)
-            return page->chrome()->client()->shouldRunModalDialogDuringPageDismissal(dialog, message, dismissal);
+            return page->chrome().client()->shouldRunModalDialogDuringPageDismissal(dialog, message, dismissal);
     }
     return true;
 }
@@ -406,8 +407,8 @@ void Chrome::setToolTip(const HitTestResult& result)
     if (toolTip.isEmpty() && m_page->settings()->showsURLsInToolTips()) {
         if (Node* node = result.innerNonSharedNode()) {
             // Get tooltip representing form action, if relevant
-            if (node->hasTagName(inputTag)) {
-                HTMLInputElement* input = static_cast<HTMLInputElement*>(node);
+            if (isHTMLInputElement(node)) {
+                HTMLInputElement* input = toHTMLInputElement(node);
                 if (input->isSubmitButton())
                     if (HTMLFormElement* form = input->form()) {
                         toolTip = form->action();
@@ -438,8 +439,8 @@ void Chrome::setToolTip(const HitTestResult& result)
     // Lastly, for <input type="file"> that allow multiple files, we'll consider a tooltip for the selected filenames
     if (toolTip.isEmpty()) {
         if (Node* node = result.innerNonSharedNode()) {
-            if (node->hasTagName(inputTag)) {
-                HTMLInputElement* input = static_cast<HTMLInputElement*>(node);
+            if (isHTMLInputElement(node)) {
+                HTMLInputElement* input = toHTMLInputElement(node);
                 toolTip = input->defaultToolTip();
 
                 // FIXME: We should obtain text direction of tooltip from
@@ -459,6 +460,16 @@ void Chrome::print(Frame* frame)
 {
     // FIXME: This should have PageGroupLoadDeferrer, like runModal() or runJavaScriptAlert(), becasue it's no different from those.
     m_client->print(frame);
+}
+
+void Chrome::enableSuddenTermination()
+{
+    m_client->enableSuddenTermination();
+}
+
+void Chrome::disableSuddenTermination()
+{
+    m_client->disableSuddenTermination();
 }
 
 #if ENABLE(DIRECTORY_UPLOAD)
@@ -518,6 +529,24 @@ void Chrome::scheduleAnimation()
 #endif
 }
 #endif
+
+PlatformDisplayID Chrome::displayID() const
+{
+    return m_displayID;
+}
+
+void Chrome::windowScreenDidChange(PlatformDisplayID displayID)
+{
+    if (displayID == m_displayID)
+        return;
+
+    m_displayID = displayID;
+
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+        if (frame->document())
+            frame->document()->windowScreenDidChange(displayID);
+    }
+}
 
 // --------
 

@@ -33,6 +33,7 @@
 #if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
 #include "FECustomFilter.h"
 
+#include "CustomFilterCompiledProgram.h"
 #include "CustomFilterRenderer.h"
 #include "CustomFilterValidatedProgram.h"
 #include "Extensions3D.h"
@@ -40,7 +41,7 @@
 #include "RenderTreeAsText.h"
 #include "TextStream.h"
 
-#include <wtf/Uint8ClampedArray.h>
+#include <runtime/Uint8ClampedArray.h>
 
 namespace WebCore {
 
@@ -156,9 +157,16 @@ bool FECustomFilter::prepareForDrawing()
 {
     m_context->makeContextCurrent();
 
-    // Lazily inject the compiled program into the CustomFilterRenderer.
-    if (!m_customFilterRenderer->compiledProgram())
-        m_customFilterRenderer->setCompiledProgram(m_validatedProgram->compiledProgram());
+    if (!m_customFilterRenderer->compiledProgram()) {
+        RefPtr<CustomFilterCompiledProgram> compiledProgram = m_validatedProgram->compiledProgram();
+        if (!compiledProgram) {
+            // Lazily create a compiled program and let CustomFilterValidatedProgram hold on to it.
+            compiledProgram = CustomFilterCompiledProgram::create(m_context, m_validatedProgram->validatedVertexShader(), m_validatedProgram->validatedFragmentShader(), m_validatedProgram->programInfo().programType());
+            m_validatedProgram->setCompiledProgram(compiledProgram);
+        }
+        // Lazily inject the compiled program into the CustomFilterRenderer.
+        m_customFilterRenderer->setCompiledProgram(compiledProgram.release());
+    }
 
     if (!m_customFilterRenderer->prepareForDrawing())
         return false;
@@ -331,12 +339,7 @@ bool FECustomFilter::resizeContext(const IntSize& newContextSize)
     m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_frameBuffer);
     m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, m_destTexture);
     // We are going to clear the output buffer anyway, so we can safely initialize the destination texture with garbage data.
-#if PLATFORM(CHROMIUM)
-    // FIXME: GraphicsContext3D::texImage2DDirect is not implemented on Chromium.
-    m_context->texImage2D(GraphicsContext3D::TEXTURE_2D, 0, GraphicsContext3D::RGBA, newContextSize.width(), newContextSize.height(), 0, GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, 0);
-#else
     m_context->texImage2DDirect(GraphicsContext3D::TEXTURE_2D, 0, GraphicsContext3D::RGBA, newContextSize.width(), newContextSize.height(), 0, GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, 0);
-#endif
     m_context->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, m_destTexture, 0);
 
     // We don't need the depth buffer for the texture framebuffer, if we already

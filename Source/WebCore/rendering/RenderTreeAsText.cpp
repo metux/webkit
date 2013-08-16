@@ -50,7 +50,6 @@
 #include "RenderWidget.h"
 #include "StylePropertySet.h"
 #include <wtf/HexNumber.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
 #include <wtf/unicode/CharacterNames.h>
 
@@ -168,7 +167,7 @@ static bool isEmptyOrUnstyledAppleStyleSpan(const Node* node)
     if (!node || !node->isHTMLElement() || !node->hasTagName(spanTag))
         return false;
 
-    const HTMLElement* elem = static_cast<const HTMLElement*>(node);
+    const HTMLElement* elem = toHTMLElement(node);
     if (elem->getAttribute(classAttr) != "Apple-style-span")
         return false;
 
@@ -428,17 +427,16 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
     }
     
     if (behavior & RenderAsTextShowIDAndClass) {
-        if (Node* node = o.node()) {
-            if (node->hasID())
-                ts << " id=\"" + static_cast<Element*>(node)->getIdAttribute() + "\"";
+        if (Element* element = o.node() && o.node()->isElementNode() ? toElement(o.node()) : 0) {
+            if (element->hasID())
+                ts << " id=\"" + element->getIdAttribute() + "\"";
 
-            if (node->hasClass()) {
+            if (element->hasClass()) {
                 ts << " class=\"";
-                StyledElement* styledElement = static_cast<StyledElement*>(node);
-                for (size_t i = 0; i < styledElement->classNames().size(); ++i) {
+                for (size_t i = 0; i < element->classNames().size(); ++i) {
                     if (i > 0)
                         ts << " ";
-                    ts << styledElement->classNames()[i];
+                    ts << element->classNames()[i];
                 }
                 ts << "\"";
             }
@@ -582,7 +580,7 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
     if (o.isWidget()) {
         Widget* widget = toRenderWidget(&o)->widget();
         if (widget && widget->isFrameView()) {
-            FrameView* view = static_cast<FrameView*>(widget);
+            FrameView* view = toFrameView(widget);
             RenderView* root = view->frame()->contentRenderer();
             if (root) {
                 view->layout();
@@ -668,8 +666,8 @@ static void writeRenderRegionList(const RenderRegionList& flowThreadRegionList, 
             String tagName = getTagName(renderRegion->generatingNode());
             if (!tagName.isEmpty())
                 ts << " {" << tagName << "}";
-            if (renderRegion->generatingNode()->isElementNode() && renderRegion->generatingNode()->hasID()) {
-                Element* element = static_cast<Element*>(renderRegion->generatingNode());
+            if (renderRegion->generatingNode()->isElementNode() && toElement(renderRegion->generatingNode())->hasID()) {
+                Element* element = toElement(renderRegion->generatingNode());
                 ts << " #" << element->idForStyleResolution();
             }
             if (renderRegion->hasCustomRegionStyle())
@@ -715,6 +713,12 @@ static void writeRenderNamedFlowThreads(TextStream& ts, RenderView* renderView, 
     }
 }
 
+static LayoutSize maxLayoutOverflow(const RenderBox* box)
+{
+    LayoutRect overflowRect = box->layoutOverflowRect();
+    return LayoutSize(overflowRect.maxX(), overflowRect.maxY());
+}
+
 static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLayer* l,
                         const LayoutRect& paintRect, int indent, RenderAsTextBehavior behavior)
 {
@@ -723,7 +727,7 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
     if (rootLayer == l) {
         paintDirtyRect.setWidth(max<LayoutUnit>(paintDirtyRect.width(), rootLayer->renderBox()->layoutOverflowRect().maxX()));
         paintDirtyRect.setHeight(max<LayoutUnit>(paintDirtyRect.height(), rootLayer->renderBox()->layoutOverflowRect().maxY()));
-        l->setSize(l->size().expandedTo(pixelSnappedIntSize(l->renderBox()->maxLayoutOverflow(), LayoutPoint(0, 0))));
+        l->setSize(l->size().expandedTo(pixelSnappedIntSize(maxLayoutOverflow(l->renderBox()), LayoutPoint(0, 0))));
     }
     
     // Calculate the clip rects we should use.
@@ -766,14 +770,22 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
     }
 
     if (Vector<RenderLayer*>* posList = l->posZOrderList()) {
-        int currIndent = indent;
-        if (behavior & RenderAsTextShowLayerNesting) {
-            writeIndent(ts, indent);
-            ts << " positive z-order list(" << posList->size() << ")\n";
-            ++currIndent;
-        }
+        size_t layerCount = 0;
         for (unsigned i = 0; i != posList->size(); ++i)
-            writeLayers(ts, rootLayer, posList->at(i), paintDirtyRect, currIndent, behavior);
+            if (!posList->at(i)->isOutOfFlowRenderFlowThread())
+                ++layerCount;
+        if (layerCount) {
+            int currIndent = indent;
+            if (behavior & RenderAsTextShowLayerNesting) {
+                writeIndent(ts, indent);
+                ts << " positive z-order list(" << layerCount << ")\n";
+                ++currIndent;
+            }
+            for (unsigned i = 0; i != posList->size(); ++i) {
+                if (!posList->at(i)->isOutOfFlowRenderFlowThread())
+                    writeLayers(ts, rootLayer, posList->at(i), paintDirtyRect, currIndent, behavior);
+            }
+        }
     }
     
     // Altough the RenderFlowThread requires a layer, it is not collected by its parent,
@@ -824,7 +836,7 @@ static void writeSelection(TextStream& ts, const RenderObject* o)
     if (!n || !n->isDocumentNode())
         return;
 
-    Document* doc = static_cast<Document*>(n);
+    Document* doc = toDocument(n);
     Frame* frame = doc->frame();
     if (!frame)
         return;

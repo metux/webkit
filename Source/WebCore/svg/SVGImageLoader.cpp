@@ -23,6 +23,7 @@
 #if ENABLE(SVG)
 #include "SVGImageLoader.h"
 
+#include "CachedImage.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "HTMLParserIdioms.h"
@@ -41,7 +42,7 @@ void SVGImageLoader::dispatchLoadEvent()
     if (image()->errorOccurred())
         element()->dispatchEvent(Event::create(eventNames().errorEvent, false, false));
     else {
-        SVGImageElement* imageElement = static_cast<SVGImageElement*>(element());
+        SVGImageElement* imageElement = toSVGImageElement(element());
         if (imageElement->externalResourcesRequiredBaseValue())
             imageElement->sendSVGLoadEventIfPossible(true);
     }

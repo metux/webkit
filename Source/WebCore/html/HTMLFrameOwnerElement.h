@@ -21,7 +21,6 @@
 #ifndef HTMLFrameOwnerElement_h
 #define HTMLFrameOwnerElement_h
 
-#include "FrameLoaderTypes.h"
 #include "HTMLElement.h"
 
 namespace WebCore {
@@ -65,7 +64,7 @@ protected:
     void setSandboxFlags(SandboxFlags);
 
 private:
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
     virtual bool isFrameOwnerElement() const OVERRIDE { return true; }
 
     Frame* m_contentFrame;

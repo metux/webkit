@@ -42,6 +42,9 @@ PassRefPtr<WebFullScreenManagerProxy> WebFullScreenManagerProxy::create(WebPageP
 WebFullScreenManagerProxy::WebFullScreenManagerProxy(WebPageProxy* page)
     : m_page(page)
     , m_webView(0)
+#if PLATFORM(EFL)
+    , m_hasRequestedFullScreen(false)
+#endif
 {
     m_page->process()->addMessageReceiver(Messages::WebFullScreenManagerProxy::messageReceiverName(), m_page->pageID(), this);
 }
@@ -88,6 +91,16 @@ void WebFullScreenManagerProxy::requestExitFullScreen()
 void WebFullScreenManagerProxy::supportsFullScreen(bool withKeyboard, bool& supports)
 {
     supports = !withKeyboard;
+}
+
+void WebFullScreenManagerProxy::saveScrollPosition()
+{
+    m_page->process()->send(Messages::WebFullScreenManager::SaveScrollPosition(), m_page->pageID());
+}
+
+void WebFullScreenManagerProxy::restoreScrollPosition()
+{
+    m_page->process()->send(Messages::WebFullScreenManager::RestoreScrollPosition(), m_page->pageID());
 }
 
 } // namespace WebKit

@@ -33,7 +33,6 @@
 #include "NodeRenderingContext.h"
 #include "RenderIFrame.h"
 #include "ScriptableDocumentParser.h"
-#include <wtf/text/TextPosition.h>
 
 namespace WebCore {
 
@@ -58,39 +57,32 @@ bool HTMLIFrameElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLFrameElementBase::isPresentationAttribute(name);
 }
 
-void HTMLIFrameElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLIFrameElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == widthAttr)
-        addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
-    else if (attribute.name() == heightAttr)
-        addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
-    else if (attribute.name() == alignAttr)
-        applyAlignmentAttributeToStyle(attribute, style);
-    else if (attribute.name() == frameborderAttr) {
+    if (name == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, value);
+    else if (name == heightAttr)
+        addHTMLLengthToStyle(style, CSSPropertyHeight, value);
+    else if (name == alignAttr)
+        applyAlignmentAttributeToStyle(value, style);
+    else if (name == frameborderAttr) {
         // Frame border doesn't really match the HTML4 spec definition for iframes. It simply adds
         // a presentational hint that the border should be off if set to zero.
-        if (!attribute.value().toInt()) {
+        if (!value.toInt()) {
             // Add a rule that nulls out our border width.
             addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderWidth, 0, CSSPrimitiveValue::CSS_PX);
         }
     } else
-        HTMLFrameElementBase::collectStyleForPresentationAttribute(attribute, style);
+        HTMLFrameElementBase::collectStyleForPresentationAttribute(name, value, style);
 }
 
 void HTMLIFrameElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (name == nameAttr) {
-        if (inDocument() && document()->isHTMLDocument() && !isInShadowTree()) {
-            HTMLDocument* document = static_cast<HTMLDocument*>(this->document());
-            document->removeExtraNamedItem(m_name);
-            document->addExtraNamedItem(value);
-        }
-        m_name = value;
-    } else if (name == sandboxAttr) {
+    if (name == sandboxAttr) {
         String invalidTokens;
         setSandboxFlags(value.isNull() ? SandboxNone : SecurityContext::parseSandboxPolicy(value, invalidTokens));
         if (!invalidTokens.isNull())
-            document()->addConsoleMessage(HTMLMessageSource, ErrorMessageLevel, "Error while parsing the 'sandbox' attribute: " + invalidTokens);
+            document()->addConsoleMessage(OtherMessageSource, ErrorMessageLevel, "Error while parsing the 'sandbox' attribute: " + invalidTokens);
     } else if (name == seamlessAttr) {
         // If we're adding or removing the seamless attribute, we need to force the content document to recalculate its StyleResolver.
         if (contentDocument())
@@ -109,45 +101,18 @@ RenderObject* HTMLIFrameElement::createRenderer(RenderArena* arena, RenderStyle*
     return new (arena) RenderIFrame(this);
 }
 
-Node::InsertionNotificationRequest HTMLIFrameElement::insertedInto(ContainerNode* insertionPoint)
-{
-    InsertionNotificationRequest result = HTMLFrameElementBase::insertedInto(insertionPoint);
-    if (insertionPoint->inDocument() && document()->isHTMLDocument() && !insertionPoint->isInShadowTree())
-        static_cast<HTMLDocument*>(document())->addExtraNamedItem(m_name);
-    return result;
-}
-
-void HTMLIFrameElement::removedFrom(ContainerNode* insertionPoint)
-{
-    HTMLFrameElementBase::removedFrom(insertionPoint);
-    if (insertionPoint->inDocument() && document()->isHTMLDocument() && !insertionPoint->isInShadowTree())
-        static_cast<HTMLDocument*>(document())->removeExtraNamedItem(m_name);
-}
-
 bool HTMLIFrameElement::shouldDisplaySeamlessly() const
 {
     return contentDocument() && contentDocument()->shouldDisplaySeamlesslyWithParent();
 }
 
-void HTMLIFrameElement::didRecalcStyle(StyleChange styleChange)
+void HTMLIFrameElement::didRecalcStyle(Style::Change styleChange)
 {
     if (!shouldDisplaySeamlessly())
         return;
     Document* childDocument = contentDocument();
-    if (styleChange >= Inherit || childDocument->childNeedsStyleRecalc() || childDocument->needsStyleRecalc())
-        contentDocument()->recalcStyle(styleChange);
+    if (styleChange >= Style::Inherit || childDocument->childNeedsStyleRecalc() || childDocument->needsStyleRecalc())
+        contentDocument()->recalcStyle(styleChange == Style::Detach ? Style::Force : styleChange);
 }
-
-#if ENABLE(MICRODATA)
-String HTMLIFrameElement::itemValueText() const
-{
-    return getURLAttribute(srcAttr);
-}
-
-void HTMLIFrameElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(srcAttr, value);
-}
-#endif
 
 }

@@ -19,6 +19,8 @@ AC_SUBST(WEBKIT_MINOR_VERSION)
 AC_SUBST(WEBKIT_MICRO_VERSION)
 AC_SUBST(WEBKIT_USER_AGENT_MAJOR_VERSION)
 AC_SUBST(WEBKIT_USER_AGENT_MINOR_VERSION)
+AC_DEFINE([USER_AGENT_GTK_MAJOR_VERSION], [webkit_user_agent_major_version], [The major version used in user agent string])
+AC_DEFINE([USER_AGENT_GTK_MINOR_VERSION], [webkit_user_agent_minor_version], [The minor version used in user agent string])
 
 m4_include([Source/autotools/CheckSystemAndBasicDependencies.m4])
 m4_include([Source/autotools/SetupLibtool.m4])
@@ -36,26 +38,21 @@ m4_include([Source/autotools/SetupAutomake.m4])
 # Processing of configuration files
 ######################################################################################
 
-AC_CONFIG_FILES([GNUmakefile Source/WebCore/platform/gtk/po/POTFILES])
-AC_CONFIG_FILES([DerivedSources/WebCore/UserAgentGtk.h:Source/WebCore/platform/gtk/UserAgentGtk.h.in])
-AC_CONFIG_FILES(
-    [Source/JavaScriptCore/javascriptcoregtk-${WEBKITGTK_API_VERSION}.pc:Source/JavaScriptCore/javascriptcoregtk.pc.in
-        Source/WebKit/gtk/JSCore-${WEBKITGTK_API_VERSION}.gir:Source/WebKit/gtk/JSCore.gir.in],
-    [WEBKITGTK_API_VERSION=$WEBKITGTK_API_VERSION,WEBKITGTK_PC_NAME=$WEBKITGTK_PC_NAME])
+AC_CONFIG_FILES([
+    GNUmakefile Source/WebCore/platform/gtk/po/POTFILES
+    Source/JavaScriptCore/javascriptcoregtk-${WEBKITGTK_API_VERSION}.pc:Source/JavaScriptCore/javascriptcoregtk.pc.in
+    JavaScriptCore-${WEBKITGTK_API_VERSION}.gir:Source/JavaScriptCore/JavaScriptCore.gir.in])
 
 if test "$enable_webkit1" = "yes"; then
-    AC_CONFIG_FILES([Source/WebKit/gtk/webkit/webkitversion.h])
-
-    AC_CONFIG_FILES([Source/WebKit/gtk/${WEBKITGTK_PC_NAME}-${WEBKITGTK_API_VERSION}.pc:Source/WebKit/gtk/webkit.pc.in],
-        [WEBKITGTK_API_VERSION=$WEBKITGTK_API_VERSION,WEBKITGTK_PC_NAME=$WEBKITGTK_PC_NAME])
+    AC_CONFIG_FILES([
+        Source/WebKit/gtk/webkit/webkitversion.h
+        Source/WebKit/gtk/${WEBKITGTK_PC_NAME}-${WEBKITGTK_API_VERSION}.pc:Source/WebKit/gtk/webkit.pc.in])
 fi
 
 if test "$enable_webkit2" = "yes"; then
-    AC_CONFIG_FILES(
-        [DerivedSources/WebKit2/webkit2gtk/webkit2/WebKitVersion.h:Source/WebKit2/UIProcess/API/gtk/WebKitVersion.h.in])
-
-    AC_CONFIG_FILES([Source/WebKit2/webkit2gtk-${WEBKITGTK_API_VERSION}.pc:Source/WebKit2/webkit2gtk.pc.in],
-        [WEBKITGTK_API_VERSION=$WEBKITGTK_API_VERSION,WEBKITGTK_PC_NAME=$WEBKITGTK_PC_NAME])
+    AC_CONFIG_FILES([
+        DerivedSources/WebKit2/webkit2gtk/webkit2/WebKitVersion.h:Source/WebKit2/UIProcess/API/gtk/WebKitVersion.h.in
+        Source/WebKit2/webkit2gtk-${WEBKITGTK_API_VERSION}.pc:Source/WebKit2/webkit2gtk.pc.in])
 fi
 
 m4_include([Source/autotools/PrintBuildConfiguration.m4])

@@ -28,9 +28,7 @@
 
 #include "IntPoint.h"
 #include "PlatformEvent.h"
-#if OS(WINDOWS)
-#include "WindowsExtras.h"
-#endif
+#include <wtf/WindowsExtras.h>
 
 #if PLATFORM(GTK)
 typedef struct _GdkEventButton GdkEventButton;
@@ -41,10 +39,6 @@ typedef struct _GdkEventMotion GdkEventMotion;
 typedef struct _Evas_Event_Mouse_Down Evas_Event_Mouse_Down;
 typedef struct _Evas_Event_Mouse_Up Evas_Event_Mouse_Up;
 typedef struct _Evas_Event_Mouse_Move Evas_Event_Mouse_Move;
-#endif
-
-#if PLATFORM(WX)
-class wxMouseEvent;
 #endif
 
 namespace WebCore {
@@ -119,10 +113,6 @@ namespace WebCore {
         PlatformMouseEvent(HWND, UINT, WPARAM, LPARAM, bool didActivateWebView = false);
         void setClickCount(int count) { m_clickCount = count; }
         bool didActivateWebView() const { return m_didActivateWebView; }
-#endif
-
-#if PLATFORM(WX)
-        PlatformMouseEvent(const wxMouseEvent&, const wxPoint& globalPoint, int clickCount);
 #endif
 
 #if PLATFORM(BLACKBERRY)

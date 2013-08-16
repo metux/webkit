@@ -28,7 +28,6 @@
 #define DOMTimer_h
 
 #include "SuspendableTimer.h"
-#include "UserGestureIndicator.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 
@@ -36,7 +35,7 @@ namespace WebCore {
 
     class ScheduledAction;
 
-    class DOMTimer : public SuspendableTimer {
+    class DOMTimer FINAL : public SuspendableTimer {
     public:
         virtual ~DOMTimer();
         // Creates a new timer owned by specified ScriptExecutionContext, starts it
@@ -44,31 +43,31 @@ namespace WebCore {
         static int install(ScriptExecutionContext*, PassOwnPtr<ScheduledAction>, int timeout, bool singleShot);
         static void removeById(ScriptExecutionContext*, int timeoutId);
 
-        // ActiveDOMObject
-        virtual void contextDestroyed();
-        virtual void stop();
-
         // Adjust to a change in the ScriptExecutionContext's minimum timer interval.
         // This allows the minimum allowable interval time to be changed in response
         // to events like moving a tab to the background.
         void adjustMinimumTimerInterval(double oldMinimumTimerInterval);
 
-        virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
     private:
         DOMTimer(ScriptExecutionContext*, PassOwnPtr<ScheduledAction>, int interval, bool singleShot);
-        virtual void fired();
+        virtual void fired() OVERRIDE;
+
+        // ActiveDOMObject
+        virtual void contextDestroyed() OVERRIDE;
+
+        // SuspendableTimer
+        virtual void didStop() OVERRIDE;
 
         double intervalClampedToMinimum(int timeout, double minimumTimerInterval) const;
 
         // Retuns timer fire time rounded to the next multiple of timer alignment interval.
-        virtual double alignedFireTime(double) const;
+        virtual double alignedFireTime(double) const OVERRIDE;
 
         int m_timeoutId;
         int m_nestingLevel;
         OwnPtr<ScheduledAction> m_action;
         int m_originalInterval;
-        RefPtr<UserGestureIndicator::Token> m_userGestureToken;
+        bool m_shouldForwardUserGesture;
     };
 
 } // namespace WebCore

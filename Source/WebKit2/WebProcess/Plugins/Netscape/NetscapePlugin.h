@@ -41,7 +41,10 @@
 namespace WebCore {
     class HTTPHeaderMap;
     class ProtectionSpace;
+    class SharedBuffer;
 }
+
+OBJC_CLASS WKNPAPIPlugInContainer;
 
 namespace WebKit {
 
@@ -69,9 +72,12 @@ public:
     bool hasHandledAKeyDownEvent() const { return m_hasHandledAKeyDownEvent; }
 
     mach_port_t compositingRenderServerPort();
+    void openPluginPreferencePane();
 
     // Computes an affine transform from the given coordinate space to the screen coordinate space.
     bool getScreenTransform(NPCoordinateSpace sourceSpace, WebCore::AffineTransform&);
+
+    WKNPAPIPlugInContainer* plugInContainer();
 
 #ifndef NP_NO_CARBON
     WindowRef windowRef() const;
@@ -239,7 +245,7 @@ private:
     virtual WebCore::Scrollbar* horizontalScrollbar();
     virtual WebCore::Scrollbar* verticalScrollbar();
 
-    bool supportsSnapshotting() const;
+    virtual bool supportsSnapshotting() const;
 
     // Convert the given point from plug-in coordinates to root view coordinates.
     virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const OVERRIDE;
@@ -248,9 +254,11 @@ private:
     // converted (if the transformation matrix isn't invertible).
     bool convertFromRootView(const WebCore::IntPoint& pointInRootViewCoordinates, WebCore::IntPoint& pointInPluginCoordinates);
 
-    virtual bool getResourceData(const unsigned char*& /* bytes */, unsigned& /* length */) const OVERRIDE { return false; }
+    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const OVERRIDE;
 
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) OVERRIDE { return false; }
+
+    virtual String getSelectionString() const OVERRIDE { return String(); }
 
     void updateNPNPrivateMode();
 
@@ -266,10 +274,10 @@ private:
 
     uint64_t m_nextRequestID;
 
-    typedef HashMap<uint64_t, std::pair<String, void*> > PendingURLNotifyMap;
+    typedef HashMap<uint64_t, std::pair<String, void*>> PendingURLNotifyMap;
     PendingURLNotifyMap m_pendingURLNotifications;
 
-    typedef HashMap<uint64_t, RefPtr<NetscapePluginStream> > StreamsMap;
+    typedef HashMap<uint64_t, RefPtr<NetscapePluginStream>> StreamsMap;
     StreamsMap m_streams;
 
     RefPtr<NetscapePluginModule> m_pluginModule;
@@ -326,7 +334,7 @@ private:
 
         WebCore::RunLoop::Timer<Timer> m_timer;
     };
-    typedef HashMap<unsigned, OwnPtr<Timer> > TimerMap;
+    typedef HashMap<unsigned, OwnPtr<Timer>> TimerMap;
     TimerMap m_timers;
     unsigned m_nextTimerID;
 
@@ -363,6 +371,8 @@ private:
 
     WebCore::IntRect m_windowFrameInScreenCoordinates;
     WebCore::IntRect m_viewFrameInWindowCoordinates;
+
+    RetainPtr<WKNPAPIPlugInContainer> m_plugInContainer;
 
 #ifndef NP_NO_CARBON
     void nullEventTimerFired();

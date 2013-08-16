@@ -54,8 +54,6 @@ public:
         const AtomicString m_namespace;
         mutable AtomicString m_localNameUpper;
 
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-
     private:
         QualifiedNameImpl(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI)
             : m_existingHash(0)
@@ -99,8 +97,6 @@ public:
     
     // Init routine for globals
     static void init();
-    
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     void ref() const { m_impl->ref(); }
@@ -144,8 +140,8 @@ struct QualifiedNameHash {
     static const bool safeToCompareToEmptyOrDeleted = false;
 };
 
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength);
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength, const AtomicString& nameNamespace);
+void createQualifiedName(void* targetAddress, StringImpl* name);
+void createQualifiedName(void* targetAddress, StringImpl* name, const AtomicString& nameNamespace);
 
 }
 

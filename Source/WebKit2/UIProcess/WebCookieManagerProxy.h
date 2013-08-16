@@ -48,10 +48,8 @@ class WebProcessProxy;
 typedef GenericCallback<WKArrayRef> ArrayCallback;
 typedef GenericCallback<WKHTTPCookieAcceptPolicy, HTTPCookieAcceptPolicy> HTTPCookieAcceptPolicyCallback;
 
-class WebCookieManagerProxy : public APIObject, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebCookieManagerProxy : public TypedAPIObject<APIObject::TypeCookieManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
-    static const Type APIType = TypeCookieManager;
-
     static const char* supplementName();
 
     static PassRefPtr<WebCookieManagerProxy> create(WebContext*);
@@ -80,8 +78,6 @@ public:
 private:
     WebCookieManagerProxy(WebContext*);
 
-    virtual Type type() const { return APIType; }
-
     void didGetHostnamesWithCookies(const Vector<String>&, uint64_t callbackID);
     void didGetHTTPCookieAcceptPolicy(uint32_t policy, uint64_t callbackID);
 
@@ -102,8 +98,8 @@ private:
     void persistHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy);
 #endif
 
-    HashMap<uint64_t, RefPtr<ArrayCallback> > m_arrayCallbacks;
-    HashMap<uint64_t, RefPtr<HTTPCookieAcceptPolicyCallback> > m_httpCookieAcceptPolicyCallbacks;
+    HashMap<uint64_t, RefPtr<ArrayCallback>> m_arrayCallbacks;
+    HashMap<uint64_t, RefPtr<HTTPCookieAcceptPolicyCallback>> m_httpCookieAcceptPolicyCallbacks;
 
     WebCookieManagerProxyClient m_client;
 

@@ -38,6 +38,7 @@
 #if PLATFORM(MAC)
 #include "LayerHostingContext.h"
 
+OBJC_CLASS NSObject;
 OBJC_CLASS PDFDocument;
 #endif
 
@@ -55,7 +56,9 @@ namespace WebCore {
     class IntPoint;
     class IntRect;
     class IntSize;
+    class FloatPoint;
     class Scrollbar;
+    class SharedBuffer;
 }
 
 namespace WebKit {
@@ -116,6 +119,9 @@ public:
     // Invalidate native tintable controls. The passed-in context is in window coordinates.
     virtual void updateControlTints(WebCore::GraphicsContext*);
 
+    // Returns whether the plug-in supports snapshotting or not.
+    virtual bool supportsSnapshotting() const = 0;
+
     // Tells the plug-in to draw itself into a bitmap, and return that.
     virtual PassRefPtr<ShareableBitmap> snapshot() = 0;
 
@@ -123,7 +129,7 @@ public:
     // If a plug-in is using the Core Animation drawing model, this returns its plug-in layer.
     virtual PlatformLayer* pluginLayer() = 0;
 #endif
-    
+
     // Returns whether the plug-in is transparent or not.
     virtual bool isTransparent() = 0;
 
@@ -254,6 +260,7 @@ public:
 
 #if PLATFORM(MAC)
     virtual RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return 0; }
+    virtual NSObject *accessibilityObject() const { return 0; }
 #endif
 
     virtual unsigned countFindMatches(const String& target, WebCore::FindOptions, unsigned maxMatchCount) = 0;
@@ -264,9 +271,11 @@ public:
 
     virtual bool shouldAlwaysAutoStart() const { return false; }
 
-    virtual bool getResourceData(const unsigned char*& bytes, unsigned& length) const = 0;
+    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const = 0;
 
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) = 0;
+
+    virtual String getSelectionString() const = 0;
 
 protected:
     Plugin();

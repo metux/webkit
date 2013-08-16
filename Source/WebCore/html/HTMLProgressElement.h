@@ -29,7 +29,7 @@ namespace WebCore {
 class ProgressValueElement;
 class RenderProgress;
 
-class HTMLProgressElement : public LabelableElement {
+class HTMLProgressElement FINAL : public LabelableElement {
 public:
     static const double IndeterminatePosition;
     static const double InvalidPosition;
@@ -44,8 +44,6 @@ public:
 
     double position() const;
 
-    bool isDeterminate() const;
-    
     virtual bool canContainRangeEndPoint() const { return false; }
 
 private:
@@ -53,10 +51,8 @@ private:
     virtual ~HTMLProgressElement();
 
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
-
+    virtual bool shouldAppearIndeterminate() const OVERRIDE;
     virtual bool supportLabels() const OVERRIDE { return true; }
-
-    virtual bool supportsFocus() const;
 
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
@@ -64,10 +60,11 @@ private:
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
-    virtual void attach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
     void didElementStateChange();
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
+    bool isDeterminate() const;
 
     ProgressValueElement* m_value;
 };
@@ -80,7 +77,7 @@ inline bool isHTMLProgressElement(Node* node)
 
 inline HTMLProgressElement* toHTMLProgressElement(Node* node)
 {
-    ASSERT(!node || isHTMLProgressElement(node));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLProgressElement(node));
     return static_cast<HTMLProgressElement*>(node);
 }
 

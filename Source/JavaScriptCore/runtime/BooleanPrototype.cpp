@@ -51,21 +51,21 @@ const ClassInfo BooleanPrototype::s_info = { "Boolean", &BooleanObject::s_info, 
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(BooleanPrototype);
 
 BooleanPrototype::BooleanPrototype(ExecState* exec, Structure* structure)
-    : BooleanObject(exec->globalData(), structure)
+    : BooleanObject(exec->vm(), structure)
 {
 }
 
 void BooleanPrototype::finishCreation(ExecState* exec, JSGlobalObject*)
 {
-    Base::finishCreation(exec->globalData());
-    setInternalValue(exec->globalData(), jsBoolean(false));
+    Base::finishCreation(exec->vm());
+    setInternalValue(exec->vm(), jsBoolean(false));
 
     ASSERT(inherits(&s_info));
 }
 
-bool BooleanPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+bool BooleanPrototype::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<BooleanObject>(exec, ExecState::booleanPrototypeTable(exec), jsCast<BooleanPrototype*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<BooleanObject>(exec, ExecState::booleanPrototypeTable(exec), jsCast<BooleanPrototype*>(object), propertyName, slot);
 }
 
 bool BooleanPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
@@ -77,22 +77,22 @@ bool BooleanPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exe
 
 EncodedJSValue JSC_HOST_CALL booleanProtoFuncToString(ExecState* exec)
 {
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
     JSValue thisValue = exec->hostThisValue();
     if (thisValue == jsBoolean(false))
-        return JSValue::encode(globalData->smallStrings.falseString());
+        return JSValue::encode(vm->smallStrings.falseString());
 
     if (thisValue == jsBoolean(true))
-        return JSValue::encode(globalData->smallStrings.trueString());
+        return JSValue::encode(vm->smallStrings.trueString());
 
     if (!thisValue.inherits(&BooleanObject::s_info))
         return throwVMTypeError(exec);
 
     if (asBooleanObject(thisValue)->internalValue() == jsBoolean(false))
-        return JSValue::encode(globalData->smallStrings.falseString());
+        return JSValue::encode(vm->smallStrings.falseString());
 
     ASSERT(asBooleanObject(thisValue)->internalValue() == jsBoolean(true));
-    return JSValue::encode(globalData->smallStrings.trueString());
+    return JSValue::encode(vm->smallStrings.trueString());
 }
 
 EncodedJSValue JSC_HOST_CALL booleanProtoFuncValueOf(ExecState* exec)

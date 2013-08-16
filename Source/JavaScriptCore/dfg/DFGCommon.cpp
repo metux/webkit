@@ -30,63 +30,79 @@
 
 #include "DFGNode.h"
 
-namespace JSC { namespace DFG {
-
-void NodePointerTraits::dump(Node* value, PrintStream& out)
-{
-    out.print(value);
-}
-
-} } // namespace JSC::DFG
-
 namespace WTF {
 
-void printInternal(PrintStream& out, JSC::DFG::OptimizationFixpointState state)
+using namespace JSC::DFG;
+
+void printInternal(PrintStream& out, OptimizationFixpointState state)
 {
     switch (state) {
-    case JSC::DFG::BeforeFixpoint:
+    case BeforeFixpoint:
         out.print("BeforeFixpoint");
-        break;
-    case JSC::DFG::FixpointNotConverged:
+        return;
+    case FixpointNotConverged:
         out.print("FixpointNotConverged");
-        break;
-    case JSC::DFG::FixpointConverged:
+        return;
+    case FixpointConverged:
         out.print("FixpointConverged");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
-void printInternal(PrintStream& out, JSC::DFG::GraphForm form)
+void printInternal(PrintStream& out, GraphForm form)
 {
     switch (form) {
-    case JSC::DFG::LoadStore:
+    case LoadStore:
         out.print("LoadStore");
-        break;
-    case JSC::DFG::ThreadedCPS:
+        return;
+    case ThreadedCPS:
         out.print("ThreadedCPS");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
+    case SSA:
+        out.print("SSA");
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
-void printInternal(PrintStream& out, JSC::DFG::UnificationState state)
+void printInternal(PrintStream& out, UnificationState state)
 {
     switch (state) {
-    case JSC::DFG::LocallyUnified:
+    case LocallyUnified:
         out.print("LocallyUnified");
-        break;
-    case JSC::DFG::GloballyUnified:
+        return;
+    case GloballyUnified:
         out.print("GloballyUnified");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+void printInternal(PrintStream& out, RefCountState state)
+{
+    switch (state) {
+    case EverythingIsLive:
+        out.print("EverythingIsLive");
+        return;
+    case ExactRefCount:
+        out.print("ExactRefCount");
+        return;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+void printInternal(PrintStream& out, ProofStatus status)
+{
+    switch (status) {
+    case IsProved:
+        out.print("IsProved");
+        return;
+    case NeedsCheck:
+        out.print("NeedsCheck");
+        return;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 } // namespace WTF

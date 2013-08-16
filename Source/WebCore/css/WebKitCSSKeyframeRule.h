@@ -31,32 +31,31 @@
 
 namespace WebCore {
 
+class CSSStyleDeclaration;
 class StyleRuleCSSStyleDeclaration;
 class WebKitCSSKeyframesRule;
 
 class StyleKeyframe : public RefCounted<StyleKeyframe> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<StyleKeyframe> create()
+    static PassRefPtr<StyleKeyframe> create(PassRefPtr<StylePropertySet> properties)
     {
-        return adoptRef(new StyleKeyframe());
+        return adoptRef(new StyleKeyframe(properties));
     }
+    ~StyleKeyframe();
 
     String keyText() const { return m_key; }
     void setKeyText(const String& s) { m_key = s; }
 
     void getKeys(Vector<float>& keys) const   { parseKeyString(m_key, keys); }
     
-    const StylePropertySet* properties() const { return m_properties.get(); }
-    StylePropertySet* mutableProperties();
-    void setProperties(PassRefPtr<StylePropertySet>);
+    const StylePropertySet& properties() const { return *m_properties; }
+    MutableStylePropertySet* mutableProperties();
     
     String cssText() const;
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
-private:    
-    StyleKeyframe() { }
+private:
+    StyleKeyframe(PassRefPtr<StylePropertySet>);
     
     static void parseKeyString(const String&, Vector<float>& keys);
     
@@ -73,12 +72,11 @@ public:
     virtual CSSRule::Type type() const OVERRIDE { return WEBKIT_KEYFRAME_RULE; }
     virtual String cssText() const OVERRIDE { return m_keyframe->cssText(); }
     virtual void reattach(StyleRuleBase*) OVERRIDE;
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
     String keyText() const { return m_keyframe->keyText(); }
     void setKeyText(const String& s) { m_keyframe->setKeyText(s); }
 
-    CSSStyleDeclaration* style() const;
+    CSSStyleDeclaration* style();
 
 private:
     WebKitCSSKeyframeRule(StyleKeyframe*, WebKitCSSKeyframesRule* parent);

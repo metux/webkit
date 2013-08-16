@@ -73,9 +73,6 @@ public:
 
     virtual void closeImmediately();
 
-    unsigned long long databaseSize() const;
-    unsigned long long maximumSize() const;
-
     void scheduleTransactionCallback(SQLTransaction*);
 
 private:
@@ -88,14 +85,6 @@ private:
         PassRefPtr<VoidCallback> successCallback, bool readOnly, const ChangeVersionData* = 0);
 
     Vector<String> performGetTableNames();
-
-#if PLATFORM(CHROMIUM)
-    void reportStartTransactionResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode);
-    void reportCommitTransactionResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode);
-#else
-    void reportStartTransactionResult(int, int, int) { }
-    void reportCommitTransactionResult(int, int, int) { }
-#endif
 
     RefPtr<SecurityOrigin> m_databaseThreadSecurityOrigin;
     RefPtr<DatabaseContext> m_databaseContext;

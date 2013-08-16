@@ -63,7 +63,7 @@ class SpecialRegister < NoChildren
     end
 end
 
-C_LOOP_SCRATCH_FPR = SpecialRegister.new("d8")
+C_LOOP_SCRATCH_FPR = SpecialRegister.new("d6")
 
 class RegisterID
     def clDump
@@ -178,7 +178,7 @@ class Address
     def pointerExpr
         if base.is_a? RegisterID and base.name == "sp" 
             offsetValue = "#{offset.value}"
-            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, globalData)), &sp->globalData)"
+            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, vm)), &sp->vm)"
         elsif offset.value == 0
             "#{base.clValue(:int8Ptr)}"
         elsif offset.value > 0
@@ -250,7 +250,7 @@ class BaseIndex
     def pointerExpr
         if base.is_a? RegisterID and base.name == "sp"
             offsetValue = "(#{index.clValue} << #{scaleShift}) + #{offset.clValue})"
-            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, globalData)), &sp->globalData)"
+            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, vm)), &sp->vm)"
         else
             "#{base.clValue(:int8Ptr)} + (#{index.clValue} << #{scaleShift}) + #{offset.clValue}"
         end
@@ -465,9 +465,9 @@ def cloopEmitOpAndBranch(operands, operator, type, conditionTest)
 
     $asm.putc "{"
     $asm.putc "    #{tempType} temp = #{op2} #{operator} #{op1};"
+    $asm.putc "    #{op2} = temp;"
     $asm.putc "    if (temp #{conditionTest})"
     $asm.putc "        goto  #{operands[2].cLabel};"
-    $asm.putc "    #{op2} = temp;"
     $asm.putc "}"
 end
 
@@ -533,10 +533,10 @@ def cloopEmitOpAndBranchIfOverflow(operands, operator, type)
         raise "Unimplemented opeartor"
     end
 
-    $asm.putc "    if #{overflowTest} {"
-    $asm.putc "        goto #{operands[2].cLabel};"
-    $asm.putc "    }"
+    $asm.putc "    bool didOverflow = #{overflowTest};"
     $asm.putc "    #{operands[1].clValue(type)} = #{operands[1].clValue(type)} #{operator} #{operands[0].clValue(type)};"
+    $asm.putc "    if (didOverflow)"
+    $asm.putc "        goto #{operands[2].cLabel};"
     $asm.putc "}"
 end
 
@@ -546,7 +546,7 @@ def cloopEmitCallSlowPath(operands)
     $asm.putc "    ExecState* exec = CAST<ExecState*>(#{operands[1].clValue(:voidPtr)});"
     $asm.putc "    Instruction* pc = CAST<Instruction*>(#{operands[2].clValue(:voidPtr)});"
     $asm.putc "    SlowPathReturnType result = #{operands[0].cLabel}(exec, pc);"
-    $asm.putc "    LLInt::decodeResult(result, t0.instruction, t1.execState);"
+    $asm.putc "    decodeResult(result, t0.instruction, t1.execState);"
     $asm.putc "}"
 end
 
@@ -1025,7 +1025,7 @@ class Instruction
         # 32-bit instruction: f2dii dblOp int32LoOp int32HiOp (based on ARMv7)
         # Encode a 64-bit double into 2 32-bit ints (low and high).
         when "fd2ii"
-            $asm.putc "Double2Ints(#{operands[0].clValue(:double)}, #{operands[1].clValue}, #{operands[2].clValue});"
+            $asm.putc "Double2Ints(#{operands[0].clValue(:double)}, #{operands[1].clValue(:uint32)}, #{operands[2].clValue(:uint32)});"
 
         # 64-bit instruction: fq2d int64Op dblOp (based on X64)
         # Copy a bit-encoded double in a 64-bit int register to a double register.

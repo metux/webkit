@@ -35,7 +35,6 @@
 #include "RenderMeter.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
-#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
@@ -69,11 +68,6 @@ RenderObject* HTMLMeterElement::createRenderer(RenderArena* arena, RenderStyle* 
 bool HTMLMeterElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
     return childContext.isOnUpperEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext);
-}
-
-bool HTMLMeterElement::supportsFocus() const
-{
-    return HTMLElement::supportsFocus() && !disabled();
 }
 
 void HTMLMeterElement::parseAttribute(const QualifiedName& name, const AtomicString& value)

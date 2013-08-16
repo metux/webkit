@@ -27,7 +27,7 @@
 
 namespace WebCore {
 
-class HTMLMetaElement : public HTMLElement {
+class HTMLMetaElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLMetaElement> create(const QualifiedName&, Document*);
 
@@ -42,14 +42,8 @@ private:
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
 
     void process();
-
-#if ENABLE(MICRODATA)
-    virtual String itemValueText() const OVERRIDE;
-    virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
-#endif
-
 };
 
-} //namespace
+} // namespace WebCore
 
 #endif

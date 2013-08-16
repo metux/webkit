@@ -31,6 +31,7 @@
 #include "Document.h"
 #include "DocumentMarkerController.h"
 #include "EditCommand.h"
+#include "Editor.h"
 #include "EditorClient.h"
 #include "Event.h"
 #include "ExceptionCodePlaceholder.h"
@@ -44,9 +45,9 @@
 #include "TextEvent.h"
 #include "TextIterator.h"
 #include "VisibleSelection.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
 #include "markup.h"
-#include "visible_units.h"
 
 namespace WebCore {
 
@@ -338,7 +339,7 @@ void AlternativeTextController::timerFired(Timer<AlternativeTextController>*)
         VisiblePosition start(selection.start(), selection.affinity());
         VisiblePosition p = startOfWord(start, LeftWordIfOnBoundary);
         VisibleSelection adjacentWords = VisibleSelection(p, start);
-        m_frame->editor()->markAllMisspellingsAndBadGrammarInRanges(TextCheckingTypeSpelling | TextCheckingTypeShowCorrectionPanel, adjacentWords.toNormalizedRange().get(), 0);
+        m_frame->editor().markAllMisspellingsAndBadGrammarInRanges(TextCheckingTypeSpelling | TextCheckingTypeReplacement | TextCheckingTypeShowCorrectionPanel, adjacentWords.toNormalizedRange().get(), 0);
     }
         break;
     case AlternativeTextTypeReversion: {
@@ -741,9 +742,9 @@ Vector<String> AlternativeTextController::dictationAlternativesForMarker(const D
 void AlternativeTextController::applyDictationAlternative(const String& alternativeString)
 {
 #if USE(DICTATION_ALTERNATIVES)
-    Editor* editor = m_frame->editor();
-    RefPtr<Range> selection = editor->selectedRange();
-    if (!selection || !editor->shouldInsertText(alternativeString, selection.get(), EditorInsertActionPasted))
+    Editor& editor = m_frame->editor();
+    RefPtr<Range> selection = editor.selectedRange();
+    if (!selection || !editor.shouldInsertText(alternativeString, selection.get(), EditorInsertActionPasted))
         return;
     DocumentMarkerController* markers = selection->startContainer()->document()->markers();
     Vector<DocumentMarker*> dictationAlternativesMarkers = markers->markersInRange(selection.get(), DocumentMarker::DictationAlternatives);

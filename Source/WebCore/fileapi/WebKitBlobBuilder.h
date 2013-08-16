@@ -33,14 +33,17 @@
 
 #include "BlobData.h"
 #include <wtf/Forward.h>
-#include <wtf/RefCounted.h>
+
+namespace JSC {
+class ArrayBuffer;
+class ArrayBufferView;
+}
 
 namespace WebCore {
 
 // FIXME: Move this file to BlobBuilder.h
 
 class Blob;
-class ScriptExecutionContext;
 class TextEncoding;
 
 typedef int ExceptionCode;
@@ -52,8 +55,8 @@ public:
     void append(Blob*);
     void append(const String& text, const String& ending);
 #if ENABLE(BLOB)
-    void append(ScriptExecutionContext*, ArrayBuffer*);
-    void append(ArrayBufferView*);
+    void append(JSC::ArrayBuffer*);
+    void append(JSC::ArrayBufferView*);
 #endif
 
     PassRefPtr<Blob> getBlob(const String& contentType);

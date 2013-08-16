@@ -1,6 +1,6 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2006, 2007, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2006, 2007, 2012, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -29,16 +29,16 @@
 #include "CSSStyleRule.h"
 #include "CachedCSSStyleSheet.h"
 #include "Document.h"
+#include "DocumentStyleSheetCollection.h"
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
+#include "HTMLStyleElement.h"
 #include "MediaList.h"
 #include "Node.h"
 #include "SVGNames.h"
 #include "SecurityOrigin.h"
 #include "StyleRule.h"
 #include "StyleSheetContents.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -56,12 +56,6 @@ private:
     
     virtual CSSStyleSheet* styleSheet() const { return m_styleSheet; }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const OVERRIDE
-    {
-        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-        info.addMember(m_styleSheet, "styleSheet");
-    }
-    
     CSSStyleSheet* m_styleSheet;
 };
 
@@ -72,7 +66,7 @@ static bool isAcceptableCSSStyleSheetParent(Node* parentNode)
     return !parentNode
         || parentNode->isDocumentNode()
         || parentNode->hasTagName(HTMLNames::linkTag)
-        || parentNode->hasTagName(HTMLNames::styleTag)
+        || isHTMLStyleElement(parentNode)
 #if ENABLE(SVG)
         || parentNode->hasTagName(SVGNames::styleTag)
 #endif
@@ -133,12 +127,12 @@ CSSStyleSheet::~CSSStyleSheet()
     m_contents->unregisterClient(this);
 }
 
-void CSSStyleSheet::willMutateRules()
+CSSStyleSheet::WhetherContentsWereClonedForMutation CSSStyleSheet::willMutateRules()
 {
     // If we are the only client it is safe to mutate.
     if (m_contents->hasOneClient() && !m_contents->isInMemoryCache()) {
         m_contents->setMutable();
-        return;
+        return ContentsWereNotClonedForMutation;
     }
     // Only cacheable stylesheets should have multiple clients.
     ASSERT(m_contents->isCacheable());
@@ -152,14 +146,32 @@ void CSSStyleSheet::willMutateRules()
 
     // Any existing CSSOM wrappers need to be connected to the copied child rules.
     reattachChildRuleCSSOMWrappers();
+
+    return ContentsWereClonedForMutation;
 }
 
-void CSSStyleSheet::didMutateRules()
+void CSSStyleSheet::didMutateRuleFromCSSStyleDeclaration()
+{
+    ASSERT(m_contents->isMutable());
+    ASSERT(m_contents->hasOneClient());
+    didMutate();
+}
+
+void CSSStyleSheet::didMutateRules(RuleMutationType mutationType, WhetherContentsWereClonedForMutation contentsWereClonedForMutation)
 {
     ASSERT(m_contents->isMutable());
     ASSERT(m_contents->hasOneClient());
 
-    didMutate();
+    Document* owner = ownerDocument();
+    if (!owner)
+        return;
+
+    if (mutationType == RuleInsertion && !contentsWereClonedForMutation && !owner->styleSheetCollection()->activeStyleSheetsContains(this)) {
+        owner->scheduleOptimizedStyleSheetUpdate();
+        return;
+    }
+
+    owner->styleResolverChanged(DeferRecalcStyle);
 }
 
 void CSSStyleSheet::didMutate()
@@ -170,6 +182,15 @@ void CSSStyleSheet::didMutate()
     owner->styleResolverChanged(DeferRecalcStyle);
 }
 
+void CSSStyleSheet::clearOwnerNode()
+{
+    Document* owner = ownerDocument();
+    m_ownerNode = 0;
+    if (!owner)
+        return;
+    owner->styleResolverChanged(DeferRecalcStyleIfNeeded);
+}
+
 void CSSStyleSheet::reattachChildRuleCSSOMWrappers()
 {
     for (unsigned i = 0; i < m_childRuleCSSOMWrappers.size(); ++i) {
@@ -177,19 +198,6 @@ void CSSStyleSheet::reattachChildRuleCSSOMWrappers()
             continue;
         m_childRuleCSSOMWrappers[i]->reattach(m_contents->ruleAt(i));
     }
-}
-
-void CSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_contents, "contents");
-    info.addMember(m_title, "title");
-    info.addMember(m_mediaQueries, "mediaQueries");
-    info.addMember(m_ownerNode, "ownerNode");
-    info.addMember(m_ownerRule, "ownerRule");
-    info.addMember(m_mediaCSSOMWrapper, "mediaCSSOMWrapper");
-    info.addMember(m_childRuleCSSOMWrappers, "childRuleCSSOMWrappers");
-    info.addMember(m_ruleListCSSOMWrapper, "ruleListCSSOMWrapper");
 }
 
 void CSSStyleSheet::setDisabled(bool disabled)
@@ -286,7 +294,8 @@ unsigned CSSStyleSheet::insertRule(const String& ruleString, unsigned index, Exc
         ec = SYNTAX_ERR;
         return 0;
     }
-    RuleMutationScope mutationScope(this);
+
+    RuleMutationScope mutationScope(this, RuleInsertion);
 
     bool success = m_contents->wrapperInsertRule(rule, index);
     if (!success) {
@@ -390,6 +399,29 @@ Document* CSSStyleSheet::ownerDocument() const
 void CSSStyleSheet::clearChildRuleCSSOMWrappers()
 {
     m_childRuleCSSOMWrappers.clear();
+}
+
+CSSStyleSheet::RuleMutationScope::RuleMutationScope(CSSStyleSheet* sheet, RuleMutationType mutationType)
+    : m_styleSheet(sheet)
+    , m_mutationType(mutationType)
+{
+    ASSERT(m_styleSheet);
+    m_contentsWereClonedForMutation = m_styleSheet->willMutateRules();
+}
+
+CSSStyleSheet::RuleMutationScope::RuleMutationScope(CSSRule* rule)
+    : m_styleSheet(rule ? rule->parentStyleSheet() : 0)
+    , m_mutationType(OtherMutation)
+    , m_contentsWereClonedForMutation(ContentsWereNotClonedForMutation)
+{
+    if (m_styleSheet)
+        m_contentsWereClonedForMutation = m_styleSheet->willMutateRules();
+}
+
+CSSStyleSheet::RuleMutationScope::~RuleMutationScope()
+{
+    if (m_styleSheet)
+        m_styleSheet->didMutateRules(m_mutationType, m_contentsWereClonedForMutation);
 }
 
 }

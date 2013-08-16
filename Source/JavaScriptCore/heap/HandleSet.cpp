@@ -26,25 +26,36 @@
 #include "config.h"
 #include "HandleSet.h"
 
+#include "HandleBlock.h"
+#include "HandleBlockInlines.h"
 #include "HeapRootVisitor.h"
 #include "JSObject.h"
 #include "Operations.h"
+#include <wtf/DataLog.h>
 
 namespace JSC {
 
-HandleSet::HandleSet(JSGlobalData* globalData)
-    : m_globalData(globalData)
+HandleSet::HandleSet(VM* vm)
+    : m_vm(vm)
     , m_nextToFinalize(0)
 {
     grow();
 }
 
+HandleSet::~HandleSet()
+{
+    while (!m_blockList.isEmpty())
+        m_vm->heap.blockAllocator().deallocate(HandleBlock::destroy(m_blockList.removeHead()));
+}
+
 void HandleSet::grow()
 {
-    Node* block = m_blockStack.grow();
-    for (int i = m_blockStack.blockLength - 1; i >= 0; --i) {
-        Node* node = &block[i];
-        new (NotNull, node) Node(this);
+    HandleBlock* newBlock = HandleBlock::create(m_vm->heap.blockAllocator().allocate<HandleBlock>(), this);
+    m_blockList.append(newBlock);
+
+    for (int i = newBlock->nodeCapacity() - 1; i >= 0; --i) {
+        Node* node = newBlock->nodeAtIndex(i);
+        new (NotNull, node) Node;
         m_freeList.push(node);
     }
 }

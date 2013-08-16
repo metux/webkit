@@ -46,10 +46,10 @@ CSSPageRule::~CSSPageRule()
         m_propertiesCSSOMWrapper->clearParentRule();
 }
 
-CSSStyleDeclaration* CSSPageRule::style() const
+CSSStyleDeclaration* CSSPageRule::style()
 {
     if (!m_propertiesCSSOMWrapper)
-        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_pageRule->mutableProperties(), const_cast<CSSPageRule*>(this));
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_pageRule->mutableProperties(), this);
     return m_propertiesCSSOMWrapper.get();
 }
 
@@ -86,7 +86,7 @@ String CSSPageRule::cssText() const
     StringBuilder result;
     result.append(selectorText());
     result.appendLiteral(" { ");
-    String decls = m_pageRule->properties()->asText();
+    String decls = m_pageRule->properties().asText();
     result.append(decls);
     if (!decls.isEmpty())
         result.append(' ');
@@ -101,14 +101,6 @@ void CSSPageRule::reattach(StyleRuleBase* rule)
     m_pageRule = static_cast<StyleRulePage*>(rule);
     if (m_propertiesCSSOMWrapper)
         m_propertiesCSSOMWrapper->reattach(m_pageRule->mutableProperties());
-}
-
-void CSSPageRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_pageRule, "pageRule");
-    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
 }
 
 } // namespace WebCore

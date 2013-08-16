@@ -43,23 +43,27 @@
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/JSValueRef.h>
 #include <WebCore/ArchiveResource.h>
-#include <WebCore/CSSComputedStyleDeclaration.h>
 #include <WebCore/Chrome.h>
 #include <WebCore/DocumentLoader.h>
+#include <WebCore/EventHandler.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
+#include <WebCore/HTMLFormElement.h>
 #include <WebCore/HTMLFrameOwnerElement.h>
+#include <WebCore/HTMLInputElement.h>
 #include <WebCore/HTMLNames.h>
+#include <WebCore/HTMLTextAreaElement.h>
 #include <WebCore/JSCSSStyleDeclaration.h>
 #include <WebCore/JSElement.h>
 #include <WebCore/JSRange.h>
-#include <WebCore/MainResourceLoader.h>
 #include <WebCore/NetworkingContext.h>
 #include <WebCore/NodeTraversal.h>
 #include <WebCore/Page.h>
 #include <WebCore/PluginDocument.h>
 #include <WebCore/RenderTreeAsText.h>
 #include <WebCore/ResourceBuffer.h>
+#include <WebCore/ResourceLoader.h>
+#include <WebCore/ScriptController.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/TextIterator.h>
 #include <WebCore/TextResourceDecoder.h>
@@ -248,21 +252,37 @@ void WebFrame::startDownload(const WebCore::ResourceRequest& request)
     WebProcess::shared().downloadManager().startDownload(policyDownloadID, request);
 }
 
-void WebFrame::convertMainResourceLoadToDownload(MainResourceLoader* mainResourceLoader, const ResourceRequest& request, const ResourceResponse& response)
+void WebFrame::convertMainResourceLoadToDownload(DocumentLoader* documentLoader, const ResourceRequest& request, const ResourceResponse& response)
 {
     ASSERT(m_policyDownloadID);
 
     uint64_t policyDownloadID = m_policyDownloadID;
     m_policyDownloadID = 0;
 
+    ResourceLoader* mainResourceLoader = documentLoader->mainResourceLoader();
+
 #if ENABLE(NETWORK_PROCESS)
     if (WebProcess::shared().usesNetworkProcess()) {
-        // FIXME: Handle this case.
+        // Use 0 to indicate that there is no main resource loader.
+        // This can happen if the main resource is in the WebCore memory cache.
+        uint64_t mainResourceLoadIdentifier;
+        if (mainResourceLoader)
+            mainResourceLoadIdentifier = mainResourceLoader->identifier();
+        else
+            mainResourceLoadIdentifier = 0;
+
+        WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ConvertMainResourceLoadToDownload(mainResourceLoadIdentifier, policyDownloadID, request, response), 0);
         return;
     }
 #endif
 
-    WebProcess::shared().downloadManager().convertHandleToDownload(policyDownloadID, mainResourceLoader->loader()->handle(), request, response);
+    if (!mainResourceLoader) {
+        // The main resource has already been loaded. Start a new download instead.
+        WebProcess::shared().downloadManager().startDownload(policyDownloadID, request);
+        return;
+    }
+
+    WebProcess::shared().downloadManager().convertHandleToDownload(policyDownloadID, documentLoader->mainResourceLoader()->handle(), request, response);
 }
 
 String WebFrame::source() const 
@@ -294,7 +314,12 @@ String WebFrame::contentsAsString() const
         for (Frame* child = m_coreFrame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
             if (!builder.isEmpty())
                 builder.append(' ');
-            builder.append(static_cast<WebFrameLoaderClient*>(child->loader()->client())->webFrame()->contentsAsString());
+
+            WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(child->loader()->client());
+            WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+            ASSERT(webFrame);
+
+            builder.append(webFrame->contentsAsString());
         }
         // FIXME: It may make sense to use toStringPreserveCapacity() here.
         return builder.toString();
@@ -323,7 +348,7 @@ String WebFrame::selectionAsString() const
     if (!m_coreFrame)
         return String();
 
-    return m_coreFrame->displayStringModifiedByEncoding(m_coreFrame->editor()->selectedText());
+    return m_coreFrame->displayStringModifiedByEncoding(m_coreFrame->editor().selectedText());
 }
 
 IntSize WebFrame::size() const
@@ -393,7 +418,8 @@ WebFrame* WebFrame::parentFrame() const
     if (!m_coreFrame || !m_coreFrame->ownerElement() || !m_coreFrame->ownerElement()->document())
         return 0;
 
-    return static_cast<WebFrameLoaderClient*>(m_coreFrame->ownerElement()->document()->frame()->loader()->client())->webFrame();
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(m_coreFrame->ownerElement()->document()->frame()->loader()->client());
+    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
 }
 
 PassRefPtr<ImmutableArray> WebFrame::childFrames()
@@ -405,11 +431,13 @@ PassRefPtr<ImmutableArray> WebFrame::childFrames()
     if (!size)
         return ImmutableArray::create();
 
-    Vector<RefPtr<APIObject> > vector;
+    Vector<RefPtr<APIObject>> vector;
     vector.reserveInitialCapacity(size);
 
     for (Frame* child = m_coreFrame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
-        WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(child->loader()->client())->webFrame();
+        WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(child->loader()->client());
+        WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+        ASSERT(webFrame);
         vector.uncheckedAppend(webFrame);
     }
 
@@ -457,8 +485,7 @@ bool WebFrame::handlesPageScaleGesture() const
 
     PluginDocument* pluginDocument = static_cast<PluginDocument*>(m_coreFrame->document());
     PluginView* pluginView = static_cast<PluginView*>(pluginDocument->pluginWidget());
-
-    return pluginView->handlesPageScaleFactor();
+    return pluginView && pluginView->handlesPageScaleFactor();
 }
 
 IntRect WebFrame::contentBounds() const
@@ -540,7 +567,7 @@ PassRefPtr<InjectedBundleHitTestResult> WebFrame::hitTest(const IntPoint point) 
     if (!m_coreFrame)
         return 0;
 
-    return InjectedBundleHitTestResult::create(m_coreFrame->eventHandler()->hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping));
+    return InjectedBundleHitTestResult::create(m_coreFrame->eventHandler()->hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent));
 }
 
 bool WebFrame::getDocumentBackgroundColor(double* red, double* green, double* blue, double* alpha)
@@ -572,7 +599,25 @@ bool WebFrame::containsAnyFormElements() const
     for (Node* node = document->documentElement(); node; node = NodeTraversal::next(node)) {
         if (!node->isElementNode())
             continue;
-        if (static_cast<Element*>(node)->hasTagName(HTMLNames::formTag))
+        if (isHTMLFormElement(node))
+            return true;
+    }
+    return false;
+}
+
+bool WebFrame::containsAnyFormControls() const
+{
+    if (!m_coreFrame)
+        return false;
+    
+    Document* document = m_coreFrame->document();
+    if (!document)
+        return false;
+
+    for (Node* node = document->documentElement(); node; node = NodeTraversal::next(node)) {
+        if (!node->isElementNode())
+            continue;
+        if (isHTMLInputElement(node) || toElement(node)->hasTagName(HTMLNames::selectTag) || isHTMLTextAreaElement(node))
             return true;
     }
     return false;
@@ -594,7 +639,9 @@ WebFrame* WebFrame::frameForContext(JSContextRef context)
         return 0;
 
     Frame* coreFrame = static_cast<JSDOMWindowShell*>(globalObjectObj)->window()->impl()->frame();
-    return static_cast<WebFrameLoaderClient*>(coreFrame->loader()->client())->webFrame();
+
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(coreFrame->loader()->client());
+    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
 }
 
 JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleNodeHandle* nodeHandle, InjectedBundleScriptWorld* world)
@@ -621,23 +668,6 @@ JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleRangeHandle* rangeHandle, I
     return toRef(exec, toJS(exec, globalObject, rangeHandle->coreRange()));
 }
 
-JSValueRef WebFrame::computedStyleIncludingVisitedInfo(JSObjectRef element)
-{
-    if (!m_coreFrame)
-        return 0;
-
-    JSDOMWindow* globalObject = m_coreFrame->script()->globalObject(mainThreadNormalWorld());
-    ExecState* exec = globalObject->globalExec();
-
-    if (!toJS(element)->inherits(&JSElement::s_info))
-        return JSValueMakeUndefined(toRef(exec));
-
-    RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(static_cast<JSElement*>(toJS(element))->impl(), true);
-
-    JSLockHolder lock(exec);
-    return toRef(exec, toJS(exec, globalObject, style.get()));
-}
-
 String WebFrame::counterValue(JSObjectRef element)
 {
     if (!toJS(element)->inherits(&JSElement::s_info))
@@ -646,20 +676,16 @@ String WebFrame::counterValue(JSObjectRef element)
     return counterValueForElement(static_cast<JSElement*>(toJS(element))->impl());
 }
 
-String WebFrame::markerText(JSObjectRef element)
-{
-    if (!toJS(element)->inherits(&JSElement::s_info))
-        return String();
-
-    return markerTextForListItem(static_cast<JSElement*>(toJS(element))->impl());
-}
-
 String WebFrame::provisionalURL() const
 {
     if (!m_coreFrame)
         return String();
 
-    return m_coreFrame->loader()->provisionalDocumentLoader()->url().string();
+    DocumentLoader* provisionalDocumentLoader = m_coreFrame->loader()->provisionalDocumentLoader();
+    if (!provisionalDocumentLoader)
+        return String();
+
+    return provisionalDocumentLoader->url().string();
 }
 
 String WebFrame::suggestedFilenameForResourceWithURL(const KURL& url) const
@@ -706,15 +732,15 @@ String WebFrame::mimeTypeForResourceWithURL(const KURL& url) const
 
 void WebFrame::setTextDirection(const String& direction)
 {
-    if (!m_coreFrame || !m_coreFrame->editor())
+    if (!m_coreFrame)
         return;
 
     if (direction == "auto")
-        m_coreFrame->editor()->setBaseWritingDirection(NaturalWritingDirection);
+        m_coreFrame->editor().setBaseWritingDirection(NaturalWritingDirection);
     else if (direction == "ltr")
-        m_coreFrame->editor()->setBaseWritingDirection(LeftToRightWritingDirection);
+        m_coreFrame->editor().setBaseWritingDirection(LeftToRightWritingDirection);
     else if (direction == "rtl")
-        m_coreFrame->editor()->setBaseWritingDirection(RightToLeftWritingDirection);
+        m_coreFrame->editor().setBaseWritingDirection(RightToLeftWritingDirection);
 }
 
 #if PLATFORM(MAC)
@@ -742,8 +768,11 @@ bool WebFrameFilter::shouldIncludeSubframe(Frame* frame) const
 {
     if (!m_callback)
         return true;
-        
-    WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
+
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
     return m_callback(toAPI(m_topLevelWebFrame), toAPI(webFrame), m_context);
 }
 

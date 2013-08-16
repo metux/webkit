@@ -44,18 +44,16 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLElement.h"
+#include "HTMLFrameOwnerElement.h"
 #include "LoaderStrategy.h"
 #include "Logging.h"
 #include "MemoryCache.h"
 #include "PingLoader.h"
 #include "PlatformStrategies.h"
 #include "ResourceLoadScheduler.h"
+#include "ScriptController.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationListHashSet.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -163,7 +161,7 @@ CachedResourceHandle<CachedImage> CachedResourceLoader::requestImage(CachedResou
     if (Frame* f = frame()) {
         if (f->loader()->pageDismissalEventBeingDispatched() != FrameLoader::NoDismissal) {
             KURL requestURL = request.resourceRequest().url();
-            if (requestURL.isValid() && canRequest(CachedResource::ImageResource, requestURL))
+            if (requestURL.isValid() && canRequest(CachedResource::ImageResource, requestURL, request.options(), request.forPreload()))
                 PingLoader::loadImage(f, requestURL);
             return 0;
         }
@@ -200,7 +198,11 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
 {
     KURL url = MemoryCache::removeFragmentIdentifierIfNeeded(request.resourceRequest().url());
 
-    if (CachedResource* existing = memoryCache()->resourceForURL(url)) {
+#if ENABLE(CACHE_PARTITIONING)
+    request.mutableResourceRequest().setCachePartition(document()->topOrigin()->cachePartition());
+#endif
+
+    if (CachedResource* existing = memoryCache()->resourceForRequest(request.resourceRequest())) {
         if (existing->type() == CachedResource::CSSStyleSheet)
             return static_cast<CachedCSSStyleSheet*>(existing);
         memoryCache()->remove(existing);
@@ -213,7 +215,7 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
     memoryCache()->add(userSheet.get());
     // FIXME: loadResource calls setOwningCachedResourceLoader() if the resource couldn't be added to cache. Does this function need to call it, too?
 
-    userSheet->load(this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck));
+    userSheet->load(this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType));
     
     return userSheet;
 }
@@ -301,11 +303,11 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
     return true;
 }
 
-bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url, bool forPreload)
+bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url, const ResourceLoaderOptions& options, bool forPreload)
 {
     if (document() && !document()->securityOrigin()->canDisplay(url)) {
         if (!forPreload)
-            FrameLoader::reportLocalLoadFailed(frame(), url.string());
+            FrameLoader::reportLocalLoadFailed(frame(), url.stringCenterEllipsizedToLength());
         LOG(ResourceLoading, "CachedResourceLoader::requestResource URL was not allowed by SecurityOrigin::canDisplay");
         return 0;
     }
@@ -333,8 +335,10 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
 #if ENABLE(CSS_SHADERS)
     case CachedResource::ShaderResource:
 #endif
-        // These types of resources can be loaded from any origin.
-        // FIXME: Are we sure about CachedResource::FontResource?
+        if (options.requestOriginPolicy == RestrictToSameOrigin && !m_document->securityOrigin()->canRequest(url)) {
+            printAccessDeniedMessage(url);
+            return false;
+        }
         break;
 #if ENABLE(SVG)
     case CachedResource::SVGDocumentResource:
@@ -416,11 +420,24 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
     return true;
 }
 
+bool CachedResourceLoader::shouldContinueAfterNotifyingLoadedFromMemoryCache(CachedResource* resource)
+{
+    if (!resource || !frame() || resource->status() != CachedResource::Cached)
+        return true;
+
+    ResourceRequest newRequest;
+    frame()->loader()->loadedResourceFromMemoryCache(resource, newRequest);
+    
+    // FIXME <http://webkit.org/b/113251>: If the delegate modifies the request's
+    // URL, it is no longer appropriate to use this CachedResource.
+    return !newRequest.isNull();
+}
+
 CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(CachedResource::Type type, CachedResourceRequest& request)
 {
     KURL url = request.resourceRequest().url();
     
-    LOG(ResourceLoading, "CachedResourceLoader::requestResource '%s', charset '%s', priority=%d, forPreload=%u", url.string().latin1().data(), request.charset().latin1().data(), request.priority(), request.forPreload());
+    LOG(ResourceLoading, "CachedResourceLoader::requestResource '%s', charset '%s', priority=%d, forPreload=%u", url.stringCenterEllipsizedToLength().latin1().data(), request.charset().latin1().data(), request.priority(), request.forPreload());
     
     // If only the fragment identifiers differ, it is the same resource.
     url = MemoryCache::removeFragmentIdentifierIfNeeded(url);
@@ -428,7 +445,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
     if (!url.isValid())
         return 0;
 
-    if (!canRequest(type, url, request.forPreload()))
+    if (!canRequest(type, url, request.options(), request.forPreload()))
         return 0;
 
     if (Frame* f = frame())
@@ -443,7 +460,13 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
     }
 
     // See if we can use an existing resource from the cache.
-    CachedResourceHandle<CachedResource> resource = memoryCache()->resourceForURL(url);
+    CachedResourceHandle<CachedResource> resource;
+#if ENABLE(CACHE_PARTITIONING)
+    if (document())
+        request.mutableResourceRequest().setCachePartition(document()->topOrigin()->cachePartition());
+#endif
+
+    resource = memoryCache()->resourceForRequest(request.resourceRequest());
 
     const RevalidationPolicy policy = determineRevalidationPolicy(type, request.mutableResourceRequest(), request.forPreload(), resource.get(), request.defer());
     switch (policy) {
@@ -457,8 +480,9 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
         resource = revalidateResource(request, resource.get());
         break;
     case Use:
+        if (!shouldContinueAfterNotifyingLoadedFromMemoryCache(resource.get()))
+            return 0;
         memoryCache()->resourceAccessed(resource.get());
-        notifyLoadedFromMemoryCache(resource.get());
         break;
     }
 
@@ -478,18 +502,6 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
             return 0;
         }
     }
-
-#if PLATFORM(CHROMIUM)
-    // FIXME: Temporarily leave main resource caching disabled for chromium, see https://bugs.webkit.org/show_bug.cgi?id=107962
-    // Ensure main resources aren't preloaded, and other main resource loads are removed from cache to prevent reuse.
-    if (type == CachedResource::MainResource) {
-        ASSERT(policy != Use);
-        ASSERT(policy != Revalidate);
-        memoryCache()->remove(resource.get());
-        if (request.forPreload())
-            return 0;
-    }
-#endif
 
     if (!request.resourceRequest().url().protocolIsData())
         m_validatedURLs.add(request.resourceRequest().url());
@@ -517,10 +529,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
     memoryCache()->remove(resource);
     memoryCache()->add(newResource.get());
 #if ENABLE(RESOURCE_TIMING)
-    if (resource->type() != CachedResource::MainResource) {
-        InitiatorInfo info = { request.initiatorName(), monotonicallyIncreasingTime() };
-        m_initiatorMap.add(newResource.get(), info);
-    }
+    storeResourceTimingInitiatorInformation(resource, request);
 #else
     UNUSED_PARAM(request);
 #endif
@@ -529,22 +538,35 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
 
 CachedResourceHandle<CachedResource> CachedResourceLoader::loadResource(CachedResource::Type type, CachedResourceRequest& request, const String& charset)
 {
-    ASSERT(!memoryCache()->resourceForURL(request.resourceRequest().url()));
+    ASSERT(!memoryCache()->resourceForRequest(request.resourceRequest()));
 
-    LOG(ResourceLoading, "Loading CachedResource for '%s'.", request.resourceRequest().url().string().latin1().data());
+    LOG(ResourceLoading, "Loading CachedResource for '%s'.", request.resourceRequest().url().stringCenterEllipsizedToLength().latin1().data());
 
     CachedResourceHandle<CachedResource> resource = createResource(type, request.mutableResourceRequest(), charset);
 
     if (!memoryCache()->add(resource.get()))
         resource->setOwningCachedResourceLoader(this);
 #if ENABLE(RESOURCE_TIMING)
-    if (type != CachedResource::MainResource) {
-        InitiatorInfo info = { request.initiatorName(), monotonicallyIncreasingTime() };
-        m_initiatorMap.add(resource.get(), info);
-    }
+    storeResourceTimingInitiatorInformation(resource, request);
 #endif
     return resource;
 }
+
+#if ENABLE(RESOURCE_TIMING)
+void CachedResourceLoader::storeResourceTimingInitiatorInformation(const CachedResourceHandle<CachedResource>& resource, const CachedResourceRequest& request)
+{
+    if (resource->type() == CachedResource::MainResource) {
+        // <iframe>s should report the initial navigation requested by the parent document, but not subsequent navigations.
+        if (frame()->ownerElement() && m_documentLoader->frameLoader()->stateMachine()->committingFirstRealLoad()) {
+            InitiatorInfo info = { frame()->ownerElement()->localName(), monotonicallyIncreasingTime() };
+            m_initiatorMap.add(resource.get(), info);
+        }
+    } else {
+        InitiatorInfo info = { request.initiatorName(), monotonicallyIncreasingTime() };
+        m_initiatorMap.add(resource.get(), info);
+    }
+}
+#endif // ENABLE(RESOURCE_TIMING)
 
 CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalidationPolicy(CachedResource::Type type, ResourceRequest& request, bool forPreload, CachedResource* existingResource, CachedResourceRequest::DeferOption defer) const
 {
@@ -648,11 +670,11 @@ void CachedResourceLoader::printAccessDeniedMessage(const KURL& url) const
 
     String message;
     if (!m_document || m_document->url().isNull())
-        message = "Unsafe attempt to load URL " + url.string() + '.';
+        message = "Unsafe attempt to load URL " + url.stringCenterEllipsizedToLength() + '.';
     else
-        message = "Unsafe attempt to load URL " + url.string() + " from frame with URL " + m_document->url().string() + ". Domains, protocols and ports must match.\n";
+        message = "Unsafe attempt to load URL " + url.stringCenterEllipsizedToLength() + " from frame with URL " + m_document->url().stringCenterEllipsizedToLength() + ". Domains, protocols and ports must match.\n";
 
-    frame()->document()->addConsoleMessage(OtherMessageSource, ErrorMessageLevel, message);
+    frame()->document()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
 }
 
 void CachedResourceLoader::setAutoLoadImages(bool enable)
@@ -730,13 +752,16 @@ void CachedResourceLoader::loadDone(CachedResource* resource)
     RefPtr<Document> protectDocument(m_document);
 
 #if ENABLE(RESOURCE_TIMING)
-    // FIXME: Add resource timing support for main resources.
-    if (resource && resource->type() != CachedResource::MainResource && resource->response().isHTTP() && ((!resource->errorOccurred() && !resource->wasCanceled()) || resource->response().httpStatusCode() == 304)) {
+    if (resource && resource->response().isHTTP() && ((!resource->errorOccurred() && !resource->wasCanceled()) || resource->response().httpStatusCode() == 304)) {
         HashMap<CachedResource*, InitiatorInfo>::iterator initiatorIt = m_initiatorMap.find(resource);
         if (initiatorIt != m_initiatorMap.end()) {
             ASSERT(document());
+            Document* initiatorDocument = document();
+            if (resource->type() == CachedResource::MainResource)
+                initiatorDocument = document()->parentDocument();
+            ASSERT(initiatorDocument);
             const InitiatorInfo& info = initiatorIt->value;
-            document()->domWindow()->performance()->addResourceTiming(info.name, document(), resource->resourceRequest(), resource->response(), info.startTime, resource->loadFinishTime());
+            initiatorDocument->domWindow()->performance()->addResourceTiming(info.name, initiatorDocument, resource->resourceRequest(), resource->response(), info.startTime, resource->loadFinishTime());
             m_initiatorMap.remove(initiatorIt);
         }
     }
@@ -784,20 +809,7 @@ void CachedResourceLoader::performPostLoadActions()
 {
     checkForPendingPreloads();
 
-#if USE(PLATFORM_STRATEGIES)
     platformStrategies()->loaderStrategy()->resourceLoadScheduler()->servePendingRequests();
-#else
-    resourceLoadScheduler()->servePendingRequests();
-#endif
-}
-
-void CachedResourceLoader::notifyLoadedFromMemoryCache(CachedResource* resource)
-{
-    if (!resource || !frame() || resource->status() != CachedResource::Cached)
-        return;
-
-    // FIXME: If the WebKit client changes or cancels the request, WebCore does not respect this and continues the load.
-    frame()->loader()->loadedResourceFromMemoryCache(resource);
 }
 
 void CachedResourceLoader::incrementRequestCount(const CachedResource* res)
@@ -820,7 +832,7 @@ void CachedResourceLoader::decrementRequestCount(const CachedResource* res)
 void CachedResourceLoader::preload(CachedResource::Type type, CachedResourceRequest& request, const String& charset)
 {
     bool delaySubresourceLoad = true;
-#if PLATFORM(IOS) || PLATFORM(CHROMIUM)
+#if PLATFORM(IOS)
     delaySubresourceLoad = false;
 #endif
     if (delaySubresourceLoad) {
@@ -968,26 +980,9 @@ void CachedResourceLoader::printPreloadStats()
 }
 #endif
 
-void CachedResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Loader);
-    info.addMember(m_documentResources, "documentResources");
-    info.addMember(m_document, "document");
-    info.addMember(m_documentLoader, "documentLoader");
-    info.addMember(m_validatedURLs, "validatedURLs");
-    info.addMember(m_preloads, "preloads");
-    info.addMember(m_pendingPreloads, "pendingPreloads");
-    info.addMember(m_garbageCollectDocumentResourcesTimer, "garbageCollectDocumentResourcesTimer");
-#if ENABLE(RESOURCE_TIMING)
-    // FIXME: m_initiatorMap has pointers to already deleted CachedResources
-    info.ignoreMember(m_initiatorMap);
-#endif
-
-}
-
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck);
+    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType);
     return options;
 }
 

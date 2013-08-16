@@ -37,13 +37,13 @@
 #include "EventNames.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "Logging.h"
 #include "PseudoElement.h"
 #include "RenderView.h"
 #include "TransitionEvent.h"
 #include "WebKitAnimationEvent.h"
 #include "WebKitTransitionEvent.h"
 #include <wtf/CurrentTime.h>
-#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
@@ -58,7 +58,8 @@ AnimationControllerPrivate::AnimationControllerPrivate(Frame* frame)
     , m_animationsWaitingForStyle()
     , m_animationsWaitingForStartTimeResponse()
     , m_waitingForAsyncStartNotification(false)
-    , m_previousTimeToNextService(0)
+    , m_isSuspended(false)
+    , m_allowsNewAnimationsWhileSuspended(false)
 {
 }
 
@@ -66,25 +67,23 @@ AnimationControllerPrivate::~AnimationControllerPrivate()
 {
 }
 
-PassRefPtr<CompositeAnimation> AnimationControllerPrivate::accessCompositeAnimation(RenderObject* renderer)
+CompositeAnimation* AnimationControllerPrivate::ensureCompositeAnimation(RenderObject* renderer)
 {
-    RefPtr<CompositeAnimation> animation = m_compositeAnimations.get(renderer);
-    if (!animation) {
-        animation = CompositeAnimation::create(this);
-        m_compositeAnimations.set(renderer, animation);
-    }
-    return animation;
+    RenderObjectAnimationMap::AddResult result = m_compositeAnimations.add(renderer, 0);
+    if (result.isNewEntry)
+        result.iterator->value = CompositeAnimation::create(this);
+    return result.iterator->value.get();
 }
 
 bool AnimationControllerPrivate::clear(RenderObject* renderer)
 {
     // Return false if we didn't do anything OR we are suspended (so we don't try to
     // do a setNeedsStyleRecalc() when suspended).
-    PassRefPtr<CompositeAnimation> animation = m_compositeAnimations.take(renderer);
+    RefPtr<CompositeAnimation> animation = m_compositeAnimations.take(renderer);
     if (!animation)
         return false;
     animation->clearRenderer();
-    return animation->suspended();
+    return animation->isSuspended();
 }
 
 double AnimationControllerPrivate::updateAnimations(SetChanged callSetChanged/* = DoNotCallSetChanged*/)
@@ -95,7 +94,7 @@ double AnimationControllerPrivate::updateAnimations(SetChanged callSetChanged/* 
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
         CompositeAnimation* compAnim = it->value.get();
-        if (!compAnim->suspended() && compAnim->hasAnimations()) {
+        if (!compAnim->isSuspended() && compAnim->hasAnimations()) {
             double t = compAnim->timeToNextService();
             if (t != -1 && (t < timeToNextService || timeToNextService == -1))
                 timeToNextService = t;
@@ -122,18 +121,13 @@ void AnimationControllerPrivate::updateAnimationTimerForRenderer(RenderObject* r
 {
     double timeToNextService = 0;
 
-    RefPtr<CompositeAnimation> compAnim = m_compositeAnimations.get(renderer);
-    if (!compAnim->suspended() && compAnim->hasAnimations())
-        timeToNextService = compAnim->timeToNextService();
+    const CompositeAnimation* compositeAnimation = m_compositeAnimations.get(renderer);
+    if (!compositeAnimation->isSuspended() && compositeAnimation->hasAnimations())
+        timeToNextService = compositeAnimation->timeToNextService();
 
-    if (m_animationTimer.isActive()) {
-        if (m_previousTimeToNextService < timeToNextService)
-            return;
+    if (m_animationTimer.isActive() && (m_animationTimer.repeatInterval() || m_animationTimer.nextFireInterval() <= timeToNextService))
+        return;
 
-        m_animationTimer.stop();
-    }
-
-    m_previousTimeToNextService = timeToNextService;
     m_animationTimer.startOneShot(timeToNextService);
 }
 
@@ -141,12 +135,12 @@ void AnimationControllerPrivate::updateAnimationTimer(SetChanged callSetChanged/
 {
     double timeToNextService = updateAnimations(callSetChanged);
 
+    LOG(Animations, "updateAnimationTimer: timeToNextService is %.2f", timeToNextService);
+
     // If we want service immediately, we start a repeating timer to reduce the overhead of starting
     if (!timeToNextService) {
         if (!m_animationTimer.isActive() || m_animationTimer.repeatInterval() == 0)
             m_animationTimer.startRepeating(cAnimationTimerDelay);
-
-        m_previousTimeToNextService = timeToNextService;
         return;
     }
 
@@ -158,9 +152,6 @@ void AnimationControllerPrivate::updateAnimationTimer(SetChanged callSetChanged/
     }
 
     // Otherwise, we want to start a one-shot timer so we get here again
-    if (m_animationTimer.isActive())
-        m_animationTimer.stop();
-    m_previousTimeToNextService = timeToNextService;
     m_animationTimer.startOneShot(timeToNextService);
 }
 
@@ -254,7 +245,7 @@ void AnimationControllerPrivate::animationTimerFired(Timer<AnimationControllerPr
 
 bool AnimationControllerPrivate::isRunningAnimationOnRenderer(RenderObject* renderer, CSSPropertyID property, bool isRunningNow) const
 {
-    RefPtr<CompositeAnimation> animation = m_compositeAnimations.get(renderer);
+    const CompositeAnimation* animation = m_compositeAnimations.get(renderer);
     if (!animation)
         return false;
 
@@ -263,7 +254,7 @@ bool AnimationControllerPrivate::isRunningAnimationOnRenderer(RenderObject* rend
 
 bool AnimationControllerPrivate::isRunningAcceleratedAnimationOnRenderer(RenderObject* renderer, CSSPropertyID property, bool isRunningNow) const
 {
-    RefPtr<CompositeAnimation> animation = m_compositeAnimations.get(renderer);
+    const CompositeAnimation* animation = m_compositeAnimations.get(renderer);
     if (!animation)
         return false;
 
@@ -272,26 +263,36 @@ bool AnimationControllerPrivate::isRunningAcceleratedAnimationOnRenderer(RenderO
 
 void AnimationControllerPrivate::suspendAnimations()
 {
+    if (isSuspended())
+        return;
+
     suspendAnimationsForDocument(m_frame->document());
-    
+
     // Traverse subframes
     for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->nextSibling())
         child->animation()->suspendAnimations();
+
+    m_isSuspended = true;
 }
 
 void AnimationControllerPrivate::resumeAnimations()
 {
+    if (!isSuspended())
+        return;
+
     resumeAnimationsForDocument(m_frame->document());
-    
+
     // Traverse subframes
     for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->nextSibling())
         child->animation()->resumeAnimations();
+
+    m_isSuspended = false;
 }
 
 void AnimationControllerPrivate::suspendAnimationsForDocument(Document* document)
 {
     setBeginAnimationUpdateTime(cBeginAnimationUpdateTimeNotSet);
-    
+
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
         RenderObject* renderer = it->key;
@@ -300,14 +301,14 @@ void AnimationControllerPrivate::suspendAnimationsForDocument(Document* document
             compAnim->suspendAnimations();
         }
     }
-    
+
     updateAnimationTimer();
 }
 
 void AnimationControllerPrivate::resumeAnimationsForDocument(Document* document)
 {
     setBeginAnimationUpdateTime(cBeginAnimationUpdateTimeNotSet);
-    
+
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
         RenderObject* renderer = it->key;
@@ -316,8 +317,19 @@ void AnimationControllerPrivate::resumeAnimationsForDocument(Document* document)
             compAnim->resumeAnimations();
         }
     }
-    
+
     updateAnimationTimer();
+}
+
+void AnimationControllerPrivate::startAnimationsIfNotSuspended(Document* document)
+{
+    if (!isSuspended() || allowsNewAnimationsWhileSuspended())
+        resumeAnimationsForDocument(document);
+}
+
+void AnimationControllerPrivate::setAllowsNewAnimationsWhileSuspended(bool allowed)
+{
+    m_allowsNewAnimationsWhileSuspended = allowed;
 }
 
 bool AnimationControllerPrivate::pauseAnimationAtTime(RenderObject* renderer, const AtomicString& name, double t)
@@ -325,11 +337,8 @@ bool AnimationControllerPrivate::pauseAnimationAtTime(RenderObject* renderer, co
     if (!renderer)
         return false;
 
-    RefPtr<CompositeAnimation> compAnim = accessCompositeAnimation(renderer);
-    if (!compAnim)
-        return false;
-
-    if (compAnim->pauseAnimationAtTime(name, t)) {
+    CompositeAnimation* compositeAnimation = ensureCompositeAnimation(renderer);
+    if (compositeAnimation->pauseAnimationAtTime(name, t)) {
         renderer->node()->setNeedsStyleRecalc(SyntheticStyleChange);
         startUpdateStyleIfNeededDispatcher();
         return true;
@@ -343,11 +352,8 @@ bool AnimationControllerPrivate::pauseTransitionAtTime(RenderObject* renderer, c
     if (!renderer)
         return false;
 
-    RefPtr<CompositeAnimation> compAnim = accessCompositeAnimation(renderer);
-    if (!compAnim)
-        return false;
-
-    if (compAnim->pauseTransitionAtTime(cssPropertyID(property), t)) {
+    CompositeAnimation* compositeAnimation = ensureCompositeAnimation(renderer);
+    if (compositeAnimation->pauseTransitionAtTime(cssPropertyID(property), t)) {
         renderer->node()->setNeedsStyleRecalc(SyntheticStyleChange);
         startUpdateStyleIfNeededDispatcher();
         return true;
@@ -381,7 +387,7 @@ PassRefPtr<RenderStyle> AnimationControllerPrivate::getAnimatedStyleForRenderer(
     if (!renderer)
         return 0;
 
-    RefPtr<CompositeAnimation> rendererAnimations = m_compositeAnimations.get(renderer);
+    const CompositeAnimation* rendererAnimations = m_compositeAnimations.get(renderer);
     if (!rendererAnimations)
         return renderer->style();
     
@@ -530,7 +536,7 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
     // We don't support anonymous pseudo elements like :first-line or :first-letter.
     ASSERT(renderer->node());
 
-    RefPtr<CompositeAnimation> rendererAnimations = m_data->accessCompositeAnimation(renderer);
+    CompositeAnimation* rendererAnimations = m_data->ensureCompositeAnimation(renderer);
     RefPtr<RenderStyle> blendedStyle = rendererAnimations->animate(renderer, oldStyle, newStyle);
 
     if (renderer->parent() || newStyle->animations() || (oldStyle && oldStyle->animations())) {
@@ -586,14 +592,31 @@ bool AnimationController::isRunningAcceleratedAnimationOnRenderer(RenderObject* 
     return m_data->isRunningAcceleratedAnimationOnRenderer(renderer, property, isRunningNow);
 }
 
+bool AnimationController::isSuspended() const
+{
+    return m_data->isSuspended();
+}
+
 void AnimationController::suspendAnimations()
 {
+    LOG(Animations, "controller is suspending animations");
     m_data->suspendAnimations();
 }
 
 void AnimationController::resumeAnimations()
 {
+    LOG(Animations, "controller is resuming animations");
     m_data->resumeAnimations();
+}
+
+bool AnimationController::allowsNewAnimationsWhileSuspended() const
+{
+    return m_data->allowsNewAnimationsWhileSuspended();
+}
+
+void AnimationController::setAllowsNewAnimationsWhileSuspended(bool allowed)
+{
+    m_data->setAllowsNewAnimationsWhileSuspended(allowed);
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
@@ -605,12 +628,20 @@ void AnimationController::serviceAnimations()
 
 void AnimationController::suspendAnimationsForDocument(Document* document)
 {
+    LOG(Animations, "suspending animations for document %p", document);
     m_data->suspendAnimationsForDocument(document);
 }
 
 void AnimationController::resumeAnimationsForDocument(Document* document)
 {
+    LOG(Animations, "resuming animations for document %p", document);
     m_data->resumeAnimationsForDocument(document);
+}
+
+void AnimationController::startAnimationsIfNotSuspended(Document* document)
+{
+    LOG(Animations, "animations may start for document %p", document);
+    m_data->startAnimationsIfNotSuspended(document);
 }
 
 void AnimationController::beginAnimationUpdate()

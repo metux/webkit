@@ -29,7 +29,7 @@
 #if ENABLE(LLINT)
 
 #include "JITCode.h"
-#include "JSGlobalData.h"
+#include "VM.h"
 #include "JSObject.h"
 #include "LLIntThunks.h"
 #include "LowLevelInterpreter.h"
@@ -37,53 +37,53 @@
 
 namespace JSC { namespace LLInt {
 
-void getFunctionEntrypoint(JSGlobalData& globalData, CodeSpecializationKind kind, JITCode& jitCode, MacroAssemblerCodePtr& arityCheck)
+void getFunctionEntrypoint(VM& vm, CodeSpecializationKind kind, RefPtr<JITCode>& jitCode, MacroAssemblerCodePtr& arityCheck)
 {
-    if (!globalData.canUseJIT()) {
+    if (!vm.canUseJIT()) {
         if (kind == CodeForCall) {
-            jitCode = JITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_function_for_call_prologue), JITCode::InterpreterThunk);
+            jitCode = adoptRef(new DirectJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_function_for_call_prologue), JITCode::InterpreterThunk));
             arityCheck = MacroAssemblerCodePtr::createLLIntCodePtr(llint_function_for_call_arity_check);
             return;
         }
 
         ASSERT(kind == CodeForConstruct);
-        jitCode = JITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_function_for_construct_prologue), JITCode::InterpreterThunk);
+        jitCode = adoptRef(new DirectJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_function_for_construct_prologue), JITCode::InterpreterThunk));
         arityCheck = MacroAssemblerCodePtr::createLLIntCodePtr(llint_function_for_construct_arity_check);
         return;
     }
     
 #if ENABLE(JIT)
     if (kind == CodeForCall) {
-        jitCode = JITCode(globalData.getCTIStub(functionForCallEntryThunkGenerator), JITCode::InterpreterThunk);
-        arityCheck = globalData.getCTIStub(functionForCallArityCheckThunkGenerator).code();
+        jitCode = adoptRef(new DirectJITCode(vm.getCTIStub(functionForCallEntryThunkGenerator), JITCode::InterpreterThunk));
+        arityCheck = vm.getCTIStub(functionForCallArityCheckThunkGenerator).code();
         return;
     }
 
     ASSERT(kind == CodeForConstruct);
-    jitCode = JITCode(globalData.getCTIStub(functionForConstructEntryThunkGenerator), JITCode::InterpreterThunk);
-    arityCheck = globalData.getCTIStub(functionForConstructArityCheckThunkGenerator).code();
+    jitCode = adoptRef(new DirectJITCode(vm.getCTIStub(functionForConstructEntryThunkGenerator), JITCode::InterpreterThunk));
+    arityCheck = vm.getCTIStub(functionForConstructArityCheckThunkGenerator).code();
 #endif // ENABLE(JIT)
 }
 
-void getEvalEntrypoint(JSGlobalData& globalData, JITCode& jitCode)
+void getEvalEntrypoint(VM& vm, RefPtr<JITCode>& jitCode)
 {
-    if (!globalData.canUseJIT()) {
-        jitCode = JITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_eval_prologue), JITCode::InterpreterThunk);
+    if (!vm.canUseJIT()) {
+        jitCode = adoptRef(new DirectJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_eval_prologue), JITCode::InterpreterThunk));
         return;
     }
 #if ENABLE(JIT)    
-    jitCode = JITCode(globalData.getCTIStub(evalEntryThunkGenerator), JITCode::InterpreterThunk);
+    jitCode = adoptRef(new DirectJITCode(vm.getCTIStub(evalEntryThunkGenerator), JITCode::InterpreterThunk));
 #endif
 }
 
-void getProgramEntrypoint(JSGlobalData& globalData, JITCode& jitCode)
+void getProgramEntrypoint(VM& vm, RefPtr<JITCode>& jitCode)
 {
-    if (!globalData.canUseJIT()) {
-        jitCode = JITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_program_prologue), JITCode::InterpreterThunk);
+    if (!vm.canUseJIT()) {
+        jitCode = adoptRef(new DirectJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_program_prologue), JITCode::InterpreterThunk));
         return;
     }
 #if ENABLE(JIT)
-    jitCode = JITCode(globalData.getCTIStub(programEntryThunkGenerator), JITCode::InterpreterThunk);
+    jitCode = adoptRef(new DirectJITCode(vm.getCTIStub(programEntryThunkGenerator), JITCode::InterpreterThunk));
 #endif
 }
 

@@ -35,7 +35,7 @@ namespace WebCore {
 
 class HTMLMediaElement;
 
-class HTMLTrackElement : public HTMLElement, public TextTrackClient {
+class HTMLTrackElement FINAL : public HTMLElement, public TextTrackClient {
 public:
     static PassRefPtr<HTMLTrackElement> create(const QualifiedName&, Document*);
 
@@ -79,11 +79,6 @@ private:
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     void loadTimerFired(Timer<HTMLTrackElement>*);
-
-#if ENABLE(MICRODATA)
-    virtual String itemValueText() const OVERRIDE;
-    virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
-#endif
 
     HTMLMediaElement* mediaElement() const;
 

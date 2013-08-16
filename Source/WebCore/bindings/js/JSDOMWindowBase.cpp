@@ -38,7 +38,6 @@
 #include "Settings.h"
 #include "WebCoreJSClientData.h"
 #include <wtf/MainThread.h>
-#include <wtf/UnusedParam.h>
 
 using namespace JSC;
 
@@ -53,21 +52,21 @@ const ClassInfo JSDOMWindowBase::s_info = { "Window", &JSDOMGlobalObject::s_info
 
 const GlobalObjectMethodTable JSDOMWindowBase::s_globalObjectMethodTable = { &shouldAllowAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptExperimentsEnabled };
 
-JSDOMWindowBase::JSDOMWindowBase(JSGlobalData& globalData, Structure* structure, PassRefPtr<DOMWindow> window, JSDOMWindowShell* shell)
-    : JSDOMGlobalObject(globalData, structure, shell->world(), &s_globalObjectMethodTable)
+JSDOMWindowBase::JSDOMWindowBase(VM& vm, Structure* structure, PassRefPtr<DOMWindow> window, JSDOMWindowShell* shell)
+    : JSDOMGlobalObject(vm, structure, shell->world(), &s_globalObjectMethodTable)
     , m_impl(window)
     , m_shell(shell)
 {
 }
 
-void JSDOMWindowBase::finishCreation(JSGlobalData& globalData, JSDOMWindowShell* shell)
+void JSDOMWindowBase::finishCreation(VM& vm, JSDOMWindowShell* shell)
 {
-    Base::finishCreation(globalData, shell);
+    Base::finishCreation(vm, shell);
     ASSERT(inherits(&s_info));
 
     GlobalPropertyInfo staticGlobals[] = {
-        GlobalPropertyInfo(Identifier(globalExec(), "document"), jsNull(), DontDelete | ReadOnly),
-        GlobalPropertyInfo(Identifier(globalExec(), "window"), m_shell, DontDelete | ReadOnly)
+        GlobalPropertyInfo(vm.propertyNames->document, jsNull(), DontDelete | ReadOnly),
+        GlobalPropertyInfo(vm.propertyNames->window, m_shell, DontDelete | ReadOnly)
     };
     
     addStaticGlobals(staticGlobals, WTF_ARRAY_LENGTH(staticGlobals));
@@ -82,7 +81,7 @@ void JSDOMWindowBase::updateDocument()
 {
     ASSERT(m_impl->document());
     ExecState* exec = globalExec();
-    symbolTablePutWithAttributes(this, exec->globalData(), Identifier(exec, "document"), toJS(exec, this, m_impl->document()), DontDelete | ReadOnly);
+    symbolTablePutWithAttributes(this, exec->vm(), exec->vm().propertyNames->document, toJS(exec, this, m_impl->document()), DontDelete | ReadOnly);
 }
 
 ScriptExecutionContext* JSDOMWindowBase::scriptExecutionContext() const
@@ -152,7 +151,7 @@ bool JSDOMWindowBase::shouldInterruptScript(const JSGlobalObject* object)
     if (!page)
         return true;
 
-    return page->chrome()->shouldInterruptJavaScript();
+    return page->chrome().shouldInterruptJavaScript();
 }
 
 bool JSDOMWindowBase::javaScriptExperimentsEnabled(const JSGlobalObject* object)
@@ -177,22 +176,19 @@ JSDOMWindowShell* JSDOMWindowBase::shell() const
     return m_shell;
 }
 
-JSGlobalData* JSDOMWindowBase::commonJSGlobalData()
+VM* JSDOMWindowBase::commonVM()
 {
     ASSERT(isMainThread());
 
-    static JSGlobalData* globalData = 0;
-    if (!globalData) {
+    static VM* vm = 0;
+    if (!vm) {
         ScriptController::initializeThreading();
-        globalData = JSGlobalData::createLeaked(LargeHeap).leakRef();
-        globalData->timeoutChecker.setTimeoutInterval(10000); // 10 seconds
-#ifndef NDEBUG
-        globalData->exclusiveThread = currentThread();
-#endif
-        initNormalWorldClientData(globalData);
+        vm = VM::createLeaked(LargeHeap).leakRef();
+        vm->exclusiveThread = currentThread();
+        initNormalWorldClientData(vm);
     }
 
-    return globalData;
+    return vm;
 }
 
 // JSDOMGlobalObject* is ignored, accessing a window in any context will

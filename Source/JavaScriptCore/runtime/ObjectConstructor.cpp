@@ -22,6 +22,7 @@
 #include "ObjectConstructor.h"
 
 #include "ButterflyInlines.h"
+#include "CallFrameInlines.h"
 #include "CopiedSpaceInlines.h"
 #include "Error.h"
 #include "ExceptionHelpers.h"
@@ -33,6 +34,7 @@
 #include "Operations.h"
 #include "PropertyDescriptor.h"
 #include "PropertyNameArray.h"
+#include "StackIterator.h"
 
 namespace JSC {
 
@@ -85,16 +87,16 @@ ObjectConstructor::ObjectConstructor(JSGlobalObject* globalObject, Structure* st
 
 void ObjectConstructor::finishCreation(ExecState* exec, ObjectPrototype* objectPrototype)
 {
-    Base::finishCreation(exec->globalData(), Identifier(exec, "Object").string());
+    Base::finishCreation(exec->vm(), Identifier(exec, "Object").string());
     // ECMA 15.2.3.1
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, objectPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().prototype, objectPrototype, DontEnum | DontDelete | ReadOnly);
     // no. of arguments for constructor
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool ObjectConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+bool ObjectConstructor::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::objectConstructorTable(exec), jsCast<ObjectConstructor*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<JSObject>(exec, ExecState::objectConstructorTable(exec), jsCast<ObjectConstructor*>(object), propertyName, slot);
 }
 
 bool ObjectConstructor::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
@@ -139,7 +141,9 @@ EncodedJSValue JSC_HOST_CALL objectConstructorGetPrototypeOf(ExecState* exec)
     if (!exec->argument(0).isObject())
         return throwVMError(exec, createTypeError(exec, ASCIILiteral("Requested prototype of a value that is not an object.")));
     JSObject* object = asObject(exec->argument(0));
-    if (!object->allowsAccessFrom(exec->trueCallerFrame()))
+    StackIterator iter = exec->begin();
+    ++iter;
+    if ((iter == exec->end()) || !object->allowsAccessFrom(iter->callFrame()))
         return JSValue::encode(jsUndefined());
     return JSValue::encode(object->prototype());
 }
@@ -160,17 +164,17 @@ EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(ExecState
 
     JSObject* description = constructEmptyObject(exec);
     if (!descriptor.isAccessorDescriptor()) {
-        description->putDirect(exec->globalData(), exec->propertyNames().value, descriptor.value() ? descriptor.value() : jsUndefined(), 0);
-        description->putDirect(exec->globalData(), exec->propertyNames().writable, jsBoolean(descriptor.writable()), 0);
+        description->putDirect(exec->vm(), exec->propertyNames().value, descriptor.value() ? descriptor.value() : jsUndefined(), 0);
+        description->putDirect(exec->vm(), exec->propertyNames().writable, jsBoolean(descriptor.writable()), 0);
     } else {
         ASSERT(descriptor.getter());
         ASSERT(descriptor.setter());
-        description->putDirect(exec->globalData(), exec->propertyNames().get, descriptor.getter(), 0);
-        description->putDirect(exec->globalData(), exec->propertyNames().set, descriptor.setter(), 0);
+        description->putDirect(exec->vm(), exec->propertyNames().get, descriptor.getter(), 0);
+        description->putDirect(exec->vm(), exec->propertyNames().set, descriptor.setter(), 0);
     }
     
-    description->putDirect(exec->globalData(), exec->propertyNames().enumerable, jsBoolean(descriptor.enumerable()), 0);
-    description->putDirect(exec->globalData(), exec->propertyNames().configurable, jsBoolean(descriptor.configurable()), 0);
+    description->putDirect(exec->vm(), exec->propertyNames().enumerable, jsBoolean(descriptor.enumerable()), 0);
+    description->putDirect(exec->vm(), exec->propertyNames().configurable, jsBoolean(descriptor.configurable()), 0);
 
     return JSValue::encode(description);
 }
@@ -311,7 +315,6 @@ static JSValue defineProperties(ExecState* exec, JSObject* object, JSObject* pro
     Vector<PropertyDescriptor> descriptors;
     MarkedArgumentBuffer markBuffer;
     for (size_t i = 0; i < numProperties; i++) {
-        PropertySlot slot;
         JSValue prop = properties->get(exec, propertyNames[i]);
         if (exec->hadException())
             return jsNull();
@@ -368,7 +371,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorSeal(ExecState* exec)
     JSObject* object = asObject(obj);
 
     if (isJSFinalObject(object)) {
-        object->seal(exec->globalData());
+        object->seal(exec->vm());
         return JSValue::encode(obj);
     }
 
@@ -390,7 +393,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorSeal(ExecState* exec)
     }
 
     // 3. Set the [[Extensible]] internal property of O to false.
-    object->preventExtensions(exec->globalData());
+    object->preventExtensions(exec->vm());
 
     // 4. Return O.
     return JSValue::encode(obj);
@@ -405,7 +408,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorFreeze(ExecState* exec)
     JSObject* object = asObject(obj);
 
     if (isJSFinalObject(object) && !hasIndexedProperties(object->structure()->indexingType())) {
-        object->freeze(exec->globalData());
+        object->freeze(exec->vm());
         return JSValue::encode(obj);
     }
 
@@ -431,7 +434,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorFreeze(ExecState* exec)
     }
 
     // 3. Set the [[Extensible]] internal property of O to false.
-    object->preventExtensions(exec->globalData());
+    object->preventExtensions(exec->vm());
 
     // 4. Return O.
     return JSValue::encode(obj);
@@ -442,7 +445,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorPreventExtensions(ExecState* exec)
     JSValue obj = exec->argument(0);
     if (!obj.isObject())
         return throwVMError(exec, createTypeError(exec, ASCIILiteral("Object.preventExtensions can only be called on Objects.")));
-    asObject(obj)->preventExtensions(exec->globalData());
+    asObject(obj)->preventExtensions(exec->vm());
     return JSValue::encode(obj);
 }
 
@@ -455,7 +458,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsSealed(ExecState* exec)
     JSObject* object = asObject(obj);
 
     if (isJSFinalObject(object))
-        return JSValue::encode(jsBoolean(object->isSealed(exec->globalData())));
+        return JSValue::encode(jsBoolean(object->isSealed(exec->vm())));
 
     // 2. For each named own property name P of O,
     PropertyNameArray properties(exec);
@@ -485,7 +488,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsFrozen(ExecState* exec)
     JSObject* object = asObject(obj);
 
     if (isJSFinalObject(object))
-        return JSValue::encode(jsBoolean(object->isFrozen(exec->globalData())));
+        return JSValue::encode(jsBoolean(object->isFrozen(exec->vm())));
 
     // 2. For each named own property name P of O,
     PropertyNameArray properties(exec);

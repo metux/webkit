@@ -47,13 +47,13 @@ void JSProxy::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_target);
 }
 
-void JSProxy::setTarget(JSGlobalData& globalData, JSGlobalObject* globalObject)
+void JSProxy::setTarget(VM& vm, JSGlobalObject* globalObject)
 {
     ASSERT_ARG(globalObject, globalObject);
-    m_target.set(globalData, this, globalObject);
-    setPrototype(globalData, globalObject->prototype());
+    m_target.set(vm, this, globalObject);
+    setPrototype(vm, globalObject->prototype());
 
-    PrototypeMap& prototypeMap = globalData.prototypeMap;
+    PrototypeMap& prototypeMap = vm.prototypeMap;
     if (!prototypeMap.isPrototype(this))
         return;
 
@@ -70,15 +70,15 @@ String JSProxy::className(const JSObject* object)
     return thisObject->target()->methodTable()->className(thisObject->target());
 }
 
-bool JSProxy::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+bool JSProxy::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
-    JSProxy* thisObject = jsCast<JSProxy*>(cell);
+    JSProxy* thisObject = jsCast<JSProxy*>(object);
     return thisObject->target()->methodTable()->getOwnPropertySlot(thisObject->target(), exec, propertyName, slot);
 }
 
-bool JSProxy::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, PropertySlot& slot)
+bool JSProxy::getOwnPropertySlotByIndex(JSObject* object, ExecState* exec, unsigned propertyName, PropertySlot& slot)
 {
-    JSProxy* thisObject = jsCast<JSProxy*>(cell);
+    JSProxy* thisObject = jsCast<JSProxy*>(object);
     return thisObject->target()->methodTable()->getOwnPropertySlotByIndex(thisObject->target(), exec, propertyName, slot);
 }
 

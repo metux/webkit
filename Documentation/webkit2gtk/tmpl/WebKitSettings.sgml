@@ -9,12 +9,10 @@ WebKitSettings
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -64,6 +62,11 @@ WebKitSettings
 </para>
 
 <!-- ##### ARG WebKitSettings:draw-compositing-indicators ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:enable-accelerated-2d-canvas ##### -->
 <para>
 
 </para>
@@ -164,6 +167,11 @@ WebKitSettings
 </para>
 
 <!-- ##### ARG WebKitSettings:enable-webgl ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:enable-write-console-messages-to-stdout ##### -->
 <para>
 
 </para>
@@ -1038,6 +1046,42 @@ WebKitSettings
 
 
 <!-- ##### FUNCTION webkit_settings_set_enable_smooth_scrolling ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_accelerated_2d_canvas ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_accelerated_2d_canvas ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_write_console_messages_to_stdout ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_write_console_messages_to_stdout ##### -->
 <para>
 
 </para>

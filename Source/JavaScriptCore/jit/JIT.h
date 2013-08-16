@@ -28,11 +28,6 @@
 
 #if ENABLE(JIT)
 
-// Verbose logging of code generation
-#define ENABLE_JIT_VERBOSE 0
-// Verbose logging for OSR-related code.
-#define ENABLE_JIT_VERBOSE_OSR 0
-
 // We've run into some problems where changing the size of the class JIT leads to
 // performance fluctuations.  Try forcing alignment in an attempt to stabalize this.
 #if COMPILER(GCC)
@@ -288,6 +283,7 @@ namespace JSC {
     void ctiPatchCallByReturnAddress(CodeBlock* codeblock, ReturnAddressPtr returnAddress, FunctionPtr newCalleeFunction);
 
     class JIT : private JSInterfaceJIT {
+        friend class JITSlowPathCall;
         friend class JITStubCall;
         friend struct PropertyStubCompilationInfo;
 
@@ -302,83 +298,83 @@ namespace JSC {
         static const int patchPutByIdDefaultOffset = 256;
 
     public:
-        static JITCode compile(JSGlobalData* globalData, CodeBlock* codeBlock, JITCompilationEffort effort, CodePtr* functionEntryArityCheck = 0)
+        static PassRefPtr<JITCode> compile(VM* vm, CodeBlock* codeBlock, JITCompilationEffort effort, CodePtr* functionEntryArityCheck = 0)
         {
-            return JIT(globalData, codeBlock).privateCompile(functionEntryArityCheck, effort);
+            return JIT(vm, codeBlock).privateCompile(functionEntryArityCheck, effort);
         }
         
-        static void compileClosureCall(JSGlobalData* globalData, CallLinkInfo* callLinkInfo, CodeBlock* callerCodeBlock, CodeBlock* calleeCodeBlock, Structure* expectedStructure, ExecutableBase* expectedExecutable, MacroAssemblerCodePtr codePtr)
+        static void compileClosureCall(VM* vm, CallLinkInfo* callLinkInfo, CodeBlock* callerCodeBlock, CodeBlock* calleeCodeBlock, Structure* expectedStructure, ExecutableBase* expectedExecutable, MacroAssemblerCodePtr codePtr)
         {
-            JIT jit(globalData, callerCodeBlock);
+            JIT jit(vm, callerCodeBlock);
             jit.m_bytecodeOffset = callLinkInfo->codeOrigin.bytecodeIndex;
             jit.privateCompileClosureCall(callLinkInfo, calleeCodeBlock, expectedStructure, expectedExecutable, codePtr);
         }
 
-        static void compileGetByIdProto(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress)
+        static void compileGetByIdProto(VM* vm, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress)
         {
-            JIT jit(globalData, codeBlock);
-            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
+            JIT jit(vm, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->codeOrigin.bytecodeIndex;
             jit.privateCompileGetByIdProto(stubInfo, structure, prototypeStructure, ident, slot, cachedOffset, returnAddress, callFrame);
         }
 
-        static void compileGetByIdSelfList(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* polymorphicStructures, int currentIndex, Structure* structure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
+        static void compileGetByIdSelfList(VM* vm, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* polymorphicStructures, int currentIndex, Structure* structure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
         {
-            JIT jit(globalData, codeBlock);
-            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
+            JIT jit(vm, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->codeOrigin.bytecodeIndex;
             jit.privateCompileGetByIdSelfList(stubInfo, polymorphicStructures, currentIndex, structure, ident, slot, cachedOffset);
         }
-        static void compileGetByIdProtoList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
+        static void compileGetByIdProtoList(VM* vm, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
         {
-            JIT jit(globalData, codeBlock);
-            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
+            JIT jit(vm, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->codeOrigin.bytecodeIndex;
             jit.privateCompileGetByIdProtoList(stubInfo, prototypeStructureList, currentIndex, structure, prototypeStructure, ident, slot, cachedOffset, callFrame);
         }
-        static void compileGetByIdChainList(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
+        static void compileGetByIdChainList(VM* vm, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructureList, int currentIndex, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
         {
-            JIT jit(globalData, codeBlock);
-            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
+            JIT jit(vm, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->codeOrigin.bytecodeIndex;
             jit.privateCompileGetByIdChainList(stubInfo, prototypeStructureList, currentIndex, structure, chain, count, ident, slot, cachedOffset, callFrame);
         }
 
-        static void compileGetByIdChain(JSGlobalData* globalData, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress)
+        static void compileGetByIdChain(VM* vm, CallFrame* callFrame, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress)
         {
-            JIT jit(globalData, codeBlock);
-            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
+            JIT jit(vm, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->codeOrigin.bytecodeIndex;
             jit.privateCompileGetByIdChain(stubInfo, structure, chain, count, ident, slot, cachedOffset, returnAddress, callFrame);
         }
         
-        static void compilePutByIdTransition(JSGlobalData* globalData, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, PropertyOffset cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
+        static void compilePutByIdTransition(VM* vm, CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, PropertyOffset cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
         {
-            JIT jit(globalData, codeBlock);
-            jit.m_bytecodeOffset = stubInfo->bytecodeIndex;
+            JIT jit(vm, codeBlock);
+            jit.m_bytecodeOffset = stubInfo->codeOrigin.bytecodeIndex;
             jit.privateCompilePutByIdTransition(stubInfo, oldStructure, newStructure, cachedOffset, chain, returnAddress, direct);
         }
         
-        static void compileGetByVal(JSGlobalData* globalData, CodeBlock* codeBlock, ByValInfo* byValInfo, ReturnAddressPtr returnAddress, JITArrayMode arrayMode)
+        static void compileGetByVal(VM* vm, CodeBlock* codeBlock, ByValInfo* byValInfo, ReturnAddressPtr returnAddress, JITArrayMode arrayMode)
         {
-            JIT jit(globalData, codeBlock);
+            JIT jit(vm, codeBlock);
             jit.m_bytecodeOffset = byValInfo->bytecodeIndex;
             jit.privateCompileGetByVal(byValInfo, returnAddress, arrayMode);
         }
 
-        static void compilePutByVal(JSGlobalData* globalData, CodeBlock* codeBlock, ByValInfo* byValInfo, ReturnAddressPtr returnAddress, JITArrayMode arrayMode)
+        static void compilePutByVal(VM* vm, CodeBlock* codeBlock, ByValInfo* byValInfo, ReturnAddressPtr returnAddress, JITArrayMode arrayMode)
         {
-            JIT jit(globalData, codeBlock);
+            JIT jit(vm, codeBlock);
             jit.m_bytecodeOffset = byValInfo->bytecodeIndex;
             jit.privateCompilePutByVal(byValInfo, returnAddress, arrayMode);
         }
 
-        static CodeRef compileCTINativeCall(JSGlobalData* globalData, NativeFunction func)
+        static CodeRef compileCTINativeCall(VM* vm, NativeFunction func)
         {
-            if (!globalData->canUseJIT()) {
+            if (!vm->canUseJIT()) {
 #if ENABLE(LLINT)
                 return CodeRef::createLLIntCodeRef(llint_native_call_trampoline);
 #else
                 return CodeRef();
 #endif
             }
-            JIT jit(globalData, 0);
-            return jit.privateCompileCTINativeCall(globalData, func);
+            JIT jit(vm, 0);
+            return jit.privateCompileCTINativeCall(vm, func);
         }
 
         static void resetPatchGetById(RepatchBuffer&, StructureStubInfo*);
@@ -386,26 +382,28 @@ namespace JSC {
         static void patchGetByIdSelf(CodeBlock*, StructureStubInfo*, Structure*, PropertyOffset cachedOffset, ReturnAddressPtr);
         static void patchPutByIdReplace(CodeBlock*, StructureStubInfo*, Structure*, PropertyOffset cachedOffset, ReturnAddressPtr, bool direct);
 
-        static void compilePatchGetArrayLength(JSGlobalData* globalData, CodeBlock* codeBlock, ReturnAddressPtr returnAddress)
+        static void compilePatchGetArrayLength(VM* vm, CodeBlock* codeBlock, ReturnAddressPtr returnAddress)
         {
-            JIT jit(globalData, codeBlock);
+            JIT jit(vm, codeBlock);
 #if ENABLE(DFG_JIT)
             // Force profiling to be enabled during stub generation.
             jit.m_canBeOptimized = true;
+            jit.m_canBeOptimizedOrInlined = true;
+            jit.m_shouldEmitProfiling = true;
 #endif // ENABLE(DFG_JIT)
             return jit.privateCompilePatchGetArrayLength(returnAddress);
         }
 
-        static void linkFor(JSFunction* callee, CodeBlock* callerCodeBlock, CodeBlock* calleeCodeBlock, CodePtr, CallLinkInfo*, JSGlobalData*, CodeSpecializationKind);
+        static void linkFor(ExecState*, JSFunction* callee, CodeBlock* callerCodeBlock, CodeBlock* calleeCodeBlock, CodePtr, CallLinkInfo*, VM*, CodeSpecializationKind);
         static void linkSlowCall(CodeBlock* callerCodeBlock, CallLinkInfo*);
 
     private:
-        JIT(JSGlobalData*, CodeBlock* = 0);
+        JIT(VM*, CodeBlock* = 0);
 
         void privateCompileMainPass();
         void privateCompileLinkPass();
         void privateCompileSlowCases();
-        JITCode privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffort);
+        PassRefPtr<JITCode> privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffort);
         
         void privateCompileClosureCall(CallLinkInfo*, CodeBlock* calleeCodeBlock, Structure*, ExecutableBase*, MacroAssemblerCodePtr);
         
@@ -419,8 +417,8 @@ namespace JSC {
         void privateCompileGetByVal(ByValInfo*, ReturnAddressPtr, JITArrayMode);
         void privateCompilePutByVal(ByValInfo*, ReturnAddressPtr, JITArrayMode);
 
-        Label privateCompileCTINativeCall(JSGlobalData*, bool isConstruct = false);
-        CodeRef privateCompileCTINativeCall(JSGlobalData*, NativeFunction);
+        Label privateCompileCTINativeCall(VM*, bool isConstruct = false);
+        CodeRef privateCompileCTINativeCall(VM*, NativeFunction);
         void privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress);
 
         static bool isDirectPutById(StructureStubInfo*);
@@ -434,8 +432,9 @@ namespace JSC {
         void compileOpCall(OpcodeID, Instruction*, unsigned callLinkInfoIndex);
         void compileOpCallSlowCase(OpcodeID, Instruction*, Vector<SlowCaseEntry>::iterator&, unsigned callLinkInfoIndex);
         void compileLoadVarargs(Instruction*);
-        void compileCallEval();
-        void compileCallEvalSlowCase(Vector<SlowCaseEntry>::iterator&);
+        void compileCallEval(Instruction*);
+        void compileCallEvalSlowCase(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitPutCallResult(Instruction*);
 
         enum CompileOpStrictEqType { OpStrictEq, OpNStrictEq };
         void compileOpStrictEq(Instruction* instruction, CompileOpStrictEqType type);
@@ -461,12 +460,12 @@ namespace JSC {
 #if ENABLE(VALUE_PROFILER)
         // This assumes that the value to profile is in regT0 and that regT3 is available for
         // scratch.
-        void emitValueProfilingSite(ValueProfile*);
-        void emitValueProfilingSite(unsigned bytecodeOffset);
-        void emitValueProfilingSite();
+        void emitValueProfilingSite(ValueProfile*, RegisterID);
+        void emitValueProfilingSite(unsigned bytecodeOffset, RegisterID);
+        void emitValueProfilingSite(RegisterID);
 #else
-        void emitValueProfilingSite(unsigned) { }
-        void emitValueProfilingSite() { }
+        void emitValueProfilingSite(unsigned, RegisterID) { }
+        void emitValueProfilingSite(RegisterID) { }
 #endif
         void emitArrayProfilingSite(RegisterID structureAndIndexingType, RegisterID scratch, ArrayProfile*);
         void emitArrayProfilingSiteForBytecodeIndex(RegisterID structureAndIndexingType, RegisterID scratch, unsigned bytecodeIndex);
@@ -611,7 +610,7 @@ namespace JSC {
 
         void emitTagAsBoolImmediate(RegisterID reg);
         void compileBinaryArithOp(OpcodeID, unsigned dst, unsigned src1, unsigned src2, OperandTypes opi);
-        void compileBinaryArithOpSlowCase(OpcodeID, Vector<SlowCaseEntry>::iterator&, unsigned dst, unsigned src1, unsigned src2, OperandTypes, bool op1HasImmediateIntFastCase, bool op2HasImmediateIntFastCase);
+        void compileBinaryArithOpSlowCase(Instruction*, OpcodeID, Vector<SlowCaseEntry>::iterator&, unsigned dst, unsigned src1, unsigned src2, OperandTypes, bool op1HasImmediateIntFastCase, bool op2HasImmediateIntFastCase);
 
         void compileGetByIdHotPath(int baseVReg, Identifier*);
         void compileGetByIdSlowCase(int resultVReg, int baseVReg, Identifier*, Vector<SlowCaseEntry>::iterator&);
@@ -646,12 +645,11 @@ namespace JSC {
         void emit_op_call(Instruction*);
         void emit_op_call_eval(Instruction*);
         void emit_op_call_varargs(Instruction*);
-        void emit_op_call_put_result(Instruction*);
         void emit_op_catch(Instruction*);
         void emit_op_construct(Instruction*);
         void emit_op_get_callee(Instruction*);
         void emit_op_create_this(Instruction*);
-        void emit_op_convert_this(Instruction*);
+        void emit_op_to_this(Instruction*);
         void emit_op_create_arguments(Instruction*);
         void emit_op_debug(Instruction*);
         void emit_op_del_by_id(Instruction*);
@@ -676,7 +674,6 @@ namespace JSC {
         void emit_op_jeq_null(Instruction*);
         void emit_op_jfalse(Instruction*);
         void emit_op_jmp(Instruction*);
-        void emit_op_jmp_scopes(Instruction*);
         void emit_op_jneq_null(Instruction*);
         void emit_op_jneq_ptr(Instruction*);
         void emit_op_jless(Instruction*);
@@ -688,14 +685,7 @@ namespace JSC {
         void emit_op_jngreater(Instruction*);
         void emit_op_jngreatereq(Instruction*);
         void emit_op_jtrue(Instruction*);
-        void emit_op_loop(Instruction*);
         void emit_op_loop_hint(Instruction*);
-        void emit_op_loop_if_less(Instruction*);
-        void emit_op_loop_if_lesseq(Instruction*);
-        void emit_op_loop_if_greater(Instruction*);
-        void emit_op_loop_if_greatereq(Instruction*);
-        void emit_op_loop_if_true(Instruction*);
-        void emit_op_loop_if_false(Instruction*);
         void emit_op_lshift(Instruction*);
         void emit_op_mod(Instruction*);
         void emit_op_mov(Instruction*);
@@ -715,10 +705,8 @@ namespace JSC {
         void emit_op_not(Instruction*);
         void emit_op_nstricteq(Instruction*);
         void emit_op_pop_scope(Instruction*);
-        void emit_op_post_dec(Instruction*);
-        void emit_op_post_inc(Instruction*);
-        void emit_op_pre_dec(Instruction*);
-        void emit_op_pre_inc(Instruction*);
+        void emit_op_dec(Instruction*);
+        void emit_op_inc(Instruction*);
         void emit_op_profile_did_call(Instruction*);
         void emit_op_profile_will_call(Instruction*);
         void emit_op_push_name_scope(Instruction*);
@@ -728,15 +716,6 @@ namespace JSC {
         void emit_op_put_by_val(Instruction*);
         void emit_op_put_getter_setter(Instruction*);
         void emit_op_init_global_const(Instruction*);
-        void emit_op_init_global_const_check(Instruction*);
-        void emit_resolve_operations(ResolveOperations*, const int* base, const int* value);
-        void emitSlow_link_resolve_operations(ResolveOperations*, Vector<SlowCaseEntry>::iterator&);
-        void emit_op_resolve(Instruction*);
-        void emit_op_resolve_base(Instruction*);
-        void emit_op_ensure_property_exists(Instruction*);
-        void emit_op_resolve_with_base(Instruction*);
-        void emit_op_resolve_with_this(Instruction*);
-        void emit_op_put_to_base(Instruction*);
         void emit_op_ret(Instruction*);
         void emit_op_ret_object_or_this(Instruction*);
         void emit_op_rshift(Instruction*);
@@ -750,7 +729,7 @@ namespace JSC {
         void emit_op_tear_off_arguments(Instruction*);
         void emit_op_throw(Instruction*);
         void emit_op_throw_static_error(Instruction*);
-        void emit_op_to_jsnumber(Instruction*);
+        void emit_op_to_number(Instruction*);
         void emit_op_to_primitive(Instruction*);
         void emit_op_unexpected_load(Instruction*);
         void emit_op_urshift(Instruction*);
@@ -763,7 +742,7 @@ namespace JSC {
         void emitSlow_op_call_eval(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_call_varargs(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_construct(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_convert_this(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_to_this(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_create_this(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_div(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_eq(Instruction*, Vector<SlowCaseEntry>::iterator&);
@@ -784,12 +763,7 @@ namespace JSC {
         void emitSlow_op_jngreater(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_jngreatereq(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_jtrue(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_loop_if_less(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_loop_if_lesseq(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_loop_if_greater(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_loop_if_greatereq(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_loop_if_true(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_loop_if_false(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_lshift(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_mod(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_mul(Instruction*, Vector<SlowCaseEntry>::iterator&);
@@ -798,28 +772,36 @@ namespace JSC {
         void emitSlow_op_new_object(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_not(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_nstricteq(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_post_dec(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_post_inc(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_pre_dec(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_pre_inc(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_dec(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_inc(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_put_by_id(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_put_by_val(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_init_global_const_check(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_rshift(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_stricteq(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_sub(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_to_jsnumber(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_to_number(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_to_primitive(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_urshift(Instruction*, Vector<SlowCaseEntry>::iterator&);
 
-        void emitSlow_op_resolve(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_resolve_base(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_resolve_with_base(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_resolve_with_this(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_put_to_base(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emit_op_resolve_scope(Instruction*);
+        void emit_op_get_from_scope(Instruction*);
+        void emit_op_put_to_scope(Instruction*);
+        void emitSlow_op_resolve_scope(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_get_from_scope(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_put_to_scope(Instruction*, Vector<SlowCaseEntry>::iterator&);
 
         void emitRightShift(Instruction*, bool isUnsigned);
         void emitRightShiftSlowCase(Instruction*, Vector<SlowCaseEntry>::iterator&, bool isUnsigned);
+
+        void emitVarInjectionCheck(bool needsVarInjectionChecks);
+        void emitResolveClosure(unsigned dst, bool needsVarInjectionChecks, unsigned depth);
+        void emitLoadWithStructureCheck(unsigned scope, Structure** structureSlot);
+        void emitGetGlobalProperty(uintptr_t* operandSlot);
+        void emitGetGlobalVar(uintptr_t operand);
+        void emitGetClosureVar(unsigned scope, uintptr_t operand);
+        void emitPutGlobalProperty(uintptr_t* operandSlot, unsigned value);
+        void emitPutGlobalVar(uintptr_t operand, unsigned value);
+        void emitPutClosureVar(unsigned scope, uintptr_t operand, unsigned value);
 
         void emitInitRegister(unsigned dst);
 
@@ -862,14 +844,12 @@ namespace JSC {
         // Loads the character value of a single character string into dst.
         void emitLoadCharacterString(RegisterID src, RegisterID dst, JumpList& failures);
         
-        enum OptimizationCheckKind { LoopOptimizationCheck, EnterOptimizationCheck };
 #if ENABLE(DFG_JIT)
-        void emitOptimizationCheck(OptimizationCheckKind);
+        void emitEnterOptimizationCheck();
 #else
-        void emitOptimizationCheck(OptimizationCheckKind) { }
+        void emitEnterOptimizationCheck() { }
 #endif
-        
-        void emitTimeoutCheck();
+
 #ifndef NDEBUG
         void printBytecodeOperandTypes(unsigned src1, unsigned src2);
 #endif
@@ -895,16 +875,18 @@ namespace JSC {
 
 #if ENABLE(DFG_JIT)
         bool canBeOptimized() { return m_canBeOptimized; }
+        bool canBeOptimizedOrInlined() { return m_canBeOptimizedOrInlined; }
         bool shouldEmitProfiling() { return m_shouldEmitProfiling; }
 #else
         bool canBeOptimized() { return false; }
+        bool canBeOptimizedOrInlined() { return false; }
         // Enables use of value profiler with tiered compilation turned off,
         // in which case all code gets profiled.
-        bool shouldEmitProfiling() { return true; }
+        bool shouldEmitProfiling() { return false; }
 #endif
 
         Interpreter* m_interpreter;
-        JSGlobalData* m_globalData;
+        VM* m_vm;
         CodeBlock* m_codeBlock;
 
         Vector<CallRecord> m_calls;
@@ -920,7 +902,6 @@ namespace JSC {
 
         unsigned m_propertyAccessInstructionIndex;
         unsigned m_byValInstructionIndex;
-        unsigned m_globalResolveInfoIndex;
         unsigned m_callLinkInfoIndex;
 
 #if USE(JSVALUE32_64)
@@ -943,90 +924,14 @@ namespace JSC {
         OwnPtr<JITDisassembler> m_disassembler;
         RefPtr<Profiler::Compilation> m_compilation;
         WeakRandom m_randomGenerator;
-        static CodeRef stringGetByValStubGenerator(JSGlobalData*);
+        static CodeRef stringGetByValStubGenerator(VM*);
 
 #if ENABLE(VALUE_PROFILER)
         bool m_canBeOptimized;
+        bool m_canBeOptimizedOrInlined;
         bool m_shouldEmitProfiling;
 #endif
     } JIT_CLASS_ALIGNMENT;
-
-    inline void JIT::emit_op_loop(Instruction* currentInstruction)
-    {
-        emitTimeoutCheck();
-        emit_op_jmp(currentInstruction);
-    }
-
-    inline void JIT::emit_op_loop_hint(Instruction*)
-    {
-        emitOptimizationCheck(LoopOptimizationCheck);
-    }
-
-    inline void JIT::emit_op_loop_if_true(Instruction* currentInstruction)
-    {
-        emitTimeoutCheck();
-        emit_op_jtrue(currentInstruction);
-    }
-
-    inline void JIT::emitSlow_op_loop_if_true(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-    {
-        emitSlow_op_jtrue(currentInstruction, iter);
-    }
-
-    inline void JIT::emit_op_loop_if_false(Instruction* currentInstruction)
-    {
-        emitTimeoutCheck();
-        emit_op_jfalse(currentInstruction);
-    }
-
-    inline void JIT::emitSlow_op_loop_if_false(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-    {
-        emitSlow_op_jfalse(currentInstruction, iter);
-    }
-
-    inline void JIT::emit_op_loop_if_less(Instruction* currentInstruction)
-    {
-        emitTimeoutCheck();
-        emit_op_jless(currentInstruction);
-    }
-
-    inline void JIT::emitSlow_op_loop_if_less(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-    {
-        emitSlow_op_jless(currentInstruction, iter);
-    }
-
-    inline void JIT::emit_op_loop_if_lesseq(Instruction* currentInstruction)
-    {
-        emitTimeoutCheck();
-        emit_op_jlesseq(currentInstruction);
-    }
-
-    inline void JIT::emitSlow_op_loop_if_lesseq(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-    {
-        emitSlow_op_jlesseq(currentInstruction, iter);
-    }
-
-    inline void JIT::emit_op_loop_if_greater(Instruction* currentInstruction)
-    {
-        emitTimeoutCheck();
-        emit_op_jgreater(currentInstruction);
-    }
-
-    inline void JIT::emitSlow_op_loop_if_greater(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-    {
-        emitSlow_op_jgreater(currentInstruction, iter);
-    }
-
-    inline void JIT::emit_op_loop_if_greatereq(Instruction* currentInstruction)
-    {
-        emitTimeoutCheck();
-        emit_op_jgreatereq(currentInstruction);
-    }
-
-    inline void JIT::emitSlow_op_loop_if_greatereq(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-    {
-        emitSlow_op_jgreatereq(currentInstruction, iter);
-    }
 
 } // namespace JSC
 

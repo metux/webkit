@@ -55,13 +55,13 @@ static EncodedJSValue JSC_HOST_CALL JSONProtoFuncStringify(ExecState*);
 namespace JSC {
 
 JSONObject::JSONObject(JSGlobalObject* globalObject, Structure* structure)
-    : JSNonFinalObject(globalObject->globalData(), structure)
+    : JSNonFinalObject(globalObject->vm(), structure)
 {
 }
 
 void JSONObject::finishCreation(JSGlobalObject* globalObject)
 {
-    Base::finishCreation(globalObject->globalData());
+    Base::finishCreation(globalObject->vm());
     ASSERT(inherits(&s_info));
 }
 
@@ -90,7 +90,7 @@ public:
 private:
     class Holder {
     public:
-        Holder(JSGlobalData&, JSObject*);
+        Holder(VM&, JSObject*);
 
         JSObject* object() const { return m_object.get(); }
 
@@ -127,7 +127,7 @@ private:
     CallData m_replacerCallData;
     const String m_gap;
 
-    Vector<Holder, 16> m_holderStack;
+    Vector<Holder, 16, UnsafeVectorOverflow> m_holderStack;
     String m_repeatedGap;
     String m_indent;
 };
@@ -217,7 +217,7 @@ Stringifier::Stringifier(ExecState* exec, const Local<Unknown>& replacer, const 
     if (m_replacer.asObject()->inherits(&JSArray::s_info)) {
         m_usingArrayReplacer = true;
         Handle<JSObject> array = m_replacer.asObject();
-        unsigned length = array->get(exec, exec->globalData().propertyNames->length).toUInt32(exec);
+        unsigned length = array->get(exec, exec->vm().propertyNames->length).toUInt32(exec);
         for (unsigned i = 0; i < length; ++i) {
             JSValue name = array->get(exec, i);
             if (exec->hadException())
@@ -240,18 +240,18 @@ Local<Unknown> Stringifier::stringify(Handle<Unknown> value)
 {
     JSObject* object = constructEmptyObject(m_exec);
     if (m_exec->hadException())
-        return Local<Unknown>(m_exec->globalData(), jsNull());
+        return Local<Unknown>(m_exec->vm(), jsNull());
 
-    PropertyNameForFunctionCall emptyPropertyName(m_exec->globalData().propertyNames->emptyIdentifier);
-    object->putDirect(m_exec->globalData(), m_exec->globalData().propertyNames->emptyIdentifier, value.get());
+    PropertyNameForFunctionCall emptyPropertyName(m_exec->vm().propertyNames->emptyIdentifier);
+    object->putDirect(m_exec->vm(), m_exec->vm().propertyNames->emptyIdentifier, value.get());
 
     StringBuilder result;
     if (appendStringifiedValue(result, value.get(), object, emptyPropertyName) != StringifySucceeded)
-        return Local<Unknown>(m_exec->globalData(), jsUndefined());
+        return Local<Unknown>(m_exec->vm(), jsUndefined());
     if (m_exec->hadException())
-        return Local<Unknown>(m_exec->globalData(), jsNull());
+        return Local<Unknown>(m_exec->vm(), jsNull());
 
-    return Local<Unknown>(m_exec->globalData(), jsString(m_exec, result.toString()));
+    return Local<Unknown>(m_exec->vm(), jsString(m_exec, result.toString()));
 }
 
 template <typename CharType>
@@ -320,10 +320,10 @@ void Stringifier::appendQuotedString(StringBuilder& builder, const String& value
 inline JSValue Stringifier::toJSON(JSValue value, const PropertyNameForFunctionCall& propertyName)
 {
     ASSERT(!m_exec->hadException());
-    if (!value.isObject() || !asObject(value)->hasProperty(m_exec, m_exec->globalData().propertyNames->toJSON))
+    if (!value.isObject() || !asObject(value)->hasProperty(m_exec, m_exec->vm().propertyNames->toJSON))
         return value;
 
-    JSValue toJSONFunction = asObject(value)->get(m_exec, m_exec->globalData().propertyNames->toJSON);
+    JSValue toJSONFunction = asObject(value)->get(m_exec, m_exec->vm().propertyNames->toJSON);
     if (m_exec->hadException())
         return jsNull();
 
@@ -416,25 +416,14 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
         }
     }
     bool holderStackWasEmpty = m_holderStack.isEmpty();
-    m_holderStack.append(Holder(m_exec->globalData(), object));
+    m_holderStack.append(Holder(m_exec->vm(), object));
     if (!holderStackWasEmpty)
         return StringifySucceeded;
 
-    // If this is the outermost call, then loop to handle everything on the holder stack.
-    TimeoutChecker localTimeoutChecker(m_exec->globalData().timeoutChecker);
-    localTimeoutChecker.reset();
-    unsigned tickCount = localTimeoutChecker.ticksUntilNextCheck();
     do {
         while (m_holderStack.last().appendNextProperty(*this, builder)) {
             if (m_exec->hadException())
                 return StringifyFailed;
-            if (!--tickCount) {
-                if (localTimeoutChecker.didTimeOut(m_exec)) {
-                    throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
-                    return StringifyFailed;
-                }
-                tickCount = localTimeoutChecker.ticksUntilNextCheck();
-            }
         }
         m_holderStack.removeLast();
     } while (!m_holderStack.isEmpty());
@@ -470,8 +459,8 @@ inline void Stringifier::startNewLine(StringBuilder& builder) const
     builder.append(m_indent);
 }
 
-inline Stringifier::Holder::Holder(JSGlobalData& globalData, JSObject* object)
-    : m_object(globalData, object)
+inline Stringifier::Holder::Holder(VM& vm, JSObject* object)
+    : m_object(vm, object)
     , m_isArray(object->inherits(&JSArray::s_info))
     , m_index(0)
 #ifndef NDEBUG
@@ -490,7 +479,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
     if (!m_index) {
         if (m_isArray) {
             m_isJSArray = isJSArray(m_object.get());
-            m_size = m_object->get(exec, exec->globalData().propertyNames->length).toUInt32(exec);
+            m_size = m_object->get(exec, exec->vm().propertyNames->length).toUInt32(exec);
             builder.append('[');
         } else {
             if (stringifier.m_usingArrayReplacer)
@@ -526,11 +515,12 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
             value = asArray(m_object.get())->getIndexQuickly(index);
         else {
             PropertySlot slot(m_object.get());
-            if (!m_object->methodTable()->getOwnPropertySlotByIndex(m_object.get(), exec, index, slot))
-                slot.setUndefined();
-            if (exec->hadException())
-                return false;
-            value = slot.getValue(exec, index);
+            if (m_object->methodTable()->getOwnPropertySlotByIndex(m_object.get(), exec, index, slot)) {
+                value = slot.getValue(exec, index);
+                if (exec->hadException())
+                    return false;
+            } else
+                value = jsUndefined();
         }
 
         // Append the separator string.
@@ -601,9 +591,9 @@ const ClassInfo JSONObject::s_info = { "JSON", &JSNonFinalObject::s_info, 0, Exe
 
 // ECMA 15.8
 
-bool JSONObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+bool JSONObject::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::jsonTable(exec), jsCast<JSONObject*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<JSObject>(exec, ExecState::jsonTable(exec), jsCast<JSONObject*>(object), propertyName, slot);
 }
 
 bool JSONObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
@@ -615,7 +605,7 @@ class Walker {
 public:
     Walker(ExecState* exec, Handle<JSObject> function, CallType callType, CallData callData)
         : m_exec(exec)
-        , m_function(exec->globalData(), function)
+        , m_function(exec->vm(), function)
         , m_callType(callType)
         , m_callData(callData)
     {
@@ -638,26 +628,22 @@ private:
     CallData m_callData;
 };
 
-// We clamp recursion well beyond anything reasonable, but we also have a timeout check
-// to guard against "infinite" execution by inserting arbitrarily large objects.
+// We clamp recursion well beyond anything reasonable.
 static const unsigned maximumFilterRecursion = 40000;
 enum WalkerState { StateUnknown, ArrayStartState, ArrayStartVisitMember, ArrayEndVisitMember, 
                                  ObjectStartState, ObjectStartVisitMember, ObjectEndVisitMember };
 NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
 {
-    Vector<PropertyNameArray, 16> propertyStack;
-    Vector<uint32_t, 16> indexStack;
-    LocalStack<JSObject, 16> objectStack(m_exec->globalData());
-    LocalStack<JSArray, 16> arrayStack(m_exec->globalData());
+    Vector<PropertyNameArray, 16, UnsafeVectorOverflow> propertyStack;
+    Vector<uint32_t, 16, UnsafeVectorOverflow> indexStack;
+    LocalStack<JSObject, 16> objectStack(m_exec->vm());
+    LocalStack<JSArray, 16> arrayStack(m_exec->vm());
     
-    Vector<WalkerState, 16> stateStack;
+    Vector<WalkerState, 16, UnsafeVectorOverflow> stateStack;
     WalkerState state = StateUnknown;
     JSValue inValue = unfiltered;
     JSValue outValue = jsNull();
     
-    TimeoutChecker localTimeoutChecker(m_exec->globalData().timeoutChecker);
-    localTimeoutChecker.reset();
-    unsigned tickCount = localTimeoutChecker.ticksUntilNextCheck();
     while (1) {
         switch (state) {
             arrayStartState:
@@ -674,12 +660,6 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
             }
             arrayStartVisitMember:
             case ArrayStartVisitMember: {
-                if (!--tickCount) {
-                    if (localTimeoutChecker.didTimeOut(m_exec))
-                        return throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
-                    tickCount = localTimeoutChecker.ticksUntilNextCheck();
-                }
-
                 JSArray* array = arrayStack.peek();
                 uint32_t index = indexStack.last();
                 if (index == array->length()) {
@@ -691,7 +671,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                 if (isJSArray(array) && array->canGetIndexQuickly(index))
                     inValue = array->getIndexQuickly(index);
                 else {
-                    PropertySlot slot;
+                    PropertySlot slot(array);
                     if (array->methodTable()->getOwnPropertySlotByIndex(array, m_exec, index, slot))
                         inValue = slot.getValue(m_exec, index);
                     else
@@ -733,12 +713,6 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
             }
             objectStartVisitMember:
             case ObjectStartVisitMember: {
-                if (!--tickCount) {
-                    if (localTimeoutChecker.didTimeOut(m_exec))
-                        return throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
-                    tickCount = localTimeoutChecker.ticksUntilNextCheck();
-                }
-
                 JSObject* object = objectStack.peek();
                 uint32_t index = indexStack.last();
                 PropertyNameArray& properties = propertyStack.last();
@@ -749,7 +723,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                     propertyStack.removeLast();
                     break;
                 }
-                PropertySlot slot;
+                PropertySlot slot(object);
                 if (object->methodTable()->getOwnPropertySlot(object, m_exec, properties[index], slot))
                     inValue = slot.getValue(m_exec, properties[index]);
                 else
@@ -796,16 +770,10 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
 
         state = stateStack.last();
         stateStack.removeLast();
-
-        if (!--tickCount) {
-            if (localTimeoutChecker.didTimeOut(m_exec))
-                return throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
-            tickCount = localTimeoutChecker.ticksUntilNextCheck();
-        }
     }
     JSObject* finalHolder = constructEmptyObject(m_exec);
     PutPropertySlot slot;
-    finalHolder->methodTable()->put(finalHolder, m_exec, m_exec->globalData().propertyNames->emptyIdentifier, outValue, slot);
+    finalHolder->methodTable()->put(finalHolder, m_exec, m_exec->vm().propertyNames->emptyIdentifier, outValue, slot);
     return callReviver(finalHolder, jsEmptyString(m_exec), outValue);
 }
 
@@ -819,7 +787,7 @@ EncodedJSValue JSC_HOST_CALL JSONProtoFuncParse(ExecState* exec)
         return JSValue::encode(jsNull());
 
     JSValue unfiltered;
-    LocalScope scope(exec->globalData());
+    LocalScope scope(exec->vm());
     if (source.is8Bit()) {
         LiteralParser<LChar> jsonParser(exec, source.characters8(), source.length(), StrictJSON);
         unfiltered = jsonParser.tryLiteralParse();
@@ -840,7 +808,7 @@ EncodedJSValue JSC_HOST_CALL JSONProtoFuncParse(ExecState* exec)
     CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
         return JSValue::encode(unfiltered);
-    return JSValue::encode(Walker(exec, Local<JSObject>(exec->globalData(), asObject(function)), callType, callData).walk(unfiltered));
+    return JSValue::encode(Walker(exec, Local<JSObject>(exec->vm(), asObject(function)), callType, callData).walk(unfiltered));
 }
 
 // ECMA-262 v5 15.12.3
@@ -848,17 +816,17 @@ EncodedJSValue JSC_HOST_CALL JSONProtoFuncStringify(ExecState* exec)
 {
     if (!exec->argumentCount())
         return throwVMError(exec, createError(exec, ASCIILiteral("No input to stringify")));
-    LocalScope scope(exec->globalData());
-    Local<Unknown> value(exec->globalData(), exec->argument(0));
-    Local<Unknown> replacer(exec->globalData(), exec->argument(1));
-    Local<Unknown> space(exec->globalData(), exec->argument(2));
+    LocalScope scope(exec->vm());
+    Local<Unknown> value(exec->vm(), exec->argument(0));
+    Local<Unknown> replacer(exec->vm(), exec->argument(1));
+    Local<Unknown> space(exec->vm(), exec->argument(2));
     return JSValue::encode(Stringifier(exec, replacer, space).stringify(value).get());
 }
 
 String JSONStringify(ExecState* exec, JSValue value, unsigned indent)
 {
-    LocalScope scope(exec->globalData());
-    Local<Unknown> result = Stringifier(exec, Local<Unknown>(exec->globalData(), jsNull()), Local<Unknown>(exec->globalData(), jsNumber(indent))).stringify(Local<Unknown>(exec->globalData(), value));
+    LocalScope scope(exec->vm());
+    Local<Unknown> result = Stringifier(exec, Local<Unknown>(exec->vm(), jsNull()), Local<Unknown>(exec->vm(), jsNumber(indent))).stringify(Local<Unknown>(exec->vm(), value));
     if (result.isUndefinedOrNull())
         return String();
     return result.getString(exec);

@@ -178,6 +178,48 @@ WebKitWebViewPrivate
 </SECTION>
 
 <SECTION>
+<FILE>WebKitAuthenticationRequest</FILE>
+WebKitAuthenticationRequest
+WebKitAuthenticationScheme
+webkit_authentication_request_authenticate
+webkit_authentication_request_cancel
+webkit_authentication_request_can_save_credentials
+webkit_authentication_request_get_host
+webkit_authentication_request_get_port
+webkit_authentication_request_is_retry
+webkit_authentication_request_get_proposed_credential
+webkit_authentication_request_get_realm
+webkit_authentication_request_get_scheme
+webkit_authentication_request_is_for_proxy
+
+<SUBSECTION Standard>
+WebKitAuthenticationRequestClass
+WEBKIT_TYPE_AUTHENTICATION_REQUEST
+WEBKIT_AUTHENTICATION_REQUEST
+WEBKIT_AUTHENTICATION_REQUEST_CLASS
+WEBKIT_AUTHENTICATION_REQUEST_GET_CLASS
+WEBKIT_IS_AUTHENTICATION_REQUEST
+WEBKIT_IS_AUTHENTICATION_REQUEST_CLASS
+WEBKIT_TYPE_CREDENTIAL
+
+<SUBSECTION Private>
+WebKitAuthenticationRequestPrivate
+webkit_authentication_request_get_type
+webkit_credential_get_type
+
+<SUBSECTION>
+WebKitCredential
+WebKitCredentialPersistence
+webkit_credential_new
+webkit_credential_copy
+webkit_credential_free
+webkit_credential_get_password
+webkit_credential_get_persistence
+webkit_credential_get_username
+webkit_credential_has_password
+</SECTION>
+
+<SECTION>
 <FILE>WebKitBackForwardList</FILE>
 WebKitBackForwardList
 webkit_back_forward_list_get_length
@@ -317,6 +359,10 @@ webkit_settings_set_user_agent
 webkit_settings_set_user_agent_with_application_details
 webkit_settings_get_enable_smooth_scrolling
 webkit_settings_set_enable_smooth_scrolling
+webkit_settings_get_enable_accelerated_2d_canvas
+webkit_settings_set_enable_accelerated_2d_canvas
+webkit_settings_get_enable_write_console_messages_to_stdout
+webkit_settings_set_enable_write_console_messages_to_stdout
 
 <SUBSECTION Standard>
 WebKitSettingsClass
@@ -804,6 +850,7 @@ webkit_uri_scheme_request_get_uri
 webkit_uri_scheme_request_get_path
 webkit_uri_scheme_request_get_web_view
 webkit_uri_scheme_request_finish
+webkit_uri_scheme_request_finish_error
 
 <SUBSECTION Standard>
 WebKitURISchemeRequestClass
@@ -991,8 +1038,8 @@ webkit_web_extension_get_type
 <FILE>WebKitWebPage</FILE>
 WebKitWebPage
 webkit_web_page_get_dom_document
-webkit_web_page_get_uri
 webkit_web_page_get_id
+webkit_web_page_get_uri
 
 <SUBSECTION Standard>
 WebKitWebPageClass

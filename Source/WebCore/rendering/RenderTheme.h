@@ -136,11 +136,6 @@ public:
     // A method asking if the platform is able to show datalist suggestions for a given input type.
     virtual bool supportsDataListUI(const AtomicString&) const { return false; }
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-    // A method asking if the platform is able to show a calendar picker for a given input type.
-    virtual bool supportsCalendarPicker(const AtomicString&) const { return false; }
-#endif
-
     // Text selection colors.
     Color activeSelectionBackgroundColor() const;
     Color inactiveSelectionBackgroundColor() const;
@@ -171,8 +166,8 @@ public:
     virtual double caretBlinkInterval() const { return 0.5; }
 
     // System fonts and colors for CSS.
-    virtual void systemFont(int cssValueId, FontDescription&) const = 0;
-    virtual Color systemColor(int cssValueId) const;
+    virtual void systemFont(CSSValueID, FontDescription&) const = 0;
+    virtual Color systemColor(CSSValueID) const;
 
     virtual int minimumMenuListSize(RenderStyle*) const { return 0; }
 
@@ -205,7 +200,6 @@ public:
     virtual bool usesVerticalVolumeSlider() const { return true; }
     virtual double mediaControlsFadeInDuration() { return 0.1; }
     virtual double mediaControlsFadeOutDuration() { return 0.3; }
-    virtual double timeWithoutMouseMovementBeforeHidingControls() { return 3.0; }
     virtual String formatMediaControlsTime(float time) const;
     virtual String formatMediaControlsCurrentTime(float currentTime, float duration) const;
     virtual String formatMediaControlsRemainingTime(float currentTime, float duration) const;
@@ -338,11 +332,14 @@ protected:
     virtual bool paintMediaVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaRewindButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaReturnToRealtimeButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
+    virtual bool paintMediaToggleClosedCaptionsButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaControlsBackground(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaCurrentTime(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaTimeRemaining(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaFullScreenVolumeSliderTrack(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaFullScreenVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
+
+    virtual bool paintSnapshottedPluginOverlay(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
 public:
     // Methods for state querying

@@ -44,8 +44,10 @@ void JSNameScope::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_registerStore);
 }
 
-JSObject* JSNameScope::toThisObject(JSCell*, ExecState* exec)
+JSValue JSNameScope::toThis(JSCell*, ExecState* exec, ECMAMode ecmaMode)
 {
+    if (ecmaMode == StrictMode)
+        return jsUndefined();
     return exec->globalThisValue();
 }
 
@@ -59,7 +61,7 @@ void JSNameScope::put(JSCell* cell, ExecState* exec, PropertyName propertyName, 
         // (a) is unlikely, and (b) is an error.
         // Also with a single entry the symbol table lookup should simply be
         // a pointer compare.
-        PropertySlot slot;
+        PropertySlot slot(thisObject);
         bool isWritable = true;
         symbolTableGet(thisObject, propertyName, slot, isWritable);
         if (!isWritable) {
@@ -73,9 +75,9 @@ void JSNameScope::put(JSCell* cell, ExecState* exec, PropertyName propertyName, 
     RELEASE_ASSERT_NOT_REACHED();
 }
 
-bool JSNameScope::getOwnPropertySlot(JSCell* cell, ExecState*, PropertyName propertyName, PropertySlot& slot)
+bool JSNameScope::getOwnPropertySlot(JSObject* object, ExecState*, PropertyName propertyName, PropertySlot& slot)
 {
-    return symbolTableGet(jsCast<JSNameScope*>(cell), propertyName, slot);
+    return symbolTableGet(jsCast<JSNameScope*>(object), propertyName, slot);
 }
 
 } // namespace JSC

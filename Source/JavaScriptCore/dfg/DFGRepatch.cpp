@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "CallFrameInlines.h"
 #include "DFGCCallHelpers.h"
 #include "DFGScratchRegisterAllocator.h"
 #include "DFGSpeculativeJIT.h"
@@ -172,7 +173,7 @@ static void linkRestoreScratch(LinkBuffer& patchBuffer, bool needToRestoreScratc
 
 static void generateProtoChainAccessStub(ExecState* exec, StructureStubInfo& stubInfo, StructureChain* chain, size_t count, PropertyOffset offset, Structure* structure, CodeLocationLabel successLabel, CodeLocationLabel slowCaseLabel, RefPtr<JITStubRoutine>& stubRoutine)
 {
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
 
     MacroAssembler stubJit;
         
@@ -231,7 +232,7 @@ static void generateProtoChainAccessStub(ExecState* exec, StructureStubInfo& stu
     
     emitRestoreScratch(stubJit, needToRestoreScratch, scratchGPR, success, fail, failureCases);
     
-    LinkBuffer patchBuffer(*globalData, &stubJit, exec->codeBlock());
+    LinkBuffer patchBuffer(*vm, &stubJit, exec->codeBlock());
     
     linkRestoreScratch(patchBuffer, needToRestoreScratch, success, fail, failureCases, successLabel, slowCaseLabel);
     
@@ -247,7 +248,7 @@ static bool tryCacheGetByID(ExecState* exec, JSValue baseValue, const Identifier
     // like the interpreter does, then add a check for recursion.
 
     CodeBlock* codeBlock = exec->codeBlock();
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
     
     if (isJSArray(baseValue) && propertyName == exec->propertyNames().length) {
         GPRReg baseGPR = static_cast<GPRReg>(stubInfo.patch.dfg.baseGPR);
@@ -292,7 +293,7 @@ static bool tryCacheGetByID(ExecState* exec, JSValue baseValue, const Identifier
         
         emitRestoreScratch(stubJit, needToRestoreScratch, scratchGPR, success, fail, failureCases);
         
-        LinkBuffer patchBuffer(*globalData, &stubJit, codeBlock);
+        LinkBuffer patchBuffer(*vm, &stubJit, codeBlock);
         
         linkRestoreScratch(patchBuffer, needToRestoreScratch, stubInfo, success, fail, failureCases);
         
@@ -323,14 +324,14 @@ static bool tryCacheGetByID(ExecState* exec, JSValue baseValue, const Identifier
 
     // Optimize self access.
     if (slot.slotBase() == baseValue) {
-        if ((slot.cachedPropertyType() != PropertySlot::Value)
+        if (!slot.isCacheableValue()
             || !MacroAssembler::isCompactPtrAlignedAddressOffset(maxOffsetRelativeToPatchedStorage(slot.cachedOffset()))) {
             dfgRepatchCall(codeBlock, stubInfo.callReturnLocation, operationGetByIdBuildList);
             return true;
         }
 
         dfgRepatchByIdSelfAccess(codeBlock, stubInfo, structure, slot.cachedOffset(), operationGetByIdBuildList, true);
-        stubInfo.initGetByIdSelf(*globalData, codeBlock->ownerExecutable(), structure);
+        stubInfo.initGetByIdSelf(*vm, codeBlock->ownerExecutable(), structure);
         return true;
     }
     
@@ -338,7 +339,7 @@ static bool tryCacheGetByID(ExecState* exec, JSValue baseValue, const Identifier
         return false;
     
     // FIXME: optimize getters and setters
-    if (slot.cachedPropertyType() != PropertySlot::Value)
+    if (!slot.isCacheableValue())
         return false;
     
     PropertyOffset offset = slot.cachedOffset();
@@ -348,15 +349,13 @@ static bool tryCacheGetByID(ExecState* exec, JSValue baseValue, const Identifier
 
     StructureChain* prototypeChain = structure->prototypeChain(exec);
     
-    ASSERT(slot.slotBase().isObject());
-    
     generateProtoChainAccessStub(exec, stubInfo, prototypeChain, count, offset, structure, stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToDone), stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToSlowCase), stubInfo.stubRoutine);
     
     RepatchBuffer repatchBuffer(codeBlock);
     replaceWithJump(repatchBuffer, stubInfo, stubInfo.stubRoutine->code().code());
-    repatchBuffer.relink(stubInfo.callReturnLocation, operationGetByIdProtoBuildList);
+    repatchBuffer.relink(stubInfo.callReturnLocation, operationGetByIdBuildList);
     
-    stubInfo.initGetByIdChain(*globalData, codeBlock->ownerExecutable(), structure, prototypeChain, count, true);
+    stubInfo.initGetByIdChain(*vm, codeBlock->ownerExecutable(), structure, prototypeChain, count, true);
     return true;
 }
 
@@ -367,48 +366,87 @@ void dfgRepatchGetByID(ExecState* exec, JSValue baseValue, const Identifier& pro
         dfgRepatchCall(exec->codeBlock(), stubInfo.callReturnLocation, operationGetById);
 }
 
+static bool getPolymorphicStructureList(
+    VM* vm, CodeBlock* codeBlock, StructureStubInfo& stubInfo,
+    PolymorphicAccessStructureList*& polymorphicStructureList, int& listIndex,
+    CodeLocationLabel& slowCase)
+{
+    slowCase = stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToSlowCase);
+    
+    if (stubInfo.accessType == access_unset) {
+        RELEASE_ASSERT(!stubInfo.stubRoutine);
+        polymorphicStructureList = new PolymorphicAccessStructureList();
+        stubInfo.initGetByIdSelfList(polymorphicStructureList, 0, false);
+        listIndex = 0;
+    } else if (stubInfo.accessType == access_get_by_id_self) {
+        RELEASE_ASSERT(!stubInfo.stubRoutine);
+        polymorphicStructureList = new PolymorphicAccessStructureList(*vm, codeBlock->ownerExecutable(), JITStubRoutine::createSelfManagedRoutine(slowCase), stubInfo.u.getByIdSelf.baseObjectStructure.get(), true);
+        stubInfo.initGetByIdSelfList(polymorphicStructureList, 1, true);
+        listIndex = 1;
+    } else if (stubInfo.accessType == access_get_by_id_chain) {
+        RELEASE_ASSERT(!!stubInfo.stubRoutine);
+        slowCase = CodeLocationLabel(stubInfo.stubRoutine->code().code());
+        polymorphicStructureList = new PolymorphicAccessStructureList(*vm, codeBlock->ownerExecutable(), stubInfo.stubRoutine, stubInfo.u.getByIdChain.baseObjectStructure.get(), stubInfo.u.getByIdChain.chain.get(), true);
+        stubInfo.stubRoutine.clear();
+        stubInfo.initGetByIdSelfList(polymorphicStructureList, 1, false);
+        listIndex = 1;
+    } else {
+        RELEASE_ASSERT(stubInfo.accessType == access_get_by_id_self_list);
+        polymorphicStructureList = stubInfo.u.getByIdSelfList.structureList;
+        listIndex = stubInfo.u.getByIdSelfList.listSize;
+        slowCase = CodeLocationLabel(polymorphicStructureList->list[listIndex - 1].stubRoutine->code().code());
+    }
+    
+    if (listIndex == POLYMORPHIC_LIST_CACHE_SIZE)
+        return false;
+    
+    RELEASE_ASSERT(listIndex < POLYMORPHIC_LIST_CACHE_SIZE);
+    return true;
+}
+
+static void patchJumpToGetByIdStub(CodeBlock* codeBlock, StructureStubInfo& stubInfo, JITStubRoutine* stubRoutine)
+{
+    RELEASE_ASSERT(stubInfo.accessType == access_get_by_id_self_list);
+    RepatchBuffer repatchBuffer(codeBlock);
+    if (stubInfo.u.getByIdSelfList.didSelfPatching) {
+        repatchBuffer.relink(
+            stubInfo.callReturnLocation.jumpAtOffset(
+                stubInfo.patch.dfg.deltaCallToStructCheck),
+            CodeLocationLabel(stubRoutine->code().code()));
+        return;
+    }
+    
+    replaceWithJump(repatchBuffer, stubInfo, stubRoutine->code().code());
+}
+
 static bool tryBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identifier& ident, const PropertySlot& slot, StructureStubInfo& stubInfo)
 {
     if (!baseValue.isCell()
         || !slot.isCacheable()
-        || baseValue.asCell()->structure()->isUncacheableDictionary()
-        || slot.slotBase() != baseValue)
+        || !baseValue.asCell()->structure()->propertyAccessesAreCacheable())
         return false;
-    
-    if (!stubInfo.patch.dfg.registersFlushed) {
-        // We cannot do as much inline caching if the registers were not flushed prior to this GetById. In particular,
-        // non-Value cached properties require planting calls, which requires registers to have been flushed. Thus,
-        // if registers were not flushed, don't do non-Value caching.
-        if (slot.cachedPropertyType() != PropertySlot::Value)
-            return false;
-    }
-    
+
     CodeBlock* codeBlock = exec->codeBlock();
+    VM* vm = &exec->vm();
     JSCell* baseCell = baseValue.asCell();
     Structure* structure = baseCell->structure();
-    JSGlobalData* globalData = &exec->globalData();
     
-    ASSERT(slot.slotBase().isObject());
+    if (slot.slotBase() == baseValue) {
+        if (!stubInfo.patch.dfg.registersFlushed) {
+            // We cannot do as much inline caching if the registers were not flushed prior to this GetById. In particular,
+            // non-Value cached properties require planting calls, which requires registers to have been flushed. Thus,
+            // if registers were not flushed, don't do non-Value caching.
+            if (!slot.isCacheableValue())
+                return false;
+        }
     
-    PolymorphicAccessStructureList* polymorphicStructureList;
-    int listIndex;
-    
-    if (stubInfo.accessType == access_unset) {
-        ASSERT(!stubInfo.stubRoutine);
-        polymorphicStructureList = new PolymorphicAccessStructureList();
-        stubInfo.initGetByIdSelfList(polymorphicStructureList, 0);
-        listIndex = 0;
-    } else if (stubInfo.accessType == access_get_by_id_self) {
-        ASSERT(!stubInfo.stubRoutine);
-        polymorphicStructureList = new PolymorphicAccessStructureList(*globalData, codeBlock->ownerExecutable(), JITStubRoutine::createSelfManagedRoutine(stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToSlowCase)), stubInfo.u.getByIdSelf.baseObjectStructure.get(), true);
-        stubInfo.initGetByIdSelfList(polymorphicStructureList, 1);
-        listIndex = 1;
-    } else {
-        polymorphicStructureList = stubInfo.u.getByIdSelfList.structureList;
-        listIndex = stubInfo.u.getByIdSelfList.listSize;
-    }
-    
-    if (listIndex < POLYMORPHIC_LIST_CACHE_SIZE) {
+        PolymorphicAccessStructureList* polymorphicStructureList;
+        int listIndex;
+        CodeLocationLabel slowCase;
+
+        if (!getPolymorphicStructureList(vm, codeBlock, stubInfo, polymorphicStructureList, listIndex, slowCase))
+            return false;
+        
         stubInfo.u.getByIdSelfList.listSize++;
         
         GPRReg baseGPR = static_cast<GPRReg>(stubInfo.patch.dfg.baseGPR);
@@ -418,7 +456,7 @@ static bool tryBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identi
         GPRReg resultGPR = static_cast<GPRReg>(stubInfo.patch.dfg.valueGPR);
         GPRReg scratchGPR = RegisterSet(stubInfo.patch.dfg.usedRegisters).getFreeGPR();
         
-        CCallHelpers stubJit(globalData, codeBlock);
+        CCallHelpers stubJit(vm, codeBlock);
         
         MacroAssembler::Jump wrongStruct = stubJit.branchPtr(MacroAssembler::NotEqual, MacroAssembler::Address(baseGPR, JSCell::structureOffset()), MacroAssembler::TrustedImmPtr(structure));
         
@@ -433,9 +471,8 @@ static bool tryBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identi
         FunctionPtr operationFunction;
         MacroAssembler::Jump success;
         
-        if (slot.cachedPropertyType() == PropertySlot::Getter
-            || slot.cachedPropertyType() == PropertySlot::Custom) {
-            if (slot.cachedPropertyType() == PropertySlot::Getter) {
+        if (slot.isCacheableGetter() || slot.isCacheableCustom()) {
+            if (slot.isCacheableGetter()) {
                 ASSERT(scratchGPR != InvalidGPRReg);
                 ASSERT(baseGPR != scratchGPR);
                 if (isInlineOffset(slot.cachedOffset())) {
@@ -458,7 +495,7 @@ static bool tryBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identi
                 stubJit.setupArgumentsWithExecState(
                     baseGPR,
                     MacroAssembler::TrustedImmPtr(FunctionPtr(slot.customGetter()).executableAddress()),
-                    MacroAssembler::TrustedImmPtr(const_cast<Identifier*>(&ident)));
+                    MacroAssembler::TrustedImmPtr(ident.impl()));
                 operationFunction = operationCallCustomGetter;
             }
             
@@ -466,7 +503,7 @@ static bool tryBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identi
             // place that we made it from. It just so happens to be the place that we are at
             // right now!
             stubJit.store32(
-                MacroAssembler::TrustedImm32(exec->codeOriginIndexForDFG()),
+                MacroAssembler::TrustedImm32(exec->locationAsRawBits()),
                 CCallHelpers::tagFor(static_cast<VirtualRegister>(JSStack::ArgumentCount)));
             
             operationCall = stubJit.call();
@@ -507,16 +544,9 @@ static bool tryBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identi
             isDirect = true;
         }
 
-        LinkBuffer patchBuffer(*globalData, &stubJit, codeBlock);
+        LinkBuffer patchBuffer(*vm, &stubJit, codeBlock);
         
-        CodeLocationLabel lastProtoBegin;
-        if (listIndex)
-            lastProtoBegin = CodeLocationLabel(polymorphicStructureList->list[listIndex - 1].stubRoutine->code().code());
-        else
-            lastProtoBegin = stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToSlowCase);
-        ASSERT(!!lastProtoBegin);
-        
-        patchBuffer.link(wrongStruct, lastProtoBegin);
+        patchBuffer.link(wrongStruct, slowCase);
         patchBuffer.link(success, stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToDone));
         if (!isDirect) {
             patchBuffer.link(operationCall, operationFunction);
@@ -528,96 +558,50 @@ static bool tryBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identi
                 FINALIZE_DFG_CODE(
                     patchBuffer,
                     ("DFG GetById polymorphic list access for %s, return point %p",
-                        toCString(*exec->codeBlock()).data(), stubInfo.callReturnLocation.labelAtOffset(
-                            stubInfo.patch.dfg.deltaCallToDone).executableAddress())),
-                *globalData,
+                     toCString(*exec->codeBlock()).data(), stubInfo.callReturnLocation.labelAtOffset(
+                         stubInfo.patch.dfg.deltaCallToDone).executableAddress())),
+                *vm,
                 codeBlock->ownerExecutable(),
-                slot.cachedPropertyType() == PropertySlot::Getter
-                || slot.cachedPropertyType() == PropertySlot::Custom);
+                slot.isCacheableGetter() || slot.isCacheableCustom());
         
-        polymorphicStructureList->list[listIndex].set(*globalData, codeBlock->ownerExecutable(), stubRoutine, structure, isDirect);
+        polymorphicStructureList->list[listIndex].set(*vm, codeBlock->ownerExecutable(), stubRoutine, structure, isDirect);
         
-        RepatchBuffer repatchBuffer(codeBlock);
-        repatchBuffer.relink(
-            stubInfo.callReturnLocation.jumpAtOffset(
-                stubInfo.patch.dfg.deltaCallToStructCheck),
-            CodeLocationLabel(stubRoutine->code().code()));
-        
-        if (listIndex < (POLYMORPHIC_LIST_CACHE_SIZE - 1))
-            return true;
+        patchJumpToGetByIdStub(codeBlock, stubInfo, stubRoutine.get());
+        return listIndex < (POLYMORPHIC_LIST_CACHE_SIZE - 1);
     }
     
-    return false;
+    if (baseValue.asCell()->structure()->typeInfo().prohibitsPropertyCaching() || !slot.isCacheableValue())
+        return false;
+
+    PropertyOffset offset = slot.cachedOffset();
+    size_t count = normalizePrototypeChainForChainAccess(exec, baseValue, slot.slotBase(), ident, offset);
+    if (count == InvalidPrototypeChain)
+        return false;
+
+    StructureChain* prototypeChain = structure->prototypeChain(exec);
+    
+    PolymorphicAccessStructureList* polymorphicStructureList;
+    int listIndex;
+    CodeLocationLabel slowCase;
+    if (!getPolymorphicStructureList(vm, codeBlock, stubInfo, polymorphicStructureList, listIndex, slowCase))
+        return false;
+    
+    stubInfo.u.getByIdProtoList.listSize++;
+    
+    RefPtr<JITStubRoutine> stubRoutine;
+    
+    generateProtoChainAccessStub(exec, stubInfo, prototypeChain, count, offset, structure, stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToDone), slowCase, stubRoutine);
+    
+    polymorphicStructureList->list[listIndex].set(*vm, codeBlock->ownerExecutable(), stubRoutine, structure, true);
+    
+    patchJumpToGetByIdStub(codeBlock, stubInfo, stubRoutine.get());
+    
+    return listIndex < (POLYMORPHIC_LIST_CACHE_SIZE - 1);
 }
 
 void dfgBuildGetByIDList(ExecState* exec, JSValue baseValue, const Identifier& propertyName, const PropertySlot& slot, StructureStubInfo& stubInfo)
 {
     bool dontChangeCall = tryBuildGetByIDList(exec, baseValue, propertyName, slot, stubInfo);
-    if (!dontChangeCall)
-        dfgRepatchCall(exec->codeBlock(), stubInfo.callReturnLocation, operationGetById);
-}
-
-static bool tryBuildGetByIDProtoList(ExecState* exec, JSValue baseValue, const Identifier& propertyName, const PropertySlot& slot, StructureStubInfo& stubInfo)
-{
-    if (!baseValue.isCell()
-        || !slot.isCacheable()
-        || baseValue.asCell()->structure()->isDictionary()
-        || baseValue.asCell()->structure()->typeInfo().prohibitsPropertyCaching()
-        || slot.slotBase() == baseValue
-        || slot.cachedPropertyType() != PropertySlot::Value)
-        return false;
-    
-    ASSERT(slot.slotBase().isObject());
-    
-    PropertyOffset offset = slot.cachedOffset();
-    size_t count = normalizePrototypeChainForChainAccess(exec, baseValue, slot.slotBase(), propertyName, offset);
-    if (count == InvalidPrototypeChain)
-        return false;
-
-    Structure* structure = baseValue.asCell()->structure();
-    StructureChain* prototypeChain = structure->prototypeChain(exec);
-    CodeBlock* codeBlock = exec->codeBlock();
-    JSGlobalData* globalData = &exec->globalData();
-    
-    PolymorphicAccessStructureList* polymorphicStructureList;
-    int listIndex = 1;
-    
-    if (stubInfo.accessType == access_get_by_id_chain) {
-        ASSERT(!!stubInfo.stubRoutine);
-        polymorphicStructureList = new PolymorphicAccessStructureList(*globalData, codeBlock->ownerExecutable(), stubInfo.stubRoutine, stubInfo.u.getByIdChain.baseObjectStructure.get(), stubInfo.u.getByIdChain.chain.get(), true);
-        stubInfo.stubRoutine.clear();
-        stubInfo.initGetByIdProtoList(polymorphicStructureList, 1);
-    } else {
-        ASSERT(stubInfo.accessType == access_get_by_id_proto_list);
-        polymorphicStructureList = stubInfo.u.getByIdProtoList.structureList;
-        listIndex = stubInfo.u.getByIdProtoList.listSize;
-    }
-    
-    if (listIndex < POLYMORPHIC_LIST_CACHE_SIZE) {
-        stubInfo.u.getByIdProtoList.listSize++;
-        
-        CodeLocationLabel lastProtoBegin = CodeLocationLabel(polymorphicStructureList->list[listIndex - 1].stubRoutine->code().code());
-        ASSERT(!!lastProtoBegin);
-
-        RefPtr<JITStubRoutine> stubRoutine;
-        
-        generateProtoChainAccessStub(exec, stubInfo, prototypeChain, count, offset, structure, stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToDone), lastProtoBegin, stubRoutine);
-        
-        polymorphicStructureList->list[listIndex].set(*globalData, codeBlock->ownerExecutable(), stubRoutine, structure, true);
-        
-        RepatchBuffer repatchBuffer(codeBlock);
-        replaceWithJump(repatchBuffer, stubInfo, stubRoutine->code().code());
-        
-        if (listIndex < (POLYMORPHIC_LIST_CACHE_SIZE - 1))
-            return true;
-    }
-    
-    return false;
-}
-
-void dfgBuildGetByIDProtoList(ExecState* exec, JSValue baseValue, const Identifier& propertyName, const PropertySlot& slot, StructureStubInfo& stubInfo)
-{
-    bool dontChangeCall = tryBuildGetByIDProtoList(exec, baseValue, propertyName, slot, stubInfo);
     if (!dontChangeCall)
         dfgRepatchCall(exec->codeBlock(), stubInfo.callReturnLocation, operationGetById);
 }
@@ -657,7 +641,7 @@ static void emitPutReplaceStub(
     CodeLocationLabel failureLabel,
     RefPtr<JITStubRoutine>& stubRoutine)
 {
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
     GPRReg baseGPR = static_cast<GPRReg>(stubInfo.patch.dfg.baseGPR);
 #if USE(JSVALUE32_64)
     GPRReg valueTagGPR = static_cast<GPRReg>(stubInfo.patch.dfg.valueTagGPR);
@@ -733,7 +717,7 @@ static void emitPutReplaceStub(
         failure = badStructure;
     }
     
-    LinkBuffer patchBuffer(*globalData, &stubJit, exec->codeBlock());
+    LinkBuffer patchBuffer(*vm, &stubJit, exec->codeBlock());
     patchBuffer.link(success, stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToDone));
     patchBuffer.link(failure, failureLabel);
             
@@ -757,7 +741,7 @@ static void emitPutTransitionStub(
     CodeLocationLabel failureLabel,
     RefPtr<JITStubRoutine>& stubRoutine)
 {
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
 
     GPRReg baseGPR = static_cast<GPRReg>(stubInfo.patch.dfg.baseGPR);
 #if USE(JSVALUE32_64)
@@ -772,7 +756,7 @@ static void emitPutTransitionStub(
 #endif
     allocator.lock(valueGPR);
     
-    CCallHelpers stubJit(globalData);
+    CCallHelpers stubJit(vm);
             
     GPRReg scratchGPR1 = allocator.allocateScratchGPR();
     ASSERT(scratchGPR1 != baseGPR);
@@ -840,7 +824,7 @@ static void emitPutTransitionStub(
     
     if (structure->outOfLineCapacity() != oldStructure->outOfLineCapacity()) {
         size_t newSize = structure->outOfLineCapacity() * sizeof(JSValue);
-        CopiedAllocator* copiedAllocator = &globalData->heap.storageAllocator();
+        CopiedAllocator* copiedAllocator = &vm->heap.storageAllocator();
         
         if (!oldStructure->outOfLineCapacity()) {
             stubJit.loadPtr(&copiedAllocator->m_currentRemaining, scratchGPR1);
@@ -912,7 +896,7 @@ static void emitPutTransitionStub(
         slowPath.link(&stubJit);
         
         allocator.restoreReusedRegistersByPopping(stubJit);
-        ScratchBuffer* scratchBuffer = globalData->scratchBufferForSize(allocator.desiredScratchBufferSize());
+        ScratchBuffer* scratchBuffer = vm->scratchBufferForSize(allocator.desiredScratchBufferSize());
         allocator.preserveUsedRegistersToScratchBuffer(stubJit, scratchBuffer, scratchGPR1);
 #if USE(JSVALUE64)
         stubJit.setupArgumentsWithExecState(baseGPR, MacroAssembler::TrustedImmPtr(structure), MacroAssembler::TrustedImm32(slot.cachedOffset()), valueGPR);
@@ -924,7 +908,7 @@ static void emitPutTransitionStub(
         successInSlowPath = stubJit.jump();
     }
     
-    LinkBuffer patchBuffer(*globalData, &stubJit, exec->codeBlock());
+    LinkBuffer patchBuffer(*vm, &stubJit, exec->codeBlock());
     patchBuffer.link(success, stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToDone));
     if (allocator.didReuseRegisters())
         patchBuffer.link(failure, failureLabel);
@@ -944,7 +928,7 @@ static void emitPutTransitionStub(
                     oldStructure, structure,
                     toCString(*exec->codeBlock()).data(), stubInfo.callReturnLocation.labelAtOffset(
                         stubInfo.patch.dfg.deltaCallToDone).executableAddress())),
-            *globalData,
+            *vm,
             exec->codeBlock()->ownerExecutable(),
             structure->outOfLineCapacity() != oldStructure->outOfLineCapacity(),
             structure);
@@ -953,7 +937,7 @@ static void emitPutTransitionStub(
 static bool tryCachePutByID(ExecState* exec, JSValue baseValue, const Identifier& ident, const PutPropertySlot& slot, StructureStubInfo& stubInfo, PutKind putKind)
 {
     CodeBlock* codeBlock = exec->codeBlock();
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
 
     if (!baseValue.isCell())
         return false;
@@ -981,7 +965,7 @@ static bool tryCachePutByID(ExecState* exec, JSValue baseValue, const Identifier
             
             // Skip optimizing the case where we need realloc, and the structure has
             // indexing storage.
-            if (hasIndexingHeader(oldStructure->indexingType()))
+            if (oldStructure->couldHaveIndexingHeader())
                 return false;
             
             if (normalizePrototypeChain(exec, baseCell) == InvalidPrototypeChain)
@@ -1002,13 +986,13 @@ static bool tryCachePutByID(ExecState* exec, JSValue baseValue, const Identifier
                 CodeLocationLabel(stubInfo.stubRoutine->code().code()));
             repatchBuffer.relink(stubInfo.callReturnLocation, appropriateListBuildingPutByIdFunction(slot, putKind));
             
-            stubInfo.initPutByIdTransition(*globalData, codeBlock->ownerExecutable(), oldStructure, structure, prototypeChain, putKind == Direct);
+            stubInfo.initPutByIdTransition(*vm, codeBlock->ownerExecutable(), oldStructure, structure, prototypeChain, putKind == Direct);
             
             return true;
         }
 
         dfgRepatchByIdSelfAccess(codeBlock, stubInfo, structure, slot.cachedOffset(), appropriateListBuildingPutByIdFunction(slot, putKind), false);
-        stubInfo.initPutByIdReplace(*globalData, codeBlock->ownerExecutable(), structure);
+        stubInfo.initPutByIdReplace(*vm, codeBlock->ownerExecutable(), structure);
         return true;
     }
 
@@ -1025,7 +1009,7 @@ void dfgRepatchPutByID(ExecState* exec, JSValue baseValue, const Identifier& pro
 static bool tryBuildPutByIdList(ExecState* exec, JSValue baseValue, const Identifier& propertyName, const PutPropertySlot& slot, StructureStubInfo& stubInfo, PutKind putKind)
 {
     CodeBlock* codeBlock = exec->codeBlock();
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
 
     if (!baseValue.isCell())
         return false;
@@ -1056,7 +1040,7 @@ static bool tryBuildPutByIdList(ExecState* exec, JSValue baseValue, const Identi
             
             // Skip optimizing the case where we need realloc, and the structure has
             // indexing storage.
-            if (hasIndexingHeader(oldStructure->indexingType()))
+            if (oldStructure->couldHaveIndexingHeader())
                 return false;
             
             if (normalizePrototypeChain(exec, baseCell) == InvalidPrototypeChain)
@@ -1077,7 +1061,7 @@ static bool tryBuildPutByIdList(ExecState* exec, JSValue baseValue, const Identi
             
             list->addAccess(
                 PutByIdAccess::transition(
-                    *globalData, codeBlock->ownerExecutable(),
+                    *vm, codeBlock->ownerExecutable(),
                     oldStructure, structure, prototypeChain,
                     stubRoutine));
         } else {
@@ -1092,7 +1076,7 @@ static bool tryBuildPutByIdList(ExecState* exec, JSValue baseValue, const Identi
             
             list->addAccess(
                 PutByIdAccess::replace(
-                    *globalData, codeBlock->ownerExecutable(),
+                    *vm, codeBlock->ownerExecutable(),
                     structure, stubRoutine));
         }
         
@@ -1115,50 +1099,170 @@ void dfgBuildPutByIdList(ExecState* exec, JSValue baseValue, const Identifier& p
         dfgRepatchCall(exec->codeBlock(), stubInfo.callReturnLocation, appropriateGenericPutByIdFunction(slot, putKind));
 }
 
-static void linkSlowFor(RepatchBuffer& repatchBuffer, JSGlobalData* globalData, CallLinkInfo& callLinkInfo, CodeSpecializationKind kind)
+static bool tryRepatchIn(
+    ExecState* exec, JSCell* base, const Identifier& ident, bool wasFound,
+    const PropertySlot& slot, StructureStubInfo& stubInfo)
+{
+    if (!base->structure()->propertyAccessesAreCacheable())
+        return false;
+    
+    if (wasFound) {
+        if (!slot.isCacheable())
+            return false;
+    }
+    
+    CodeBlock* codeBlock = exec->codeBlock();
+    VM* vm = &exec->vm();
+    Structure* structure = base->structure();
+    
+    PropertyOffset offsetIgnored;
+    size_t count = normalizePrototypeChainForChainAccess(exec, base, wasFound ? slot.slotBase() : JSValue(), ident, offsetIgnored);
+    if (count == InvalidPrototypeChain)
+        return false;
+    
+    PolymorphicAccessStructureList* polymorphicStructureList;
+    int listIndex;
+    
+    CodeLocationLabel successLabel = stubInfo.hotPathBegin;
+    CodeLocationLabel slowCaseLabel;
+    
+    if (stubInfo.accessType == access_unset) {
+        polymorphicStructureList = new PolymorphicAccessStructureList();
+        stubInfo.initInList(polymorphicStructureList, 0);
+        slowCaseLabel = stubInfo.callReturnLocation.labelAtOffset(
+            stubInfo.patch.dfg.deltaCallToSlowCase);
+        listIndex = 0;
+    } else {
+        RELEASE_ASSERT(stubInfo.accessType == access_in_list);
+        polymorphicStructureList = stubInfo.u.inList.structureList;
+        listIndex = stubInfo.u.inList.listSize;
+        slowCaseLabel = CodeLocationLabel(polymorphicStructureList->list[listIndex - 1].stubRoutine->code().code());
+        
+        if (listIndex == POLYMORPHIC_LIST_CACHE_SIZE)
+            return false;
+    }
+    
+    StructureChain* chain = structure->prototypeChain(exec);
+    RefPtr<JITStubRoutine> stubRoutine;
+    
+    {
+        GPRReg baseGPR = static_cast<GPRReg>(stubInfo.patch.dfg.baseGPR);
+        GPRReg resultGPR = static_cast<GPRReg>(stubInfo.patch.dfg.valueGPR);
+        GPRReg scratchGPR = RegisterSet(stubInfo.patch.dfg.usedRegisters).getFreeGPR();
+        
+        CCallHelpers stubJit(vm);
+        
+        bool needToRestoreScratch;
+        if (scratchGPR == InvalidGPRReg) {
+            scratchGPR = SpeculativeJIT::selectScratchGPR(baseGPR, resultGPR);
+            stubJit.push(scratchGPR);
+            needToRestoreScratch = true;
+        } else
+            needToRestoreScratch = false;
+        
+        MacroAssembler::JumpList failureCases;
+        failureCases.append(stubJit.branchPtr(
+            MacroAssembler::NotEqual,
+            MacroAssembler::Address(baseGPR, JSCell::structureOffset()),
+            MacroAssembler::TrustedImmPtr(structure)));
+        
+        Structure* currStructure = structure;
+        WriteBarrier<Structure>* it = chain->head();
+        for (unsigned i = 0; i < count; ++i, ++it) {
+            JSObject* prototype = asObject(currStructure->prototypeForLookup(exec));
+            addStructureTransitionCheck(
+                prototype, prototype->structure(), exec->codeBlock(), stubInfo, stubJit,
+                failureCases, scratchGPR);
+            currStructure = it->get();
+        }
+        
+#if USE(JSVALUE64)
+        stubJit.move(MacroAssembler::TrustedImm64(JSValue::encode(jsBoolean(wasFound))), resultGPR);
+#else
+        stubJit.move(MacroAssembler::TrustedImm32(wasFound), resultGPR);
+#endif
+        
+        MacroAssembler::Jump success, fail;
+        
+        emitRestoreScratch(stubJit, needToRestoreScratch, scratchGPR, success, fail, failureCases);
+        
+        LinkBuffer patchBuffer(*vm, &stubJit, exec->codeBlock());
+
+        linkRestoreScratch(patchBuffer, needToRestoreScratch, success, fail, failureCases, successLabel, slowCaseLabel);
+        
+        stubRoutine = FINALIZE_CODE_FOR_DFG_STUB(
+            patchBuffer,
+            ("DFG In (found = %s) stub for %s, return point %p",
+                wasFound ? "yes" : "no", toCString(*exec->codeBlock()).data(),
+                successLabel.executableAddress()));
+    }
+    
+    polymorphicStructureList->list[listIndex].set(*vm, codeBlock->ownerExecutable(), stubRoutine, structure, true);
+    stubInfo.u.inList.listSize++;
+    
+    RepatchBuffer repatchBuffer(codeBlock);
+    repatchBuffer.relink(stubInfo.hotPathBegin.jumpAtOffset(0), CodeLocationLabel(stubRoutine->code().code()));
+    
+    return listIndex < (POLYMORPHIC_LIST_CACHE_SIZE - 1);
+}
+
+void dfgRepatchIn(
+    ExecState* exec, JSCell* base, const Identifier& ident, bool wasFound,
+    const PropertySlot& slot, StructureStubInfo& stubInfo)
+{
+    if (tryRepatchIn(exec, base, ident, wasFound, slot, stubInfo))
+        return;
+    dfgRepatchCall(exec->codeBlock(), stubInfo.callReturnLocation, operationIn);
+}
+
+static void linkSlowFor(RepatchBuffer& repatchBuffer, VM* vm, CallLinkInfo& callLinkInfo, CodeSpecializationKind kind)
 {
     if (kind == CodeForCall) {
-        repatchBuffer.relink(callLinkInfo.callReturnLocation, globalData->getCTIStub(virtualCallThunkGenerator).code());
+        repatchBuffer.relink(callLinkInfo.callReturnLocation, vm->getCTIStub(virtualCallThunkGenerator).code());
         return;
     }
     ASSERT(kind == CodeForConstruct);
-    repatchBuffer.relink(callLinkInfo.callReturnLocation, globalData->getCTIStub(virtualConstructThunkGenerator).code());
+    repatchBuffer.relink(callLinkInfo.callReturnLocation, vm->getCTIStub(virtualConstructThunkGenerator).code());
 }
 
 void dfgLinkFor(ExecState* exec, CallLinkInfo& callLinkInfo, CodeBlock* calleeCodeBlock, JSFunction* callee, MacroAssemblerCodePtr codePtr, CodeSpecializationKind kind)
 {
     ASSERT(!callLinkInfo.stub);
     
+    // If you're being call-linked from a DFG caller then you obviously didn't get inlined.
+    if (calleeCodeBlock)
+        calleeCodeBlock->m_shouldAlwaysBeInlined = false;
+    
     CodeBlock* callerCodeBlock = exec->callerFrame()->codeBlock();
-    JSGlobalData* globalData = callerCodeBlock->globalData();
+    VM* vm = callerCodeBlock->vm();
     
     RepatchBuffer repatchBuffer(callerCodeBlock);
     
     ASSERT(!callLinkInfo.isLinked());
-    callLinkInfo.callee.set(exec->callerFrame()->globalData(), callLinkInfo.hotPathBegin, callerCodeBlock->ownerExecutable(), callee);
-    callLinkInfo.lastSeenCallee.set(exec->callerFrame()->globalData(), callerCodeBlock->ownerExecutable(), callee);
+    callLinkInfo.callee.set(exec->callerFrame()->vm(), callLinkInfo.hotPathBegin, callerCodeBlock->ownerExecutable(), callee);
+    callLinkInfo.lastSeenCallee.set(exec->callerFrame()->vm(), callerCodeBlock->ownerExecutable(), callee);
     repatchBuffer.relink(callLinkInfo.hotPathOther, codePtr);
     
     if (calleeCodeBlock)
-        calleeCodeBlock->linkIncomingCall(&callLinkInfo);
+        calleeCodeBlock->linkIncomingCall(exec->callerFrame(), &callLinkInfo);
     
     if (kind == CodeForCall) {
-        repatchBuffer.relink(callLinkInfo.callReturnLocation, globalData->getCTIStub(linkClosureCallThunkGenerator).code());
+        repatchBuffer.relink(callLinkInfo.callReturnLocation, vm->getCTIStub(linkClosureCallThunkGenerator).code());
         return;
     }
     
     ASSERT(kind == CodeForConstruct);
-    linkSlowFor(repatchBuffer, globalData, callLinkInfo, CodeForConstruct);
+    linkSlowFor(repatchBuffer, vm, callLinkInfo, CodeForConstruct);
 }
 
 void dfgLinkSlowFor(ExecState* exec, CallLinkInfo& callLinkInfo, CodeSpecializationKind kind)
 {
     CodeBlock* callerCodeBlock = exec->callerFrame()->codeBlock();
-    JSGlobalData* globalData = callerCodeBlock->globalData();
+    VM* vm = callerCodeBlock->vm();
     
     RepatchBuffer repatchBuffer(callerCodeBlock);
     
-    linkSlowFor(repatchBuffer, globalData, callLinkInfo, kind);
+    linkSlowFor(repatchBuffer, vm, callLinkInfo, kind);
 }
 
 void dfgLinkClosureCall(ExecState* exec, CallLinkInfo& callLinkInfo, CodeBlock* calleeCodeBlock, Structure* structure, ExecutableBase* executable, MacroAssemblerCodePtr codePtr)
@@ -1166,11 +1270,11 @@ void dfgLinkClosureCall(ExecState* exec, CallLinkInfo& callLinkInfo, CodeBlock* 
     ASSERT(!callLinkInfo.stub);
     
     CodeBlock* callerCodeBlock = exec->callerFrame()->codeBlock();
-    JSGlobalData* globalData = callerCodeBlock->globalData();
+    VM* vm = callerCodeBlock->vm();
     
     GPRReg calleeGPR = static_cast<GPRReg>(callLinkInfo.calleeGPR);
     
-    CCallHelpers stubJit(globalData, callerCodeBlock);
+    CCallHelpers stubJit(vm, callerCodeBlock);
     
     CCallHelpers::JumpList slowPath;
     
@@ -1223,26 +1327,26 @@ void dfgLinkClosureCall(ExecState* exec, CallLinkInfo& callLinkInfo, CodeBlock* 
     stubJit.restoreReturnAddressBeforeReturn(GPRInfo::nonArgGPR2);
     JITCompiler::Jump slow = stubJit.jump();
     
-    LinkBuffer patchBuffer(*globalData, &stubJit, callerCodeBlock);
+    LinkBuffer patchBuffer(*vm, &stubJit, callerCodeBlock);
     
     patchBuffer.link(call, FunctionPtr(codePtr.executableAddress()));
     patchBuffer.link(done, callLinkInfo.callReturnLocation.labelAtOffset(0));
-    patchBuffer.link(slow, CodeLocationLabel(globalData->getCTIStub(virtualCallThunkGenerator).code()));
+    patchBuffer.link(slow, CodeLocationLabel(vm->getCTIStub(virtualCallThunkGenerator).code()));
     
     RefPtr<ClosureCallStubRoutine> stubRoutine = adoptRef(new ClosureCallStubRoutine(
         FINALIZE_DFG_CODE(
             patchBuffer,
             ("DFG closure call stub for %s, return point %p, target %p (%s)",
                 toCString(*callerCodeBlock).data(), callLinkInfo.callReturnLocation.labelAtOffset(0).executableAddress(),
-                codePtr.executableAddress(), toCString(*calleeCodeBlock).data())),
-        *globalData, callerCodeBlock->ownerExecutable(), structure, executable, callLinkInfo.codeOrigin));
+                codePtr.executableAddress(), toCString(pointerDump(calleeCodeBlock)).data())),
+        *vm, callerCodeBlock->ownerExecutable(), structure, executable, callLinkInfo.codeOrigin));
     
     RepatchBuffer repatchBuffer(callerCodeBlock);
     
     repatchBuffer.replaceWithJump(
         RepatchBuffer::startOfBranchPtrWithPatchOnRegister(callLinkInfo.hotPathBegin),
         CodeLocationLabel(stubRoutine->code().code()));
-    linkSlowFor(repatchBuffer, globalData, callLinkInfo, CodeForCall);
+    linkSlowFor(repatchBuffer, vm, callLinkInfo, CodeForCall);
     
     callLinkInfo.stub = stubRoutine.release();
     
@@ -1303,6 +1407,11 @@ void dfgResetPutByID(RepatchBuffer& repatchBuffer, StructureStubInfo& stubInfo)
     repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabel32AtOffset(stubInfo.patch.dfg.deltaCallToPayloadLoadOrStore), 0);
 #endif
     repatchBuffer.relink(stubInfo.callReturnLocation.jumpAtOffset(stubInfo.patch.dfg.deltaCallToStructCheck), stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToSlowCase));
+}
+
+void dfgResetIn(RepatchBuffer& repatchBuffer, StructureStubInfo& stubInfo)
+{
+    repatchBuffer.relink(stubInfo.hotPathBegin.jumpAtOffset(0), stubInfo.callReturnLocation.labelAtOffset(stubInfo.patch.dfg.deltaCallToSlowCase));
 }
 
 } } // namespace JSC::DFG

@@ -40,17 +40,11 @@ class SVGDocument;
 class SVGFontElement;
 struct FontCustomPlatformData;
 
-class CachedFont : public CachedResource {
+class CachedFont FINAL : public CachedResource {
 public:
     CachedFont(const ResourceRequest&);
     virtual ~CachedFont();
-    
-    virtual void load(CachedResourceLoader*, const ResourceLoaderOptions&);
 
-    virtual void didAddClient(CachedResourceClient*);
-    virtual void data(PassRefPtr<ResourceBuffer> data, bool allDataReceived);
-
-    virtual void allClientsRemoved();
     void beginLoadIfNeeded(CachedResourceLoader* dl);
     bool stillNeedsLoad() const { return !m_loadInitiated; }
 
@@ -62,12 +56,20 @@ public:
     SVGFontElement* getSVGFontById(const String&) const;
 #endif
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
 private:
     virtual void checkNotify();
+    virtual bool mayTryReplaceEncodedData() const OVERRIDE;
+
+    virtual void load(CachedResourceLoader*, const ResourceLoaderOptions&) OVERRIDE;
+
+    virtual void didAddClient(CachedResourceClient*) OVERRIDE;
+    virtual void finishLoading(ResourceBuffer*) OVERRIDE;
+
+    virtual void allClientsRemoved() OVERRIDE;
+
     FontCustomPlatformData* m_fontData;
     bool m_loadInitiated;
+    bool m_hasCreatedFontData;
 
 #if ENABLE(SVG_FONTS)
     RefPtr<SVGDocument> m_externalSVGDocument;
@@ -76,14 +78,6 @@ private:
     friend class MemoryCache;
 };
 
-class CachedFontClient : public CachedResourceClient {
-public:
-    virtual ~CachedFontClient() { }
-    static CachedResourceClientType expectedType() { return FontType; }
-    virtual CachedResourceClientType resourceClientType() const { return expectedType(); }
-    virtual void fontLoaded(CachedFont*) { }
-};
+} // namespace WebCore
 
-}
-
-#endif
+#endif // CachedFont_h

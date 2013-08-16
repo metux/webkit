@@ -33,6 +33,8 @@
 
 namespace JSC {
 
+struct JITStackFrame;
+
 class MacroAssemblerX86Common : public AbstractMacroAssembler<X86Assembler> {
 protected:
 #if CPU(X86_64)
@@ -68,6 +70,7 @@ public:
     enum ResultCondition {
         Overflow = X86Assembler::ConditionO,
         Signed = X86Assembler::ConditionS,
+        PositiveOrZero = X86Assembler::ConditionNS,
         Zero = X86Assembler::ConditionE,
         NonZero = X86Assembler::ConditionNE
     };
@@ -93,6 +96,7 @@ public:
         DoubleConditionBits_should_not_interfere_with_X86Assembler_Condition_codes);
 
     static const RegisterID stackPointerRegister = X86Registers::esp;
+    static const RegisterID framePointerRegister = X86Registers::ebp;
 
 #if ENABLE(JIT_CONSTANT_BLINDING)
     static bool shouldBlindForSpecificArch(uint32_t value) { return value >= 0x00ffffff; }
@@ -884,13 +888,14 @@ public:
     // If the result is not representable as a 32 bit value, branch.
     // May also branch for some values that are representable in 32 bits
     // (specifically, in this case, 0).
-    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID fpTemp)
+    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID fpTemp, bool negZeroCheck = true)
     {
         ASSERT(isSSE2Present());
         m_assembler.cvttsd2si_rr(src, dest);
 
         // If the result is zero, it might have been -0.0, and the double comparison won't catch this!
-        failureCases.append(branchTest32(Zero, dest));
+        if (negZeroCheck)
+            failureCases.append(branchTest32(Zero, dest));
 
         // Convert the integer result back to float & compare to the original value - if not equal or unordered (NaN) then jump.
         convertInt32ToDouble(dest, fpTemp);
@@ -1435,6 +1440,30 @@ public:
     {
         return X86Assembler::maxJumpReplacementSize();
     }
+
+#if USE(MASM_PROBE)
+    struct CPUState {
+        #define DECLARE_REGISTER(_type, _regName) \
+            _type _regName;
+        FOR_EACH_CPU_REGISTER(DECLARE_REGISTER)
+        #undef DECLARE_REGISTER
+    };
+
+    struct ProbeContext;
+    typedef void (*ProbeFunction)(struct ProbeContext*);
+
+    struct ProbeContext {
+        ProbeFunction probeFunction;
+        void* arg1;
+        void* arg2;
+        JITStackFrame* jitStackFrame;
+        CPUState cpu;
+
+        void dump(const char* indentation = 0);
+    private:
+        void dumpCPURegisters(const char* indentation);
+    };
+#endif // USE(MASM_PROBE)
 
 protected:
     X86Assembler::Condition x86Condition(RelationalCondition cond)

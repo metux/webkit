@@ -37,13 +37,13 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-class SummaryContentElement : public HTMLContentElement {
+class SummaryContentElement : public InsertionPoint {
 public:
     static PassRefPtr<SummaryContentElement> create(Document*);
 
 private:
     SummaryContentElement(Document* document)
-        : HTMLContentElement(HTMLNames::webkitShadowContentTag, document)
+        : InsertionPoint(HTMLNames::webkitShadowContentTag, document)
     {
     }
 };
@@ -73,13 +73,16 @@ RenderObject* HTMLSummaryElement::createRenderer(RenderArena* arena, RenderStyle
 
 bool HTMLSummaryElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
+    if (childContext.node()->isPseudoElement())
+        return HTMLElement::childShouldCreateRenderer(childContext);
+
     return childContext.isOnEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext);
 }
 
 void HTMLSummaryElement::didAddUserAgentShadowRoot(ShadowRoot* root)
 {
-    root->appendChild(DetailsMarkerControl::create(document()), ASSERT_NO_EXCEPTION, true);
-    root->appendChild(SummaryContentElement::create(document()), ASSERT_NO_EXCEPTION, true);
+    root->appendChild(DetailsMarkerControl::create(document()), ASSERT_NO_EXCEPTION, AttachLazily);
+    root->appendChild(SummaryContentElement::create(document()), ASSERT_NO_EXCEPTION, AttachLazily);
 }
 
 HTMLDetailsElement* HTMLSummaryElement::detailsElement() const

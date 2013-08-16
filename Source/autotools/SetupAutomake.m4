@@ -19,6 +19,7 @@ AM_CONDITIONAL([OS_WIN32],[test "$os_win32" = "yes"])
 AM_CONDITIONAL([OS_UNIX],[test "$os_win32" = "no"])
 AM_CONDITIONAL([OS_LINUX],[test "$os_linux" = "yes"])
 AM_CONDITIONAL([OS_GNU],[test "$os_gnu" = "yes"])
+AM_CONDITIONAL([OS_DARWIN],[test "$os_darwin" = "yes"])
 AM_CONDITIONAL([OS_FREEBSD],[test "$os_freebsd" = "yes"])
 
 # Target conditionals.
@@ -36,36 +37,24 @@ AM_CONDITIONAL([HAVE_ATSPI2], [test "$have_atspi2" = "yes"])
 
 # Accelerated compositing conditionals.
 AM_CONDITIONAL([USE_ACCELERATED_COMPOSITING], [test "$enable_accelerated_compositing" = "yes"])
-AM_CONDITIONAL([USE_TEXTURE_MAPPER_CAIRO],
-    [test "$enable_accelerated_compositing" = "yes" && test "$with_acceleration_backend" = "none"])
-AM_CONDITIONAL([USE_TEXTURE_MAPPER_GL],
-    [test "$enable_accelerated_compositing" = "yes" && test "$with_acceleration_backend" = "opengl"])
-AM_CONDITIONAL([USE_CLUTTER], [test "$with_acceleration_backend" = "clutter"])
+AM_CONDITIONAL([USE_TEXTURE_MAPPER_GL], [test "$enable_accelerated_compositing" = "yes" && test "$found_opengl" = "yes"])
 
-# These are the same for now, but they will soon be separate.
-AM_CONDITIONAL([USE_OPENGL], [test "$with_acceleration_backend" = "opengl"])
-AM_CONDITIONAL([USE_EGL], [test "$enable_egl" = "yes"])
-AM_CONDITIONAL([USE_GLES2], [test "$enable_gles2" = "yes"])
+# OpenGL graphics conditionals.
 AM_CONDITIONAL([USE_GLX], [test "$enable_glx" = "yes"])
+AM_CONDITIONAL([USE_EGL], [test "$enable_egl" = "yes"])
+AM_CONDITIONAL([USE_OPENGL], [test "$found_opengl" = "yes"])
+AM_CONDITIONAL([USE_GLES2], [test "$enable_gles2" = "yes"])
 
 # WebKit feature conditionals.
 AM_CONDITIONAL([ENABLE_DEBUG],[test "$enable_debug" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBGL],[test "$enable_webgl" = "yes"])
-AM_CONDITIONAL([ENABLE_GAMEPAD],[test "$enable_gamepad" = "yes"])
-AM_CONDITIONAL([ENABLE_XSLT],[test "$enable_xslt" = "yes"])
-AM_CONDITIONAL([ENABLE_GEOLOCATION], [test "$enable_geolocation" = "yes"])
 AM_CONDITIONAL([ENABLE_VIDEO],[test "$enable_video" = "yes"])
 AM_CONDITIONAL([ENABLE_SVG],[test "$enable_svg" = "yes"])
-AM_CONDITIONAL([ENABLE_SVG_FONTS],[test "$enable_svg_fonts" = "yes"])
 AM_CONDITIONAL([ENABLE_COVERAGE],[test "$enable_coverage" = "yes"])
 AM_CONDITIONAL([ENABLE_WEB_AUDIO],[test "$enable_web_audio" = "yes"])
-AM_CONDITIONAL([ENABLE_OPCODE_STATS],[test "$enable_opcode_stats" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBKIT1],[test "$enable_webkit1" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBKIT2],[test "$enable_webkit2" = "yes"])
 AM_CONDITIONAL([ENABLE_SPELLCHECK],[test "$enable_spellcheck" = "yes"])
-AM_CONDITIONAL([ENABLE_CSS_FILTERS],[test "$enable_css_filters" = "yes"])
-AM_CONDITIONAL([ENABLE_CSS_SHADERS],[test "$enable_css_shaders" = "yes"])
 
 # Introspection conditional.
 AM_CONDITIONAL([ENABLE_INTROSPECTION],[test "$enable_introspection" = "yes"])
-

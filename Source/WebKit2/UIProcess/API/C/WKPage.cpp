@@ -29,15 +29,19 @@
 
 #include "PrintInfo.h"
 #include "WKAPICast.h"
+#include "WKPluginInformation.h"
 #include "WebBackForwardList.h"
 #include "WebData.h"
 #include "WebPageProxy.h"
 #include "WebProcessProxy.h"
 #include <WebCore/Page.h>
-#include <wtf/UnusedParam.h>
 
 #ifdef __BLOCKS__
 #include <Block.h>
+#endif
+
+#if ENABLE(CONTEXT_MENUS)
+#include "WebContextMenuItem.h"
 #endif
 
 using namespace WebCore;
@@ -63,9 +67,39 @@ void WKPageLoadURL(WKPageRef pageRef, WKURLRef URLRef)
     toImpl(pageRef)->loadURL(toWTFString(URLRef));
 }
 
+void WKPageLoadURLWithUserData(WKPageRef pageRef, WKURLRef URLRef, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadURL(toWTFString(URLRef), toImpl(userDataRef));
+}
+
 void WKPageLoadURLRequest(WKPageRef pageRef, WKURLRequestRef urlRequestRef)
 {
     toImpl(pageRef)->loadURLRequest(toImpl(urlRequestRef));    
+}
+
+void WKPageLoadURLRequestWithUserData(WKPageRef pageRef, WKURLRequestRef urlRequestRef, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadURLRequest(toImpl(urlRequestRef), toImpl(userDataRef));    
+}
+
+void WKPageLoadFile(WKPageRef pageRef, WKURLRef fileURL, WKURLRef resourceDirectoryURL)
+{
+    toImpl(pageRef)->loadFile(toWTFString(fileURL), toWTFString(resourceDirectoryURL));
+}
+
+void WKPageLoadFileWithUserData(WKPageRef pageRef, WKURLRef fileURL, WKURLRef resourceDirectoryURL, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadFile(toWTFString(fileURL), toWTFString(resourceDirectoryURL), toImpl(userDataRef));
+}
+
+void WKPageLoadData(WKPageRef pageRef, WKDataRef dataRef, WKStringRef MIMETypeRef, WKStringRef encodingRef, WKURLRef baseURLRef)
+{
+    toImpl(pageRef)->loadData(toImpl(dataRef), toWTFString(MIMETypeRef), toWTFString(encodingRef), toWTFString(baseURLRef));
+}
+
+void WKPageLoadDataWithUserData(WKPageRef pageRef, WKDataRef dataRef, WKStringRef MIMETypeRef, WKStringRef encodingRef, WKURLRef baseURLRef, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadData(toImpl(dataRef), toWTFString(MIMETypeRef), toWTFString(encodingRef), toWTFString(baseURLRef), toImpl(userDataRef));
 }
 
 void WKPageLoadHTMLString(WKPageRef pageRef, WKStringRef htmlStringRef, WKURLRef baseURLRef)
@@ -73,9 +107,19 @@ void WKPageLoadHTMLString(WKPageRef pageRef, WKStringRef htmlStringRef, WKURLRef
     toImpl(pageRef)->loadHTMLString(toWTFString(htmlStringRef), toWTFString(baseURLRef));
 }
 
+void WKPageLoadHTMLStringWithUserData(WKPageRef pageRef, WKStringRef htmlStringRef, WKURLRef baseURLRef, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadHTMLString(toWTFString(htmlStringRef), toWTFString(baseURLRef), toImpl(userDataRef));
+}
+
 void WKPageLoadAlternateHTMLString(WKPageRef pageRef, WKStringRef htmlStringRef, WKURLRef baseURLRef, WKURLRef unreachableURLRef)
 {
     toImpl(pageRef)->loadAlternateHTMLString(toWTFString(htmlStringRef), toWTFString(baseURLRef), toWTFString(unreachableURLRef));
+}
+
+void WKPageLoadAlternateHTMLStringWithUserData(WKPageRef pageRef, WKStringRef htmlStringRef, WKURLRef baseURLRef, WKURLRef unreachableURLRef, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadAlternateHTMLString(toWTFString(htmlStringRef), toWTFString(baseURLRef), toWTFString(unreachableURLRef), toImpl(userDataRef));
 }
 
 void WKPageLoadPlainTextString(WKPageRef pageRef, WKStringRef plainTextStringRef)
@@ -83,9 +127,19 @@ void WKPageLoadPlainTextString(WKPageRef pageRef, WKStringRef plainTextStringRef
     toImpl(pageRef)->loadPlainTextString(toWTFString(plainTextStringRef));    
 }
 
+void WKPageLoadPlainTextStringWithUserData(WKPageRef pageRef, WKStringRef plainTextStringRef, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadPlainTextString(toWTFString(plainTextStringRef), toImpl(userDataRef));    
+}
+
 void WKPageLoadWebArchiveData(WKPageRef pageRef, WKDataRef webArchiveDataRef)
 {
     toImpl(pageRef)->loadWebArchiveData(toImpl(webArchiveDataRef));
+}
+
+void WKPageLoadWebArchiveDataWithUserData(WKPageRef pageRef, WKDataRef webArchiveDataRef, WKTypeRef userDataRef)
+{
+    toImpl(pageRef)->loadWebArchiveData(toImpl(webArchiveDataRef), toImpl(userDataRef));
 }
 
 void WKPageStopLoading(WKPageRef pageRef)
@@ -262,6 +316,12 @@ WKStringRef WKPageGetSessionHistoryURLValueType()
 {
     static WebString* sessionHistoryURLValueType = WebString::create("SessionHistoryURL").leakRef();
     return toAPI(sessionHistoryURLValueType);
+}
+
+WKStringRef WKPageGetSessionBackForwardListItemValueType()
+{
+    static WebString* sessionBackForwardListValueType = WebString::create("SessionBackForwardListItem").leakRef();
+    return toAPI(sessionBackForwardListValueType);
 }
 
 WKDataRef WKPageCopySessionState(WKPageRef pageRef, void *context, WKPageSessionStateFilterCallback filter)
@@ -811,7 +871,100 @@ void WKPageSetMayStartMediaWhenInWindow(WKPageRef pageRef, bool mayStartMedia)
     toImpl(pageRef)->setMayStartMediaWhenInWindow(mayStartMedia);
 }
 
+
+void WKPageSelectContextMenuItem(WKPageRef page, WKContextMenuItemRef item)
+{
+#if ENABLE(CONTEXT_MENUS)
+    toImpl(page)->contextMenuItemSelected(*(toImpl(item)->data()));
+#endif
+}
+
+WKScrollPinningBehavior WKPageGetScrollPinningBehavior(WKPageRef page)
+{
+    ScrollPinningBehavior pinning = toImpl(page)->scrollPinningBehavior();
+    
+    switch (pinning) {
+    case WebCore::ScrollPinningBehavior::DoNotPin:
+        return kWKScrollPinningBehaviorDoNotPin;
+    case WebCore::ScrollPinningBehavior::PinToTop:
+        return kWKScrollPinningBehaviorPinToTop;
+    case WebCore::ScrollPinningBehavior::PinToBottom:
+        return kWKScrollPinningBehaviorPinToBottom;
+    }
+    
+    ASSERT_NOT_REACHED();
+    return kWKScrollPinningBehaviorDoNotPin;
+}
+
+void WKPageSetScrollPinningBehavior(WKPageRef page, WKScrollPinningBehavior pinning)
+{
+    ScrollPinningBehavior corePinning = ScrollPinningBehavior::DoNotPin;
+
+    switch (pinning) {
+    case kWKScrollPinningBehaviorDoNotPin:
+        corePinning = ScrollPinningBehavior::DoNotPin;
+        break;
+    case kWKScrollPinningBehaviorPinToTop:
+        corePinning = ScrollPinningBehavior::PinToTop;
+        break;
+    case kWKScrollPinningBehaviorPinToBottom:
+        corePinning = ScrollPinningBehavior::PinToBottom;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+    
+    toImpl(page)->setScrollPinningBehavior(corePinning);
+}
+
+
+
+// -- DEPRECATED --
+
 void WKPageSetInvalidMessageFunction(WKPageInvalidMessageFunction)
 {
     // FIXME: Remove this function when doing so won't break WebKit nightlies.
 }
+
+WKStringRef WKPageGetPluginInformationBundleIdentifierKey()
+{
+    return WKPluginInformationBundleIdentifierKey();
+}
+
+WKStringRef WKPageGetPluginInformationBundleVersionKey()
+{
+    return WKPluginInformationBundleVersionKey();
+}
+
+WKStringRef WKPageGetPluginInformationDisplayNameKey()
+{
+    return WKPluginInformationDisplayNameKey();
+}
+
+WKStringRef WKPageGetPluginInformationFrameURLKey()
+{
+    return WKPluginInformationFrameURLKey();
+}
+
+WKStringRef WKPageGetPluginInformationMIMETypeKey()
+{
+    return WKPluginInformationMIMETypeKey();
+}
+
+WKStringRef WKPageGetPluginInformationPageURLKey()
+{
+    return WKPluginInformationPageURLKey();
+}
+
+WKStringRef WKPageGetPluginInformationPluginspageAttributeURLKey()
+{
+    return WKPluginInformationPluginspageAttributeURLKey();
+}
+
+WKStringRef WKPageGetPluginInformationPluginURLKey()
+{
+    return WKPluginInformationPluginURLKey();
+}
+
+// -- DEPRECATED --
+

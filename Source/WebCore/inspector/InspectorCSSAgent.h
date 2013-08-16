@@ -47,7 +47,9 @@ class CSSStyleDeclaration;
 class CSSStyleRule;
 class CSSStyleSheet;
 class Document;
+class DocumentStyleSheetCollection;
 class Element;
+class InspectorCSSOMWrappers;
 class InspectorFrontend;
 class InstrumentingAgents;
 class NameNodeMap;
@@ -57,6 +59,7 @@ class SelectorProfile;
 class StyleResolver;
 class StyleRule;
 class UpdateRegionLayoutTask;
+class ChangeRegionOversetTask;
 
 #if ENABLE(INSPECTOR)
 
@@ -105,6 +108,8 @@ public:
     void willRemoveNamedFlow(Document*, WebKitNamedFlow*);
     void didUpdateRegionLayout(Document*, WebKitNamedFlow*);
     void regionLayoutUpdated(WebKitNamedFlow*, int documentNodeId);
+    void didChangeRegionOverset(Document*, WebKitNamedFlow*);
+    void regionOversetChanged(WebKitNamedFlow*, int documentNodeId);
 
     virtual void getComputedStyleForNode(ErrorString*, int nodeId, RefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSComputedStyleProperty> >&);
     virtual void getInlineStylesForNode(ErrorString*, int nodeId, RefPtr<TypeBuilder::CSS::CSSStyle>& inlineStyle, RefPtr<TypeBuilder::CSS::CSSStyle>& attributes);
@@ -113,6 +118,7 @@ public:
     virtual void getStyleSheet(ErrorString*, const String& styleSheetId, RefPtr<TypeBuilder::CSS::CSSStyleSheetBody>& result);
     virtual void getStyleSheetText(ErrorString*, const String& styleSheetId, String* result);
     virtual void setStyleSheetText(ErrorString*, const String& styleSheetId, const String& text);
+    virtual void setStyleText(ErrorString*, const RefPtr<InspectorObject>& styleId, const String& text, RefPtr<TypeBuilder::CSS::CSSStyle>& result);
     virtual void setPropertyText(ErrorString*, const RefPtr<InspectorObject>& styleId, int propertyIndex, const String& text, bool overwrite, RefPtr<TypeBuilder::CSS::CSSStyle>& result);
     virtual void toggleProperty(ErrorString*, const RefPtr<InspectorObject>& styleId, int propertyIndex, bool disable, RefPtr<TypeBuilder::CSS::CSSStyle>& result);
     virtual void setRuleSelector(ErrorString*, const RefPtr<InspectorObject>& ruleId, const String& selector, RefPtr<TypeBuilder::CSS::CSSRule>& result);
@@ -125,7 +131,7 @@ public:
     virtual void stopSelectorProfiler(ErrorString*, RefPtr<TypeBuilder::CSS::SelectorProfile>&);
 
     PassRefPtr<TypeBuilder::CSS::SelectorProfile> stopSelectorProfilerImpl(ErrorString*, bool needProfile);
-    void willMatchRule(StyleRule*, StyleResolver*);
+    void willMatchRule(StyleRule*, InspectorCSSOMWrappers&, DocumentStyleSheetCollection*);
     void didMatchRule(bool);
     void willProcessRule(StyleRule*, StyleResolver*);
     void didProcessRule();
@@ -133,6 +139,7 @@ public:
 private:
     class StyleSheetAction;
     class SetStyleSheetTextAction;
+    class SetStyleTextAction;
     class SetPropertyTextAction;
     class TogglePropertyAction;
     class SetRuleSelectorAction;
@@ -157,9 +164,10 @@ private:
     InspectorStyleSheet* assertStyleSheetForId(ErrorString*, const String&);
     TypeBuilder::CSS::StyleSheetOrigin::Enum detectOrigin(CSSStyleSheet* pageStyleSheet, Document* ownerDocument);
 
-    PassRefPtr<TypeBuilder::CSS::CSSRule> buildObjectForRule(CSSStyleRule*, StyleResolver*);
-    PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > buildArrayForRuleList(CSSRuleList*, StyleResolver*);
-    PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::RuleMatch> > buildArrayForMatchedRuleList(CSSRuleList*, StyleResolver*, Element*);
+    PassRefPtr<TypeBuilder::CSS::CSSRule> buildObjectForRule(StyleRule*, StyleResolver*);
+    PassRefPtr<TypeBuilder::CSS::CSSRule> buildObjectForRule(CSSStyleRule*);
+    PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > buildArrayForRuleList(CSSRuleList*);
+    PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::RuleMatch> > buildArrayForMatchedRuleList(const Vector<RefPtr<StyleRuleBase> >&, StyleResolver*, Element*);
     PassRefPtr<TypeBuilder::CSS::CSSStyle> buildObjectForAttributesStyle(Element*);
     PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::Region> > buildArrayForRegions(ErrorString*, PassRefPtr<NodeList>, int documentNodeId);
     PassRefPtr<TypeBuilder::CSS::NamedFlow> buildObjectForNamedFlow(ErrorString*, WebKitNamedFlow*, int documentNodeId);
@@ -184,6 +192,7 @@ private:
     NodeIdToForcedPseudoState m_nodeIdToForcedPseudoState;
     HashSet<int> m_namedFlowCollectionsRequested;
     OwnPtr<UpdateRegionLayoutTask> m_updateRegionLayoutTask;
+    OwnPtr<ChangeRegionOversetTask> m_changeRegionOversetTask;
 
     int m_lastStyleSheetId;
 

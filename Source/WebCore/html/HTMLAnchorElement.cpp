@@ -26,17 +26,23 @@
 
 #include "Attribute.h"
 #include "DNS.h"
+#include "EventHandler.h"
 #include "EventNames.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameLoaderTypes.h"
+#include "FrameSelection.h"
 #include "HTMLImageElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "KeyboardEvent.h"
 #include "MouseEvent.h"
 #include "PingLoader.h"
+#include "PlatformMouseEvent.h"
 #include "RenderImage.h"
+#include "ResourceRequest.h"
+#include "SVGImage.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
@@ -89,15 +95,38 @@ bool HTMLAnchorElement::supportsFocus() const
 
 bool HTMLAnchorElement::isMouseFocusable() const
 {
-    // Anchor elements should be mouse focusable, https://bugs.webkit.org/show_bug.cgi?id=26856
-#if !PLATFORM(GTK) && !PLATFORM(QT) && !PLATFORM(EFL)
+#if !(PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(QT))
+    // Only allow links with tabIndex or contentEditable to be mouse focusable.
+    // This is our rule for the Mac platform; on many other platforms we focus any link you click on.
     if (isLink())
-        // Only allow links with tabIndex or contentEditable to be mouse focusable.
         return HTMLElement::supportsFocus();
 #endif
 
-    // Allow tab index etc to control focus.
     return HTMLElement::isMouseFocusable();
+}
+
+static bool hasNonEmptyBox(RenderBoxModelObject* renderer)
+{
+    if (!renderer)
+        return false;
+
+    // Before calling absoluteRects, check for the common case where borderBoundingBox
+    // is non-empty, since this is a faster check and almost always returns true.
+    // FIXME: Why do we need to call absoluteRects at all?
+    if (!renderer->borderBoundingBox().isEmpty())
+        return true;
+
+    // FIXME: Since all we are checking is whether the rects are empty, could we just
+    // pass in 0,0 for the layout point instead of calling localToAbsolute?
+    Vector<IntRect> rects;
+    renderer->absoluteRects(rects, flooredLayoutPoint(renderer->localToAbsolute()));
+    size_t size = rects.size();
+    for (size_t i = 0; i < size; ++i) {
+        if (!rects[i].isEmpty())
+            return true;
+    }
+
+    return false;
 }
 
 bool HTMLAnchorElement::isKeyboardFocusable(KeyboardEvent* event) const
@@ -117,7 +146,7 @@ bool HTMLAnchorElement::isKeyboardFocusable(KeyboardEvent* event) const
     if (isInCanvasSubtree())
         return true;
 
-    return hasNonEmptyBoundingBox();
+    return hasNonEmptyBox(renderBoxModelObject());
 }
 
 static void appendServerMapMousePosition(StringBuilder& url, Event* event)
@@ -128,10 +157,10 @@ static void appendServerMapMousePosition(StringBuilder& url, Event* event)
     ASSERT(event->target());
     Node* target = event->target()->toNode();
     ASSERT(target);
-    if (!target->hasTagName(imgTag))
+    if (!isHTMLImageElement(target))
         return;
 
-    HTMLImageElement* imageElement = static_cast<HTMLImageElement*>(event->target()->toNode());
+    HTMLImageElement* imageElement = toHTMLImageElement(target);
     if (!imageElement || !imageElement->isServerMap())
         return;
 
@@ -210,14 +239,14 @@ void HTMLAnchorElement::setActive(bool down, bool pause)
 
     }
     
-    ContainerNode::setActive(down, pause);
+    HTMLElement::setActive(down, pause);
 }
 
 void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == hrefAttr) {
         bool wasLink = isLink();
-        setIsLink(!value.isNull());
+        setIsLink(!value.isNull() && !shouldProhibitLinks(this));
         if (wasLink != isLink())
             didAffectSelector(AffectedSelectorLink | AffectedSelectorVisited | AffectedSelectorEnabled);
         if (isLink()) {
@@ -243,7 +272,7 @@ void HTMLAnchorElement::accessKeyAction(bool sendMouseEvents)
 
 bool HTMLAnchorElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attribute.name() == hrefAttr || HTMLElement::isURLAttribute(attribute);
+    return attribute.name().localName() == hrefAttr || HTMLElement::isURLAttribute(attribute);
 }
 
 bool HTMLAnchorElement::canStartSelection() const
@@ -282,10 +311,7 @@ bool HTMLAnchorElement::hasRel(uint32_t relation) const
 
 void HTMLAnchorElement::setRel(const String& value)
 {
-    m_linkRelations = 0;
-    SpaceSplitString newLinkRelations(value, true);
-    // FIXME: Add link relations as they are implemented
-    if (newLinkRelations.contains("noreferrer"))
+    if (SpaceSplitString::spaceSplitStringContainsValue(value, "noreferrer", true))
         m_linkRelations |= RelationNoReferrer;
 }
 
@@ -308,7 +334,9 @@ String HTMLAnchorElement::target() const
 String HTMLAnchorElement::hash() const
 {
     String fragmentIdentifier = href().fragmentIdentifier();
-    return fragmentIdentifier.isEmpty() ? emptyString() : "#" + fragmentIdentifier;
+    if (fragmentIdentifier.isEmpty())
+        return emptyString();
+    return AtomicString(String("#" + fragmentIdentifier));
 }
 
 void HTMLAnchorElement::setHash(const String& value)
@@ -572,22 +600,19 @@ bool isLinkClick(Event* event)
     return event->type() == eventNames().clickEvent && (!event->isMouseEvent() || static_cast<MouseEvent*>(event)->button() != RightButton);
 }
 
+bool shouldProhibitLinks(Element* element)
+{
+#if ENABLE(SVG)
+    return isInSVGImage(element);
+#else
+    return false;
+#endif
+}
+
 bool HTMLAnchorElement::willRespondToMouseClickEvents()
 {
     return isLink() || HTMLElement::willRespondToMouseClickEvents();
 }
-
-#if ENABLE(MICRODATA)
-String HTMLAnchorElement::itemValueText() const
-{
-    return getURLAttribute(hrefAttr);
-}
-
-void HTMLAnchorElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(hrefAttr, value);
-}
-#endif
 
 typedef HashMap<const HTMLAnchorElement*, RefPtr<Element> > RootEditableElementMap;
 
@@ -601,7 +626,7 @@ Element* HTMLAnchorElement::rootEditableElementForSelectionOnMouseDown() const
 {
     if (!m_hasRootEditableElementForSelectionOnMouseDown)
         return 0;
-    return rootEditableElementMap().get(this).get();
+    return rootEditableElementMap().get(this);
 }
 
 void HTMLAnchorElement::clearRootEditableElementForSelectionOnMouseDown()

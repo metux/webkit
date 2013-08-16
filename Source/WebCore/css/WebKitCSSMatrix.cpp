@@ -31,7 +31,7 @@
 #include "CSSValueKeywords.h"
 #include "ExceptionCode.h"
 #include "StylePropertySet.h"
-#include "StyleResolver.h"
+#include "TransformFunctions.h"
 #include <wtf/MathExtras.h>
 
 namespace WebCore {
@@ -55,18 +55,18 @@ void WebKitCSSMatrix::setMatrixValue(const String& string, ExceptionCode& ec)
     if (string.isEmpty())
         return;
 
-    RefPtr<StylePropertySet> styleDeclaration = StylePropertySet::create();
+    RefPtr<MutableStylePropertySet> styleDeclaration = MutableStylePropertySet::create();
     if (CSSParser::parseValue(styleDeclaration.get(), CSSPropertyWebkitTransform, string, true, CSSStrictMode, 0)) {
         // Convert to TransformOperations. This can fail if a property
         // requires style (i.e., param uses 'ems' or 'exs')
         RefPtr<CSSValue> value = styleDeclaration->getPropertyCSSValue(CSSPropertyWebkitTransform);
 
         // Check for a "none" or empty transform. In these cases we can use the default identity matrix.
-        if (!value || (value->isPrimitiveValue() && (static_cast<CSSPrimitiveValue*>(value.get()))->getIdent() == CSSValueNone))
+        if (!value || (value->isPrimitiveValue() && (static_cast<CSSPrimitiveValue*>(value.get()))->getValueID() == CSSValueNone))
             return;
 
         TransformOperations operations;
-        if (!StyleResolver::createTransformOperations(value.get(), 0, 0, operations)) {
+        if (!transformsForValue(0, 0, value.get(), operations)) {
             ec = SYNTAX_ERR;
             return;
         }

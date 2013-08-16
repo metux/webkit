@@ -48,6 +48,7 @@
 #include "CustomFilterProgram.h"
 #include "CustomFilterValidatedProgram.h"
 #include "FECustomFilter.h"
+#include "GraphicsContext3D.h"
 #include "RenderView.h"
 #include "ValidatedCustomFilterOperation.h"
 #endif
@@ -162,7 +163,7 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject
         if (!node->isSVGElement())
             continue;
 
-        SVGElement* element = static_cast<SVGElement*>(node);
+        SVGElement* element = toSVGElement(node);
         if (!element->isFilterEffect())
             continue;
 
@@ -363,7 +364,7 @@ bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations&
         if (effect) {
             // Unlike SVG, filters applied here should not clip to their primitive subregions.
             effect->setClipsToBounds(false);
-            effect->setColorSpace(ColorSpaceDeviceRGB);
+            effect->setOperatingColorSpace(ColorSpaceDeviceRGB);
             
             if (filterOperation->getOperationType() != FilterOperation::REFERENCE) {
                 effect->inputEffects().append(previousEffect);
@@ -469,8 +470,17 @@ bool FilterEffectRendererHelper::prepareFilterEffect(RenderLayer* renderLayer, c
     }
     return true;
 }
-   
-GraphicsContext* FilterEffectRendererHelper::beginFilterEffect(GraphicsContext* oldContext)
+
+GraphicsContext* FilterEffectRendererHelper::filterContext() const
+{
+    if (!m_haveFilterEffect)
+        return 0;
+
+    FilterEffectRenderer* filter = m_renderLayer->filterRenderer();
+    return filter->inputContext();
+}
+
+bool FilterEffectRendererHelper::beginFilterEffect()
 {
     ASSERT(m_renderLayer);
     
@@ -481,21 +491,20 @@ GraphicsContext* FilterEffectRendererHelper::beginFilterEffect(GraphicsContext* 
     if (!sourceGraphicsContext || !isFilterSizeValid(filter->filterRegion())) {
         // Disable the filters and continue.
         m_haveFilterEffect = false;
-        return oldContext;
+        return false;
     }
-    
-    m_savedGraphicsContext = oldContext;
     
     // Translate the context so that the contents of the layer is captuterd in the offscreen memory buffer.
     sourceGraphicsContext->save();
     sourceGraphicsContext->translate(-m_paintOffset.x(), -m_paintOffset.y());
     sourceGraphicsContext->clearRect(m_repaintRect);
     sourceGraphicsContext->clip(m_repaintRect);
-    
-    return sourceGraphicsContext;
+
+    m_startedFilterEffect = true;
+    return true;
 }
 
-GraphicsContext* FilterEffectRendererHelper::applyFilterEffect()
+void FilterEffectRendererHelper::applyFilterEffect(GraphicsContext* destinationContext)
 {
     ASSERT(m_haveFilterEffect && m_renderLayer->filterRenderer());
     FilterEffectRenderer* filter = m_renderLayer->filterRenderer();
@@ -507,11 +516,9 @@ GraphicsContext* FilterEffectRendererHelper::applyFilterEffect()
     LayoutRect destRect = filter->outputRect();
     destRect.move(m_paintOffset.x(), m_paintOffset.y());
     
-    m_savedGraphicsContext->drawImageBuffer(filter->output(), m_renderLayer->renderer()->style()->colorSpace(), pixelSnappedIntRect(destRect), CompositeSourceOver);
+    destinationContext->drawImageBuffer(filter->output(), m_renderLayer->renderer()->style()->colorSpace(), pixelSnappedIntRect(destRect), CompositeSourceOver);
     
     filter->clearIntermediateResults();
-    
-    return m_savedGraphicsContext;
 }
 
 } // namespace WebCore

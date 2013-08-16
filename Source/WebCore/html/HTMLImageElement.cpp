@@ -26,14 +26,18 @@
 #include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
+#include "CachedImage.h"
 #include "EventNames.h"
 #include "FrameView.h"
+#include "HTMLAnchorElement.h"
 #include "HTMLDocument.h"
 #include "HTMLFormElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
+#include "Page.h"
 #include "RenderImage.h"
 #include "ScriptEventListener.h"
+#include <wtf/NotFound.h>
 
 using namespace std;
 
@@ -85,26 +89,31 @@ bool HTMLImageElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLImageElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLImageElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == widthAttr)
-        addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
-    else if (attribute.name() == heightAttr)
-        addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
-    else if (attribute.name() == borderAttr)
-        applyBorderAttributeToStyle(attribute, style);
-    else if (attribute.name() == vspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attribute.value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attribute.value());
-    } else if (attribute.name() == hspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attribute.value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attribute.value());
-    } else if (attribute.name() == alignAttr)
-        applyAlignmentAttributeToStyle(attribute, style);
-    else if (attribute.name() == valignAttr)
-        addPropertyToPresentationAttributeStyle(style, CSSPropertyVerticalAlign, attribute.value());
+    if (name == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, value);
+    else if (name == heightAttr)
+        addHTMLLengthToStyle(style, CSSPropertyHeight, value);
+    else if (name == borderAttr)
+        applyBorderAttributeToStyle(value, style);
+    else if (name == vspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginTop, value);
+        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, value);
+    } else if (name == hspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, value);
+        addHTMLLengthToStyle(style, CSSPropertyMarginRight, value);
+    } else if (name == alignAttr)
+        applyAlignmentAttributeToStyle(value, style);
+    else if (name == valignAttr)
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyVerticalAlign, value);
     else
-        HTMLElement::collectStyleForPresentationAttribute(attribute, style);
+        HTMLElement::collectStyleForPresentationAttribute(name, value, style);
+}
+
+const AtomicString& HTMLImageElement::imageSourceURL() const
+{
+    return m_bestFitImageURL.isEmpty() ? fastGetAttribute(srcAttr) : m_bestFitImageURL;
 }
 
 void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -112,12 +121,14 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
     if (name == altAttr) {
         if (renderer() && renderer()->isImage())
             toRenderImage(renderer())->updateAltText();
-    } else if (name == srcAttr)
+    } else if (name == srcAttr || name == srcsetAttr) {
+        float deviceScaleFactor = 1.0;
+        if (Page* page = document()->page())
+            deviceScaleFactor = page->deviceScaleFactor();
+        m_bestFitImageURL = bestFitSourceForImageAttributes(deviceScaleFactor, fastGetAttribute(srcAttr), fastGetAttribute(srcsetAttr));
         m_imageLoader.updateFromElementIgnoringPreviousError();
-    else if (name == usemapAttr)
-        setIsLink(!value.isNull());
-    else if (name == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, name, value));
+    } else if (name == usemapAttr)
+        setIsLink(!value.isNull() && !shouldProhibitLinks(this));
     else if (name == onbeforeloadAttr)
         setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, name, value));
     else if (name == compositeAttr) {
@@ -125,8 +136,22 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
         BlendMode blendOp = BlendModeNormal;
         if (!parseCompositeAndBlendOperator(value, m_compositeOperator, blendOp))
             m_compositeOperator = CompositeSourceOver;
-    } else
+    } else {
+        if (name == nameAttr) {
+            bool willHaveName = !value.isNull();
+            if (hasName() != willHaveName && inDocument() && document()->isHTMLDocument()) {
+                HTMLDocument* document = toHTMLDocument(this->document());
+                const AtomicString& id = getIdAttribute();
+                if (!id.isEmpty() && id != getNameAttribute()) {
+                    if (willHaveName)
+                        document->documentNamedItemMap().add(id.impl(), this);
+                    else
+                        document->documentNamedItemMap().remove(id.impl(), this);
+                }
+            }
+        }
         HTMLElement::parseAttribute(name, value);
+    }
 }
 
 String HTMLImageElement::altText() const
@@ -159,9 +184,9 @@ bool HTMLImageElement::canStartSelection() const
     return false;
 }
 
-void HTMLImageElement::attach()
+void HTMLImageElement::attach(const AttachContext& context)
 {
-    HTMLElement::attach();
+    HTMLElement::attach(context);
 
     if (renderer() && renderer()->isImage() && !m_imageLoader.hasPendingBeforeLoadEvent()) {
         RenderImage* renderImage = toRenderImage(renderer());
@@ -182,8 +207,8 @@ Node::InsertionNotificationRequest HTMLImageElement::insertedInto(ContainerNode*
     if (!m_form) {
         // m_form can be non-null if it was set in constructor.
         for (ContainerNode* ancestor = parentNode(); ancestor; ancestor = ancestor->parentNode()) {
-            if (ancestor->hasTagName(formTag)) {
-                m_form = static_cast<HTMLFormElement*>(ancestor);
+            if (isHTMLFormElement(ancestor)) {
+                m_form = toHTMLFormElement(ancestor);
                 m_form->registerImgElement(this);
                 break;
             }
@@ -362,26 +387,6 @@ bool HTMLImageElement::isServerMap() const
         return false;
 
     return document()->completeURL(stripLeadingAndTrailingHTMLSpaces(usemap)).isEmpty();
-}
-
-#if ENABLE(MICRODATA)
-String HTMLImageElement::itemValueText() const
-{
-    return getURLAttribute(srcAttr);
-}
-
-void HTMLImageElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(srcAttr, value);
-}
-#endif
-
-void HTMLImageElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    HTMLElement::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_imageLoader, "imageLoader");
-    info.addMember(m_form, "form");
 }
 
 }

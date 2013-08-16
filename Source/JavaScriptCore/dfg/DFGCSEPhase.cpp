@@ -28,6 +28,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "DFGEdgeUsesStructure.h"
 #include "DFGGraph.h"
 #include "DFGPhase.h"
 #include "JSCellInlines.h"
@@ -35,19 +36,27 @@
 
 namespace JSC { namespace DFG {
 
+enum CSEMode { NormalCSE, StoreElimination };
+
+template<CSEMode cseMode>
 class CSEPhase : public Phase {
 public:
     CSEPhase(Graph& graph)
-        : Phase(graph, "common subexpression elimination")
+        : Phase(graph, cseMode == NormalCSE ? "common subexpression elimination" : "store elimination")
     {
     }
     
     bool run()
     {
+        ASSERT((cseMode == NormalCSE) == (m_graph.m_fixpointState == FixpointNotConverged));
+        ASSERT(m_graph.m_fixpointState != BeforeFixpoint);
+        
         m_changed = false;
         
-        for (unsigned block = 0; block < m_graph.m_blocks.size(); ++block)
-            performBlockCSE(m_graph.m_blocks[block].get());
+        m_graph.clearReplacements();
+        
+        for (unsigned blockIndex = 0; blockIndex < m_graph.numBlocks(); ++blockIndex)
+            performBlockCSE(m_graph.block(blockIndex));
         
         return m_changed;
     }
@@ -94,9 +103,6 @@ private:
             if (otherNode == child1 || otherNode == child2 || otherNode == child3)
                 break;
 
-            if (!otherNode->shouldGenerate())
-                continue;
-            
             if (node->op() != otherNode->op())
                 continue;
             
@@ -132,11 +138,8 @@ private:
             Node* otherNode = m_currentBlock->at(i);
             if (otherNode == node->child1())
                 return 0;
-            if (!otherNode->shouldGenerate())
-                continue;
             switch (otherNode->op()) {
             case Int32ToDouble:
-            case ForwardInt32ToDouble:
                 if (otherNode->child1() == node->child1())
                     return otherNode;
                 break;
@@ -154,9 +157,6 @@ private:
             if (otherNode->op() != JSConstant)
                 continue;
             
-            if (!otherNode->shouldGenerate())
-                continue;
-            
             if (otherNode->constantNumber() != node->constantNumber())
                 continue;
             
@@ -172,9 +172,6 @@ private:
             if (otherNode->op() != WeakJSConstant)
                 continue;
             
-            if (!otherNode->shouldGenerate())
-                continue;
-            
             if (otherNode->weakConstant() != node->weakConstant())
                 continue;
             
@@ -187,8 +184,6 @@ private:
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             if (node->codeOrigin.inlineCallFrame != inlineCallFrame)
                 continue;
             switch (node->op()) {
@@ -207,8 +202,6 @@ private:
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetArrayLength:
                 if (node->child1() == array)
@@ -234,8 +227,6 @@ private:
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetGlobalVar:
                 if (node->registerPointer() == registerPointer)
@@ -258,15 +249,13 @@ private:
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
-            case GetScopedVar: {
+            case GetClosureVar: {
                 if (node->child1() == registers && node->varNumber() == varNumber)
                     return node;
                 break;
             } 
-            case PutScopedVar: {
+            case PutClosureVar: {
                 if (node->child2() == registers && node->varNumber() == varNumber)
                     return node->child3().node();
                 break;
@@ -291,8 +280,6 @@ private:
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GlobalVarWatchpoint:
                 if (node->registerPointer() == registerPointer)
@@ -310,16 +297,25 @@ private:
         }
         return false;
     }
+
+    bool varInjectionWatchpointElimination()
+    {
+        for (unsigned i = m_indexInBlock; i--;) {
+            Node* node = m_currentBlock->at(i);
+            if (node->op() == VarInjectionWatchpoint)
+                return true;
+            if (m_graph.clobbersWorld(node))
+                break;
+        }
+        return false;
+    }
     
     Node* globalVarStoreElimination(WriteBarrier<Unknown>* registerPointer)
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case PutGlobalVar:
-            case PutGlobalVarCheck:
                 if (node->registerPointer() == registerPointer)
                     return node;
                 break;
@@ -342,16 +338,14 @@ private:
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
-            case PutScopedVar: {
+            case PutClosureVar: {
                 if (node->child1() == scope && node->child2() == registers && node->varNumber() == varNumber)
                     return node;
                 break;
             }
                 
-            case GetScopedVar: {
+            case GetClosureVar: {
                 // Let's be conservative.
                 if (node->varNumber() == varNumber)
                     return 0;
@@ -382,8 +376,6 @@ private:
             if (node == child1 || node == canonicalize(child2)) 
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetByVal:
                 if (!m_graph.byValIsPure(node))
@@ -400,6 +392,8 @@ private:
                 // We must assume that the PutByVal will clobber the location we're getting from.
                 // FIXME: We can do better; if we know that the PutByVal is accessing an array of a
                 // different type than the GetByVal, then we know that they won't clobber each other.
+                // ... except of course for typed arrays, where all typed arrays clobber all other
+                // typed arrays!  An Int32Array can alias a Float64Array for example, and so on.
                 return 0;
             }
             case PutStructure:
@@ -451,18 +445,14 @@ private:
             if (node == child1) 
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case CheckStructure:
-            case ForwardCheckStructure:
                 if (node->child1() == child1
                     && structureSet.isSupersetOf(node->structureSet()))
                     return true;
                 break;
                 
             case StructureTransitionWatchpoint:
-            case ForwardStructureTransitionWatchpoint:
                 if (node->child1() == child1
                     && structureSet.contains(node->structure()))
                     return true;
@@ -512,11 +502,8 @@ private:
             if (node == child1) 
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case CheckStructure:
-            case ForwardCheckStructure:
                 if (node->child1() == child1
                     && node->structureSet().containsOnly(structure))
                     return true;
@@ -541,7 +528,6 @@ private:
                 return false;
                 
             case StructureTransitionWatchpoint:
-            case ForwardStructureTransitionWatchpoint:
                 if (node->structure() == structure && node->child1() == child1)
                     return true;
                 break;
@@ -567,11 +553,8 @@ private:
             Node* node = m_currentBlock->at(i);
             if (node == child1)
                 break;
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case CheckStructure:
-            case ForwardCheckStructure:
                 return 0;
                 
             case PhantomPutStructure:
@@ -593,7 +576,6 @@ private:
             case NewFunctionExpression:
             case CreateActivation:
             case TearOffActivation:
-            case StrCat:
             case ToPrimitive:
             case NewRegexp:
             case NewArrayBuffer:
@@ -603,6 +585,15 @@ private:
             case AllocatePropertyStorage:
             case ReallocatePropertyStorage:
             case TypeOf:
+            case ToString:
+            case NewStringObject:
+            case MakeRope:
+                return 0;
+                
+            // This either exits, causes a GC (lazy string allocation), or clobbers
+            // the world. The chances of it not doing any of those things are so
+            // slim that we might as well not even try to reason about it.
+            case GetByVal:
                 return 0;
                 
             case GetIndexedPropertyStorage:
@@ -615,6 +606,8 @@ private:
             }
             if (m_graph.clobbersWorld(node) || node->canExit())
                 return 0;
+            if (edgesUseStructure(m_graph, node))
+                return 0;
         }
         return 0;
     }
@@ -626,8 +619,6 @@ private:
             if (node == child1)
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetByOffset:
                 if (node->child1() == child1
@@ -673,8 +664,6 @@ private:
             if (node == child1)
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetByOffset:
                 if (m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber == identifierNumber)
@@ -718,8 +707,6 @@ private:
             if (node == child1) 
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetButterfly:
                 if (node->child1() == child1)
@@ -775,8 +762,6 @@ private:
             if (node == child1) 
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case PutByOffset:
             case PutStructure:
@@ -811,8 +796,6 @@ private:
             if (node == child1) 
                 break;
 
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetIndexedPropertyStorage: {
                 if (node->child1() == child1 && node->arrayMode() == arrayMode)
@@ -839,8 +822,6 @@ private:
     {
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             if (node->codeOrigin.inlineCallFrame != inlineCallFrame)
                 continue;
             switch (node->op()) {
@@ -864,8 +845,6 @@ private:
         
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetLocal:
                 if (node->local() == local) {
@@ -888,7 +867,7 @@ private:
                 }
                 break;
                 
-            case PutScopedVar:
+            case PutClosureVar:
                 if (static_cast<VirtualRegister>(node->varNumber()) == local)
                     return 0;
                 break;
@@ -920,8 +899,6 @@ private:
         SetLocalStoreEliminationResult result;
         for (unsigned i = m_indexInBlock; i--;) {
             Node* node = m_currentBlock->at(i);
-            if (!node->shouldGenerate())
-                continue;
             switch (node->op()) {
             case GetLocal:
             case Flush:
@@ -939,12 +916,10 @@ private:
                     break;
                 if (node != expectedNode)
                     result.mayBeAccessed = true;
-                if (node->refCount() > 1)
-                    result.mayBeAccessed = true;
                 return result;
             }
                 
-            case GetScopedVar:
+            case GetClosureVar:
                 if (static_cast<VirtualRegister>(node->varNumber()) == local)
                     result.mayBeAccessed = true;
                 break;
@@ -969,7 +944,7 @@ private:
                 
             case GetByVal:
                 // If this is accessing arguments then it's potentially accessing locals.
-                if (node->child1()->shouldSpeculateArguments())
+                if (node->arrayMode().type() == Array::Arguments)
                     result.mayBeAccessed = true;
                 break;
                 
@@ -1002,40 +977,33 @@ private:
             Edge edge = node->children.child(i);
             if (!edge)
                 continue;
+            if (edge.useKind() != UntypedUse)
+                continue; // Keep the type check.
             if (edge->flags() & NodeRelevantToOSR)
                 continue;
             
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
             dataLog("   Eliminating edge @", m_currentNode->index(), " -> @", edge->index());
 #endif
-            m_graph.deref(edge);
-            node->children.removeEdgeFromBag(i--);
+            node->children.removeEdge(i--);
             m_changed = true;
         }
     }
     
-    enum PredictionHandlingMode { RequireSamePrediction, AllowPredictionMismatch };
-    bool setReplacement(Node* replacement, PredictionHandlingMode predictionHandlingMode = RequireSamePrediction)
+    bool setReplacement(Node* replacement)
     {
         if (!replacement)
-            return false;
-        
-        // Be safe. Don't try to perform replacements if the predictions don't
-        // agree.
-        if (predictionHandlingMode == RequireSamePrediction
-            && m_currentNode->prediction() != replacement->prediction())
             return false;
         
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLogF("   Replacing @%u -> @%u", m_currentNode->index(), replacement->index());
 #endif
         
-        m_currentNode->setOpAndDefaultFlags(Phantom);
-        m_currentNode->setRefCount(1);
+        m_currentNode->convertToPhantom();
         eliminateIrrelevantPhantomChildren(m_currentNode);
         
         // At this point we will eliminate all references to this node.
-        m_currentNode->replacement = replacement;
+        m_currentNode->misc.replacement = replacement;
         
         m_changed = true;
         
@@ -1048,9 +1016,8 @@ private:
         dataLogF("   Eliminating @%u", m_currentNode->index());
 #endif
         
-        ASSERT(m_currentNode->refCount() == 1);
         ASSERT(m_currentNode->mustGenerate());
-        m_currentNode->setOpAndDefaultFlags(Phantom);
+        m_currentNode->convertToPhantom();
         eliminateIrrelevantPhantomChildren(m_currentNode);
         
         m_changed = true;
@@ -1060,10 +1027,8 @@ private:
     {
         if (!node)
             return;
-        if (node->refCount() != 1)
-            return;
         ASSERT(node->mustGenerate());
-        node->setOpAndDefaultFlags(phantomType);
+        node->setOpAndDefaultNonExitFlags(phantomType);
         if (phantomType == Phantom)
             eliminateIrrelevantPhantomChildren(node);
         
@@ -1072,30 +1037,21 @@ private:
     
     void performNodeCSE(Node* node)
     {
-        m_graph.performSubstitution(node);
+        if (cseMode == NormalCSE)
+            m_graph.performSubstitution(node);
         
         if (node->op() == SetLocal)
             node->child1()->mergeFlags(NodeRelevantToOSR);
-        
-        if (!node->shouldGenerate())
-            return;
         
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLogF("   %s @%u: ", Graph::opName(node->op()), node->index());
 #endif
         
-        // NOTE: there are some nodes that we deliberately don't CSE even though we
-        // probably could, like StrCat and ToPrimitive. That's because there is no
-        // evidence that doing CSE on these nodes would result in a performance
-        // progression. Hence considering these nodes in CSE would just mean that this
-        // code does more work with no win. Of course, we may want to reconsider this,
-        // since StrCat is trivially CSE-able. It's not trivially doable for
-        // ToPrimitive, but we could change that with some speculations if we really
-        // needed to.
-        
         switch (node->op()) {
         
         case Identity:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(node->child1().node());
             break;
             
@@ -1110,6 +1066,7 @@ private:
         case ArithSub:
         case ArithNegate:
         case ArithMul:
+        case ArithIMul:
         case ArithMod:
         case ArithDiv:
         case ArithAbs:
@@ -1128,24 +1085,32 @@ private:
         case LogicalNot:
         case SkipTopScope:
         case SkipScope:
-        case GetScopeRegisters:
+        case GetClosureRegisters:
         case GetScope:
         case TypeOf:
         case CompareEqConstant:
         case ValueToInt32:
+        case MakeRope:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(pureCSE(node));
             break;
             
         case Int32ToDouble:
-        case ForwardInt32ToDouble:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(int32ToDoubleCSE(node));
             break;
             
         case GetCallee:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(getCalleeLoadElimination(node->codeOrigin.inlineCallFrame));
             break;
 
         case GetLocal: {
+            if (cseMode == StoreElimination)
+                break;
             VariableAccessData* variableAccessData = node->variableAccessData();
             if (!variableAccessData->isCaptured())
                 break;
@@ -1164,16 +1129,16 @@ private:
             
             // If we replace a GetLocal with a GetLocalUnlinked, then turn the GetLocalUnlinked
             // into a GetLocal.
-            if (relevantLocalOp->op() == GetLocalUnlinked) {
+            if (relevantLocalOp->op() == GetLocalUnlinked)
                 relevantLocalOp->convertToGetLocal(variableAccessData, phi);
-                m_graph.ref(phi);
-            }
 
             m_changed = true;
             break;
         }
             
         case GetLocalUnlinked: {
+            if (cseMode == StoreElimination)
+                break;
             Node* relevantLocalOpIgnored;
             setReplacement(getLocalLoadElimination(node->unlinkedLocal(), relevantLocalOpIgnored, true));
             break;
@@ -1188,7 +1153,7 @@ private:
             ASSERT(replacement->variableAccessData() == variableAccessData);
             // FIXME: We should be able to remove SetLocals that can exit; we just need
             // to replace them with appropriate type checks.
-            if (m_graph.m_fixpointState == FixpointNotConverged) {
+            if (cseMode == NormalCSE) {
                 // Need to be conservative at this time; if the SetLocal has any chance of performing
                 // any speculations then we cannot do anything.
                 if (variableAccessData->isCaptured()) {
@@ -1213,36 +1178,40 @@ private:
             if (result.mayBeAccessed || result.mayClobberWorld)
                 break;
             ASSERT(replacement->op() == SetLocal);
-            ASSERT(replacement->refCount() == 1);
-            ASSERT(replacement->shouldGenerate());
             // FIXME: Investigate using mayExit as a further optimization.
-            node->setOpAndDefaultFlags(Phantom);
+            node->convertToPhantom();
             Node* dataNode = replacement->child1().node();
             ASSERT(dataNode->hasResult());
-            m_graph.clearAndDerefChild1(node);
-            node->children.child1() = Edge(dataNode);
-            m_graph.ref(dataNode);
+            node->child1() = Edge(dataNode);
             m_graph.dethread();
             m_changed = true;
             break;
         }
             
         case JSConstant:
+            if (cseMode == StoreElimination)
+                break;
             // This is strange, but necessary. Some phases will convert nodes to constants,
             // which may result in duplicated constants. We use CSE to clean this up.
-            setReplacement(constantCSE(node), AllowPredictionMismatch);
+            setReplacement(constantCSE(node));
             break;
             
         case WeakJSConstant:
+            if (cseMode == StoreElimination)
+                break;
             // FIXME: have CSE for weak constants against strong constants and vice-versa.
             setReplacement(weakConstantCSE(node));
             break;
             
         case GetArrayLength:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(getArrayLengthElimination(node->child1().node()));
             break;
 
         case GetMyScope:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(getMyScopeLoadElimination(node->codeOrigin.inlineCallFrame));
             break;
             
@@ -1254,6 +1223,8 @@ private:
         case CompareGreater:
         case CompareGreaterEq:
         case CompareEq: {
+            if (cseMode == StoreElimination)
+                break;
             if (m_graph.isPredictedNumerical(node)) {
                 Node* replacement = pureCSE(node);
                 if (replacement && m_graph.isPredictedNumerical(replacement))
@@ -1265,39 +1236,55 @@ private:
         // Finally handle heap accesses. These are not quite pure, but we can still
         // optimize them provided that some subtle conditions are met.
         case GetGlobalVar:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(globalVarLoadElimination(node->registerPointer()));
             break;
 
-        case GetScopedVar: {
+        case GetClosureVar: {
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(scopedVarLoadElimination(node->child1().node(), node->varNumber()));
             break;
         }
 
         case GlobalVarWatchpoint:
+            if (cseMode == StoreElimination)
+                break;
             if (globalVarWatchpointElimination(node->registerPointer()))
                 eliminate();
             break;
             
+        case VarInjectionWatchpoint:
+            if (cseMode == StoreElimination)
+                break;
+            if (varInjectionWatchpointElimination())
+                eliminate();
+            break;
+            
         case PutGlobalVar:
-        case PutGlobalVarCheck:
-            if (m_graph.m_fixpointState == FixpointNotConverged)
+            if (cseMode == NormalCSE)
                 break;
             eliminate(globalVarStoreElimination(node->registerPointer()));
             break;
             
-        case PutScopedVar: {
-            if (m_graph.m_fixpointState == FixpointNotConverged)
+        case PutClosureVar: {
+            if (cseMode == NormalCSE)
                 break;
             eliminate(scopedVarStoreElimination(node->child1().node(), node->child2().node(), node->varNumber()));
             break;
         }
 
         case GetByVal:
+            if (cseMode == StoreElimination)
+                break;
             if (m_graph.byValIsPure(node))
                 setReplacement(getByValLoadElimination(node->child1().node(), node->child2().node()));
             break;
             
         case PutByVal: {
+            if (cseMode == StoreElimination)
+                break;
             Edge child1 = m_graph.varArgChild(node, 0);
             Edge child2 = m_graph.varArgChild(node, 1);
             if (node->arrayMode().canCSEStorage()) {
@@ -1310,53 +1297,67 @@ private:
         }
             
         case CheckStructure:
-        case ForwardCheckStructure:
+            if (cseMode == StoreElimination)
+                break;
             if (checkStructureElimination(node->structureSet(), node->child1().node()))
                 eliminate();
             break;
             
         case StructureTransitionWatchpoint:
-        case ForwardStructureTransitionWatchpoint:
+            if (cseMode == StoreElimination)
+                break;
             if (structureTransitionWatchpointElimination(node->structure(), node->child1().node()))
                 eliminate();
             break;
             
         case PutStructure:
-            if (m_graph.m_fixpointState == FixpointNotConverged)
+            if (cseMode == NormalCSE)
                 break;
             eliminate(putStructureStoreElimination(node->child1().node()), PhantomPutStructure);
             break;
 
         case CheckFunction:
+            if (cseMode == StoreElimination)
+                break;
             if (checkFunctionElimination(node->function(), node->child1().node()))
                 eliminate();
             break;
                 
         case CheckExecutable:
+            if (cseMode == StoreElimination)
+                break;
             if (checkExecutableElimination(node->executable(), node->child1().node()))
                 eliminate();
             break;
                 
         case CheckArray:
+            if (cseMode == StoreElimination)
+                break;
             if (checkArrayElimination(node->child1().node(), node->arrayMode()))
                 eliminate();
             break;
             
         case GetIndexedPropertyStorage: {
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(getIndexedPropertyStorageLoadElimination(node->child1().node(), node->arrayMode()));
             break;
         }
 
         case GetButterfly:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(getPropertyStorageLoadElimination(node->child1().node()));
             break;
 
         case GetByOffset:
+            if (cseMode == StoreElimination)
+                break;
             setReplacement(getByOffsetLoadElimination(m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber, node->child1().node()));
             break;
             
         case PutByOffset:
-            if (m_graph.m_fixpointState == FixpointNotConverged)
+            if (cseMode == NormalCSE)
                 break;
             eliminate(putByOffsetStoreElimination(m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber, node->child1().node()));
             break;
@@ -1389,20 +1390,16 @@ private:
         for (unsigned i = 0; i < LastNodeType; ++i)
             m_lastSeen[i] = UINT_MAX;
         
-        // All Phis need to already be marked as relevant to OSR, and have their
-        // replacements cleared, so we don't get confused while doing substitutions on
-        // GetLocal's.
-        for (unsigned i = 0; i < block->phis.size(); ++i) {
-            ASSERT(block->phis[i]->flags() & NodeRelevantToOSR);
-            block->phis[i]->replacement = 0;
+        // All Phis need to already be marked as relevant to OSR.
+        if (!ASSERT_DISABLED) {
+            for (unsigned i = 0; i < block->phis.size(); ++i)
+                ASSERT(block->phis[i]->flags() & NodeRelevantToOSR);
         }
         
         // Make all of my SetLocal and GetLocal nodes relevant to OSR, and do some other
         // necessary bookkeeping.
         for (unsigned i = 0; i < block->size(); ++i) {
             Node* node = block->at(i);
-            
-            node->replacement = 0;
             
             switch (node->op()) {
             case SetLocal:
@@ -1419,6 +1416,12 @@ private:
             m_currentNode = block->at(m_indexInBlock);
             performNodeCSE(m_currentNode);
         }
+        
+        if (!ASSERT_DISABLED && cseMode == StoreElimination) {
+            // Nobody should have replacements set.
+            for (unsigned i = 0; i < block->size(); ++i)
+                ASSERT(!block->at(i)->misc.replacement);
+        }
     }
     
     BasicBlock* m_currentBlock;
@@ -1431,7 +1434,13 @@ private:
 bool performCSE(Graph& graph)
 {
     SamplingRegion samplingRegion("DFG CSE Phase");
-    return runPhase<CSEPhase>(graph);
+    return runPhase<CSEPhase<NormalCSE> >(graph);
+}
+
+bool performStoreElimination(Graph& graph)
+{
+    SamplingRegion samplingRegion("DFG Store Elimination Phase");
+    return runPhase<CSEPhase<StoreElimination> >(graph);
 }
 
 } } // namespace JSC::DFG

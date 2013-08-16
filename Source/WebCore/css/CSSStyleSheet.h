@@ -1,6 +1,6 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2006, 2007, 2008, 2009, 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2006, 2007, 2008, 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -44,7 +44,7 @@ class StyleSheetContents;
 
 typedef int ExceptionCode;
 
-class CSSStyleSheet : public StyleSheet {
+class CSSStyleSheet FINAL : public StyleSheet {
 public:
     static PassRefPtr<CSSStyleSheet> create(PassRefPtr<StyleSheetContents>, CSSImportRule* ownerRule = 0);
     static PassRefPtr<CSSStyleSheet> create(PassRefPtr<StyleSheetContents>, Node* ownerNode);
@@ -74,7 +74,7 @@ public:
     unsigned length() const;
     CSSRule* item(unsigned index);
 
-    virtual void clearOwnerNode() OVERRIDE { m_ownerNode = 0; }
+    virtual void clearOwnerNode() OVERRIDE;
     virtual CSSImportRule* ownerRule() const OVERRIDE { return m_ownerRule; }
     virtual KURL baseURL() const OVERRIDE;
     virtual bool isLoading() const OVERRIDE;
@@ -85,19 +85,25 @@ public:
     void setMediaQueries(PassRefPtr<MediaQuerySet>);
     void setTitle(const String& title) { m_title = title; }
 
+    enum RuleMutationType { OtherMutation, RuleInsertion };
+    enum WhetherContentsWereClonedForMutation { ContentsWereNotClonedForMutation = 0, ContentsWereClonedForMutation };
+
     class RuleMutationScope {
         WTF_MAKE_NONCOPYABLE(RuleMutationScope);
     public:
-        RuleMutationScope(CSSStyleSheet*);
+        RuleMutationScope(CSSStyleSheet*, RuleMutationType = OtherMutation);
         RuleMutationScope(CSSRule*);
         ~RuleMutationScope();
 
     private:
         CSSStyleSheet* m_styleSheet;
+        RuleMutationType m_mutationType;
+        WhetherContentsWereClonedForMutation m_contentsWereClonedForMutation;
     };
 
-    void willMutateRules();
-    void didMutateRules();
+    WhetherContentsWereClonedForMutation willMutateRules();
+    void didMutateRules(RuleMutationType, WhetherContentsWereClonedForMutation);
+    void didMutateRuleFromCSSStyleDeclaration();
     void didMutate();
     
     void clearChildRuleCSSOMWrappers();
@@ -105,14 +111,12 @@ public:
 
     StyleSheetContents* contents() const { return m_contents.get(); }
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
 private:
     CSSStyleSheet(PassRefPtr<StyleSheetContents>, CSSImportRule* ownerRule);
     CSSStyleSheet(PassRefPtr<StyleSheetContents>, Node* ownerNode, bool isInlineStylesheet);
 
     virtual bool isCSSStyleSheet() const { return true; }
-    virtual String type() const { return "text/css"; }
+    virtual String type() const { return ASCIILiteral("text/css"); }
 
     bool canAccessRules() const;
     
@@ -129,26 +133,6 @@ private:
     mutable Vector<RefPtr<CSSRule> > m_childRuleCSSOMWrappers;
     mutable OwnPtr<CSSRuleList> m_ruleListCSSOMWrapper;
 };
-
-inline CSSStyleSheet::RuleMutationScope::RuleMutationScope(CSSStyleSheet* sheet)
-    : m_styleSheet(sheet)
-{
-    if (m_styleSheet)
-        m_styleSheet->willMutateRules();
-}
-
-inline CSSStyleSheet::RuleMutationScope::RuleMutationScope(CSSRule* rule)
-    : m_styleSheet(rule ? rule->parentStyleSheet() : 0)
-{
-    if (m_styleSheet)
-        m_styleSheet->willMutateRules();
-}
-
-inline CSSStyleSheet::RuleMutationScope::~RuleMutationScope()
-{
-    if (m_styleSheet)
-        m_styleSheet->didMutateRules();
-}
 
 } // namespace
 

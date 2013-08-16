@@ -33,13 +33,12 @@
 
 #include "CSSSelectorList.h"
 #include "InsertionPoint.h"
-#include <wtf/Forward.h>
 
 namespace WebCore {
 
 #if ENABLE(SHADOW_DOM)
 
-class HTMLContentElement : public InsertionPoint {
+class HTMLContentElement FINAL : public InsertionPoint {
 public:
     static const QualifiedName& contentTagName(Document*);
     static PassRefPtr<HTMLContentElement> create(const QualifiedName&, Document*);
@@ -52,7 +51,7 @@ public:
 
     virtual MatchType matchTypeFor(Node*) OVERRIDE;
     virtual const CSSSelectorList& selectorList() OVERRIDE;
-    virtual Type insertionPointType() const OVERRIDE { return ContentInsertionPoint; }
+    virtual Type insertionPointType() const OVERRIDE { return HTMLContentElementType; }
     virtual bool canAffectSelector() const OVERRIDE { return true; }
     virtual bool isSelectValid();
 
@@ -81,34 +80,19 @@ inline const CSSSelectorList& HTMLContentElement::selectorList()
     return m_selectorList;
 }
 
-#else
-
-// FIXME: shouldn't inherit from InsertionPoint: https://bugs.webkit.org/show_bug.cgi?id=103339
-class HTMLContentElement : public InsertionPoint {
-public:
-    static const QualifiedName& contentTagName(Document*);
-    static PassRefPtr<HTMLContentElement> create(Document*);
-
-    virtual Type insertionPointType() const OVERRIDE { return ContentInsertionPoint; }
-
-protected:
-    HTMLContentElement(const QualifiedName&, Document*);
-
-};
-
-#endif // if ENABLE(SHADOW_DOM)
-
 inline bool isHTMLContentElement(const Node* node)
 {
     ASSERT(node);
-    return node->isInsertionPoint() && toInsertionPoint(node)->insertionPointType() == InsertionPoint::ContentInsertionPoint;
+    return node->isInsertionPoint() && toInsertionPoint(node)->insertionPointType() == InsertionPoint::HTMLContentElementType;
 }
 
 inline HTMLContentElement* toHTMLContentElement(Node* node)
 {
-    ASSERT(!node || isHTMLContentElement(node));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLContentElement(node));
     return static_cast<HTMLContentElement*>(node);
 }
+
+#endif // if ENABLE(SHADOW_DOM)
 
 }
 

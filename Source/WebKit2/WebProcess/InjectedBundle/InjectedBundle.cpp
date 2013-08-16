@@ -51,6 +51,7 @@
 #include <WebCore/ApplicationCache.h>
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameLoader.h>
 #include <WebCore/FrameView.h>
 #include <WebCore/GCController.h>
 #include <WebCore/GeolocationClient.h>
@@ -72,7 +73,7 @@
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 
-#if ENABLE(SHADOW_DOM) || ENABLE(CSS_REGIONS) || ENABLE(IFRAME_SEAMLESS)
+#if ENABLE(SHADOW_DOM) || ENABLE(CSS_REGIONS) || ENABLE(IFRAME_SEAMLESS) || ENABLE(CSS_COMPOSITING)
 #include <WebCore/RuntimeEnabledFeatures.h>
 #endif
 
@@ -111,7 +112,7 @@ void InjectedBundle::postMessage(const String& messageName, APIObject* messageBo
     encoder->encode(messageName);
     encoder->encode(InjectedBundleUserMessageEncoder(messageBody));
 
-    WebProcess::shared().connection()->sendMessage(encoder.release());
+    WebProcess::shared().parentProcessConnection()->sendMessage(encoder.release());
 }
 
 void InjectedBundle::postSynchronousMessage(const String& messageName, APIObject* messageBody, RefPtr<APIObject>& returnData)
@@ -119,11 +120,11 @@ void InjectedBundle::postSynchronousMessage(const String& messageName, APIObject
     InjectedBundleUserMessageDecoder messageDecoder(returnData);
 
     uint64_t syncRequestID;
-    OwnPtr<CoreIPC::MessageEncoder> encoder = WebProcess::shared().connection()->createSyncMessageEncoder(WebContextLegacyMessages::messageReceiverName(), WebContextLegacyMessages::postSynchronousMessageMessageName(), 0, syncRequestID);
+    OwnPtr<CoreIPC::MessageEncoder> encoder = WebProcess::shared().parentProcessConnection()->createSyncMessageEncoder(WebContextLegacyMessages::messageReceiverName(), WebContextLegacyMessages::postSynchronousMessageMessageName(), 0, syncRequestID);
     encoder->encode(messageName);
     encoder->encode(InjectedBundleUserMessageEncoder(messageBody));
 
-    OwnPtr<CoreIPC::MessageDecoder> replyDecoder = WebProcess::shared().connection()->sendSyncMessage(syncRequestID, encoder.release(), CoreIPC::Connection::NoTimeout);
+    OwnPtr<CoreIPC::MessageDecoder> replyDecoder = WebProcess::shared().parentProcessConnection()->sendSyncMessage(syncRequestID, encoder.release(), CoreIPC::Connection::NoTimeout);
     if (!replyDecoder || !replyDecoder->decode(messageDecoder)) {
         returnData = nullptr;
         return;
@@ -160,40 +161,49 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
 
     if (preference == "WebKitTabToLinksPreferenceKey") {
-       WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::tabsToLinksKey(), enabled);
-       for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
-            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
-            webPage->setTabToLinksEnabled(enabled);
+        WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::tabsToLinksKey(), enabled);
+        for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient((*i)->mainFrame()->loader()->client());
+            ASSERT(webFrameLoaderClient);
+            webFrameLoaderClient->webFrame()->page()->setTabToLinksEnabled(enabled);
         }
     }
 
     if (preference == "WebKit2AsynchronousPluginInitializationEnabled") {
         WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledKey(), enabled);
         for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
-            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
-            webPage->setAsynchronousPluginInitializationEnabled(enabled);
+            WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient((*i)->mainFrame()->loader()->client());
+            ASSERT(webFrameLoaderClient);
+            webFrameLoaderClient->webFrame()->page()->setAsynchronousPluginInitializationEnabled(enabled);
         }
     }
 
     if (preference == "WebKit2AsynchronousPluginInitializationEnabledForAllPlugins") {
         WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledForAllPluginsKey(), enabled);
         for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
-            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
-            webPage->setAsynchronousPluginInitializationEnabledForAllPlugins(enabled);
+            WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient((*i)->mainFrame()->loader()->client());
+            ASSERT(webFrameLoaderClient);
+            webFrameLoaderClient->webFrame()->page()->setAsynchronousPluginInitializationEnabledForAllPlugins(enabled);
         }
     }
 
     if (preference == "WebKit2ArtificialPluginInitializationDelayEnabled") {
         WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::artificialPluginInitializationDelayEnabledKey(), enabled);
         for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
-            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
-            webPage->setArtificialPluginInitializationDelayEnabled(enabled);
+            WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient((*i)->mainFrame()->loader()->client());
+            ASSERT(webFrameLoaderClient);
+            webFrameLoaderClient->webFrame()->page()->setArtificialPluginInitializationDelayEnabled(enabled);
         }
     }
 
 #if ENABLE(CSS_REGIONS)
     if (preference == "WebKitCSSRegionsEnabled")
         RuntimeEnabledFeatures::setCSSRegionsEnabled(enabled);
+#endif
+
+#if ENABLE(CSS_COMPOSITING)
+    if (preference == "WebKitCSSCompositingEnabled")
+        RuntimeEnabledFeatures::setCSSCompositingEnabled(enabled);
 #endif
 
     // Map the names used in LayoutTests with the names used in WebCore::Settings and WebPreferencesStore.
@@ -229,6 +239,10 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     }
 
     FOR_EACH_OVERRIDE_BOOL_PREFERENCE(OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES)
+
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+    OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES(WebKitHiddenPageDOMTimerThrottlingEnabled, HiddenPageDOMTimerThrottlingEnabled, hiddenPageDOMTimerThrottlingEnabled)
+#endif
 
 #undef OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES
 #undef FOR_EACH_OVERRIDE_BOOL_PREFERENCE
@@ -289,7 +303,8 @@ void InjectedBundle::setJavaScriptCanAccessClipboard(WebPageGroupProxy* pageGrou
 
 void InjectedBundle::setPrivateBrowsingEnabled(WebPageGroupProxy* pageGroup, bool enabled)
 {
-#if PLATFORM(MAC) || USE(CFNETWORK)
+    // FIXME (NetworkProcess): This test-only function doesn't work with NetworkProcess, <https://bugs.webkit.org/show_bug.cgi?id=115274>.
+#if PLATFORM(MAC) || USE(CFNETWORK) || USE(SOUP)
     if (enabled)
         WebFrameNetworkingContext::ensurePrivateBrowsingSession();
     else
@@ -346,6 +361,13 @@ void InjectedBundle::resetOriginAccessWhitelists()
     SecurityPolicy::resetOriginAccessWhitelists();
 }
 
+void InjectedBundle::setAsynchronousSpellCheckingEnabled(WebPageGroupProxy* pageGroup, bool enabled)
+{
+    const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
+    for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
+        (*iter)->settings()->setAsynchronousSpellCheckingEnabled(enabled);
+}
+
 void InjectedBundle::clearAllDatabases()
 {
 #if ENABLE(SQL_DATABASE)
@@ -398,12 +420,12 @@ void InjectedBundle::resetApplicationCacheOriginQuota(const String& originString
 
 PassRefPtr<ImmutableArray> InjectedBundle::originsWithApplicationCache()
 {
-    HashSet<RefPtr<SecurityOrigin> > origins;
+    HashSet<RefPtr<SecurityOrigin>> origins;
     cacheStorage().getOriginsWithCache(origins);
-    Vector< RefPtr<APIObject> > originsVector;
+    Vector< RefPtr<APIObject>> originsVector;
 
-    HashSet<RefPtr<SecurityOrigin> >::iterator it = origins.begin();
-    HashSet<RefPtr<SecurityOrigin> >::iterator end = origins.end();
+    HashSet<RefPtr<SecurityOrigin>>::iterator it = origins.begin();
+    HashSet<RefPtr<SecurityOrigin>>::iterator end = origins.end();
     for ( ; it != end; ++it)
         originsVector.append(WebString::create((*it)->databaseIdentifier()));
 
@@ -535,8 +557,8 @@ void InjectedBundle::garbageCollectJavaScriptObjectsOnAlternateThreadForDebuggin
 
 size_t InjectedBundle::javaScriptObjectsCount()
 {
-    JSLockHolder lock(JSDOMWindow::commonJSGlobalData());
-    return JSDOMWindow::commonJSGlobalData()->heap.objectCount();
+    JSLockHolder lock(JSDOMWindow::commonVM());
+    return JSDOMWindow::commonVM()->heap.objectCount();
 }
 
 void InjectedBundle::reportException(JSContextRef context, JSValueRef exception)
@@ -650,6 +672,15 @@ void InjectedBundle::setCSSRegionsEnabled(bool enabled)
 {
 #if ENABLE(CSS_REGIONS)
     RuntimeEnabledFeatures::setCSSRegionsEnabled(enabled);
+#else
+    UNUSED_PARAM(enabled);
+#endif
+}
+
+void InjectedBundle::setCSSCompositingEnabled(bool enabled)
+{
+#if ENABLE(CSS_COMPOSITING)
+    RuntimeEnabledFeatures::setCSSCompositingEnabled(enabled);
 #else
     UNUSED_PARAM(enabled);
 #endif

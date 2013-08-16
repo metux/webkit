@@ -25,9 +25,10 @@
  */
 
 [
+    GlobalContext=DOMWindow&WorkerGlobalScope,
+    Conditional=CHANNEL_MESSAGING,
     Constructor,
-    CallWith=ScriptExecutionContext,
-    V8CustomConstructor,
+    ConstructorCallWith=ScriptExecutionContext,
     JSCustomMarkFunction,
     JSNoStaticTables,
     ImplementationLacksVTable

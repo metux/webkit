@@ -39,10 +39,6 @@
 @protocol WebCoreFrameScrollView;
 #endif
 
-#if PLATFORM(WX)
-class wxScrollWinEvent;
-#endif
-
 namespace WebCore {
 
 class HostWindow;
@@ -185,6 +181,13 @@ public:
     int scrollX() const { return scrollPosition().x(); }
     int scrollY() const { return scrollPosition().y(); }
 
+    // scrollOffset() anchors its (0,0) point at the top end of the header if this ScrollableArea
+    // has a header, so it is relative to the totalContentsSize(). scrollOffsetRelativeToDocument()
+    // anchors (0,0) at the top of the Document, which will be beneath any headers, so it is relative
+    // to contentsSize().
+    IntSize scrollOffsetRelativeToDocument() const;
+    IntPoint scrollPositionRelativeToDocument() const;
+
     virtual IntSize overhangAmount() const OVERRIDE;
 
     void cacheCurrentScrollPosition() { m_cachedScrollPosition = scrollPosition(); }
@@ -211,6 +214,8 @@ public:
     IntPoint contentsToRootView(const IntPoint&) const;
     IntRect rootViewToContents(const IntRect&) const;
     IntRect contentsToRootView(const IntRect&) const;
+
+    IntPoint rootViewToTotalContents(const IntPoint&) const;
 
     // Event coordinates are assumed to be in the coordinate space of a window that contains
     // the entire widget hierarchy. It is up to the platform to decide what the precise definition
@@ -242,6 +247,9 @@ public:
     
     // Widget override to update our scrollbars and notify our contents of the resize.
     virtual void setFrameRect(const IntRect&);
+
+    // Widget override to notify our contents of a cliprect change.
+    virtual void clipRectChanged() OVERRIDE;
 
     // For platforms that need to hit test scrollbars from within the engine's event handlers (like Win32).
     Scrollbar* scrollbarAtPoint(const IntPoint& windowPoint);
@@ -291,6 +299,8 @@ public:
     virtual IntPoint convertFromContainingViewToScrollbar(const Scrollbar*, const IntPoint&) const OVERRIDE;
 
     void calculateAndPaintOverhangAreas(GraphicsContext*, const IntRect& dirtyRect);
+
+    virtual bool isScrollView() const OVERRIDE { return true; }
 
 protected:
     ScrollView();
@@ -378,6 +388,7 @@ private:
     void platformSetCanBlitOnScroll(bool);
     bool platformCanBlitOnScroll() const;
     IntRect platformVisibleContentRect(bool includeScrollbars) const;
+    IntSize platformVisibleContentSize(bool includeScrollbars) const;
     void platformSetContentsSize();
     IntRect platformContentsToScreen(const IntRect&) const;
     IntPoint platformScreenToContents(const IntPoint&) const;
@@ -400,17 +411,22 @@ public:
 private:
     NSScrollView<WebCoreFrameScrollView>* scrollView() const;
 #endif
-
-#if PLATFORM(WX)
-public:
-    virtual void setPlatformWidget(wxWindow*);
-    void adjustScrollbars(int x = -1, int y = -1, bool refresh = true);
-private:
-    class ScrollViewPrivate;
-    ScrollViewPrivate* m_data;
-#endif
-
 }; // class ScrollView
+
+inline ScrollView* toScrollView(Widget* widget)
+{
+    ASSERT(!widget || widget->isScrollView());
+    return static_cast<ScrollView*>(widget);
+}
+
+inline const ScrollView* toScrollView(const Widget* widget)
+{
+    ASSERT(!widget || widget->isScrollView());
+    return static_cast<const ScrollView*>(widget);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toScrollView(const ScrollView*);
 
 } // namespace WebCore
 

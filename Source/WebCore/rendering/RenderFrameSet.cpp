@@ -40,8 +40,7 @@
 #include "RenderLayer.h"
 #include "RenderView.h"
 #include "Settings.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
@@ -157,24 +156,6 @@ void RenderFrameSet::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
             yPos += borderThickness;
         }
     }
-}
-
-bool RenderFrameSet::nodeAtPoint(const HitTestRequest& request, HitTestResult& result,
-    const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
-{
-    if (action != HitTestForeground)
-        return false;
-
-    bool inside = RenderBox::nodeAtPoint(request, result, locationInContainer, accumulatedOffset, action)
-        || m_isResizing;
-
-    if (inside && frameSet()->noResize()
-            && !request.readOnly() && !result.innerNode() && !request.touchMove()) {
-        result.setInnerNode(node());
-        result.setInnerNonSharedNode(node());
-    }
-
-    return inside || m_isChildResizing;
 }
 
 void RenderFrameSet::GridAxis::resize(int size)
@@ -422,10 +403,10 @@ void RenderFrameSet::computeEdgeInfo()
     if (!child)
         return;
 
-    int rows = frameSet()->totalRows();
-    int cols = frameSet()->totalCols();
-    for (int r = 0; r < rows; ++r) {
-        for (int c = 0; c < cols; ++c) {
+    size_t rows = m_rows.m_sizes.size();
+    size_t cols = m_cols.m_sizes.size();
+    for (size_t r = 0; r < rows; ++r) {
+        for (size_t c = 0; c < cols; ++c) {
             FrameEdgeInfo edgeInfo;
             if (child->isFrameSet())
                 edgeInfo = toRenderFrameSet(child)->edgeInfo();
@@ -813,24 +794,6 @@ CursorDirective RenderFrameSet::getCursor(const LayoutPoint& point, Cursor& curs
         return SetCursor;
     }
     return RenderBox::getCursor(point, cursor);
-}
-
-void RenderFrameSet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
-    RenderBox::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_children, "children");
-    info.addMember(m_rows, "rows");
-    info.addMember(m_cols, "cols");
-}
-
-void RenderFrameSet::GridAxis::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
-    info.addMember(m_sizes, "sizes");
-    info.addMember(m_deltas, "deltas");
-    info.addMember(m_preventResize, "preventResize");
-    info.addMember(m_allowBorder, "allowBorder");
 }
 
 } // namespace WebCore

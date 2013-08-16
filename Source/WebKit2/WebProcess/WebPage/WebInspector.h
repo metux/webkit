@@ -43,10 +43,8 @@ class WebInspectorFrontendClient;
 class WebPage;
 struct WebPageCreationParameters;
 
-class WebInspector : public APIObject {
+class WebInspector : public TypedAPIObject<APIObject::TypeBundleInspector> {
 public:
-    static const Type APIType = TypeBundleInspector;
-
     static PassRefPtr<WebInspector> create(WebPage*, WebCore::InspectorFrontendChannel*);
 
     WebPage* page() const { return m_page; }
@@ -59,7 +57,12 @@ public:
     void show();
     void close();
 
-    void setAttachedWindow(bool);
+    void didSave(const String& url);
+    void didAppend(const String& url);
+
+    void attachedBottom();
+    void attachedRight();
+    void detached();
 
     void evaluateScriptForTest(long callID, const String& script);
 
@@ -85,22 +88,26 @@ private:
 
     explicit WebInspector(WebPage*, WebCore::InspectorFrontendChannel*);
 
-    virtual Type type() const { return APIType; }
-
     // Called from WebInspectorClient
     WebPage* createInspectorPage();
     void destroyInspectorPage();
 
     // Called from WebInspectorFrontendClient
-    void didLoadInspectorPage();
     void didClose();
     void bringToFront();
     void inspectedURLChanged(const String&);
 
-    void attach();
+    bool canSave() const;
+    void save(const String& filename, const String& content, bool forceSaveAs);
+    void append(const String& filename, const String& content);
+
+    void attachBottom();
+    void attachRight();
     void detach();
 
     void setAttachedWindowHeight(unsigned);
+    void setAttachedWindowWidth(unsigned);
+    void setToolbarHeight(unsigned);
 
     // Implemented in platform WebInspector file
     String localizedStringsURL() const;

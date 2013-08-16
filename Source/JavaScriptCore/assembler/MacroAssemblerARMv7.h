@@ -34,6 +34,8 @@
 
 namespace JSC {
 
+struct JITStackFrame;
+
 class MacroAssemblerARMv7 : public AbstractMacroAssembler<ARMv7Assembler> {
     // FIXME: switch dataTempRegister & addressTempRegister, or possibly use r7?
     //        - dTR is likely used more than aTR, and we'll get better instruction
@@ -59,7 +61,7 @@ public:
         return value >= -255 && value <= 255;
     }
 
-    Vector<LinkRecord>& jumpsToLink() { return m_assembler.jumpsToLink(); }
+    Vector<LinkRecord, 0, UnsafeVectorOverflow>& jumpsToLink() { return m_assembler.jumpsToLink(); }
     void* unlinkedCode() { return m_assembler.unlinkedCode(); }
     bool canCompact(JumpType jumpType) { return m_assembler.canCompact(jumpType); }
     JumpLinkType computeJumpType(JumpType jumpType, const uint8_t* from, const uint8_t* to) { return m_assembler.computeJumpType(jumpType, from, to); }
@@ -119,6 +121,7 @@ public:
     enum ResultCondition {
         Overflow = ARMv7Assembler::ConditionVS,
         Signed = ARMv7Assembler::ConditionMI,
+        PositiveOrZero = ARMv7Assembler::ConditionPL,
         Zero = ARMv7Assembler::ConditionEQ,
         NonZero = ARMv7Assembler::ConditionNE
     };
@@ -261,6 +264,12 @@ public:
     void and32(TrustedImm32 imm, RegisterID dest)
     {
         and32(imm, dest, dest);
+    }
+
+    void and32(Address src, RegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        and32(dataTempRegister, dest);
     }
 
     void countLeadingZeros32(RegisterID src, RegisterID dest)
@@ -1097,7 +1106,7 @@ public:
     // If the result is not representable as a 32 bit value, branch.
     // May also branch for some values that are representable in 32 bits
     // (specifically, in this case, 0).
-    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID)
+    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID, bool negZeroCheck = true)
     {
         m_assembler.vcvt_floatingPointToSigned(fpTempRegisterAsSingle(), src);
         m_assembler.vmov(dest, fpTempRegisterAsSingle());
@@ -1107,7 +1116,8 @@ public:
         failureCases.append(branchDouble(DoubleNotEqualOrUnordered, src, fpTempRegister));
 
         // If the result is zero, it might have been -0.0, and the double comparison won't catch this!
-        failureCases.append(branchTest32(Zero, dest));
+        if (negZeroCheck)
+            failureCases.append(branchTest32(Zero, dest));
     }
 
     Jump branchDoubleNonZero(FPRegisterID reg, FPRegisterID)
@@ -1767,9 +1777,14 @@ public:
         return label.labelAtOffset(-twoWordOpSize * 2);
     }
     
-    static void revertJumpReplacementToBranchPtrWithPatch(CodeLocationLabel instructionStart, RegisterID, void* initialValue)
+    static void revertJumpReplacementToBranchPtrWithPatch(CodeLocationLabel instructionStart, RegisterID rd, void* initialValue)
     {
+#if OS(LINUX) || OS(QNX)
+        ARMv7Assembler::revertJumpTo_movT3movtcmpT2(instructionStart.dataLocation(), rd, dataTempRegister, reinterpret_cast<uintptr_t>(initialValue));
+#else
+        UNUSED_PARAM(rd);
         ARMv7Assembler::revertJumpTo_movT3(instructionStart.dataLocation(), dataTempRegister, ARMThumbImmediate::makeUInt16(reinterpret_cast<uintptr_t>(initialValue) & 0xffff));
+#endif
     }
     
     static CodeLocationLabel startOfPatchableBranchPtrWithPatchOnAddress(CodeLocationDataLabelPtr)
@@ -1782,6 +1797,33 @@ public:
     {
         UNREACHABLE_FOR_PLATFORM();
     }
+
+#if USE(MASM_PROBE)
+    struct CPUState {
+        #define DECLARE_REGISTER(_type, _regName) \
+            _type _regName;
+        FOR_EACH_CPU_REGISTER(DECLARE_REGISTER)
+        #undef DECLARE_REGISTER
+    };
+
+    struct ProbeContext;
+    typedef void (*ProbeFunction)(struct ProbeContext*);
+
+    struct ProbeContext {
+        ProbeFunction probeFunction;
+        void* arg1;
+        void* arg2;
+        JITStackFrame* jitStackFrame;
+        CPUState cpu;
+
+        void dump(const char* indentation = 0);
+    private:
+        void dumpCPURegisters(const char* indentation);
+    };
+
+    // For details about probe(), see comment in MacroAssemblerX86_64.h.
+    void probe(ProbeFunction, void* arg1 = 0, void* arg2 = 0);
+#endif // USE(MASM_PROBE)
 
 protected:
     ALWAYS_INLINE Jump jump()
@@ -1892,6 +1934,23 @@ private:
     {
         ARMv7Assembler::relinkCall(call.dataLocation(), destination.executableAddress());
     }
+
+#if USE(MASM_PROBE)
+    inline TrustedImm32 trustedImm32FromPtr(void* ptr)
+    {
+        return TrustedImm32(TrustedImmPtr(ptr));
+    }
+
+    inline TrustedImm32 trustedImm32FromPtr(ProbeFunction function)
+    {
+        return TrustedImm32(TrustedImmPtr(reinterpret_cast<void*>(function)));
+    }
+
+    inline TrustedImm32 trustedImm32FromPtr(void (*function)())
+    {
+        return TrustedImm32(TrustedImmPtr(reinterpret_cast<void*>(function)));
+    }
+#endif
 
     bool m_makeJumpPatchable;
 };

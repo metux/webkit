@@ -30,10 +30,6 @@
 #include "StyleTransformData.h"
 #include "StyleImage.h"
 #include "StyleResolver.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/MemoryObjectInfo.h>
 
 namespace WebCore {
 
@@ -50,16 +46,18 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
 #endif
     , m_mask(FillLayer(MaskFillLayer))
     , m_pageSize()
+#if ENABLE(CSS_SHAPES)
     , m_shapeInside(RenderStyle::initialShapeInside())
     , m_shapeOutside(RenderStyle::initialShapeOutside())
     , m_shapeMargin(RenderStyle::initialShapeMargin())
     , m_shapePadding(RenderStyle::initialShapePadding())
+#endif
     , m_clipPath(RenderStyle::initialClipPath())
     , m_visitedLinkBackgroundColor(RenderStyle::initialBackgroundColor())
     , m_order(RenderStyle::initialOrder())
     , m_flowThread(RenderStyle::initialFlowThread())
     , m_regionThread(RenderStyle::initialRegionThread())
-    , m_regionOverflow(RenderStyle::initialRegionOverflow())
+    , m_regionFragment(RenderStyle::initialRegionFragment())
     , m_regionBreakAfter(RenderStyle::initialPageBreak())
     , m_regionBreakBefore(RenderStyle::initialPageBreak())
     , m_regionBreakInside(RenderStyle::initialPageBreak())
@@ -124,11 +122,17 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_mask(o.m_mask)
     , m_maskBoxImage(o.m_maskBoxImage)
     , m_pageSize(o.m_pageSize)
+#if ENABLE(CSS_SHAPES)
     , m_shapeInside(o.m_shapeInside)
     , m_shapeOutside(o.m_shapeOutside)
     , m_shapeMargin(o.m_shapeMargin)
     , m_shapePadding(o.m_shapePadding)
+#endif
     , m_clipPath(o.m_clipPath)
+#if ENABLE(CSS3_TEXT)
+    , m_textDecorationColor(o.m_textDecorationColor)
+    , m_visitedLinkTextDecorationColor(o.m_visitedLinkTextDecorationColor)
+#endif // CSS3_TEXT
     , m_visitedLinkBackgroundColor(o.m_visitedLinkBackgroundColor)
     , m_visitedLinkOutlineColor(o.m_visitedLinkOutlineColor)
     , m_visitedLinkBorderLeftColor(o.m_visitedLinkBorderLeftColor)
@@ -138,7 +142,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_order(o.m_order)
     , m_flowThread(o.m_flowThread)
     , m_regionThread(o.m_regionThread)
-    , m_regionOverflow(o.m_regionOverflow)
+    , m_regionFragment(o.m_regionFragment)
     , m_regionBreakAfter(o.m_regionBreakAfter)
     , m_regionBreakBefore(o.m_regionBreakBefore)
     , m_regionBreakInside(o.m_regionBreakInside)
@@ -209,11 +213,17 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_mask == o.m_mask
         && m_maskBoxImage == o.m_maskBoxImage
         && m_pageSize == o.m_pageSize
+#if ENABLE(CSS_SHAPES)
         && m_shapeInside == o.m_shapeInside
         && m_shapeOutside == o.m_shapeOutside
         && m_shapeMargin == o.m_shapeMargin
         && m_shapePadding == o.m_shapePadding
+#endif
         && m_clipPath == o.m_clipPath
+#if ENABLE(CSS3_TEXT)
+        && m_textDecorationColor == o.m_textDecorationColor
+        && m_visitedLinkTextDecorationColor == o.m_visitedLinkTextDecorationColor
+#endif // CSS3_TEXT
         && m_visitedLinkBackgroundColor == o.m_visitedLinkBackgroundColor
         && m_visitedLinkOutlineColor == o.m_visitedLinkOutlineColor
         && m_visitedLinkBorderLeftColor == o.m_visitedLinkBorderLeftColor
@@ -223,7 +233,7 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_order == o.m_order
         && m_flowThread == o.m_flowThread
         && m_regionThread == o.m_regionThread
-        && m_regionOverflow == o.m_regionOverflow
+        && m_regionFragment == o.m_regionFragment
         && m_regionBreakAfter == o.m_regionBreakAfter
         && m_regionBreakBefore == o.m_regionBreakBefore
         && m_regionBreakInside == o.m_regionBreakInside
@@ -314,41 +324,6 @@ bool StyleRareNonInheritedData::transitionDataEquivalent(const StyleRareNonInher
     if (m_transitions && o.m_transitions && (*m_transitions != *o.m_transitions))
         return false;
     return true;
-}
-
-void StyleRareNonInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-#if ENABLE(DASHBOARD_SUPPORT)
-    info.addMember(m_dashboardRegions, "dashboardRegions");
-#endif
-    info.addMember(m_deprecatedFlexibleBox, "deprecatedFlexibleBox");
-    info.addMember(m_flexibleBox, "flexibleBox");
-    info.addMember(m_marquee, "marquee");
-    info.addMember(m_multiCol, "multiCol");
-    info.addMember(m_transform, "transform");
-#if ENABLE(CSS_FILTERS)
-    info.addMember(m_filter, "filter");
-#endif
-    info.addMember(m_grid, "grid");
-    info.addMember(m_gridItem, "gridItem");
-    info.addMember(m_content, "content");
-    info.addMember(m_counterDirectives, "counterDirectives");
-    info.addMember(m_boxShadow, "boxShadow");
-    info.addMember(m_boxReflect, "boxReflect");
-    info.addMember(m_animations, "animations");
-    info.addMember(m_transitions, "transitions");
-    info.addMember(m_shapeInside, "shapeInside");
-    info.addMember(m_shapeOutside, "shapeOutside");
-    info.addMember(m_clipPath, "clipPath");
-    info.addMember(m_flowThread, "flowThread");
-    info.addMember(m_regionThread, "regionThread");
-
-    info.ignoreMember(m_perspectiveOriginX);
-    info.ignoreMember(m_perspectiveOriginY);
-    info.ignoreMember(m_pageSize);
-    info.ignoreMember(m_shapeMargin);
-    info.ignoreMember(m_shapePadding);
 }
 
 } // namespace WebCore

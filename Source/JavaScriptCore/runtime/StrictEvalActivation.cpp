@@ -37,7 +37,7 @@ const ClassInfo StrictEvalActivation::s_info = { "Object", &Base::s_info, 0, 0, 
 
 StrictEvalActivation::StrictEvalActivation(ExecState* exec)
     : Base(
-        exec->globalData(),
+        exec->vm(),
         exec->lexicalGlobalObject()->strictEvalActivationStructure(),
         exec->scope()
     )
@@ -49,8 +49,10 @@ bool StrictEvalActivation::deleteProperty(JSCell*, ExecState*, PropertyName)
     return false;
 }
 
-JSObject* StrictEvalActivation::toThisObject(JSCell*, ExecState* exec)
+JSValue StrictEvalActivation::toThis(JSCell*, ExecState* exec, ECMAMode ecmaMode)
 {
+    if (ecmaMode == StrictMode)
+        return jsUndefined();
     return exec->globalThisValue();
 }
 

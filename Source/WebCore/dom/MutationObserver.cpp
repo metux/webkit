@@ -129,7 +129,7 @@ void MutationObserver::disconnect()
     m_records.clear();
     HashSet<MutationObserverRegistration*> registrations(m_registrations);
     for (HashSet<MutationObserverRegistration*>::iterator iter = registrations.begin(); iter != registrations.end(); ++iter)
-        (*iter)->unregister();
+        MutationObserverRegistration::unregisterAndDelete(*iter);
 }
 
 void MutationObserver::observationStarted(MutationObserverRegistration* registration)
@@ -204,7 +204,7 @@ void MutationObserver::deliver()
     Vector<RefPtr<MutationRecord> > records;
     records.swap(m_records);
 
-    m_callback->handleEvent(&records, this);
+    m_callback->call(records, this);
 }
 
 void MutationObserver::deliverAllMutations()

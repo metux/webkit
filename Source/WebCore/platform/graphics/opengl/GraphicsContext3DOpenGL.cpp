@@ -38,12 +38,11 @@
 #include <algorithm>
 #include <cstring>
 #include <wtf/MainThread.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 
 #if PLATFORM(MAC)
 #include <OpenGL/gl.h>
-#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT)
+#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT) || PLATFORM(WIN)
 #include "OpenGLShims.h"
 #endif
 
@@ -98,7 +97,7 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
         GLint sampleCount = std::min(8, maxSampleCount);
         if (sampleCount > maxSampleCount)
             sampleCount = maxSampleCount;
-        if (m_boundFBO != m_multisampleFBO) {
+        if (m_state.boundFBO != m_multisampleFBO) {
             ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_multisampleFBO);
             mustRestoreFBO = true;
         }
@@ -121,7 +120,7 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
     }
 
     // resize regular FBO
-    if (m_boundFBO != m_fbo) {
+    if (m_state.boundFBO != m_fbo) {
         mustRestoreFBO = true;
         ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_fbo);
     }
@@ -147,7 +146,7 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
 
     if (m_attrs.antialias) {
         ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_multisampleFBO);
-        if (m_boundFBO == m_multisampleFBO)
+        if (m_state.boundFBO == m_multisampleFBO)
             mustRestoreFBO = false;
     }
 
@@ -256,8 +255,19 @@ bool GraphicsContext3D::texImage2D(GC3Denum target, GC3Dint level, GC3Denum inte
             openGLInternalFormat = GL_RGBA32F_ARB;
         else if (format == GL_RGB)
             openGLInternalFormat = GL_RGB32F_ARB;
+    } else if (type == HALF_FLOAT_OES) {
+        if (format == GL_RGBA)
+            openGLInternalFormat = GL_RGBA16F_ARB;
+        else if (format == GL_RGB)
+            openGLInternalFormat = GL_RGB16F_ARB;
+        else if (format == GL_LUMINANCE)
+            openGLInternalFormat = GL_LUMINANCE16F_ARB;
+        else if (format == GL_ALPHA)
+            openGLInternalFormat = GL_ALPHA16F_ARB;
+        else if (format == GL_LUMINANCE_ALPHA)
+            openGLInternalFormat = GL_LUMINANCE_ALPHA16F_ARB;
+        type = GL_HALF_FLOAT_ARB;
     }
-
     texImage2DDirect(target, level, openGLInternalFormat, width, height, border, format, type, pixels);
     return true;
 }
@@ -287,13 +297,13 @@ void GraphicsContext3D::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsi
     // all previous rendering calls should be done before reading pixels.
     makeContextCurrent();
     ::glFlush();
-    if (m_attrs.antialias && m_boundFBO == m_multisampleFBO) {
+    if (m_attrs.antialias && m_state.boundFBO == m_multisampleFBO) {
         resolveMultisamplingIfNecessary(IntRect(x, y, width, height));
         ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_fbo);
         ::glFlush();
     }
     ::glReadPixels(x, y, width, height, format, type, data);
-    if (m_attrs.antialias && m_boundFBO == m_multisampleFBO)
+    if (m_attrs.antialias && m_state.boundFBO == m_multisampleFBO)
         ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_multisampleFBO);
 }
 

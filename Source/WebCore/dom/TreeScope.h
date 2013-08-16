@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All Rights Reserved.
- * Copyright (C) 2012 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,12 +54,19 @@ public:
     TreeScope* parentTreeScope() const { return m_parentTreeScope; }
     void setParentTreeScope(TreeScope*);
 
-    Node* focusedNode();
+    Element* focusedElement();
     Element* getElementById(const AtomicString&) const;
+    const Vector<Element*>* getAllElementsById(const AtomicString&) const;
     bool hasElementWithId(AtomicStringImpl* id) const;
     bool containsMultipleElementsWithId(const AtomicString& id) const;
     void addElementById(const AtomicString& elementId, Element*);
     void removeElementById(const AtomicString& elementId, Element*);
+
+    Element* getElementByName(const AtomicString&) const;
+    bool hasElementWithName(AtomicStringImpl*) const;
+    bool containsMultipleElementsWithName(const AtomicString&) const;
+    void addElementByName(const AtomicString&, Element*);
+    void removeElementByName(const AtomicString&, Element*);
 
     Document* documentScope() const { return m_documentScope; }
 
@@ -96,13 +103,34 @@ public:
 
     IdTargetObserverRegistry& idTargetObserverRegistry() const { return *m_idTargetObserverRegistry.get(); }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
-
     static TreeScope* noDocumentInstance()
     {
         DEFINE_STATIC_LOCAL(TreeScope, instance, ());
         return &instance;
     }
+
+    // Nodes belonging to this scope hold guard references -
+    // these are enough to keep the scope from being destroyed, but
+    // not enough to keep it from removing its children. This allows a
+    // node that outlives its scope to still have a valid document
+    // pointer without introducing reference cycles.
+    void guardRef()
+    {
+        ASSERT(!deletionHasBegun());
+        ++m_guardRefCount;
+    }
+
+    void guardDeref()
+    {
+        ASSERT(!deletionHasBegun());
+        --m_guardRefCount;
+        if (!m_guardRefCount && !refCount() && this != noDocumentInstance()) {
+            beginDeletion();
+            delete this;
+        }
+    }
+
+    void removedLastRefToScope();
 
 protected:
     TreeScope(ContainerNode*, Document*);
@@ -118,14 +146,29 @@ protected:
         m_documentScope = document;
     }
 
+    bool hasGuardRefCount() const { return m_guardRefCount; }
+
 private:
     TreeScope();
+
+    virtual void dispose() { }
+
+    int refCount() const;
+#ifndef NDEBUG
+    bool deletionHasBegun();
+    void beginDeletion();
+#else
+    bool deletionHasBegun() { return false; }
+    void beginDeletion() { }
+#endif
 
     ContainerNode* m_rootNode;
     Document* m_documentScope;
     TreeScope* m_parentTreeScope;
+    int m_guardRefCount;
 
     OwnPtr<DocumentOrderedMap> m_elementsById;
+    OwnPtr<DocumentOrderedMap> m_elementsByName;
     OwnPtr<DocumentOrderedMap> m_imageMapsByName;
     OwnPtr<DocumentOrderedMap> m_labelsByForAttribute;
 
@@ -143,6 +186,17 @@ inline bool TreeScope::hasElementWithId(AtomicStringImpl* id) const
 inline bool TreeScope::containsMultipleElementsWithId(const AtomicString& id) const
 {
     return m_elementsById && m_elementsById->containsMultiple(id.impl());
+}
+
+inline bool TreeScope::hasElementWithName(AtomicStringImpl* id) const
+{
+    ASSERT(id);
+    return m_elementsByName && m_elementsByName->contains(id);
+}
+
+inline bool TreeScope::containsMultipleElementsWithName(const AtomicString& name) const
+{
+    return m_elementsByName && m_elementsByName->containsMultiple(name.impl());
 }
 
 Node* nodeFromPoint(Document*, int x, int y, LayoutPoint* localPoint = 0);

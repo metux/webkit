@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,17 +33,35 @@
 
 namespace JSC { namespace Profiler {
 
-Database::Database(JSGlobalData& globalData)
-    : m_globalData(globalData)
+#if COMPILER(MINGW) || COMPILER(MSVC7_OR_LOWER) || OS(WINCE)
+static int databaseCounter;
+#else
+static volatile int databaseCounter;
+#endif
+static SpinLock registrationLock = SPINLOCK_INITIALIZER;
+static int didRegisterAtExit;
+static Database* firstDatabase;
+
+Database::Database(VM& vm)
+    : m_databaseID(atomicIncrement(&databaseCounter))
+    , m_vm(vm)
+    , m_shouldSaveAtExit(false)
+    , m_nextRegisteredDatabase(0)
 {
 }
 
 Database::~Database()
 {
+    if (m_shouldSaveAtExit) {
+        removeDatabaseFromAtExit();
+        performAtExitSave();
+    }
 }
 
 Bytecodes* Database::ensureBytecodesFor(CodeBlock* codeBlock)
 {
+    Locker locker(m_lock);
+    
     codeBlock = codeBlock->baselineVersion();
     
     HashMap<CodeBlock*, Bytecodes*>::iterator iter = m_bytecodesMap.find(codeBlock);
@@ -60,19 +78,16 @@ Bytecodes* Database::ensureBytecodesFor(CodeBlock* codeBlock)
 
 void Database::notifyDestruction(CodeBlock* codeBlock)
 {
+    Locker locker(m_lock);
+    
     m_bytecodesMap.remove(codeBlock);
 }
 
-PassRefPtr<Compilation> Database::newCompilation(Bytecodes* bytecodes, CompilationKind kind)
+void Database::addCompilation(PassRefPtr<Compilation> compilation)
 {
-    RefPtr<Compilation> compilation = adoptRef(new Compilation(bytecodes, kind));
+    ASSERT(!isCompilationThread());
+    
     m_compilations.append(compilation);
-    return compilation.release();
-}
-
-PassRefPtr<Compilation> Database::newCompilation(CodeBlock* codeBlock, CompilationKind kind)
-{
-    return newCompilation(ensureBytecodesFor(codeBlock), kind);
 }
 
 JSValue Database::toJS(ExecState* exec) const
@@ -82,12 +97,12 @@ JSValue Database::toJS(ExecState* exec) const
     JSArray* bytecodes = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_bytecodes.size(); ++i)
         bytecodes->putDirectIndex(exec, i, m_bytecodes[i].toJS(exec));
-    result->putDirect(exec->globalData(), exec->propertyNames().bytecodes, bytecodes);
+    result->putDirect(exec->vm(), exec->propertyNames().bytecodes, bytecodes);
     
     JSArray* compilations = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_compilations.size(); ++i)
         compilations->putDirectIndex(exec, i, m_compilations[i]->toJS(exec));
-    result->putDirect(exec->globalData(), exec->propertyNames().compilations, compilations);
+    result->putDirect(exec->vm(), exec->propertyNames().compilations, compilations);
     
     return result;
 }
@@ -95,7 +110,7 @@ JSValue Database::toJS(ExecState* exec) const
 String Database::toJSON() const
 {
     JSGlobalObject* globalObject = JSGlobalObject::create(
-        m_globalData, JSGlobalObject::createStructure(m_globalData, jsNull()));
+        m_vm, JSGlobalObject::createStructure(m_vm, jsNull()));
     
     return JSONStringify(globalObject->globalExec(), toJS(globalObject->globalExec()), 0);
 }
@@ -108,6 +123,63 @@ bool Database::save(const char* filename) const
     
     out->print(toJSON());
     return true;
+}
+
+void Database::registerToSaveAtExit(const char* filename)
+{
+    m_atExitSaveFilename = filename;
+    
+    if (m_shouldSaveAtExit)
+        return;
+    
+    addDatabaseToAtExit();
+    m_shouldSaveAtExit = true;
+}
+
+void Database::addDatabaseToAtExit()
+{
+    if (atomicIncrement(&didRegisterAtExit) == 1)
+        atexit(atExitCallback);
+    
+    TCMalloc_SpinLockHolder holder(&registrationLock);
+    m_nextRegisteredDatabase = firstDatabase;
+    firstDatabase = this;
+}
+
+void Database::removeDatabaseFromAtExit()
+{
+    TCMalloc_SpinLockHolder holder(&registrationLock);
+    for (Database** current = &firstDatabase; *current; current = &(*current)->m_nextRegisteredDatabase) {
+        if (*current != this)
+            continue;
+        *current = m_nextRegisteredDatabase;
+        m_nextRegisteredDatabase = 0;
+        m_shouldSaveAtExit = false;
+        break;
+    }
+}
+
+void Database::performAtExitSave() const
+{
+    save(m_atExitSaveFilename.data());
+}
+
+Database* Database::removeFirstAtExitDatabase()
+{
+    TCMalloc_SpinLockHolder holder(&registrationLock);
+    Database* result = firstDatabase;
+    if (result) {
+        firstDatabase = result->m_nextRegisteredDatabase;
+        result->m_nextRegisteredDatabase = 0;
+        result->m_shouldSaveAtExit = false;
+    }
+    return result;
+}
+
+void Database::atExitCallback()
+{
+    while (Database* database = removeFirstAtExitDatabase())
+        database->performAtExitSave();
 }
 
 } } // namespace JSC::Profiler

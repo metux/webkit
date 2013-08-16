@@ -57,7 +57,7 @@ public:
         return adoptRef(new FTPDirectoryDocumentParser(document));
     }
 
-    virtual void append(const SegmentedString&);
+    virtual void append(PassRefPtr<StringImpl>);
     virtual void finish();
 
     virtual bool isWaitingForScripts() const { return false; }
@@ -304,10 +304,10 @@ bool FTPDirectoryDocumentParser::loadDocumentTemplate()
     RefPtr<Element> tableElement = document()->getElementById("ftpDirectoryTable");
     if (!tableElement)
         LOG_ERROR("Unable to find element by id \"ftpDirectoryTable\" in the template document.");
-    else if (!tableElement->hasTagName(tableTag))
+    else if (!isHTMLTableElement(tableElement.get()))
         LOG_ERROR("Element of id \"ftpDirectoryTable\" is not a table element");
     else 
-        m_tableElement = static_cast<HTMLTableElement*>(tableElement.get());
+        m_tableElement = toHTMLTableElement(tableElement.get());
 
     // Bail if we found the table element
     if (m_tableElement)
@@ -315,7 +315,7 @@ bool FTPDirectoryDocumentParser::loadDocumentTemplate()
 
     // Otherwise create one manually
     tableElement = document()->createElement(tableTag, false);
-    m_tableElement = static_cast<HTMLTableElement*>(tableElement.get());
+    m_tableElement = toHTMLTableElement(tableElement.get());
     m_tableElement->setAttribute("id", "ftpDirectoryTable", IGNORE_EXCEPTION);
 
     // If we didn't find the table element, lets try to append our own to the body
@@ -340,14 +340,16 @@ void FTPDirectoryDocumentParser::createBasicDocument()
     document()->appendChild(bodyElement, IGNORE_EXCEPTION);
 
     RefPtr<Element> tableElement = document()->createElement(tableTag, false);
-    m_tableElement = static_cast<HTMLTableElement*>(tableElement.get());
+    m_tableElement = toHTMLTableElement(tableElement.get());
     m_tableElement->setAttribute("id", "ftpDirectoryTable", IGNORE_EXCEPTION);
 
     bodyElement->appendChild(m_tableElement, IGNORE_EXCEPTION);
 }
 
-void FTPDirectoryDocumentParser::append(const SegmentedString& source)
+void FTPDirectoryDocumentParser::append(PassRefPtr<StringImpl> inputSource)
 {
+    String source(inputSource);
+
     // Make sure we have the table element to append to by loading the template set in the pref, or
     // creating a very basic document with the appropriate table
     if (!m_tableElement) {

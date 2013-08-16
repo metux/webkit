@@ -31,7 +31,7 @@ namespace WebCore {
 class HTMLInputElement;
 class SearchPopupMenu;
 
-class RenderSearchField : public RenderTextControlSingleLine, private PopupMenuClient {
+class RenderSearchField FINAL : public RenderTextControlSingleLine, private PopupMenuClient {
 public:
     RenderSearchField(Element*);
     virtual ~RenderSearchField();
@@ -47,8 +47,8 @@ public:
 
 private:
     virtual void centerContainerIfNeeded(RenderBox*) const OVERRIDE;
-    virtual LayoutUnit computeControlHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const OVERRIDE;
-    virtual LayoutUnit computeHeightLimit() const OVERRIDE;
+    virtual LayoutUnit computeControlLogicalHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const OVERRIDE;
+    virtual LayoutUnit computeLogicalHeightLimit() const OVERRIDE;
     virtual void updateFromElement() OVERRIDE;
     EVisibility visibilityForCancelButton() const;
     const AtomicString& autosaveName() const;

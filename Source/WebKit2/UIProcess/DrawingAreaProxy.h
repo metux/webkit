@@ -62,13 +62,15 @@ public:
     virtual void waitForBackingStoreUpdateOnNextPaint() { }
 
     const WebCore::IntSize& size() const { return m_size; }
-    void setSize(const WebCore::IntSize&, const WebCore::IntSize& scrollOffset);
+    void setSize(const WebCore::IntSize&, const WebCore::IntSize&, const WebCore::IntSize& scrollOffset);
 
-    virtual void pageCustomRepresentationChanged() { }
-    virtual void waitForPossibleGeometryUpdate() { }
+    // The timeout, in seconds, we use when waiting for a DidUpdateGeometry message.
+    static const double didUpdateBackingStoreStateTimeout;
+
+    virtual void waitForPossibleGeometryUpdate(double = didUpdateBackingStoreStateTimeout) { }
 
     virtual void colorSpaceDidChange() { }
-    virtual void minimumLayoutWidthDidChange() { }
+    virtual void minimumLayoutSizeDidChange() { }
 
 #if USE(COORDINATED_GRAPHICS)
     virtual void updateViewport();
@@ -86,6 +88,7 @@ protected:
     WebPageProxy* m_webPageProxy;
 
     WebCore::IntSize m_size;
+    WebCore::IntSize m_layerPosition;
     WebCore::IntSize m_scrollOffset;
 
 #if USE(COORDINATED_GRAPHICS)
@@ -108,7 +111,7 @@ private:
     virtual void updateAcceleratedCompositingMode(uint64_t /* backingStoreStateID */, const LayerTreeContext&) { }
 #endif
 #if PLATFORM(MAC)
-    virtual void didUpdateGeometry(const WebCore::IntSize& newIntrinsicContentSize) { }
+    virtual void didUpdateGeometry() { }
     virtual void intrinsicContentSizeDidChange(const WebCore::IntSize& newIntrinsicContentSize) { }
 #endif
 };

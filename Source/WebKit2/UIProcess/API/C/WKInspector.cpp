@@ -28,7 +28,6 @@
 
 #include "WKAPICast.h"
 #include "WebInspectorProxy.h"
-#include <wtf/UnusedParam.h>
 
 using namespace WebKit;
 
@@ -48,6 +47,16 @@ WKPageRef WKInspectorGetPage(WKInspectorRef inspectorRef)
 #else
     UNUSED_PARAM(inspectorRef);
     return 0;
+#endif
+}
+
+bool WKInspectorIsConnected(WKInspectorRef inspectorRef)
+{
+#if ENABLE(INSPECTOR)
+    return toImpl(inspectorRef)->isConnected();
+#else
+    UNUSED_PARAM(inspectorRef);
+    return false;
 #endif
 }
 
@@ -71,10 +80,28 @@ bool WKInspectorIsFront(WKInspectorRef inspectorRef)
 #endif
 }
 
+void WKInspectorConnect(WKInspectorRef inspectorRef)
+{
+#if ENABLE(INSPECTOR)
+    toImpl(inspectorRef)->connect();
+#else
+    UNUSED_PARAM(inspectorRef);
+#endif
+}
+
 void WKInspectorShow(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->show();
+#else
+    UNUSED_PARAM(inspectorRef);
+#endif
+}
+
+void WKInspectorHide(WKInspectorRef inspectorRef)
+{
+#if ENABLE(INSPECTOR)
+    toImpl(inspectorRef)->hide();
 #else
     UNUSED_PARAM(inspectorRef);
 #endif

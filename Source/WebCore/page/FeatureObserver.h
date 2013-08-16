@@ -45,7 +45,7 @@ public:
     enum Feature {
         PageDestruction,
         LegacyNotifications,
-        UnusedSlot01, // Prior to 10/2012, we used this slot for LegacyBlobBuilder.
+        MultipartMainResource,
         PrefixedIndexedDB,
         WorkerStart,
         SharedWorkerStart,
@@ -54,7 +54,7 @@ public:
         PrefixedContentSecurityPolicy,
         UnprefixedIndexedDB,
         OpenWebDatabase,
-        LegacyHTMLNotifications,
+        UnusedSlot01, // We used this slot for LegacyHTMLNotifications.
         LegacyTextNotifications,
         UnprefixedRequestAnimationFrame,
         PrefixedRequestAnimationFrame,
@@ -96,6 +96,17 @@ public:
         ResultsAttribute,
         StepAttribute,
         PageVisits,
+        HTMLMarqueeElement,
+        CSSOverflowMarquee,
+        Reflection,
+        CursorVisibility,
+        StorageInfo,
+        XFrameOptions,
+        XFrameOptionsSameOrigin,
+        XFrameOptionsSameOriginWithBadAncestorChain,
+        DeprecatedFlexboxWebContent,
+        DeprecatedFlexboxChrome,
+        DeprecatedFlexboxChromeExtension,
         // Add new features above this line. Don't change assigned numbers of each items.
         NumberOfFeatures, // This enum value must be last.
     };
@@ -103,6 +114,8 @@ public:
     static void observe(Document*, Feature);
     static void observe(DOMWindow*, Feature);
     void didCommitLoad();
+
+    const BitVector* accumulatedFeatureBits() const { return m_featureBits.get(); }
 
 private:
     void didObserve(Feature feature)

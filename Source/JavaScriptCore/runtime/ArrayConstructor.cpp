@@ -61,14 +61,14 @@ ArrayConstructor::ArrayConstructor(JSGlobalObject* globalObject, Structure* stru
 
 void ArrayConstructor::finishCreation(ExecState* exec, ArrayPrototype* arrayPrototype)
 {
-    Base::finishCreation(exec->globalData(), arrayPrototype->classInfo()->className);
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, arrayPrototype, DontEnum | DontDelete | ReadOnly);
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
+    Base::finishCreation(exec->vm(), arrayPrototype->classInfo()->className);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().prototype, arrayPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool ArrayConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+bool ArrayConstructor::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::arrayConstructorTable(exec), jsCast<ArrayConstructor*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::arrayConstructorTable(exec), jsCast<ArrayConstructor*>(object), propertyName, slot);
 }
 
 bool ArrayConstructor::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)

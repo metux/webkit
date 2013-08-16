@@ -52,9 +52,8 @@ WebCore::InspectorFrontendChannel* WebInspectorClient::openInspectorFrontend(Ins
 
 void WebInspectorClient::closeInspectorFrontend()
 {
-    if (m_page->inspector()) {
+    if (m_page->inspector())
         m_page->inspector()->didClose();
-    }
 }
 
 void WebInspectorClient::bringFrontendToFront()
@@ -74,8 +73,11 @@ void WebInspectorClient::highlight()
         RefPtr<PageOverlay> highlightOverlay = PageOverlay::create(this);
         m_highlightOverlay = highlightOverlay.get();
         m_page->installPageOverlay(highlightOverlay.release(), true);
-    } else
         m_highlightOverlay->setNeedsDisplay();
+    } else {
+        m_highlightOverlay->stopFadeOutAnimation();
+        m_highlightOverlay->setNeedsDisplay();
+    }
 }
 
 void WebInspectorClient::hideHighlight()
@@ -101,6 +103,14 @@ bool WebInspectorClient::sendMessageToFrontend(const String& message)
     if (inspectorPage)
         return doDispatchMessageOnFrontendPage(inspectorPage->corePage(), message);
 
+    return false;
+}
+
+bool WebInspectorClient::supportsFrameInstrumentation()
+{
+#if USE(COORDINATED_GRAPHICS)
+    return true;
+#endif
     return false;
 }
 

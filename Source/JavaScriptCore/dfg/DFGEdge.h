@@ -31,6 +31,7 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGCommon.h"
+#include "DFGUseKind.h"
 
 namespace JSC { namespace DFG {
 
@@ -38,42 +39,118 @@ class AdjacencyList;
 
 class Edge {
 public:
-    Edge()
-        : m_encodedWord(makeWord(0, UntypedUse))
+    explicit Edge(Node* node = 0, UseKind useKind = UntypedUse, ProofStatus proofStatus = NeedsCheck, KillStatus killStatus = DoesNotKill)
+#if USE(JSVALUE64)
+        : m_encodedWord(makeWord(node, useKind, proofStatus, killStatus))
+#else
+        : m_node(node)
+        , m_encodedWord(makeWord(useKind, proofStatus, killStatus))
+#endif
     {
     }
     
-    explicit Edge(Node* node)
-        : m_encodedWord(makeWord(node, UntypedUse))
-    {
-    }
-    
-    Edge(Node* node, UseKind useKind)
-        : m_encodedWord(makeWord(node, useKind))
-    {
-    }
-    
-    Node* node() const { return bitwise_cast<Node*>(m_encodedWord & ~((1 << shift()) - 1)); }
+#if USE(JSVALUE64)
+    Node* node() const { return bitwise_cast<Node*>(m_encodedWord >> shift()); }
+#else
+    Node* node() const { return m_node; }
+#endif
+
     Node& operator*() const { return *node(); }
     Node* operator->() const { return node(); }
     
     void setNode(Node* node)
     {
-        m_encodedWord = makeWord(node, useKind());
+#if USE(JSVALUE64)
+        m_encodedWord = makeWord(node, useKind(), proofStatus(), killStatus());
+#else
+        m_node = node;
+#endif
     }
     
+    UseKind useKindUnchecked() const
+    {
+#if USE(JSVALUE64)
+        unsigned masked = m_encodedWord & (((1 << shift()) - 1));
+        unsigned shifted = masked >> 2;
+#else
+        unsigned shifted = static_cast<UseKind>(m_encodedWord) >> 2;
+#endif
+        ASSERT(shifted < static_cast<unsigned>(LastUseKind));
+        UseKind result = static_cast<UseKind>(shifted);
+        ASSERT(node() || result == UntypedUse);
+        return result;
+    }
     UseKind useKind() const
     {
         ASSERT(node());
-        unsigned masked = m_encodedWord & (((1 << shift()) - 1));
-        ASSERT(masked < LastUseKind);
-        return static_cast<UseKind>(masked);
+        return useKindUnchecked();
     }
     void setUseKind(UseKind useKind)
     {
         ASSERT(node());
-        m_encodedWord = makeWord(node(), useKind);
+#if USE(JSVALUE64)
+        m_encodedWord = makeWord(node(), useKind, proofStatus(), killStatus());
+#else
+        m_encodedWord = makeWord(useKind, proofStatus(), killStatus());
+#endif
     }
+    
+    ProofStatus proofStatusUnchecked() const
+    {
+        return proofStatusForIsProved(m_encodedWord & 1);
+    }
+    ProofStatus proofStatus() const
+    {
+        ASSERT(node());
+        return proofStatusUnchecked();
+    }
+    void setProofStatus(ProofStatus proofStatus)
+    {
+        ASSERT(node());
+#if USE(JSVALUE64)
+        m_encodedWord = makeWord(node(), useKind(), proofStatus, killStatus());
+#else
+        m_encodedWord = makeWord(useKind(), proofStatus, killStatus());
+#endif
+    }
+    bool isProved() const
+    {
+        return proofStatus() == IsProved;
+    }
+    bool needsCheck() const
+    {
+        return proofStatus() == NeedsCheck;
+    }
+    
+    bool willNotHaveCheck() const
+    {
+        return isProved() || useKind() == UntypedUse;
+    }
+    bool willHaveCheck() const
+    {
+        return !willNotHaveCheck();
+    }
+    
+    KillStatus killStatusUnchecked() const
+    {
+        return killStatusForDoesKill(m_encodedWord & 2);
+    }
+    KillStatus killStatus() const
+    {
+        ASSERT(node());
+        return killStatusUnchecked();
+    }
+    void setKillStatus(KillStatus killStatus)
+    {
+        ASSERT(node());
+#if USE(JSVALUE64)
+        m_encodedWord = makeWord(node(), useKind(), proofStatus(), killStatus);
+#else
+        m_encodedWord = makeWord(useKind(), proofStatus(), killStatus);
+#endif
+    }
+    bool doesKill() const { return DFG::doesKill(killStatus()); }
+    bool doesNotKill() const { return !doesKill(); }
     
     bool isSet() const { return !!node(); }
     
@@ -84,11 +161,15 @@ public:
     
     bool operator==(Edge other) const
     {
+#if USE(JSVALUE64)
         return m_encodedWord == other.m_encodedWord;
+#else
+        return m_node == other.m_node && m_encodedWord == other.m_encodedWord;
+#endif
     }
     bool operator!=(Edge other) const
     {
-        return m_encodedWord != other.m_encodedWord;
+        return !(*this == other);
     }
     
     void dump(PrintStream&) const;
@@ -96,17 +177,30 @@ public:
 private:
     friend class AdjacencyList;
     
-    static uint32_t shift() { return 2; }
+#if USE(JSVALUE64)
+    static uint32_t shift() { return 7; }
     
-    static uintptr_t makeWord(Node* node, UseKind useKind)
+    static uintptr_t makeWord(Node* node, UseKind useKind, ProofStatus proofStatus, KillStatus killStatus)
     {
-        uintptr_t value = bitwise_cast<uintptr_t>(node);
-        ASSERT(!(value & ((1 << shift()) - 1)));
+        ASSERT(sizeof(node) == 8);
+        uintptr_t shiftedValue = bitwise_cast<uintptr_t>(node) << shift();
+        ASSERT((shiftedValue >> shift()) == bitwise_cast<uintptr_t>(node));
         ASSERT(useKind >= 0 && useKind < LastUseKind);
-        ASSERT(LastUseKind <= (1 << shift()));
-        return value | static_cast<uintptr_t>(useKind);
+        ASSERT((static_cast<uintptr_t>(LastUseKind) << 2) <= (static_cast<uintptr_t>(2) << shift()));
+        return shiftedValue | (static_cast<uintptr_t>(useKind) << 2) | (DFG::doesKill(killStatus) << 1) | DFG::isProved(proofStatus);
     }
     
+#else
+    static uintptr_t makeWord(UseKind useKind, ProofStatus proofStatus, KillStatus killStatus)
+    {
+        return (static_cast<uintptr_t>(useKind) << 2) | (DFG::doesKill(killStatus) << 1) | DFG::isProved(proofStatus);
+    }
+    
+    Node* m_node;
+#endif
+    // On 64-bit this holds both the pointer and the use kind, while on 32-bit
+    // this just holds the use kind. In both cases this may be hijacked by
+    // AdjacencyList for storing firstChild and numChildren.
     uintptr_t m_encodedWord;
 };
 

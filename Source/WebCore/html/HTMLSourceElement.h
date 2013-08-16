@@ -32,7 +32,7 @@
 
 namespace WebCore {
 
-class HTMLSourceElement : public HTMLElement {
+class HTMLSourceElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLSourceElement> create(const QualifiedName&, Document*);
 
@@ -53,11 +53,6 @@ private:
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     void errorEventTimerFired(Timer<HTMLSourceElement>*);
-
-#if ENABLE(MICRODATA)
-    virtual String itemValueText() const OVERRIDE;
-    virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
-#endif
 
     Timer<HTMLSourceElement> m_errorEventTimer;
 };

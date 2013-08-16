@@ -151,7 +151,7 @@ void SVGTRefElement::updateReferencedText(Element* target)
         textContent = target->textContent();
 
     ASSERT(shadow());
-    ShadowRoot* root = shadow()->oldestShadowRoot();
+    ShadowRoot* root = shadow()->shadowRoot();
     if (!root->firstChild())
         root->appendChild(Text::create(document(), textContent), ASSERT_NO_EXCEPTION);
     else {
@@ -168,7 +168,7 @@ void SVGTRefElement::detachTarget()
     String emptyContent;
 
     ASSERT(shadow());
-    Node* container = shadow()->oldestShadowRoot()->firstChild();
+    Node* container = shadow()->shadowRoot()->firstChild();
     if (container)
         container->setTextContent(emptyContent, IGNORE_EXCEPTION);
 
@@ -187,7 +187,7 @@ bool SVGTRefElement::isSupportedAttribute(const QualifiedName& attrName)
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty())
         SVGURIReference::addSupportedAttributes(supportedAttributes);
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGTRefElement::parseAttribute(const QualifiedName& name, const AtomicString& value)

@@ -28,6 +28,8 @@
 
 #include "Attribute.h"
 #include "HTMLToken.h"
+#include <wtf/OwnPtr.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -88,8 +90,8 @@ public:
         Vector<UChar, 32> value;
     };
 
-    typedef WTF::Vector<Attribute, 10> AttributeList;
-    typedef WTF::Vector<UChar, 1024> DataVector;
+    typedef Vector<Attribute, 10> AttributeList;
+    typedef Vector<UChar, 256> DataVector;
 
     HTMLToken() { clear(); }
 
@@ -149,16 +151,6 @@ public:
         ASSERT(character);
         m_data.append(character);
         m_orAllData |= character;
-    }
-
-    // FIXME: Rename this to copyNameAsString().
-    String nameString() const
-    {
-        if (!m_data.size())
-            return emptyString();
-        if (isAll8BitData())
-            return String::make8BitFrom16BitSource(m_data.data(), m_data.size());
-        return String(m_data);
     }
 
     /* DOCTYPE Tokens */

@@ -28,6 +28,7 @@
 
 #include "CSSComputedStyleDeclaration.h"
 #include "HTMLNames.h"
+#include "HTMLTableElement.h"
 #include "InlineIterator.h"
 #include "InlineTextBox.h"
 #include "Logging.h"
@@ -39,8 +40,8 @@
 #include "Text.h"
 #include "TextIterator.h"
 #include "VisiblePosition.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 #include <stdio.h>
 #include <wtf/text/CString.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -51,7 +52,7 @@ using namespace HTMLNames;
 
 static Node* nextRenderedEditable(Node* node)
 {
-    while ((node = node->nextLeafNode())) {
+    while ((node = nextLeafNode(node))) {
         if (!node->rendererIsEditable())
             continue;
         RenderObject* renderer = node->renderer();
@@ -65,7 +66,7 @@ static Node* nextRenderedEditable(Node* node)
 
 static Node* previousRenderedEditable(Node* node)
 {
-    while ((node = node->previousLeafNode())) {
+    while ((node = previousLeafNode(node))) {
         if (!node->rendererIsEditable())
             continue;
         RenderObject* renderer = node->renderer();
@@ -300,15 +301,7 @@ Element* Position::element() const
     Node* n = anchorNode();
     while (n && !n->isElementNode())
         n = n->parentNode();
-    return static_cast<Element*>(n);
-}
-
-PassRefPtr<CSSComputedStyleDeclaration> Position::computedStyle() const
-{
-    Element* elem = element();
-    if (!elem)
-        return 0;
-    return CSSComputedStyleDeclaration::create(elem);
+    return toElement(n);
 }
 
 Position Position::previous(PositionMoveType moveType) const
@@ -569,7 +562,7 @@ static bool endsOfNodeAreVisuallyDistinctPositions(Node* node)
         return true;
         
     // Don't include inline tables.
-    if (node->hasTagName(tableTag))
+    if (isHTMLTableElement(node))
         return false;
     
     // There is a VisiblePosition inside an empty inline-block container.
@@ -993,6 +986,11 @@ bool Position::isRenderedCharacter() const
     return false;
 }
 
+static bool inSameEnclosingBlockFlowElement(Node* a, Node* b)
+{
+    return a && b && deprecatedEnclosingBlockFlowElement(a) == deprecatedEnclosingBlockFlowElement(b);
+}
+
 bool Position::rendersInDifferentPosition(const Position &pos) const
 {
     if (isNull() || pos.isNull())
@@ -1029,7 +1027,7 @@ bool Position::rendersInDifferentPosition(const Position &pos) const
     if (pos.deprecatedNode()->hasTagName(brTag) && isCandidate())
         return true;
                 
-    if (deprecatedNode()->enclosingBlockFlowElement() != pos.deprecatedNode()->enclosingBlockFlowElement())
+    if (!inSameEnclosingBlockFlowElement(deprecatedNode(), pos.deprecatedNode()))
         return true;
 
     if (deprecatedNode()->isTextNode() && !inRenderedText())
@@ -1090,7 +1088,7 @@ Position Position::leadingWhitespacePosition(EAffinity affinity, bool considerNo
         return Position();
 
     Position prev = previousCharacterPosition(affinity);
-    if (prev != *this && prev.deprecatedNode()->inSameContainingBlockFlowElement(deprecatedNode()) && prev.deprecatedNode()->isTextNode()) {
+    if (prev != *this && inSameEnclosingBlockFlowElement(deprecatedNode(), prev.deprecatedNode()) && prev.deprecatedNode()->isTextNode()) {
         String string = toText(prev.deprecatedNode())->data();
         UChar c = string[prev.deprecatedEditingOffset()];
         if (considerNonCollapsibleWhitespace ? (isSpaceOrNewline(c) || c == noBreakSpace) : isCollapsibleWhitespace(c))

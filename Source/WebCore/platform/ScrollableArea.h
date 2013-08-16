@@ -69,8 +69,8 @@ public:
     ScrollElasticity horizontalScrollElasticity() const { return static_cast<ScrollElasticity>(m_horizontalScrollElasticity); }
 
     bool inLiveResize() const { return m_inLiveResize; }
-    void willStartLiveResize();
-    void willEndLiveResize();
+    virtual void willStartLiveResize();
+    virtual void willEndLiveResize();
 
     void contentAreaWillPaint() const;
     void mouseEnteredContentArea() const;
@@ -82,11 +82,10 @@ public:
     void contentAreaDidHide() const;
 
     void finishCurrentScrollAnimations() const;
+    virtual bool scrollbarAnimationsAreSuppressed() const { return false; }
 
-    void didAddVerticalScrollbar(Scrollbar*);
-    void willRemoveVerticalScrollbar(Scrollbar*);
-    virtual void didAddHorizontalScrollbar(Scrollbar*);
-    virtual void willRemoveHorizontalScrollbar(Scrollbar*);
+    virtual void didAddScrollbar(Scrollbar*, ScrollbarOrientation);
+    virtual void willRemoveScrollbar(Scrollbar*, ScrollbarOrientation);
 
     virtual void contentsResized();
 
@@ -146,6 +145,13 @@ public:
     virtual IntSize contentsSize() const = 0;
     virtual IntSize overhangAmount() const { return IntSize(); }
     virtual IntPoint lastKnownMousePosition() const { return IntPoint(); }
+    virtual bool isHandlingWheelEvent() const { return false; }
+
+    virtual int headerHeight() const { return 0; }
+    virtual int footerHeight() const { return 0; }
+
+    // The totalContentsSize() is equivalent to the contentsSize() plus the header and footer heights.
+    IntSize totalContentsSize() const;
 
     virtual bool shouldSuspendScrollAnimations() const { return true; }
     virtual void scrollbarStyleChanged(int /*newStyle*/, bool /*forceUpdate*/) { }
@@ -167,7 +173,7 @@ public:
     // NOTE: Only called from Internals for testing.
     void setScrollOffsetFromInternals(const IntPoint&);
 
-    static IntPoint constrainScrollPositionForOverhang(const IntRect& visibleContentRect, const IntSize& contentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin);
+    static IntPoint constrainScrollPositionForOverhang(const IntRect& visibleContentRect, const IntSize& totalContentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin, int headerHeight, int footetHeight);
     IntPoint constrainScrollPositionForOverhang(const IntPoint& scrollPosition);
 
     // Let subclasses provide a way of asking for and servicing scroll
@@ -180,8 +186,6 @@ public:
     virtual bool usesCompositedScrolling() const { return false; }
 #endif
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
-
 protected:
     ScrollableArea();
     virtual ~ScrollableArea();
@@ -193,6 +197,8 @@ protected:
     virtual void invalidateScrollCornerRect(const IntRect&) = 0;
 
 #if USE(ACCELERATED_COMPOSITING)
+    friend class ScrollingCoordinator;
+    virtual GraphicsLayer* layerForScrolling() const { return 0; }
     virtual GraphicsLayer* layerForHorizontalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForVerticalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForScrollCorner() const { return 0; }

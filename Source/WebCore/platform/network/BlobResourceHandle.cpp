@@ -44,6 +44,7 @@
 #include "ResourceHandleClient.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
+#include "SharedBuffer.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -82,10 +83,10 @@ class BlobResourceSynchronousLoader : public ResourceHandleClient {
 public:
     BlobResourceSynchronousLoader(ResourceError&, ResourceResponse&, Vector<char>&);
 
-    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse&);
-    virtual void didReceiveData(ResourceHandle*, const char*, int, int /*encodedDataLength*/);
-    virtual void didFinishLoading(ResourceHandle*, double /*finishTime*/);
-    virtual void didFail(ResourceHandle*, const ResourceError&);
+    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse&) OVERRIDE;
+    virtual void didReceiveData(ResourceHandle*, const char*, int, int /*encodedDataLength*/) OVERRIDE;
+    virtual void didFinishLoading(ResourceHandle*, double /*finishTime*/) OVERRIDE;
+    virtual void didFail(ResourceHandle*, const ResourceError&) OVERRIDE;
 
 private:
     ResourceError& m_error;
@@ -133,7 +134,7 @@ void BlobResourceSynchronousLoader::didFail(ResourceHandle*, const ResourceError
 ///////////////////////////////////////////////////////////////////////////////
 // BlobResourceHandle
 
-PassRefPtr<BlobResourceHandle> BlobResourceHandle::createAsync(PassRefPtr<BlobStorageData> blobData, const ResourceRequest& request, ResourceHandleClient* client)
+PassRefPtr<BlobResourceHandle> BlobResourceHandle::createAsync(BlobStorageData* blobData, const ResourceRequest& request, ResourceHandleClient* client)
 {
     // FIXME: Should probably call didFail() instead of blocking the load without explanation.
     if (!equalIgnoringCase(request.httpMethod(), "GET"))
@@ -142,7 +143,7 @@ PassRefPtr<BlobResourceHandle> BlobResourceHandle::createAsync(PassRefPtr<BlobSt
     return adoptRef(new BlobResourceHandle(blobData, request, client, true));
 }
 
-void BlobResourceHandle::loadResourceSynchronously(PassRefPtr<BlobStorageData> blobData, const ResourceRequest& request, ResourceError& error, ResourceResponse& response, Vector<char>& data)
+void BlobResourceHandle::loadResourceSynchronously(BlobStorageData* blobData, const ResourceRequest& request, ResourceError& error, ResourceResponse& response, Vector<char>& data)
 {
     if (!equalIgnoringCase(request.httpMethod(), "GET")) {
         error = ResourceError(webKitBlobResourceDomain, methodNotAllowed, response.url(), "Request method must be GET");
@@ -168,9 +169,9 @@ BlobResourceHandle::BlobResourceHandle(PassRefPtr<BlobStorageData> blobData, con
     , m_sizeItemCount(0)
     , m_readItemCount(0)
     , m_fileOpened(false)
-{    
+{
     if (m_async)
-        m_asyncStream = client->createAsyncFileStream(this);
+        m_asyncStream = AsyncFileStream::create(this);
     else
         m_stream = FileStream::create();
 }
@@ -378,7 +379,9 @@ int BlobResourceHandle::readSync(char* buf, int length)
     else
         result = length - remaining;
 
-    notifyReceiveData(buf, result);
+    if (result > 0)
+        notifyReceiveData(buf, result);
+
     if (!result)
         notifyFinish();
 
@@ -580,7 +583,14 @@ void BlobResourceHandle::notifyResponseOnSuccess()
     response.setHTTPStatusText(isRangeRequest ? httpPartialContentText : httpOKText);
     if (!m_blobData->contentDisposition().isEmpty())
         response.setHTTPHeaderField("Content-Disposition", m_blobData->contentDisposition());
-    client()->didReceiveResponse(this, response);
+
+    // BlobResourceHandle cannot be used with downloading, and doesn't even wait for continueDidReceiveResponse.
+    // It's currently client's responsibility to know that didReceiveResponseAsync cannot be used to convert a
+    // load into a download or blobs.
+    if (client()->usesAsyncCallbacks())
+        client()->didReceiveResponseAsync(this, response);
+    else
+        client()->didReceiveResponse(this, response);
 }
 
 void BlobResourceHandle::notifyResponseOnError()
@@ -606,13 +616,19 @@ void BlobResourceHandle::notifyResponseOnError()
         response.setHTTPStatusText(httpInternalErrorText);
         break;
     }
-    client()->didReceiveResponse(this, response);
+
+    // Note that we don't wait for continueDidReceiveResponse when using didReceiveResponseAsync.
+    // This is not formally correct, but the client has to be a no-op anyway, because blobs can't be downloaded.
+    if (client()->usesAsyncCallbacks())
+        client()->didReceiveResponseAsync(this, response);
+    else
+        client()->didReceiveResponse(this, response);
 }
 
 void BlobResourceHandle::notifyReceiveData(const char* data, int bytesRead)
 {
     if (client())
-        client()->didReceiveData(this, data, bytesRead, bytesRead);
+        client()->didReceiveBuffer(this, SharedBuffer::create(data, bytesRead), bytesRead);
 }
 
 void BlobResourceHandle::notifyFail(int errorCode)

@@ -9,12 +9,10 @@ WebKitURISchemeRequest
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -73,5 +71,14 @@ WebKitURISchemeRequest
 @stream: 
 @stream_length: 
 @mime_type: 
+
+
+<!-- ##### FUNCTION webkit_uri_scheme_request_finish_error ##### -->
+<para>
+
+</para>
+
+@request: 
+@error: 
 
 

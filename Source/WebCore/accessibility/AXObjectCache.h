@@ -150,7 +150,7 @@ public:
     bool nodeIsTextControl(const Node*);
 
     AXID platformGenerateAXID() const;
-    AccessibilityObject* objectFromAXID(AXID id) const { return m_objects.get(id).get(); }
+    AccessibilityObject* objectFromAXID(AXID id) const { return m_objects.get(id); }
 
     // Text marker utilities.
     void textMarkerDataForVisiblePosition(TextMarkerData&, const VisiblePosition&);
@@ -240,6 +240,16 @@ private:
     AXID getAXID(AccessibilityObject*);
 };
 
+class AXAttributeCacheEnabler
+{
+public:
+    explicit AXAttributeCacheEnabler(AXObjectCache *cache);
+    ~AXAttributeCacheEnabler();
+    
+private:
+    AXObjectCache* m_cache;
+};
+    
 bool nodeHasRole(Node*, const String& role);
 // This will let you know if aria-hidden was explicitly set to false.
 bool isNodeAriaVisible(Node*);

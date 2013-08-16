@@ -38,56 +38,36 @@
 
 namespace JSC { namespace LLInt {
 
-static void fixupPCforExceptionIfNeeded(ExecState* exec)
-{
-    CodeBlock* codeBlock = exec->codeBlock();
-    ASSERT(!!codeBlock);
-    Instruction* pc = exec->currentVPC();
-    exec->setCurrentVPC(codeBlock->adjustPCIfAtCallSite(pc));
-}
-
-void interpreterThrowInCaller(ExecState* exec, ReturnAddressPtr pc)
-{
-    JSGlobalData* globalData = &exec->globalData();
-    NativeCallFrameTracer tracer(globalData, exec);
-#if LLINT_SLOW_PATH_TRACING
-    dataLog("Throwing exception ", globalData->exception, ".\n");
-#endif
-    fixupPCforExceptionIfNeeded(exec);
-    genericThrow(
-        globalData, exec, globalData->exception,
-        exec->codeBlock()->bytecodeOffset(exec, pc));
-}
-
 Instruction* returnToThrowForThrownException(ExecState* exec)
 {
     UNUSED_PARAM(exec);
     return LLInt::exceptionInstructions();
 }
 
+static void doThrow(ExecState* exec, Instruction* pc)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+    genericThrow(vm, exec, vm->exception, pc - exec->codeBlock()->instructions().begin());
+}
+
 Instruction* returnToThrow(ExecState* exec, Instruction* pc)
 {
-    JSGlobalData* globalData = &exec->globalData();
-    NativeCallFrameTracer tracer(globalData, exec);
 #if LLINT_SLOW_PATH_TRACING
-    dataLog("Throwing exception ", globalData->exception, " (returnToThrow).\n");
+    VM* vm = &exec->vm();
+    dataLog("Throwing exception ", vm->exception, " (returnToThrow).\n");
 #endif
-    fixupPCforExceptionIfNeeded(exec);
-    genericThrow(globalData, exec, globalData->exception, pc - exec->codeBlock()->instructions().begin());
-    
+    doThrow(exec, pc);
     return LLInt::exceptionInstructions();
 }
 
 void* callToThrow(ExecState* exec, Instruction* pc)
 {
-    JSGlobalData* globalData = &exec->globalData();
-    NativeCallFrameTracer tracer(globalData, exec);
 #if LLINT_SLOW_PATH_TRACING
-    dataLog("Throwing exception ", globalData->exception, " (callToThrow).\n");
+    VM* vm = &exec->vm();
+    dataLog("Throwing exception ", vm->exception, " (callToThrow).\n");
 #endif
-    fixupPCforExceptionIfNeeded(exec);
-    genericThrow(globalData, exec, globalData->exception, pc - exec->codeBlock()->instructions().begin());
-
+    doThrow(exec, pc);
     return LLInt::getCodePtr(llint_throw_during_call_trampoline);
 }
 

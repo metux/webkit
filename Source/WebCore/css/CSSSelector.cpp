@@ -3,7 +3,7 @@
  *               1999 Waldo Bastian (bastian@kde.org)
  *               2001 Andreas Schlapbach (schlpbch@iam.unibe.ch)
  *               2001-2003 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2002, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2002, 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2008 David Smith (catfish.man@gmail.com)
  * Copyright (C) 2010 Google Inc. All rights reserved.
  *
@@ -215,6 +215,7 @@ PseudoId CSSSelector::pseudoId(PseudoType type)
     case PseudoLang:
     case PseudoNot:
     case PseudoRoot:
+    case PseudoScope:
     case PseudoScrollbarBack:
     case PseudoScrollbarForward:
     case PseudoWindowInactive:
@@ -242,9 +243,6 @@ PseudoId CSSSelector::pseudoId(PseudoType type)
 #endif
 #if ENABLE(IFRAME_SEAMLESS)
     case PseudoSeamlessDocument:
-#endif
-#if ENABLE(SHADOW_DOM)
-    case PseudoDistributed:
 #endif
         return NOPSEUDO;
     case PseudoNotParsed:
@@ -336,11 +334,9 @@ static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoTypeMap(
 #if ENABLE(IFRAME_SEAMLESS)
     DEFINE_STATIC_LOCAL(AtomicString, seamlessDocument, ("-webkit-seamless-document", AtomicString::ConstructFromLiteral));
 #endif
-#if ENABLE(SHADOW_DOM)
-    DEFINE_STATIC_LOCAL(AtomicString, distributed, ("-webkit-distributed(", AtomicString::ConstructFromLiteral));
-#endif
     DEFINE_STATIC_LOCAL(AtomicString, inRange, ("in-range", AtomicString::ConstructFromLiteral));
     DEFINE_STATIC_LOCAL(AtomicString, outOfRange, ("out-of-range", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, scope, ("scope", AtomicString::ConstructFromLiteral));
 
     static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoType = 0;
     if (!nameToPseudoType) {
@@ -395,6 +391,7 @@ static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoTypeMap(
         nameToPseudoType->set(optional.impl(), CSSSelector::PseudoOptional);
         nameToPseudoType->set(required.impl(), CSSSelector::PseudoRequired);
         nameToPseudoType->set(resizer.impl(), CSSSelector::PseudoResizer);
+        nameToPseudoType->set(scope.impl(), CSSSelector::PseudoScope);
         nameToPseudoType->set(scrollbar.impl(), CSSSelector::PseudoScrollbar);
         nameToPseudoType->set(scrollbarButton.impl(), CSSSelector::PseudoScrollbarButton);
         nameToPseudoType->set(scrollbarCorner.impl(), CSSSelector::PseudoScrollbarCorner);
@@ -422,9 +419,6 @@ static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoTypeMap(
 #if ENABLE(IFRAME_SEAMLESS)
         nameToPseudoType->set(seamlessDocument.impl(), CSSSelector::PseudoSeamlessDocument);
 #endif
-#if ENABLE(SHADOW_DOM)
-        nameToPseudoType->set(distributed.impl(), CSSSelector::PseudoDistributed);
-#endif
         nameToPseudoType->set(inRange.impl(), CSSSelector::PseudoInRange);
         nameToPseudoType->set(outOfRange.impl(), CSSSelector::PseudoOutOfRange);
     }
@@ -447,12 +441,6 @@ CSSSelector::PseudoType CSSSelector::parsePseudoType(const AtomicString& name)
         return PseudoUserAgentCustomElement;
 
     return PseudoUnknown;
-}
-
-bool CSSSelector::isCustomPseudoType(const AtomicString& name)
-{
-    CSSSelector::PseudoType type = parsePseudoType(name);
-    return type == PseudoUserAgentCustomElement || type == PseudoWebKitCustomElement;
 }
 
 void CSSSelector::extractPseudoType() const
@@ -520,6 +508,7 @@ void CSSSelector::extractPseudoType() const
     case PseudoRequired:
     case PseudoReadOnly:
     case PseudoReadWrite:
+    case PseudoScope:
     case PseudoValid:
     case PseudoInvalid:
     case PseudoIndeterminate:
@@ -604,7 +593,7 @@ bool CSSSelector::operator==(const CSSSelector& other) const
     return true;
 }
 
-String CSSSelector::selectorText() const
+String CSSSelector::selectorText(const String& rightSide) const
 {
     StringBuilder str;
 
@@ -665,7 +654,7 @@ String CSSSelector::selectorText() const
             const AtomicString& prefix = cs->attribute().prefix();
             if (!prefix.isNull()) {
                 str.append(prefix);
-                str.append("|");
+                str.append('|');
             }
             str.append(cs->attribute().localName());
             switch (cs->m_match) {
@@ -705,34 +694,29 @@ String CSSSelector::selectorText() const
     }
 
     if (const CSSSelector* tagHistory = cs->tagHistory()) {
-        String tagHistoryText = tagHistory->selectorText();
         switch (cs->relation()) {
         case CSSSelector::Descendant:
-            return tagHistoryText + " " + str.toString();
+            return tagHistory->selectorText(" " + str.toString() + rightSide);
         case CSSSelector::Child:
-            return tagHistoryText + " > " + str.toString();
+            return tagHistory->selectorText(" > " + str.toString() + rightSide);
         case CSSSelector::DirectAdjacent:
-            return tagHistoryText + " + " + str.toString();
+            return tagHistory->selectorText(" + " + str.toString() + rightSide);
         case CSSSelector::IndirectAdjacent:
-            return tagHistoryText + " ~ " + str.toString();
+            return tagHistory->selectorText(" ~ " + str.toString() + rightSide);
         case CSSSelector::SubSelector:
             ASSERT_NOT_REACHED();
         case CSSSelector::ShadowDescendant:
-            return tagHistoryText + str.toString();
-#if ENABLE(SHADOW_DOM)
-        case CSSSelector::ShadowDistributed:
-            return tagHistoryText + "::-webkit-distributed(" + str.toString() + ")";
-#endif
+            return tagHistory->selectorText(str.toString() + rightSide);
         }
     }
-
-    return str.toString();
+    return str.toString() + rightSide;
 }
 
-void CSSSelector::setAttribute(const QualifiedName& value)
+void CSSSelector::setAttribute(const QualifiedName& value, bool isCaseInsensitive)
 {
     createRareData();
     m_data.m_rareData->m_attribute = value;
+    m_data.m_rareData->m_attributeCanonicalLocalName = isCaseInsensitive ? value.localName().lower() : value.localName();
 }
 
 void CSSSelector::setArgument(const AtomicString& value)

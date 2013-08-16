@@ -30,6 +30,7 @@
 
 #include <glib.h>
 #include <gst/gst.h>
+#include <gst/pbutils/install-plugins.h>
 #include <wtf/Forward.h>
 
 typedef struct _GstBuffer GstBuffer;
@@ -43,11 +44,15 @@ public:
     ~MediaPlayerPrivateGStreamer();
     static void registerMediaEngine(MediaEngineRegistrar);
     gboolean handleMessage(GstMessage*);
+    void handlePluginInstallerResult(GstInstallPluginsReturn);
 
     bool hasVideo() const { return m_hasVideo; }
     bool hasAudio() const { return m_hasAudio; }
 
     void load(const String &url);
+#if ENABLE(MEDIA_SOURCE)
+    void load(const String& url, PassRefPtr<MediaSource>);
+#endif
     void commitLoad();
     void cancelLoad();
 
@@ -109,6 +114,7 @@ private:
 
     void cacheDuration();
     void updateStates();
+    void asyncStateChangeDone();
 
     void createGSTPlayBin();
     bool changePipelineState(GstState);
@@ -135,11 +141,14 @@ private:
     bool m_resetPipeline;
     bool m_paused;
     bool m_seeking;
+    bool m_seekIsPending;
+    float m_timeOfOverlappingSeek;
+    bool m_canFallBackToLastFinishedSeekPositon;
     bool m_buffering;
     float m_playbackRate;
     bool m_errorOccured;
-    gfloat m_mediaDuration;
-    bool m_startedBuffering;
+    mutable gfloat m_mediaDuration;
+    bool m_downloadFinished;
     Timer<MediaPlayerPrivateGStreamer> m_fillTimer;
     float m_maxTimeLoaded;
     int m_bufferingPercentage;
@@ -158,6 +167,7 @@ private:
     bool m_preservesPitch;
     GstState m_requestedState;
     GRefPtr<GstElement> m_autoAudioSink;
+    bool m_missingPlugins;
 };
 }
 

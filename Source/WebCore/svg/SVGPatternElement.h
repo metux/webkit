@@ -30,7 +30,7 @@
 #include "SVGAnimatedTransformList.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGFitToViewBox.h"
-#include "SVGLangSpace.h"
+#include "SVGNames.h"
 #include "SVGStyledElement.h"
 #include "SVGTests.h"
 #include "SVGURIReference.h"
@@ -40,12 +40,11 @@ namespace WebCore {
 
 struct PatternAttributes;
  
-class SVGPatternElement : public SVGStyledElement,
-                          public SVGURIReference,
-                          public SVGTests,
-                          public SVGLangSpace,
-                          public SVGExternalResourcesRequired,
-                          public SVGFitToViewBox {
+class SVGPatternElement FINAL : public SVGStyledElement,
+                                public SVGURIReference,
+                                public SVGTests,
+                                public SVGExternalResourcesRequired,
+                                public SVGFitToViewBox {
 public:
     static PassRefPtr<SVGPatternElement> create(const QualifiedName&, Document*);
 
@@ -87,6 +86,12 @@ private:
     virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
     virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 };
+
+inline SVGPatternElement* toSVGPatternElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(SVGNames::patternTag));
+    return static_cast<SVGPatternElement*>(node);
+}
 
 } // namespace WebCore
 

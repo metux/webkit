@@ -35,7 +35,7 @@ namespace WebCore {
 class HTMLMediaElement;
 class HTMLVideoElement;
 
-class RenderVideo : public RenderMedia {
+class RenderVideo FINAL : public RenderMedia {
 public:
     RenderVideo(HTMLVideoElement*);
     virtual ~RenderVideo();
@@ -82,6 +82,8 @@ private:
 #endif
 
     void updatePlayer();
+
+    virtual bool foregroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect, unsigned maxDepthToTest) const OVERRIDE;
 
     LayoutSize m_cachedImageSize;
 };

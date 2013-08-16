@@ -119,7 +119,6 @@ WebInspector.ScriptSnippetModel.prototype = {
             return;
         snippet.name = newName;
         this._restoreBreakpoints(uiSourceCode, breakpointLocations);
-        uiSourceCode.urlChanged(snippet.name);
     },
 
     /**
@@ -434,6 +433,18 @@ WebInspector.SnippetScriptFile.prototype = {
         return this._isDivergingFromVM;
     },
 
+    checkMapping: function()
+    {
+    },
+
+    /**
+     * @return {boolean}
+     */
+    isMergingToVM: function()
+    {
+        return false;
+    },
+
     /**
      * @param {boolean} isDivergingFromVM
      */
@@ -485,6 +496,14 @@ WebInspector.SnippetScriptMapping.prototype = {
     uiLocationToRawLocation: function(uiSourceCode, lineNumber, columnNumber)
     {
         return this._scriptSnippetModel._uiLocationToRawLocation(uiSourceCode, lineNumber, columnNumber);
+    },
+
+    /**
+     * @return {boolean}
+     */
+    isIdentity: function()
+    {
+        return true;
     },
 
     /**

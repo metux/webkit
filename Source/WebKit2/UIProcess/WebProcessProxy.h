@@ -60,8 +60,8 @@ struct WebNavigationDataStore;
 
 class WebProcessProxy : public ChildProcessProxy, ResponsivenessTimer::Client {
 public:
-    typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem> > WebBackForwardListItemMap;
-    typedef HashMap<uint64_t, RefPtr<WebFrameProxy> > WebFrameProxyMap;
+    typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem>> WebBackForwardListItemMap;
+    typedef HashMap<uint64_t, RefPtr<WebFrameProxy>> WebFrameProxyMap;
     typedef HashMap<uint64_t, WebPageProxy*> WebPageProxyMap;
 
     static PassRefPtr<WebProcessProxy> create(PassRefPtr<WebContext>);
@@ -109,11 +109,17 @@ public:
     void pageVisibilityChanged(WebPageProxy*);
     void pagePreferencesChanged(WebPageProxy*);
 
+    void didSaveToPageCache();
+    void releasePageCache();
+
 #if PLATFORM(MAC)
     bool allPagesAreProcessSuppressible() const;
     static bool pageIsProcessSuppressible(WebPageProxy*);
     void updateProcessSuppressionState();
 #endif
+
+    void enableSuddenTermination();
+    void disableSuddenTermination();
 
     void requestTermination();
 
@@ -138,10 +144,10 @@ private:
 
     // Plugins
 #if ENABLE(NETSCAPE_PLUGIN_API)
-    void getPlugins(bool refresh, Vector<WebCore::PluginInfo>& plugins);
+    void getPlugins(bool refresh, Vector<WebCore::PluginInfo>& plugins, Vector<WebCore::PluginInfo>& applicationPlugins);
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 #if ENABLE(PLUGIN_PROCESS)
-    void getPluginProcessConnection(const String& pluginPath, uint32_t processType, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
+    void getPluginProcessConnection(uint64_t pluginProcessToken, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
 #elif ENABLE(NETSCAPE_PLUGIN_API)
     void didGetSitesWithPluginData(const Vector<String>& sites, uint64_t callbackID);
     void didClearPluginSiteData(uint64_t callbackID);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,13 +36,15 @@
 #include "MacroAssemblerCodeRef.h"
 #include "ThunkGenerator.h"
 #include "Weak.h"
+#include "WeakInlines.h"
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/ThreadingPrimitives.h>
 
 namespace JSC {
 
-class JSGlobalData;
+class VM;
 class NativeExecutable;
 
 class JITThunks {
@@ -50,21 +52,26 @@ public:
     JITThunks();
     ~JITThunks();
 
-    MacroAssemblerCodePtr ctiNativeCall(JSGlobalData*);
-    MacroAssemblerCodePtr ctiNativeConstruct(JSGlobalData*);
+    MacroAssemblerCodePtr ctiNativeCall(VM*);
+    MacroAssemblerCodePtr ctiNativeConstruct(VM*);
 
-    MacroAssemblerCodeRef ctiStub(JSGlobalData*, ThunkGenerator);
+    MacroAssemblerCodeRef ctiStub(VM*, ThunkGenerator);
 
-    NativeExecutable* hostFunctionStub(JSGlobalData*, NativeFunction, NativeFunction constructor);
-    NativeExecutable* hostFunctionStub(JSGlobalData*, NativeFunction, ThunkGenerator, Intrinsic);
+    NativeExecutable* hostFunctionStub(VM*, NativeFunction, NativeFunction constructor);
+    NativeExecutable* hostFunctionStub(VM*, NativeFunction, ThunkGenerator, Intrinsic);
 
     void clearHostFunctionStubs();
 
 private:
+    // Main thread can hold this lock for a while, so use an adaptive mutex.
+    typedef Mutex Lock;
+    typedef MutexLocker Locker;
+    
     typedef HashMap<ThunkGenerator, MacroAssemblerCodeRef> CTIStubMap;
     CTIStubMap m_ctiStubMap;
-    typedef HashMap<NativeFunction, Weak<NativeExecutable> > HostFunctionStubMap;
+    typedef HashMap<std::pair<NativeFunction, NativeFunction>, Weak<NativeExecutable> > HostFunctionStubMap;
     OwnPtr<HostFunctionStubMap> m_hostFunctionStubMap;
+    Lock m_lock;
 };
 
 } // namespace JSC

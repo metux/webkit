@@ -37,6 +37,7 @@
 #include "RenderText.h"
 #include "RenderView.h"
 #include "StyleInheritedData.h"
+#include <wtf/StackStats.h>
 
 using namespace std;
 
@@ -233,11 +234,13 @@ void RenderRubyRun::layout()
 {
     RenderBlock::layout();
     
-    // Place the RenderRubyText such that its bottom is flush with the lineTop of the first line of the RenderRubyBase.
     RenderRubyText* rt = rubyText();
     if (!rt)
         return;
+
+    rt->setLogicalLeft(0);
     
+    // Place the RenderRubyText such that its bottom is flush with the lineTop of the first line of the RenderRubyBase.
     LayoutUnit lastLineRubyTextBottom = rt->logicalHeight();
     LayoutUnit firstLineRubyTextTop = 0;
     RootInlineBox* rootBox = rt->lastRootBox();
@@ -270,7 +273,6 @@ void RenderRubyRun::layout()
     }
 
     // Update our overflow to account for the new RenderRubyText position.
-    m_overflow.clear();
     computeOverflow(clientLogicalBottom());
 }
 

@@ -27,7 +27,13 @@
 #include "GRefPtrGStreamer.h"
 #include "MediaPlayerPrivate.h"
 
+#include <glib.h>
+
 #include <wtf/Forward.h>
+
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+#include "TextureMapperPlatformLayer.h"
+#endif
 
 typedef struct _GstBuffer GstBuffer;
 typedef struct _GstElement GstElement;
@@ -43,7 +49,11 @@ class IntSize;
 class IntRect;
 class GStreamerGWorld;
 
-class MediaPlayerPrivateGStreamerBase : public MediaPlayerPrivateInterface {
+class MediaPlayerPrivateGStreamerBase : public MediaPlayerPrivateInterface
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+    , public TextureMapperPlatformLayer
+#endif
+{
 
 public:
     ~MediaPlayerPrivateGStreamerBase();
@@ -93,11 +103,18 @@ public:
     unsigned audioDecodedByteCount() const;
     unsigned videoDecodedByteCount() const;
 
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+    virtual PlatformLayer* platformLayer() const { return const_cast<MediaPlayerPrivateGStreamerBase*>(this); }
+    virtual bool supportsAcceleratedRendering() const { return true; }
+    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float);
+#endif
+
 protected:
     MediaPlayerPrivateGStreamerBase(MediaPlayer*);
     GstElement* createVideoSink(GstElement* pipeline);
     void setStreamVolumeElement(GstStreamVolume*);
     virtual GstElement* audioSink() const { return 0; }
+    GRefPtr<GstCaps> currentVideoSinkCaps() const;
 
     MediaPlayer* m_player;
     GRefPtr<GstStreamVolume> m_volumeElement;
@@ -107,6 +124,7 @@ protected:
     MediaPlayer::ReadyState m_readyState;
     MediaPlayer::NetworkState m_networkState;
     IntSize m_size;
+    GMutex* m_bufferMutex;
     GstBuffer* m_buffer;
 #if USE(NATIVE_FULLSCREEN_VIDEO)
     RefPtr<GStreamerGWorld> m_gstGWorld;
@@ -117,8 +135,10 @@ protected:
     unsigned long m_repaintHandler;
     unsigned long m_volumeSignalHandler;
     unsigned long m_muteSignalHandler;
-    GRefPtr<GstPad> m_videoSinkPad;
     mutable IntSize m_videoSize;
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+    PassRefPtr<BitmapTexture> updateTexture(TextureMapper*);
+#endif
 };
 }
 

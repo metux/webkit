@@ -20,7 +20,7 @@
 #ifndef SVGElementRareData_h
 #define SVGElementRareData_h
 
-#include "CSSParserMode.h"
+#include "StylePropertySet.h"
 #include "StyleResolver.h"
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
@@ -74,11 +74,11 @@ public:
     CSSCursorImageValue* cursorImageValue() const { return m_cursorImageValue; }
     void setCursorImageValue(CSSCursorImageValue* cursorImageValue) { m_cursorImageValue = cursorImageValue; }
 
-    StylePropertySet* animatedSMILStyleProperties() const { return m_animatedSMILStyleProperties.get(); }
-    StylePropertySet* ensureAnimatedSMILStyleProperties()
+    MutableStylePropertySet* animatedSMILStyleProperties() const { return m_animatedSMILStyleProperties.get(); }
+    MutableStylePropertySet* ensureAnimatedSMILStyleProperties()
     {
         if (!m_animatedSMILStyleProperties)
-            m_animatedSMILStyleProperties = StylePropertySet::create(SVGAttributeMode);
+            m_animatedSMILStyleProperties = MutableStylePropertySet::create(SVGAttributeMode);
         return m_animatedSMILStyleProperties.get();
     }
 
@@ -94,7 +94,7 @@ public:
             return 0;
         if (!m_overrideComputedStyle || m_needsOverrideComputedStyleUpdate) {
             // The style computed here contains no CSS Animations/Transitions or SMIL induced rules - this is needed to compute the "base value" for the SMIL animation sandwhich model.
-            m_overrideComputedStyle = element->document()->styleResolver()->styleForElement(element, parentStyle, DisallowStyleSharing, MatchAllRulesExcludingSMIL);
+            m_overrideComputedStyle = element->document()->ensureStyleResolver()->styleForElement(element, parentStyle, DisallowStyleSharing, MatchAllRulesExcludingSMIL);
             m_needsOverrideComputedStyleUpdate = false;
         }
         ASSERT(m_overrideComputedStyle);
@@ -113,7 +113,7 @@ private:
     bool m_instancesUpdatesBlocked : 1;
     bool m_useOverrideComputedStyle : 1;
     bool m_needsOverrideComputedStyleUpdate : 1;
-    RefPtr<StylePropertySet> m_animatedSMILStyleProperties;
+    RefPtr<MutableStylePropertySet> m_animatedSMILStyleProperties;
     RefPtr<RenderStyle> m_overrideComputedStyle;
 };
 

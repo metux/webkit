@@ -30,6 +30,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include <wtf/PrintStream.h>
 #include <wtf/StdLibExtras.h>
 
 namespace JSC { namespace DFG {
@@ -52,22 +53,23 @@ namespace JSC { namespace DFG {
 #define NodeMayOverflow           0x080
 #define NodeMayNegZero            0x100
                                 
-#define NodeBackPropMask         0x3E00
+#define NodeBackPropMask         0x1E00
 #define NodeUseBottom            0x0000
 #define NodeUsedAsNumber         0x0200 // The result of this computation may be used in a context that observes fractional, or bigger-than-int32, results.
 #define NodeNeedsNegZero         0x0400 // The result of this computation may be used in a context that observes -0.
 #define NodeUsedAsOther          0x0800 // The result of this computation may be used in a context that distinguishes between NaN and other things (like undefined).
 #define NodeUsedAsValue          (NodeUsedAsNumber | NodeNeedsNegZero | NodeUsedAsOther)
 #define NodeUsedAsInt            0x1000 // The result of this computation is known to be used in a context that prefers, but does not require, integer values.
-#define NodeUsedAsIntLocally     0x2000 // Same as NodeUsedAsInt, but within the same basic block.
 
 #define NodeArithFlagsMask       (NodeBehaviorMask | NodeBackPropMask)
 
-#define NodeDoesNotExit          0x4000 // This flag is negated to make it natural for the default to be that a node does exit.
+#define NodeDoesNotExit          0x2000 // This flag is negated to make it natural for the default to be that a node does exit.
 
-#define NodeRelevantToOSR        0x8000
+#define NodeRelevantToOSR        0x4000
 
-typedef uint16_t NodeFlags;
+#define NodeExitsForward         0x8000
+
+typedef uint32_t NodeFlags;
 
 static inline bool nodeUsedAsNumber(NodeFlags flags)
 {
@@ -100,7 +102,8 @@ static inline bool nodeCanSpeculateInteger(NodeFlags flags)
     return true;
 }
 
-const char* nodeFlagsAsString(NodeFlags);
+void dumpNodeFlags(PrintStream&, NodeFlags);
+MAKE_PRINT_ADAPTOR(NodeFlagsDump, NodeFlags, dumpNodeFlags);
 
 } } // namespace JSC::DFG
 

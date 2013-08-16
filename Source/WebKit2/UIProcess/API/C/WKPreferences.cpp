@@ -69,6 +69,16 @@ bool WKPreferencesGetJavaScriptEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->javaScriptEnabled();
 }
 
+void WKPreferencesSetJavaScriptMarkupEnabled(WKPreferencesRef preferencesRef, bool javaScriptMarkupEnabled)
+{
+    toImpl(preferencesRef)->setJavaScriptMarkupEnabled(javaScriptMarkupEnabled);
+}
+
+bool WKPreferencesGetJavaScriptMarkupEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->javaScriptMarkupEnabled();
+}
+
 void WKPreferencesSetLoadsImagesAutomatically(WKPreferencesRef preferencesRef, bool loadsImagesAutomatically)
 {
     toImpl(preferencesRef)->setLoadsImagesAutomatically(loadsImagesAutomatically);
@@ -331,15 +341,6 @@ WKStringRef WKPreferencesCopyDefaultTextEncodingName(WKPreferencesRef preference
 
 void WKPreferencesSetPrivateBrowsingEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
-    if (toImpl(preferencesRef)->privateBrowsingEnabled() == enabled)
-        return;
-
-    // Regardless of whether there are any open pages, we should tell WebContext, so that it could track browsing sessions.
-    if (enabled)
-        WebContext::willStartUsingPrivateBrowsing();
-    else
-        WebContext::willStopUsingPrivateBrowsing();
-
     toImpl(preferencesRef)->setPrivateBrowsingEnabled(enabled);
 }
 
@@ -416,6 +417,16 @@ void WKPreferencesSetAcceleratedCompositingEnabled(WKPreferencesRef preferencesR
 bool WKPreferencesGetAcceleratedCompositingEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->acceleratedCompositingEnabled();
+}
+
+void WKPreferencesSetAcceleratedCompositingForOverflowScrollEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setAcceleratedCompositingForOverflowScrollEnabled(flag);
+}
+
+bool WKPreferencesGetAcceleratedCompositingForOverflowScrollEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->acceleratedCompositingForOverflowScrollEnabled();
 }
 
 void WKPreferencesSetCompositingBordersVisible(WKPreferencesRef preferencesRef, bool flag)
@@ -656,6 +667,16 @@ void WKPreferencesSetFullScreenEnabled(WKPreferencesRef preferencesRef, bool ena
 bool WKPreferencesGetFullScreenEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->fullScreenEnabled();
+}
+
+void WKPreferencesSetAsynchronousSpellCheckingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setAsynchronousSpellCheckingEnabled(enabled);
+}
+
+bool WKPreferencesGetAsynchronousSpellCheckingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->asynchronousSpellCheckingEnabled();
 }
 
 void WKPreferencesSetAVFoundationEnabled(WKPreferencesRef preferencesRef, bool enabled)
@@ -964,6 +985,36 @@ bool WKPreferencesGetPlugInSnapshottingEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->plugInSnapshottingEnabled();
 }
 
+void WKPreferencesSetSnapshotAllPlugIns(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setSnapshotAllPlugIns(enabled);
+}
+
+bool WKPreferencesGetSnapshotAllPlugIns(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->snapshotAllPlugIns();
+}
+
+void WKPreferencesSetAutostartOriginPlugInSnapshottingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setAutostartOriginPlugInSnapshottingEnabled(enabled);
+}
+
+bool WKPreferencesGetAutostartOriginPlugInSnapshottingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->autostartOriginPlugInSnapshottingEnabled();
+}
+
+void WKPreferencesSetPrimaryPlugInSnapshotDetectionEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setPrimaryPlugInSnapshotDetectionEnabled(enabled);
+}
+
+bool WKPreferencesGetPrimaryPlugInSnapshotDetectionEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->primaryPlugInSnapshotDetectionEnabled();
+}
+
 void WKPreferencesSetPDFPluginEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
     toImpl(preferencesRef)->setPDFPluginEnabled(enabled);
@@ -1032,4 +1083,64 @@ void WKPreferencesSetPageVisibilityBasedProcessSuppressionEnabled(WKPreferencesR
 bool WKPreferencesGetPageVisibilityBasedProcessSuppressionEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->pageVisibilityBasedProcessSuppressionEnabled();
+}
+
+void WKPreferencesSetSmartInsertDeleteEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setSmartInsertDeleteEnabled(enabled);
+}
+
+bool WKPreferencesGetSmartInsertDeleteEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->smartInsertDeleteEnabled();
+}
+
+void WKPreferencesSetSelectTrailingWhitespaceEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setSelectTrailingWhitespaceEnabled(enabled);
+}
+
+bool WKPreferencesGetSelectTrailingWhitespaceEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->selectTrailingWhitespaceEnabled();
+}
+
+void WKPreferencesSetShowsURLsInToolTipsEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setShowsURLsInToolTipsEnabled(enabled);
+}
+
+bool WKPreferencesGetShowsURLsInToolTipsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->showsURLsInToolTipsEnabled();
+}
+
+void WKPreferencesSetHiddenPageDOMTimerThrottlingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setHiddenPageDOMTimerThrottlingEnabled(enabled);
+}
+
+bool WKPreferencesGetHiddenPageDOMTimerThrottlingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->hiddenPageDOMTimerThrottlingEnabled();
+}
+
+void WKPreferencesSetHiddenPageCSSAnimationSuspensionEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setHiddenPageCSSAnimationSuspensionEnabled(enabled);
+}
+
+bool WKPreferencesGetHiddenPageCSSAnimationSuspensionEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->hiddenPageCSSAnimationSuspensionEnabled();
+}
+
+void WKPreferencesSetIncrementalRenderingSuppressionTimeout(WKPreferencesRef preferencesRef, double timeout)
+{
+    toImpl(preferencesRef)->setIncrementalRenderingSuppressionTimeout(timeout);
+}
+
+double WKPreferencesGetIncrementalRenderingSuppressionTimeout(WKPreferencesRef preferencesRef)
+{
+    return toAPI(toImpl(preferencesRef)->incrementalRenderingSuppressionTimeout());
 }

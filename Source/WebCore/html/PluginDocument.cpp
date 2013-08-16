@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2008, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,13 +28,12 @@
 #include "DocumentLoader.h"
 #include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
 #include "HTMLEmbedElement.h"
 #include "HTMLHtmlElement.h"
 #include "HTMLNames.h"
-#include "MainResourceLoader.h"
-#include "NodeList.h"
 #include "Page.h"
 #include "RawDataDocumentParser.h"
 #include "RenderEmbeddedObject.h"
@@ -96,7 +95,7 @@ void PluginDocumentParser::createDocumentStructure()
     if (loader)
         m_embedElement->setAttribute(typeAttr, loader->writer()->mimeType());
 
-    static_cast<PluginDocument*>(document())->setPluginNode(m_embedElement);
+    toPluginDocument(document())->setPluginElement(m_embedElement);
 
     body->appendChild(embedElement, IGNORE_EXCEPTION);
 }
@@ -112,7 +111,7 @@ void PluginDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
     if (!frame)
         return;
     Settings* settings = frame->settings();
-    if (!settings || !frame->loader()->subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
+    if (!settings)
         return;
 
     document()->updateLayout();
@@ -130,13 +129,13 @@ void PluginDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
             // In a plugin document, the main resource is the plugin. If we have a null widget, that means
             // the loading of the plugin was cancelled, which gives us a null mainResourceLoader(), so we
             // need to have this call in a null check of the widget or of mainResourceLoader().
-            frame->loader()->activeDocumentLoader()->mainResourceLoader()->setDataBufferingPolicy(DoNotBufferData);
+            frame->loader()->activeDocumentLoader()->setMainResourceDataBufferingPolicy(DoNotBufferData);
         }
     }
 }
 
 PluginDocument::PluginDocument(Frame* frame, const KURL& url)
-    : HTMLDocument(frame, url)
+    : HTMLDocument(frame, url, PluginDocumentClass)
     , m_shouldLoadPluginManually(true)
 {
     setCompatibilityMode(QuirksMode);
@@ -150,25 +149,25 @@ PassRefPtr<DocumentParser> PluginDocument::createParser()
 
 Widget* PluginDocument::pluginWidget()
 {
-    if (m_pluginNode && m_pluginNode->renderer()) {
-        ASSERT(m_pluginNode->renderer()->isEmbeddedObject());
-        return toRenderEmbeddedObject(m_pluginNode->renderer())->widget();
+    if (m_pluginElement && m_pluginElement->renderer()) {
+        ASSERT(m_pluginElement->renderer()->isEmbeddedObject());
+        return toRenderEmbeddedObject(m_pluginElement->renderer())->widget();
     }
     return 0;
 }
 
-Node* PluginDocument::pluginNode()
+void PluginDocument::setPluginElement(PassRefPtr<HTMLPlugInElement> element)
 {
-    return m_pluginNode.get();
+    m_pluginElement = element;
 }
 
-void PluginDocument::detach()
+void PluginDocument::detach(const AttachContext& context)
 {
-    // Release the plugin node so that we don't have a circular reference.
-    m_pluginNode = 0;
+    // Release the plugin Element so that we don't have a circular reference.
+    m_pluginElement = 0;
     if (FrameLoader* loader = frame()->loader())
         loader->client()->redirectDataToPlugin(0);
-    HTMLDocument::detach();
+    HTMLDocument::detach(context);
 }
 
 void PluginDocument::cancelManualPluginLoad()
@@ -178,7 +177,8 @@ void PluginDocument::cancelManualPluginLoad()
     if (!shouldLoadPluginManually())
         return;
 
-    frame()->loader()->activeDocumentLoader()->mainResourceLoader()->cancel();
+    DocumentLoader* documentLoader = frame()->loader()->activeDocumentLoader();
+    documentLoader->cancelMainResourceLoad(frame()->loader()->cancelledError(documentLoader->request()));
     setShouldLoadPluginManually(false);
 }
 

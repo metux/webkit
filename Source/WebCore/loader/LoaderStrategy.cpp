@@ -26,10 +26,9 @@
 #include "config.h"
 #include "LoaderStrategy.h"
 
+#include "BlobRegistryImpl.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadScheduler.h"
-
-#if USE(PLATFORM_STRATEGIES)
 
 namespace WebCore {
 
@@ -38,11 +37,17 @@ ResourceLoadScheduler* LoaderStrategy::resourceLoadScheduler()
     return WebCore::resourceLoadScheduler();
 }
 
-void LoaderStrategy::loadResourceSynchronously(NetworkingContext* context, unsigned long, const ResourceRequest& request, StoredCredentials storedCredentials, ResourceError& error, ResourceResponse& response, Vector<char>& data)
+void LoaderStrategy::loadResourceSynchronously(NetworkingContext* context, unsigned long, const ResourceRequest& request, StoredCredentials storedCredentials, ClientCredentialPolicy, ResourceError& error, ResourceResponse& response, Vector<char>& data)
 {
     ResourceHandle::loadResourceSynchronously(context, request, storedCredentials, error, response, data);
 }
 
-} // namespace WebCore
+#if ENABLE(BLOB)
+BlobRegistry* LoaderStrategy::createBlobRegistry()
+{
+    return new BlobRegistryImpl;
+}
+#endif
 
-#endif // USE(PLATFORM_STRATEGIES)
+
+} // namespace WebCore

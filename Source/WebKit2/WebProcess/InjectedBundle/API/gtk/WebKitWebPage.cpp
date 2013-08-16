@@ -20,11 +20,13 @@
 #include "config.h"
 #include "WebKitWebPage.h"
 
+#include "ImageOptions.h"
 #include "ImmutableDictionary.h"
 #include "InjectedBundle.h"
 #include "WKBundleAPICast.h"
 #include "WKBundleFrame.h"
 #include "WebFrame.h"
+#include "WebImage.h"
 #include "WebKitDOMDocumentPrivate.h"
 #include "WebKitMarshal.h"
 #include "WebKitPrivate.h"
@@ -35,6 +37,7 @@
 #include <WebCore/Document.h>
 #include <WebCore/DocumentLoader.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameView.h>
 #include <glib/gi18n-lib.h>
 #include <wtf/text/CString.h>
 
@@ -136,17 +139,17 @@ static WKURLRequestRef willSendRequestForFrame(WKBundlePageRef page, WKBundleFra
 
     ResourceRequest resourceRequest;
     webkitURIRequestGetResourceRequest(request.get(), resourceRequest);
-    WebURLRequest* newRequest = WebURLRequest::create(resourceRequest).leakRef();
+    RefPtr<WebURLRequest> newRequest = WebURLRequest::create(resourceRequest);
 
     ImmutableDictionary::MapType message;
     message.set(String::fromUTF8("Page"), toImpl(page));
     message.set(String::fromUTF8("Identifier"), WebUInt64::create(identifier));
-    message.set(String::fromUTF8("Request"), newRequest);
+    message.set(String::fromUTF8("Request"), newRequest.get());
     if (!toImpl(wkRedirectResponse)->resourceResponse().isNull())
         message.set(String::fromUTF8("RedirectResponse"), toImpl(wkRedirectResponse));
     WebProcess::shared().injectedBundle()->postMessage(String::fromUTF8("WebPage.DidSendRequestForResource"), ImmutableDictionary::adopt(message).get());
 
-    return toAPI(newRequest);
+    return toAPI(newRequest.release().leakRef());
 }
 
 static void didReceiveResponseForResource(WKBundlePageRef page, WKBundleFrameRef, uint64_t identifier, WKURLResponseRef response, const void*)
@@ -281,7 +284,7 @@ WebKitWebPage* webkitWebPageCreate(WebPage* webPage)
         0, // didFailProvisionalLoadWithErrorForFrame
         0, // didCommitLoadForFrame
         didFinishDocumentLoadForFrame,
-        0, // didFinishLoadForFrame,
+        0, // didFinishLoadForFrame
         0, // didFailLoadWithErrorForFrame
         didSameDocumentNavigationForFrame,
         0, // didReceiveTitleForFrame
@@ -306,7 +309,10 @@ WebKitWebPage* webkitWebPageCreate(WebPage* webPage)
         0, // shouldForceUniversalAccessFromLocalURL
         0, // didReceiveIntentForFrame_unavailable
         0, // registerIntentServiceForFrame_unavailable
-        0 // didLayout
+        0, // didLayout
+        0, // featuresUsedInPage
+        0, // willLoadURLRequest;
+        0, // willLoadDataRequest;
     };
     WKBundlePageSetPageLoaderClient(toAPI(webPage), &loaderClient);
 
@@ -325,6 +331,40 @@ WebKitWebPage* webkitWebPageCreate(WebPage* webPage)
     WKBundlePageSetResourceLoadClient(toAPI(webPage), &resourceLoadClient);
 
     return page;
+}
+
+void webkitWebPageDidReceiveMessage(WebKitWebPage* page, const String& messageName, ImmutableDictionary& message)
+{
+    if (messageName == String("GetSnapshot")) {
+        SnapshotOptions snapshotOptions = static_cast<SnapshotOptions>(static_cast<WebUInt64*>(message.get("SnapshotOptions"))->value());
+        uint64_t callbackID = static_cast<WebUInt64*>(message.get("CallbackID"))->value();
+        SnapshotRegion region = static_cast<SnapshotRegion>(static_cast<WebUInt64*>(message.get("SnapshotRegion"))->value());
+
+        RefPtr<WebImage> snapshotImage;
+        WebPage* webPage = page->priv->webPage;
+        if (WebCore::FrameView* frameView = webPage->mainFrameView()) {
+            WebCore::IntRect snapshotRect;
+            switch (region) {
+            case SnapshotRegionVisible:
+                snapshotRect = frameView->visibleContentRect(WebCore::ScrollableArea::ExcludeScrollbars);
+                break;
+            case SnapshotRegionFullDocument:
+                snapshotRect = WebCore::IntRect(WebCore::IntPoint(0, 0), frameView->contentsSize());
+                break;
+            default:
+                ASSERT_NOT_REACHED();
+            }
+            if (!snapshotRect.isEmpty())
+                snapshotImage = webPage->scaledSnapshotWithOptions(snapshotRect, 1, snapshotOptions | SnapshotOptionsShareable);
+        }
+
+        ImmutableDictionary::MapType messageReply;
+        messageReply.set("Page", webPage);
+        messageReply.set("CallbackID", WebUInt64::create(callbackID));
+        messageReply.set("Snapshot", snapshotImage);
+        WebProcess::shared().injectedBundle()->postMessage("WebPage.DidGetSnapshot", ImmutableDictionary::adopt(messageReply).get());
+    } else
+        ASSERT_NOT_REACHED();
 }
 
 /**
@@ -348,6 +388,21 @@ WebKitDOMDocument* webkit_web_page_get_dom_document(WebKitWebPage* webPage)
 }
 
 /**
+ * webkit_web_page_get_id:
+ * @web_page: a #WebKitWebPage
+ *
+ * Get the identifier of the #WebKitWebPage
+ *
+ * Returns: the identifier of @web_page
+ */
+guint64 webkit_web_page_get_id(WebKitWebPage* webPage)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_PAGE(webPage), 0);
+
+    return webPage->priv->webPage->pageID();
+}
+
+/**
  * webkit_web_page_get_uri:
  * @web_page: a #WebKitWebPage
  *
@@ -364,19 +419,4 @@ const gchar* webkit_web_page_get_uri(WebKitWebPage* webPage)
     g_return_val_if_fail(WEBKIT_IS_WEB_PAGE(webPage), 0);
 
     return webPage->priv->uri.data();
-}
-
-/**
- * webkit_web_page_get_id:
- * @web_page: a #WebKitWebPage
- *
- * Get the identifier of the #WebKitWebPage
- *
- * Returns: the identifier of @web_page
- */
-guint64 webkit_web_page_get_id(WebKitWebPage* webPage)
-{
-    g_return_val_if_fail(WEBKIT_IS_WEB_PAGE(webPage), 0);
-
-    return webPage->priv->webPage->pageID();
 }

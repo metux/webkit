@@ -68,8 +68,6 @@
 #define DFG_ENABLE_OSR_ENTRY ENABLE(DFG_JIT)
 // Generate stats on how successful we were in making use of the DFG jit, and remaining on the hot path.
 #define DFG_ENABLE_SUCCESS_STATS 0
-// Enable verification that the DFG is able to insert code for control flow edges.
-#define DFG_ENABLE_EDGE_CODE_VERIFICATION 0
 
 namespace JSC { namespace DFG {
 
@@ -80,13 +78,7 @@ static const BlockIndex NoBlock = UINT_MAX;
 
 struct NodePointerTraits {
     static Node* defaultValue() { return 0; }
-    static void dump(Node* value, PrintStream& out);
-};
-
-enum UseKind {
-    UntypedUse,
-    DoubleUse,
-    LastUseKind // Must always be the last entry in the enum, as it is used to denote the number of enum elements.
+    static bool isEmptyForDump(Node* value) { return !value; }
 };
 
 // Use RefChildren if the child ref counts haven't already been adjusted using
@@ -105,37 +97,6 @@ enum RefNodeMode {
     RefNode,
     DontRefNode
 };
-
-inline const char* useKindToString(UseKind useKind)
-{
-    switch (useKind) {
-    case UntypedUse:
-        return "";
-    case DoubleUse:
-        return "d";
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        return 0;
-    }
-}
-
-inline bool isARMv7s()
-{
-#if CPU(APPLE_ARMV7S)
-    return true;
-#else
-    return false;
-#endif
-}
-
-inline bool isX86()
-{
-#if CPU(X86_64) || CPU(X86)
-    return true;
-#else
-    return false;
-#endif
-}
 
 inline bool verboseCompilationEnabled()
 {
@@ -170,6 +131,15 @@ inline bool validationEnabled()
     return true;
 #else
     return Options::validateGraph() || Options::validateGraphAtEachPhase();
+#endif
+}
+
+inline bool enableConcurrentJIT()
+{
+#if ENABLE(CONCURRENT_JIT)
+    return Options::enableConcurrentJIT() && Options::numberOfCompilerThreads();
+#else
+    return false;
 #endif
 }
 
@@ -224,7 +194,10 @@ enum GraphForm {
     //
     // ThreadedCPS form is suitable for data flow analysis (CFA, prediction
     // propagation), register allocation, and code generation.
-    ThreadedCPS
+    ThreadedCPS,
+    
+    // SSA form. See DFGSSAConversionPhase.h for a description.
+    SSA
 };
 
 // Describes the state of the UnionFind structure of VariableAccessData's.
@@ -236,7 +209,53 @@ enum UnificationState {
     GloballyUnified
 };
 
+// Describes how reference counts in the graph behave.
+enum RefCountState {
+    // Everything has refCount() == 1.
+    EverythingIsLive,
+
+    // Set after DCE has run.
+    ExactRefCount
+};
+
+enum OperandSpeculationMode { AutomaticOperandSpeculation, ManualOperandSpeculation };
+
 enum SpeculationDirection { ForwardSpeculation, BackwardSpeculation };
+
+enum ProofStatus { NeedsCheck, IsProved };
+
+inline bool isProved(ProofStatus proofStatus)
+{
+    ASSERT(proofStatus == IsProved || proofStatus == NeedsCheck);
+    return proofStatus == IsProved;
+}
+
+inline ProofStatus proofStatusForIsProved(bool isProved)
+{
+    return isProved ? IsProved : NeedsCheck;
+}
+
+enum KillStatus { DoesNotKill, DoesKill };
+
+inline bool doesKill(KillStatus killStatus)
+{
+    ASSERT(killStatus == DoesNotKill || killStatus == DoesKill);
+    return killStatus == DoesKill;
+}
+
+inline KillStatus killStatusForDoesKill(bool doesKill)
+{
+    return doesKill ? DoesKill : DoesNotKill;
+}
+
+template<typename T, typename U>
+bool checkAndSet(T& left, U right)
+{
+    if (left == right)
+        return false;
+    left = right;
+    return true;
+}
 
 } } // namespace JSC::DFG
 
@@ -245,6 +264,8 @@ namespace WTF {
 void printInternal(PrintStream&, JSC::DFG::OptimizationFixpointState);
 void printInternal(PrintStream&, JSC::DFG::GraphForm);
 void printInternal(PrintStream&, JSC::DFG::UnificationState);
+void printInternal(PrintStream&, JSC::DFG::RefCountState);
+void printInternal(PrintStream&, JSC::DFG::ProofStatus);
 
 } // namespace WTF
 
@@ -254,7 +275,60 @@ namespace JSC { namespace DFG {
 
 // Put things here that must be defined even if ENABLE(DFG_JIT) is false.
 
-enum CapabilityLevel { CannotCompile, ShouldProfile, CanCompile, CapabilityLevelNotSet };
+enum CapabilityLevel { CannotCompile, CanInline, CanCompile, CanCompileAndInline, CapabilityLevelNotSet };
+
+inline bool canCompile(CapabilityLevel level)
+{
+    switch (level) {
+    case CanCompile:
+    case CanCompileAndInline:
+        return true;
+    default:
+        return false;
+    }
+}
+
+inline bool canInline(CapabilityLevel level)
+{
+    switch (level) {
+    case CanInline:
+    case CanCompileAndInline:
+        return true;
+    default:
+        return false;
+    }
+}
+
+inline CapabilityLevel leastUpperBound(CapabilityLevel a, CapabilityLevel b)
+{
+    switch (a) {
+    case CannotCompile:
+        return CannotCompile;
+    case CanInline:
+        switch (b) {
+        case CanInline:
+        case CanCompileAndInline:
+            return CanInline;
+        default:
+            return CannotCompile;
+        }
+    case CanCompile:
+        switch (b) {
+        case CanCompile:
+        case CanCompileAndInline:
+            return CanCompile;
+        default:
+            return CannotCompile;
+        }
+    case CanCompileAndInline:
+        return b;
+    case CapabilityLevelNotSet:
+        ASSERT_NOT_REACHED();
+        return CannotCompile;
+    }
+    ASSERT_NOT_REACHED();
+    return CannotCompile;
+}
 
 // Unconditionally disable DFG disassembly support if the DFG is not compiled in.
 inline bool shouldShowDisassembly()

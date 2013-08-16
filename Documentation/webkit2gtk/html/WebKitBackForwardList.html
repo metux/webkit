@@ -3,10 +3,10 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitBackForwardList</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitWebView.html" title="WebKitWebView">
+<link rel="prev" href="WebKitAuthenticationRequest.html" title="WebKitAuthenticationRequest">
 <link rel="next" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
@@ -14,7 +14,7 @@
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
 <tr valign="middle">
-<td><a accesskey="p" href="WebKitWebView.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitAuthenticationRequest.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
@@ -108,8 +108,11 @@ item or items.
 <div class="refsect2">
 <a name="webkit-back-forward-list-get-length"></a><h3>webkit_back_forward_list_get_length ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint"><span class="returnvalue">guint</span></a>               webkit_back_forward_list_get_length (<em class="parameter"><code><a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="type">WebKitBackForwardList</span></a> *back_forward_list</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -131,8 +134,11 @@ item or items.
 <p>
 Returns the current item in <em class="parameter"><code>back_forward_list</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -156,8 +162,11 @@ or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">N
 <p>
 Returns the item that precedes the current item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -181,8 +190,11 @@ preceding the current item or <a href="../glib/glib-Standard-Macros.html#NULL:CA
 <p>
 Returns the item that follows the current item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -207,8 +219,11 @@ following the current item or <a href="../glib/glib-Standard-Macros.html#NULL:CA
 <p>
 Returns the item at a given index relative to the current item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -233,8 +248,11 @@ located at the specified index relative to the current item. <span class="annota
 <a name="webkit-back-forward-list-get-back-list"></a><h3>webkit_back_forward_list_get_back_list ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Doubly-Linked-Lists.html#GList"><span class="returnvalue">GList</span></a> *             webkit_back_forward_list_get_back_list
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="type">WebKitBackForwardList</span></a> *back_forward_list</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -256,8 +274,11 @@ items preceding the current item. <span class="annotation">[<acronym title="Gene
 <pre class="programlisting"><a href="../glib/glib-Doubly-Linked-Lists.html#GList"><span class="returnvalue">GList</span></a> *             webkit_back_forward_list_get_back_list_with_limit
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="type">WebKitBackForwardList</span></a> *back_forward_list</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> limit</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -282,8 +303,11 @@ items preceding the current item limited by <em class="parameter"><code>limit</c
 <a name="webkit-back-forward-list-get-forward-list"></a><h3>webkit_back_forward_list_get_forward_list ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Doubly-Linked-Lists.html#GList"><span class="returnvalue">GList</span></a> *             webkit_back_forward_list_get_forward_list
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="type">WebKitBackForwardList</span></a> *back_forward_list</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -305,8 +329,11 @@ items following the current item. <span class="annotation">[<acronym title="Gene
 <pre class="programlisting"><a href="../glib/glib-Doubly-Linked-Lists.html#GList"><span class="returnvalue">GList</span></a> *             webkit_back_forward_list_get_forward_list_with_limit
                                                         (<em class="parameter"><code><a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="type">WebKitBackForwardList</span></a> *back_forward_list</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> limit</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>
@@ -342,8 +369,11 @@ items are removed. Note that both <em class="parameter"><code>item_added</code><
 <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> when only the current item is updated. Items are only removed
 when the list is cleared or the maximum items limit is reached.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>back_forward_list</code></em> :</span></p></td>

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitURISchemeRequest</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWebInspector.html" title="WebKitWebInspector">
@@ -50,6 +50,9 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
                                                          <em class="parameter"><code><a href="../gio/GInputStream.html"><span class="type">GInputStream</span></a> *stream</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gint64"><span class="type">gint64</span></a> stream_length</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *mime_type</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish-error" title="webkit_uri_scheme_request_finish_error ()">webkit_uri_scheme_request_finish_error</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> *error</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -88,8 +91,11 @@ request, and also finish the request with
 <p>
 Get the URI scheme of <em class="parameter"><code>request</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
@@ -111,8 +117,11 @@ Get the URI scheme of <em class="parameter"><code>request</code></em>
 <p>
 Get the URI of <em class="parameter"><code>request</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
@@ -134,8 +143,11 @@ Get the URI of <em class="parameter"><code>request</code></em>
 <p>
 Get the URI path of <em class="parameter"><code>request</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
@@ -158,8 +170,11 @@ Get the URI path of <em class="parameter"><code>request</code></em>
 <p>
 Get the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> that initiated the request.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
@@ -184,8 +199,11 @@ Get the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span cl
 <p>
 Finish a <a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> by setting the contents of the request and its mime type.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
@@ -207,6 +225,35 @@ Finish a <a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISche
 </tr>
 </tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-uri-scheme-request-finish-error"></a><h3>webkit_uri_scheme_request_finish_error ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_uri_scheme_request_finish_error
+                                                        (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> *error</code></em>);</pre>
+<p>
+Finish a <a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> with a <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a>.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td>a <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> that will be passed to the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
 </div>
 </div>
 </div>

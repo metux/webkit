@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitDownload</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebResource.html" title="WebKitWebResource">
@@ -114,8 +114,11 @@ out what is to be downloaded, and do it itself.
 <p>
 Enum values used to denote the various download errors.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-DOWNLOAD-ERROR-CANCELLED-BY-USER:CAPS"></a><span class="term"><code class="literal">WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER</code></span></p></td>
@@ -149,8 +152,11 @@ Enum values used to denote the various download errors.
 <p>
 Enum values used to denote the various states of a download.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-DOWNLOAD-STATUS-ERROR:CAPS"></a><span class="term"><code class="literal">WEBKIT_DOWNLOAD_STATUS_ERROR</code></span></p></td>
@@ -199,8 +205,11 @@ that cancelling the download provokes the emission of the
 WebKitDownload::error signal, reporting that the download was
 cancelled.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
 <td>the <a class="link" href="webkitgtk-webkitdownload.html#WebKitDownload"><span class="type">WebKitDownload</span></a>
@@ -216,8 +225,11 @@ cancelled.
 <p>
 Current already downloaded size.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -241,8 +253,11 @@ Obtains the URI to which the downloaded file will be written. This
 must have been set by the application before calling
 <a class="link" href="webkitgtk-webkitdownload.html#webkit-download-start" title="webkit_download_start ()"><code class="function">webkit_download_start()</code></a>, and may be <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -267,8 +282,11 @@ Elapsed time for the download in seconds, including any fractional
 part. If the download is finished, had an error or was cancelled
 this is the time between its start and the event.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -293,8 +311,11 @@ this is the time between its start and the event.
 Retrieves the <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> object that backs the download
 process.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -319,8 +340,11 @@ process.
 Retrieves the <a class="link" href="WebKitNetworkResponse.html" title="WebKitNetworkResponse"><span class="type">WebKitNetworkResponse</span></a> object that backs the download
 process.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -343,8 +367,11 @@ process.
 <p>
 Determines the current progress of the download.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -367,8 +394,11 @@ Determines the current progress of the download.
 Obtains the current status of the download, as a
 <a class="link" href="webkitgtk-webkitdownload.html#WebKitDownloadStatus" title="enum WebKitDownloadStatus"><span class="type">WebKitDownloadStatus</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -393,8 +423,11 @@ Obtains the current status of the download, as a
 Retrieves the filename that was suggested by the server, or the one
 derived by WebKit from the URI.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -420,8 +453,11 @@ Content-Length. Notice that this may grow over time, as it will be
 always the same as current_size in the cases where current size
 surpasses it.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -444,8 +480,11 @@ surpasses it.
 Convenience method to retrieve the URI from the
 <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> which is being downloaded.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -468,8 +507,11 @@ Convenience method to retrieve the URI from the
 Creates a new <a class="link" href="webkitgtk-webkitdownload.html#WebKitDownload"><span class="type">WebKitDownload</span></a> object for the given
 <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkRequest"><span class="type">WebKitNetworkRequest</span></a> object.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
@@ -493,8 +535,11 @@ Creates a new <a class="link" href="webkitgtk-webkitdownload.html#WebKitDownload
 <p>
 Defines the URI that should be used to save the downloaded file to.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -517,8 +562,11 @@ Defines the URI that should be used to save the downloaded file to.
 Initiates the download. Notice that you must have set the
 destination-uri property before calling this method.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
 <td>the <a class="link" href="webkitgtk-webkitdownload.html#WebKitDownload"><span class="type">WebKitDownload</span></a>
@@ -627,8 +675,11 @@ Emitted when <em class="parameter"><code>download</code></em> is interrupted eit
 network errors, <em class="parameter"><code>error_detail</code></em> will take any value of
 <a class="link" href="webkitgtk-webkitdownload.html#WebKitDownloadError" title="enum WebKitDownloadError"><span class="type">WebKitDownloadError</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>

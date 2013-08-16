@@ -28,11 +28,9 @@
 #include "ResourceResponseBase.h"
 
 #include "HTTPParsers.h"
-#include "PlatformMemoryInstrumentation.h"
 #include "ResourceResponse.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/StdLibExtras.h>
 
 using namespace std;
@@ -49,7 +47,6 @@ inline const ResourceResponse& ResourceResponseBase::asResourceResponse() const
 ResourceResponseBase::ResourceResponseBase()  
     : m_expectedContentLength(0)
     , m_httpStatusCode(0)
-    , m_lastModifiedDate(0)
     , m_wasCached(false)
     , m_connectionID(0)
     , m_connectionReused(false)
@@ -77,7 +74,6 @@ ResourceResponseBase::ResourceResponseBase(const KURL& url, const String& mimeTy
     , m_textEncodingName(textEncodingName)
     , m_suggestedFilename(filename)
     , m_httpStatusCode(0)
-    , m_lastModifiedDate(0)
     , m_wasCached(false)
     , m_connectionID(0)
     , m_connectionReused(false)
@@ -112,7 +108,6 @@ PassOwnPtr<ResourceResponse> ResourceResponseBase::adopt(PassOwnPtr<CrossThreadR
 
     response->lazyInit(CommonAndUncommonFields);
     response->m_httpHeaderFields.adopt(data->m_httpHeaders.release());
-    response->setLastModifiedDate(data->m_lastModifiedDate);
     response->setResourceLoadTiming(data->m_resourceLoadTiming.release());
     response->doPlatformAdopt(data);
     return response.release();
@@ -129,7 +124,6 @@ PassOwnPtr<CrossThreadResourceResponseData> ResourceResponseBase::copyData() con
     data->m_httpStatusCode = httpStatusCode();
     data->m_httpStatusText = httpStatusText().isolatedCopy();
     data->m_httpHeaders = httpHeaderFields().copyData();
-    data->m_lastModifiedDate = lastModifiedDate();
     if (m_resourceLoadTiming)
         data->m_resourceLoadTiming = m_resourceLoadTiming->deepCopy();
     return asResourceResponse().doPlatformCopyData(data.release());
@@ -156,7 +150,9 @@ void ResourceResponseBase::setURL(const KURL& url)
     lazyInit(CommonFieldsOnly);
     m_isNull = false;
 
-    m_url = url; 
+    m_url = url;
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 const String& ResourceResponseBase::mimeType() const
@@ -171,7 +167,10 @@ void ResourceResponseBase::setMimeType(const String& mimeType)
     lazyInit(CommonFieldsOnly);
     m_isNull = false;
 
-    m_mimeType = mimeType; 
+    // FIXME: MIME type is determined by HTTP Content-Type header. We should update the header, so that it doesn't disagree with m_mimeType.
+    m_mimeType = mimeType;
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 long long ResourceResponseBase::expectedContentLength() const 
@@ -186,7 +185,10 @@ void ResourceResponseBase::setExpectedContentLength(long long expectedContentLen
     lazyInit(CommonFieldsOnly);
     m_isNull = false;
 
+    // FIXME: Content length is determined by HTTP Content-Length header. We should update the header, so that it doesn't disagree with m_expectedContentLength.
     m_expectedContentLength = expectedContentLength; 
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 const String& ResourceResponseBase::textEncodingName() const
@@ -201,7 +203,10 @@ void ResourceResponseBase::setTextEncodingName(const String& encodingName)
     lazyInit(CommonFieldsOnly);
     m_isNull = false;
 
-    m_textEncodingName = encodingName; 
+    // FIXME: Text encoding is determined by HTTP Content-Type header. We should update the header, so that it doesn't disagree with m_textEncodingName.
+    m_textEncodingName = encodingName;
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 // FIXME should compute this on the fly
@@ -217,7 +222,10 @@ void ResourceResponseBase::setSuggestedFilename(const String& suggestedName)
     lazyInit(AllFields);
     m_isNull = false;
 
+    // FIXME: Suggested file name is calculated based on other headers. There should not be a setter for it.
     m_suggestedFilename = suggestedName; 
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 int ResourceResponseBase::httpStatusCode() const
@@ -232,6 +240,8 @@ void ResourceResponseBase::setHTTPStatusCode(int statusCode)
     lazyInit(CommonFieldsOnly);
 
     m_httpStatusCode = statusCode;
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 const String& ResourceResponseBase::httpStatusText() const 
@@ -246,6 +256,8 @@ void ResourceResponseBase::setHTTPStatusText(const String& statusText)
     lazyInit(CommonAndUncommonFields);
 
     m_httpStatusText = statusText; 
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 String ResourceResponseBase::httpHeaderField(const AtomicString& name) const
@@ -304,6 +316,8 @@ void ResourceResponseBase::setHTTPHeaderField(const AtomicString& name, const St
     updateHeaderParsedState(name);
 
     m_httpHeaderFields.set(name, value);
+
+    // FIXME: Should invalidate or update platform response if present.
 }
 
 void ResourceResponseBase::addHTTPHeaderField(const AtomicString& name, const String& value)
@@ -499,20 +513,6 @@ bool ResourceResponseBase::isAttachment() const
     return equalIgnoringCase(value, attachmentString);
 }
   
-void ResourceResponseBase::setLastModifiedDate(time_t lastModifiedDate)
-{
-    lazyInit(CommonAndUncommonFields);
-
-    m_lastModifiedDate = lastModifiedDate;
-}
-
-time_t ResourceResponseBase::lastModifiedDate() const
-{
-    lazyInit(CommonAndUncommonFields);
-
-    return m_lastModifiedDate;
-}
-
 bool ResourceResponseBase::wasCached() const
 {
     lazyInit(CommonAndUncommonFields);
@@ -567,38 +567,11 @@ void ResourceResponseBase::setResourceLoadTiming(PassRefPtr<ResourceLoadTiming> 
     m_resourceLoadTiming = resourceLoadTiming;
 }
 
-PassRefPtr<ResourceLoadInfo> ResourceResponseBase::resourceLoadInfo() const
-{
-    lazyInit(CommonAndUncommonFields);
-
-    return m_resourceLoadInfo.get();
-}
-
-void ResourceResponseBase::setResourceLoadInfo(PassRefPtr<ResourceLoadInfo> loadInfo)
-{
-    lazyInit(CommonAndUncommonFields);
-
-    m_resourceLoadInfo = loadInfo;
-}
-
 void ResourceResponseBase::lazyInit(InitLevel initLevel) const
 {
     const_cast<ResourceResponse*>(static_cast<const ResourceResponse*>(this))->platformLazyInit(initLevel);
 }
 
-void ResourceResponseBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Loader);
-    info.addMember(m_url, "url");
-    info.addMember(m_mimeType, "mimeType");
-    info.addMember(m_textEncodingName, "textEncodingName");
-    info.addMember(m_suggestedFilename, "suggestedFilename");
-    info.addMember(m_httpStatusText, "httpStatusText");
-    info.addMember(m_httpHeaderFields, "httpHeaderFields");
-    info.addMember(m_resourceLoadTiming, "resourceLoadTiming");
-    info.addMember(m_resourceLoadInfo, "resourceLoadInfo");
-}
-    
 bool ResourceResponseBase::compare(const ResourceResponse& a, const ResourceResponse& b)
 {
     if (a.isNull() != b.isNull())

@@ -34,7 +34,6 @@
 
 #include "PageRuntimeAgent.h"
 
-#include "Console.h"
 #include "Document.h"
 #include "InjectedScript.h"
 #include "InjectedScriptManager.h"
@@ -42,6 +41,8 @@
 #include "InspectorState.h"
 #include "InstrumentingAgents.h"
 #include "Page.h"
+#include "PageConsole.h"
+#include "ScriptController.h"
 #include "SecurityOrigin.h"
 
 using WebCore::TypeBuilder::Runtime::ExecutionContextDescription;
@@ -148,12 +149,12 @@ InjectedScript PageRuntimeAgent::injectedScriptForEval(ErrorString* errorString,
 
 void PageRuntimeAgent::muteConsole()
 {
-    Console::mute();
+    PageConsole::mute();
 }
 
 void PageRuntimeAgent::unmuteConsole()
 {
-    Console::unmute();
+    PageConsole::unmute();
 }
 
 void PageRuntimeAgent::reportExecutionContextCreation()

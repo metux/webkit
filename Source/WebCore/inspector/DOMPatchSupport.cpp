@@ -46,6 +46,7 @@
 #include "HTMLNames.h"
 #include "InspectorHistory.h"
 #include "Node.h"
+#include "XMLDocumentParser.h"
 
 #include <wtf/Deque.h>
 #include <wtf/HashTraits.h>
@@ -89,9 +90,23 @@ DOMPatchSupport::~DOMPatchSupport() { }
 
 void DOMPatchSupport::patchDocument(const String& markup)
 {
-    RefPtr<HTMLDocument> newDocument = HTMLDocument::create(0, KURL());
+    RefPtr<Document> newDocument;
+    if (m_document->isHTMLDocument())
+        newDocument = HTMLDocument::create(0, KURL());
+    else if (m_document->isXHTMLDocument())
+        newDocument = HTMLDocument::createXHTML(0, KURL());
+#if ENABLE(SVG)
+    else if (m_document->isSVGDocument())
+        newDocument = Document::create(0, KURL());
+#endif
+
+    ASSERT(newDocument);
     newDocument->setContextFeatures(m_document->contextFeatures());
-    RefPtr<DocumentParser> parser = HTMLDocumentParser::create(newDocument.get(), false);
+    RefPtr<DocumentParser> parser;
+    if (m_document->isHTMLDocument())
+        parser = HTMLDocumentParser::create(static_cast<HTMLDocument*>(newDocument.get()), false);
+    else
+        parser = XMLDocumentParser::create(newDocument.get(), 0);
     parser->insert(markup); // Use insert() so that the parser will not yield.
     parser->finish();
     parser->detach();
@@ -117,7 +132,10 @@ Node* DOMPatchSupport::patchNode(Node* node, const String& markup, ExceptionCode
     Node* previousSibling = node->previousSibling();
     // FIXME: This code should use one of createFragment* in markup.h
     RefPtr<DocumentFragment> fragment = DocumentFragment::create(m_document);
-    fragment->parseHTML(markup, node->parentElement() ? node->parentElement() : m_document->documentElement());
+    if (m_document->isHTMLDocument())
+        fragment->parseHTML(markup, node->parentElement() ? node->parentElement() : m_document->documentElement());
+    else
+        fragment->parseXML(markup, node->parentElement() ? node->parentElement() : m_document->documentElement());
 
     // Compose the old list.
     ContainerNode* parentNode = node->parentNode();
@@ -170,14 +188,14 @@ bool DOMPatchSupport::innerPatchNode(Digest* oldDigest, Digest* newDigest, Excep
         return true;
 
     // Patch attributes
-    Element* oldElement = static_cast<Element*>(oldNode);
-    Element* newElement = static_cast<Element*>(newNode);
+    Element* oldElement = toElement(oldNode);
+    Element* newElement = toElement(newNode);
     if (oldDigest->m_attrsSHA1 != newDigest->m_attrsSHA1) {
         // FIXME: Create a function in Element for removing all properties. Take in account whether did/willModifyAttribute are important.
         if (oldElement->hasAttributesWithoutUpdate()) {
             while (oldElement->attributeCount()) {
-                const Attribute* attribute = oldElement->attributeItem(0);
-                if (!m_domEditor->removeAttribute(oldElement, attribute->localName(), ec))
+                const Attribute& attribute = oldElement->attributeAt(0);
+                if (!m_domEditor->removeAttribute(oldElement, attribute.localName(), ec))
                     return false;
             }
         }
@@ -186,8 +204,8 @@ bool DOMPatchSupport::innerPatchNode(Digest* oldDigest, Digest* newDigest, Excep
         if (newElement->hasAttributesWithoutUpdate()) {
             size_t numAttrs = newElement->attributeCount();
             for (size_t i = 0; i < numAttrs; ++i) {
-                const Attribute* attribute = newElement->attributeItem(i);
-                if (!m_domEditor->setAttribute(oldElement, attribute->name().localName(), attribute->value(), ec))
+                const Attribute& attribute = newElement->attributeAt(i);
+                if (!m_domEditor->setAttribute(oldElement, attribute.name().localName(), attribute.value(), ec))
                     return false;
             }
         }
@@ -417,15 +435,15 @@ PassOwnPtr<DOMPatchSupport::Digest> DOMPatchSupport::createDigest(Node* node, Un
             child = child->nextSibling();
             digest->m_children.append(childInfo.release());
         }
-        Element* element = static_cast<Element*>(node);
+        Element* element = toElement(node);
 
         if (element->hasAttributesWithoutUpdate()) {
             size_t numAttrs = element->attributeCount();
             SHA1 attrsSHA1;
             for (size_t i = 0; i < numAttrs; ++i) {
-                const Attribute* attribute = element->attributeItem(i);
-                addStringToSHA1(attrsSHA1, attribute->name().toString());
-                addStringToSHA1(attrsSHA1, attribute->value());
+                const Attribute& attribute = element->attributeAt(i);
+                addStringToSHA1(attrsSHA1, attribute.name().toString());
+                addStringToSHA1(attrsSHA1, attribute.value());
             }
             Vector<uint8_t, 20> attrsHash;
             attrsSHA1.computeHash(attrsHash);

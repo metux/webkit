@@ -73,12 +73,7 @@ static gpointer testServerMonitorThreadFunc(gpointer)
 static void startTestServerMonitor()
 {
     gChildIsReady = false;
-
-#if (!GLIB_CHECK_VERSION(2, 31, 0))
-    g_thread_create(testServerMonitorThreadFunc, 0, FALSE, 0);
-#else
     g_thread_new("TestServerMonitor", testServerMonitorThreadFunc, 0);
-#endif
 }
 
 static void startTestServer()
@@ -189,7 +184,7 @@ static void testInspectorServerPageList(InspectorServerTest* test, gconstpointer
     g_assert(javascriptResult);
     g_assert(!error.get());
     valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
-    String validInspectorURL = String("/webinspector/inspector.html?page=") + String::number(pageId);
+    String validInspectorURL = String("/inspector.html?page=") + String::number(pageId);
     ASSERT_CMP_CSTRING(valueString.get(), ==, validInspectorURL.utf8());
 }
 

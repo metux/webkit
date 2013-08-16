@@ -20,7 +20,7 @@
 #ifndef TextureMapperLayer_h
 #define TextureMapperLayer_h
 
-#if USE(ACCELERATED_COMPOSITING)
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
 
 #include "FilterOperations.h"
 #include "FloatRect.h"
@@ -31,6 +31,7 @@
 
 namespace WebCore {
 
+class Region;
 class TextureMapperPaintOptions;
 class TextureMapperPlatformLayer;
 
@@ -38,22 +39,40 @@ class TextureMapperLayer : public GraphicsLayerAnimation::Client {
     WTF_MAKE_NONCOPYABLE(TextureMapperLayer);
     WTF_MAKE_FAST_ALLOCATED;
 public:
+
+    class ScrollingClient {
+    public:
+        virtual void commitScrollOffset(uint32_t layerID, const IntSize& offset) = 0;
+    };
+
     TextureMapperLayer()
         : m_parent(0)
         , m_effectTarget(0)
         , m_contentsLayer(0)
         , m_currentOpacity(1)
         , m_centerZ(0)
-        , m_shouldUpdateCurrentTransformFromGraphicsLayer(true)
-        , m_shouldUpdateCurrentOpacityFromGraphicsLayer(true)
-#if ENABLE(CSS_FILTERS)
-        , m_shouldUpdateCurrentFiltersFromGraphicsLayer(true)
-#endif
         , m_textureMapper(0)
         , m_fixedToViewport(false)
+        , m_id(0)
+        , m_scrollClient(0)
+        , m_isScrollable(false)
+        , m_patternTransformDirty(false)
     { }
 
     virtual ~TextureMapperLayer();
+
+    void setID(uint32_t id) { m_id = id; }
+    uint32_t id() { return m_id; }
+
+    const Vector<TextureMapperLayer*>& children() const { return m_children; }
+    TextureMapperLayer* findScrollableContentsLayerAt(const FloatPoint& pos);
+
+    void setScrollClient(ScrollingClient* scrollClient) { m_scrollClient = scrollClient; }
+    void scrollBy(const WebCore::FloatSize&);
+
+    void didCommitScrollOffset(const IntSize&);
+    void setIsScrollable(bool isScrollable) { m_isScrollable = isScrollable; }
+    bool isScrollable() const { return m_isScrollable; }
 
     TextureMapper* textureMapper() const;
     void setTextureMapper(TextureMapper* texmap) { m_textureMapper = texmap; }
@@ -70,19 +89,38 @@ public:
     void setContentsRect(const IntRect&);
     void setMasksToBounds(bool);
     void setDrawsContent(bool);
+    bool drawsContent() const { return m_state.drawsContent; }
+    bool contentsAreVisible() const { return m_state.contentsVisible; }
+    FloatSize size() const { return m_state.size; }
+    float opacity() const { return m_state.opacity; }
+    TransformationMatrix transform() const { return m_state.transform; }
     void setContentsVisible(bool);
     void setContentsOpaque(bool);
     void setBackfaceVisibility(bool);
     void setOpacity(float);
     void setSolidColor(const Color&);
+    void setContentsTileSize(const IntSize&);
+    void setContentsTilePhase(const IntPoint&);
 #if ENABLE(CSS_FILTERS)
     void setFilters(const FilterOperations&);
 #endif
+
+    bool hasFilters() const
+    {
+#if ENABLE(CSS_FILTERS)
+        return !m_currentFilters.isEmpty();
+#else
+        return false;
+#endif
+    }
+
     void setDebugVisuals(bool showDebugBorders, const Color& debugBorderColor, float debugBorderWidth, bool showRepaintCounter);
+    bool isShowingRepaintCounter() const { return m_state.showRepaintCounter; }
     void setRepaintCount(int);
     void setContentsLayer(TextureMapperPlatformLayer*);
     void setAnimations(const GraphicsLayerAnimations&);
     void setFixedToViewport(bool);
+    bool fixedToViewport() const { return m_fixedToViewport; }
     void setBackingStore(PassRefPtr<TextureMapperBackingStore>);
 
     void syncAnimations();
@@ -93,28 +131,37 @@ public:
     void setScrollPositionDeltaIfNeeded(const FloatSize&);
 
     void applyAnimationsRecursively();
+    void addChild(TextureMapperLayer*);
 
 private:
     const TextureMapperLayer* rootLayer() const;
     void computeTransformsRecursive();
-    IntRect intermediateSurfaceRect(const TransformationMatrix&);
-    IntRect intermediateSurfaceRect();
 
     static int compareGraphicsLayersZValue(const void* a, const void* b);
-    static void sortByZOrder(Vector<TextureMapperLayer* >& array, int first, int last);
+    static void sortByZOrder(Vector<TextureMapperLayer* >& array);
 
     PassRefPtr<BitmapTexture> texture() { return m_backingStore ? m_backingStore->texture() : 0; }
-    FloatPoint adjustedPosition() const { return m_state.pos + m_scrollPositionDelta; }
+    FloatPoint adjustedPosition() const { return m_state.pos + m_scrollPositionDelta - m_userScrollOffset; }
     bool isAncestorFixedToViewport() const;
-
-    void addChild(TextureMapperLayer*);
+    TransformationMatrix replicaTransform();
     void removeFromParent();
     void removeAllChildren();
 
+    enum ResolveSelfOverlapMode {
+        ResolveSelfOverlapAlways = 0,
+        ResolveSelfOverlapIfNeeded
+    };
+    void computeOverlapRegions(Region& overlapRegion, Region& nonOverlapRegion, ResolveSelfOverlapMode);
+
     void paintRecursive(const TextureMapperPaintOptions&);
+    void paintUsingOverlapRegions(const TextureMapperPaintOptions&);
+    PassRefPtr<BitmapTexture> paintIntoSurface(const TextureMapperPaintOptions&, const IntSize&);
+    void paintWithIntermediateSurface(const TextureMapperPaintOptions&, const IntRect&);
     void paintSelf(const TextureMapperPaintOptions&);
     void paintSelfAndChildren(const TextureMapperPaintOptions&);
     void paintSelfAndChildrenWithReplica(const TextureMapperPaintOptions&);
+    void applyMask(const TextureMapperPaintOptions&);
+    void computePatternTransformIfNeeded();
 
     // GraphicsLayerAnimation::Client
     virtual void setAnimatedTransform(const TransformationMatrix&) OVERRIDE;
@@ -130,8 +177,7 @@ private:
         MultipleLayersWithContents
     };
 
-    ContentsLayerCount countPotentialLayersWithContents() const;
-    bool shouldPaintToIntermediateSurface() const;
+    bool shouldBlend() const;
 
     inline FloatRect layerRect() const
     {
@@ -149,12 +195,12 @@ private:
     FilterOperations m_currentFilters;
 #endif
     float m_centerZ;
-    
-    bool m_shouldUpdateCurrentTransformFromGraphicsLayer;
-    bool m_shouldUpdateCurrentOpacityFromGraphicsLayer;
-#if ENABLE(CSS_FILTERS)
-    bool m_shouldUpdateCurrentFiltersFromGraphicsLayer;
-#endif
+
+    template<class HitTestCondition> TextureMapperLayer* hitTest(const FloatPoint&, HitTestCondition);
+    static bool scrollableLayerHitTestCondition(TextureMapperLayer*, const FloatPoint&);
+
+    FloatSize mapScrollOffset(const FloatSize&);
+    void commitScrollOffset(const FloatSize&);
 
     struct State {
         FloatPoint pos;
@@ -164,6 +210,8 @@ private:
         TransformationMatrix childrenTransform;
         float opacity;
         FloatRect contentsRect;
+        IntSize contentsTileSize;
+        IntPoint contentsTilePhase;
         TextureMapperLayer* maskLayer;
         TextureMapperLayer* replicaLayer;
         Color solidColor;
@@ -208,6 +256,13 @@ private:
     GraphicsLayerAnimations m_animations;
     FloatSize m_scrollPositionDelta;
     bool m_fixedToViewport;
+    uint32_t m_id;
+    ScrollingClient* m_scrollClient;
+    bool m_isScrollable;
+    FloatSize m_userScrollOffset;
+    FloatSize m_accumulatedScrollOffsetFractionalPart;
+    TransformationMatrix m_patternTransform;
+    bool m_patternTransformDirty;
 };
 
 }

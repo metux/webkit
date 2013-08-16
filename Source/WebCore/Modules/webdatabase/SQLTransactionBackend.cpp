@@ -37,8 +37,10 @@
 #include "DatabaseBackend.h"
 #include "DatabaseBackendContext.h"
 #include "DatabaseThread.h"
+#include "DatabaseTracker.h"
 #include "ExceptionCode.h"
 #include "Logging.h"
+#include "OriginLock.h"
 #include "SQLError.h"
 #include "SQLStatementBackend.h"
 #include "SQLTransactionClient.h"
@@ -386,6 +388,8 @@ void SQLTransactionBackend::doCleanup()
 
     ASSERT(currentThread() == database()->databaseContext()->databaseThread()->getThreadID());
 
+    releaseOriginLockIfNeeded();
+
     MutexLocker locker(m_statementMutex);
     m_statementQueue.clear();
 
@@ -413,10 +417,19 @@ void SQLTransactionBackend::doCleanup()
     // There is no harm in letting it finish making the request. It'll set
     // m_requestedState, but we won't execute a transition to that state because
     // we've already shut down the transaction.
+    //
+    // We also can't clear m_currentStatementBackend and m_transactionError.
+    // m_currentStatementBackend may be accessed asynchronously by the
+    // frontend's deliverStatementCallback() state. Similarly,
+    // m_transactionError may be accessed by deliverTransactionErrorCallback().
+    // This occurs if requests for transition to those states have already been
+    // registered with the frontend just prior to a clean up request arriving.
+    //
+    // So instead, let our destructor handle their clean up since this
+    // SQLTransactionBackend is guaranteed to not destruct until the frontend
+    // is also destructing.
 
-    m_currentStatementBackend = 0;
     m_wrapper = 0;
-    m_transactionError = 0;
 }
 
 AbstractSQLStatement* SQLTransactionBackend::currentStatement()
@@ -482,6 +495,7 @@ void SQLTransactionBackend::computeNextStateAndCleanupIfNeeded()
         return;
     }
 
+    // If we get here, then we should be shutting down. Do clean up if needed:
     if (m_nextState == SQLTransactionState::End)
         return;
     m_nextState = SQLTransactionState::End;
@@ -517,7 +531,7 @@ void SQLTransactionBackend::executeSQL(PassOwnPtr<AbstractSQLStatement> statemen
     statementBackend = SQLStatementBackend::create(statement, sqlStatement, arguments, permissions);
 
     if (Database::from(m_database.get())->deleted())
-        statementBackend->setDatabaseDeletedError(m_database.get());
+        statementBackend->setDatabaseDeletedError();
 
     enqueueStatementBackend(statementBackend);
 }
@@ -555,14 +569,15 @@ SQLTransactionState SQLTransactionBackend::openTransactionAndPreflight()
 
     // If the database was deleted, jump to the error callback
     if (Database::from(m_database.get())->deleted()) {
-        m_database->reportStartTransactionResult(1, SQLError::UNKNOWN_ERR, 0);
         m_transactionError = SQLError::create(SQLError::UNKNOWN_ERR, "unable to open a transaction, because the user deleted the database");
         return nextStateForTransactionError();
     }
 
     // Set the maximum usage for this transaction if this transactions is not read-only
-    if (!m_readOnly)
+    if (!m_readOnly) {
+        acquireOriginLock();
         m_database->sqliteDatabase().setMaximumSize(m_database->maximumSize());
+    }
 
     ASSERT(!m_sqliteTransaction);
     m_sqliteTransaction = adoptPtr(new SQLiteTransaction(m_database->sqliteDatabase(), m_readOnly));
@@ -575,7 +590,6 @@ SQLTransactionState SQLTransactionBackend::openTransactionAndPreflight()
     // Spec 4.3.2.1+2: Open a transaction to the database, jumping to the error callback if that fails
     if (!m_sqliteTransaction->inProgress()) {
         ASSERT(!m_database->sqliteDatabase().transactionInProgress());
-        m_database->reportStartTransactionResult(2, SQLError::DATABASE_ERR, m_database->sqliteDatabase().lastError());
         m_transactionError = SQLError::create(SQLError::DATABASE_ERR, "unable to begin transaction",
             m_database->sqliteDatabase().lastError(), m_database->sqliteDatabase().lastErrorMsg());
         m_sqliteTransaction.clear();
@@ -587,7 +601,6 @@ SQLTransactionState SQLTransactionBackend::openTransactionAndPreflight()
     // the actual version. In single-process browsers, this is just a map lookup.
     String actualVersion;
     if (!m_database->getActualVersionForTransaction(actualVersion)) {
-        m_database->reportStartTransactionResult(3, SQLError::DATABASE_ERR, m_database->sqliteDatabase().lastError());
         m_transactionError = SQLError::create(SQLError::DATABASE_ERR, "unable to read version",
             m_database->sqliteDatabase().lastError(), m_database->sqliteDatabase().lastErrorMsg());
         m_database->disableAuthorizer();
@@ -603,10 +616,8 @@ SQLTransactionState SQLTransactionBackend::openTransactionAndPreflight()
         m_sqliteTransaction.clear();
         m_database->enableAuthorizer();
         m_transactionError = m_wrapper->sqlError();
-        if (!m_transactionError) {
-            m_database->reportStartTransactionResult(4, SQLError::UNKNOWN_ERR, 0);
+        if (!m_transactionError)
             m_transactionError = SQLError::create(SQLError::UNKNOWN_ERR, "unknown error occurred during transaction preflight");
-        }
         return nextStateForTransactionError();
     }
 
@@ -671,14 +682,12 @@ SQLTransactionState SQLTransactionBackend::runCurrentStatementAndGetNextState()
     m_database->resetAuthorizer();
 
     if (m_hasVersionMismatch)
-        m_currentStatementBackend->setVersionMismatchedError(Database::from(m_database.get()));
+        m_currentStatementBackend->setVersionMismatchedError();
 
     if (m_currentStatementBackend->execute(m_database.get())) {
         if (m_database->lastActionChangedDatabase()) {
             // Flag this transaction as having changed the database for later delegate notification
             m_modifiedDatabase = true;
-            // Also dirty the size of this database file for calculating quota usage
-            m_database->transactionClient()->didExecuteStatement(Database::from(database()));
         }
 
         if (m_currentStatementBackend->hasStatementCallback()) {
@@ -705,10 +714,8 @@ SQLTransactionState SQLTransactionBackend::nextStateForCurrentStatementError()
         return SQLTransactionState::DeliverStatementCallback;
 
     m_transactionError = m_currentStatementBackend->sqlError();
-    if (!m_transactionError) {
-        m_database->reportCommitTransactionResult(1, SQLError::DATABASE_ERR, 0);
+    if (!m_transactionError)
         m_transactionError = SQLError::create(SQLError::DATABASE_ERR, "the statement failed to execute");
-    }
     return nextStateForTransactionError();
 }
 
@@ -719,10 +726,8 @@ SQLTransactionState SQLTransactionBackend::postflightAndCommit()
     // Spec 4.3.2.7: Perform postflight steps, jumping to the error callback if they fail.
     if (m_wrapper && !m_wrapper->performPostflight(this)) {
         m_transactionError = m_wrapper->sqlError();
-        if (!m_transactionError) {
-            m_database->reportCommitTransactionResult(3, SQLError::UNKNOWN_ERR, 0);
+        if (!m_transactionError)
             m_transactionError = SQLError::create(SQLError::UNKNOWN_ERR, "unknown error occurred during transaction postflight");
-        }
         return nextStateForTransactionError();
     }
 
@@ -733,17 +738,16 @@ SQLTransactionState SQLTransactionBackend::postflightAndCommit()
     m_sqliteTransaction->commit();
     m_database->enableAuthorizer();
 
+    releaseOriginLockIfNeeded();
+
     // If the commit failed, the transaction will still be marked as "in progress"
     if (m_sqliteTransaction->inProgress()) {
         if (m_wrapper)
             m_wrapper->handleCommitFailedAfterPostflight(this);
-        m_database->reportCommitTransactionResult(4, SQLError::DATABASE_ERR, m_database->sqliteDatabase().lastError());
         m_transactionError = SQLError::create(SQLError::DATABASE_ERR, "unable to commit transaction",
             m_database->sqliteDatabase().lastError(), m_database->sqliteDatabase().lastErrorMsg());
         return nextStateForTransactionError();
     }
-
-    m_database->reportCommitTransactionResult(0, -1, 0); // OK
 
     // Vacuum the database if anything was deleted.
     if (m_database->hadDeletes())
@@ -797,6 +801,8 @@ SQLTransactionState SQLTransactionBackend::cleanupAfterTransactionErrorCallback(
     }
     m_database->enableAuthorizer();
 
+    releaseOriginLockIfNeeded();
+
     ASSERT(!m_database->sqliteDatabase().transactionInProgress());
 
     return SQLTransactionState::CleanupAndTerminate;
@@ -827,6 +833,21 @@ SQLTransactionState SQLTransactionBackend::sendToFrontendState()
     ASSERT(m_nextState != SQLTransactionState::Idle);
     m_frontend->requestTransitToState(m_nextState);
     return SQLTransactionState::Idle;
+}
+
+void SQLTransactionBackend::acquireOriginLock()
+{
+    ASSERT(!m_originLock);
+    m_originLock = DatabaseTracker::tracker().originLockFor(m_database->securityOrigin());
+    m_originLock->lock();
+}
+
+void SQLTransactionBackend::releaseOriginLockIfNeeded()
+{
+    if (m_originLock) {
+        m_originLock->unlock();
+        m_originLock.clear();
+    }
 }
 
 } // namespace WebCore

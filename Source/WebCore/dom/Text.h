@@ -24,6 +24,7 @@
 #define Text_h
 
 #include "CharacterData.h"
+#include "StyleResolveTree.h"
 
 namespace WebCore {
 
@@ -44,15 +45,14 @@ public:
     String wholeText() const;
     PassRefPtr<Text> replaceWholeText(const String&, ExceptionCode&);
     
-    void recalcTextStyle(StyleChange);
     void createTextRendererIfNeeded();
     bool textRendererIsNeeded(const NodeRenderingContext&);
     RenderText* createTextRenderer(RenderArena*, RenderStyle*);
     void updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfReplacedData);
 
-    virtual void attach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE FINAL;
     
-    virtual bool canContainRangeEndPoint() const { return true; }
+    virtual bool canContainRangeEndPoint() const OVERRIDE FINAL { return true; }
 
 protected:
     Text(Document* document, const String& data, ConstructionType type)
@@ -61,10 +61,10 @@ protected:
     }
 
 private:
-    virtual String nodeName() const;
-    virtual NodeType nodeType() const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
-    virtual bool childTypeAllowed(NodeType) const;
+    virtual String nodeName() const OVERRIDE;
+    virtual NodeType nodeType() const OVERRIDE;
+    virtual PassRefPtr<Node> cloneNode(bool deep) OVERRIDE;
+    virtual bool childTypeAllowed(NodeType) const OVERRIDE;
 
     virtual PassRefPtr<Text> virtualCreate(const String&);
 

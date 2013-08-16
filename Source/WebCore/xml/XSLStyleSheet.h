@@ -37,9 +37,10 @@
 
 namespace WebCore {
 
+class CachedResourceLoader;
 class XSLImportRule;
     
-class XSLStyleSheet : public StyleSheet {
+class XSLStyleSheet FINAL : public StyleSheet {
 public:
 #if !USE(QXMLQUERY)
     static PassRefPtr<XSLStyleSheet> create(XSLImportRule* parentImport, const String& originalURL, const KURL& finalURL)

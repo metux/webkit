@@ -28,16 +28,15 @@
 
 #include "Cursor.h"
 #include "DragActions.h"
-#include "DragState.h"
 #include "FocusDirection.h"
 #include "HitTestRequest.h"
+#include "LayoutPoint.h"
 #include "PlatformMouseEvent.h"
 #include "PlatformWheelEvent.h"
 #include "ScrollTypes.h"
 #include "TextEventInputType.h"
 #include "TextGranularity.h"
 #include "Timer.h"
-#include "UserGestureIndicator.h"
 #include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
@@ -54,6 +53,8 @@ namespace WebCore {
 
 class AutoscrollController;
 class Clipboard;
+class Document;
+class Element;
 class Event;
 class EventTarget;
 class FloatPoint;
@@ -79,6 +80,8 @@ class TouchEvent;
 class VisibleSelection;
 class WheelEvent;
 class Widget;
+
+struct DragState;
 
 #if ENABLE(GESTURE_EVENTS)
 class PlatformGestureEvent;
@@ -127,8 +130,8 @@ public:
     void dispatchFakeMouseMoveEventSoonInQuad(const FloatQuad&);
 
     HitTestResult hitTestResultAtPoint(const LayoutPoint&,
-                                       HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active,
-                                       const LayoutSize& padding = LayoutSize());
+        HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent,
+        const LayoutSize& padding = LayoutSize());
 
     bool mousePressed() const { return m_mousePressed; }
     void setMousePressed(bool pressed) { m_mousePressed = pressed; }
@@ -143,6 +146,7 @@ public:
 #endif
 
     void scheduleHoverStateUpdate();
+    void scheduleCursorUpdate();
 
     void setResizingFrameSet(HTMLFrameSetElement*);
 
@@ -181,6 +185,7 @@ public:
     bool handleGestureTwoFingerTap(const PlatformGestureEvent&);
     bool handleGestureScrollUpdate(const PlatformGestureEvent&);
     bool handleGestureScrollBegin(const PlatformGestureEvent&);
+    void clearGestureScrollNodes();
     bool isScrollbarHandlingGestures() const;
 #endif
 
@@ -211,6 +216,8 @@ public:
     bool keyEvent(const PlatformKeyboardEvent&);
     void defaultKeyboardEventHandler(KeyboardEvent*);
 
+    void handleKeyboardSelectionMovementForAccessibility(KeyboardEvent*);
+
     bool handleTextInputEvent(const String& text, Event* underlyingEvent = 0, TextEventInputType = TextEventInputKeyboard);
     void defaultTextInputEventHandler(TextEvent*);
 
@@ -224,7 +231,6 @@ public:
 
     void capsLockStateMayHaveChanged(); // Only called by FrameSelection
     
-    void sendResizeEvent(); // Only called in FrameView
     void sendScrollEvent(); // Ditto
 
 #if PLATFORM(MAC) && defined(__OBJC__)
@@ -249,6 +255,9 @@ public:
 #endif
 
     bool useHandCursor(Node*, bool isOverLink, bool shiftKey);
+    void updateCursor();
+
+    bool isHandlingWheelEvent() const { return m_isHandlingWheelEvent; }
 
 private:
 #if ENABLE(DRAG_SUPPORT)
@@ -275,8 +284,10 @@ private:
 #endif
     bool handleMouseReleaseEvent(const MouseEventWithHitTestResults&);
 
-    OptionalCursor selectCursor(const MouseEventWithHitTestResults&, Scrollbar*);
+    OptionalCursor selectCursor(const HitTestResult&, bool shiftKey);
+
     void hoverTimerFired(Timer<EventHandler>*);
+    void cursorUpdateTimerFired(Timer<EventHandler>*);
 
     bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
     
@@ -293,7 +304,7 @@ private:
 
 #if ENABLE(TOUCH_EVENTS)
     bool dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent&);
-    HitTestResult hitTestResultInFrame(Frame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active);
+    HitTestResult hitTestResultInFrame(Frame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
 #endif
 
     void invalidateClick();
@@ -378,9 +389,16 @@ private:
     bool handleGestureForTextSelectionOrContextMenu(const PlatformGestureEvent&);
     bool passGestureEventToWidget(const PlatformGestureEvent&, Widget*);
     bool passGestureEventToWidgetIfPossible(const PlatformGestureEvent&, RenderObject*);
+    bool sendScrollEventToView(const PlatformGestureEvent&, const FloatSize&);
 #endif
 
     void setLastKnownMousePosition(const PlatformMouseEvent&);
+
+#if ENABLE(CURSOR_VISIBILITY)
+    void startAutoHideCursorTimer();
+    void cancelAutoHideCursorTimer();
+    void autoHideCursorTimerFired(Timer<EventHandler>*);
+#endif
 
     Frame* m_frame;
 
@@ -404,6 +422,7 @@ private:
     bool m_panScrollButtonPressed;
 
     Timer<EventHandler> m_hoverTimer;
+    Timer<EventHandler> m_cursorUpdateTimer;
 
     OwnPtr<AutoscrollController> m_autoscrollController;
     bool m_mouseDownMayStartAutoscroll;
@@ -446,7 +465,6 @@ private:
     IntPoint m_mouseDownPos; // In our view's coords.
     double m_mouseDownTimestamp;
     PlatformMouseEvent m_mouseDown;
-    RefPtr<UserGestureIndicator::Token> m_lastMouseDownUserGestureToken;
 
     RefPtr<Node> m_latchedWheelEventNode;
     bool m_widgetIsLatched;
@@ -469,6 +487,7 @@ private:
 #if ENABLE(GESTURE_EVENTS)
     RefPtr<Node> m_scrollGestureHandlingNode;
     bool m_lastHitTestResultOverWidget;
+    RefPtr<Node> m_previousGestureScrolledNode;
     RefPtr<Scrollbar> m_scrollbarHandlingScrollGesture;
 #endif
 
@@ -476,6 +495,11 @@ private:
     PlatformEvent::Type m_baseEventType;
     bool m_didStartDrag;
     bool m_didLongPressInvokeContextMenu;
+    bool m_isHandlingWheelEvent;
+
+#if ENABLE(CURSOR_VISIBILITY)
+    Timer<EventHandler> m_autoHideCursorTimer;
+#endif
 };
 
 } // namespace WebCore

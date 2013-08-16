@@ -40,15 +40,15 @@ namespace JSC {
 
         static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
 
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
+        static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
         JSValue getValueProperty(ExecState*, int token) const;
 
         static const ClassInfo s_info;
 
-        static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue proto) 
+        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto) 
         { 
-            return Structure::create(globalData, globalObject, proto, TypeInfo(ObjectType, StructureFlags), &s_info); 
+            return Structure::create(vm, globalObject, proto, TypeInfo(ObjectType, StructureFlags), &s_info); 
         }
 
         enum { NaNValue, NegInfinity, PosInfinity, MaxValue, MinValue };

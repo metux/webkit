@@ -56,19 +56,19 @@
 #include "AccessibilityTableHeaderContainer.h"
 #include "AccessibilityTableRow.h"
 #include "Document.h"
+#include "Editor.h"
 #include "FocusController.h"
 #include "Frame.h"
 #include "HTMLAreaElement.h"
 #include "HTMLImageElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLLabelElement.h"
+#include "HTMLMeterElement.h"
 #include "HTMLNames.h"
-#if ENABLE(VIDEO)
-#include "MediaControlElements.h"
-#endif
 #include "Page.h"
 #include "RenderListBox.h"
 #include "RenderMenuList.h"
+#include "RenderMeter.h"
 #include "RenderProgress.h"
 #include "RenderSlider.h"
 #include "RenderTable.h"
@@ -76,8 +76,11 @@
 #include "RenderTableRow.h"
 #include "RenderView.h"
 #include "ScrollView.h"
-
 #include <wtf/PassRefPtr.h>
+
+#if ENABLE(VIDEO)
+#include "MediaControlElements.h"
+#endif
 
 namespace WebCore {
 
@@ -159,14 +162,11 @@ AccessibilityObject* AXObjectCache::focusedUIElementForPage(const Page* page)
 
     // get the focused node in the page
     Document* focusedDocument = page->focusController()->focusedOrMainFrame()->document();
-    Node* focusedNode = focusedDocument->focusedNode();
-    if (!focusedNode)
-        focusedNode = focusedDocument;
+    Element* focusedElement = focusedDocument->focusedElement();
+    if (focusedElement && isHTMLAreaElement(focusedElement))
+        return focusedImageMapUIElement(toHTMLAreaElement(focusedElement));
 
-    if (focusedNode->hasTagName(areaTag))
-        return focusedImageMapUIElement(static_cast<HTMLAreaElement*>(focusedNode));
-    
-    AccessibilityObject* obj = focusedNode->document()->axObjectCache()->getOrCreate(focusedNode);
+    AccessibilityObject* obj = focusedDocument->axObjectCache()->getOrCreate(focusedElement ? static_cast<Node*>(focusedElement) : focusedDocument);
     if (!obj)
         return 0;
 
@@ -192,7 +192,7 @@ AccessibilityObject* AXObjectCache::get(Widget* widget)
     if (!axID)
         return 0;
     
-    return m_objects.get(axID).get();    
+    return m_objects.get(axID);    
 }
     
 AccessibilityObject* AXObjectCache::get(RenderObject* renderer)
@@ -205,7 +205,7 @@ AccessibilityObject* AXObjectCache::get(RenderObject* renderer)
     if (!axID)
         return 0;
 
-    return m_objects.get(axID).get();    
+    return m_objects.get(axID);    
 }
 
 AccessibilityObject* AXObjectCache::get(Node* node)
@@ -228,12 +228,12 @@ AccessibilityObject* AXObjectCache::get(Node* node)
     }
 
     if (renderID)
-        return m_objects.get(renderID).get();
+        return m_objects.get(renderID);
 
     if (!nodeID)
         return 0;
 
-    return m_objects.get(nodeID).get();
+    return m_objects.get(nodeID);
 }
 
 // FIXME: This probably belongs on Node.
@@ -243,7 +243,7 @@ bool nodeHasRole(Node* node, const String& role)
     if (!node || !node->isElementNode())
         return false;
 
-    return equalIgnoringCase(static_cast<Element*>(node)->getAttribute(roleAttr), role);
+    return equalIgnoringCase(toElement(node)->getAttribute(roleAttr), role);
 }
 
 static PassRefPtr<AccessibilityObject> createFromRenderer(RenderObject* renderer)
@@ -295,6 +295,10 @@ static PassRefPtr<AccessibilityObject> createFromRenderer(RenderObject* renderer
         // progress bar
         if (cssBox->isProgress())
             return AccessibilityProgressIndicator::create(toRenderProgress(cssBox));
+#endif
+#if ENABLE(METER_ELEMENT)
+        if (cssBox->isMeter())
+            return AccessibilityProgressIndicator::create(toRenderMeter(cssBox));
 #endif
 
         // input type=range
@@ -354,7 +358,13 @@ AccessibilityObject* AXObjectCache::getOrCreate(Node* node)
     // Or if it's a hidden element, but we still want to expose it because of other ARIA attributes.
     bool inCanvasSubtree = node->parentElement()->isInCanvasSubtree();
     bool isHidden = !node->renderer() && isNodeAriaVisible(node);
-    if (!inCanvasSubtree && !isHidden)
+
+    bool insideMeterElement = false;
+#if ENABLE(METER_ELEMENT)
+    insideMeterElement = isHTMLMeterElement(node->parentElement());
+#endif
+    
+    if (!inCanvasSubtree && !isHidden && !insideMeterElement)
         return 0;
 
     RefPtr<AccessibilityObject> newObj = createFromNode(node);
@@ -469,7 +479,7 @@ void AXObjectCache::remove(AXID axID)
         return;
     
     // first fetch object to operate some cleanup functions on it 
-    AccessibilityObject* obj = m_objects.get(axID).get();
+    AccessibilityObject* obj = m_objects.get(axID);
     if (!obj)
         return;
     
@@ -630,6 +640,9 @@ void AXObjectCache::notificationPostTimerFired(Timer<AXObjectCache>*)
         if (!obj->axObjectID())
             continue;
 
+        if (!obj->axObjectCache())
+            continue;
+        
 #ifndef NDEBUG
         // Make sure none of the render views are in the process of being layed out.
         // Notifications should only be sent after the renderer has finished
@@ -799,7 +812,7 @@ void AXObjectCache::handleAttributeChanged(const QualifiedName& attrName, Elemen
         handleAriaRoleChanged(element);
     else if (attrName == altAttr || attrName == titleAttr)
         textChanged(element);
-    else if (attrName == forAttr && element->hasTagName(labelTag))
+    else if (attrName == forAttr && isHTMLLabelElement(element))
         labelChanged(element);
 
     if (!attrName.localName().string().startsWith("aria-"))
@@ -827,8 +840,8 @@ void AXObjectCache::handleAttributeChanged(const QualifiedName& attrName, Elemen
 
 void AXObjectCache::labelChanged(Element* element)
 {
-    ASSERT(element->hasTagName(labelTag));
-    HTMLElement* correspondingControl = static_cast<HTMLLabelElement*>(element)->control();
+    ASSERT(isHTMLLabelElement(element));
+    HTMLElement* correspondingControl = toHTMLLabelElement(element)->control();
     textChanged(correspondingControl);
 }
 
@@ -846,7 +859,8 @@ void AXObjectCache::startCachingComputedObjectAttributesUntilTreeMutates()
 
 void AXObjectCache::stopCachingComputedObjectAttributes()
 {
-    m_computedObjectAttributeCache.clear();
+    if (m_computedObjectAttributeCache)
+        m_computedObjectAttributeCache.clear();
 }
 
 VisiblePosition AXObjectCache::visiblePositionForTextMarkerData(TextMarkerData& textMarkerData)
@@ -940,6 +954,19 @@ bool isNodeAriaVisible(Node* node)
     return equalIgnoringCase(toElement(node)->getAttribute(aria_hiddenAttr), "false");
 }
 
+AXAttributeCacheEnabler::AXAttributeCacheEnabler(AXObjectCache* cache)
+    : m_cache(cache)
+{
+    if (m_cache)
+        m_cache->startCachingComputedObjectAttributesUntilTreeMutates();
+}
+    
+AXAttributeCacheEnabler::~AXAttributeCacheEnabler()
+{
+    if (m_cache)
+        m_cache->stopCachingComputedObjectAttributes();
+}
+    
 } // namespace WebCore
 
 #endif // HAVE(ACCESSIBILITY)

@@ -27,7 +27,6 @@
 
 #include "EditingBoundary.h"
 #include "EventTarget.h"
-#include "FocusDirection.h"
 #include "KURLHash.h"
 #include "LayoutRect.h"
 #include "MutationObserver.h"
@@ -40,12 +39,10 @@
 #include <wtf/ListHashSet.h>
 #include <wtf/text/AtomicString.h>
 
-#if USE(JSC)
 namespace JSC {
-    class JSGlobalData;
+    class VM;
     class SlotVisitor;
 }
-#endif
 
 // This needs to be here because Document.h also depends on it.
 #define DUMP_NODE_STATISTICS 0
@@ -92,9 +89,12 @@ class TagNodeList;
 class PlatformGestureEvent;
 #endif
 
-#if ENABLE(MICRODATA)
-class HTMLPropertiesCollection;
-class PropertyNodeList;
+#if ENABLE(INDIE_UI)
+class UIRequestEvent;
+#endif
+    
+#if ENABLE(TOUCH_EVENTS)
+class TouchEvent;
 #endif
 
 typedef int ExceptionCode;
@@ -123,6 +123,11 @@ protected:
 
 private:
     RenderObject* m_renderer;
+};
+
+enum AttachBehavior {
+    AttachNow,
+    AttachLazily,
 };
 
 class Node : public EventTarget, public ScriptWrappable, public TreeShared<Node> {
@@ -163,10 +168,8 @@ public:
 
     static void dumpStatistics();
 
-    enum StyleChange { NoChange, NoInherit, Inherit, Detach, Force };    
-    static StyleChange diff(const RenderStyle*, const RenderStyle*, Document*);
-
     virtual ~Node();
+    void willBeDeletedFrom(Document*);
 
     // DOM methods & attributes for Node
 
@@ -185,6 +188,10 @@ public:
     Node* lastChild() const;
     bool hasAttributes() const;
     NamedNodeMap* attributes() const;
+    Node* pseudoAwareNextSibling() const;
+    Node* pseudoAwarePreviousSibling() const;
+    Node* pseudoAwareFirstChild() const;
+    Node* pseudoAwareLastChild() const;
 
     virtual KURL baseURI() const;
     
@@ -193,17 +200,17 @@ public:
     // These should all actually return a node, but this is only important for language bindings,
     // which will already know and hold a ref on the right node to return. Returning bool allows
     // these methods to be more efficient since they don't need to return a ref
-    bool insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode&, bool shouldLazyAttach = false);
-    bool replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode&, bool shouldLazyAttach = false);
+    bool insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode&, AttachBehavior = AttachNow);
+    bool replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode&, AttachBehavior = AttachNow);
     bool removeChild(Node* child, ExceptionCode&);
-    bool appendChild(PassRefPtr<Node> newChild, ExceptionCode&, bool shouldLazyAttach = false);
+    bool appendChild(PassRefPtr<Node> newChild, ExceptionCode&, AttachBehavior = AttachNow);
 
     void remove(ExceptionCode&);
     bool hasChildNodes() const { return firstChild(); }
     virtual PassRefPtr<Node> cloneNode(bool deep) = 0;
-    const AtomicString& localName() const { return virtualLocalName(); }
-    const AtomicString& namespaceURI() const { return virtualNamespaceURI(); }
-    const AtomicString& prefix() const { return virtualPrefix(); }
+    virtual const AtomicString& localName() const;
+    virtual const AtomicString& namespaceURI() const;
+    virtual const AtomicString& prefix() const;
     virtual void setPrefix(const AtomicString&, ExceptionCode&);
     void normalize();
 
@@ -220,8 +227,6 @@ public:
     Node* lastDescendant() const;
     Node* firstDescendant() const;
 
-    virtual bool isActiveNode() const { return false; }
-    
     // Other methods (not part of DOM)
 
     bool isElementNode() const { return getFlag(IsElementFlag); }
@@ -252,6 +257,8 @@ public:
     bool isDocumentFragment() const { return getFlag(IsDocumentFragmentFlag); }
     bool isShadowRoot() const { return isDocumentFragment() && isTreeScope(); }
     bool isInsertionPoint() const { return getFlag(NeedsShadowTreeWalkerFlag) && isInsertionPointNode(); }
+    // Returns Node rather than InsertionPoint. Should be used only for language bindings.
+    Node* insertionParentForBinding() const;
 
     bool needsShadowTreeWalker() const;
     bool needsShadowTreeWalkerSlow() const;
@@ -260,6 +267,8 @@ public:
 
     bool inNamedFlow() const { return getFlag(InNamedFlowFlag); }
     bool hasCustomStyleCallbacks() const { return getFlag(HasCustomStyleCallbacksFlag); }
+
+    bool isRegisteredWithNamedFlow() const;
 
     bool hasSyntheticAttrChildNodes() const { return getFlag(HasSyntheticAttrChildNodesFlag); }
     void setHasSyntheticAttrChildNodes(bool flag) { setFlag(flag, HasSyntheticAttrChildNodesFlag); }
@@ -270,7 +279,7 @@ public:
     // Deprecated. Should use shadowHost() and check the return value.
     Node* deprecatedShadowAncestorNode() const;
     ShadowRoot* containingShadowRoot() const;
-    ShadowRoot* youngestShadowRoot() const;
+    ShadowRoot* shadowRoot() const;
 
     // Returns 0, a child of ShadowRoot, or a legacy shadow root.
     Node* nonBoundaryShadowTreeRootNode();
@@ -292,38 +301,15 @@ public:
     // Returns the enclosing event parent node (or self) that, when clicked, would trigger a navigation.
     Node* enclosingLinkEventParentOrSelf();
 
-    bool isBlockFlow() const;
-
     // These low-level calls give the caller responsibility for maintaining the integrity of the tree.
     void setPreviousSibling(Node* previous) { m_previous = previous; }
     void setNextSibling(Node* next) { m_next = next; }
 
     virtual bool canContainRangeEndPoint() const { return false; }
 
-    // FIXME: These two functions belong in editing -- "atomic node" is an editing concept.
-    Node* previousNodeConsideringAtomicNodes() const;
-    Node* nextNodeConsideringAtomicNodes() const;
-    
-    // Returns the next leaf node or 0 if there are no more.
-    // Delivers leaf nodes as if the whole DOM tree were a linear chain of its leaf nodes.
-    // Uses an editing-specific concept of what a leaf node is, and should probably be moved
-    // out of the Node class into an editing-specific source file.
-    Node* nextLeafNode() const;
-
-    // Returns the previous leaf node or 0 if there are no more.
-    // Delivers leaf nodes as if the whole DOM tree were a linear chain of its leaf nodes.
-    // Uses an editing-specific concept of what a leaf node is, and should probably be moved
-    // out of the Node class into an editing-specific source file.
-    Node* previousLeafNode() const;
-
-    // enclosingBlockFlowElement() is deprecated. Use enclosingBlock instead.
-    Element* enclosingBlockFlowElement() const;
-
     bool isRootEditableElement() const;
     Element* rootEditableElement() const;
     Element* rootEditableElement(EditableType) const;
-
-    bool inSameContainingBlockFlowElement(Node*);
 
     // Called by the parser when this element's close tag is reached,
     // signaling that all child tags have been parsed and added.
@@ -339,17 +325,8 @@ public:
     virtual void notifyLoadedSheetAndAllCriticalSubresources(bool /* error loading subresource */) { }
     virtual void startLoadingDynamicSheet() { ASSERT_NOT_REACHED(); }
 
-    bool hasName() const { return !isTextNode() && getFlag(HasNameOrIsEditingTextFlag); }
-    bool hasID() const;
-    bool hasClass() const;
-
     bool isUserActionElement() const { return getFlag(IsUserActionElement); }
     void setUserActionElement(bool flag) { setFlag(flag, IsUserActionElement); }
-
-    bool active() const { return isUserActionElement() && isUserActionElementActive(); }
-    bool inActiveChain() const { return isUserActionElement() && isUserActionElementInActiveChain(); }
-    bool hovered() const { return isUserActionElement() && isUserActionElementHovered(); }
-    bool focused() const { return isUserActionElement() && isUserActionElementFocused(); }
 
     bool attached() const { return getFlag(IsAttachedFlag); }
     void setAttached() { setFlag(IsAttachedFlag); }
@@ -357,9 +334,8 @@ public:
     StyleChangeType styleChangeType() const { return static_cast<StyleChangeType>(m_nodeFlags & StyleChangeMask); }
     bool childNeedsStyleRecalc() const { return getFlag(ChildNeedsStyleRecalcFlag); }
     bool isLink() const { return getFlag(IsLinkFlag); }
-    bool isEditingText() const { return isTextNode() && getFlag(HasNameOrIsEditingTextFlag); }
+    bool isEditingText() const { return getFlag(IsEditingTextFlag); }
 
-    void setHasName(bool f) { ASSERT(!isTextNode()); setFlag(f, HasNameOrIsEditingTextFlag); }
     void setChildNeedsStyleRecalc() { setFlag(ChildNeedsStyleRecalcFlag); }
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
 
@@ -380,32 +356,12 @@ public:
     bool hasEventTargetData() const { return getFlag(HasEventTargetDataFlag); }
     void setHasEventTargetData(bool flag) { setFlag(flag, HasEventTargetDataFlag); }
 
-#if USE(V8)
-    bool isV8CollectableDuringMinorGC() const { return getFlag(V8CollectableDuringMinorGCFlag); }
-    void setV8CollectableDuringMinorGC(bool flag) { setFlag(flag, V8CollectableDuringMinorGCFlag); }
-#endif
-
     enum ShouldSetAttached {
         SetAttached,
         DoNotSetAttached
     };
     void lazyAttach(ShouldSetAttached = SetAttached);
     void lazyReattach(ShouldSetAttached = SetAttached);
-
-    virtual void setFocus(bool flag);
-    virtual void setActive(bool flag = true, bool pause = false);
-    virtual void setHovered(bool flag = true);
-
-    virtual short tabIndex() const;
-
-    // Whether this kind of node can receive focus by default. Most nodes are
-    // not focusable but some elements, such as form controls and links, are.
-    virtual bool supportsFocus() const;
-    // Whether the node can actually be focused.
-    virtual bool isFocusable() const;
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isMouseFocusable() const;
-    virtual Node* focusDelegate();
 
     enum UserSelectAllTreatment {
         UserSelectAllDoesNotAffectEditability,
@@ -440,16 +396,10 @@ public:
         return false;
     }
 
-    virtual bool shouldUseInputMethod();
     virtual LayoutRect boundingBox() const;
     IntRect pixelSnappedBoundingBox() const { return pixelSnappedIntRect(boundingBox()); }
     LayoutRect renderRect(bool* isReplaced);
     IntRect pixelSnappedRenderRect(bool* isReplaced) { return pixelSnappedIntRect(renderRect(isReplaced)); }
-
-    // Returns true if the node has a non-empty bounding box in layout.
-    // This does not 100% guarantee the user can see it, but is pretty close.
-    // Note: This method only works properly after layout has occurred.
-    bool hasNonEmptyBoundingBox() const;
 
     unsigned nodeIndex() const;
 
@@ -522,21 +472,28 @@ public:
     RenderBox* renderBox() const;
     RenderBoxModelObject* renderBoxModelObject() const;
 
+    struct AttachContext {
+        RenderStyle* resolvedStyle;
+        bool performingReattach;
+
+        AttachContext() : resolvedStyle(0), performingReattach(false) { }
+    };
+
     // Attaches this node to the rendering tree. This calculates the style to be applied to the node and creates an
     // appropriate RenderObject which will be inserted into the tree (except when the style has display: none). This
     // makes the node visible in the FrameView.
-    virtual void attach();
+    virtual void attach(const AttachContext& = AttachContext());
 
     // Detaches the node from the rendering tree, making it invisible in the rendered view. This method will remove
     // the node's rendering object from the rendering tree and delete it.
-    virtual void detach();
+    virtual void detach(const AttachContext& = AttachContext());
 
 #ifndef NDEBUG
     bool inDetach() const;
 #endif
 
-    void reattach();
-    void reattachIfAttached();
+    void reattach(const AttachContext& = AttachContext());
+    void reattachIfAttached(const AttachContext& = AttachContext());
     ContainerNode* parentNodeForRenderingAndStyle();
     
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
@@ -628,8 +585,6 @@ public:
 
     void dispatchSubtreeModifiedEvent();
     bool dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEvent);
-    void dispatchFocusInEvent(const AtomicString& eventType, PassRefPtr<Node> oldFocusedNode);
-    void dispatchFocusOutEvent(const AtomicString& eventType, PassRefPtr<Node> newFocusedNode);
 
     bool dispatchKeyEvent(const PlatformKeyboardEvent&);
     bool dispatchWheelEvent(const PlatformWheelEvent&);
@@ -637,33 +592,25 @@ public:
 #if ENABLE(GESTURE_EVENTS)
     bool dispatchGestureEvent(const PlatformGestureEvent&);
 #endif
-    void dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouseEventOptions = SendNoEvents, SimulatedClickVisualOptions = ShowPressedLook);
+#if ENABLE(TOUCH_EVENTS)
+    bool dispatchTouchEvent(PassRefPtr<TouchEvent>);
+#endif
+#if ENABLE(INDIE_UI)
+    bool dispatchUIRequestEvent(PassRefPtr<UIRequestEvent>);
+#endif
+
     bool dispatchBeforeLoadEvent(const String& sourceURL);
 
-    virtual void dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode, FocusDirection);
-    virtual void dispatchBlurEvent(PassRefPtr<Node> newFocusedNode);
-    virtual void dispatchChangeEvent();
     virtual void dispatchInputEvent();
 
     // Perform the default action for an event.
     virtual void defaultEventHandler(Event*);
-
-    // Used for disabled form elements; if true, prevents mouse events from being dispatched
-    // to event listeners, and prevents DOMActivate events from being sent at all.
-    virtual bool disabled() const;
 
     using TreeShared<Node>::ref;
     using TreeShared<Node>::deref;
 
     virtual EventTargetData* eventTargetData();
     virtual EventTargetData* ensureEventTargetData();
-
-#if ENABLE(MICRODATA)
-    DOMSettableTokenList* itemProp();
-    DOMSettableTokenList* itemRef();
-    DOMSettableTokenList* itemType();
-    PassRefPtr<PropertyNodeList> propertyNodeList(const String&);
-#endif
 
     void getRegisteredMutationObserversOfType(HashMap<MutationObserver*, MutationRecordDeliveryOptions>&, MutationObserver::MutationType, const QualifiedName* attributeName);
     void registerMutationObserver(MutationObserver*, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter);
@@ -675,8 +622,6 @@ public:
     virtual void registerScopedHTMLStyleChild();
     virtual void unregisterScopedHTMLStyleChild();
     size_t numberOfScopedHTMLStyleChildren() const;
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
     void textRects(Vector<IntRect>&) const;
 
@@ -713,16 +658,13 @@ private:
 
         SelfOrAncestorHasDirAutoFlag = 1 << 17,
 
-        HasNameOrIsEditingTextFlag = 1 << 18,
+        IsEditingTextFlag = 1 << 18,
 
         InNamedFlowFlag = 1 << 19,
         HasSyntheticAttrChildNodesFlag = 1 << 20,
         HasCustomStyleCallbacksFlag = 1 << 21,
         HasScopedHTMLStyleChildFlag = 1 << 22,
         HasEventTargetDataFlag = 1 << 23,
-#if USE(V8)
-        V8CollectableDuringMinorGCFlag = 1 << 24,
-#endif
         NeedsShadowTreeWalkerFlag = 1 << 25,
         IsInShadowTreeFlag = 1 << 26,
 
@@ -750,7 +692,7 @@ protected:
         CreateSVGElement = CreateStyledElement | IsSVGFlag,
         CreateDocument = CreateContainer | InDocumentFlag,
         CreateInsertionPoint = CreateHTMLElement | NeedsShadowTreeWalkerFlag,
-        CreateEditingText = CreateText | HasNameOrIsEditingTextFlag,
+        CreateEditingText = CreateText | IsEditingTextFlag,
     };
     Node(Document*, ConstructionType);
 
@@ -787,11 +729,6 @@ private:
     bool rendererIsEditable(EditableLevel, UserSelectAllTreatment = UserSelectAllIsAlwaysNonEditable) const;
     bool isEditableToAccessibility(EditableLevel) const;
 
-    bool isUserActionElementActive() const;
-    bool isUserActionElementInActiveChain() const;
-    bool isUserActionElementHovered() const;
-    bool isUserActionElementFocused() const;
-
     void setStyleChange(StyleChangeType);
 
     // Used to share code between lazyAttach and setNeedsStyleRecalc.
@@ -801,10 +738,6 @@ private:
     virtual void derefEventTarget();
 
     virtual RenderStyle* nonRendererStyle() const { return 0; }
-
-    virtual const AtomicString& virtualPrefix() const;
-    virtual const AtomicString& virtualLocalName() const;
-    virtual const AtomicString& virtualNamespaceURI() const;
     virtual RenderStyle* virtualComputedStyle(PseudoId = NOPSEUDO);
 
     Element* ancestorElement() const;
@@ -835,12 +768,6 @@ protected:
     bool hasSVGRareData() const { return getFlag(HasSVGRareDataFlag); }
     void setHasSVGRareData() { setFlag(HasSVGRareDataFlag); }
     void clearHasSVGRareData() { clearFlag(HasSVGRareDataFlag); }
-#endif
-
-#if ENABLE(MICRODATA)
-    void setItemProp(const String&);
-    void setItemRef(const String&);
-    void setItemType(const String&);
 #endif
 };
 
@@ -874,23 +801,29 @@ inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
     return parentOrShadowHostNode();
 }
 
-inline void Node::reattach()
+inline void Node::reattach(const AttachContext& context)
 {
+    AttachContext reattachContext(context);
+    reattachContext.performingReattach = true;
+
     if (attached())
-        detach();
-    attach();
+        detach(reattachContext);
+    attach(reattachContext);
 }
 
-inline void Node::reattachIfAttached()
+inline void Node::reattachIfAttached(const AttachContext& context)
 {
     if (attached())
-        reattach();
+        reattach(context);
 }
 
 inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
 {
+    AttachContext context;
+    context.performingReattach = true;
+
     if (attached())
-        detach();
+        detach(context);
     lazyAttach(shouldSetAttached);
 }
 

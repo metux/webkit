@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,7 +40,8 @@ BytecodeSequence::BytecodeSequence(CodeBlock* codeBlock)
     
 #if ENABLE(VALUE_PROFILER)
     for (unsigned i = 0; i < codeBlock->numberOfArgumentValueProfiles(); ++i) {
-        CString description = codeBlock->valueProfileForArgument(i)->briefDescription();
+        ConcurrentJITLocker locker(codeBlock->m_lock);
+        CString description = codeBlock->valueProfileForArgument(i)->briefDescription(locker);
         if (!description.length())
             continue;
         out.reset();
@@ -52,9 +53,9 @@ BytecodeSequence::BytecodeSequence(CodeBlock* codeBlock)
     for (unsigned bytecodeIndex = 0; bytecodeIndex < codeBlock->instructions().size();) {
         out.reset();
         codeBlock->dumpBytecode(out, bytecodeIndex);
-        m_sequence.append(Bytecode(bytecodeIndex, codeBlock->globalData()->interpreter->getOpcodeID(codeBlock->instructions()[bytecodeIndex].u.opcode), out.toCString()));
+        m_sequence.append(Bytecode(bytecodeIndex, codeBlock->vm()->interpreter->getOpcodeID(codeBlock->instructions()[bytecodeIndex].u.opcode), out.toCString()));
         bytecodeIndex += opcodeLength(
-            codeBlock->globalData()->interpreter->getOpcodeID(
+            codeBlock->vm()->interpreter->getOpcodeID(
                 codeBlock->instructions()[bytecodeIndex].u.opcode));
     }
 }
@@ -78,12 +79,12 @@ void BytecodeSequence::addSequenceProperties(ExecState* exec, JSObject* result) 
     JSArray* header = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_header.size(); ++i)
         header->putDirectIndex(exec, i, jsString(exec, String::fromUTF8(m_header[i])));
-    result->putDirect(exec->globalData(), exec->propertyNames().header, header);
+    result->putDirect(exec->vm(), exec->propertyNames().header, header);
     
     JSArray* sequence = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_sequence.size(); ++i)
         sequence->putDirectIndex(exec, i, m_sequence[i].toJS(exec));
-    result->putDirect(exec->globalData(), exec->propertyNames().bytecode, sequence);
+    result->putDirect(exec->vm(), exec->propertyNames().bytecode, sequence);
 }
 
 } } // namespace JSC::Profiler

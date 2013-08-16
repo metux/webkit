@@ -33,13 +33,13 @@
 #include "GraphicsLayer.h"
 #include "GraphicsLayerClient.h"
 #include "RenderLayer.h"
-#include "TransformationMatrix.h"
 
 namespace WebCore {
 
 class KeyframeList;
 class RenderLayerCompositor;
 class TiledBacking;
+class TransformationMatrix;
 
 enum CompositingLayerType {
     NormalCompositingLayer, // non-tiled layer with backing store
@@ -86,6 +86,8 @@ public:
     // Layer to get clipped by ancestor
     bool hasAncestorClippingLayer() const { return m_ancestorClippingLayer != 0; }
     GraphicsLayer* ancestorClippingLayer() const { return m_ancestorClippingLayer.get(); }
+
+    GraphicsLayer* contentsContainmentLayer() const { return m_contentsContainmentLayer.get(); }
 
     bool hasContentsLayer() const { return m_foregroundLayer != 0; }
     GraphicsLayer* foregroundLayer() const { return m_foregroundLayer.get(); }
@@ -147,14 +149,15 @@ public:
     void positionOverflowControlsLayers(const IntSize& offsetFromRoot);
     bool hasUnpositionedOverflowControlsLayers() const;
 
-    bool usingTileCache() const { return m_usingTiledCacheLayer; }
+    bool usingTiledBacking() const { return m_usingTiledCacheLayer; }
     TiledBacking* tiledBacking() const;
-    void adjustTileCacheCoverage();
+    void adjustTiledBackingCoverage();
     
     void updateDebugIndicators(bool showBorder, bool showRepaintCounter);
 
     // GraphicsLayerClient interface
-    virtual bool shouldUseTileCache(const GraphicsLayer*) const OVERRIDE;
+    virtual bool shouldUseTiledBacking(const GraphicsLayer*) const OVERRIDE;
+    virtual void tiledBackingUsageChanged(const GraphicsLayer*, bool /*usingTiledBacking*/) OVERRIDE;
     virtual void notifyAnimationStarted(const GraphicsLayer*, double startTime) OVERRIDE;
     virtual void notifyFlushRequired(const GraphicsLayer*) OVERRIDE;
     virtual void notifyFlushBeforeDisplayRefresh(const GraphicsLayer*) OVERRIDE;
@@ -189,14 +192,18 @@ public:
     // Return an estimate of the backing store area (in pixels) allocated by this object's GraphicsLayers.
     double backingStoreMemoryEstimate() const;
 
+    bool didSwitchToFullTileCoverageDuringLoading() const { return m_didSwitchToFullTileCoverageDuringLoading; }
+    void setDidSwitchToFullTileCoverageDuringLoading() { m_didSwitchToFullTileCoverageDuringLoading = true; }
+
 #if ENABLE(CSS_COMPOSITING)
     void setBlendMode(BlendMode);
 #endif
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     void createPrimaryGraphicsLayer();
     void destroyGraphicsLayers();
+    
+    void willDestroyLayer(const GraphicsLayer*);
     
     PassOwnPtr<GraphicsLayer> createGraphicsLayer(const String&);
 
@@ -247,20 +254,23 @@ private:
     // Returns true if this compositing layer has no visible content.
     bool isSimpleContainerCompositingLayer() const;
     // Returns true if this layer has content that needs to be rendered by painting into the backing store.
-    bool containsPaintedContent() const;
+    bool containsPaintedContent(bool isSimpleContainer) const;
     // Returns true if the RenderLayer just contains an image that we can composite directly.
     bool isDirectlyCompositedImage() const;
     void updateImageContents();
 
     Color rendererBackgroundColor() const;
-    void updateBackgroundColor(bool isSimpleContainer);
-    void updateContentsRect(bool isSimpleContainer);
+    void updateDirectlyCompositedBackgroundColor(bool isSimpleContainer, bool& didUpdateContentsRect);
+    void updateDirectlyCompositedBackgroundImage(bool isSimpleContainer, bool& didUpdateContentsRect);
+    void updateDirectlyCompositedContents(bool isSimpleContainer, bool& didUpdateContentsRect);
+
+    void resetContentsRect();
 
     bool hasVisibleNonCompositingDescendantLayers() const;
 
     bool shouldClipCompositedBounds() const;
 
-    bool hasTileCacheFlatteningLayer() const { return (m_childContainmentLayer && m_usingTiledCacheLayer); }
+    bool hasTiledBackingFlatteningLayer() const { return (m_childContainmentLayer && m_usingTiledCacheLayer); }
     GraphicsLayer* tileCacheFlatteningLayer() const { return m_usingTiledCacheLayer ? m_childContainmentLayer.get() : 0; }
 
     void paintIntoLayer(const GraphicsLayer*, GraphicsContext*, const IntRect& paintDirtyRect, PaintBehavior, GraphicsLayerPaintingPhase);
@@ -298,6 +308,7 @@ private:
     bool m_canCompositeFilters;
 #endif
     bool m_backgroundLayerPaintsFixedRootBackground;
+    bool m_didSwitchToFullTileCoverageDuringLoading;
 
     static bool m_creatingPrimaryGraphicsLayer;
 };

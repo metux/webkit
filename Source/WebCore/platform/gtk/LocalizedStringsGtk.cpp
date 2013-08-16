@@ -141,6 +141,16 @@ String contextMenuItemTagOpenAudioInNewWindow()
     return String::fromUTF8(_("Open _Audio in New Window"));
 }
 
+String contextMenuItemTagDownloadVideoToDisk()
+{
+    return String::fromUTF8(_("Download _Video"));
+}
+
+String contextMenuItemTagDownloadAudioToDisk()
+{
+    return String::fromUTF8(_("Download _Audio"));
+}
+
 String contextMenuItemTagCopyVideoLinkToClipboard()
 {
     return String::fromUTF8(_("Cop_y Video Link Location"));
@@ -154,6 +164,16 @@ String contextMenuItemTagCopyAudioLinkToClipboard()
 String contextMenuItemTagToggleMediaControls()
 {
     return String::fromUTF8(_("_Toggle Media Controls"));
+}
+
+String contextMenuItemTagShowMediaControls()
+{
+    return String::fromUTF8(_("_Show Media Controls"));
+}
+
+String contextMenuItemTagHideMediaControls()
+{
+    return String::fromUTF8(_("_Hide Media Controls"));
 }
 
 String contextMenuItemTagToggleMediaLoop()
@@ -412,6 +432,11 @@ String AXDefinitionText()
     return String::fromUTF8(_("definition"));
 }
 
+String AXDescriptionListText()
+{
+    return String::fromUTF8(_("description list"));
+}
+
 String AXDescriptionListTermText()
 {
     return String::fromUTF8(_("term"));
@@ -463,6 +488,11 @@ String AXMenuListPopupActionVerb()
 }
 
 String AXMenuListActionVerb()
+{
+    return String();
+}
+
+String AXListItemActionVerb()
 {
     return String();
 }
@@ -532,9 +562,9 @@ String mediaElementLiveBroadcastStateText()
 String localizedMediaControlElementString(const String& name)
 {
     if (name == "AudioElement")
-        return String::fromUTF8(_("audio element controller"));
+        return String::fromUTF8(_("audio playback"));
     if (name == "VideoElement")
-        return String::fromUTF8(_("video element controller"));
+        return String::fromUTF8(_("video playback"));
     if (name == "MuteButton")
         return String::fromUTF8(_("mute"));
     if (name == "UnMuteButton")

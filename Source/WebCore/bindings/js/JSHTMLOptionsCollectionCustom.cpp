@@ -37,38 +37,6 @@ using namespace JSC;
 
 namespace WebCore {
 
-static JSValue getNamedItems(ExecState* exec, JSHTMLOptionsCollection* collection, PropertyName propertyName)
-{
-    Vector<RefPtr<Node> > namedItems;
-    const AtomicString& name = propertyNameToAtomicString(propertyName);
-    collection->impl()->namedItems(name, namedItems);
-
-    if (namedItems.isEmpty())
-        return jsUndefined();
-    if (namedItems.size() == 1)
-        return toJS(exec, collection->globalObject(), namedItems[0].get());
-
-    // FIXME: HTML5 specifies that this should be a LiveNodeList.
-    return toJS(exec, collection->globalObject(), StaticNodeList::adopt(namedItems).get());
-}
-
-bool JSHTMLOptionsCollection::canGetItemsForName(ExecState*, HTMLOptionsCollection* collection, PropertyName propertyName)
-{
-    return collection->hasNamedItem(propertyNameToAtomicString(propertyName));
-}
-
-JSValue JSHTMLOptionsCollection::nameGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
-{
-    JSHTMLOptionsCollection* thisObj = jsCast<JSHTMLOptionsCollection*>(asObject(slotBase));
-    return getNamedItems(exec, thisObj, propertyName);
-}
-
-JSValue JSHTMLOptionsCollection::namedItem(ExecState* exec)
-{
-    JSValue value = getNamedItems(exec, this, Identifier(exec, exec->argument(0).toString(exec)->value(exec)));
-    return value.isUndefined() ? jsNull() : value;
-}
-
 void JSHTMLOptionsCollection::setLength(ExecState* exec, JSValue value)
 {
     HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
@@ -103,14 +71,10 @@ JSValue JSHTMLOptionsCollection::add(ExecState* exec)
     if (exec->argumentCount() < 2)
         imp->add(option, ec);
     else {
-        bool ok;
-        int index = finiteInt32Value(exec->argument(1), exec, ok);
+        int index = exec->argument(1).toInt32(exec);
         if (exec->hadException())
             return jsUndefined();
-        if (!ok)
-            ec = TYPE_MISMATCH_ERR;
-        else
-            imp->add(option, index, ec);
+        imp->add(option, index, ec);
     }
     setDOMException(exec, ec);
     return jsUndefined();

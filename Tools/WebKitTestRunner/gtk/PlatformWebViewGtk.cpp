@@ -33,7 +33,7 @@
 
 namespace WTR {
 
-PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup, WKDictionaryRef options)
+PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup, WKPageRef /* relatedPage */, WKDictionaryRef options)
     : m_view(WKViewCreate(context, pageGroup))
     , m_window(gtk_window_new(GTK_WINDOW_POPUP))
     , m_windowIsKey(true)
@@ -119,6 +119,10 @@ WKRetainPtr<WKImageRef> PlatformWebView::windowSnapshotImage()
     // FIXME: implement to capture pixels in the UI process,
     // which may be necessary to capture things like 3D transforms.
     return 0;
+}
+
+void PlatformWebView::didInitializeClients()
+{
 }
 
 } // namespace WTR

@@ -65,9 +65,9 @@ RegExpPrototype::RegExpPrototype(JSGlobalObject* globalObject, Structure* struct
 {
 }
 
-bool RegExpPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+bool RegExpPrototype::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<RegExpObject>(exec, ExecState::regExpPrototypeTable(exec), jsCast<RegExpPrototype*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<RegExpObject>(exec, ExecState::regExpPrototypeTable(exec), jsCast<RegExpPrototype*>(object), propertyName, slot);
 }
 
 bool RegExpPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
@@ -108,7 +108,7 @@ EncodedJSValue JSC_HOST_CALL regExpProtoFuncCompile(ExecState* exec)
             return throwVMError(exec, createTypeError(exec, ASCIILiteral("Cannot supply flags when constructing one RegExp from another.")));
         regExp = asRegExpObject(arg0)->regExp();
     } else {
-        String pattern = !exec->argumentCount() ? String("") : arg0.toString(exec)->value(exec);
+        String pattern = !exec->argumentCount() ? emptyString() : arg0.toString(exec)->value(exec);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
 
@@ -120,13 +120,13 @@ EncodedJSValue JSC_HOST_CALL regExpProtoFuncCompile(ExecState* exec)
             if (flags == InvalidFlags)
                 return throwVMError(exec, createSyntaxError(exec, ASCIILiteral("Invalid flags supplied to RegExp constructor.")));
         }
-        regExp = RegExp::create(exec->globalData(), pattern, flags);
+        regExp = RegExp::create(exec->vm(), pattern, flags);
     }
 
     if (!regExp->isValid())
         return throwVMError(exec, createSyntaxError(exec, regExp->errorMessage()));
 
-    asRegExpObject(thisValue)->setRegExp(exec->globalData(), regExp);
+    asRegExpObject(thisValue)->setRegExp(exec->vm(), regExp);
     asRegExpObject(thisValue)->setLastIndex(exec, 0);
     return JSValue::encode(jsUndefined());
 }

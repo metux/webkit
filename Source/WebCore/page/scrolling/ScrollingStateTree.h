@@ -26,7 +26,7 @@
 #ifndef ScrollingStateTree_h
 #define ScrollingStateTree_h
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #include "ScrollingStateScrollingNode.h"
 #include <wtf/OwnPtr.h>
@@ -62,6 +62,8 @@ public:
     void setHasChangedProperties(bool changedProperties) { m_hasChangedProperties = changedProperties; }
     bool hasChangedProperties() const { return m_hasChangedProperties; }
 
+    bool hasNewRootStateNode() const { return m_hasNewRootStateNode; }
+
 private:
     ScrollingStateTree();
 
@@ -75,10 +77,11 @@ private:
     OwnPtr<ScrollingStateScrollingNode> m_rootStateNode;
     Vector<ScrollingNodeID> m_nodesRemovedSinceLastCommit;
     bool m_hasChangedProperties;
+    bool m_hasNewRootStateNode;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #endif // ScrollingStateTree_h

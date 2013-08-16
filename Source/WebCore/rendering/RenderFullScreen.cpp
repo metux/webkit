@@ -36,7 +36,7 @@
 
 using namespace WebCore;
 
-class RenderFullScreenPlaceholder : public RenderBlock {
+class RenderFullScreenPlaceholder FINAL : public RenderBlock {
 public:
     RenderFullScreenPlaceholder(RenderFullScreen* owner) 
         : RenderBlock(0)
@@ -152,6 +152,11 @@ void RenderFullScreen::unwrapRenderer()
     if (parent()) {
         RenderObject* child;
         while ((child = firstChild())) {
+            // We have to clear the override size, because as a flexbox, we
+            // may have set one on the child, and we don't want to leave that
+            // lying around on the child.
+            if (child->isBox())
+                toRenderBox(child)->clearOverrideSize();
             child->remove();
             parent()->addChild(child, this);
             parent()->setNeedsLayoutAndPrefWidthsRecalc();

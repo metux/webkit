@@ -65,7 +65,7 @@ public:
     JSCell(CreatingEarlyCellTag);
 
 protected:
-    JSCell(JSGlobalData&, Structure*);
+    JSCell(VM&, Structure*);
     JS_EXPORT_PRIVATE static void destroy(JSCell*);
 
 public:
@@ -78,7 +78,7 @@ public:
     bool isAPIValueWrapper() const;
 
     Structure* structure() const;
-    void setStructure(JSGlobalData&, Structure*);
+    void setStructure(VM&, Structure*);
     void clearStructure() { m_structure.clear(); }
 
     const char* className();
@@ -96,11 +96,12 @@ public:
     JS_EXPORT_PRIVATE JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
     bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;
     bool toBoolean(ExecState*) const;
+    TriState pureToBoolean() const;
     JS_EXPORT_PRIVATE double toNumber(ExecState*) const;
     JS_EXPORT_PRIVATE JSObject* toObject(ExecState*, JSGlobalObject*) const;
 
     static void visitChildren(JSCell*, SlotVisitor&);
-    JS_EXPORT_PRIVATE static void copyBackingStore(JSCell*, CopyVisitor&);
+    JS_EXPORT_PRIVATE static void copyBackingStore(JSCell*, CopyVisitor&, CopyToken);
 
     // Object operations, with the toObject operation included.
     const ClassInfo* classInfo() const;
@@ -112,16 +113,11 @@ public:
     static bool deleteProperty(JSCell*, ExecState*, PropertyName);
     static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
 
-    static JSObject* toThisObject(JSCell*, ExecState*);
+    static JSValue toThis(JSCell*, ExecState*, ECMAMode);
 
     void zap() { *reinterpret_cast<uintptr_t**>(this) = 0; }
     bool isZapped() const { return !*reinterpret_cast<uintptr_t* const*>(this); }
 
-    // FIXME: Rename getOwnPropertySlot to virtualGetOwnPropertySlot, and
-    // fastGetOwnPropertySlot to getOwnPropertySlot. Callers should always
-    // call this function, not its slower virtual counterpart. (For integer
-    // property names, we want a similar interface with appropriate optimizations.)
-    bool fastGetOwnPropertySlot(ExecState*, PropertyName, PropertySlot&);
     JSValue fastGetOwnProperty(ExecState*, const String&);
 
     static ptrdiff_t structureOffset()
@@ -141,12 +137,8 @@ public:
     static const TypedArrayType TypedArrayStorageType = TypedArrayNone;
 protected:
 
-    void finishCreation(JSGlobalData&);
-    void finishCreation(JSGlobalData&, Structure*, CreatingEarlyCellTag);
-
-    // Base implementation; for non-object classes implements getPropertySlot.
-    static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-    static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
+    void finishCreation(VM&);
+    void finishCreation(VM&, Structure*, CreatingEarlyCellTag);
 
     // Dummy implementations of override-able static functions for classes to put in their MethodTable
     static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
@@ -158,6 +150,8 @@ protected:
     static NO_RETURN_DUE_TO_CRASH void putDirectVirtual(JSObject*, ExecState*, PropertyName, JSValue, unsigned attributes);
     static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool shouldThrow);
     static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+    static bool getOwnPropertySlotByIndex(JSObject*, ExecState*, unsigned propertyName, PropertySlot&);
 
 private:
     friend class LLIntOffsetsExtractor;

@@ -185,7 +185,7 @@ InjectedScript.prototype = {
             case "Storage":
                 var storageId = InjectedScriptHost.storageId(object)
                 if (storageId)
-                    hints.domStorageId = storageId;
+                    hints.domStorageId = InjectedScriptHost.evaluate("(" + storageId + ")");
                 break;
         }
         InjectedScriptHost.inspect(objectId, hints);
@@ -345,6 +345,8 @@ InjectedScript.prototype = {
         if (typeof func !== "function")
             return "Cannot resolve function by id.";
         var details = InjectedScriptHost.functionDetails(func);
+        if (!details)
+            return "Cannot resolve function details.";
         if ("rawScopes" in details) {
             var objectGroupName = this._idToObjectGroupName[parsedFunctionId.id];
             var rawScopes = details.rawScopes;
@@ -484,7 +486,7 @@ InjectedScript.prototype = {
      * Resolves a value from CallArgument description.
      * @param {RuntimeAgent.CallArgument} callArgumentJson
      * @return {*} resolved value
-     * @throw {string} error message
+     * @throws {string} error message
      */
     _resolveCallArgument: function(callArgumentJson) {
         var objectId = callArgumentJson.objectId;
@@ -550,22 +552,63 @@ InjectedScript.prototype = {
      */
     _evaluateOn: function(evalFunction, object, objectGroup, expression, isEvalOnCallFrame, injectCommandLineAPI)
     {
-        // Only install command line api object for the time of evaluation.
-        // Surround the expression in with statements to inject our command line API so that
-        // the window object properties still take more precedent than our API functions.
+        var commandLineAPI = injectCommandLineAPI ? new CommandLineAPI(this._commandLineAPIImpl, isEvalOnCallFrame ? object : null) : null;
 
-        try {
-            if (injectCommandLineAPI && inspectedWindow.console) {
-                inspectedWindow.console._commandLineAPI = new CommandLineAPI(this._commandLineAPIImpl, isEvalOnCallFrame ? object : null);
-                expression = "with ((window && window.console && window.console._commandLineAPI) || {}) {\n" + expression + "\n}";
+        if (isEvalOnCallFrame) {
+            // We can only use this approach if the evaluate function is the true 'eval'. That allows us to use it with
+            // the 'eval' identifier when calling it. Using 'eval' grants access to the local scope of the closure we
+            // create that provides the command line APIs.
+
+            var parameters = [InjectedScriptHost.evaluate, expression];
+            var expressionFunctionBody = "var __originalEval = window.eval; window.eval = __eval; try { return eval(__currentExpression); } finally { window.eval = __originalEval; }";
+
+            if (commandLineAPI) {
+                // To avoid using a 'with' statement (which fails in strict mode and requires injecting the API object)
+                // we instead create a closure where we evaluate the expression. The command line APIs are passed as
+                // parameters to the closure so they are in scope but not injected. This allows the code evaluated in
+                // the console to stay in strict mode (if is was already set), or to get strict mode by prefixing
+                // expressions with 'use strict';.
+
+                var parameterNames = Object.getOwnPropertyNames(commandLineAPI);
+                for (var i = 0; i < parameterNames.length; ++i)
+                    parameters.push(commandLineAPI[parameterNames[i]]);
+
+                var expressionFunctionString = "(function(__eval, __currentExpression, " + parameterNames.join(", ") + ") { " + expressionFunctionBody + " })";
+            } else {
+                // Use a closure in this case too to keep the same behavior of 'var' being captured by the closure instead
+                // of leaking out into the calling scope.
+                var expressionFunctionString = "(function(__eval, __currentExpression) { " + expressionFunctionBody + " })";
             }
-            var result = evalFunction.call(object, expression);
+
+            // Bind 'this' to the function expression using another closure instead of Function.prototype.bind. This ensures things will work if the page replaces bind.
+            var boundExpressionFunctionString = "(function(__function, __thisObject) { return function() { return __function.apply(__thisObject, arguments) }; })(" + expressionFunctionString + ", this)";
+            var expressionFunction = evalFunction.call(object, boundExpressionFunctionString);
+            var result = expressionFunction.apply(null, parameters);
+
             if (objectGroup === "console")
                 this._lastResult = result;
+
+            return result;
+        }
+
+        // When not evaluating on a call frame we use a 'with' statement to allow var and function statements to leak
+        // into the global scope. This allow them to stick around between evaluations.
+
+        try {
+            if (commandLineAPI && inspectedWindow.console) {
+                inspectedWindow.console.__commandLineAPI = commandLineAPI;
+                expression = "with ((window && window.console && window.console.__commandLineAPI) || {}) { " + expression + "\n}";
+            }
+
+            var result = evalFunction.call(object, expression);
+
+            if (objectGroup === "console")
+                this._lastResult = result;
+
             return result;
         } finally {
-            if (injectCommandLineAPI && inspectedWindow.console)
-                delete inspectedWindow.console._commandLineAPI;
+            if (commandLineAPI && inspectedWindow.console)
+                delete inspectedWindow.console.__commandLineAPI;
         }
     },
 
@@ -1089,7 +1132,7 @@ InjectedScript.CallFrameProxy._createScopeJson = function(scopeTypeCode, scopeOb
 
     return {
         object: injectedScript._wrapObject(scopeObject, groupId),
-        type: scopeTypeNames[scopeTypeCode]
+        type: /** @type {DebuggerAgent.ScopeType} */ (scopeTypeNames[scopeTypeCode])
     };
 }
 
@@ -1117,12 +1160,22 @@ function CommandLineAPI(commandLineAPIImpl, callFrame)
         return false;
     }
 
+    /**
+     * @param {string} name The name of the method for which a toString method should be generated.
+     * @return {function():string}
+     */
+    function customToStringMethod(name)
+    {
+        return function () { return "function " + name + "() { [Command Line API] }"; };
+    }
+
     for (var i = 0; i < CommandLineAPI.members_.length; ++i) {
         var member = CommandLineAPI.members_[i];
         if (member in inspectedWindow || inScopeVariables(member))
             continue;
 
         this[member] = bind(commandLineAPIImpl[member], commandLineAPIImpl);
+        this[member].toString = customToStringMethod(member);
     }
 
     for (var i = 0; i < 5; ++i) {

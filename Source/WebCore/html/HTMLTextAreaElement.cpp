@@ -30,14 +30,17 @@
 #include "BeforeTextInsertedEvent.h"
 #include "CSSValueKeywords.h"
 #include "Document.h"
+#include "Editor.h"
 #include "ElementShadow.h"
 #include "Event.h"
+#include "EventHandler.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "ExceptionCodePlaceholder.h"
 #include "FormController.h"
 #include "FormDataList.h"
 #include "Frame.h"
+#include "FrameSelection.h"
 #include "HTMLNames.h"
 #include "LocalizedStrings.h"
 #include "RenderTextControlMultiLine.h"
@@ -147,9 +150,9 @@ bool HTMLTextAreaElement::isPresentationAttribute(const QualifiedName& name) con
     return HTMLTextFormControlElement::isPresentationAttribute(name);
 }
 
-void HTMLTextAreaElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLTextAreaElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == wrapAttr) {
+    if (name == wrapAttr) {
         if (shouldWrapText()) {
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWhiteSpace, CSSValuePreWrap);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWordWrap, CSSValueBreakWord);
@@ -158,7 +161,7 @@ void HTMLTextAreaElement::collectStyleForPresentationAttribute(const Attribute& 
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWordWrap, CSSValueNormal);
         }
     } else
-        HTMLTextFormControlElement::collectStyleForPresentationAttribute(attribute, style);
+        HTMLTextFormControlElement::collectStyleForPresentationAttribute(name, value, style);
 }
 
 void HTMLTextAreaElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -280,7 +283,7 @@ void HTMLTextAreaElement::subtreeHasChanged()
         return;
 
     if (Frame* frame = document()->frame())
-        frame->editor()->textDidChangeInTextArea(this);
+        frame->editor().textDidChangeInTextArea(this);
     // When typing in a textarea, childrenChanged is not called, so we need to force the directionality check.
     calculateAndAdjustDirectionality();
 }
@@ -386,7 +389,7 @@ void HTMLTextAreaElement::setValueCommon(const String& newValue)
     setFormControlValueMatchesRenderer(true);
 
     // Set the caret to the end of the text value.
-    if (document()->focusedNode() == this) {
+    if (document()->focusedElement() == this) {
         unsigned endOfString = m_value.length();
         setSelectionRange(endOfString, endOfString);
     }
@@ -521,20 +524,20 @@ HTMLElement* HTMLTextAreaElement::placeholderElement() const
     return m_placeholder;
 }
 
-void HTMLTextAreaElement::attach()
+void HTMLTextAreaElement::attach(const AttachContext& context)
 {
-    HTMLTextFormControlElement::attach();
+    HTMLTextFormControlElement::attach(context);
     fixPlaceholderRenderer(m_placeholder, innerTextElement());
 }
 
 bool HTMLTextAreaElement::matchesReadOnlyPseudoClass() const
 {
-    return readOnly();
+    return isReadOnly();
 }
 
 bool HTMLTextAreaElement::matchesReadWritePseudoClass() const
 {
-    return !readOnly();
+    return !isReadOnly();
 }
 
 void HTMLTextAreaElement::updatePlaceholderText()

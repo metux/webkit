@@ -37,11 +37,12 @@
 #include "JITCompilationEffort.h"
 #include "MacroAssembler.h"
 #include <wtf/DataLog.h>
+#include <wtf/FastAllocBase.h>
 #include <wtf/Noncopyable.h>
 
 namespace JSC {
 
-class JSGlobalData;
+class VM;
 
 // LinkBuffer:
 //
@@ -58,7 +59,8 @@ class JSGlobalData;
 //   * The value referenced by a DataLabel may be set.
 //
 class LinkBuffer {
-    WTF_MAKE_NONCOPYABLE(LinkBuffer);
+    WTF_MAKE_NONCOPYABLE(LinkBuffer); WTF_MAKE_FAST_ALLOCATED;
+    
     typedef MacroAssemblerCodeRef CodeRef;
     typedef MacroAssemblerCodePtr CodePtr;
     typedef MacroAssembler::Label Label;
@@ -76,17 +78,16 @@ class LinkBuffer {
 #endif
 
 public:
-    LinkBuffer(JSGlobalData& globalData, MacroAssembler* masm, void* ownerUID, JITCompilationEffort effort = JITCompilationMustSucceed)
+    LinkBuffer(VM& vm, MacroAssembler* masm, void* ownerUID, JITCompilationEffort effort = JITCompilationMustSucceed)
         : m_size(0)
 #if ENABLE(BRANCH_COMPACTION)
         , m_initialSize(0)
 #endif
         , m_code(0)
         , m_assembler(masm)
-        , m_globalData(&globalData)
+        , m_vm(&vm)
 #ifndef NDEBUG
         , m_completed(false)
-        , m_effort(effort)
 #endif
     {
         linkCode(ownerUID, effort);
@@ -94,7 +95,6 @@ public:
 
     ~LinkBuffer()
     {
-        ASSERT(m_completed || (!m_executableMemory && m_effort == JITCompilationCanFail));
     }
     
     bool didFailToAllocate() const
@@ -199,6 +199,11 @@ public:
         return applyOffset(label.m_label).m_offset;
     }
 
+    unsigned offsetOf(PatchableJump jump)
+    {
+        return applyOffset(jump.m_jump.m_label).m_offset;
+    }
+
     // Upon completion of all patching 'FINALIZE_CODE()' should be called once to
     // complete generation of the code. Alternatively, call
     // finalizeCodeWithoutDisassembly() directly if you have your own way of
@@ -256,10 +261,9 @@ private:
 #endif
     void* m_code;
     MacroAssembler* m_assembler;
-    JSGlobalData* m_globalData;
+    VM* m_vm;
 #ifndef NDEBUG
     bool m_completed;
-    JITCompilationEffort m_effort;
 #endif
 };
 

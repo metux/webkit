@@ -33,8 +33,9 @@
 #include "CodeBlock.h"
 #include "DFGFPRInfo.h"
 #include "DFGGPRInfo.h"
+#include "DFGJITCode.h"
 #include "DFGNode.h"
-#include "JSGlobalData.h"
+#include "VM.h"
 #include "MacroAssembler.h"
 
 namespace JSC { namespace DFG {
@@ -43,20 +44,20 @@ typedef void (*V_DFGDebugOperation_EPP)(ExecState*, void*, void*);
 
 class AssemblyHelpers : public MacroAssembler {
 public:
-    AssemblyHelpers(JSGlobalData* globalData, CodeBlock* codeBlock)
-        : m_globalData(globalData)
+    AssemblyHelpers(VM* vm, CodeBlock* codeBlock)
+        : m_vm(vm)
         , m_codeBlock(codeBlock)
         , m_baselineCodeBlock(codeBlock ? codeBlock->baselineVersion() : 0)
     {
         if (m_codeBlock) {
             ASSERT(m_baselineCodeBlock);
             ASSERT(!m_baselineCodeBlock->alternative());
-            ASSERT(m_baselineCodeBlock->getJITType() == JITCode::BaselineJIT);
+            ASSERT(m_baselineCodeBlock->jitType() == JITCode::BaselineJIT);
         }
     }
     
     CodeBlock* codeBlock() { return m_codeBlock; }
-    JSGlobalData* globalData() { return m_globalData; }
+    VM* vm() { return m_vm; }
     AssemblerType_T& assembler() { return m_assembler; }
     
 #if CPU(X86_64) || CPU(X86)
@@ -190,7 +191,7 @@ public:
     void debugCall(V_DFGDebugOperation_EPP function, void* argument)
     {
         size_t scratchSize = sizeof(EncodedJSValue) * (GPRInfo::numberOfRegisters + FPRInfo::numberOfRegisters);
-        ScratchBuffer* scratchBuffer = m_globalData->scratchBufferForSize(scratchSize);
+        ScratchBuffer* scratchBuffer = m_vm->scratchBufferForSize(scratchSize);
         EncodedJSValue* buffer = static_cast<EncodedJSValue*>(scratchBuffer->dataBuffer());
 
         for (unsigned i = 0; i < GPRInfo::numberOfRegisters; ++i) {
@@ -292,9 +293,9 @@ public:
     Jump emitExceptionCheck(ExceptionCheckKind kind = NormalExceptionCheck)
     {
 #if USE(JSVALUE64)
-        return branchTest64(kind == NormalExceptionCheck ? NonZero : Zero, AbsoluteAddress(&globalData()->exception));
+        return branchTest64(kind == NormalExceptionCheck ? NonZero : Zero, AbsoluteAddress(&vm()->exception));
 #elif USE(JSVALUE32_64)
-        return branch32(kind == NormalExceptionCheck ? NotEqual : Equal, AbsoluteAddress(reinterpret_cast<char*>(&globalData()->exception) + OBJECT_OFFSETOF(JSValue, u.asBits.tag)), TrustedImm32(JSValue::EmptyValueTag));
+        return branch32(kind == NormalExceptionCheck ? NotEqual : Equal, AbsoluteAddress(reinterpret_cast<char*>(&vm()->exception) + OBJECT_OFFSETOF(JSValue, u.asBits.tag)), TrustedImm32(JSValue::EmptyValueTag));
 #endif
     }
 
@@ -317,12 +318,6 @@ public:
     JSGlobalObject* globalObjectFor(CodeOrigin codeOrigin)
     {
         return codeBlock()->globalObjectFor(codeOrigin);
-    }
-    
-    JSObject* globalThisObjectFor(CodeOrigin codeOrigin)
-    {
-        JSGlobalObject* object = globalObjectFor(codeOrigin);
-        return object->methodTable()->toThisObject(object, 0);
     }
     
     bool strictModeFor(CodeOrigin codeOrigin)
@@ -387,7 +382,7 @@ public:
     Vector<BytecodeAndMachineOffset>& decodedCodeMapFor(CodeBlock*);
     
 protected:
-    JSGlobalData* m_globalData;
+    VM* m_vm;
     CodeBlock* m_codeBlock;
     CodeBlock* m_baselineCodeBlock;
 

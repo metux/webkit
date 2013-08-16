@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,8 @@
 
 
 #if ENABLE(JIT)
+
+#include "CallFrameInlines.h"
 
 namespace JSC {
 
@@ -78,16 +80,16 @@ ALWAYS_INLINE void JIT::emitGetFromCallFrameHeader64(JSStack::CallFrameHeaderEnt
 
 ALWAYS_INLINE void JIT::emitLoadCharacterString(RegisterID src, RegisterID dst, JumpList& failures)
 {
-    failures.append(branchPtr(NotEqual, Address(src, JSCell::structureOffset()), TrustedImmPtr(m_globalData->stringStructure.get())));
+    failures.append(branchPtr(NotEqual, Address(src, JSCell::structureOffset()), TrustedImmPtr(m_vm->stringStructure.get())));
     failures.append(branch32(NotEqual, MacroAssembler::Address(src, ThunkHelpers::jsStringLengthOffset()), TrustedImm32(1)));
     loadPtr(MacroAssembler::Address(src, ThunkHelpers::jsStringValueOffset()), dst);
     failures.append(branchTest32(Zero, dst));
-    loadPtr(MacroAssembler::Address(dst, ThunkHelpers::stringImplFlagsOffset()), regT1);
-    loadPtr(MacroAssembler::Address(dst, ThunkHelpers::stringImplDataOffset()), dst);
+    loadPtr(MacroAssembler::Address(dst, StringImpl::flagsOffset()), regT1);
+    loadPtr(MacroAssembler::Address(dst, StringImpl::dataOffset()), dst);
 
     JumpList is16Bit;
     JumpList cont8Bit;
-    is16Bit.append(branchTest32(Zero, regT1, TrustedImm32(ThunkHelpers::stringImpl8BitFlag())));
+    is16Bit.append(branchTest32(Zero, regT1, TrustedImm32(StringImpl::flagIs8Bit())));
     load8(MacroAssembler::Address(dst, 0), dst);
     cont8Bit.append(jump());
     is16Bit.link(this);
@@ -136,18 +138,15 @@ ALWAYS_INLINE void JIT::beginUninterruptedSequence(int insnSpace, int constSpace
     m_assembler.ensureSpace(insnSpace + m_assembler.maxInstructionSize + 2, constSpace + 8);
 #endif
 
-#if defined(ASSEMBLER_HAS_CONSTANT_POOL) && ASSEMBLER_HAS_CONSTANT_POOL
 #ifndef NDEBUG
     m_uninterruptedInstructionSequenceBegin = label();
     m_uninterruptedConstantSequenceBegin = sizeOfConstantPool();
-#endif
 #endif
 }
 
 ALWAYS_INLINE void JIT::endUninterruptedSequence(int insnSpace, int constSpace, int dst)
 {
-    UNUSED_PARAM(dst);
-#if defined(ASSEMBLER_HAS_CONSTANT_POOL) && ASSEMBLER_HAS_CONSTANT_POOL
+#ifndef NDEBUG
     /* There are several cases when the uninterrupted sequence is larger than
      * maximum required offset for pathing the same sequence. Eg.: if in a
      * uninterrupted sequence the last macroassembler's instruction is a stub
@@ -155,6 +154,7 @@ ALWAYS_INLINE void JIT::endUninterruptedSequence(int insnSpace, int constSpace, 
      * calculation of length of uninterrupted sequence. So, the insnSpace and
      * constSpace should be upper limit instead of hard limit.
      */
+
 #if CPU(SH4)
     if ((dst > 15) || (dst < -16)) {
         insnSpace += 8;
@@ -163,25 +163,32 @@ ALWAYS_INLINE void JIT::endUninterruptedSequence(int insnSpace, int constSpace, 
 
     if (((dst >= -16) && (dst < 0)) || ((dst > 7) && (dst <= 15)))
         insnSpace += 8;
+#else
+    UNUSED_PARAM(dst);
 #endif
+
     ASSERT(differenceBetween(m_uninterruptedInstructionSequenceBegin, label()) <= insnSpace);
     ASSERT(sizeOfConstantPool() - m_uninterruptedConstantSequenceBegin <= constSpace);
+#else
+    UNUSED_PARAM(insnSpace);
+    UNUSED_PARAM(constSpace);
+    UNUSED_PARAM(dst);
 #endif
 }
 
-#endif
+#endif // ASSEMBLER_HAS_CONSTANT_POOL
 
 ALWAYS_INLINE void JIT::updateTopCallFrame()
 {
     ASSERT(static_cast<int>(m_bytecodeOffset) >= 0);
-    if (m_bytecodeOffset) {
 #if USE(JSVALUE32_64)
-        storePtr(TrustedImmPtr(m_codeBlock->instructions().begin() + m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
+    Instruction* instruction = m_codeBlock->instructions().begin() + m_bytecodeOffset + 1; 
+    uint32_t locationBits = CallFrame::Location::encodeAsBytecodeInstruction(instruction);
 #else
-        store32(TrustedImm32(m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
+    uint32_t locationBits = CallFrame::Location::encodeAsBytecodeOffset(m_bytecodeOffset + 1);
 #endif
-    }
-    storePtr(callFrameRegister, &m_globalData->topCallFrame);
+    store32(TrustedImm32(locationBits), intTagFor(JSStack::ArgumentCount));
+    storePtr(callFrameRegister, &m_vm->topCallFrame);
 }
 
 ALWAYS_INLINE void JIT::restoreArgumentReferenceForTrampoline()
@@ -328,7 +335,7 @@ inline void JIT::emitAllocateJSObject(RegisterID allocator, StructureType struct
 }
 
 #if ENABLE(VALUE_PROFILER)
-inline void JIT::emitValueProfilingSite(ValueProfile* valueProfile)
+inline void JIT::emitValueProfilingSite(ValueProfile* valueProfile, RegisterID bucketCounterRegister)
 {
     ASSERT(shouldEmitProfiling());
     ASSERT(valueProfile);
@@ -366,16 +373,16 @@ inline void JIT::emitValueProfilingSite(ValueProfile* valueProfile)
 #endif
 }
 
-inline void JIT::emitValueProfilingSite(unsigned bytecodeOffset)
+inline void JIT::emitValueProfilingSite(unsigned bytecodeOffset, RegisterID bucketCounterRegister)
 {
     if (!shouldEmitProfiling())
         return;
-    emitValueProfilingSite(m_codeBlock->valueProfileForBytecodeOffset(bytecodeOffset));
+    emitValueProfilingSite(m_codeBlock->valueProfileForBytecodeOffset(bytecodeOffset), bucketCounterRegister);
 }
 
-inline void JIT::emitValueProfilingSite()
+inline void JIT::emitValueProfilingSite(RegisterID bucketCounterRegister)
 {
-    emitValueProfilingSite(m_bytecodeOffset);
+    emitValueProfilingSite(m_bytecodeOffset, bucketCounterRegister);
 }
 #endif // ENABLE(VALUE_PROFILER)
 
@@ -386,7 +393,7 @@ inline void JIT::emitArrayProfilingSite(RegisterID structureAndIndexingType, Reg
     RegisterID structure = structureAndIndexingType;
     RegisterID indexingType = structureAndIndexingType;
     
-    if (canBeOptimized())
+    if (shouldEmitProfiling())
         storePtr(structure, arrayProfile->addressOfLastSeenStructure());
 
     load8(Address(structure, Structure::indexingTypeOffset()), indexingType);
@@ -433,9 +440,10 @@ static inline bool arrayProfileSaw(ArrayModes arrayModes, IndexingType capabilit
 
 inline JITArrayMode JIT::chooseArrayMode(ArrayProfile* profile)
 {
-#if ENABLE(VALUE_PROFILER)        
-    profile->computeUpdatedPrediction(m_codeBlock);
-    ArrayModes arrayModes = profile->observedArrayModes();
+#if ENABLE(VALUE_PROFILER)
+    ConcurrentJITLocker locker(m_codeBlock->m_lock);
+    profile->computeUpdatedPrediction(locker, m_codeBlock);
+    ArrayModes arrayModes = profile->observedArrayModes(locker);
     if (arrayProfileSaw(arrayModes, DoubleShape))
         return JITDouble;
     if (arrayProfileSaw(arrayModes, Int32Shape))
@@ -624,8 +632,8 @@ inline void JIT::map(unsigned bytecodeOffset, int virtualRegisterIndex, Register
     m_mappedTag = tag;
     m_mappedPayload = payload;
     
-    ASSERT(!canBeOptimized() || m_mappedPayload == regT0);
-    ASSERT(!canBeOptimized() || m_mappedTag == regT1);
+    ASSERT(!canBeOptimizedOrInlined() || m_mappedPayload == regT0);
+    ASSERT(!canBeOptimizedOrInlined() || m_mappedTag == regT1);
 }
 
 inline void JIT::unmap(RegisterID registerID)

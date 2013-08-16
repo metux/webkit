@@ -26,8 +26,6 @@
 #ifndef WebPlatformStrategies_h
 #define WebPlatformStrategies_h
 
-#if USE(PLATFORM_STRATEGIES)
-
 #include <WebCore/CookiesStrategy.h>
 #include <WebCore/DatabaseStrategy.h>
 #include <WebCore/LoaderStrategy.h>
@@ -73,16 +71,23 @@ private:
     // WebCore::LoaderStrategy
 #if ENABLE(NETWORK_PROCESS)
     virtual WebCore::ResourceLoadScheduler* resourceLoadScheduler() OVERRIDE;
-    virtual void loadResourceSynchronously(WebCore::NetworkingContext*, unsigned long resourceLoadIdentifier, const WebCore::ResourceRequest&, WebCore::StoredCredentials, WebCore::ResourceError&, WebCore::ResourceResponse&, Vector<char>& data) OVERRIDE;
+    virtual void loadResourceSynchronously(WebCore::NetworkingContext*, unsigned long resourceLoadIdentifier, const WebCore::ResourceRequest&, WebCore::StoredCredentials, WebCore::ClientCredentialPolicy, WebCore::ResourceError&, WebCore::ResourceResponse&, Vector<char>& data) OVERRIDE;
+#if ENABLE(BLOB)
+    virtual WebCore::BlobRegistry* createBlobRegistry() OVERRIDE;
+#endif
 #endif
 
     // WebCore::PluginStrategy
     virtual void refreshPlugins() OVERRIDE;
     virtual void getPluginInfo(const WebCore::Page*, Vector<WebCore::PluginInfo>&) OVERRIDE;
 
+    // WebCore::SharedWorkerStrategy.
+    virtual bool isAvailable() const OVERRIDE;
+
     // WebCore::StorageStrategy.
-    virtual PassRefPtr<WebCore::StorageNamespace> localStorageNamespace(const String& path, unsigned quota) OVERRIDE;
-    virtual PassRefPtr<WebCore::StorageNamespace> sessionStorageNamespace(WebCore::Page*, unsigned quota) OVERRIDE;
+    virtual PassRefPtr<WebCore::StorageNamespace> localStorageNamespace(WebCore::PageGroup*) OVERRIDE;
+    virtual PassRefPtr<WebCore::StorageNamespace> transientLocalStorageNamespace(WebCore::PageGroup*, WebCore::SecurityOrigin*) OVERRIDE;
+    virtual PassRefPtr<WebCore::StorageNamespace> sessionStorageNamespace(WebCore::Page*) OVERRIDE;
 
     // WebCore::VisitedLinkStrategy
     virtual bool isLinkVisited(WebCore::Page*, WebCore::LinkHash, const WebCore::KURL& baseURL, const WTF::AtomicString& attributeURL) OVERRIDE;
@@ -113,15 +118,14 @@ private:
     bool m_pluginCacheIsPopulated;
     bool m_shouldRefreshPlugins;
     Vector<WebCore::PluginInfo> m_cachedPlugins;
+    Vector<WebCore::PluginInfo> m_cachedApplicationPlugins;
 #endif // ENABLE(PLUGIN_PROCESS)
 };
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
-void handleDidGetPlugins(uint64_t requestID, const Vector<WebCore::PluginInfo>&);
+void handleDidGetPlugins(uint64_t requestID, const Vector<WebCore::PluginInfo>&, const Vector<WebCore::PluginInfo>& applicationPlugins);
 #endif // ENABLE(PLUGIN_PROCESS)
 
 } // namespace WebKit
-
-#endif // USE(PLATFORM_STRATEGIES)
 
 #endif // WebPlatformStrategies_h
