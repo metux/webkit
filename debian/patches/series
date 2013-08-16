@@ -1,9 +1,5 @@
 01_do-not-build-testing-tools.patch
 02_notebook_scroll.patch
-03_atomics-buildfix.patch
 10_hurd_getCurrentExecutablePath.patch
 15_ia64-use-system-malloc.patch
 20_bsd-hurd-gtest-port.patch
-changeset_145551.diff
-changeset_147557.diff
-changeset_150256.diff
