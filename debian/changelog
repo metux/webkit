@@ -1,3 +1,9 @@
+webkitgtk (2.1.4-1) experimental; urgency=low
+
+  * New development release
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 15 Aug 2013 21:20:24 -0300
+
 webkitgtk (2.0.4-2) unstable; urgency=low
 
   [ Jeremy Bicha ]
