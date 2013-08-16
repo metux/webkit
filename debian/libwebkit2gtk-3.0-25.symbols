@@ -1,5 +1,7 @@
 libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  WebProcessMainGtk@Base 2.0.2
+ (c++)"WebKit::WebGtkExtensionManager::initialize(OpaqueWKBundle const*, void const*)@Base" 2.0.2
+ (c++)"WebKit::WebGtkExtensionManager::shared()@Base" 2.0.2
  webkit_authentication_dialog_get_type@Base 2.0.2
  webkit_authentication_widget_get_type@Base 2.0.2
  webkit_back_forward_list_get_back_item@Base 2.0.2
