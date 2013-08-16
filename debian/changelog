@@ -1,8 +1,10 @@
 webkitgtk (2.1.4-1) experimental; urgency=low
 
   * New development release
+  * debian/patches/01_do-not-build-testing-tools.patch:
+  - refreshed
 
- -- Gustavo Noronha Silva <kov@debian.org>  Thu, 15 Aug 2013 21:20:24 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 15 Aug 2013 22:10:04 -0300
 
 webkitgtk (2.0.4-2) unstable; urgency=low
 
